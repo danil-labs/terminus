@@ -102,7 +102,7 @@ env:
   # ya creen. Cambiarlas exige tocar este archivo, que es un PR que alguien lee —
   # en vez de un `tauri.conf.json` que se edita por otra razón.
   LLAVE_PUBLICA: dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM5ODEzRDE1M0QwQ0RFQjgKUldTNDNndzlGVDJCT1hPSnp4ZzBIbkowOW9kVGFYb0YyRkZKZjNTT2N3eERXOXhuRi9UblY5d3EK
-  IDENTIFICADOR: ai.danil.harness
+  IDENTIFICADOR: ai.danil.terminus
   NOMBRE: Terminus
 
 jobs:
