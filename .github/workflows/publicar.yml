@@ -495,3 +495,35 @@ jobs:
           done
 
           echo "v$V publicada, firmada para las dos plataformas y descargable."
+
+      # ----------------------------------------------------------------------
+      # Avisar a la página, que enseña este número.
+      #
+      # `terminus.danil.ai` resuelve la versión AL COMPILAR, así que sin este
+      # aviso la página seguiría enseñando la anterior hasta que corriera su
+      # reloj — hasta una hora diciendo que la última versión es otra, justo
+      # cuando más gente entra a bajarla.
+      #
+      # Va **después** de comprobar que la release se puede descargar, y no
+      # antes: avisar de una release que no sirve haría que la página anunciara
+      # una versión que nadie puede instalar.
+      #
+      # **Y falla la corrida si no puede avisar.** Un `|| true` aquí dejaría la
+      # página vieja sin que nadie se entere, que es exactamente el fallo
+      # silencioso que este flujo evita en todos los demás pasos. El token es
+      # de repositorio y solo alcanza a `terminus-landing`: si caduca, esto se
+      # pone rojo y se ve.
+      - name: Avisar a la página
+        env:
+          GH_TOKEN: ${{ secrets.LANDING_DISPATCH_TOKEN }}
+          V: ${{ needs.mirar.outputs.version }}
+        run: |
+          set -euo pipefail
+          [ -n "${GH_TOKEN:-}" ] || {
+            echo "::error::falta el secreto LANDING_DISPATCH_TOKEN — la página no se va a enterar de la v$V"
+            exit 1
+          }
+          gh api repos/soydanil/terminus-landing/dispatches \
+            -f event_type=release-publicada \
+            -F "client_payload[version]=$V"
+          echo "Avisado a terminus-landing: v$V"
