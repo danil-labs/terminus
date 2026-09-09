@@ -22,10 +22,11 @@ al instalador `.exe` que se baja a mano desde [terminus.danil.ai](https://termin
 5. En Windows lanza el instalador; en macOS descomprime la app y la deja en
    `/Applications`. A partir de ahí, la app se actualiza sola.
 
-Hay build de **Windows x64** y de **macOS Apple Silicon**. En un Mac Intel o en
-Linux el comando lo dice claro y sale con código distinto de cero, en vez de
-fingir un soporte que no existe: lo que se construye es arm64, y darle un binario
-que no puede ejecutar sería peor que decírselo.
+Hay build de **Windows x64**, **macOS Apple Silicon** y **macOS Intel** (cuando
+la release publica `darwin-x86_64` en `latest.json`, construido en runner nativo
+`macos-13`). En Linux el comando lo dice claro y sale con código distinto de
+cero mientras no haya artefacto `linux-x86_64` — no finge un soporte que no
+existe.
 
 **En macOS este canal se salta el diálogo de «desarrollador no verificado».** La
 cuarentena la pone quien descarga —el navegador—, no el archivo: bajado con
