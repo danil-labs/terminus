@@ -1,5 +1,5 @@
 # Mira si `soydanil/harness-app` tiene una versión que aquí no está, y si la
-# tiene la construye para macOS y Windows y la publica como release.
+# tiene la construye para macOS, Windows y Linux x64 y la publica como release.
 #
 # **Por qué vive aquí y no en el repo del código.** Ahí vivía —`desktop-build.yml`—
 # y se retiró el 12-ago (`6c83bfd`): `harness-app` es privado y los minutos del
@@ -107,7 +107,7 @@ env:
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────────────
-  # ¿Hay algo que publicar? Sale barato preguntarlo, y ahorra los dos runners.
+  # ¿Hay algo que publicar? Sale barato preguntarlo, y ahorra los runners de build.
   # ─────────────────────────────────────────────────────────────────────────────
   mirar:
     runs-on: ubuntu-latest
@@ -246,6 +246,10 @@ jobs:
           # Intel cae al git del sistema, camino que `env.rs` ya cubre.
           - so: macos-latest
             nombre: macos
+          # Linux x64 AppImage. `git:fetch` en Linux no empaqueta git (usa el del
+          # sistema); el sidecar `browse` se compila en el runner.
+          - so: ubuntu-22.04
+            nombre: linux
     runs-on: ${{ matrix.so }}
     steps:
       - name: Traer la fuente
@@ -273,6 +277,15 @@ jobs:
           key: ${{ matrix.nombre }}
 
       - run: pnpm install --frozen-lockfile
+
+      # Dependencias de sistema de Tauri en Linux (webkitgtk 4.1 + AppImage).
+      - name: Dependencias Linux
+        if: matrix.nombre == 'linux'
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
+            patchelf libssl-dev build-essential pkg-config libfuse2
 
       # El git que viaja dentro del instalador: MinGit en Windows, el árbol de
       # Homebrew con las dylibs relocalizadas en macOS. Sin este paso el bundle
@@ -326,6 +339,27 @@ jobs:
             exigir '*_x64-setup.exe'     "Terminus_${V}_x64-setup.exe"
             exigir '*_x64-setup.exe.sig' "Terminus_${V}_x64-setup.exe.sig"
             cp "entrega/Terminus_${V}_x64-setup.exe" entrega/Terminus-Windows-Setup.exe
+          elif [ "${{ matrix.nombre }}" = "linux" ]; then
+            # AppImage: formato que el updater de Tauri aplica en Linux.
+            # **No renombrar el archivo firmado.** La firma minisign lleva el
+            # nombre en el comentario de confianza (igual que el `.app.tar.gz`
+            # de macOS). Se publica con el nombre que puso Tauri y se añade una
+            # copia estable sin `.sig` para la página / npx.
+            appimage=$(find "$B" -type f -name '*.AppImage' ! -name '*.sig' | head -1)
+            if [ -z "$appimage" ]; then
+              echo "::error::No se construyó ningún AppImage. Contenido de $B:"
+              find "$B" -type f | sed 's/^/    /'
+              exit 1
+            fi
+            nombre=$(basename "$appimage")
+            if [ ! -f "${appimage}.sig" ]; then
+              echo "::error::Falta ${nombre}.sig"
+              exit 1
+            fi
+            cp "$appimage" "entrega/$nombre"
+            cp "${appimage}.sig" "entrega/${nombre}.sig"
+            cp "entrega/$nombre" entrega/Terminus-Linux.AppImage
+            echo "  $nombre → entrega/  ($(du -h "$appimage" | cut -f1))"
           else
             # En macOS el updater NO usa el DMG: reemplaza el `.app` desde un
             # tar.gz. El DMG es solo para la primera instalación desde la página,
@@ -366,7 +400,7 @@ jobs:
           path: entrega/*
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # Una sola release con las dos plataformas dentro, y el `latest.json` que la
+  # Una sola release con las tres plataformas dentro, y el `latest.json` que la
   # app consulta. Va en un job aparte porque **publicar media release es peor que
   # no publicarla**: si macOS falla, aquí no se llega y Windows tampoco sale.
   # ─────────────────────────────────────────────────────────────────────────────
@@ -418,6 +452,7 @@ jobs:
           # busca **la suya** y, si no está, concluye que está al día. Sin ruido,
           # sin error y sin actualizarse nunca — que es como estuvo `darwin` desde
           # la primera release hasta hoy.
+          LINUX_APP=$(basename "$(ls entrega/*.AppImage | grep -v Terminus-Linux.AppImage | head -1)")
           jq -n \
             --arg v "$V" \
             --arg notas "$NOTA" \
@@ -426,13 +461,16 @@ jobs:
             --arg win_url "$BASE/Terminus_${V}_x64-setup.exe" \
             --arg mac_sig "$(cat "entrega/Terminus.app.tar.gz.sig")" \
             --arg mac_url "$BASE/Terminus.app.tar.gz" \
+            --arg linux_sig "$(cat "entrega/${LINUX_APP}.sig")" \
+            --arg linux_url "$BASE/$LINUX_APP" \
             '{
               version: $v,
               notes: $notas,
               pub_date: $fecha,
               platforms: {
                 "windows-x86_64": { signature: $win_sig, url: $win_url },
-                "darwin-aarch64": { signature: $mac_sig, url: $mac_url }
+                "darwin-aarch64": { signature: $mac_sig, url: $mac_url },
+                "linux-x86_64": { signature: $linux_sig, url: $linux_url }
               }
             }' > entrega/latest.json
 
@@ -447,7 +485,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          CUERPO=$(printf '%s\n\n---\n\nWindows: `Terminus-Windows-Setup.exe` · macOS (Apple Silicon): `Terminus-macOS.dmg`\n\nQuien ya la tenga instalada no necesita bajar nada: la app avisa sola.\n\nConstruida desde `%s` en `%s`.\n' "$NOTA" "$SHA" "$GITHUB_RUN_ID")
+          CUERPO=$(printf '%s\n\n---\n\nWindows: `Terminus-Windows-Setup.exe` · macOS (Apple Silicon): `Terminus-macOS.dmg` · Linux x64: `Terminus-Linux.AppImage`\n\nQuien ya la tenga instalada no necesita bajar nada: la app avisa sola.\n\nConstruida desde `%s` en `%s`.\n' "$NOTA" "$SHA" "$GITHUB_RUN_ID")
 
           # Rehacer una versión reemplaza la release entera. Borrarla y crearla de
           # nuevo, y no `upload --clobber`, porque un asset que dejó de producirse
@@ -483,15 +521,15 @@ jobs:
 
           [ "$(echo "$J" | jq -r .version)" = "$V" ] \
             || { echo "::error::releases/latest sirve otra versión"; exit 1; }
-          for p in windows-x86_64 darwin-aarch64; do
+          for p in windows-x86_64 darwin-aarch64 linux-x86_64; do
             echo "$J" | jq -e --arg p "$p" '.platforms[$p].signature | length > 0' >/dev/null \
               || { echo "::error::$p se publicó sin firma"; exit 1; }
           done
 
-          # Y que los dos nombres estables que enlaza terminus.danil.ai existan.
-          for a in Terminus-Windows-Setup.exe Terminus-macOS.dmg; do
+          # Y que los nombres estables que enlaza terminus.danil.ai / npx existan.
+          for a in Terminus-Windows-Setup.exe Terminus-macOS.dmg Terminus-Linux.AppImage; do
             curl -fsSIL -o /dev/null "$BASE/$a" \
               || { echo "::error::$a no se puede descargar — el botón de la página está roto"; exit 1; }
           done
 
-          echo "v$V publicada, firmada para las dos plataformas y descargable."
+          echo "v$V publicada, firmada para Windows, macOS y Linux x64, y descargable."
