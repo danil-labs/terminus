@@ -12,6 +12,7 @@ Download the latest installer:
 
 - **[Terminus-Windows-Setup.exe](https://github.com/soydanil/terminus/releases/latest/download/Terminus-Windows-Setup.exe)** — Windows 10 or 11, 64-bit
 - **[Terminus-macOS.dmg](https://github.com/soydanil/terminus/releases/latest/download/Terminus-macOS.dmg)** — macOS, Apple Silicon
+- **[Terminus-macOS-Intel.dmg](https://github.com/soydanil/terminus/releases/latest/download/Terminus-macOS-Intel.dmg)** — macOS, Intel (x86_64)
 
 The app updates itself from here — you install once.
 
@@ -31,8 +32,9 @@ uses to update itself.
 
 This repository hosts the Terminus release binaries and their update manifest,
 and it builds them: [`publicar.yml`](.github/workflows/publicar.yml) watches the
-source repository and, when its version has no release yet, builds macOS and
-Windows, signs them and publishes. Every version, with its installers and
+source repository and, when its version has no release yet, builds macOS
+(Apple Silicon + Intel on native runners), Windows, signs them and publishes.
+Every version, with its installers and
 signatures, is on the
 [releases page](https://github.com/soydanil/terminus/releases).
 

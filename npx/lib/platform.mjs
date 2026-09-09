@@ -1,12 +1,10 @@
 // Detección de SO/arquitectura y mapeo a la clave de plataforma del updater
 // de Tauri (la misma que usa latest.json: "windows-x86_64", "darwin-aarch64",
-// ...). Hoy la release publica esas dos; el día que haya Linux basta con que
-// aparezca su clave en el manifiesto — este archivo ya la resuelve.
+// "darwin-x86_64", "linux-x86_64", ...).
 //
-// Un Mac Intel resuelve `darwin-x86_64`, que la release NO publica, y sale por
-// el camino de «todavía no hay build para tu plataforma». Es correcto: lo que
-// se construye es arm64, y darle un binario que no puede ejecutar sería peor
-// que decírselo.
+// Un Mac Intel resuelve `darwin-x86_64`. Cuando la release publica esa clave
+// (build nativo en runner `macos-13`), npx instala ese artefacto. Si aún no
+// está en latest.json, sale por «todavía no hay build para tu plataforma».
 
 const LABELS = {
   win32: 'Windows',
@@ -48,7 +46,7 @@ export function detectPlatform() {
     // Qué hay que hacer con lo que se baja, que no es lo mismo en las dos:
     // Windows recibe un instalador que se ejecuta, y macOS el `.app`
     // comprimido, que se descomprime y se copia. Linux existe para dar el
-    // mensaje correcto mientras no haya build.
+    // mensaje correcto mientras no haya build (o instalar AppImage si ya hay).
     installerKind:
       platform === 'win32' ? 'windows-nsis' : platform === 'darwin' ? 'macos' : platform === 'linux' ? 'linux' : 'unknown',
   };
