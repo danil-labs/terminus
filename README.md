@@ -21,11 +21,13 @@ Or, if you have Node:
 npx @soydanil/terminus
 ```
 
-Neither installer is signed with a system certificate yet, so the OS warns the
-first time: **More info → Run anyway** on Windows, **right click → Open** on
-macOS. The `npx` route on macOS avoids that dialog — the download never gets a
-quarantine attribute — and still verifies the same minisign signature the app
-uses to update itself.
+The Windows installer is signed by Software y Servicios Danil, S.A.P.I. de C.V.
+(releases up to v0.1.25 aren't). The certificate is new, so until it builds
+reputation SmartScreen may still warn the first time: **More info → Run
+anyway**. The macOS installer isn't signed with an Apple certificate yet, so
+macOS warns the first time: **right click → Open**. The `npx` route on macOS
+avoids that dialog — the download never gets a quarantine attribute — and still
+verifies the same minisign signature the app uses to update itself.
 
 ## Releases
 
