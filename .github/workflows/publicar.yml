@@ -34,8 +34,10 @@
 # La app comprueba lo que se baja contra la llave pública **que viaja dentro del
 # binario ya instalado**. Una release sin firmar no se instala mal: no se instala,
 # y la copia de quien la esperaba se queda donde está. Es minisign, y no tiene
-# nada que ver con Authenticode ni con la notarización de Apple —esas siguen sin
-# existir, y lo que producen es el aviso de SmartScreen la primera vez—.
+# nada que ver con Authenticode ni con la notarización de Apple. Authenticode
+# —el certificado de SSL.com, por eSigner— tiene su propio paso en `construir`;
+# la notarización sigue sin existir, y lo que produce es el aviso de macOS la
+# primera vez.
 name: publicar
 
 on:
@@ -288,6 +290,77 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: pnpm desktop:build
+
+      # Authenticode: la firma del sistema, la que mira SmartScreen. Se firma
+      # **solo el instalador**: es lo único que llega con la marca de «bajado de
+      # internet», y cada firma de eSigner cuenta contra la cuota del plan.
+      #
+      # **Va después del build y rehace el `.sig`.** Firmar cambia los bytes del
+      # `.exe`, y la firma minisign que Tauri acaba de sacar habla de los bytes
+      # viejos: publicarla así es la release que el updater rechaza sin avisar.
+      - name: Firmar el instalador (Authenticode)
+        if: matrix.nombre == 'windows'
+        shell: bash
+        env:
+          ES_USERNAME: ${{ secrets.ES_USERNAME }}
+          ES_PASSWORD: ${{ secrets.ES_PASSWORD }}
+          ES_CREDENTIAL_ID: ${{ secrets.ES_CREDENTIAL_ID }}
+          ES_TOTP_SECRET: ${{ secrets.ES_TOTP_SECRET }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          CST_URL: https://github.com/SSLcom/CodeSignTool/releases/download/v1.3.2/CodeSignTool-v1.3.2-windows.zip
+          CST_SHA256: 4afc32e8b7f79bbe1de7e4e7049aaad4e0f754357613b9bbec0e3052f06fd36b
+        run: |
+          set -euo pipefail
+
+          for v in ES_USERNAME ES_PASSWORD ES_CREDENTIAL_ID ES_TOTP_SECRET; do
+            [ -n "${!v}" ] || { echo "::error title=Falta el secret $v::Sin él no se firma el instalador. Va en Settings → Secrets and variables → Actions de este repo."; exit 1; }
+          done
+
+          EXE=$(find src-tauri/target/release/bundle -type f -name '*_x64-setup.exe' | head -1)
+          [ -n "$EXE" ] || { echo "::error::No se construyó ningún *_x64-setup.exe que firmar."; exit 1; }
+          EXE_W=$(cygpath -w "$(realpath "$EXE")")
+
+          T=$(cygpath -u "$RUNNER_TEMP")
+          curl -fsSL -o "$T/cst.zip" "$CST_URL"
+          echo "$CST_SHA256  $T/cst.zip" | sha256sum -c -
+          pwsh -NoProfile -Command "Expand-Archive -LiteralPath '$(cygpath -w "$T/cst.zip")' -DestinationPath '$(cygpath -w "$T/cst")'"
+          mkdir -p "$T/firmado"
+
+          # Java directo y no `CodeSignTool.bat`: el .bat reparte los argumentos
+          # por `cmd`, que se come los `%`, `^` y `&` de una contraseña. Y la
+          # herramienta busca su `conf/` en el directorio actual.
+          (
+            cd "$T/cst"
+            MSYS_NO_PATHCONV=1 ./jdk-11.0.2/bin/java.exe -jar jar/code_sign_tool-1.3.2.jar sign \
+              -username="$ES_USERNAME" \
+              -password="$ES_PASSWORD" \
+              -credential_id="$ES_CREDENTIAL_ID" \
+              -totp_secret="$ES_TOTP_SECRET" \
+              -input_file_path="$EXE_W" \
+              -output_dir_path="$(cygpath -w "$T/firmado")"
+          )
+
+          FIRMADO="$T/firmado/$(basename "$EXE")"
+          [ -f "$FIRMADO" ] || { echo "::error::CodeSignTool no dejó el instalador firmado; su salida está arriba."; exit 1; }
+
+          # El código de salida de CodeSignTool no es de fiar: lo que cuenta es
+          # lo que Windows ve en el archivo.
+          FIRMADO_W=$(cygpath -w "$FIRMADO")
+          export FIRMADO_W
+          # shellcheck disable=SC2016  # $s y $env son de PowerShell, no de bash
+          VISTO=$(pwsh -NoProfile -Command '$s = Get-AuthenticodeSignature -LiteralPath $env:FIRMADO_W; "{0}|{1}|{2}" -f $s.Status, $s.SignerCertificate.Subject, [bool]$s.TimeStamperCertificate' | tr -d '\r')
+          echo "Authenticode: $VISTO"
+          IFS='|' read -r ESTADO SUJETO SELLO <<< "$VISTO"
+          [ "$ESTADO" = "Valid" ] || { echo "::error::Windows no da la firma por válida: $ESTADO."; exit 1; }
+          case "$SUJETO" in
+            *"Software y Servicios Danil"*) ;;
+            *) echo "::error::Firmó un certificado que no es el de Danil: $SUJETO"; exit 1 ;;
+          esac
+          [ "$SELLO" = "True" ] || { echo "::error::La firma no lleva sello de tiempo: dejaría de valer el día que caduque el certificado."; exit 1; }
+
+          mv -f "$FIRMADO" "$EXE"
+          pnpm tauri signer sign "$EXE"
 
       # Los nombres que produce Tauri llevan la versión y la arquitectura dentro,
       # y cambian solos al subir cualquiera de las dos. Aquí se normalizan a una
