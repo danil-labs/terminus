@@ -1,4 +1,4 @@
-# Mira si `soydanil/harness-app` tiene una versión que aquí no está, y si la
+# Mira si `danil-labs/harness-app` tiene una versión que aquí no está, y si la
 # tiene la construye para macOS y Windows y la publica como release.
 #
 # **Por qué vive aquí y no en el repo del código.** Ahí vivía —`desktop-build.yml`—
@@ -58,7 +58,7 @@ on:
 
   # Y a mano, para no esperar la media hora después de mergear a `main`:
   #
-  #     gh workflow run publicar.yml -R soydanil/terminus
+  #     gh workflow run publicar.yml -R danil-labs/terminus
   #
   # (o `pnpm publicar` desde `harness-app`, que hace exactamente eso).
   workflow_dispatch:
@@ -77,7 +77,7 @@ concurrency:
 env:
   # De dónde sale el código. Privado: se entra con la deploy key de solo lectura
   # `HARNESS_DEPLOY_KEY`, que solo sirve para leer ese repo y para nada más.
-  FUENTE: soydanil/harness-app
+  FUENTE: danil-labs/harness-app
   RAMA: main
 
   # ─── La identidad de la app, copiada aquí a propósito ───────────────────────

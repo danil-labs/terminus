@@ -1,6 +1,6 @@
 {
   "name": "@danil-labs/terminus",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Instala Terminus (app de escritorio Danil) con un solo comando: npx @danil-labs/terminus",
   "type": "module",
   "bin": {
@@ -29,7 +29,7 @@
   "homepage": "https://terminus.danil.ai",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/soydanil/terminus.git"
+    "url": "git+https://github.com/danil-labs/terminus.git"
   },
   "dependencies": {}
 }
