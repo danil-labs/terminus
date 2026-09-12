@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// npx @soydanil/terminus — instala Terminus (app de escritorio Danil) con un
+// npx @danil-labs/terminus — instala Terminus (app de escritorio Danil) con un
 // comando. Canal para desarrolladores (que ya tienen Node), adicional al .exe
 // que se descarga a mano.
 //
@@ -50,7 +50,7 @@ function printHelp() {
   log(`${paint(C.bold, 'Terminus')} — instalador vía npx
 
   Uso:
-    npx @soydanil/terminus [opciones]
+    npx @danil-labs/terminus [opciones]
 
   Opciones:
     -n, --dry-run   Descarga y verifica, pero NO ejecuta el instalador.
