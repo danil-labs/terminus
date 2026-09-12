@@ -2,6 +2,9 @@ name: probar eSigner
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - ci/probar-esigner
 
 # Diagnóstico de solo lectura para los datos de acceso de SSL.com. No invoca
 # `sign`, por lo que no genera ni consume una firma Authenticode.
