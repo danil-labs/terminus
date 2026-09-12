@@ -18,7 +18,7 @@ The app updates itself from here — you install once.
 Or, if you have Node:
 
 ```
-npx @soydanil/terminus
+npx @danil-labs/terminus
 ```
 
 The Windows installer is signed by Software y Servicios Danil, S.A.P.I. de C.V.

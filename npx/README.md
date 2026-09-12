@@ -1,9 +1,9 @@
-# @soydanil/terminus
+# @danil-labs/terminus
 
 Instala **Terminus** (la app de escritorio de Danil) con un solo comando:
 
 ```bash
-npx @soydanil/terminus
+npx @danil-labs/terminus
 ```
 
 Es un canal de distribución para desarrolladores —que ya tienen Node— adicional
