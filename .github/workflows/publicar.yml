@@ -472,6 +472,23 @@ jobs:
       # El código de salida de `tauri build` tampoco basta: un .app ad-hoc o sin
       # ticket grapado llega a `entrega/` igual. `stapler validate` es lo que
       # Gatekeeper mira en un Mac sin red; si falla, no se publica.
+      # Tauri notariza y grapa el `.app`; el `.dmg` lo arma después, y sale sin
+      # ticket propio. Lo que la gente descarga es el `.dmg`, así que se
+      # notariza también: con su ticket grapado, Gatekeeper lo acepta en un Mac
+      # sin red. Hay que someterlo aparte porque el ticket va por hash, y el del
+      # `.dmg` no es el del `.app` que lleva dentro.
+      - name: Notarizar y grapar el .dmg
+        if: matrix.nombre == 'macos'
+        env:
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+        run: |
+          set -euo pipefail
+          DMG=$(find src-tauri/target/release/bundle -type f -name '*.dmg' | head -1)
+          [ -n "$DMG" ] || { echo "::error::No se construyó el .dmg."; exit 1; }
+          xcrun notarytool submit "$DMG"             --key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER"             --wait
+          xcrun stapler staple "$DMG"
+
       - name: Comprobar la firma de Apple
         if: matrix.nombre == 'macos'
         run: |
