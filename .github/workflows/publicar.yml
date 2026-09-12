@@ -37,6 +37,10 @@
 # nada que ver con Authenticode ni con la notarización de Apple —esas quitan el
 # aviso del sistema la primera vez, y cada una tiene su propio paso en
 # `construir`: eSigner (SSL.com) en Windows, Developer ID + notarytool en macOS.
+#
+# En macOS no basta con firmar la app: la notarización abre los comprimidos que
+# viajan dentro del bundle, y el git empaquetado lleva sus propios Mach-O. Se
+# firman antes de construir, en su propio paso.
 name: publicar
 
 on:
@@ -280,6 +284,66 @@ jobs:
       # sale sin git y la app depende de que la máquina destino lo tenga.
       - name: Preparar el git empaquetado
         run: pnpm git:fetch
+
+      # El git portable viaja dentro del `.app`, y la notarización lo abre.
+      #
+      # Apple recorre los archivos comprimidos del bundle: encuentra los Mach-O
+      # de git —`libpcre2-8.0.dylib`, `libintl.8.dylib`, el propio `git`— y los
+      # rechaza por no llevar Developer ID ni sello de tiempo. Que se extraiga
+      # fuera del `.app` al arrancar no cuenta: lo que se notariza es el bundle
+      # tal como se sube, con el tar dentro.
+      #
+      # Se firman aquí y no en `git:fetch` porque el certificado solo existe en
+      # este runner; `pnpm git:fetch` sigue corriendo sin credenciales en local.
+      - name: Firmar el git empaquetado
+        if: matrix.nombre == 'macos'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          set -euo pipefail
+
+          TGZ=src-tauri/resources/git-macos.tar.gz
+          [ -f "$TGZ" ] || { echo "::error::No existe $TGZ; 'pnpm git:fetch' no dejó el git empaquetado."; exit 1; }
+          TGZ_ABS=$(cd "$(dirname "$TGZ")" && pwd)/$(basename "$TGZ")
+
+          # Llavero propio y efímero. Tauri crea el suyo al construir; este solo
+          # existe para que `codesign` encuentre la identidad en este paso.
+          LLAVERO="$RUNNER_TEMP/git-firma.keychain-db"
+          CLAVE=$(openssl rand -hex 32)
+          security create-keychain -p "$CLAVE" "$LLAVERO"
+          security set-keychain-settings -lut 21600 "$LLAVERO"
+          security unlock-keychain -p "$CLAVE" "$LLAVERO"
+          P12="$RUNNER_TEMP/git-firma.p12"
+          printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$P12"
+          security import "$P12" -k "$LLAVERO" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -f pkcs12
+          rm -f "$P12"
+          # Sin esto codesign pide la contraseña por UI y el paso se cuelga.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$CLAVE" "$LLAVERO" >/dev/null
+          security list-keychains -d user -s "$LLAVERO" $(security list-keychains -d user | tr -d '"')
+
+          ARBOL="$RUNNER_TEMP/git-macos"
+          rm -rf "$ARBOL"; mkdir -p "$ARBOL"
+          tar xzf "$TGZ_ABS" -C "$ARBOL"
+
+          # Solo archivos: el árbol de git son casi todos symlinks al mismo
+          # binario, y firmar por el enlace firmaría el destino varias veces.
+          FIRMADOS=0
+          while IFS= read -r f; do
+            file -b "$f" | grep -q 'Mach-O' || continue
+            codesign --force --timestamp --options runtime --keychain "$LLAVERO" --sign "$APPLE_SIGNING_IDENTITY" "$f"
+            codesign --verify --strict "$f"
+            FIRMADOS=$((FIRMADOS + 1))
+          done < <(find "$ARBOL" -type f)
+
+          [ "$FIRMADOS" -gt 0 ] || { echo "::error::No se firmó ningún Mach-O del git empaquetado; algo cambió en cómo se arma."; exit 1; }
+          echo "Mach-O firmados en el git empaquetado: $FIRMADOS"
+
+          # Se rehace igual que en `fetch-git.mjs`: `-C <arbol> .`
+          rm -f "$TGZ_ABS"
+          tar czf "$TGZ_ABS" -C "$ARBOL" .
+          rm -rf "$ARBOL"
 
       # La notarización pide un `.p8` en disco, no el contenido en una variable.
       # Tauri busca `AuthKey_<APPLE_API_KEY>.p8` o `APPLE_API_KEY_PATH`. El
