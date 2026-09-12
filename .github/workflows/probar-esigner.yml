@@ -1,0 +1,49 @@
+name: probar eSigner
+
+on:
+  workflow_dispatch:
+
+# Diagnóstico de solo lectura para los datos de acceso de SSL.com. No invoca
+# `sign`, por lo que no genera ni consume una firma Authenticode.
+jobs:
+  comprobar:
+    runs-on: windows-latest
+    permissions: {}
+    steps:
+      - name: Comprobar acceso y certificado eSigner
+        shell: bash
+        env:
+          ES_USERNAME: ${{ secrets.ES_USERNAME }}
+          ES_PASSWORD: ${{ secrets.ES_PASSWORD }}
+          ES_CREDENTIAL_ID: ${{ secrets.ES_CREDENTIAL_ID }}
+          CST_URL: https://github.com/SSLcom/CodeSignTool/releases/download/v1.3.2/CodeSignTool-v1.3.2-windows.zip
+          CST_SHA256: 4afc32e8b7f79bbe1de7e4e7049aaad4e0f754357613b9bbec0e3052f06fd36b
+        run: |
+          set -euo pipefail
+
+          for v in ES_USERNAME ES_PASSWORD ES_CREDENTIAL_ID; do
+            [ -n "${!v}" ] || { echo "::error title=Falta el secret $v::Agrégalo en Settings → Secrets and variables → Actions."; exit 1; }
+          done
+          echo "::add-mask::$ES_CREDENTIAL_ID"
+
+          T=$(cygpath -u "$RUNNER_TEMP")
+          curl -fsSL -o "$T/cst.zip" "$CST_URL"
+          echo "$CST_SHA256  $T/cst.zip" | sha256sum -c -
+          pwsh -NoProfile -Command "Expand-Archive -LiteralPath '$(cygpath -w "$T/cst.zip")' -DestinationPath '$(cygpath -w "$T/cst")'"
+
+          cd "$T/cst"
+          MSYS_NO_PATHCONV=1 ./jdk-11.0.2/bin/java.exe -jar jar/code_sign_tool-1.3.2.jar get_credential_ids \
+            -username="$ES_USERNAME" \
+            -password="$ES_PASSWORD" > "$T/credential-ids.txt"
+
+          grep -Fq -- "$ES_CREDENTIAL_ID" "$T/credential-ids.txt" || {
+            echo "::error title=Credential ID no asociado::SSL.com aceptó el usuario, pero ES_CREDENTIAL_ID no pertenece a esta cuenta."
+            exit 1
+          }
+
+          MSYS_NO_PATHCONV=1 ./jdk-11.0.2/bin/java.exe -jar jar/code_sign_tool-1.3.2.jar credential_info \
+            -username="$ES_USERNAME" \
+            -password="$ES_PASSWORD" \
+            -credential_id="$ES_CREDENTIAL_ID"
+
+          echo "::notice title=eSigner verificado::Usuario, contraseña y Credential ID son válidos. Este diagnóstico no probó ni consumió el TOTP ni una firma."
