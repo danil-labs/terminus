@@ -1,5 +1,5 @@
 # Mira si `danil-labs/harness-app` tiene una versión que aquí no está, y si la
-# tiene la construye para macOS y Windows y la publica como release.
+# tiene la construye para macOS (Apple Silicon e Intel) y Windows y la publica como release.
 #
 # **Por qué vive aquí y no en el repo del código.** Ahí vivía —`desktop-build.yml`—
 # y se retiró el 12-ago (`6c83bfd`): `harness-app` es privado y los minutos del
@@ -112,7 +112,7 @@ env:
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────────────
-  # ¿Hay algo que publicar? Sale barato preguntarlo, y ahorra los dos runners.
+  # ¿Hay algo que publicar? Sale barato preguntarlo, y evita arrancar los runners de build.
   # ─────────────────────────────────────────────────────────────────────────────
   mirar:
     runs-on: ubuntu-latest
@@ -244,13 +244,15 @@ jobs:
         include:
           - so: windows-latest
             nombre: windows
-          # `macos-latest` es Apple Silicon. **Solo arm64, y a propósito:**
-          # `git:fetch` empaqueta el git del host que compila, así que un binario
-          # universal llevaría dentro un git de una sola arquitectura y en el otro
-          # Mac no arrancaría — roto en silencio, que es peor que no estar. Un Mac
-          # Intel cae al git del sistema, camino que `env.rs` ya cubre.
+          # Git se empaqueta desde el host: cada arquitectura necesita un runner nativo.
           - so: macos-latest
             nombre: macos
+            arch: aarch64
+            mach_arch: arm64
+          - so: macos-15-intel
+            nombre: macos-intel
+            arch: x86_64
+            mach_arch: x86_64
     runs-on: ${{ matrix.so }}
     steps:
       - name: Traer la fuente
@@ -296,7 +298,7 @@ jobs:
       # Se firman aquí y no en `git:fetch` porque el certificado solo existe en
       # este runner; `pnpm git:fetch` sigue corriendo sin credenciales en local.
       - name: Firmar el git empaquetado
-        if: matrix.nombre == 'macos'
+        if: runner.os == 'macOS'
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -352,7 +354,7 @@ jobs:
       # `signingIdentity: "-"` en `tauri.conf.json` se queda: es la firma ad-hoc
       # de los builds locales. `APPLE_SIGNING_IDENTITY` la pisa solo aquí.
       - name: Preparar la notarización de Apple
-        if: matrix.nombre == 'macos'
+        if: runner.os == 'macOS'
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -397,6 +399,27 @@ jobs:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_KEY_PATH: ${{ env.APPLE_API_KEY_PATH }}
         run: pnpm desktop:build
+
+      - name: Comprobar la arquitectura de macOS
+        if: runner.os == 'macOS'
+        env:
+          EXPECTED_ARCH: ${{ matrix.mach_arch }}
+        run: |
+          set -euo pipefail
+          APP=src-tauri/target/release/bundle/macos/Terminus.app
+          lipo -verify_arch "$EXPECTED_ARCH" "$APP/Contents/MacOS/terminus"
+          while IFS= read -r f; do
+            file -b "$f" | grep -q 'Mach-O' || continue
+            lipo -verify_arch "$EXPECTED_ARCH" "$f"
+          done < <(find "$APP" -type f)
+          ARBOL=$(mktemp -d)
+          trap 'rm -rf "$ARBOL"' EXIT
+          tar xzf src-tauri/resources/git-macos.tar.gz -C "$ARBOL"
+          while IFS= read -r f; do
+            file -b "$f" | grep -q 'Mach-O' || continue
+            lipo -verify_arch "$EXPECTED_ARCH" "$f"
+          done < <(find "$ARBOL" -type f)
+          "$ARBOL/bin/git" --version
 
       # Authenticode: la firma del sistema, la que mira SmartScreen. Se firma
       # **solo el instalador**: es lo único que llega con la marca de «bajado de
@@ -478,7 +501,7 @@ jobs:
       # sin red. Hay que someterlo aparte porque el ticket va por hash, y el del
       # `.dmg` no es el del `.app` que lleva dentro.
       - name: Notarizar y grapar el .dmg
-        if: matrix.nombre == 'macos'
+        if: runner.os == 'macOS'
         env:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
@@ -490,7 +513,7 @@ jobs:
           xcrun stapler staple "$DMG"
 
       - name: Comprobar la firma de Apple
-        if: matrix.nombre == 'macos'
+        if: runner.os == 'macOS'
         run: |
           set -euo pipefail
           B=src-tauri/target/release/bundle
@@ -523,6 +546,9 @@ jobs:
         shell: bash
         env:
           V: ${{ needs.mirar.outputs.version }}
+          MAC_ARCH: ${{ matrix.arch }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           set -euo pipefail
           mkdir -p entrega
@@ -549,26 +575,22 @@ jobs:
             exigir '*_x64-setup.exe.sig' "Terminus_${V}_x64-setup.exe.sig"
             cp "entrega/Terminus_${V}_x64-setup.exe" entrega/Terminus-Windows-Setup.exe
           else
-            # En macOS el updater NO usa el DMG: reemplaza el `.app` desde un
-            # tar.gz. El DMG es solo para la primera instalación desde la página,
-            # y hasta hoy no se construía — el botón de macOS de terminus.danil.ai
-            # daba 404.
-            # **Este no se renombra, y es la excepción que hay que respetar.**
-            # La firma minisign sella también el NOMBRE del archivo firmado, en
-            # su comentario de confianza. Tauri lo llama `Terminus.app.tar.gz`;
-            # publicarlo como `Terminus_0.1.8_aarch64.app.tar.gz` deja la firma
-            # hablando de un archivo que ya no existe, y quien comprueba ese
-            # dato —`npx`, que lo hace a propósito— se niega a instalar:
-            #
-            #   la firma es para "Terminus.app.tar.gz",
-            #   no para "Terminus_0.1.8_aarch64.app.tar.gz"
-            #
-            # En Windows no se ve porque ahí el nombre que pone Tauri ya trae la
-            # versión y el renombrado era el mismo nombre. Aquí no.
-            exigir '*.app.tar.gz'     "Terminus.app.tar.gz"
-            exigir '*.app.tar.gz.sig' "Terminus.app.tar.gz.sig"
-            exigir '*.dmg'            "Terminus_${V}_aarch64.dmg"
-            cp "entrega/Terminus_${V}_aarch64.dmg" entrega/Terminus-macOS.dmg
+            # El nombre firmado debe coincidir con el publicado, también para npx.
+            if [ "$MAC_ARCH" = "x86_64" ]; then
+              exigir '*.app.tar.gz' "Terminus-Intel.app.tar.gz"
+              pnpm tauri signer sign entrega/Terminus-Intel.app.tar.gz
+              [ -s entrega/Terminus-Intel.app.tar.gz.sig ]
+              exigir '*_x64.dmg' "Terminus_${V}_x64.dmg"
+              cp "entrega/Terminus_${V}_x64.dmg" entrega/Terminus-macOS-Intel.dmg
+            elif [ "$MAC_ARCH" = "aarch64" ]; then
+              exigir '*.app.tar.gz'     "Terminus.app.tar.gz"
+              exigir '*.app.tar.gz.sig' "Terminus.app.tar.gz.sig"
+              exigir '*_aarch64.dmg'     "Terminus_${V}_aarch64.dmg"
+              cp "entrega/Terminus_${V}_aarch64.dmg" entrega/Terminus-macOS.dmg
+            else
+              echo "::error::Arquitectura macOS desconocida: $MAC_ARCH"
+              exit 1
+            fi
           fi
 
           echo "### Instaladores — ${{ matrix.nombre }}" >> "$GITHUB_STEP_SUMMARY"
@@ -588,7 +610,7 @@ jobs:
           path: entrega/*
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # Una sola release con las dos plataformas dentro, y el `latest.json` que la
+  # Una sola release con las tres compilaciones dentro, y el `latest.json` que la
   # app consulta. Va en un job aparte porque **publicar media release es peor que
   # no publicarla**: si macOS falla, aquí no se llega y Windows tampoco sale.
   # ─────────────────────────────────────────────────────────────────────────────
@@ -616,7 +638,7 @@ jobs:
           mal=0
           for sig in entrega/*.sig; do
             archivo=$(basename "${sig%.sig}")
-            dentro=$(base64 -d "$sig" | grep -o 'file:[^[:space:]]*' | head -1 | cut -d: -f2-)
+            dentro=$(base64 -d < "$sig" | grep -o 'file:[^[:space:]]*' | head -1 | cut -d: -f2-)
             if [ "$dentro" != "$archivo" ]; then
               echo "::error title=Firma renombrada::$archivo lleva una firma que dice «$dentro». Renombrar un artefacto firmado rompe la comprobación de nombre."
               mal=1
@@ -648,13 +670,16 @@ jobs:
             --arg win_url "$BASE/Terminus_${V}_x64-setup.exe" \
             --arg mac_sig "$(cat "entrega/Terminus.app.tar.gz.sig")" \
             --arg mac_url "$BASE/Terminus.app.tar.gz" \
+            --arg intel_sig "$(cat "entrega/Terminus-Intel.app.tar.gz.sig")" \
+            --arg intel_url "$BASE/Terminus-Intel.app.tar.gz" \
             '{
               version: $v,
               notes: $notas,
               pub_date: $fecha,
               platforms: {
                 "windows-x86_64": { signature: $win_sig, url: $win_url },
-                "darwin-aarch64": { signature: $mac_sig, url: $mac_url }
+                "darwin-aarch64": { signature: $mac_sig, url: $mac_url },
+                "darwin-x86_64": { signature: $intel_sig, url: $intel_url }
               }
             }' > entrega/latest.json
 
@@ -669,7 +694,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          CUERPO=$(printf '%s\n\n---\n\nWindows: `Terminus-Windows-Setup.exe` · macOS (Apple Silicon): `Terminus-macOS.dmg`\n\nQuien ya la tenga instalada no necesita bajar nada: la app avisa sola.\n\nConstruida desde `%s` en `%s`.\n' "$NOTA" "$SHA" "$GITHUB_RUN_ID")
+          CUERPO=$(printf '%s\n\n---\n\nWindows: `Terminus-Windows-Setup.exe` · macOS (Apple Silicon): `Terminus-macOS.dmg` · macOS (Intel): `Terminus-macOS-Intel.dmg`\n\nQuien ya la tenga instalada no necesita bajar nada: la app avisa sola.\n\nConstruida desde `%s` en `%s`.\n' "$NOTA" "$SHA" "$GITHUB_RUN_ID")
 
           # Rehacer una versión reemplaza la release entera. Borrarla y crearla de
           # nuevo, y no `upload --clobber`, porque un asset que dejó de producirse
@@ -705,15 +730,15 @@ jobs:
 
           [ "$(echo "$J" | jq -r .version)" = "$V" ] \
             || { echo "::error::releases/latest sirve otra versión"; exit 1; }
-          for p in windows-x86_64 darwin-aarch64; do
+          for p in windows-x86_64 darwin-aarch64 darwin-x86_64; do
             echo "$J" | jq -e --arg p "$p" '.platforms[$p].signature | length > 0' >/dev/null \
               || { echo "::error::$p se publicó sin firma"; exit 1; }
           done
 
-          # Y que los dos nombres estables que enlaza terminus.danil.ai existan.
-          for a in Terminus-Windows-Setup.exe Terminus-macOS.dmg; do
+          # Los enlaces de descarga estables deben existir para las tres compilaciones.
+          for a in Terminus-Windows-Setup.exe Terminus-macOS.dmg Terminus-macOS-Intel.dmg; do
             curl -fsSIL -o /dev/null "$BASE/$a" \
               || { echo "::error::$a no se puede descargar — el botón de la página está roto"; exit 1; }
           done
 
-          echo "v$V publicada, firmada para las dos plataformas y descargable."
+          echo "v$V publicada, firmada para Windows y ambas arquitecturas de macOS y descargable."

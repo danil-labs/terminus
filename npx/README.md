@@ -22,10 +22,12 @@ al instalador `.exe` que se baja a mano desde [terminus.danil.ai](https://termin
 5. En Windows lanza el instalador; en macOS descomprime la app y la deja en
    `/Applications`. A partir de ahí, la app se actualiza sola.
 
-Hay build de **Windows x64** y de **macOS Apple Silicon**. En un Mac Intel o en
-Linux el comando lo dice claro y sale con código distinto de cero, en vez de
-fingir un soporte que no existe: lo que se construye es arm64, y darle un binario
-que no puede ejecutar sería peor que decírselo.
+El comando selecciona Windows x64, Mac Apple Silicon o Mac Intel según la
+entrada disponible en `latest.json`. La release v0.2.0 solo trae los dos
+primeros. El workflow incorpora Intel; estará disponible cuando una release
+publique `darwin-x86_64`. No hace falta cambiar el comando ni el instalador npx.
+Si falta la entrada de una plataforma, incluida Linux, informa que no hay build
+y termina con error.
 
 **En macOS este canal se salta el diálogo de «desarrollador no verificado».** La
 cuarentena la pone quien descarga —el navegador—, no el archivo: bajado con
