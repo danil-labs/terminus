@@ -1,0 +1,47 @@
+name: Reportar un bug
+description: Algo en Terminus no funciona como debería.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: que-paso
+    attributes:
+      label: ¿Qué pasó?
+      description: Qué esperabas que pasara, y qué pasó en cambio.
+      placeholder: Al hacer clic en... esperaba que... pero en cambio...
+    validations:
+      required: true
+  - type: textarea
+    id: pasos
+    attributes:
+      label: Pasos para reproducirlo
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: Versión de Terminus
+      description: La ves en la esquina inferior derecha de la ventana.
+      placeholder: "0.2.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: plataforma
+    attributes:
+      label: Plataforma
+      options:
+        - Windows
+        - macOS
+    validations:
+      required: true
+  - type: textarea
+    id: capturas
+    attributes:
+      label: Capturas o video
+      description: Arrastra una imagen o un video aquí si tienes uno — ayuda mucho.
+    validations:
+      required: false
