@@ -1,12 +1,5 @@
-// Detección de SO/arquitectura y mapeo a la clave de plataforma del updater
-// de Tauri (la misma que usa latest.json: "windows-x86_64", "darwin-aarch64",
-// ...). Hoy la release publica esas dos; el día que haya Linux basta con que
-// aparezca su clave en el manifiesto — este archivo ya la resuelve.
-//
-// Un Mac Intel resuelve `darwin-x86_64`, que la release NO publica, y sale por
-// el camino de «todavía no hay build para tu plataforma». Es correcto: lo que
-// se construye es arm64, y darle un binario que no puede ejecutar sería peor
-// que decírselo.
+// La clave selecciona la arquitectura en latest.json. Sin entrada publicada,
+// el instalador informa que todavía no hay build para esa plataforma.
 
 const LABELS = {
   win32: 'Windows',
