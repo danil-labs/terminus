@@ -38,9 +38,6 @@
 # aviso del sistema la primera vez, y cada una tiene su propio paso en
 # `construir`: eSigner (SSL.com) en Windows, Developer ID + notarytool en macOS.
 #
-# En macOS no basta con firmar la app: la notarización abre los comprimidos que
-# viajan dentro del bundle, y el git empaquetado lleva sus propios Mach-O. Se
-# firman antes de construir, en su propio paso.
 name: publicar
 
 on:
@@ -208,13 +205,12 @@ jobs:
             exit 1
           fi
 
-          echo "version=$V" >> "$GITHUB_OUTPUT"
-          echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
-
           # La nota es lo que lee una persona en la página de la release. Sale
           # del repo del código para que se revise en el mismo PR que sube la
           # versión, y no se invente aquí.
           {
+            echo "version=$V"
+            echo "sha=$(git rev-parse HEAD)"
             echo "nota<<FIN"
             if [ -f NOTA-DE-VERSION.md ]; then cat NOTA-DE-VERSION.md; else echo "Mejoras y correcciones."; fi
             echo "FIN"
@@ -244,22 +240,15 @@ jobs:
         include:
           - so: windows-latest
             nombre: windows
-          # Git se empaqueta desde el host: cada arquitectura necesita un runner nativo.
           - so: macos-latest
             nombre: macos
-            arch: aarch64
-            mach_arch: arm64
-          - so: macos-15-intel
-            nombre: macos-intel
-            arch: x86_64
-            mach_arch: x86_64
     runs-on: ${{ matrix.so }}
     steps:
       - name: Traer la fuente
         uses: actions/checkout@v4
         with:
           repository: ${{ env.FUENTE }}
-          ref: ${{ env.RAMA }}
+          ref: ${{ needs.mirar.outputs.sha }}
           ssh-key: ${{ secrets.HARNESS_DEPLOY_KEY }}
           fetch-depth: 1
 
@@ -273,6 +262,8 @@ jobs:
           cache: pnpm
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - uses: swatinem/rust-cache@v2
         with:
@@ -281,71 +272,14 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # El git que viaja dentro del instalador: MinGit en Windows, el árbol de
-      # Homebrew con las dylibs relocalizadas en macOS. Sin este paso el bundle
-      # sale sin git y la app depende de que la máquina destino lo tenga.
-      - name: Preparar el git empaquetado
-        run: pnpm git:fetch
-
-      # El git portable viaja dentro del `.app`, y la notarización lo abre.
-      #
-      # Apple recorre los archivos comprimidos del bundle: encuentra los Mach-O
-      # de git —`libpcre2-8.0.dylib`, `libintl.8.dylib`, el propio `git`— y los
-      # rechaza por no llevar Developer ID ni sello de tiempo. Que se extraiga
-      # fuera del `.app` al arrancar no cuenta: lo que se notariza es el bundle
-      # tal como se sube, con el tar dentro.
-      #
-      # Se firman aquí y no en `git:fetch` porque el certificado solo existe en
-      # este runner; `pnpm git:fetch` sigue corriendo sin credenciales en local.
-      - name: Firmar el git empaquetado
-        if: runner.os == 'macOS'
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      - name: Comprobar el contrato del entorno descargable
+        shell: bash
         run: |
-          set -euo pipefail
+          node -e 'const fs = require("node:fs"); const c = JSON.parse(fs.readFileSync("src-tauri/tauri.conf.json")); if (!fs.existsSync("src-tauri/src/environment/git-runtime.json") || c.bundle.externalBin?.length || Object.keys(c.bundle.resources).some(k => k.includes("resources/"))) process.exit(1);'
 
-          TGZ=src-tauri/resources/git-macos.tar.gz
-          [ -f "$TGZ" ] || { echo "::error::No existe $TGZ; 'pnpm git:fetch' no dejó el git empaquetado."; exit 1; }
-          TGZ_ABS=$(cd "$(dirname "$TGZ")" && pwd)/$(basename "$TGZ")
-
-          # Llavero propio y efímero. Tauri crea el suyo al construir; este solo
-          # existe para que `codesign` encuentre la identidad en este paso.
-          LLAVERO="$RUNNER_TEMP/git-firma.keychain-db"
-          CLAVE=$(openssl rand -hex 32)
-          security create-keychain -p "$CLAVE" "$LLAVERO"
-          security set-keychain-settings -lut 21600 "$LLAVERO"
-          security unlock-keychain -p "$CLAVE" "$LLAVERO"
-          P12="$RUNNER_TEMP/git-firma.p12"
-          printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$P12"
-          security import "$P12" -k "$LLAVERO" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -f pkcs12
-          rm -f "$P12"
-          # Sin esto codesign pide la contraseña por UI y el paso se cuelga.
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$CLAVE" "$LLAVERO" >/dev/null
-          security list-keychains -d user -s "$LLAVERO" $(security list-keychains -d user | tr -d '"')
-
-          ARBOL="$RUNNER_TEMP/git-macos"
-          rm -rf "$ARBOL"; mkdir -p "$ARBOL"
-          tar xzf "$TGZ_ABS" -C "$ARBOL"
-
-          # Solo archivos: el árbol de git son casi todos symlinks al mismo
-          # binario, y firmar por el enlace firmaría el destino varias veces.
-          FIRMADOS=0
-          while IFS= read -r f; do
-            file -b "$f" | grep -q 'Mach-O' || continue
-            codesign --force --timestamp --options runtime --keychain "$LLAVERO" --sign "$APPLE_SIGNING_IDENTITY" "$f"
-            codesign --verify --strict "$f"
-            FIRMADOS=$((FIRMADOS + 1))
-          done < <(find "$ARBOL" -type f)
-
-          [ "$FIRMADOS" -gt 0 ] || { echo "::error::No se firmó ningún Mach-O del git empaquetado; algo cambió en cómo se arma."; exit 1; }
-          echo "Mach-O firmados en el git empaquetado: $FIRMADOS"
-
-          # Se rehace igual que en `fetch-git.mjs`: `-C <arbol> .`
-          rm -f "$TGZ_ABS"
-          tar czf "$TGZ_ABS" -C "$ARBOL" .
-          rm -rf "$ARBOL"
+      - name: Probar el Git descargable de Windows
+        if: runner.os == 'Windows'
+        run: node scripts/git-runtime.test.mjs --download
 
       # La notarización pide un `.p8` en disco, no el contenido en una variable.
       # Tauri busca `AuthKey_<APPLE_API_KEY>.p8` o `APPLE_API_KEY_PATH`. El
@@ -398,28 +332,22 @@ jobs:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_KEY_PATH: ${{ env.APPLE_API_KEY_PATH }}
-        run: pnpm desktop:build
+        run: pnpm desktop:build ${{ runner.os == 'macOS' && '--target universal-apple-darwin' || '' }}
 
-      - name: Comprobar la arquitectura de macOS
+      - name: Comprobar el bundle universal
         if: runner.os == 'macOS'
-        env:
-          EXPECTED_ARCH: ${{ matrix.mach_arch }}
         run: |
           set -euo pipefail
-          APP=src-tauri/target/release/bundle/macos/Terminus.app
-          lipo -verify_arch "$EXPECTED_ARCH" "$APP/Contents/MacOS/terminus"
+          APP=src-tauri/target/universal-apple-darwin/release/bundle/macos/Terminus.app
+          lipo "$APP/Contents/MacOS/terminus" -verify_arch arm64 x86_64
           while IFS= read -r f; do
             file -b "$f" | grep -q 'Mach-O' || continue
-            lipo -verify_arch "$EXPECTED_ARCH" "$f"
+            lipo "$f" -verify_arch arm64 x86_64
           done < <(find "$APP" -type f)
-          ARBOL=$(mktemp -d)
-          trap 'rm -rf "$ARBOL"' EXIT
-          tar xzf src-tauri/resources/git-macos.tar.gz -C "$ARBOL"
-          while IFS= read -r f; do
-            file -b "$f" | grep -q 'Mach-O' || continue
-            lipo -verify_arch "$EXPECTED_ARCH" "$f"
-          done < <(find "$ARBOL" -type f)
-          "$ARBOL/bin/git" --version
+          if find "$APP" -name 'git*.tar.gz' -o -name 'git*.zip' | grep -q .; then
+            echo "::error::Git debe descargarse durante la preparación."
+            exit 1
+          fi
 
       # Authenticode: la firma del sistema, la que mira SmartScreen. Se firma
       # **solo el instalador**: es lo único que llega con la marca de «bajado de
@@ -507,7 +435,7 @@ jobs:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
         run: |
           set -euo pipefail
-          DMG=$(find src-tauri/target/release/bundle -type f -name '*.dmg' | head -1)
+          DMG=$(find src-tauri/target/universal-apple-darwin/release/bundle -type f -name '*.dmg' | head -1)
           [ -n "$DMG" ] || { echo "::error::No se construyó el .dmg."; exit 1; }
           xcrun notarytool submit "$DMG"             --key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER"             --wait
           xcrun stapler staple "$DMG"
@@ -516,7 +444,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           set -euo pipefail
-          B=src-tauri/target/release/bundle
+          B=src-tauri/target/universal-apple-darwin/release/bundle
           APP=$(find "$B" -name 'Terminus.app' -type d | head -1)
           DMG=$(find "$B" -type f -name '*.dmg' | head -1)
           [ -n "$APP" ] || { echo "::error::No se construyó Terminus.app."; exit 1; }
@@ -546,13 +474,15 @@ jobs:
         shell: bash
         env:
           V: ${{ needs.mirar.outputs.version }}
-          MAC_ARCH: ${{ matrix.arch }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           set -euo pipefail
           mkdir -p entrega
           B=src-tauri/target/release/bundle
+          if [ "${{ matrix.nombre }}" = "macos" ]; then
+            B=src-tauri/target/universal-apple-darwin/release/bundle
+          fi
 
           exigir() {
             local que="$1" destino="$2"
@@ -575,33 +505,22 @@ jobs:
             exigir '*_x64-setup.exe.sig' "Terminus_${V}_x64-setup.exe.sig"
             cp "entrega/Terminus_${V}_x64-setup.exe" entrega/Terminus-Windows-Setup.exe
           else
-            # El nombre firmado debe coincidir con el publicado, también para npx.
-            if [ "$MAC_ARCH" = "x86_64" ]; then
-              exigir '*.app.tar.gz' "Terminus-Intel.app.tar.gz"
-              pnpm tauri signer sign entrega/Terminus-Intel.app.tar.gz
-              [ -s entrega/Terminus-Intel.app.tar.gz.sig ]
-              exigir '*_x64.dmg' "Terminus_${V}_x64.dmg"
-              cp "entrega/Terminus_${V}_x64.dmg" entrega/Terminus-macOS-Intel.dmg
-            elif [ "$MAC_ARCH" = "aarch64" ]; then
-              exigir '*.app.tar.gz'     "Terminus.app.tar.gz"
-              exigir '*.app.tar.gz.sig' "Terminus.app.tar.gz.sig"
-              exigir '*_aarch64.dmg'     "Terminus_${V}_aarch64.dmg"
-              cp "entrega/Terminus_${V}_aarch64.dmg" entrega/Terminus-macOS.dmg
-            else
-              echo "::error::Arquitectura macOS desconocida: $MAC_ARCH"
-              exit 1
-            fi
+            exigir '*.app.tar.gz'     "Terminus.app.tar.gz"
+            exigir '*.app.tar.gz.sig' "Terminus.app.tar.gz.sig"
+            exigir '*_universal.dmg'  "Terminus_${V}_universal.dmg"
+            cp "entrega/Terminus_${V}_universal.dmg" entrega/Terminus-macOS.dmg
+            cp "entrega/Terminus_${V}_universal.dmg" entrega/Terminus-macOS-Intel.dmg
           fi
 
-          echo "### Instaladores — ${{ matrix.nombre }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "git empaquetado: \`$(tr -d '\n' < src-tauri/resources/git-version.txt)\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "| archivo | tamaño |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
-          for f in entrega/*; do
-            echo "| $(basename "$f") | $(du -h "$f" | cut -f1) |" >> "$GITHUB_STEP_SUMMARY"
-          done
+          {
+            echo "### Instaladores — ${{ matrix.nombre }}"
+            echo ""
+            echo "| archivo | tamaño |"
+            echo "|---|---|"
+            for f in entrega/*; do
+              echo "| $(basename "$f") | $(du -h "$f" | cut -f1) |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -610,12 +529,57 @@ jobs:
           path: entrega/*
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # Una sola release con las tres compilaciones dentro, y el `latest.json` que la
+  # Una sola release con Windows y macOS universal dentro, y el `latest.json` que la
   # app consulta. Va en un job aparte porque **publicar media release es peor que
   # no publicarla**: si macOS falla, aquí no se llega y Windows tampoco sale.
   # ─────────────────────────────────────────────────────────────────────────────
-  publicar:
+  probar-macos:
     needs: [mirar, construir]
+    strategy:
+      matrix:
+        so: [macos-latest, macos-15-intel]
+    runs-on: ${{ matrix.so }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.FUENTE }}
+          ref: ${{ needs.mirar.outputs.sha }}
+          ssh-key: ${{ secrets.HARNESS_DEPLOY_KEY }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Probar el Git descargable de macOS
+        run: node scripts/git-runtime.test.mjs --download
+      - uses: actions/download-artifact@v4
+        with:
+          name: entrega-macos
+          path: entrega
+      - name: Ejecutar el mismo universal en ambas arquitecturas
+        run: |
+          set -euo pipefail
+          tar xzf entrega/Terminus.app.tar.gz
+          lipo Terminus.app/Contents/MacOS/terminus -verify_arch arm64 x86_64
+          codesign --verify --deep --strict Terminus.app
+          Terminus.app/Contents/MacOS/terminus kn --help
+
+  probar-git-linux:
+    needs: mirar
+    if: needs.mirar.outputs.hay == 'true'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.FUENTE }}
+          ref: ${{ needs.mirar.outputs.sha }}
+          ssh-key: ${{ secrets.HARNESS_DEPLOY_KEY }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Probar el Git descargable de Linux
+        run: node scripts/git-runtime.test.mjs --download
+
+  publicar:
+    needs: [mirar, construir, probar-macos, probar-git-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -670,8 +634,6 @@ jobs:
             --arg win_url "$BASE/Terminus_${V}_x64-setup.exe" \
             --arg mac_sig "$(cat "entrega/Terminus.app.tar.gz.sig")" \
             --arg mac_url "$BASE/Terminus.app.tar.gz" \
-            --arg intel_sig "$(cat "entrega/Terminus-Intel.app.tar.gz.sig")" \
-            --arg intel_url "$BASE/Terminus-Intel.app.tar.gz" \
             '{
               version: $v,
               notes: $notas,
@@ -679,7 +641,7 @@ jobs:
               platforms: {
                 "windows-x86_64": { signature: $win_sig, url: $win_url },
                 "darwin-aarch64": { signature: $mac_sig, url: $mac_url },
-                "darwin-x86_64": { signature: $intel_sig, url: $intel_url }
+                "darwin-x86_64": { signature: $mac_sig, url: $mac_url }
               }
             }' > entrega/latest.json
 
@@ -694,7 +656,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          CUERPO=$(printf '%s\n\n---\n\nWindows: `Terminus-Windows-Setup.exe` · macOS (Apple Silicon): `Terminus-macOS.dmg` · macOS (Intel): `Terminus-macOS-Intel.dmg`\n\nQuien ya la tenga instalada no necesita bajar nada: la app avisa sola.\n\nConstruida desde `%s` en `%s`.\n' "$NOTA" "$SHA" "$GITHUB_RUN_ID")
+          # shellcheck disable=SC2016  # Los backticks son Markdown literal.
+          CUERPO=$(printf '%s\n\n---\n\nWindows: `Terminus-Windows-Setup.exe` · macOS (Intel y Apple Silicon): `Terminus-macOS.dmg`\n\nQuien ya la tenga instalada no necesita bajar nada: la app avisa sola.\n\nConstruida desde `%s` en `%s`.\n' "$NOTA" "$SHA" "$GITHUB_RUN_ID")
 
           # Rehacer una versión reemplaza la release entera. Borrarla y crearla de
           # nuevo, y no `upload --clobber`, porque un asset que dejó de producirse
@@ -735,7 +698,7 @@ jobs:
               || { echo "::error::$p se publicó sin firma"; exit 1; }
           done
 
-          # Los enlaces de descarga estables deben existir para las tres compilaciones.
+          # Los enlaces de descarga estables deben existir para Windows y macOS universal.
           for a in Terminus-Windows-Setup.exe Terminus-macOS.dmg Terminus-macOS-Intel.dmg; do
             curl -fsSIL -o /dev/null "$BASE/$a" \
               || { echo "::error::$a no se puede descargar — el botón de la página está roto"; exit 1; }

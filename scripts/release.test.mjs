@@ -27,13 +27,12 @@ try {
   const merged = join(scratch, 'merged');
   mkdirSync(join(merged, 'entrega'), { recursive: true });
   const matrices = workflow.jobs.construir.strategy.matrix.include;
-  assert.deepEqual(matrices.map(m => m.nombre), ['windows', 'macos', 'macos-intel']);
-  const intel = matrices.find(m => m.nombre === 'macos-intel');
-  assert.equal(intel.so, 'macos-15-intel');
-  assert.equal(intel.mach_arch, 'x86_64');
+  assert.deepEqual(matrices.map(m => m.nombre), ['windows', 'macos']);
+  assert.deepEqual(workflow.jobs['probar-macos'].strategy.matrix.so, ['macos-latest', 'macos-15-intel']);
+  assert(workflow.jobs.publicar.needs.includes('probar-macos'));
   for (const row of matrices) {
     const cwd = join(scratch, row.nombre);
-    const bundle = join(cwd, 'src-tauri/target/release/bundle');
+    const bundle = join(cwd, row.nombre === 'macos' ? 'src-tauri/target/universal-apple-darwin/release/bundle' : 'src-tauri/target/release/bundle');
     const resources = join(cwd, 'src-tauri/resources');
     mkdirSync(bundle, { recursive: true });
     mkdirSync(resources, { recursive: true });
@@ -41,15 +40,16 @@ try {
     const archive = row.nombre === 'windows' ? 'Terminus_9.9.9_x64-setup.exe' : 'Terminus.app.tar.gz';
     writeFileSync(join(bundle, archive), `Fixture for ${row.nombre}`);
     execFileSync(pnpm, [...cli, 'signer', 'sign', join(bundle, archive)], { env: { ...process.env, ...signing }, stdio: 'pipe' });
-    if (row.arch) writeFileSync(join(bundle, `Terminus_9.9.9_${row.arch === 'x86_64' ? 'x64' : row.arch}.dmg`), row.nombre);
+    if (row.nombre === 'macos') writeFileSync(join(bundle, 'Terminus_9.9.9_universal.dmg'), row.nombre);
     const code = step('construir', 'Recoger los artefactos').replaceAll('${{ matrix.nombre }}', row.nombre);
     const env = { ...signing, PATH: `${bin}:${process.env.PATH}`, V: '9.9.9', MAC_ARCH: row.arch || '', GITHUB_STEP_SUMMARY: join(cwd, 'summary') };
     run(code, cwd, env);
     const files = readdirSync(join(cwd, 'entrega'));
-    if (row.nombre === 'macos-intel') {
-      assert.deepEqual(files.sort(), ['Terminus-Intel.app.tar.gz', 'Terminus-Intel.app.tar.gz.sig', 'Terminus-macOS-Intel.dmg', 'Terminus_9.9.9_x64.dmg'].sort());
-      await assert.rejects(verifyFile({ filePath: join(cwd, 'entrega/Terminus-Intel.app.tar.gz'), sigFileB64: readFileSync(join(bundle, `${archive}.sig`), 'utf8'), publicKeyB64, expectedFileName: 'Terminus-Intel.app.tar.gz' }), /la firma es para/);
-      rmSync(join(bundle, 'Terminus_9.9.9_x64.dmg'));
+    if (row.nombre === 'macos') {
+      assert.deepEqual(files.sort(), ['Terminus.app.tar.gz', 'Terminus.app.tar.gz.sig', 'Terminus-macOS.dmg', 'Terminus-macOS-Intel.dmg', 'Terminus_9.9.9_universal.dmg'].sort());
+      assert.deepEqual(readFileSync(join(cwd, 'entrega/Terminus-macOS.dmg')), readFileSync(join(cwd, 'entrega/Terminus-macOS-Intel.dmg')));
+      await assert.rejects(verifyFile({ filePath: join(bundle, archive), sigFileB64: readFileSync(join(bundle, `${archive}.sig`), 'utf8'), publicKeyB64, expectedFileName: 'Terminus-Intel.app.tar.gz' }), /la firma es para/);
+      rmSync(join(bundle, 'Terminus_9.9.9_universal.dmg'));
       run(code, cwd, env, 1);
     }
     for (const f of files) {
@@ -62,17 +62,18 @@ try {
   run(step('publicar', 'Armar latest.json'), merged, env);
   const manifest = JSON.parse(readFileSync(join(merged, 'entrega/latest.json'), 'utf8'));
   assert.deepEqual(Object.keys(manifest.platforms).sort(), ['windows-x86_64', 'darwin-aarch64', 'darwin-x86_64'].sort());
+  assert.deepEqual(manifest.platforms['darwin-aarch64'], manifest.platforms['darwin-x86_64']);
   for (const [platform, entry] of Object.entries(manifest.platforms)) {
     const name = basename(new URL(entry.url).pathname);
     await verifyFile({ filePath: join(merged, 'entrega', name), sigFileB64: entry.signature, publicKeyB64, expectedFileName: name });
-    console.log(`PASS ${platform}: distinct asset, valid Tauri signature, accepted by npx`);
+    console.log(`PASS ${platform}: correct asset, valid Tauri signature, accepted by npx`);
   }
   const platformSource = readFileSync(join(repo, 'npx/lib/platform.mjs'), 'utf8');
   for (const [arch, expected] of [['x64', 'darwin-x86_64'], ['arm64', 'darwin-aarch64']]) {
     const { detectPlatform } = await import(`data:text/javascript,${encodeURIComponent(platformSource.replace('process.platform', "'darwin'").replace('process.arch;', `'${arch}';`))}`);
     assert.equal(detectPlatform().key, expected);
   }
-  console.log('PASS negative controls: stale filename signature rejected; missing Intel DMG aborts collection');
+  console.log('PASS negative controls: stale filename signature rejected; missing universal DMG aborts collection');
   console.log('PASS npx architecture selection: Mac Intel and Apple Silicon');
 } finally {
   rmSync(scratch, { recursive: true, force: true });

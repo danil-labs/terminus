@@ -24,8 +24,8 @@ al instalador `.exe` que se baja a mano desde [terminus.danil.ai](https://termin
 
 El comando selecciona Windows x64, Mac Apple Silicon o Mac Intel según la
 entrada disponible en `latest.json`. La release v0.2.0 solo trae los dos
-primeros. El workflow incorpora Intel; estará disponible cuando una release
-publique `darwin-x86_64`. No hace falta cambiar el comando ni el instalador npx.
+primeros. El workflow universal asigna el mismo archivo y firma a `darwin-aarch64` y
+`darwin-x86_64`; estará disponible cuando se publique esa release. No hace falta cambiar el comando ni el instalador npx.
 Si falta la entrada de una plataforma, incluida Linux, informa que no hay build
 y termina con error.
 
