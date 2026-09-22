@@ -341,7 +341,13 @@ jobs:
           pwsh -NoProfile -Command "Expand-Archive -LiteralPath '$(cygpath -w "$T/cst.zip")' -DestinationPath '$(cygpath -w "$T/cst")'"
 
           firmar() {
-            local archivo="$1" salida firmado visto estado sujeto sello
+            local archivo="$1" absoluto salida firmado visto estado sujeto sello
+            # Absoluta ANTES del subshell, porque dentro se hace `cd` y ahi una
+            # ruta relativa deja de apuntar a nada. `cygpath -w` tampoco la
+            # resuelve: devuelve la misma relativa con barras invertidas, y
+            # CodeSignTool responde `Invalid input file path` sin intentar
+            # firmar. Es lo que ya hace `ARCHIVO_W` unas lineas mas abajo.
+            absoluto=$(realpath "$archivo")
             salida="$T/firmado-$(basename "$archivo")"
             rm -rf "$salida"
             mkdir -p "$salida"
@@ -352,7 +358,7 @@ jobs:
                 -password="$ES_PASSWORD" \
                 -credential_id="$ES_CREDENTIAL_ID" \
                 -totp_secret="$ES_TOTP_SECRET" \
-                -input_file_path="$(cygpath -w "$archivo")" \
+                -input_file_path="$(cygpath -w "$absoluto")" \
                 -output_dir_path="$(cygpath -w "$salida")"
             )
             firmado="$salida/$(basename "$archivo")"
