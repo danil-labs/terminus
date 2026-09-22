@@ -328,6 +328,8 @@ jobs:
           ES_TOTP_SECRET: ${{ secrets.ES_TOTP_SECRET }}
           CST_URL: https://github.com/SSLcom/CodeSignTool/releases/download/v1.3.2/CodeSignTool-v1.3.2-windows.zip
           CST_SHA256: 4afc32e8b7f79bbe1de7e4e7049aaad4e0f754357613b9bbec0e3052f06fd36b
+          SSLCOM_ROOT_URL: http://cert.ssl.com/SSLcom-TLS-Root-2022-RSA.cer
+          SSLCOM_ROOT_SHA256: 8faf7d2e2cb4709bb8e0b33666bf75a5dd45b5de480f8ea8d4bfe6bebc17f2ed
         run: |
           set -euo pipefail
 
@@ -339,6 +341,17 @@ jobs:
           curl -fsSL -o "$T/cst.zip" "$CST_URL"
           echo "$CST_SHA256  $T/cst.zip" | sha256sum -c -
           pwsh -NoProfile -Command "Expand-Archive -LiteralPath '$(cygpath -w "$T/cst.zip")' -DestinationPath '$(cygpath -w "$T/cst")'"
+
+          # JDK 11.0.2 (2019) bundled en CodeSignTool no incluye la raíz
+          # "SSL.com TLS RSA Root CA 2022" que cs.ssl.com empezó a usar en
+          # septiembre de 2026. Sin ella, el handshake TLS cae por PKIX.
+          curl -fsSL -o "$T/sslcom-root.cer" "$SSLCOM_ROOT_URL"
+          echo "$SSLCOM_ROOT_SHA256  $T/sslcom-root.cer" | sha256sum -c -
+          "$T/cst/jdk-11.0.2/bin/keytool.exe" -import -noprompt -trustcacerts \
+            -alias sslcomtlsroot2022 \
+            -file "$(cygpath -w "$T/sslcom-root.cer")" \
+            -keystore "$(cygpath -w "$T/cst/jdk-11.0.2/lib/security/cacerts")" \
+            -storepass changeit
 
           firmar() {
             local archivo="$1" absoluto salida firmado visto estado sujeto sello
