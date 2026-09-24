@@ -64,6 +64,18 @@ on:
         description: "Volver a construir aunque la versión ya tenga release (la reemplaza)"
         type: boolean
         default: false
+      # Para probar un cambio a este archivo sin tocar lo publicado. Corre todo
+      # —build, firmas, comprobaciones— y se detiene antes de `publicar`. Se
+      # lanza desde la rama del PR:
+      #
+      #     gh workflow run publicar.yml -R danil-labs/terminus --ref <rama> -f ensayo=true
+      #
+      # Cada ensayo gasta las firmas de eSigner de una release (ver «Construir y
+      # firmar en Windows»).
+      ensayo:
+        description: "Construir y comprobar sin publicar nada"
+        type: boolean
+        default: false
 
 # Dos corridas a la vez se pisarían creando el mismo tag. No se cancela la que
 # esté en curso: a mitad de un build cancelar deja el tag sin sus binarios.
@@ -188,6 +200,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REHACER: ${{ inputs.rehacer }}
+          ENSAYO: ${{ inputs.ensayo }}
         run: |
           set -euo pipefail
 
@@ -216,7 +229,10 @@ jobs:
             echo "FIN"
           } >> "$GITHUB_OUTPUT"
 
-          if [ "${REHACER:-false}" = "true" ]; then
+          if [ "${ENSAYO:-false}" = "true" ]; then
+            echo "Ensayo de v$V: se construye y se comprueba, no se publica."
+            echo "hay=true" >> "$GITHUB_OUTPUT"
+          elif [ "${REHACER:-false}" = "true" ]; then
             echo "Se pidió rehacer v$V."
             echo "hay=true" >> "$GITHUB_OUTPUT"
           elif gh release view "v$V" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
@@ -316,6 +332,25 @@ jobs:
           [ "$(tail -c1 "$P8" | wc -l)" -eq 1 ] || echo >> "$P8"
           echo "APPLE_API_KEY_PATH=$P8" >> "$GITHUB_ENV"
 
+      # **Tauri reescribe `terminus.exe` al empaquetar.** `tauri bundle` busca en
+      # el binario la marca `__TAURI_BUNDLE_TYPE_VAR_UNK` y la cambia por
+      # `__TAURI_BUNDLE_TYPE_VAR_NSS` (`patch_binary` en
+      # `tauri-bundler/src/bundle.rs`, CLI 2.11.4): así el updater de la app sabe
+      # qué paquete le toca bajar. Firmar el `.exe` antes de ese paso, como se hizo
+      # hasta v0.2.6, deja la firma sobre bytes que ya no existen: en la copia
+      # instalada `Get-AuthenticodeSignature` da `HashMismatch`. Y el desinstalador
+      # lo genera `makensis` dentro del paquete, así que nadie lo firmaba.
+      #
+      # Por eso firma Tauri, con `bundle.windows.signCommand`. Llama al comando
+      # **después** de parchear el `.exe`, desde `!uninstfinalize` para el
+      # desinstalador y sobre el instalador antes de escribir su `.sig` de minisign.
+      # Se pasa con `--config` desde aquí para no tocar `harness-app`.
+      #
+      # Tauri también le pasa las DLL de plugins de NSIS. Esas no se firman: solo
+      # existen en un temporal mientras corre el instalador y nunca quedan
+      # instaladas. Cada firma cuenta en el plan de eSigner: **tres por release**
+      # (ejecutable, desinstalador e instalador), una más que antes, y esa es la
+      # del desinstalador.
       - name: Construir y firmar en Windows
         if: runner.os == 'Windows'
         shell: bash
@@ -338,6 +373,7 @@ jobs:
           done
 
           T=$(cygpath -u "$RUNNER_TEMP")
+          export T
           curl -fsSL -o "$T/cst.zip" "$CST_URL"
           echo "$CST_SHA256  $T/cst.zip" | sha256sum -c -
           pwsh -NoProfile -Command "Expand-Archive -LiteralPath '$(cygpath -w "$T/cst.zip")' -DestinationPath '$(cygpath -w "$T/cst")'"
@@ -353,53 +389,156 @@ jobs:
             -keystore "$(cygpath -w "$T/cst/jdk-11.0.2/lib/security/cacerts")" \
             -storepass changeit
 
-          firmar() {
-            local archivo="$1" absoluto salida firmado visto estado sujeto sello
-            # Absoluta ANTES del subshell, porque dentro se hace `cd` y ahi una
-            # ruta relativa deja de apuntar a nada. `cygpath -w` tampoco la
-            # resuelve: devuelve la misma relativa con barras invertidas, y
-            # CodeSignTool responde `Invalid input file path` sin intentar
-            # firmar. Es lo que ya hace `ARCHIVO_W` unas lineas mas abajo.
-            absoluto=$(realpath "$archivo")
-            salida="$T/firmado-$(basename "$archivo")"
-            rm -rf "$salida"
-            mkdir -p "$salida"
-            (
-              cd "$T/cst"
-              MSYS_NO_PATHCONV=1 ./jdk-11.0.2/bin/java.exe -jar jar/code_sign_tool-1.3.2.jar sign \
-                -username="$ES_USERNAME" \
-                -password="$ES_PASSWORD" \
-                -credential_id="$ES_CREDENTIAL_ID" \
-                -totp_secret="$ES_TOTP_SECRET" \
-                -input_file_path="$(cygpath -w "$absoluto")" \
-                -output_dir_path="$(cygpath -w "$salida")"
-            )
-            firmado="$salida/$(basename "$archivo")"
-            [ -f "$firmado" ] || { echo "::error::CodeSignTool no dejó $(basename "$archivo") firmado; su salida está arriba."; exit 1; }
-            mv -f "$firmado" "$archivo"
-            visto=$(pwsh -NoProfile -Command '$s = Get-AuthenticodeSignature -LiteralPath $env:ARCHIVO_W; "{0}|{1}|{2}" -f $s.Status, $s.SignerCertificate.Subject, [bool]$s.TimeStamperCertificate' | tr -d '\r')
-            echo "Authenticode $(basename "$archivo"): $visto"
-            IFS='|' read -r estado sujeto sello <<< "$visto"
-            [ "$estado" = "Valid" ] || { echo "::error::Windows no da la firma de $(basename "$archivo") por válida: $estado."; exit 1; }
-            case "$sujeto" in
-              *"Software y Servicios Danil"*) ;;
-              *) echo "::error::Firmó un certificado que no es el de Danil: $sujeto"; exit 1 ;;
-            esac
-            [ "$sello" = "True" ] || { echo "::error::La firma de $(basename "$archivo") no lleva sello de tiempo."; exit 1; }
-          }
+          # Lo llama Tauri, un archivo por vez, con la ruta de Windows como único
+          # argumento. Hereda del paso los secrets de eSigner y `T`.
+          cat > "$T/firmar-authenticode.sh" <<'FIRMAR'
+          set -euo pipefail
+          original=$(cygpath -u "$1")
+          nombre=$(basename "$original")
 
-          pnpm desktop:build --no-bundle
-          APP=src-tauri/target/release/terminus.exe
-          [ -f "$APP" ] || { echo "::error::No se construyó Terminus.exe."; exit 1; }
-          export ARCHIVO_W=$(cygpath -w "$(realpath "$APP")")
-          firmar "$APP"
+          case "$nombre" in
+            NSISdl.dll|StartMenu.dll|System.dll|nsDialogs.dll|nsis_tauri_utils.dll)
+              echo "Authenticode: $nombre no se firma (plugin de NSIS, no se instala)."
+              exit 0 ;;
+          esac
 
-          pnpm tauri bundle --bundles nsis
+          # El desinstalador llega con el nombre temporal que le da makensis
+          # (`nst….tmp`). Se firma una copia con nombre `.exe` y se devuelve.
+          case "$nombre" in
+            *.exe) copia="$nombre" ;;
+            *) copia="desinstalador.exe" ;;
+          esac
+          entrada="$T/firmar-entrada"
+          salida="$T/firmar-salida"
+          rm -rf "$entrada" "$salida"
+          mkdir -p "$entrada" "$salida"
+          cp "$original" "$entrada/$copia"
+
+          # Cada firma manda un código TOTP. Entre la del desinstalador y la del
+          # instalador pasan pocos segundos, y si eSigner rechaza un código ya
+          # usado, la segunda fallaría. Esperar a la siguiente ventana de 30 s
+          # cuesta, como mucho, medio minuto.
+          if [ -f "$T/ultima-firma" ]; then
+            espera=$(( $(cat "$T/ultima-firma") + 31 - $(date +%s) ))
+            [ "$espera" -le 0 ] || sleep "$espera"
+          fi
+
+          (
+            cd "$T/cst"
+            MSYS_NO_PATHCONV=1 ./jdk-11.0.2/bin/java.exe -jar jar/code_sign_tool-1.3.2.jar sign \
+              -username="$ES_USERNAME" \
+              -password="$ES_PASSWORD" \
+              -credential_id="$ES_CREDENTIAL_ID" \
+              -totp_secret="$ES_TOTP_SECRET" \
+              -input_file_path="$(cygpath -w "$entrada/$copia")" \
+              -output_dir_path="$(cygpath -w "$salida")"
+          )
+          date +%s > "$T/ultima-firma"
+
+          firmado="$salida/$copia"
+          [ -f "$firmado" ] || { echo "CodeSignTool no dejó $nombre firmado; su salida está arriba." >&2; exit 1; }
+
+          visto=$(ARCHIVO_W="$(cygpath -w "$firmado")" pwsh -NoProfile -Command '$s = Get-AuthenticodeSignature -LiteralPath $env:ARCHIVO_W; "{0}|{1}|{2}" -f $s.Status, $s.SignerCertificate.Subject, [bool]$s.TimeStamperCertificate' | tr -d '\r')
+          IFS='|' read -r estado sujeto sello <<< "$visto"
+          [ "$estado" = "Valid" ] || { echo "Windows no da la firma de $nombre por válida: $estado." >&2; exit 1; }
+          case "$sujeto" in
+            *"Software y Servicios Danil"*) ;;
+            *) echo "Firmó un certificado que no es el de Danil: $sujeto" >&2; exit 1 ;;
+          esac
+          [ "$sello" = "True" ] || { echo "La firma de $nombre no lleva sello de tiempo." >&2; exit 1; }
+
+          cp -f "$firmado" "$original"
+          echo "$copia|$visto" >> "$T/firmados.txt"
+          FIRMAR
+
+          # Rutas absolutas y con `/`: el mismo comando lo ejecuta Tauri y, para
+          # el desinstalador, makensis desde otra carpeta. `bash` con ruta
+          # completa porque, sin ella, Windows puede encontrar antes el de WSL
+          # en System32.
+          CONFIG=$(jq -nc \
+            --arg bash "$(cygpath -m "$(command -v bash)")" \
+            --arg firmar "$(cygpath -m "$T/firmar-authenticode.sh")" \
+            '{bundle: {windows: {signCommand: {cmd: $bash, args: [$firmar, "%1"]}}}}')
+          echo "signCommand: $CONFIG"
+          : > "$T/firmados.txt"
+
+          pnpm desktop:build --bundles nsis --config "$CONFIG"
+
           INSTALADOR=$(find src-tauri/target/release/bundle -type f -name '*_x64-setup.exe' | head -1)
           [ -n "$INSTALADOR" ] || { echo "::error::No se construyó ningún *_x64-setup.exe."; exit 1; }
-          export ARCHIVO_W=$(cygpath -w "$(realpath "$INSTALADOR")")
-          firmar "$INSTALADOR"
+
+          # Tauri ya escribe el `.sig` después de la firma Authenticode. Se
+          # rehace de todos modos: sale gratis y no depende de ese orden interno.
           pnpm tauri signer sign "$INSTALADOR"
+
+          # Lo que se firmó, y cuántas firmas de eSigner costó.
+          echo "Firmado con eSigner:"
+          sed 's/^/  /' "$T/firmados.txt"
+          mal=0
+          for esperado in terminus.exe desinstalador.exe "$(basename "$INSTALADOR")"; do
+            grep -q "^$esperado|" "$T/firmados.txt" \
+              || { echo "::error::Tauri no pidió firmar $esperado."; mal=1; }
+          done
+          [ "$mal" = 0 ]
+          n=$(wc -l < "$T/firmados.txt")
+          [ "$n" -le 3 ] || echo "::warning title=Más firmas de eSigner::Esta release gastó $n firmas, no 3. Mira qué más pasó por signCommand."
+          {
+            echo "### Authenticode — Windows"
+            echo ""
+            echo "Firmas de eSigner en esta corrida: **$n**"
+            echo ""
+            cut -d'|' -f1,2 "$T/firmados.txt" | sed 's/|/: /; s/^/- /'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # La firma que importa es la del archivo que queda en disco, no la del que
+      # salió del build: v0.2.6 pasó todas las comprobaciones del build con un
+      # `terminus.exe` que, instalado, daba `HashMismatch`. Aquí se instala en
+      # silencio, como usuario, igual que lo hace una persona, y se mira lo que
+      # quedó en `%LOCALAPPDATA%\Terminus`.
+      - name: Comprobar las firmas de lo que se instala
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $instalador = Get-ChildItem -Recurse -File src-tauri/target/release/bundle -Filter '*_x64-setup.exe' | Select-Object -First 1
+          if (-not $instalador) { throw 'No se construyó ningún *_x64-setup.exe.' }
+
+          $p = Start-Process -FilePath $instalador.FullName -ArgumentList '/S' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "El instalador salió con $($p.ExitCode)." }
+
+          $dir = Join-Path $env:LOCALAPPDATA $env:NOMBRE
+          $mal = $false
+          foreach ($esperado in 'terminus.exe', 'uninstall.exe') {
+            if (-not (Test-Path (Join-Path $dir $esperado))) {
+              Write-Output "::error::El instalador no dejó $esperado en $dir."
+              $mal = $true
+            }
+          }
+
+          Get-ChildItem -Recurse -File $dir -Include *.exe, *.dll | ForEach-Object {
+            $s = Get-AuthenticodeSignature -LiteralPath $_.FullName
+            $rel = $_.FullName.Substring($dir.Length + 1)
+            Write-Output ("{0}: {1} | {2} | sello: {3}" -f $rel, $s.Status, $s.SignerCertificate.Subject, [bool]$s.TimeStamperCertificate)
+            if ($s.Status -ne 'Valid') {
+              Write-Output "::error title=Firma inválida en lo instalado::$rel quedó $($s.Status)."
+              $mal = $true
+            } elseif ($s.SignerCertificate.Subject -notlike '*Software y Servicios Danil*' -or -not $s.TimeStamperCertificate) {
+              Write-Output "::error::$rel no lleva el certificado de Danil con sello de tiempo."
+              $mal = $true
+            }
+          }
+
+          # Y que lo firmado sea el `.exe` ya parcheado: sin la marca de NSIS, el
+          # updater de la app no sabría qué paquete bajar.
+          $bytes = [IO.File]::ReadAllBytes((Join-Path $dir 'terminus.exe'))
+          $texto = [Text.Encoding]::ASCII.GetString($bytes)
+          if (-not $texto.Contains('__TAURI_BUNDLE_TYPE_VAR_NSS')) {
+            Write-Output '::error::El terminus.exe instalado no lleva la marca __TAURI_BUNDLE_TYPE_VAR_NSS.'
+            $mal = $true
+          }
+
+          if ($mal) { exit 1 }
+          Write-Output 'Lo instalado: terminus.exe y uninstall.exe firmados por Danil, válidos y con sello de tiempo.'
 
       - name: Construir y firmar en macOS
         if: runner.os == 'macOS'
@@ -590,6 +729,7 @@ jobs:
 
   publicar:
     needs: [mirar, construir, probar-macos, probar-git-linux]
+    if: ${{ success() && !inputs.ensayo }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
