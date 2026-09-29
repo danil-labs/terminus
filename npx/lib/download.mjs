@@ -1,17 +1,19 @@
-// Streaming download with a simple progress bar, using Node's native fetch
-// (18+). Writes to disk as data arrives so 40+ MB are not loaded into memory.
-// No dependencies.
+// Descarga por streaming con barra de progreso simple, usando fetch nativo de
+// Node (18+). Escribe a disco a medida que llega para no cargar 40+ MB en
+// memoria. Sin dependencias.
 
 import fs from 'node:fs';
 import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
+
+import { t } from './i18n.mjs';
 
 function fmtMB(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1);
 }
 
 function renderProgress(received, total) {
-  if (!process.stderr.isTTY) return; // in logs we don't clutter the output with \r
+  if (!process.stderr.isTTY) return; // en logs no ensuciamos con \r
   const width = 24;
   if (total) {
     const ratio = Math.min(1, received / total);
@@ -21,15 +23,15 @@ function renderProgress(received, total) {
       `\r  [${bar}] ${fmtMB(received)} / ${fmtMB(total)} MB (${Math.round(ratio * 100)}%)`
     );
   } else {
-    process.stderr.write(`\r  downloading... ${fmtMB(received)} MB`);
+    process.stderr.write(t('downloadingProgress', { mb: fmtMB(received) }));
   }
 }
 
-// Downloads `url` to `destPath`. Returns { bytes }. Throws if HTTP is not 200.
+// Descarga `url` a `destPath`. Devuelve { bytes }. Lanza si el HTTP no es 200.
 export async function downloadToFile(url, destPath) {
   const res = await fetch(url, { redirect: 'follow' });
   if (!res.ok) {
-    throw new Error(`download failed: HTTP ${res.status} ${res.statusText} at ${url}`);
+    throw new Error(t('httpDownload', { status: `${res.status} ${res.statusText}`.trim(), url }));
   }
   const total = Number(res.headers.get('content-length')) || 0;
   let received = 0;
@@ -44,16 +46,16 @@ export async function downloadToFile(url, destPath) {
   if (process.stderr.isTTY) process.stderr.write('\n');
 
   if (total && received !== total) {
-    throw new Error(`incomplete download: ${received} of ${total} bytes`);
+    throw new Error(t('incompleteDownload', { received, total }));
   }
   return { bytes: received };
 }
 
-// Downloads a small text resource (latest.json, .sig).
+// Descarga un recurso de texto pequeño (latest.json, .sig).
 export async function fetchText(url) {
   const res = await fetch(url, { redirect: 'follow' });
   if (!res.ok) {
-    throw new Error(`could not read ${url}: HTTP ${res.status} ${res.statusText}`);
+    throw new Error(t('httpRead', { url, status: `${res.status} ${res.statusText}`.trim() }));
   }
   return res.text();
 }
