@@ -26,7 +26,8 @@
 #     prerelease— so neither is created here.
 #
 #   • **terminus.danil.ai** links to `releases/latest/download/Terminus-Windows-Setup.exe`
-#     and `.../Terminus-macOS.dmg`. Those are **stable names with no version in
+#     `.../Terminus-macOS.dmg`, `.../Terminus-macOS-Intel.dmg`, and
+#     `.../Terminus-Linux-x86_64.AppImage`. Those are **stable names with no version in
 #     them**: the page isn't touched when publishing, which is why this workflow
 #     uploads a copy with that name in addition to the versioned file. Changing
 #     them breaks the download button without anything warning you.
@@ -264,6 +265,8 @@ jobs:
             nombre: windows
           - so: macos-latest
             nombre: macos
+          - so: ubuntu-22.04
+            nombre: linux
     runs-on: ${{ matrix.so }}
     steps:
       - name: Fetch the source
@@ -291,6 +294,10 @@ jobs:
         with:
           workspaces: src-tauri
           key: ${{ matrix.nombre }}
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf pkg-config build-essential libssl-dev libfuse2 xvfb
 
       - run: pnpm install --frozen-lockfile
 
@@ -563,6 +570,13 @@ jobs:
           APPLE_API_KEY_PATH: ${{ env.APPLE_API_KEY_PATH }}
         run: pnpm desktop:build --target universal-apple-darwin
 
+      - name: Build and sign on Linux
+        if: runner.os == 'Linux'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: pnpm exec tauri build --config src-tauri/tauri.linux.conf.json
+
       - name: Check the universal bundle
         if: runner.os == 'macOS'
         run: |
@@ -663,12 +677,16 @@ jobs:
             exigir '*_x64-setup.exe'     "Terminus_${V}_x64-setup.exe"
             exigir '*_x64-setup.exe.sig' "Terminus_${V}_x64-setup.exe.sig"
             cp "entrega/Terminus_${V}_x64-setup.exe" entrega/Terminus-Windows-Setup.exe
-          else
+          elif [ "${{ matrix.nombre }}" = "macos" ]; then
             exigir '*.app.tar.gz'     "Terminus.app.tar.gz"
             exigir '*.app.tar.gz.sig' "Terminus.app.tar.gz.sig"
             exigir '*_universal.dmg'  "Terminus_${V}_universal.dmg"
             cp "entrega/Terminus_${V}_universal.dmg" entrega/Terminus-macOS.dmg
             cp "entrega/Terminus_${V}_universal.dmg" entrega/Terminus-macOS-Intel.dmg
+          else
+            exigir '*.AppImage'     "Terminus_${V}_amd64.AppImage"
+            exigir '*.AppImage.sig' "Terminus_${V}_amd64.AppImage.sig"
+            cp "entrega/Terminus_${V}_amd64.AppImage" entrega/Terminus-Linux-x86_64.AppImage
           fi
 
           {
@@ -688,7 +706,7 @@ jobs:
           path: entrega/*
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # A single release with Windows and universal macOS inside, and the `latest.json`
+  # A single release with Windows, universal macOS, Linux, and `latest.json`
   # the app queries. It goes in a separate job because **publishing half a release
   # is worse than not publishing it**: if macOS fails, we never get here and
   # Windows doesn't go out either.
@@ -738,9 +756,46 @@ jobs:
       - name: Test the downloadable Git on Linux
         run: node scripts/git-runtime.test.mjs --download
 
+  probar-linux:
+    needs: [mirar, construir]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: canal
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install AppImage runtime dependencies
+        run: sudo apt-get update && sudo apt-get install -y libfuse2 xvfb libwebkit2gtk-4.1-0 libayatana-appindicator3-1
+      - uses: actions/download-artifact@v4
+        with:
+          name: entrega-linux
+          path: entrega
+      - name: Verify the AppImage signature and start it
+        env:
+          V: ${{ needs.mirar.outputs.version }}
+        run: |
+          set -euo pipefail
+          APP="Terminus_${V}_amd64.AppImage"
+          export APP LLAVE_PUBLICA
+          node --input-type=module <<'JS'
+          import { verifyFile } from './canal/npx/lib/minisign.mjs';
+          import { readFileSync } from 'node:fs';
+          await verifyFile({
+            filePath: `entrega/${process.env.APP}`,
+            sigFileB64: readFileSync(`entrega/${process.env.APP}.sig`, 'utf8'),
+            publicKeyB64: process.env.LLAVE_PUBLICA,
+            expectedFileName: process.env.APP,
+          });
+          console.log('AppImage minisign signature verified.');
+          JS
+          chmod +x "entrega/$APP"
+          timeout 60s xvfb-run -a "entrega/$APP" --appimage-extract-and-run kn --help
+
   publicar:
-    needs: [mirar, construir, probar-macos, probar-git-linux]
-    if: ${{ success() && !inputs.ensayo }}
+    needs: [mirar, construir, probar-macos, probar-git-linux, probar-linux]
+    if: ${{ success() }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -796,6 +851,8 @@ jobs:
             --arg win_url "$BASE/Terminus_${V}_x64-setup.exe" \
             --arg mac_sig "$(cat "entrega/Terminus.app.tar.gz.sig")" \
             --arg mac_url "$BASE/Terminus.app.tar.gz" \
+            --arg linux_sig "$(cat "entrega/Terminus_${V}_amd64.AppImage.sig")" \
+            --arg linux_url "$BASE/Terminus_${V}_amd64.AppImage" \
             '{
               version: $v,
               notes: $notas,
@@ -803,13 +860,22 @@ jobs:
               platforms: {
                 "windows-x86_64": { signature: $win_sig, url: $win_url },
                 "darwin-aarch64": { signature: $mac_sig, url: $mac_url },
-                "darwin-x86_64": { signature: $mac_sig, url: $mac_url }
+                "darwin-x86_64": { signature: $mac_sig, url: $mac_url },
+                "linux-x86_64": { signature: $linux_sig, url: $linux_url }
               }
             }' > entrega/latest.json
 
           cat entrega/latest.json
 
+      - uses: actions/upload-artifact@v4
+        if: inputs.ensayo
+        with:
+          name: entrega-manifiesto
+          path: entrega/latest.json
+          if-no-files-found: error
+
       - name: Publish the release
+        if: ${{ !inputs.ensayo }}
         env:
           GH_TOKEN: ${{ github.token }}
           V: ${{ needs.mirar.outputs.version }}
@@ -819,7 +885,7 @@ jobs:
           set -euo pipefail
 
           # shellcheck disable=SC2016  # The backticks are literal Markdown.
-          CUERPO=$(printf '%s\n\n---\n\nWindows: `Terminus-Windows-Setup.exe` · macOS (Intel and Apple Silicon): `Terminus-macOS.dmg`\n\nIf you already have it installed there is nothing to download: the app notifies you on its own.\n\nBuilt from `%s` in run `%s`.\n' "$NOTA" "$SHA" "$GITHUB_RUN_ID")
+          CUERPO=$(printf '%s\n\n---\n\nWindows: `Terminus-Windows-Setup.exe` · macOS Apple Silicon: `Terminus-macOS.dmg` · macOS Intel: `Terminus-macOS-Intel.dmg` · Linux x86_64: `Terminus-Linux-x86_64.AppImage`\n\nThe two macOS files contain the same universal DMG. If you already have it installed there is nothing to download: the app notifies you on its own.\n\nBuilt from `%s` in run `%s`.\n' "$NOTA" "$SHA" "$GITHUB_RUN_ID")
 
           # Rebuilding a version replaces the entire release. Delete it and create
           # it again, rather than `upload --clobber`, because an asset that is no
@@ -844,6 +910,7 @@ jobs:
       # `latest.json` being served is this one. This is the only thing that turns
       # it into a fact, and it costs three seconds.
       - name: Check that the app sees it
+        if: ${{ !inputs.ensayo }}
         env:
           V: ${{ needs.mirar.outputs.version }}
         run: |
@@ -855,15 +922,15 @@ jobs:
 
           [ "$(echo "$J" | jq -r .version)" = "$V" ] \
             || { echo "::error::releases/latest serves a different version"; exit 1; }
-          for p in windows-x86_64 darwin-aarch64 darwin-x86_64; do
+          for p in windows-x86_64 darwin-aarch64 darwin-x86_64 linux-x86_64; do
             echo "$J" | jq -e --arg p "$p" '.platforms[$p].signature | length > 0' >/dev/null \
               || { echo "::error::$p was published without a signature"; exit 1; }
           done
 
-          # The stable download links must exist for Windows and universal macOS.
-          for a in Terminus-Windows-Setup.exe Terminus-macOS.dmg Terminus-macOS-Intel.dmg; do
+          # All stable download links must exist before declaring success.
+          for a in Terminus-Windows-Setup.exe Terminus-macOS.dmg Terminus-macOS-Intel.dmg Terminus-Linux-x86_64.AppImage; do
             curl -fsSIL -o /dev/null "$BASE/$a" \
               || { echo "::error::$a cannot be downloaded — the page's button is broken"; exit 1; }
           done
 
-          echo "v$V published, signed for Windows and both macOS architectures, and downloadable."
+          echo "v$V published, signed for Windows, both macOS architectures, and Linux x86_64, and downloadable."
