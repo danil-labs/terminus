@@ -1,7 +1,7 @@
 {
   "name": "@danil-labs/terminus",
   "version": "0.1.6",
-  "description": "Install Terminus (Danil desktop app) with a single command: npx @danil-labs/terminus",
+  "description": "Instala Terminus (app de escritorio Danil) con un solo comando: npx @danil-labs/terminus",
   "type": "module",
   "bin": {
     "terminus": "bin.mjs",

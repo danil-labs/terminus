@@ -1,3 +1,7 @@
+// Prueba el empaquetado de la release sin construir ni publicar nada: corre los
+// pasos `run:` del workflow con archivos de prueba y llaves temporales, y mira
+// lo que dejan. Los pasos se buscan por `id`, no por `name`: el nombre es
+// documentación y cambia cuando se afina el texto.
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, cpSync, rmSync } from 'node:fs';
@@ -6,12 +10,13 @@ import { join, basename, dirname, resolve } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const workflow = JSON.parse(execFileSync('ruby', ['-ryaml', '-rjson', '-e', 'puts JSON.generate(YAML.load_file(ARGV[0]))', '.github/workflows/publicar.yml'], { cwd: repo, encoding: 'utf8' }));
+const workflow = JSON.parse(execFileSync('ruby', ['-ryaml', '-rjson', '-e', 'puts JSON.generate(YAML.load_file(ARGV[0]))', '.github/workflows/publish.yml'], { cwd: repo, encoding: 'utf8' }));
 const { verifyFile } = await import(pathToFileURL(join(repo, 'npx/lib/minisign.mjs')));
-const scratch = mkdtempSync(join(tmpdir(), 'terminus-intel-test-'));
+const { detectLocale, t } = await import(pathToFileURL(join(repo, 'npx/lib/i18n.mjs')));
+const scratch = mkdtempSync(join(tmpdir(), 'terminus-release-test-'));
 const pnpm = execFileSync('which', ['pnpm'], { encoding: 'utf8' }).trim();
 const cli = ['--package=@tauri-apps/cli@2.11.4', 'dlx', 'tauri'];
-const step = (job, name) => workflow.jobs[job].steps.find(s => s.name === name).run;
+const step = (job, id) => workflow.jobs[job].steps.find(s => s.id === id).run;
 const run = (code, cwd, env, expected = 0) => {
   const r = spawnSync('bash', ['-c', code], { cwd, env: { ...process.env, ...env }, encoding: 'utf8', timeout: 120000 });
   assert.equal(r.status, expected, `${r.error || ''}\n${r.stdout}\n${r.stderr}`);
@@ -25,56 +30,103 @@ try {
   mkdirSync(bin);
   writeFileSync(join(bin, 'pnpm'), `#!/bin/sh\nshift\nexec '${pnpm.replaceAll("'", "'\\''")}' --package=@tauri-apps/cli@2.11.4 dlx tauri "$@"\n`, { mode: 0o755 });
   const merged = join(scratch, 'merged');
-  mkdirSync(join(merged, 'entrega'), { recursive: true });
-  const matrices = workflow.jobs.construir.strategy.matrix.include;
-  assert.deepEqual(matrices.map(m => m.nombre), ['windows', 'macos']);
-  assert.deepEqual(workflow.jobs['probar-macos'].strategy.matrix.so, ['macos-latest', 'macos-15-intel']);
-  assert(workflow.jobs.publicar.needs.includes('probar-macos'));
+  mkdirSync(join(merged, 'dist'), { recursive: true });
+  const matrices = workflow.jobs.build.strategy.matrix.include;
+  assert.deepEqual(matrices.map(m => m.name), ['windows', 'macos', 'linux']);
+  assert.deepEqual(workflow.jobs['test-macos'].strategy.matrix.so, ['macos-latest', 'macos-15-intel']);
+  for (const job of ['test-macos', 'test-git-linux', 'test-linux']) assert(workflow.jobs.publish.needs.includes(job), `publish no espera a ${job}`);
+  // Ruby (YAML 1.1) lee la clave `on` como el booleano `true`.
+  const triggers = workflow.on ?? workflow.true;
+  assert(triggers.schedule.some(s => s.cron), 'el cron dejó de estar declarado');
+  assert.equal(triggers.workflow_dispatch.inputs.dry_run.type, 'boolean');
+  assert.equal(triggers.workflow_dispatch.inputs.rebuild.type, 'boolean');
   for (const row of matrices) {
-    const cwd = join(scratch, row.nombre);
-    const bundle = join(cwd, row.nombre === 'macos' ? 'src-tauri/target/universal-apple-darwin/release/bundle' : 'src-tauri/target/release/bundle');
+    const cwd = join(scratch, row.name);
+    const bundle = join(cwd, row.name === 'macos' ? 'src-tauri/target/universal-apple-darwin/release/bundle' : 'src-tauri/target/release/bundle');
     const resources = join(cwd, 'src-tauri/resources');
     mkdirSync(bundle, { recursive: true });
     mkdirSync(resources, { recursive: true });
     writeFileSync(join(resources, 'git-version.txt'), 'test git\n');
-    const archive = row.nombre === 'windows' ? 'Terminus_9.9.9_x64-setup.exe' : 'Terminus.app.tar.gz';
-    writeFileSync(join(bundle, archive), `Fixture for ${row.nombre}`);
+    const archive = { windows: 'Terminus_9.9.9_x64-setup.exe', macos: 'Terminus.app.tar.gz', linux: 'Terminus_9.9.9_amd64.AppImage' }[row.name];
+    writeFileSync(join(bundle, archive), `Fixture for ${row.name}`);
     execFileSync(pnpm, [...cli, 'signer', 'sign', join(bundle, archive)], { env: { ...process.env, ...signing }, stdio: 'pipe' });
-    if (row.nombre === 'macos') writeFileSync(join(bundle, 'Terminus_9.9.9_universal.dmg'), row.nombre);
-    const code = step('construir', 'Collect the artifacts').replaceAll('${{ matrix.nombre }}', row.nombre);
+    if (row.name === 'macos') writeFileSync(join(bundle, 'Terminus_9.9.9_universal.dmg'), row.name);
+    const code = step('build', 'collect-artifacts').replaceAll('${{ matrix.name }}', row.name);
     const env = { ...signing, PATH: `${bin}:${process.env.PATH}`, V: '9.9.9', MAC_ARCH: row.arch || '', GITHUB_STEP_SUMMARY: join(cwd, 'summary') };
     run(code, cwd, env);
-    const files = readdirSync(join(cwd, 'entrega'));
-    if (row.nombre === 'macos') {
+    const files = readdirSync(join(cwd, 'dist'));
+    if (row.name === 'macos') {
       assert.deepEqual(files.sort(), ['Terminus.app.tar.gz', 'Terminus.app.tar.gz.sig', 'Terminus-macOS.dmg', 'Terminus-macOS-Intel.dmg', 'Terminus_9.9.9_universal.dmg'].sort());
-      assert.deepEqual(readFileSync(join(cwd, 'entrega/Terminus-macOS.dmg')), readFileSync(join(cwd, 'entrega/Terminus-macOS-Intel.dmg')));
-      await assert.rejects(verifyFile({ filePath: join(bundle, archive), sigFileB64: readFileSync(join(bundle, `${archive}.sig`), 'utf8'), publicKeyB64, expectedFileName: 'Terminus-Intel.app.tar.gz' }), /the signature is for/);
+      assert.deepEqual(readFileSync(join(cwd, 'dist/Terminus-macOS.dmg')), readFileSync(join(cwd, 'dist/Terminus-macOS-Intel.dmg')));
+      await assert.rejects(verifyFile({ filePath: join(bundle, archive), sigFileB64: readFileSync(join(bundle, `${archive}.sig`), 'utf8'), publicKeyB64, expectedFileName: 'Terminus-Intel.app.tar.gz' }), /la firma es para|the signature is for/);
       rmSync(join(bundle, 'Terminus_9.9.9_universal.dmg'));
       run(code, cwd, env, 1);
     }
+    if (row.name === 'linux') {
+      assert.deepEqual(files.sort(), ['Terminus-Linux-x86_64.AppImage', 'Terminus_9.9.9_amd64.AppImage', 'Terminus_9.9.9_amd64.AppImage.sig'].sort());
+      assert.deepEqual(readFileSync(join(cwd, 'dist/Terminus-Linux-x86_64.AppImage')), readFileSync(join(cwd, 'dist/Terminus_9.9.9_amd64.AppImage')));
+      rmSync(join(bundle, `${archive}.sig`));
+      run(code, cwd, env, 1);
+    }
     for (const f of files) {
-      assert(!readdirSync(join(merged, 'entrega')).includes(f), `Asset collision: ${f}`);
-      cpSync(join(cwd, 'entrega', f), join(merged, 'entrega', f));
+      assert(!readdirSync(join(merged, 'dist')).includes(f), `Asset collision: ${f}`);
+      cpSync(join(cwd, 'dist', f), join(merged, 'dist', f));
     }
   }
-  const env = { V: '9.9.9', NOTA: 'Intel test', GITHUB_REPOSITORY: 'danil-labs/terminus' };
-  run(step('publicar', 'Each signature speaks for the file being published'), merged, env);
-  run(step('publicar', 'Assemble latest.json'), merged, env);
-  const manifest = JSON.parse(readFileSync(join(merged, 'entrega/latest.json'), 'utf8'));
-  assert.deepEqual(Object.keys(manifest.platforms).sort(), ['windows-x86_64', 'darwin-aarch64', 'darwin-x86_64'].sort());
+
+  // El manifiesto, con las notas en los dos idiomas y con la transición: sin
+  // nota en inglés, `notes` cae a la de español y `notes_by_locale.en` queda vacío.
+  const base = { V: '9.9.9', GITHUB_REPOSITORY: 'danil-labs/terminus' };
+  run(step('publish', 'verify-signature-names'), merged, base);
+  run(step('publish', 'build-manifest'), merged, { ...base, NOTE_ES: 'Prueba', NOTE_EN: 'Test' });
+  let manifest = JSON.parse(readFileSync(join(merged, 'dist/latest.json'), 'utf8'));
+  assert.equal(manifest.notes, 'Test');
+  assert.deepEqual(manifest.notes_by_locale, { es: 'Prueba', en: 'Test' });
+  run(step('publish', 'build-manifest'), merged, { ...base, NOTE_ES: 'Solo español', NOTE_EN: '' });
+  manifest = JSON.parse(readFileSync(join(merged, 'dist/latest.json'), 'utf8'));
+  assert.equal(manifest.notes, 'Solo español');
+  assert.deepEqual(manifest.notes_by_locale, { es: 'Solo español', en: '' });
+  console.log('PASS notes: notes + notes_by_locale, with and without an English note');
+
+  assert.deepEqual(Object.keys(manifest.platforms).sort(), ['windows-x86_64', 'darwin-aarch64', 'darwin-x86_64', 'linux-x86_64'].sort());
   assert.deepEqual(manifest.platforms['darwin-aarch64'], manifest.platforms['darwin-x86_64']);
   for (const [platform, entry] of Object.entries(manifest.platforms)) {
     const name = basename(new URL(entry.url).pathname);
-    await verifyFile({ filePath: join(merged, 'entrega', name), sigFileB64: entry.signature, publicKeyB64, expectedFileName: name });
+    await verifyFile({ filePath: join(merged, 'dist', name), sigFileB64: entry.signature, publicKeyB64, expectedFileName: name });
     console.log(`PASS ${platform}: correct asset, valid Tauri signature, accepted by npx`);
   }
+
   const platformSource = readFileSync(join(repo, 'npx/lib/platform.mjs'), 'utf8');
+  // Se reemplazan las dos líneas exactas y no la primera mención: `process.platform`
+  // también aparece en un comentario, y ahí el reemplazo no cambiaría nada.
+  const detect = async (platform, arch) => {
+    const { detectPlatform } = await import(`data:text/javascript,${encodeURIComponent(platformSource.replace('const platform = process.platform;', `const platform = '${platform}';`).replace('const arch = process.arch;', `const arch = '${arch}';`))}`);
+    return detectPlatform();
+  };
   for (const [arch, expected] of [['x64', 'darwin-x86_64'], ['arm64', 'darwin-aarch64']]) {
-    const { detectPlatform } = await import(`data:text/javascript,${encodeURIComponent(platformSource.replace('process.platform', "'darwin'").replace('process.arch;', `'${arch}';`))}`);
-    assert.equal(detectPlatform().key, expected);
+    assert.equal((await detect('darwin', arch)).key, expected);
   }
-  console.log('PASS negative controls: stale filename signature rejected; missing universal DMG aborts collection');
-  console.log('PASS npx architecture selection: Mac Intel and Apple Silicon');
+  const linux = await detect('linux', 'x64');
+  assert.equal(linux.key, 'linux-x86_64');
+  assert.equal(linux.installerKind, 'linux-appimage');
+  console.log('PASS npx platform selection: Mac Intel, Apple Silicon and Linux x86_64');
+
+  // El idioma de los mensajes de `npx`: el entorno manda y el inglés es el
+  // valor por defecto.
+  assert.equal(detectLocale({ LC_ALL: 'es_MX.UTF-8', LANG: 'en_US.UTF-8' }), 'es');
+  assert.equal(detectLocale({ LANG: 'es_ES.UTF-8' }), 'es');
+  assert.equal(detectLocale({ LC_ALL: 'en_GB.UTF-8', LANG: 'es_MX.UTF-8' }), 'en');
+  assert.equal(detectLocale({ LC_ALL: 'fr_FR.UTF-8' }), 'en');
+  assert.equal(detectLocale({ LANG: 'C' }), detectLocale({}));
+  const before = { LC_ALL: process.env.LC_ALL };
+  process.env.LC_ALL = 'es_MX.UTF-8';
+  assert.match(t('otherKey', { got: 'a', expected: 'b' }), /otra clave/);
+  process.env.LC_ALL = 'en_US.UTF-8';
+  assert.match(t('otherKey', { got: 'a', expected: 'b' }), /different key/);
+  if (before.LC_ALL === undefined) delete process.env.LC_ALL; else process.env.LC_ALL = before.LC_ALL;
+  console.log('PASS npx language: Spanish or English by system locale, English by default');
+
+  console.log('PASS negative controls: stale filename signature rejected; missing universal DMG and missing AppImage signature abort collection');
 } finally {
   rmSync(scratch, { recursive: true, force: true });
 }

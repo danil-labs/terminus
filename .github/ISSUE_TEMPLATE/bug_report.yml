@@ -1,20 +1,20 @@
-name: Report a bug
-description: Something in Terminus isn't working as it should.
+name: Reportar un bug
+description: Algo en Terminus no funciona como debería.
 title: "[Bug]: "
 labels: ["bug"]
 body:
   - type: textarea
-    id: que-paso
+    id: what-happened
     attributes:
-      label: What happened?
-      description: What you expected to happen, and what happened instead.
-      placeholder: When I clicked... I expected... but instead...
+      label: ¿Qué pasó?
+      description: Qué esperabas que pasara, y qué pasó en cambio.
+      placeholder: Al hacer clic en... esperaba que... pero en cambio...
     validations:
       required: true
   - type: textarea
-    id: pasos
+    id: steps
     attributes:
-      label: Steps to reproduce
+      label: Pasos para reproducirlo
       placeholder: |
         1. ...
         2. ...
@@ -24,24 +24,25 @@ body:
   - type: input
     id: version
     attributes:
-      label: Terminus version
-      description: You can see it in the bottom-right corner of the window.
+      label: Versión de Terminus
+      description: La ves en la esquina inferior derecha de la ventana.
       placeholder: "0.2.0"
     validations:
       required: true
   - type: dropdown
-    id: plataforma
+    id: platform
     attributes:
-      label: Platform
+      label: Plataforma
       options:
         - Windows
         - macOS
+        - Linux
     validations:
       required: true
   - type: textarea
-    id: capturas
+    id: screenshots
     attributes:
-      label: Screenshots or video
-      description: Drag an image or a video here if you have one — it helps a lot.
+      label: Capturas o video
+      description: Arrastra una imagen o un video aquí si tienes uno — ayuda mucho.
     validations:
       required: false
