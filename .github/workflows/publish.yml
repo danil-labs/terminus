@@ -1,0 +1,15 @@
+# Reserva el nombre `publish.yml` en `main`. GitHub solo deja despachar a mano
+# (`gh workflow run`) un workflow que ya exista en la rama por defecto, y el
+# ensayo de la renombrada de `publicar.yml` a `publish.yml` necesita despacharse
+# desde la rama del PR antes de mergear. Este archivo no hace nada; el PR que
+# sigue lo reemplaza por el workflow de verdad.
+name: publish
+
+on:
+  workflow_dispatch:
+
+jobs:
+  placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Marcador de posicion"
