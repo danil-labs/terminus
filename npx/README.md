@@ -1,89 +1,92 @@
 # @danil-labs/terminus
 
-Instala **Terminus** (la app de escritorio de Danil) con un solo comando:
+Install **Terminus** (Danil's desktop app) with a single command:
 
 ```bash
 npx @danil-labs/terminus
 ```
 
-Es un canal de distribución para desarrolladores —que ya tienen Node— adicional
-al instalador `.exe` que se baja a mano desde [terminus.danil.ai](https://terminus.danil.ai).
+It is a distribution channel for developers — who already have Node — in
+addition to the installer you download by hand from
+[terminus.danil.ai](https://terminus.danil.ai).
 
-## Qué hace
+## What it does
 
-1. Detecta tu sistema operativo y arquitectura (`process.platform` / `process.arch`).
-2. Lee `latest.json` de la última release pública de
+1. Detects your operating system and architecture (`process.platform` /
+   `process.arch`).
+2. Reads `latest.json` from the latest public release of
    [`danil-labs/terminus`](https://github.com/danil-labs/terminus/releases/latest)
-   (repo público, sin autenticación) y resuelve el instalador de tu plataforma.
-3. Descarga el instalador a una carpeta temporal, con barra de progreso.
-4. **Verifica su firma antes de ejecutar ni copiar nada.** Si la verificación
-   falla, borra la descarga y sale con error — nunca ejecuta un binario no
-   verificado.
-5. En Windows lanza el instalador; en macOS descomprime la app y la deja en
-   `/Applications`. A partir de ahí, la app se actualiza sola.
+   (public repository, no authentication) and resolves the installer for your
+   platform.
+3. Downloads the installer to a temporary folder, with a progress bar.
+4. **Verifies its signature before running or copying anything.** If
+   verification fails, it deletes the download and exits with an error — it never
+   runs an unverified binary.
+5. On Windows it launches the installer; on macOS it unpacks the app and places
+   it in `/Applications`. From then on, the app updates itself.
 
-El comando selecciona Windows x64, Mac Apple Silicon o Mac Intel según la
-entrada disponible en `latest.json`. La release v0.2.0 solo trae los dos
-primeros. El workflow universal asigna el mismo archivo y firma a `darwin-aarch64` y
-`darwin-x86_64`; estará disponible cuando se publique esa release. No hace falta cambiar el comando ni el instalador npx.
-Si falta la entrada de una plataforma, incluida Linux, informa que no hay build
-y termina con error.
+The command selects Windows x64, Apple Silicon Mac or Intel Mac according to the
+entry available in `latest.json`. Release v0.2.0 only ships the first two. The
+universal workflow assigns the same file and signature to `darwin-aarch64` and
+`darwin-x86_64`; it will be available once that release is published. Neither the
+command nor the npx installer needs to change. If a platform's entry is missing,
+Linux included, it reports that there is no build and exits with an error.
 
-**En macOS este canal se salta el diálogo de «desarrollador no verificado».** La
-cuarentena la pone quien descarga —el navegador—, no el archivo: bajado con
-`fetch` y descomprimido con `tar`, el `.app` nace sin ese atributo. El `.dmg` de
-la página sí lo lleva. No es un atajo de seguridad: la firma minisign se
-comprueba igual, contra la misma llave que la app usa para actualizarse, y sin
-ella no se llega a copiar nada.
+**On macOS this channel skips the "unverified developer" dialog.** Quarantine is
+set by whoever downloads — the browser — not by the file: downloaded with `fetch`
+and unpacked with `tar`, the `.app` is born without that attribute. The `.dmg`
+on the website does carry it. This is not a security shortcut: the minisign
+signature is checked all the same, against the same key the app uses to update
+itself, and without it nothing gets copied.
 
-## Opciones
+## Options
 
-| Opción | Efecto |
+| Option | Effect |
 |---|---|
-| `-n`, `--dry-run` | Descarga y verifica, pero **no** ejecuta el instalador. |
-| `-h`, `--help` | Muestra la ayuda. |
+| `-n`, `--dry-run` | Downloads and verifies, but does **not** run the installer. |
+| `-h`, `--help` | Shows the help. |
 
-## Verificación de integridad
+## Integrity verification
 
-El nivel logrado es **firma minisign completa**, no un simple SHA-256:
+The level achieved is a **full minisign signature**, not a plain SHA-256:
 
-- El instalador está firmado con **minisign en modo hashed** (prehash
-  BLAKE2b-512 + Ed25519) — la firma que genera el updater de Tauri. La clave
-  pública está embebida en la app (`tauri.conf.json` → `plugins.updater.pubkey`)
-  y se copia como constante en `bin.mjs`. Es pública por diseño.
-- Se verifican **las dos firmas** del archivo minisign: la del **contenido**
-  (prueba que los bytes descargados son los firmados) y la del **comentario de
-  confianza** (autentica el nombre del archivo firmado).
-- Además se comprueba que el `keyId` de la firma coincide con el de la clave, y
-  que el nombre del archivo firmado es el esperado.
-- Todo con el módulo `crypto` nativo de Node — **cero dependencias**. Node 18+
-  trae `blake2b512` (vía OpenSSL) y verificación Ed25519 nativa.
+- The installer is signed with **minisign in hashed mode** (BLAKE2b-512 prehash
+  + Ed25519) — the signature generated by the Tauri updater. The public key is
+  embedded in the app (`tauri.conf.json` → `plugins.updater.pubkey`) and copied
+  as a constant into `bin.mjs`. It is public by design.
+- **Both signatures** in the minisign file are verified: the one over the
+  **content** (proves the downloaded bytes are the signed ones) and the one over
+  the **trusted comment** (authenticates the name of the signed file).
+- It also checks that the signature's `keyId` matches the key's, and that the
+  signed file's name is the expected one.
+- All with Node's native `crypto` module — **zero dependencies**. Node 18+ ships
+  `blake2b512` (via OpenSSL) and native Ed25519 verification.
 
-Como transparencia se imprime también el SHA-256 del archivo, pero la garantía
-fuerte es la firma minisign, no el hash.
+For transparency the file's SHA-256 is printed too, but the strong guarantee is
+the minisign signature, not the hash.
 
-## Requisitos
+## Requirements
 
-- **Node.js 18 o superior** (usa `fetch` y Web Streams nativos).
-- Sin dependencias de terceros.
+- **Node.js 18 or later** (uses native `fetch` and Web Streams).
+- No third-party dependencies.
 
-## Cómo se resuelve el asset
+## How the asset is resolved
 
-`latest.json` es la fuente de verdad: trae la versión, la URL exacta del
-artefacto firmado y su firma embebida. Se descarga y verifica **ese** artefacto
-—el que la firma cubre—, no el alias de nombre estable
-`Terminus-Windows-Setup.exe` (que es una copia byte a byte, pero no dependemos
-de esa suposición: verificamos exactamente lo firmado).
+`latest.json` is the source of truth: it carries the version, the exact URL of
+the signed artifact and its embedded signature. **That** artifact — the one the
+signature covers — is downloaded and verified, not the stable-name alias
+`Terminus-Windows-Setup.exe` (which is a byte-for-byte copy, but we don't rely on
+that assumption: we verify exactly what was signed).
 
-En macOS lo que trae el manifiesto **no es el `.dmg`**: es el `.app` comprimido,
-el mismo artefacto que la app usa para actualizarse sola. El `.dmg` existe para
-quien baja de la página y no lleva firma minisign, así que este canal usa el que
-sí la lleva. Por eso instalar aquí es descomprimir y copiar, no abrir un
-instalador.
+On macOS what the manifest carries is **not the `.dmg`**: it is the compressed
+`.app`, the same artifact the app uses to update itself. The `.dmg` exists for
+people who download from the website and carries no minisign signature, so this
+channel uses the one that does. That is why installing here means unpacking and
+copying, not opening an installer.
 
-## Desarrollo / prueba local
+## Development / local testing
 
 ```bash
-node bin.mjs --dry-run   # descarga + verifica contra la release real, sin instalar
-npm pack                 # genera el tarball para inspección
+node bin.mjs --dry-run   # download + verify against the real release, without installing
+npm pack                 # generate the tarball for inspection
 ```
