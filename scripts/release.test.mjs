@@ -30,7 +30,7 @@ try {
   mkdirSync(bin);
   writeFileSync(join(bin, 'pnpm'), `#!/bin/sh\nshift\nexec '${pnpm.replaceAll("'", "'\\''")}' --package=@tauri-apps/cli@2.11.4 dlx tauri "$@"\n`, { mode: 0o755 });
   const merged = join(scratch, 'merged');
-  mkdirSync(join(merged, 'dist'), { recursive: true });
+  mkdirSync(join(merged, 'release-assets'), { recursive: true });
   const matrices = workflow.jobs.build.strategy.matrix.include;
   assert.deepEqual(matrices.map(m => m.name), ['windows', 'macos', 'linux']);
   assert.deepEqual(workflow.jobs['test-macos'].strategy.matrix.so, ['macos-latest', 'macos-15-intel']);
@@ -54,23 +54,23 @@ try {
     const code = step('build', 'collect-artifacts').replaceAll('${{ matrix.name }}', row.name);
     const env = { ...signing, PATH: `${bin}:${process.env.PATH}`, V: '9.9.9', MAC_ARCH: row.arch || '', GITHUB_STEP_SUMMARY: join(cwd, 'summary') };
     run(code, cwd, env);
-    const files = readdirSync(join(cwd, 'dist'));
+    const files = readdirSync(join(cwd, 'release-assets'));
     if (row.name === 'macos') {
       assert.deepEqual(files.sort(), ['Terminus.app.tar.gz', 'Terminus.app.tar.gz.sig', 'Terminus-macOS.dmg', 'Terminus-macOS-Intel.dmg', 'Terminus_9.9.9_universal.dmg'].sort());
-      assert.deepEqual(readFileSync(join(cwd, 'dist/Terminus-macOS.dmg')), readFileSync(join(cwd, 'dist/Terminus-macOS-Intel.dmg')));
+      assert.deepEqual(readFileSync(join(cwd, 'release-assets/Terminus-macOS.dmg')), readFileSync(join(cwd, 'release-assets/Terminus-macOS-Intel.dmg')));
       await assert.rejects(verifyFile({ filePath: join(bundle, archive), sigFileB64: readFileSync(join(bundle, `${archive}.sig`), 'utf8'), publicKeyB64, expectedFileName: 'Terminus-Intel.app.tar.gz' }), /la firma es para|the signature is for/);
       rmSync(join(bundle, 'Terminus_9.9.9_universal.dmg'));
       run(code, cwd, env, 1);
     }
     if (row.name === 'linux') {
       assert.deepEqual(files.sort(), ['Terminus-Linux-x86_64.AppImage', 'Terminus_9.9.9_amd64.AppImage', 'Terminus_9.9.9_amd64.AppImage.sig'].sort());
-      assert.deepEqual(readFileSync(join(cwd, 'dist/Terminus-Linux-x86_64.AppImage')), readFileSync(join(cwd, 'dist/Terminus_9.9.9_amd64.AppImage')));
+      assert.deepEqual(readFileSync(join(cwd, 'release-assets/Terminus-Linux-x86_64.AppImage')), readFileSync(join(cwd, 'release-assets/Terminus_9.9.9_amd64.AppImage')));
       rmSync(join(bundle, `${archive}.sig`));
       run(code, cwd, env, 1);
     }
     for (const f of files) {
-      assert(!readdirSync(join(merged, 'dist')).includes(f), `Asset collision: ${f}`);
-      cpSync(join(cwd, 'dist', f), join(merged, 'dist', f));
+      assert(!readdirSync(join(merged, 'release-assets')).includes(f), `Asset collision: ${f}`);
+      cpSync(join(cwd, 'release-assets', f), join(merged, 'release-assets', f));
     }
   }
 
@@ -79,11 +79,11 @@ try {
   const base = { V: '9.9.9', GITHUB_REPOSITORY: 'danil-labs/terminus' };
   run(step('publish', 'verify-signature-names'), merged, base);
   run(step('publish', 'build-manifest'), merged, { ...base, NOTE_ES: 'Prueba', NOTE_EN: 'Test' });
-  let manifest = JSON.parse(readFileSync(join(merged, 'dist/latest.json'), 'utf8'));
+  let manifest = JSON.parse(readFileSync(join(merged, 'release-assets/latest.json'), 'utf8'));
   assert.equal(manifest.notes, 'Test');
   assert.deepEqual(manifest.notes_by_locale, { es: 'Prueba', en: 'Test' });
   run(step('publish', 'build-manifest'), merged, { ...base, NOTE_ES: 'Solo español', NOTE_EN: '' });
-  manifest = JSON.parse(readFileSync(join(merged, 'dist/latest.json'), 'utf8'));
+  manifest = JSON.parse(readFileSync(join(merged, 'release-assets/latest.json'), 'utf8'));
   assert.equal(manifest.notes, 'Solo español');
   assert.deepEqual(manifest.notes_by_locale, { es: 'Solo español', en: '' });
   console.log('PASS notes: notes + notes_by_locale, with and without an English note');
@@ -92,7 +92,7 @@ try {
   assert.deepEqual(manifest.platforms['darwin-aarch64'], manifest.platforms['darwin-x86_64']);
   for (const [platform, entry] of Object.entries(manifest.platforms)) {
     const name = basename(new URL(entry.url).pathname);
-    await verifyFile({ filePath: join(merged, 'dist', name), sigFileB64: entry.signature, publicKeyB64, expectedFileName: name });
+    await verifyFile({ filePath: join(merged, 'release-assets', name), sigFileB64: entry.signature, publicKeyB64, expectedFileName: name });
     console.log(`PASS ${platform}: correct asset, valid Tauri signature, accepted by npx`);
   }
 
@@ -125,6 +125,13 @@ try {
   assert.match(t('otherKey', { got: 'a', expected: 'b' }), /different key/);
   if (before.LC_ALL === undefined) delete process.env.LC_ALL; else process.env.LC_ALL = before.LC_ALL;
   console.log('PASS npx language: Spanish or English by system locale, English by default');
+
+  // `dist/` es la salida de Vite en harness-app: si el workflow junta ahí los
+  // instaladores, el frontend compilado (`index.html`, `assets/`) se cuela en la
+  // release y `gh release create` falla al topar con una carpeta. Pasó en v0.2.7.
+  const publishYml = readFileSync(join(repo, '.github/workflows/publish.yml'), 'utf8');
+  assert(!/(?<![\w-])dist\//.test(publishYml), 'publish.yml usa la carpeta dist/, que es la de Vite');
+  console.log('PASS installers are collected outside Vite\'s dist/');
 
   console.log('PASS negative controls: stale filename signature rejected; missing universal DMG and missing AppImage signature abort collection');
 } finally {

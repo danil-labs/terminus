@@ -625,7 +625,7 @@ jobs:
           fi
 
       # El código de salida de `tauri build` tampoco basta: un .app ad-hoc o sin
-      # ticket grapado llega a `dist/` igual. `stapler validate` es lo que
+      # ticket grapado llega a `release-assets/` igual. `stapler validate` es lo que
       # Gatekeeper mira en un Mac sin red; si falla, no se publica.
       # Tauri notariza y grapa el `.app`; el `.dmg` lo arma después, y sale sin
       # ticket propio. Lo que la gente descarga es el `.dmg`, así que se
@@ -683,7 +683,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          mkdir -p dist
+          mkdir -p release-assets
           B=src-tauri/target/release/bundle
           if [ "${{ matrix.name }}" = "macos" ]; then
             B=src-tauri/target/universal-apple-darwin/release/bundle
@@ -698,7 +698,7 @@ jobs:
               find "$B" -type f | sed 's/^/    /'
               exit 1
             fi
-            cp "$f" "dist/$target"
+            cp "$f" "release-assets/$target"
             echo "  $pattern → $target  ($(du -h "$f" | cut -f1))"
           }
 
@@ -708,19 +708,19 @@ jobs:
             # de progreso pero sin preguntar nada.
             require_file '*_x64-setup.exe'     "Terminus_${V}_x64-setup.exe"
             require_file '*_x64-setup.exe.sig' "Terminus_${V}_x64-setup.exe.sig"
-            cp "dist/Terminus_${V}_x64-setup.exe" dist/Terminus-Windows-Setup.exe
+            cp "release-assets/Terminus_${V}_x64-setup.exe" release-assets/Terminus-Windows-Setup.exe
           elif [ "${{ matrix.name }}" = "macos" ]; then
             require_file '*.app.tar.gz'     "Terminus.app.tar.gz"
             require_file '*.app.tar.gz.sig' "Terminus.app.tar.gz.sig"
             require_file '*_universal.dmg'  "Terminus_${V}_universal.dmg"
-            cp "dist/Terminus_${V}_universal.dmg" dist/Terminus-macOS.dmg
-            cp "dist/Terminus_${V}_universal.dmg" dist/Terminus-macOS-Intel.dmg
+            cp "release-assets/Terminus_${V}_universal.dmg" release-assets/Terminus-macOS.dmg
+            cp "release-assets/Terminus_${V}_universal.dmg" release-assets/Terminus-macOS-Intel.dmg
           else
             # El AppImage es lo que el updater baja y lo que la página enlaza:
             # una sola copia versionada, más el nombre estable.
             require_file '*.AppImage'     "Terminus_${V}_amd64.AppImage"
             require_file '*.AppImage.sig' "Terminus_${V}_amd64.AppImage.sig"
-            cp "dist/Terminus_${V}_amd64.AppImage" dist/Terminus-Linux-x86_64.AppImage
+            cp "release-assets/Terminus_${V}_amd64.AppImage" release-assets/Terminus-Linux-x86_64.AppImage
           fi
 
           {
@@ -728,7 +728,7 @@ jobs:
             echo ""
             echo "| archivo | tamaño |"
             echo "|---|---|"
-            for f in dist/*; do
+            for f in release-assets/*; do
               echo "| $(basename "$f") | $(du -h "$f" | cut -f1) |"
             done
           } >> "$GITHUB_STEP_SUMMARY"
@@ -737,7 +737,7 @@ jobs:
         with:
           name: dist-${{ matrix.name }}
           if-no-files-found: error
-          path: dist/*
+          path: release-assets/*
 
   # ─────────────────────────────────────────────────────────────────────────────
   # Una sola release con Windows, macOS universal y Linux dentro, y el
@@ -765,11 +765,11 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: dist-macos
-          path: dist
+          path: release-assets
       - name: Ejecutar el mismo universal en ambas arquitecturas
         run: |
           set -euo pipefail
-          tar xzf dist/Terminus.app.tar.gz
+          tar xzf release-assets/Terminus.app.tar.gz
           lipo Terminus.app/Contents/MacOS/terminus -verify_arch arm64 x86_64
           codesign --verify --deep --strict Terminus.app
           Terminus.app/Contents/MacOS/terminus kn --help
@@ -810,7 +810,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: dist-linux
-          path: dist
+          path: release-assets
       - name: Verificar la firma del AppImage y arrancarlo
         env:
           V: ${{ needs.check.outputs.version }}
@@ -822,15 +822,15 @@ jobs:
           import { verifyFile } from './channel/npx/lib/minisign.mjs';
           import { readFileSync } from 'node:fs';
           await verifyFile({
-            filePath: `dist/${process.env.APP}`,
-            sigFileB64: readFileSync(`dist/${process.env.APP}.sig`, 'utf8'),
+            filePath: `release-assets/${process.env.APP}`,
+            sigFileB64: readFileSync(`release-assets/${process.env.APP}.sig`, 'utf8'),
             publicKeyB64: process.env.PUBLIC_KEY,
             expectedFileName: process.env.APP,
           });
           console.log('Firma minisign del AppImage verificada.');
           JS
-          chmod +x "dist/$APP"
-          timeout 60s xvfb-run -a "dist/$APP" --appimage-extract-and-run kn --help
+          chmod +x "release-assets/$APP"
+          timeout 60s xvfb-run -a "release-assets/$APP" --appimage-extract-and-run kn --help
 
   publish:
     needs: [check, build, test-macos, test-git-linux, test-linux]
@@ -843,7 +843,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          path: dist
+          path: release-assets
           merge-multiple: true
 
       # La firma no cubre solo los bytes: su comentario de confianza lleva el
@@ -858,7 +858,7 @@ jobs:
         run: |
           set -euo pipefail
           failed=0
-          for sig in dist/*.sig; do
+          for sig in release-assets/*.sig; do
             file=$(basename "${sig%.sig}")
             signed_name=$(base64 -d < "$sig" | grep -o 'file:[^[:space:]]*' | head -1 | cut -d: -f2-)
             if [ "$signed_name" != "$file" ]; then
@@ -878,7 +878,7 @@ jobs:
           NOTE_EN: ${{ needs.check.outputs.note_en }}
         run: |
           set -euo pipefail
-          ls -la dist
+          ls -la release-assets
 
           BASE="https://github.com/$GITHUB_REPOSITORY/releases/download/v$V"
 
@@ -895,11 +895,11 @@ jobs:
             --arg notes_es "$NOTE_ES" \
             --arg notes_en "$NOTE_EN" \
             --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" \
-            --arg win_sig "$(cat "dist/Terminus_${V}_x64-setup.exe.sig")" \
+            --arg win_sig "$(cat "release-assets/Terminus_${V}_x64-setup.exe.sig")" \
             --arg win_url "$BASE/Terminus_${V}_x64-setup.exe" \
-            --arg mac_sig "$(cat "dist/Terminus.app.tar.gz.sig")" \
+            --arg mac_sig "$(cat "release-assets/Terminus.app.tar.gz.sig")" \
             --arg mac_url "$BASE/Terminus.app.tar.gz" \
-            --arg linux_sig "$(cat "dist/Terminus_${V}_amd64.AppImage.sig")" \
+            --arg linux_sig "$(cat "release-assets/Terminus_${V}_amd64.AppImage.sig")" \
             --arg linux_url "$BASE/Terminus_${V}_amd64.AppImage" \
             '{
               version: $v,
@@ -912,9 +912,9 @@ jobs:
                 "darwin-x86_64": { signature: $mac_sig, url: $mac_url },
                 "linux-x86_64": { signature: $linux_sig, url: $linux_url }
               }
-            }' > dist/latest.json
+            }' > release-assets/latest.json
 
-          cat dist/latest.json
+          cat release-assets/latest.json
 
       # En un ensayo no hay release donde mirarlo: el manifiesto se queda como
       # artefacto, que es lo que se revisa para saber que salió bien armado.
@@ -922,7 +922,7 @@ jobs:
         if: inputs.dry_run
         with:
           name: dist-manifest
-          path: dist/latest.json
+          path: release-assets/latest.json
           if-no-files-found: error
 
       - name: Publicar la release
@@ -969,7 +969,7 @@ jobs:
             --title "v$V" \
             --notes "$BODY" \
             --latest \
-            dist/*
+            release-assets/*
 
       # Comprobar lo publicado desde fuera, por la misma URL que usan la app y la
       # página. Que el paso anterior salga con 0 dice que GitHub aceptó los
