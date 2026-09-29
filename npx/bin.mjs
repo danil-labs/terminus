@@ -168,6 +168,29 @@ function installMacApp(tarPath, tmpDir) {
   spawnSync('open', [puesta]);
 }
 
+
+function installLinuxAppImage(srcPath) {
+  const appsDir = path.join(os.homedir(), 'Applications');
+  const dest = path.join(appsDir, 'Terminus.AppImage');
+  const binLink = path.join(os.homedir(), '.local', 'bin', 'terminus');
+  log(`\n${paint(C.bold, 'Instalando')}`);
+  fs.mkdirSync(appsDir, { recursive: true });
+  fs.mkdirSync(path.dirname(binLink), { recursive: true });
+  fs.copyFileSync(srcPath, dest);
+  fs.chmodSync(dest, 0o755);
+  try { fs.symlinkSync(dest, binLink); } catch (e) {
+    if (e && e.code === 'EEXIST') {
+      fs.unlinkSync(binLink);
+      fs.symlinkSync(dest, binLink);
+    } else {
+      throw e;
+    }
+  }
+  log(paint(C.green, `\n✓ Instalada en ${dest}`));
+  log(paint(C.dim, '  También en ~/.local/bin/terminus (si ese directorio está en tu PATH).'));
+  log(paint(C.dim, '  A partir de ahora, Terminus se actualiza sola desde dentro de la app.'));
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) return printHelp();
@@ -260,6 +283,8 @@ async function main() {
     log(paint(C.dim, '  A partir de ahora, Terminus se actualiza solo desde dentro de la app.'));
   } else if (plat.installerKind === 'macos') {
     installMacApp(installerPath, tmpDir);
+  } else if (plat.installerKind === 'linux') {
+    installLinuxAppImage(installerPath);
   } else {
     // Plataforma resuelta en latest.json pero sin ejecución automática aquí.
     log(paint(C.green, `\n✓ Descargado y verificado: ${installerPath}`));
