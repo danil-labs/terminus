@@ -1,14 +1,14 @@
 #!/usr/bin/env node
-// npx @danil-labs/terminus — instala Terminus (app de escritorio Danil) con un
-// comando. Canal para desarrolladores (que ya tienen Node), adicional al .exe
-// que se descarga a mano.
+// npx @danil-labs/terminus — installs Terminus (Danil desktop app) with one
+// command. A channel for developers (who already have Node), in addition to the
+// .exe that is downloaded by hand.
 //
-// Flujo: detecta SO/arquitectura -> resuelve el asset en las releases PÚBLICAS
-// de danil-labs/terminus vía latest.json -> descarga -> VERIFICA minisign (no
-// opcional: descargamos y ejecutamos un binario nativo) -> ejecuta el
-// instalador. Si la verificación falla, borra la descarga y sale con error.
+// Flow: detect OS/architecture -> resolve the asset in the PUBLIC releases of
+// danil-labs/terminus via latest.json -> download -> VERIFY minisign (not
+// optional: we download and run a native binary) -> run the installer. If
+// verification fails, it deletes the download and exits with an error.
 //
-// Sin dependencias: fetch/crypto/child_process nativos de Node 18+.
+// No dependencies: native fetch/crypto/child_process from Node 18+.
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -20,9 +20,9 @@ import { detectPlatform } from './lib/platform.mjs';
 import { downloadToFile, fetchText } from './lib/download.mjs';
 import { verifyFile } from './lib/minisign.mjs';
 
-// Clave pública minisign de Terminus. Idéntica a la embebida en la app
+// Terminus minisign public key. Identical to the one embedded in the app
 // (harness-app/terminus-app -> src-tauri/tauri.conf.json -> plugins.updater.pubkey).
-// Es pública por diseño; sella que el instalador salió de Danil.
+// It is public by design; it seals that the installer came from Danil.
 const PUBKEY_B64 =
   'dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM5ODEzRDE1M0QwQ0RFQjgKUldTNDNndzlGVDJCT1hPSnp4ZzBIbkowOW9kVGFYb0YyRkZKZjNTT2N3eERXOXhuRi9UblY5d3EK';
 
@@ -47,24 +47,24 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-  log(`${paint(C.bold, 'Terminus')} — instalador vía npx
+  log(`${paint(C.bold, 'Terminus')} — installer via npx
 
-  Uso:
-    npx @danil-labs/terminus [opciones]
+  Usage:
+    npx @danil-labs/terminus [options]
 
-  Opciones:
-    -n, --dry-run   Descarga y verifica, pero NO ejecuta el instalador.
-    -h, --help      Muestra esta ayuda.
+  Options:
+    -n, --dry-run   Downloads and verifies, but does NOT run the installer.
+    -h, --help      Shows this help.
 
-  Qué hace:
-    1. Detecta tu sistema operativo y arquitectura.
-    2. Resuelve el artefacto correcto de las releases públicas de Terminus.
-    3. Lo descarga a una carpeta temporal.
-    4. Verifica su firma minisign antes de ejecutar ni copiar nada.
-    5. Windows: lanza el instalador. macOS: descomprime la app y la deja en
-       /Applications. A partir de ahí, se actualiza sola.
+  What it does:
+    1. Detects your operating system and architecture.
+    2. Resolves the right artifact from the public Terminus releases.
+    3. Downloads it to a temporary folder.
+    4. Verifies its minisign signature before running or copying anything.
+    5. Windows: launches the installer. macOS: unpacks the app and places it in
+       /Applications. From then on, it updates itself.
 
-  Descarga manual: ${MANUAL_DOWNLOAD_URL}`);
+  Manual download: ${MANUAL_DOWNLOAD_URL}`);
 }
 
 async function sha256File(filePath) {
@@ -75,25 +75,25 @@ async function sha256File(filePath) {
 }
 
 function runWindowsInstaller(exePath) {
-  // NSIS en modo normal (interactivo). Se lanza desprendido para que este
-  // proceso de npx pueda salir mientras el instalador sigue en pantalla.
+  // NSIS in normal (interactive) mode. It is launched detached so this npx
+  // process can exit while the installer stays on screen.
   const child = spawn(exePath, [], { detached: true, stdio: 'ignore' });
   child.unref();
 }
 
-// En macOS lo que publica la release NO es un instalador: es el `.app`
-// comprimido —el mismo artefacto que la app usa para actualizarse sola—. No hay
-// nada que ejecutar, así que instalar aquí es descomprimirlo y ponerlo en su
-// sitio. Dejarlo como «ya lo descargué, ábrelo tú» sería devolverle a alguien un
-// `.tar.gz` en una carpeta temporal, que no se abre haciendo doble clic y que se
-// borra sola.
+// On macOS what the release publishes is NOT an installer: it is the compressed
+// `.app` — the same artifact the app uses to update itself. There is nothing to
+// run, so installing here means unpacking it and putting it in place. Leaving it
+// as "I've downloaded it, open it yourself" would hand someone a `.tar.gz` in a
+// temporary folder, which doesn't open by double-clicking and which deletes
+// itself.
 //
-// **Y esta ruta se salta el diálogo de «desarrollador no verificado».** La
-// cuarentena la pone quien descarga —el navegador—, no el archivo: bajado con
-// `fetch` y descomprimido con `tar`, el `.app` nace sin ese atributo. El DMG de
-// la página sí lo lleva. Es la ventaja real de este canal, no un atajo: la firma
-// se comprobó arriba contra la misma llave que usa la app, y sin ella no se
-// llega hasta aquí.
+// **And this path skips the "unverified developer" dialog.** Quarantine is set
+// by whoever downloads — the browser — not by the file: downloaded with `fetch`
+// and unpacked with `tar`, the `.app` is born without that attribute. The
+// website's DMG does carry it. It is this channel's real advantage, not a
+// shortcut: the signature was checked above against the same key the app uses,
+// and without it we never get here.
 function installMacApp(tarPath, tmpDir) {
   const destinos = [
     '/Applications',
@@ -110,29 +110,29 @@ function installMacApp(tarPath, tmpDir) {
     return r;
   };
 
-  log(`\n${paint(C.bold, 'Instalando')}`);
+  log(`\n${paint(C.bold, 'Installing')}`);
   correr('tar', ['-xzf', tarPath, '-C', tmpDir]);
 
   const bundle = fs
     .readdirSync(tmpDir)
     .find((n) => n.endsWith('.app'));
   if (!bundle) {
-    err(paint(C.red, '\n  El archivo no traía ninguna app dentro.'));
-    err(paint(C.dim, `  Contenido: ${fs.readdirSync(tmpDir).join(', ')}`));
+    err(paint(C.red, '\n  The archive contained no app.'));
+    err(paint(C.dim, `  Contents: ${fs.readdirSync(tmpDir).join(', ')}`));
     process.exit(1);
   }
   const origen = path.join(tmpDir, bundle);
 
-  // Copiar encima de una app abierta le cambia el binario por debajo y la mata
-  // a mitad de lo que esté haciendo. Se mira por ruta y no por nombre: el
-  // ejecutable de dentro no se llama como el bundle.
+  // Copying over a running app swaps its binary out from under it and kills it
+  // mid-task. We check by path and not by name: the executable inside isn't
+  // named like the bundle.
   for (const dir of destinos) {
     const destino = path.join(dir, bundle);
     if (!fs.existsSync(destino)) continue;
     const ps = spawnSync('ps', ['-Ao', 'comm='], { encoding: 'utf8' });
     if ((ps.stdout || '').split('\n').some((l) => l.startsWith(`${destino}/`))) {
-      err(paint(C.yellow, `\n  ${bundle} está abierta.`));
-      err('  Ciérrala y repite — instalar encima la mataría a mitad de lo que esté haciendo.');
+      err(paint(C.yellow, `\n  ${bundle} is open.`));
+      err('  Close it and run this again — installing over it would kill it mid-task.');
       process.exit(1);
     }
   }
@@ -143,28 +143,29 @@ function installMacApp(tarPath, tmpDir) {
     const destino = path.join(dir, bundle);
     try {
       fs.mkdirSync(dir, { recursive: true });
-      // Reemplazo y no fusión: un `cp` encima deja los archivos de la versión
-      // vieja que la nueva ya no trae, y un bundle mitad y mitad no arranca de
-      // una forma que se pueda diagnosticar.
+      // Replace, don't merge: a `cp` on top leaves behind the old version's
+      // files that the new one no longer ships, and a half-and-half bundle fails
+      // to start in a way that can't be diagnosed.
       fs.rmSync(destino, { recursive: true, force: true });
       correr('ditto', [origen, destino]);
       puesta = destino;
       break;
     } catch (e) {
-      // `/Applications` pide permiso en algunas máquinas. Se cae a la carpeta
-      // del usuario en vez de pedir sudo: instalar una app no debería exigir
-      // administrador, y pedirlo enseña a dárselo a cualquier cosa.
+      // `/Applications` asks for permission on some machines. We fall back to
+      // the user's folder instead of asking for sudo: installing an app
+      // shouldn't require an administrator, and asking for one teaches people to
+      // grant it to anything.
       ultimoFallo = e;
     }
   }
 
   if (!puesta) {
-    err(paint(C.red, `\n  No se pudo instalar.\n  ${ultimoFallo?.message ?? ''}`));
+    err(paint(C.red, `\n  Could not install.\n  ${ultimoFallo?.message ?? ''}`));
     process.exit(1);
   }
 
-  log(paint(C.green, `\n✓ Instalada en ${puesta}`));
-  log(paint(C.dim, '  A partir de ahora, Terminus se actualiza sola desde dentro de la app.'));
+  log(paint(C.green, `\n✓ Installed at ${puesta}`));
+  log(paint(C.dim, '  From now on, Terminus updates itself from inside the app.'));
   spawnSync('open', [puesta]);
 }
 
@@ -173,62 +174,62 @@ async function main() {
   if (args.help) return printHelp();
 
   if (typeof fetch !== 'function') {
-    err(paint(C.red, 'Necesitas Node 18 o superior (falta fetch nativo).'));
+    err(paint(C.red, 'You need Node 18 or later (native fetch is missing).'));
     process.exit(1);
   }
 
-  log(paint(C.bold, 'Terminus') + paint(C.dim, ' · instalador'));
+  log(paint(C.bold, 'Terminus') + paint(C.dim, ' · installer'));
 
   const plat = detectPlatform();
-  log(`  Sistema:    ${plat.label}  ${paint(C.dim, `(${plat.platform}/${plat.arch})`)}`);
+  log(`  System:     ${plat.label}  ${paint(C.dim, `(${plat.platform}/${plat.arch})`)}`);
 
-  // 1) Manifiesto de la release. Es la fuente de verdad de versión, URL del
-  //    asset y firma — y es multiplataforma por diseño.
+  // 1) Release manifest. It is the source of truth for version, asset URL and
+  //    signature — and it is cross-platform by design.
   let manifest;
   try {
     manifest = JSON.parse(await fetchText(LATEST_JSON_URL));
   } catch (e) {
-    err(paint(C.red, `\nNo se pudo leer la información de la última versión.\n  ${e.message}`));
+    err(paint(C.red, `\nCould not read the latest version's information.\n  ${e.message}`));
     process.exit(1);
   }
 
   const entry = plat.key ? manifest.platforms?.[plat.key] : null;
   if (!entry) {
-    // No fingimos soporte que no existe.
+    // We don't pretend to support what doesn't exist.
     err(
-      paint(C.yellow, `\nTodavía no hay build para ${plat.label}.`) +
-        `\nDescárgalo a mano en ${paint(C.cyan, MANUAL_DOWNLOAD_URL)} cuando esté disponible.`
+      paint(C.yellow, `\nThere is no build for ${plat.label} yet.`) +
+        `\nDownload it by hand at ${paint(C.cyan, MANUAL_DOWNLOAD_URL)} once it is available.`
     );
     process.exit(1);
   }
 
-  const version = manifest.version || '(desconocida)';
+  const version = manifest.version || '(unknown)';
   const installerUrl = entry.url;
   const signatureB64 = entry.signature;
   const expectedFileName = path.basename(new URL(installerUrl).pathname);
-  log(`  Versión:    ${version}`);
+  log(`  Version:    ${version}`);
 
   if (!installerUrl || !signatureB64) {
-    err(paint(C.red, '\nEl manifiesto de la release está incompleto (falta url o firma).'));
+    err(paint(C.red, '\nThe release manifest is incomplete (missing url or signature).'));
     process.exit(1);
   }
 
-  // 2) Descarga a temporal.
+  // 2) Download to a temporary folder.
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'danil-terminus-'));
   const installerPath = path.join(tmpDir, expectedFileName);
   const cleanup = () => { try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {} };
 
-  log(`\n${paint(C.bold, 'Descargando')} ${expectedFileName}`);
+  log(`\n${paint(C.bold, 'Downloading')} ${expectedFileName}`);
   try {
     await downloadToFile(installerUrl, installerPath);
   } catch (e) {
     cleanup();
-    err(paint(C.red, `\nDescarga falló.\n  ${e.message}`));
+    err(paint(C.red, `\nDownload failed.\n  ${e.message}`));
     process.exit(1);
   }
 
-  // 3) VERIFICACIÓN DE INTEGRIDAD — obligatoria. Si falla, no se ejecuta nada.
-  log(`\n${paint(C.bold, 'Verificando firma')} ${paint(C.dim, '(minisign · BLAKE2b-512 + Ed25519)')}`);
+  // 3) INTEGRITY VERIFICATION — mandatory. If it fails, nothing is run.
+  log(`\n${paint(C.bold, 'Verifying signature')} ${paint(C.dim, '(minisign · BLAKE2b-512 + Ed25519)')}`);
   try {
     const info = await verifyFile({
       filePath: installerPath,
@@ -237,37 +238,37 @@ async function main() {
       expectedFileName,
     });
     const sha = await sha256File(installerPath);
-    log(paint(C.green, '  ✓ Firma válida') + paint(C.dim, ` (keyId ${info.keyId})`));
+    log(paint(C.green, '  ✓ Valid signature') + paint(C.dim, ` (keyId ${info.keyId})`));
     log(paint(C.dim, `  sha256: ${sha}`));
   } catch (e) {
     cleanup();
-    err(paint(C.red, `\n  ✗ VERIFICACIÓN FALLIDA — no se ejecuta el instalador.\n  ${e.message}`));
-    err(paint(C.dim, '  La descarga fue borrada.'));
+    err(paint(C.red, `\n  ✗ VERIFICATION FAILED — the installer is not run.\n  ${e.message}`));
+    err(paint(C.dim, '  The download was deleted.'));
     process.exit(1);
   }
 
-  // 4) Ejecutar (o parar en dry-run).
+  // 4) Run (or stop on dry-run).
   if (args.dryRun) {
-    log(paint(C.yellow, '\n--dry-run: descarga verificada, no se ejecuta el instalador.'));
-    log(paint(C.dim, `  Instalador en: ${installerPath}`));
-    return; // se deja el archivo para inspección manual en dry-run
+    log(paint(C.yellow, '\n--dry-run: download verified, the installer is not run.'));
+    log(paint(C.dim, `  Installer at: ${installerPath}`));
+    return; // the file is left in place for manual inspection on dry-run
   }
 
   if (plat.installerKind === 'windows-nsis') {
-    log(`\n${paint(C.bold, 'Ejecutando el instalador')}...`);
+    log(`\n${paint(C.bold, 'Running the installer')}...`);
     runWindowsInstaller(installerPath);
-    log(paint(C.green, '\n✓ Instalador lanzado.') + ' Sigue los pasos en pantalla.');
-    log(paint(C.dim, '  A partir de ahora, Terminus se actualiza solo desde dentro de la app.'));
+    log(paint(C.green, '\n✓ Installer launched.') + ' Follow the steps on screen.');
+    log(paint(C.dim, '  From now on, Terminus updates itself from inside the app.'));
   } else if (plat.installerKind === 'macos') {
     installMacApp(installerPath, tmpDir);
   } else {
-    // Plataforma resuelta en latest.json pero sin ejecución automática aquí.
-    log(paint(C.green, `\n✓ Descargado y verificado: ${installerPath}`));
-    log('  Ábrelo para completar la instalación.');
+    // Platform resolved in latest.json but with no automatic execution here.
+    log(paint(C.green, `\n✓ Downloaded and verified: ${installerPath}`));
+    log('  Open it to complete the installation.');
   }
 }
 
 main().catch((e) => {
-  err(paint(C.red, `\nError inesperado: ${e?.stack || e}`));
+  err(paint(C.red, `\nUnexpected error: ${e?.stack || e}`));
   process.exit(1);
 });

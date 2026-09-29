@@ -1,6 +1,6 @@
-// Descarga por streaming con barra de progreso simple, usando fetch nativo de
-// Node (18+). Escribe a disco a medida que llega para no cargar 40+ MB en
-// memoria. Sin dependencias.
+// Streaming download with a simple progress bar, using Node's native fetch
+// (18+). Writes to disk as data arrives so 40+ MB are not loaded into memory.
+// No dependencies.
 
 import fs from 'node:fs';
 import { pipeline } from 'node:stream/promises';
@@ -11,7 +11,7 @@ function fmtMB(bytes) {
 }
 
 function renderProgress(received, total) {
-  if (!process.stderr.isTTY) return; // en logs no ensuciamos con \r
+  if (!process.stderr.isTTY) return; // in logs we don't clutter the output with \r
   const width = 24;
   if (total) {
     const ratio = Math.min(1, received / total);
@@ -21,15 +21,15 @@ function renderProgress(received, total) {
       `\r  [${bar}] ${fmtMB(received)} / ${fmtMB(total)} MB (${Math.round(ratio * 100)}%)`
     );
   } else {
-    process.stderr.write(`\r  descargando... ${fmtMB(received)} MB`);
+    process.stderr.write(`\r  downloading... ${fmtMB(received)} MB`);
   }
 }
 
-// Descarga `url` a `destPath`. Devuelve { bytes }. Lanza si el HTTP no es 200.
+// Downloads `url` to `destPath`. Returns { bytes }. Throws if HTTP is not 200.
 export async function downloadToFile(url, destPath) {
   const res = await fetch(url, { redirect: 'follow' });
   if (!res.ok) {
-    throw new Error(`descarga falló: HTTP ${res.status} ${res.statusText} en ${url}`);
+    throw new Error(`download failed: HTTP ${res.status} ${res.statusText} at ${url}`);
   }
   const total = Number(res.headers.get('content-length')) || 0;
   let received = 0;
@@ -44,16 +44,16 @@ export async function downloadToFile(url, destPath) {
   if (process.stderr.isTTY) process.stderr.write('\n');
 
   if (total && received !== total) {
-    throw new Error(`descarga incompleta: ${received} de ${total} bytes`);
+    throw new Error(`incomplete download: ${received} of ${total} bytes`);
   }
   return { bytes: received };
 }
 
-// Descarga un recurso de texto pequeño (latest.json, .sig).
+// Downloads a small text resource (latest.json, .sig).
 export async function fetchText(url) {
   const res = await fetch(url, { redirect: 'follow' });
   if (!res.ok) {
-    throw new Error(`no se pudo leer ${url}: HTTP ${res.status} ${res.statusText}`);
+    throw new Error(`could not read ${url}: HTTP ${res.status} ${res.statusText}`);
   }
   return res.text();
 }

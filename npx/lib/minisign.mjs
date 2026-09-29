@@ -1,24 +1,24 @@
-// Verificación minisign completa, sin dependencias externas.
+// Full minisign verification, with no external dependencies.
 //
-// Terminus firma sus instaladores con minisign en modo "hashed" (prehash
-// BLAKE2b-512 + Ed25519), que es lo que genera el updater de Tauri. La clave
-// pública está embebida en el binario de la app (tauri.conf.json -> pubkey) y
-// se copia aquí como constante: es pública por diseño y sella la cadena.
+// Terminus signs its installers with minisign in "hashed" mode (BLAKE2b-512
+// prehash + Ed25519), which is what the Tauri updater generates. The public key
+// is embedded in the app binary (tauri.conf.json -> pubkey) and copied here as a
+// constant: it is public by design and seals the chain.
 //
-// Node 18+ trae todo lo necesario en su módulo `crypto`:
-//   - `blake2b512` como hash (lo provee OpenSSL).
-//   - verificación Ed25519 nativa (`crypto.verify(null, ...)`).
-// Por eso este archivo no importa nada fuera de Node.
+// Node 18+ ships everything needed in its `crypto` module:
+//   - `blake2b512` as a hash (provided by OpenSSL).
+//   - native Ed25519 verification (`crypto.verify(null, ...)`).
+// That is why this file imports nothing from outside Node.
 //
-// Un archivo .sig de minisign (base64 sobre TODO su contenido) tiene 4 líneas:
+// A minisign .sig file (base64 over ALL of its content) has 4 lines:
 //   1) untrusted comment: ...
-//   2) <firma>            = 2 bytes algo ("ED") + 8 bytes keyId + 64 bytes firma
-//   3) trusted comment: timestamp:... file:<nombre>
-//   4) <firma global>     = Ed25519 sobre (firma_bytes || texto_trusted_comment)
+//   2) <signature>        = 2 algo bytes ("ED") + 8 bytes keyId + 64 bytes signature
+//   3) trusted comment: timestamp:... file:<name>
+//   4) <global signature> = Ed25519 over (signature_bytes || trusted_comment_text)
 //
-// La línea 2 firma el CONTENIDO del archivo (su hash BLAKE2b-512): es la prueba
-// de integridad. La línea 4 firma el comentario de confianza (incluye el nombre
-// del archivo): autentica ese metadato. Verificamos las dos.
+// Line 2 signs the file's CONTENT (its BLAKE2b-512 hash): it is the integrity
+// proof. Line 4 signs the trusted comment (which includes the file name): it
+// authenticates that metadata. We verify both.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -31,13 +31,13 @@ function ed25519PublicKey(raw32) {
   return crypto.createPublicKey({ key: der, format: 'der', type: 'spki' });
 }
 
-// Recibe el bloque base64 tal cual está en tauri.conf.json (pubkey).
+// Takes the base64 block exactly as it appears in tauri.conf.json (pubkey).
 export function parsePublicKey(pubkeyB64) {
   const text = Buffer.from(pubkeyB64, 'base64').toString('utf8');
   const line = text.trim().split('\n')[1]?.trim();
-  if (!line) throw new Error('clave pública minisign malformada');
+  if (!line) throw new Error('malformed minisign public key');
   const raw = Buffer.from(line, 'base64');
-  if (raw.length !== 42) throw new Error('clave pública minisign con tamaño inesperado');
+  if (raw.length !== 42) throw new Error('minisign public key has unexpected size');
   return {
     algo: raw.subarray(0, 2).toString('ascii'),
     keyId: raw.subarray(2, 10),
@@ -45,14 +45,15 @@ export function parsePublicKey(pubkeyB64) {
   };
 }
 
-// Recibe el contenido del archivo .sig (base64 de las 4 líneas), tal cual viene
-// en el campo `signature` de latest.json o en el .sig subido a la release.
+// Takes the contents of the .sig file (base64 of the 4 lines), exactly as it
+// comes in the `signature` field of latest.json or in the .sig uploaded to the
+// release.
 export function parseSignature(sigFileB64) {
   const text = Buffer.from(sigFileB64.trim(), 'base64').toString('utf8');
   const lines = text.split('\n');
-  if (lines.length < 4) throw new Error('firma minisign malformada');
+  if (lines.length < 4) throw new Error('malformed minisign signature');
   const sigBytes = Buffer.from(lines[1].trim(), 'base64');
-  if (sigBytes.length !== 74) throw new Error('firma minisign con tamaño inesperado');
+  if (sigBytes.length !== 74) throw new Error('minisign signature has unexpected size');
   const trustedComment = lines[2].replace(/^trusted comment: /, '');
   const fileMatch = trustedComment.match(/file:([^\t\n]+)/);
   return {
@@ -71,38 +72,38 @@ async function blake2b512File(filePath) {
   return hash.digest();
 }
 
-// Verifica un archivo contra una firma minisign con una clave pública.
-// Lanza Error (con motivo concreto) si algo no cuadra. No devuelve booleano:
-// el llamador debe abortar ante cualquier excepción.
+// Verifies a file against a minisign signature with a public key.
+// Throws Error (with the specific reason) if anything doesn't add up. It does
+// not return a boolean: the caller must abort on any exception.
 export async function verifyFile({ filePath, sigFileB64, publicKeyB64, expectedFileName }) {
   const pub = parsePublicKey(publicKeyB64);
   const sig = parseSignature(sigFileB64);
 
   if (!pub.keyId.equals(sig.keyId)) {
     throw new Error(
-      `la firma fue hecha con otra clave (keyId ${sig.keyId.toString('hex')} != ${pub.keyId.toString('hex')})`
+      `the signature was made with a different key (keyId ${sig.keyId.toString('hex')} != ${pub.keyId.toString('hex')})`
     );
   }
   if (sig.algo !== 'ED') {
-    throw new Error(`algoritmo de firma inesperado "${sig.algo}" (se esperaba "ED", minisign hashed)`);
+    throw new Error(`unexpected signature algorithm "${sig.algo}" (expected "ED", minisign hashed)`);
   }
   if (expectedFileName && sig.signedFileName && sig.signedFileName !== expectedFileName) {
     throw new Error(
-      `la firma es para "${sig.signedFileName}", no para "${expectedFileName}"`
+      `the signature is for "${sig.signedFileName}", not for "${expectedFileName}"`
     );
   }
 
   const pubKeyObj = ed25519PublicKey(pub.key);
 
-  // 1) Firma del contenido: Ed25519 sobre el hash BLAKE2b-512 del archivo.
+  // 1) Content signature: Ed25519 over the file's BLAKE2b-512 hash.
   const digest = await blake2b512File(filePath);
   const contentOk = crypto.verify(null, digest, pubKeyObj, sig.signature);
-  if (!contentOk) throw new Error('la firma del contenido no valida (archivo alterado o firma incorrecta)');
+  if (!contentOk) throw new Error('the content signature does not validate (file altered or wrong signature)');
 
-  // 2) Firma global: Ed25519 sobre (firma || comentario de confianza).
+  // 2) Global signature: Ed25519 over (signature || trusted comment).
   const globalMsg = Buffer.concat([sig.signature, Buffer.from(sig.trustedComment, 'utf8')]);
   const globalOk = crypto.verify(null, globalMsg, pubKeyObj, sig.globalSignature);
-  if (!globalOk) throw new Error('la firma del comentario de confianza no valida');
+  if (!globalOk) throw new Error('the trusted comment signature does not validate');
 
   return {
     keyId: pub.keyId.toString('hex'),

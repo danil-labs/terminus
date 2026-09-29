@@ -41,14 +41,14 @@ try {
     writeFileSync(join(bundle, archive), `Fixture for ${row.nombre}`);
     execFileSync(pnpm, [...cli, 'signer', 'sign', join(bundle, archive)], { env: { ...process.env, ...signing }, stdio: 'pipe' });
     if (row.nombre === 'macos') writeFileSync(join(bundle, 'Terminus_9.9.9_universal.dmg'), row.nombre);
-    const code = step('construir', 'Recoger los artefactos').replaceAll('${{ matrix.nombre }}', row.nombre);
+    const code = step('construir', 'Collect the artifacts').replaceAll('${{ matrix.nombre }}', row.nombre);
     const env = { ...signing, PATH: `${bin}:${process.env.PATH}`, V: '9.9.9', MAC_ARCH: row.arch || '', GITHUB_STEP_SUMMARY: join(cwd, 'summary') };
     run(code, cwd, env);
     const files = readdirSync(join(cwd, 'entrega'));
     if (row.nombre === 'macos') {
       assert.deepEqual(files.sort(), ['Terminus.app.tar.gz', 'Terminus.app.tar.gz.sig', 'Terminus-macOS.dmg', 'Terminus-macOS-Intel.dmg', 'Terminus_9.9.9_universal.dmg'].sort());
       assert.deepEqual(readFileSync(join(cwd, 'entrega/Terminus-macOS.dmg')), readFileSync(join(cwd, 'entrega/Terminus-macOS-Intel.dmg')));
-      await assert.rejects(verifyFile({ filePath: join(bundle, archive), sigFileB64: readFileSync(join(bundle, `${archive}.sig`), 'utf8'), publicKeyB64, expectedFileName: 'Terminus-Intel.app.tar.gz' }), /la firma es para/);
+      await assert.rejects(verifyFile({ filePath: join(bundle, archive), sigFileB64: readFileSync(join(bundle, `${archive}.sig`), 'utf8'), publicKeyB64, expectedFileName: 'Terminus-Intel.app.tar.gz' }), /the signature is for/);
       rmSync(join(bundle, 'Terminus_9.9.9_universal.dmg'));
       run(code, cwd, env, 1);
     }
@@ -58,8 +58,8 @@ try {
     }
   }
   const env = { V: '9.9.9', NOTA: 'Intel test', GITHUB_REPOSITORY: 'danil-labs/terminus' };
-  run(step('publicar', 'Cada firma habla del archivo que se publica'), merged, env);
-  run(step('publicar', 'Armar latest.json'), merged, env);
+  run(step('publicar', 'Each signature speaks for the file being published'), merged, env);
+  run(step('publicar', 'Assemble latest.json'), merged, env);
   const manifest = JSON.parse(readFileSync(join(merged, 'entrega/latest.json'), 'utf8'));
   assert.deepEqual(Object.keys(manifest.platforms).sort(), ['windows-x86_64', 'darwin-aarch64', 'darwin-x86_64'].sort());
   assert.deepEqual(manifest.platforms['darwin-aarch64'], manifest.platforms['darwin-x86_64']);

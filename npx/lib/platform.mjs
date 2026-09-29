@@ -1,5 +1,5 @@
-// La clave selecciona la arquitectura en latest.json. Sin entrada publicada,
-// el instalador informa que todavía no hay build para esa plataforma.
+// The key selects the architecture in latest.json. With no published entry,
+// the installer reports that there is no build for that platform yet.
 
 const LABELS = {
   win32: 'Windows',
@@ -13,7 +13,7 @@ const ARCH_LABELS = {
   ia32: 'x86 32-bit',
 };
 
-// process.platform x process.arch -> clave de plataforma de Tauri updater.
+// process.platform x process.arch -> Tauri updater platform key.
 function tauriPlatformKey(platform, arch) {
   const archKey = arch === 'x64' ? 'x86_64' : arch === 'arm64' ? 'aarch64' : null;
   if (!archKey) return null;
@@ -38,10 +38,10 @@ export function detectPlatform() {
     arch,
     label,
     key: tauriPlatformKey(platform, arch),
-    // Qué hay que hacer con lo que se baja, que no es lo mismo en las dos:
-    // Windows recibe un instalador que se ejecuta, y macOS el `.app`
-    // comprimido, que se descomprime y se copia. Linux existe para dar el
-    // mensaje correcto mientras no haya build.
+    // What to do with the download, which differs between the two: Windows
+    // gets an installer to run, and macOS gets the compressed `.app`, which is
+    // unpacked and copied. Linux exists to give the right message while there
+    // is no build.
     installerKind:
       platform === 'win32' ? 'windows-nsis' : platform === 'darwin' ? 'macos' : platform === 'linux' ? 'linux' : 'unknown',
   };

@@ -1,127 +1,133 @@
-# Mira si `danil-labs/harness-app` tiene una versión que aquí no está, y si la
-# tiene la construye para macOS (Apple Silicon e Intel) y Windows y la publica como release.
+# Checks whether `danil-labs/harness-app` has a version that isn't here, and if
+# it does, builds it for macOS (Apple Silicon and Intel) and Windows and
+# publishes it as a release.
 #
-# **Por qué vive aquí y no en el repo del código.** Ahí vivía —`desktop-build.yml`—
-# y se retiró el 12-ago (`6c83bfd`): `harness-app` es privado y los minutos del
-# plan Free se facturan Windows ×2 y macOS ×10, así que construir instaladores los
-# agotó en dos días. Y agotarse no se ve como se cree: los jobs **fallan sin
-# ejecutar un solo paso** —tres segundos, cero pasos— y en pantalla eso es idéntico
-# a código roto. Se mergearon PRs con checks en rojo que no significaban nada.
+# **Why this lives here and not in the code repo.** It used to live there
+# —`desktop-build.yml`— and was retired on Aug 12 (`6c83bfd`): `harness-app` is
+# private and the Free plan's minutes are billed Windows ×2 and macOS ×10, so
+# building installers used them all up in two days. And running out doesn't look
+# the way you'd think: the jobs **fail without running a single step** — three
+# seconds, zero steps — and on screen that is identical to broken code. PRs were
+# merged with red checks that meant nothing.
 #
-# Este repo es **público**, y en los repos públicos las Actions no gastan minutos
-# —tampoco los de macOS—. La causa por la que aquello se retiró no existe aquí.
+# This repo is **public**, and in public repos Actions don't spend minutes —
+# macOS ones included. The reason that was retired doesn't exist here.
 #
-# **Qué se publica y qué no.** El código sigue siendo privado: la única copia que
-# toca este workflow vive en el disco efímero del runner y muere con él. Aquí solo
-# aterrizan los binarios y su `latest.json`.
+# **What is published and what isn't.** The code stays private: the only copy
+# this workflow touches lives on the runner's ephemeral disk and dies with it.
+# Only the binaries and their `latest.json` land here.
 #
-# ## El contrato con las dos cosas que consumen esto
+# ## The contract with the two things that consume this
 #
-#   • **La app instalada** pregunta por
+#   • **The installed app** asks for
 #     `releases/latest/download/latest.json` (`tauri.conf.json` → `plugins.updater`)
-#     y enseña el aviso de versión nueva abajo a la derecha. `releases/latest`
-#     resuelve a la última release **publicada** —ni borrador ni prerelease—, así
-#     que aquí no se crea ninguna de las dos.
+#     and shows the new-version notice at the bottom right. `releases/latest`
+#     resolves to the latest **published** release —neither draft nor
+#     prerelease— so neither is created here.
 #
-#   • **terminus.danil.ai** enlaza a `releases/latest/download/Terminus-Windows-Setup.exe`
-#     y `.../Terminus-macOS.dmg`. Son **nombres estables sin versión dentro**: la
-#     página no se toca al publicar, y por eso este workflow sube una copia con
-#     ese nombre además del archivo versionado. Cambiarlos rompe el botón de
-#     descarga sin que nada avise.
+#   • **terminus.danil.ai** links to `releases/latest/download/Terminus-Windows-Setup.exe`
+#     and `.../Terminus-macOS.dmg`. Those are **stable names with no version in
+#     them**: the page isn't touched when publishing, which is why this workflow
+#     uploads a copy with that name in addition to the versioned file. Changing
+#     them breaks the download button without anything warning you.
 #
-# ## Firmar no es opcional, y no es una sola firma
+# ## Signing is not optional, and it is not a single signature
 #
-# La app comprueba lo que se baja contra la llave pública **que viaja dentro del
-# binario ya instalado**. Una release sin firmar no se instala mal: no se instala,
-# y la copia de quien la esperaba se queda donde está. Es minisign, y no tiene
-# nada que ver con Authenticode ni con la notarización de Apple —esas quitan el
-# aviso del sistema la primera vez, y cada una tiene su propio paso en
-# `construir`: eSigner (SSL.com) en Windows, Developer ID + notarytool en macOS.
+# The app checks what it downloads against the public key **that travels inside
+# the already-installed binary**. An unsigned release doesn't install badly: it
+# doesn't install, and the copy of whoever was waiting for it stays where it is.
+# That is minisign, and it has nothing to do with Authenticode or Apple
+# notarization —those remove the system warning the first time, and each has its
+# own step in `construir`: eSigner (SSL.com) on Windows, Developer ID + notarytool
+# on macOS.
 #
 name: publicar
 
 on:
-  # Cada media hora, que es lo que convierte «hay que acordarse» en «ya está».
-  # Lo que mira es barato: un checkout superficial y leer un JSON. Si la versión
-  # de `main` ya tiene release, no arranca ningún runner de build.
+  # Every half hour, which is what turns "someone has to remember" into "it's
+  # done". What it checks is cheap: a shallow checkout and reading a JSON. If
+  # `main`'s version already has a release, no build runner starts.
   #
-  # **Aviso que se paga solo una vez si se sabe:** GitHub apaga los `schedule` de
-  # un repo sin actividad en 60 días. Publicar crea un tag, y un tag es
-  # actividad — mientras se publique, esto sigue vivo. Si el producto se congela
-  # medio año, lo primero que hay que mirar al volver es si el cron sigue
-  # encendido.
+  # **A warning that only costs you once, if you know it:** GitHub turns off a
+  # repo's `schedule` after 60 days without activity. Publishing creates a tag,
+  # and a tag is activity — as long as releases keep going out, this stays alive.
+  # If the product is frozen for half a year, the first thing to check on
+  # returning is whether the cron is still on.
   schedule:
     - cron: "*/30 * * * *"
 
-  # Y a mano, para no esperar la media hora después de mergear a `main`:
+  # And by hand, so you don't wait the half hour after merging to `main`:
   #
   #     gh workflow run publicar.yml -R danil-labs/terminus
   #
-  # (o `pnpm publicar` desde `harness-app`, que hace exactamente eso).
+  # (or `pnpm publicar` from `harness-app`, which does exactly that).
   workflow_dispatch:
     inputs:
       rehacer:
-        description: "Volver a construir aunque la versión ya tenga release (la reemplaza)"
+        description: "Build again even if the version already has a release (replaces it)"
         type: boolean
         default: false
-      # Para probar un cambio a este archivo sin tocar lo publicado. Corre todo
-      # —build, firmas, comprobaciones— y se detiene antes de `publicar`. Se
-      # lanza desde la rama del PR:
+      # To test a change to this file without touching what is published. It runs
+      # everything —build, signatures, checks— and stops before `publicar`. It is
+      # launched from the PR's branch:
       #
-      #     gh workflow run publicar.yml -R danil-labs/terminus --ref <rama> -f ensayo=true
+      #     gh workflow run publicar.yml -R danil-labs/terminus --ref <branch> -f ensayo=true
       #
-      # Cada ensayo gasta las firmas de eSigner de una release (ver «Construir y
-      # firmar en Windows»).
+      # Each dry run spends one release's worth of eSigner signatures (see
+      # "Build and sign on Windows").
       ensayo:
-        description: "Construir y comprobar sin publicar nada"
+        description: "Build and check without publishing anything"
         type: boolean
         default: false
 
-# Dos corridas a la vez se pisarían creando el mismo tag. No se cancela la que
-# esté en curso: a mitad de un build cancelar deja el tag sin sus binarios.
+# Two runs at once would step on each other creating the same tag. The one in
+# progress is not cancelled: cancelling mid-build leaves the tag without its
+# binaries.
 concurrency:
   group: publicar
   cancel-in-progress: false
 
 env:
-  # De dónde sale el código. Privado: se entra con la deploy key de solo lectura
-  # `HARNESS_DEPLOY_KEY`, que solo sirve para leer ese repo y para nada más.
+  # Where the code comes from. Private: it is accessed with the read-only deploy
+  # key `HARNESS_DEPLOY_KEY`, which is good for reading that repo and nothing
+  # else.
   FUENTE: danil-labs/harness-app
   RAMA: main
 
-  # ─── La identidad de la app, copiada aquí a propósito ───────────────────────
+  # ─── The app's identity, copied here on purpose ─────────────────────────────
   #
-  # Estas tres cosas **no se pueden cambiar publicando**. Un cambio en cualquiera
-  # de ellas sale de un build que funciona, de un instalador que se ejecuta y de
-  # una corrida en verde — y rompe algo que nadie va a ver hasta semanas después:
+  # These three things **can't be changed by publishing**. A change to any of
+  # them comes out of a build that works, an installer that runs and a green run
+  # — and breaks something nobody will see until weeks later:
   #
-  #   • `LLAVE_PUBLICA` — la app instalada verifica lo que baja contra la llave
-  #     que lleva **compilada dentro de su propio binario**. Una release firmada
-  #     con otra llave no es «una actualización que falla»: esa copia queda
-  #     varada en su versión para siempre, y desde dentro no hay vuelta. Rotar la
-  #     llave son dos pasos y en este orden: primero una versión firmada con la
-  #     llave VIEJA que ya lleve la NUEVA dentro, y solo después firmar con la
-  #     nueva. Quien se salte esa versión puente reinstala a mano.
+  #   • `LLAVE_PUBLICA` — the installed app verifies what it downloads against
+  #     the key **compiled inside its own binary**. A release signed with a
+  #     different key isn't "an update that fails": that copy is stranded on its
+  #     version forever, and from the inside there is no way back. Rotating the
+  #     key takes two steps, in this order: first a version signed with the OLD
+  #     key that already carries the NEW one inside, and only then signing with
+  #     the new one. Whoever skips that bridge version reinstalls by hand.
   #
-  #   • `IDENTIFICADOR` — es dónde viven los datos (sesiones, cuentas, consumo) y
-  #     la llave del llavero. Cambiarlo no borra nada: deja los datos huérfanos y
-  #     la app abre **vacía**, sin error y sin aviso.
+  #   • `IDENTIFICADOR` — is where the data lives (sessions, accounts, usage) and
+  #     the keychain key. Changing it deletes nothing: it orphans the data and
+  #     the app opens **empty**, with no error and no warning.
   #
-  #   • `NOMBRE` — es la clave del registro de desinstalación en Windows
-  #     (`HKCU\…\Uninstall\Terminus`) y la carpeta de instalación. Cambiarlo
-  #     instala **al lado** de la copia vieja: dos entradas en Programas y
-  #     características y dos apps en disco.
+  #   • `NOMBRE` — is the uninstall registry key on Windows
+  #     (`HKCU\…\Uninstall\Terminus`) and the install folder. Changing it
+  #     installs **next to** the old copy: two entries in Programs and Features
+  #     and two apps on disk.
   #
-  # Duplicarlas aquí es el punto: son la memoria de lo que las copias instaladas
-  # ya creen. Cambiarlas exige tocar este archivo, que es un PR que alguien lee —
-  # en vez de un `tauri.conf.json` que se edita por otra razón.
+  # Duplicating them here is the point: they are the memory of what the installed
+  # copies already believe. Changing them requires touching this file, which is a
+  # PR someone reads — instead of a `tauri.conf.json` that gets edited for
+  # another reason.
   LLAVE_PUBLICA: dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM5ODEzRDE1M0QwQ0RFQjgKUldTNDNndzlGVDJCT1hPSnp4ZzBIbkowOW9kVGFYb0YyRkZKZjNTT2N3eERXOXhuRi9UblY5d3EK
   IDENTIFICADOR: ai.danil.terminus
   NOMBRE: Terminus
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────────────
-  # ¿Hay algo que publicar? Sale barato preguntarlo, y evita arrancar los runners de build.
+  # Is there anything to publish? It's cheap to ask, and it avoids starting the build runners.
   # ─────────────────────────────────────────────────────────────────────────────
   mirar:
     runs-on: ubuntu-latest
@@ -131,7 +137,7 @@ jobs:
       sha: ${{ steps.comparar.outputs.sha }}
       nota: ${{ steps.comparar.outputs.nota }}
     steps:
-      - name: Traer la fuente
+      - name: Fetch the source
         uses: actions/checkout@v4
         with:
           repository: ${{ env.FUENTE }}
@@ -139,21 +145,21 @@ jobs:
           ssh-key: ${{ secrets.HARNESS_DEPLOY_KEY }}
           fetch-depth: 1
 
-      # El código del instalador `npx` vive en este repo y lleva **una tercera
-      # copia** de la llave pública: la usa para verificar lo que baja antes de
-      # ejecutarlo. Si se queda con la vieja, `npx` deja de instalar el día de
-      # una rotación aunque la app se actualice bien.
-      - name: Traer el instalador npx
+      # The `npx` installer's code lives in this repo and carries **a third
+      # copy** of the public key: it uses it to verify what it downloads before
+      # running it. If it keeps the old one, `npx` stops installing the day of a
+      # rotation even though the app updates fine.
+      - name: Fetch the npx installer
         uses: actions/checkout@v4
         with:
           path: canal
           fetch-depth: 1
 
-      # Lo que este paso protege no lo protege ninguna otra cosa: el build, el
-      # instalador y la corrida salen todos en verde con la identidad cambiada.
-      # Falla aquí, antes de publicar, porque después de publicar ya no se puede
-      # arreglar en las copias instaladas.
-      - name: La identidad no cambió a espaldas de nadie
+      # What this step protects, nothing else protects: the build, the installer
+      # and the run all come out green with the identity changed. It fails here,
+      # before publishing, because after publishing it can no longer be fixed in
+      # the installed copies.
+      - name: The identity hasn't changed behind anyone's back
         run: |
           set -euo pipefail
 
@@ -161,41 +167,41 @@ jobs:
           comparar() {
             local que="$1" esperado="$2" encontrado="$3" consecuencia="$4"
             if [ "$esperado" != "$encontrado" ]; then
-              echo "::error title=$que cambió::esperado '$esperado', encontrado '$encontrado'. $consecuencia"
+              echo "::error title=$que changed::expected '$esperado', found '$encontrado'. $consecuencia"
               mal=1
             fi
           }
 
-          comparar "La llave pública del updater" \
+          comparar "The updater public key" \
             "$LLAVE_PUBLICA" \
             "$(jq -r .plugins.updater.pubkey src-tauri/tauri.conf.json)" \
-            "Publicar así deja varada en su versión, para siempre, a toda copia ya instalada. Se rota en dos pasos: primero una versión firmada con la llave vieja que lleve la nueva dentro."
+            "Publishing like this strands every already-installed copy on its version, forever. It is rotated in two steps: first a version signed with the old key that carries the new one inside."
 
-          comparar "El identificador del bundle" \
+          comparar "The bundle identifier" \
             "$IDENTIFICADOR" \
             "$(jq -r .identifier src-tauri/tauri.conf.json)" \
-            "Los datos de quien ya la tiene quedan huérfanos y la app abre vacía, sin error. Hace falta una migración en migration.rs."
+            "The data of anyone who already has it is orphaned and the app opens empty, with no error. A migration in migration.rs is needed."
 
-          comparar "El nombre del producto" \
+          comparar "The product name" \
             "$NOMBRE" \
             "$(jq -r .productName src-tauri/tauri.conf.json)" \
-            "La actualización instala al lado de la copia vieja: dos entradas en Programas y características."
+            "The update installs next to the old copy: two entries in Programs and Features."
 
-          comparar "La llave pública que usa npx" \
+          comparar "The public key npx uses" \
             "$LLAVE_PUBLICA" \
             "$(sed -n "s/^ *'\(dW50cnVzdGVk[^']*\)';$/\1/p" canal/npx/bin.mjs | head -1)" \
-            "npx dejaría de poder instalar aunque la app se actualice bien."
+            "npx would stop being able to install even though the app updates fine."
 
           [ "$mal" = 0 ] || {
             echo ""
-            echo "Si el cambio es deliberado, va en el mismo PR que actualiza estos valores"
-            echo "en .github/workflows/publicar.yml — y lee ahí lo que cuesta cada uno."
+            echo "If the change is deliberate, it goes in the same PR that updates these values"
+            echo "in .github/workflows/publicar.yml — and read there what each one costs."
             exit 1
           }
 
-          echo "Identidad intacta: misma llave, mismo identificador, mismo nombre."
+          echo "Identity intact: same key, same identifier, same name."
 
-      - name: Comparar con lo publicado
+      - name: Compare with what is published
         id: comparar
         env:
           GH_TOKEN: ${{ github.token }}
@@ -204,48 +210,48 @@ jobs:
         run: |
           set -euo pipefail
 
-          # La versión de la app la manda `tauri.conf.json`: es la que se compila
-          # dentro del binario y la que el updater compara. `package.json` y
-          # `Cargo.toml` la repiten y podrían desincronizarse, así que se
-          # comprueba que las tres digan lo mismo antes de publicar nada — una
-          # release cuyo binario dice otra versión que su `latest.json` deja a
-          # todo el mundo en bucle de actualizar.
+          # The app's version is dictated by `tauri.conf.json`: it is the one
+          # compiled into the binary and the one the updater compares.
+          # `package.json` and `Cargo.toml` repeat it and could drift out of
+          # sync, so we check that all three say the same thing before publishing
+          # anything — a release whose binary says a different version than its
+          # `latest.json` leaves everyone in an update loop.
           V=$(jq -r .version src-tauri/tauri.conf.json)
           VP=$(jq -r .version package.json)
           VC=$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -1)
           if [ "$V" != "$VP" ] || [ "$V" != "$VC" ]; then
-            echo "::error::Las versiones no coinciden — tauri.conf.json=$V package.json=$VP Cargo.toml=$VC"
+            echo "::error::Versions do not match — tauri.conf.json=$V package.json=$VP Cargo.toml=$VC"
             exit 1
           fi
 
-          # La nota es lo que lee una persona en la página de la release. Sale
-          # del repo del código para que se revise en el mismo PR que sube la
-          # versión, y no se invente aquí.
+          # The note is what a person reads on the release page. It comes from the
+          # code repo so that it is reviewed in the same PR that bumps the
+          # version, and isn't invented here.
           {
             echo "version=$V"
             echo "sha=$(git rev-parse HEAD)"
             echo "nota<<FIN"
-            if [ -f NOTA-DE-VERSION.md ]; then cat NOTA-DE-VERSION.md; else echo "Mejoras y correcciones."; fi
+            if [ -f NOTA-DE-VERSION.md ]; then cat NOTA-DE-VERSION.md; else echo "Improvements and fixes."; fi
             echo "FIN"
           } >> "$GITHUB_OUTPUT"
 
           if [ "${ENSAYO:-false}" = "true" ]; then
-            echo "Ensayo de v$V: se construye y se comprueba, no se publica."
+            echo "Dry run of v$V: it is built and checked, not published."
             echo "hay=true" >> "$GITHUB_OUTPUT"
           elif [ "${REHACER:-false}" = "true" ]; then
-            echo "Se pidió rehacer v$V."
+            echo "A rebuild of v$V was requested."
             echo "hay=true" >> "$GITHUB_OUTPUT"
           elif gh release view "v$V" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "v$V ya está publicada. No hay nada que hacer."
+            echo "v$V is already published. Nothing to do."
             echo "hay=false" >> "$GITHUB_OUTPUT"
           else
-            echo "v$V no está publicada. Se construye."
+            echo "v$V is not published. Building."
             echo "hay=true" >> "$GITHUB_OUTPUT"
           fi
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # Un runner por plataforma. Cross-compilar Windows desde macOS no funciona —el
-  # target MSVC necesita el `link.exe` de Microsoft— así que no hay atajo.
+  # One runner per platform. Cross-compiling Windows from macOS doesn't work —the
+  # MSVC target needs Microsoft's `link.exe`— so there is no shortcut.
   # ─────────────────────────────────────────────────────────────────────────────
   construir:
     needs: mirar
@@ -260,7 +266,7 @@ jobs:
             nombre: macos
     runs-on: ${{ matrix.so }}
     steps:
-      - name: Traer la fuente
+      - name: Fetch the source
         uses: actions/checkout@v4
         with:
           repository: ${{ env.FUENTE }}
@@ -288,22 +294,23 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Comprobar el contrato del entorno descargable
+      - name: Check the downloadable environment contract
         shell: bash
         run: |
           node -e 'const fs = require("node:fs"); const c = JSON.parse(fs.readFileSync("src-tauri/tauri.conf.json")); if (!fs.existsSync("src-tauri/src/environment/git-runtime.json") || c.bundle.externalBin?.length || Object.keys(c.bundle.resources).some(k => k.includes("resources/"))) process.exit(1);'
 
-      - name: Probar el Git descargable de Windows
+      - name: Test the downloadable Git on Windows
         if: runner.os == 'Windows'
         run: node scripts/git-runtime.test.mjs --download
 
-      # La notarización pide un `.p8` en disco, no el contenido en una variable.
-      # Tauri busca `AuthKey_<APPLE_API_KEY>.p8` o `APPLE_API_KEY_PATH`. El
-      # secret es el PEM entero; aquí se escribe y se borra con el runner.
+      # Notarization asks for a `.p8` on disk, not the content in a variable.
+      # Tauri looks for `AuthKey_<APPLE_API_KEY>.p8` or `APPLE_API_KEY_PATH`. The
+      # secret is the whole PEM; here it is written out and deleted along with the
+      # runner.
       #
-      # `signingIdentity: "-"` en `tauri.conf.json` se queda: es la firma ad-hoc
-      # de los builds locales. `APPLE_SIGNING_IDENTITY` la pisa solo aquí.
-      - name: Preparar la notarización de Apple
+      # `signingIdentity: "-"` in `tauri.conf.json` stays: it is the ad-hoc
+      # signature of local builds. `APPLE_SIGNING_IDENTITY` overrides it only here.
+      - name: Prepare Apple notarization
         if: runner.os == 'macOS'
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -317,41 +324,43 @@ jobs:
           set -euo pipefail
 
           for v in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_TEAM_ID APPLE_API_ISSUER APPLE_API_KEY APPLE_API_KEY_P8; do
-            [ -n "${!v}" ] || { echo "::error title=Falta el secret $v::Sin él el .dmg sale ad-hoc y macOS avisa. Va en Settings → Secrets and variables → Actions de este repo."; exit 1; }
+            [ -n "${!v}" ] || { echo "::error title=Missing secret $v::Without it the .dmg comes out ad-hoc and macOS warns. It goes in this repo's Settings → Secrets and variables → Actions."; exit 1; }
           done
 
           umask 077
           mkdir -p "$RUNNER_TEMP/private_keys"
           P8="$RUNNER_TEMP/private_keys/AuthKey_${APPLE_API_KEY}.p8"
           printf '%s' "$APPLE_API_KEY_P8" | tr -d '\r' > "$P8"
-          [ -s "$P8" ] || { echo "::error::APPLE_API_KEY_P8 quedó vacío al escribirlo."; exit 1; }
+          [ -s "$P8" ] || { echo "::error::APPLE_API_KEY_P8 was empty after writing it."; exit 1; }
           grep -q "BEGIN PRIVATE KEY" "$P8" \
-            || { echo "::error::APPLE_API_KEY_P8 no parece un PEM: falta BEGIN PRIVATE KEY. Pega el .p8 entero, encabezado incluido."; exit 1; }
-          # PEM con newline final: notarytool es más quisquilloso si el archivo
-          # se corta a media línea.
+            || { echo "::error::APPLE_API_KEY_P8 doesn't look like a PEM: BEGIN PRIVATE KEY is missing. Paste the whole .p8, header included."; exit 1; }
+          # PEM with a trailing newline: notarytool is pickier if the file is cut
+          # off mid-line.
           [ "$(tail -c1 "$P8" | wc -l)" -eq 1 ] || echo >> "$P8"
           echo "APPLE_API_KEY_PATH=$P8" >> "$GITHUB_ENV"
 
-      # **Tauri reescribe `terminus.exe` al empaquetar.** `tauri bundle` busca en
-      # el binario la marca `__TAURI_BUNDLE_TYPE_VAR_UNK` y la cambia por
-      # `__TAURI_BUNDLE_TYPE_VAR_NSS` (`patch_binary` en
-      # `tauri-bundler/src/bundle.rs`, CLI 2.11.4): así el updater de la app sabe
-      # qué paquete le toca bajar. Firmar el `.exe` antes de ese paso, como se hizo
-      # hasta v0.2.6, deja la firma sobre bytes que ya no existen: en la copia
-      # instalada `Get-AuthenticodeSignature` da `HashMismatch`. Y el desinstalador
-      # lo genera `makensis` dentro del paquete, así que nadie lo firmaba.
+      # **Tauri rewrites `terminus.exe` when packaging.** `tauri bundle` looks in
+      # the binary for the marker `__TAURI_BUNDLE_TYPE_VAR_UNK` and swaps it for
+      # `__TAURI_BUNDLE_TYPE_VAR_NSS` (`patch_binary` in
+      # `tauri-bundler/src/bundle.rs`, CLI 2.11.4): that is how the app's updater
+      # knows which package to download. Signing the `.exe` before that step, as
+      # was done up to v0.2.6, leaves the signature over bytes that no longer
+      # exist: on the installed copy `Get-AuthenticodeSignature` gives
+      # `HashMismatch`. And the uninstaller is generated by `makensis` inside the
+      # package, so nobody was signing it.
       #
-      # Por eso firma Tauri, con `bundle.windows.signCommand`. Llama al comando
-      # **después** de parchear el `.exe`, desde `!uninstfinalize` para el
-      # desinstalador y sobre el instalador antes de escribir su `.sig` de minisign.
-      # Se pasa con `--config` desde aquí para no tocar `harness-app`.
+      # That is why Tauri does the signing, with `bundle.windows.signCommand`. It
+      # calls the command **after** patching the `.exe`, from `!uninstfinalize`
+      # for the uninstaller, and on the installer before writing its minisign
+      # `.sig`. It is passed with `--config` from here so as not to touch
+      # `harness-app`.
       #
-      # Tauri también le pasa las DLL de plugins de NSIS. Esas no se firman: solo
-      # existen en un temporal mientras corre el instalador y nunca quedan
-      # instaladas. Cada firma cuenta en el plan de eSigner: **tres por release**
-      # (ejecutable, desinstalador e instalador), una más que antes, y esa es la
-      # del desinstalador.
-      - name: Construir y firmar en Windows
+      # Tauri also hands it the NSIS plugin DLLs. Those are not signed: they only
+      # exist in a temp folder while the installer runs and never end up
+      # installed. Each signature counts against the eSigner plan: **three per
+      # release** (executable, uninstaller and installer), one more than before,
+      # and that one is the uninstaller's.
+      - name: Build and sign on Windows
         if: runner.os == 'Windows'
         shell: bash
         env:
@@ -369,7 +378,7 @@ jobs:
           set -euo pipefail
 
           for v in ES_USERNAME ES_PASSWORD ES_CREDENTIAL_ID ES_TOTP_SECRET; do
-            [ -n "${!v}" ] || { echo "::error title=Falta el secret $v::Sin él no se firma la release de Windows. Va en Settings → Secrets and variables → Actions de este repo."; exit 1; }
+            [ -n "${!v}" ] || { echo "::error title=Missing secret $v::Without it the Windows release isn't signed. It goes in this repo's Settings → Secrets and variables → Actions."; exit 1; }
           done
 
           T=$(cygpath -u "$RUNNER_TEMP")
@@ -378,9 +387,9 @@ jobs:
           echo "$CST_SHA256  $T/cst.zip" | sha256sum -c -
           pwsh -NoProfile -Command "Expand-Archive -LiteralPath '$(cygpath -w "$T/cst.zip")' -DestinationPath '$(cygpath -w "$T/cst")'"
 
-          # JDK 11.0.2 (2019) bundled en CodeSignTool no incluye la raíz
-          # "SSL.com TLS RSA Root CA 2022" que cs.ssl.com empezó a usar en
-          # septiembre de 2026. Sin ella, el handshake TLS cae por PKIX.
+          # The JDK 11.0.2 (2019) bundled in CodeSignTool doesn't include the
+          # "SSL.com TLS RSA Root CA 2022" root that cs.ssl.com started using in
+          # September 2026. Without it, the TLS handshake fails with PKIX.
           curl -fsSL -o "$T/sslcom-root.cer" "$SSLCOM_ROOT_URL"
           echo "$SSLCOM_ROOT_SHA256  $T/sslcom-root.cer" | sha256sum -c -
           "$T/cst/jdk-11.0.2/bin/keytool.exe" -import -noprompt -trustcacerts \
@@ -389,8 +398,8 @@ jobs:
             -keystore "$(cygpath -w "$T/cst/jdk-11.0.2/lib/security/cacerts")" \
             -storepass changeit
 
-          # Lo llama Tauri, un archivo por vez, con la ruta de Windows como único
-          # argumento. Hereda del paso los secrets de eSigner y `T`.
+          # Tauri calls it, one file at a time, with the Windows path as the only
+          # argument. It inherits the eSigner secrets and `T` from the step.
           cat > "$T/firmar-authenticode.sh" <<'FIRMAR'
           set -euo pipefail
           original=$(cygpath -u "$1")
@@ -398,12 +407,12 @@ jobs:
 
           case "$nombre" in
             NSISdl.dll|StartMenu.dll|System.dll|nsDialogs.dll|nsis_tauri_utils.dll)
-              echo "Authenticode: $nombre no se firma (plugin de NSIS, no se instala)."
+              echo "Authenticode: $nombre is not signed (NSIS plugin, not installed)."
               exit 0 ;;
           esac
 
-          # El desinstalador llega con el nombre temporal que le da makensis
-          # (`nst….tmp`). Se firma una copia con nombre `.exe` y se devuelve.
+          # The uninstaller arrives with the temporary name makensis gives it
+          # (`nst….tmp`). A copy named `.exe` is signed and handed back.
           case "$nombre" in
             *.exe) copia="$nombre" ;;
             *) copia="desinstalador.exe" ;;
@@ -414,10 +423,10 @@ jobs:
           mkdir -p "$entrada" "$salida"
           cp "$original" "$entrada/$copia"
 
-          # Cada firma manda un código TOTP. Entre la del desinstalador y la del
-          # instalador pasan pocos segundos, y si eSigner rechaza un código ya
-          # usado, la segunda fallaría. Esperar a la siguiente ventana de 30 s
-          # cuesta, como mucho, medio minuto.
+          # Each signature sends a TOTP code. Only a few seconds pass between the
+          # uninstaller's and the installer's, and if eSigner rejects an
+          # already-used code, the second would fail. Waiting for the next 30 s
+          # window costs, at most, half a minute.
           if [ -f "$T/ultima-firma" ]; then
             espera=$(( $(cat "$T/ultima-firma") + 31 - $(date +%s) ))
             [ "$espera" -le 0 ] || sleep "$espera"
@@ -436,25 +445,24 @@ jobs:
           date +%s > "$T/ultima-firma"
 
           firmado="$salida/$copia"
-          [ -f "$firmado" ] || { echo "CodeSignTool no dejó $nombre firmado; su salida está arriba." >&2; exit 1; }
+          [ -f "$firmado" ] || { echo "CodeSignTool did not leave $nombre signed; its output is above." >&2; exit 1; }
 
           visto=$(ARCHIVO_W="$(cygpath -w "$firmado")" pwsh -NoProfile -Command '$s = Get-AuthenticodeSignature -LiteralPath $env:ARCHIVO_W; "{0}|{1}|{2}" -f $s.Status, $s.SignerCertificate.Subject, [bool]$s.TimeStamperCertificate' | tr -d '\r')
           IFS='|' read -r estado sujeto sello <<< "$visto"
-          [ "$estado" = "Valid" ] || { echo "Windows no da la firma de $nombre por válida: $estado." >&2; exit 1; }
+          [ "$estado" = "Valid" ] || { echo "Windows does not consider the signature of $nombre valid: $estado." >&2; exit 1; }
           case "$sujeto" in
             *"Software y Servicios Danil"*) ;;
-            *) echo "Firmó un certificado que no es el de Danil: $sujeto" >&2; exit 1 ;;
+            *) echo "It was signed by a certificate that is not Danil's: $sujeto" >&2; exit 1 ;;
           esac
-          [ "$sello" = "True" ] || { echo "La firma de $nombre no lleva sello de tiempo." >&2; exit 1; }
+          [ "$sello" = "True" ] || { echo "The signature of $nombre carries no timestamp." >&2; exit 1; }
 
           cp -f "$firmado" "$original"
           echo "$copia|$visto" >> "$T/firmados.txt"
           FIRMAR
 
-          # Rutas absolutas y con `/`: el mismo comando lo ejecuta Tauri y, para
-          # el desinstalador, makensis desde otra carpeta. `bash` con ruta
-          # completa porque, sin ella, Windows puede encontrar antes el de WSL
-          # en System32.
+          # Absolute paths with `/`: the same command is run by Tauri and, for the
+          # uninstaller, by makensis from another folder. `bash` with its full
+          # path because, without it, Windows may find WSL's in System32 first.
           CONFIG=$(jq -nc \
             --arg bash "$(cygpath -m "$(command -v bash)")" \
             --arg firmar "$(cygpath -m "$T/firmar-authenticode.sh")" \
@@ -465,52 +473,53 @@ jobs:
           pnpm desktop:build --bundles nsis --config "$CONFIG"
 
           INSTALADOR=$(find src-tauri/target/release/bundle -type f -name '*_x64-setup.exe' | head -1)
-          [ -n "$INSTALADOR" ] || { echo "::error::No se construyó ningún *_x64-setup.exe."; exit 1; }
+          [ -n "$INSTALADOR" ] || { echo "::error::No *_x64-setup.exe was built."; exit 1; }
 
-          # Tauri ya escribe el `.sig` después de la firma Authenticode. Se
-          # rehace de todos modos: sale gratis y no depende de ese orden interno.
+          # Tauri already writes the `.sig` after the Authenticode signature. It is
+          # redone anyway: it costs nothing and doesn't depend on that internal
+          # order.
           pnpm tauri signer sign "$INSTALADOR"
 
-          # Lo que se firmó, y cuántas firmas de eSigner costó.
-          echo "Firmado con eSigner:"
+          # What was signed, and how many eSigner signatures it cost.
+          echo "Signed with eSigner:"
           sed 's/^/  /' "$T/firmados.txt"
           mal=0
           for esperado in terminus.exe desinstalador.exe "$(basename "$INSTALADOR")"; do
             grep -q "^$esperado|" "$T/firmados.txt" \
-              || { echo "::error::Tauri no pidió firmar $esperado."; mal=1; }
+              || { echo "::error::Tauri did not ask to sign $esperado."; mal=1; }
           done
           [ "$mal" = 0 ]
           n=$(wc -l < "$T/firmados.txt")
-          [ "$n" -le 3 ] || echo "::warning title=Más firmas de eSigner::Esta release gastó $n firmas, no 3. Mira qué más pasó por signCommand."
+          [ "$n" -le 3 ] || echo "::warning title=More eSigner signatures::This release spent $n signatures, not 3. Look at what else went through signCommand."
           {
             echo "### Authenticode — Windows"
             echo ""
-            echo "Firmas de eSigner en esta corrida: **$n**"
+            echo "eSigner signatures in this run: **$n**"
             echo ""
             cut -d'|' -f1,2 "$T/firmados.txt" | sed 's/|/: /; s/^/- /'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # La firma que importa es la del archivo que queda en disco, no la del que
-      # salió del build: v0.2.6 pasó todas las comprobaciones del build con un
-      # `terminus.exe` que, instalado, daba `HashMismatch`. Aquí se instala en
-      # silencio, como usuario, igual que lo hace una persona, y se mira lo que
-      # quedó en `%LOCALAPPDATA%\Terminus`.
-      - name: Comprobar las firmas de lo que se instala
+      # The signature that matters is that of the file left on disk, not of the
+      # one that came out of the build: v0.2.6 passed every build check with a
+      # `terminus.exe` that, once installed, gave `HashMismatch`. Here it is
+      # installed silently, as a user, the way a person does it, and what ended up
+      # in `%LOCALAPPDATA%\Terminus` is inspected.
+      - name: Check the signatures of what gets installed
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $instalador = Get-ChildItem -Recurse -File src-tauri/target/release/bundle -Filter '*_x64-setup.exe' | Select-Object -First 1
-          if (-not $instalador) { throw 'No se construyó ningún *_x64-setup.exe.' }
+          if (-not $instalador) { throw 'No *_x64-setup.exe was built.' }
 
           $p = Start-Process -FilePath $instalador.FullName -ArgumentList '/S' -Wait -PassThru
-          if ($p.ExitCode -ne 0) { throw "El instalador salió con $($p.ExitCode)." }
+          if ($p.ExitCode -ne 0) { throw "The installer exited with $($p.ExitCode)." }
 
           $dir = Join-Path $env:LOCALAPPDATA $env:NOMBRE
           $mal = $false
           foreach ($esperado in 'terminus.exe', 'uninstall.exe') {
             if (-not (Test-Path (Join-Path $dir $esperado))) {
-              Write-Output "::error::El instalador no dejó $esperado en $dir."
+              Write-Output "::error::The installer did not leave $esperado in $dir."
               $mal = $true
             }
           }
@@ -518,29 +527,29 @@ jobs:
           Get-ChildItem -Recurse -File $dir -Include *.exe, *.dll | ForEach-Object {
             $s = Get-AuthenticodeSignature -LiteralPath $_.FullName
             $rel = $_.FullName.Substring($dir.Length + 1)
-            Write-Output ("{0}: {1} | {2} | sello: {3}" -f $rel, $s.Status, $s.SignerCertificate.Subject, [bool]$s.TimeStamperCertificate)
+            Write-Output ("{0}: {1} | {2} | timestamp: {3}" -f $rel, $s.Status, $s.SignerCertificate.Subject, [bool]$s.TimeStamperCertificate)
             if ($s.Status -ne 'Valid') {
-              Write-Output "::error title=Firma inválida en lo instalado::$rel quedó $($s.Status)."
+              Write-Output "::error title=Invalid signature in what was installed::$rel ended up $($s.Status)."
               $mal = $true
             } elseif ($s.SignerCertificate.Subject -notlike '*Software y Servicios Danil*' -or -not $s.TimeStamperCertificate) {
-              Write-Output "::error::$rel no lleva el certificado de Danil con sello de tiempo."
+              Write-Output "::error::$rel does not carry Danil's certificate with a timestamp."
               $mal = $true
             }
           }
 
-          # Y que lo firmado sea el `.exe` ya parcheado: sin la marca de NSIS, el
-          # updater de la app no sabría qué paquete bajar.
+          # And that what was signed is the already-patched `.exe`: without the NSIS
+          # marker, the app's updater wouldn't know which package to download.
           $bytes = [IO.File]::ReadAllBytes((Join-Path $dir 'terminus.exe'))
           $texto = [Text.Encoding]::ASCII.GetString($bytes)
           if (-not $texto.Contains('__TAURI_BUNDLE_TYPE_VAR_NSS')) {
-            Write-Output '::error::El terminus.exe instalado no lleva la marca __TAURI_BUNDLE_TYPE_VAR_NSS.'
+            Write-Output '::error::The installed terminus.exe does not carry the __TAURI_BUNDLE_TYPE_VAR_NSS marker.'
             $mal = $true
           }
 
           if ($mal) { exit 1 }
-          Write-Output 'Lo instalado: terminus.exe y uninstall.exe firmados por Danil, válidos y con sello de tiempo.'
+          Write-Output 'What was installed: terminus.exe and uninstall.exe signed by Danil, valid and timestamped.'
 
-      - name: Construir y firmar en macOS
+      - name: Build and sign on macOS
         if: runner.os == 'macOS'
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -554,7 +563,7 @@ jobs:
           APPLE_API_KEY_PATH: ${{ env.APPLE_API_KEY_PATH }}
         run: pnpm desktop:build --target universal-apple-darwin
 
-      - name: Comprobar el bundle universal
+      - name: Check the universal bundle
         if: runner.os == 'macOS'
         run: |
           set -euo pipefail
@@ -565,19 +574,20 @@ jobs:
             lipo "$f" -verify_arch arm64 x86_64
           done < <(find "$APP" -type f)
           if find "$APP" -name 'git*.tar.gz' -o -name 'git*.zip' | grep -q .; then
-            echo "::error::Git debe descargarse durante la preparación."
+            echo "::error::Git must be downloaded during setup."
             exit 1
           fi
 
-      # El código de salida de `tauri build` tampoco basta: un .app ad-hoc o sin
-      # ticket grapado llega a `entrega/` igual. `stapler validate` es lo que
-      # Gatekeeper mira en un Mac sin red; si falla, no se publica.
-      # Tauri notariza y grapa el `.app`; el `.dmg` lo arma después, y sale sin
-      # ticket propio. Lo que la gente descarga es el `.dmg`, así que se
-      # notariza también: con su ticket grapado, Gatekeeper lo acepta en un Mac
-      # sin red. Hay que someterlo aparte porque el ticket va por hash, y el del
-      # `.dmg` no es el del `.app` que lleva dentro.
-      - name: Notarizar y grapar el .dmg
+      # The exit code of `tauri build` isn't enough either: an ad-hoc .app, or one
+      # without a stapled ticket, reaches `entrega/` all the same. `stapler
+      # validate` is what Gatekeeper checks on a Mac with no network; if it fails,
+      # nothing is published.
+      # Tauri notarizes and staples the `.app`; the `.dmg` is assembled after, and
+      # comes out with no ticket of its own. What people download is the `.dmg`,
+      # so it is notarized too: with its ticket stapled, Gatekeeper accepts it on
+      # a Mac with no network. It has to be submitted separately because the
+      # ticket is per hash, and the `.dmg`'s isn't that of the `.app` inside it.
+      - name: Notarize and staple the .dmg
         if: runner.os == 'macOS'
         env:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
@@ -585,41 +595,41 @@ jobs:
         run: |
           set -euo pipefail
           DMG=$(find src-tauri/target/universal-apple-darwin/release/bundle -type f -name '*.dmg' | head -1)
-          [ -n "$DMG" ] || { echo "::error::No se construyó el .dmg."; exit 1; }
+          [ -n "$DMG" ] || { echo "::error::The .dmg was not built."; exit 1; }
           xcrun notarytool submit "$DMG"             --key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER"             --wait
           xcrun stapler staple "$DMG"
 
-      - name: Comprobar la firma de Apple
+      - name: Check the Apple signature
         if: runner.os == 'macOS'
         run: |
           set -euo pipefail
           B=src-tauri/target/universal-apple-darwin/release/bundle
           APP=$(find "$B" -name 'Terminus.app' -type d | head -1)
           DMG=$(find "$B" -type f -name '*.dmg' | head -1)
-          [ -n "$APP" ] || { echo "::error::No se construyó Terminus.app."; exit 1; }
-          [ -n "$DMG" ] || { echo "::error::No se construyó el .dmg."; exit 1; }
+          [ -n "$APP" ] || { echo "::error::Terminus.app was not built."; exit 1; }
+          [ -n "$DMG" ] || { echo "::error::The .dmg was not built."; exit 1; }
 
           codesign --verify --deep --strict --verbose=2 "$APP"
           INFO=$(codesign -dv --verbose=4 "$APP" 2>&1)
           echo "$INFO"
           echo "$INFO" | grep -q "Developer ID Application: Software y Servicios Danil" \
-            || { echo "::error::No está firmado con el Developer ID de Danil."; exit 1; }
+            || { echo "::error::Not signed with Danil's Developer ID."; exit 1; }
           echo "$INFO" | grep -q "flags=.*runtime" \
-            || { echo "::error::Falta hardened runtime: Apple rechaza la notarización."; exit 1; }
+            || { echo "::error::Hardened runtime is missing: Apple rejects the notarization."; exit 1; }
 
           xcrun stapler validate "$APP"
           xcrun stapler validate "$DMG"
-          echo "Apple: Developer ID de Danil, hardened runtime, ticket grapado en .app y .dmg."
+          echo "Apple: Danil's Developer ID, hardened runtime, ticket stapled on .app and .dmg."
 
-      # Los nombres que produce Tauri llevan la versión y la arquitectura dentro,
-      # y cambian solos al subir cualquiera de las dos. Aquí se normalizan a una
-      # carpeta con nombres fijos: lo que el paso de publicar espera encontrar
-      # deja de depender de cómo se llamó el archivo hoy.
+      # The names Tauri produces carry the version and the architecture in them,
+      # and change on their own when either is bumped. Here they are normalized
+      # into a folder with fixed names: what the publish step expects to find
+      # stops depending on what the file happened to be called today.
       #
-      # Y **se falla si algo no está**. Un `cp` que no encuentra su origen en un
-      # `if` amable publica una release a la que le falta el `.sig`, que es
-      # exactamente la release que nadie puede instalar.
-      - name: Recoger los artefactos
+      # And **it fails if anything is missing**. A `cp` that can't find its source
+      # inside a polite `if` publishes a release that lacks its `.sig`, which is
+      # exactly the release nobody can install.
+      - name: Collect the artifacts
         shell: bash
         env:
           V: ${{ needs.mirar.outputs.version }}
@@ -638,7 +648,7 @@ jobs:
             local f
             f=$(find "$B" -type f -name "$que" | head -1)
             if [ -z "$f" ]; then
-              echo "::error::No se construyó ningún $que. Contenido de $B:"
+              echo "::error::No $que was built. Contents of $B:"
               find "$B" -type f | sed 's/^/    /'
               exit 1
             fi
@@ -647,9 +657,9 @@ jobs:
           }
 
           if [ "${{ matrix.nombre }}" = "windows" ]; then
-            # NSIS y no MSI: es el formato que el updater sabe aplicar sin
-            # intervención, y `installMode: passive` lo instala enseñando barra
-            # de progreso pero sin preguntar nada.
+            # NSIS and not MSI: it is the format the updater knows how to apply
+            # unattended, and `installMode: passive` installs it showing a
+            # progress bar but asking nothing.
             exigir '*_x64-setup.exe'     "Terminus_${V}_x64-setup.exe"
             exigir '*_x64-setup.exe.sig' "Terminus_${V}_x64-setup.exe.sig"
             cp "entrega/Terminus_${V}_x64-setup.exe" entrega/Terminus-Windows-Setup.exe
@@ -662,9 +672,9 @@ jobs:
           fi
 
           {
-            echo "### Instaladores — ${{ matrix.nombre }}"
+            echo "### Installers — ${{ matrix.nombre }}"
             echo ""
-            echo "| archivo | tamaño |"
+            echo "| file | size |"
             echo "|---|---|"
             for f in entrega/*; do
               echo "| $(basename "$f") | $(du -h "$f" | cut -f1) |"
@@ -678,9 +688,10 @@ jobs:
           path: entrega/*
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # Una sola release con Windows y macOS universal dentro, y el `latest.json` que la
-  # app consulta. Va en un job aparte porque **publicar media release es peor que
-  # no publicarla**: si macOS falla, aquí no se llega y Windows tampoco sale.
+  # A single release with Windows and universal macOS inside, and the `latest.json`
+  # the app queries. It goes in a separate job because **publishing half a release
+  # is worse than not publishing it**: if macOS fails, we never get here and
+  # Windows doesn't go out either.
   # ─────────────────────────────────────────────────────────────────────────────
   probar-macos:
     needs: [mirar, construir]
@@ -697,13 +708,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Probar el Git descargable de macOS
+      - name: Test the downloadable Git on macOS
         run: node scripts/git-runtime.test.mjs --download
       - uses: actions/download-artifact@v4
         with:
           name: entrega-macos
           path: entrega
-      - name: Ejecutar el mismo universal en ambas arquitecturas
+      - name: Run the same universal binary on both architectures
         run: |
           set -euo pipefail
           tar xzf entrega/Terminus.app.tar.gz
@@ -724,7 +735,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Probar el Git descargable de Linux
+      - name: Test the downloadable Git on Linux
         run: node scripts/git-runtime.test.mjs --download
 
   publicar:
@@ -739,14 +750,15 @@ jobs:
           path: entrega
           merge-multiple: true
 
-      # La firma no cubre solo los bytes: su comentario de confianza lleva el
-      # **nombre** del archivo que se firmó. Publicarlo con otro nombre deja una
-      # release que se instala en unos sitios y no en otros —el updater de Tauri
-      # mira los bytes, `npx` mira además el nombre y se niega— y eso no se ve
-      # aquí: se ve en la terminal de otro, tres canales más allá.
+      # The signature doesn't cover only the bytes: its trusted comment carries
+      # the **name** of the file that was signed. Publishing it under another name
+      # leaves a release that installs in some places and not in others —Tauri's
+      # updater looks at the bytes, `npx` also looks at the name and refuses— and
+      # you don't see that here: you see it in someone else's terminal, three
+      # channels away.
       #
-      # Pasó con `Terminus.app.tar.gz`, renombrado a `Terminus_0.1.8_aarch64…`.
-      - name: Cada firma habla del archivo que se publica
+      # It happened with `Terminus.app.tar.gz`, renamed to `Terminus_0.1.8_aarch64…`.
+      - name: Each signature speaks for the file being published
         run: |
           set -euo pipefail
           mal=0
@@ -754,7 +766,7 @@ jobs:
             archivo=$(basename "${sig%.sig}")
             dentro=$(base64 -d < "$sig" | grep -o 'file:[^[:space:]]*' | head -1 | cut -d: -f2-)
             if [ "$dentro" != "$archivo" ]; then
-              echo "::error title=Firma renombrada::$archivo lleva una firma que dice «$dentro». Renombrar un artefacto firmado rompe la comprobación de nombre."
+              echo "::error title=Renamed signature::$archivo carries a signature that says \"$dentro\". Renaming a signed artifact breaks the name check."
               mal=1
             else
               echo "  $archivo ✓"
@@ -762,7 +774,7 @@ jobs:
           done
           [ "$mal" = 0 ]
 
-      - name: Armar latest.json
+      - name: Assemble latest.json
         env:
           V: ${{ needs.mirar.outputs.version }}
           NOTA: ${{ needs.mirar.outputs.nota }}
@@ -772,10 +784,10 @@ jobs:
 
           BASE="https://github.com/$GITHUB_REPOSITORY/releases/download/v$V"
 
-          # Las claves de plataforma las decide el plugin, no nosotros: la app
-          # busca **la suya** y, si no está, concluye que está al día. Sin ruido,
-          # sin error y sin actualizarse nunca — que es como estuvo `darwin` desde
-          # la primera release hasta hoy.
+          # The platform keys are decided by the plugin, not by us: the app looks
+          # for **its own** and, if it isn't there, concludes it is up to date.
+          # No noise, no error and never updating — which is how `darwin` was from
+          # the first release until today.
           jq -n \
             --arg v "$V" \
             --arg notas "$NOTA" \
@@ -797,7 +809,7 @@ jobs:
 
           cat entrega/latest.json
 
-      - name: Publicar la release
+      - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
           V: ${{ needs.mirar.outputs.version }}
@@ -806,16 +818,16 @@ jobs:
         run: |
           set -euo pipefail
 
-          # shellcheck disable=SC2016  # Los backticks son Markdown literal.
-          CUERPO=$(printf '%s\n\n---\n\nWindows: `Terminus-Windows-Setup.exe` · macOS (Intel y Apple Silicon): `Terminus-macOS.dmg`\n\nQuien ya la tenga instalada no necesita bajar nada: la app avisa sola.\n\nConstruida desde `%s` en `%s`.\n' "$NOTA" "$SHA" "$GITHUB_RUN_ID")
+          # shellcheck disable=SC2016  # The backticks are literal Markdown.
+          CUERPO=$(printf '%s\n\n---\n\nWindows: `Terminus-Windows-Setup.exe` · macOS (Intel and Apple Silicon): `Terminus-macOS.dmg`\n\nIf you already have it installed there is nothing to download: the app notifies you on its own.\n\nBuilt from `%s` in run `%s`.\n' "$NOTA" "$SHA" "$GITHUB_RUN_ID")
 
-          # Rehacer una versión reemplaza la release entera. Borrarla y crearla de
-          # nuevo, y no `upload --clobber`, porque un asset que dejó de producirse
-          # se quedaría colgando de la anterior y el `latest.json` nuevo no lo
-          # menciona: un archivo que nadie referencia pero que la página sí
-          # enlaza por nombre estable.
+          # Rebuilding a version replaces the entire release. Delete it and create
+          # it again, rather than `upload --clobber`, because an asset that is no
+          # longer produced would be left hanging off the previous release and the
+          # new `latest.json` doesn't mention it: a file nobody references but
+          # which the page does link by stable name.
           if gh release view "v$V" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Reemplazando v$V."
+            echo "Replacing v$V."
             gh release delete "v$V" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
           fi
 
@@ -826,12 +838,12 @@ jobs:
             --latest \
             entrega/*
 
-      # Comprobar lo publicado desde fuera, por la misma URL que usan la app y la
-      # página. Que el paso anterior salga con 0 dice que GitHub aceptó los
-      # archivos; no dice que `releases/latest` resuelva a esta release ni que el
-      # `latest.json` que se sirve sea este. Es lo único que lo convierte en un
-      # hecho, y cuesta tres segundos.
-      - name: Comprobar que la app lo ve
+      # Check what was published from the outside, through the same URL the app and
+      # the page use. The previous step exiting 0 says GitHub accepted the files;
+      # it doesn't say `releases/latest` resolves to this release, or that the
+      # `latest.json` being served is this one. This is the only thing that turns
+      # it into a fact, and it costs three seconds.
+      - name: Check that the app sees it
         env:
           V: ${{ needs.mirar.outputs.version }}
         run: |
@@ -842,16 +854,16 @@ jobs:
           echo "$J" | jq .
 
           [ "$(echo "$J" | jq -r .version)" = "$V" ] \
-            || { echo "::error::releases/latest sirve otra versión"; exit 1; }
+            || { echo "::error::releases/latest serves a different version"; exit 1; }
           for p in windows-x86_64 darwin-aarch64 darwin-x86_64; do
             echo "$J" | jq -e --arg p "$p" '.platforms[$p].signature | length > 0' >/dev/null \
-              || { echo "::error::$p se publicó sin firma"; exit 1; }
+              || { echo "::error::$p was published without a signature"; exit 1; }
           done
 
-          # Los enlaces de descarga estables deben existir para Windows y macOS universal.
+          # The stable download links must exist for Windows and universal macOS.
           for a in Terminus-Windows-Setup.exe Terminus-macOS.dmg Terminus-macOS-Intel.dmg; do
             curl -fsSIL -o /dev/null "$BASE/$a" \
-              || { echo "::error::$a no se puede descargar — el botón de la página está roto"; exit 1; }
+              || { echo "::error::$a cannot be downloaded — the page's button is broken"; exit 1; }
           done
 
-          echo "v$V publicada, firmada para Windows y ambas arquitecturas de macOS y descargable."
+          echo "v$V published, signed for Windows and both macOS architectures, and downloadable."
