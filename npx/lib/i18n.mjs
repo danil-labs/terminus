@@ -178,6 +178,10 @@ const MESSAGES = {
     es: ({ received, total }) => `descarga incompleta: ${received} de ${total} bytes`,
     en: ({ received, total }) => `incomplete download: ${received} of ${total} bytes`,
   },
+  'stalled': {
+    es: ({ url, seconds }) => `la conexión se detuvo: ${seconds} s sin recibir datos de ${url}`,
+    en: ({ url, seconds }) => `the connection stalled: ${seconds} s without data from ${url}`,
+  },
   'httpRead': {
     es: ({ url, status }) => `no se pudo leer ${url}: HTTP ${status}`,
     en: ({ url, status }) => `could not read ${url}: HTTP ${status}`,
