@@ -56,7 +56,8 @@ export function parseSignature(sigFileB64) {
   const sigBytes = Buffer.from(lines[1].trim(), 'base64');
   if (sigBytes.length !== 74) throw new Error(t('badSignatureSize'));
   const trustedComment = lines[2].replace(/^trusted comment: /, '');
-  const fileMatch = trustedComment.match(/file:([^\t\n]+)/);
+  // El nombre termina en el primer espacio o tabulador: lo que siga es otro campo.
+  const fileMatch = trustedComment.match(/file:(\S+)/);
   return {
     algorithm: sigBytes.subarray(0, 2).toString('ascii'), // "ED" = hashed, "Ed" = legacy
     keyId: sigBytes.subarray(2, 10),
