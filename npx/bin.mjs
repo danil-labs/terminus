@@ -18,6 +18,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
+import { pipeline } from 'node:stream/promises';
 
 import { detectPlatform } from './lib/platform.mjs';
 import { downloadToFile, fetchText } from './lib/download.mjs';
@@ -55,10 +56,9 @@ function printHelp() {
 }
 
 async function sha256File(filePath) {
-  return new Promise((resolve, reject) => {
-    const h = crypto.createHash('sha256');
-    fs.createReadStream(filePath).on('data', (d) => h.update(d)).on('end', () => resolve(h.digest('hex'))).on('error', reject);
-  });
+  const h = crypto.createHash('sha256');
+  await pipeline(fs.createReadStream(filePath), h);
+  return h.digest('hex');
 }
 
 function runWindowsInstaller(exePath) {
