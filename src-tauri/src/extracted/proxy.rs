@@ -107,9 +107,13 @@ fn failure(error: &Error) -> Value {
     {
         return error.detail.clone();
     }
+    // Un motor que no escucha no vuelve solo: `engine_down` no está en los reintentos de `src/lib/invoke.ts`.
+    if error.code == "app_unavailable" {
+        return json!({"what":{"clave":"shell.service.engine_down"},"detail":"engine_down"});
+    }
     let key = match error.code.as_str() {
         "service_busy" | "task_busy" => "shell.service.busy",
-        "app_unavailable" | "invalid_token" | "io" => "shell.service.unreachable",
+        "invalid_token" | "io" => "shell.service.unreachable",
         "version_mismatch" | "service_version" => "shell.service.version",
         "no_host" => "shell.service.no_host",
         "command" | "unsupported" => "shell.service.command",

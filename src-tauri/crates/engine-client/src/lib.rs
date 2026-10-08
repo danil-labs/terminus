@@ -132,6 +132,7 @@ pub struct Client {
     descriptor: Snapshot,
     credential: Snapshot,
     token: String,
+    status: Value,
 }
 impl Client {
     pub fn select(path: &Path) -> Result<Self> {
@@ -164,13 +165,14 @@ impl Client {
         if token.is_empty() || token.len() > 4096 || token.chars().any(char::is_whitespace) {
             return Err(Error::new("invalid_token"));
         }
-        let client = Self {
+        let mut client = Self {
             selection,
             endpoint,
             selection_file,
             descriptor,
             credential,
             token,
+            status: Value::Null,
         };
         let status = client.request("status", None, json!({}), Duration::from_secs(3))?;
         if status["runtime"] != client.selection.runtime
@@ -184,7 +186,11 @@ impl Client {
         {
             return Err(Error::new("version_mismatch"));
         }
+        client.status = status;
         Ok(client)
+    }
+    pub fn status(&self) -> &Value {
+        &self.status
     }
     pub fn runtime(&self) -> &str {
         &self.endpoint.runtime

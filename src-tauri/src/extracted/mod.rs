@@ -5,6 +5,7 @@ pub mod env;
 mod local_image;
 mod proxy;
 mod sites;
+mod startup;
 pub mod util;
 use std::{path::Path, sync::Arc};
 use tauri::Emitter;
@@ -12,6 +13,14 @@ use terminus_engine_client::Client;
 use terminus_engine_protocol::{Error, Result};
 
 pub fn launch() -> Result<()> {
+    let result = open();
+    if let Err(error) = &result {
+        startup::show(error);
+    }
+    result
+}
+
+fn open() -> Result<()> {
     let args: Vec<_> = std::env::args_os().collect();
     if args.len() != 3 || args[1] != "--external-host" {
         return Err(Error::new("invalid_request"));
@@ -34,6 +43,7 @@ pub fn run(client: Arc<Client>) {
     let context = tauri::generate_context!();
     let window_data = state.client.selection().window_data.clone();
     let runtime = state.client.runtime().to_owned();
+    let engine = startup::engine_build(state.client.status());
     let log = tauri_plugin_log::Builder::default()
         .targets([tauri_plugin_log::Target::new(
             tauri_plugin_log::TargetKind::Folder {
@@ -49,7 +59,7 @@ pub fn run(client: Arc<Client>) {
             desktop::configure_close_menu(app)?;
             let mut config = app.config().app.windows[0].clone();
             config.url = tauri::WebviewUrl::App("index.html".into());
-            config.title = format!("{} · {}", config.title, runtime);
+            config.title = format!("{} · {} · {}", config.title, runtime, engine);
             let handle = app.handle().clone();
             tauri::WebviewWindowBuilder::from_config(app.handle(), &config)?
                 .data_directory(window_data.join("webview"))
