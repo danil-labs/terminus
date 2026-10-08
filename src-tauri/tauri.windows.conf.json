@@ -1,0 +1,25 @@
+{
+  "app": {
+    "windows": [
+      {
+        "title": "Terminus",
+        "width": 1000,
+        "height": 720,
+        "resizable": true,
+        "fullscreen": false,
+        "label": "main",
+        "minWidth": 720,
+        "minHeight": 520,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "decorations": false,
+        "create": false
+      }
+    ]
+  },
+  "bundle": {
+    "targets": [
+      "nsis"
+    ]
+  }
+}

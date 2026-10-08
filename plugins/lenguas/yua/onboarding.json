@@ -1,0 +1,12 @@
+{
+  "onboarding.cancel": "Pʼatej",
+  "onboarding.continue": "Táanilkuunsej",
+  "onboarding.done": "Tsʼoʼok",
+  "onboarding.agent.installing": "táan u yoksaʼal…",
+  "onboarding.agent.from_system": "oksaʼan tiʼ le computadoraaʼ",
+  "onboarding.agent.installed": "oksaʼan",
+  "onboarding.agent.size": "ku éensaʼal {size}",
+  "onboarding.workspace.title.new": "Túumben kúuchil meyaj",
+  "onboarding.workspace.name": "U kʼaabaʼ le kúuchil meyajoʼ",
+  "onboarding.workspace.creating": "Táan u beetaʼal…"
+}

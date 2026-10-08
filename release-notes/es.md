@@ -1,0 +1,10 @@
+Escribe documentos Typst con la vista al lado, como en typst.app, también los grandes. El chat muestra dentro de la conversación el trabajo que un agente delega, y el panel de archivos del espacio dice qué ocupa cada proyecto y lleva a su tarea.
+
+- **Typst en vivo.** Con el plugin Typst (Configuración → Plugins), el ojo del árbol elige el documento principal y su PDF queda fijo al lado de cualquier archivo de texto de la tarea. La vista cambia mientras escribes, los errores se marcan en el editor con la opción de que el agente los arregle, un clic en el código lleva la vista a ese punto y un doble clic en la vista abre la línea. «Exportar PDF» escribe `dist/<principal>.pdf`. Una instalación anterior del plugin pide actualizarse.
+- **Trabajo delegado en el chat.** Las tareas que crea un agente aparecen en su conversación con la misma tarjeta de la barra lateral, agrupadas bajo «Tareas creadas». El botón de subtareas de la barra superior las filtra y permite volver al coordinador, y la fila del coordinador sigue indicando trabajo mientras una subtarea trabaja.
+- **Archivos del espacio.** El panel es compacto, agrupa por proyecto o por tarea, muestra la última actividad y permite abrir o vaciar cada tarea. Mide mucho más rápido y ya no se rinde diciendo que no pudo hablar con el Seldon Plan Host en carpetas grandes.
+- **Proveedores de IA.** En Configuración cada proveedor se pliega y la cuenta activa se lee de un vistazo.
+- **Ordenar espacios y workspaces.** Se arrastran para cambiar su orden y el orden se conserva al reabrir.
+- **Copiar enlace.** El menú de un enlace web del chat permite copiarlo.
+- **Fondo del chat.** Terminus guarda una copia del fondo elegido; sigue disponible aunque se borre el original.
+- **Arreglos.** Los mensajes de un chat ya no desaparecen un momento al cerrarse un turno largo, la respuesta de una pregunta al margen se desplaza dentro de su panel, el aviso de un workspace ya no se sale de su caja, el indicador de subtareas ya no sale duplicado en el composer y un PDF demasiado grande para la vista previa se ofrece abrir con la app del sistema.

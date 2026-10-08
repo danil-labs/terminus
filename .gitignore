@@ -1,0 +1,25 @@
+node_modules/
+.venv/
+**/__pycache__/
+dist/
+.DS_Store
+*.local
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/gen/
+
+
+
+# nunca
+.env
+.env.*
+tsconfig.tsbuildinfo
+dist-min
+dist-solid
+docs/FRASES.md
+
+src-tauri/crates/*/target/
+
+# Downloaded engine and local engine labs
+.engine/

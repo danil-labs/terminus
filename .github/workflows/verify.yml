@@ -1,0 +1,86 @@
+# Runs the deterministic part of `pnpm verificar` on every pull request,
+# including pull requests from forks.
+#
+# Safe for forks by construction:
+#   - triggered by `pull_request` (never `pull_request_target`), so the fork's
+#     code runs without this repository's secrets;
+#   - the token is read-only;
+#   - every action is pinned to a commit SHA.
+#
+# Rust (fmt, check, clippy, test) runs in the `rust` job on Linux. Windows and
+# macOS are verified by maintainers with `pnpm verificar` on those machines.
+
+name: verify
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify (front)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+        with:
+          version: 10.15.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm verificar --sin-cargo
+
+  rust:
+    name: verify (rust)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install Tauri build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev pkg-config build-essential libssl-dev
+
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
+        with:
+          workspaces: src-tauri
+          # A fork's pull request may read the cache but never writes it.
+          save-if: ${{ github.event_name == 'push' }}
+
+      # `tauri::generate_context!` embeds `dist/`; an empty folder is enough to
+      # type-check and lint the Rust side.
+      - run: mkdir -p dist
+
+      - name: cargo fmt
+        working-directory: src-tauri
+        run: cargo fmt --check -- --config-path rustfmt.toml
+
+      - name: cargo clippy
+        working-directory: src-tauri
+        run: cargo clippy --locked --all-targets
+
+      - name: cargo test
+        working-directory: src-tauri
+        run: cargo test --locked

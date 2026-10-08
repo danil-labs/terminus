@@ -1,0 +1,21 @@
+# Los finales de línea los fija el repo, no la máquina de quien clona.
+#
+# **Sin esto, cualquier guarda que compare texto generado miente en Windows.**
+# Los scripts de `scripts/` escriben con LF; git, con `core.autocrlf=true` —el
+# valor por omisión de la instalación de Windows—, entrega el archivo con CRLF.
+# Lo generado y lo que hay en disco dejan de ser iguales byte a byte, así que
+# `frases.mjs --check` y `iconos.mjs --check` reportan «desactualizado» sobre un
+# archivo idéntico, **para siempre y desde un checkout limpio**.
+#
+# Eso muerde donde más caro es: el gate de publicar es `pnpm verificar` en verde,
+# y con dos guardas rojas por el sistema de archivos quien publica tiene que
+# decidir a ojo cuáles ignorar — que es exactamente cómo se cuela la que sí
+# importaba. Ya van cinco defectos de esta familia (`agents.rs` buscando
+# `"\n}\n"` en un archivo con CRLF, `desarrollo.rs` metiendo `C:\Users\…` en un
+# JSON) y todos se veían como código roto.
+#
+# `text=auto` deja que git detecte qué es texto —los `.png` y los `.ttf` no se
+# tocan— y `eol=lf` fija cómo sale al disco en las tres plataformas. No hay
+# ningún `.bat` ni `.cmd` en el árbol, que son los únicos que querrían CRLF.
+* text=auto eol=lf
+*.pdf binary

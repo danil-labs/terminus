@@ -1,0 +1,343 @@
+[
+  {
+    "name": "sin etiqueta el texto sale igual",
+    "input": "Listo, ya quedó.\n\n- [ ] esto es una lista de tareas normal",
+    "streaming": false,
+    "parts": [
+      {
+        "kind": "markdown",
+        "markdown": "Listo, ya quedó.\n\n- [ ] esto es una lista de tareas normal"
+      }
+    ],
+    "plain": "Listo, ya quedó.\n\n- [ ] esto es una lista de tareas normal",
+    "preview": "Listo, ya quedó. - [ ] esto es una lista de tareas normal"
+  },
+  {
+    "name": "bloque al final: la prosa se queda y las opciones se van",
+    "input": "Arreglé el guarda.\n\n<NEXT_STEPS>\nPuedo seguir con:\n- [ ] Corre las pruebas en la VM\n- [ ] Abre el PR contra dev\n</NEXT_STEPS>\n",
+    "streaming": false,
+    "parts": [
+      {
+        "kind": "markdown",
+        "markdown": "Arreglé el guarda.\n\n"
+      },
+      {
+        "kind": "next_steps",
+        "prose": "Puedo seguir con:",
+        "options": [
+          "Corre las pruebas en la VM",
+          "Abre el PR contra dev"
+        ],
+        "complete": true
+      }
+    ],
+    "plain": "Arreglé el guarda.\n\nPuedo seguir con:\n",
+    "preview": "Arreglé el guarda. Puedo seguir con:"
+  },
+  {
+    "name": "dentro de un bloque de código no es un bloque de opciones",
+    "input": "Así se escribe:\n\n```\n<NEXT_STEPS>\n- [ ] Una opción\n</NEXT_STEPS>\n```\n",
+    "streaming": false,
+    "parts": [
+      {
+        "kind": "markdown",
+        "markdown": "Así se escribe:\n\n```\n<NEXT_STEPS>\n- [ ] Una opción\n</NEXT_STEPS>\n```\n"
+      }
+    ],
+    "plain": "Así se escribe:\n\n```\n<NEXT_STEPS>\n- [ ] Una opción\n</NEXT_STEPS>\n```\n",
+    "preview": "Así se escribe: ``` <NEXT_STEPS> - [ ] Una opción </NEXT_STEPS> ```"
+  },
+  {
+    "name": "cerca de cuatro acentos graves no la cierra una de tres",
+    "input": "````md\n```\n<NEXT_STEPS>\n- [ ] Dentro\n</NEXT_STEPS>\n```\n````\n",
+    "streaming": false,
+    "parts": [
+      {
+        "kind": "markdown",
+        "markdown": "````md\n```\n<NEXT_STEPS>\n- [ ] Dentro\n</NEXT_STEPS>\n```\n````\n"
+      }
+    ],
+    "plain": "````md\n```\n<NEXT_STEPS>\n- [ ] Dentro\n</NEXT_STEPS>\n```\n````\n",
+    "preview": "````md ``` <NEXT_STEPS> - [ ] Dentro </NEXT_STEPS> ``` ````"
+  },
+  {
+    "name": "cerca de tildes",
+    "input": "~~~\n<NEXT_STEPS>\n- [ ] Dentro\n</NEXT_STEPS>\n~~~",
+    "streaming": false,
+    "parts": [
+      {
+        "kind": "markdown",
+        "markdown": "~~~\n<NEXT_STEPS>\n- [ ] Dentro\n</NEXT_STEPS>\n~~~"
+      }
+    ],
+    "plain": "~~~\n<NEXT_STEPS>\n- [ ] Dentro\n</NEXT_STEPS>\n~~~",
+    "preview": "~~~ <NEXT_STEPS> - [ ] Dentro </NEXT_STEPS> ~~~"
+  },
+  {
+    "name": "la etiqueta a media línea es texto",
+    "input": "El agente escribe `<NEXT_STEPS>` al final y la ventana pinta botones.",
+    "streaming": false,
+    "parts": [
+      {
+        "kind": "markdown",
+        "markdown": "El agente escribe `<NEXT_STEPS>` al final y la ventana pinta botones."
+      }
+    ],
+    "plain": "El agente escribe `<NEXT_STEPS>` al final y la ventana pinta botones.",
+    "preview": "El agente escribe `<NEXT_STEPS>` al final y la ventana pinta botones."
+  },
+  {
+    "name": "en streaming un bloque sin cerrar se oculta y no se puede pulsar",
+    "input": "Hecho.\n\n<NEXT_STEPS>\n- [ ] Corre las pru",
+    "streaming": true,
+    "parts": [
+      {
+        "kind": "markdown",
+        "markdown": "Hecho.\n\n"
+      },
+      {
+        "kind": "next_steps",
+        "prose": "",
+        "options": [
+          "Corre las pru"
+        ],
+        "complete": false
+      }
+    ],
+    "plain": "Hecho.\n\n",
+    "preview": "Hecho."
+  },
+  {
+    "name": "en streaming la etiqueta a medio llegar no se pinta",
+    "input": "Hecho.\n\n<NEXT_ST",
+    "streaming": true,
+    "parts": [
+      {
+        "kind": "markdown",
+        "markdown": "Hecho.\n\n"
+      }
+    ],
+    "plain": "Hecho.\n\n<NEXT_ST",
+    "preview": "Hecho. <NEXT_ST"
+  },
+  {
+    "name": "en streaming solo la etiqueta de apertura",
+    "input": "Hecho.\n\n<NEXT_STEPS>\n",
+    "streaming": true,
+    "parts": [
+      {
+        "kind": "markdown",
+        "markdown": "Hecho.\n\n"
+      }
+    ],
+    "plain": "Hecho.\n\n",
+    "preview": "Hecho."
+  },
+  {
+    "name": "terminado sin etiqueta de cierre cuenta como cerrado",
+    "input": "Hecho.\n\n<NEXT_STEPS>\n- [ ] Sigue\n- [ ] Para aquí",
+    "streaming": false,
+    "parts": [
+      {
+        "kind": "markdown",
+        "markdown": "Hecho.\n\n"
+      },
+      {
+        "kind": "next_steps",
+        "prose": "",
+        "options": [
+          "Sigue",
+          "Para aquí"
+        ],
+        "complete": true
+      }
+    ],
+    "plain": "Hecho.\n\n",
+    "preview": "Hecho."
+  },
+  {
+    "name": "variantes de casilla y fin de línea CRLF",
+    "input": "Ok.\r\n<NEXT_STEPS>\r\n-[] Uno\r\n- [ ]: Dos\r\n  - [  ] Tres  \r\n  </NEXT_STEPS>  \r\n",
+    "streaming": false,
+    "parts": [
+      {
+        "kind": "markdown",
+        "markdown": "Ok.\r\n"
+      },
+      {
+        "kind": "next_steps",
+        "prose": "",
+        "options": [
+          "Uno",
+          "Dos",
+          "Tres"
+        ],
+        "complete": true
+      }
+    ],
+    "plain": "Ok.\r\n",
+    "preview": "Ok."
+  },
+  {
+    "name": "sin opciones válidas el contenido queda como texto sin etiquetas",
+    "input": "Ok.\n<NEXT_STEPS>\nNo hay nada más que hacer.\n</NEXT_STEPS>\n",
+    "streaming": false,
+    "parts": [
+      {
+        "kind": "markdown",
+        "markdown": "Ok.\n"
+      },
+      {
+        "kind": "markdown",
+        "markdown": "No hay nada más que hacer."
+      }
+    ],
+    "plain": "Ok.\nNo hay nada más que hacer.\n",
+    "preview": "Ok. No hay nada más que hacer."
+  },
+  {
+    "name": "una casilla marcada o vacía no es una opción",
+    "input": "<NEXT_STEPS>\n- [x] Ya hecho\n- [ ] \n</NEXT_STEPS>",
+    "streaming": false,
+    "parts": [
+      {
+        "kind": "markdown",
+        "markdown": "- [x] Ya hecho\n- [ ] "
+      }
+    ],
+    "plain": "- [x] Ya hecho\n- [ ] \n",
+    "preview": "- [x] Ya hecho - [ ]"
+  },
+  {
+    "name": "texto después del bloque se conserva",
+    "input": "<NEXT_STEPS>\n- [ ] Uno\n</NEXT_STEPS>\nPD: avísame.",
+    "streaming": false,
+    "parts": [
+      {
+        "kind": "next_steps",
+        "prose": "",
+        "options": [
+          "Uno"
+        ],
+        "complete": true
+      },
+      {
+        "kind": "markdown",
+        "markdown": "PD: avísame."
+      }
+    ],
+    "plain": "PD: avísame.",
+    "preview": "PD: avísame."
+  },
+  {
+    "name": "contenido en la misma línea que la apertura",
+    "input": "<NEXT_STEPS>- [ ] Uno\n- [ ] Dos\n</NEXT_STEPS>",
+    "streaming": false,
+    "parts": [
+      {
+        "kind": "next_steps",
+        "prose": "",
+        "options": [
+          "Uno",
+          "Dos"
+        ],
+        "complete": true
+      }
+    ],
+    "plain": "",
+    "preview": ""
+  },
+  {
+    "name": "una opción que empieza por signo de admiración sigue siendo texto",
+    "input": "<NEXT_STEPS>\n- [ ] !rm -rf ~\n</NEXT_STEPS>",
+    "streaming": false,
+    "parts": [
+      {
+        "kind": "next_steps",
+        "prose": "",
+        "options": [
+          "!rm -rf ~"
+        ],
+        "complete": true
+      }
+    ],
+    "plain": "",
+    "preview": ""
+  },
+  {
+    "name": "la vista previa larga se corta en 180 después de limpiar",
+    "input": "a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a \n<NEXT_STEPS>\n- [ ] Uno\n</NEXT_STEPS>",
+    "streaming": false,
+    "parts": [
+      {
+        "kind": "markdown",
+        "markdown": "a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a \n"
+      },
+      {
+        "kind": "next_steps",
+        "prose": "",
+        "options": [
+          "Uno"
+        ],
+        "complete": true
+      }
+    ],
+    "plain": "a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a \n",
+    "preview": "a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a"
+  },
+  {
+    "name": "la vista previa corta por caracteres, no parte un emoji",
+    "input": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé😀 fin",
+    "streaming": false,
+    "parts": [
+      {
+        "kind": "markdown",
+        "markdown": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé😀 fin"
+      }
+    ],
+    "plain": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé😀 fin",
+    "preview": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé😀"
+  },
+  {
+    "name": "en streaming una opción a medias no convierte el bloque en lista",
+    "input": "Anotado.\n\n<NEXT_STEPS>\n- [ ] Corrige\n- [",
+    "streaming": true,
+    "parts": [
+      {
+        "kind": "markdown",
+        "markdown": "Anotado.\n\n"
+      },
+      {
+        "kind": "next_steps",
+        "prose": "",
+        "options": [
+          "Corrige"
+        ],
+        "complete": false
+      }
+    ],
+    "plain": "Anotado.\n\n- [ ] Corrige\n- [\n",
+    "preview": "Anotado. - [ ] Corrige - ["
+  },
+  {
+    "name": "en streaming una casilla todavía vacía no convierte el bloque en lista",
+    "input": "Anotado.\n\n<NEXT_STEPS>\n- [ ] Corrige\n- [ ] ",
+    "streaming": true,
+    "parts": [
+      {
+        "kind": "markdown",
+        "markdown": "Anotado.\n\n"
+      },
+      {
+        "kind": "next_steps",
+        "prose": "",
+        "options": [
+          "Corrige"
+        ],
+        "complete": false
+      }
+    ],
+    "plain": "Anotado.\n\n- [ ] Corrige\n- [ ] \n",
+    "preview": "Anotado. - [ ] Corrige - [ ]"
+  }
+]

@@ -1,0 +1,73 @@
+[package]
+# The package name is the executable name (`terminus.exe`), which is what the
+# OS shows in task managers and firewall prompts.
+name = "terminus"
+version = "0.2.74"
+description = "Terminus desktop window: the client for the Seldon engine"
+authors = ["Danil"]
+license = "Apache-2.0"
+repository = "https://github.com/danil-labs/terminus"
+edition = "2021"
+rust-version = "1.89"
+default-run = "terminus"
+
+# Desktop only: no `staticlib`/`cdylib` for mobile targets.
+[lib]
+name = "app_lib"
+crate-type = ["rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[lints.rust]
+unused_must_use = "deny"
+
+[lints.clippy]
+# Lo que no puede llegar a un build: un `dbg!` olvidado, un futuro que nadie
+# espera, una comparación de rutas que en Windows no significa lo mismo.
+dbg_macro = "deny"
+let_underscore_future = "deny"
+todo = "deny"
+# Un `unwrap` en producción es un panic sin mensaje. En tests está permitido.
+unwrap_used = "deny"
+
+[profile.release]
+# El binario viaja por el updater: lo que no se mide en tiempo de arranque se
+# mide en megas de descarga.
+lto = true
+codegen-units = 1
+strip = true
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+uuid = { version = "1", features = ["v4"] }
+# `unstable` is required for `Window::add_child`: native site webviews are
+# mounted over a tab without loosening the main window's policy.
+tauri = { version = "2.11.3", features = ["unstable"] }
+tauri-plugin-log = "2"
+tauri-plugin-dialog = "2.7.2"
+tauri-plugin-updater = "2.10.1"
+tauri-plugin-process = "2.3.1"
+tauri-plugin-clipboard-manager = "2.3.3"
+ureq = { version = "3.2", features = ["json"] }
+terminus-engine-client = { path = "crates/engine-client" }
+terminus-engine-protocol = { path = "crates/engine-protocol" }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18.2"
+
+[features]
+# The window is always the client of an external engine (`seldon-runtime`).
+# `extracted-client` stays as the default feature so existing build commands
+# (`--features extracted-client`) keep working; it embeds the frontend.
+default = ["extracted-client"]
+extracted-client = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

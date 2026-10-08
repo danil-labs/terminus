@@ -1,0 +1,6212 @@
+{
+  "commands": [
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "account_limits",
+      "output": "-> Query",
+      "parameters": [
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "force",
+          "name": "force",
+          "type": "bool"
+        }
+      ],
+      "path": "limits::account_limits"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "account_status",
+      "output": "-> Result < AccountStatus , String >",
+      "parameters": [
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "accounts::account_status"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "add_account",
+      "output": "-> Result < Account , String >",
+      "parameters": [
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "String"
+        },
+        {
+          "key": "label",
+          "name": "label",
+          "type": "String"
+        }
+      ],
+      "path": "accounts::add_account"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "add_folder",
+      "output": "-> Result < Source , String >",
+      "parameters": [
+        {
+          "key": "locator",
+          "name": "locator",
+          "type": "String"
+        }
+      ],
+      "path": "context::add_folder"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "add_mcp_servers",
+      "output": "-> Result < usize , Failure >",
+      "parameters": [
+        {
+          "key": "bloque",
+          "name": "bloque",
+          "type": "String"
+        }
+      ],
+      "path": "mcp::add_mcp_servers"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "add_repo_url",
+      "output": "-> Result < Source , Failure >",
+      "parameters": [
+        {
+          "key": "cloneUrl",
+          "name": "clone_url",
+          "type": "String"
+        },
+        {
+          "key": "branch",
+          "name": "branch",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "context::add_repo_url"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "add_skill_source",
+      "output": "-> Result < Fuente , Failure >",
+      "parameters": [
+        {
+          "key": "url",
+          "name": "url",
+          "type": "String"
+        },
+        {
+          "key": "branch",
+          "name": "branch",
+          "type": "Option < String >"
+        },
+        {
+          "key": "rotulo",
+          "name": "rotulo",
+          "type": "Rotulo"
+        },
+        {
+          "key": "provider",
+          "name": "provider",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "skill_sources::add_skill_source"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "add_workspace",
+      "output": "-> Result < Workspace , String >",
+      "parameters": [
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "key": "folder",
+          "name": "folder",
+          "type": "Option < String >"
+        },
+        {
+          "key": "provider",
+          "name": "provider",
+          "type": "Option < String >"
+        },
+        {
+          "key": "remote",
+          "name": "remote",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "workspaces::add_workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "agent_download_size",
+      "output": "-> Result < u64 , String >",
+      "parameters": [
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "String"
+        }
+      ],
+      "path": "agents::agent_download_size"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "agentsview_status",
+      "output": "-> Result < IntegrationStatus , String >",
+      "parameters": [],
+      "path": "integrations::agentsview_status"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "answer_question",
+      "output": "-> Result < Turn , String >",
+      "parameters": [
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "requestId",
+          "name": "request_id",
+          "type": "String"
+        },
+        {
+          "key": "respuestas",
+          "name": "respuestas",
+          "type": "Vec < questions :: RespuestaEnviada >"
+        }
+      ],
+      "path": "chat::answer_question"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "answer_shell_output",
+      "output": "-> Result < bool , String >",
+      "parameters": [
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "String"
+        },
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "model",
+          "name": "model",
+          "type": "Option < String >"
+        },
+        {
+          "key": "effort",
+          "name": "effort",
+          "type": "Option < String >"
+        },
+        {
+          "key": "permissionMode",
+          "name": "permission_mode",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "chat::answer_shell_output"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "archived_tasks",
+      "output": "-> Result < ArchivedTasks , Failure >",
+      "parameters": [],
+      "path": "spaces::archived_tasks"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "artifact_history",
+      "output": "-> Result < History , String >",
+      "parameters": [
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        }
+      ],
+      "path": "versions::artifact_history"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "ask_side_question",
+      "output": "-> Result < SideAnswer , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "question",
+          "name": "question",
+          "type": "String"
+        }
+      ],
+      "path": "chat::ask_side_question"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "attach_known_source",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "source",
+          "name": "source",
+          "type": "String"
+        }
+      ],
+      "path": "projects::attach_known_source"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "attach_repo",
+      "output": "-> Result < Source , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "provider",
+          "name": "provider",
+          "type": "String"
+        },
+        {
+          "key": "cloneUrl",
+          "name": "clone_url",
+          "type": "String"
+        },
+        {
+          "key": "branch",
+          "name": "branch",
+          "type": "Option < String >"
+        },
+        {
+          "key": "name",
+          "name": "name",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "context::attach_repo"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "attachment_preview",
+      "output": "-> Result < Preview , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "rel",
+          "name": "rel",
+          "type": "String"
+        }
+      ],
+      "path": "preview::attachment_preview"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "backup_task_work",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "history::backup_task_work"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "call_mcp_app_tool",
+      "output": "-> Result < Value , Failure >",
+      "parameters": [
+        {
+          "key": "connectionId",
+          "name": "connection_id",
+          "type": "String"
+        },
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "key": "arguments",
+          "name": "arguments",
+          "type": "Value"
+        }
+      ],
+      "path": "mcp::call_mcp_app_tool"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "cancel_browser_login",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "providers::cancel_browser_login"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "cancel_local_model",
+      "output": "",
+      "parameters": [],
+      "path": "models::cancel_local_model"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "cancel_login",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "accounts::cancel_login"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "cancel_project_clone",
+      "output": "",
+      "parameters": [
+        {
+          "key": "operation",
+          "name": "operation",
+          "type": "String"
+        }
+      ],
+      "path": "projects::cloning::cancel_project_clone"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "cancel_question",
+      "output": "-> Result < Turn , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "turn",
+          "name": "turn",
+          "type": "String"
+        }
+      ],
+      "path": "chat::cancel_question"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "change_agent_folders",
+      "output": "-> Result < Option < Vec < String > > , Failure >",
+      "parameters": [
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Alcance"
+        },
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "key": "change",
+          "name": "change",
+          "type": "FolderChange"
+        }
+      ],
+      "path": "handler_catalog::change_agent_folders"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "check_environment",
+      "output": "-> EnvReport",
+      "parameters": [
+        {
+          "key": "force",
+          "name": "force",
+          "type": "Option < bool >"
+        }
+      ],
+      "path": "env::check_environment"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "check_integration",
+      "output": "-> Result < serde_json :: Value , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "Plugin"
+        }
+      ],
+      "path": "integrations::check_integration"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "check_mcp",
+      "output": "-> Result < Vec < (String , Salud) > , Failure >",
+      "parameters": [],
+      "path": "mcp::check_mcp"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "check_provider",
+      "output": "-> Result < ProviderInfo , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "providers::check_provider"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "cli_task_opened",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "operation",
+          "name": "operation",
+          "type": "String"
+        },
+        {
+          "key": "error",
+          "name": "error",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "cli::cli_task_opened"
+    },
+    {
+      "async": false,
+      "channel": "progress",
+      "kind": "stream",
+      "name": "clone_project",
+      "output": "-> Result < Project , crate :: util :: Failure >",
+      "parameters": [
+        {
+          "key": "url",
+          "name": "url",
+          "type": "String"
+        },
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "key": "directory",
+          "name": "directory",
+          "type": "Option < String >"
+        },
+        {
+          "key": "operation",
+          "name": "operation",
+          "type": "String"
+        },
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "String"
+        },
+        {
+          "key": "portfolio",
+          "name": "portfolio",
+          "type": "Option < String >"
+        },
+        {
+          "key": "provider",
+          "name": "provider",
+          "type": "Option < String >"
+        },
+        {
+          "key": "space",
+          "name": "space",
+          "type": "Option < String >"
+        },
+        {
+          "key": "progress",
+          "name": "progress",
+          "type": "tauri :: ipc :: Channel < cloning :: Progress >"
+        }
+      ],
+      "path": "projects::clone_project"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "close_mcp_app",
+      "output": "",
+      "parameters": [
+        {
+          "key": "connectionId",
+          "name": "connection_id",
+          "type": "String"
+        }
+      ],
+      "path": "mcp::close_mcp_app"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "close_port",
+      "output": "-> Result < Cierre , String >",
+      "parameters": [
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "pid",
+          "name": "pid",
+          "type": "u32"
+        },
+        {
+          "key": "puerto",
+          "name": "puerto",
+          "type": "u16"
+        }
+      ],
+      "path": "ports::close_port"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "close_process",
+      "output": "-> Result < Cierre , String >",
+      "parameters": [
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "pid",
+          "name": "pid",
+          "type": "u32"
+        }
+      ],
+      "path": "ports::close_process"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "collect_orphans",
+      "output": "-> Result < Liberado , String >",
+      "parameters": [],
+      "path": "storage::collect_orphans"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "connect_known_mcp",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "mcp::connect_known_mcp"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "connect_provider",
+      "output": "-> Result < ProviderInfo , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "data",
+          "name": "data",
+          "type": "Data"
+        },
+        {
+          "key": "token",
+          "name": "token",
+          "type": "String"
+        },
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "providers::connect_provider"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "consent_text",
+      "output": "-> (Vec < Frase > , u32)",
+      "parameters": [],
+      "path": "workspaces::consent_text"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "create_agent_thread",
+      "output": "-> Result < String , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "key": "title",
+          "name": "title",
+          "type": "String"
+        },
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "String"
+        },
+        {
+          "key": "model",
+          "name": "model",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "sessions::create_agent_thread"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "create_encargado",
+      "output": "-> Result < Creado , String >",
+      "parameters": [
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "key": "description",
+          "name": "description",
+          "type": "String"
+        },
+        {
+          "key": "instructions",
+          "name": "instructions",
+          "type": "String"
+        },
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Alcance"
+        }
+      ],
+      "path": "handlers::create_encargado"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "create_project",
+      "output": "-> Result < Project , crate :: util :: Failure >",
+      "parameters": [
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "key": "workingDirectory",
+          "name": "working_directory",
+          "type": "Option < String >"
+        },
+        {
+          "key": "space",
+          "name": "space",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "projects::create_project"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "create_space",
+      "output": "-> Result < Space , Failure >",
+      "parameters": [
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "key": "folders",
+          "name": "folders",
+          "type": "Option < Vec < String > >"
+        }
+      ],
+      "path": "spaces::create_space"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "delete_encargado",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        }
+      ],
+      "path": "handlers::delete_encargado"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "delete_memory_entry",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Scope"
+        },
+        {
+          "key": "file",
+          "name": "file",
+          "type": "String"
+        }
+      ],
+      "path": "memory::commands::delete_memory_entry"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "delete_project",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "projects::delete_project"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "delete_session",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "force",
+          "name": "force",
+          "type": "Option < bool >"
+        }
+      ],
+      "path": "sessions::delete_session"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "delete_space",
+      "output": "-> Result < DeleteOutcome , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "seen",
+          "name": "seen",
+          "type": "Consent"
+        }
+      ],
+      "path": "spaces::delete_space"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "detach_session_source",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "source",
+          "name": "source",
+          "type": "String"
+        }
+      ],
+      "path": "sessions::detach_session_source"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "detach_source",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "source",
+          "name": "source",
+          "type": "String"
+        }
+      ],
+      "path": "context::detach_source"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "discard_account",
+      "output": "-> Result < bool , String >",
+      "parameters": [
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "accounts::discard_account"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "discard_task_changes",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "files",
+          "name": "files",
+          "type": "Vec < String >"
+        }
+      ],
+      "path": "history::discard_task_changes"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "disconnect_known_mcp",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "mcp::disconnect_known_mcp"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "disconnect_provider",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "providers::disconnect_provider"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "download_artifact",
+      "output": "-> Result < Descarga , Failure >",
+      "parameters": [
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        },
+        {
+          "key": "version",
+          "name": "version",
+          "type": "Option < u32 >"
+        },
+        {
+          "key": "destino",
+          "name": "destino",
+          "type": "String"
+        }
+      ],
+      "path": "versions::download_artifact"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "empty_build_cache",
+      "output": "-> Result < Liberado , String >",
+      "parameters": [],
+      "path": "storage::empty_build_cache"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "export_chat",
+      "output": "-> Result < ChatExportado , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "export::export_chat"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "file_size",
+      "output": "-> Result < u64 , String >",
+      "parameters": [
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        }
+      ],
+      "path": "preview::file_size"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "finish_browser_login",
+      "output": "-> Result < ProviderInfo , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "providers::finish_browser_login"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "finish_provider_setup",
+      "output": "-> Result < ProviderInfo , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "providers::finish_provider_setup"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "finish_task",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "history::finish_task"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "get_profile",
+      "output": "-> Profile",
+      "parameters": [],
+      "path": "workspaces::get_profile"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "get_project_directory",
+      "output": "-> Result < PathBuf , Failure >",
+      "parameters": [],
+      "path": "workspaces::get_project_directory"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "get_radiant_identity",
+      "output": "-> Result < Identity , Failure >",
+      "parameters": [],
+      "path": "radiant::get_radiant_identity"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "guardar_imagen_pegada",
+      "output": "-> Result < String , Failure >",
+      "parameters": [
+        {
+          "key": "mime",
+          "name": "mime",
+          "type": "String"
+        },
+        {
+          "key": "datos",
+          "name": "datos",
+          "type": "String"
+        }
+      ],
+      "path": "chat::guardar_imagen_pegada"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "has_mcp_app",
+      "output": "-> bool",
+      "parameters": [
+        {
+          "key": "server",
+          "name": "server",
+          "type": "String"
+        },
+        {
+          "key": "tool",
+          "name": "tool",
+          "type": "String"
+        }
+      ],
+      "path": "mcp::has_mcp_app"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "import_chat_background",
+      "output": "-> Result < String , crate :: util :: Failure >",
+      "parameters": [
+        {
+          "key": "source",
+          "name": "source",
+          "type": "String"
+        }
+      ],
+      "path": "handlers::import_chat_background"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "inject_message",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "prompt",
+          "name": "prompt",
+          "type": "String"
+        },
+        {
+          "key": "queueId",
+          "name": "queue_id",
+          "type": "Option < String >"
+        },
+        {
+          "key": "attachments",
+          "name": "attachments",
+          "type": "Option < Vec < String > >"
+        },
+        {
+          "key": "taskMentions",
+          "name": "task_mentions",
+          "type": "Option < Vec < crate :: workspace :: task_mentions :: TaskMention > >"
+        },
+        {
+          "key": "recipients",
+          "name": "recipients",
+          "type": "Option < Vec < crate :: recipients :: Recipient > >"
+        }
+      ],
+      "path": "chat::inject_message"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "install_agent",
+      "output": "-> Result < String , String >",
+      "parameters": [
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "String"
+        }
+      ],
+      "path": "agents::install_agent"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "install_base_tool",
+      "output": "-> Result < String , String >",
+      "parameters": [
+        {
+          "key": "tool",
+          "name": "tool",
+          "type": "String"
+        }
+      ],
+      "path": "bootstrap::install_base_tool"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "install_bundled_language_pack",
+      "output": "-> Result < Paquete , String >",
+      "parameters": [
+        {
+          "key": "code",
+          "name": "code",
+          "type": "String"
+        }
+      ],
+      "path": "locales::install_bundled_language_pack"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "install_gh",
+      "output": "-> Result < String , String >",
+      "parameters": [],
+      "path": "github::install_gh"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "install_integration",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "Plugin"
+        }
+      ],
+      "path": "integrations::install_integration"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "install_language_pack",
+      "output": "-> Result < Paquete , String >",
+      "parameters": [
+        {
+          "key": "source",
+          "name": "source",
+          "type": "String"
+        }
+      ],
+      "path": "locales::install_language_pack"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "install_local_model",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "models::install_local_model"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "install_local_runtime",
+      "output": "-> Result < () , Failure >",
+      "parameters": [],
+      "path": "models::install_local_runtime"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "install_tool",
+      "output": "-> Result < String , String >",
+      "parameters": [
+        {
+          "key": "tool",
+          "name": "tool",
+          "type": "String"
+        }
+      ],
+      "path": "toolchain::install_tool"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "keep_awake_status",
+      "output": "-> Status",
+      "parameters": [],
+      "path": "awake::keep_awake_status"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "kn_cloud_start",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "retry",
+          "name": "retry",
+          "type": "bool"
+        }
+      ],
+      "path": "kn_cloud::kn_cloud_start"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "kn_cloud_state",
+      "output": "-> Result < Descarga , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        }
+      ],
+      "path": "kn_cloud::kn_cloud_state"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "kn_finish",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        }
+      ],
+      "path": "kn::kn_finish"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "kn_pending",
+      "output": "-> Result < Resumen , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        }
+      ],
+      "path": "kn::kn_pending"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "kn_status",
+      "output": "-> Result < Vec < Pendiente > , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        }
+      ],
+      "path": "kn::kn_status"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "kn_update",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        }
+      ],
+      "path": "kn::kn_update"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_accounts",
+      "output": "-> Result < AccountList , String >",
+      "parameters": [
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "String"
+        }
+      ],
+      "path": "accounts::list_accounts"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_active_turns",
+      "output": "-> Vec < String >",
+      "parameters": [
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "String"
+        }
+      ],
+      "path": "turn::list_active_turns"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_agent_profiles",
+      "output": "-> Result < std :: collections :: HashMap < String , Profile > , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        }
+      ],
+      "path": "handlers::list_agent_profiles"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_agents",
+      "output": "-> Vec < AgentInfo >",
+      "parameters": [],
+      "path": "agents::list_agents"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_archived",
+      "output": "-> Result < Vec < ArchivedRow > , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        }
+      ],
+      "path": "sessions::list_archived"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_bundled_language_packs",
+      "output": "-> Vec < Disponible >",
+      "parameters": [],
+      "path": "locales::list_bundled_language_packs"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_delegated_sessions",
+      "output": "-> Result < Vec < SessionRow > , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "sessions::list_delegated_sessions"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_dependencies",
+      "output": "-> Vec < Dependency >",
+      "parameters": [
+        {
+          "key": "force",
+          "name": "force",
+          "type": "Option < bool >"
+        }
+      ],
+      "path": "deps::list_dependencies"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_encargado_status",
+      "output": "-> Result < Vec < HandlerStatusRow > , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        }
+      ],
+      "path": "handlers::list_encargado_status"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_encargados",
+      "output": "-> Listado",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        }
+      ],
+      "path": "handlers::list_encargados"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_governed_mcp_logins",
+      "output": "-> Result < Vec < LoginGobernado > , Failure >",
+      "parameters": [],
+      "path": "mcp::list_governed_mcp_logins"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_integrations",
+      "output": "-> Result < IntegrationCatalog , Failure >",
+      "parameters": [],
+      "path": "integrations::list_integrations"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_known_mcp",
+      "output": "-> Result < Vec < ConocidoInfo > , Failure >",
+      "parameters": [],
+      "path": "mcp::list_known_mcp"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_language_packs",
+      "output": "-> Result < Vec < Paquete > , String >",
+      "parameters": [],
+      "path": "locales::list_language_packs"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_live_sessions",
+      "output": "-> Result < Vec < SessionRow > , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "open",
+          "name": "open",
+          "type": "Option < Vec < String > >"
+        }
+      ],
+      "path": "sessions::list_live_sessions"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_live_turns",
+      "output": "-> Vec < TurnoEnVuelo >",
+      "parameters": [],
+      "path": "turn::list_live_turns"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_local_models",
+      "output": "-> Result < Vec < ModelState > , Failure >",
+      "parameters": [],
+      "path": "models::list_local_models"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_machine_agents",
+      "output": "-> Result < Catalogo , String >",
+      "parameters": [],
+      "path": "handler_catalog::list_machine_agents"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_mcp_agents",
+      "output": "-> Vec < AgenteMcp >",
+      "parameters": [],
+      "path": "mcp::list_mcp_agents"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_mcp_servers",
+      "output": "-> Result < Vec < ServidorInfo > , Failure >",
+      "parameters": [],
+      "path": "mcp::list_mcp_servers"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_memory_entries",
+      "output": "-> Result < Listing , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Scope"
+        }
+      ],
+      "path": "memory::commands::list_memory_entries"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_mentions",
+      "output": "-> Result < Fuentes , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "sources",
+          "name": "sources",
+          "type": "Option < Vec < String > >"
+        },
+        {
+          "key": "excludedSources",
+          "name": "excluded_sources",
+          "type": "Option < Vec < String > >"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "mentions::list_mentions"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_models",
+      "output": "-> Result < AgentModels , String >",
+      "parameters": [
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "String"
+        }
+      ],
+      "path": "models::list_models"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_permission_modes",
+      "output": "-> Result < Vec < ModoInfo > , String >",
+      "parameters": [
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "String"
+        }
+      ],
+      "path": "agents::list_permission_modes"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_ports",
+      "output": "-> Result < Puertos , String >",
+      "parameters": [],
+      "path": "ports::list_ports"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_project_repositories",
+      "output": "-> Result < Vec < ProjectRepository > , Failure >",
+      "parameters": [
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "String"
+        }
+      ],
+      "path": "projects::list_project_repositories"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_projects",
+      "output": "-> Result < Vec < ProjectInfo > , String >",
+      "parameters": [],
+      "path": "projects::list_projects"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_providers",
+      "output": "-> Result < Vec < ProviderInfo > , Failure >",
+      "parameters": [
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "providers::list_providers"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_radiant_connections",
+      "output": "-> Result < Vec < RemoteConnection > , Failure >",
+      "parameters": [],
+      "path": "governed::list_radiant_connections"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_radiant_workspaces",
+      "output": "-> Result < Vec < RemoteWorkspace > , Failure >",
+      "parameters": [],
+      "path": "radiant::list_radiant_workspaces"
+    },
+    {
+      "async": false,
+      "channel": "progress",
+      "kind": "stream",
+      "name": "list_session_git",
+      "output": "-> Result < Rows , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "remote",
+          "name": "remote",
+          "type": "bool"
+        },
+        {
+          "key": "priority",
+          "name": "priority",
+          "type": "Option < Vec < String > >"
+        },
+        {
+          "key": "progress",
+          "name": "progress",
+          "type": "tauri :: ipc :: Channel < Rows >"
+        }
+      ],
+      "path": "development::list_session_git"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_skill_sources",
+      "output": "-> Result < Listado , String >",
+      "parameters": [],
+      "path": "skill_sources::list_skill_sources"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_slash_menu",
+      "output": "-> MenuDeBarra",
+      "parameters": [
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "String"
+        }
+      ],
+      "path": "agents::list_slash_menu"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_source_branches",
+      "output": "-> Result < Vec < String > , Failure >",
+      "parameters": [
+        {
+          "key": "source",
+          "name": "source",
+          "type": "String"
+        }
+      ],
+      "path": "context::list_source_branches"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_source_skills",
+      "output": "-> Vec < SkillDeFuente >",
+      "parameters": [],
+      "path": "practices::list_source_skills"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_sources",
+      "output": "-> Result < Vec < SourceInfo > , String >",
+      "parameters": [],
+      "path": "context::list_sources"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_spaces",
+      "output": "-> Result < Vec < Space > , Failure >",
+      "parameters": [],
+      "path": "spaces::list_spaces"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_storage",
+      "output": "-> Result < Almacenamiento , String >",
+      "parameters": [
+        {
+          "key": "refrescar",
+          "name": "refrescar",
+          "type": "bool"
+        }
+      ],
+      "path": "storage::list_storage"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_surfaces",
+      "output": "-> Vec < Superficie >",
+      "parameters": [],
+      "path": "surfaces::list_surfaces"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_task_mentions",
+      "output": "-> Result < Vec < Candidate > , String >",
+      "parameters": [],
+      "path": "workspace::task_mentions::list_task_mentions"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_task_trees",
+      "output": "-> Result < Vec < ArbolEnTarea > , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        }
+      ],
+      "path": "development::list_task_trees"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_workspace_attention",
+      "output": "-> Vec < WorkspaceAttention >",
+      "parameters": [],
+      "path": "attention::list_workspace_attention"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "list_workspaces",
+      "output": "-> Result < Startup , String >",
+      "parameters": [],
+      "path": "workspaces::list_workspaces"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "load_queue",
+      "output": "-> Result < Vec < Queued > , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        }
+      ],
+      "path": "chat::load_queue"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "load_session",
+      "output": "-> Result < OpenedSession , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "sessions::load_session"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "local_downloads",
+      "output": "-> Vec < Progress >",
+      "parameters": [],
+      "path": "models::local_downloads"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "local_runtime",
+      "output": "-> RuntimeInfo",
+      "parameters": [],
+      "path": "models::local_runtime"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "login_account",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "mode",
+          "name": "mode",
+          "type": "String"
+        }
+      ],
+      "path": "accounts::login_account"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "mark_task_seen",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        }
+      ],
+      "path": "attention::mark_task_seen"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "mcp_login",
+      "output": "-> Result < Frase , Failure >",
+      "parameters": [
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "mcp::mcp_login"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "mcp_logout",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "mcp::mcp_logout"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "move_session",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "to",
+          "name": "to",
+          "type": "String"
+        }
+      ],
+      "path": "sessions::move_session"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "move_task_to_space",
+      "output": "-> Result < SpaceRef , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "space",
+          "name": "space",
+          "type": "String"
+        }
+      ],
+      "path": "spaces::move_task_to_space"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "observability_connect",
+      "output": "-> Result < Conexion , String >",
+      "parameters": [],
+      "path": "observability::observability_connect"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "observability_disconnect",
+      "output": "-> Result < () , String >",
+      "parameters": [],
+      "path": "observability::observability_disconnect"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "office_preview",
+      "output": "-> Result < Preview , String >",
+      "parameters": [
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        }
+      ],
+      "path": "preview::office_preview"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "open_external",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "target",
+          "name": "target",
+          "type": "String"
+        }
+      ],
+      "path": "env::open_external"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "open_file_external",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "target",
+          "name": "target",
+          "type": "String"
+        }
+      ],
+      "path": "env::open_file_external"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "pending_requests",
+      "output": "-> serde_json :: Value",
+      "parameters": [
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        }
+      ],
+      "path": "chat::pending_requests"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "prepare_attachments",
+      "output": "-> Result < Vec < String > , crate :: util :: Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "paths",
+          "name": "paths",
+          "type": "Vec < String >"
+        }
+      ],
+      "path": "preview::prepare_attachments"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "prepare_print",
+      "output": "-> Result < String , String >",
+      "parameters": [
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        },
+        {
+          "key": "html",
+          "name": "html",
+          "type": "String"
+        }
+      ],
+      "path": "preview::prepare_print"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "prepare_runtime",
+      "output": "-> Result < Preparacion , String >",
+      "parameters": [
+        {
+          "key": "joinOnly",
+          "name": "join_only",
+          "type": "Option < bool >"
+        }
+      ],
+      "path": "bootstrap::prepare_runtime"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "prepare_session_continuation",
+      "output": "-> Result < ContinuationContext , crate :: util :: Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "turno",
+          "name": "turno",
+          "type": "String"
+        }
+      ],
+      "path": "fork::prepare_session_continuation"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "preview_file",
+      "output": "-> Result < Preview , String >",
+      "parameters": [
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        },
+        {
+          "key": "rel",
+          "name": "rel",
+          "type": "String"
+        }
+      ],
+      "path": "preview::preview_file"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "preview_tree_files",
+      "output": "-> Result < ArchivosDelArbol , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "baseRef",
+          "name": "base_ref",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "development::preview_tree_files"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "preview_tree_show",
+      "output": "-> Result < Contenido , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "baseRef",
+          "name": "base_ref",
+          "type": "Option < String >"
+        },
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        }
+      ],
+      "path": "development::preview_tree_show"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "project_base_branches",
+      "output": "-> Result < BaseBranches , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "refresh",
+          "name": "refresh",
+          "type": "Option < bool >"
+        },
+        {
+          "key": "details",
+          "name": "details",
+          "type": "Option < bool >"
+        }
+      ],
+      "path": "worktrees::project_base_branches"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "project_setup_command",
+      "output": "-> Result < Option < String > , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        }
+      ],
+      "path": "worktrees::project_setup_command"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "provider_areas",
+      "output": "-> Result < Vec < Project > , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "providers::provider_areas"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "provider_available_areas",
+      "output": "-> Result < Vec < Project > , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "providers::provider_available_areas"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "provider_pending_setup",
+      "output": "-> Result < Option < String > , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "providers::provider_pending_setup"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "provider_projects",
+      "output": "-> Result < Vec < RemoteRepo > , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "area",
+          "name": "area",
+          "type": "String"
+        },
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Option < String >"
+        },
+        {
+          "key": "includeSkills",
+          "name": "include_skills",
+          "type": "Option < bool >"
+        }
+      ],
+      "path": "providers::provider_projects"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "publications_of",
+      "output": "-> Result < Vec < Publicacion > , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        }
+      ],
+      "path": "publications::publications_of"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "queue_ready",
+      "output": "-> Result < bool , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        }
+      ],
+      "path": "chat::queue_ready"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "radiant_cancel_login",
+      "output": "-> Result < Status , Failure >",
+      "parameters": [],
+      "path": "radiant::radiant_cancel_login"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "radiant_connect_account",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "governed::radiant_connect_account"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "radiant_govern_disable",
+      "output": "-> Result < Status , Failure >",
+      "parameters": [],
+      "path": "governed::radiant_govern_disable"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "radiant_govern_enable",
+      "output": "-> Result < Status , Failure >",
+      "parameters": [],
+      "path": "governed::radiant_govern_enable"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "radiant_govern_refresh",
+      "output": "-> Result < Status , Failure >",
+      "parameters": [],
+      "path": "governed::radiant_govern_refresh"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "radiant_governance_status",
+      "output": "-> Result < Status , Failure >",
+      "parameters": [],
+      "path": "governed::radiant_governance_status"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "radiant_login",
+      "output": "-> Result < Status , Failure >",
+      "parameters": [],
+      "path": "radiant::radiant_login"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "radiant_logout",
+      "output": "-> Result < Status , Failure >",
+      "parameters": [],
+      "path": "radiant::radiant_logout"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "radiant_select_organization",
+      "output": "-> Result < Status , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "radiant::radiant_select_organization"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "radiant_select_workspace",
+      "output": "-> Result < Status , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "radiant::radiant_select_workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "radiant_set_server",
+      "output": "-> Result < Status , Failure >",
+      "parameters": [
+        {
+          "key": "server",
+          "name": "server",
+          "type": "String"
+        }
+      ],
+      "path": "radiant::radiant_set_server"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "radiant_status",
+      "output": "-> Result < Status , Failure >",
+      "parameters": [],
+      "path": "radiant::radiant_status"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "radiant_usage_set_opt_in",
+      "output": "-> Result < Status , Failure >",
+      "parameters": [
+        {
+          "key": "enabled",
+          "name": "enabled",
+          "type": "bool"
+        }
+      ],
+      "path": "radiant::usage_report::radiant_usage_set_opt_in"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "radiant_usage_status",
+      "output": "-> Result < Status , Failure >",
+      "parameters": [],
+      "path": "radiant::usage_report::radiant_usage_status"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "read_drawio_asset",
+      "output": "-> Result < String , Failure >",
+      "parameters": [
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        }
+      ],
+      "path": "drawio::read_drawio_asset"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "read_mcp_app",
+      "output": "-> Result < Option < AppView > , Failure >",
+      "parameters": [
+        {
+          "key": "server",
+          "name": "server",
+          "type": "String"
+        },
+        {
+          "key": "tool",
+          "name": "tool",
+          "type": "String"
+        }
+      ],
+      "path": "mcp::read_mcp_app"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "read_mcp_app_resource",
+      "output": "-> Result < Value , Failure >",
+      "parameters": [
+        {
+          "key": "connectionId",
+          "name": "connection_id",
+          "type": "String"
+        },
+        {
+          "key": "uri",
+          "name": "uri",
+          "type": "String"
+        }
+      ],
+      "path": "mcp::read_mcp_app_resource"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "read_version",
+      "output": "-> Result < String , String >",
+      "parameters": [
+        {
+          "key": "referencia",
+          "name": "referencia",
+          "type": "VersionRef"
+        }
+      ],
+      "path": "versions::read_version"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "reclaim_storage",
+      "output": "-> Result < Liberado , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "rutas",
+          "name": "rutas",
+          "type": "Vec < String >"
+        }
+      ],
+      "path": "storage::reclaim_storage"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "record_export",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "referencia",
+          "name": "referencia",
+          "type": "crate :: versions :: VersionRef"
+        },
+        {
+          "key": "via",
+          "name": "via",
+          "type": "String"
+        },
+        {
+          "key": "destino",
+          "name": "destino",
+          "type": "String"
+        },
+        {
+          "key": "bytes",
+          "name": "bytes",
+          "type": "u64"
+        }
+      ],
+      "path": "export::record_export"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "recreate_task_work",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "history::recreate_task_work"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "reintentar_reanudacion_por_entregas",
+      "output": "-> Result < String , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        }
+      ],
+      "path": "chat::launch::reintentar_reanudacion_por_entregas"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "remove_account",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "accounts::remove_account"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "remove_agent",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "String"
+        }
+      ],
+      "path": "agents::remove_agent"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "remove_gh",
+      "output": "-> Result < () , String >",
+      "parameters": [],
+      "path": "github::remove_gh"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "remove_language_pack",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "code",
+          "name": "code",
+          "type": "String"
+        }
+      ],
+      "path": "locales::remove_language_pack"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "remove_local_model",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "models::remove_local_model"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "remove_local_runtime",
+      "output": "-> Result < () , Failure >",
+      "parameters": [],
+      "path": "models::remove_local_runtime"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "remove_mcp_server",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        }
+      ],
+      "path": "mcp::remove_mcp_server"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "remove_skill_source",
+      "output": "-> Result < Retirada , String >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "skill_sources::remove_skill_source"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "remove_source",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "source",
+          "name": "source",
+          "type": "String"
+        }
+      ],
+      "path": "context::remove_source"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "remove_tool",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "tool",
+          "name": "tool",
+          "type": "String"
+        }
+      ],
+      "path": "toolchain::remove_tool"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "remove_workspace",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "workspaces::remove_workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "rename_project",
+      "output": "-> Result < Project , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        }
+      ],
+      "path": "projects::rename_project"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "rename_session",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "title",
+          "name": "title",
+          "type": "String"
+        }
+      ],
+      "path": "sessions::rename_session"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "rename_space",
+      "output": "-> Result < Space , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        }
+      ],
+      "path": "spaces::rename_space"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "rename_workspace",
+      "output": "-> Result < Workspace , String >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        }
+      ],
+      "path": "workspaces::rename_workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "repo_branches",
+      "output": "-> Result < crate :: providers :: RemoteBranches , Failure >",
+      "parameters": [
+        {
+          "key": "cloneUrl",
+          "name": "clone_url",
+          "type": "String"
+        },
+        {
+          "key": "provider",
+          "name": "provider",
+          "type": "Option < String >"
+        },
+        {
+          "key": "defaultBranch",
+          "name": "default_branch",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "context::repo_branches"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "desktop",
+      "name": "request_close",
+      "output": "-> Result < () , String >",
+      "parameters": [],
+      "path": "request_close"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "respond_permission",
+      "output": "-> Result < Turn , String >",
+      "parameters": [
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "requestId",
+          "name": "request_id",
+          "type": "String"
+        },
+        {
+          "key": "allow",
+          "name": "allow",
+          "type": "bool"
+        }
+      ],
+      "path": "chat::respond_permission"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "restore_task_work",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "destination",
+          "name": "destination",
+          "type": "PathBuf"
+        }
+      ],
+      "path": "history::restore_task_work"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "restore_version",
+      "output": "-> Result < History , String >",
+      "parameters": [
+        {
+          "key": "referencia",
+          "name": "referencia",
+          "type": "VersionRef"
+        }
+      ],
+      "path": "versions::restore_version"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "resume_awaiting_quota",
+      "output": "-> Result < usize , String >",
+      "parameters": [
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "String"
+        }
+      ],
+      "path": "chat::resume_awaiting_quota"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "retire_memory_entry",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Scope"
+        },
+        {
+          "key": "File",
+          "name": "_file",
+          "type": "String"
+        }
+      ],
+      "path": "memory::commands::retire_memory_entry"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "reuse_project",
+      "output": "-> Result < Project , Failure >",
+      "parameters": [
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "String"
+        },
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "space",
+          "name": "space",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "projects::reuse_project"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "run_shell_command",
+      "output": "-> Result < Corrida , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "Option < String >"
+        },
+        {
+          "key": "command",
+          "name": "command",
+          "type": "String"
+        },
+        {
+          "key": "queueId",
+          "name": "queue_id",
+          "type": "Option < String >"
+        },
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "Option < String >"
+        },
+        {
+          "key": "model",
+          "name": "model",
+          "type": "Option < String >"
+        },
+        {
+          "key": "effort",
+          "name": "effort",
+          "type": "Option < String >"
+        },
+        {
+          "key": "permissionMode",
+          "name": "permission_mode",
+          "type": "Option < String >"
+        },
+        {
+          "key": "space",
+          "name": "space",
+          "type": "Option < String >"
+        },
+        {
+          "key": "encargado",
+          "name": "encargado",
+          "type": "Option < String >"
+        },
+        {
+          "key": "baseRef",
+          "name": "base_ref",
+          "type": "Option < String >"
+        },
+        {
+          "key": "runId",
+          "name": "run_id",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "chat::run_shell_command"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "save_agent_declaration",
+      "output": "-> Result < HandlerDefinition , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "key": "description",
+          "name": "description",
+          "type": "String"
+        },
+        {
+          "key": "instructions",
+          "name": "instructions",
+          "type": "String"
+        }
+      ],
+      "path": "handlers::save_agent_declaration"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "save_agent_profile",
+      "output": "-> Result < Profile , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "key": "displayName",
+          "name": "display_name",
+          "type": "Option < String >"
+        },
+        {
+          "key": "body",
+          "name": "body",
+          "type": "Option < String >"
+        },
+        {
+          "key": "veil",
+          "name": "veil",
+          "type": "f32"
+        }
+      ],
+      "path": "handlers::save_agent_profile"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "save_queue",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "queued",
+          "name": "queued",
+          "type": "Vec < Queued >"
+        }
+      ],
+      "path": "chat::save_queue"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "select_provider_area",
+      "output": "-> Result < ProviderInfo , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "area",
+          "name": "area",
+          "type": "String"
+        },
+        {
+          "key": "enabled",
+          "name": "enabled",
+          "type": "bool"
+        },
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "providers::select_provider_area"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "send_message",
+      "output": "-> Result < String , String >",
+      "parameters": [
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "String"
+        },
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "Option < String >"
+        },
+        {
+          "key": "prompt",
+          "name": "prompt",
+          "type": "String"
+        },
+        {
+          "key": "model",
+          "name": "model",
+          "type": "Option < String >"
+        },
+        {
+          "key": "effort",
+          "name": "effort",
+          "type": "Option < String >"
+        },
+        {
+          "key": "permissionMode",
+          "name": "permission_mode",
+          "type": "Option < String >"
+        },
+        {
+          "key": "attachments",
+          "name": "attachments",
+          "type": "Option < Vec < String > >"
+        },
+        {
+          "key": "sources",
+          "name": "sources",
+          "type": "Option < Vec < String > >"
+        },
+        {
+          "key": "excludedSources",
+          "name": "excluded_sources",
+          "type": "Option < Vec < String > >"
+        },
+        {
+          "key": "respuestas",
+          "name": "respuestas",
+          "type": "Option < Vec < questions :: RespuestaEnviada > >"
+        },
+        {
+          "key": "baseRef",
+          "name": "base_ref",
+          "type": "Option < String >"
+        },
+        {
+          "key": "encargado",
+          "name": "encargado",
+          "type": "Option < String >"
+        },
+        {
+          "key": "taskFromAgent",
+          "name": "task_from_agent",
+          "type": "Option < bool >"
+        },
+        {
+          "key": "fromEncargado",
+          "name": "from_encargado",
+          "type": "Option < String >"
+        },
+        {
+          "key": "fromChannel",
+          "name": "from_channel",
+          "type": "Option < String >"
+        },
+        {
+          "key": "replyTo",
+          "name": "reply_to",
+          "type": "Option < ReplyTo >"
+        },
+        {
+          "key": "hops",
+          "name": "hops",
+          "type": "Option < u32 >"
+        },
+        {
+          "key": "taskMentions",
+          "name": "task_mentions",
+          "type": "Option < Vec < crate :: workspace :: task_mentions :: TaskMention > >"
+        },
+        {
+          "key": "recipients",
+          "name": "recipients",
+          "type": "Option < Vec < crate :: recipients :: Recipient > >"
+        },
+        {
+          "key": "fromTask",
+          "name": "from_task",
+          "type": "Option < crate :: sessions :: SenderTask >"
+        },
+        {
+          "key": "space",
+          "name": "space",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "chat::send_message"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "desktop",
+      "name": "service_cancel_update",
+      "output": "-> std :: result :: Result < () , String >",
+      "parameters": [],
+      "path": "cli::service::service_cancel_update"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "desktop",
+      "name": "service_poll",
+      "output": "-> std :: result :: Result < Value , String >",
+      "parameters": [
+        {
+          "key": "cursor",
+          "name": "cursor",
+          "type": "Option < u64 >"
+        },
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "Option < String >"
+        },
+        {
+          "key": "replay",
+          "name": "replay",
+          "type": "bool"
+        },
+        {
+          "key": "runtime",
+          "name": "runtime",
+          "type": "Option < String >"
+        },
+        {
+          "key": "setup",
+          "name": "setup",
+          "type": "Option < bool >"
+        }
+      ],
+      "path": "cli::service::service_poll"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "desktop",
+      "name": "service_prepare_update",
+      "output": "-> std :: result :: Result < () , Value >",
+      "parameters": [],
+      "path": "cli::service::service_prepare_update"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "session_folder",
+      "output": "-> Result < String , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "sessions::session_folder"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "session_usage",
+      "output": "-> SessionUsage",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        }
+      ],
+      "path": "usage::session_usage"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "session_worktree",
+      "output": "-> Result < Option < Worktree > , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "worktrees::session_worktree"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_active_account",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "accounts::set_active_account"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_active_workspace",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "workspaces::set_active_workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_agent_avatar",
+      "output": "-> Result < Profile , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "key": "source",
+          "name": "source",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "handlers::set_agent_avatar"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_agent_background",
+      "output": "-> Result < Profile , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "key": "source",
+          "name": "source",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "handlers::set_agent_background"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_agent_consent",
+      "output": "-> Result < Workspace , String >",
+      "parameters": [
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "String"
+        },
+        {
+          "key": "accepted",
+          "name": "accepted",
+          "type": "bool"
+        }
+      ],
+      "path": "workspaces::set_agent_consent"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_agent_hidden",
+      "output": "-> Result < Profile , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "key": "hidden",
+          "name": "hidden",
+          "type": "bool"
+        }
+      ],
+      "path": "handlers::set_agent_hidden"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_agent_model",
+      "output": "-> Result < Profile , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "Option < String >"
+        },
+        {
+          "key": "model",
+          "name": "model",
+          "type": "Option < String >"
+        },
+        {
+          "key": "effort",
+          "name": "effort",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "handlers::set_agent_model"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_api_key",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "key",
+          "name": "key",
+          "type": "String"
+        }
+      ],
+      "path": "accounts::set_api_key"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_effort",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "effort",
+          "name": "effort",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "chat::set_effort"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_go_usage_key",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "key",
+          "name": "key",
+          "type": "String"
+        }
+      ],
+      "path": "accounts::set_go_usage_key"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_integration_enabled",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "Plugin"
+        },
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "String"
+        },
+        {
+          "key": "enabled",
+          "name": "enabled",
+          "type": "bool"
+        }
+      ],
+      "path": "integrations::set_integration_enabled"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_keep_awake",
+      "output": "-> Result < Status , String >",
+      "parameters": [
+        {
+          "key": "mode",
+          "name": "mode",
+          "type": "Mode"
+        }
+      ],
+      "path": "awake::set_keep_awake"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_memory_provider",
+      "output": "-> Result < Workspace , String >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "block",
+          "name": "block",
+          "type": "Option < String >"
+        },
+        {
+          "key": "readWrite",
+          "name": "read_write",
+          "type": "bool"
+        }
+      ],
+      "path": "workspaces::set_memory_provider"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_permission_mode",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "mode",
+          "name": "mode",
+          "type": "String"
+        }
+      ],
+      "path": "chat::set_permission_mode"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_profile",
+      "output": "-> Result < Profile , String >",
+      "parameters": [
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        }
+      ],
+      "path": "workspaces::set_profile"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_project_base_branch",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "reference",
+          "name": "reference",
+          "type": "String"
+        }
+      ],
+      "path": "worktrees::set_project_base_branch"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_project_directory",
+      "output": "-> Result < PathBuf , Failure >",
+      "parameters": [
+        {
+          "key": "directory",
+          "name": "directory",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "workspaces::set_project_directory"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_project_setup_command",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "command",
+          "name": "command",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "worktrees::set_project_setup_command"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_project_work_tree",
+      "output": "-> Result < Project , String >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "dir",
+          "name": "dir",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "projects::set_project_work_tree"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_root",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "source",
+          "name": "source",
+          "type": "String"
+        }
+      ],
+      "path": "context::set_root"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_session_pinned",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "pinned",
+          "name": "pinned",
+          "type": "bool"
+        }
+      ],
+      "path": "sessions::set_session_pinned"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_session_stage",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "stage",
+          "name": "stage",
+          "type": "Option < Etapa >"
+        }
+      ],
+      "path": "sessions::set_session_stage"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_skill_source_enabled",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "enabled",
+          "name": "enabled",
+          "type": "bool"
+        }
+      ],
+      "path": "skill_sources::set_skill_source_enabled"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_source_branch",
+      "output": "-> Result < Source , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "source",
+          "name": "source",
+          "type": "String"
+        },
+        {
+          "key": "branch",
+          "name": "branch",
+          "type": "String"
+        }
+      ],
+      "path": "context::set_source_branch"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_source_skill",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "source",
+          "name": "source",
+          "type": "String"
+        },
+        {
+          "key": "skill",
+          "name": "skill",
+          "type": "String"
+        },
+        {
+          "key": "on",
+          "name": "on",
+          "type": "bool"
+        }
+      ],
+      "path": "context::set_source_skill"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_space_folders",
+      "output": "-> Result < Space , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "folders",
+          "name": "folders",
+          "type": "Vec < String >"
+        }
+      ],
+      "path": "spaces::set_space_folders"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_task_archived",
+      "output": "-> Result < Option < crate :: spaces :: SpaceRef > , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "archived",
+          "name": "archived",
+          "type": "bool"
+        },
+        {
+          "key": "space",
+          "name": "space",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "history::set_task_archived"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_workspace_language",
+      "output": "-> Result < Workspace , String >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "lengua",
+          "name": "lengua",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "workspaces::set_workspace_language"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_workspace_logo",
+      "output": "-> Result < LogoGuardado , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "source",
+          "name": "source",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "workspaces::set_workspace_logo"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_workspace_logo_png",
+      "output": "-> Result < LogoGuardado , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "pngBase64",
+          "name": "png_base64",
+          "type": "String"
+        }
+      ],
+      "path": "workspaces::set_workspace_logo_png"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_workspace_output_language",
+      "output": "-> Result < Workspace , String >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "lengua",
+          "name": "lengua",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "workspaces::set_workspace_output_language"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_workspace_permission_mode",
+      "output": "-> Result < Workspace , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "mode",
+          "name": "mode",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "workspaces::set_workspace_permission_mode"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_workspace_source",
+      "output": "-> Result < Source , String >",
+      "parameters": [
+        {
+          "key": "kind",
+          "name": "kind",
+          "type": "String"
+        },
+        {
+          "key": "locator",
+          "name": "locator",
+          "type": "String"
+        }
+      ],
+      "path": "context::set_workspace_source"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_workspace_terminal_theme",
+      "output": "-> Result < Workspace , String >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "theme",
+          "name": "theme",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "workspaces::set_workspace_terminal_theme"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_workspace_worktrees_root",
+      "output": "-> Result < Workspace , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "root",
+          "name": "root",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "workspaces::set_workspace_worktrees_root"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "setup_required",
+      "output": "-> bool",
+      "parameters": [],
+      "path": "bootstrap::setup_required"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "desktop",
+      "name": "site_close",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "label",
+          "name": "label",
+          "type": "String"
+        }
+      ],
+      "path": "sites::site_close"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "desktop",
+      "name": "site_go",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "label",
+          "name": "label",
+          "type": "String"
+        },
+        {
+          "key": "delta",
+          "name": "delta",
+          "type": "i32"
+        }
+      ],
+      "path": "sites::site_go"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "desktop",
+      "name": "site_hide",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "label",
+          "name": "label",
+          "type": "String"
+        }
+      ],
+      "path": "sites::site_hide"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "desktop",
+      "name": "site_navigate",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "label",
+          "name": "label",
+          "type": "String"
+        },
+        {
+          "key": "url",
+          "name": "url",
+          "type": "String"
+        }
+      ],
+      "path": "sites::site_navigate"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "desktop",
+      "name": "site_open",
+      "output": "-> Result < Sitio , String >",
+      "parameters": [
+        {
+          "key": "url",
+          "name": "url",
+          "type": "String"
+        },
+        {
+          "key": "x",
+          "name": "x",
+          "type": "f64"
+        },
+        {
+          "key": "y",
+          "name": "y",
+          "type": "f64"
+        },
+        {
+          "key": "width",
+          "name": "width",
+          "type": "f64"
+        },
+        {
+          "key": "height",
+          "name": "height",
+          "type": "f64"
+        }
+      ],
+      "path": "sites::site_open"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "desktop",
+      "name": "site_open_external",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "url",
+          "name": "url",
+          "type": "String"
+        }
+      ],
+      "path": "sites::site_open_external"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "desktop",
+      "name": "site_open_local",
+      "output": "-> Result < Sitio , String >",
+      "parameters": [
+        {
+          "key": "port",
+          "name": "port",
+          "type": "u16"
+        },
+        {
+          "key": "css",
+          "name": "css",
+          "type": "Option < String >"
+        },
+        {
+          "key": "x",
+          "name": "x",
+          "type": "f64"
+        },
+        {
+          "key": "y",
+          "name": "y",
+          "type": "f64"
+        },
+        {
+          "key": "width",
+          "name": "width",
+          "type": "f64"
+        },
+        {
+          "key": "height",
+          "name": "height",
+          "type": "f64"
+        }
+      ],
+      "path": "sites::site_open_local"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "desktop",
+      "name": "site_place",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "label",
+          "name": "label",
+          "type": "String"
+        },
+        {
+          "key": "x",
+          "name": "x",
+          "type": "f64"
+        },
+        {
+          "key": "y",
+          "name": "y",
+          "type": "f64"
+        },
+        {
+          "key": "width",
+          "name": "width",
+          "type": "f64"
+        },
+        {
+          "key": "height",
+          "name": "height",
+          "type": "f64"
+        }
+      ],
+      "path": "sites::site_place"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "desktop",
+      "name": "site_reload",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "label",
+          "name": "label",
+          "type": "String"
+        }
+      ],
+      "path": "sites::site_reload"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "desktop",
+      "name": "site_sweep",
+      "output": "-> Result < () , String >",
+      "parameters": [],
+      "path": "sites::site_sweep"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "desktop",
+      "name": "site_zoom",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "label",
+          "name": "label",
+          "type": "String"
+        },
+        {
+          "key": "factor",
+          "name": "factor",
+          "type": "f64"
+        }
+      ],
+      "path": "sites::site_zoom"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "skill_source_freshness",
+      "output": "-> Result < Vec < crate :: context :: Frescura > , String >",
+      "parameters": [],
+      "path": "skill_sources::skill_source_freshness"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "sleep_session",
+      "output": "-> Result < () , crate :: util :: Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        }
+      ],
+      "path": "chat::sleep_session"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "source_detail",
+      "output": "-> Result < Detalle , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "mirar",
+          "name": "mirar",
+          "type": "bool"
+        }
+      ],
+      "path": "context::source_detail"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "source_freshness",
+      "output": "-> Result < Vec < Frescura > , String >",
+      "parameters": [],
+      "path": "context::source_freshness"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "sources_in_use",
+      "output": "-> Vec < String >",
+      "parameters": [],
+      "path": "turn::sources_in_use"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "space_delete_preview",
+      "output": "-> Result < DeletePreview , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "spaces::space_delete_preview"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "start_browser_login",
+      "output": "-> Result < Wait , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "providers::start_browser_login"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "start_local_model",
+      "output": "-> Result < String , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "models::start_local_model"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "stop_local_model",
+      "output": "-> Result < () , Failure >",
+      "parameters": [],
+      "path": "models::stop_local_model"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "stop_shell_command",
+      "output": "-> bool",
+      "parameters": [
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        }
+      ],
+      "path": "chat::stop_shell_command"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "stop_turn",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        }
+      ],
+      "path": "chat::stop_turn"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "submit_login_code",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "code",
+          "name": "code",
+          "type": "String"
+        }
+      ],
+      "path": "accounts::submit_login_code"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "task_blockers",
+      "output": "-> Result < Blockers , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "finish",
+          "name": "finish",
+          "type": "bool"
+        }
+      ],
+      "path": "history::task_blockers"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "task_coordinator",
+      "output": "-> Result < Option < SenderTask > , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "sessions::task_coordinator"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "task_history",
+      "output": "-> Result < View , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "history::task_history"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "tasks_awaiting_quota",
+      "output": "-> Result < Vec < EnEspera > , String >",
+      "parameters": [
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "String"
+        }
+      ],
+      "path": "chat::tasks_awaiting_quota"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "telegram_disable",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        }
+      ],
+      "path": "telegram::telegram_disable"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "telegram_set_token",
+      "output": "-> Result < TelegramStatus , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "key": "token",
+          "name": "token",
+          "type": "String"
+        }
+      ],
+      "path": "telegram::telegram_set_token"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "telegram_start_pairing",
+      "output": "-> Result < PairingResponse , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        }
+      ],
+      "path": "telegram::telegram_start_pairing"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "telegram_status",
+      "output": "-> Result < TelegramStatus , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        }
+      ],
+      "path": "telegram::telegram_status"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "tree_changes",
+      "output": "-> Result < Cambios , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "tree",
+          "name": "tree",
+          "type": "String"
+        }
+      ],
+      "path": "development::tree_changes"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "tree_create_file",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "tree",
+          "name": "tree",
+          "type": "String"
+        },
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        }
+      ],
+      "path": "development::tree_create_file"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "tree_create_folder",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "tree",
+          "name": "tree",
+          "type": "String"
+        },
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        }
+      ],
+      "path": "development::tree_create_folder"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "tree_delete",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "tree",
+          "name": "tree",
+          "type": "String"
+        },
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        }
+      ],
+      "path": "development::tree_delete"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "tree_diff",
+      "output": "-> Result < DiffDeArbol , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "tree",
+          "name": "tree",
+          "type": "String"
+        },
+        {
+          "key": "before",
+          "name": "before",
+          "type": "String"
+        },
+        {
+          "key": "after",
+          "name": "after",
+          "type": "String"
+        },
+        {
+          "key": "path",
+          "name": "path",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "development::tree_diff"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "tree_files",
+      "output": "-> Result < ArchivosDelArbol , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "tree",
+          "name": "tree",
+          "type": "String"
+        }
+      ],
+      "path": "development::tree_files"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "tree_git_status",
+      "output": "-> Result < Vec < GitStatusEntry > , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "tree",
+          "name": "tree",
+          "type": "String"
+        }
+      ],
+      "path": "development::tree_git_status"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "tree_office_preview",
+      "output": "-> Result < crate :: preview :: Preview , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "tree",
+          "name": "tree",
+          "type": "String"
+        },
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        }
+      ],
+      "path": "development::tree_office_preview"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "tree_open_external",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "tree",
+          "name": "tree",
+          "type": "String"
+        },
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        }
+      ],
+      "path": "development::tree_open_external"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "tree_patch",
+      "output": "-> Result < String , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "tree",
+          "name": "tree",
+          "type": "String"
+        },
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        }
+      ],
+      "path": "development::tree_patch"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "tree_rename",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "tree",
+          "name": "tree",
+          "type": "String"
+        },
+        {
+          "key": "from",
+          "name": "from",
+          "type": "String"
+        },
+        {
+          "key": "to",
+          "name": "to",
+          "type": "String"
+        }
+      ],
+      "path": "development::tree_rename"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "tree_show",
+      "output": "-> Result < Contenido , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "tree",
+          "name": "tree",
+          "type": "String"
+        },
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        }
+      ],
+      "path": "development::tree_show"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "tree_summary",
+      "output": "-> Result < Resumen , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "tree",
+          "name": "tree",
+          "type": "String"
+        }
+      ],
+      "path": "development::tree_summary"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "tree_typst_export",
+      "output": "-> Result < crate :: environment :: typst :: Exportacion , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "tree",
+          "name": "tree",
+          "type": "String"
+        },
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        },
+        {
+          "key": "main",
+          "name": "main",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "development::tree_typst_export"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "tree_typst_target",
+      "output": "-> Result < ObjetivoTypst , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "tree",
+          "name": "tree",
+          "type": "String"
+        },
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        },
+        {
+          "key": "main",
+          "name": "main",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "development::tree_typst_target"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "tree_write",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "tree",
+          "name": "tree",
+          "type": "String"
+        },
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        },
+        {
+          "key": "text",
+          "name": "text",
+          "type": "String"
+        }
+      ],
+      "path": "development::tree_write"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "turn_authors",
+      "output": "-> Signatures",
+      "parameters": [
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "String"
+        }
+      ],
+      "path": "sessions::turn_authors"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "desktop",
+      "name": "typst_live_change",
+      "output": "-> Result < () , Value >",
+      "parameters": [
+        {
+          "key": "key",
+          "name": "key",
+          "type": "String"
+        },
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        },
+        {
+          "key": "text",
+          "name": "text",
+          "type": "String"
+        }
+      ],
+      "path": "typst_live::typst_live_change"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "desktop",
+      "name": "typst_live_close_doc",
+      "output": "-> Result < () , Value >",
+      "parameters": [
+        {
+          "key": "key",
+          "name": "key",
+          "type": "String"
+        },
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        }
+      ],
+      "path": "typst_live::typst_live_close_doc"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "desktop",
+      "name": "typst_live_open",
+      "output": "-> Result < VistaViva , Value >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "tree",
+          "name": "tree",
+          "type": "String"
+        },
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        },
+        {
+          "key": "main",
+          "name": "main",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "typst_live::typst_live_open"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "desktop",
+      "name": "typst_live_reveal",
+      "output": "-> Result < () , Value >",
+      "parameters": [
+        {
+          "key": "key",
+          "name": "key",
+          "type": "String"
+        },
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        },
+        {
+          "key": "line",
+          "name": "line",
+          "type": "u32"
+        },
+        {
+          "key": "column",
+          "name": "column",
+          "type": "u32"
+        }
+      ],
+      "path": "typst_live::typst_live_reveal"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "desktop",
+      "name": "typst_live_stop",
+      "output": "",
+      "parameters": [
+        {
+          "key": "key",
+          "name": "key",
+          "type": "Option < String >"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "typst_live::typst_live_stop"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "uninstall_integration",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "Plugin"
+        }
+      ],
+      "path": "integrations::uninstall_integration"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "uninstall_source_skill",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "source",
+          "name": "source",
+          "type": "String"
+        },
+        {
+          "key": "skill",
+          "name": "skill",
+          "type": "String"
+        }
+      ],
+      "path": "practices::uninstall_source_skill"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "unwatch_task_tree",
+      "output": "",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "development::unwatch_task_tree"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "update_integration",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "Plugin"
+        }
+      ],
+      "path": "integrations::update_integration"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "update_skill_source",
+      "output": "-> Result < String , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "skill_sources::update_skill_source"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "update_source",
+      "output": "-> Result < String , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "context::update_source"
+    },
+    {
+      "async": false,
+      "channel": "changes",
+      "kind": "stream",
+      "name": "watch_task_tree",
+      "output": "-> Result < String , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "changes",
+          "name": "changes",
+          "type": "tauri :: ipc :: Channel < () >"
+        }
+      ],
+      "path": "development::watch_task_tree"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "desktop",
+      "name": "window_ready",
+      "output": "",
+      "parameters": [
+        {
+          "key": "at",
+          "name": "at",
+          "type": "u64"
+        }
+      ],
+      "path": "window_ready"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "desktop",
+      "name": "window_vitals",
+      "output": "",
+      "parameters": [
+        {
+          "key": "nodes",
+          "name": "nodes",
+          "type": "u64"
+        },
+        {
+          "key": "heapMb",
+          "name": "heap_mb",
+          "type": "u64"
+        },
+        {
+          "key": "tabs",
+          "name": "tabs",
+          "type": "u64"
+        },
+        {
+          "key": "threads",
+          "name": "threads",
+          "type": "u64"
+        },
+        {
+          "key": "messages",
+          "name": "messages",
+          "type": "u64"
+        }
+      ],
+      "path": "window_vitals"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "workspaces_startup",
+      "output": "-> Result < Startup , String >",
+      "parameters": [],
+      "path": "workspaces::workspaces_startup"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "worktree_rename_branch",
+      "output": "-> Result < Worktree , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        }
+      ],
+      "path": "worktrees::worktree_rename_branch"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "write_memory_entry",
+      "output": "-> Result < EntryView , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Scope"
+        },
+        {
+          "key": "file",
+          "name": "file",
+          "type": "String"
+        },
+        {
+          "key": "r#type",
+          "name": "r#type",
+          "type": "Option < String >"
+        },
+        {
+          "key": "text",
+          "name": "text",
+          "type": "String"
+        }
+      ],
+      "path": "memory::commands::write_memory_entry"
+    }
+  ],
+  "events": [
+    "account",
+    "account-rejected",
+    "agents",
+    "agentsview-changed",
+    "attention",
+    "bootstrap",
+    "bootstrap-run",
+    "chat",
+    "cli-changed",
+    "cli-open-task",
+    "close-tab",
+    "integrations-changed",
+    "keep-awake-changed",
+    "kn-cloud",
+    "local-engine",
+    "local-model",
+    "mcp",
+    "mcp-login",
+    "question",
+    "radiant",
+    "session",
+    "site",
+    "sitio-pedido",
+    "telegram-changed",
+    "toolchain",
+    "typst-live",
+    "usage"
+  ],
+  "license": "Apache-2.0",
+  "rpc_version": 1,
+  "source_commit": "b40d34999d140d30a0e1192ba752b2fdb860dc90",
+  "source_repository": "danil-labs/harness-app",
+  "version": 1
+}

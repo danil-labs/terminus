@@ -1,0 +1,28 @@
+Terminus
+Copyright 2025-2026 Software y Servicios Danil, S.A.P.I. de C.V.
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+It includes third-party software under their own licenses:
+
+- src/features/code/file-icons.ts: icons and mappings generated from
+  material-icon-theme v5.37.0, MIT License, Copyright (c) Philipp Kief.
+- src/features/chat/paste.ts: derived from use-stick-to-bottom 1.1.6,
+  MIT License, Copyright (c) StackBlitz.
+- src/lib/nextSteps.ts: derived from traycer
+  (clients/gui-app/src/markdown/traycer-next-steps.ts, commit 48be0c1f),
+  MIT License, Copyright (c) 2026 Traycer AI.
+- src/styles/fonts/Geist-Variable.woff2, GeistMono-Variable.woff2: Geist and
+  Geist Mono by Vercel, SIL Open Font License 1.1.
+- src/styles/fonts/BricolageGrotesque-*.woff2: Bricolage Grotesque,
+  Copyright 2022 The Bricolage Grotesque Project Authors, SIL Open Font
+  License 1.1 (src/styles/fonts/OFL-BricolageGrotesque.txt).
+
+The npm packages and Rust crates compiled into the application, with their
+license texts, are listed in third-party/npm.md and third-party/rust.md.
+
+The Seldon engine (seldon-runtime) is proprietary software by Danil. It is not
+part of this repository and is not covered by the Apache License; its terms
+are published with each engine release (TERMS.md).
+
+"Terminus", "Danil" and their logos are trademarks of Danil.

@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "name": "seldon-runtime",
+  "engine_version": "0.2.73",
+  "commit": "d6ab489827ffee505e00d528f9d8c95e1aca46b2",
+  "release": "seldon-runtime-v0.2.73-d6ab489",
+  "manifest": "https://github.com/danil-labs/terminus/releases/download/seldon-runtime-v0.2.73-d6ab489/seldon-runtime.json",
+  "terms": "https://github.com/danil-labs/terminus/releases/download/seldon-runtime-v0.2.73-d6ab489/TERMS.md",
+  "contract": "2701d8c1cf79951ba997598922d44ad1bec42c85e84808bb1c09b92f57f7f827",
+  "platforms": {
+    "x86_64-pc-windows-msvc": {
+      "url": "https://github.com/danil-labs/terminus/releases/download/seldon-runtime-v0.2.73-d6ab489/seldon-runtime-x86_64-pc-windows-msvc.exe",
+      "sha256": "b9e1594c96c1f3f3d3e5d0d9eca95d6d7119c1b84f6d764cf114ec83536c04f7"
+    },
+    "aarch64-apple-darwin": { "url": "", "sha256": "" },
+    "x86_64-apple-darwin": { "url": "", "sha256": "" },
+    "x86_64-unknown-linux-gnu": { "url": "", "sha256": "" }
+  }
+}

@@ -1,0 +1,49 @@
+/* Las marcas son una máscara, no un nodo por input. Su paso se comprime cuando
+   hay más mensajes que espacio visible; el índice bajo el puntero usa el mismo
+   paso para que cada marca lleve a su mensaje. */
+
+.riel-de-mensajes::before,
+.riel-de-mensajes::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+}
+
+.riel-de-mensajes::before {
+  top: 8px;
+  bottom: 8px;
+  width: 12px;
+  background-color: var(--color-neutral-300);
+  -webkit-mask-image: repeating-linear-gradient(to bottom, black 0 var(--riel-grosor), transparent var(--riel-grosor) var(--riel-paso));
+  mask-image: repeating-linear-gradient(to bottom, black 0 var(--riel-grosor), transparent var(--riel-grosor) var(--riel-paso));
+}
+
+.riel-de-mensajes::after {
+  top: var(--riel-activo, 8px);
+  width: 20px;
+  height: 3px;
+  border-radius: 999px;
+  background-color: var(--color-neutral-700);
+}
+
+.riel-de-mensajes:hover::before,
+.riel-de-mensajes[aria-expanded="true"]::before {
+  background-color: var(--color-neutral-500);
+}
+
+.riel-de-mensajes:hover::after,
+.riel-de-mensajes[aria-expanded="true"]::after {
+  background-color: var(--color-neutral-950);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .riel-de-mensajes::before {
+    transition: background-color 150ms ease-out;
+  }
+
+  .riel-de-mensajes::after {
+    transition:
+      top 150ms ease-out,
+      background-color 150ms ease-out;
+  }
+}

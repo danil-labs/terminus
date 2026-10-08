@@ -1,0 +1,629 @@
+/**
+ * El modelo de eventos del turno y la transcripción que se pinta: Rust
+ * normaliza claude y codex a estas formas, y `transcripcion()` convierte los
+ * turnos guardados en los mensajes del hilo. Es cálculo sin JSX; vive con su
+ * dominio y se prueba desde Node.
+ */
+
+import type { CodeRange } from "../../lib/model.ts";
+import type { Recipient, ReplyTo, SenderTask } from "../../lib/recipients.ts";
+import { type Detalle, pasoDe } from "../../lib/steps.ts";
+import type {
+  Author,
+  CambioPorCupo,
+  FalloDelTurno,
+  Msg,
+  PermissionDecision,
+  PermissionOrigin,
+} from "./Chat.tsx";
+import type { Producido } from "./Delivery.tsx";
+import type { Pregunta, Respuesta } from "./Questions.tsx";
+
+/** Modelo de eventos propio: Rust normaliza claude y codex a estas formas. */
+export type ChatEvent = {
+  /**
+   * De qué workspace es el turno que lo manda, o ausente si no viene de uno
+   * —un aviso que Rust emite contestando a lo que se acaba de hacer aquí—.
+   *
+   * Existe desde que se puede cambiar de workspace con una tarea contestando:
+   * el turno del otro cliente sigue emitiendo mientras la ventana enseña éste.
+   */
+  workspace?: string;
+  session: string;
+  /** `tool` abre un paso; `tool_done` lo cierra con su resultado. */
+  kind:
+    | "started"
+    | "delta"
+    | "tool"
+    | "tool_done"
+    | "permission"
+    | "notice"
+    | "task_launched"
+    | "model"
+    | "effort"
+    /** El CLI está reintentando contra su proveedor: `meta` trae `"3/5"`. */
+    | "retry"
+    /** El agente contestó y está libre; el turno sigue por una hija en segundo plano. */
+    | "background"
+    /** Al arrancar el turno: `text` trae `{agent, servers}` con los MCP que piden sesión. */
+    | "mcp_auth"
+    /**
+     * Esta tarea cambió de estado fuera de un turno —despertó, durmió, o
+     * empezó a trabajar—. `text` trae uno de `HandlerStatus`
+     * (`docs/agents.md` § Estado observable). No entra en la transcripción, como
+     * `retry`.
+     */
+    | "presence"
+    | "command_output"
+    /** El comando sigue corriendo en el CLI (`"compacting"`); solo pinta. */
+    | "command_running"
+    /** Un `!` mientras corre, con su ejecución en `id` (`runtime/chat/shell.rs`). */
+    | "shell_started"
+    | "shell_output"
+    | "shell_done"
+    /**
+     * Una imagen que el agente acaba de producir. `detail.images` trae los
+     * data URL. No es un paso: se pega a la respuesta en curso.
+     */
+    | "image"
+    | "done";
+  text: string;
+  meta: string | null;
+  /**
+   * Solo en `delta`: este texto empieza OTRO mensaje del agente.
+   *
+   * Lo dice el CLI, no se deduce. Ausente donde el proveedor no publica la
+   * frontera — ver `runtime/chat/events.rs`.
+   */
+  starts_message?: boolean;
+  /**
+   * Solo en `delta`: el mensaje del agente al que pertenece el fragmento, si
+   * el CLI lo publica. ACP lo manda por `messageId`, y su orden de entrega no
+   * es el de generación: una herramienta del mensaje puede caer entre dos
+   * fragmentos suyos. Con esto el texto vuelve a su globo en vez de abrir uno
+   * nuevo. Ver `runtime/acp.rs`.
+   */
+  message_id?: string;
+  /** Solo en `tool`/`tool_done`: con qué paso empareja. */
+  id?: string;
+  /** Solo en `tool`: sobre qué actuó. */
+  target?: string;
+  /** El cuerpo del paso: salida de terminal, o el antes y después de un archivo. */
+  detail?: Detalle;
+  mcp_app?: McpAppCall;
+  task?: SenderTask;
+  /** En `done`, si el turno cerró bien. En `tool_done`, si el paso salió bien. */
+  ok: boolean | null;
+  /** Solo en `permission`: correlaciona la decisión con el agente que la pidió. */
+  request_id: string | null;
+  /**
+   * Solo en `permission`: de qué fuente es el objetivo y si es material que el
+   * turno no tiene concedido. Lo resuelve Rust contra la lista de la que
+   * salieron los `--add-dir`; aquí solo se pinta.
+   */
+  origin?: PermissionOrigin;
+};
+
+export type McpAppCall = {
+  server: string;
+  tool: string;
+  arguments?: Record<string, unknown> | null;
+  result?: Record<string, unknown> | null;
+};
+
+export function mcpCallFromName(name: string): McpAppCall | undefined {
+  if (name.startsWith("mcp__")) {
+    const split = name.slice(5).indexOf("__");
+    if (split > 0) return {
+      server: name.slice(5, 5 + split),
+      tool: name.slice(7 + split),
+    };
+  }
+  const split = name.indexOf("·");
+  if (split > 0) return { server: name.slice(0, split), tool: name.slice(split + 1) };
+  return undefined;
+}
+
+/**
+ * Mete un fragmento de respuesta en el hilo vivo.
+ *
+ * Los fragmentos del mismo mensaje se concatenan SIN separador, y
+ * `startsMessage` abre otro globo. `messageId` —que ACP publica— dice a cuál
+ * pertenece el fragmento: si ya hay un globo de ese mensaje se le pega aunque
+ * una herramienta haya quedado en medio, y el mensaje no sale partido.
+ */
+export function anexarDelta(
+  msgs: Msg[],
+  d: {
+    text: string;
+    messageId?: string;
+    startsMessage?: boolean;
+    author: Author | null;
+    /** Con qué se lanzó el turno; el cierre lo cambia por el observado. */
+    model?: string | null;
+  },
+): Msg[] {
+  const nuevo = (text: string): Msg[] => [
+    ...msgs,
+    {
+      role: "agent",
+      text,
+      author: d.author,
+      nativeMessageId: d.messageId,
+      ...(d.model ? { reported_model: d.model } : {}),
+    },
+  ];
+  if (d.startsMessage) return nuevo(d.text.replace(/^\n+/, ""));
+  if (d.messageId) {
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].meta === "task_launched") break;
+      if (msgs[i].role === "agent" && msgs[i].nativeMessageId === d.messageId) {
+        const copia = [...msgs];
+        copia[i] = { ...msgs[i], text: msgs[i].text + d.text };
+        return copia;
+      }
+    }
+    // La imagen puede llegar antes que el primer token. Sin pegarla a este
+    // mensaje, el PNG se queda en un globo vacío y el texto abre otro.
+    const ultimo = msgs[msgs.length - 1];
+    if (
+      ultimo?.role === "agent" &&
+      !ultimo.turno &&
+      !ultimo.nativeMessageId &&
+      !ultimo.text &&
+      ultimo.images?.length
+    ) {
+      return [
+        ...msgs.slice(0, -1),
+        { ...ultimo, text: d.text, nativeMessageId: d.messageId },
+      ];
+    }
+    return nuevo(d.text);
+  }
+  const ultimo = msgs[msgs.length - 1];
+  if (ultimo?.role === "agent") {
+    return [...msgs.slice(0, -1), { ...ultimo, text: ultimo.text + d.text }];
+  }
+  return nuevo(d.text);
+}
+
+/**
+ * Pega imágenes a la respuesta que se está escribiendo.
+ *
+ * Van en el último globo del agente que todavía no cerró. Si la herramienta
+ * terminó antes del primer token, el globo nace vacío y el delta siguiente
+ * le escribe el texto: si no, la imagen y la frase quedan en dos mensajes.
+ */
+export function anexarImagen(msgs: Msg[], images: string[]): Msg[] {
+  if (images.length === 0) return msgs;
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const m = msgs[i];
+    if (m.role !== "agent" || m.turno) continue;
+    const previas = m.images ?? [];
+    const nuevas = images.filter((url) => !previas.includes(url));
+    if (nuevas.length === 0) return msgs;
+    const copia = [...msgs];
+    copia[i] = { ...m, images: [...previas, ...nuevas] };
+    return copia;
+  }
+  return [...msgs, { role: "agent", text: "", images: images.slice() }];
+}
+
+/** Una herramienta que el agente usó, tal como quedó **guardada** en el turno. */
+export type Tool = {
+  name: string;
+  target: string | null;
+  images?: string[];
+  mcp_app?: McpAppCall;
+  /**
+   * Si la herramienta devolvió error. `undefined` es «no se sabe»: lo guardado
+   * antes de que el campo existiera, y los drivers cuyo stream no cierra el
+   * paso. Ver `sessions::Tool`.
+   */
+  ok?: boolean | null;
+};
+
+/**
+ * Un trozo de lo que el agente produjo, en el orden en que lo produjo.
+ * `tool` indexa `Turn.tools`. Ver `sessions::Piece`.
+ */
+export type Piece = { text: string } | { tool: number };
+
+/**
+ * La clave con la que una respuesta apunta a su pregunta: el turno que la hizo
+ * y la pregunta dentro de ese turno. Va por `JSON.stringify` y no concatenada
+ * con un separador porque los ids de pregunta los escribe el agente, y
+ * cualquier separador que se elija puede aparecer dentro de uno.
+ */
+export function clave(turno: string, pregunta: string) {
+  return JSON.stringify([turno, pregunta]);
+}
+
+/** Lo que el agente dejó preguntado al cerrar un turno. */
+export type PreguntaEvent = {
+  /** Ver `ChatEvent.workspace`. */
+  workspace?: string;
+  session: string;
+  turno: string;
+  preguntas: Pregunta[];
+  request_id?: string;
+};
+
+/**
+ * La otra ventana escribió una transcripción. `sync.rs` · `Signal`.
+ *
+ * Existe porque con la app instalada abierta y una rama levantada con
+ * `--datos-reales` las dos comparten carpeta de datos, y `app.emit` no cruza de
+ * un proceso al otro: sin esto, la ventana que no lanzó el turno se queda con lo
+ * que leyó al abrir la tarea.
+ */
+export type SessionEvent = {
+  /** Ver `ChatEvent.workspace`. */
+  workspace?: string;
+  project: string;
+  session: string;
+};
+
+/** Quién pregunta y quién contesta, según Rust. */
+export type Signatures = { person: Author; agent: Author };
+
+/** `workspace/artifacts.rs` · `ChatExportado`. */
+export type ChatExportado = { rel: string; path: string };
+
+export type Turn = {
+  task_mentions?: import("../../lib/taskMentions.ts").TaskMention[];
+  role: string;
+  text: string;
+  /** Lo que la persona adjuntó a ESTE mensaje. Ver `sessions::Turn`. */
+  attachments?: string[] | null;
+  /** Tiempo de trabajo activo del tramo del agente; falta en tareas antiguas. */
+  duration_ms?: number | null;
+  /** Cuándo quedó escrito el turno, en ms desde la época; falta en tareas antiguas. */
+  at?: number | null;
+  shell?: {
+    cwd: string;
+    output: string;
+    exit_code: number | null;
+    duration_ms: number;
+    truncated: boolean;
+  } | null;
+  /** Las fotos que encierran el turno, una por árbol. Ver `sessions::CodeRange`. */
+  code?: CodeRange[] | null;
+  /** "fallo" en un cierre que tiene que seguir visible al reabrir la tarea. */
+  meta?: string | null;
+  /** Por qué falló, cuando se pudo clasificar. Ver `failures::Fallo`. */
+  fallo?: FalloDelTurno | null;
+  /** Con qué cuenta siguió tras quedarse sin cupo. Ver `quota::QuotaResume`. */
+  quota?: CambioPorCupo | null;
+  /** Causa interna de una reanudación que se puede volver a lanzar. */
+  resume?: string | null;
+  /** Vacío en las sesiones escritas antes de que el turno llevara autor. */
+  author?: Author | null;
+  /** HandlerDefinition que escribió este input, si no fue la persona. */
+  encargado?: string | null;
+  /** Por qué canal lo escribió la persona (`Turn::channel`). */
+  channel?: string | null;
+  /** A quién iba dirigido (`Turn::recipients`). */
+  recipients?: Recipient[] | null;
+  /** Dónde se contesta, cuando no es aquí (`Turn::reply_to`). */
+  reply_to?: ReplyTo | null;
+  /** La tarea que lo escribió por el CLI (`Turn::from_task`). */
+  from_task?: SenderTask | null;
+  /** Cuántas entregas encadenadas lleva (`Turn::hops`). */
+  hops?: number | null;
+  /** Las tareas que despertaron a la Bandeja (`Turn::woke_by`). */
+  woke_by?: string[] | null;
+  tools?: Tool[];
+  /**
+   * El turno en su orden: el texto partido en los mensajes que el agente
+   * dijo, con las herramientas donde las usó. Ver `sessions::Piece`.
+   *
+   * Ausente o vacío es «no se registró», y ahí el rastro se pinta delante
+   * del texto como siempre.
+   */
+  pieces?: Piece[] | null;
+  id?: string | null;
+  /** El modelo elegido al lanzar; ausente si se dejó el de por defecto. */
+  model?: string | null;
+  /** El modelo que reportó el CLI al cerrar el turno. */
+  reported_model?: string | null;
+  /** El proveedor de modelos del turno («OpenCode Zen», «OpenCode Go»).
+   *  Ausente en los turnos anteriores al campo y en los que no lanzan nada. */
+  provider?: string | null;
+
+  native_id?: string | null;
+  questions?: Pregunta[] | null;
+  answers?: Respuesta[] | null;
+  permission?: PermissionDecision | null;
+  /**
+   * Con qué material se lanzó este turno, por id de fuente.
+   *
+   * Ausente significa **«no se registró»** y no «ninguno»: los turnos escritos
+   * antes de que esto existiera, y las respuestas del agente, que pertenecen al
+   * lanzamiento que registró la pregunta (`workspace/sessions.rs`).
+   */
+  sources?: string[] | null;
+  /**
+   * Qué dejó este turno en la carpeta de trabajo.
+   *
+   * Ausente es **«no se registró»** —los turnos de antes de este campo, y todos
+   * los de la persona—; una lista vacía es «no produjo nada». Con una sola forma
+   * para las dos, una tarea vieja se leería como una en la que nunca se entregó
+   * nada, que es justo lo contrario de lo que pasó.
+   */
+  artifacts?: Producido[] | null;
+};
+
+export type Session = {
+  id: string;
+  agent: string;
+  /** El material adjunto a esta tarea, por id de fuente. */
+  sources?: string[];
+  /** Fuentes heredadas del proyecto que esta tarea deja fuera. */
+  excluded_sources?: string[];
+  model: string | null;
+  effort: string | null;
+  /** Cuánto se aprobó a mano. `null` en las tareas anteriores a este control. */
+  permission_mode?: string | null;
+  /** Ver `SessionRow.subagent`. */
+  subagent?: string | null;
+  parent?: string | null;
+  /** Con qué criterio trabaja. Ver `SessionRow.encargado`. */
+  encargado?: string | null;
+  /** Si esta sesión es el chat persistente de un encargado, no una tarea. */
+  chat_de_agente?: boolean;
+  agent_thread?: boolean;
+  turns: Turn[];
+  /** Solo en una archivada cuyo CLI aún tiene la transcripción (`chat::cli_transcript`). */
+  transcript?: TranscriptOrigin | null;
+  /** Con qué contestó la última vez una tarea raíz en la que nadie eligió modelo (`sessions::OpenedSession`). */
+  observed_model?: string | null;
+};
+
+/** De qué archivo del CLI salió lo que dijo el agente, y en cuántas respuestas. */
+export type TranscriptOrigin = {
+  agent: string;
+  file: string;
+  from_cli: number;
+  agent_turns: number;
+};
+
+/**
+ * El modelo que se muestra al abrir una tarea: el elegido o, si nadie eligió,
+ * el último que se observó contestando. Solo la que nunca contestó deja el
+ * selector vacío para que el CLI use el suyo.
+ */
+export function modeloDeSubtarea(session: Session): string | null {
+  if (session.model) return session.model;
+  if (!(session.parent || session.subagent)) return session.observed_model ?? null;
+  for (let i = session.turns.length - 1; i >= 0; i--) {
+    const turno = session.turns[i];
+    if (turno.role === "agent" && turno.model) return turno.model;
+  }
+  return null;
+}
+
+// Líneas de sistema que Rust guarda sin texto y la ventana compone.
+const LINEAS_SIN_PROSA = new Set([
+  "task_launched",
+  "task_finished",
+  "task_finished_read",
+  "task_chain_limit",
+  "woke_by_tasks",
+  "respondido",
+  "shell_reply",
+]);
+
+/**
+ * La transcripción guardada, tal como se pinta.
+ *
+ * **El rastro va delante de la respuesta que ayudó a producir.** No reproduce el
+ * entrelazado exacto —en vivo el agente escribe, usa una herramienta y sigue
+ * escribiendo, y el turno guarda un solo texto porque los deltas se concatenan—,
+ * pero deja los pasos pegados a lo que explican, que es para lo que se leen.
+ */
+export function transcripcion(turns: Turn[]): Msg[] {
+  // Todo lo ofrecido en la sesión hasta este turno. Contra el turno anterior, uno
+  // guardado con la lista vacía porque no llegó a lanzarse haría anunciar otra
+  // vez todo su material.
+  //
+  // `null` es «todavía no hay con qué comparar», y ahí no se anuncia nada: en
+  // una tarea empezada antes de que esto se guardara, tratar el vacío como el
+  // conjunto previo pintaría todo su material como recién llegado.
+  let ofrecido: Set<string> | null = null;
+  // Las respuestas guardadas antes de que su fila llevara modelo y proveedor
+  // los toman del turno de la persona que las lanzó (`closing.rs`).
+  let delLanzamiento: Pick<Turn, "reported_model" | "provider"> = {};
+
+  return turns.flatMap((t) => {
+    if (t.role === "user") delLanzamiento = t;
+    const cambio: Msg[] = [];
+    if (t.sources) {
+      if (ofrecido) {
+        const entraron = t.sources.filter((id) => !ofrecido!.has(id));
+        if (entraron.length > 0) {
+          cambio.push({ role: "system", text: "", contexto: { entraron } });
+        }
+      }
+      ofrecido = new Set([...(ofrecido ?? []), ...t.sources]);
+    }
+    // El `ok` vuelve del disco: sin él la transcripción reabierta perdía
+    // las marcas de los pasos que devolvieron error y contaba otra cosa
+    // que la de en vivo. La salida no vuelve —no se guarda—, así que la
+    // fila se abre y enseña el comando, no su cuerpo.
+    const paso = (h: Tool): Msg => ({
+      role: "system",
+      text: h.name,
+      meta: "usó",
+      paso: pasoDe(h.name, h.target, { ok: h.ok ?? null, mcpApp: h.mcp_app ?? mcpCallFromName(h.name) }),
+    });
+    const visible = (h: Tool | undefined) =>
+      h !== undefined && !h.target?.includes(".preguntas.json");
+    const pasos: Msg[] = (t.tools ?? []).filter(visible).map(paso);
+    if (t.shell) {
+      return [
+        ...cambio,
+        {
+          role: "system" as const,
+          text: t.text,
+          meta: "usó",
+          shell: {
+            cwd: t.shell.cwd,
+            output: t.shell.output,
+            exit_code: t.shell.exit_code,
+            truncated: t.shell.truncated,
+            duration_ms: t.shell.duration_ms,
+          },
+          paso: pasoDe("command_execution", t.text, {
+            ok: t.shell.exit_code === 0,
+            detalle: {
+              kind: "output",
+              text: t.shell.output,
+              exit_code: t.shell.exit_code,
+              truncated: t.shell.truncated,
+              cwd: t.shell.cwd,
+            },
+          }),
+        },
+      ];
+    }
+    // Lo que el turno preguntó y lo que se contestó vuelve con él: una pregunta
+    // que no sobrevive a cerrar la app deja la sesión esperando para siempre,
+    // sin nadie que sepa que espera.
+    const propio: Msg = {
+      role: t.role as Msg["role"],
+      text: t.text,
+      task_mentions: t.task_mentions,
+      // Un aviso de cierre —una interrupción— vive en el turno, no en el evento
+      // de la ventana. Sin esto desaparecía al reabrir la tarea y una respuesta
+      // cortada se leía como completa.
+      meta: t.meta ?? undefined,
+      // **Sin este renglón la clase se guarda y no se ve**, y no da error: el
+      // campo es opcional y su ausencia se lee como «este turno no falló». Es el
+      // mismo camino por el que pasó `code`.
+      fallo: t.fallo ?? undefined,
+      quota: t.quota ?? undefined,
+      resume: t.resume ?? undefined,
+      author: t.author ?? undefined,
+      encargado: t.encargado ?? undefined,
+      channel: t.channel ?? undefined,
+      // El sobre se relee del disco con el turno. Sin estos tres renglones la
+      // transcripción reabierta pierde a quién se entregó, dónde se contesta y
+      // cuántos saltos lleva, y la fila de reenvío se queda sin nada que decir.
+      recipients: t.recipients ?? undefined,
+      reply_to: t.reply_to ?? undefined,
+      // Sin este renglón el mensaje de otra tarea se relee como de la persona.
+      fromTask: t.from_task ?? undefined,
+      hops: t.hops ?? undefined,
+      woke_by: t.woke_by ?? undefined,
+      turno: t.id ?? undefined,
+      // Sin este renglón el punto de corte de un fork nativo no existe para
+      // la pantalla, y todas las respuestas se leerían como turnos en vuelo.
+      nativeId: t.native_id ?? undefined,
+      preguntas: t.questions ?? undefined,
+      respuestas: t.answers ?? undefined,
+      permission: t.permission ?? undefined,
+      duration_ms: t.duration_ms ?? undefined,
+      at: t.at ?? undefined,
+      // **Sin esto el bloque de cambios del turno no se pintaba nunca.** Rust lo
+      // guardaba, el tipo lo declaraba y el componente lo esperaba; lo que
+      // faltaba era copiarlo aquí, que es por donde pasa todo lo que se lee del
+      // disco. No dio error en ningún sitio: `code` es opcional, así que la
+      // ausencia se lee como «este turno no tocó código».
+      code: t.code ?? undefined,
+      // Y lo mismo vale para los archivos: este renglón es todo lo que separa
+      // «el adjunto está guardado» de «el adjunto se ve».
+      attachments: t.attachments ?? undefined,
+      agent: t.author?.kind !== "person" ? t.author?.kind : undefined,
+      images: [
+        ...new Set((t.tools ?? []).flatMap((h) => h.images ?? [])),
+      ],
+      // El proveedor y el modelo con los que se contestó, para la línea del
+      // turno. Van en `propio`, que es el mensaje que cierra el turno; en un
+      // turno con el orden registrado lo comparten los globos, y ahí el que
+      // importa es este, porque es el que lleva la fila de acciones. Sin esto la
+      // línea no puede decir de dónde salió la respuesta, y el dato ya viaja
+      // desde Rust.
+      provider: t.provider ?? delLanzamiento.provider ?? undefined,
+      // El observado antes que el pedido: el pedido puede ser un alias sin
+      // versión («opus») y el del lanzamiento sí la trae («claude-opus-5-5»).
+      reported_model: t.reported_model ?? delLanzamiento.reported_model ?? t.model ?? undefined,
+    };
+    // Lo que el turno entregó, **detrás de la respuesta y no delante**: al
+    // revés que los pasos, no es lo que el agente hizo para contestar sino el
+    // resultado, y ahí es donde estaba en vivo cuando ocurrió.
+    const entrega: Msg[] = t.artifacts?.length
+      ? [{ role: "system", text: "", artefactos: t.artifacts }]
+      : [];
+    // Un turno sin texto que tampoco preguntó ni contestó —el agente miró cosas
+    // y murió antes de responder— aporta sus pasos y ningún globo vacío: es
+    // justo el que hay que investigar.
+    // `attachments` cuenta: mandar una captura sin escribir nada es un mensaje,
+    // y sin esta condición se descartaba entero por no tener texto.
+    if (
+      !t.text &&
+      !LINEAS_SIN_PROSA.has(t.meta ?? "") &&
+      !propio.attachments &&
+      !propio.preguntas &&
+      !propio.respuestas &&
+      !propio.permission
+    )
+      return [...cambio, ...pasos, ...entrega];
+    // Con el orden registrado se pinta el orden. Lo que el turno arrastra
+    // —lo que preguntó, lo que cambió, cuánto tardó— va en el ÚLTIMO mensaje:
+    // es el que cierra el turno, y repartirlo pintaría cada cosa varias veces.
+    const enOrden = entrelazado(t, propio, paso, visible);
+    if (enOrden) return [...cambio, ...enOrden, ...entrega];
+    return [...cambio, ...pasos, propio, ...entrega];
+  });
+}
+
+/**
+ * El turno pintado en su orden, o `null` si no se registró.
+ *
+ * Los mensajes anteriores al último son globos pelados: llevan de quién son y
+ * nada más. Sin esto, un turno con tres mensajes pintaría tres veces sus
+ * preguntas, sus cambios de código y su entrega.
+ */
+function entrelazado(
+  t: Turn,
+  propio: Msg,
+  paso: (h: Tool) => Msg,
+  visible: (h: Tool | undefined) => boolean,
+): Msg[] | null {
+  const piezas = t.pieces ?? [];
+  if (piezas.length === 0) return null;
+  const ultimoTexto = piezas.reduce(
+    (acc, p, i) => ("text" in p ? i : acc),
+    -1,
+  );
+  // La respuesta es lo dicho tras la última herramienta, como `orchestration::mensaje_final`.
+  let primeroFinal = ultimoTexto;
+  while (primeroFinal > 0 && "text" in piezas[primeroFinal - 1]) primeroFinal--;
+  const respuesta = piezas
+    .slice(primeroFinal, ultimoTexto + 1)
+    .map((p) => ("text" in p ? p.text.trim() : ""))
+    .filter(Boolean)
+    .join("\n\n");
+  const out: Msg[] = [];
+  piezas.forEach((pieza, i) => {
+    if ("tool" in pieza) {
+      const h = (t.tools ?? [])[pieza.tool];
+      if (visible(h)) out.push(paso(h));
+      return;
+    }
+    if (i === ultimoTexto) {
+      out.push({ ...propio, text: respuesta });
+      return;
+    }
+    if (i >= primeroFinal) return;
+    out.push({
+      role: "agent",
+      text: pieza.text,
+      avanceDe: t.id ?? undefined,
+      author: t.author ?? undefined,
+      agent: t.author?.kind !== "person" ? t.author?.kind : undefined,
+    });
+  });
+  return out;
+}

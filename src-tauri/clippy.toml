@@ -1,0 +1,3 @@
+# Un `unwrap` en un test es la aserción; en producción es un panic sin mensaje.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- LA MISMA LÍNEA QUE `index.html`, y tiene que serlo: si la política del
+         laboratorio no es la de la app, lo que aquí salga no dice nada de la app.
+         `scripts/csp.mjs` falla si las dos dejan de ser el mismo texto. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; script-src-elem 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: terminus-image: http://terminus-image.localhost; font-src 'self' data:; media-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>La ventana del chat, atacada</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/attacks/hostile-window.tsx"></script>
+  </body>
+</html>

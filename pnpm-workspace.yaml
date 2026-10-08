@@ -1,0 +1,5 @@
+# pnpm 10.15+ / 12: approval for packages that run install scripts.
+# Without this, `pnpm build` (beforeBuildCommand de Tauri) aborta en Linux
+# con ERR_PNPM_IGNORED_BUILDS para esbuild.
+allowBuilds:
+  esbuild: true

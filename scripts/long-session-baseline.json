@@ -1,0 +1,12 @@
+{
+  "nodes": 0,
+  "detached": 0,
+  "ownerless": 0,
+  "listeners": 0,
+  "tauriListeners": 0,
+  "intervals": 0,
+  "observers": 0,
+  "threadsWithoutTab": 0,
+  "nodesPerTab": 13,
+  "threadsAfterClosing": 0
+}
