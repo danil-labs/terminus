@@ -368,6 +368,14 @@ jobs:
       # instaladas. Cada firma cuenta en el plan de eSigner: **tres por release**
       # (ejecutable, desinstalador e instalador), una más que antes, y esa es la
       # del desinstalador.
+      #
+      # **El motor, cuando viaje dentro.** Si `bundle.externalBin` declara
+      # `seldon-runtime`, Tauri le pasa también ese `.exe` a `signCommand` antes
+      # de empaquetar —salvo que ya llegue firmado: `signtool verify /pa` y se lo
+      # salta (`sign_binaries_if_needed`, tauri-bundler 2.9.4)—. El de
+      # `seldon-runtime.lock` (v0.2.73) llega `NotSigned`, así que son **cuatro
+      # firmas**. Sin ese `externalBin` el paso sigue esperando tres, y la guarda
+      # de `check` impide publicar sin motor.
       - name: Construir y firmar en Windows
         if: runner.os == 'Windows'
         shell: bash
@@ -479,6 +487,23 @@ jobs:
           echo "signCommand: $CONFIG"
           : > "$T/signed.txt"
 
+          # El motor como sidecar: Tauri lo busca en `src-tauri/<entrada>-<triple>.exe`
+          # y lo instala como `seldon-runtime.exe`. Si ya llega firmado por Danil,
+          # Tauri no lo pasa por eSigner y no cuenta como firma de esta corrida.
+          ENGINE_SIDECAR=""
+          ENGINE_ENTRY=$(jq -rs 'map(.bundle.externalBin // []) | add | map(select(test("seldon-runtime"))) | .[0] // ""' \
+            src-tauri/tauri.conf.json src-tauri/tauri.windows.conf.json)
+          if [ -n "$ENGINE_ENTRY" ]; then
+            ENGINE_FILE="src-tauri/${ENGINE_ENTRY}-x86_64-pc-windows-msvc.exe"
+            [ -f "$ENGINE_FILE" ] || { echo "::error title=Motor sin empaquetar::externalBin declara $ENGINE_ENTRY pero no está $ENGINE_FILE."; exit 1; }
+            echo "ENGINE_PACKAGED=true" >> "$GITHUB_ENV"
+            engine_signer=$(FILE_W="$(cygpath -w "$(realpath "$ENGINE_FILE")")" pwsh -NoProfile -Command '$s = Get-AuthenticodeSignature -LiteralPath $env:FILE_W; "{0}|{1}" -f $s.Status, $s.SignerCertificate.Subject' | tr -d '\r')
+            case "$engine_signer" in
+              "Valid|"*"Software y Servicios Danil"*) echo "seldon-runtime ya llega firmado por Danil: Tauri no lo vuelve a firmar." ;;
+              *) ENGINE_SIDECAR=$(basename "$ENGINE_FILE"); echo "seldon-runtime llega sin la firma de Danil ($engine_signer): lo firma eSigner." ;;
+            esac
+          fi
+
           pnpm desktop:build --bundles nsis --config "$CONFIG"
 
           INSTALLER=$(find src-tauri/target/release/bundle -type f -name '*_x64-setup.exe' | head -1)
@@ -492,13 +517,15 @@ jobs:
           echo "Firmado con eSigner:"
           sed 's/^/  /' "$T/signed.txt"
           failed=0
-          for expected in terminus.exe uninstaller.exe "$(basename "$INSTALLER")"; do
+          expected_files=(terminus.exe uninstaller.exe "$(basename "$INSTALLER")")
+          [ -z "$ENGINE_SIDECAR" ] || expected_files+=("$ENGINE_SIDECAR")
+          for expected in "${expected_files[@]}"; do
             grep -q "^$expected|" "$T/signed.txt" \
               || { echo "::error::Tauri no pidió firmar $expected."; failed=1; }
           done
           [ "$failed" = 0 ]
           n=$(wc -l < "$T/signed.txt")
-          [ "$n" -le 3 ] || echo "::warning title=Más firmas de eSigner::Esta release gastó $n firmas, no 3. Mira qué más pasó por signCommand."
+          [ "$n" -le "${#expected_files[@]}" ] || echo "::warning title=Más firmas de eSigner::Esta release gastó $n firmas, no ${#expected_files[@]}. Mira qué más pasó por signCommand."
           {
             echo "### Authenticode — Windows"
             echo ""
@@ -525,7 +552,9 @@ jobs:
 
           $dir = Join-Path $env:LOCALAPPDATA $env:PRODUCT_NAME
           $failed = $false
-          foreach ($expected in 'terminus.exe', 'uninstall.exe') {
+          $required = @('terminus.exe', 'uninstall.exe')
+          if ($env:ENGINE_PACKAGED -eq 'true') { $required += 'seldon-runtime.exe' }
+          foreach ($expected in $required) {
             if (-not (Test-Path (Join-Path $dir $expected))) {
               Write-Output "::error::El instalador no dejó $expected en $dir."
               $failed = $true
@@ -555,7 +584,7 @@ jobs:
           }
 
           if ($failed) { exit 1 }
-          Write-Output 'Lo instalado: terminus.exe y uninstall.exe firmados por Danil, válidos y con sello de tiempo.'
+          Write-Output ("Lo instalado: {0} firmados por Danil, válidos y con sello de tiempo." -f ($required -join ', '))
 
       - name: Construir y firmar en macOS
         if: runner.os == 'macOS'
