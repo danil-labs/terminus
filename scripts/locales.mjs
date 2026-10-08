@@ -50,6 +50,8 @@ const FUENTE = join(RAIZ, "src");
 const LENGUAS = join(RAIZ, "src/locales");
 /** Las claves que manda el motor: su código no vive en este repositorio. */
 const ENGINE_KEYS = join(RAIZ, "src-tauri/crates/engine-protocol/phrase-keys.json");
+/** El Rust de la ventana pide sus claves con `Frase::new("clave")`. */
+const WINDOW_RUST = join(RAIZ, "src-tauri/src");
 /** La lengua en la que se escribe el catálogo fuente. Ver `lib/i18n.ts`. */
 const BASE = "es";
 /** La versión del formato de paquete. Espeja `CONTRATO` de `src-tauri/src/environment/locales.rs`. */
@@ -110,6 +112,23 @@ for (const archivo of tsx(FUENTE)) {
  * clave no se puede componer en Rust — un `format!` aquí sale de la
  * comprobación sin que nada avise.
  */
+function rust(dir, salida = []) {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, e.name);
+    if (e.isDirectory()) rust(p, salida);
+    else if (e.name.endsWith(".rs")) salida.push(p);
+  }
+  return salida;
+}
+for (const archivo of rust(WINDOW_RUST)) {
+  const limpio = sinComentarios(readFileSync(archivo, "utf8"));
+  for (const m of limpio.matchAll(/\bFrase::new\(\s*"([^"]+)"/g)) {
+    const linea = limpio.slice(0, m.index).split("\n").length;
+    if (!usos.has(m[1])) usos.set(m[1], []);
+    usos.get(m[1]).push({ archivo: relative(RAIZ, archivo), linea });
+  }
+}
+
 const engineKeys = JSON.parse(readFileSync(ENGINE_KEYS, "utf8")).keys;
 for (const clave of engineKeys) {
   if (!usos.has(clave)) usos.set(clave, []);
