@@ -88,22 +88,32 @@ fn spawn(paths: &Paths) -> Result<Child> {
         .stdin(Stdio::null())
         .stdout(log.try_clone()?)
         .stderr(log);
-    detach(&mut command);
-    Ok(command.spawn()?)
+    Ok(spawn_detached(&mut command)?)
 }
 
+// Sale del job de quien lanzó la ventana para sobrevivirla; si ese job no lo permite, queda dentro.
 #[cfg(windows)]
-fn detach(command: &mut Command) {
+fn spawn_detached(command: &mut Command) -> std::io::Result<Child> {
     use std::os::windows::process::CommandExt;
     const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+    const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    command.creation_flags(CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW);
+    let flags = CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW;
+    command.creation_flags(flags | CREATE_BREAKAWAY_FROM_JOB);
+    match command.spawn() {
+        Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
+            command.creation_flags(flags);
+            command.spawn()
+        }
+        other => other,
+    }
 }
 
 #[cfg(unix)]
-fn detach(command: &mut Command) {
+fn spawn_detached(command: &mut Command) -> std::io::Result<Child> {
     use std::os::unix::process::CommandExt;
     command.process_group(0);
+    command.spawn()
 }
 
 fn failed(paths: &Paths) -> Error {
