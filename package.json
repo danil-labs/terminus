@@ -14,6 +14,7 @@
     "desktop:build": "tauri build",
     "window:build": "tauri build --debug --no-bundle",
     "engine:download": "node scripts/engine.mjs download",
+    "engine:sidecar": "node scripts/engine.mjs sidecar",
     "engine:start": "node scripts/engine.mjs start",
     "engine:stop": "node scripts/engine.mjs stop",
     "indicators": "node scripts/indicators.mjs",
