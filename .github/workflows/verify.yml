@@ -73,6 +73,11 @@ jobs:
       # type-check and lint the Rust side.
       - run: mkdir -p dist
 
+      # `bundle.externalBin` declares the engine: `tauri-build` refuses to compile
+      # without the pinned binary for this platform in `src-tauri/binaries/`.
+      - name: Engine sidecar
+        run: node scripts/engine.mjs sidecar
+
       - name: cargo fmt
         working-directory: src-tauri
         run: cargo fmt --check -- --config-path rustfmt.toml

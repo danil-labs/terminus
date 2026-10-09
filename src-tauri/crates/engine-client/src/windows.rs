@@ -10,20 +10,27 @@ use std::{
 use windows_sys::Win32::{
     Foundation::{CloseHandle, LocalFree, ERROR_SUCCESS, HANDLE},
     Security::{
+        AddAccessAllowedAceEx,
         Authorization::{GetSecurityInfo, SE_FILE_OBJECT},
-        EqualSid, GetAce, GetTokenInformation, IsValidSid, IsWellKnownSid, TokenUser,
+        EqualSid, GetAce, GetLengthSid, GetTokenInformation, InitializeAcl,
+        InitializeSecurityDescriptor, IsValidSid, IsWellKnownSid, SetKernelObjectSecurity,
+        SetSecurityDescriptorControl, SetSecurityDescriptorDacl, TokenUser,
         WinBuiltinAdministratorsSid, WinCreatorOwnerSid, WinLocalSystemSid, ACCESS_ALLOWED_ACE,
-        ACE_HEADER, ACL, DACL_SECURITY_INFORMATION, INHERIT_ONLY_ACE, OWNER_SECURITY_INFORMATION,
-        PSECURITY_DESCRIPTOR, PSID, TOKEN_QUERY, TOKEN_USER,
+        ACE_HEADER, ACL, ACL_REVISION, CONTAINER_INHERIT_ACE, DACL_SECURITY_INFORMATION,
+        INHERIT_ONLY_ACE, OBJECT_INHERIT_ACE, OWNER_SECURITY_INFORMATION,
+        PROTECTED_DACL_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR, PSID, SECURITY_DESCRIPTOR,
+        SE_DACL_PROTECTED, TOKEN_QUERY, TOKEN_USER,
     },
     Storage::FileSystem::{
-        GetFileInformationByHandle, BY_HANDLE_FILE_INFORMATION, FILE_ATTRIBUTE_DIRECTORY,
-        FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
+        GetFileInformationByHandle, BY_HANDLE_FILE_INFORMATION, FILE_ALL_ACCESS,
+        FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_BACKUP_SEMANTICS,
+        FILE_FLAG_OPEN_REPARSE_POINT, FILE_READ_ATTRIBUTES, READ_CONTROL, WRITE_DAC,
     },
     System::Threading::{GetCurrentProcess, OpenProcessToken},
 };
 
 const ACCESS_ALLOWED_ACE_TYPE: u8 = 0;
+const SECURITY_DESCRIPTOR_REVISION: u32 = 1;
 const ACCESS_DENIED_ACE_TYPE: u8 = 1;
 
 pub struct Identity {
@@ -84,6 +91,47 @@ pub fn owned_exclusively(file: &File) -> bool {
         && unsafe { grants_only_to(dacl, user.sid()) };
     unsafe { LocalFree(descriptor) };
     exclusive
+}
+
+/// DACL protegida con una sola entrada, el usuario: quita lo que heredaba del perfil.
+/// No se propaga a lo que ya existe dentro; lo que se cree después hereda solo al usuario.
+pub fn make_private(path: &Path) -> std::io::Result<()> {
+    let file = OpenOptions::new()
+        .access_mode(READ_CONTROL | WRITE_DAC | FILE_READ_ATTRIBUTES)
+        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT)
+        .open(path)?;
+    let opened = identity(&file).ok_or_else(|| std::io::Error::other("reparse point"))?;
+    let user = CurrentUser::query().ok_or_else(std::io::Error::last_os_error)?;
+    let sid = user.sid();
+    let size = std::mem::size_of::<ACL>() + std::mem::size_of::<ACCESS_ALLOWED_ACE>()
+        - std::mem::size_of::<u32>()
+        + unsafe { GetLengthSid(sid) } as usize;
+    let mut acl = vec![0u32; size.div_ceil(4)];
+    let acl_ptr = acl.as_mut_ptr() as *mut ACL;
+    let flags = if opened.directory {
+        OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE
+    } else {
+        0
+    };
+    let mut descriptor: SECURITY_DESCRIPTOR = unsafe { std::mem::zeroed() };
+    let descriptor_ptr = ptr::addr_of_mut!(descriptor) as PSECURITY_DESCRIPTOR;
+    let applied = unsafe {
+        InitializeAcl(acl_ptr, (acl.len() * 4) as u32, ACL_REVISION) != 0
+            && AddAccessAllowedAceEx(acl_ptr, ACL_REVISION, flags, FILE_ALL_ACCESS, sid) != 0
+            && InitializeSecurityDescriptor(descriptor_ptr, SECURITY_DESCRIPTOR_REVISION) != 0
+            && SetSecurityDescriptorDacl(descriptor_ptr, 1, acl_ptr, 0) != 0
+            && SetSecurityDescriptorControl(descriptor_ptr, SE_DACL_PROTECTED, SE_DACL_PROTECTED)
+                != 0
+            && SetKernelObjectSecurity(
+                file.as_raw_handle() as HANDLE,
+                DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
+                descriptor_ptr,
+            ) != 0
+    };
+    if !applied {
+        return Err(std::io::Error::last_os_error());
+    }
+    Ok(())
 }
 
 unsafe fn grants_only_to(dacl: *const ACL, user: PSID) -> bool {

@@ -4,6 +4,7 @@ import "../locales/catalogs";
 import { render } from "solid-js/web";
 import App from "./App";
 import Setup from "../features/settings/Setup";
+import Lanzador from "../features/shell/Launcher";
 import { seguirElTema } from "../lib/theme";
 import { aplicarEscala, atajoDeEscala } from "../lib/zoom";
 import { trimNativeMenu } from "../lib/contextMenu";
@@ -49,11 +50,13 @@ function laQueTocaYaEstaDentro(): boolean {
 const montar = () =>
   render(
     () => (
-      // La pantalla de preparación va por fuera: si falta git no hay nada útil
-      // que renderizar detrás. Cuando no falta nada, no se ve.
-      <Setup>
-        <App />
-      </Setup>
+      // El lanzador va antes que todo: sin motor conectado no hay a quién preguntar.
+      // La preparación va por fuera de la app: si falta git no hay nada útil detrás.
+      <Lanzador>
+        <Setup>
+          <App />
+        </Setup>
+      </Lanzador>
     ),
     document.getElementById("root")!,
   );

@@ -50,6 +50,7 @@ tauri-plugin-log = "2"
 tauri-plugin-dialog = "2.7.2"
 # The startup notice is shown before the webview exists; same rfd as tauri-plugin-dialog.
 rfd = { version = "0.16", default-features = false, features = ["gtk3", "common-controls-v6"] }
+dirs = "6"
 tauri-plugin-updater = "2.10.1"
 tauri-plugin-process = "2.3.1"
 tauri-plugin-clipboard-manager = "2.3.3"
@@ -67,7 +68,7 @@ objc2 = "0.6"
 gtk = "0.18.2"
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Globalization", "Win32_Storage_FileSystem", "Win32_System_Console"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Globalization", "Win32_Storage_FileSystem", "Win32_System_Console", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Threading"] }
 
 [features]
 # The window is always the client of an external engine (`seldon-runtime`).

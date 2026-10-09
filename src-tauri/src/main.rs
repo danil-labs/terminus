@@ -5,6 +5,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
+    if std::env::args_os()
+        .nth(1)
+        .is_some_and(|arg| arg == "--stop-engine")
+    {
+        std::process::exit(app_lib::stop_engine());
+    }
     if let Err(error) = app_lib::launch() {
         eprintln!("{}", error.message_key);
         std::process::exit(1);

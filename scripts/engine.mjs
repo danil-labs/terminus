@@ -4,6 +4,7 @@
  * and runs the Terminus window against it with throwaway data.
  *
  *   node scripts/engine.mjs download [--from <seldon-runtime>]
+ *   node scripts/engine.mjs sidecar   places the pinned engine in src-tauri/binaries/ for `bundle.externalBin`
  *   node scripts/engine.mjs start    [--window <terminus>] [--lab <dir>]
  *   node scripts/engine.mjs engine | select | window | status | stop  [--lab <dir>]
  *
@@ -121,6 +122,59 @@ async function download() {
   console.log(`seldon-runtime ${LOCK.engine_version} (${LOCK.release}) installed at ${ENGINE} (sha256 verified).`);
 }
 
+/**
+ * The engine the installer packages: Tauri looks for `src-tauri/binaries/seldon-runtime-<triple>`
+ * on every platform. macOS also gets `universal-apple-darwin`, a `lipo` of both pinned binaries,
+ * for the universal bundle.
+ */
+async function sidecar() {
+  const triples = process.platform === "darwin" ? ["aarch64-apple-darwin", "x86_64-apple-darwin"] : [PLATFORM];
+  const placed = [];
+  for (const triple of triples) placed.push(await placeSidecar(triple));
+  if (process.platform === "darwin") {
+    const universal = sidecarPath("universal-apple-darwin");
+    const result = spawnSync("lipo", ["-create", "-output", universal, ...placed], { stdio: "inherit" });
+    if (result.status !== 0) fail(`lipo could not build ${universal}.`);
+    chmodSync(universal, 0o755);
+    console.log(`Sidecar ready: ${universal} (lipo of ${triples.join(", ")}).`);
+  }
+}
+
+async function fetchRetrying(url, attempts = 3) {
+  for (let attempt = 1; ; attempt++) {
+    console.log(`Downloading ${url}`);
+    try {
+      const response = await fetch(url, { redirect: "follow" });
+      if (!response.ok) fail(`Download failed: HTTP ${response.status}`);
+      return Buffer.from(await response.arrayBuffer());
+    } catch (error) {
+      if (attempt >= attempts) fail(`Download failed: ${error.message}`);
+    }
+  }
+}
+
+const sidecarPath = (triple) => join(ROOT, "src-tauri", "binaries", `seldon-runtime-${triple}${triple.includes("windows") ? ".exe" : ""}`);
+
+/** One pinned engine, downloaded only when the copy in place does not match the lock. */
+async function placeSidecar(triple) {
+  const pinned = LOCK.platforms[triple];
+  if (!pinned?.url || !pinned?.sha256) fail(`seldon-runtime.lock does not pin ${triple}: the bundle cannot carry the engine.`);
+  if (/\.(zip|tar\.gz|tgz)$/.test(pinned.url)) fail(`The sidecar takes a bare executable; ${triple} is pinned as an archive.`);
+  const target = sidecarPath(triple);
+  if (existsSync(target) && sha256(target) === pinned.sha256) {
+    console.log(`Sidecar in place: ${target} (sha256 matches the lock).`);
+    return target;
+  }
+  const bytes = await fetchRetrying(pinned.url);
+  const got = createHash("sha256").update(bytes).digest("hex");
+  if (got !== pinned.sha256) fail(`SHA-256 mismatch for ${triple}: expected ${pinned.sha256}, got ${got}. Nothing was placed.`);
+  mkdirSync(dirname(target), { recursive: true });
+  writeFileSync(target, bytes);
+  if (!triple.includes("windows")) chmodSync(target, 0o755);
+  console.log(`Sidecar ready: ${target} (sha256 ${got}).`);
+  return target;
+}
+
 function findFile(dir, name) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
@@ -231,6 +285,7 @@ function openWindow() {
 
 const commands = {
   download,
+  sidecar,
   engine: startEngine,
   select,
   window: openWindow,

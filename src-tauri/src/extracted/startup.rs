@@ -8,6 +8,8 @@ use terminus_engine_protocol::Error;
 
 const ES: &str = include_str!("../../../src/locales/es/shell.json");
 const EN: &str = include_str!("../../../src/locales/en/shell.json");
+/// La última versión con el motor dentro de la app; sus datos no se tocan.
+const PREVIOUS_RELEASE: &str = "https://github.com/danil-labs/terminus/releases/tag/v0.2.74";
 
 pub fn show(error: &Error) {
     if !nobody_reads_stderr() {
@@ -21,6 +23,10 @@ pub fn show(error: &Error) {
     .unwrap_or_default();
     let phrase = |frase: Frase| catalog[frase.0].as_str().unwrap_or(frase.0).to_owned();
     let key = match error.code.as_str() {
+        "engine_missing" => Frase::new("shell.startup.engine_missing"),
+        "engine_start_failed" | "service_busy" | "authority_incompatible" => {
+            Frase::new("shell.startup.engine_start_failed")
+        }
         "app_unavailable" => Frase::new("shell.startup.engine_down"),
         "invalid_token" => Frase::new("shell.startup.not_private"),
         "version_mismatch" => Frase::new("shell.service.version"),
@@ -29,7 +35,13 @@ pub fn show(error: &Error) {
     rfd::MessageDialog::new()
         .set_level(rfd::MessageLevel::Error)
         .set_title(phrase(Frase::new("shell.startup.title")))
-        .set_description(format!("{}\n\n{}", phrase(key), error.code))
+        .set_description(format!(
+            "{}\n\n{}",
+            phrase(key)
+                .replace("{log}", error.detail.as_str().unwrap_or_default())
+                .replace("{release}", PREVIOUS_RELEASE),
+            error.code
+        ))
         .set_buttons(rfd::MessageButtons::Ok)
         .show();
 }

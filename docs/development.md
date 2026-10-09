@@ -18,6 +18,7 @@ window` to open another window against the running engine.
 | Command | What it does |
 |---|---|
 | `download [--from <path>]` | Downloads the engine pinned in `seldon-runtime.lock` and checks its SHA-256, or copies a local binary |
+| `sidecar` | Places the pinned engine in `src-tauri/binaries/` for `bundle.externalBin` (on macOS both architectures and their `lipo`); Rust builds need it, and `beforeDevCommand`, `beforeBuildCommand` and `pnpm verificar` run it |
 | `engine` | Starts the engine with data under `.engine/lab/` and identity `ai.danil.seldon.dev` |
 | `select` | Asks the engine for `status` and writes a private `selection.json` |
 | `window [--window <path>]` | Opens the window against that selection |

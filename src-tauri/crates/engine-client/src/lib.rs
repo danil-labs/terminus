@@ -1,5 +1,6 @@
-//! Cliente RPC1 sin descubrimiento, arranque ni dependencia del motor.
-//! La selección fija host, build y datos; un cambio requiere seleccionarlo de nuevo.
+//! Cliente RPC1 sin arranque ni dependencia del motor. `probe` pregunta por un
+//! descriptor conocido; la selección fija host, build y datos, y un cambio
+//! requiere seleccionarlo de nuevo.
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::{
@@ -114,6 +115,25 @@ pub fn private_directory(path: &Path) -> Result<()> {
     return Err(Error::new("unsupported"));
     Ok(())
 }
+/// Crea la carpeta si falta y la deja solo al usuario: `0700` en Unix; en Windows,
+/// sin la herencia del perfil (`%LOCALAPPDATA%` puede conceder acceso a otros).
+pub fn make_private_directory(path: &Path) -> Result<()> {
+    std::fs::create_dir_all(path)?;
+    let meta = std::fs::symlink_metadata(path)?;
+    if !meta.is_dir() || meta.file_type().is_symlink() {
+        return Err(Error::new("invalid_request"));
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))?;
+    }
+    #[cfg(windows)]
+    if private_directory(path).is_err() {
+        windows::make_private(path)?;
+    }
+    private_directory(path)
+}
 fn unchanged(snapshot: &Snapshot) -> Result<()> {
     let current = private_file(&snapshot.path)?;
     if current.device != snapshot.device
@@ -123,6 +143,107 @@ fn unchanged(snapshot: &Snapshot) -> Result<()> {
         return Err(Error::new("invalid_token"));
     }
     Ok(())
+}
+
+fn exchange(
+    address: &std::net::SocketAddr,
+    request: &Request,
+    timeout: Duration,
+) -> Result<Response> {
+    let mut socket = TcpStream::connect_timeout(address, timeout.min(Duration::from_secs(3)))
+        .map_err(|_| Error::new("app_unavailable"))?;
+    socket.set_read_timeout(Some(timeout))?;
+    socket.set_write_timeout(Some(timeout))?;
+    let mut body = serde_json::to_vec(request)?;
+    if body.len() as u64 >= MAX_FRAME {
+        return Err(Error::new("invalid_request"));
+    }
+    body.push(b'\n');
+    socket.write_all(&body).map_err(|_| Error::new("io"))?;
+    let mut line = Vec::new();
+    BufReader::new(socket.take(MAX_FRAME + 1)).read_until(b'\n', &mut line)?;
+    if line.len() as u64 > MAX_FRAME {
+        return Err(Error::new("response_too_large"));
+    }
+    let response: Response = serde_json::from_slice(&line)?;
+    if response.version != VERSION || response.request_id != request.request_id {
+        return Err(Error::new("version_mismatch"));
+    }
+    Ok(response)
+}
+fn reply(response: Response) -> Result<Value> {
+    match (response.result, response.error) {
+        (Some(value), None) => Ok(value),
+        (None, Some(error)) => Err(error),
+        _ => Err(Error::new("invalid_request")),
+    }
+}
+
+/// Una petición RPC1 suelta a una dirección local con su token, sin selección:
+/// los servicios de 0.2.74 guardan el token dentro de su `endpoint.json`.
+pub fn call(
+    address: std::net::SocketAddr,
+    token: &str,
+    command: &str,
+    args: Value,
+    timeout: Duration,
+) -> Result<Value> {
+    if !address.ip().is_loopback() {
+        return Err(Error::new("invalid_request"));
+    }
+    let request = Request {
+        version: VERSION,
+        token: token.to_owned(),
+        workspace: None,
+        folder: None,
+        command: command.to_owned(),
+        args,
+        request_id: uuid::Uuid::new_v4().to_string(),
+    };
+    reply(exchange(&address, &request, timeout)?)
+}
+
+/// El descriptor y el `status` del motor que lo escribió, con las mismas
+/// comprobaciones de archivo privado que la selección. `app_unavailable` si nadie escucha.
+pub fn probe(endpoint_path: &Path) -> Result<(Endpoint, Value)> {
+    let (endpoint, status) = request_endpoint(endpoint_path, "status", Duration::from_secs(3))?;
+    if status["runtime"] != endpoint.runtime.as_str() || status["service"] != true {
+        return Err(Error::new("version_mismatch"));
+    }
+    Ok((endpoint, status))
+}
+
+/// Una orden sin argumentos al motor que escribió el descriptor, con las comprobaciones de `probe`.
+pub fn request_endpoint(
+    endpoint_path: &Path,
+    command: &str,
+    timeout: Duration,
+) -> Result<(Endpoint, Value)> {
+    let descriptor = private_file(endpoint_path)?;
+    let endpoint: Endpoint = serde_json::from_slice(&descriptor.bytes)?;
+    if endpoint.version != VERSION
+        || endpoint.product != PRODUCT
+        || endpoint.contract != contract()
+        || !endpoint.address.ip().is_loopback()
+    {
+        return Err(Error::new("version_mismatch"));
+    }
+    let credential = private_file(&endpoint.token_file)?;
+    let token = std::str::from_utf8(&credential.bytes)
+        .map_err(|_| Error::new("invalid_token"))?
+        .trim()
+        .to_owned();
+    let request = Request {
+        version: VERSION,
+        token,
+        workspace: None,
+        folder: None,
+        command: command.into(),
+        args: json!({}),
+        request_id: uuid::Uuid::new_v4().to_string(),
+    };
+    let value = reply(exchange(&endpoint.address, &request, timeout)?)?;
+    Ok((endpoint, value))
 }
 
 pub struct Client {
@@ -226,32 +347,9 @@ impl Client {
         if request.token != self.token || request.version != VERSION {
             return Err(Error::new("invalid_token"));
         }
-        let mut socket =
-            TcpStream::connect_timeout(&self.endpoint.address, timeout.min(Duration::from_secs(3)))
-                .map_err(|_| Error::new("app_unavailable"))?;
-        socket.set_read_timeout(Some(timeout))?;
-        socket.set_write_timeout(Some(timeout))?;
-        let mut body = serde_json::to_vec(request)?;
-        if body.len() as u64 >= MAX_FRAME {
-            return Err(Error::new("invalid_request"));
-        }
-        body.push(b'\n');
-        socket.write_all(&body).map_err(|_| Error::new("io"))?;
-        let mut line = Vec::new();
-        BufReader::new(socket.take(MAX_FRAME + 1)).read_until(b'\n', &mut line)?;
-        if line.len() as u64 > MAX_FRAME {
-            return Err(Error::new("response_too_large"));
-        }
-        let response: Response = serde_json::from_slice(&line)?;
-        if response.version != VERSION || response.request_id != request.request_id {
-            return Err(Error::new("version_mismatch"));
-        }
+        let response = exchange(&self.endpoint.address, request, timeout)?;
         self.check_selection().map_err(|_| Error::new("io"))?;
-        match (response.result, response.error) {
-            (Some(value), None) => Ok(value),
-            (None, Some(error)) => Err(error),
-            _ => Err(Error::new("invalid_request")),
-        }
+        reply(response)
     }
     pub fn invoke(
         &self,
