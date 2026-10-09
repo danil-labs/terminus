@@ -12,8 +12,28 @@
 #   • **La app instalada** pregunta por
 #     `releases/latest/download/latest.json` (`tauri.conf.json` → `plugins.updater`)
 #     y enseña el aviso de versión nueva abajo a la derecha. `releases/latest`
-#     resuelve a la última release **publicada** —ni borrador ni prerelease—, así
-#     que aquí no se crea ninguna de las dos.
+#     resuelve a la última release **publicada** —ni borrador ni prerelease—.
+#     Una corrida normal publica con `--latest`: llega a todas las copias.
+#
+#   • **Prerelease** (`-f prerelease=true`, solo a mano). La release sale con
+#     `--prerelease` y sin marca de latest: `releases/latest` sigue en la
+#     anterior, así que ni el updater ni la página la ven. Lleva los mismos
+#     archivos que una normal, `latest.json` y nombres estables incluidos. El
+#     tag lo crea la release sobre `sha` con el token del workflow, y eso no
+#     dispara otra corrida; empujar el tag `v*` a mano sí, y publicaría como
+#     latest. Se lanza desde la rama, sin tag:
+#
+#         gh workflow run publish.yml -R danil-labs/terminus --ref main -f prerelease=true
+#
+#     Pasarla a latest después de probar la actualización es una sola orden; no
+#     se reconstruye ni se resube nada, porque `latest.json` y los nombres
+#     estables ya están en la release y apuntan a `download/v<versión>`:
+#
+#         gh release edit v<versión> -R danil-labs/terminus --prerelease=false --latest
+#
+#     Y se comprueba como lo hace «Comprobar que la app lo ve»:
+#
+#         curl -fsSL https://github.com/danil-labs/terminus/releases/latest/download/latest.json | jq .version
 #
 #   • **terminus.danil.ai** enlaza a `releases/latest/download/Terminus-Windows-Setup.exe`,
 #     `.../Terminus-macOS.dmg`, `.../Terminus-macOS-Intel.dmg` y
@@ -67,6 +87,11 @@ on:
       # firmar en Windows»).
       dry_run:
         description: "Construir y comprobar sin publicar nada"
+        type: boolean
+        default: false
+      # Ver «Prerelease» arriba: el updater y la página no la ven hasta pasarla a latest.
+      prerelease:
+        description: "Publicar como prerelease, sin tocar releases/latest"
         type: boolean
         default: false
 
@@ -203,6 +228,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REBUILD: ${{ inputs.rebuild }}
           DRY_RUN: ${{ inputs.dry_run }}
+          PRERELEASE: ${{ inputs.prerelease }}
         run: |
           set -euo pipefail
 
@@ -247,6 +273,14 @@ jobs:
             printf '%s\n' "$NOTE_EN"
             echo "$DELIMITER"
           } >> "$GITHUB_OUTPUT"
+
+          # Rehacer como prerelease una versión que ya es latest la borraría, y
+          # `releases/latest` volvería a la anterior para todas las copias.
+          if [ "${PRERELEASE:-false}" = "true" ] \
+            && [ "$(gh release view "v$V" --repo "$GITHUB_REPOSITORY" --json isPrerelease -q .isPrerelease 2>/dev/null)" = "false" ]; then
+            echo "::error::v$V ya está publicada y no es prerelease. Una prerelease necesita una versión nueva."
+            exit 1
+          fi
 
           if [ "${DRY_RUN:-false}" = "true" ]; then
             echo "Ensayo de v$V: se construye y se comprueba, no se publica."
@@ -933,14 +967,16 @@ jobs:
           path: release-assets/latest.json
           if-no-files-found: error
 
+      # En un ensayo arma el cuerpo, escribe la orden que habría usado y para ahí.
       - name: Publicar la release
-        if: ${{ !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ github.token }}
           V: ${{ needs.check.outputs.version }}
           NOTE_ES: ${{ needs.check.outputs.note_es }}
           NOTE_EN: ${{ needs.check.outputs.note_en }}
           SHA: ${{ needs.check.outputs.sha }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          PRERELEASE: ${{ inputs.prerelease }}
         run: |
           set -euo pipefail
 
@@ -967,6 +1003,22 @@ jobs:
           # se quedaría colgando de la anterior y el `latest.json` nuevo no lo
           # menciona: un archivo que nadie referencia pero que la página sí
           # enlaza por nombre estable.
+          # `--target`: sin tag previo, gh lo crearía sobre la rama por omisión.
+          # `--latest=false` explícito: sin él la marca la decide la API.
+          if [ "${PRERELEASE:-false}" = "true" ]; then
+            MODE=(--prerelease --latest=false)
+          else
+            MODE=(--latest)
+          fi
+          ASSETS=(release-assets/*)
+          echo "gh release create v$V --repo $GITHUB_REPOSITORY --target $SHA --title v$V --notes <cuerpo> ${MODE[*]} ${ASSETS[*]}"
+          printf '### Release\n\n`gh release create v%s --target %s %s`\n' "$V" "$SHA" "${MODE[*]}" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "${DRY_RUN:-false}" = "true" ]; then
+            echo "Ensayo: no se crea la release."
+            exit 0
+          fi
+
           if gh release view "v$V" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Reemplazando v$V."
             gh release delete "v$V" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
@@ -974,10 +1026,11 @@ jobs:
 
           gh release create "v$V" \
             --repo "$GITHUB_REPOSITORY" \
+            --target "$SHA" \
             --title "v$V" \
             --notes "$BODY" \
-            --latest \
-            release-assets/*
+            "${MODE[@]}" \
+            "${ASSETS[@]}"
 
       # Comprobar lo publicado desde fuera, por la misma URL que usan la app y la
       # página. Que el paso anterior salga con 0 dice que GitHub aceptó los
@@ -985,7 +1038,7 @@ jobs:
       # `latest.json` que se sirve sea este. Es lo único que lo convierte en un
       # hecho, y cuesta tres segundos.
       - name: Comprobar que la app lo ve
-        if: ${{ !inputs.dry_run }}
+        if: ${{ !inputs.dry_run && !inputs.prerelease }}
         env:
           V: ${{ needs.check.outputs.version }}
         run: |
@@ -1012,3 +1065,22 @@ jobs:
           done
 
           echo "v$V publicada, firmada para Windows, ambas arquitecturas de macOS y Linux x86_64, y descargable."
+
+      # Lo contrario: la prerelease tiene su `latest.json` y `releases/latest`
+      # sigue sirviendo otra versión a la app y a la página.
+      - name: Comprobar que la app no ve la prerelease
+        if: ${{ !inputs.dry_run && inputs.prerelease }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ needs.check.outputs.version }}
+        run: |
+          set -euo pipefail
+          [ "$(gh release view "v$V" --repo "$GITHUB_REPOSITORY" --json isPrerelease -q .isPrerelease)" = "true" ] \
+            || { echo "::error::v$V no quedó como prerelease"; exit 1; }
+          J=$(curl -fsSL "https://github.com/$GITHUB_REPOSITORY/releases/download/v$V/latest.json")
+          [ "$(echo "$J" | jq -r .version)" = "$V" ] \
+            || { echo "::error::el latest.json de v$V no dice $V"; exit 1; }
+          LATEST=$(curl -fsSL "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/latest.json" | jq -r .version)
+          [ "$LATEST" != "$V" ] \
+            || { echo "::error::releases/latest ya sirve v$V: las copias instaladas la van a bajar"; exit 1; }
+          echo "v$V publicada como prerelease; releases/latest sigue en $LATEST."

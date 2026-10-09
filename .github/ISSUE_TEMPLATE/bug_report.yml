@@ -28,7 +28,7 @@ body:
     attributes:
       label: Terminus version
       description: Shown in the bottom-right corner of the window, or the commit if you built from source.
-      placeholder: "0.2.74"
+      placeholder: "0.2.75"
     validations:
       required: true
   - type: dropdown
