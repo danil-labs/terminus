@@ -484,6 +484,9 @@ pub(super) fn service_poll(
             if (error.code == "app_unavailable" || state.client().check_selection().is_err())
                 && state.restart().is_ok() =>
         {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_title(&super::title(&app, &state.client()));
+            }
             return Ok(
                 json!({"cursor":null,"gap":false,"replay":true,"runtime":state.client().runtime(),"reset":true}),
             );

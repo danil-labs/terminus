@@ -68,6 +68,15 @@ fn open() -> Result<()> {
     Ok(())
 }
 
+/// `--stop-engine`, para el instalador: 0 paró, 3 trabaja (no se toca), 1 no contestó.
+pub fn stop_engine() -> i32 {
+    match engine::stop() {
+        engine::Stopped::Done => 0,
+        engine::Stopped::Busy => 3,
+        engine::Stopped::Unanswered => 1,
+    }
+}
+
 pub fn run(client: Arc<Client>) {
     start(Some(client), false, launcher::Launcher::ready(None));
 }

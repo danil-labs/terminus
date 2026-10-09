@@ -29,13 +29,17 @@ platform, and a CRLF copy has a different hash.
 ## Starting the engine
 
 Opened without arguments (a double click), the window uses the engine that
-ships with it: `seldon-runtime` next to the window executable, packaged as a
-Windows `externalBin`.
+ships with it: `seldon-runtime` next to the window executable, packaged as
+`bundle.externalBin` on every platform. Its `--resource-dir` is the
+installation's resource folder, the one Tauri's `resource_dir()` names (the
+executable's folder on Windows, `Contents/Resources` on macOS), where the
+bundled language packs (`lenguas/`) live. Inside an AppImage those resources
+are copied to `resources/` beside the window first.
 
 A release build uses the identity `ai.danil.terminus` and passes
 `--production-identity`. Its data root is the one 0.2.74 used,
 `<local data>/ai.danil.terminus`; what belongs to the window lives beside it,
-in `<local data>/ai.danil.terminus-window/` (`window/`, `resources/`,
+in `<local data>/ai.danil.terminus-window/` (`window/`,
 `selection.json`, `engine-launch.log`, `launch.lock`), never inside the data
 root.
 
@@ -46,7 +50,7 @@ identity except `ai.danil.terminus`). Then everything lives under one root:
 | Path under `<local data>/ai.danil.seldon.dev/` (or `TERMINUS_LAB_ROOT`) | What it is |
 |---|---|
 | `engine/` | the engine's `--data-dir` (its log is `engine/host.log`) |
-| `resources/` | the engine's `--resource-dir` |
+| `resources/` | inside an AppImage, the copy of the bundled resources |
 | `window/` | the window's `window_data` (log and webview storage) |
 | `selection.json` | the selection the window builds |
 | `engine-launch.log` | the engine's stdout and stderr when the window starts it |
@@ -60,8 +64,10 @@ gets that lab identity: it never reads the data or the keychain entries of
 With the lock held, the window asks the engine named by
 `engine/seldon-endpoint.json` for its `status`. If it answers, the window reuses
 it; two windows share one engine. If not, the window starts the packaged
-engine, waits up to 30 seconds for a descriptor written by that process, and
-writes `selection.json`. If the binary is missing, the error is
+engine, waits up to 30 seconds for a descriptor written by that process (ten
+minutes with `--adopt-existing`: adopting a real 0.2.74 root took about 25 s,
+and the handoff screen shows that step meanwhile), and writes
+`selection.json`. If the binary is missing, the error is
 `engine_missing`; if it exits or does not answer, `engine_start_failed`. The
 startup notice then names the folder with the logs and links the 0.2.74
 release, whose data the engine never touched.
@@ -111,12 +117,19 @@ Selection, credential and window folder must belong to the current user only:
   or junction). A file created from an elevated session is owned by
   Administrators and is rejected.
 
+The window's own folders (the root beside the data, `window/`) get a protected
+DACL with the user alone when they inherit anything wider, as the engine does
+with its private paths: `%LOCALAPPDATA%` can grant Modify to others (the Codex
+sandbox gives it to `CodexSandboxUsers`). `selection.json` is created inside
+and inherits only the user.
+
 `window_data` must be separate from the engine's data directory. A startup
 error is printed to stderr as a catalog key (for example
 `cli.error.invalid_token`). When nobody reads stderr (a double-click launch:
 no terminal, file or pipe), a native notice explains it with the `es`/`en`
 catalog in the system language before the webview exists. The window title
-shows the runtime, version and build that `status` reports.
+shows the runtime, version and build that `status` reports, and changes when
+the window restarts or adopts another engine.
 
 ## RPC, events and channels
 
@@ -145,11 +158,9 @@ Reusing an engine leaves `selection.json` untouched when its content is the same
 
 ## Not done yet
 
-- Only the Windows installer bundles the engine. On macOS and Linux the
-  window still needs `scripts/engine.mjs` and `--external-host`; declaring
-  `externalBin` there waits for a pinned engine for those platforms.
-- The engine is published for Windows x86_64 only; macOS and Linux have no
-  pinned binary in `seldon-runtime.lock` yet.
+- The engine is pinned for the four platforms and bundled on all of them, but
+  only Windows has been tried from an installer. The macOS universal bundle
+  carries a `lipo` of the two pinned macOS binaries.
 - Seven window functions (`site_open_local`, `site_zoom` and the
   `typst_live_*` family) are in the contract but not served by the window, so
   the live Typst view does not work.

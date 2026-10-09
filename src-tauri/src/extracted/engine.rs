@@ -15,6 +15,8 @@ use terminus_engine_protocol::{Error, Result, Selection, VERSION};
 pub const PRODUCTION: &str = "ai.danil.terminus";
 pub const LAB_IDENTITY: &str = "ai.danil.seldon.dev";
 const START_TIMEOUT: Duration = Duration::from_secs(30);
+// Adoptar una raíz real de 0.2.74 tardó unos 25 s; el traspaso enseña el paso mientras tanto.
+const ADOPT_TIMEOUT: Duration = Duration::from_secs(600);
 
 #[derive(Clone)]
 pub struct Paths {
@@ -36,7 +38,7 @@ pub fn paths() -> Result<Paths> {
         return Ok(Paths {
             identity: PRODUCTION.into(),
             data: base.join(PRODUCTION),
-            resources: root.join("resources"),
+            resources: installed_resources(&root)?,
             window: root.join("window"),
             selection: root.join("selection.json"),
             launch_log: root.join("engine-launch.log"),
@@ -46,7 +48,7 @@ pub fn paths() -> Result<Paths> {
     Ok(Paths {
         identity,
         data: root.join("engine"),
-        resources: root.join("resources"),
+        resources: installed_resources(&root)?,
         window: root.join("window"),
         selection: root.join("selection.json"),
         launch_log: root.join("engine-launch.log"),
@@ -71,9 +73,31 @@ fn lab(base: &Path) -> Option<(String, PathBuf)> {
     Some((identity, root))
 }
 
+/// Los recursos de la instalación (`lenguas/`), los mismos que `resource_dir()` de Tauri.
+/// Dentro de un AppImage el montaje desaparece con la ventana: se copian a `<root>/resources`.
+fn installed_resources(root: &Path) -> Result<PathBuf> {
+    let exe = std::env::current_exe()?;
+    let dir = exe.parent().ok_or_else(|| Error::new("invalid_request"))?;
+    if cfg!(target_os = "macos") && dir.ends_with("Contents/MacOS") {
+        return Ok(dir.join("../Resources").canonicalize()?);
+    }
+    #[cfg(target_os = "linux")]
+    if let Some(appdir) =
+        std::env::var_os("APPDIR").filter(|_| std::env::var_os("APPIMAGE").is_some())
+    {
+        // productName de tauri.conf.json: el bundle de Linux pone ahí los recursos.
+        let mounted = PathBuf::from(appdir).join("usr/lib/Terminus");
+        let copy = root.join("resources");
+        super::legacy::mirror(&mounted, &copy)?;
+        return Ok(copy);
+    }
+    let _ = root;
+    Ok(dir.to_path_buf())
+}
+
 /// Las carpetas de la ventana, antes de abrirla aunque el motor todavía no exista.
 pub fn prepare(paths: &Paths) -> Result<()> {
-    for dir in [&paths.root, &paths.resources, &paths.window] {
+    for dir in [&paths.root, &paths.window] {
         private_dir(dir)?;
     }
     Ok(())
@@ -95,7 +119,7 @@ pub fn ensure(paths: &Paths, adopt: bool) -> Result<PathBuf> {
     }
     let offset = std::fs::metadata(&paths.launch_log).map_or(0, |m| m.len());
     let mut child = spawn(paths, adopt)?;
-    let deadline = Instant::now() + START_TIMEOUT;
+    let deadline = Instant::now() + if adopt { ADOPT_TIMEOUT } else { START_TIMEOUT };
     while Instant::now() < deadline {
         if child.try_wait()?.is_some() {
             return Err(failed(paths, offset));
@@ -108,6 +132,56 @@ pub fn ensure(paths: &Paths, adopt: bool) -> Result<PathBuf> {
         std::thread::sleep(Duration::from_millis(200));
     }
     Err(failed(paths, offset))
+}
+
+pub enum Stopped {
+    /// Aceptó y salió.
+    Done,
+    /// Se negó con `task_busy` por trabajo: turnos, descargas u operaciones.
+    Busy,
+    /// No contestó, no salió, o solo lo retienen observadores: el instalador lo para.
+    Unanswered,
+}
+
+/// Para el instalador: pide `service stop` al motor de esta raíz, que se niega si trabaja.
+pub fn stop() -> Stopped {
+    let Ok(paths) = paths() else {
+        return Stopped::Unanswered;
+    };
+    let endpoint = paths.data.join("seldon-endpoint.json");
+    match terminus_engine_client::request_endpoint(
+        &endpoint,
+        "service stop",
+        Duration::from_secs(5),
+    ) {
+        Ok((found, _)) => {
+            let deadline = Instant::now() + Duration::from_secs(30);
+            while Instant::now() < deadline {
+                if !super::legacy::alive(found.pid) {
+                    return Stopped::Done;
+                }
+                std::thread::sleep(Duration::from_millis(200));
+            }
+            Stopped::Unanswered
+        }
+        Err(error) if error.code == "task_busy" && working(&error.detail) => Stopped::Busy,
+        Err(_) => Stopped::Unanswered,
+    }
+}
+
+// Un `watch_task_tree` de una ventana cerrada a la fuerza no caduca y retiene al motor; no es trabajo.
+fn working(busy: &serde_json::Value) -> bool {
+    !busy.is_object()
+        || busy["turns"].as_u64().unwrap_or(0) > 0
+        || busy["downloading"] == true
+        || busy["operations"].as_array().is_some_and(|operations| {
+            operations.iter().any(|operation| {
+                !matches!(
+                    operation["command"].as_str(),
+                    Some("watch_task_tree" | "list_session_git")
+                )
+            })
+        })
 }
 
 fn spawn(paths: &Paths, adopt: bool) -> Result<Child> {
@@ -232,18 +306,8 @@ fn write_selection(
     Ok(paths.selection.clone())
 }
 
-#[cfg(unix)]
 fn private_dir(dir: &Path) -> Result<()> {
-    use std::os::unix::fs::PermissionsExt;
-    std::fs::create_dir_all(dir)?;
-    std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))?;
-    Ok(())
-}
-
-#[cfg(windows)]
-fn private_dir(dir: &Path) -> Result<()> {
-    std::fs::create_dir_all(dir)?;
-    Ok(())
+    terminus_engine_client::make_private_directory(dir)
 }
 
 fn private_file(path: &Path) -> Result<File> {
@@ -255,4 +319,28 @@ fn private_file(path: &Path) -> Result<File> {
         options.mode(0o600);
     }
     Ok(options.open(path)?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::working;
+    use serde_json::json;
+
+    #[test]
+    fn only_turns_downloads_and_real_operations_keep_the_installer_out() {
+        let watchers = json!({"turns": null, "downloading": false, "operations": [
+            {"command": "watch_task_tree", "since": 1}, {"command": "list_session_git", "since": 2}]});
+        assert!(!working(&watchers));
+        assert!(working(
+            &json!({"turns": 1, "downloading": false, "operations": []})
+        ));
+        assert!(working(
+            &json!({"turns": null, "downloading": true, "operations": []})
+        ));
+        assert!(working(
+            &json!({"turns": null, "downloading": false, "operations": [
+            {"command": "watch_task_tree"}, {"command": "clone_project"}]})
+        ));
+        assert!(working(&json!(null)));
+    }
 }

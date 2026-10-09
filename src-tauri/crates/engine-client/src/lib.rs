@@ -115,6 +115,25 @@ pub fn private_directory(path: &Path) -> Result<()> {
     return Err(Error::new("unsupported"));
     Ok(())
 }
+/// Crea la carpeta si falta y la deja solo al usuario: `0700` en Unix; en Windows,
+/// sin la herencia del perfil (`%LOCALAPPDATA%` puede conceder acceso a otros).
+pub fn make_private_directory(path: &Path) -> Result<()> {
+    std::fs::create_dir_all(path)?;
+    let meta = std::fs::symlink_metadata(path)?;
+    if !meta.is_dir() || meta.file_type().is_symlink() {
+        return Err(Error::new("invalid_request"));
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))?;
+    }
+    #[cfg(windows)]
+    if private_directory(path).is_err() {
+        windows::make_private(path)?;
+    }
+    private_directory(path)
+}
 fn unchanged(snapshot: &Snapshot) -> Result<()> {
     let current = private_file(&snapshot.path)?;
     if current.device != snapshot.device
@@ -187,6 +206,19 @@ pub fn call(
 /// El descriptor y el `status` del motor que lo escribió, con las mismas
 /// comprobaciones de archivo privado que la selección. `app_unavailable` si nadie escucha.
 pub fn probe(endpoint_path: &Path) -> Result<(Endpoint, Value)> {
+    let (endpoint, status) = request_endpoint(endpoint_path, "status", Duration::from_secs(3))?;
+    if status["runtime"] != endpoint.runtime.as_str() || status["service"] != true {
+        return Err(Error::new("version_mismatch"));
+    }
+    Ok((endpoint, status))
+}
+
+/// Una orden sin argumentos al motor que escribió el descriptor, con las comprobaciones de `probe`.
+pub fn request_endpoint(
+    endpoint_path: &Path,
+    command: &str,
+    timeout: Duration,
+) -> Result<(Endpoint, Value)> {
     let descriptor = private_file(endpoint_path)?;
     let endpoint: Endpoint = serde_json::from_slice(&descriptor.bytes)?;
     if endpoint.version != VERSION
@@ -206,19 +238,12 @@ pub fn probe(endpoint_path: &Path) -> Result<(Endpoint, Value)> {
         token,
         workspace: None,
         folder: None,
-        command: "status".into(),
+        command: command.into(),
         args: json!({}),
         request_id: uuid::Uuid::new_v4().to_string(),
     };
-    let status = reply(exchange(
-        &endpoint.address,
-        &request,
-        Duration::from_secs(3),
-    )?)?;
-    if status["runtime"] != endpoint.runtime.as_str() || status["service"] != true {
-        return Err(Error::new("version_mismatch"));
-    }
-    Ok((endpoint, status))
+    let value = reply(exchange(&endpoint.address, &request, timeout)?)?;
+    Ok((endpoint, value))
 }
 
 pub struct Client {

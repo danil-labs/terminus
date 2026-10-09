@@ -178,11 +178,10 @@ jobs:
 
       # La ventana no trae motor: lo arranca desde el `seldon-runtime` empaquetado.
       # Publicar sin él deja a toda copia instalada con una ventana que no abre,
-      # y el updater la reparte sola. Esto falla hasta que el motor esté fijado
-      # para las cuatro plataformas y declarado como `externalBin` en cada una.
+      # y el updater la reparte sola. El ensayo también lo exige: es lo que prueba.
+      # Que el archivo esté lo comprueba cada build, después de «Colocar el motor como sidecar».
       - name: El motor viaja dentro del instalador
         id: engine-pinned
-        if: ${{ !inputs.dry_run }}
         run: |
           set -euo pipefail
           missing=$(jq -r '.platforms | to_entries[] | select(.value.url == "" or .value.sha256 == "") | .key' seldon-runtime.lock)
@@ -320,11 +319,22 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       # El motor fijado en `seldon-runtime.lock`, verificado por su SHA-256 y
-      # copiado a `src-tauri/binaries/` para `bundle.externalBin`. Sin este paso
-      # el build de Windows falla en «Motor sin empaquetar». En las plataformas
-      # que todavía no declaran el sidecar, el script no hace nada.
+      # copiado a `src-tauri/binaries/` para `bundle.externalBin`, que lo declara
+      # para las cuatro plataformas. En macOS también deja el universal (`lipo`
+      # de los dos) que pide `--target universal-apple-darwin`.
       - name: Colocar el motor como sidecar
-        run: pnpm engine:sidecar
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm engine:sidecar
+          case "${{ matrix.name }}" in
+            windows) expected=(seldon-runtime-x86_64-pc-windows-msvc.exe) ;;
+            macos) expected=(seldon-runtime-aarch64-apple-darwin seldon-runtime-x86_64-apple-darwin seldon-runtime-universal-apple-darwin) ;;
+            linux) expected=(seldon-runtime-x86_64-unknown-linux-gnu) ;;
+          esac
+          for f in "${expected[@]}"; do
+            [ -f "src-tauri/binaries/$f" ] || { echo "::error title=Motor sin empaquetar::falta src-tauri/binaries/$f."; exit 1; }
+          done
 
       # La notarización pide un `.p8` en disco, no el contenido en una variable.
       # Tauri busca `AuthKey_<APPLE_API_KEY>.p8` o `APPLE_API_KEY_PATH`. El
@@ -777,14 +787,16 @@ jobs:
           tar xzf release-assets/Terminus.app.tar.gz
           lipo Terminus.app/Contents/MacOS/terminus -verify_arch arm64 x86_64
           codesign --verify --deep --strict Terminus.app
-          # Sin selección la ventana sale con `cli.error.invalid_request`: eso
-          # prueba que el ejecutable carga, no que la interfaz abra.
-          out=$(Terminus.app/Contents/MacOS/terminus 2>&1) && { echo "::error::Arrancó sin selección"; exit 1; }
+          lipo Terminus.app/Contents/MacOS/seldon-runtime -verify_arch arm64 x86_64
+          # Sin argumentos arrancaría el motor empaquetado. Con uno que no entiende
+          # sale con `cli.error.invalid_request`: el ejecutable carga; la interfaz no se prueba.
+          out=$(Terminus.app/Contents/MacOS/terminus --external-host 2>&1) && { echo "::error::Arrancó con un argumento inválido"; exit 1; }
           echo "$out" | grep -q invalid_request
 
   # El AppImage que se va a publicar, en un Ubuntu limpio: la firma minisign
-  # con el mismo verificador que usa `npx`, y que el binario cargue y responda
-  # (sin selección sale con `invalid_request`: el ejecutable carga; la interfaz no se prueba).
+  # con el mismo verificador que usa `npx`, que lleve el motor, y que el binario
+  # cargue y responda (con un argumento que no entiende sale con `invalid_request`:
+  # el ejecutable carga; la interfaz no se prueba).
   # `xvfb-run` da una pantalla virtual y `--appimage-extract-and-run` evita
   # depender de que FUSE funcione dentro del runner.
   test-linux:
@@ -823,7 +835,9 @@ jobs:
           console.log('Firma minisign del AppImage verificada.');
           JS
           chmod +x "release-assets/$APP"
-          out=$(timeout 60s xvfb-run -a "release-assets/$APP" --appimage-extract-and-run 2>&1) && { echo "::error::Arrancó sin selección"; exit 1; }
+          (cd "$RUNNER_TEMP" && "$GITHUB_WORKSPACE/release-assets/$APP" --appimage-extract usr/bin/seldon-runtime >/dev/null)
+          [ -x "$RUNNER_TEMP/squashfs-root/usr/bin/seldon-runtime" ] || { echo "::error title=Motor sin empaquetar::el AppImage no lleva usr/bin/seldon-runtime."; exit 1; }
+          out=$(timeout 60s xvfb-run -a "release-assets/$APP" --appimage-extract-and-run --external-host 2>&1) && { echo "::error::Arrancó con un argumento inválido"; exit 1; }
           echo "$out" | grep -q invalid_request
 
   publish:

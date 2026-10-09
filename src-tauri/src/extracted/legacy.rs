@@ -206,6 +206,49 @@ pub fn stable_engine(bundled: &Path, window: &Path) -> std::io::Result<PathBuf> 
     Ok(target)
 }
 
+/// Copia los recursos del montaje a `target`, entera y de una vez.
+#[cfg(target_os = "linux")]
+pub fn mirror(source: &Path, target: &Path) -> std::io::Result<()> {
+    fn copy(from: &Path, to: &Path) -> std::io::Result<()> {
+        std::fs::create_dir_all(to)?;
+        for entry in std::fs::read_dir(from)? {
+            let entry = entry?;
+            let path = to.join(entry.file_name());
+            if entry.file_type()?.is_dir() {
+                copy(&entry.path(), &path)?;
+            } else {
+                std::fs::copy(entry.path(), path)?;
+            }
+        }
+        Ok(())
+    }
+    // Otra ventana pudo dejar la copia con un motor vivo leyéndola: solo se rehace si cambió.
+    fn same(from: &Path, to: &Path) -> bool {
+        let Ok(entries) = std::fs::read_dir(from) else {
+            return false;
+        };
+        entries.flatten().all(|entry| {
+            let path = to.join(entry.file_name());
+            match (entry.metadata(), std::fs::metadata(&path)) {
+                (Ok(a), Ok(b)) if a.is_dir() && b.is_dir() => same(&entry.path(), &path),
+                (Ok(a), Ok(b)) => a.is_file() && b.is_file() && a.len() == b.len(),
+                _ => false,
+            }
+        })
+    }
+    if !source.is_dir() {
+        return std::fs::create_dir_all(target);
+    }
+    if target.is_dir() && same(source, target) {
+        return Ok(());
+    }
+    let staged = target.with_extension("next");
+    let _ = std::fs::remove_dir_all(&staged);
+    copy(source, &staged)?;
+    let _ = std::fs::remove_dir_all(target);
+    std::fs::rename(staged, target)
+}
+
 #[cfg(not(target_os = "linux"))]
 pub fn stable_engine(bundled: &Path, _window: &Path) -> std::io::Result<PathBuf> {
     Ok(bundled.to_path_buf())

@@ -2,5 +2,5 @@
 //! selected at launch; the domain lives in the engine, not here.
 
 mod extracted;
-pub use extracted::launch;
 pub use extracted::{env, run, util};
+pub use extracted::{launch, stop_engine};
