@@ -186,7 +186,11 @@ pub fn probe(endpoint_path: &Path) -> Result<(Endpoint, Value)> {
         args: json!({}),
         request_id: uuid::Uuid::new_v4().to_string(),
     };
-    let status = reply(exchange(&endpoint.address, &request, Duration::from_secs(3))?)?;
+    let status = reply(exchange(
+        &endpoint.address,
+        &request,
+        Duration::from_secs(3),
+    )?)?;
     if status["runtime"] != endpoint.runtime.as_str() || status["service"] != true {
         return Err(Error::new("version_mismatch"));
     }
