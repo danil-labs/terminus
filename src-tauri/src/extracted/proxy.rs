@@ -47,7 +47,8 @@ impl State {
             .unwrap_or_else(|p| p.into_inner())
             .clone()
     }
-    /// Relanza el motor empaquetado tras un corte, como mucho tres veces en diez minutos.
+    /// Relanza el motor empaquetado tras un corte, o adopta el que otra ventana relanzó;
+    /// como mucho tres veces en diez minutos.
     fn restart(&self) -> Result<(), Error> {
         if !self.autostart {
             return Err(Error::new("app_unavailable"));
@@ -469,7 +470,11 @@ pub(super) fn service_poll(
         Duration::from_secs(3),
     );
     let page = match polled {
-        Err(error) if error.code == "app_unavailable" && state.restart().is_ok() => {
+        // Otra ventana pudo relanzarlo ya: su selección nueva invalida este cliente antes de conectar.
+        Err(error)
+            if (error.code == "app_unavailable" || state.client().check_selection().is_err())
+                && state.restart().is_ok() =>
+        {
             return Ok(
                 json!({"cursor":null,"gap":false,"replay":true,"runtime":state.client().runtime(),"reset":true}),
             );

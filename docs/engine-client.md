@@ -101,7 +101,9 @@ without clients or turns. Restarting the engine requires a new selection. A
 window that started without arguments does that on its own: when `service_poll`
 finds no engine, it runs the same search-or-start as at startup (at most three
 times in ten minutes), swaps the client and answers `reset: true` so the front
-resynchronizes. Otherwise it shows `shell.service.engine_down`.
+resynchronizes. A window whose selection changed under it, because another
+window already restarted the engine, takes the same path and adopts that engine.
+Reusing an engine leaves `selection.json` untouched when its content is the same. Otherwise it shows `shell.service.engine_down`.
 
 ## Not done yet
 
