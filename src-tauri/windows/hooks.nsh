@@ -1,10 +1,13 @@
 ; The engine runs beside terminus.exe as its own process. Installing over it or
 ; uninstalling asks it to stop; with work in flight the installer stops instead.
 ; Windows close first so none of them starts the engine again meanwhile.
+; __FILEDIR__ inside a macro names the file that expands it, so it is read here.
+!define TERMINUS_HOOKS_DIR "${__FILEDIR__}"
+
 !macro TERMINUS_STOP_ENGINE
   !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
   InitPluginsDir
-  File "/oname=$PLUGINSDIR\stop-engine.ps1" "${__FILEDIR__}\stop-engine.ps1"
+  File "/oname=$PLUGINSDIR\stop-engine.ps1" "${TERMINUS_HOOKS_DIR}\stop-engine.ps1"
   nsExec::Exec `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\stop-engine.ps1" -InstallDir "$INSTDIR"`
   Pop $0
   ${If} $0 == 2
