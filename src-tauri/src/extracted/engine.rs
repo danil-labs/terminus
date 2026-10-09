@@ -136,7 +136,10 @@ fn write_selection(
         runtime: found.runtime.clone(),
         data_directory: found.data_directory.clone(),
         contract: found.contract.clone(),
-        service_build: status["service_build"].as_str().unwrap_or_default().to_owned(),
+        service_build: status["service_build"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned(),
         window_data: paths.window.clone(),
     };
     let bytes = serde_json::to_vec(&selection)?;
