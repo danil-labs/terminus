@@ -1,4 +1,7 @@
 {
+  "build": {
+    "beforeBuildCommand": "pnpm build && pnpm engine:sidecar"
+  },
   "app": {
     "windows": [
       {
@@ -20,6 +23,14 @@
   "bundle": {
     "targets": [
       "nsis"
-    ]
+    ],
+    "externalBin": [
+      "binaries/seldon-runtime"
+    ],
+    "windows": {
+      "nsis": {
+        "installerHooks": "./windows/hooks.nsh"
+      }
+    }
   }
 }

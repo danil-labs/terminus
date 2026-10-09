@@ -4,6 +4,7 @@
  * and runs the Terminus window against it with throwaway data.
  *
  *   node scripts/engine.mjs download [--from <seldon-runtime>]
+ *   node scripts/engine.mjs sidecar   copies it to src-tauri/binaries/ for `bundle.externalBin`
  *   node scripts/engine.mjs start    [--window <terminus>] [--lab <dir>]
  *   node scripts/engine.mjs engine | select | window | status | stop  [--lab <dir>]
  *
@@ -121,6 +122,22 @@ async function download() {
   console.log(`seldon-runtime ${LOCK.engine_version} (${LOCK.release}) installed at ${ENGINE} (sha256 verified).`);
 }
 
+/** The engine the installer packages: Tauri looks for `src-tauri/binaries/seldon-runtime-<triple>`. */
+async function sidecar() {
+  if (!WINDOWS) {
+    console.log("No sidecar on this platform: bundle.externalBin is declared only in tauri.windows.conf.json.");
+    return;
+  }
+  const pinned = LOCK.platforms[PLATFORM];
+  const plainBinary = pinned?.url && !/\.(zip|tar\.gz|tgz)$/.test(pinned.url);
+  if (!existsSync(ENGINE) || (plainBinary && sha256(ENGINE) !== pinned.sha256)) await download();
+  const target = join(ROOT, "src-tauri", "binaries", `seldon-runtime-${PLATFORM}${EXE}`);
+  mkdirSync(dirname(target), { recursive: true });
+  copyFileSync(ENGINE, target);
+  if (!WINDOWS) chmodSync(target, 0o755);
+  console.log(`Sidecar ready: ${target} (sha256 ${sha256(target)}).`);
+}
+
 function findFile(dir, name) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
@@ -231,6 +248,7 @@ function openWindow() {
 
 const commands = {
   download,
+  sidecar,
   engine: startEngine,
   select,
   window: openWindow,

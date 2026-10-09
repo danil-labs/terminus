@@ -15,6 +15,7 @@ sends).
 
 | Guard | File | Contract and limit |
 |---|---|---|
+| `engine` | `scripts/engine.mjs` | Before the Rust steps, places the engine pinned in `seldon-runtime.lock` (SHA-256 checked) as the Windows `externalBin` sidecar; `tauri-build` refuses to compile without it. Elsewhere it does nothing. |
 | `reviewable` | `scripts/reviewable.mjs` | Rejects control bytes that turn a diff binary. Needs git metadata. |
 | `bridge` | `scripts/bridge.mjs` | Every event the front listens to is emitted by the window or declared in the engine contract. |
 | `commands` | `scripts/commands.mjs` | Every `invoke` name exists in the window registry or the engine contract, and every contract command has a caller or a written reason. |
