@@ -160,6 +160,30 @@ fn reply(response: Response) -> Result<Value> {
     }
 }
 
+/// Una petición RPC1 suelta a una dirección local con su token, sin selección:
+/// los servicios de 0.2.74 guardan el token dentro de su `endpoint.json`.
+pub fn call(
+    address: std::net::SocketAddr,
+    token: &str,
+    command: &str,
+    args: Value,
+    timeout: Duration,
+) -> Result<Value> {
+    if !address.ip().is_loopback() {
+        return Err(Error::new("invalid_request"));
+    }
+    let request = Request {
+        version: VERSION,
+        token: token.to_owned(),
+        workspace: None,
+        folder: None,
+        command: command.to_owned(),
+        args,
+        request_id: uuid::Uuid::new_v4().to_string(),
+    };
+    reply(exchange(&address, &request, timeout)?)
+}
+
 /// El descriptor y el `status` del motor que lo escribió, con las mismas
 /// comprobaciones de archivo privado que la selección. `app_unavailable` si nadie escucha.
 pub fn probe(endpoint_path: &Path) -> Result<(Endpoint, Value)> {

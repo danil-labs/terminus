@@ -38,6 +38,8 @@ import { spaceScenarios } from "./mount-spaces.mjs";
  * segunda sí: el arranque tiene que elegir la usable, no la primera fila.
  */
 const RESPUESTAS = {
+  // La ventana ya tiene motor: el lanzador deja pasar a la app.
+  launcher_state: { phase: "ready", blank_0274: false },
   // La medida de arranque: la manda `App` en cuanto monta, en todos los casos.
   window_ready: null,
   // Lo que crece en la ventana: se manda al montar y cada pocos minutos.

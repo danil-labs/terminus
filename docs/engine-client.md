@@ -30,10 +30,20 @@ platform, and a CRLF copy has a different hash.
 
 Opened without arguments (a double click), the window uses the engine that
 ships with it: `seldon-runtime` next to the window executable, packaged as a
-Windows `externalBin`. Everything lives under one root in the user's local
-data folder, apart from `ai.danil.terminus`:
+Windows `externalBin`.
 
-| Path under `<local data>/ai.danil.seldon.dev/` | What it is |
+A release build uses the identity `ai.danil.terminus` and passes
+`--production-identity`. Its data root is the one 0.2.74 used,
+`<local data>/ai.danil.terminus`; what belongs to the window lives beside it,
+in `<local data>/ai.danil.terminus-window/` (`window/`, `resources/`,
+`selection.json`, `engine-launch.log`, `launch.lock`), never inside the data
+root.
+
+The lab uses `ai.danil.seldon.dev`: a debug build, or any build with
+`TERMINUS_LAB_ROOT` (an absolute folder) or `TERMINUS_LAB_IDENTITY` (any
+identity except `ai.danil.terminus`). Then everything lives under one root:
+
+| Path under `<local data>/ai.danil.seldon.dev/` (or `TERMINUS_LAB_ROOT`) | What it is |
 |---|---|
 | `engine/` | the engine's `--data-dir` (its log is `engine/host.log`) |
 | `resources/` | the engine's `--resource-dir` |
@@ -44,8 +54,8 @@ data folder, apart from `ai.danil.terminus`:
 
 `<local data>` is `%LOCALAPPDATA%` on Windows, `~/Library/Application Support`
 on macOS and `$XDG_DATA_HOME` (or `~/.local/share`) on Linux. The engine always
-gets `--identity ai.danil.seldon.dev`: it never reads the data or the keychain
-entries of `ai.danil.terminus`. Its keychain names derive from that identity.
+gets that lab identity: it never reads the data or the keychain entries of
+`ai.danil.terminus`. Its keychain names derive from that identity.
 
 With the lock held, the window asks the engine named by
 `engine/seldon-endpoint.json` for its `status`. If it answers, the window reuses
@@ -55,6 +65,34 @@ writes `selection.json`. If the binary is missing, the error is
 `engine_missing`; if it exits or does not answer, `engine_start_failed`. The
 startup notice then names the folder with the logs and links the 0.2.74
 release, whose data the engine never touched.
+
+## Handoff from 0.2.74
+
+Before starting the engine, the window looks at the data root. If it holds
+0.2.74 data and no `seldon-authority.json`, or a 0.2.74 service answers on it,
+the window opens on the handoff screen instead of the app
+(`src-tauri/src/extracted/launcher.rs`, `src/features/shell/Launcher.tsx`). It
+does the same when the engine refuses with `cli.error.adoption_required`
+(0.2.74 opened the root again, or the app moved). After the person accepts:
+
+1. While the 0.2.74 window is open (the parent of its service, with the same
+   executable), it waits: with its window open, a stopped 0.2.74 service comes
+   back. On macOS the window cannot see that parent and infers it when a
+   stopped service reappears.
+2. It asks each 0.2.74 service for `service stop` only when its `status` shows
+   no turns; the service refuses with `task_busy` while any is live. Nothing
+   is killed.
+3. It waits for Git (`gc.pid`, `tmp_pack_*`), then starts the engine through
+   the same search-or-start with `--adopt-existing`.
+
+If the engine refuses, the screen shows the code, `engine-launch.log` and how
+to go back to 0.2.74, which opens the same data root once the engine stops.
+Inside an AppImage the engine is copied to `window/engine/` first, since the
+AppImage mount disappears with the window.
+
+With the engine running, a 0.2.74 window on the same root stays blank: it
+writes `app_unavailable` to `logs/Terminus.log` every few seconds. The window
+watches that file and shows a notice while it keeps growing.
 
 ## Selection
 
@@ -108,7 +146,8 @@ Reusing an engine leaves `selection.json` untouched when its content is the same
 ## Not done yet
 
 - Only the Windows installer bundles the engine. On macOS and Linux the
-  window still needs `scripts/engine.mjs` and `--external-host`.
+  window still needs `scripts/engine.mjs` and `--external-host`; declaring
+  `externalBin` there waits for a pinned engine for those platforms.
 - The engine is published for Windows x86_64 only; macOS and Linux have no
   pinned binary in `seldon-runtime.lock` yet.
 - Seven window functions (`site_open_local`, `site_zoom` and the

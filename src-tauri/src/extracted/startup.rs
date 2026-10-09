@@ -24,7 +24,9 @@ pub fn show(error: &Error) {
     let phrase = |frase: Frase| catalog[frase.0].as_str().unwrap_or(frase.0).to_owned();
     let key = match error.code.as_str() {
         "engine_missing" => Frase::new("shell.startup.engine_missing"),
-        "engine_start_failed" => Frase::new("shell.startup.engine_start_failed"),
+        "engine_start_failed" | "service_busy" | "authority_incompatible" => {
+            Frase::new("shell.startup.engine_start_failed")
+        }
         "app_unavailable" => Frase::new("shell.startup.engine_down"),
         "invalid_token" => Frase::new("shell.startup.not_private"),
         "version_mismatch" => Frase::new("shell.service.version"),

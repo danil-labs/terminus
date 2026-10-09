@@ -1,8 +1,8 @@
 //! Sin `--external-host`, la ventana usa el motor que viaja con ella: reutiliza
 //! uno vivo sobre su carpeta de datos o lanza `seldon-runtime` junto al
-//! ejecutable. La identidad es `ai.danil.seldon.dev` y la raíz vive aparte de la
-//! de `ai.danil.terminus`: nunca se leen sus datos ni su llavero. Un candado sobre
-//! la raíz evita que dos ventanas arranquen dos motores. Ver `docs/engine-client.md`.
+//! ejecutable. Un release abre la raíz de `ai.danil.terminus`, la de 0.2.74; el
+//! laboratorio usa `ai.danil.seldon.dev` y nunca esa raíz. Un candado evita que
+//! dos ventanas arranquen dos motores. Ver `docs/engine-client.md`.
 use std::{
     fs::{File, OpenOptions},
     io::Write,
@@ -12,22 +12,39 @@ use std::{
 };
 use terminus_engine_protocol::{Error, Result, Selection, VERSION};
 
-pub const IDENTITY: &str = "ai.danil.seldon.dev";
+pub const PRODUCTION: &str = "ai.danil.terminus";
+pub const LAB_IDENTITY: &str = "ai.danil.seldon.dev";
 const START_TIMEOUT: Duration = Duration::from_secs(30);
 
+#[derive(Clone)]
 pub struct Paths {
+    pub identity: String,
     pub root: PathBuf,
-    data: PathBuf,
+    pub data: PathBuf,
     resources: PathBuf,
-    window: PathBuf,
+    pub window: PathBuf,
     selection: PathBuf,
-    launch_log: PathBuf,
+    pub launch_log: PathBuf,
 }
 
+/// Con la identidad de producción los datos son la raíz de 0.2.74 y lo de la
+/// ventana vive al lado, en `ai.danil.terminus-window`: dentro no se admite.
 pub fn paths() -> Result<Paths> {
     let base = dirs::data_local_dir().ok_or_else(|| Error::new("invalid_request"))?;
-    let root = base.join(IDENTITY);
+    let Some((identity, root)) = lab(&base) else {
+        let root = base.join(format!("{PRODUCTION}-window"));
+        return Ok(Paths {
+            identity: PRODUCTION.into(),
+            data: base.join(PRODUCTION),
+            resources: root.join("resources"),
+            window: root.join("window"),
+            selection: root.join("selection.json"),
+            launch_log: root.join("engine-launch.log"),
+            root,
+        });
+    };
     Ok(Paths {
+        identity,
         data: root.join("engine"),
         resources: root.join("resources"),
         window: root.join("window"),
@@ -37,10 +54,38 @@ pub fn paths() -> Result<Paths> {
     })
 }
 
-/// La selección del motor de esta ventana: el vivo sobre la raíz o uno recién lanzado.
-pub fn ensure(paths: &Paths) -> Result<PathBuf> {
-    for dir in [&paths.root, &paths.data, &paths.resources, &paths.window] {
+/// El laboratorio: `TERMINUS_LAB_ROOT` o `TERMINUS_LAB_IDENTITY` en cualquier build, o
+/// un build de desarrollo. Nunca con la identidad de producción.
+fn lab(base: &Path) -> Option<(String, PathBuf)> {
+    let identity = std::env::var("TERMINUS_LAB_IDENTITY")
+        .ok()
+        .filter(|i| !i.is_empty() && i != PRODUCTION);
+    let root = std::env::var_os("TERMINUS_LAB_ROOT")
+        .map(PathBuf::from)
+        .filter(|root| root.is_absolute());
+    if identity.is_none() && root.is_none() && !cfg!(debug_assertions) {
+        return None;
+    }
+    let identity = identity.unwrap_or_else(|| LAB_IDENTITY.into());
+    let root = root.unwrap_or_else(|| base.join(&identity));
+    Some((identity, root))
+}
+
+/// Las carpetas de la ventana, antes de abrirla aunque el motor todavía no exista.
+pub fn prepare(paths: &Paths) -> Result<()> {
+    for dir in [&paths.root, &paths.resources, &paths.window] {
         private_dir(dir)?;
+    }
+    Ok(())
+}
+
+/// La selección del motor de esta ventana: el vivo sobre la raíz o uno recién lanzado.
+/// `adopt` pasa `--adopt-existing`: solo tras el traspaso que la persona aceptó.
+pub fn ensure(paths: &Paths, adopt: bool) -> Result<PathBuf> {
+    prepare(paths)?;
+    // La raíz de 0.2.74 ya existe y es del motor validarla; una nueva la crea él.
+    if paths.identity != PRODUCTION {
+        private_dir(&paths.data)?;
     }
     let lock = File::create(paths.root.join("launch.lock"))?;
     lock.lock()?;
@@ -48,11 +93,12 @@ pub fn ensure(paths: &Paths) -> Result<PathBuf> {
     if let Ok((found, status)) = terminus_engine_client::probe(&endpoint) {
         return write_selection(paths, &endpoint, &found, &status);
     }
-    let mut child = spawn(paths)?;
+    let offset = std::fs::metadata(&paths.launch_log).map_or(0, |m| m.len());
+    let mut child = spawn(paths, adopt)?;
     let deadline = Instant::now() + START_TIMEOUT;
     while Instant::now() < deadline {
         if child.try_wait()?.is_some() {
-            return Err(failed(paths));
+            return Err(failed(paths, offset));
         }
         if let Ok((found, status)) = terminus_engine_client::probe(&endpoint) {
             if found.pid == child.id() {
@@ -61,10 +107,10 @@ pub fn ensure(paths: &Paths) -> Result<PathBuf> {
         }
         std::thread::sleep(Duration::from_millis(200));
     }
-    Err(failed(paths))
+    Err(failed(paths, offset))
 }
 
-fn spawn(paths: &Paths) -> Result<Child> {
+fn spawn(paths: &Paths, adopt: bool) -> Result<Child> {
     let exe = std::env::current_exe()?
         .with_file_name(format!("seldon-runtime{}", std::env::consts::EXE_SUFFIX));
     if !exe.is_file() {
@@ -73,6 +119,7 @@ fn spawn(paths: &Paths) -> Result<Child> {
             ..Error::new("engine_missing")
         });
     }
+    let exe = super::legacy::stable_engine(&exe, &paths.root)?;
     let log = OpenOptions::new()
         .create(true)
         .append(true)
@@ -84,10 +131,21 @@ fn spawn(paths: &Paths) -> Result<Child> {
         .arg(&paths.data)
         .arg("--resource-dir")
         .arg(&paths.resources)
-        .args(["--identity", IDENTITY])
+        .arg("--identity")
+        .arg(&paths.identity)
         .stdin(Stdio::null())
         .stdout(log.try_clone()?)
         .stderr(log);
+    if paths.identity == PRODUCTION {
+        command.arg("--production-identity");
+    }
+    if adopt {
+        command.arg("--adopt-existing");
+    }
+    log::info!(
+        "[engine] starting identity={} adopt={adopt}",
+        paths.identity
+    );
     Ok(spawn_detached(&mut command)?)
 }
 
@@ -116,10 +174,27 @@ fn spawn_detached(command: &mut Command) -> std::io::Result<Child> {
     command.spawn()
 }
 
-fn failed(paths: &Paths) -> Error {
+/// La clave con que el motor rechazó el arranque, de lo que escribió en esta corrida.
+fn failed(paths: &Paths, offset: u64) -> Error {
+    let written = std::fs::read(&paths.launch_log).unwrap_or_default();
+    let tail = String::from_utf8_lossy(written.get(offset as usize..).unwrap_or_default());
+    let code = tail
+        .rsplit_once("cli.error.")
+        .map(|(_, rest)| {
+            rest.chars()
+                .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                .collect::<String>()
+        })
+        .filter(|code| {
+            matches!(
+                code.as_str(),
+                "adoption_required" | "service_busy" | "authority_incompatible"
+            )
+        })
+        .unwrap_or_else(|| "engine_start_failed".into());
     Error {
-        detail: serde_json::json!(paths.root),
-        ..Error::new("engine_start_failed")
+        detail: serde_json::json!(paths.launch_log),
+        ..Error::new(&code)
     }
 }
 
