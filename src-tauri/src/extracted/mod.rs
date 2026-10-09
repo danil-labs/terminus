@@ -23,6 +23,7 @@ pub fn launch() -> Result<()> {
 
 fn open() -> Result<()> {
     let args: Vec<_> = std::env::args_os().collect();
+    let autostart = args.len() == 1;
     let selection = match args.as_slice() {
         [_] => engine::ensure(&engine::paths()?)?,
         [_, flag, path] if flag == "--external-host" => PathBuf::from(path),
@@ -36,17 +37,21 @@ fn open() -> Result<()> {
     if window.starts_with(&data) || data.starts_with(&window) {
         return Err(Error::new("invalid_request"));
     }
-    run(Arc::new(client));
+    start(Arc::new(client), autostart);
     Ok(())
 }
 
 pub fn run(client: Arc<Client>) {
+    start(client, false);
+}
+
+fn start(client: Arc<Client>, autostart: bool) {
     let _ = desktop::STARTED.set(std::time::Instant::now());
-    let state = Arc::new(proxy::State::new(client));
+    let state = Arc::new(proxy::State::new(client, autostart));
     let context = tauri::generate_context!();
-    let window_data = state.client.selection().window_data.clone();
-    let runtime = state.client.runtime().to_owned();
-    let engine = startup::engine_build(state.client.status());
+    let window_data = state.client().selection().window_data.clone();
+    let runtime = state.client().runtime().to_owned();
+    let engine = startup::engine_build(state.client().status());
     let log = tauri_plugin_log::Builder::default()
         .targets([tauri_plugin_log::Target::new(
             tauri_plugin_log::TargetKind::Folder {

@@ -97,14 +97,16 @@ carries `clone_project`, `list_session_git` and `watch_task_tree`; the window
 rebuilds only the Tauri `Channel`.
 
 Closing the window leaves the engine running; it stops after five minutes
-without clients or turns. Restarting the engine requires a new selection.
+without clients or turns. Restarting the engine requires a new selection. A
+window that started without arguments does that on its own: when `service_poll`
+finds no engine, it runs the same search-or-start as at startup (at most three
+times in ten minutes), swaps the client and answers `reset: true` so the front
+resynchronizes. Otherwise it shows `shell.service.engine_down`.
 
 ## Not done yet
 
 - Only the Windows installer bundles the engine. On macOS and Linux the
   window still needs `scripts/engine.mjs` and `--external-host`.
-- A window whose engine dies does not restart it yet; it shows
-  `shell.service.engine_down`.
 - The engine is published for Windows x86_64 only; macOS and Linux have no
   pinned binary in `seldon-runtime.lock` yet.
 - Seven window functions (`site_open_local`, `site_zoom` and the

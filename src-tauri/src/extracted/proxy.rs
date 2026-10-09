@@ -4,9 +4,9 @@ use serde_json::{json, Value};
 use std::{
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
-        Arc, Mutex, OnceLock,
+        Arc, Mutex, OnceLock, RwLock,
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tauri::{Emitter, Manager};
 use terminus_engine_client::Client;
@@ -15,7 +15,9 @@ use terminus_engine_protocol::{Error, StreamPage};
 type OwnedWatch = (Option<String>, Arc<AtomicBool>);
 
 pub(super) struct State {
-    pub client: Arc<Client>,
+    client: RwLock<Arc<Client>>,
+    autostart: bool,
+    restarts: Mutex<Vec<Instant>>,
     workspace: Mutex<Option<String>>,
     closed: AtomicBool,
     in_flight: AtomicUsize,
@@ -25,9 +27,11 @@ pub(super) struct State {
     streams: Mutex<Vec<(String, Option<String>)>>,
 }
 impl State {
-    pub fn new(client: Arc<Client>) -> Self {
+    pub fn new(client: Arc<Client>, autostart: bool) -> Self {
         Self {
-            client,
+            client: RwLock::new(client),
+            autostart,
+            restarts: Mutex::new(Vec::new()),
             workspace: Mutex::new(None),
             closed: AtomicBool::new(false),
             in_flight: AtomicUsize::new(0),
@@ -36,6 +40,28 @@ impl State {
             clones: Mutex::new(Default::default()),
             streams: Mutex::new(Vec::new()),
         }
+    }
+    pub fn client(&self) -> Arc<Client> {
+        self.client
+            .read()
+            .unwrap_or_else(|p| p.into_inner())
+            .clone()
+    }
+    /// Relanza el motor empaquetado tras un corte, como mucho tres veces en diez minutos.
+    fn restart(&self) -> Result<(), Error> {
+        if !self.autostart {
+            return Err(Error::new("app_unavailable"));
+        }
+        let mut restarts = self.restarts.lock().unwrap_or_else(|p| p.into_inner());
+        restarts.retain(|at| at.elapsed() < Duration::from_secs(600));
+        if restarts.len() >= 3 {
+            return Err(Error::new("app_unavailable"));
+        }
+        restarts.push(Instant::now());
+        let selection = super::engine::ensure(&super::engine::paths()?)?;
+        let client = Client::select(&selection)?;
+        *self.client.write().unwrap_or_else(|p| p.into_inner()) = Arc::new(client);
+        Ok(())
     }
     pub fn close(&self) {
         self.closed.store(true, Ordering::SeqCst);
@@ -48,7 +74,7 @@ impl State {
             if std::time::Instant::now() >= deadline {
                 break;
             }
-            let _ = self.client.request(
+            let _ = self.client().request(
                 "service invoke",
                 workspace,
                 json!({"command":"unwatch_task_tree","arguments":{"id":id}}),
@@ -59,7 +85,7 @@ impl State {
             if std::time::Instant::now() >= deadline {
                 break;
             }
-            let _ = self.client.request(
+            let _ = self.client().request(
                 "service stream cancel",
                 workspace,
                 json!({"stream_id":id}),
@@ -232,7 +258,7 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
             return;
         }
         let result = state
-            .client
+            .client()
             .invoke(&name, workspace.clone(), args.clone())
             .map_err(|e| failure(&e))
             .and_then(reply);
@@ -306,7 +332,7 @@ fn stream(
             .insert(operation.clone(), workspace.clone());
     }
     let id = uuid::Uuid::new_v4().to_string();
-    let start = state.client.request(
+    let start = state.client().request(
         "service stream start",
         workspace.clone(),
         json!({"command":name,"arguments":arguments,"stream_id":id,"channel":key}),
@@ -342,7 +368,7 @@ fn stream(
     let result = (|| -> Result<(), Value> {
         while !state.closed.load(Ordering::SeqCst) && !cancel.load(Ordering::SeqCst) {
             let value = state
-                .client
+                .client()
                 .request(
                     "service stream read",
                     workspace.clone(),
@@ -395,7 +421,7 @@ fn stream(
         resolve(&resolver, Err(error.clone()));
         log::warn!("[transport] stream={name} code={}", error["detail"]);
     }
-    let _ = state.client.request(
+    let _ = state.client().request(
         "service stream cancel",
         workspace,
         json!({"stream_id":id}),
@@ -432,11 +458,24 @@ pub(super) fn service_poll(
     let state = app.state::<Arc<State>>();
     if runtime
         .as_ref()
-        .is_some_and(|id| id != state.client.runtime())
+        .is_some_and(|id| id != state.client().runtime())
     {
         return Err(failure(&Error::new("version_mismatch")));
     }
-    let page=state.client.request("service events",workspace.clone(),json!({"cursor":cursor,"workspace":workspace,"replay":replay,"desktop":true,"desktop_pid":std::process::id(),"tail":setup==Some(true)&&cursor.is_none()}),Duration::from_secs(3)).map_err(|e|failure(&e))?;
+    let polled = state.client().request(
+        "service events",
+        workspace.clone(),
+        json!({"cursor":cursor,"workspace":workspace,"replay":replay,"desktop":true,"desktop_pid":std::process::id(),"tail":setup==Some(true)&&cursor.is_none()}),
+        Duration::from_secs(3),
+    );
+    let page = match polled {
+        Err(error) if error.code == "app_unavailable" && state.restart().is_ok() => {
+            return Ok(
+                json!({"cursor":null,"gap":false,"replay":true,"runtime":state.client().runtime(),"reset":true}),
+            );
+        }
+        other => other.map_err(|e| failure(&e))?,
+    };
     if let Some(events) = page["events"].as_array() {
         for event in events {
             let Some(name) = event["name"].as_str() else {
@@ -454,7 +493,7 @@ pub(super) fn service_poll(
         }
     }
     Ok(
-        json!({"cursor":page["cursor"],"gap":page["gap"] == true || state.stream_gap.swap(false, Ordering::SeqCst),"replay":page["replay"],"runtime":state.client.runtime(),"reset":false}),
+        json!({"cursor":page["cursor"],"gap":page["gap"] == true || state.stream_gap.swap(false, Ordering::SeqCst),"replay":page["replay"],"runtime":state.client().runtime(),"reset":false}),
     )
 }
 #[tauri::command]
