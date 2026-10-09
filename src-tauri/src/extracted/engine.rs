@@ -87,33 +87,62 @@ fn spawn(paths: &Paths) -> Result<Child> {
         .args(["--identity", IDENTITY])
         .stdin(Stdio::null())
         .stdout(log.try_clone()?)
-        .stderr(log);
-    Ok(spawn_detached(&mut command)?)
+        .stderr(log.try_clone()?);
+    let (child, launch) = spawn_detached(&mut command)?;
+    let seconds = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_secs());
+    let _ = writeln!(&log, "[ventana] unix={seconds} pid={} {launch}", child.id());
+    Ok(child)
 }
 
 // Sale del job de quien lanzó la ventana para sobrevivirla; si ese job no lo permite, queda dentro.
+// Devuelve, para engine-launch.log, si la ventana y el motor quedaron en un job.
 #[cfg(windows)]
-fn spawn_detached(command: &mut Command) -> std::io::Result<Child> {
-    use std::os::windows::process::CommandExt;
+fn spawn_detached(command: &mut Command) -> std::io::Result<(Child, String)> {
+    use std::os::windows::{io::AsRawHandle, process::CommandExt};
     const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
     const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     let flags = CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW;
+    let launcher = in_job(unsafe { windows_sys::Win32::System::Threading::GetCurrentProcess() });
     command.creation_flags(flags | CREATE_BREAKAWAY_FROM_JOB);
-    match command.spawn() {
+    let (child, breakaway) = match command.spawn() {
         Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
             command.creation_flags(flags);
-            command.spawn()
+            (command.spawn()?, "rechazado")
         }
-        other => other,
+        other => (other?, "pedido"),
+    };
+    let engine = in_job(child.as_raw_handle() as _);
+    Ok((
+        child,
+        format!("ventana_en_job={launcher} breakaway={breakaway} motor_en_job={engine}"),
+    ))
+}
+
+#[cfg(windows)]
+fn in_job(process: windows_sys::Win32::Foundation::HANDLE) -> &'static str {
+    let mut result = 0;
+    let ok = unsafe {
+        windows_sys::Win32::System::JobObjects::IsProcessInJob(
+            process,
+            std::ptr::null_mut(),
+            &mut result,
+        )
+    };
+    match (ok != 0, result != 0) {
+        (false, _) => "desconocido",
+        (true, true) => "si",
+        (true, false) => "no",
     }
 }
 
 #[cfg(unix)]
-fn spawn_detached(command: &mut Command) -> std::io::Result<Child> {
+fn spawn_detached(command: &mut Command) -> std::io::Result<(Child, String)> {
     use std::os::unix::process::CommandExt;
     command.process_group(0);
-    command.spawn()
+    Ok((command.spawn()?, "grupo_propio".into()))
 }
 
 fn failed(paths: &Paths) -> Error {
