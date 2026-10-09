@@ -1,13 +1,14 @@
 //! Ventana habitual conectada exclusivamente al motor privado seleccionado.
 //! No importa, descubre ni arranca el backend original en este build.
 mod desktop;
+mod engine;
 pub mod env;
 mod local_image;
 mod proxy;
 mod sites;
 mod startup;
 pub mod util;
-use std::{path::Path, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 use tauri::Emitter;
 use terminus_engine_client::Client;
 use terminus_engine_protocol::{Error, Result};
@@ -22,10 +23,12 @@ pub fn launch() -> Result<()> {
 
 fn open() -> Result<()> {
     let args: Vec<_> = std::env::args_os().collect();
-    if args.len() != 3 || args[1] != "--external-host" {
-        return Err(Error::new("invalid_request"));
-    }
-    let client = Client::select(Path::new(&args[2]))?;
+    let selection = match args.as_slice() {
+        [_] => engine::ensure(&engine::paths()?)?,
+        [_, flag, path] if flag == "--external-host" => PathBuf::from(path),
+        _ => return Err(Error::new("invalid_request")),
+    };
+    let client = Client::select(&selection)?;
     let directory = &client.selection().window_data;
     terminus_engine_client::private_directory(directory)?;
     let window = std::fs::canonicalize(directory)?;
