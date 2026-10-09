@@ -39,7 +39,7 @@ data folder, apart from `ai.danil.terminus`:
 | `resources/` | the engine's `--resource-dir` |
 | `window/` | the window's `window_data` (log and webview storage) |
 | `selection.json` | the selection the window builds |
-| `engine-launch.log` | the engine's stdout and stderr when the window starts it |
+| `engine-launch.log` | the engine's stdout and stderr when the window starts it, plus one line per launch saying whether the window and the engine are in a Job Object and whether breakaway was refused |
 | `launch.lock` | held while a window looks for or starts the engine |
 
 `<local data>` is `%LOCALAPPDATA%` on Windows, `~/Library/Application Support`
