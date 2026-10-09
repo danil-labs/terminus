@@ -314,6 +314,13 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # El motor fijado en `seldon-runtime.lock`, verificado por su SHA-256 y
+      # copiado a `src-tauri/binaries/` para `bundle.externalBin`. Sin este paso
+      # el build de Windows falla en «Motor sin empaquetar». En las plataformas
+      # que todavía no declaran el sidecar, el script no hace nada.
+      - name: Colocar el motor como sidecar
+        run: pnpm engine:sidecar
+
       # La notarización pide un `.p8` en disco, no el contenido en una variable.
       # Tauri busca `AuthKey_<APPLE_API_KEY>.p8` o `APPLE_API_KEY_PATH`. El
       # secret es el PEM entero; aquí se escribe y se borra con el runner.
