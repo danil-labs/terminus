@@ -105,6 +105,10 @@ permissions:
   contents: read
 
 env:
+  # El runner de macOS (7 GB) se queda sin heap de Node al construir el front con
+  # Mermaid 12 y Excalidraw; el límite por omisión es menor que la memoria.
+  NODE_OPTIONS: --max-old-space-size=6144
+
   # ─── La identidad de la app, copiada aquí a propósito ───────────────────────
   #
   # Estas tres cosas **no se pueden cambiar publicando**. Un cambio en cualquiera
