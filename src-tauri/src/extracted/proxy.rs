@@ -59,7 +59,7 @@ impl State {
             return Err(Error::new("app_unavailable"));
         }
         restarts.push(Instant::now());
-        let selection = super::engine::ensure(&super::engine::paths()?)?;
+        let selection = super::engine::ensure(&super::engine::paths()?, false)?;
         let client = Client::select(&selection)?;
         *self.client.write().unwrap_or_else(|p| p.into_inner()) = Arc::new(client);
         Ok(())
@@ -115,6 +115,7 @@ fn command(name: &str) -> Option<&'static Value> {
 }
 pub(super) fn desktop_command(name: &str) -> bool {
     command(name).is_some_and(|c| c["kind"] == "desktop")
+        || matches!(name, "launcher_state" | "launcher_continue")
 }
 pub(super) fn with_desktop(
     local: impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static,
@@ -193,7 +194,13 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
         return;
     };
     let webview = invoke.message.webview().clone();
-    let state = webview.app_handle().state::<Arc<State>>().inner().clone();
+    let Some(state) = webview.app_handle().try_state::<Arc<State>>() else {
+        invoke
+            .resolver
+            .reject(failure(&Error::new("app_unavailable")));
+        return;
+    };
+    let state = state.inner().clone();
     if state.closed.load(Ordering::SeqCst) {
         invoke
             .resolver
@@ -456,7 +463,9 @@ pub(super) fn service_poll(
     runtime: Option<String>,
     setup: Option<bool>,
 ) -> Result<Value, Value> {
-    let state = app.state::<Arc<State>>();
+    let state = app
+        .try_state::<Arc<State>>()
+        .ok_or_else(|| failure(&Error::new("app_unavailable")))?;
     if runtime
         .as_ref()
         .is_some_and(|id| id != state.client().runtime())
