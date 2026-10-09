@@ -23,3 +23,5 @@ src-tauri/crates/*/target/
 
 # Downloaded engine and local engine labs
 .engine/
+# Engine copied for bundle.externalBin (`pnpm engine:sidecar`)
+src-tauri/binaries/

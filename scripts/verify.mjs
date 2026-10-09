@@ -40,6 +40,7 @@ function undocumentedGuards() {
 }
 
 const rustSteps = [
+  ["El motor empaquetado está en su sitio", process.execPath, [join(root, "scripts/engine.mjs"), "sidecar"], root],
   ["cargo fmt", "cargo", ["fmt", "--check", "--", "--config-path", "rustfmt.toml"], backend],
   ["cargo check", rustBuild.command, ["check", "--locked", "--all-targets"], backend],
   ["cargo clippy", rustBuild.command, ["clippy", "--locked", "--all-targets"], backend],
