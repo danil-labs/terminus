@@ -179,7 +179,7 @@ jobs:
       # La ventana no trae motor: lo arranca desde el `seldon-runtime` empaquetado.
       # Publicar sin él deja a toda copia instalada con una ventana que no abre,
       # y el updater la reparte sola. Esto falla hasta que el motor esté fijado
-      # para las cuatro plataformas y declarado como `externalBin`.
+      # para las cuatro plataformas y declarado como `externalBin` en cada una.
       - name: El motor viaja dentro del instalador
         id: engine-pinned
         if: ${{ !inputs.dry_run }}
@@ -190,8 +190,13 @@ jobs:
             echo "::error title=Motor sin fijar::seldon-runtime.lock no fija: $(echo $missing). Una release sin motor deja la app instalada sin abrir."
             exit 1
           fi
-          jq -e '[.bundle.externalBin[]? | select(test("seldon-runtime"))] | length > 0' src-tauri/tauri.conf.json >/dev/null \
-            || { echo "::error title=Motor sin empaquetar::tauri.conf.json no declara seldon-runtime en bundle.externalBin."; exit 1; }
+          # Tauri suma a la base el archivo de cada plataforma; macOS no tiene archivo propio.
+          for os in windows linux macos; do
+            files=(src-tauri/tauri.conf.json)
+            [ -f "src-tauri/tauri.$os.conf.json" ] && files+=("src-tauri/tauri.$os.conf.json")
+            jq -es 'map(.bundle.externalBin // []) | add | map(select(test("seldon-runtime"))) | length > 0' "${files[@]}" >/dev/null \
+              || { echo "::error title=Motor sin empaquetar::$os no declara seldon-runtime en bundle.externalBin (${files[*]})."; exit 1; }
+          done
 
       - name: Comparar con lo publicado
         id: compare
