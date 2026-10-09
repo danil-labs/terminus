@@ -26,9 +26,39 @@ so the window can translate them.
 Keep `commands.json` byte-exact: `.gitattributes` checks it out with LF on every
 platform, and a CRLF copy has a different hash.
 
+## Starting the engine
+
+Opened without arguments (a double click), the window uses the engine that
+ships with it: `seldon-runtime` next to the window executable, packaged as a
+Windows `externalBin`. Everything lives under one root in the user's local
+data folder, apart from `ai.danil.terminus`:
+
+| Path under `<local data>/ai.danil.seldon.dev/` | What it is |
+|---|---|
+| `engine/` | the engine's `--data-dir` (its log is `engine/host.log`) |
+| `resources/` | the engine's `--resource-dir` |
+| `window/` | the window's `window_data` (log and webview storage) |
+| `selection.json` | the selection the window builds |
+| `engine-launch.log` | the engine's stdout and stderr when the window starts it |
+| `launch.lock` | held while a window looks for or starts the engine |
+
+`<local data>` is `%LOCALAPPDATA%` on Windows, `~/Library/Application Support`
+on macOS and `$XDG_DATA_HOME` (or `~/.local/share`) on Linux. The engine always
+gets `--identity ai.danil.seldon.dev`: it never reads the data or the keychain
+entries of `ai.danil.terminus`. Its keychain names derive from that identity.
+
+With the lock held, the window asks the engine named by
+`engine/seldon-endpoint.json` for its `status`. If it answers, the window reuses
+it; two windows share one engine. If not, the window starts the packaged
+engine, waits up to 30 seconds for a descriptor written by that process, and
+writes `selection.json`. If the binary is missing, the error is
+`engine_missing`; if it exits or does not answer, `engine_start_failed`. The
+startup notice then names the folder with the logs and links the 0.2.74
+release, whose data the engine never touched.
+
 ## Selection
 
-The window starts with `--external-host <absolute path to selection.json>`.
+Labs and tests start the window with `--external-host <absolute path to selection.json>`.
 The selection names the engine `endpoint` descriptor, the `credential` (token
 file), `runtime`, `data_directory`, `contract`, `service_build` and
 `window_data`, the window's own private folder (log and webview storage). The
@@ -71,14 +101,12 @@ without clients or turns. Restarting the engine requires a new selection.
 
 ## Not done yet
 
-- The window does not start the engine on its own and the installer does not
-  bundle it yet. Until then, `scripts/engine.mjs` starts it for development.
-  Whoever starts it passes `--identity ai.danil.seldon.dev`: the engine rejects
-  `ai.danil.terminus`.
+- Only the Windows installer bundles the engine. On macOS and Linux the
+  window still needs `scripts/engine.mjs` and `--external-host`.
+- A window whose engine dies does not restart it yet; it shows
+  `shell.service.engine_down`.
 - The engine is published for Windows x86_64 only; macOS and Linux have no
   pinned binary in `seldon-runtime.lock` yet.
 - Seven window functions (`site_open_local`, `site_zoom` and the
   `typst_live_*` family) are in the contract but not served by the window, so
   the live Typst view does not work.
-- When the engine dies, the open window shows no global notice until the next
-  action fails.

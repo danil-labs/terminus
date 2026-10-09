@@ -55,6 +55,8 @@
   "shell.service.unreachable": "No se pudo hablar con el Seldon Plan Host. Si Terminus acaba de actualizarse, reinicia la app.",
   "shell.service.version": "El Seldon Plan Host que corre no es el de esta versión de la app. Reinicia Terminus.",
   "shell.startup.engine_down": "No hay un motor de Terminus respondiendo para esta selección. Arranca el motor y vuelve a abrir la ventana.",
+  "shell.startup.engine_missing": "Terminus no encontró su motor (seldon-runtime) junto a la app: {log}. Reinstala Terminus. Para volver a la 0.2.74, descárgala de {release}; sus datos no se tocaron.",
+  "shell.startup.engine_start_failed": "El motor de Terminus no arrancó. Su registro está en la carpeta {log}. Para volver a la 0.2.74, descárgala de {release}; sus datos no se tocaron.",
   "shell.startup.invalid": "La selección del motor o la carpeta de la ventana no son válidas. Revísalas y vuelve a abrir la ventana.",
   "shell.startup.not_private": "La selección del motor no es privada: otra cuenta del equipo puede leerla, o es un enlace. Créala de nuevo solo para tu usuario.",
   "shell.startup.title": "Terminus no pudo abrir",
