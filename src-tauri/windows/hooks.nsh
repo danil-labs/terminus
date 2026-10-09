@@ -1,9 +1,19 @@
 ; The engine runs beside terminus.exe as its own process. Installing over it or
-; uninstalling would leave it alive and its executable locked.
-; NSIS is 32-bit: its PowerShell cannot read Process.Path of the 64-bit engine, WMI can.
+; uninstalling asks it to stop; with work in flight the installer stops instead.
+; Windows close first so none of them starts the engine again meanwhile.
 !macro TERMINUS_STOP_ENGINE
-  nsExec::Exec `powershell -NoProfile -NonInteractive -Command "Get-CimInstance Win32_Process | Where-Object { $$_.Name -eq 'seldon-runtime.exe' -and $$_.ExecutablePath -like '$INSTDIR\*' } | ForEach-Object { Stop-Process -Id $$_.ProcessId -Force }"`
+  !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
+  InitPluginsDir
+  File "/oname=$PLUGINSDIR\stop-engine.ps1" "${__FILEDIR__}\stop-engine.ps1"
+  nsExec::Exec `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\stop-engine.ps1" -InstallDir "$INSTDIR"`
   Pop $0
+  ${If} $0 == 2
+    MessageBox MB_ICONEXCLAMATION|MB_OK "Terminus is still working: a task or a download is running. It keeps going with the window closed. Open Terminus, wait for it to finish or stop it, and run this again." /SD IDOK
+    Abort
+  ${ElseIf} $0 != 0
+    MessageBox MB_ICONEXCLAMATION|MB_OK "The Terminus engine (seldon-runtime.exe) did not answer. Close it from Task Manager and run this again." /SD IDOK
+    Abort
+  ${EndIf}
 !macroend
 
 !macro NSIS_HOOK_PREINSTALL
