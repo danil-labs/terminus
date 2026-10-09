@@ -161,6 +161,11 @@ Reusing an engine leaves `selection.json` untouched when its content is the same
 - The engine is pinned for the four platforms and bundled on all of them, but
   only Windows has been tried from an installer. The macOS universal bundle
   carries a `lipo` of the two pinned macOS binaries.
+- `seldon-runtime.lock` pins 7fa5120, whose `seldon-endpoint.json` inherits
+  the data root's ACL. On a Windows profile that grants others access to
+  `%LOCALAPPDATA%` (the Codex sandbox) the window rejects it (`invalid_token`)
+  and the handoff fails; seldon-host #20 (`fa6d965`) fixes it and needs a new
+  pinned prerelease. A lab root hides this: the window makes it private.
 - Seven window functions (`site_open_local`, `site_zoom` and the
   `typst_live_*` family) are in the contract but not served by the window, so
   the live Typst view does not work.

@@ -149,24 +149,37 @@ pub fn stop() -> Stopped {
         return Stopped::Unanswered;
     };
     let endpoint = paths.data.join("seldon-endpoint.json");
-    match terminus_engine_client::request_endpoint(
-        &endpoint,
-        "service stop",
-        Duration::from_secs(5),
-    ) {
-        Ok((found, _)) => {
-            let deadline = Instant::now() + Duration::from_secs(30);
-            while Instant::now() < deadline {
-                if !super::legacy::alive(found.pid) {
-                    return Stopped::Done;
+    // Una orden de una ventana que se acaba de cerrar termina sola; un turno o una descarga, no.
+    let settle = Instant::now() + Duration::from_secs(20);
+    loop {
+        match terminus_engine_client::request_endpoint(
+            &endpoint,
+            "service stop",
+            Duration::from_secs(5),
+        ) {
+            Ok((found, _)) => {
+                let deadline = Instant::now() + Duration::from_secs(30);
+                while Instant::now() < deadline {
+                    if !super::legacy::alive(found.pid) {
+                        return Stopped::Done;
+                    }
+                    std::thread::sleep(Duration::from_millis(200));
                 }
-                std::thread::sleep(Duration::from_millis(200));
+                return Stopped::Unanswered;
             }
-            Stopped::Unanswered
+            Err(error) if error.code == "task_busy" && working(&error.detail) => {
+                if !only_operations(&error.detail) || Instant::now() >= settle {
+                    return Stopped::Busy;
+                }
+                std::thread::sleep(Duration::from_secs(1));
+            }
+            Err(_) => return Stopped::Unanswered,
         }
-        Err(error) if error.code == "task_busy" && working(&error.detail) => Stopped::Busy,
-        Err(_) => Stopped::Unanswered,
     }
+}
+
+fn only_operations(busy: &serde_json::Value) -> bool {
+    busy.is_object() && busy["turns"].as_u64().unwrap_or(0) == 0 && busy["downloading"] != true
 }
 
 // Un `watch_task_tree` de una ventana cerrada a la fuerza no caduca y retiene al motor; no es trabajo.
@@ -330,7 +343,7 @@ fn private_file(path: &Path) -> Result<File> {
 
 #[cfg(test)]
 mod tests {
-    use super::working;
+    use super::{only_operations, working};
     use serde_json::json;
 
     #[test]
@@ -349,5 +362,14 @@ mod tests {
             {"command": "watch_task_tree"}, {"command": "clone_project"}]})
         ));
         assert!(working(&json!(null)));
+        assert!(only_operations(
+            &json!({"turns": null, "downloading": false, "operations": [{"command": "add_project"}]})
+        ));
+        assert!(!only_operations(
+            &json!({"turns": 2, "downloading": false, "operations": []})
+        ));
+        assert!(!only_operations(
+            &json!({"turns": null, "downloading": true, "operations": []})
+        ));
     }
 }
