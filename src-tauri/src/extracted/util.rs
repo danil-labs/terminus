@@ -13,3 +13,10 @@ pub fn no_console_window(command: &mut std::process::Command) -> &mut std::proce
     }
     command
 }
+/// Clave del catálogo que traduce quien la pinta; el guarda `locales` la busca en `Frase::new`.
+pub struct Frase(pub &'static str);
+impl Frase {
+    pub const fn new(clave: &'static str) -> Self {
+        Self(clave)
+    }
+}

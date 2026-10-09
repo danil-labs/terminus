@@ -2018,12 +2018,15 @@ export default function App() {
         if (page.gap) setError(t("chat.error.service_gap"));
         if (failingSince !== null) {
           failingSince = null;
-          if (error() === t("chat.error.service_unavailable")) setError(null);
+          if (error() === t("chat.error.service_unavailable") || error() === t("shell.service.engine_down")) setError(null);
         }
-      } catch {
+      } catch (e) {
         // Un sondeo suelto falla al empezar un turno y el siguiente ya contesta.
         failingSince ??= Date.now();
-        if (!disposed && Date.now() - failingSince > 10_000) setError(t("chat.error.service_unavailable"));
+        const caido = claveDe(e) === "shell.service.engine_down";
+        if (!disposed && Date.now() - failingSince > (caido ? 2_000 : 10_000)) {
+          setError(t(caido ? "shell.service.engine_down" : "chat.error.service_unavailable"));
+        }
       } finally {
         if (!disposed) timer = setTimeout(() => void poll(), 250);
       }

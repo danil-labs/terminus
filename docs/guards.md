@@ -36,7 +36,7 @@ sends).
 | `animations` | `scripts/animations.mjs` | Restricts continuous infinite animations and their per-file quota. |
 | `csp` | `scripts/csp.mjs` | The content policy is the same in the window, the lab and the Markdown filters. |
 | `terminal-themes` | `scripts/terminal-themes.mjs` | Terminal theme tokens, identifiers and contrast, without touching the chrome. |
-| `locales` | `scripts/locales.mjs` | Used keys exist, unused keys are reported, placeholders match across catalogs. Engine keys come from `phrase-keys.json`. |
+| `locales` | `scripts/locales.mjs` | Used keys exist, unused keys are reported, placeholders match across catalogs. Engine keys come from `phrase-keys.json`; the window's Rust keys from `Frase::new("…")` in `src-tauri/src`. |
 | `literals` | `scripts/literals.mjs` | Interface text outside the catalog in files already migrated. |
 | `plugins` | `scripts/plugins.mjs` | Manifests and phrases of the bundled language packs. Coverage is reported, not required. |
 | `comments` | `scripts/comments.mjs` | Limits long blocks, Markdown, argument and history in comments. The baseline only goes down. |

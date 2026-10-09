@@ -45,7 +45,10 @@ Selection, credential and window folder must belong to the current user only:
 
 `window_data` must be separate from the engine's data directory. A startup
 error is printed to stderr as a catalog key (for example
-`cli.error.invalid_token`).
+`cli.error.invalid_token`). When nobody reads stderr (a double-click launch:
+no terminal, file or pipe), a native notice explains it with the `es`/`en`
+catalog in the system language before the webview exists. The window title
+shows the runtime, version and build that `status` reports.
 
 ## RPC, events and channels
 
@@ -56,7 +59,10 @@ polled with the same `request_id`; a failure after sending stays uncertain and
 is not resent under another identity.
 
 Each call captures the workspace selected by the window. `service_poll` reads
-`service events` with cursor, gap and replay. `service stream start/read/cancel`
+`service events` with cursor, gap and replay. An engine that refuses
+connections answers `shell.service.engine_down` with detail `engine_down`,
+which the front does not retry; the app shows it two seconds after the first
+failed poll. `service stream start/read/cancel`
 carries `clone_project`, `list_session_git` and `watch_task_tree`; the window
 rebuilds only the Tauri `Channel`.
 
