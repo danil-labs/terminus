@@ -41,6 +41,16 @@ fn open() -> Result<()> {
     Ok(())
 }
 
+/// El título nombra la corrida del motor; cambia cuando la ventana se pasa a otra.
+pub(super) fn title(base: &str, client: &Client) -> String {
+    format!(
+        "{} · {} · {}",
+        base,
+        client.runtime(),
+        startup::engine_build(client.status())
+    )
+}
+
 pub fn run(client: Arc<Client>) {
     start(client, false);
 }
@@ -50,8 +60,6 @@ fn start(client: Arc<Client>, autostart: bool) {
     let state = Arc::new(proxy::State::new(client, autostart));
     let context = tauri::generate_context!();
     let window_data = state.client().selection().window_data.clone();
-    let runtime = state.client().runtime().to_owned();
-    let engine = startup::engine_build(state.client().status());
     let log = tauri_plugin_log::Builder::default()
         .targets([tauri_plugin_log::Target::new(
             tauri_plugin_log::TargetKind::Folder {
@@ -60,6 +68,7 @@ fn start(client: Arc<Client>, autostart: bool) {
             },
         )])
         .build();
+    let titled = state.client();
     tauri::Builder::default()
         .manage(state.clone())
         .setup(move |app| {
@@ -67,7 +76,7 @@ fn start(client: Arc<Client>, autostart: bool) {
             desktop::configure_close_menu(app)?;
             let mut config = app.config().app.windows[0].clone();
             config.url = tauri::WebviewUrl::App("index.html".into());
-            config.title = format!("{} · {} · {}", config.title, runtime, engine);
+            config.title = title(&config.title, &titled);
             let handle = app.handle().clone();
             tauri::WebviewWindowBuilder::from_config(app.handle(), &config)?
                 .data_directory(window_data.join("webview"))
