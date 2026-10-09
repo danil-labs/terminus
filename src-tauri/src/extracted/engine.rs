@@ -142,10 +142,15 @@ fn write_selection(
             .to_owned(),
         window_data: paths.window.clone(),
     };
+    let bytes = serde_json::to_vec(&selection)?;
+    // Reescribirla igual invalidaría el cliente de las otras ventanas sobre el mismo motor.
+    if std::fs::read(&paths.selection).is_ok_and(|current| current == bytes) {
+        return Ok(paths.selection.clone());
+    }
     let temporary = paths.selection.with_extension("json.tmp");
     let _ = std::fs::remove_file(&temporary);
     let mut file = private_file(&temporary)?;
-    file.write_all(&serde_json::to_vec(&selection)?)?;
+    file.write_all(&bytes)?;
     file.sync_all()?;
     drop(file);
     std::fs::rename(&temporary, &paths.selection)?;
