@@ -50,6 +50,7 @@
   "shell.service.busy": "El Seldon Plan Host está ocupado con otra operación. Vuelve a intentar en un momento.",
   "shell.service.command": "Esta ventana pide algo que el Seldon Plan Host al que está conectada no sabe hacer.",
   "shell.service.engine_down": "El motor de Terminus no responde. Puede haberse cerrado: vuelve a abrirlo y reinicia esta ventana.",
+  "shell.service.engine_missing": "Terminus no encuentra su motor (seldon-runtime) junto a la app; puede que el antivirus lo haya puesto en cuarentena. Restáuralo desde la cuarentena o reinstala Terminus, y vuelve a abrir la ventana.",
   "shell.service.failed": "El Seldon Plan Host no pudo completar la operación.",
   "shell.service.no_host": "No hay ningún Terminus corriendo sobre estos datos. Abre Terminus y vuelve a intentar.",
   "shell.service.unreachable": "No se pudo hablar con el Seldon Plan Host. Si Terminus acaba de actualizarse, reinicia la app.",

@@ -234,12 +234,12 @@ fn spawn(paths: &Paths, adopt: bool) -> Result<Child> {
         paths.identity
     );
     let (child, outside) = spawn_detached(&mut command)?;
-    if !outside {
-        let _ = writeln!(
-            log,
-            "window: the engine started inside the launcher's job; it will die with that job"
-        );
-    }
+    let _ = writeln!(
+        log,
+        "window: launched pid={}{}",
+        child.id(),
+        launch_note(&child, outside)
+    );
     Ok(child)
 }
 
@@ -259,6 +259,38 @@ fn spawn_detached(command: &mut Command) -> std::io::Result<(Child, bool)> {
         }
         other => Ok((other?, true)),
     }
+}
+
+/// Si la ventana y el motor quedaron en un Job Object: un job que mata al cerrarse se lleva al motor.
+#[cfg(windows)]
+fn launch_note(child: &Child, outside: bool) -> String {
+    use std::os::windows::io::AsRawHandle;
+    let window = in_job(unsafe { windows_sys::Win32::System::Threading::GetCurrentProcess() });
+    let breakaway = if outside { "accepted" } else { "refused" };
+    let engine = in_job(child.as_raw_handle() as _);
+    format!(" window_in_job={window} breakaway={breakaway} engine_in_job={engine}")
+}
+
+#[cfg(windows)]
+fn in_job(process: windows_sys::Win32::Foundation::HANDLE) -> &'static str {
+    let mut result = 0;
+    let ok = unsafe {
+        windows_sys::Win32::System::JobObjects::IsProcessInJob(
+            process,
+            std::ptr::null_mut(),
+            &mut result,
+        )
+    };
+    match (ok != 0, result != 0) {
+        (false, _) => "unknown",
+        (true, true) => "yes",
+        (true, false) => "no",
+    }
+}
+
+#[cfg(unix)]
+fn launch_note(_child: &Child, _outside: bool) -> String {
+    " process_group=own".into()
 }
 
 #[cfg(unix)]

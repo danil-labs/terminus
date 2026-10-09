@@ -53,7 +53,7 @@ identity except `ai.danil.terminus`). Then everything lives under one root:
 | `resources/` | inside an AppImage, the copy of the bundled resources |
 | `window/` | the window's `window_data` (log and webview storage) |
 | `selection.json` | the selection the window builds |
-| `engine-launch.log` | the engine's stdout and stderr when the window starts it |
+| `engine-launch.log` | the engine's stdout and stderr when the window starts it, plus one line per launch: on Windows, whether the window and the engine are in a Job Object and whether breakaway was accepted |
 | `launch.lock` | held while a window looks for or starts the engine |
 
 `<local data>` is `%LOCALAPPDATA%` on Windows, `~/Library/Application Support`
