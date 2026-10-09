@@ -18,6 +18,7 @@ pub(super) struct State {
     client: RwLock<Arc<Client>>,
     autostart: bool,
     restarts: Mutex<Vec<Instant>>,
+    restart_failure: Mutex<Option<Error>>,
     workspace: Mutex<Option<String>>,
     closed: AtomicBool,
     in_flight: AtomicUsize,
@@ -32,6 +33,7 @@ impl State {
             client: RwLock::new(client),
             autostart,
             restarts: Mutex::new(Vec::new()),
+            restart_failure: Mutex::new(None),
             workspace: Mutex::new(None),
             closed: AtomicBool::new(false),
             in_flight: AtomicUsize::new(0),
@@ -55,14 +57,30 @@ impl State {
         }
         let mut restarts = self.restarts.lock().unwrap_or_else(|p| p.into_inner());
         restarts.retain(|at| at.elapsed() < Duration::from_secs(600));
+        let mut last_failure = self
+            .restart_failure
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
         if restarts.len() >= 3 {
-            return Err(Error::new("app_unavailable"));
+            return Err(last_failure
+                .clone()
+                .unwrap_or_else(|| Error::new("app_unavailable")));
         }
         restarts.push(Instant::now());
-        let selection = super::engine::ensure(&super::engine::paths()?, false)?;
-        let client = Client::select(&selection)?;
-        *self.client.write().unwrap_or_else(|p| p.into_inner()) = Arc::new(client);
-        Ok(())
+        let selected = super::engine::paths()
+            .and_then(|paths| super::engine::ensure(&paths, false))
+            .and_then(|selection| Client::select(&selection));
+        match selected {
+            Ok(client) => {
+                *last_failure = None;
+                *self.client.write().unwrap_or_else(|p| p.into_inner()) = Arc::new(client);
+                Ok(())
+            }
+            Err(error) => {
+                *last_failure = Some(error.clone());
+                Err(error)
+            }
+        }
     }
     pub fn close(&self) {
         self.closed.store(true, Ordering::SeqCst);
@@ -138,6 +156,9 @@ fn failure(error: &Error) -> Value {
     // Un motor que no escucha no vuelve solo: `engine_down` no está en los reintentos de `src/lib/invoke.ts`.
     if error.code == "app_unavailable" {
         return json!({"what":{"clave":"shell.service.engine_down"},"detail":"engine_down"});
+    }
+    if error.code == "engine_missing" {
+        return json!({"what":{"clave":"shell.service.engine_missing"},"detail":error.detail});
     }
     let key = match error.code.as_str() {
         "service_busy" | "task_busy" => "shell.service.busy",
@@ -481,9 +502,17 @@ pub(super) fn service_poll(
     let page = match polled {
         // Otra ventana pudo relanzarlo ya: su selección nueva invalida este cliente antes de conectar.
         Err(error)
-            if (error.code == "app_unavailable" || state.client().check_selection().is_err())
-                && state.restart().is_ok() =>
+            if error.code == "app_unavailable" || state.client().check_selection().is_err() =>
         {
+            // Sin motor que relanzar (un antivirus puede apartarlo), el aviso dice eso y no «no responde».
+            if let Err(restart) = state.restart() {
+                let shown = if restart.code == "engine_missing" {
+                    restart
+                } else {
+                    error
+                };
+                return Err(failure(&shown));
+            }
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_title(&super::title(&app, &state.client()));
             }

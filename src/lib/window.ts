@@ -34,7 +34,7 @@ export const needsTrafficLightPadding = (
 export function createWindowTitle(): Accessor<string> {
   const [title, setTitle] = createSignal("");
 
-  onMount(() => {
+  const read = () => {
     // getCurrentWindow() puede lanzar sin metadata; un catch de la promesa no lo captura.
     try {
       void getCurrentWindow()
@@ -43,7 +43,11 @@ export function createWindowTitle(): Accessor<string> {
         .catch(() => {});
     } catch {
     }
-  });
+  };
+  onMount(read);
+  // Un motor relanzado cambia el título nativo; el reenganche avisa con este evento.
+  window.addEventListener("harness:service-resync", read);
+  onCleanup(() => window.removeEventListener("harness:service-resync", read));
 
   return title;
 }
