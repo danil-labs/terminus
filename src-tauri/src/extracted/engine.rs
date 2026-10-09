@@ -194,7 +194,7 @@ fn spawn(paths: &Paths, adopt: bool) -> Result<Child> {
         });
     }
     let exe = super::legacy::stable_engine(&exe, &paths.root)?;
-    let log = OpenOptions::new()
+    let mut log = OpenOptions::new()
         .create(true)
         .append(true)
         .open(&paths.launch_log)?;
@@ -209,7 +209,7 @@ fn spawn(paths: &Paths, adopt: bool) -> Result<Child> {
         .arg(&paths.identity)
         .stdin(Stdio::null())
         .stdout(log.try_clone()?)
-        .stderr(log);
+        .stderr(log.try_clone()?);
     if paths.identity == PRODUCTION {
         command.arg("--production-identity");
     }
@@ -220,12 +220,19 @@ fn spawn(paths: &Paths, adopt: bool) -> Result<Child> {
         "[engine] starting identity={} adopt={adopt}",
         paths.identity
     );
-    Ok(spawn_detached(&mut command)?)
+    let (child, outside) = spawn_detached(&mut command)?;
+    if !outside {
+        let _ = writeln!(
+            log,
+            "window: the engine started inside the launcher's job; it will die with that job"
+        );
+    }
+    Ok(child)
 }
 
 // Sale del job de quien lanzó la ventana para sobrevivirla; si ese job no lo permite, queda dentro.
 #[cfg(windows)]
-fn spawn_detached(command: &mut Command) -> std::io::Result<Child> {
+fn spawn_detached(command: &mut Command) -> std::io::Result<(Child, bool)> {
     use std::os::windows::process::CommandExt;
     const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
     const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
@@ -235,17 +242,17 @@ fn spawn_detached(command: &mut Command) -> std::io::Result<Child> {
     match command.spawn() {
         Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
             command.creation_flags(flags);
-            command.spawn()
+            Ok((command.spawn()?, false))
         }
-        other => other,
+        other => Ok((other?, true)),
     }
 }
 
 #[cfg(unix)]
-fn spawn_detached(command: &mut Command) -> std::io::Result<Child> {
+fn spawn_detached(command: &mut Command) -> std::io::Result<(Child, bool)> {
     use std::os::unix::process::CommandExt;
     command.process_group(0);
-    command.spawn()
+    Ok((command.spawn()?, true))
 }
 
 /// La clave con que el motor rechazó el arranque, de lo que escribió en esta corrida.
