@@ -4894,6 +4894,107 @@ if (!roto) {
   assert.ok(workColumn.classList.contains("shrink-[1000]"));
   unstarted.w.close();
 
+  for (const settings of [true, false]) {
+    for (const available of [true, false]) {
+      let latest = { rid: 276, currentVersion: "0.2.76", version: "0.2.77", rawJson: {} };
+      const installed = [];
+      let checks = 0;
+      let finishDownload;
+      const updater = await arrancar("listo", `update-latest-${settings}-${available}`, {
+        ...RESPUESTAS,
+        "plugin:updater|check": () => { checks++; return latest; },
+        "plugin:updater|download_and_install": ({ rid }) => {
+          installed.push(rid);
+          return new Promise(resolve => { finishDownload = resolve; });
+        },
+        service_prepare_update: null,
+        service_cancel_update: null,
+        list_language_packs: [],
+        list_bundled_language_packs: [],
+        "plugin:app|version": "0.2.76",
+      });
+      const doc = updater.w.document;
+      if (settings) {
+        [...doc.querySelectorAll("button")].find(b => b.textContent.trim() === "Ahora no").click();
+        doc.querySelector('button[aria-label="Configuraci\u00f3n"]').click();
+        await espera(100);
+        doc.querySelector("#cfg-tab-entorno").click();
+        await espera(100);
+      }
+      latest = available ? { ...latest, rid: 278, version: "0.2.78" } : null;
+      const install = [...doc.querySelectorAll("button")].find(b => b.textContent.trim() === "Actualizar");
+      assert.ok(install, `update action is visible (settings=${settings})`);
+      install.click();
+      await espera(100);
+      if (available) {
+        latest = { ...latest, rid: 279, version: "0.2.79" };
+        const before = checks;
+        const clock = Date.now;
+        Date.now = () => clock() + 31 * 60 * 1000;
+        try {
+          updater.w.dispatchEvent(new updater.w.Event("focus"));
+          await espera(20);
+          if (!settings) assert.equal(checks, before, "downloading skips background checks");
+          assert.ok(doc.body.textContent.includes("0.2.78"), "downloading keeps the selected release");
+        } finally { Date.now = clock; }
+        finishDownload();
+        await espera(20);
+      }
+      assert.deepEqual(installed, available ? [278] : [], `installs the latest release (settings=${settings})`);
+      assert.ok(doc.body.textContent.includes(available ? "0.2.78" : "Tienes la versi\u00f3n m\u00e1s reciente."), "shows the latest check result");
+      if (available) {
+        const before = checks;
+        const clock = Date.now;
+        Date.now = () => clock() + 31 * 60 * 1000;
+        try {
+          updater.w.dispatchEvent(new updater.w.Event("focus"));
+          doc.dispatchEvent(new updater.w.Event("visibilitychange"));
+          await espera(20);
+          if (!settings) assert.equal(checks, before, "ready to restart skips background checks");
+          assert.ok(doc.body.textContent.includes("0.2.78"), "ready to restart keeps the installed version");
+          assert.deepEqual(installed, [278], "does not chain downloads");
+        } finally { Date.now = clock; }
+      }
+      assert.deepEqual(updater.fallos, []);
+      updater.w.close();
+    }
+  }
+
+  let release = { rid: 277, currentVersion: "0.2.76", version: "0.2.77", rawJson: {} };
+  let checks = 0;
+  let resolveCheck;
+  const notice = await arrancar("listo", "update-focus", {
+    ...RESPUESTAS,
+    "plugin:updater|check": () => { checks++; return release; },
+  });
+  const clock = Date.now;
+  let elapsed = 0;
+  Date.now = () => clock() + elapsed;
+  try {
+    const doc = notice.w.document;
+    const focus = () => notice.w.dispatchEvent(new notice.w.Event("focus"));
+    focus();
+    await espera(20);
+    assert.equal(checks, 1, "focus within ten minutes does not check again");
+    [...doc.querySelectorAll("button")].find(b => b.textContent.trim() === "Ahora no").click();
+    elapsed = 11 * 60 * 1000;
+    focus();
+    await espera(20);
+    assert.ok(!doc.body.textContent.includes("Hay una versi\u00f3n nueva:"), "dismissed version stays hidden");
+    elapsed += 11 * 60 * 1000;
+    release = new Promise(resolve => { resolveCheck = resolve; });
+    focus();
+    doc.dispatchEvent(new notice.w.Event("visibilitychange"));
+    await espera(20);
+    assert.equal(checks, 3, "focus and visibility share the pending check");
+    resolveCheck({ rid: 278, currentVersion: "0.2.76", version: "0.2.78", rawJson: {} });
+    await espera(20);
+    assert.ok(doc.body.textContent.includes("Hay una versi\u00f3n nueva: 0.2.78"), "a newer version is announced");
+  } finally {
+    Date.now = clock;
+    notice.w.close();
+  }
+
   await spaceScenarios({ arrancar, espera, CON_TAREA });
 
   console.log(`El front monta — ${normal.pintado.length} bytes en #root, ${((Date.now() - t0) / 1000).toFixed(1)}s`);
