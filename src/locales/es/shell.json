@@ -167,6 +167,7 @@
   "shell.update.restart": "Reiniciar ahora",
   "shell.window.close": "Cerrar",
   "shell.window.close_app": "Cerrar Terminus",
+  "shell.window.engine_build": "motor {build}",
   "shell.window.maximize": "Maximizar",
   "shell.window.minimize": "Minimizar",
   "shell.window.restore": "Restaurar",

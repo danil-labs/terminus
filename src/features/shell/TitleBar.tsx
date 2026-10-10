@@ -45,11 +45,15 @@ export default function TitleBar(props: {
   const ws = createWorkspaces();
   const apartarSemaforo = needsTrafficLightPadding(() => true, createFullscreen());
   const titulo = createWindowTitle();
-  // En producción el título es `Terminus` a secas y aquí no se pinta nada.
-  const rama = () => {
+  // Tres partes (base, runtime y build) son el build del motor y se
+  // etiquetan; una sola parte extra es la rama de una build de desarrollo
+  // y se enseña tal cual.
+  const segmentoFinal = () => {
     const actual = titulo();
-    if (!actual || actual === "Terminus") return "";
-    return actual.split(" · ").at(-1) ?? actual;
+    if (!actual || actual === "Terminus") return null;
+    const partes = actual.split(" · ");
+    const texto = partes.at(-1) ?? actual;
+    return partes.length >= 3 ? t("shell.window.engine_build", { build: texto }) : texto;
   };
 
   return (
@@ -67,10 +71,10 @@ export default function TitleBar(props: {
       <Show when={props.escritorios && ws.actual()}>{(actual) => props.escritorios?.(() => actual().name)}</Show>
       {/* Un solo margen automático para el final de la fila: ver `WindowControls`. */}
       <div class="ml-auto flex min-w-0 items-center">
-        <Show when={rama()}>
-          {(r) => (
+        <Show when={segmentoFinal()}>
+          {(texto) => (
             <span data-window-branch="" class="min-w-0 truncate px-3 text-xs font-medium text-neutral-500">
-              {r()}
+              {texto()}
             </span>
           )}
         </Show>
