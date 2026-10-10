@@ -14,15 +14,19 @@ Un subcomando llega a `invalid_request`, y `launch()` llama a
 ser modal cuando nadie lee stderr. Esto explica el rechazo y el bloqueo de
 #67/#69 al descartar la salida.
 
-No se encuentra reenvío en Windows en esta base ni sustitución del ejecutable
-por un shim en `publish.yml`: el flujo coloca el motor como sidecar y empaqueta
-la ventana. El resultado comunicado de Windows (`task --help`, `instances`)
-se conserva como evidencia de otro artefacto; no demuestra una rama de código
-Windows aquí. Hace falta registrar su versión, commit, ruta efectiva y hash
-antes de atribuir la diferencia a una plataforma. No se cambia Windows.
+Windows tiene el mismo defecto. La revisión del usuario confirma que el dato
+previo de CLI funcional correspondía a 0.2.74; `terminus.exe instances --json`
+en la 0.2.76 instalada devuelve `cli.error.invalid_request`. No hay reenvío ni
+shim en la base anterior: `publish.yml` empaqueta la ventana con su sidecar.
+El despacho ahora se ejecuta en las tres plataformas antes de Tauri.
 
-`src-tauri/src/cli.rs` despacha cualquier primer argumento salvo las dos
-entradas reservadas. En Unix ejecuta el `seldon-runtime` hermano del ejecutable
+`src-tauri/src/cli.rs` acepta una lista explícita de subcomandos raíz y flags
+globales. La fuente es `crates/existing-runtime/src/cli/args.rs` del motor
+fijado: `SPECS`, `command()` y `schema()`, contrastados con `agent-context`.
+Incluye `kn`, el subcomando `help`, `--help`/`-h`, `--version`/`-V` y flags
+globales con valor separado o `=valor`. Una actualización del catálogo requiere
+revisar esta lista. No se usa el catálogo RPC como si fuera el de la CLI.
+En Unix ejecuta el `seldon-runtime` hermano del ejecutable
 real mediante `CommandExt::exec`, antes de Tauri. No resuelve por PATH ni acepta
 un motor alternativo por una variable nueva. Conserva argumentos como
 `OsString`, entorno, stdin/stdout/stderr, PID, señales y salida del motor. No
@@ -30,11 +34,44 @@ captura salida ni crea un hijo al que haya que esperar. Si falla `exec`, escribe
 el error en stderr y sale con 1, sin diálogo. Sin argumentos sigue abriendo la
 ventana: es el punto de entrada del escritorio.
 
-La prueba `scripts/cli-forward.test.mjs` compila el módulo de producción sin
-Tauri. En Unix usa un motor de prueba para comprobar argumentos con espacios y
-acentos, stdin, los dos canales de salida, código 23, salida descartada y motor
-ausente. En Windows solo ejecuta las pruebas del despacho; `exec` se omite.
-La cadena incluye esta prueba. El guard de procesos reconoce que `exec` Unix
+En Windows, un proceso de subsistema gráfico se conecta a la consola del padre
+si existe. Conserva antes sus handles válidos y los restaura tras
+`AttachConsole`, incluyendo pipes, archivos y NUL. Sin consola del padre sigue
+usando los handles heredados. Lanza el sidecar con `CREATE_NO_WINDOW`, los tres
+streams heredados explícitamente, espera su salida y devuelve su código.
+No captura ni acumula salida, y no impone un plazo a comandos que observan
+turnos. `no_console_window` se comparte desde `src-tauri/src/console.rs` con
+las utilidades existentes; no cambia sus flags.
+
+Referencia de handles consultada el 2026-10-10:
+[AttachConsole](https://learn.microsoft.com/en-us/windows/console/attachconsole) y
+[GetStdHandle](https://learn.microsoft.com/en-us/windows/console/getstdhandle).
+
+### Entradas de ventana revisadas
+
+| Entrada | Evidencia y despacho |
+|---|---|
+| Doble clic, menú Inicio y arranque normal | Sin argumentos vuelve a `app_lib::launch()`; no se conecta a una consola ni lanza la CLI. |
+| `--external-host <selección>` | Entrada del laboratorio y la ventana; queda fuera de la lista de CLI. |
+| `--stop-engine` | Los hooks NSIS la llaman para detener el motor antes de reemplazarlo; sigue entrando en el mismo handler. |
+| Actualizador NSIS | `tauri-plugin-updater` 2.10.1, `src/updater.rs:797`, pasa los argumentos de la ventana mediante `/ARGS` al instalador; `/P` y `/UPDATE` son del instalador. Este repo no agrega argumentos de relanzamiento; los existentes conservan su ruta. |
+| URLs / deep links / archivos | Cargo/configuración no declaran `tauri-plugin-deep-link`, `tauri-plugin-single-instance`, esquemas ni `fileAssociations`. URLs y rutas quedan fuera de la CLI; no se agrega soporte para abrirlas. |
+| `-psn_…` de LaunchServices | Queda fuera del catálogo y conserva la ruta de ventana, al igual que otros argumentos ajenos a CLI. No se verifica aquí su tratamiento nativo en macOS. |
+
+La clasificación distingue quién recibe la entrada; no añade nuevos handlers
+de ventana. Por ejemplo, una URL no configurada puede ser rechazada por
+`open()`, pero nunca se entrega al motor. Una ruta explícita `./task` no es
+el subcomando `task`.
+
+La prueba `scripts/cli-forward.test.mjs` compila el `main.rs` de producción y
+sus módulos sin construir Tauri. Solo las entradas `app_lib::launch()` y
+`stop_engine()` se sustituyen por marcadores para observar qué ruta se toma;
+despacho, reenvío, handles y flags son los reales. Un motor de prueba compilado
+comprueba argumentos con espacios y acentos, stdin, stdout/stderr, código 23,
+streams redirigidos a archivos, salida descartada, 256 KiB por canal y motor
+ausente. En Windows comprueba el subsistema PE gráfico del wrapper y que el
+motor no reciba una consola nueva. No hay unitarias Rust ni omisiones por
+plataforma. La cadena incluye esta prueba. El guard reconoce que `exec` Unix
 reemplaza al llamador, sin aumentar el cupo de procesos esperados sin plazo.
 
 ## Linux: cobertura y límite de #67
@@ -151,7 +188,7 @@ restaurar solo los datos no restaura la ACL. No usar secretos de producción.
 
 1. Registrar versión/commit de la ventana, hashes de los dos ejecutables y
    `codesign -d -r-` de ambos. Ejecutar `node --test scripts/cli-forward.test.mjs`
-   en el checkout: deben pasar las dos pruebas, sin omisión Unix.
+   en el checkout: debe pasar la prueba de reenvío, sin omisiones.
 2. Con `T=/Applications/Terminus.app/Contents/MacOS/terminus` y
    `S=/Applications/Terminus.app/Contents/MacOS/seldon-runtime`, comparar
    `"$T" task --help` y `"$S" task --help`, luego `instances --json`.
@@ -159,9 +196,9 @@ restaurar solo los datos no restaura la ACL. No usar secretos de producción.
 3. Con Python `subprocess.run([T, 'instances', '--json'], capture_output=True,
    timeout=10)`, comprobar JSON y salida antes de 10 s. Repetir con
    `stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL`: debe terminar sin
-   diálogo. Repetir con un subcomando inexistente: debe devolver el mismo error
+   diálogo. Repetir con `task subcomando-inexistente`: debe devolver el mismo error
    y código no cero del sidecar, sin abrir ventana.
-4. Sin motor vivo, repetir `task --help` y el subcomando inexistente. Los
+4. Sin motor vivo, repetir `task --help` y `task subcomando-inexistente`. Los
    comandos locales no deben depender de una ventana ni bloquearse. Para los
    que sí requieren motor, aceptar el error del sidecar, nunca un modal.
 5. Con ventana y motor vivos, registrar PID de `instances` y comparar
@@ -199,32 +236,55 @@ del AppImage sigue pendiente; `--instance` debe funcionar.
    reinicio del motor y vuelta a 0.2.74. La conexión debe seguir utilizable.
    Inspeccionar otras entradas legadas para descartar diálogos posteriores.
 
-Esta candidata solo arregla la CLI Unix. El diálogo del llavero sigue pendiente
+Esta candidata arregla el despacho de CLI en las tres plataformas. El diálogo del llavero sigue pendiente
 de diseño coordinado y de estas pruebas; no se declara resuelto.
 
-## Verificación local
+## Verificación de la revisión
 
-Cambio de CLI: `0c2b5aa5563e4ef1b05d026c33a408cb2e4b921f`.
-Windows, PowerShell. Antes de los dos comandos Cargo se establece
-`$env:CARGO_BUILD_JOBS='2'`. No se compila ni se abre la aplicación completa,
-no se ejecuta la cadena con Cargo y no se realiza push ni PR.
+Windows, PowerShell. Cambio de código:
+`cff17256a9ec0427daba8e160ae3b18336a5bdef`, encima de `0c2b5aa` y `197e985`,
+sin push ni PR. Antes de
+check/clippy se establece `$env:CARGO_BUILD_JOBS='2'`. Se compilan únicamente
+los ejecutables mínimos de la prueba y se revisa el crate `terminus` con Cargo;
+no se construye ni se abre la aplicación completa.
+
+Control negativo reproducible: extraer `src-tauri/src/main.rs` de `197e985`
+con `git show` a una carpeta temporal como `main.rs`, establecer
+`$env:TERMINUS_CLI_TEST_MAIN` a esa ruta y ejecutar
+`node --test scripts/cli-forward.test.mjs`. Código 1, resumen `pass 0`,
+`fail 1`, `skipped 0`; aserción literal `0 !== 23`. El marcador de ventana
+retorna 0 en esa prueba: se reproduce la ruta equivocada, no el diálogo de la
+app instalada. Quitar la variable y ejecutar la misma prueba sobre producción
+corregida da código 0:
+
+```text
+✔ el main de producción reenvía la CLI con pipes, archivos, salida descartada y sin consola nueva
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+```
+
+Se ejecuta de verdad en Windows, con un wrapper de subsistema gráfico
+verificado en su cabecera PE y el motor de prueba sin consola. Los handlers
+Tauri/instalador son marcadores; no acredita el escritorio ni un NSIS real.
+La omisión Unix de la prueba anterior se elimina; aquí no hay unitarias Rust.
 
 | Comando | Código y salida literal relevante |
 |---|---|
-| `pnpm install --frozen-lockfile` | 0; `Done in 1m 11s using pnpm v10.33.2` |
-| `pnpm engine:sidecar` | 0; `Sidecar ready:` seguido de la ruta local; `sha256 5d42f5f078492f73000ae34f0c7e8c5c7d11ad47c477fd5028c4b6e0cd01a5dd` |
-| `cargo check --manifest-path src-tauri/Cargo.toml --locked -p terminus --all-targets` | 0; ``Finished `dev` profile [unoptimized + debuginfo] target(s) in 5m 38s`` |
-| `cargo clippy --manifest-path src-tauri/Cargo.toml --locked -p terminus --all-targets` | 0; ``Finished `dev` profile [unoptimized + debuginfo] target(s) in 21.53s`` |
+| `cargo check --manifest-path src-tauri/Cargo.toml --locked -p terminus --all-targets` | 0; ``Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.95s`` |
+| `cargo clippy --manifest-path src-tauri/Cargo.toml --locked -p terminus --all-targets` | 0; ``Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.16s`` |
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --check -- --config-path src-tauri/rustfmt.toml` | 0; sin salida |
 | `git diff --cached --check` | 0; sin salida |
 | `node scripts/doc-paths.mjs` | 0; `Las rutas y enlaces locales de 23 documentos existen.` |
-| `node scripts/console-window.mjs` | 0; `Ningún proceso de producción abre una consola en Windows.` |
-| `node scripts/processes.mjs` | 0; `Ningún proceso nuevo se espera sin plazo: 0 sin él (cupo 0).` |
 
 `pnpm verificar --sin-cargo` termina con 0. Resumen literal:
 
 ```text
-  Verificado en Windows (cadena sin Rust), 561s.
+  Verificado en Windows (cadena sin Rust), 622s.
   Sin comprobar en esta corrida: cargo fmt, check, clippy y test.
     La ventana tiene permiso para lo que se le pide — necesita el build de Rust.
 ```
@@ -232,24 +292,17 @@ no se ejecuta la cadena con Cargo y no se realiza push ni PR.
 Fmt, check y clippy se ejecutan por separado como indica la tabla. No se
 ejecutan cargo test ni el guard de permisos del build nativo completo.
 
-Check y clippy muestran el aviso previo ``warning: unused import: `tauri::Emitter` ``
+Ambos mantienen el aviso previo ``warning: unused import: `tauri::Emitter` ``
 en `src/extracted/desktop.rs:2:5`; ese archivo no se modifica.
 
-`node --test scripts/cli-forward.test.mjs` termina con 0. Su resumen literal,
-sin los escapes de color, es:
+Quedan sin comprobar la consola interactiva real de cmd/PowerShell/Windows
+Terminal, el doble clic/menú Inicio, un instalador/actualizador real y el bundle
+firmado de Windows. En esa prueba posterior, comparar el sidecar y
+`terminus.exe task --help`, `instances --json`, salida a archivo y salida a pipe;
+deben tener los mismos streams/código y ninguna ventana nueva. Repetir el
+arranque normal, `--external-host` de laboratorio y `--stop-engine` sin trabajo
+vivo para observar sus handlers reales.
 
-```text
-ℹ tests 2
-ℹ suites 0
-ℹ pass 1
-ℹ fail 0
-ℹ cancelled 0
-ℹ skipped 1
-ℹ todo 0
-```
-
-La omisión dice `exec solo existe en Unix`: no equivale a comprobar el reenvío.
-Las dos pruebas Rust de clasificación ejecutadas por ese paso pasan. El check
-y clippy de Windows tampoco compilan las ramas `cfg(unix)`. Quedan pendientes
-compilación/ejecución Unix, aplicación firmada, AppImage real y toda la
-migración de llavero. No se declara el defecto del llavero corregido.
+macOS/Linux siguen pendientes de compilación y ejecución nativa, AppImage y
+aplicación firmada. Los escenarios anteriores siguen siendo el QA requerido.
+El diseño y las pruebas del llavero permanecen sin implementar y sin verificar.
