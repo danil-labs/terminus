@@ -1,8 +1,5 @@
-Terminus estrena motor. La ventana y el motor que hace el trabajo pasan a ser dos programas: el motor sigue con tus tareas aunque cierres la ventana, y la ventana lo vuelve a arrancar si se cae.
+Terminus 0.2.76 corrige una actualización que se detenía en Windows y dos avisos confusos de la ventana.
 
-- **Tus datos se quedan donde están.** Al abrirla por primera vez, Terminus pasa tus workspaces, tareas, cuentas y bóveda de 0.2.74 al motor nuevo sin copiarlos.
-- **Cierra Terminus 0.2.74 antes.** Si sigue abierta, Terminus espera a que termine sus tareas: no cierra nada a la fuerza.
-- **Para volver a 0.2.74**, cierra esta ventana y espera a que el motor se apague (5 minutos sin ventanas). Después instala 0.2.74 desde su página de release: abre la misma carpeta de datos. Si el motor no arranca, Terminus te dice por qué y dónde está su registro.
-- **Instalar y desinstalar** esperan a que el motor termine: si hay una tarea en curso, el instalador avisa y no instala.
-
-**Limitación conocida.** La vista en vivo de Typst no funciona en esta versión: el PDF no se muestra al lado del documento. Los sitios locales (las páginas de `localhost` que abre una tarea) sí funcionan.
+- **La actualización en Windows ya no se detiene.** Si una cuenta de agente guardó cachés del navegador integrado (WebView2) en la carpeta de datos, el motor nuevo la acepta: antes, actualizar desde 0.2.74 se detenía con «El motor no acepta esta carpeta de datos».
+- **La barra de título ahora dice que es el motor.** El número que aparece arriba a la derecha es la versión del motor, no la de Terminus; ahora se lee, por ejemplo, «motor 0.2.73 fa6d965».
+- **Ya no aparece un aviso de salida en vivo incompleta** después de que el motor se reinicia sin ningún trabajo en curso.
