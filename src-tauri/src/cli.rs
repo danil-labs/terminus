@@ -2,42 +2,123 @@ use std::ffi::OsStr;
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;
 
+// Catálogo de args.rs del motor fijado en seldon-runtime.lock, más help y kn.
+const COMMANDS: &[&str] = &[
+    "account",
+    "agent",
+    "agent-context",
+    "auth",
+    "chat",
+    "config",
+    "context",
+    "folder",
+    "guide",
+    "handler",
+    "help",
+    "instances",
+    "keep-awake",
+    "kn",
+    "mcp",
+    "notify",
+    "operation",
+    "plugin",
+    "portfolio",
+    "service",
+    "skill",
+    "space",
+    "status",
+    "task",
+    "telegram",
+    "vm",
+    "workspace",
+];
+const GLOBAL_FLAGS: &[&str] = &[
+    "--workspace",
+    "--folder",
+    "--instance",
+    "--request-id",
+    "--timeout",
+    "--no-wait",
+    "--json",
+    "--help",
+    "-h",
+    "--version",
+    "-V",
+];
+
 pub fn requested(first: Option<&OsStr>) -> bool {
-    first.is_some_and(|arg| arg != "--external-host" && arg != "--stop-engine")
+    first.and_then(OsStr::to_str).is_some_and(|arg| {
+        COMMANDS.contains(&arg) || GLOBAL_FLAGS.contains(&arg.split('=').next().unwrap_or(arg))
+    })
+}
+
+pub fn dispatch() {
+    if !requested(std::env::args_os().nth(1).as_deref()) {
+        return;
+    }
+    #[cfg(windows)]
+    if let Err(error) = attach_parent() {
+        eprintln!("cli.error.engine_start_failed: {error}");
+        std::process::exit(1);
+    }
+    match forward() {
+        Ok(code) => std::process::exit(code),
+        Err(error) => {
+            eprintln!("cli.error.engine_start_failed: {error}");
+            std::process::exit(1);
+        }
+    }
 }
 
 // exec conserva los descriptores, las señales y el código de salida sin iniciar Tauri.
 #[cfg(unix)]
-pub fn forward() -> std::io::Result<()> {
+fn forward() -> std::io::Result<i32> {
     let exe = std::env::current_exe()?.with_file_name("seldon-runtime");
     Err(std::process::Command::new(exe)
         .args(std::env::args_os().skip(1))
         .exec())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::requested;
-    use std::ffi::OsStr;
+#[cfg(windows)]
+fn forward() -> std::io::Result<i32> {
+    use std::process::{Command, Stdio};
+    let exe = std::env::current_exe()?.with_file_name("seldon-runtime.exe");
+    let mut command = Command::new(exe);
+    // proceso largo: a propósito. Una CLI puede observar un turno hasta que termine.
+    let status = crate::console::no_console_window(&mut command)
+        .args(std::env::args_os().skip(1))
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status()?;
+    Ok(status.code().unwrap_or(1))
+}
 
-    #[test]
-    fn window_and_installer_keep_their_entry_points() {
-        assert!(!requested(None));
-        assert!(!requested(Some(OsStr::new("--external-host"))));
-        assert!(!requested(Some(OsStr::new("--stop-engine"))));
+#[cfg(windows)]
+fn attach_parent() -> std::io::Result<()> {
+    use std::ffi::c_void;
+    type Handle = *mut c_void;
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn AttachConsole(pid: u32) -> i32;
+        fn GetStdHandle(which: u32) -> Handle;
+        fn SetStdHandle(which: u32, handle: Handle) -> i32;
+        fn GetFileType(handle: Handle) -> u32;
     }
-
-    #[test]
-    fn commands_and_global_flags_go_to_the_engine() {
-        for arg in [
-            "task",
-            "instances",
-            "--help",
-            "--version",
-            "--instance",
-            "unknown",
-        ] {
-            assert!(requested(Some(OsStr::new(arg))));
+    let streams = [-10i32 as u32, -11i32 as u32, -12i32 as u32];
+    let saved = streams.map(|which| {
+        let handle = unsafe { GetStdHandle(which) };
+        let valid =
+            !handle.is_null() && handle as isize != -1 && unsafe { GetFileType(handle) } != 0;
+        (which, handle, valid)
+    });
+    // AttachConsole puede sustituir los handles; los pipes, archivos y NUL se conservan.
+    if unsafe { AttachConsole(u32::MAX) } != 0 {
+        for (which, handle, valid) in saved {
+            if valid && unsafe { SetStdHandle(which, handle) } == 0 {
+                return Err(std::io::Error::last_os_error());
+            }
         }
     }
+    Ok(())
 }

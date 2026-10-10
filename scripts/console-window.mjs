@@ -23,7 +23,7 @@ import { archivos } from "./git.mjs";
 
 const ROOT = fileURLToPath(new URL("../src-tauri/src", import.meta.url));
 /** El módulo que define la contención: es donde vive `no_console_window`. */
-const OWNER = "util.rs";
+const OWNER = "console.rs";
 /** Cuántas líneas alrededor de la llamada se acepta la contención. */
 const WINDOW_SIZE = 14;
 

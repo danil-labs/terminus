@@ -1,60 +1,113 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-const source = fileURLToPath(new URL("../src-tauri/src/cli.rs", import.meta.url));
+const main = process.env.TERMINUS_CLI_TEST_MAIN ?? fileURLToPath(new URL("../src-tauri/src/main.rs", import.meta.url));
+const windows = process.platform === "win32";
 
-test("el despacho conserva las entradas de ventana e instalador", () => {
-  const scratch = mkdtempSync(join(tmpdir(), "terminus-cli-"));
-  try {
-    const binary = join(scratch, process.platform === "win32" ? "tests.exe" : "tests");
-    execFileSync("rustc", ["--edition=2021", "--test", source, "-o", binary], { timeout: 60_000 });
-    execFileSync(binary, [], { timeout: 10_000 });
-  } finally {
-    rmSync(scratch, { recursive: true, force: true });
-  }
-});
-
-test("Unix reenvía argumentos, stdin, stdout, stderr y salida sin esperar una ventana", {
-  skip: process.platform === "win32" ? "exec solo existe en Unix" : false,
-}, () => {
-  const scratch = mkdtempSync(join(tmpdir(), "terminus-cli-"));
-  try {
-    const main = join(scratch, "main.rs");
-    const binary = join(scratch, "terminus");
-    writeFileSync(main, `#[path = ${JSON.stringify(source)}] mod cli;
-fn main() {
-    if cli::requested(std::env::args_os().nth(1).as_deref()) {
-        eprintln!("{:?}", cli::forward());
-        std::process::exit(1);
-    }
-    println!("window");
-}`);
-    execFileSync("rustc", ["--edition=2021", main, "-o", binary], { timeout: 60_000 });
-    const engine = join(scratch, "seldon-runtime");
-    writeFileSync(engine, '#!/bin/sh\nprintf "%s\\n" "$@"\ncat\nprintf "engine stderr\\n" >&2\nexit 23\n');
-    chmodSync(engine, 0o700);
-    const result = spawnSync(binary, ["task", "á con espacios", "--json"], {
-      input: "entrada\n", encoding: "utf8", timeout: 10_000,
-    });
+test("el main de producción reenvía la CLI con pipes, archivos, salida descartada y sin consola nueva", () => {
+  const scratch = mkdtempSync(join(tmpdir(), "terminus-forward-"));
+  const binary = join(scratch, windows ? "terminus.exe" : "terminus");
+  const engine = join(scratch, windows ? "seldon-runtime.exe" : "seldon-runtime");
+  const run = (args, options = {}) => {
+    const result = spawnSync(binary, args, { encoding: "utf8", timeout: 10_000, windowsHide: true, ...options });
     assert.ifError(result.error);
-    assert.equal(result.status, 23);
-    assert.equal(result.stdout, "task\ná con espacios\n--json\nentrada\n");
-    assert.equal(result.stderr, "engine stderr\n");
-    const discarded = spawnSync(binary, ["instances", "--json"], { stdio: "ignore", timeout: 10_000 });
-    assert.ifError(discarded.error);
-    assert.equal(discarded.status, 23);
+    return result;
+  };
+  try {
+    const stub = join(scratch, "app_lib.rs");
+    const library = join(scratch, "libapp_lib.rlib");
+    writeFileSync(stub, `pub struct Error { pub message_key: &'static str }
+pub fn launch() -> Result<(), Error> { println!("window"); Ok(()) }
+pub fn stop_engine() -> i32 { println!("stop-engine"); 0 }
+`);
+    execFileSync("rustc", ["--edition=2021", "--crate-name", "app_lib", "--crate-type=rlib", stub, "-o", library], { timeout: 60_000 });
+    execFileSync("rustc", ["--edition=2021", "-C", "debug-assertions=no", main, "--extern", `app_lib=${library}`, "-o", binary], { timeout: 60_000 });
+    const fixture = join(scratch, "engine.rs");
+    writeFileSync(fixture, `use std::io::{Read, Write};
+#[cfg(windows)]
+fn check_console() {
+    #[link(name="kernel32")] extern "system" { fn GetConsoleWindow() -> *mut std::ffi::c_void; }
+    if !unsafe { GetConsoleWindow() }.is_null() { eprintln!("unexpected console"); std::process::exit(99); }
+}
+fn main() {
+    #[cfg(windows)] check_console();
+    let args: Vec<_> = std::env::args().skip(1).collect();
+    for arg in &args { println!("{arg}"); }
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).expect("stdin");
+    print!("{input}");
+    if args.iter().any(|arg| arg == "--stream") {
+        std::io::stdout().write_all(&vec![b'x'; 256 * 1024]).expect("stdout");
+        std::io::stderr().write_all(&vec![b'y'; 256 * 1024]).expect("stderr");
+    }
+    eprintln!("engine stderr");
+    std::process::exit(23);
+}
+`);
+    execFileSync("rustc", ["--edition=2021", fixture, "-o", engine], { timeout: 60_000 });
+
+    if (windows) {
+      const pe = readFileSync(binary);
+      const optionalHeader = pe.readUInt32LE(0x3c) + 24;
+      assert.equal(pe.readUInt16LE(optionalHeader + 68), 2, "el wrapper debe ser un PE de subsistema Windows");
+    }
+
+    const piped = run(["task", "á con espacios", "--json"], { input: "entrada\n" });
+    assert.equal(piped.status, 23);
+    assert.equal(piped.stdout, "task\ná con espacios\n--json\nentrada\n");
+    assert.equal(piped.stderr, "engine stderr\n");
+
+    const inputFile = join(scratch, "input.txt");
+    const outputFile = join(scratch, "output.txt");
+    const errorFile = join(scratch, "error.txt");
+    writeFileSync(inputFile, "desde archivo\n");
+    const descriptors = [openSync(inputFile, "r"), openSync(outputFile, "w"), openSync(errorFile, "w")];
+    try {
+      assert.equal(run(["instances", "--json"], { stdio: descriptors }).status, 23);
+    } finally {
+      for (const fd of descriptors) closeSync(fd);
+    }
+    assert.equal(readFileSync(outputFile, "utf8"), "instances\n--json\ndesde archivo\n");
+    assert.equal(readFileSync(errorFile, "utf8"), "engine stderr\n");
+    assert.equal(run(["instances", "--json"], { stdio: "ignore" }).status, 23);
+    const streamed = run(["chat", "--stream"], { maxBuffer: 1024 * 1024 });
+    assert.equal(streamed.status, 23);
+    assert.equal(streamed.stdout, `chat\n--stream\n${"x".repeat(256 * 1024)}`);
+    assert.equal(streamed.stderr, `${"y".repeat(256 * 1024)}engine stderr\n`);
+
+    for (const args of [["--instance=123", "status"], ["--instance", "123", "status"], ["--json", "instances"], ["--help"], ["-h"], ["--version"], ["-V"], ["kn", "--help"]]) {
+      const result = run(args);
+      assert.equal(result.status, 23);
+      assert.equal(result.stdout, `${args.join("\n")}\n`);
+      assert.equal(result.stderr, "engine stderr\n");
+    }
+    for (const args of [[], ["--external-host", "selection.json"], ["-psn_0_123"],
+      ["terminus://task?id=qa"], ["https://example.invalid/"], ["C:\\QA\\report.md"],
+      ["/tmp/report.md"], ["report.md"], ["./task"], ["--updated"], ["/S"], ["/P"],
+      ["/UPDATE"], ["/ARGS", "--external-host", "selection.json"], ["--", "status"], ["unknown"]]) {
+      const result = run(args);
+      assert.equal(result.status, 0);
+      assert.equal(result.stdout, "window\n", JSON.stringify(args));
+      assert.equal(result.stderr, "");
+    }
+    const installer = run(["--stop-engine"]);
+    assert.equal(installer.stdout, "stop-engine\n");
+    assert.equal(installer.status, 0);
+
     rmSync(engine);
-    const missing = spawnSync(binary, ["task"], { encoding: "utf8", timeout: 10_000 });
-    assert.ifError(missing.error);
+    const missing = run(["task"]);
     assert.equal(missing.status, 1);
     assert.equal(missing.stdout, "");
-    assert.ok(missing.stderr.length > 0);
+    assert.match(missing.stderr, /^cli\.error\.engine_start_failed:/);
   } finally {
-    rmSync(scratch, { recursive: true, force: true });
+    const checked = resolve(scratch);
+    assert.equal(dirname(checked), resolve(tmpdir()));
+    assert.ok(relative(tmpdir(), checked).startsWith("terminus-forward-"));
+    rmSync(checked, { recursive: true, force: true });
   }
 });
