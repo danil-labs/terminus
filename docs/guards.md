@@ -23,7 +23,7 @@ sends).
 | `artifact` | `scripts/artifact.mjs`, `scripts/artifact-viewer.test.ts` | Validates the artifact container script and the CSS classes it shares with the viewer. |
 | `window` | `scripts/window.mjs` | Platform overrides keep the window structure (`label`, `create`). |
 | `console-window` | `scripts/console-window.mjs` | Production processes use `no_console_window` on Windows. |
-| `processes` | `scripts/processes.mjs` | Finds processes awaited without a timeout. The quota only goes down. |
+| `processes` | `scripts/processes.mjs` | Finds processes awaited without a timeout. Unix `exec` replaces the caller without waiting for a child. The quota only goes down. |
 | `doc-paths` | `scripts/doc-paths.mjs` | Code paths and local links in the documentation exist. Generated files are excluded. |
 | `missing-classes` | `scripts/missing-classes.mjs` | Finds written classes that Tailwind does not generate. |
 | `triggers` | `scripts/triggers.test.mjs` | A trigger keeps the handler that opens its panel. |
