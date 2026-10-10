@@ -2015,7 +2015,9 @@ export default function App() {
           if (vivas().length > 0) setError(t("chat.error.service_restarted"));
           void reconcileActiveTurns();
         }
-        if (page.gap) setError(t("chat.error.service_gap"));
+        // Un reinicio sin turnos vivos también corta el stream (`page.gap`); sin
+        // esta guarda el aviso de hueco sale sin que nada se haya perdido.
+        if (page.gap && vivas().length > 0) setError(t("chat.error.service_gap"));
         if (failingSince !== null) {
           failingSince = null;
           if (error() === t("chat.error.service_unavailable") || error() === t("shell.service.engine_down") || error() === t("shell.service.engine_missing")) setError(null);
