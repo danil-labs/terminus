@@ -1555,6 +1555,19 @@ export default function App() {
   function refreshSessionsOnEvent(proyectos: string[]) {
     return sessionLists.gathered(proyectos);
   }
+  // Un hueco del stream o un motor nuevo se lleva los eventos `session` de en medio: se
+  // relee lo que habrían refrescado. Las tareas vivas las reconcilia `reconcileActiveTurns`.
+  function releerTrasHueco() {
+    const generation = sessionGeneration;
+    void refreshSessionsOnEvent(grupos());
+    for (const pestana of pestanas.open()) avisarDeLosArboles(pestana.id);
+    const abierta = sessionId();
+    if (!abierta || vivas().includes(abierta)) return;
+    avisarDeLosArboles(abierta);
+    void invoke<Session>("load_session", { project: project(), id: abierta })
+      .then((s) => loadResult(abierta, s, true, generation))
+      .catch(() => {});
+  }
 
   // La miniatura de un adjunto del mensaje, o `null` si no hay que enseñar
   // una: null no es un fallo, y no se distingue del error. Un PDF, un `.docx`
@@ -2007,6 +2020,7 @@ export default function App() {
         replay = page.replay;
         runtime = page.runtime;
         if (page.reset || page.gap || failingSince !== null) window.dispatchEvent(new CustomEvent("harness:service-resync"));
+        if (page.reset || page.gap) releerTrasHueco();
         if (page.reset) {
           liveThreads.clear();
           workspaceThreads.clear();
