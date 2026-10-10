@@ -49,6 +49,7 @@ const rustSteps = [
 ];
 
 const steps = [
+  ["La CLI Unix reenvía al motor sin abrir ventana", process.execPath, ["--test", join(root, "scripts/cli-forward.test.mjs")], root],
   ["El buscador de proyectos combina repositorios sin duplicarlos", process.execPath, ["--test", "--experimental-strip-types", join(root, "scripts/project-repositories.test.ts")], root],
   ["Todo el código es revisable", process.execPath, [join(root, "scripts/reviewable.mjs")], root],
   [

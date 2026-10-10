@@ -42,6 +42,9 @@ function cuenta() {
       if (enPruebas) return;
       if (!/Command::new\s*\(/.test(l)) return;
       if (/^\s*(\/\/|\*|\/\*)/.test(l)) return;
+      // exec en Unix reemplaza este proceso; no espera a un hijo.
+      const nearby = lineas.slice(Math.max(0, i - 8), i + VENTANA).join("\n");
+      if (/#\[cfg\(unix\)\]/.test(nearby) && /\.exec\(\)/.test(nearby)) return;
       if (conPlazo.test(lineas.slice(Math.max(0, i - 3), i + VENTANA).join("\n"))) return;
       n += 1;
     });
