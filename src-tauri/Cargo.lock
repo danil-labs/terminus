@@ -3885,14 +3885,17 @@ dependencies = [
 
 [[package]]
 name = "terminus"
-version = "0.2.77"
+version = "0.2.78"
 dependencies = [
+ "core-foundation",
  "dirs",
  "gtk",
  "libc",
  "log",
  "objc2",
  "rfd",
+ "security-framework",
+ "security-framework-sys",
  "serde",
  "serde_json",
  "tauri",
@@ -3907,6 +3910,7 @@ dependencies = [
  "ureq",
  "uuid",
  "windows-sys 0.61.2",
+ "zeroize",
 ]
 
 [[package]]

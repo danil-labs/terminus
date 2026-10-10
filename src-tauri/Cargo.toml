@@ -2,7 +2,7 @@
 # The package name is the executable name (`terminus.exe`), which is what the
 # OS shows in task managers and firewall prompts.
 name = "terminus"
-version = "0.2.77"
+version = "0.2.78"
 description = "Terminus desktop window: the client for the Seldon engine"
 authors = ["Danil"]
 license = "Apache-2.0"
@@ -63,6 +63,10 @@ libc = "0.2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
+security-framework = "3.7"
+security-framework-sys = "2.17"
+core-foundation = "0.10"
+zeroize = "1"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = "0.18.2"
