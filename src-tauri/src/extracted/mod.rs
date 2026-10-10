@@ -5,6 +5,8 @@ mod engine;
 pub mod env;
 mod launcher;
 mod legacy;
+#[cfg(target_os = "linux")]
+mod linux_engine;
 mod local_image;
 mod proxy;
 mod sites;

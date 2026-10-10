@@ -213,6 +213,8 @@ fn spawn(paths: &Paths, adopt: bool) -> Result<Child> {
         .open(&paths.launch_log)?;
     // proceso largo: a propósito. El motor sobrevive a la ventana y se apaga solo sin clientes.
     let mut command = Command::new(exe);
+    #[cfg(target_os = "linux")]
+    super::linux_engine::prepare(&mut command, &paths.root)?;
     crate::util::no_console_window(&mut command)
         .arg("--data-dir")
         .arg(&paths.data)
