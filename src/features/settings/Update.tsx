@@ -101,6 +101,8 @@ export default function Actualizacion(props: { build?: string }) {
   };
 
   async function mirar() {
+    const actual = hay();
+    if (actual && actual.paso !== "quieto") return;
     setVersion({ t: "mirando" });
     try {
       const u = await check();
@@ -121,16 +123,30 @@ export default function Actualizacion(props: { build?: string }) {
   });
 
   async function poner() {
-    const v = version();
-    if (!es(v, "hay")) return;
+    let v = version();
+    if (!es(v, "hay") || v.paso !== "quieto") return;
     setVersion({ ...v, paso: "bajando", fallo: null, ocupan: null });
     let stopped = false;
+    let checked = false;
     try {
+      const u = await check();
+      checked = true;
+      if (!u) {
+        setVersion({ t: "al-dia" });
+        return;
+      }
+      v = { ...v, u };
+      setVersion({ ...v, paso: "bajando", fallo: null, ocupan: null });
       await invoke("service_prepare_update");
       stopped = true;
       await v.u.downloadAndInstall();
       setVersion({ ...v, paso: "listo", fallo: null, ocupan: null });
     } catch (e) {
+      if (!checked) {
+        const f = asFailure(e);
+        setVersion({ t: "sin-respuesta", crudo: f.detail || prosa(f.what) });
+        return;
+      }
       await invoke("service_cancel_update");
       setVersion({
         ...v,
