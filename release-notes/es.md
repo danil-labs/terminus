@@ -1,5 +1,4 @@
-Terminus 0.2.76 corrige una actualización que se detenía en Windows y dos avisos confusos de la ventana.
+Terminus 0.2.77 devuelve la línea de comandos a `terminus` y corrige el arranque del motor en Linux.
 
-- **La actualización en Windows ya no se detiene.** Si una cuenta de agente guardó cachés del navegador integrado (WebView2) en la carpeta de datos, el motor nuevo la acepta: antes, actualizar desde 0.2.74 se detenía con «El motor no acepta esta carpeta de datos».
-- **La barra de título ahora dice que es el motor.** El número que aparece arriba a la derecha es la versión del motor, no la de Terminus; ahora se lee, por ejemplo, «motor 0.2.73 fa6d965».
-- **Ya no aparece un aviso de salida en vivo incompleta** después de que el motor se reinicia sin ningún trabajo en curso.
+- **`terminus <comando>` vuelve a funcionar en la terminal.** Desde la 0.2.75, en Windows, macOS y Linux, el ejecutable de Terminus solo abría la ventana y los comandos respondían «cli.error.invalid_request». Ahora los reenvía al motor y devuelve su salida y su código de salida, también en una consola de Windows.
+- **Linux: git por HTTPS vuelve a funcionar en las tareas.** El motor ya no hereda las bibliotecas ni el directorio del AppImage, y el montaje se libera al cerrar la ventana.

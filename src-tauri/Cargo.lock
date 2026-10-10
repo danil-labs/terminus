@@ -3885,7 +3885,7 @@ dependencies = [
 
 [[package]]
 name = "terminus"
-version = "0.2.76"
+version = "0.2.77"
 dependencies = [
  "dirs",
  "gtk",
