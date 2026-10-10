@@ -144,9 +144,7 @@ fn help_output_with_timeout(exe: &Path) -> bool {
                 Ok(0) if exited.is_some() => {
                     return Ok(exited
                         .is_some_and(|status: std::process::ExitStatus| status.success())
-                        && String::from_utf8_lossy(&output)
-                            .split_whitespace()
-                            .any(|word| word == "--master-fd"));
+                        && String::from_utf8_lossy(&output).contains("--master-fd"));
                 }
                 Ok(n) => output.extend_from_slice(&buffer[..n]),
                 Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
