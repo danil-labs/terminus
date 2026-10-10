@@ -24,8 +24,9 @@ El despacho ahora se ejecuta en las tres plataformas antes de Tauri.
 globales. La fuente es `crates/existing-runtime/src/cli/args.rs` del motor
 fijado: `SPECS`, `command()` y `schema()`, contrastados con `agent-context`.
 Incluye `kn`, el subcomando `help`, `--help`/`-h`, `--version`/`-V` y flags
-globales con valor separado o `=valor`. Una actualización del catálogo requiere
-revisar esta lista. No se usa el catálogo RPC como si fuera el de la CLI.
+globales con valor separado o `=valor`. La prueba contrasta cada comando raíz
+publicado por el `agent-context` del sidecar local, tras validar su SHA-256
+contra el lock. No se usa el catálogo RPC como si fuera el de la CLI.
 En Unix ejecuta el `seldon-runtime` hermano del ejecutable
 real mediante `CommandExt::exec`, antes de Tauri. No resuelve por PATH ni acepta
 un motor alternativo por una variable nueva. Conserva argumentos como
@@ -37,8 +38,10 @@ ventana: es el punto de entrada del escritorio.
 En Windows, un proceso de subsistema gráfico se conecta a la consola del padre
 si existe. Conserva antes sus handles válidos y los restaura tras
 `AttachConsole`, incluyendo pipes, archivos y NUL. Sin consola del padre sigue
-usando los handles heredados. Lanza el sidecar con `CREATE_NO_WINDOW`, los tres
-streams heredados explícitamente, espera su salida y devuelve su código.
+usando los handles heredados. `attach_parent()` devuelve si se conectó: aplica
+`CREATE_NO_WINDOW` únicamente cuando no pudo conectarse; con consola padre,
+el sidecar hereda esa consola. Los tres streams se heredan explícitamente;
+espera su salida y devuelve su código.
 No captura ni acumula salida, y no impone un plazo a comandos que observan
 turnos. `no_console_window` se comparte desde `src-tauri/src/console.rs` con
 las utilidades existentes; no cambia sus flags.
@@ -295,8 +298,8 @@ ejecutan cargo test ni el guard de permisos del build nativo completo.
 Ambos mantienen el aviso previo ``warning: unused import: `tauri::Emitter` ``
 en `src/extracted/desktop.rs:2:5`; ese archivo no se modifica.
 
-Quedan sin comprobar la consola interactiva real de cmd/PowerShell/Windows
-Terminal, el doble clic/menú Inicio, un instalador/actualizador real y el bundle
+En esta revisión quedaron sin comprobar la consola interactiva (cubierta en
+el ajuste siguiente), el doble clic/menú Inicio, un instalador/actualizador real y el bundle
 firmado de Windows. En esa prueba posterior, comparar el sidecar y
 `terminus.exe task --help`, `instances --json`, salida a archivo y salida a pipe;
 deben tener los mismos streams/código y ninguna ventana nueva. Repetir el
@@ -306,3 +309,73 @@ vivo para observar sus handlers reales.
 macOS/Linux siguen pendientes de compilación y ejecución nativa, AppImage y
 aplicación firmada. Los escenarios anteriores siguen siendo el QA requerido.
 El diseño y las pruebas del llavero permanecen sin implementar y sin verificar.
+
+## Ajuste final: consola heredada y catálogo
+
+Se ejecuta la prueba interactiva en la pseudoconsola del terminal de PowerShell
+de esta máquina, con `$env:TERMINUS_CLI_TEST_INTERACTIVE='1'` y
+`node scripts/cli-forward.test.mjs` (sin `--test`, que aísla el worker de la
+consola). El motor de prueba exige una consola, y el caso interactivo hereda
+los tres streams del terminal. Salida literal observable, código 0 del test:
+
+```text
+task
+--interactive
+INTERACTIVE_STDOUT
+engine stderr
+ℹ 25 comandos raíz contrastados con seldon-runtime-v0.2.73-4a5f05c
+ℹ tests 2
+ℹ pass 2
+ℹ fail 0
+ℹ skipped 0
+```
+
+También pasan en esa consola los casos con pipes, archivos, NUL y salida larga.
+Como control negativo, la misma prueba usa `main.rs`/`console.rs` copiados a un
+directorio temporal y `cli.rs` extraído del HEAD anterior (`80a4be0`), mediante
+`TERMINUS_CLI_TEST_MAIN`. Termina con 1 y `99 !== 23`: el motor detecta que
+perdió la consola. No se agregan dependencias ni se construye Tauri.
+
+La comprobación del catálogo ejecuta `agent-context --json` del sidecar sin
+red, valida su hash contra `seldon-runtime.lock` y llama al wrapper de producción
+con cada raíz y el motor de prueba. Una raíz ausente de `COMMANDS` abre el
+marcador de ventana y falla. Control negativo retirando `telegram` de una copia
+temporal de `cli.rs`: código 1, `falta COMMANDS: telegram`, `0 !== 23`.
+`help` y `kn`, ausentes del catálogo publicado, mantienen casos explícitos.
+
+La cadena completa prepara el sidecar antes de esta prueba; `--sin-cargo`
+usa únicamente el archivo local. Si falta, la prueba falla indicando
+`sidecar local ausente; preparar con pnpm engine:sidecar y repetir`. Al cambiar
+el lock, preparar ese sidecar y actualizar `COMMANDS` hasta que pasen todas
+las raíces; no hay omisión silenciosa ni copia de la lógica del despacho.
+
+Resultados finales de Cargo con `CARGO_BUILD_JOBS=2`:
+
+| Comando | Código y resultado literal |
+|---|---|
+| `cargo check --manifest-path src-tauri/Cargo.toml --locked -p terminus --all-targets` | 0; ``Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.59s`` |
+| `cargo clippy --manifest-path src-tauri/Cargo.toml --locked -p terminus --all-targets` | 0; ``Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.89s`` |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check -- --config-path src-tauri/rustfmt.toml` | 0; sin salida |
+
+`node --test scripts/cli-forward.test.mjs`: código 0, `tests 2`, `pass 2`,
+`fail 0`, `skipped 0`, con las 25 raíces del motor fijado.
+`node scripts/doc-paths.mjs`: código 0,
+`Las rutas y enlaces locales de 23 documentos existen.`
+`git diff --cached --check`: código 0, sin salida.
+
+`pnpm verificar --sin-cargo`: código 0, resumen literal de este ajuste:
+
+```text
+  Verificado en Windows (cadena sin Rust), 512s.
+  Sin comprobar en esta corrida: cargo fmt, check, clippy y test.
+    La ventana tiene permiso para lo que se le pide — necesita el build de Rust.
+```
+
+Se mantiene el aviso previo de `tauri::Emitter`. Falta probar el bundle instalado
+en cmd y Windows Terminal: ejecutar `terminus.exe task --help` e
+`instances --json` con streams heredados, después a archivo y pipe, y comparar
+salida/código con el sidecar. No debe aparecer ventana de escritorio ni consola
+nueva. Probar también entrada interactiva con un comando que la consuma y EOF.
+La prueba automatizada usa un motor de prueba; no acredita esos comandos del
+motor instalado, los handlers Tauri ni el instalador. macOS, Linux y llavero
+mantienen sus pendientes anteriores.

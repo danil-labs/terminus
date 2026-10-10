@@ -56,11 +56,6 @@ pub fn dispatch() {
     if !requested(std::env::args_os().nth(1).as_deref()) {
         return;
     }
-    #[cfg(windows)]
-    if let Err(error) = attach_parent() {
-        eprintln!("cli.error.engine_start_failed: {error}");
-        std::process::exit(1);
-    }
     match forward() {
         Ok(code) => std::process::exit(code),
         Err(error) => {
@@ -82,10 +77,14 @@ fn forward() -> std::io::Result<i32> {
 #[cfg(windows)]
 fn forward() -> std::io::Result<i32> {
     use std::process::{Command, Stdio};
+    let attached = attach_parent()?;
     let exe = std::env::current_exe()?.with_file_name("seldon-runtime.exe");
     let mut command = Command::new(exe);
+    if !attached {
+        crate::console::no_console_window(&mut command);
+    }
     // proceso largo: a propósito. Una CLI puede observar un turno hasta que termine.
-    let status = crate::console::no_console_window(&mut command)
+    let status = command
         .args(std::env::args_os().skip(1))
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
@@ -95,7 +94,7 @@ fn forward() -> std::io::Result<i32> {
 }
 
 #[cfg(windows)]
-fn attach_parent() -> std::io::Result<()> {
+fn attach_parent() -> std::io::Result<bool> {
     use std::ffi::c_void;
     type Handle = *mut c_void;
     #[link(name = "kernel32")]
@@ -113,12 +112,13 @@ fn attach_parent() -> std::io::Result<()> {
         (which, handle, valid)
     });
     // AttachConsole puede sustituir los handles; los pipes, archivos y NUL se conservan.
-    if unsafe { AttachConsole(u32::MAX) } != 0 {
+    let attached = unsafe { AttachConsole(u32::MAX) } != 0;
+    if attached {
         for (which, handle, valid) in saved {
             if valid && unsafe { SetStdHandle(which, handle) } == 0 {
                 return Err(std::io::Error::last_os_error());
             }
         }
     }
-    Ok(())
+    Ok(attached)
 }

@@ -39,8 +39,9 @@ function undocumentedGuards() {
   ];
 }
 
+const engineStep = ["El motor empaquetado está en su sitio", process.execPath, [join(root, "scripts/engine.mjs"), "sidecar"], root];
 const rustSteps = [
-  ["El motor empaquetado está en su sitio", process.execPath, [join(root, "scripts/engine.mjs"), "sidecar"], root],
+  engineStep,
   ["cargo fmt", "cargo", ["fmt", "--check", "--", "--config-path", "rustfmt.toml"], backend],
   ["cargo check", rustBuild.command, ["check", "--locked", "--all-targets"], backend],
   ["cargo clippy", rustBuild.command, ["clippy", "--locked", "--all-targets"], backend],
@@ -49,6 +50,7 @@ const rustSteps = [
 ];
 
 const steps = [
+  ...(SKIP_RUST ? [] : [engineStep]),
   ["La CLI reenvía al motor sin abrir ventana", process.execPath, ["--test", join(root, "scripts/cli-forward.test.mjs")], root],
   ["El buscador de proyectos combina repositorios sin duplicarlos", process.execPath, ["--test", "--experimental-strip-types", join(root, "scripts/project-repositories.test.ts")], root],
   ["Todo el código es revisable", process.execPath, [join(root, "scripts/reviewable.mjs")], root],
@@ -465,7 +467,7 @@ const steps = [
   ["Un turno no vuelve a pedir cada historial", process.execPath, [join(root, "scripts/task-history-calls.mjs")], root],
   ["Toda clase escrita pinta algo", process.execPath, [join(root, "scripts/missing-classes.mjs")], root],
   ["Todo color se invierte con el tema", process.execPath, [join(root, "scripts/theme-inversion.mjs")], root],
-  ...(SKIP_RUST ? [] : rustSteps),
+  ...(SKIP_RUST ? [] : rustSteps.slice(1)),
 ];
 
 const undocumented = undocumentedGuards();

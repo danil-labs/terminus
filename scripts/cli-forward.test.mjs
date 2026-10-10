@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { closeSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { closeSync, existsSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { test } from "node:test";
@@ -8,8 +9,10 @@ import { fileURLToPath } from "node:url";
 
 const main = process.env.TERMINUS_CLI_TEST_MAIN ?? fileURLToPath(new URL("../src-tauri/src/main.rs", import.meta.url));
 const windows = process.platform === "win32";
+const triple = { win32: "x86_64-pc-windows-msvc", darwin: `${process.arch === "arm64" ? "aarch64" : "x86_64"}-apple-darwin`, linux: "x86_64-unknown-linux-gnu" }[process.platform];
+const sidecar = fileURLToPath(new URL(`../src-tauri/binaries/seldon-runtime-${triple}${windows ? ".exe" : ""}`, import.meta.url));
 
-test("el main de producción reenvía la CLI con pipes, archivos, salida descartada y sin consola nueva", () => {
+test("el main de producción reenvía la CLI con pipes, archivos, salida descartada y sin consola nueva", async (t) => {
   const scratch = mkdtempSync(join(tmpdir(), "terminus-forward-"));
   const binary = join(scratch, windows ? "terminus.exe" : "terminus");
   const engine = join(scratch, windows ? "seldon-runtime.exe" : "seldon-runtime");
@@ -32,14 +35,18 @@ pub fn stop_engine() -> i32 { println!("stop-engine"); 0 }
 #[cfg(windows)]
 fn check_console() {
     #[link(name="kernel32")] extern "system" { fn GetConsoleWindow() -> *mut std::ffi::c_void; }
-    if !unsafe { GetConsoleWindow() }.is_null() { eprintln!("unexpected console"); std::process::exit(99); }
+    let present = !unsafe { GetConsoleWindow() }.is_null();
+    if std::env::args().any(|arg| arg == "--probe") { println!("{present}"); std::process::exit(0); }
+    let expected = std::env::var("TERMINUS_CLI_TEST_INTERACTIVE").as_deref() == Ok("1");
+    if present != expected { eprintln!("unexpected console: {present}"); std::process::exit(99); }
 }
 fn main() {
     #[cfg(windows)] check_console();
     let args: Vec<_> = std::env::args().skip(1).collect();
     for arg in &args { println!("{arg}"); }
     let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).expect("stdin");
+    if args.iter().any(|arg| arg == "--interactive") { input = "INTERACTIVE_STDOUT\\n".into(); }
+    else { std::io::stdin().read_to_string(&mut input).expect("stdin"); }
     print!("{input}");
     if args.iter().any(|arg| arg == "--stream") {
         std::io::stdout().write_all(&vec![b'x'; 256 * 1024]).expect("stdout");
@@ -55,7 +62,28 @@ fn main() {
       const pe = readFileSync(binary);
       const optionalHeader = pe.readUInt32LE(0x3c) + 24;
       assert.equal(pe.readUInt16LE(optionalHeader + 68), 2, "el wrapper debe ser un PE de subsistema Windows");
+      if (process.env.TERMINUS_CLI_TEST_INTERACTIVE === "1") {
+        assert.equal(execFileSync(engine, ["--probe"], { encoding: "utf8" }).trim(), "true", "el padre debe tener consola real");
+        assert.equal(run(["task", "--interactive"], { stdio: "inherit" }).status, 23);
+      }
     }
+
+    await t.test("todos los comandos raíz del motor fijado se reenvían", () => {
+      assert.ok(existsSync(sidecar), "sidecar local ausente; preparar con pnpm engine:sidecar y repetir");
+      const lock = JSON.parse(readFileSync(new URL("../seldon-runtime.lock", import.meta.url), "utf8"));
+      assert.equal(createHash("sha256").update(readFileSync(sidecar)).digest("hex"), lock.platforms[triple].sha256, "el catálogo debe pertenecer al motor fijado");
+      const catalog = JSON.parse(execFileSync(sidecar, ["agent-context", "--json"], { encoding: "utf8", timeout: 10_000, windowsHide: true }));
+      assert.equal(catalog.error, null);
+      const roots = new Set(catalog.result.commands.map(({ command }) => command.split(" ")[0]));
+      assert.ok(roots.size > 0);
+      for (const root of roots) {
+        const result = run([root]);
+        assert.equal(result.status, 23, `falta COMMANDS: ${root}`);
+        assert.equal(result.stdout, `${root}\n`);
+        assert.equal(result.stderr, "engine stderr\n");
+      }
+      t.diagnostic(`${roots.size} comandos raíz contrastados con ${lock.release}`);
+    });
 
     const piped = run(["task", "á con espacios", "--json"], { input: "entrada\n" });
     assert.equal(piped.status, 23);
