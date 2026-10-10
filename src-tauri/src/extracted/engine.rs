@@ -14,7 +14,8 @@ use terminus_engine_protocol::{Error, Result, Selection, VERSION};
 
 pub const PRODUCTION: &str = "ai.danil.terminus";
 pub const LAB_IDENTITY: &str = "ai.danil.seldon.dev";
-const START_TIMEOUT: Duration = Duration::from_secs(30);
+// Un motor que rechaza o muere sale enseguida por `try_wait`; este plazo solo corta a uno vivo y lento.
+const START_TIMEOUT: Duration = Duration::from_secs(300);
 // Adoptar una raíz real de 0.2.74 tardó unos 25 s; el traspaso enseña el paso mientras tanto.
 const ADOPT_TIMEOUT: Duration = Duration::from_secs(600);
 

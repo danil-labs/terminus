@@ -64,7 +64,9 @@ gets that lab identity: it never reads the data or the keychain entries of
 With the lock held, the window asks the engine named by
 `engine/seldon-endpoint.json` for its `status`. If it answers, the window reuses
 it; two windows share one engine. If not, the window starts the packaged
-engine, waits up to 30 seconds for a descriptor written by that process (ten
+engine, waits up to 5 minutes for a descriptor written by that process while
+it stays alive (a rejection or crash ends the wait at once; a startup that checks
+many account files can take more than 30 seconds on a loaded machine), ten
 minutes with `--adopt-existing`: adopting a real 0.2.74 root took about 25 s,
 and the handoff screen shows that step meanwhile), and writes
 `selection.json`. If the binary is missing, the error is
