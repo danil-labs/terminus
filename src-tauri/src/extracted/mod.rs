@@ -8,6 +8,8 @@ mod legacy;
 #[cfg(target_os = "linux")]
 mod linux_engine;
 mod local_image;
+#[cfg(target_os = "macos")]
+mod master_handoff;
 mod proxy;
 mod sites;
 mod startup;

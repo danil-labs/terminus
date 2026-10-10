@@ -212,7 +212,7 @@ fn spawn(paths: &Paths, adopt: bool) -> Result<Child> {
         .append(true)
         .open(&paths.launch_log)?;
     // proceso largo: a propósito. El motor sobrevive a la ventana y se apaga solo sin clientes.
-    let mut command = Command::new(exe);
+    let mut command = Command::new(&exe);
     #[cfg(target_os = "linux")]
     super::linux_engine::prepare(&mut command, &paths.root)?;
     crate::util::no_console_window(&mut command)
@@ -231,11 +231,15 @@ fn spawn(paths: &Paths, adopt: bool) -> Result<Child> {
     if adopt {
         command.arg("--adopt-existing");
     }
+    #[cfg(target_os = "macos")]
+    let master_pipe = super::master_handoff::prepare(&exe, &paths.identity, &mut command);
     log::info!(
         "[engine] starting identity={} adopt={adopt}",
         paths.identity
     );
     let (child, outside) = spawn_detached(&mut command)?;
+    #[cfg(target_os = "macos")]
+    drop(master_pipe);
     let _ = writeln!(
         log,
         "window: launched pid={}{}",

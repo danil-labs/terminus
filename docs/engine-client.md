@@ -74,6 +74,12 @@ release, whose data the engine never touched.
 
 ## Handoff from 0.2.74
 
+On macOS, each new engine launch can hand the vault master to a signed engine
+through an inherited pipe, after a noninteractive keychain read. This is gated
+by the engine's `--help` advertising `--master-fd`; an older engine keeps its
+existing behavior. See [the macOS QA scenarios](master-fd-qa.md) for the gates
+and native validation that remains required.
+
 Before starting the engine, the window looks at the data root. If it holds
 0.2.74 data and no `seldon-authority.json`, or a 0.2.74 service answers on it,
 the window opens on the handoff screen instead of the app
