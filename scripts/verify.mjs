@@ -40,6 +40,7 @@ function undocumentedGuards() {
 }
 
 const engineStep = ["El motor empaquetado está en su sitio", process.execPath, [join(root, "scripts/engine.mjs"), "sidecar"], root];
+const cliStep = ["La CLI reenvía al motor sin abrir ventana", process.execPath, ["--test", join(root, "scripts/cli-forward.test.mjs")], root];
 const rustSteps = [
   engineStep,
   ["cargo fmt", "cargo", ["fmt", "--check", "--", "--config-path", "rustfmt.toml"], backend],
@@ -51,7 +52,7 @@ const rustSteps = [
 
 const steps = [
   ...(SKIP_RUST ? [] : [engineStep]),
-  ["La CLI reenvía al motor sin abrir ventana", process.execPath, ["--test", join(root, "scripts/cli-forward.test.mjs")], root],
+  cliStep,
   ["El buscador de proyectos combina repositorios sin duplicarlos", process.execPath, ["--test", "--experimental-strip-types", join(root, "scripts/project-repositories.test.ts")], root],
   ["Todo el código es revisable", process.execPath, [join(root, "scripts/reviewable.mjs")], root],
   [
@@ -500,6 +501,11 @@ const skipped = [];
 
 for (const [name, cmd, args, cwd] of steps) {
   process.stdout.write(`  ${name.padEnd(50)}`);
+  if (SKIP_RUST && name === cliStep[0]) {
+    console.log("OMITIDO");
+    skipped.push([name, "--sin-cargo: necesita rustc y el sidecar fijado; se ejecuta en la cadena completa y verify (rust).", true]);
+    continue;
+  }
   const start = Date.now();
   try {
     execFileSync(cmd, args, { cwd, env: cmd === rustBuild.command && cwd === backend && args[0] !== "fmt" ? rustBuild.env : process.env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
@@ -554,4 +560,4 @@ if (SKIP_RUST) {
   console.log(`  ${OTHER_PLATFORMS} NO se comprobó — quien revise desde ahí lo compila.\n`);
 }
 
-if (skipped.length && process.env.CI) process.exit(1);
+if (skipped.some(([, , expected]) => !expected) && process.env.CI) process.exit(1);

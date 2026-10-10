@@ -78,6 +78,9 @@ jobs:
       - name: Engine sidecar
         run: node scripts/engine.mjs sidecar
 
+      - name: CLI forwarding and pinned command catalog
+        run: node --test scripts/cli-forward.test.mjs
+
       - name: cargo fmt
         working-directory: src-tauri
         run: cargo fmt --check -- --config-path rustfmt.toml

@@ -343,9 +343,12 @@ marcador de ventana y falla. Control negativo retirando `telegram` de una copia
 temporal de `cli.rs`: código 1, `falta COMMANDS: telegram`, `0 !== 23`.
 `help` y `kn`, ausentes del catálogo publicado, mantienen casos explícitos.
 
-La cadena completa prepara el sidecar antes de esta prueba; `--sin-cargo`
-usa únicamente el archivo local. Si falta, la prueba falla indicando
-`sidecar local ausente; preparar con pnpm engine:sidecar y repetir`. Al cambiar
+La cadena completa prepara el sidecar antes de esta prueba; `verify (rust)`
+también la ejecuta después de `engine.mjs sidecar`. `--sin-cargo` la marca
+`OMITIDO`, con su motivo, antes de ejecutar el test o compilar `main.rs`, incluso
+si hay sidecar local. Esa omisión prevista no hace fallar el job del front;
+otras omisiones inesperadas siguen haciendo fallar CI. Para ejecutar la prueba
+nativa directamente se prepara el entorno con `pnpm engine:sidecar`. Al cambiar
 el lock, preparar ese sidecar y actualizar `COMMANDS` hasta que pasen todas
 las raíces; no hay omisión silenciosa ni copia de la lógica del despacho.
 
@@ -379,3 +382,20 @@ nueva. Probar también entrada interactiva con un comando que la consuma y EOF.
 La prueba automatizada usa un motor de prueba; no acredita esos comandos del
 motor instalado, los handlers Tauri ni el instalador. macOS, Linux y llavero
 mantienen sus pendientes anteriores.
+
+## Separación de CI: PR #70
+
+Reproducción en Windows con `CI=true`, `src-tauri/binaries/` renombrado
+temporalmente y `pnpm verificar --sin-cargo`: código 0, ninguna `FALLA`.
+El directorio se restaura al terminar mediante `finally`. Salida literal:
+
+```text
+  La CLI reenvía al motor sin abrir ventana         OMITIDO
+  Corrido en Windows, 802s — y 1 de 101 pasos NO corrió: esto NO es una verificación.
+      --sin-cargo: necesita rustc y el sidecar fijado; se ejecuta en la cadena completa y verify (rust).
+```
+
+Con el sidecar restaurado, `node --test scripts/cli-forward.test.mjs` termina
+con 0: `tests 2`, `pass 2`, `fail 0`, `skipped 0`; contrasta las 25 raíces.
+Es la misma orden incorporada a `verify (rust)`, después de preparar el motor.
+La ejecución nativa en Ubuntu queda para el nuevo run del PR.
