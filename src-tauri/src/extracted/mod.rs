@@ -85,19 +85,13 @@ pub fn run(client: Arc<Client>) {
     start(Some(client), false, launcher::Launcher::ready(None));
 }
 
-fn title(app: &tauri::AppHandle, client: &Client) -> String {
-    let base = app
-        .config()
+fn title(app: &tauri::AppHandle) -> String {
+    app.config()
         .app
         .windows
         .first()
         .map_or("Terminus", |w| w.title.as_str())
-        .to_owned();
-    format!(
-        "{base} · {} · {}",
-        client.runtime(),
-        startup::engine_build(client.status())
-    )
+        .to_owned()
 }
 
 /// Sin cliente, la ventana abre en el traspaso y el lanzador registra el estado al conectar.
@@ -132,8 +126,8 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
             desktop::configure_close_menu(app)?;
             let mut config = app.config().app.windows[0].clone();
             config.url = tauri::WebviewUrl::App("index.html".into());
-            if let Some(state) = app.try_state::<Arc<proxy::State>>() {
-                config.title = title(app.handle(), &state.client());
+            if app.try_state::<Arc<proxy::State>>().is_some() {
+                config.title = title(app.handle());
             }
             let handle = app.handle().clone();
             tauri::WebviewWindowBuilder::from_config(app.handle(), &config)?

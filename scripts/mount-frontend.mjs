@@ -3561,7 +3561,7 @@ if (!roto) {
   assert.equal(d1.querySelector("[data-workspace-column]"), null, "con un solo workspace no hay columna");
   assert.ok(barra.classList.contains("pl-[84px]"), "en macOS la fila del título se aparta del semáforo");
   assert.equal(d1.querySelectorAll(".pl-\\[84px\\]").length, 1, "y ninguna otra cabecera reserva su hueco");
-  assert.equal(barra.querySelector("[data-window-branch]")?.textContent, "una-rama", "el build de la rama se nombra al final de la fila");
+  assert.equal(barra.querySelector("[data-window-branch]")?.textContent, "una-rama", "la rama de desarrollo se nombra al final sin etiqueta de motor");
   assert.equal(d1.body.textContent.split("una-rama").length, 2, "una sola vez");
   const altas = [];
   solo.w.addEventListener("harness:new-workspace", () => altas.push(1));
@@ -3614,7 +3614,12 @@ if (!roto) {
    * de trabajo abierto o cerrado. La app de producción no pinta ningún rótulo de build.
    */
   const WINDOWS = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36 Edg/120.0";
-  const enWindows = await arrancar("listo", "title-bar-windows", { ...CON_TAREA, "plugin:window|title": "Terminus" }, WINDOWS);
+  const enWindows = await arrancar("listo", "title-bar-windows", { ...CON_TAREA,
+    "plugin:window|title": "Terminus",
+    check_environment: () => ({ ready: true, blocked: false, reason: null, items: [], bootstrap: [], engineBuild: "0.2.73 b1fed68" }),
+    list_dependencies: [],
+    list_language_packs: [], list_bundled_language_packs: [],
+  }, WINDOWS);
   await espera(300);
   const d3 = enWindows.w.document;
   const minimizar = () => [...d3.querySelectorAll('button[aria-label="Minimizar"]')];
@@ -3629,6 +3634,11 @@ if (!roto) {
   assert.ok(d3.querySelector('button[aria-label="Cerrar el árbol de trabajo"]'), "el árbol de trabajo abre");
   assert.equal(minimizar().length, 1, "con el árbol abierto siguen siendo uno");
   assert.ok(minimizar()[0].closest("[data-title-bar]"));
+  d3.querySelector('button[aria-label="Configuración"]')?.click();
+  await espera(150);
+  [...d3.querySelectorAll("button")].find((b) => b.textContent.trim() === "Estado del entorno").click();
+  await espera(200);
+  assert.equal(d3.body.textContent.split("Motor 0.2.73 b1fed68").length, 2, "el build del motor aparece una sola vez en Estado del entorno");
   assert.deepEqual(enWindows.fallos, []);
   /**
    * Un turno vivo sobrevive al cambio de workspace, y su reloj también.

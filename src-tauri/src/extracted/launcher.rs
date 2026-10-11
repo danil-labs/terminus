@@ -165,7 +165,7 @@ fn drive(app: &tauri::AppHandle, launcher: &Launcher, paths: &engine::Paths, rea
             Ok(client) => {
                 let state = Arc::new(proxy::State::new(Arc::new(client), true));
                 if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.set_title(&super::title(app, &state.client()));
+                    let _ = window.set_title(&super::title(app));
                 }
                 app.manage(state);
                 if let Phase::Handoff(mut steps) = launcher.phase() {

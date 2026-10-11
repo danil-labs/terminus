@@ -1,4 +1,5 @@
 {
+  "settings.environment.engine_build": "Engine {build}",
   "settings.ai_providers.zen_go": "Zen and Go",
   "settings.account_card.active": "active",
   "settings.account_card.asking": "asking",
