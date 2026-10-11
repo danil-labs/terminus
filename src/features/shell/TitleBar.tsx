@@ -45,15 +45,12 @@ export default function TitleBar(props: {
   const ws = createWorkspaces();
   const apartarSemaforo = needsTrafficLightPadding(() => true, createFullscreen());
   const titulo = createWindowTitle();
-  // Tres partes (base, runtime y build) son el build del motor y se
-  // etiquetan; una sola parte extra es la rama de una build de desarrollo
-  // y se enseña tal cual.
   const segmentoFinal = () => {
     const actual = titulo();
     if (!actual || actual === "Terminus") return null;
     const partes = actual.split(" · ");
     const texto = partes.at(-1) ?? actual;
-    return partes.length >= 3 ? t("shell.window.engine_build", { build: texto }) : texto;
+    return texto;
   };
 
   return (

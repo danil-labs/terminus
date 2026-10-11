@@ -286,11 +286,16 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
             stream(state, &name, args, workspace, key, channel, worker);
             return;
         }
-        let result = state
+        let mut result = state
             .client()
             .invoke(&name, workspace.clone(), args.clone())
             .map_err(|e| failure(&e))
             .and_then(reply);
+        if name == "check_environment" {
+            if let Ok(value) = &mut result {
+                value["engineBuild"] = json!(super::startup::engine_build(state.client().status()));
+            }
+        }
         if let Ok(value) = &result {
             if name == "unwatch_task_tree" {
                 if let Some((_, cancel)) = args["id"].as_str().and_then(|id| {
@@ -514,7 +519,7 @@ pub(super) fn service_poll(
                 return Err(failure(&shown));
             }
             if let Some(window) = app.get_webview_window("main") {
-                let _ = window.set_title(&super::title(&app, &state.client()));
+                let _ = window.set_title(&super::title(&app));
             }
             return Ok(
                 json!({"cursor":null,"gap":false,"replay":true,"runtime":state.client().runtime(),"reset":true}),

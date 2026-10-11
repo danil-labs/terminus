@@ -174,6 +174,9 @@ export default function Environment() {
   return (
     <SettingsPanel>
       <Actualizacion build={reporte()?.build} />
+      <Show when={reporte()?.engineBuild}>
+        {(build) => <p class="text-sm text-neutral-500">{t("settings.environment.engine_build", { build: build() })}</p>}
+      </Show>
 
       <SettingsSection
         title={t("settings.environment.title")}

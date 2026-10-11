@@ -50,6 +50,7 @@ export type EnvReport = {
   reason: string | null;
   /** De qué commit salió este binario. Lo sella `build.rs`. */
   build: string;
+  engineBuild?: string;
   /** Dependencias administradas que esta versión debe preparar. */
   bootstrap: string[];
   /** El runtime nunca se preparó en esta máquina: se enseña la preparación. */
