@@ -1,3 +1,4 @@
-Terminus 0.2.80 starts in seconds even after several updates.
+Terminus 0.2.81 fixes connecting Antigravity and cleans up the title bar.
 
-- **Fast startup on Windows.** Each update or forced engine shutdown left behind a record of a process that no longer existed, and on startup the engine tried to connect to each one, about 2 s per record. It now discards them without connecting, and startup takes a few seconds again.
+- **Connecting Antigravity opens a single sign-in.** Before, several browser tabs opened and none finished connecting. Now you have up to 15 minutes to complete the sign-in, and retrying cancels the previous attempt.
+- **The title bar no longer shows the engine version.** That detail is now in Settings → Environment status.

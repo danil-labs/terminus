@@ -1,3 +1,4 @@
-Terminus 0.2.80 arranca en segundos aunque lleves varias versiones instaladas.
+Terminus 0.2.81 arregla la conexión de Antigravity y limpia la barra de título.
 
-- **Arranque rápido en Windows.** Cada actualización o cierre forzado del motor dejaba un registro de un proceso que ya no existía, y al arrancar el motor intentaba conectarse a cada uno, unos 2 s por registro. Ahora los descarta sin conectarse, y el arranque vuelve a tardar unos segundos.
+- **Conectar Antigravity abre una sola autenticación.** Antes se abrían varias pestañas del navegador y ninguna terminaba de conectar. Ahora tienes hasta 15 minutos para completar el inicio de sesión, y volver a intentarlo cancela el intento anterior.
+- **La barra de título ya no muestra la versión del motor.** Ese dato ahora está en Configuración → Estado del entorno.
