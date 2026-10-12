@@ -54,6 +54,8 @@
         Pop $R0
         Sleep 500
       ${EndIf}
+      ; The window restarts the engine that PREUNINSTALL stopped; that one has no turns yet.
+      !insertmacro TERMINUS_KILL_ENGINE
     ${EndIf}
   !endif
 !macroend
