@@ -131,8 +131,8 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
             }
             let handle = app.handle().clone();
             tauri::WebviewWindowBuilder::from_config(app.handle(), &config)?
+                // Sin incógnito: `localStorage`, con el tema, debe durar entre arranques.
                 .data_directory(window_data.join("webview"))
-                .incognito(true)
                 .on_navigation(move |url| {
                     if url.scheme() == "tauri"
                         || url.host_str() == Some("tauri.localhost")
