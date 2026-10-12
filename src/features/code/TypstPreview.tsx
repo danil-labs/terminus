@@ -80,8 +80,10 @@ export default function VistaPreviaTypst(props: {
   const errores = () => compilado()?.diagnostics.filter((d) => d.severity === "error") ?? [];
   const avisos = () => compilado()?.diagnostics.filter((d) => d.severity === "warning") ?? [];
 
-  tomarVista(props.session, props.arbol);
-  onCleanup(() => soltarVista(props.session, props.arbol));
+  // Al desmontar, las props pueden venir de un `<Show>` que ya no se cumple: leerlas lanza «Stale read».
+  const tomada = { session: props.session, arbol: props.arbol };
+  tomarVista(tomada.session, tomada.arbol);
+  onCleanup(() => soltarVista(tomada.session, tomada.arbol));
 
   let pedido = 0;
   async function abrir() {
@@ -100,7 +102,7 @@ export default function VistaPreviaTypst(props: {
   onCleanup(() => void integraciones.then((dejar) => dejar()));
 
   // La capa es del árbol y la comparten sus visores: abrir otro .typ no la vuelve a dibujar.
-  const ocupante = ocuparCapa(props.session, props.arbol);
+  const ocupante = ocuparCapa(tomada.session, tomada.arbol);
   let hueco: HTMLDivElement | undefined;
   let ultimo: Hueco = { x: 0, y: 0, width: 0, height: 0 };
   const avisarHueco = () => moverOcupante(props.session, props.arbol, ocupante, { visible: props.visible, hueco: ultimo });
@@ -148,7 +150,7 @@ export default function VistaPreviaTypst(props: {
     }
   });
   createEffect(on([() => props.visible, ampliada], medirYAvisar));
-  onCleanup(() => desocuparCapa(props.session, props.arbol, ocupante));
+  onCleanup(() => desocuparCapa(tomada.session, tomada.arbol, ocupante));
 
   function arreglar() {
     const c = compilado();
