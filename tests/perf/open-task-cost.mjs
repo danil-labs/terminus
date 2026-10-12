@@ -136,7 +136,7 @@ function responses(longTurns) {
 }
 
 // Lo que un reloj dispara solo: contarlo haría depender el número de cuánto tardó la apertura.
-const PERIODIC = new Set(["service_poll", "list_active_turns", "list_live_turns", "list_storage", "window_vitals"]);
+const PERIODIC = new Set(["service_poll", "list_active_turns", "list_live_turns", "list_storage", "window_vitals", "update_pending"]);
 
 // El silencio se cuenta desde el gesto que se acaba de hacer, no desde la última mutación.
 async function settle(since, quiet = 300) {

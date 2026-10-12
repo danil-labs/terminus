@@ -44,6 +44,8 @@ const RESPUESTAS = {
   window_ready: null,
   // Lo que crece en la ventana: se manda al montar y cada pocos minutos.
   window_vitals: null,
+  // Si otra versión quedó instalada sobre la ventana: se mira cada minuto.
+  update_pending: false,
   // La compuerta del primer pintado. `false` monta la app sin esperar nada.
   setup_required: false,
   list_agents: [
@@ -4913,8 +4915,9 @@ if (!roto) {
       const updater = await boot("listo", `update-latest-${settings}-${available}`, {
         ...RESPUESTAS,
         "plugin:updater|check": () => { checks++; return latest; },
-        "plugin:updater|download_and_install": ({ rid }) => {
-          installed.push(rid);
+        // Rust vuelve a preguntar y baja la última; en Windows el plugin cerraría la app.
+        update_install: () => {
+          installed.push(latest.rid);
           return new Promise(resolve => { finishDownload = resolve; });
         },
         service_prepare_update: null,
