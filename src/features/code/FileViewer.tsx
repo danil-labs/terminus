@@ -514,7 +514,7 @@ export default function VisorDeArchivo(props: {
   const vivaDelArbol = () => (typstVivo() ? vivaDe(props.session, props.arbol) : null);
   let enviando = false;
   let porEnviar: { key: string; texto: string } | null = null;
-  let abiertoEn: string | null = null;
+  let abiertoEn: { key: string; path: string } | null = null;
   async function enviar(key: string, texto: string) {
     porEnviar = { key, texto };
     if (enviando) return;
@@ -523,8 +523,9 @@ export default function VisorDeArchivo(props: {
       const envio: { key: string; texto: string } = porEnviar;
       porEnviar = null;
       try {
-        await invoke("typst_live_change", { key: envio.key, path: props.ruta, text: envio.texto });
-        abiertoEn = envio.key;
+        const path = props.ruta;
+        await invoke("typst_live_change", { key: envio.key, path, text: envio.texto });
+        abiertoEn = { key: envio.key, path };
       } catch {
         // La vista se apagó o se está rehaciendo: el siguiente cambio o la vista nueva lo vuelven a mandar.
       }
@@ -538,7 +539,8 @@ export default function VisorDeArchivo(props: {
     void enviar(viva.key, texto);
   });
   onCleanup(() => {
-    if (abiertoEn) void invoke("typst_live_close_doc", { key: abiertoEn, path: props.ruta }).catch(() => {});
+    // Sin `props.ruta`: al desmontar puede venir de un `<Show>` que ya no se cumple y lanzar «Stale read».
+    if (abiertoEn) void invoke("typst_live_close_doc", abiertoEn).catch(() => {});
   });
 
   function mostrarEnLaVista(linea: number, columna: number) {
