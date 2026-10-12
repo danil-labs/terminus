@@ -186,6 +186,9 @@ export function createWorkspaces() {
     if (id === activo()) return;
     try {
       await invoke("set_active_workspace", { id });
+      // Una lista pedida antes del cambio trae el anterior como activo; los
+      // demás montajes la heredarían y un clic de vuelta a él no haría nada.
+      enVuelo = null;
       setActivo(id);
       setFallo(null);
       anunciarMudanza();
