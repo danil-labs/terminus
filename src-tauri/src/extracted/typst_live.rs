@@ -126,8 +126,8 @@ pub fn typst_live_open(
         }
     }
     detener(&key);
-    let proceso = arrancar(&app, &key, &tinymist, a_ruta("paquetes"), &root, &main)
-        .map_err(fallo)?;
+    let proceso =
+        arrancar(&app, &key, &tinymist, a_ruta("paquetes"), &root, &main).map_err(fallo)?;
     let puerto = proceso.puerto.load(Ordering::Relaxed);
     PROCESOS
         .lock()
@@ -573,11 +573,7 @@ fn diagnosticos(key: &str, params: &Value, raices: &[PathBuf]) -> Aviso {
                 (None, Some(a), Some(l), Some(c)) => format!("{}:{l}:{c}: {mensaje}", a.display()),
                 _ => mensaje,
             };
-            Some(Diagnostico::de_lsp(
-                severidad == 1,
-                lugar,
-                mensaje,
-            ))
+            Some(Diagnostico::de_lsp(severidad == 1, lugar, mensaje))
         })
         .collect();
     Aviso {
