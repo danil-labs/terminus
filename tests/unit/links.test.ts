@@ -126,6 +126,7 @@ test("las rutas locales del Markdown conservan espacios y caracteres codificados
   assert.equal(localFilePath("/tmp/avance%2520.html"), "/tmp/avance%20.html");
   assert.equal(localFilePath("C:/Users/persona/Mis%20documentos/demo.html"), "C:/Users/persona/Mis documentos/demo.html");
   assert.equal(localFilePath(String.raw`C:\Users\persona\demo.html`), String.raw`C:\Users\persona\demo.html`);
+  assert.equal(localFilePath("/C:/Users/persona/Mis%20documentos/demo.html"), "C:/Users/persona/Mis documentos/demo.html");
   assert.equal(destinoAbrible(path), null);
   assert.equal(imagenInerte(path), null);
 });

@@ -66,6 +66,8 @@ export function localFilePath(value: unknown): string | null {
     return null;
   }
   if (/[\u0000-\u001f\u007f]/.test(path)) return null;
+  // Markdown escribe una ruta de Windows como `/C:/x.html`; con esa barra delante el disco no la abre.
+  path = path.replace(/^\/([a-z]:[\/\\])/i, "$1");
   if (/^\/(?![\/\\])/.test(path) || /^[a-z]:[\/\\]/i.test(path)) {
     return path;
   }
@@ -93,7 +95,7 @@ export function imagenInerte(v: unknown): string | null {
  */
 export function imagenLocal(v: unknown): string | null {
   if (typeof v !== "string") return null;
-  const ruta = localFilePath(v.replace(/^file:\/\/(?:localhost)?(?=\/)/i, "").replace(/^\/([a-z]:[\/\\])/i, "$1"));
+  const ruta = localFilePath(v.replace(/^file:\/\/(?:localhost)?(?=\/)/i, ""));
   if (!ruta || !/\.(png|jpe?g|gif|webp|avif|bmp|ico|svg)$/i.test(ruta)) return null;
   return ruta;
 }
