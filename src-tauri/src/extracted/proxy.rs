@@ -133,7 +133,10 @@ fn command(name: &str) -> Option<&'static Value> {
 }
 pub(super) fn desktop_command(name: &str) -> bool {
     command(name).is_some_and(|c| c["kind"] == "desktop")
-        || matches!(name, "launcher_state" | "launcher_continue")
+        || matches!(
+            name,
+            "launcher_state" | "launcher_continue" | "update_install" | "update_pending"
+        )
 }
 pub(super) fn with_desktop(
     local: impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static,

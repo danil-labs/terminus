@@ -56,7 +56,7 @@ Referencia de handles consultada el 2026-10-10:
 |---|---|
 | Doble clic, menú Inicio y arranque normal | Sin argumentos vuelve a `app_lib::launch()`; no se conecta a una consola ni lanza la CLI. |
 | `--external-host <selección>` | Entrada del laboratorio y la ventana; queda fuera de la lista de CLI. |
-| `--stop-engine` | Los hooks NSIS la llaman para detener el motor antes de reemplazarlo; sigue entrando en el mismo handler. |
+| `--stop-engine` | El desinstalador NSIS la llama para detener el motor antes de quitarlo; sigue entrando en el mismo handler. |
 | Actualizador NSIS | `tauri-plugin-updater` 2.10.1, `src/updater.rs:797`, pasa los argumentos de la ventana mediante `/ARGS` al instalador; `/P` y `/UPDATE` son del instalador. Este repo no agrega argumentos de relanzamiento; los existentes conservan su ruta. |
 | URLs / deep links / archivos | Cargo/configuración no declaran `tauri-plugin-deep-link`, `tauri-plugin-single-instance`, esquemas ni `fileAssociations`. URLs y rutas quedan fuera de la CLI; no se agrega soporte para abrirlas. |
 | `-psn_…` de LaunchServices | Queda fuera del catálogo y conserva la ruta de ventana, al igual que otros argumentos ajenos a CLI. No se verifica aquí su tratamiento nativo en macOS. |

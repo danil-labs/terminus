@@ -139,7 +139,8 @@ export default function Actualizacion(props: { build?: string }) {
       setVersion({ ...v, paso: "bajando", fallo: null, ocupan: null });
       await invoke("service_prepare_update");
       stopped = true;
-      await v.u.downloadAndInstall();
+      // En Windows `downloadAndInstall` cierra la app; Rust instala sin cerrarla.
+      await invoke("update_install");
       setVersion({ ...v, paso: "listo", fallo: null, ocupan: null });
     } catch (e) {
       if (!checked) {

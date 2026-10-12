@@ -13,3 +13,28 @@ impl Frase {
         Self(clave)
     }
 }
+
+/// Espera a `command` hasta `timeout` y lo mata al vencer. No lee su salida: stdout y stderr van a null.
+pub fn output_with_timeout(
+    command: &mut std::process::Command,
+    timeout: std::time::Duration,
+) -> std::io::Result<std::process::ExitStatus> {
+    use std::process::Stdio;
+    let mut child = command
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()?;
+    let deadline = std::time::Instant::now() + timeout;
+    loop {
+        if let Some(status) = child.try_wait()? {
+            return Ok(status);
+        }
+        if std::time::Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(std::io::ErrorKind::TimedOut.into());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+}
