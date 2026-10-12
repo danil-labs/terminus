@@ -425,17 +425,18 @@ jobs:
       #
       # Tauri también le pasa las DLL de plugins de NSIS. Esas no se firman: solo
       # existen en un temporal mientras corre el instalador y nunca quedan
-      # instaladas. Cada firma cuenta en el plan de eSigner: **tres por release**
-      # (ejecutable, desinstalador e instalador), una más que antes, y esa es la
-      # del desinstalador.
+      # instaladas. Cada firma cuenta en el plan de eSigner, de 20 al mes: **dos por
+      # release**, el ejecutable y el instalador. El desinstalador no se firma:
+      # makensis lo regenera en cada build y no se descarga, así que SmartScreen
+      # no lo evalúa; firmarlo costaba una firma por release.
       #
-      # **El motor, cuando viaje dentro.** Si `bundle.externalBin` declara
-      # `seldon-runtime`, Tauri le pasa también ese `.exe` a `signCommand` antes
-      # de empaquetar —salvo que ya llegue firmado: `signtool verify /pa` y se lo
-      # salta (`sign_binaries_if_needed`, tauri-bundler 2.9.4)—. El de
-      # `seldon-runtime.lock` (v0.2.73) llega `NotSigned`, así que son **cuatro
-      # firmas**. Sin ese `externalBin` el paso sigue esperando tres, y la guarda
-      # de `check` impide publicar sin motor.
+      # **El motor viaja dentro.** `bundle.externalBin` declara `seldon-runtime` y
+      # Tauri le pasa ese `.exe` a `signCommand` salvo que ya llegue firmado
+      # (`signtool verify /pa`, `sign_binaries_if_needed`, tauri-bundler 2.9.4).
+      # El lock fija el `.exe` de Windows ya firmado por Danil, así que el motor
+      # cuesta una firma por versión del motor, no por release: la primera release
+      # que lo empaqueta sin firma lo firma y deja la copia firmada en el artefacto
+      # `seldon-runtime-windows-signed`, que se sube a la release del motor y se fija.
       - name: Construir y firmar en Windows
         if: runner.os == 'Windows'
         shell: bash
@@ -485,13 +486,11 @@ jobs:
             NSISdl.dll|StartMenu.dll|System.dll|nsDialogs.dll|nsis_tauri_utils.dll)
               echo "Authenticode: $name no se firma (plugin de NSIS, no se instala)."
               exit 0 ;;
-          esac
-
-          # El desinstalador llega con el nombre temporal que le da makensis
-          # (`nst….tmp`). Se firma una copia con nombre `.exe` y se devuelve.
-          case "$name" in
             *.exe) copy="$name" ;;
-            *) copy="uninstaller.exe" ;;
+            *)
+              # El desinstalador llega con el nombre temporal que le da makensis (`nst….tmp`).
+              echo "Authenticode: el desinstalador ($name) no se firma."
+              exit 0 ;;
           esac
           input_dir="$T/sign-input"
           output_dir="$T/sign-output"
@@ -560,7 +559,10 @@ jobs:
             engine_signer=$(FILE_W="$(cygpath -w "$(realpath "$ENGINE_FILE")")" pwsh -NoProfile -Command '$s = Get-AuthenticodeSignature -LiteralPath $env:FILE_W; "{0}|{1}" -f $s.Status, $s.SignerCertificate.Subject' | tr -d '\r')
             case "$engine_signer" in
               "Valid|"*"Software y Servicios Danil"*) echo "seldon-runtime ya llega firmado por Danil: Tauri no lo vuelve a firmar." ;;
-              *) ENGINE_SIDECAR=$(basename "$ENGINE_FILE"); echo "seldon-runtime llega sin la firma de Danil ($engine_signer): lo firma eSigner." ;;
+              *)
+                ENGINE_SIDECAR=$(basename "$ENGINE_FILE")
+                echo "ENGINE_SIGNED_HERE=true" >> "$GITHUB_ENV"
+                echo "::warning title=Motor sin firma en el lock::seldon-runtime llega sin la firma de Danil ($engine_signer): lo firma eSigner. Sube el artefacto seldon-runtime-windows-signed a la release del motor y fíjalo en seldon-runtime.lock para no volver a gastar esta firma." ;;
             esac
           fi
 
@@ -577,7 +579,7 @@ jobs:
           echo "Firmado con eSigner:"
           sed 's/^/  /' "$T/signed.txt"
           failed=0
-          expected_files=(terminus.exe uninstaller.exe "$(basename "$INSTALLER")")
+          expected_files=(terminus.exe "$(basename "$INSTALLER")")
           [ -z "$ENGINE_SIDECAR" ] || expected_files+=("$ENGINE_SIDECAR")
           for expected in "${expected_files[@]}"; do
             grep -q "^$expected|" "$T/signed.txt" \
@@ -625,7 +627,9 @@ jobs:
             $s = Get-AuthenticodeSignature -LiteralPath $_.FullName
             $rel = $_.FullName.Substring($dir.Length + 1)
             Write-Output ("{0}: {1} | {2} | sello: {3}" -f $rel, $s.Status, $s.SignerCertificate.Subject, [bool]$s.TimeStamperCertificate)
-            if ($s.Status -ne 'Valid') {
+            if ($rel -eq 'uninstall.exe' -and $s.Status -eq 'NotSigned') {
+              # Sin firmar a propósito: ver «Construir y firmar en Windows».
+            } elseif ($s.Status -ne 'Valid') {
               Write-Output "::error title=Firma inválida en lo instalado::$rel quedó $($s.Status)."
               $failed = $true
             } elseif ($s.SignerCertificate.Subject -notlike '*Software y Servicios Danil*' -or -not $s.TimeStamperCertificate) {
@@ -644,7 +648,26 @@ jobs:
           }
 
           if ($failed) { exit 1 }
-          Write-Output ("Lo instalado: {0} firmados por Danil, válidos y con sello de tiempo." -f ($required -join ', '))
+          Write-Output ("Lo instalado: {0} presentes; los firmados, por Danil, válidos y con sello de tiempo." -f ($required -join ', '))
+
+          if ($env:ENGINE_SIGNED_HERE -eq 'true') {
+            $out = Join-Path $env:RUNNER_TEMP 'engine-signed'
+            New-Item -ItemType Directory -Force $out | Out-Null
+            $signedEngine = Join-Path $out 'seldon-runtime-x86_64-pc-windows-msvc.exe'
+            Copy-Item -LiteralPath (Join-Path $dir 'seldon-runtime.exe') -Destination $signedEngine
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $signedEngine).Hash.ToLowerInvariant()
+            "ENGINE_SIGNED_DIR=$out" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+            "### Motor firmado en esta corrida`n`nSHA-256 ``$hash``. Súbelo a la release del motor y fíjalo en ``seldon-runtime.lock``." | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
+          }
+
+      - name: Guardar el motor firmado
+        if: runner.os == 'Windows' && env.ENGINE_SIGNED_HERE == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: seldon-runtime-windows-signed
+          path: ${{ env.ENGINE_SIGNED_DIR }}
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Construir y firmar en macOS
         if: runner.os == 'macOS'

@@ -9,8 +9,8 @@
   "contract": "2701d8c1cf79951ba997598922d44ad1bec42c85e84808bb1c09b92f57f7f827",
   "platforms": {
     "x86_64-pc-windows-msvc": {
-      "url": "https://github.com/danil-labs/terminus/releases/download/seldon-runtime-v0.2.73-4b8714c/seldon-runtime-x86_64-pc-windows-msvc.exe",
-      "sha256": "86e454d6983a725aca440b193723fb4d7f1973027bdc0fed1157aa827949e926"
+      "url": "https://github.com/danil-labs/terminus/releases/download/seldon-runtime-v0.2.73-4b8714c/seldon-runtime-x86_64-pc-windows-msvc.signed.exe",
+      "sha256": "0ba20c92b7aa46eb069716d97b08de11ffdba5919114ca6d1ae634f7dc1d432b"
     },
     "aarch64-apple-darwin": {
       "url": "https://github.com/danil-labs/terminus/releases/download/seldon-runtime-v0.2.73-4b8714c/seldon-runtime-aarch64-apple-darwin",
