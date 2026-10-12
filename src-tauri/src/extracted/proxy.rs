@@ -280,6 +280,16 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
     let resolver = Arc::new(Mutex::new(Some(invoke.resolver)));
     let worker = resolver.clone();
     let queued = name == "set_active_workspace";
+    // Se adopta al clic: adoptado al contestar el motor, lo pedido entretanto
+    // sale con el workspace anterior y el motor lo devuelve como activo.
+    let adopted = if queued {
+        args["id"].as_str().map(str::to_owned)
+    } else {
+        None
+    };
+    if let Some(id) = &adopted {
+        *state.workspace.lock().unwrap_or_else(|p| p.into_inner()) = Some(id.clone());
+    }
     let job = move || {
         let _slot = slot;
         if let Some((key, channel)) = channel {
@@ -310,7 +320,6 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
             }
 
             let target = match name.as_str() {
-                "set_active_workspace" => args["id"].as_str(),
                 "workspaces_startup" if state.workspace().is_none() => value["active"].as_str(),
                 _ => None,
             };
@@ -320,6 +329,12 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
             }
             if name == "remove_workspace" && workspace.as_deref() == args["id"].as_str() {
                 *state.workspace.lock().unwrap_or_else(|p| p.into_inner()) = None;
+            }
+        }
+        if let (Err(_), Some(id)) = (&result, &adopted) {
+            let mut current = state.workspace.lock().unwrap_or_else(|p| p.into_inner());
+            if current.as_deref() == Some(id.as_str()) {
+                *current = workspace.clone();
             }
         }
         resolve(&worker, result);
