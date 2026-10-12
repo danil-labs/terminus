@@ -181,7 +181,7 @@ fn reply(value: Value) -> Result<Value, Value> {
 }
 pub(super) fn invoke(state: &State, command: &str, arguments: Value) -> Result<Value, Value> {
     state
-        .client
+        .client()
         .invoke(command, state.workspace(), arguments)
         .map_err(|e| failure(&e))
         .and_then(reply)
