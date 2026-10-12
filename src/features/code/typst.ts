@@ -41,7 +41,22 @@ export function esTypst(ruta: string) {
 
 /** Si el plugin Typst está activo en este workspace: sin él, un `.typ` es un archivo de texto más. */
 const [pluginTypst, setPluginTypst] = createSignal(false);
-export { pluginTypst };
+
+/** Si esta ventana registra `typst_live_*`: hasta saberlo, no hay vista que ofrecer. */
+const [vistaServida, setVistaServida] = createSignal(false);
+export { vistaServida };
+
+/** El ojo y el PDF al lado: el plugin activo y una ventana que sirve la vista. */
+export const conVistaTypst = () => pluginTypst() && vistaServida();
+
+/** Al montar la ventana: suelta los Tinymist que dejó una recarga y, de paso, sabe si la vista existe. */
+export function soltarVistasHuerfanas() {
+  // `typst_live_stop` no devuelve error: si se rechaza, es que la ventana no lo registra.
+  void invoke("typst_live_stop", { key: null, session: null }).then(
+    () => setVistaServida(true),
+    () => setVistaServida(false),
+  );
+}
 
 let consultado = false;
 async function consultarPlugin() {

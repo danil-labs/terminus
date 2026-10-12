@@ -172,4 +172,6 @@ Reusing an engine leaves `selection.json` untouched when its content is the same
   bundle carries a `lipo` of the two pinned macOS binaries.
 - Seven window functions (`site_open_local`, `site_zoom` and the
   `typst_live_*` family) are in the contract but not served by the window, so
-  the live Typst view does not work.
+  the live Typst view does not work. The front hides it while
+  `typst_live_stop` is rejected (`vistaServida` in `src/features/code/typst.ts`)
+  and offers it again once the window registers the family.

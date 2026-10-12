@@ -44,11 +44,11 @@ import {
   ampliadaDe,
   ampliarVista,
   compiladoDe,
+  conVistaTypst,
   consumirSalto,
   diagnosticosDelArchivo,
   esTypst,
   pedirArreglo,
-  pluginTypst,
   principalElegido,
   revelarEnElArbol,
   seguirPluginTypst,
@@ -219,7 +219,7 @@ export default function VisorDeArchivo(props: {
    * al PDF, en un panel que no depende de la pestaña. Sin ojo, un `.typ` es solo código.
    */
   const vistaTypst = () =>
-    pluginTypst() &&
+    conVistaTypst() &&
     !previa() &&
     principalElegido(props.project) !== null &&
     !CON_VISOR_PROPIO.includes(extension(props.ruta)) &&
