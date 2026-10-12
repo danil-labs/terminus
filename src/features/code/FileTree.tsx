@@ -28,7 +28,7 @@ import { ITEM_DE_MENU, Popover, PopoverContent } from "../../ui/Popover";
 import { IconoDeArchivo } from "./FileIcon";
 import { colorDeMarca, describirEstado, publicarLocales } from "./localStatus";
 import { alMoverseElArbol, avisarDeLosArboles } from "./refresh";
-import { elegirPrincipal, esTypst, pluginTypst, principalElegido, seguirPluginTypst } from "./typst";
+import { conVistaTypst, elegirPrincipal, esTypst, principalElegido, seguirPluginTypst } from "./typst";
 import {
   type CambioKn,
   type Carpeta,
@@ -208,7 +208,7 @@ export default function ArbolDeArchivos(props: {
   // La vista previa lee un commit: ahí no hay árbol que escribir.
   const editable = () => !props.preview;
   seguirPluginTypst();
-  const conOjo = (ruta: string) => !props.preview && pluginTypst() && esTypst(ruta);
+  const conOjo = (ruta: string) => !props.preview && conVistaTypst() && esTypst(ruta);
   const [seleccion, setSeleccion] = createSignal<{ ruta: string; tipo: Tipo } | null>(null);
 
   // Un archivo que se abrió desde fuera del árbol (el doble clic en la vista de Typst) se enseña aquí.

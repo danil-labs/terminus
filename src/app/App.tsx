@@ -229,7 +229,7 @@ import { Dialog, DialogContent, DialogTitle } from "../ui/Dialog";
 import { asFailure, claveDe, prosaDe } from "../ui/Failure";
 import { BotonConAtajo } from "../ui/Shortcut";
 import { Toast, ToastStack } from "../ui/Toast";
-import { apagarVistasDe, hayVistasDe } from "../features/code/typst";
+import { apagarVistasDe, hayVistasDe, soltarVistasHuerfanas } from "../features/code/typst";
 
 // Lo que falla en el camino a la ventana y no en el comando: se vuelve a
 // preguntar en vez de pintarlo (`cli/service/mod.rs`, `para_la_ventana`).
@@ -2117,7 +2117,7 @@ export default function App() {
   // nuevo. Ver `sites::site_sweep`.
   onMount(() => void invoke("site_sweep").catch(() => {}));
   // Lo mismo con los Tinymist de la vista de Typst: sin visor que los suelte, seguirían vivos.
-  onMount(() => void invoke("typst_live_stop", { key: null, session: null }).catch(() => {}));
+  onMount(soltarVistasHuerfanas);
 
   onMount(() => {
     const chat = listen<ChatEvent>("chat", (e) => {
