@@ -13,6 +13,7 @@ mod master_handoff;
 mod proxy;
 mod sites;
 mod startup;
+mod typst_live;
 pub mod util;
 use std::{path::PathBuf, sync::Arc};
 use tauri::{Emitter, Manager};
@@ -173,7 +174,14 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
             sites::site_go,
             sites::site_navigate,
             sites::site_reload,
-            sites::site_open_external
+            sites::site_open_external,
+            sites::site_open_local,
+            sites::site_zoom,
+            typst_live::typst_live_open,
+            typst_live::typst_live_change,
+            typst_live::typst_live_close_doc,
+            typst_live::typst_live_reveal,
+            typst_live::typst_live_stop
         ]))
         .build(context)
         .expect("tauri extracted client")

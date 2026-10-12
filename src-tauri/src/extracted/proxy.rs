@@ -179,6 +179,13 @@ fn reply(value: Value) -> Result<Value, Value> {
         Err(failure(&Error::new("invalid_request")))
     }
 }
+pub(super) fn invoke(state: &State, command: &str, arguments: Value) -> Result<Value, Value> {
+    state
+        .client
+        .invoke(command, state.workspace(), arguments)
+        .map_err(|e| failure(&e))
+        .and_then(reply)
+}
 type Job = Box<dyn FnOnce() + Send>;
 fn ordered(job: Job) -> std::io::Result<()> {
     static Q: OnceLock<std::sync::mpsc::Sender<Job>> = OnceLock::new();

@@ -3905,6 +3905,7 @@ dependencies = [
  "tauri-plugin-log",
  "tauri-plugin-process",
  "tauri-plugin-updater",
+ "tempfile",
  "terminus-engine-client",
  "terminus-engine-protocol",
  "ureq",
