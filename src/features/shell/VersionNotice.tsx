@@ -9,6 +9,8 @@ import { invoke } from "../../lib/invoke.ts";
 /** El reinicio requiere una acción de la persona; descartar dura hasta otra versión. */
 const CADA = 30 * 60 * 1000;
 const AL_VOLVER = 10 * 60 * 1000;
+/** Mirar si otra versión quedó instalada es local: no espera a la red. */
+const INSTALADA_CADA = 60 * 1000;
 
 export default function AvisoDeVersion() {
   const [fallo, setFallo] = createSignal(false);
@@ -35,7 +37,6 @@ export default function AvisoDeVersion() {
   }
 
   async function comprobar() {
-    if (await invoke<boolean>("update_pending").catch(() => false)) setInstalada(true);
     try {
       const u = await check();
       if (estado() !== "quieto") return;
@@ -50,16 +51,26 @@ export default function AvisoDeVersion() {
     }
   }
 
+  function mirarInstalada() {
+    void invoke<boolean>("update_pending")
+      .then((si) => si && setInstalada(true))
+      .catch(() => {});
+  }
+
   onMount(() => {
     void mirar();
+    mirarInstalada();
     const reloj = setInterval(() => void mirar(), CADA);
+    const relojLocal = setInterval(mirarInstalada, INSTALADA_CADA);
     const volver = () => {
+      mirarInstalada();
       if (document.visibilityState === "visible" && Date.now() - ultima > AL_VOLVER) void mirar();
     };
     window.addEventListener("focus", volver);
     document.addEventListener("visibilitychange", volver);
     onCleanup(() => {
       clearInterval(reloj);
+      clearInterval(relojLocal);
       window.removeEventListener("focus", volver);
       document.removeEventListener("visibilitychange", volver);
     });
