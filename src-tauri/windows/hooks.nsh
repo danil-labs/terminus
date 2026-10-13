@@ -72,6 +72,9 @@
   ${AndIfNot} ${Silent}
   ${AndIf} $PassiveMode <> 1
     MessageBox MB_OK|MB_ICONINFORMATION "Terminus ${VERSION} is installed. Restart Terminus to use it; tasks that are running keep working.$\r$\n$\r$\nTerminus ${VERSION} quedó instalado. Reinicia Terminus para usarlo; las tareas que están corriendo siguen trabajando."
+    ; The finish page would run a second window next to the open one; its shortcut box is checked by default.
+    Call CreateOrUpdateDesktopShortcut
+    Quit
   ${EndIf}
 !macroend
 

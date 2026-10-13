@@ -53,7 +53,9 @@ async fn install(update: &tauri_plugin_updater::Update, bytes: Vec<u8>) -> Resul
 /// Hay otra versión instalada sobre esta ventana, desde la app o con el instalador a mano.
 #[tauri::command]
 pub(super) fn update_pending() -> bool {
+    // Desinstalar antes de instalar aparta el ejecutable antes de escribir el nuevo en su ruta.
     super::legacy::set_aside(std::process::id())
+        && std::env::current_exe().is_ok_and(|exe| exe.is_file())
 }
 
 /// Lo que dejó apartado una instalación anterior; lo que sigue abierto no se deja borrar.
@@ -65,15 +67,32 @@ pub fn sweep() {
     else {
         return;
     };
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let name = entry.file_name().to_string_lossy().to_lowercase();
-        if name.starts_with("old_") && name.ends_with(".exe") {
-            let _ = std::fs::remove_file(entry.path());
-        }
-    }
+    // La ventana que se reinicia tarda unos segundos en soltar su ejecutable.
+    let _ = std::thread::Builder::new()
+        .name("sweep".into())
+        .spawn(move || {
+            for _ in 0..10 {
+                if remove_set_aside(&dir) {
+                    return;
+                }
+                std::thread::sleep(std::time::Duration::from_secs(3));
+            }
+        });
 }
 #[cfg(not(windows))]
 pub fn sweep() {}
+
+#[cfg(windows)]
+fn remove_set_aside(dir: &std::path::Path) -> bool {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return true;
+    };
+    let mut clean = true;
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_lowercase();
+        if name.starts_with("old_") && name.ends_with(".exe") {
+            clean &= std::fs::remove_file(entry.path()).is_ok();
+        }
+    }
+    clean
+}
