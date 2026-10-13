@@ -39,6 +39,8 @@
  * - `img-src`/`font-src`/`media-src data:`: embebido, nunca remoto. Obliga a
  *   que el artefacto sea autocontenido de verdad.
  */
+import { CSS_INLINE, inlineVisualStyles, JS_INLINE, type VisualTheme } from "./inlineVisual.ts";
+
 export const CSP_ARTEFACTO = [
   "default-src 'none'",
   "script-src 'unsafe-inline'",
@@ -497,10 +499,12 @@ const JS_RUNTIME = String.raw`
 
 export function envolver(
   html: string,
-  opciones?: { impresion?: boolean },
+  opciones?: { impresion?: boolean; inline?: { font: string; theme: VisualTheme } },
 ): string {
-  const forma = formaDe(html);
+  const forma = opciones?.inline ? "web" : formaDe(html);
   const runtime = JS_RUNTIME.replace('"__FORMA__"', JSON.stringify(forma));
+  const inline = opciones?.inline;
+  const styles = inline ? inlineVisualStyles(inline.font, inline.theme) : "";
   const imprimir = opciones?.impresion
     ? `<script data-harness="quitar">window.addEventListener("load", function () { setTimeout(function () { window.print(); }, 250); });</script>`
     : "";
@@ -511,11 +515,12 @@ export function envolver(
   //
 
   return (
-    `<!doctype html><html><head><meta charset="utf-8" data-harness="quitar">` +
+    `<!doctype html><html${inline ? ` data-theme="${inline.theme.mode}"` : ""}><head><meta charset="utf-8" data-harness="quitar">` +
     `<meta http-equiv="Content-Security-Policy" content="${CSP_ARTEFACTO}" data-harness="quitar">` +
     `<meta name="viewport" content="width=device-width, initial-scale=1" data-harness="quitar">` +
-    `<style data-harness="quitar">${CSS_BASE}</style></head><body>` +
+    `<style data-harness="quitar">${CSS_BASE}${styles}</style></head><body>` +
     html +
-    `<script data-harness="quitar">${runtime}</script>${imprimir}</body></html>`
+    (inline ? `<style data-harness="quitar">${CSS_INLINE}</style>` : "") +
+    `<script data-harness="quitar">${runtime}${inline ? JS_INLINE : ""}</script>${imprimir}</body></html>`
   );
 }

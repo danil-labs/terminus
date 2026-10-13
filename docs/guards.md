@@ -20,7 +20,7 @@ sends).
 | `bridge` | `scripts/guards/bridge.mjs` | Every event the front listens to is emitted by the window or declared in the engine contract. |
 | `commands` | `scripts/guards/commands.mjs` | Every `invoke` name exists in the window registry or the engine contract, and every contract command has a caller or a written reason. |
 | `service-errors` | `scripts/guards/service-errors.mjs` | Errors rejected by `invoke` are not flattened with `String()`. The per-file quota only goes down. |
-| `artifact` | `scripts/guards/artifact.mjs`, `tests/unit/artifact-viewer.test.ts` | Validates the artifact container script and the CSS classes it shares with the viewer. |
+| `artifact` | `scripts/guards/artifact.mjs`, `tests/unit/artifact-viewer.test.ts` | Validates the artifact container and inline chat scripts, and the CSS classes shared with the viewer. |
 | `window` | `scripts/guards/window.mjs` | Platform overrides keep the window structure (`label`, `create`). |
 | `console-window` | `scripts/guards/console-window.mjs` | Production processes use `no_console_window` on Windows. |
 | `processes` | `scripts/guards/processes.mjs` | Finds processes awaited without a timeout. Unix `exec` replaces the caller without waiting for a child. The quota only goes down. |
