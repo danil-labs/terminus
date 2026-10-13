@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { partirSiguientes, textoSinSiguientes, ultimaVezEnviada, usadaDesde, vistaPrevia, vistaPreviaDelHilo } from "../../src/lib/nextSteps.ts";
+import { splitNextSteps, stripNextSteps, lastSentAt, usedSince, previewOf, threadPreview } from "../../src/lib/nextSteps.ts";
 
 type Caso = {
   name: string;
@@ -27,7 +27,7 @@ const casos: Caso[] = JSON.parse(
 
 for (const caso of casos) {
   test(`partir: ${caso.name}`, () => {
-    const partes = partirSiguientes(caso.input, caso.streaming).map((p) =>
+    const partes = splitNextSteps(caso.input, caso.streaming).map((p) =>
       p.kind === "markdown"
         ? { kind: p.kind, markdown: p.markdown }
         : { kind: p.kind, prose: p.prose, options: p.options.map((o) => o.prompt), complete: p.complete },
@@ -36,14 +36,14 @@ for (const caso of casos) {
   });
 
   test(`limpiar: ${caso.name}`, () => {
-    assert.equal(textoSinSiguientes(caso.input), caso.plain);
-    assert.equal(vistaPrevia(caso.input), caso.preview);
+    assert.equal(stripNextSteps(caso.input), caso.plain);
+    assert.equal(previewOf(caso.input), caso.preview);
   });
 }
 
 test("el id de un bloque no cambia mientras llegan sus opciones", () => {
-  const a = partirSiguientes("Hecho.\n<NEXT_STEPS>\n- [ ] Un", true);
-  const b = partirSiguientes("Hecho.\n<NEXT_STEPS>\n- [ ] Uno\n- [ ] Do", true);
+  const a = splitNextSteps("Hecho.\n<NEXT_STEPS>\n- [ ] Un", true);
+  const b = splitNextSteps("Hecho.\n<NEXT_STEPS>\n- [ ] Uno\n- [ ] Do", true);
   const idDe = (ps: typeof a) => ps.find((p) => p.kind === "next_steps")?.id;
   assert.ok(idDe(a));
   assert.equal(idDe(a), idDe(b));
@@ -56,18 +56,18 @@ test("una opción cuenta como usada solo si la persona la mandó después del tu
     { role: "user", text: "  Corre las pruebas en la VM \n" },
     { role: "agent", text: "Abre el PR contra dev" },
   ];
-  const vez = ultimaVezEnviada(hilo, []);
-  assert.ok(usadaDesde(vez, "Corre las pruebas en la VM", 1));
-  assert.ok(!usadaDesde(vez, "Abre el PR contra dev", 1), "lo que la persona dijo antes no la gasta, ni lo que repite el agente");
+  const vez = lastSentAt(hilo, []);
+  assert.ok(usedSince(vez, "Corre las pruebas en la VM", 1));
+  assert.ok(!usedSince(vez, "Abre el PR contra dev", 1), "lo que la persona dijo antes no la gasta, ni lo que repite el agente");
 });
 
 test("lo que espera en la cola ya cuenta como mandado", () => {
-  const vez = ultimaVezEnviada([{ role: "agent", text: "…" }], ["Abre el PR contra dev "]);
-  assert.ok(usadaDesde(vez, "Abre el PR contra dev", 0));
+  const vez = lastSentAt([{ role: "agent", text: "…" }], ["Abre el PR contra dev "]);
+  assert.ok(usedSince(vez, "Abre el PR contra dev", 0));
 });
 
 test("un bloque que pega la persona es contenido y la vista previa lo conserva", () => {
   const pegado = "Mira:\n<NEXT_STEPS>\n- [ ] Uno\n</NEXT_STEPS>";
-  assert.equal(vistaPreviaDelHilo([{ role: "agent", text: "Hola" }, { role: "user", text: pegado }]), "Mira: <NEXT_STEPS> - [ ] Uno </NEXT_STEPS>");
-  assert.equal(vistaPreviaDelHilo([{ role: "user", text: "Hola" }, { role: "agent", text: pegado }]), "Mira:");
+  assert.equal(threadPreview([{ role: "agent", text: "Hola" }, { role: "user", text: pegado }]), "Mira: <NEXT_STEPS> - [ ] Uno </NEXT_STEPS>");
+  assert.equal(threadPreview([{ role: "user", text: "Hola" }, { role: "agent", text: pegado }]), "Mira:");
 });

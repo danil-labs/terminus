@@ -135,7 +135,7 @@ import type {
 } from "../lib/model";
 import { carpetaDeTrabajo } from "../lib/model";
 import { type CatalogosDeModelos, effortAlCambiarDeModelo, type OpcionDeModelo } from "../lib/models";
-import { vistaPreviaDelHilo } from "../lib/nextSteps";
+import { threadPreview } from "../lib/nextSteps";
 import {
   createPanels,
   deleteLayout,
@@ -1523,7 +1523,7 @@ export default function App() {
         .filter((n) => n.project === project && !enDisco.has(n.row.id))
         .map((n) => n.row);
       return [project, [...propias, ...rows.map(row => {
-        const preview = vistaPreviaDelHilo(hilos()[row.id]?.vivo ?? []) ?? row.last_message;
+        const preview = threadPreview(hilos()[row.id]?.vivo ?? []) ?? row.last_message;
         const sinVer = unseen.has(row.id);
         return row.esperando === pending.has(row.id) && preview === row.last_message && !!row.sin_ver === sinVer ? row : {
           ...row, esperando: pending.has(row.id), last_message: preview, sin_ver: sinVer,
