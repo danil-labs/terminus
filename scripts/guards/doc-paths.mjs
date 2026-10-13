@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fromMarkdown } from "mdast-util-from-markdown";
-import { esteArchivo as isMain, RAIZ as ROOT, archivos as walkFiles } from "../git.mjs";
+import { isMain, ROOT, walkFiles } from "../git.mjs";
 
 const roots = ["AGENTS.md", "README.md", "CONTRIBUTING.md", "SECURITY.md", "CREDITS.md", "NOTICE", "src/AGENTS.md", "scripts/AGENTS.md", "tests/AGENTS.md"];
 const directories = ["docs", "plugins", "tests", "src-tauri/icons", "src-tauri/crates", "npx"];
@@ -12,7 +12,7 @@ const documents = [
   ...directories.flatMap((directory) =>
     [...walkFiles(join(ROOT, directory), [".md"])].map((path) => relative(ROOT, path)),
   ),
-].filter((path) => path !== "docs/FRASES.md");
+].filter((path) => path !== "docs/PHRASES.md");
 const sourcePath = /`((?:src|src-tauri|scripts|tests|plugins|docs|npx|\.github)\/[A-Za-z0-9_.@-]+(?:\/[A-Za-z0-9_.@-]+)*\/?)`/g;
 const frontendPath = /`((?:features|lib|ui|app|locales|styles)\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*\/?)`/g;
 
@@ -61,7 +61,7 @@ function ignored(paths) {
     encoding: "utf8",
   });
   // Sin Git solo se excluyen los generados conocidos; los enlaces siguen comprobándose.
-  if (result.error) return new Set(paths.filter((path) => /^(?:src-tauri\/(?:target|gen)\/|dist\/)|^docs\/FRASES\.md$/.test(path)));
+  if (result.error) return new Set(paths.filter((path) => /^(?:src-tauri\/(?:target|gen)\/|dist\/)|^docs\/PHRASES\.md$/.test(path)));
   return new Set(result.stdout.split("\n").filter(Boolean));
 }
 

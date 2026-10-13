@@ -7,7 +7,7 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { arrancar, espera } from "../helpers/jsdom-app.mjs";
+import { boot, sleep } from "../helpers/jsdom-app.mjs";
 
 const ETAPAS = ["platform", "git", "node", "pnpm", "bun", "agent-browser"];
 const ESENCIALES = ["platform", "git", "node"];
@@ -24,7 +24,7 @@ const estado = (app) => app.w.document.querySelector('main [role="status"]')?.te
 
 test("la ventana que llega con una preparación en curso ofrece cómo seguir cuando esta termina", async () => {
   const hechas = new Set(["platform", "git"]);
-  const app = await arrancar("listo", "preparacion-en-curso", respuestas({
+  const app = await boot("listo", "preparacion-en-curso", respuestas({
     stages: ETAPAS.map((name) => ({
       name,
       essential: ESENCIALES.includes(name),
@@ -37,7 +37,7 @@ test("la ventana que llega con una preparación en curso ofrece cómo seguir cua
     if (name !== "node") app.emit("bootstrap-run", { type: "stage", name, state: "running" });
     app.emit("bootstrap-run", { type: "stage", name, state: "succeeded", durationMs: 1 });
   }
-  await espera(100);
+  await sleep(100);
 
   assert.ok(acciones(app).length > 0, `la corrida terminó y la pantalla no ofrece seguir ni reintentar; dice «${estado(app)}»`);
   assert.deepEqual(app.fallos, []);
@@ -45,8 +45,8 @@ test("la ventana que llega con una preparación en curso ofrece cómo seguir cua
 
 // Durante una instalación la ventana nueva puede hablar con el servicio anterior.
 test("frente a un servicio que contesta sin estado, la pantalla ofrece reintentar", async () => {
-  const app = await arrancar("listo", "servicio-anterior", respuestas(null));
-  await espera(100);
+  const app = await boot("listo", "servicio-anterior", respuestas(null));
+  await sleep(100);
 
   assert.ok(acciones(app).length > 0, `sin estado ni eventos la pantalla no ofrece salida; dice «${estado(app)}»`);
   assert.deepEqual(app.fallos, []);

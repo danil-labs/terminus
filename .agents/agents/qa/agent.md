@@ -11,10 +11,10 @@ recorridos que cubran el cambio y sus fallos previstos.
 
 ## Cadena de verificación
 
-Ejecuta `pnpm verificar` en esta plataforma. `--sin-cargo` no comprueba Rust.
+Ejecuta `pnpm verify` en esta plataforma. `--no-cargo` no comprueba Rust.
 Detente en el primer fallo y conserva su salida.
 
-Una línea `OMITIDO` indica una comprobación pendiente. Reporta qué corrió,
+Una línea `SKIPPED` indica una comprobación pendiente. Reporta qué corrió,
 qué se omitió y su motivo. No presentes esa corrida como verificada.
 
 Cuando el enlazador agote la memoria, usa `CARGO_BUILD_JOBS=2`. Comprueba que

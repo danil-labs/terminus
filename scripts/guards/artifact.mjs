@@ -34,7 +34,7 @@
  * clase de cadena que un nombre de evento entre Rust y la interfaz, y
  * `bridge.mjs` existe por lo mismo.
  *
- * Node pelado, sin dependencias: lo corre `pnpm verificar`, en esta máquina.
+ * Node pelado, sin dependencias: lo corre `pnpm verify`, en esta máquina.
  */
 import { readFileSync } from "node:fs";
 // Ver la nota de `paths.mjs`: `.pathname` en Windows da `/C:/…` y revienta.

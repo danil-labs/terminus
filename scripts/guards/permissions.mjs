@@ -25,7 +25,7 @@
  *
  * ## Qué mira, y qué no puede mirar
  *
- * Solo los archivos que importan `@tauri-apps/api/window`, y dentro de ellos los
+ * Solo los walkFiles que importan `@tauri-apps/api/window`, y dentro de ellos los
  * métodos cuyo nombre tiene un `allow-*` en el manifiesto que genera Tauri
  * (`gen/schemas/acl-manifests.json`) — la lista real de la versión instalada, no
  * una copia que envejece aquí. Lo que no tiene permiso asociado no es un comando
@@ -38,7 +38,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, relative } from "node:path";
-import { archivos } from "../git.mjs";
+import { walkFiles } from "../git.mjs";
 
 const raiz = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const MANIFIESTO = join(raiz, "src-tauri/gen/schemas/acl-manifests.json");
@@ -79,7 +79,7 @@ for (const p of capacidades.permissions) {
 const faltan = new Map();
 let mirados = 0;
 
-for (const archivo of archivos(join(raiz, "src"), [".ts", ".tsx"])) {
+for (const archivo of walkFiles(join(raiz, "src"), [".ts", ".tsx"])) {
   const texto = readFileSync(archivo, "utf8");
   if (!texto.includes("@tauri-apps/api/window")) continue;
   mirados++;

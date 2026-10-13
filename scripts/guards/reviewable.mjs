@@ -35,7 +35,7 @@
  */
 import { execFileSync } from "node:child_process";
 
-import { localizarGit, RAIZ, SALIDA_OMITIDO } from "../git.mjs";
+import { locateGit, ROOT, SKIPPED_EXIT_CODE } from "../git.mjs";
 
 /**
  * **Sin git no hay pregunta que hacer, y eso se dice — no se aprueba.**
@@ -43,11 +43,11 @@ import { localizarGit, RAIZ, SALIDA_OMITIDO } from "../git.mjs";
  * Las cuatro comprobaciones de abajo son la misma: preguntarle a git qué
  * considera binario. Sin metadata alcanzable no hay a quién preguntarle, y las
  * dos salidas honestas son quedarse callado o mentir. Se elige la primera y en
- * voz alta: `SALIDA_OMITIDO` le dice a `verify.mjs` que siga con los demás
+ * voz alta: `SKIPPED_EXIT_CODE` le dice a `verify.mjs` que siga con los demás
  * guardas y que nombre este al terminar. Lo que no puede pasar —y
  * pasaba— es que la cadena entera muera aquí y nadie corra nada.
  */
-const git = localizarGit();
+const git = locateGit();
 if (!git.ok) {
   console.error("No hay metadata de git alcanzable desde este árbol.\n");
   console.error(git.motivo);
@@ -57,17 +57,17 @@ if (!git.ok) {
       "lo vería. Se comprueba desde un clon con git, o apuntando GIT_DIR y\n" +
       "GIT_WORK_TREE a la metadata de este árbol.",
   );
-  process.exit(SALIDA_OMITIDO);
+  process.exit(SKIPPED_EXIT_CODE);
 }
 
 /**
  * Cómo se invoca a git aquí: **parado en el árbol y con el entorno que lo
  * localiza**. El `cwd` explícito es lo que hace que `node scripts/guards/reviewable.mjs` dé
- * lo mismo que dentro de `pnpm verificar` — los caminos que devuelve `ls-files`
+ * lo mismo que dentro de `pnpm verify` — los caminos que devuelve `ls-files`
  * son relativos a él, y `--no-index` los resuelve desde ahí.
  */
 const OPCIONES = {
-  cwd: RAIZ,
+  cwd: ROOT,
   encoding: "utf8",
   maxBuffer: 64 * 1024 * 1024,
   env: { ...process.env, ...git.entorno },

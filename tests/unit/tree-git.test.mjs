@@ -21,7 +21,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 
-import { localizarGit, SALIDA_OMITIDO } from "../../scripts/git.mjs";
+import { locateGit, SKIPPED_EXIT_CODE } from "../../scripts/git.mjs";
 
 const raiz = resolve(import.meta.dirname, "../..");
 
@@ -94,7 +94,7 @@ function comoTerminus({ proyecto }) {
 
 test("un clon normal usa su propio git, sin variables de más", () => {
   const dir = conGit(arbol(temporal("clon")));
-  const donde = localizarGit(dir);
+  const donde = locateGit(dir);
   assert.equal(donde.ok, true);
   assert.equal(donde.entorno.GIT_DIR, undefined);
 });
@@ -102,11 +102,11 @@ test("un clon normal usa su propio git, sin variables de más", () => {
 test("una tarea sin proyecto guarda su control bajo `_`, y también se encuentra", () => {
   const { trabajo, control } = comoTerminus({ proyecto: null });
   conGit(arbol(trabajo), control);
-  assert.equal(localizarGit(trabajo).entorno.GIT_DIR, control);
+  assert.equal(locateGit(trabajo).entorno.GIT_DIR, control);
 });
 
 test("sin git en ninguna parte no se inventa nada, y el motivo dice dónde se buscó", () => {
-  const donde = localizarGit(arbol(temporal("pelado")));
+  const donde = locateGit(arbol(temporal("pelado")));
   assert.equal(donde.ok, false);
   assert.match(donde.motivo, /este árbol/);
 });
@@ -115,7 +115,7 @@ test("un árbol dentro de otro repositorio no hereda su git", () => {
   // Git contesta desde el de arriba, y revisar ese sería revisar otra cosa.
   const fuera = conGit(arbol(temporal("fuera")));
   const dentro = arbol(join(fuera, "anidado"));
-  const donde = localizarGit(dentro);
+  const donde = locateGit(dentro);
   assert.equal(donde.ok, false);
   assert.match(donde.motivo, /es otro repositorio/);
 });
@@ -140,7 +140,7 @@ function revisable(dir) {
 
 test("sin git el guarda se omite en voz alta, y NO sale en verde", () => {
   const r = revisable(arbol(temporal("omitido")));
-  assert.equal(r.status, SALIDA_OMITIDO);
+  assert.equal(r.status, SKIPPED_EXIT_CODE);
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /no corrió/i);
   assert.match(r.stderr, /GIT_DIR/);

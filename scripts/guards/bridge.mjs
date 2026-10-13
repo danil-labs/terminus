@@ -35,7 +35,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { relative } from "node:path";
 // Ver la nota de `paths.mjs`: `.pathname` en Windows da `/C:/…` y revienta.
 import { fileURLToPath } from "node:url";
-import { archivos } from "../git.mjs";
+import { walkFiles } from "../git.mjs";
 
 const RUST = fileURLToPath(new URL("../../src-tauri/src", import.meta.url));
 
@@ -68,7 +68,7 @@ const ESCUCHA_TODO = /\blisten\s*[<(]/g;
 function nombres(dirs, exts, re) {
   const out = new Map();
   for (const dir of [dirs].flat()) {
-    for (const f of archivos(dir, exts)) {
+    for (const f of walkFiles(dir, exts)) {
       const texto = readFileSync(f, "utf8");
       // Se lee el archivo entero y no línea a línea: el nombre puede ir en la
       // línea de después del paréntesis, que es justo el caso que se escapó.
@@ -87,7 +87,7 @@ function nombres(dirs, exts, re) {
 function cuenta(dirs, exts, re) {
   let n = 0;
   for (const dir of [dirs].flat()) {
-    for (const f of archivos(dir, exts)) {
+    for (const f of walkFiles(dir, exts)) {
       n += [...readFileSync(f, "utf8").matchAll(re)].length;
     }
   }

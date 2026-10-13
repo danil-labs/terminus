@@ -41,7 +41,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { relative } from "node:path";
 // Ver la nota de `paths.mjs`: `.pathname` en Windows da `/C:/…` y revienta.
 import { fileURLToPath } from "node:url";
-import { archivos } from "../git.mjs";
+import { walkFiles } from "../git.mjs";
 
 const LIB = fileURLToPath(new URL("../../src-tauri/src/extracted/mod.rs", import.meta.url));
 const CONTRACT = fileURLToPath(new URL("../../src-tauri/crates/engine-protocol/commands.json", import.meta.url));
@@ -136,7 +136,7 @@ for (const command of manifest.commands) {
 const invocados = new Map();
 const dinamicos = [];
 for (const { dir, f } of ARBOLES.flatMap((dir) =>
-  [...archivos(dir, [".ts", ".tsx"])].map((f) => ({ dir, f })),
+  [...walkFiles(dir, [".ts", ".tsx"])].map((f) => ({ dir, f })),
 )) {
   const texto = readFileSync(f, "utf8");
   const rel = relative(dir, f);

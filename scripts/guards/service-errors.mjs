@@ -12,7 +12,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, relative } from "node:path";
-import { archivos } from "../git.mjs";
+import { walkFiles } from "../git.mjs";
 
 const raiz = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const FUENTE = join(raiz, "src");
@@ -26,7 +26,7 @@ const cuenta = {};
 
 // La variable de un `catch`, y no el error de un `invoke`: distinguirlos pide
 // un AST y un `catch` recibe igual lo que se le lance.
-for (const archivo of archivos(FUENTE, [".ts", ".tsx"])) {
+for (const archivo of walkFiles(FUENTE, [".ts", ".tsx"])) {
   const nombre = relative(FUENTE, archivo).replaceAll("\\", "/");
   const fuente = readFileSync(archivo, "utf8");
   const capturadas = new Set(

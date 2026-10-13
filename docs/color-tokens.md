@@ -144,5 +144,5 @@ El relleno (`success`, `error`…) es igual en todos los temas; el texto (`-stro
    - `link` y `--action-text` sobre su fondo: 4,5:1 o más;
    - escalones contiguos de superficie, el hover del sidebar (`neutral-100` contra `bg`) y el globo de un agente contra el chat: alrededor de **1,1:1**, para que se distingan.
 4. **Añade la opción** en [`src/lib/theme.ts`](../src/lib/theme.ts) (`DarkStyle` o `LightStyle`) y en [`Appearance.tsx`](../src/features/settings/Appearance.tsx), con sus textos en `src/locales/{es,en}/settings.json`.
-5. **Revisa en la app** chat, diff, editor, menús y Ajustes. `pnpm verificar` cuida que ningún color salga de la paleta por omisión de Tailwind (`scripts/guards/theme-inversion.mjs`), pero no mira contrastes.
+5. **Revisa en la app** chat, diff, editor, menús y Ajustes. `pnpm verify` cuida que ningún color salga de la paleta por omisión de Tailwind (`scripts/guards/theme-inversion.mjs`), pero no mira contrastes.
 6. **Actualiza este documento** con una columna nueva, añade la paleta a `PALETAS` en `scripts/color-tokens.mjs` y regenera el HTML.

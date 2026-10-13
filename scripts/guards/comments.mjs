@@ -3,23 +3,23 @@
  * Los comentarios no crecen, no argumentan y no cuentan historia.
  *
  *   node scripts/guards/comments.mjs              guarda: compara con comments-baseline.json
- *   node scripts/guards/comments.mjs --ajustar    baja el baseline a lo que hay hoy
- *   node scripts/guards/comments.mjs --archivo p  lista lo que caza en un archivo
+ *   node scripts/guards/comments.mjs --update    baja el baseline a lo que hay hoy
+ *   node scripts/guards/comments.mjs --file p  lista lo que caza en un archivo
  *   node scripts/guards/comments.mjs --hook       PreToolUse de Claude Code: rechaza la edición que añade
  *
  * Política: AGENTS.md § Comentarios. Sale con 1 si una categoría supera el baseline.
  */
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join, relative, extname } from "node:path";
-import { archivos, esteArchivo, RAIZ } from "../git.mjs";
+import { walkFiles, isMain, ROOT } from "../git.mjs";
 
 const BASELINE = join(import.meta.dirname, "comments-baseline.json");
 const CARPETAS = ["src-tauri/src", "src-tauri/tests", "src", "scripts", "tests"];
 const EXTS = [".rs", ".ts", ".tsx", ".mjs"];
 const EXCLUIDOS = [/file-icons\.ts$/, /comments-baseline\.json$/, /[\/\\]tests[\/\\]security[\/\\]/];
 
-export const LIMITE_BLOQUE = 6;
-export const LIMITE_CABECERA = 10;
+export const BLOCK_LIMIT = 6;
+export const HEADER_LIMIT = 10;
 
 const HISTORIA =
   /\b(se report[oó]|reportad[oa]|pas[oó] de verdad|cost[oó]|hubo .* y se retir[oó]|antes (era|se|hab[ií]a|sal[ií]a)|se retir[oó]|medido el 20|comprobado el 20|20\d\d-\d\d-\d\d)\b/iu;
@@ -30,7 +30,7 @@ const MARKDOWN = /^(#{1,6} |\| |```)/;
 const CATEGORIAS = ["bloque_largo", "markdown", "argumento", "historia"];
 
 /** Bloques de comentario de un texto: [{ inicio, lineas: [texto sin marcador], cabecera }]. */
-export function bloques(texto, ext) {
+export function blocks(texto, ext) {
   const lineas = texto.split("\n");
   const out = [];
   let actual = null;
@@ -73,10 +73,10 @@ export function bloques(texto, ext) {
 }
 
 /** Hallazgos de un texto: [{ linea, categoria, detalle }]. */
-export function hallazgos(texto, ext) {
+export function findings(texto, ext) {
   const out = [];
-  for (const b of bloques(texto, ext)) {
-    const tope = b.cabecera ? LIMITE_CABECERA : LIMITE_BLOQUE;
+  for (const b of blocks(texto, ext)) {
+    const tope = b.cabecera ? HEADER_LIMIT : BLOCK_LIMIT;
     // Las líneas del delimitador —`/**`, `*/`, un `*` solo— no son contenido.
     // Contándolas, un tope de seis dejaba escribir cuatro.
     const contenido = b.lineas.filter((l) => l.trim() !== "").length;
@@ -99,9 +99,9 @@ function enAlcance(ruta) {
 
 function* fuentes() {
   for (const carpeta of CARPETAS) {
-    const dir = join(RAIZ, carpeta);
+    const dir = join(ROOT, carpeta);
     if (!existsSync(dir)) continue;
-    for (const p of archivos(dir, EXTS)) if (enAlcance(p)) yield p;
+    for (const p of walkFiles(dir, EXTS)) if (enAlcance(p)) yield p;
   }
 }
 
@@ -109,9 +109,9 @@ function contar() {
   const totales = Object.fromEntries(CATEGORIAS.map((c) => [c, 0]));
   const porArchivo = new Map();
   for (const p of fuentes()) {
-    const h = hallazgos(readFileSync(p, "utf8"), extname(p));
+    const h = findings(readFileSync(p, "utf8"), extname(p));
     if (h.length === 0) continue;
-    const rel = relative(RAIZ, p);
+    const rel = relative(ROOT, p);
     const cuenta = Object.fromEntries(CATEGORIAS.map((c) => [c, 0]));
     for (const x of h) {
       totales[x.categoria]++;
@@ -131,7 +131,7 @@ function guarda() {
   const { totales, porArchivo } = contar();
   const base = leerBaseline();
   if (!base) {
-    console.error(`Falta ${relative(RAIZ, BASELINE)}. Créalo con: node scripts/guards/comments.mjs --ajustar`);
+    console.error(`Falta ${relative(ROOT, BASELINE)}. Créalo con: node scripts/guards/comments.mjs --update`);
     return 1;
   }
   let fallo = false;
@@ -157,7 +157,7 @@ function guarda() {
   }
   const resumen = CATEGORIAS.map((c) => `${c}=${totales[c]}`).join("  ");
   console.log(`Los comentarios no crecen: ${resumen}.`);
-  if (bajo) console.log("Bajaron: fija el trinquete con `node scripts/guards/comments.mjs --ajustar`.");
+  if (bajo) console.log("Bajaron: fija el trinquete con `node scripts/guards/comments.mjs --update`.");
   return 0;
 }
 
@@ -172,8 +172,8 @@ function ajustar() {
 }
 
 function archivo(ruta) {
-  const p = join(RAIZ, ruta);
-  const h = hallazgos(readFileSync(p, "utf8"), extname(p));
+  const p = join(ROOT, ruta);
+  const h = findings(readFileSync(p, "utf8"), extname(p));
   for (const x of h) console.log(`${ruta}:${x.linea}  ${x.categoria}  ${x.detalle}`);
   console.log(`${h.length} hallazgos`);
   return 0;
@@ -194,7 +194,7 @@ function hook() {
   }
   const t = ev.tool_input ?? {};
   const ruta = t.file_path ?? "";
-  if (!ruta || !enAlcance(ruta) || !ruta.startsWith(RAIZ)) return 0;
+  if (!ruta || !enAlcance(ruta) || !ruta.startsWith(ROOT)) return 0;
   const ext = extname(ruta);
   let antes = "";
   let despues = "";
@@ -209,32 +209,32 @@ function hook() {
   }
   const cuenta = (texto) => {
     const c = Object.fromEntries(CATEGORIAS.map((k) => [k, 0]));
-    for (const x of hallazgos(texto, ext)) c[x.categoria]++;
+    for (const x of findings(texto, ext)) c[x.categoria]++;
     return c;
   };
   const a = cuenta(antes);
   const d = cuenta(despues);
   const nuevos = CATEGORIAS.filter((c) => d[c] > a[c]);
   if (nuevos.length === 0) return 0;
-  const detalle = hallazgos(despues, ext)
+  const detalle = findings(despues, ext)
     .filter((x) => nuevos.includes(x.categoria))
     .slice(0, 6)
     .map((x) => `  ${x.categoria}: ${x.detalle}`)
     .join("\n");
   console.error(
-    `Comentario rechazado en ${relative(RAIZ, ruta)}: añade ${nuevos.join(", ")}.\n${detalle}\n` +
+    `Comentario rechazado en ${relative(ROOT, ruta)}: añade ${nuevos.join(", ")}.\n${detalle}\n` +
       "Un comentario dice qué se rompe si cambias esta línea, en 1-3 líneas, sin negritas ni historia. " +
       "Si es una regla, vive en un doc: nómbralo. AGENTS.md § Comentarios.",
   );
   return 2;
 }
 
-if (esteArchivo(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const args = process.argv.slice(2);
   let codigo = 0;
   if (args.includes("--hook")) codigo = hook();
-  else if (args.includes("--ajustar")) codigo = ajustar();
-  else if (args.includes("--archivo")) codigo = archivo(args[args.indexOf("--archivo") + 1]);
+  else if (args.includes("--update")) codigo = ajustar();
+  else if (args.includes("--file")) codigo = archivo(args[args.indexOf("--file") + 1]);
   else codigo = guarda();
   process.exit(codigo);
 }

@@ -1,5 +1,5 @@
 ---
-name: revisar-interfaz
+name: review-ui
 description: Revisión visual y de accesibilidad de un cambio en la interfaz de Terminus antes de darlo por bueno — capturas en tema claro y oscuro, contraste medido y no a ojo, foco y teclado, movimiento reducido, y en qué webview se miró. Úsala cuando pidan revisar cómo se ve algo, comprobar si se lee en oscuro, sacar capturas, auditar accesibilidad o contraste, o antes de abrir un pull request que toca el front de Terminus.
 ---
 
@@ -17,7 +17,7 @@ contratos estáticos que comprueba la cadena están en `docs/guards.md`.
 
 ## Pasos
 
-1. **Guardas primero**: `pnpm verificar --sin-cargo`. Un `OMITIDO` no es verde,
+1. **Guardas primero**: `pnpm verify --no-cargo`. Un `SKIPPED` no es verde,
    y se reporta cuál se omitió.
 2. **Capturar en los dos temas** la vista que cambió, en su estado normal, vacío,
    cargando y con error si los tiene. La apariencia se fuerza desde Configuración
@@ -47,7 +47,7 @@ Un informe corto que diga:
 
 Se cierra con una línea: se ve bien, se ve bien con salvedades, o no se ve bien.
 Esta skill no arregla lo que encuentra: lo reporta para que se arregle con
-`componente-de-interfaz`.
+`ui-component`.
 
 ## Ejemplo
 

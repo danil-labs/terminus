@@ -97,7 +97,7 @@ const bloque = (valor: string) => ({
 });
 
 test("copiar un bloque de código deja el comando sin el salto final", () => {
-  assert.equal(textoDelBloque(bloque("pnpm verificar\n")), "pnpm verificar");
+  assert.equal(textoDelBloque(bloque("pnpm verify\n")), "pnpm verify");
 });
 
 test("copiar un bloque conserva sus líneas en blanco y su sangría", () => {

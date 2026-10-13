@@ -3,17 +3,17 @@
  * Cuántos nodos del hilo se desmontan cuando la ventana vuelve a leer una tarea abierta.
  *
  *   node tests/perf/reread-thread.mjs              guarda: compara con reread-thread-baseline.json
- *   node tests/perf/reread-thread.mjs --ajustar    baja el techo a lo que cuesta hoy
+ *   node tests/perf/reread-thread.mjs --update    baja el techo a lo que cuesta hoy
  *
  * Tres casos: releer sin cambios, releer con un turno nuevo, y la tarea quieta
  * durante varios relojes de 30 s en un hilo que no llena la vista. Un techo solo baja.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { arrancar, espera } from "../helpers/jsdom-app.mjs";
+import { boot, sleep } from "../helpers/jsdom-app.mjs";
 
 const BASELINE = join(import.meta.dirname, "reread-thread-baseline.json");
-const ADJUST = process.argv.includes("--ajustar");
+const ADJUST = process.argv.includes("--update");
 
 // El reloj que suelta lo leído arriba dura 30 s; en la quietud dura lo bastante para contar varios.
 const SOLTAR_LO_LEIDO_MS = 30_000;
@@ -106,7 +106,7 @@ async function quieta(app, ms = 300) {
   const o = new app.w.MutationObserver(() => (last = Date.now()));
   o.observe(app.w.document.body, { subtree: true, childList: true, characterData: true });
   const limit = Date.now() + 60_000;
-  while (Date.now() - last < ms && Date.now() < limit) await espera(25);
+  while (Date.now() - last < ms && Date.now() < limit) await sleep(25);
   o.disconnect();
 }
 
@@ -143,7 +143,7 @@ async function medir(app, gesto, ms) {
 const releer = (app, id) => () => app.emit("session", { session: id, project: "", workspace: "w" });
 const shown = (doc, text) => doc.querySelector("#root").textContent.includes(text);
 
-const app = await arrancar("listo", "reread-thread", responses());
+const app = await boot("listo", "reread-thread", responses());
 const doc = app.w.document;
 await quieta(app, 800);
 doc.querySelector('[data-sesion="larga"]').click();
@@ -169,7 +169,7 @@ if (!shown(doc, "Pregunta 0 ")) {
   console.error("Un hilo que cabe en la vista no montó su primer mensaje.");
   process.exit(1);
 }
-const quietud = await medir(app, () => espera(RELOJ_CORTO * 6), RELOJ_CORTO * 2);
+const quietud = await medir(app, () => sleep(RELOJ_CORTO * 6), RELOJ_CORTO * 2);
 
 if (app.fallos.length > 0) {
   console.error(app.fallos.slice(0, 3).join("\n"));
@@ -199,5 +199,5 @@ if (over.length > 0) {
   process.exit(1);
 }
 const room = Object.entries(ceiling).filter(([k, v]) => counters[k] < v);
-if (room.length > 0) console.log(`Bajó: ${room.map(([k, v]) => `${k} ${v} → ${counters[k]}`).join(", ")}. Fíjalo con --ajustar.`);
+if (room.length > 0) console.log(`Bajó: ${room.map(([k, v]) => `${k} ${v} → ${counters[k]}`).join(", ")}. Fíjalo con --update.`);
 process.exit(0);

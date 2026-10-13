@@ -4,7 +4,7 @@
  * sesión larga, y cuánto crece cada contador entre el calentamiento y el último.
  *
  *   node --expose-gc tests/perf/long-session.mjs              guarda: compara con long-session-baseline.json
- *   node --expose-gc tests/perf/long-session.mjs --ajustar    baja el techo a lo que crece hoy
+ *   node --expose-gc tests/perf/long-session.mjs --update    baja el techo a lo que crece hoy
  *   node --expose-gc tests/perf/long-session.mjs --ciclos 30  más ciclos (por omisión 12)
  *   node --expose-gc tests/perf/long-session.mjs --heap f     el heap por constructor al calentar y al final
  *
@@ -17,7 +17,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { registerHooks } from "node:module";
 import v8 from "node:v8";
-import { arrancar, dist, espera } from "../helpers/jsdom-app.mjs";
+import { boot, dist, sleep } from "../helpers/jsdom-app.mjs";
 
 const BASELINE = join(import.meta.dirname, "long-session-baseline.json");
 const args = process.argv.slice(2);
@@ -25,7 +25,7 @@ const flag = (name) => {
   const i = args.indexOf(name);
   return i === -1 ? null : args[i + 1] ?? "";
 };
-const ADJUST = args.includes("--ajustar");
+const ADJUST = args.includes("--update");
 const CYCLES = Number(flag("--ciclos") ?? 12);
 const WARMUP = 3;
 const HEAP_DUMP = flag("--heap");
@@ -197,7 +197,7 @@ const observe = () => {
   for (const o of [...observing]) if (o.targets.size > 0) o.callback([...o.targets].map(o.constructor.entry), o);
 };
 
-const app = await arrancar("listo", "long-session", responses);
+const app = await boot("listo", "long-session", responses);
 if (!instrumented) {
   console.error("No encuentro la fábrica de cómputos de Solid en el bundle: sin ella no se cuentan los memos sin dueño.");
   process.exit(1);
@@ -253,7 +253,7 @@ async function settle(quiet = 250) {
   });
   observer.observe(doc.body, { subtree: true, childList: true, attributes: true, characterData: true });
   const limit = Date.now() + 30_000;
-  while (Date.now() - last < quiet && Date.now() < limit) await espera(20);
+  while (Date.now() - last < quiet && Date.now() < limit) await sleep(20);
   observer.disconnect();
 }
 
@@ -275,7 +275,7 @@ async function turn(session, seed) {
       chat(session, "tool", { text: "Bash", target: `pnpm test ${n}`, id: `item_${n}` });
       chat(session, "tool_done", { text: "Bash", id: `item_${n}`, ok: true, detail: { kind: "output", text: "ok\n".repeat(20) } });
     }
-    if (n % 10 === 0) await espera(5);
+    if (n % 10 === 0) await sleep(5);
   }
   chat(session, "notice", { text: "Aviso del turno" });
 }
@@ -290,7 +290,7 @@ async function queue(text) {
   field.value = text;
   field.dispatchEvent(new w.Event("input", { bubbles: true }));
   field.closest("form").dispatchEvent(new w.Event("submit", { bubbles: true, cancelable: true }));
-  await espera(50);
+  await sleep(50);
 }
 
 async function cycle(i) {
@@ -379,7 +379,7 @@ function threadsWithoutTab() {
 async function measure() {
   for (let k = 0; k < 3; k++) {
     globalThis.gc();
-    await espera(20);
+    await sleep(20);
   }
   removed = removed.filter((r) => r.ref.deref() && !r.ref.deref().isConnected);
   const tauri = app.comandos.filter((c) => c === "plugin:event|listen").length -

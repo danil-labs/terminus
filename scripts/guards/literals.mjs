@@ -24,7 +24,7 @@
  *
  * ## Qué NO puede ver, y por eso lo imprime cada vez
  *
- * - **Los archivos que aún no se migraron.** No son un fallo: son la lista de lo
+ * - **Los walkFiles que aún no se migraron.** No son un fallo: son la lista de lo
  *   que falta. Se cuentan al final para que no se pierda de vista.
  * - **El texto del backend.** `src-tauri/` está fuera: sus frases viajan como
  *   error o como campo serializado y el front las pinta crudas. Es otra fase.
@@ -34,7 +34,7 @@
 import { readFileSync } from "node:fs";
 import { join, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { archivos } from "../git.mjs";
+import { walkFiles } from "../git.mjs";
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const FUENTE = join(RAIZ, "src");
@@ -81,7 +81,7 @@ const pareceFrase = (s) => {
  * **Y son preexistentes**, que es lo que lo vuelve grave: la primera pantalla
  * que alguien migre estrena diez o treinta hallazgos ciertos que **no se
  * arreglan sacando nada al catálogo**. Eso es exactamente lo que apaga un
- * guarda, y lo dice su propia cabecera. El guarda nació con tres archivos
+ * guarda, y lo dice su propia cabecera. El guarda nació con tres walkFiles
  * migrados que no usaban `cn`, así que no se vio hasta que llegó una superficie
  * de verdad: `features/chat/` le sacó **33 hallazgos y ninguno cierto**.
  *
@@ -134,7 +134,7 @@ const migrados = [];
 const pendientes = [];
 const hallazgos = [];
 
-for (const archivo of archivos(FUENTE, [".tsx"])) {
+for (const archivo of walkFiles(FUENTE, [".tsx"])) {
   if (archivo.startsWith(LENGUAS)) continue;
   const crudo = readFileSync(archivo, "utf8");
   const usa = /from\s+"[^"]*lib\/i18n"/.test(crudo);
@@ -195,7 +195,7 @@ if (hallazgos.length === 0) {
 }
 
 console.error(
-  `\n${hallazgos.length} frase(s) soldadas en archivos que ya usan el catálogo:\n`,
+  `\n${hallazgos.length} frase(s) soldadas en walkFiles que ya usan el catálogo:\n`,
 );
 for (const h of hallazgos) {
   console.error(`  ${h.rel}:${h.linea}  [${h.donde}]`);

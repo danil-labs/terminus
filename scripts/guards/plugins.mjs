@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Que un paquete de lengua de `plugins/lenguas/` diga lo que la app sabe pedir.
+ * Que un paquete de lengua de `plugins/languages/` diga lo que la app sabe pedir.
  *
  * `scripts/guards/locales.mjs` no lo mira, y no debe: exige traducción **completa**, y
  * un paquete de disco va por detrás de la app a propósito —para eso está la
@@ -29,7 +29,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "../..");
-const PAQUETES = join(RAIZ, "plugins/lenguas");
+const PAQUETES = join(RAIZ, "plugins/languages");
 const BASE = join(RAIZ, "src/locales/es");
 /** Espeja `CONTRATO` de `src-tauri/src/environment/locales.rs`. */
 const CONTRATO = 2;
@@ -61,7 +61,7 @@ function leer(dir, omitir = new Set()) {
 }
 
 if (!existsSync(PAQUETES)) {
-  console.error(`plugins/lenguas/ no existe, y tauri.conf.json la empaqueta como recurso del bundle`);
+  console.error(`plugins/languages/ no existe, y tauri.conf.json la empaqueta como recurso del bundle`);
   process.exit(1);
 }
 const base = leer(BASE);
@@ -70,7 +70,7 @@ const codigos = readdirSync(PAQUETES).filter(
   (nombre) => !nombre.startsWith(".") && statSync(join(PAQUETES, nombre)).isDirectory(),
 );
 if (codigos.length === 0) {
-  console.error(`plugins/lenguas/ está vacía, y tauri.conf.json la empaqueta como recurso del bundle`);
+  console.error(`plugins/languages/ está vacía, y tauri.conf.json la empaqueta como recurso del bundle`);
   process.exit(1);
 }
 
@@ -78,7 +78,7 @@ for (const codigo of codigos) {
   const dir = join(PAQUETES, codigo);
   const mf = join(dir, "manifiesto.json");
   if (!existsSync(mf)) {
-    problemas.push(`plugins/lenguas/${codigo}/ no tiene manifiesto.json`);
+    problemas.push(`plugins/languages/${codigo}/ no tiene manifiesto.json`);
     continue;
   }
   const m = JSON.parse(readFileSync(mf, "utf8"));

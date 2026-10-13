@@ -1,5 +1,5 @@
 ---
-name: componente-de-interfaz
+name: ui-component
 description: Cómo se escribe o se cambia una pieza de interfaz de Terminus dentro del sistema visual — tokens en @theme, átomos de src/ui con cva y cn, Kobalte para foco y portal, Solid sin desestructurar props y texto desde el catálogo. Úsala cuando pidan una pantalla, un panel, un componente, un botón o un control nuevo, cambiar colores, espaciado o tipografía, añadir una variante, o «rediseñar» algo en el front de Terminus.
 ---
 
@@ -35,15 +35,15 @@ y valores nuevos se definen en los archivos compartidos.
    como función y no copiadas en otra señal.
 5. **El texto sale del catálogo** (`src/locales/`, según `docs/localization.md`). Si la pieza necesita un renglón de explicación, se arregla la
    estructura y no se añade el renglón.
-6. **Correr los guardas** con `pnpm verificar --sin-cargo`: `theme-inversion` comprueba
+6. **Correr los guardas** con `pnpm verify --no-cargo`: `theme-inversion` comprueba
    colores fuera de `@theme`, y `missing-classes` comprueba clases que Tailwind
    no generó. Sus contratos están en `docs/guards.md`. Después, revisa la pieza
-   con `revisar-interfaz`.
+   con `review-ui`.
 
 ## Salida esperada
 
 La pieza usando átomos y tokens. Cualquier token o variante nueva vive en
-`src/styles/global.css` o en su átomo. `pnpm verificar --sin-cargo` pasa sin `OMITIDO`, o se
+`src/styles/global.css` o en su átomo. `pnpm verify --no-cargo` pasa sin `SKIPPED`, o se
 dice cuál se omitió. Hay capturas en claro y oscuro.
 
 ## Ejemplo

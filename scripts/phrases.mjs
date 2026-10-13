@@ -11,7 +11,7 @@
  * Se **genera**, no se escribe: un documento escrito a mano se desincroniza en
  * el primer arreglo y entonces miente sobre lo que hay que traducir.
  *
- *   node scripts/phrases.mjs            → escribe docs/FRASES.md
+ *   node scripts/phrases.mjs            → escribe docs/PHRASES.md
  *   node scripts/phrases.mjs --check    → falla si el archivo está desactualizado
  *
  * ## Qué NO puede decir, y por eso lo imprime
@@ -30,14 +30,14 @@ const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "..");
 const FUENTE = join(RAIZ, "src");
 const LENGUAS = join(RAIZ, "src/locales");
 const BACKEND = join(RAIZ, "src-tauri/src");
-const SALIDA = join(RAIZ, "docs/FRASES.md");
+const SALIDA = join(RAIZ, "docs/PHRASES.md");
 /**
  * La ruta de un archivo tal y como se escribe en la hoja, siempre con `/`.
  *
  * `relative()` devuelve el separador de la plataforma: `src/locales/es` en
  * macOS y `src\lenguas\es` en Windows. Como esta hoja se commitea y el guarda
  * la compara carácter a carácter, sin normalizar **el resultado depende de
- * quién la generó**: en Windows `pnpm verificar` sale roja siempre, regenerar
+ * quién la generó**: en Windows `pnpm verify` sale roja siempre, regenerar
  * reescribe las 891 filas con barras invertidas, y entonces sale roja en macOS.
  * Un ping-pong que no converge y que no tiene nada que ver con las frases.
  *

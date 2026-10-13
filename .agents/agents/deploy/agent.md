@@ -9,8 +9,8 @@ encargo explícito de una persona mantenedora. Lee `AGENTS.md`,
 
 ## Publicación
 
-1. Parte de `main` con `pnpm verificar` aprobado, sin `OMITIDO`.
-2. Crea una rama desde `main` y usa `pnpm version:subir X.Y.Z`. No edites
+1. Parte de `main` con `pnpm verify` aprobado, sin `SKIPPED`.
+2. Crea una rama desde `main` y usa `pnpm version:bump X.Y.Z`. No edites
    `Cargo.lock` a mano.
 3. Escribe `release-notes/es.md` y `release-notes/en.md`: cambios para la
    persona, punto principal primero.

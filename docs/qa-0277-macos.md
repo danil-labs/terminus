@@ -284,7 +284,7 @@ La omisión Unix de la prueba anterior se elimina; aquí no hay unitarias Rust.
 | `git diff --cached --check` | 0; sin salida |
 | `node scripts/guards/doc-paths.mjs` | 0; `Las rutas y enlaces locales de 23 documentos existen.` |
 
-`pnpm verificar --sin-cargo` termina con 0. Resumen literal:
+`pnpm verify --no-cargo` termina con 0. Resumen literal:
 
 ```text
   Verificado en Windows (cadena sin Rust), 622s.
@@ -344,8 +344,8 @@ temporal de `cli.rs`: código 1, `falta COMMANDS: telegram`, `0 !== 23`.
 `help` y `kn`, ausentes del catálogo publicado, mantienen casos explícitos.
 
 La cadena completa prepara el sidecar antes de esta prueba; `verify (rust)`
-también la ejecuta después de `engine.mjs sidecar`. `--sin-cargo` la marca
-`OMITIDO`, con su motivo, antes de ejecutar el test o compilar `main.rs`, incluso
+también la ejecuta después de `engine.mjs sidecar`. `--no-cargo` la marca
+`SKIPPED`, con su motivo, antes de ejecutar el test o compilar `main.rs`, incluso
 si hay sidecar local. Esa omisión prevista no hace fallar el job del front;
 otras omisiones inesperadas siguen haciendo fallar CI. Para ejecutar la prueba
 nativa directamente se prepara el entorno con `pnpm engine:sidecar`. Al cambiar
@@ -366,7 +366,7 @@ Resultados finales de Cargo con `CARGO_BUILD_JOBS=2`:
 `Las rutas y enlaces locales de 23 documentos existen.`
 `git diff --cached --check`: código 0, sin salida.
 
-`pnpm verificar --sin-cargo`: código 0, resumen literal de este ajuste:
+`pnpm verify --no-cargo`: código 0, resumen literal de este ajuste:
 
 ```text
   Verificado en Windows (cadena sin Rust), 512s.
@@ -386,13 +386,13 @@ mantienen sus pendientes anteriores.
 ## Separación de CI: PR #70
 
 Reproducción en Windows con `CI=true`, `src-tauri/binaries/` renombrado
-temporalmente y `pnpm verificar --sin-cargo`: código 0, ninguna `FALLA`.
+temporalmente y `pnpm verify --no-cargo`: código 0, ninguna `FALLA`.
 El directorio se restaura al terminar mediante `finally`. Salida literal:
 
 ```text
-  La CLI reenvía al motor sin abrir ventana         OMITIDO
+  La CLI reenvía al motor sin abrir ventana         SKIPPED
   Corrido en Windows, 802s — y 1 de 101 pasos NO corrió: esto NO es una verificación.
-      --sin-cargo: necesita rustc y el sidecar fijado; se ejecuta en la cadena completa y verify (rust).
+      --no-cargo: necesita rustc y el sidecar fijado; se ejecuta en la cadena completa y verify (rust).
 ```
 
 Con el sidecar restaurado, `node --test tests/unit/cli-forward.test.mjs` termina

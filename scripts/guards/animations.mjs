@@ -9,7 +9,7 @@
 import { readFileSync } from "node:fs";
 import { relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { archivos } from "../git.mjs";
+import { walkFiles } from "../git.mjs";
 
 const RAIZ = fileURLToPath(new URL("../../src", import.meta.url));
 
@@ -33,7 +33,7 @@ const POR_PASOS = /\bsteps\(|\bstep-(?:start|end)\b/;
 const TAILWIND_CONTINUA = /\banimate-(?:spin|pulse|ping|bounce)(?![\w-])/g;
 
 const fallos = [];
-for (const f of archivos(RAIZ, [".css"])) {
+for (const f of walkFiles(RAIZ, [".css"])) {
   const fuente = readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, " "));
   for (const m of fuente.matchAll(DECLARACION)) {
     const valor = m[1].trim();
@@ -44,7 +44,7 @@ for (const f of archivos(RAIZ, [".css"])) {
   }
 }
 
-for (const f of archivos(RAIZ, [".ts", ".tsx"])) {
+for (const f of walkFiles(RAIZ, [".ts", ".tsx"])) {
   const cuantas = [...readFileSync(f, "utf8").matchAll(TAILWIND_CONTINUA)].length;
   const clave = relative(RAIZ, f).replaceAll("\\", "/");
   const cupo = CUPO_TAILWIND[clave] ?? 0;

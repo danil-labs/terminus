@@ -3,7 +3,7 @@
  * Cuánto trabajo le cuesta a la ventana abrir una tarea con historia larga.
  *
  *   node tests/perf/open-task-cost.mjs              guarda: compara con open-task-cost-baseline.json
- *   node tests/perf/open-task-cost.mjs --ajustar    baja el techo a lo que cuesta hoy
+ *   node tests/perf/open-task-cost.mjs --update    baja el techo a lo que cuesta hoy
  *   node tests/perf/open-task-cost.mjs --reloj 10   además, la mediana del reloj en 10 aperturas, una por proceso
  *   node tests/perf/open-task-cost.mjs --session f  con un session.json real en vez del sintético
  *
@@ -12,7 +12,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
-import { arrancar, espera } from "../helpers/jsdom-app.mjs";
+import { boot, sleep } from "../helpers/jsdom-app.mjs";
 
 const BASELINE = join(import.meta.dirname, "open-task-cost-baseline.json");
 const args = process.argv.slice(2);
@@ -20,10 +20,10 @@ const flag = (name) => {
   const i = args.indexOf(name);
   return i === -1 ? null : args[i + 1] ?? "";
 };
-const ADJUST = args.includes("--ajustar");
+const ADJUST = args.includes("--update");
 const CLOCK_RUNS = Number(flag("--reloj") ?? 0);
 const REAL_SESSION = flag("--session");
-const ONE_CLOCK = args.includes("--una");
+const ONE_CLOCK = args.includes("--once");
 
 // Sembrado: la misma tarea en cada corrida, o los contadores dejan de ser comparables.
 function prng(seed) {
@@ -142,7 +142,7 @@ const PERIODIC = new Set(["service_poll", "list_active_turns", "list_live_turns"
 async function settle(since, quiet = 300) {
   since.last = Math.max(since.last, Date.now());
   const limit = Date.now() + 120_000;
-  while (Date.now() - since.last < quiet && Date.now() < limit) await espera(25);
+  while (Date.now() - since.last < quiet && Date.now() < limit) await sleep(25);
 }
 
 // jsdom no tiene geometría: subir hasta arriba del hilo se simula con lo que ve este observador.
@@ -198,7 +198,7 @@ async function behaves(app, turns, clock) {
 
 /** Abre la tarea corta, luego la larga, y cuenta lo que cuesta la segunda. */
 async function openLong(turns, run, check) {
-  const app = await arrancar("listo", `open-task-${run}`, responses(turns));
+  const app = await boot("listo", `open-task-${run}`, responses(turns));
   const doc = app.w.document;
   const clock = { last: Date.now() };
   let mutations = 0;
@@ -260,7 +260,7 @@ if (first.failure) {
 if (CLOCK_RUNS > 0) {
   const own = REAL_SESSION ? ["--session", REAL_SESSION] : [];
   const times = Array.from({ length: CLOCK_RUNS }, () =>
-    Number(execFileSync(process.execPath, [import.meta.filename, "--una", ...own], { encoding: "utf8" }).trim()),
+    Number(execFileSync(process.execPath, [import.meta.filename, "--once", ...own], { encoding: "utf8" }).trim()),
   );
   times.sort((a, b) => a - b);
   const median = times[Math.floor(times.length / 2)];
@@ -285,6 +285,6 @@ if (over.length > 0) {
   process.exit(1);
 }
 const room = Object.entries(ceiling).filter(([k, v]) => counters[k] < v);
-if (room.length > 0) console.log(`Bajó: ${room.map(([k, v]) => `${k} ${v} → ${counters[k]}`).join(", ")}. Fíjalo con --ajustar.`);
+if (room.length > 0) console.log(`Bajó: ${room.map(([k, v]) => `${k} ${v} → ${counters[k]}`).join(", ")}. Fíjalo con --update.`);
 
 process.exit(0);

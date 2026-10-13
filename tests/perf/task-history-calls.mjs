@@ -4,17 +4,17 @@
  * ante los avisos del CLI con la ventana quieta y mientras un turno largo transmite.
  *
  *   node tests/perf/task-history-calls.mjs              guarda: compara con task-history-calls-baseline.json
- *   node tests/perf/task-history-calls.mjs --ajustar    baja el techo a lo que cuesta hoy
+ *   node tests/perf/task-history-calls.mjs --update    baja el techo a lo que cuesta hoy
  *
  * Cada `task_history` corre git en el servicio y su respuesta cruza a la vista: en la Mac de la
  * persona llegaron a 30–40 por segundo con varias pestañas abiertas. Un techo solo baja.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { arrancar, espera } from "../helpers/jsdom-app.mjs";
+import { boot, sleep } from "../helpers/jsdom-app.mjs";
 
 const BASELINE = join(import.meta.dirname, "task-history-calls-baseline.json");
-const ADJUST = process.argv.includes("--ajustar");
+const ADJUST = process.argv.includes("--update");
 const DELTAS = 400;
 
 const TASKS = Array.from({ length: 10 }, (_, n) => `t${n}`);
@@ -70,7 +70,7 @@ const responses = {
   list_active_turns: () => [...active],
   service_poll: { cursor: 0, gap: false, replay: false, runtime: "bench", reset: false },
   // Lo que tarda git en el servicio: una respuesta que llega después del siguiente delta.
-  task_history: ({ id }) => espera(40).then(() => (id === BROKEN ? Promise.reject(new Error("sin árbol")) : work)),
+  task_history: ({ id }) => sleep(40).then(() => (id === BROKEN ? Promise.reject(new Error("sin árbol")) : work)),
   load_session: ({ id }) => ({ id, agent: "codex", sources: [], model: "gpt-5.6", effort: null, permission_mode: null, turns: history(id) }),
   load_queue: [],
   save_queue: null,
@@ -80,7 +80,7 @@ const responses = {
   inject_message: null,
 };
 
-const app = await arrancar("listo", "task-history-calls", responses);
+const app = await boot("listo", "task-history-calls", responses);
 const doc = app.w.document;
 const count = (cmd) => app.comandos.filter((c) => c === cmd).length;
 const chat = (session, kind, extra = {}) => {
@@ -88,19 +88,19 @@ const chat = (session, kind, extra = {}) => {
   app.emit("chat", { kind, session, workspace: "w", ...extra });
 };
 
-await espera(1500);
+await sleep(1500);
 const startup = { task_history: count("task_history"), list_live_sessions: count("list_live_sessions") };
 // La vista de agentes del riel pide la lista de encargados de cada carpeta una vez.
 doc.querySelector('div[role=group] button[aria-pressed="false"]')?.click();
-await espera(500);
+await sleep(500);
 const quiet = { task_history: count("task_history"), list_live_sessions: count("list_live_sessions"), list_encargados: count("list_encargados") };
 // Lo que emite el servicio por cada mutación del CLI (`cli::server::notify`), con la ventana quieta.
 for (let n = 0; n < MUTATIONS; n++) {
   app.emit("session", { instance: "cli", workspace: "w", project: FOLDERS[0], session: `${FOLDERS[0]}t0`, seq: n, when: n });
   app.emit("cli-changed", { workspace: "w", folder: FOLDERS[0], command: "task.send" });
-  await espera(300);
+  await sleep(300);
 }
-await espera(500);
+await sleep(500);
 const idle = {
   task_history: count("task_history") - quiet.task_history,
   list_live_sessions: count("list_live_sessions") - quiet.list_live_sessions,
@@ -111,9 +111,9 @@ for (const id of TABS) {
   const el = doc.querySelector(`[data-sesion="${id}"]`);
   if (!el) throw new Error(`No está la fila de ${id}.`);
   el.click();
-  await espera(150);
+  await sleep(150);
 }
-await espera(500);
+await sleep(500);
 
 const before = { task_history: count("task_history"), list_live_sessions: count("list_live_sessions") };
 // Un turno largo en la abierta y otro de fondo; a mitad, otra tarea cierra el suyo y mueve su `updated_at`.
@@ -123,20 +123,20 @@ for (const id of [shown, hidden]) {
   active.add(id);
   chat(id, "started");
 }
-await espera(200);
+await sleep(200);
 for (let n = 0; n < DELTAS; n++) {
   chat(n % 3 === 0 ? hidden : shown, "delta", { text: `palabra ${n} ` });
   if (n === DELTAS / 2) {
     chat(TASKS[0], "started");
     chat(TASKS[0], "done", { ok: true });
   }
-  if (n % 4 === 0) await espera(10);
+  if (n % 4 === 0) await sleep(10);
 }
 for (const id of [shown, hidden]) {
   active.delete(id);
   chat(id, "done", { ok: true });
 }
-await espera(1500);
+await sleep(1500);
 
 if (app.fallos.length > 0) {
   console.error(app.fallos.slice(0, 3).map((f) => String(f).split("\n").slice(0, 4).join("\n  ")).join("\n"));

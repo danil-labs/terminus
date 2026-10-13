@@ -37,7 +37,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import test from "node:test";
-import { archivos } from "../../scripts/git.mjs";
+import { walkFiles } from "../../scripts/git.mjs";
 
 const raiz = resolve(import.meta.dirname, "../..");
 const WEB = join(raiz, "src");
@@ -62,7 +62,7 @@ function bloque(fuente, desde) {
  * Los disparadores de `fuente` que pisan un manejador propio sobre `{...p}`.
  * Devuelve `[{ manejador, linea }]`.
  */
-export function pisados(fuente) {
+export function overridden(fuente) {
   const fallos = [];
   // `as={(p: object) => (` — el nombre del parámetro es lo que se esparce.
   const inicio = /as=\{\s*\(\s*(\w+)\s*(?::[^)]*)?\)\s*=>/g;
@@ -87,8 +87,8 @@ export function pisados(fuente) {
 
 test("ningún disparador pisa el manejador que lo abre", () => {
   const malos = [];
-  for (const archivo of archivos(WEB, [".tsx"])) {
-    for (const f of pisados(readFileSync(archivo, "utf8"))) {
+  for (const archivo of walkFiles(WEB, [".tsx"])) {
+    for (const f of overridden(readFileSync(archivo, "utf8"))) {
       malos.push(`${relative(raiz, archivo)}:${f.linea} — ${f.manejador}`);
     }
   }
@@ -117,6 +117,6 @@ test("reconoce el defecto que lo hizo falta", () => {
         </button>
       )}
     />`;
-  assert.equal(pisados(roto).length, 1);
-  assert.equal(pisados(roto)[0].manejador, "onClick");
+  assert.equal(overridden(roto).length, 1);
+  assert.equal(overridden(roto)[0].manejador, "onClick");
 });

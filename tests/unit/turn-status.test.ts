@@ -41,9 +41,9 @@ test("cada herramienta en curso se nombra en presente y con su sujeto", () => {
 });
 
 test("un comando en curso se enseña sin su envoltorio y en una línea", () => {
-  assert.deepEqual(inProgress(stepOf("Bash", '/bin/zsh -lc "pnpm verificar\nls"')), {
+  assert.deepEqual(inProgress(stepOf("Bash", '/bin/zsh -lc "pnpm verify\nls"')), {
     verbo: "Ejecutando",
-    sujeto: "pnpm verificar",
+    sujeto: "pnpm verify",
   });
 });
 
@@ -54,7 +54,7 @@ test("la cabecera de un tramo cuenta por clase, y las ediciones por archivo", ()
     stepOf("Edit", "a.ts"),
     stepOf("Edit", "a.ts"),
     stepOf("Write", "c.ts"),
-    stepOf("Bash", "pnpm verificar"),
+    stepOf("Bash", "pnpm verify"),
     permissionStep("Bash", "rm -rf dist", false),
   ];
   assert.equal(
@@ -74,7 +74,7 @@ test("un tramo vivo se cuenta en gerundio, y su fila en curso también", () => {
   const segment = [
     stepOf("Edit", "a.ts"),
     stepOf("Write", "c.ts"),
-    { ...stepOf("Bash", "pnpm verificar"), corriendo: true },
+    { ...stepOf("Bash", "pnpm verify"), corriendo: true },
   ];
   assert.equal(segmentCount(segment, true), "Editando 2 archivos, ejecutando 1 comando");
   assert.equal(segmentCount(segment), "Editó 2 archivos, ejecutó 1 comando");

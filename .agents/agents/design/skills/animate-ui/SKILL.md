@@ -1,5 +1,5 @@
 ---
-name: animar-interfaz
+name: animate-ui
 description: Cómo se anima la interfaz de Terminus (Solid + Tailwind v4 dentro del webview de Tauri) — qué herramienta elegir entre CSS, Web Animations, View Transitions, Motion y GSAP, con qué duraciones, cómo se limpia en Solid y cómo se respeta prefers-reduced-motion. Úsala cuando pidan animar, meter una transición, un efecto de entrada o salida, un timeline, algo «más fluido» o «con más vida», o usar GSAP, Motion o anime.js en el front de Terminus.
 ---
 
@@ -47,7 +47,7 @@ herramienta necesaria y libera sus recursos al desmontar.
    `gsap.matchMedia()`.
 5. **Limpiar en el ciclo de Solid**. Se anima en `onMount` o en un
    `createEffect` sobre el `ref`, y se revierte en `onCleanup`. El patrón de
-   GSAP y Motion en Solid está en `references/gsap-y-motion-en-solid.md`:
+   GSAP y Motion en Solid está en `references/gsap-and-motion-in-solid.md`:
    ábrelo antes de escribir la primera línea con cualquiera de los dos.
 6. **Mirarla en la app**: `pnpm window:build` y `pnpm engine:start`, según
    `docs/development.md`, y también con el movimiento reducido activado en el

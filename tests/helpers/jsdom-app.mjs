@@ -56,10 +56,10 @@ const HTML = indice
 let copiadas = [];
 
 /** El arranque son promesas ya resueltas: basta con dejar correr la cola. */
-export const espera = (ms) => new Promise((r) => setTimeout(r, ms));
+export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Con qué causa se emitió un evento, para atribuirle lo que dispare. */
-export const causa = new AsyncLocalStorage();
+export const cause = new AsyncLocalStorage();
 
 /**
  * Monta el árbol una vez y devuelve qué pintó y qué lanzó.
@@ -74,7 +74,7 @@ export const causa = new AsyncLocalStorage();
  *   normal sube por el `setEnv` de `Setup.revisar` y **la traga su propio
  *   `try`**, que es exactamente por qué este fallo no dejó ni un mensaje.
  */
-export async function arrancar(entorno, version, respuestas, userAgent) {
+export async function boot(entorno, version, respuestas, userAgent) {
   const fallos = [];
   const comandos = [];
   const storageQueries = [];
@@ -329,7 +329,7 @@ export async function arrancar(entorno, version, respuestas, userAgent) {
   await import(`${pathToFileURL(join(dist, "assets", bundle)).href}?v=${version}`).catch((e) =>
     fallos.push(`al evaluar el módulo: ${e?.stack ?? e}`),
   );
-  await espera(500);
+  await sleep(500);
 
   return { w, fallos, comandos, storageQueries, emit: (event, payload) => { for (const id of [...(events.get(event)?.values() ?? [])]) callbacks.get(id)?.({ event, payload }); }, pintado: w.document.querySelector("#root")?.innerHTML ?? "" };
 }

@@ -1,8 +1,8 @@
 # Verification guards
 
-`pnpm verificar` runs `scripts/verify.mjs` and stops at the first failure.
-`OMITIDO` (skipped) marks a check that could not run. In CI a skip fails the
-run; locally it is allowed and listed in the summary. `--sin-cargo` skips the
+`pnpm verify` runs `scripts/verify.mjs` and stops at the first failure.
+`SKIPPED` (skipped) marks a check that could not run. In CI a skip fails the
+run; locally it is allowed and listed in the summary. `--no-cargo` skips the
 Rust steps.
 
 The engine (`seldon-runtime`) is not in this repository. Guards that need to

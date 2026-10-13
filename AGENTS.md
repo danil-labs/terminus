@@ -14,14 +14,14 @@ area guide before editing an area: [front](src/AGENTS.md),
 
 ```bash
 pnpm install
-pnpm verificar              # guards, front build and Rust on this platform
-pnpm verificar --sin-cargo  # the same chain without Rust
+pnpm verify              # guards, front build and Rust on this platform
+pnpm verify --no-cargo  # the same chain without Rust
 pnpm window:build           # debug window with the front embedded
 pnpm engine:download        # engine pinned in seldon-runtime.lock
 pnpm engine:start           # engine with throwaway data + window
 ```
 
-The chain stops at the first failure. `OMITIDO` means a check did not run; it
+The chain stops at the first failure. `SKIPPED` means a check did not run; it
 is not a pass. What each guard checks is in [docs/guards.md](docs/guards.md);
 `scripts/verify.mjs` requires a row there for every guard and runs every
 `tests/unit/*.test.*`. Details are in [docs/development.md](docs/development.md).

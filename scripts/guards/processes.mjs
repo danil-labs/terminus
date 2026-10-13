@@ -3,7 +3,7 @@
  * Un proceso que alguien espera lleva plazo, y la deuda solo baja.
  *
  *   node scripts/guards/processes.mjs              guarda: compara con processes-baseline.json
- *   node scripts/guards/processes.mjs --ajustar    baja el cupo a lo que hay hoy
+ *   node scripts/guards/processes.mjs --update    baja el cupo a lo que hay hoy
  *
  * Esperar a un CLI sin plazo cuelga al hilo que llamó y deja al hijo vivo. No da
  * error: se ve como que la máquina va lenta. El tope es `util::output_with_timeout`,
@@ -16,7 +16,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { archivos, RAIZ } from "../git.mjs";
+import { walkFiles } from "../git.mjs";
 
 const ROOT = fileURLToPath(new URL("../../src-tauri/src", import.meta.url));
 const BASELINE = join(import.meta.dirname, "processes-baseline.json");
@@ -30,7 +30,7 @@ const conPlazo = /output_with_timeout|output_with_input|output_with_progress|PLA
 
 function cuenta() {
   const porArchivo = {};
-  for (const f of archivos(ROOT, [".rs"])) {
+  for (const f of walkFiles(ROOT, [".rs"])) {
     const rel = relative(ROOT, f).split(sep).join("/");
     if (/(^|\/)tests\.rs$|_tests\.rs$|(^|\/)tests\//.test(rel)) continue;
     if (DEL_TURNO.some((d) => rel.startsWith(d))) continue;
@@ -56,7 +56,7 @@ function cuenta() {
 const suma = (o) => Object.values(o).reduce((a, b) => a + b, 0);
 const hoy = cuenta();
 
-if (process.argv.includes("--ajustar")) {
+if (process.argv.includes("--update")) {
   writeFileSync(BASELINE, `${JSON.stringify(hoy, null, 2)}\n`);
   console.log(`Cupo: ${suma(hoy)} procesos sin plazo.`);
   process.exit(0);
@@ -68,7 +68,7 @@ const subieron = Object.entries(hoy).filter(([f, n]) => n > (cupo[f] ?? 0));
 if (subieron.length === 0) {
   console.log(`Ningún proceso nuevo se espera sin plazo: ${suma(hoy)} sin él (cupo ${suma(cupo)}).`);
   if (suma(hoy) < suma(cupo)) {
-    console.log("Bajaron: fija el trinquete con `node scripts/guards/processes.mjs --ajustar`.");
+    console.log("Bajaron: fija el trinquete con `node scripts/guards/processes.mjs --update`.");
   }
   process.exit(0);
 }

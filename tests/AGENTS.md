@@ -1,7 +1,7 @@
 # Tests
 
 Applies [AGENTS.md](../AGENTS.md). Everything here runs with Node's test
-runner or as a step of `pnpm verificar`; the static guards live in
+runner or as a step of `pnpm verify`; the static guards live in
 [scripts/](../scripts/AGENTS.md).
 
 | Folder | What it holds |

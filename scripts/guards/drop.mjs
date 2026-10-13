@@ -17,7 +17,7 @@
  * coordenadas por dos en un Mac Retina**: el punto cae arriba a la izquierda,
  * así que soltar un archivo no adjunta nada y ni siquiera enciende el
  * resaltado. No hay error ni nada en consola; se lee como que la app no acepta
- * archivos. Y en un Mac sin Retina, o en Windows, el mismo código funciona —
+ * walkFiles. Y en un Mac sin Retina, o en Windows, el mismo código funciona —
  * que es por qué esto no lo caza probar.
  *
  * Hoy la zona de soltar es la ventana entera y no hay geometría que convertir.
@@ -33,7 +33,7 @@ import { relative } from "node:path";
 // `.pathname` de un `file://` da `/C:/Users/…` en Windows, y `readdirSync` lo
 // resuelve contra la unidad actual. Ver `scripts/paths.mjs`.
 import { fileURLToPath } from "node:url";
-import { archivos } from "../git.mjs";
+import { walkFiles } from "../git.mjs";
 
 const RAIZ = fileURLToPath(new URL("../../src", import.meta.url));
 const ESCUCHA = /onDragDropEvent/;
@@ -41,7 +41,7 @@ const CONVIERTE = /devicePixelRatio/;
 
 const fugas = [];
 let escuchan = 0;
-for (const f of archivos(RAIZ, [".ts", ".tsx"])) {
+for (const f of walkFiles(RAIZ, [".ts", ".tsx"])) {
   const fuente = readFileSync(f, "utf8");
   if (!ESCUCHA.test(fuente)) continue;
   escuchan += 1;

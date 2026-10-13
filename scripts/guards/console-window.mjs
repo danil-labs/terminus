@@ -19,7 +19,7 @@
 import { readFileSync } from "node:fs";
 import { relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { archivos } from "../git.mjs";
+import { walkFiles } from "../git.mjs";
 
 const ROOT = fileURLToPath(new URL("../../src-tauri/src", import.meta.url));
 /** El módulo que define la contención: es donde vive `no_console_window`. */
@@ -28,7 +28,7 @@ const OWNER = "console.rs";
 const WINDOW_SIZE = 14;
 
 const violations = [];
-for (const f of archivos(ROOT, [".rs"])) {
+for (const f of walkFiles(ROOT, [".rs"])) {
   const rel = relative(ROOT, f).split(sep).join("/");
   // Un archivo que es entero un módulo de pruebas no lleva el `#[cfg(test)]`
   // dentro: lo lleva el `mod tests;` del padre.

@@ -7,7 +7,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { arrancar, espera } from "../helpers/jsdom-app.mjs";
+import { boot, sleep } from "../helpers/jsdom-app.mjs";
 
 // Cada caso en su propio proceso: el arnés deja `window` en la última ventana, y los
 // temporizadores de una anterior llamarían a los stubs de la siguiente.
@@ -90,9 +90,9 @@ const acciones = (app) => [...app.w.document.querySelectorAll("main > footer but
 
 caso("lo esencial que falta con la app pintada se repara detrás, sin abrir la preparación", async () => {
   const s = servicio({ setupRequired: false, entorno: reporte(true, ["node", "npm"]), preparar: enCurso });
-  const app = await arrancar("listo", "reparacion-detras", s.respuestas);
+  const app = await boot("listo", "reparacion-detras", s.respuestas);
   s.conectar(app);
-  await espera(400);
+  await sleep(400);
 
   assert.equal(enPantalla(app), false, "la preparación se abrió con la app ya pintada");
   assert.ok(aviso(app), "no hay aviso de la reparación en curso");
@@ -105,9 +105,9 @@ caso("la primera vez la pantalla avanza con la foto aunque no llegue ningún eve
     entorno: reporte(false, []),
     preparar: (n) => (n === 1 ? enCurso() : terminada()),
   });
-  const app = await arrancar("listo", "foto-sin-eventos", s.respuestas);
+  const app = await boot("listo", "foto-sin-eventos", s.respuestas);
   s.conectar(app);
-  await espera(6000);
+  await sleep(6000);
 
   assert.ok(s.llamadas.prepare_runtime.length >= 2, "la ventana no volvió a pedir la foto");
   assert.ok(acciones(app).length > 0, "la corrida terminó y la pantalla no ofrece seguir");
@@ -121,9 +121,9 @@ caso("un servicio nuevo a mitad de la corrida la retoma y la pantalla termina", 
     preparar: (n) => (n === 1 ? enCurso() : terminada()),
     reset: () => ++polls === 3,
   });
-  const app = await arrancar("listo", "reset-a-mitad", s.respuestas);
+  const app = await boot("listo", "reset-a-mitad", s.respuestas);
   s.conectar(app);
-  await espera(2500);
+  await sleep(2500);
 
   assert.ok(s.llamadas.prepare_runtime.length >= 2, "con `reset` nadie volvió a pedir la corrida");
   assert.ok(acciones(app).length > 0, "tras el cambio de servicio la pantalla no ofrece seguir");
@@ -141,9 +141,9 @@ caso("un corte del servicio a mitad de la corrida no deja error cuando termina b
       return polls === 3;
     },
   });
-  const app = await arrancar("listo", "corte-a-mitad", s.respuestas);
+  const app = await boot("listo", "corte-a-mitad", s.respuestas);
   s.conectar(app);
-  await espera(2500);
+  await sleep(2500);
 
   assert.ok(acciones(app).length > 0, "tras el corte la pantalla no ofrece seguir");
   assert.ok(!app.w.document.body.textContent.includes("No se pudo revisar esta computadora"), "quedó pintado el error del corte");
@@ -152,28 +152,28 @@ caso("un corte del servicio a mitad de la corrida no deja error cuando termina b
 
 caso("cada evento de la preparación pinta una sola línea", async () => {
   const s = servicio({ setupRequired: true, entorno: reporte(false, []), preparar: enCurso });
-  const app = await arrancar("listo", "un-lector", s.respuestas);
+  const app = await boot("listo", "un-lector", s.respuestas);
   s.conectar(app);
   s.publicar("bootstrap-run", { type: "note", stage: "platform", kind: "platform", value: "windows x86_64" });
-  await espera(1500);
+  await sleep(1500);
 
   assert.equal(lineas(app).filter((l) => l.includes("windows x86_64")).length, 1);
 });
 
 caso("la corrida que retoma un servicio nuevo empieza con la terminal limpia", async () => {
   const s = servicio({ setupRequired: true, entorno: reporte(false, []), preparar: enCurso });
-  const app = await arrancar("listo", "dos-corridas", s.respuestas);
+  const app = await boot("listo", "dos-corridas", s.respuestas);
   s.conectar(app);
   const manifiesto = { type: "manifest", stages: ETAPAS.map((name) => ({ name, essential: ESENCIALES.includes(name) })) };
   s.publicar("bootstrap-run", manifiesto);
   s.publicar("bootstrap-run", { type: "note", stage: "platform", kind: "platform", value: "corrida-uno" });
-  await espera(800);
+  await sleep(800);
   // El servicio nuevo emite su manifiesto antes de que la ventana empiece a leerlo.
   s.cambiarDeServicio();
   s.publicar("bootstrap-run", manifiesto);
-  await espera(600);
+  await sleep(600);
   s.publicar("bootstrap-run", { type: "note", stage: "platform", kind: "platform", value: "corrida-dos" });
-  await espera(800);
+  await sleep(800);
 
   assert.equal(lineas(app).filter((l) => l.includes("corrida-dos")).length, 1);
   assert.deepEqual(lineas(app).filter((l) => l.includes("corrida-uno")), [], "la terminal repite la corrida anterior");
@@ -182,9 +182,9 @@ caso("la corrida que retoma un servicio nuevo empieza con la terminal limpia", a
 caso("una herramienta que no contestó a tiempo no abre la preparación ni avisa", async () => {
   const lento = { id: "node", label: "Node.js", ok: false, required: false, detail: "", timed_out: true };
   const s = servicio({ setupRequired: false, entorno: reporte(false, [], [lento]), preparar: enCurso });
-  const app = await arrancar("listo", "node-sin-respuesta", s.respuestas);
+  const app = await boot("listo", "node-sin-respuesta", s.respuestas);
   s.conectar(app);
-  await espera(400);
+  await sleep(400);
 
   assert.equal(enPantalla(app), false);
   assert.equal(aviso(app), null);

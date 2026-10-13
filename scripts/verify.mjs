@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { archivos as walkFiles, SALIDA_OMITIDO as SKIPPED_EXIT_CODE } from "./git.mjs";
+import { SKIPPED_EXIT_CODE, walkFiles } from "./git.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const backend = join(root, "src-tauri");
@@ -16,7 +16,7 @@ const OTHER_PLATFORMS =
       ? "macOS y Linux"
       : "Windows y macOS";
 
-const SKIP_RUST = process.argv.includes("--sin-cargo");
+const SKIP_RUST = process.argv.includes("--no-cargo");
 const rustBuild = { command: "cargo", env: process.env };
 
 function undocumentedGuards() {
@@ -503,8 +503,8 @@ const skipped = [];
 for (const [name, cmd, args, cwd] of steps) {
   process.stdout.write(`  ${name.padEnd(50)}`);
   if (SKIP_RUST && name === cliStep[0]) {
-    console.log("OMITIDO");
-    skipped.push([name, "--sin-cargo: necesita rustc y el sidecar fijado; se ejecuta en la cadena completa y verify (rust).", true]);
+    console.log("SKIPPED");
+    skipped.push([name, "--no-cargo: necesita rustc y el sidecar fijado; se ejecuta en la cadena completa y verify (rust).", true]);
     continue;
   }
   const start = Date.now();
@@ -513,7 +513,7 @@ for (const [name, cmd, args, cwd] of steps) {
     console.log(`ok   ${((Date.now() - start) / 1000).toFixed(1)}s`);
   } catch (e) {
     if (e?.status === SKIPPED_EXIT_CODE) {
-      console.log("OMITIDO");
+      console.log("SKIPPED");
       skipped.push([name, outputOf(e)]);
       continue;
     }

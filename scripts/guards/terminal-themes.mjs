@@ -8,7 +8,7 @@
  * tokens, que el de por omisión repita `@theme`, que los identificadores del
  * CSS y los del catálogo TypeScript coincidan, y el contraste medido.
  *
- *   node scripts/guards/terminal-themes.mjs [--tabla]
+ *   node scripts/guards/terminal-themes.mjs [--table]
  */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -41,7 +41,7 @@ function luminancia(hex) {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-export function contraste(a, b) {
+export function contrast(a, b) {
   const [x, y] = [luminancia(a), luminancia(b)];
   return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
 }
@@ -132,7 +132,7 @@ for (const [id, tokens] of temas) {
   for (const [nombre, minimo] of Object.entries(MINIMOS)) {
     const color = tokens.get(nombre);
     if (!color) continue;
-    const sobreFondo = contraste(color, fondo);
+    const sobreFondo = contrast(color, fondo);
     tabla.push([id, nombre.replace("--color-terminal-", ""), sobreFondo, minimo]);
     if (sobreFondo < minimo) {
       fallos.push(
@@ -143,7 +143,7 @@ for (const [id, tokens] of temas) {
   // La barra de título lleva el nombre del tema y el contador de etapas.
   if (barra) {
     for (const nombre of ["--color-terminal-text", "--color-terminal-muted"]) {
-      const sobreBarra = contraste(tokens.get(nombre), barra);
+      const sobreBarra = contrast(tokens.get(nombre), barra);
       tabla.push([id, `${nombre.replace("--color-terminal-", "")} / barra`, sobreBarra, 4.5]);
       if (sobreBarra < 4.5) {
         fallos.push(
@@ -154,7 +154,7 @@ for (const [id, tokens] of temas) {
   }
 }
 
-if (process.argv.includes("--tabla")) {
+if (process.argv.includes("--table")) {
   for (const [id, token, valor, minimo] of tabla) {
     console.log(`${id.padEnd(22)} ${token.padEnd(16)} ${valor.toFixed(2).padStart(6)}:1  (≥${minimo})`);
   }

@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "verificar": "node scripts/verify.mjs",
+    "verify": "node scripts/verify.mjs",
     "lint": "biome lint src scripts",
     "tauri": "tauri",
     "desktop:build": "tauri build",
@@ -18,9 +18,9 @@
     "engine:start": "node scripts/engine.mjs start",
     "engine:stop": "node scripts/engine.mjs stop",
     "indicators": "node scripts/indicators.mjs",
-    "frases": "node scripts/phrases.mjs",
-    "iconos": "node scripts/icons.mjs",
-    "version:subir": "node scripts/version.mjs"
+    "phrases": "node scripts/phrases.mjs",
+    "icons": "node scripts/icons.mjs",
+    "version:bump": "node scripts/version.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",
