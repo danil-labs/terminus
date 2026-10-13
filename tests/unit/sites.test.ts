@@ -32,9 +32,27 @@ g.window = dom.window;
 g.document = dom.window.document;
 g.MutationObserver = dom.window.MutationObserver;
 
-const { hayCapaEncima, corta } = await import("../../src/lib/sites.ts");
+const { hayCapaEncima, corta, suspendSiteLayers } = await import("../../src/lib/sites.ts");
 
 const body = dom.window.document.body;
+
+/** El hueco de una capa en la columna derecha, como el PDF de Typst. */
+const HUECO = { x: 600, y: 40, width: 400, height: 700 };
+
+/** jsdom no maqueta: cada elemento dice el rectángulo que tendría en la ventana. */
+function ocupa(el: Element, x: number, y: number, width: number, height: number) {
+  el.getBoundingClientRect = () => ({ x, y, width, height, top: y, left: x, right: x + width, bottom: y + height, toJSON() {} }) as DOMRect;
+}
+
+/** Un portal como los de `Kobalte.Portal` y Solid: un `div` sin tamaño con lo que pinta `fixed` dentro. */
+function abrirPortal(x: number, y: number, width: number, height: number) {
+  const portal = dom.window.document.createElement("div");
+  const dentro = dom.window.document.createElement("div");
+  ocupa(dentro, x, y, width, height);
+  portal.append(dentro);
+  body.append(portal);
+  return portal;
+}
 
 /** Deja `<body>` como lo deja `index.html` recién cargado. */
 function comoIndexHtml() {
@@ -57,28 +75,57 @@ test("el arranque de la app no cuenta como algo abierto encima", async () => {
   comoIndexHtml();
   await asentar();
   assert.equal(
-    hayCapaEncima(),
+    hayCapaEncima(HUECO),
     false,
     "`#root` y el `<script>` de arranque son el estado normal: con esto en " +
       "`true` la capa no se enseña nunca y nada falla",
   );
 });
 
-test("un portal abierto esconde la capa", async () => {
+test("un portal sobre el hueco esconde la capa", async () => {
   comoIndexHtml();
   await asentar();
-  // Así montan `Kobalte.Portal` y el `Portal` de Solid: un `div` hermano de
-  // `#root`. Es lo que hay detrás de un diálogo, un menú, un globo y de
-  // Configuración entera.
-  const portal = dom.window.document.createElement("div");
-  portal.append(dom.window.document.createElement("div"));
-  body.append(portal);
+  const portal = abrirPortal(700, 100, 200, 160);
   await asentar();
-  assert.equal(hayCapaEncima(), true, "un portal taparía la capa");
+  assert.equal(hayCapaEncima(HUECO), true, "el menú se abriría detrás de la capa");
 
   portal.remove();
   await asentar();
-  assert.equal(hayCapaEncima(), false, "al cerrarse, la capa vuelve");
+  assert.equal(hayCapaEncima(HUECO), false, "al cerrarse, la capa vuelve");
+});
+
+test("un portal en otra columna no esconde la capa", async () => {
+  comoIndexHtml();
+  await asentar();
+  // El menú de `/` del chat, a la izquierda del PDF.
+  abrirPortal(40, 500, 400, 240);
+  await asentar();
+  assert.equal(hayCapaEncima(HUECO), false, "escribir `/` en el chat escondía la vista de Typst");
+  assert.equal(hayCapaEncima({ x: 0, y: 0, width: 500, height: 800 }), true, "la capa de esa columna sí se esconde");
+});
+
+test("un diálogo esconde todas las capas", async () => {
+  comoIndexHtml();
+  await asentar();
+  // El fondo del diálogo cubre la ventana entera, aunque la caja esté en medio.
+  const portal = dom.window.document.createElement("div");
+  const fondo = dom.window.document.createElement("div");
+  const caja = dom.window.document.createElement("div");
+  ocupa(fondo, 0, 0, 1280, 800);
+  ocupa(caja, 340, 200, 600, 400);
+  portal.append(fondo, caja);
+  body.append(portal);
+  await asentar();
+  assert.equal(hayCapaEncima(HUECO), true);
+  assert.equal(hayCapaEncima({ x: 0, y: 0, width: 300, height: 800 }), true);
+});
+
+test("tocarse por el borde no es estar encima", async () => {
+  comoIndexHtml();
+  await asentar();
+  abrirPortal(HUECO.x - 200, HUECO.y, 200, 300);
+  await asentar();
+  assert.equal(hayCapaEncima(HUECO), false);
 });
 
 test("lo que no pinta un píxel no esconde nada", async () => {
@@ -88,10 +135,19 @@ test("lo que no pinta un píxel no esconde nada", async () => {
   }
   await asentar();
   assert.equal(
-    hayCapaEncima(),
+    hayCapaEncima(HUECO),
     false,
     "ninguna de esas etiquetas ocupa sitio: contarlas esconde la capa para siempre",
   );
+});
+
+test("la capa modal nativa de un visual del chat esconde todas las capas", async () => {
+  comoIndexHtml();
+  await asentar();
+  const soltar = suspendSiteLayers();
+  assert.equal(hayCapaEncima(HUECO), true, "el visual ampliado vive bajo #root, sin portal que medir");
+  soltar();
+  assert.equal(hayCapaEncima(HUECO), false);
 });
 
 test("la dirección se lee igual en la pestaña y en la vista", () => {
