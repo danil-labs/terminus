@@ -6,6 +6,7 @@ import { envolver, SANDBOX_ARTEFACTO } from "../artifacts/sandbox";
 import { VISUAL_THEME_TOKENS, type VisualTheme } from "../artifacts/inlineVisual";
 import geist from "../../styles/fonts/Geist-Variable.woff2?inline";
 import { t } from "../../lib/i18n";
+import { suspendSiteLayers } from "../../lib/sites";
 import { Button } from "../../ui/Button";
 import { asFailure, FailureNote } from "../../ui/Failure";
 import type { VisualBudget } from "./visualBudget";
@@ -21,6 +22,7 @@ export default function ChatVisual(props: {
   let panel!: HTMLDialogElement;
   let frame: HTMLIFrameElement | undefined;
   let expandButton: HTMLButtonElement | undefined;
+  let restoreSites: (() => void) | undefined;
   const [visible, setVisible] = createSignal(false);
   const [opened, setOpened] = createSignal(true);
   const [expanded, setExpanded] = createSignal(false);
@@ -43,8 +45,13 @@ export default function ChatVisual(props: {
     setExpanded(next);
     // El mismo nodo pasa a la capa modal; mover el iframe a un portal lo recarga.
     panel.close();
-    if (next) panel.showModal();
+    if (next) {
+      restoreSites = suspendSiteLayers();
+      panel.showModal();
+    }
     else {
+      restoreSites?.();
+      restoreSites = undefined;
       panel.show();
       expandButton?.focus({ preventScroll: true });
     }
@@ -58,7 +65,7 @@ export default function ChatVisual(props: {
     if (!current.pending) current.release();
     current = undefined;
   };
-  onCleanup(() => { disposed = true; retire(); });
+  onCleanup(() => { disposed = true; retire(); restoreSites?.(); });
   const identity = createMemo(() => `${props.owner}:${props.visual.id}`);
   const [html, { refetch, mutate }] = createResource(
     () => visible() && opened() ? identity() : false,

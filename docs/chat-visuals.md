@@ -72,6 +72,9 @@ Ampliar pasa el mismo nodo a la capa modal del navegador, con hasta 75 dvh,
 trampa de foco y fondo. Reducir o Escape lo devuelve al mensaje y restaura
 el foco. El iframe permanece montado, con sus filtros y sliders.
 Las acciones aparecen al posar o enfocar, y quedan visibles con puntero táctil.
+La ampliación reserva la capa modal en `lib/sites.ts`, ocultando los sitios
+nativos aunque el diálogo siga bajo `#root`. Reducir, cerrar o desmontar libera
+esa reserva; los menús y portales conservan su propia suspensión.
 
 El historial conserva la directiva original. Reabrir carga el mismo archivo;
 el estado JavaScript se reinicia tras cerrar o desmontar el iframe.
@@ -84,6 +87,7 @@ El sandbox no limita CPU ni memoria de los scripts del agente.
 | Filtro, slider, tema y paleta | Actualizan la gráfica sin recargarla |
 | Título, cierre del turno y relectura | Conservan iframe y selección |
 | Ampliar, tabular y Escape | Mismo estado, foco modal y retorno al botón |
+| Gráfica y sitio en paneles separados | Ampliar oculta el sitio nativo; cerrar lo restaura |
 | Contenido que crece y se reduce; ancho estrecho | Ajusta altura y permite seguir por el chat |
 | Altura no finita o mensaje de otro marco | Rechaza; las alturas válidas se acotan |
 | Ocho directivas y una novena; 17 marcos en el hilo | Respeta límites y permite cerrar para cargar otro |
