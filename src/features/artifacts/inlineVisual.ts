@@ -46,7 +46,8 @@ export const JS_INLINE = String.raw`
   var pending = false;
   function measure() {
     pending = false;
-    var height = Math.ceil(Math.max(document.body.getBoundingClientRect().height, document.body.scrollHeight));
+    var height = Math.ceil(Math.max(document.documentElement.getBoundingClientRect().height,
+      document.body.getBoundingClientRect().height, document.body.scrollHeight));
     height = Math.max(48, Math.min(4096, height));
     if (height === lastHeight) return;
     lastHeight = height;

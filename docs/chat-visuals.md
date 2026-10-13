@@ -62,7 +62,8 @@ reserva hasta 16 visualizaciones cargadas, con archivos de hasta 512 KiB.
 Cerrar, fallar o desmontar libera la reserva; una lectura pendiente conserva
 la suya hasta terminar y descarta resultados anteriores.
 
-El runtime mide el cuerpo después de cambios de contenido, fuentes y ancho.
+El runtime mide el cuerpo y la caja del documento, incluidos los márgenes
+exteriores, después de cambios de contenido, fuentes y ancho.
 La altura inicial reserva 320 píxeles; después sigue el contenido entre 48 y
 4096 píxeles. Lo que excede ese tope se desplaza dentro del marco.
 El receptor acepta solo alturas numéricas finitas y Escape del `contentWindow`
@@ -88,7 +89,7 @@ El sandbox no limita CPU ni memoria de los scripts del agente.
 | Título, cierre del turno y relectura | Conservan iframe y selección |
 | Ampliar, tabular y Escape | Mismo estado, foco modal y retorno al botón |
 | Gráfica y sitio en paneles separados | Ampliar oculta el sitio nativo; cerrar lo restaura |
-| Contenido que crece y se reduce; ancho estrecho | Ajusta altura y permite seguir por el chat |
+| Contenido que crece y se reduce; márgenes; ancho estrecho | Ajusta altura y permite seguir por el chat |
 | Altura no finita o mensaje de otro marco | Rechaza; las alturas válidas se acotan |
 | Ocho directivas y una novena; 17 marcos en el hilo | Respeta límites y permite cerrar para cargar otro |
 | Archivo faltante y reintento | Error localizado; recupera tras crear el archivo |
