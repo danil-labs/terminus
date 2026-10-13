@@ -4,7 +4,7 @@ import { POR_EXTENSION, POR_NOMBRE } from "./file-icons.ts";
 
 /**
  * Qué icono le toca a cada archivo del árbol de código. Aparte del componente
- * porque se prueba sin montar nada (`scripts/icons.test.ts`).
+ * porque se prueba sin montar nada (`tests/unit/icons.test.ts`).
  *
  * El icono es el logo del formato: identidad de un tercero, como el color de
  * marca de un canal en su chip — no color semántico del sistema. La única

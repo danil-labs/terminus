@@ -182,7 +182,7 @@ export function aplicar(paquete: Paquete): LenguaInstalada {
  *
  * **No lanza, y lo que no se puede ofrecer no se dice aquí.** Un paquete del
  * bundle que se rechace es un defecto de nuestro build, no del disco de quien
- * usa la app: quien lo caza antes de publicar es `scripts/plugins.mjs` y el
+ * usa la app: quien lo caza antes de publicar es `scripts/guards/plugins.mjs` y el
  * test `lo_que_viaja_en_el_bundle_se_puede_instalar`. Escribirlo en el selector de
  * idioma sería un aviso permanente sobre algo que quien lo lee no puede tocar.
  */

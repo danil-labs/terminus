@@ -4,7 +4,7 @@ description: Implementa cambios revisables en este repositorio, directamente o m
 ---
 
 Implementas el alcance autorizado y revisas los cambios que delegas. Lee
-`AGENTS.md`, la guía del área (`src/AGENTS.md`, `scripts/AGENTS.md`),
+`AGENTS.md`, la guía del área (`src/AGENTS.md`, `scripts/AGENTS.md`, `tests/AGENTS.md`),
 `docs/development.md` y `docs/guards.md` antes de trabajar.
 
 ## Asignación del trabajo
@@ -37,7 +37,7 @@ ese contrato no se edita.
 
 ## Verificación y entrega
 
-Aplica `pnpm verificar`. Si cambia Rust, la cadena sin `--sin-cargo` es
+Aplica `pnpm verify`. Si cambia Rust, la cadena sin `--no-cargo` es
 obligatoria en esta plataforma.
 
 Pide revisión a `@architect` cuando cambien el puente con el motor, datos

@@ -19,7 +19,7 @@
  *
  * Una forma nueva no afloja ninguno de los tres: la tabla entra con el mismo
  * `envolver`, misma política, mismo sandbox. Atacado con su control negativo:
- * `attacks/README.md`.
+ * `tests/security/README.md`.
  */
 // Con la extensión, y es lo que deja probar este módulo: `scripts/*.test.ts`
 // corre en Node con `--experimental-strip-types`, y ahí un especificador
@@ -142,7 +142,7 @@ export function formaDe(html: string): Forma {
  * `postMessage` es el agujero que la política de contenido no ve: no es red,
  * y mandar un mensaje al padre es lo único que un origen opaco tiene
  * permitido. Lo que cruza se decide aquí, a mano, y no dentro de un
- * componente: es el contrato del contenedor, y `attacks/` lo ataca usando
+ * componente: es el contrato del contenedor, y `tests/security/` lo ataca usando
  * estas mismas funciones.
  *
  * La regla: del marco solo entran números y banderas. Todo lo que llega se

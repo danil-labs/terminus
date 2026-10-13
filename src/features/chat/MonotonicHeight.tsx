@@ -19,7 +19,7 @@ import { createEffect, createMemo, createSignal, onCleanup, type JSX } from "sol
  * el observador se re-dispara por su propia escritura.
  *
  * El guarda de existencia es por los dos entornos sin layout de este repo:
- * `node --test` y el jsdom de `scripts/mount-frontend.mjs` no implementan
+ * `node --test` y el jsdom de `scripts/guards/mount-frontend.mjs` no implementan
  * `ResizeObserver`.
  */
 export function AltoMonotono(props: { vivo: boolean; children: JSX.Element; searchBlock?: number }) {

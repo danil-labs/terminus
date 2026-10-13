@@ -185,7 +185,7 @@ const cuenta =
  * **El guarda es que el generado cuadre con el paquete instalado.** Sin esto,
  * actualizar `material-icon-theme` no cambia nada visible: el catálogo sigue
  * siendo el de la versión anterior, con los logos viejos y sin las extensiones
- * nuevas, y nada lo dice. Es el mismo trato que `docs/FRASES.md`.
+ * nuevas, y nada lo dice. Es el mismo trato que `docs/PHRASES.md`.
  */
 if (process.argv.includes("--check")) {
   const actual = existsSync(DESTINO) ? readFileSync(DESTINO, "utf8") : "";

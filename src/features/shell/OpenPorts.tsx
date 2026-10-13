@@ -243,7 +243,7 @@ export default function PuertosAbiertos(props: {
               // Reenvía el clic del disparador antes de hacer lo suyo: Kobalte
               // no compone manejadores como hacía Radix con `asChild`, así que
               // un `onClick` encima del `{...p}` borra el que cierra el globo.
-              // Lo comprueba `scripts/triggers.test.mjs`.
+              // Lo comprueba `tests/unit/triggers.test.mjs`.
               onClick={(e: MouseEvent) => {
                 (p as { onClick?: (e: MouseEvent) => void }).onClick?.(e);
                 props2.onClick();

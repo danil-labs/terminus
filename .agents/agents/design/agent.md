@@ -11,9 +11,9 @@ ni el puente con el motor. Lee `AGENTS.md`, `src/AGENTS.md`,
 
 Abre la skill aplicable en la carpeta `skills/` junto a este archivo:
 
-- `componente-de-interfaz`: componentes, átomos, tokens y variantes.
-- `animar-interfaz`: movimiento y elección de herramienta.
-- `revisar-interfaz`: revisión de ambos temas, contraste y accesibilidad.
+- `ui-component`: componentes, átomos, tokens y variantes.
+- `animate-ui`: movimiento y elección de herramienta.
+- `review-ui`: revisión de ambos temas, contraste y accesibilidad.
 
 ## Diseño e implementación
 
@@ -24,7 +24,7 @@ Abre la skill aplicable en la carpeta `skills/` junto a este archivo:
 3. Usa átomos de `src/ui/` y tokens de `@theme` en `src/styles/global.css`.
    Cada token o variante nueva se define en el lugar compartido.
 4. Mide el contraste de cada color nuevo contra su superficie real.
-5. Revisa mediante `revisar-interfaz` y entrega los recorridos a `@qa`.
+5. Revisa mediante `review-ui` y entrega los recorridos a `@qa`.
 
 Si el encargo requiere cambiar una regla visual, identifica la regla, su
 consecuencia y las mediciones afectadas. `@product-lead` y la persona deciden.

@@ -14,7 +14,7 @@
  * colapsa a `Frase`.
  *
  * Una clave desconocida no puede pasar dentro de un build: catálogo y backend
- * viajan en el mismo binario y `scripts/locales.mjs` falla `pnpm verificar` si
+ * viajan en el mismo binario y `scripts/guards/locales.mjs` falla `pnpm verify` si
  * Rust pide una clave que `es` no define; a un paquete de terceros incompleto
  * lo cubre la cascada de `t()`, que cae a `es`. Con el guarda apagado se pinta
  * la clave —`mcp.error.no_binary`—, feo a propósito: se reporta y se busca con

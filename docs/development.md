@@ -18,7 +18,7 @@ window` to open another window against the running engine.
 | Command | What it does |
 |---|---|
 | `download [--from <path>]` | Downloads the engine pinned in `seldon-runtime.lock` and checks its SHA-256, or copies a local binary |
-| `sidecar` | Places the pinned engine in `src-tauri/binaries/` for `bundle.externalBin` (on macOS both architectures and their `lipo`); Rust builds need it, and `beforeDevCommand`, `beforeBuildCommand` and `pnpm verificar` run it |
+| `sidecar` | Places the pinned engine in `src-tauri/binaries/` for `bundle.externalBin` (on macOS both architectures and their `lipo`); Rust builds need it, and `beforeDevCommand`, `beforeBuildCommand` and `pnpm verify` run it |
 | `engine` | Starts the engine with data under `.engine/lab/` and identity `ai.danil.seldon.dev` |
 | `select` | Asks the engine for `status` and writes a private `selection.json` |
 | `window [--window <path>]` | Opens the window against that selection |
@@ -54,7 +54,7 @@ refuses an engine that speaks another contract.
 Maintainers publish with a version tag:
 
 1. Bump the version in `package.json`, `src-tauri/Cargo.toml` and
-   `src-tauri/tauri.conf.json` (`pnpm version:subir`), and update
+   `src-tauri/tauri.conf.json` (`pnpm version:bump`), and update
    `release-notes/en.md` and `release-notes/es.md`.
 2. Merge to `main`, tag `v<version>` and push the tag.
 
@@ -68,7 +68,7 @@ workflow without publishing:
 gh workflow run publish.yml -R danil-labs/terminus --ref <branch> -f dry_run=true
 ```
 
-`node scripts/release/publish.test.mjs` (macOS or Linux, needs Ruby and jq)
+`node tests/release/publish.test.mjs` (macOS or Linux, needs Ruby and jq)
 runs the packaging steps of the workflow with fixtures and temporary signing
 keys.
 

@@ -241,7 +241,7 @@ export default function Herramientas(props: { solo?: string | string[] }) {
     // El backend avisa cuando un inicio de sesión termina, y se vuelve a
     // preguntar cómo quedó en vez de creerse que salió bien: sin esto la
     // tarjeta seguiría diciendo «pide sesión» después de autorizar.
-    // El nombre va como literal: `scripts/bridge.mjs` solo sabe leer
+    // El nombre va como literal: `scripts/guards/bridge.mjs` solo sabe leer
     // literales en el sitio de la llamada.
     const dice = listen<string>("mcp-login", (e) => setUrlDeLogin(e.payload));
     onCleanup(() => void dice.then((f) => f()));

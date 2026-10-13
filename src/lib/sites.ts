@@ -16,7 +16,7 @@
  * píxeles CSS, que son los puntos lógicos que `sites::site_place` espera: Rust
  * convierte con el factor de escala de la ventana. Multiplicar aquí por
  * `devicePixelRatio` pone la capa al doble de lejos en un Mac Retina y acierta
- * en una pantalla normal — la misma trampa que `scripts/drop.mjs` caza al revés,
+ * en una pantalla normal — la misma trampa que `scripts/guards/drop.mjs` caza al revés,
  * y por la que **ni una máquina verifica por la otra**.
  *
  * Un `ResizeObserver` sobre el hueco alcanza para todo lo que lo mueve: plegar

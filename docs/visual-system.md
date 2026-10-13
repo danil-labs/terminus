@@ -72,11 +72,11 @@ código respondan a esa elección.
 
 | Comprobación | Alcance |
 |---|---|
-| `scripts/terminal-themes.mjs` | Conjunto de tokens, coincidencia de catálogos y contraste calculado de temas de terminal |
-| `scripts/missing-classes.mjs` | Utilities usadas que Tailwind no genera |
-| `scripts/theme-inversion.mjs` | Colores de la paleta de Tailwind ajenos a los tokens del sistema |
+| `scripts/guards/terminal-themes.mjs` | Conjunto de tokens, coincidencia de catálogos y contraste calculado de temas de terminal |
+| `scripts/guards/missing-classes.mjs` | Utilities usadas que Tailwind no genera |
+| `scripts/guards/theme-inversion.mjs` | Colores de la paleta de Tailwind ajenos a los tokens del sistema |
 | `scripts/icons.mjs` | Iconos generados frente al paquete fuente |
-| `scripts/animations.mjs` | Animaciones continuas fuera del contrato permitido |
+| `scripts/guards/animations.mjs` | Animaciones continuas fuera del contrato permitido |
 
 Los contrastes se calculan desde los tokens vigentes. Un valor histórico no certifica
 las cuatro paletas actuales. Ninguno de esos guardas demuestra la accesibilidad
