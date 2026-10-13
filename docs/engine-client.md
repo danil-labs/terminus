@@ -170,14 +170,23 @@ resynchronizes. A window whose selection changed under it, because another
 window already restarted the engine, takes the same path and adopts that engine.
 Reusing an engine leaves `selection.json` untouched when its content is the same. Otherwise it shows `shell.service.engine_down`.
 
+## Live Typst view
+
+The window serves the seven window functions of the contract: `site_open_local`,
+`site_zoom` and the `typst_live_*` family (`src-tauri/src/extracted/typst_live.rs`).
+For each task tree the window runs one `tinymist lsp` and shows its preview as a
+native site limited to `127.0.0.1:<port>`. The engine resolves the folder, the
+main file and the binary (`tree_typst_target`); the window never starts
+Tinymist with a path from the webview. On Windows a Job Object kills the
+Tinymist processes if the window dies.
+
 ## Not done yet
 
 - The engine is pinned for the four platforms and bundled on all of them. The
   published installers were tried on Windows 11, macOS 15.8 (Apple silicon)
   and Linux, updating from 0.2.74 with real data (#60). The macOS universal
   bundle carries a `lipo` of the two pinned macOS binaries.
-- Seven window functions (`site_open_local`, `site_zoom` and the
-  `typst_live_*` family) are in the contract but not served by the window, so
-  the live Typst view does not work. The front hides it while
-  `typst_live_stop` is rejected (`vistaServida` in `src/features/code/typst.ts`)
-  and offers it again once the window registers the family.
+- The engine still installs, updates and removes the Typst plugin, while the
+  window runs its Tinymist. Settings stops every live view before touching the
+  plugin (`typst_live_stop`); moving the plugin into the window is planned in
+  seldon-host.
