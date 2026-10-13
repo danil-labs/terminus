@@ -68,7 +68,7 @@ workflow without publishing:
 gh workflow run publish.yml -R danil-labs/terminus --ref <branch> -f dry_run=true
 ```
 
-`node scripts/release/publish.test.mjs` (macOS or Linux, needs Ruby and jq)
+`node tests/release/publish.test.mjs` (macOS or Linux, needs Ruby and jq)
 runs the packaging steps of the workflow with fixtures and temporary signing
 keys.
 

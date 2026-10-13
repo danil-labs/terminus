@@ -6,6 +6,8 @@
       "src/**/*.tsx",
       "scripts/**/*.ts",
       "scripts/**/*.mjs",
+      "tests/**/*.ts",
+      "tests/**/*.mjs",
       "!src/features/code/file-icons.ts"
     ]
   },
@@ -26,7 +28,7 @@
   },
   "overrides": [
     {
-      "includes": ["scripts/**"],
+      "includes": ["scripts/**", "tests/**"],
       "linter": { "rules": { "suspicious": { "noConsole": "off" } } }
     }
   ]

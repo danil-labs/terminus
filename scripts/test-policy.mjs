@@ -9,7 +9,7 @@ const sum = (counts) => Object.values(counts).reduce((total, count) => total + c
 
 export function countSourceReads() {
   const source_reads = {};
-  for (const path of walkFiles(`${ROOT}${sep}scripts`, [".ts", ".mjs"])) {
+  for (const path of walkFiles(`${ROOT}${sep}tests`, [".ts", ".mjs"])) {
     if (!/\.test\.(ts|mjs)$/.test(path)) continue;
     const count = (readFileSync(path, "utf8").match(sourceRead) ?? []).length;
     if (count) source_reads[relative(ROOT, path).split(sep).join("/")] = count;

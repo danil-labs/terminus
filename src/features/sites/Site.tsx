@@ -12,7 +12,7 @@ import { prosaDe } from "../../ui/Failure";
  *
  * El motivo de que sea una capa nativa y no un `<iframe>` está en
  * `src-tauri/src/environment/sites.rs`: la política de la ventana dice `frame-src 'self'`
- * y **no se afloja** —lo que impide está medido en `attacks/window.mjs`—,
+ * y **no se afloja** —lo que impide está medido en `tests/security/window.mjs`—,
  * mientras que un webview hijo no es contenido de este documento y trae la
  * suya.
  *

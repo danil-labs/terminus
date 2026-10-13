@@ -8,7 +8,7 @@
  * glob dentro del motor cualquier módulo que llamara a `t()` —`steps.ts`,
  * `usage.ts`, `history.ts`, `limits.ts`, `format.ts`— arrastraba el motor y
  * **reventaba la prueba con `ERR_MODULE_NOT_FOUND`**. Pasó con
- * `scripts/models.test.ts` y con `scripts/turn-status.test.ts`.
+ * `tests/unit/models.test.ts` y con `tests/unit/turn-status.test.ts`.
  *
  * El glob se queda —no imports uno a uno— por lo de siempre: con imports
  * explícitos, un archivo de catálogo que nadie importara quedaría fuera del

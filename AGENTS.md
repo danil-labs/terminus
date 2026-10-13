@@ -8,7 +8,7 @@ repository. The window reaches it over RPC1 through a frozen contract; see
 
 This file is for people and coding agents contributing from outside. Read the
 area guide before editing an area: [front](src/AGENTS.md),
-[scripts and guards](scripts/AGENTS.md).
+[scripts and guards](scripts/AGENTS.md), [tests](tests/AGENTS.md).
 
 ## Commands
 
@@ -24,7 +24,7 @@ pnpm engine:start           # engine with throwaway data + window
 The chain stops at the first failure. `OMITIDO` means a check did not run; it
 is not a pass. What each guard checks is in [docs/guards.md](docs/guards.md);
 `scripts/verify.mjs` requires a row there for every guard and runs every
-`scripts/*.test.*`. Details are in [docs/development.md](docs/development.md).
+`tests/unit/*.test.*`. Details are in [docs/development.md](docs/development.md).
 
 ## Do not change
 

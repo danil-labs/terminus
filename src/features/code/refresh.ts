@@ -25,7 +25,7 @@ export function avisarDeLosArboles(session: string) {
  * a cerrar.
  *
  * Está aparte del componente porque es la decisión, no la fontanería: se prueba
- * sola (`scripts/code-refresh.test.ts`).
+ * sola (`tests/unit/code-refresh.test.ts`).
  */
 export type Entrada = "avisa" | "entra" | "arrastra";
 

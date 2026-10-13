@@ -26,8 +26,8 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { arrancar as montar, causa, dist, espera } from "./jsdom-app.mjs";
-import { spaceScenarios } from "./mount-spaces.mjs";
+import { arrancar as montar, causa, dist, espera } from "../tests/helpers/jsdom-app.mjs";
+import { spaceScenarios } from "../tests/helpers/mount-spaces.mjs";
 
 /**
  * Lo que el arranque pregunta, contestado con lo mínimo creíble.

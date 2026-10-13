@@ -14,9 +14,9 @@ import { join, relative, extname } from "node:path";
 import { archivos, esteArchivo, RAIZ } from "./git.mjs";
 
 const BASELINE = join(RAIZ, "scripts/comments-baseline.json");
-const CARPETAS = ["src-tauri/src", "src-tauri/tests", "src", "scripts"];
+const CARPETAS = ["src-tauri/src", "src-tauri/tests", "src", "scripts", "tests"];
 const EXTS = [".rs", ".ts", ".tsx", ".mjs"];
-const EXCLUIDOS = [/file-icons\.ts$/, /comments-baseline\.json$/];
+const EXCLUIDOS = [/file-icons\.ts$/, /comments-baseline\.json$/, /[\/\\]tests[\/\\]security[\/\\]/];
 
 export const LIMITE_BLOQUE = 6;
 export const LIMITE_CABECERA = 10;

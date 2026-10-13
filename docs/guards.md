@@ -20,19 +20,19 @@ sends).
 | `bridge` | `scripts/bridge.mjs` | Every event the front listens to is emitted by the window or declared in the engine contract. |
 | `commands` | `scripts/commands.mjs` | Every `invoke` name exists in the window registry or the engine contract, and every contract command has a caller or a written reason. |
 | `service-errors` | `scripts/service-errors.mjs` | Errors rejected by `invoke` are not flattened with `String()`. The per-file quota only goes down. |
-| `artifact` | `scripts/artifact.mjs`, `scripts/artifact-viewer.test.ts` | Validates the artifact container script and the CSS classes it shares with the viewer. |
+| `artifact` | `scripts/artifact.mjs`, `tests/unit/artifact-viewer.test.ts` | Validates the artifact container script and the CSS classes it shares with the viewer. |
 | `window` | `scripts/window.mjs` | Platform overrides keep the window structure (`label`, `create`). |
 | `console-window` | `scripts/console-window.mjs` | Production processes use `no_console_window` on Windows. |
 | `processes` | `scripts/processes.mjs` | Finds processes awaited without a timeout. Unix `exec` replaces the caller without waiting for a child. The quota only goes down. |
 | `doc-paths` | `scripts/doc-paths.mjs` | Code paths and local links in the documentation exist. Generated files are excluded. |
 | `missing-classes` | `scripts/missing-classes.mjs` | Finds written classes that Tailwind does not generate. |
-| `triggers` | `scripts/triggers.test.mjs` | A trigger keeps the handler that opens its panel. |
+| `triggers` | `tests/unit/triggers.test.mjs` | A trigger keeps the handler that opens its panel. |
 | `mount-frontend` | `scripts/mount-frontend.mjs` | Runs `dist/` in jsdom with a simulated IPC and checks that it mounts. It does not open a native window. |
-| `storage-refresh` | `scripts/storage-refresh.test.ts` | Refresh batching, stale responses and workspace switches. |
-| `open-task-cost` | `scripts/open-task-cost.mjs` | Nodes, mutations and IPC when opening a 480-turn thread. The ceiling only goes down. |
-| `reread-thread` | `scripts/reread-thread.mjs` | Unmounts when re-reading an unchanged thread, with a new turn and during refreshes. The ceiling only goes down. |
-| `long-session` | `scripts/long-session.mjs` | Retained nodes, computations, listeners, intervals and observers after usage cycles. The ceiling only goes down; heap is informative. |
-| `task-history-calls` | `scripts/task-history-calls.mjs` | History and status calls during mutations and deltas. The ceiling only goes down. |
+| `storage-refresh` | `tests/unit/storage-refresh.test.ts` | Refresh batching, stale responses and workspace switches. |
+| `open-task-cost` | `tests/perf/open-task-cost.mjs` | Nodes, mutations and IPC when opening a 480-turn thread. The ceiling only goes down. |
+| `reread-thread` | `tests/perf/reread-thread.mjs` | Unmounts when re-reading an unchanged thread, with a new turn and during refreshes. The ceiling only goes down. |
+| `long-session` | `tests/perf/long-session.mjs` | Retained nodes, computations, listeners, intervals and observers after usage cycles. The ceiling only goes down; heap is informative. |
+| `task-history-calls` | `tests/perf/task-history-calls.mjs` | History and status calls during mutations and deltas. The ceiling only goes down. |
 | `drop` | `scripts/drop.mjs` | Coordinate conversion per platform for file drops. |
 | `animations` | `scripts/animations.mjs` | Restricts continuous infinite animations and their per-file quota. |
 | `csp` | `scripts/csp.mjs` | The content policy is the same in the window, the lab and the Markdown filters. |
@@ -52,7 +52,7 @@ sends).
 ## Maintenance
 
 Every `.mjs` guard in the chain needs a row here, and every
-`scripts/*.test.*` must be in the chain; `scripts/verify.mjs` checks both
+`tests/unit/*.test.*` must be in the chain; `scripts/verify.mjs` checks both
 lists. Quotas are lowered after a cleanup; they are never raised to accept a
 regression.
 

@@ -79,7 +79,7 @@ jobs:
         run: node scripts/engine.mjs sidecar
 
       - name: CLI forwarding and pinned command catalog
-        run: node --test scripts/cli-forward.test.mjs
+        run: node --test tests/unit/cli-forward.test.mjs
 
       - name: cargo fmt
         working-directory: src-tauri

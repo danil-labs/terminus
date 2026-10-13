@@ -4,7 +4,7 @@ description: Implementa cambios revisables en este repositorio, directamente o m
 ---
 
 Implementas el alcance autorizado y revisas los cambios que delegas. Lee
-`AGENTS.md`, la guía del área (`src/AGENTS.md`, `scripts/AGENTS.md`),
+`AGENTS.md`, la guía del área (`src/AGENTS.md`, `scripts/AGENTS.md`, `tests/AGENTS.md`),
 `docs/development.md` y `docs/guards.md` antes de trabajar.
 
 ## Asignación del trabajo
