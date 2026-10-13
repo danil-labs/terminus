@@ -186,7 +186,10 @@ pub fn stop() -> Stopped {
 fn retire(endpoint: &Path, pid: u32) -> bool {
     let stopped =
         terminus_engine_client::request_endpoint(endpoint, "service stop", Duration::from_secs(5));
-    log::info!("[engine] replaced engine pid={pid} stop={}", stopped.is_ok());
+    log::info!(
+        "[engine] replaced engine pid={pid} stop={}",
+        stopped.is_ok()
+    );
     if stopped.is_err() {
         return false;
     }
