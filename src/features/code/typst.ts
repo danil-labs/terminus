@@ -59,13 +59,15 @@ export function soltarVistasHuerfanas() {
 }
 
 let consultado = false;
+/** Desactivar y reactivar seguido cruza dos consultas: solo cuenta la última que se pidió. */
+let consulta = 0;
 async function consultarPlugin() {
-  try {
-    const catalogo = await invoke<{ plugins: { id: string; enabled: boolean }[] }>("list_integrations");
-    setPluginTypst(catalogo.plugins.some((p) => p.id === "typst" && p.enabled));
-  } catch {
-    setPluginTypst(false);
-  }
+  const n = ++consulta;
+  const activo = await invoke<{ plugins: { id: string; enabled: boolean }[] }>("list_integrations").then(
+    (catalogo) => catalogo.plugins.some((p) => p.id === "typst" && p.enabled),
+    () => false,
+  );
+  if (n === consulta) setPluginTypst(activo);
 }
 
 /** Pide el estado una vez y lo sigue con cada cambio de plugins o de workspace. */
