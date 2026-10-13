@@ -13,6 +13,12 @@ Terminus has two processes:
 The window never runs the domain itself. Every `invoke` that is not a window
 function travels to the engine over RPC1.
 
+Las [visualizaciones del chat](chat-visuals.md) usan el selector reservado
+`terminus-chat-visuals` de `tree_show`, sin agregar un comando al contrato.
+La ventana captura el workspace de esa lectura mediante un header IPC local
+y el proxy lo coloca en el sobre RPC1 existente. La lectura segura de archivos
+y las instrucciones nativas del agente pertenecen al motor.
+
 ## Contract
 
 `src-tauri/crates/engine-protocol/commands.json` is the frozen contract: 316

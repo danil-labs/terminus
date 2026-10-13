@@ -234,7 +234,22 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
         return;
     }
     let slot = Slot(state.clone());
-    let workspace = if name == "unwatch_task_tree" {
+    let workspace = if name == "tree_show" && args["tree"] == "terminus-chat-visuals" {
+        // El scope pertenece al sobre RPC1, no a los parámetros congelados del comando.
+        let Some(workspace) = invoke
+            .message
+            .headers()
+            .get("x-terminus-workspace")
+            .and_then(|value| value.to_str().ok())
+            .filter(|value| !value.is_empty())
+        else {
+            invoke
+                .resolver
+                .reject(failure(&Error::new("invalid_request")));
+            return;
+        };
+        Some(workspace.to_owned())
+    } else if name == "unwatch_task_tree" {
         let watchers = state.watchers.lock().unwrap_or_else(|p| p.into_inner());
         args["id"]
             .as_str()

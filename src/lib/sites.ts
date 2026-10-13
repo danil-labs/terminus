@@ -79,6 +79,18 @@ export function aDireccion(texto: string): string | null {
 export type Hueco = { x: number; y: number; width: number; height: number };
 
 const [encima, setEncima] = createSignal(false);
+const [nativeModals, setNativeModals] = createSignal(0);
+
+// La capa modal del navegador conserva su nodo bajo #root, sin un portal en body.
+export function suspendSiteLayers(): () => void {
+  setNativeModals((count) => count + 1);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    setNativeModals((count) => count - 1);
+  };
+}
 
 /** Mientras se arrastra un separador las capas se esconden: una capa nativa sigue al DOM con retraso y se montaría encima. */
 const [moviendoHueco, setMoviendoHueco] = createSignal(false);
@@ -94,7 +106,7 @@ export { moviendoHueco, setMoviendoHueco };
  */
 export function hayCapaEncima() {
   encender();
-  return encima();
+  return encima() || nativeModals() > 0;
 }
 
 let observando: MutationObserver | null = null;

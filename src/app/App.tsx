@@ -118,6 +118,7 @@ import { pedirElCampo } from "../lib/focus";
 import { lastRoster, rememberRoster } from "../lib/handlerRoster";
 import { aplicarLenguaDeWorkspace, clavesConocidas, t } from "../lib/i18n";
 import { invoke } from "../lib/invoke.ts";
+import { readChatVisual } from "../features/chat/readVisual";
 import { createPointerDrag } from "../lib/pointer-drag";
 import type { InternalTaskLink } from "../lib/links";
 import type { MentionSources } from "../lib/mentions";
@@ -555,9 +556,10 @@ export default function App() {
       },
     ),
   );
-  /** Las tareas repartidas, que son las que necesitan su propia transcripción. */
-  const tareasEnVentanas = createMemo(() =>
-    pestanasEnPantalla().filter(isTaskTab),
+  /** El panel conserva workspace y conversación; el título pertenece a la tira. */
+  const tareasEnVentanas = createMemo<(Pick<TaskTab, "id" | "session" | "project"> & { workspace: string | null })[]>((previous) =>
+    conservar(previous ?? [], pestanas.open().filter(isTaskTab).map(({ id, session, project }) =>
+      ({ id, session, project, workspace: workspaceActivo() })), (p) => p.id),
   );
   /** Las tareas con pestaña: la lista viva las trae aunque estén archivadas. */
   const sesionesConPestana = createMemo(
@@ -5629,6 +5631,7 @@ export default function App() {
     proyecto?: string | null;
     soloLectura?: boolean;
   }) => {
+    const visualWorkspace = workspaceActivo() ?? "";
     /**
      * Mensajes de ESTA ventana, memoizados en dos pasos: leer `hilos()`
      * directo baja al fondo TODAS las ventanas al moverse una. El
@@ -6061,6 +6064,8 @@ export default function App() {
         onInput={setInput}
         onSend={mandar}
         onRespuestaRapida={mandarTexto}
+        visualScope={JSON.stringify([visualWorkspace, pp.proyecto ?? "", pp.sesion])}
+        readVisual={(file) => readChatVisual({ workspace: visualWorkspace, project: pp.proyecto ?? "", session: pp.sesion ?? "" }, file)}
         onMiniatura={miniaturaDeAdjunto}
         onPegarImagen={pegarImagen}
         onStop={detener}

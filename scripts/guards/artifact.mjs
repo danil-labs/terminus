@@ -34,7 +34,7 @@
  * clase de cadena que un nombre de evento entre Rust y la interfaz, y
  * `bridge.mjs` existe por lo mismo.
  *
- * Node pelado, sin dependencias: lo corre `pnpm verify`, en esta máquina.
+ * Node pelado, sin dependencias: lo corre `pnpm verificar`, en esta máquina.
  */
 import { readFileSync } from "node:fs";
 // Ver la nota de `paths.mjs`: `.pathname` en Windows da `/C:/…` y revienta.
@@ -51,29 +51,34 @@ const fallos = [];
  * Se corta en el primer acento grave porque dentro no puede haber ninguno: uno
  * solo cierra la plantilla, y ese es el fallo ruidoso que el build ya caza.
  */
-function literal(nombre) {
-  const i = fuente.indexOf(`const ${nombre} =`);
+function literal(nombre, texto = fuente) {
+  const i = texto.indexOf(`const ${nombre} =`);
   if (i < 0) return null;
-  const abre = fuente.indexOf("`", i);
+  const abre = texto.indexOf("`", i);
   if (abre < 0) return null;
-  const cierra = fuente.indexOf("`", abre + 1);
+  const cierra = texto.indexOf("`", abre + 1);
   if (cierra < 0) return null;
   return {
-    crudo: fuente.slice(i, abre).includes("String.raw"),
-    cuerpo: fuente.slice(abre + 1, cierra),
+    crudo: texto.slice(i, abre).includes("String.raw"),
+    cuerpo: texto.slice(abre + 1, cierra),
   };
 }
 
 const CSS = literal("CSS_BASE");
 const JS = literal("JS_RUNTIME");
+const inline = readFileSync(fileURLToPath(new URL("../../src/features/artifacts/inlineVisual.ts", import.meta.url)), "utf8");
+const inlineCss = literal("CSS_INLINE", inline);
+const inlineJs = literal("JS_INLINE", inline);
 
 for (const [nombre, l] of [
   ["CSS_BASE", CSS],
   ["JS_RUNTIME", JS],
+  ["CSS_INLINE", inlineCss],
+  ["JS_INLINE", inlineJs],
 ]) {
   if (!l) {
     fallos.push(
-      `No encuentro \`const ${nombre} = String.raw\`…\`\` en src/features/artifacts/sandbox.ts.\n` +
+      `No encuentro \`const ${nombre} = String.raw\`…\`\` en src/features/artifacts/.\n` +
         `  Ahí vive lo que corre dentro del contenedor; sin ello este chequeo no mira nada.`,
     );
     continue;
@@ -89,14 +94,15 @@ for (const [nombre, l] of [
 
 // --------------------------------------------------- 2. el runtime parsea
 
-if (JS?.cuerpo) {
+for (const [name, runtime] of [["JS_RUNTIME", JS], ["JS_INLINE", inlineJs]]) {
+  if (!runtime?.cuerpo) continue;
   // `"__FORMA__"` es el hueco que `envolver()` sustituye por la forma del
   // documento. Como literal ya parsea, así que se le pasa tal cual.
   try {
-    new Function(JS.cuerpo);
+    new Function(runtime.cuerpo);
   } catch (e) {
     fallos.push(
-      `El runtime del artefacto no parsea: ${e.message}\n` +
+      `El runtime ${name} no parsea: ${e.message}\n` +
         `  Es una cadena, así que \`tsc\` la da por buena. Un error de sintaxis aquí no se ve\n` +
         `  hasta abrir un artefacto, y se ve como un documento en blanco.`,
     );

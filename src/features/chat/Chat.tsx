@@ -102,6 +102,10 @@ import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
 import { asFailure, type Failure, FailureNote, prosaDe } from "../../ui/Failure";
 import { MarcaAgente } from "../../ui/icons";
 import { Markdown } from "../../ui/Markdown";
+import { createVisualBudget, type VisualBudget } from "./visualBudget";
+import ChatVisual from "./ChatVisual";
+import { splitChatVisuals, type ChatVisual as Visual } from "./visualDirective";
+import type { NextStepsPart } from "../../lib/nextSteps";
 import { splitNextSteps, stripNextSteps, lastSentAt, usedSince } from "../../lib/nextSteps";
 import NextSteps from "./NextSteps";
 import { Skeleton } from "../../ui/Skeleton";
@@ -578,6 +582,8 @@ export type ChatProps = {
   onSend: (attachments: string[]) => Promise<boolean>;
   /** Manda una respuesta rápida del agente tal cual, por el camino de `onSend`. */
   onRespuestaRapida?: (texto: string) => Promise<boolean>;
+  visualScope?: string;
+  readVisual?: (file: string) => Promise<string>;
   /**
    * La miniatura de un adjunto ya mandado, de ruta relativa a `data:` URI.
    * Aquí y no dentro de `Adjuntos`: este componente no conoce el proyecto
@@ -721,6 +727,7 @@ export default function Chat(props: ChatProps) {
    * persiste: qué bloque tenías abierto en una conversación no es una
    * preferencia de la app, y guardarlo haría crecer el `localStorage`.
    */
+  const visualBudget = createVisualBudget();
   const [trabajos, setTrabajos] = props.vista.trabajos;
   /**
    * Qué registro de preguntas está plegado, por turno. Guarda el pliegue y
@@ -2637,6 +2644,9 @@ export default function Chat(props: ChatProps) {
                   {(trabajo) => (
                     <TrabajoDeAgente
                       searchBlock={chunk * CHUNK + blockIndex}
+                      visualBudget={visualBudget}
+                      visualScope={props.visualScope}
+                      readVisual={props.readVisual}
                       pasos={fromWork(b(), (t) => t.pasos, [])}
                       avance={fromWork(b(), (t) => t.avance ?? SIN_AVANCE, SIN_AVANCE)}
                       msg={fromWork(b(), (t) => t.msg, SIN_MENSAJE)}
@@ -3204,6 +3214,9 @@ function RegistroDeTrabajo(props: {
 }
 
 function TrabajoDeAgente(props: {
+  visualBudget: VisualBudget;
+  visualScope?: string;
+  readVisual?: (file: string) => Promise<string>;
   searchBlock?: number;
   pasos: Paso[];
   avance: Avance[];
@@ -3290,7 +3303,7 @@ function TrabajoDeAgente(props: {
       <Show when={texto()}>
         {(md) => (
           <AltoMonotono vivo={props.vivo} searchBlock={props.searchBlock}>
-            <TextoConSiguientes texto={md()} vivo={props.vivo} rapida={props.rapida} />
+            <TextoConSiguientes texto={md()} vivo={props.vivo} rapida={props.rapida} readVisual={props.readVisual} owner={props.visualScope ?? ""} visualBudget={props.visualBudget} />
           </AltoMonotono>
         )}
       </Show>
@@ -3371,8 +3384,11 @@ type RespuestaRapida = {
  * `Index` y no `For`: cada token trae partes nuevas y `For` remontaría el
  * markdown entero en cada una.
  */
-function TextoConSiguientes(props: { texto: string; vivo: boolean; rapida: RespuestaRapida | null }) {
-  const partes = createMemo(() => splitNextSteps(props.texto, props.vivo));
+function TextoConSiguientes(props: { texto: string; vivo: boolean; rapida: RespuestaRapida | null; owner: string; visualBudget: VisualBudget; readVisual?: (file: string) => Promise<string> }) {
+  const partes = createMemo(() => {
+    const visuals = props.readVisual ? splitChatVisuals(props.texto, props.vivo) : [{ kind: "markdown" as const, markdown: props.texto }];
+    return visuals.flatMap<Visual | NextStepsPart>((part) => part.kind === "visual" ? [part] : splitNextSteps(part.markdown, props.vivo));
+  });
   const [enviando, setEnviando] = createSignal(false);
   const elegir = async (texto: string) => {
     if (!props.rapida || enviando()) return;
@@ -3395,6 +3411,7 @@ function TextoConSiguientes(props: { texto: string; vivo: boolean; rapida: Respu
           return p.kind === "markdown" ? p.markdown : "";
         };
         return (
+          <Show when={parte().kind === "visual" && props.readVisual} fallback={
           <Show when={bloque()} fallback={<Markdown>{markdown()}</Markdown>}>
             <Show when={bloque()?.prose}>
               <Markdown>{bloque()?.prose ?? ""}</Markdown>
@@ -3405,6 +3422,9 @@ function TextoConSiguientes(props: { texto: string; vivo: boolean; rapida: Respu
               habilitado={Boolean(props.rapida?.puede && bloque()?.complete) && !enviando()}
               onElegir={(texto) => void elegir(texto)}
             />
+          </Show>
+          }>
+            <ChatVisual visual={parte() as Visual} owner={props.owner} budget={props.visualBudget} read={(file) => props.readVisual!(file)} />
           </Show>
         );
       }}
