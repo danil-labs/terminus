@@ -2,7 +2,7 @@
 /**
  * Que un paquete de lengua de `plugins/lenguas/` diga lo que la app sabe pedir.
  *
- * `scripts/locales.mjs` no lo mira, y no debe: exige traducción **completa**, y
+ * `scripts/guards/locales.mjs` no lo mira, y no debe: exige traducción **completa**, y
  * un paquete de disco va por detrás de la app a propósito —para eso está la
  * cascada de respaldo—. Lo que sí falla en silencio es lo otro:
  *
@@ -20,7 +20,7 @@
  * No exige cobertura: dice cuánta hay. Un paquete al 59 % es un estado
  * legítimo, y el número es lo que deja verlo crecer.
  *
- *   node scripts/plugins.mjs
+ *   node scripts/guards/plugins.mjs
  *
  * Sale con 1 si encuentra algo.
  */
@@ -28,7 +28,7 @@ import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "..");
+const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const PAQUETES = join(RAIZ, "plugins/lenguas");
 const BASE = join(RAIZ, "src/locales/es");
 /** Espeja `CONTRATO` de `src-tauri/src/environment/locales.rs`. */

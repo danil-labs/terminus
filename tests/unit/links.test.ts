@@ -1,7 +1,7 @@
 /**
  * Lo que el chat acepta de una respuesta que escribió un agente.
  *
- * `scripts/csp.mjs` comprueba que el filtro **está**; esto comprueba que **dice lo
+ * `scripts/guards/csp.mjs` comprueba que el filtro **está**; esto comprueba que **dice lo
  * que hay que decir**. Los dos hacen falta: un filtro que se llame igual y deje
  * pasar `javascript:` pasaría el guarda entero.
  */

@@ -23,7 +23,7 @@ import { envolver, formaDe } from "../../src/features/artifacts/sandbox.ts";
  *   funcionalidad; en un mockup es la maqueta cambiada por debajo, sin poder
  *   deshacerlo desde la app.
  *
- * `scripts/artifact.mjs` comprueba que el runtime **parsea**. Esto lo
+ * `scripts/guards/artifact.mjs` comprueba que el runtime **parsea**. Esto lo
  * **ejecuta**, que es lo único que dice qué hace.
  *
  * El documento se corre en jsdom con `runScripts`, así que lo que se mide es el

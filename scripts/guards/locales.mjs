@@ -26,7 +26,7 @@
  * cambiar una frase. Este repo se investiga con `git log -S`; una clave que no
  * se puede buscar rompe esa herramienta.
  *
- *   node scripts/locales.mjs
+ *   node scripts/guards/locales.mjs
  *
  * Sale con 1 si encuentra algo. No necesita `dist/`: lee el código fuente —el
  * del front **y el del backend**, porque desde que Rust manda claves en vez de
@@ -45,7 +45,7 @@ import { readFileSync, readdirSync, } from "node:fs";
 import { join, dirname, relative, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "..");
+const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const FUENTE = join(RAIZ, "src");
 const LENGUAS = join(RAIZ, "src/locales");
 /** Las claves que manda el motor: su código no vive en este repositorio. */

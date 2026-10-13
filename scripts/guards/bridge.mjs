@@ -35,9 +35,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { relative } from "node:path";
 // Ver la nota de `paths.mjs`: `.pathname` en Windows da `/C:/…` y revienta.
 import { fileURLToPath } from "node:url";
-import { archivos } from "./git.mjs";
+import { archivos } from "../git.mjs";
 
-const RUST = fileURLToPath(new URL("../src-tauri/src", import.meta.url));
+const RUST = fileURLToPath(new URL("../../src-tauri/src", import.meta.url));
 
 /**
  * **Todos los árboles de interfaz, no uno.**
@@ -52,7 +52,7 @@ const RUST = fileURLToPath(new URL("../src-tauri/src", import.meta.url));
  * vigila uno. Lo que impide que eso pase inadvertido es la comprobación de
  * abajo: si la cuenta de `listen` baja a cero, falla.
  */
-const WEB = [fileURLToPath(new URL("../src", import.meta.url))].filter((d) =>
+const WEB = [fileURLToPath(new URL("../../src", import.meta.url))].filter((d) =>
   existsSync(d),
 );
 
@@ -96,7 +96,7 @@ function cuenta(dirs, exts, re) {
 
 const emitidos = nombres(RUST, [".rs"], EMITE);
 // El motor emite los suyos; su código no vive aquí y el contrato los declara.
-const CONTRATO = fileURLToPath(new URL("../src-tauri/crates/engine-protocol/commands.json", import.meta.url));
+const CONTRATO = fileURLToPath(new URL("../../src-tauri/crates/engine-protocol/commands.json", import.meta.url));
 for (const evento of JSON.parse(readFileSync(CONTRATO, "utf8")).events) {
   if (!emitidos.has(evento)) emitidos.set(evento, ["commands.json"]);
 }

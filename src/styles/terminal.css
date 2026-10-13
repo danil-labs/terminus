@@ -1,7 +1,7 @@
 /* La segunda capa de color: terminal, código y diff. Repinta eso y nada más.
    El chrome de la app —superficies, rampa neutra, acción, semánticos— es la
    primera capa y no se configura; las mediciones de `docs/visual-system.md`
-   están hechas contra ella. Lo sostiene `scripts/terminal-themes.mjs`.
+   están hechas contra ella. Lo sostiene `scripts/guards/terminal-themes.mjs`.
 
    Sin capa, para ganarle al `:root` que emite `@theme`, igual que el bloque de
    oscuro de `global.css`. El atributo lo pone `lib/terminal-themes.ts` sobre

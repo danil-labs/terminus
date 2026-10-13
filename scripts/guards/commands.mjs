@@ -41,11 +41,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { relative } from "node:path";
 // Ver la nota de `paths.mjs`: `.pathname` en Windows da `/C:/…` y revienta.
 import { fileURLToPath } from "node:url";
-import { archivos } from "./git.mjs";
+import { archivos } from "../git.mjs";
 
-const LIB = fileURLToPath(new URL("../src-tauri/src/extracted/mod.rs", import.meta.url));
-const CONTRACT = fileURLToPath(new URL("../src-tauri/crates/engine-protocol/commands.json", import.meta.url));
-const WEB = fileURLToPath(new URL("../src", import.meta.url));
+const LIB = fileURLToPath(new URL("../../src-tauri/src/extracted/mod.rs", import.meta.url));
+const CONTRACT = fileURLToPath(new URL("../../src-tauri/crates/engine-protocol/commands.json", import.meta.url));
+const WEB = fileURLToPath(new URL("../../src", import.meta.url));
 /**
  * **Todos los árboles de interfaz, no uno.**
  *

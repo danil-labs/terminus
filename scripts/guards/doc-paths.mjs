@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fromMarkdown } from "mdast-util-from-markdown";
-import { esteArchivo as isMain, RAIZ as ROOT, archivos as walkFiles } from "./git.mjs";
+import { esteArchivo as isMain, RAIZ as ROOT, archivos as walkFiles } from "../git.mjs";
 
 const roots = ["AGENTS.md", "README.md", "CONTRIBUTING.md", "SECURITY.md", "CREDITS.md", "NOTICE", "src/AGENTS.md", "scripts/AGENTS.md", "tests/AGENTS.md"];
 const directories = ["docs", "plugins", "tests", "src-tauri/icons", "src-tauri/crates", "npx"];

@@ -1,7 +1,10 @@
 # Scripts and guards
 
-Applies [AGENTS.md](../AGENTS.md). Node programs: contract guards and
-development tools. Tests live in [tests/](../tests/AGENTS.md).
+Applies [AGENTS.md](../AGENTS.md). Node programs in two groups: `guards/`
+holds the static contract checks that `verify.mjs` runs (each with a row in
+the catalog); the rest are development tools run by hand (`engine.mjs`,
+`version.mjs`, `notices.mjs`, `icons.mjs`, `phrases.mjs`). Tests live in
+[tests/](../tests/AGENTS.md).
 
 - `verify.mjs` lists every step and stops at the first failure. Its catalog is
   [docs/guards.md](../docs/guards.md).

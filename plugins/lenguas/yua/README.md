@@ -23,7 +23,7 @@ permanecen en el repositorio. El paquete no se incorpora a `src/locales/`, que
 contiene los catálogos embebidos.
 
 ```bash
-node scripts/plugins.mjs
+node scripts/guards/plugins.mjs
 ```
 
 El comando valida manifiesto, claves, placeholders y saltillos, y calcula la

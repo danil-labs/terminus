@@ -246,7 +246,7 @@ if (sinUso.length) {
   l.push("## Frases que hoy no usa nadie");
   l.push("");
   l.push("O las arma el código en tiempo de ejecución —y entonces la clave no aparece");
-  l.push("entera en ningún archivo— o sobran. `scripts/locales.mjs` distingue los dos");
+  l.push("entera en ningún archivo— o sobran. `scripts/guards/locales.mjs` distingue los dos");
   l.push("casos y falla con las segundas.");
   l.push("");
   for (const c of sinUso) l.push(`- \`${c}\``);

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- La política de la ventana, y **el mismo texto que `tauri.conf.json`**:
-         `scripts/csp.mjs` falla si los dos dejan de coincidir. Hacen falta los
+         `scripts/guards/csp.mjs` falla si los dos dejan de coincidir. Hacen falta los
          dos sitios porque gobiernan momentos distintos — en desarrollo la ventana
          carga del servidor de Vite y Tauri no llega a poner su cabecera, así que
          ahí este `<meta>` es la única política que hay.

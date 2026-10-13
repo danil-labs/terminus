@@ -12,9 +12,9 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, relative } from "node:path";
-import { archivos } from "./git.mjs";
+import { archivos } from "../git.mjs";
 
-const raiz = join(dirname(fileURLToPath(import.meta.url)), "..");
+const raiz = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const FUENTE = join(raiz, "src");
 
 // El cupo de cada archivo. Empezó en 61 aplanamientos repartidos en catorce
@@ -69,7 +69,7 @@ if (problemas.length) {
 
 if (holgura.length) {
   console.error("");
-  console.error("  Bajó y el cupo no. Aprieta scripts/service-errors.mjs:");
+  console.error("  Bajó y el cupo no. Aprieta scripts/guards/service-errors.mjs:");
   for (const h of holgura) console.error(`    ${h}`);
   console.error("");
   process.exit(1);

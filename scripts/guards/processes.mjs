@@ -2,8 +2,8 @@
 /**
  * Un proceso que alguien espera lleva plazo, y la deuda solo baja.
  *
- *   node scripts/processes.mjs              guarda: compara con processes-baseline.json
- *   node scripts/processes.mjs --ajustar    baja el cupo a lo que hay hoy
+ *   node scripts/guards/processes.mjs              guarda: compara con processes-baseline.json
+ *   node scripts/guards/processes.mjs --ajustar    baja el cupo a lo que hay hoy
  *
  * Esperar a un CLI sin plazo cuelga al hilo que llamó y deja al hijo vivo. No da
  * error: se ve como que la máquina va lenta. El tope es `util::output_with_timeout`,
@@ -16,10 +16,10 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { archivos, RAIZ } from "./git.mjs";
+import { archivos, RAIZ } from "../git.mjs";
 
-const ROOT = fileURLToPath(new URL("../src-tauri/src", import.meta.url));
-const BASELINE = join(RAIZ, "scripts/processes-baseline.json");
+const ROOT = fileURLToPath(new URL("../../src-tauri/src", import.meta.url));
+const BASELINE = join(import.meta.dirname, "processes-baseline.json");
 
 /** Dónde el proceso dura lo que dura la conversación: el turno y su transporte. */
 const DEL_TURNO = ["runtime/chat/", "runtime/acp.rs", "cli/service/", "cli/server.rs"];
@@ -68,7 +68,7 @@ const subieron = Object.entries(hoy).filter(([f, n]) => n > (cupo[f] ?? 0));
 if (subieron.length === 0) {
   console.log(`Ningún proceso nuevo se espera sin plazo: ${suma(hoy)} sin él (cupo ${suma(cupo)}).`);
   if (suma(hoy) < suma(cupo)) {
-    console.log("Bajaron: fija el trinquete con `node scripts/processes.mjs --ajustar`.");
+    console.log("Bajaron: fija el trinquete con `node scripts/guards/processes.mjs --ajustar`.");
   }
   process.exit(0);
 }

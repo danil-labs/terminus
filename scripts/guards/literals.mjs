@@ -9,7 +9,7 @@
  * escribió— y se ve bien en maya salvo por ese renglón. Sin esto, la app vuelve
  * a ser monolingüe **una frase por vez**.
  *
- *   node scripts/literals.mjs
+ *   node scripts/guards/literals.mjs
  *
  * Sale con 1 si encuentra alguna. No necesita `dist/`.
  *
@@ -34,9 +34,9 @@
 import { readFileSync } from "node:fs";
 import { join, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { archivos } from "./git.mjs";
+import { archivos } from "../git.mjs";
 
-const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "..");
+const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const FUENTE = join(RAIZ, "src");
 const LENGUAS = join(RAIZ, "src/locales");
 

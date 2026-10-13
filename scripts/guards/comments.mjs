@@ -2,18 +2,18 @@
 /**
  * Los comentarios no crecen, no argumentan y no cuentan historia.
  *
- *   node scripts/comments.mjs              guarda: compara con comments-baseline.json
- *   node scripts/comments.mjs --ajustar    baja el baseline a lo que hay hoy
- *   node scripts/comments.mjs --archivo p  lista lo que caza en un archivo
- *   node scripts/comments.mjs --hook       PreToolUse de Claude Code: rechaza la edición que añade
+ *   node scripts/guards/comments.mjs              guarda: compara con comments-baseline.json
+ *   node scripts/guards/comments.mjs --ajustar    baja el baseline a lo que hay hoy
+ *   node scripts/guards/comments.mjs --archivo p  lista lo que caza en un archivo
+ *   node scripts/guards/comments.mjs --hook       PreToolUse de Claude Code: rechaza la edición que añade
  *
  * Política: AGENTS.md § Comentarios. Sale con 1 si una categoría supera el baseline.
  */
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join, relative, extname } from "node:path";
-import { archivos, esteArchivo, RAIZ } from "./git.mjs";
+import { archivos, esteArchivo, RAIZ } from "../git.mjs";
 
-const BASELINE = join(RAIZ, "scripts/comments-baseline.json");
+const BASELINE = join(import.meta.dirname, "comments-baseline.json");
 const CARPETAS = ["src-tauri/src", "src-tauri/tests", "src", "scripts", "tests"];
 const EXTS = [".rs", ".ts", ".tsx", ".mjs"];
 const EXCLUIDOS = [/file-icons\.ts$/, /comments-baseline\.json$/, /[\/\\]tests[\/\\]security[\/\\]/];
@@ -131,7 +131,7 @@ function guarda() {
   const { totales, porArchivo } = contar();
   const base = leerBaseline();
   if (!base) {
-    console.error(`Falta ${relative(RAIZ, BASELINE)}. Créalo con: node scripts/comments.mjs --ajustar`);
+    console.error(`Falta ${relative(RAIZ, BASELINE)}. Créalo con: node scripts/guards/comments.mjs --ajustar`);
     return 1;
   }
   let fallo = false;
@@ -157,7 +157,7 @@ function guarda() {
   }
   const resumen = CATEGORIAS.map((c) => `${c}=${totales[c]}`).join("  ");
   console.log(`Los comentarios no crecen: ${resumen}.`);
-  if (bajo) console.log("Bajaron: fija el trinquete con `node scripts/comments.mjs --ajustar`.");
+  if (bajo) console.log("Bajaron: fija el trinquete con `node scripts/guards/comments.mjs --ajustar`.");
   return 0;
 }
 

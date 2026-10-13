@@ -14,7 +14,7 @@
  * adjunto se quedaba sin nombre y sin botón de quitar, con la «x» flotando sola
  * porque esa sí se leía.
  *
- *   pnpm build && node scripts/theme-inversion.mjs
+ *   pnpm build && node scripts/guards/theme-inversion.mjs
  *
  * ## Por qué esta prosa no escribe los nombres que caza
  *
@@ -48,7 +48,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const DIST = join(ROOT, "dist/assets");
 
 if (!existsSync(DIST)) {

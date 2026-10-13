@@ -53,10 +53,9 @@ function git(args, entorno) {
  * repositorio de verdad, y un archivo de código que revisar.
  */
 function arbol(dir, { conByteNulo = false } = {}) {
-  mkdirSync(join(dir, "scripts"), { recursive: true });
-  for (const f of ["git.mjs", "reviewable.mjs"]) {
-    copyFileSync(join(raiz, "scripts", f), join(dir, "scripts", f));
-  }
+  mkdirSync(join(dir, "scripts", "guards"), { recursive: true });
+  copyFileSync(join(raiz, "scripts", "git.mjs"), join(dir, "scripts", "git.mjs"));
+  copyFileSync(join(raiz, "scripts", "guards", "reviewable.mjs"), join(dir, "scripts", "guards", "reviewable.mjs"));
   writeFileSync(join(dir, "codigo.ts"), "export const uno = 1;\n");
   if (conByteNulo) writeFileSync(join(dir, "sucio.ts"), "export const dos = \0 2;\n");
   return dir;
@@ -132,7 +131,7 @@ function revisable(dir) {
   const entorno = { ...process.env };
   delete entorno.GIT_DIR;
   delete entorno.GIT_WORK_TREE;
-  return spawnSync(process.execPath, [join(dir, "scripts", "reviewable.mjs")], {
+  return spawnSync(process.execPath, [join(dir, "scripts", "guards", "reviewable.mjs")], {
     cwd: dir,
     encoding: "utf8",
     env: entorno,

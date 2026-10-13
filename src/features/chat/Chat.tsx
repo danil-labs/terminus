@@ -1244,7 +1244,7 @@ export default function Chat(props: ChatProps) {
    * Si vuelve a hacer falta saber dónde se soltó, se resuelve preguntando
    * al backend por el `scale_factor` de la ventana, no con
    * `devicePixelRatio`, sabiendo que en macOS no hay que dividir. Lo
-   * comprueba `scripts/drop.mjs`.
+   * comprueba `scripts/guards/drop.mjs`.
    */
   onMount(() => {
     let disposed = false;

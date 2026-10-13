@@ -1,7 +1,7 @@
 /**
  * Que un `focus()` automático no le quite el sitio a quien está escribiendo.
  * La guarda vive en `src/lib/focus.ts` y la usan los `focus()` que no nacen de
- * un gesto. El caso legítimo se comprueba en `scripts/mount-frontend.mjs`.
+ * un gesto. El caso legítimo se comprueba en `scripts/guards/mount-frontend.mjs`.
  */
 import assert from "node:assert/strict";
 import test from "node:test";

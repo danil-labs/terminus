@@ -282,7 +282,7 @@ La omisión Unix de la prueba anterior se elimina; aquí no hay unitarias Rust.
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --locked -p terminus --all-targets` | 0; ``Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.16s`` |
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --check -- --config-path src-tauri/rustfmt.toml` | 0; sin salida |
 | `git diff --cached --check` | 0; sin salida |
-| `node scripts/doc-paths.mjs` | 0; `Las rutas y enlaces locales de 23 documentos existen.` |
+| `node scripts/guards/doc-paths.mjs` | 0; `Las rutas y enlaces locales de 23 documentos existen.` |
 
 `pnpm verificar --sin-cargo` termina con 0. Resumen literal:
 
@@ -362,7 +362,7 @@ Resultados finales de Cargo con `CARGO_BUILD_JOBS=2`:
 
 `node --test tests/unit/cli-forward.test.mjs`: código 0, `tests 2`, `pass 2`,
 `fail 0`, `skipped 0`, con las 25 raíces del motor fijado.
-`node scripts/doc-paths.mjs`: código 0,
+`node scripts/guards/doc-paths.mjs`: código 0,
 `Las rutas y enlaces locales de 23 documentos existen.`
 `git diff --cached --check`: código 0, sin salida.
 

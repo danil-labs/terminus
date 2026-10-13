@@ -33,9 +33,9 @@ import { relative } from "node:path";
 // `.pathname` de un `file://` da `/C:/Users/…` en Windows, y `readdirSync` lo
 // resuelve contra la unidad actual. Ver `scripts/paths.mjs`.
 import { fileURLToPath } from "node:url";
-import { archivos } from "./git.mjs";
+import { archivos } from "../git.mjs";
 
-const RAIZ = fileURLToPath(new URL("../src", import.meta.url));
+const RAIZ = fileURLToPath(new URL("../../src", import.meta.url));
 const ESCUCHA = /onDragDropEvent/;
 const CONVIERTE = /devicePixelRatio/;
 

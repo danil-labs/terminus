@@ -8,13 +8,13 @@
  * tokens, que el de por omisión repita `@theme`, que los identificadores del
  * CSS y los del catálogo TypeScript coincidan, y el contraste medido.
  *
- *   node scripts/terminal-themes.mjs [--tabla]
+ *   node scripts/guards/terminal-themes.mjs [--tabla]
  */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const CSS = join(ROOT, "src/styles/terminal.css");
 const GLOBAL = join(ROOT, "src/styles/global.css");
 const CATALOGO = join(ROOT, "src/lib/terminal-themes.ts");

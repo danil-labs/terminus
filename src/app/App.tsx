@@ -2104,7 +2104,7 @@ export default function App() {
   createEffect(on(workspaceActivo, () => void reconcileActiveTurns()));
 
   // Los tres oyentes de Rust. Los nombres van como cadena literal:
-  // `scripts/bridge.mjs` comprueba que alguien emita lo que la interfaz
+  // `scripts/guards/bridge.mjs` comprueba que alguien emita lo que la interfaz
   // escucha, y es lo único que sabe leer; una constante lo deja ciego sin
   // fallar. Se suscriben una vez: las funciones de respuesta leen
   // `sessionId()` y las demás señales al recibir cada evento, y copiar sus

@@ -40,7 +40,7 @@ import { readFileSync } from "node:fs";
 // Ver la nota de `paths.mjs`: `.pathname` en Windows da `/C:/…` y revienta.
 import { fileURLToPath } from "node:url";
 
-const RUTA = fileURLToPath(new URL("../src/features/artifacts/sandbox.ts", import.meta.url));
+const RUTA = fileURLToPath(new URL("../../src/features/artifacts/sandbox.ts", import.meta.url));
 const fuente = readFileSync(RUTA, "utf8");
 
 const fallos = [];

@@ -29,7 +29,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-const raiz = (p) => fileURLToPath(new URL(`../${p}`, import.meta.url));
+const raiz = (p) => fileURLToPath(new URL(`../../${p}`, import.meta.url));
 
 const SITIOS = [
   ["src-tauri/tauri.conf.json", (t) => JSON.parse(t).app?.security?.csp],

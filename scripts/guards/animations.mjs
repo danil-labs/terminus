@@ -9,9 +9,9 @@
 import { readFileSync } from "node:fs";
 import { relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { archivos } from "./git.mjs";
+import { archivos } from "../git.mjs";
 
-const RAIZ = fileURLToPath(new URL("../src", import.meta.url));
+const RAIZ = fileURLToPath(new URL("../../src", import.meta.url));
 
 /** Animaciones de CSS que corren solo mientras dura un gesto corto. */
 const KEYFRAMES_PERMITIDOS = new Set(["finish-task-ignition", "finish-task-exhaust"]);

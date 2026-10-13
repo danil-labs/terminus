@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { relative, sep } from "node:path";
-import { RAIZ as ROOT, archivos as walkFiles } from "./git.mjs";
+import { join, relative, sep } from "node:path";
+import { RAIZ as ROOT, archivos as walkFiles } from "../git.mjs";
 
-const baselinePath = `${ROOT}${sep}scripts${sep}test-policy-baseline.json`;
+const baselinePath = join(import.meta.dirname, "test-policy-baseline.json");
 const sourceRead = /readFileSync\([\s\S]{0,200}?(?:"|'|`)[^"'`\n]*?(?:src\/|src-tauri\/src\/|\.\.\/src\/)[^"'`\n]*?\.(?:ts|tsx|rs|css|mjs)["'`]/g;
 const sum = (counts) => Object.values(counts).reduce((total, count) => total + count, 0);
 
@@ -32,7 +32,7 @@ if (args.includes("--archivo")) {
   process.exit(0);
 }
 if (!existsSync(baselinePath)) {
-  console.error("Falta scripts/test-policy-baseline.json. Usa: node scripts/test-policy.mjs --ajustar");
+  console.error("Falta scripts/guards/test-policy-baseline.json. Usa: node scripts/guards/test-policy.mjs --ajustar");
   process.exit(1);
 }
 const current = countSourceReads().source_reads;
@@ -41,7 +41,7 @@ const limits = baseline.source_reads ?? baseline.fuente ?? {};
 const excess = Object.entries(current).filter(([path, count]) => count > (limits[path] ?? 0));
 if (excess.length === 0) {
   console.log(`No aumentaron las lecturas de fuente: ${sum(current)}.`);
-  if (sum(current) < sum(limits)) console.log("Bajaron: fija el trinquete con node scripts/test-policy.mjs --ajustar.");
+  if (sum(current) < sum(limits)) console.log("Bajaron: fija el trinquete con node scripts/guards/test-policy.mjs --ajustar.");
   process.exit(0);
 }
 for (const [path, count] of excess) console.error(`${path}: ${count} lecturas (cupo ${limits[path] ?? 0})`);

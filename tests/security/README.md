@@ -188,7 +188,7 @@ Y lo que sale por aquí no pasa por ninguna salida registrada: **sin sello y sin
 |---|---|
 | `hostile-response.ts` | La respuesta del agente, con siete vectores. **No se toca**: es el patrón de comparación |
 | `hostile-window.tsx` | Monta el `Markdown` de la app —el de verdad, importado de `src/ui/`— o la copia congelada de cómo pintaba antes |
-| `window.html` | La misma política que `index.html`, byte por byte. `scripts/csp.mjs` falla si dejan de serlo |
+| `window.html` | La misma política que `index.html`, byte por byte. `scripts/guards/csp.mjs` falla si dejan de serlo |
 | `unrestricted-window.html` | El mismo archivo sin política ninguna: el control negativo |
 | `window.mjs` | Levanta la sonda, el servidor de desarrollo y los dos motores, y dice qué salió |
 

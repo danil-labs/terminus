@@ -613,7 +613,7 @@ export function seguirElFondo(enTurno: () => boolean = () => true): Pegado {
    * Ninguno toca `msgs`.
    *
    * El guarda de existencia cubre `node --test` y el jsdom de
-   * `scripts/mount-frontend.mjs`: ninguno de los dos implementa `ResizeObserver` ni
+   * `scripts/guards/mount-frontend.mjs`: ninguno de los dos implementa `ResizeObserver` ni
    * tiene alturas que seguir. El webview siempre lo trae.
    */
   let altoPrevio: number | undefined;

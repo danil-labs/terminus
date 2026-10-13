@@ -327,7 +327,7 @@ function BotonDeDisposicion(props: {
  * el caso normal y ponerle una sería repetir lo que ya dice estar en la lista.
  *
  * Función y no un mapa de módulo por dos cosas: `t()` lee la lengua al llamarse
- * —en una constante se congelaría en la del arranque—, y `scripts/locales.mjs`
+ * —en una constante se congelaría en la del arranque—, y `scripts/guards/locales.mjs`
  * solo ve las claves escritas enteras, así que una armada al vuelo se
  * reportaría como huérfana.
  */

@@ -15,7 +15,7 @@
  * la píldora transparente: una perilla blanca sobre una tarjeta blanca, que se
  * reportó como «no veo nada, solo un mensaje, ¿cómo lo activo?».
  *
- *   pnpm build && node scripts/missing-classes.mjs
+ *   pnpm build && node scripts/guards/missing-classes.mjs
  *
  * Sale con 1 si encuentra alguna. Necesita `dist/assets`: compara contra el CSS
  * **compilado**, no contra `global.css` — leer el token en el archivo fuente es
@@ -41,7 +41,7 @@ import { join, extname, relative } from "node:path";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "..");
+const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const FUENTE = join(RAIZ, "src");
 const DIST = join(RAIZ, "dist/assets");
 const GLOBAL = join(RAIZ, "src/styles/global.css");

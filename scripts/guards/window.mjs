@@ -26,7 +26,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-const raiz = join(dirname(fileURLToPath(import.meta.url)), "..");
+const raiz = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const tauri = join(raiz, "src-tauri");
 
 /** Las que rompen el arranque si se pierden, no las que pintan. */

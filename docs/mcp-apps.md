@@ -59,7 +59,7 @@ que la sesión del agente autentique todos los servidores remotos de una MCP App
 - `src/features/chat/mcpAppProxy.ts`: sandbox y CSP.
 - `src/features/chat/ExcalidrawMcpCanvas.tsx`: checkpoints.
 - `src/features/chat/DrawioMcpCanvas.tsx`: XML y plugin.
-- `scripts/mount-frontend.mjs`: montaje con IPC simulado.
+- `scripts/guards/mount-frontend.mjs`: montaje con IPC simulado.
 
 El montaje simulado no certifica el alojamiento ni la interacción en Tauri real.
 El QA identifica servidor, plugin, plataforma y build de ventana y servicio.

@@ -35,7 +35,7 @@
  */
 import { execFileSync } from "node:child_process";
 
-import { localizarGit, RAIZ, SALIDA_OMITIDO } from "./git.mjs";
+import { localizarGit, RAIZ, SALIDA_OMITIDO } from "../git.mjs";
 
 /**
  * **Sin git no hay pregunta que hacer, y eso se dice — no se aprueba.**
@@ -62,7 +62,7 @@ if (!git.ok) {
 
 /**
  * Cómo se invoca a git aquí: **parado en el árbol y con el entorno que lo
- * localiza**. El `cwd` explícito es lo que hace que `node scripts/reviewable.mjs` dé
+ * localiza**. El `cwd` explícito es lo que hace que `node scripts/guards/reviewable.mjs` dé
  * lo mismo que dentro de `pnpm verificar` — los caminos que devuelve `ls-files`
  * son relativos a él, y `--no-index` los resuelve desde ahí.
  */

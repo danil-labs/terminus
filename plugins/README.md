@@ -28,7 +28,7 @@ un ZIP. Ambas entradas las valida el motor.
 No hay descarga de paquetes de lengua por red.
 
 Instalar copia los JSON; los Markdown permanecen en el repositorio.
-`remove_language_pack` retira el paquete instalado. `scripts/plugins.mjs`
+`remove_language_pack` retira el paquete instalado. `scripts/guards/plugins.mjs`
 valida manifiestos, claves, placeholders y ortografía del saltillo; reporta
 cobertura sin exigir que el paquete traduzca todo el catálogo.
 

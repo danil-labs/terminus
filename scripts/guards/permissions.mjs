@@ -38,9 +38,9 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, relative } from "node:path";
-import { archivos } from "./git.mjs";
+import { archivos } from "../git.mjs";
 
-const raiz = join(dirname(fileURLToPath(import.meta.url)), "..");
+const raiz = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const MANIFIESTO = join(raiz, "src-tauri/gen/schemas/acl-manifests.json");
 const CAPACIDADES = join(raiz, "src-tauri/capabilities/default.json");
 
