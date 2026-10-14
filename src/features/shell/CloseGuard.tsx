@@ -5,6 +5,7 @@ import { escribirPref, leerPref } from "../../lib/prefs";
 import { t } from "../../lib/i18n";
 import { Button } from "../../ui/Button";
 import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
+import { quietFinished } from "./TaskNotifier";
 
 /** Qué hacer al cerrar la ventana con agentes trabajando. */
 export type CloseChoice = "ask" | "background" | "stop";
@@ -81,39 +82,13 @@ export default function CloseGuard(props: { title: (session: string) => string |
   }
 
   let refresh: ReturnType<typeof setInterval> | undefined;
-  /** Lo que había en la vuelta anterior, para avisar de lo que cambió. */
-  let before = new Map<string, Shown>();
-
-  function notifyChanges(rows: Shown[]) {
-    const now = new Map(rows.map((row) => [row.session, row]));
-    for (const [session, row] of before) {
-      if (!now.has(session)) {
-        void invoke("tray_notify", {
-          title: t("shell.notify.finished", { title: row.title }),
-          body: rows.length ? t("shell.notify.remaining", { count: rows.length }) : t("shell.notify.none_left"),
-        }).catch(() => {});
-      }
-    }
-    for (const row of rows) {
-      if (row.waiting && !before.get(row.session)?.waiting) {
-        void invoke("tray_notify", {
-          title: t("shell.notify.waiting", { title: row.title }),
-          body: t("shell.notify.open_from_tray"),
-        }).catch(() => {});
-      }
-    }
-    before = now;
-  }
-
   async function tick() {
     const rows = await titled(await invoke<LiveTurn[]>("list_live_turns").catch(() => []));
-    notifyChanges(rows);
     await invoke("tray_update", await trayPayload(rows));
   }
 
   async function toBackground() {
     const rows = await titled(await invoke<LiveTurn[]>("list_live_turns").catch(() => []));
-    before = new Map(rows.map((row) => [row.session, row]));
     await invoke("window_to_background", await trayPayload(rows));
     clearInterval(refresh);
     refresh = setInterval(() => void tick().catch(() => {}), 5000);
@@ -125,6 +100,7 @@ export default function CloseGuard(props: { title: (session: string) => string |
     const choice = leerPref<CloseChoice>(CLOSE_PREF, "ask");
     if (choice === "background") return void toBackground();
     if (choice === "stop") {
+      quietFinished();
       await stopTurns(turns);
       return close();
     }
@@ -138,6 +114,7 @@ export default function CloseGuard(props: { title: (session: string) => string |
     if (remember()) escribirPref(CLOSE_PREF, choice);
     if (choice === "stop") {
       setStopping(true);
+      quietFinished();
       await stopTurns(turns);
       setStopping(false);
     }
@@ -153,12 +130,12 @@ export default function CloseGuard(props: { title: (session: string) => string |
     const unlisten = [
       listen("close-requested", () => void onCloseRequested()),
       listen("tray-stop-all", async () => {
+        quietFinished();
         await stopTurns(await invoke<LiveTurn[]>("list_live_turns").catch(() => []));
-        // Las detuvo la persona: no se avisa de cada una como si hubieran terminado.
-        before = new Map();
         void trayPayload().then((payload) => invoke("tray_update", payload)).catch(() => {});
       }),
       listen("tray-quit", async () => {
+        quietFinished();
         await stopTurns(await invoke<LiveTurn[]>("list_live_turns").catch(() => []));
         void invoke("quit_completely").catch(() => {});
       }),
