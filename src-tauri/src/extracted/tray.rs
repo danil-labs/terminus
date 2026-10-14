@@ -143,10 +143,16 @@ pub(super) fn restart_app(app: AppHandle) {
     app.restart();
 }
 
-/// Aviso del sistema mientras la ventana está oculta: terminó una tarea o espera respuesta.
+/// Aviso del sistema con la ventana oculta o sin foco: una tarea terminó o necesita a la persona.
 #[tauri::command]
 pub(super) fn tray_notify(app: AppHandle, title: String, body: String) -> Result<(), String> {
     use tauri_plugin_notification::NotificationExt;
+    // Visible pero detrás de otra app: la barra de tareas parpadea (o rebota el Dock).
+    if let Some(window) = app.get_webview_window("main") {
+        if window.is_visible().unwrap_or(false) && !window.is_focused().unwrap_or(true) {
+            let _ = window.request_user_attention(Some(tauri::UserAttentionType::Informational));
+        }
+    }
     app.notification()
         .builder()
         .title(title)
