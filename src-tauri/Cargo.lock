@@ -4272,6 +4272,7 @@ dependencies = [
  "tauri-plugin-notification",
  "tauri-plugin-process",
  "tauri-plugin-updater",
+ "tauri-winrt-notification",
  "tempfile",
  "terminus-engine-client",
  "terminus-engine-protocol",

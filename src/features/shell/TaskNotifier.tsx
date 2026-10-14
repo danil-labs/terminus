@@ -6,6 +6,9 @@ import { Button } from "../../ui/Button";
 import { Toast } from "../../ui/Toast";
 import { createWorkspaces } from "../settings/workspaces-store";
 import type { AttentionState, WorkspaceAttention } from "./attention";
+import { Dynamic } from "solid-js/web";
+import { cn } from "../../lib/utils";
+import { stateColor, stateIcon } from "../projects/TaskStatus";
 
 /** Qué tareas avisan: todas, solo las que necesitan a la persona, o ninguna. */
 export type NotifyChoice = "all" | "needs_you" | "off";
@@ -23,8 +26,8 @@ export function quietFinished(ms = 15000) {
 
 /**
  * Avisa cuando una tarea pasa a necesitar a la persona o termina sin que nadie
- * la mire. Con la ventana sin foco (u oculta en segundo plano) sale un aviso del
- * sistema; con foco en otra tarea, un aviso dentro de la app.
+ * la mire. Fuera de la pantalla, aviso del sistema; a la vista sin foco, parpadeo
+ * si la necesita; con foco en otra tarea, un aviso dentro de la app.
  */
 export default function TaskNotifier(props: {
   attention: WorkspaceAttention[];
@@ -60,9 +63,11 @@ export default function TaskNotifier(props: {
     if (notice.state === "unseen" && Date.now() < quietUntil) return;
     const focused = document.visibilityState === "visible" && document.hasFocus();
     if (!focused) {
+      // Rust decide: oculta o minimizada, aviso del sistema; a la vista, solo parpadeo.
       void invoke("tray_notify", {
         title: heading(notice.state, notice.title),
         body: hint(notice.state),
+        needsYou: NEEDS_YOU.includes(notice.state),
       }).catch(() => {});
       return;
     }
@@ -107,7 +112,10 @@ export default function TaskNotifier(props: {
     <For each={notices()}>
       {(notice) => (
         <Toast data-task-notice={notice.state} onDismiss={() => setNotices((list) => list.filter((n) => n.key !== notice.key))}>
-          <p class="m-0 break-words text-xs text-neutral-950">{heading(notice.state, notice.title)}</p>
+          <div class="flex items-start gap-2">
+            <Dynamic component={stateIcon(notice.state)} size={14} aria-hidden="true" class={cn("mt-px shrink-0", stateColor(notice.state))} />
+            <p class="m-0 min-w-0 break-words text-xs text-neutral-950">{heading(notice.state, notice.title)}</p>
+          </div>
           <div>
             <Button variant="outline" size="compact" onClick={() => go(notice)}>
               {t("shell.notify.open")}
