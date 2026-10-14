@@ -106,20 +106,32 @@ export default function TabStrip(props: {
     );
   });
 
+  // Se revela el envoltorio y no el tab: el botón de cerrar queda a su derecha.
   // scrollIntoView puede faltar en el entorno que monta el guarda mount-frontend.
+  function reveal(n: number) {
+    const element = strip?.querySelector<HTMLElement>(`[data-envoltorio="${n}"]`);
+    element?.scrollIntoView?.({ inline: "nearest", block: "nearest" });
+  }
   createEffect(
     on(
       () => props.activeId,
       (id) => {
-        if (!id || !strip) return;
+        if (!id) return;
         // Los ids contienen bytes nulos y no se pueden usar como valores de un selector CSS.
         const n = props.tabs.findIndex((p) => p.id === id);
-        if (n < 0) return;
-        const element = strip.querySelector<HTMLElement>(`[data-pestana="${n}"]`);
-        element?.scrollIntoView?.({ inline: "nearest", block: "nearest" });
+        if (n >= 0) reveal(n);
       },
     ),
   );
+
+  function wheel(e: WheelEvent) {
+    const el = e.currentTarget as HTMLElement;
+    const limit = el.scrollWidth - el.clientWidth;
+    if (limit <= 0 || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+    const before = el.scrollLeft;
+    el.scrollLeft = Math.min(limit, Math.max(0, before + e.deltaY));
+    if (el.scrollLeft !== before) e.preventDefault();
+  }
 
   const [selected, setSelectedTab] = createSignal<string | null>(null);
   const group = (action: BatchCloseAction) => {
@@ -144,6 +156,7 @@ export default function TabStrip(props: {
     props.onPick(next.id);
     const n = (i + offset + list.length) % list.length;
     strip?.querySelector<HTMLElement>(`[data-pestana="${n}"]`)?.focus();
+    reveal(n);
   }
 
   return (
@@ -153,15 +166,16 @@ export default function TabStrip(props: {
       role="tablist"
       aria-label={t("projects.tabs.label")}
       onKeyDown={move}
+      onWheel={wheel}
       onContextMenu={(e: MouseEvent) => {
         const element = (e.target as HTMLElement).closest<HTMLElement>("[data-envoltorio]");
         const p = element ? props.tabs[Number(element.dataset.envoltorio)] : undefined;
         if (!p) e.preventDefault();
         setSelectedTab(p?.id ?? null);
       }}
-      // La barra de scroll ocuparía el alto de las pestañas.
+      // Con más de 3px la barra recortaría el alto de las pestañas en una franja h-8.
       // flex-1 separaría el botón de añadir de la última pestaña.
-      class="flex min-w-0 items-center gap-0.5 self-stretch overflow-x-auto [scrollbar-width:none]"
+      class="flex min-w-0 items-center gap-0.5 self-stretch overflow-x-auto overflow-y-hidden overscroll-x-contain [&::-webkit-scrollbar]:h-[3px] [&:hover::-webkit-scrollbar-thumb]:bg-[var(--scrollbar-thumb)]"
     >
       <For each={props.tabs}>
         {(p, i) => {
@@ -252,7 +266,11 @@ export default function TabStrip(props: {
                       ? t("projects.tabs.unsaved.named", { title: text() })
                       : (description() ?? (local() ? text() : undefined)),
                   )}
-                  onClick={() => props.onPick(p.id)}
+                  onClick={() => {
+                    props.onPick(p.id);
+                    // El foco del clic solo revela el tab, sin su botón de cerrar.
+                    reveal(i());
+                  }}
                   onAuxClick={(e) => {
                     if (e.button === 1) {
                       e.preventDefault();
