@@ -71,8 +71,8 @@ test("con el agrupado por encargado, Mis tareas va arriba", () => {
   );
 });
 
-// Una tarea lanzada desde otra carpeta quedaba escondida en la suya porque su
-// lanzador existía, aunque no estuviera en esa lista (#97).
+// Una tarea lanzada desde otra carpeta se escondía en la suya con solo existir su
+// lanzador, aunque no estuviera en esa lista (#97).
 test("la barra solo agrupa una tarea bajo un lanzador de la misma carpeta", () => {
   const lanzador = { id: "chat-a" };
   const delegada = { id: "t1", launched_by: "chat-a", launcher_available: true };

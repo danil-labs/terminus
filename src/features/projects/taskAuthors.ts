@@ -44,7 +44,7 @@ export function authorKeys(rows: AuthorRow[], groupByHandler = false): string[] 
 }
 
 /**
- * Si la barra esconde una tarea porque se ve bajo su lanzador. Solo cuenta un
+ * Si la barra esconde una tarea para mostrarla bajo su lanzador. Solo cuenta un
  * lanzador de la misma lista: el de otra carpeta no la muestra en esta.
  */
 export function shownUnderLauncher(
