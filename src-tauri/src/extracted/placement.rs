@@ -29,7 +29,8 @@ pub(super) fn read(window_data: &Path) -> Option<Placement> {
 pub(super) fn restore(window: &tauri::WebviewWindow, saved: Placement) {
     *LAST.lock().unwrap_or_else(|p| p.into_inner()) = Some(saved);
     // Con un monitor que ya no está, abre en el tamaño de siempre y no fuera de la vista.
-    let reachable = window.available_monitors().unwrap_or_default().iter().any(|monitor| {
+    let monitors = window.available_monitors().unwrap_or_default();
+    let reachable = monitors.iter().any(|monitor| {
         let origin = monitor.position();
         let size = monitor.size();
         let (left, top) = (saved.x + 40, saved.y + 20);
