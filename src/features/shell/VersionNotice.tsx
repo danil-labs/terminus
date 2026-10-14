@@ -108,15 +108,15 @@ export default function AvisoDeVersion() {
       <Show when={alDia()}>
         <Toast>
           <p class="m-0 text-xs text-neutral-500">{t("settings.update.uptodate")}</p>
-          <Button variant="ghost" size="sm" onClick={() => setAlDia(false)}>{t("shell.update.later")}</Button>
+          <Button variant="ghost" size="compact" onClick={() => setAlDia(false)}>{t("shell.update.later")}</Button>
         </Toast>
       </Show>
       <Show when={instalada() && !instaladaVista() && !hay()}>
         <Toast>
           <p class="m-0 text-xs text-neutral-500">{t("shell.update.installed")}</p>
-          <div class="flex gap-1.5">
+          <div class="flex flex-wrap gap-1.5">
             <Aplicar />
-            <Button variant="ghost" size="sm" onClick={() => setInstaladaVista(true)}>
+            <Button variant="ghost" size="compact" onClick={() => setInstaladaVista(true)}>
               {t("shell.update.later")}
             </Button>
           </div>
@@ -140,12 +140,12 @@ export default function AvisoDeVersion() {
                 {t("shell.update.background")}
               </p>
               <div class="flex gap-1.5">
-                <Button variant="primary" size="sm" onClick={() => void poner()}>
+                <Button variant="primary" size="compact" onClick={() => void poner()}>
                   {t("shell.update.install")}
                 </Button>
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="compact"
                   onClick={() => {
                     setDescartadas((d) => [...d, u().version]);
                     setHay(null);
@@ -164,7 +164,7 @@ export default function AvisoDeVersion() {
               <p class="m-0 text-xs text-neutral-500">
                 {t("shell.update.ready")}
               </p>
-              <div class="flex gap-1.5">
+              <div class="flex flex-wrap gap-1.5">
                 <Aplicar />
               </div>
             </Show>
@@ -203,11 +203,11 @@ function Aplicar() {
           {t("shell.update.waiting_tasks", { count: vivas().length })}
         </p>
       </Show>
-      <Button variant="secondary" size="sm" onClick={() => void invoke("restart_app")}>
+      <Button variant="secondary" size="compact" onClick={() => void invoke("restart_app")}>
         {t("shell.update.restart")}
       </Button>
       <Show when={vivas().length > 0}>
-        <Button variant="ghost" size="sm" onClick={() => void detenerYAplicar()}>
+        <Button variant="ghost" size="compact" onClick={() => void detenerYAplicar()}>
           {t("shell.update.stop_and_apply")}
         </Button>
       </Show>
