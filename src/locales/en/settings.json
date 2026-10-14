@@ -189,6 +189,8 @@
   "settings.appearance.background.description": "The image behind the conversation.",
   "settings.appearance.background.title": "Chat background",
   "settings.appearance.background.visibility": "How much the image shows · {percent}%",
+  "settings.appearance.tabs_veil": "Tab veil · {percent}%",
+  "settings.appearance.tabs_veil.description": "Shades the tab strip so the active tab blends into its chat.",
   "settings.appearance.dark_style.description": "How the app looks when the theme is dark.",
   "settings.appearance.dark_style.graphite": "Graphite",
   "settings.appearance.dark_style.navy": "Blue",

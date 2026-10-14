@@ -14,7 +14,8 @@ import {
   claseDeFondo,
   type FondoDeChat,
 } from "../../lib/chat-background";
-import { elegirFondoDeChat, elegirFondoPropio, elegirVeloDeFondo, fondoDeChat, fondoPropio, quitarFondoPropio, veloDeFondo } from "../../lib/chat-background-store";
+import { elegirFondoDeChat, elegirFondoPropio, elegirVeloDeFondo, elegirVeloDePestanas, fondoDeChat, fondoPropio, quitarFondoPropio, veloDeFondo, veloDePestanas } from "../../lib/chat-background-store";
+import { VELO_DE_PESTANAS_MAX, VELO_DE_PESTANAS_MIN } from "../../lib/chat-background";
 import type { Preview } from "../artifacts/Preview";
 import {
   apariencia,
@@ -38,6 +39,7 @@ import { createWorkspaces } from "./workspaces-store";
 
 const IMAGES = ["png", "jpg", "jpeg", "webp"];
 const VISIBILITY_ID = "settings-appearance-background-visibility";
+const TABS_VEIL_ID = "settings-appearance-tabs-veil";
 
 const temas = (): { id: Apariencia; Icono: Component<{ size?: number }>; label: string }[] => [
   { id: "sistema", Icono: Monitor, label: t("settings.appearance.theme.system") },
@@ -88,6 +90,7 @@ export default function Appearance(props: { proyecto: string }) {
   const [propia, setPropia] = createSignal<string | null>(fondoPropio());
   const [velo, setVelo] = createSignal(veloDeFondo());
   const visibilidad = () => Math.round((1 - velo()) * 100);
+  const [veloPestanas, setVeloPestanas] = createSignal(veloDePestanas());
   const espacios = createWorkspaces();
   const [filas, setFilas] = createSignal<Fila[]>([]);
   const [cargado, setCargado] = createSignal(false);
@@ -354,6 +357,25 @@ export default function Appearance(props: { proyecto: string }) {
             class="w-40 accent-primary"
             value={visibilidad()}
             onInput={(e) => setVelo(elegirVeloDeFondo(1 - Number(e.currentTarget.value) / 100))}
+          />
+        </SettingsRow>
+        <SettingsRow
+          label={
+            <label for={TABS_VEIL_ID}>
+              {t("settings.appearance.tabs_veil", { percent: Math.round(veloPestanas() * 100) })}
+            </label>
+          }
+          description={t("settings.appearance.tabs_veil.description")}
+        >
+          <input
+            id={TABS_VEIL_ID}
+            type="range"
+            min={VELO_DE_PESTANAS_MIN * 100}
+            max={VELO_DE_PESTANAS_MAX * 100}
+            step="5"
+            class="w-40 accent-primary"
+            value={Math.round(veloPestanas() * 100)}
+            onInput={(e) => setVeloPestanas(elegirVeloDePestanas(Number(e.currentTarget.value) / 100))}
           />
         </SettingsRow>
         <Show when={backgroundFailure()}>

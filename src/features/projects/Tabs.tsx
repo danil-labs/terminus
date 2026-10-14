@@ -31,6 +31,10 @@ import EstadoDeTarea, { taskLabel } from "./TaskStatus";
 import { taskPriority } from "./taskActivity";
 import { type GitStatus, watchSessionGit } from "./taskGit";
 
+// Lo que asoma de la pestaña vecina y el padding de la tira, en px.
+const PEEK = 56;
+const EDGE = 6;
+
 // El For de App vuelve a montar la tira al activar una pestaña; su scroll sobrevive aquí.
 const scrollBySite = new Map<string, number>();
 
@@ -109,11 +113,19 @@ export default function TabStrip(props: {
     );
   });
 
-  // Se revela el envoltorio y no el tab: el botón de cerrar queda a su derecha.
-  // scrollIntoView puede faltar en el entorno que monta el guarda mount-frontend.
+  // Se revela el envoltorio, que incluye el botón de cerrar. Si hay que desplazar,
+  // asoma también la vecina de ese lado para poder seguir avanzando con clics.
   function reveal(n: number) {
     const element = strip?.querySelector<HTMLElement>(`[data-envoltorio="${n}"]`);
-    element?.scrollIntoView?.({ inline: "nearest", block: "nearest" });
+    if (!strip || !element) return;
+    const start = element.offsetLeft - EDGE;
+    const end = element.offsetLeft + element.offsetWidth + EDGE;
+    const view = strip.clientWidth;
+    let target = strip.scrollLeft;
+    if (start < target) target = start - (n > 0 ? PEEK : 0);
+    else if (end > target + view) target = end + (n < props.tabs.length - 1 ? PEEK : 0) - view;
+    else return;
+    strip.scrollLeft = Math.max(0, Math.min(target, strip.scrollWidth - view));
   }
   const site = () => strip?.closest("[data-ventana]")?.getAttribute("data-ventana") ?? "";
   let restored = false;
@@ -225,9 +237,9 @@ export default function TabStrip(props: {
         if (!p) e.preventDefault();
         setSelectedTab(p?.id ?? null);
       }}
-      // La pestaña activa toca el borde inferior; el padding deja ver sus curvas en los extremos.
+      // La pestaña activa toca el borde inferior para fundirse con su panel bajo el velo.
       // flex-1 separaría el botón de añadir de la última pestaña.
-      class="group/strip relative flex min-w-0 items-end gap-0.5 self-stretch overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-px-1.5 px-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      class="group/strip relative flex min-w-0 items-end gap-0.5 self-stretch overflow-x-auto overflow-y-hidden overscroll-x-contain px-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       <For each={props.tabs}>
         {(p, i) => {
@@ -299,8 +311,8 @@ export default function TabStrip(props: {
                   "group flex h-7 shrink-0 touch-none items-center rounded-[var(--radius-sm)] pr-1 select-none",
                   task() ? "w-[220px] text-sm" : "w-[180px] text-[0.75rem]",
                   active()
-                    ? "tab-active bg-surface-muted font-semibold text-neutral-950"
-                    : "font-medium text-neutral-500 hover:bg-surface-muted hover:text-neutral-950",
+                    ? "tab-active font-semibold text-neutral-950"
+                    : "font-medium text-neutral-500 hover:bg-neutral-950/5 hover:text-neutral-950",
                 )}
               >
                 <div

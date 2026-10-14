@@ -189,6 +189,8 @@
   "settings.appearance.background.description": "La imagen que se ve detrás de la conversación.",
   "settings.appearance.background.title": "Fondo de los chats",
   "settings.appearance.background.visibility": "Cuánto se ve la imagen · {percent}%",
+  "settings.appearance.tabs_veil": "Velo de las pestañas · {percent}%",
+  "settings.appearance.tabs_veil.description": "Oscurece la franja de pestañas para que la activa se funda con su chat.",
   "settings.appearance.dark_style.description": "Cómo se ve la app cuando el tema es oscuro.",
   "settings.appearance.dark_style.graphite": "Grafito",
   "settings.appearance.dark_style.navy": "Azul",
