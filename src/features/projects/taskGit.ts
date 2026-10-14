@@ -72,13 +72,14 @@ const projects = new Map<string, Entry>();
 const parked = new Map<string, { rows: Record<string, GitStatus>; forget: () => void }>();
 function park(project: string, rows: Record<string, GitStatus>) {
   parked.get(project)?.forget();
+  const target = window;
   const forget = () => {
     clearTimeout(timer);
-    window.removeEventListener("harness:workspace", forget);
+    target.removeEventListener("harness:workspace", forget);
     if (parked.get(project)?.rows === rows) parked.delete(project);
   };
   const timer = setTimeout(forget, 3_000);
-  window.addEventListener("harness:workspace", forget);
+  target.addEventListener("harness:workspace", forget);
   parked.set(project, { rows, forget });
 }
 function unpark(project: string) {
