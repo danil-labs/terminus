@@ -1684,6 +1684,8 @@ if (!roto) {
       pending_requests: () => ({ questions: [], permissions: [{ request_id: "r", tool: "Write", target: "hola.txt" }] }),
       close_confirmed: null,
       stop_turn: null,
+      window_to_background: null,
+      tray_update: null,
     });
     cierre.emit("close-requested", null);
     await sleep(100);
@@ -1700,6 +1702,14 @@ if (!roto) {
     await sleep(150);
     assert.ok(cierre.comandos.slice(antes).includes("stop_turn"));
     assert.ok(cierre.comandos.slice(antes).includes("close_confirmed"));
+    // «Seguir en segundo plano» oculta la ventana con el icono; no la cierra.
+    const antesFondo = cierre.comandos.length;
+    cierre.emit("close-requested", null);
+    await sleep(150);
+    [...cierre.w.document.querySelector("[data-close-guard]").querySelectorAll("button")].find(b => b.textContent.includes("Seguir en segundo plano")).click();
+    await sleep(150);
+    assert.ok(cierre.comandos.slice(antesFondo).includes("window_to_background"));
+    assert.equal(cierre.comandos.slice(antesFondo).includes("close_confirmed"), false);
     assert.deepEqual(cierre.fallos, []);
   }
   // Abrir una tarea que ya contestaba con una herramienta en curso lanzaba

@@ -1,6 +1,5 @@
 import { Show, createSignal, onCleanup, onMount } from "solid-js";
 import { check, type Update } from "@tauri-apps/plugin-updater";
-import { relaunch } from "@tauri-apps/plugin-process";
 import { Button } from "../../ui/Button";
 import { Toast } from "../../ui/Toast";
 import { t } from "../../lib/i18n";
@@ -115,7 +114,7 @@ export default function AvisoDeVersion() {
         <Toast>
           <p class="m-0 text-xs text-neutral-500">{t("shell.update.installed")}</p>
           <div class="flex gap-1.5">
-            <Button variant="secondary" size="sm" onClick={() => void relaunch()}>
+            <Button variant="secondary" size="sm" onClick={() => void invoke("restart_app")}>
               {t("shell.update.restart")}
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setInstaladaVista(true)}>
@@ -170,7 +169,7 @@ export default function AvisoDeVersion() {
                 variant="secondary"
                 size="sm"
                 class="justify-self-start"
-                onClick={() => void relaunch()}
+                onClick={() => void invoke("restart_app")}
               >
                 {t("shell.update.restart")}
               </Button>

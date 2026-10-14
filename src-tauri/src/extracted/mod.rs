@@ -3,6 +3,7 @@
 mod desktop;
 mod engine;
 pub mod env;
+mod instance;
 mod launcher;
 mod legacy;
 #[cfg(target_os = "linux")]
@@ -13,6 +14,7 @@ mod master_handoff;
 mod proxy;
 mod sites;
 mod startup;
+mod tray;
 mod typst_live;
 mod update;
 pub mod util;
@@ -109,6 +111,11 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
     else {
         return;
     };
+    let listener = match instance::claim(&window_data) {
+        instance::Claim::Shown => return,
+        instance::Claim::First(listener) => Some(listener),
+        instance::Claim::Alone => None,
+    };
     let launcher = Arc::new(launcher);
     let starting = launcher.clone();
     let log = tauri_plugin_log::Builder::default()
@@ -153,6 +160,10 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
                 })
                 .build()?;
             launcher::start(app.handle().clone(), starting.clone());
+            if let Some(listener) = listener {
+                let handle = app.handle().clone();
+                instance::serve(listener, move || tray::show_window(&handle));
+            }
             Ok(())
         })
         .register_asynchronous_uri_scheme_protocol(
@@ -167,6 +178,10 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
         .invoke_handler(proxy::with_desktop(tauri::generate_handler![
             desktop::request_close,
             desktop::close_confirmed,
+            tray::window_to_background,
+            tray::tray_update,
+            tray::quit_completely,
+            tray::restart_app,
             desktop::window_ready,
             desktop::window_vitals,
             launcher::launcher_state,
@@ -197,6 +212,7 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
         .expect("tauri extracted client")
         .run(move |app, event| {
             if matches!(event, tauri::RunEvent::Exit) {
+                instance::exiting();
                 if let Some(state) = app.try_state::<Arc<proxy::State>>() {
                     state.close();
                 }

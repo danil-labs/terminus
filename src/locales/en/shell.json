@@ -174,6 +174,14 @@
   "shell.close.stop": "Stop them and quit",
   "shell.close.stopping": "Stopping…",
   "shell.close.background": "Keep in background",
+  "shell.tray.header": {
+    "one": "Terminus · {count} task working",
+    "other": "Terminus · {count} tasks working"
+  },
+  "shell.tray.idle": "Terminus · no tasks working",
+  "shell.tray.open": "Open Terminus",
+  "shell.tray.stop_all": "Stop all tasks",
+  "shell.tray.quit": "Quit completely",
   "shell.update.installed": "A new version of Terminus is installed. It applies when you restart; tasks that are running keep working.",
   "shell.update.install": "Update",
   "shell.update.later": "Not now",

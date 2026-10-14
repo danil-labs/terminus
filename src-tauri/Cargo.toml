@@ -45,7 +45,7 @@ log = "0.4"
 uuid = { version = "1", features = ["v4"] }
 # `unstable` is required for `Window::add_child`: native site webviews are
 # mounted over a tab without loosening the main window's policy.
-tauri = { version = "2.11.3", features = ["unstable"] }
+tauri = { version = "2.11.3", features = ["unstable", "tray-icon"] }
 tauri-plugin-log = "2"
 tauri-plugin-dialog = "2.7.2"
 # The startup notice is shown before the webview exists; same rfd as tauri-plugin-dialog.
