@@ -68,9 +68,11 @@ export default function VistaPreviaTypst(props: {
   const zoom = () => zoomDe(props.session, props.arbol);
   const ampliada = () => ampliadaDe(props.session, props.arbol);
 
-  // Esc vuelve a lado a lado, solo desde el visor que se ve.
+  // Esc vuelve a lado a lado solo con el foco en este visor: en el chat u otro panel es de ellos.
+  let raiz: HTMLDivElement | undefined;
   const alTeclear = (e: KeyboardEvent) => {
     if (e.key !== "Escape" || !props.visible || !ampliada() || e.defaultPrevented) return;
+    if (!(e.target instanceof Node) || !raiz?.contains(e.target)) return;
     ampliarVista(props.session, props.arbol, false);
   };
   window.addEventListener("keydown", alTeclear);
@@ -205,7 +207,7 @@ export default function VistaPreviaTypst(props: {
     window.dispatchEvent(new CustomEvent("harness:open-settings", { detail: "plugins" }));
 
   return (
-    <div class="flex min-h-0 flex-1 flex-col">
+    <div ref={raiz} class="flex min-h-0 flex-1 flex-col">
       <Show when={viva()?.estado === "sin_typst"}>
         <div class="flex flex-col items-center gap-3 p-6 text-center">
           <p class="m-0 text-xs text-neutral-500">{t("code.typst.missing")}</p>
