@@ -184,7 +184,7 @@ type LiveTurn = { session: string; workspace: string; project: string; started_a
 function Aplicar() {
   const [vivas, setVivas] = createSignal<LiveTurn[]>([]);
   async function mirar() {
-    const turnos: LiveTurn[] = await invoke("list_live_turns").catch(() => []);
+    const turnos = (await invoke("list_live_turns").catch(() => [])) as LiveTurn[];
     setVivas(turnos);
   }
   onMount(() => {
