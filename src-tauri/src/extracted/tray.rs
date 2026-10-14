@@ -157,6 +157,7 @@ pub(super) fn tray_notify(
     if let Some(window) = app.get_webview_window("main") {
         let on_screen =
             window.is_visible().unwrap_or(false) && !window.is_minimized().unwrap_or(false);
+        log::info!("[aviso] needs_you={needs_you} on_screen={on_screen}");
         if on_screen {
             if needs_you && !window.is_focused().unwrap_or(true) {
                 let _ =
@@ -195,14 +196,24 @@ fn windows_toast(app: &AppHandle, title: &str, body: &str) -> Result<(), String>
         Toast::POWERSHELL_APP_ID.to_owned()
     };
     let handle = app.clone();
-    Toast::new(&app_id)
-        .title(title)
-        .text1(body)
-        .on_activated(move |_| {
-            let window = handle.clone();
-            let _ = handle.run_on_main_thread(move || show_window(&window));
-            Ok(())
-        })
-        .show()
-        .map_err(|error| error.to_string())
+    let (title, body) = (title.to_owned(), body.to_owned());
+    // Como el plugin: WinRT fuera del hilo de la ventana, que no acepta el aviso.
+    std::thread::spawn(move || {
+        let clicked = handle.clone();
+        let shown = Toast::new(&app_id)
+            .title(&title)
+            .text1(&body)
+            .on_activated(move |_| {
+                log::info!("[aviso] clic");
+                let window = clicked.clone();
+                let _ = clicked.run_on_main_thread(move || show_window(&window));
+                Ok(())
+            })
+            .show();
+        match shown {
+            Ok(()) => log::info!("[aviso] mostrado app_id={app_id}"),
+            Err(error) => log::warn!("[aviso] no se pudo mostrar app_id={app_id}: {error}"),
+        }
+    });
+    Ok(())
 }
