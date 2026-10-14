@@ -180,6 +180,27 @@ main file and the binary (`tree_typst_target`); the window never starts
 Tinymist with a path from the webview. On Windows a Job Object kills the
 Tinymist processes if the window dies.
 
+## Updating on Windows
+
+Windows does not overwrite a running `.exe`, but it renames one. The installer
+(`src-tauri/windows/hooks.nsh`) renames `terminus.exe` and `seldon-runtime.exe`
+to `old_*` and writes the new ones, so the open window and its engine keep
+working. The template's step that closes Terminus only runs on a real
+uninstall; an installer replacing the copy runs the uninstaller in place
+(`_?=$INSTDIR`), and that run also sets the files aside. The app does not use
+`downloadAndInstall`, which exits on Windows: `update_install` downloads with
+the plugin's signature check and runs the installer with `/S /UPDATE`.
+
+`update_pending` reports when this window's image was set aside and the new
+`terminus.exe` is already in its place, whether the app or a manual installer
+did it, and the front asks for a restart. A manual installer that finds
+Terminus open shows the same notice and ends there, instead of running a second
+window from its finish page. On the next start, an engine running from
+`old_seldon-runtime.exe` gets `service stop`; one that refuses keeps working
+and the new engine waits for the next start. Then the window deletes the
+`old_*` files no one holds, retrying for a few seconds while the window it
+replaces exits.
+
 ## Not done yet
 
 - The engine is pinned for the four platforms and bundled on all of them. The

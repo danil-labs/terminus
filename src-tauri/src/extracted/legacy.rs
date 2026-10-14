@@ -184,6 +184,20 @@ pub fn window_open(_service: u32) -> Option<bool> {
     None
 }
 
+/// El instalador aparta a `old_*` el ejecutable en uso; el sistema da la ruta actual, no la de arranque.
+#[cfg(windows)]
+pub fn set_aside(pid: u32) -> bool {
+    windows::image(pid).is_some_and(|(image, _)| {
+        Path::new(&image)
+            .file_name()
+            .is_some_and(|name| name.to_string_lossy().starts_with("old_"))
+    })
+}
+#[cfg(not(windows))]
+pub fn set_aside(_pid: u32) -> bool {
+    false
+}
+
 /// Dentro de un AppImage el motor vive en un montaje que desaparece con la ventana:
 /// se copia a una ruta fija fuera de la raíz.
 #[cfg(target_os = "linux")]
