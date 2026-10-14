@@ -99,6 +99,7 @@ export default function CloseGuard(props: { title: (session: string) => string |
       return close();
     }
     setRemember(false);
+    setStopping(false);
     setShown(await titled(turns));
   }
 
@@ -108,6 +109,7 @@ export default function CloseGuard(props: { title: (session: string) => string |
     if (choice === "stop") {
       setStopping(true);
       await stopTurns(turns);
+      setStopping(false);
     }
     setShown(null);
     if (choice === "background") return void toBackground();
