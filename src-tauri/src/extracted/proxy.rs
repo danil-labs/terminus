@@ -144,6 +144,7 @@ pub(super) fn desktop_command(name: &str) -> bool {
                 | "tray_update"
                 | "quit_completely"
                 | "restart_app"
+                | "tray_notify"
         )
 }
 pub(super) fn with_desktop(

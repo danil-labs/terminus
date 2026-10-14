@@ -142,3 +142,15 @@ pub(super) fn restart_app(app: AppHandle) {
     super::instance::exiting();
     app.restart();
 }
+
+/// Aviso del sistema mientras la ventana está oculta: terminó una tarea o espera respuesta.
+#[tauri::command]
+pub(super) fn tray_notify(app: AppHandle, title: String, body: String) -> Result<(), String> {
+    use tauri_plugin_notification::NotificationExt;
+    app.notification()
+        .builder()
+        .title(title)
+        .body(body)
+        .show()
+        .map_err(|error| error.to_string())
+}

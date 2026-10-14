@@ -182,6 +182,14 @@
   "shell.tray.open": "Abrir Terminus",
   "shell.tray.stop_all": "Detener todas las tareas",
   "shell.tray.quit": "Salir por completo",
+  "shell.notify.finished": "Terminó «{title}»",
+  "shell.notify.remaining": {
+    "one": "Queda {count} tarea trabajando.",
+    "other": "Quedan {count} tareas trabajando."
+  },
+  "shell.notify.none_left": "No quedan tareas trabajando.",
+  "shell.notify.waiting": "«{title}» espera tu respuesta",
+  "shell.notify.open_from_tray": "Ábrela desde el icono de Terminus junto al reloj.",
   "shell.update.installed": "Se instaló una versión nueva de Terminus. Se aplica al reiniciar; las tareas que están corriendo siguen trabajando.",
   "shell.update.install": "Actualizar",
   "shell.update.later": "Ahora no",

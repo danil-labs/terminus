@@ -63,8 +63,8 @@ export default function CloseGuard(props: { title: (session: string) => string |
   }
 
   /** Lo que dice el icono junto al reloj; los textos van traducidos desde aquí. */
-  async function trayPayload() {
-    const rows = await titled(await invoke<LiveTurn[]>("list_live_turns").catch(() => []));
+  async function trayPayload(rows?: Shown[]) {
+    rows ??= await titled(await invoke<LiveTurn[]>("list_live_turns").catch(() => []));
     const count = rows.length;
     return {
       labels: {
@@ -81,12 +81,42 @@ export default function CloseGuard(props: { title: (session: string) => string |
   }
 
   let refresh: ReturnType<typeof setInterval> | undefined;
+  /** Lo que había en la vuelta anterior, para avisar de lo que cambió. */
+  let before = new Map<string, Shown>();
+
+  function notifyChanges(rows: Shown[]) {
+    const now = new Map(rows.map((row) => [row.session, row]));
+    for (const [session, row] of before) {
+      if (!now.has(session)) {
+        void invoke("tray_notify", {
+          title: t("shell.notify.finished", { title: row.title }),
+          body: rows.length ? t("shell.notify.remaining", { count: rows.length }) : t("shell.notify.none_left"),
+        }).catch(() => {});
+      }
+    }
+    for (const row of rows) {
+      if (row.waiting && !before.get(row.session)?.waiting) {
+        void invoke("tray_notify", {
+          title: t("shell.notify.waiting", { title: row.title }),
+          body: t("shell.notify.open_from_tray"),
+        }).catch(() => {});
+      }
+    }
+    before = now;
+  }
+
+  async function tick() {
+    const rows = await titled(await invoke<LiveTurn[]>("list_live_turns").catch(() => []));
+    notifyChanges(rows);
+    await invoke("tray_update", await trayPayload(rows));
+  }
+
   async function toBackground() {
-    await invoke("window_to_background", await trayPayload());
+    const rows = await titled(await invoke<LiveTurn[]>("list_live_turns").catch(() => []));
+    before = new Map(rows.map((row) => [row.session, row]));
+    await invoke("window_to_background", await trayPayload(rows));
     clearInterval(refresh);
-    refresh = setInterval(() => {
-      void trayPayload().then((payload) => invoke("tray_update", payload)).catch(() => {});
-    }, 5000);
+    refresh = setInterval(() => void tick().catch(() => {}), 5000);
   }
 
   async function onCloseRequested() {
@@ -124,6 +154,8 @@ export default function CloseGuard(props: { title: (session: string) => string |
       listen("close-requested", () => void onCloseRequested()),
       listen("tray-stop-all", async () => {
         await stopTurns(await invoke<LiveTurn[]>("list_live_turns").catch(() => []));
+        // Las detuvo la persona: no se avisa de cada una como si hubieran terminado.
+        before = new Map();
         void trayPayload().then((payload) => invoke("tray_update", payload)).catch(() => {});
       }),
       listen("tray-quit", async () => {
