@@ -187,6 +187,14 @@
     "other": "The new engine takes over when {count} working tasks finish."
   },
   "shell.update.stop_and_apply": "Stop and apply now",
+  "shell.notify.finished": "“{title}” finished",
+  "shell.notify.remaining": {
+    "one": "{count} task is still working.",
+    "other": "{count} tasks are still working."
+  },
+  "shell.notify.none_left": "No tasks are working.",
+  "shell.notify.waiting": "“{title}” is waiting for your answer",
+  "shell.notify.open_from_tray": "Open it from the Terminus icon next to the clock.",
   "shell.update.installed": "A new version of Terminus is installed. It applies when you restart; tasks that are running keep working.",
   "shell.update.install": "Update",
   "shell.update.later": "Not now",

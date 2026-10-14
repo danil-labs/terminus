@@ -173,6 +173,7 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(log)
         .invoke_handler(proxy::with_desktop(tauri::generate_handler![
@@ -182,6 +183,7 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
             tray::tray_update,
             tray::quit_completely,
             tray::restart_app,
+            tray::tray_notify,
             desktop::window_ready,
             desktop::window_vitals,
             launcher::launcher_state,

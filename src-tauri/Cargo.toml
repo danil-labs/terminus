@@ -53,6 +53,8 @@ rfd = { version = "0.16", default-features = false, features = ["gtk3", "common-
 dirs = "6"
 tauri-plugin-updater = "2.10.1"
 tauri-plugin-process = "2.3.1"
+# Avisos del segundo plano; se lanzan desde Rust, sin paquete ni permiso en el front.
+tauri-plugin-notification = "2"
 tauri-plugin-clipboard-manager = "2.3.3"
 ureq = { version = "3.2", features = ["json"] }
 # La vista en vivo de Typst arranca Tinymist en una carpeta de trabajo vacía.

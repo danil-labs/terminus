@@ -1686,6 +1686,7 @@ if (!roto) {
       stop_turn: null,
       window_to_background: null,
       tray_update: null,
+      tray_notify: null,
     });
     cierre.emit("close-requested", null);
     await sleep(100);
