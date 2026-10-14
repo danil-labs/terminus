@@ -79,6 +79,6 @@ test("la barra solo agrupa una tarea bajo un lanzador de la misma carpeta", () =
   assert.equal(shownUnderLauncher(delegada, [lanzador, delegada]), true);
   assert.equal(shownUnderLauncher(delegada, [delegada]), false);
   assert.equal(shownUnderLauncher({ ...delegada, launcher_available: false }, [lanzador, delegada]), false);
-  assert.equal(shownUnderLauncher({ id: "t2", parent: "chat-a" }, [lanzador]), true);
-  assert.equal(shownUnderLauncher({ id: "t3", launched_by: null }, [lanzador]), false);
+  assert.equal(shownUnderLauncher({ parent: "chat-a" }, [lanzador]), true);
+  assert.equal(shownUnderLauncher({ launched_by: null }, [lanzador]), false);
 });
