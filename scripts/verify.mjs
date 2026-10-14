@@ -144,6 +144,12 @@ const steps = [
     root,
   ],
   [
+    "Los comandos `!` quedan alineados en la caja y se corren sin la sangría",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "scripts/terminal-indent.test.ts")],
+    root,
+  ],
+  [
     "El menú de la arroba propone encargados por nombre, sin chocar con el material",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "scripts/recipient-menu.test.ts")],
