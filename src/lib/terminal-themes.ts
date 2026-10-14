@@ -3,7 +3,7 @@ import { createSignal } from "solid-js";
 /**
  * La segunda capa de color: qué tema pinta la terminal, el código y el diff.
  * Los colores viven en `styles/terminal.css`; aquí solo el identificador, y
- * `scripts/terminal-themes.mjs` comprueba que las dos listas coincidan.
+ * `scripts/guards/terminal-themes.mjs` comprueba que las dos listas coincidan.
  *
  * Un nombre de esquema es un nombre propio y no pasa por `t()`. La elección es
  * del workspace: `workspaces::Workspace::terminal_theme`.

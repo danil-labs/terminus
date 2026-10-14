@@ -10,13 +10,13 @@
  * | | Qué contesta |
  * |---|---|
  * | [`seguirHueco`] | Dónde está el hueco de la pestaña, ahora y cada vez que cambia |
- * | [`hayCapaEncima`] | Si el DOM tiene algo abierto que la capa taparía |
+ * | [`hayCapaEncima`] | Si el DOM tiene algo abierto que la capa taparía en su hueco |
  *
  * **El hueco se mide en píxeles CSS y no se toca.** `getBoundingClientRect()` da
  * píxeles CSS, que son los puntos lógicos que `sites::site_place` espera: Rust
  * convierte con el factor de escala de la ventana. Multiplicar aquí por
  * `devicePixelRatio` pone la capa al doble de lejos en un Mac Retina y acierta
- * en una pantalla normal — la misma trampa que `scripts/drop.mjs` caza al revés,
+ * en una pantalla normal — la misma trampa que `scripts/guards/drop.mjs` caza al revés,
  * y por la que **ni una máquina verifica por la otra**.
  *
  * Un `ResizeObserver` sobre el hueco alcanza para todo lo que lo mueve: plegar
@@ -78,26 +78,55 @@ export function aDireccion(texto: string): string | null {
 /** El rectángulo del hueco, en píxeles CSS. Es lo que viaja a `site_place`. */
 export type Hueco = { x: number; y: number; width: number; height: number };
 
-const [encima, setEncima] = createSignal(false);
+const mismasZonas = (a: readonly Hueco[], b: readonly Hueco[]) =>
+  a.length === b.length &&
+  a.every((z, i) => z.x === b[i].x && z.y === b[i].y && z.width === b[i].width && z.height === b[i].height);
+/** Lo que pinta cada portal abierto en `<body>`, en píxeles CSS. */
+const [zonas, setZonas] = createSignal<readonly Hueco[]>([], { equals: mismasZonas });
+const [nativeModals, setNativeModals] = createSignal(0);
+
+// La capa modal del navegador conserva su nodo bajo #root, sin un portal en body.
+export function suspendSiteLayers(): () => void {
+  setNativeModals((count) => count + 1);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    setNativeModals((count) => count - 1);
+  };
+}
 
 /** Mientras se arrastra un separador las capas se esconden: una capa nativa sigue al DOM con retraso y se montaría encima. */
 const [moviendoHueco, setMoviendoHueco] = createSignal(false);
 export { moviendoHueco, setMoviendoHueco };
 
+/** La capa modal nativa no tiene rectángulo que medir: tapa la ventana entera. */
+const TODA: Hueco = { x: -1e9, y: -1e9, width: 3e9, height: 3e9 };
+
 /**
- * Si el DOM tiene algo abierto que la capa taparía.
- *
- * El observador se enciende con el primer sitio que se abre y no se apaga: es
- * un `MutationObserver` sobre `childList` de `<body>` **sin `subtree`**, así que
- * solo se despierta cuando un portal se monta o se desmonta. Ponerle `subtree`
- * lo despertaría con cada token que pinta el chat.
+ * Lo abierto encima de la app, en rectángulos: la señal que siguen los efectos que colocan capas.
+ * Sobre `<body>` se observa `childList` sin `subtree`, que despertaría con cada token del chat;
+ * dentro de cada portal se mira todo: un menú se coloca un cuadro después de montarse.
  */
-export function hayCapaEncima() {
+export function zonasEncima(): readonly Hueco[] {
   encender();
-  return encima();
+  return nativeModals() > 0 ? [TODA] : zonas();
+}
+
+/** Si algo abierto en el DOM se cruza con `hueco`. Tocarse por el borde no cuenta. */
+export function hayCapaEncima(hueco: Hueco) {
+  return zonasEncima().some(
+    (z) =>
+      z.x < hueco.x + hueco.width &&
+      hueco.x < z.x + z.width &&
+      z.y < hueco.y + hueco.height &&
+      hueco.y < z.y + z.height,
+  );
 }
 
 let observando: MutationObserver | null = null;
+let dentro: MutationObserver | null = null;
+let pedida = 0;
 
 /** Etiquetas que están en `<body>` y no ocupan un píxel. */
 const PINTAN_NADA = new Set([
@@ -110,16 +139,41 @@ const PINTAN_NADA = new Set([
   "TITLE",
 ]);
 
+const portales = () =>
+  Array.from(document.body.children).filter((el) => el.id !== "root" && !PINTAN_NADA.has(el.tagName));
+
+/** El envoltorio de un portal mide 0×0 y lo que pinta va `fixed` dentro: se baja hasta lo que ocupa algo. */
+function rectangulos(el: Element): Hueco[] {
+  const r = el.getBoundingClientRect();
+  if (r.width > 0 && r.height > 0) return [{ x: r.x, y: r.y, width: r.width, height: r.height }];
+  return Array.from(el.children).flatMap(rectangulos);
+}
+
+const medirZonas = () => setZonas(portales().flatMap(rectangulos));
+
+function pedirMedida() {
+  if (pedida || typeof requestAnimationFrame === "undefined") return;
+  pedida = requestAnimationFrame(() => {
+    pedida = 0;
+    medirZonas();
+  });
+}
+
 function encender() {
   if (observando || typeof MutationObserver === "undefined") return;
-  const mirar = () =>
-    setEncima(
-      Array.from(document.body.children).some(
-        (el) => el.id !== "root" && !PINTAN_NADA.has(el.tagName),
-      ),
-    );
+  dentro = new MutationObserver(pedirMedida);
+  const mirar = () => {
+    dentro?.disconnect();
+    for (const el of portales()) {
+      dentro?.observe(el, { subtree: true, childList: true, attributes: true, attributeFilter: ["style", "class"] });
+    }
+    // Ya, para esconder antes de que la capa pinte encima; y otra vez cuando el portal se haya colocado.
+    medirZonas();
+    pedirMedida();
+  };
   observando = new MutationObserver(mirar);
   observando.observe(document.body, { childList: true });
+  if (typeof window !== "undefined") window.addEventListener("resize", pedirMedida);
   mirar();
 }
 

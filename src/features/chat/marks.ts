@@ -8,7 +8,7 @@ import { t } from "../../lib/i18n";
  * para decidir qué botón ofrecer. Meterlas en el catálogo de lenguas rompe la
  * comparación al traducir la app — sin error y sin nada en consola.
  *
- * Viven en un `.ts` a propósito: `scripts/literals.mjs` solo mira `.tsx`, y
+ * Viven en un `.ts` a propósito: `scripts/guards/literals.mjs` solo mira `.tsx`, y
  * ahí «sin elegir» se lee como una frase soldada.
  */
 
@@ -46,6 +46,6 @@ export function rotuloDeMarca(marca: string): string {
   }
 }
 
-/* Un `switch` con claves literales, y no un mapa: `scripts/locales.mjs` solo
+/* Un `switch` con claves literales, y no un mapa: `scripts/guards/locales.mjs` solo
    cuenta como usada una clave escrita dentro de `t("…")` en el sitio de la
    llamada. En un `Record` las siete saldrían como frases que sobran. */

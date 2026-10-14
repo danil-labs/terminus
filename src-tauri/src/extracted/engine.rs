@@ -116,7 +116,10 @@ pub fn ensure(paths: &Paths, adopt: bool) -> Result<PathBuf> {
     lock.lock()?;
     let endpoint = paths.data.join("seldon-endpoint.json");
     if let Ok((found, status)) = terminus_engine_client::probe(&endpoint) {
-        return write_selection(paths, &endpoint, &found, &status);
+        // Uno que trabaja sigue con su versión; la nueva entra cuando lo dejen parar.
+        if !super::legacy::set_aside(found.pid) || !retire(&endpoint, found.pid) {
+            return write_selection(paths, &endpoint, &found, &status);
+        }
     }
     let offset = std::fs::metadata(&paths.launch_log).map_or(0, |m| m.len());
     let mut child = spawn(paths, adopt)?;
@@ -177,6 +180,27 @@ pub fn stop() -> Stopped {
             Err(_) => return Stopped::Unanswered,
         }
     }
+}
+
+/// Una sola petición: al abrir la ventana no se espera a que acaben las órdenes.
+fn retire(endpoint: &Path, pid: u32) -> bool {
+    let stopped =
+        terminus_engine_client::request_endpoint(endpoint, "service stop", Duration::from_secs(5));
+    log::info!(
+        "[engine] replaced engine pid={pid} stop={}",
+        stopped.is_ok()
+    );
+    if stopped.is_err() {
+        return false;
+    }
+    let deadline = Instant::now() + Duration::from_secs(30);
+    while Instant::now() < deadline {
+        if !super::legacy::alive(pid) {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    false
 }
 
 fn only_operations(busy: &serde_json::Value) -> bool {

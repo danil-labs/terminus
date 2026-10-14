@@ -20,8 +20,8 @@ engine can't be made here, but bug reports about them are welcome as issues.
 3. Run the chain and make sure it passes:
 
    ```sh
-   pnpm verificar              # full chain, including Rust
-   pnpm verificar --sin-cargo  # without Rust, if you only touched the front
+   pnpm verify              # full chain, including Rust
+   pnpm verify --no-cargo  # without Rust, if you only touched the front
    ```
 
 4. Check the change in the real window when it affects what people see

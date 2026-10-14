@@ -3,47 +3,45 @@
  * `<NEXT_STEPS>`, como líneas `- [ ] <mensaje>`. Se leen del texto crudo; una
  * etiqueta dentro de un bloque de código es texto. La limpieza para lo que sale
  * del chat vive en `runtime/chat/next_steps.rs` y comparte `next-steps.cases.json` con esta.
- *
- * Derivado de `traycer-next-steps.ts` (Copyright (c) 2026 Traycer AI, MIT),
- * https://github.com/traycerai/traycer. La atribución está en `CREDITS.md`.
  */
 
-const APERTURA = "<NEXT_STEPS>";
-const CIERRE_EN_LINEA = /^[\t ]*<\/NEXT_STEPS>[\t ]*$/;
-const APERTURA_AL_INICIO = /^[\t ]*<NEXT_STEPS>[\t ]*/;
-const CERCA = /^( {0,3})(`{3,}|~{3,})/;
-const OPCION = /^[\t ]*-[\t ]*\[[\t ]*\][\t ]*:?\s*([\s\S]*?)[\t ]*$/;
+const OPEN_TAG = "<NEXT_STEPS>";
+const FENCE = /^ {0,3}(`{3,}|~{3,})/;
+const OPTION = /^\s*-\s*\[\s*\]\s*:?\s*(.*?)\s*$/;
+const PREVIEW_LENGTH = 180;
 
-export type OpcionSiguiente = { id: string; prompt: string };
+export type NextStepOption = { id: string; prompt: string };
 
-export type ParteSiguiente =
+export type NextStepsPart =
   | { kind: "markdown"; id: string; markdown: string }
-  | { kind: "next_steps"; id: string; prose: string; options: OpcionSiguiente[]; complete: boolean };
+  | { kind: "next_steps"; id: string; prose: string; options: NextStepOption[]; complete: boolean };
 
-type Linea = { text: string; start: number; endWithNewline: number };
-type Bloque = { start: number; contentStart: number; contentEnd: number; end: number; complete: boolean };
+/** Un bloque `<NEXT_STEPS>` localizado en el texto, por offsets. */
+type Block = { from: number; to: number; bodyFrom: number; bodyTo: number; closed: boolean };
 
 /** El mensaje partido en texto y bloques de opciones, en orden. */
-export function partirSiguientes(markdown: string, streaming: boolean): ParteSiguiente[] {
-  const recortado = streaming ? sinAperturaAMedias(markdown) : markdown;
-  if (!recortado.includes(APERTURA)) return [{ kind: "markdown", id: "markdown:0", markdown: recortado }];
-  const partes: ParteSiguiente[] = [];
+export function splitNextSteps(markdown: string, streaming: boolean): NextStepsPart[] {
+  const text = streaming ? withoutPartialOpenTag(markdown) : markdown;
+  const parts: NextStepsPart[] = [];
+  const markdownPart = (chunk: string) => {
+    if (chunk) parts.push({ kind: "markdown", id: `markdown:${parts.length}`, markdown: chunk });
+  };
   let cursor = 0;
-  for (const bloque of bloques(recortado, streaming)) {
-    if (bloque.start > cursor) empujarMarkdown(partes, recortado.slice(cursor, bloque.start));
-    const crudo = recortado.slice(bloque.contentStart, bloque.contentEnd);
-    const contenido = bloque.complete ? crudo : sinOpcionAMedias(crudo);
-    const leido = leerBloque(contenido);
-    if (leido === null) {
-      empujarMarkdown(partes, sinLineasEnBlancoAlBorde(contenido));
-    } else {
+  for (const block of findBlocks(text)) {
+    markdownPart(text.slice(cursor, block.from));
+    const complete = block.closed || !streaming;
+    const body = text.slice(block.bodyFrom, block.bodyTo);
+    const read = readOptions(complete ? body : withoutPartialOption(body));
+    if (read) {
       // Solo el inicio: el final crece con cada token y remontaría los botones.
-      partes.push({ kind: "next_steps", id: `next:${bloque.start}`, ...leido, complete: bloque.complete });
+      parts.push({ kind: "next_steps", id: `next:${block.from}`, ...read, complete });
+    } else {
+      markdownPart(trimBlankLines(complete ? body : withoutPartialOption(body)));
     }
-    cursor = bloque.end;
+    cursor = block.to;
   }
-  if (cursor < recortado.length) empujarMarkdown(partes, recortado.slice(cursor));
-  return partes.length === 0 ? [{ kind: "markdown", id: "markdown:0", markdown: "" }] : partes;
+  markdownPart(text.slice(cursor));
+  return parts.length ? parts : [{ kind: "markdown", id: "markdown:0", markdown: "" }];
 }
 
 /**
@@ -51,42 +49,40 @@ export function partirSiguientes(markdown: string, streaming: boolean): ParteSig
  * Las opciones hablan con la voz de la persona: fuera de los botones, quien
  * las lee las toma por una orden de quien contestó.
  */
-export function textoSinSiguientes(markdown: string): string {
-  if (!markdown.includes(APERTURA)) return markdown;
-  let fuera = "";
+export function stripNextSteps(markdown: string): string {
+  let out = "";
   let cursor = 0;
-  for (const bloque of bloques(markdown, false)) {
-    fuera += markdown.slice(cursor, bloque.start);
-    const contenido = markdown.slice(bloque.contentStart, bloque.contentEnd);
-    const queda = leerBloque(contenido)?.prose ?? sinLineasEnBlancoAlBorde(contenido);
-    if (queda) fuera += `${queda}\n`;
-    cursor = bloque.end;
+  for (const block of findBlocks(markdown)) {
+    const body = markdown.slice(block.bodyFrom, block.bodyTo);
+    const kept = readOptions(body)?.prose ?? trimBlankLines(body);
+    out += markdown.slice(cursor, block.from) + (kept ? `${kept}\n` : "");
+    cursor = block.to;
   }
-  return fuera + markdown.slice(cursor);
+  return out + markdown.slice(cursor);
 }
 
 /** La vista previa de un mensaje del agente; `sessions::preview_of` la calcula igual. */
-export function vistaPrevia(texto: string): string {
-  return resumen(textoSinSiguientes(texto));
+export function previewOf(text: string): string {
+  return summarize(stripNextSteps(text));
 }
 
 /**
  * La vista previa del último mensaje con texto de la persona o del agente.
  * Solo se limpia el del agente: un bloque que pega la persona es contenido.
  */
-export function vistaPreviaDelHilo(hilo: readonly { role: string; text: string; meta?: string }[]): string | undefined {
-  for (let i = hilo.length - 1; i >= 0; i -= 1) {
-    const m = hilo[i];
-    if ((m.role !== "user" && m.role !== "agent") || m.meta) continue;
-    const vista = m.role === "agent" ? vistaPrevia(m.text) : resumen(m.text);
-    if (vista) return vista;
+export function threadPreview(thread: readonly { role: string; text: string; meta?: string }[]): string | undefined {
+  for (let i = thread.length - 1; i >= 0; i -= 1) {
+    const message = thread[i];
+    if ((message.role !== "user" && message.role !== "agent") || message.meta) continue;
+    const preview = message.role === "agent" ? previewOf(message.text) : summarize(message.text);
+    if (preview) return preview;
   }
   return undefined;
 }
 
 // Por caracteres y no por unidades UTF-16: así corta Rust, y un emoji no se parte.
-function resumen(texto: string): string {
-  return Array.from(texto.replace(/\s+/g, " ").trim()).slice(0, 180).join("").trimEnd();
+function summarize(text: string): string {
+  return Array.from(text.replace(/\s+/g, " ").trim()).slice(0, PREVIEW_LENGTH).join("").trimEnd();
 }
 
 /**
@@ -94,118 +90,104 @@ function resumen(texto: string): string {
  * recortado; lo que espera en la cola cuenta como mandado al final. Una opción
  * se pinta usada si su texto se mandó después del mensaje que la propuso.
  */
-export function ultimaVezEnviada(
-  hilo: readonly { role: string; text: string }[],
-  cola: readonly string[],
+export function lastSentAt(
+  thread: readonly { role: string; text: string }[],
+  queue: readonly string[],
 ): Map<string, number> {
-  const vez = new Map<string, number>();
-  hilo.forEach((m, i) => {
-    if (m.role === "user") vez.set(m.text.trim(), i);
+  const at = new Map<string, number>();
+  thread.forEach((message, i) => {
+    if (message.role === "user") at.set(message.text.trim(), i);
   });
-  for (const texto of cola) vez.set(texto.trim(), Number.POSITIVE_INFINITY);
-  return vez;
+  for (const text of queue) at.set(text.trim(), Number.POSITIVE_INFINITY);
+  return at;
 }
 
-export function usadaDesde(vez: ReadonlyMap<string, number>, texto: string, desde: number): boolean {
-  return (vez.get(texto) ?? -1) > desde;
+export function usedSince(at: ReadonlyMap<string, number>, text: string, since: number): boolean {
+  return (at.get(text) ?? -1) > since;
+}
+
+/**
+ * Los bloques del texto, fuera de cercas de código. Una apertura cuenta solo al
+ * principio de su línea; el cierre, solo en una línea propia. Un bloque sin
+ * cierre llega hasta el final del texto.
+ */
+function findBlocks(text: string): Block[] {
+  const blocks: Block[] = [];
+  let fence: string | null = null;
+  let open: { from: number; bodyFrom: number } | null = null;
+  for (const line of text.matchAll(/[^\n]*\n?/g)) {
+    const from = line.index;
+    const to = from + line[0].length;
+    const content = line[0].replace(/\r?\n$/, "").replace(/\r$/, "");
+    const fenced = fence !== null;
+    fence = fenceAfter(fence, content);
+    if (fenced) continue;
+    if (open === null) {
+      const tag = /^[\t ]*<NEXT_STEPS>[\t ]*/.exec(content);
+      if (tag) open = { from, bodyFrom: tag[0].length < content.length ? from + tag[0].length : to };
+    } else if (/^[\t ]*<\/NEXT_STEPS>[\t ]*$/.test(content)) {
+      blocks.push({ from: open.from, bodyFrom: open.bodyFrom, bodyTo: from, to, closed: true });
+      open = null;
+    }
+  }
+  if (open) blocks.push({ from: open.from, bodyFrom: Math.min(open.bodyFrom, text.length), bodyTo: text.length, to: text.length, closed: false });
+  return blocks;
+}
+
+// La cerca abierta tras esta línea: la misma marca, igual o más larga, la cierra.
+function fenceAfter(fence: string | null, line: string): string | null {
+  const mark = FENCE.exec(line)?.[1];
+  if (!mark) return fence;
+  if (fence === null) return mark;
+  return mark[0] === fence[0] && mark.length >= fence.length ? null : fence;
+}
+
+// Las opciones son las últimas líneas del cuerpo; lo de arriba es prosa.
+function readOptions(body: string): { prose: string; options: NextStepOption[] } | null {
+  const lines = body.replace(/\r\n?/g, "\n").split("\n");
+  const options: NextStepOption[] = [];
+  let end = lines.length;
+  while (end > 0) {
+    const line = lines[end - 1];
+    if (!line.trim()) {
+      end -= 1;
+      continue;
+    }
+    const prompt = OPTION.exec(line)?.[1];
+    if (!prompt) break;
+    // El índice de línea no cambia mientras el texto de la última opción crece.
+    options.unshift({ id: `option:${end - 1}`, prompt });
+    end -= 1;
+  }
+  return options.length ? { prose: trimBlankLines(lines.slice(0, end).join("\n")), options } : null;
 }
 
 // Mientras llega, `<NEXT_ST` al final se pintaría crudo un cuadro antes de ocultarse.
-function sinAperturaAMedias(markdown: string): string {
-  const inicio = markdown.lastIndexOf("\n") + 1;
-  const ultima = markdown.slice(inicio).trimStart();
-  if (ultima.length === 0 || ultima.length >= APERTURA.length || !APERTURA.startsWith(ultima)) return markdown;
-  let cerca: string | null = null;
-  for (const linea of lineas(markdown.slice(0, inicio))) cerca = siguienteCerca(cerca, linea.text);
-  return cerca === null ? markdown.slice(0, inicio) : markdown;
+function withoutPartialOpenTag(markdown: string): string {
+  const lineStart = markdown.lastIndexOf("\n") + 1;
+  const tail = markdown.slice(lineStart).trimStart();
+  const partial = tail.length > 0 && tail.length < OPEN_TAG.length && OPEN_TAG.startsWith(tail);
+  if (!partial || insideFence(markdown.slice(0, lineStart))) return markdown;
+  return markdown.slice(0, lineStart);
+}
+
+function insideFence(text: string): boolean {
+  let fence: string | null = null;
+  for (const line of text.split("\n")) fence = fenceAfter(fence, line.replace(/\r$/, ""));
+  return fence !== null;
 }
 
 // Mientras llega, `- [` al final todavía no es una opción: leída, el bloque
 // entero caería a markdown un cuadro y volvería a botones con el siguiente token.
-function sinOpcionAMedias(contenido: string): string {
-  const inicio = contenido.lastIndexOf("\n") + 1;
-  const ultima = contenido.slice(inicio);
-  return OPCION.exec(ultima)?.[1].trim() ? contenido : contenido.slice(0, inicio);
+function withoutPartialOption(body: string): string {
+  const lineStart = body.lastIndexOf("\n") + 1;
+  return OPTION.exec(body.slice(lineStart))?.[1] ? body : body.slice(0, lineStart);
 }
 
-function bloques(markdown: string, streaming: boolean): Bloque[] {
-  const fuera: Bloque[] = [];
-  let cerca: string | null = null;
-  let abierto: number | null = null;
-  let contentStart = 0;
-  for (const linea of lineas(markdown)) {
-    const siguiente = siguienteCerca(cerca, linea.text);
-    const apertura = APERTURA_AL_INICIO.exec(linea.text);
-    if (cerca === null && abierto === null && apertura !== null) {
-      abierto = linea.start;
-      contentStart =
-        apertura[0].length >= linea.text.length ? linea.endWithNewline : linea.start + apertura[0].length;
-    } else if (cerca === null && abierto !== null && CIERRE_EN_LINEA.test(linea.text)) {
-      fuera.push({ start: abierto, contentStart, contentEnd: linea.start, end: linea.endWithNewline, complete: true });
-      abierto = null;
-    }
-    cerca = siguiente;
-  }
-  if (abierto !== null) {
-    const fin = markdown.length;
-    fuera.push({ start: abierto, contentStart: Math.min(contentStart, fin), contentEnd: fin, end: fin, complete: !streaming });
-  }
-  return fuera;
+function trimBlankLines(text: string): string {
+  return text
+    .replace(/\r\n?/g, "\n")
+    .replace(/^(?:[ \t]*\n)+/, "")
+    .replace(/(?:\n[ \t]*)+$/, "");
 }
 
-function lineas(texto: string): Linea[] {
-  const fuera: Linea[] = [];
-  let start = 0;
-  while (start < texto.length) {
-    const salto = texto.indexOf("\n", start);
-    const end = salto < 0 ? texto.length : salto;
-    const endWithNewline = salto < 0 ? texto.length : salto + 1;
-    const text = end > start && texto.charCodeAt(end - 1) === 13 ? texto.slice(start, end - 1) : texto.slice(start, end);
-    fuera.push({ text, start, endWithNewline });
-    start = endWithNewline;
-  }
-  return fuera;
-}
-
-function siguienteCerca(cerca: string | null, linea: string): string | null {
-  const m = CERCA.exec(linea);
-  if (m === null) return cerca;
-  const marca = m[2];
-  if (cerca === null) return marca;
-  if (marca[0] !== cerca[0] || marca.length < cerca.length) return cerca;
-  return null;
-}
-
-// Las opciones son las últimas líneas del bloque; lo de arriba es prosa.
-function leerBloque(contenido: string): { prose: string; options: OpcionSiguiente[] } | null {
-  const filas = contenido.replace(/\r\n?/g, "\n").split("\n");
-  let i = filas.length - 1;
-  while (i >= 0 && filas[i].trim().length === 0) i -= 1;
-  const options: OpcionSiguiente[] = [];
-  while (i >= 0) {
-    if (filas[i].trim().length === 0) {
-      i -= 1;
-      continue;
-    }
-    const prompt = OPCION.exec(filas[i])?.[1].trim();
-    if (!prompt) break;
-    // El índice de línea no cambia mientras el texto de la última opción crece.
-    options.unshift({ id: `option:${i}`, prompt });
-    i -= 1;
-  }
-  if (options.length === 0) return null;
-  return { prose: sinLineasEnBlancoAlBorde(filas.slice(0, i + 1).join("\n")), options };
-}
-
-function sinLineasEnBlancoAlBorde(texto: string): string {
-  const filas = texto.replace(/\r\n?/g, "\n").split("\n");
-  let a = 0;
-  let b = filas.length;
-  while (a < b && filas[a].trim().length === 0) a += 1;
-  while (b > a && filas[b - 1].trim().length === 0) b -= 1;
-  return filas.slice(a, b).join("\n");
-}
-
-function empujarMarkdown(partes: ParteSiguiente[], markdown: string) {
-  if (markdown.length > 0) partes.push({ kind: "markdown", id: `markdown:${partes.length}`, markdown });
-}

@@ -4,10 +4,10 @@
 # Los scripts de `scripts/` escriben con LF; git, con `core.autocrlf=true` —el
 # valor por omisión de la instalación de Windows—, entrega el archivo con CRLF.
 # Lo generado y lo que hay en disco dejan de ser iguales byte a byte, así que
-# `frases.mjs --check` y `iconos.mjs --check` reportan «desactualizado» sobre un
+# `phrases.mjs --check` and `icons.mjs --check` reportan «desactualizado» sobre un
 # archivo idéntico, **para siempre y desde un checkout limpio**.
 #
-# Eso muerde donde más caro es: el gate de publicar es `pnpm verificar` en verde,
+# Eso muerde donde más caro es: el gate de publicar es `pnpm verify` en verde,
 # y con dos guardas rojas por el sistema de archivos quien publica tiene que
 # decidir a ojo cuáles ignorar — que es exactamente cómo se cuela la que sí
 # importaba. Ya van cinco defectos de esta familia (`agents.rs` buscando

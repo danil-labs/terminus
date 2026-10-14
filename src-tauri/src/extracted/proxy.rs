@@ -133,7 +133,10 @@ fn command(name: &str) -> Option<&'static Value> {
 }
 pub(super) fn desktop_command(name: &str) -> bool {
     command(name).is_some_and(|c| c["kind"] == "desktop")
-        || matches!(name, "launcher_state" | "launcher_continue")
+        || matches!(
+            name,
+            "launcher_state" | "launcher_continue" | "update_install" | "update_pending"
+        )
 }
 pub(super) fn with_desktop(
     local: impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static,
@@ -178,6 +181,13 @@ fn reply(value: Value) -> Result<Value, Value> {
     } else {
         Err(failure(&Error::new("invalid_request")))
     }
+}
+pub(super) fn invoke(state: &State, command: &str, arguments: Value) -> Result<Value, Value> {
+    state
+        .client()
+        .invoke(command, state.workspace(), arguments)
+        .map_err(|e| failure(&e))
+        .and_then(reply)
 }
 type Job = Box<dyn FnOnce() + Send>;
 fn ordered(job: Job) -> std::io::Result<()> {
@@ -234,7 +244,22 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
         return;
     }
     let slot = Slot(state.clone());
-    let workspace = if name == "unwatch_task_tree" {
+    let workspace = if name == "tree_show" && args["tree"] == "terminus-chat-visuals" {
+        // El scope pertenece al sobre RPC1, no a los parámetros congelados del comando.
+        let Some(workspace) = invoke
+            .message
+            .headers()
+            .get("x-terminus-workspace")
+            .and_then(|value| value.to_str().ok())
+            .filter(|value| !value.is_empty())
+        else {
+            invoke
+                .resolver
+                .reject(failure(&Error::new("invalid_request")));
+            return;
+        };
+        Some(workspace.to_owned())
+    } else if name == "unwatch_task_tree" {
         let watchers = state.watchers.lock().unwrap_or_else(|p| p.into_inner());
         args["id"]
             .as_str()

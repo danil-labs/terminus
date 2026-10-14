@@ -307,7 +307,7 @@ function elegirForma(plural: Plural, datos: Record<string, string | number> | un
 
 /**
  * Por nombre y no por posición: quien traduce reordena la frase. Un placeholder
- * mal escrito pinta la llave a pelo sin romper; lo caza `scripts/locales.mjs`
+ * mal escrito pinta la llave a pelo sin romper; lo caza `scripts/guards/locales.mjs`
  * comparando contra `es`.
  */
 function interpolar(texto: string, datos?: Record<string, string | number>): string {

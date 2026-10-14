@@ -13,7 +13,7 @@ también pertenece al workspace.
 
 | Id | Capacidad | Ficha |
 |---|---|---|
-| `yua` | Catálogo y perfil de salida en maya yucateco | [Lengua](lenguas/yua/README.md) |
+| `yua` | Catálogo y perfil de salida en maya yucateco | [Lengua](languages/yua/README.md) |
 | `agentsview` | Índice local de sesiones | AgentsView (motor) |
 | `libreoffice` | Conversión de documentos | LibreOffice (motor) |
 | `drawio` | Visor de diagramas en el chat | draw.io (motor) |
@@ -23,12 +23,12 @@ también pertenece al workspace.
 ## Lenguas
 
 El paquete contiene `manifiesto.json` y catálogos JSON. El bundle ofrece los
-paquetes de `plugins/lenguas/`; la persona también puede elegir una carpeta o
+paquetes de `plugins/languages/`; la persona también puede elegir una carpeta o
 un ZIP. Ambas entradas las valida el motor.
 No hay descarga de paquetes de lengua por red.
 
 Instalar copia los JSON; los Markdown permanecen en el repositorio.
-`remove_language_pack` retira el paquete instalado. `scripts/plugins.mjs`
+`remove_language_pack` retira el paquete instalado. `scripts/guards/plugins.mjs`
 valida manifiestos, claves, placeholders y ortografía del saltillo; reporta
 cobertura sin exigir que el paquete traduzca todo el catálogo.
 

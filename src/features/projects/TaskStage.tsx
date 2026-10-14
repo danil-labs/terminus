@@ -35,7 +35,7 @@ export type Etapa = "in_progress" | "review" | "done";
  *
  * El rótulo es una función y su `t()` lleva la clave **escrita entera**: una
  * clave compuesta —`` t(`projects.stage.${id}`) `` — sale de la comprobación de
- * `scripts/locales.mjs` sin que nada avise, y lo que se pinta entonces es la
+ * `scripts/guards/locales.mjs` sin que nada avise, y lo que se pinta entonces es la
  * clave en medio de la fila.
  */
 export const ETAPAS: { id: Etapa; rotulo: () => string; clase: string }[] = [

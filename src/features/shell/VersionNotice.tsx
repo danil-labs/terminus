@@ -4,16 +4,22 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { Button } from "../../ui/Button";
 import { Toast } from "../../ui/Toast";
 import { t } from "../../lib/i18n";
+import { invoke } from "../../lib/invoke.ts";
 
 /** El reinicio requiere una acción de la persona; descartar dura hasta otra versión. */
 const CADA = 30 * 60 * 1000;
 const AL_VOLVER = 10 * 60 * 1000;
+/** Mirar si otra versión quedó instalada es local: no espera a la red. */
+const INSTALADA_CADA = 60 * 1000;
 
 export default function AvisoDeVersion() {
   const [fallo, setFallo] = createSignal(false);
   const [hay, setHay] = createSignal<Update | null>(null);
   const [alDia, setAlDia] = createSignal(false);
   const [estado, setEstado] = createSignal<"quieto" | "bajando" | "listo">("quieto");
+  /** Otra versión quedó instalada sobre esta ventana: desde aquí o con el instalador a mano. */
+  const [instalada, setInstalada] = createSignal(false);
+  const [instaladaVista, setInstaladaVista] = createSignal(false);
   /** Versiones que esta persona ya descartó. */
   const [descartadas, setDescartadas] = createSignal<string[]>([]);
 
@@ -45,16 +51,26 @@ export default function AvisoDeVersion() {
     }
   }
 
+  function mirarInstalada() {
+    void invoke<boolean>("update_pending")
+      .then((si) => si && setInstalada(true))
+      .catch(() => {});
+  }
+
   onMount(() => {
     void mirar();
+    mirarInstalada();
     const reloj = setInterval(() => void mirar(), CADA);
+    const relojLocal = setInterval(mirarInstalada, INSTALADA_CADA);
     const volver = () => {
+      mirarInstalada();
       if (document.visibilityState === "visible" && Date.now() - ultima > AL_VOLVER) void mirar();
     };
     window.addEventListener("focus", volver);
     document.addEventListener("visibilitychange", volver);
     onCleanup(() => {
       clearInterval(reloj);
+      clearInterval(relojLocal);
       window.removeEventListener("focus", volver);
       document.removeEventListener("visibilitychange", volver);
     });
@@ -76,7 +92,8 @@ export default function AvisoDeVersion() {
         return;
       }
       setHay(reciente);
-      await reciente.downloadAndInstall();
+      // En Windows `downloadAndInstall` cierra la app; Rust instala sin cerrarla.
+      await invoke("update_install");
       setEstado("listo");
     } catch {
       // Si falla la descarga, el aviso se queda: volver a intentarlo es del
@@ -92,6 +109,19 @@ export default function AvisoDeVersion() {
         <Toast>
           <p class="m-0 text-xs text-neutral-500">{t("settings.update.uptodate")}</p>
           <Button variant="ghost" size="sm" onClick={() => setAlDia(false)}>{t("shell.update.later")}</Button>
+        </Toast>
+      </Show>
+      <Show when={instalada() && !instaladaVista() && !hay()}>
+        <Toast>
+          <p class="m-0 text-xs text-neutral-500">{t("shell.update.installed")}</p>
+          <div class="flex gap-1.5">
+            <Button variant="secondary" size="sm" onClick={() => void relaunch()}>
+              {t("shell.update.restart")}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setInstaladaVista(true)}>
+              {t("shell.update.later")}
+            </Button>
+          </div>
         </Toast>
       </Show>
       <Show when={hay()}>

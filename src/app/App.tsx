@@ -118,6 +118,7 @@ import { pedirElCampo } from "../lib/focus";
 import { lastRoster, rememberRoster } from "../lib/handlerRoster";
 import { aplicarLenguaDeWorkspace, clavesConocidas, t } from "../lib/i18n";
 import { invoke } from "../lib/invoke.ts";
+import { readChatVisual } from "../features/chat/readVisual";
 import { createPointerDrag } from "../lib/pointer-drag";
 import type { InternalTaskLink } from "../lib/links";
 import type { MentionSources } from "../lib/mentions";
@@ -135,7 +136,7 @@ import type {
 } from "../lib/model";
 import { carpetaDeTrabajo } from "../lib/model";
 import { type CatalogosDeModelos, effortAlCambiarDeModelo, type OpcionDeModelo } from "../lib/models";
-import { vistaPreviaDelHilo } from "../lib/nextSteps";
+import { threadPreview } from "../lib/nextSteps";
 import {
   createPanels,
   deleteLayout,
@@ -555,9 +556,10 @@ export default function App() {
       },
     ),
   );
-  /** Las tareas repartidas, que son las que necesitan su propia transcripción. */
-  const tareasEnVentanas = createMemo(() =>
-    pestanasEnPantalla().filter(isTaskTab),
+  /** El panel conserva workspace y conversación; el título pertenece a la tira. */
+  const tareasEnVentanas = createMemo<(Pick<TaskTab, "id" | "session" | "project"> & { workspace: string | null })[]>((previous) =>
+    conservar(previous ?? [], pestanas.open().filter(isTaskTab).map(({ id, session, project }) =>
+      ({ id, session, project, workspace: workspaceActivo() })), (p) => p.id),
   );
   /** Las tareas con pestaña: la lista viva las trae aunque estén archivadas. */
   const sesionesConPestana = createMemo(
@@ -1523,7 +1525,7 @@ export default function App() {
         .filter((n) => n.project === project && !enDisco.has(n.row.id))
         .map((n) => n.row);
       return [project, [...propias, ...rows.map(row => {
-        const preview = vistaPreviaDelHilo(hilos()[row.id]?.vivo ?? []) ?? row.last_message;
+        const preview = threadPreview(hilos()[row.id]?.vivo ?? []) ?? row.last_message;
         const sinVer = unseen.has(row.id);
         return row.esperando === pending.has(row.id) && preview === row.last_message && !!row.sin_ver === sinVer ? row : {
           ...row, esperando: pending.has(row.id), last_message: preview, sin_ver: sinVer,
@@ -2104,7 +2106,7 @@ export default function App() {
   createEffect(on(workspaceActivo, () => void reconcileActiveTurns()));
 
   // Los tres oyentes de Rust. Los nombres van como cadena literal:
-  // `scripts/bridge.mjs` comprueba que alguien emita lo que la interfaz
+  // `scripts/guards/bridge.mjs` comprueba que alguien emita lo que la interfaz
   // escucha, y es lo único que sabe leer; una constante lo deja ciego sin
   // fallar. Se suscriben una vez: las funciones de respuesta leen
   // `sessionId()` y las demás señales al recibir cada evento, y copiar sus
@@ -5629,6 +5631,7 @@ export default function App() {
     proyecto?: string | null;
     soloLectura?: boolean;
   }) => {
+    const visualWorkspace = workspaceActivo() ?? "";
     /**
      * Mensajes de ESTA ventana, memoizados en dos pasos: leer `hilos()`
      * directo baja al fondo TODAS las ventanas al moverse una. El
@@ -6061,6 +6064,8 @@ export default function App() {
         onInput={setInput}
         onSend={mandar}
         onRespuestaRapida={mandarTexto}
+        visualScope={JSON.stringify([visualWorkspace, pp.proyecto ?? "", pp.sesion])}
+        readVisual={(file) => readChatVisual({ workspace: visualWorkspace, project: pp.proyecto ?? "", session: pp.sesion ?? "" }, file)}
         onMiniatura={miniaturaDeAdjunto}
         onPegarImagen={pegarImagen}
         onStop={detener}

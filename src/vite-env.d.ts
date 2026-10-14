@@ -6,7 +6,7 @@
  *
  * **El glob no es comodidad.** Con imports uno a uno, un archivo de catálogo
  * nuevo que nadie importara quedaría fuera del bundle mientras
- * `scripts/locales.mjs` —que lee el disco— lo daría por bueno: el guarda vería
+ * `scripts/guards/locales.mjs` —que lee el disco— lo daría por bueno: el guarda vería
  * la clave y la app no. Así los dos miran el mismo conjunto.
  */
 /// <reference types="vite/client" />

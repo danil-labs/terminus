@@ -56,7 +56,7 @@ Referencia de handles consultada el 2026-10-10:
 |---|---|
 | Doble clic, menú Inicio y arranque normal | Sin argumentos vuelve a `app_lib::launch()`; no se conecta a una consola ni lanza la CLI. |
 | `--external-host <selección>` | Entrada del laboratorio y la ventana; queda fuera de la lista de CLI. |
-| `--stop-engine` | Los hooks NSIS la llaman para detener el motor antes de reemplazarlo; sigue entrando en el mismo handler. |
+| `--stop-engine` | El desinstalador NSIS la llama para detener el motor antes de quitarlo; sigue entrando en el mismo handler. |
 | Actualizador NSIS | `tauri-plugin-updater` 2.10.1, `src/updater.rs:797`, pasa los argumentos de la ventana mediante `/ARGS` al instalador; `/P` y `/UPDATE` son del instalador. Este repo no agrega argumentos de relanzamiento; los existentes conservan su ruta. |
 | URLs / deep links / archivos | Cargo/configuración no declaran `tauri-plugin-deep-link`, `tauri-plugin-single-instance`, esquemas ni `fileAssociations`. URLs y rutas quedan fuera de la CLI; no se agrega soporte para abrirlas. |
 | `-psn_…` de LaunchServices | Queda fuera del catálogo y conserva la ruta de ventana, al igual que otros argumentos ajenos a CLI. No se verifica aquí su tratamiento nativo en macOS. |
@@ -66,7 +66,7 @@ de ventana. Por ejemplo, una URL no configurada puede ser rechazada por
 `open()`, pero nunca se entrega al motor. Una ruta explícita `./task` no es
 el subcomando `task`.
 
-La prueba `scripts/cli-forward.test.mjs` compila el `main.rs` de producción y
+La prueba `tests/unit/cli-forward.test.mjs` compila el `main.rs` de producción y
 sus módulos sin construir Tauri. Solo las entradas `app_lib::launch()` y
 `stop_engine()` se sustituyen por marcadores para observar qué ruta se toma;
 despacho, reenvío, handles y flags son los reales. Un motor de prueba compilado
@@ -190,7 +190,7 @@ restaurar solo los datos no restaura la ACL. No usar secretos de producción.
 ### CLI de la aplicación firmada
 
 1. Registrar versión/commit de la ventana, hashes de los dos ejecutables y
-   `codesign -d -r-` de ambos. Ejecutar `node --test scripts/cli-forward.test.mjs`
+   `codesign -d -r-` de ambos. Ejecutar `node --test tests/unit/cli-forward.test.mjs`
    en el checkout: debe pasar la prueba de reenvío, sin omisiones.
 2. Con `T=/Applications/Terminus.app/Contents/MacOS/terminus` y
    `S=/Applications/Terminus.app/Contents/MacOS/seldon-runtime`, comparar
@@ -254,7 +254,7 @@ no se construye ni se abre la aplicación completa.
 Control negativo reproducible: extraer `src-tauri/src/main.rs` de `197e985`
 con `git show` a una carpeta temporal como `main.rs`, establecer
 `$env:TERMINUS_CLI_TEST_MAIN` a esa ruta y ejecutar
-`node --test scripts/cli-forward.test.mjs`. Código 1, resumen `pass 0`,
+`node --test tests/unit/cli-forward.test.mjs`. Código 1, resumen `pass 0`,
 `fail 1`, `skipped 0`; aserción literal `0 !== 23`. El marcador de ventana
 retorna 0 en esa prueba: se reproduce la ruta equivocada, no el diálogo de la
 app instalada. Quitar la variable y ejecutar la misma prueba sobre producción
@@ -282,9 +282,9 @@ La omisión Unix de la prueba anterior se elimina; aquí no hay unitarias Rust.
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --locked -p terminus --all-targets` | 0; ``Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.16s`` |
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --check -- --config-path src-tauri/rustfmt.toml` | 0; sin salida |
 | `git diff --cached --check` | 0; sin salida |
-| `node scripts/doc-paths.mjs` | 0; `Las rutas y enlaces locales de 23 documentos existen.` |
+| `node scripts/guards/doc-paths.mjs` | 0; `Las rutas y enlaces locales de 23 documentos existen.` |
 
-`pnpm verificar --sin-cargo` termina con 0. Resumen literal:
+`pnpm verify --no-cargo` termina con 0. Resumen literal:
 
 ```text
   Verificado en Windows (cadena sin Rust), 622s.
@@ -314,7 +314,7 @@ El diseño y las pruebas del llavero permanecen sin implementar y sin verificar.
 
 Se ejecuta la prueba interactiva en la pseudoconsola del terminal de PowerShell
 de esta máquina, con `$env:TERMINUS_CLI_TEST_INTERACTIVE='1'` y
-`node scripts/cli-forward.test.mjs` (sin `--test`, que aísla el worker de la
+`node tests/unit/cli-forward.test.mjs` (sin `--test`, que aísla el worker de la
 consola). El motor de prueba exige una consola, y el caso interactivo hereda
 los tres streams del terminal. Salida literal observable, código 0 del test:
 
@@ -344,8 +344,8 @@ temporal de `cli.rs`: código 1, `falta COMMANDS: telegram`, `0 !== 23`.
 `help` y `kn`, ausentes del catálogo publicado, mantienen casos explícitos.
 
 La cadena completa prepara el sidecar antes de esta prueba; `verify (rust)`
-también la ejecuta después de `engine.mjs sidecar`. `--sin-cargo` la marca
-`OMITIDO`, con su motivo, antes de ejecutar el test o compilar `main.rs`, incluso
+también la ejecuta después de `engine.mjs sidecar`. `--no-cargo` la marca
+`SKIPPED`, con su motivo, antes de ejecutar el test o compilar `main.rs`, incluso
 si hay sidecar local. Esa omisión prevista no hace fallar el job del front;
 otras omisiones inesperadas siguen haciendo fallar CI. Para ejecutar la prueba
 nativa directamente se prepara el entorno con `pnpm engine:sidecar`. Al cambiar
@@ -360,13 +360,13 @@ Resultados finales de Cargo con `CARGO_BUILD_JOBS=2`:
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --locked -p terminus --all-targets` | 0; ``Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.89s`` |
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --check -- --config-path src-tauri/rustfmt.toml` | 0; sin salida |
 
-`node --test scripts/cli-forward.test.mjs`: código 0, `tests 2`, `pass 2`,
+`node --test tests/unit/cli-forward.test.mjs`: código 0, `tests 2`, `pass 2`,
 `fail 0`, `skipped 0`, con las 25 raíces del motor fijado.
-`node scripts/doc-paths.mjs`: código 0,
+`node scripts/guards/doc-paths.mjs`: código 0,
 `Las rutas y enlaces locales de 23 documentos existen.`
 `git diff --cached --check`: código 0, sin salida.
 
-`pnpm verificar --sin-cargo`: código 0, resumen literal de este ajuste:
+`pnpm verify --no-cargo`: código 0, resumen literal de este ajuste:
 
 ```text
   Verificado en Windows (cadena sin Rust), 512s.
@@ -386,16 +386,16 @@ mantienen sus pendientes anteriores.
 ## Separación de CI: PR #70
 
 Reproducción en Windows con `CI=true`, `src-tauri/binaries/` renombrado
-temporalmente y `pnpm verificar --sin-cargo`: código 0, ninguna `FALLA`.
+temporalmente y `pnpm verify --no-cargo`: código 0, ninguna `FALLA`.
 El directorio se restaura al terminar mediante `finally`. Salida literal:
 
 ```text
-  La CLI reenvía al motor sin abrir ventana         OMITIDO
+  La CLI reenvía al motor sin abrir ventana         SKIPPED
   Corrido en Windows, 802s — y 1 de 101 pasos NO corrió: esto NO es una verificación.
-      --sin-cargo: necesita rustc y el sidecar fijado; se ejecuta en la cadena completa y verify (rust).
+      --no-cargo: necesita rustc y el sidecar fijado; se ejecuta en la cadena completa y verify (rust).
 ```
 
-Con el sidecar restaurado, `node --test scripts/cli-forward.test.mjs` termina
+Con el sidecar restaurado, `node --test tests/unit/cli-forward.test.mjs` termina
 con 0: `tests 2`, `pass 2`, `fail 0`, `skipped 0`; contrasta las 25 raíces.
 Es la misma orden incorporada a `verify (rust)`, después de preparar el motor.
 La ejecución nativa en Ubuntu queda para el nuevo run del PR.

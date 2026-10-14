@@ -446,7 +446,7 @@
   "settings.update.downloading": "Descargando… No cierres la app.",
   "settings.update.error_download": "No se pudo descargar la versión nueva. Vuelve a intentar.",
   "settings.update.install": "Actualizar",
-  "settings.update.ready": "Lista. Se aplica al reiniciar; si tienes una tarea corriendo, espérala.",
+  "settings.update.ready": "Lista. Se aplica al reiniciar; las tareas que están corriendo siguen trabajando.",
   "settings.update.relaunch": "Reiniciar ahora",
   "settings.update.title": "Versión",
   "settings.update.unreachable": "No pude comprobar si hay una versión nueva.",

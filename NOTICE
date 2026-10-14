@@ -9,9 +9,6 @@ It includes third-party software under their own licenses:
   material-icon-theme v5.37.0, MIT License, Copyright (c) Philipp Kief.
 - src/features/chat/paste.ts: derived from use-stick-to-bottom 1.1.6,
   MIT License, Copyright (c) StackBlitz.
-- src/lib/nextSteps.ts: derived from traycer
-  (clients/gui-app/src/markdown/traycer-next-steps.ts, commit 48be0c1f),
-  MIT License, Copyright (c) 2026 Traycer AI.
 - src/styles/fonts/Geist-Variable.woff2, GeistMono-Variable.woff2: Geist and
   Geist Mono by Vercel, SIL Open Font License 1.1.
 - src/styles/fonts/BricolageGrotesque-*.woff2: Bricolage Grotesque,

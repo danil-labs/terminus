@@ -33,7 +33,7 @@
     "active": true,
     "targets": "all",
     "resources": {
-      "../plugins/lenguas": "lenguas"
+      "../plugins/languages": "lenguas"
     },
     "externalBin": [
       "binaries/seldon-runtime"

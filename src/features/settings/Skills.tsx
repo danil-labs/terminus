@@ -18,7 +18,7 @@ import Herramientas from "./Tools";
 type Pestana = "skills" | "mcp";
 
 // El nombre es una función y no una cadena: `t()` con una variable dentro deja
-// ciego a `scripts/locales.mjs`, que solo lee literales en el sitio de la
+// ciego a `scripts/guards/locales.mjs`, que solo lee literales en el sitio de la
 // llamada. Y evaluado al importar, la pestaña se congela en la lengua de carga.
 const PESTANAS: { id: Pestana; nombre: () => string }[] = [
   { id: "skills", nombre: () => t("settings.skills.tab_skills") },

@@ -55,6 +55,8 @@ tauri-plugin-updater = "2.10.1"
 tauri-plugin-process = "2.3.1"
 tauri-plugin-clipboard-manager = "2.3.3"
 ureq = { version = "3.2", features = ["json"] }
+# La vista en vivo de Typst arranca Tinymist en una carpeta de trabajo vacía.
+tempfile = "3"
 terminus-engine-client = { path = "crates/engine-client" }
 terminus-engine-protocol = { path = "crates/engine-protocol" }
 

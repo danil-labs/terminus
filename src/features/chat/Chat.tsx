@@ -102,7 +102,11 @@ import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
 import { asFailure, type Failure, FailureNote, prosaDe } from "../../ui/Failure";
 import { MarcaAgente } from "../../ui/icons";
 import { Markdown } from "../../ui/Markdown";
-import { partirSiguientes, textoSinSiguientes, ultimaVezEnviada, usadaDesde } from "../../lib/nextSteps";
+import { createVisualBudget, type VisualBudget } from "./visualBudget";
+import ChatVisual from "./ChatVisual";
+import { splitChatVisuals, type ChatVisual as Visual } from "./visualDirective";
+import type { NextStepsPart } from "../../lib/nextSteps";
+import { splitNextSteps, stripNextSteps, lastSentAt, usedSince } from "../../lib/nextSteps";
 import NextSteps from "./NextSteps";
 import { Skeleton } from "../../ui/Skeleton";
 import { MarcaFuente } from "../../ui/sources";
@@ -578,6 +582,8 @@ export type ChatProps = {
   onSend: (attachments: string[]) => Promise<boolean>;
   /** Manda una respuesta rápida del agente tal cual, por el camino de `onSend`. */
   onRespuestaRapida?: (texto: string) => Promise<boolean>;
+  visualScope?: string;
+  readVisual?: (file: string) => Promise<string>;
   /**
    * La miniatura de un adjunto ya mandado, de ruta relativa a `data:` URI.
    * Aquí y no dentro de `Adjuntos`: este componente no conoce el proyecto
@@ -721,6 +727,7 @@ export default function Chat(props: ChatProps) {
    * persiste: qué bloque tenías abierto en una conversación no es una
    * preferencia de la app, y guardarlo haría crecer el `localStorage`.
    */
+  const visualBudget = createVisualBudget();
   const [trabajos, setTrabajos] = props.vista.trabajos;
   /**
    * Qué registro de preguntas está plegado, por turno. Guarda el pliegue y
@@ -919,13 +926,13 @@ export default function Chat(props: ChatProps) {
   // El campo no pide superficie: sin cuenta conectada hay que poder escribir un `!`.
   const mandable = () => escribible() && (Boolean(actual()?.usable) || seMandaSinSuperficie(props.input));
   const listo = () => mandable() && preparingAttachments() === 0;
-  const enviadas = createMemo(() => ultimaVezEnviada(props.msgs, props.cola.items.map((q) => q.text)));
+  const enviadas = createMemo(() => lastSentAt(props.msgs, props.cola.items.map((q) => q.text)));
   const respuestaRapida = (desde: number): RespuestaRapida | null => {
     const mandarRapida = props.onRespuestaRapida;
     if (!mandarRapida || props.soloLectura) return null;
     return {
       puede: Boolean(actual()?.usable) && !props.esperando,
-      usada: (texto) => usadaDesde(enviadas(), texto, desde),
+      usada: (texto) => usedSince(enviadas(), texto, desde),
       onElegir: (texto) => {
         hilo.bajar();
         return mandarRapida(texto);
@@ -1244,7 +1251,7 @@ export default function Chat(props: ChatProps) {
    * Si vuelve a hacer falta saber dónde se soltó, se resuelve preguntando
    * al backend por el `scale_factor` de la ventana, no con
    * `devicePixelRatio`, sabiendo que en macOS no hay que dividir. Lo
-   * comprueba `scripts/drop.mjs`.
+   * comprueba `scripts/guards/drop.mjs`.
    */
   onMount(() => {
     let disposed = false;
@@ -1484,7 +1491,7 @@ export default function Chat(props: ChatProps) {
   const searchMessages = () => bloques().flatMap((block, index) => {
     const message = block.tipo === "pasos" ? null : block.msg;
     if (!message || !["user", "agent"].includes(message.role) || message.shell || message.permission) return [];
-    return [{ block: index, text: message.role === "agent" ? textoSinSiguientes(textoVisible(message.text)) : message.text, markdown: message.role === "agent" }];
+    return [{ block: index, text: message.role === "agent" ? stripNextSteps(textoVisible(message.text)) : message.text, markdown: message.role === "agent" }];
   });
   const esLaTiraViva = (bloque: Bloque) => Boolean(props.busy) && bloque === bloques().at(-1);
   // Pasos que llegan tras la respuesta abren otro tramo, y el de la respuesta deja de correr.
@@ -2637,6 +2644,9 @@ export default function Chat(props: ChatProps) {
                   {(trabajo) => (
                     <TrabajoDeAgente
                       searchBlock={chunk * CHUNK + blockIndex}
+                      visualBudget={visualBudget}
+                      visualScope={props.visualScope}
+                      readVisual={props.readVisual}
                       pasos={fromWork(b(), (t) => t.pasos, [])}
                       avance={fromWork(b(), (t) => t.avance ?? SIN_AVANCE, SIN_AVANCE)}
                       msg={fromWork(b(), (t) => t.msg, SIN_MENSAJE)}
@@ -3204,6 +3214,9 @@ function RegistroDeTrabajo(props: {
 }
 
 function TrabajoDeAgente(props: {
+  visualBudget: VisualBudget;
+  visualScope?: string;
+  readVisual?: (file: string) => Promise<string>;
   searchBlock?: number;
   pasos: Paso[];
   avance: Avance[];
@@ -3290,7 +3303,7 @@ function TrabajoDeAgente(props: {
       <Show when={texto()}>
         {(md) => (
           <AltoMonotono vivo={props.vivo} searchBlock={props.searchBlock}>
-            <TextoConSiguientes texto={md()} vivo={props.vivo} rapida={props.rapida} />
+            <TextoConSiguientes texto={md()} vivo={props.vivo} rapida={props.rapida} readVisual={props.readVisual} owner={props.visualScope ?? ""} visualBudget={props.visualBudget} />
           </AltoMonotono>
         )}
       </Show>
@@ -3306,7 +3319,7 @@ function TrabajoDeAgente(props: {
             <BotonCopiar
               copiando={props.copiando}
               copiado={props.copiado}
-              onCopiar={() => void props.onCopiar(props.msg.turno ?? "", textoSinSiguientes(md()))}
+              onCopiar={() => void props.onCopiar(props.msg.turno ?? "", stripNextSteps(md()))}
             />
           )}
         </Show>
@@ -3371,8 +3384,11 @@ type RespuestaRapida = {
  * `Index` y no `For`: cada token trae partes nuevas y `For` remontaría el
  * markdown entero en cada una.
  */
-function TextoConSiguientes(props: { texto: string; vivo: boolean; rapida: RespuestaRapida | null }) {
-  const partes = createMemo(() => partirSiguientes(props.texto, props.vivo));
+function TextoConSiguientes(props: { texto: string; vivo: boolean; rapida: RespuestaRapida | null; owner: string; visualBudget: VisualBudget; readVisual?: (file: string) => Promise<string> }) {
+  const partes = createMemo(() => {
+    const visuals = props.readVisual ? splitChatVisuals(props.texto, props.vivo) : [{ kind: "markdown" as const, markdown: props.texto }];
+    return visuals.flatMap<Visual | NextStepsPart>((part) => part.kind === "visual" ? [part] : splitNextSteps(part.markdown, props.vivo));
+  });
   const [enviando, setEnviando] = createSignal(false);
   const elegir = async (texto: string) => {
     if (!props.rapida || enviando()) return;
@@ -3395,6 +3411,7 @@ function TextoConSiguientes(props: { texto: string; vivo: boolean; rapida: Respu
           return p.kind === "markdown" ? p.markdown : "";
         };
         return (
+          <Show when={parte().kind === "visual" && props.readVisual} fallback={
           <Show when={bloque()} fallback={<Markdown>{markdown()}</Markdown>}>
             <Show when={bloque()?.prose}>
               <Markdown>{bloque()?.prose ?? ""}</Markdown>
@@ -3405,6 +3422,9 @@ function TextoConSiguientes(props: { texto: string; vivo: boolean; rapida: Respu
               habilitado={Boolean(props.rapida?.puede && bloque()?.complete) && !enviando()}
               onElegir={(texto) => void elegir(texto)}
             />
+          </Show>
+          }>
+            <ChatVisual visual={parte() as Visual} owner={props.owner} budget={props.visualBudget} read={(file) => props.readVisual!(file)} />
           </Show>
         );
       }}

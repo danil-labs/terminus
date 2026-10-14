@@ -3,7 +3,7 @@ import { createEffect, createRoot, createSignal, on } from "solid-js";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
 import { createPref } from "../../lib/prefs";
-import { hayCapaEncima, moviendoHueco, type Hueco } from "../../lib/sites";
+import { hayCapaEncima, moviendoHueco, zonasEncima, type Hueco } from "../../lib/sites";
 
 /** `environment/typst.rs` · `Diagnostico`. */
 export type DiagnosticoTypst = {
@@ -59,13 +59,15 @@ export function soltarVistasHuerfanas() {
 }
 
 let consultado = false;
+/** Desactivar y reactivar seguido cruza dos consultas: solo cuenta la última que se pidió. */
+let consulta = 0;
 async function consultarPlugin() {
-  try {
-    const catalogo = await invoke<{ plugins: { id: string; enabled: boolean }[] }>("list_integrations");
-    setPluginTypst(catalogo.plugins.some((p) => p.id === "typst" && p.enabled));
-  } catch {
-    setPluginTypst(false);
-  }
+  const n = ++consulta;
+  const activo = await invoke<{ plugins: { id: string; enabled: boolean }[] }>("list_integrations").then(
+    (catalogo) => catalogo.plugins.some((p) => p.id === "typst" && p.enabled),
+    () => false,
+  );
+  if (n === consulta) setPluginTypst(activo);
 }
 
 /** Pide el estado una vez y lo sigue con cada cambio de plugins o de workspace. */
@@ -216,7 +218,7 @@ let reaccionando = false;
 function reaccionar() {
   if (reaccionando) return;
   reaccionando = true;
-  createRoot(() => createEffect(on([hayCapaEncima, moviendoHueco], () => capas.forEach((_, clave) => colocarCapa(clave)))));
+  createRoot(() => createEffect(on([zonasEncima, moviendoHueco], () => capas.forEach((_, clave) => colocarCapa(clave)))));
 }
 
 // Cambiar de pestaña esconde un visor y enseña otro en el mismo cuadro: se junta todo y sale
@@ -239,7 +241,7 @@ function colocarAhora(clave: string) {
   if (!capa?.label) return;
   const label = capa.label;
   const visible = [...(ocupantes.get(clave)?.values() ?? [])].find((o) => o.visible && o.hueco.width >= 1);
-  const esconder = !visible || hayCapaEncima() || moviendoHueco();
+  const esconder = !visible || hayCapaEncima(visible.hueco) || moviendoHueco();
   const destino = esconder ? "escondida" : JSON.stringify(visible.hueco);
   if (destino === capa.ultima) return;
   capa.ultima = destino;

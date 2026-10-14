@@ -446,7 +446,7 @@
   "settings.update.downloading": "Downloading it. Do not close the app.",
   "settings.update.error_download": "Could not download the new version. Try again.",
   "settings.update.install": "Update",
-  "settings.update.ready": "Ready. It applies when you restart; if you have a task running, wait for it.",
+  "settings.update.ready": "Ready. It applies when you restart; tasks that are running keep working.",
   "settings.update.relaunch": "Restart now",
   "settings.update.title": "Version",
   "settings.update.unreachable": "I could not check whether there is a new version.",

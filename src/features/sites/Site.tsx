@@ -2,7 +2,7 @@ import { createEffect, createSignal, on, onCleanup, onMount, Show } from "solid-
 import { invoke } from "../../lib/invoke.ts";
 import { listen } from "@tauri-apps/api/event";
 import { Button } from "../../ui/Button";
-import { aDireccion, corta, hayCapaEncima, seguirHueco } from "../../lib/sites";
+import { aDireccion, corta, hayCapaEncima, seguirHueco, zonasEncima } from "../../lib/sites";
 import { t } from "../../lib/i18n";
 import { prosaDe } from "../../ui/Failure";
 
@@ -12,7 +12,7 @@ import { prosaDe } from "../../ui/Failure";
  *
  * El motivo de que sea una capa nativa y no un `<iframe>` está en
  * `src-tauri/src/environment/sites.rs`: la política de la ventana dice `frame-src 'self'`
- * y **no se afloja** —lo que impide está medido en `attacks/window.mjs`—,
+ * y **no se afloja** —lo que impide está medido en `tests/security/window.mjs`—,
  * mientras que un webview hijo no es contenido de este documento y trae la
  * suya.
  *
@@ -23,7 +23,7 @@ import { prosaDe } from "../../ui/Failure";
  * que la cierre.
  *
  * **Se enseña con tres condiciones a la vez**: la pestaña es la activa, la capa
- * ya existe —el servidor contestó— y el DOM no tiene nada abierto encima
+ * ya existe —el servidor contestó— y el DOM no tiene nada abierto sobre su hueco
  * (`lib/sites.ts` · `hayCapaEncima`). En cuanto una falla, se esconde. Esconder
  * y enseñar es barato —la página no se recarga ni pierde el scroll o lo
  * escrito—, así que el criterio puede ser estricto sin costar nada; el error
@@ -208,9 +208,14 @@ export default function Sitio(props: {
   function colocar() {
     const l = label();
     if (!l) return;
+    // Se remide antes de decidir. Mientras la pestaña está escondida su
+    // hueco mide 0×0 —`hidden` en el contenedor de `App.tsx`— y el observador
+    // avisa **después** del efecto que la vuelve visible: sin esto, la capa
+    // aparecería un fotograma en la esquina superior izquierda.
+    medir();
     const puede =
       props.visible &&
-      !hayCapaEncima() &&
+      !hayCapaEncima(ultimo) &&
       estado() !== "fallo" &&
       estado() !== "abriendo" &&
       estado() !== "inicio";
@@ -218,11 +223,6 @@ export default function Sitio(props: {
       void invoke("site_hide", { label: l }).catch(() => {});
       return;
     }
-    // Se remide justo antes de enseñar. Mientras la pestaña está escondida su
-    // hueco mide 0×0 —`hidden` en el contenedor de `App.tsx`— y el observador
-    // avisa **después** del efecto que la vuelve visible: sin esto, la capa
-    // aparecería un fotograma en la esquina superior izquierda.
-    medir();
     void invoke("site_place", { label: l, ...ultimo }).catch(() => {});
   }
 
@@ -266,7 +266,7 @@ export default function Sitio(props: {
 
   // Cambiar de pestaña, abrir un diálogo o pasar a `fallo` mueve la capa. Es un
   // efecto y no un manejador porque las tres condiciones son señales.
-  createEffect(on([() => props.visible, hayCapaEncima, estado], colocar));
+  createEffect(on([() => props.visible, zonasEncima, estado], colocar));
 
   onCleanup(() => {
     cerrado = true;

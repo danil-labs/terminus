@@ -399,7 +399,7 @@ export default function Alcance(props: {
                 // Anclado al chip que se pulsó. Sin `onClick` propio en el
                 // disparador: Kobalte pasa el suyo dentro y en JSX gana el
                 // último, así que ponerlo aquí borraría el que abre — es lo que
-                // vigila `scripts/triggers.test.mjs`. Abrir y cerrar viajan
+                // vigila `tests/unit/triggers.test.mjs`. Abrir y cerrar viajan
                 // por `onOpenChange`.
                 <Popover
                   open={eligiendo()?.id === f.id}

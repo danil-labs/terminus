@@ -215,7 +215,7 @@ const alternarDesplegada = (id: string) =>
  * prop propia pisaría el que `PopoverTrigger` pasa dentro de `p` y el panel no
  * abriría —Kobalte no compone manejadores, gana el último—, así que **quien no
  * deja pasar el clic a la fila es la fila**, que ignora lo que venga de su
- * columna de acciones. Lo comprueba `scripts/triggers.test.mjs`.
+ * columna de acciones. Lo comprueba `tests/unit/triggers.test.mjs`.
  */
 export default function Sessions(props: {
   sessions: SessionRow[];
