@@ -31,6 +31,9 @@ import EstadoDeTarea, { taskLabel } from "./TaskStatus";
 import { taskPriority } from "./taskActivity";
 import { type GitStatus, watchSessionGit } from "./taskGit";
 
+// El For de App vuelve a montar la tira al activar una pestaña; su scroll sobrevive aquí.
+const scrollBySite = new Map<string, number>();
+
 // Tira de pestañas; lib/tabs.ts determina su persistencia y el cierre en bloque.
 // Cerrar una pestaña deja su tarea y su turno vivos.
 export default function TabStrip(props: {
@@ -112,10 +115,16 @@ export default function TabStrip(props: {
     const element = strip?.querySelector<HTMLElement>(`[data-envoltorio="${n}"]`);
     element?.scrollIntoView?.({ inline: "nearest", block: "nearest" });
   }
+  const site = () => strip?.closest("[data-ventana]")?.getAttribute("data-ventana") ?? "";
+  let restored = false;
   createEffect(
     on(
       () => props.activeId,
       (id) => {
+        if (!restored && strip) {
+          restored = true;
+          strip.scrollLeft = scrollBySite.get(site()) ?? 0;
+        }
         if (!id) return;
         // Los ids contienen bytes nulos y no se pueden usar como valores de un selector CSS.
         const n = props.tabs.findIndex((p) => p.id === id);
@@ -134,11 +143,16 @@ export default function TabStrip(props: {
   }
 
   // La barra nativa ocuparía alto bajo las pestañas; esta flota encima.
+  // Vive dentro del contenedor que se desplaza, así que su left suma el scrollLeft.
   const [thumb, setThumb] = createSignal<{ left: number; width: number } | null>(null);
   function measure() {
     if (!strip || strip.scrollWidth <= strip.clientWidth) return setThumb(null);
     const ratio = strip.clientWidth / strip.scrollWidth;
-    setThumb({ left: strip.scrollLeft * ratio, width: strip.clientWidth * ratio });
+    setThumb({ left: strip.scrollLeft * (1 + ratio), width: strip.clientWidth * ratio });
+  }
+  function scrolled() {
+    if (strip) scrollBySite.set(site(), strip.scrollLeft);
+    measure();
   }
   createEffect(on(() => props.tabs.length, () => queueMicrotask(measure)));
   onMount(() => {
@@ -198,14 +212,13 @@ export default function TabStrip(props: {
 
   return (
     <ContextMenu>
-    <div class="group/strip relative flex min-w-0 self-stretch">
     <ContextMenuTrigger
       ref={strip}
       role="tablist"
       aria-label={t("projects.tabs.label")}
       onKeyDown={move}
       onWheel={wheel}
-      onScroll={measure}
+      onScroll={scrolled}
       onContextMenu={(e: MouseEvent) => {
         const element = (e.target as HTMLElement).closest<HTMLElement>("[data-envoltorio]");
         const p = element ? props.tabs[Number(element.dataset.envoltorio)] : undefined;
@@ -214,7 +227,7 @@ export default function TabStrip(props: {
       }}
       // La pestaña activa toca el borde inferior; el padding deja ver sus curvas en los extremos.
       // flex-1 separaría el botón de añadir de la última pestaña.
-      class="flex min-w-0 items-end gap-0.5 self-stretch overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-px-1.5 px-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      class="group/strip relative flex min-w-0 items-end gap-0.5 self-stretch overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-px-1.5 px-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       <For each={props.tabs}>
         {(p, i) => {
@@ -446,18 +459,17 @@ export default function TabStrip(props: {
           class="h-5 w-0.5 shrink-0 self-center rounded-full bg-primary"
         />
       </Show>
+      <Show when={thumb()}>
+        {(bar) => (
+          <div
+            aria-hidden="true"
+            onPointerDown={dragThumb}
+            class="absolute bottom-0 h-1 rounded-full bg-[var(--scrollbar-thumb)] opacity-0 transition-opacity group-hover/strip:opacity-100 hover:bg-[var(--scrollbar-thumb-hover)]"
+            style={{ left: `${bar().left}px`, width: `${bar().width}px` }}
+          />
+        )}
+      </Show>
     </ContextMenuTrigger>
-    <Show when={thumb()}>
-      {(bar) => (
-        <div
-          aria-hidden="true"
-          onPointerDown={dragThumb}
-          class="absolute bottom-0 h-1 rounded-full bg-[var(--scrollbar-thumb)] opacity-0 transition-opacity group-hover/strip:opacity-100 hover:bg-[var(--scrollbar-thumb-hover)]"
-          style={{ left: `${bar().left}px`, width: `${bar().width}px` }}
-        />
-      )}
-    </Show>
-    </div>
     <ContextMenuContent>
       <ContextMenuItem onSelect={() => closeBatch("esta")}>
         {t("projects.tabs.close")}

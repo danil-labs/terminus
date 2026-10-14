@@ -450,18 +450,9 @@ export default function App() {
         : undefined;
     return gridCell(sitio, paneles.rowsPerColumn()[sitio.col] ?? 1);
   };
-  // Un objeto nuevo por lectura haría que `For` volviera a montar la tira y perdiera su scroll.
-  const sitiosEstables = new Map<string, SitioDePanel>();
-  const sitioEstable = (sitio: SitioDePanel) => {
-    const clave = `${sitio.col},${sitio.fila}`;
-    const previo = sitiosEstables.get(clave);
-    if (previo) return previo;
-    sitiosEstables.set(clave, sitio);
-    return sitio;
-  };
   /** Las ventanas que se pintan. Con la ventana estrecha, solo la activa. */
   const ventanas = () =>
-    (unaSolaVentana() ? [paneles.activeSite()] : paneles.sites()).map(sitioEstable);
+    unaSolaVentana() ? [paneles.activeSite()] : paneles.sites();
   /** Solo las filas bajo la primera llevan su tira dentro de la cuadrícula. */
   const llevaTiraInterior = (sitio: SitioDePanel | null | undefined) =>
     paneles.isSplit() && (sitio?.fila ?? 0) > 0;
@@ -6243,7 +6234,8 @@ export default function App() {
             fila propia. */}
 
         {/* Sin partir hay una sola ventana y una sola tira. Su envoltorio y
-            el «+» quedan fuera del `For`. */}
+            el «+» quedan fuera del `For`, que vuelve a montar la tira al
+            abrir una tarea: así el «+» no cuesta nodos en cada apertura. */}
         <Show when={!paneles.isSplit()}>
           <div
             class="flex min-w-0 flex-1 items-center self-stretch"
@@ -6251,7 +6243,7 @@ export default function App() {
             data-ventana="0,0"
             onPointerDown={() => mandarVentana({ col: 0, fila: 0 })}
           >
-            <For each={paneles.columns().map((_, col) => sitioEstable({ col, fila: 0 }))}>
+            <For each={paneles.columns().map((_, col) => ({ col, fila: 0 }))}>
               {(sitio) => (
                 <TabStrip
                   session={filaDe}
