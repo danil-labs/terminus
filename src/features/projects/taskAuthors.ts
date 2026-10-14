@@ -42,3 +42,16 @@ export function authorKeys(rows: AuthorRow[], groupByHandler = false): string[] 
     (a, b) => rango(a) - rango(b) || antes(nombre(a), nombre(b)),
   );
 }
+
+/**
+ * Si la barra esconde una tarea porque se ve bajo su lanzador. Solo cuenta un
+ * lanzador de la misma lista: el de otra carpeta no la muestra en esta.
+ */
+export function shownUnderLauncher(
+  session: AuthorRow & { launcher_available?: boolean },
+  rows: readonly { id: string }[],
+): boolean {
+  const launcher = session.parent ?? session.launched_by;
+  return !!launcher && session.launcher_available !== false
+    && rows.some((row) => row.id === launcher);
+}
