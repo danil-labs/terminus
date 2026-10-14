@@ -183,10 +183,13 @@ type LiveTurn = { session: string; workspace: string; project: string; started_a
  */
 function Aplicar() {
   const [vivas, setVivas] = createSignal<LiveTurn[]>([]);
-  const mirar = () => void invoke<LiveTurn[]>("list_live_turns").then(setVivas).catch(() => {});
+  async function mirar() {
+    const turnos: LiveTurn[] = await invoke("list_live_turns").catch(() => []);
+    setVivas(turnos);
+  }
   onMount(() => {
-    mirar();
-    const reloj = setInterval(mirar, 10_000);
+    void mirar();
+    const reloj = setInterval(() => void mirar(), 10_000);
     onCleanup(() => clearInterval(reloj));
   });
   async function detenerYAplicar() {
