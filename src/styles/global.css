@@ -694,6 +694,30 @@
   }
 }
 
+/* Curvas cóncavas a los lados de la pestaña activa, que la asientan en el borde de la tira. */
+.tab-active {
+  position: relative;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.tab-active::before,
+.tab-active::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  width: var(--radius-md);
+  height: var(--radius-md);
+  pointer-events: none;
+}
+.tab-active::before {
+  right: 100%;
+  background: radial-gradient(circle at 0 0, transparent calc(var(--radius-md) - 0.5px), var(--color-surface-muted) var(--radius-md));
+}
+.tab-active::after {
+  left: 100%;
+  background: radial-gradient(circle at 100% 0, transparent calc(var(--radius-md) - 0.5px), var(--color-surface-muted) var(--radius-md));
+}
+
 .finish-task-flame {
   transform: rotate(45deg);
   transform-origin: center top;
