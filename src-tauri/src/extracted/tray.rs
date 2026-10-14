@@ -159,7 +159,8 @@ pub(super) fn tray_notify(
             window.is_visible().unwrap_or(false) && !window.is_minimized().unwrap_or(false);
         if on_screen {
             if needs_you && !window.is_focused().unwrap_or(true) {
-                let _ = window.request_user_attention(Some(tauri::UserAttentionType::Informational));
+                let _ =
+                    window.request_user_attention(Some(tauri::UserAttentionType::Informational));
             }
             return Ok(());
         }
