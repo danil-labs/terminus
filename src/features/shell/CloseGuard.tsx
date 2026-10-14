@@ -68,6 +68,7 @@ export default function CloseGuard(props: { title: (session: string) => string |
       }),
     );
     setRemember(false);
+    setStopping(false);
     setShown(rows);
   }
 
@@ -77,6 +78,7 @@ export default function CloseGuard(props: { title: (session: string) => string |
     if (choice === "stop") {
       setStopping(true);
       await stopTurns(turns);
+      setStopping(false);
     }
     setShown(null);
     close();
