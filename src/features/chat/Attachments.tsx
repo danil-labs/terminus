@@ -18,14 +18,27 @@ export default function Adjuntos(props: {
   miniatura: (rel: string) => Promise<string | null>;
 }) {
   return (
-    <div class="mb-2 flex flex-wrap gap-2">
-      <For each={props.rels}>{(rel) => <Adjunto rel={rel} miniatura={props.miniatura} />}</For>
+    <div class="mb-2 flex gap-2 overflow-x-auto overflow-y-hidden pb-1" onWheel={rodarEnHorizontal}>
+      <For each={props.rels}>
+        {(rel) => (
+          <div class="shrink-0">
+            <Adjunto rel={rel} miniatura={props.miniatura} />
+          </div>
+        )}
+      </For>
     </div>
   );
 }
+
+/** Una fila de miniaturas que desborda: la rueda vertical la recorre de lado. */
+export function rodarEnHorizontal(e: WheelEvent & { currentTarget: HTMLElement }) {
+  const fila = e.currentTarget;
+  if (e.deltaX !== 0 || fila.scrollWidth <= fila.clientWidth) return;
+  fila.scrollLeft += e.deltaY;
+  e.preventDefault();
+}
 export function Adjunto(props: {
   rel: string;
-  compacto?: boolean;
   miniatura: (rel: string) => Promise<string | null>;
 }) {
   // Una ruta desaparecida no debe impedir que se lea la conversación.
@@ -67,9 +80,7 @@ export function Adjunto(props: {
             <img
               src={src()}
               alt={nombreDe(props.rel)}
-              class={props.compacto
-                ? "size-14 rounded-md border border-border object-cover"
-                : "size-48 rounded-md border border-border bg-surface object-contain"}
+              class="size-14 rounded-md border border-border object-cover"
             />
           )}
         </Show>
