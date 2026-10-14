@@ -117,7 +117,7 @@ pub fn ensure(paths: &Paths, adopt: bool) -> Result<PathBuf> {
     let endpoint = paths.data.join("seldon-endpoint.json");
     if let Ok((found, status)) = terminus_engine_client::probe(&endpoint) {
         // Uno que trabaja sigue con su versión; la nueva entra cuando lo dejen parar.
-        if !super::legacy::set_aside(found.pid) || !retire(&endpoint, found.pid) {
+        if !super::legacy::engine_replaced(found.pid, true) || !retire(&endpoint, found.pid) {
             return write_selection(paths, &endpoint, &found, &status);
         }
     }
@@ -179,6 +179,18 @@ pub fn stop() -> Stopped {
             }
             Err(_) => return Stopped::Unanswered,
         }
+    }
+}
+
+/// Con otra versión instalada, el motor viejo se para en cuanto queda sin trabajo;
+/// la ventana arranca el nuevo en su siguiente sondeo, como tras cualquier caída.
+pub fn retire_if_replaced(paths: &Paths) {
+    let endpoint = paths.data.join("seldon-endpoint.json");
+    let Ok((found, status)) = terminus_engine_client::probe(&endpoint) else {
+        return;
+    };
+    if super::legacy::engine_replaced(found.pid, false) && !working(&status["busy"]) {
+        retire(&endpoint, found.pid);
     }
 }
 

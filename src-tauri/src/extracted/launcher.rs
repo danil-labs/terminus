@@ -307,6 +307,13 @@ fn watch(launcher: &Launcher, paths: &engine::Paths) {
             launcher.set(Phase::Ready {
                 blank_0274: legacy::blank_window(&paths.data),
             });
+            let connected = launcher
+                .app
+                .get()
+                .is_some_and(|app| app.try_state::<Arc<proxy::State>>().is_some());
+            if connected {
+                engine::retire_if_replaced(paths);
+            }
         }
         std::thread::sleep(Duration::from_secs(15));
     }
