@@ -143,20 +143,65 @@ pub(super) fn restart_app(app: AppHandle) {
     app.restart();
 }
 
-/// Aviso del sistema con la ventana oculta o sin foco: una tarea terminó o necesita a la persona.
+/// Una tarea terminó o necesita a la persona. Con la ventana fuera de la pantalla
+/// sale un aviso del sistema; a la vista solo parpadea, y solo si la necesita.
 #[tauri::command]
-pub(super) fn tray_notify(app: AppHandle, title: String, body: String) -> Result<(), String> {
+pub(super) fn tray_notify(
+    app: AppHandle,
+    title: String,
+    body: String,
+    needs_you: bool,
+) -> Result<(), String> {
+    #[cfg(not(windows))]
     use tauri_plugin_notification::NotificationExt;
-    // Visible pero detrás de otra app: la barra de tareas parpadea (o rebota el Dock).
     if let Some(window) = app.get_webview_window("main") {
-        if window.is_visible().unwrap_or(false) && !window.is_focused().unwrap_or(true) {
-            let _ = window.request_user_attention(Some(tauri::UserAttentionType::Informational));
+        let on_screen =
+            window.is_visible().unwrap_or(false) && !window.is_minimized().unwrap_or(false);
+        if on_screen {
+            if needs_you && !window.is_focused().unwrap_or(true) {
+                let _ = window.request_user_attention(Some(tauri::UserAttentionType::Informational));
+            }
+            return Ok(());
         }
     }
-    app.notification()
-        .builder()
+    #[cfg(windows)]
+    {
+        windows_toast(&app, &title, &body)
+    }
+    #[cfg(not(windows))]
+    {
+        app.notification()
+            .builder()
+            .title(title)
+            .body(body)
+            .show()
+            .map_err(|error| error.to_string())
+    }
+}
+
+/// El plugin no deja reaccionar al clic en Windows; aquí el clic trae la ventana.
+#[cfg(windows)]
+fn windows_toast(app: &AppHandle, title: &str, body: &str) -> Result<(), String> {
+    use tauri_winrt_notification::Toast;
+    // Sin instalar no hay AppUserModelID registrado y Windows descarta el aviso.
+    let installed = tauri::utils::platform::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|dir| dir.to_path_buf()))
+        .is_some_and(|dir| !dir.ends_with("target/debug") && !dir.ends_with("target/release"));
+    let app_id = if installed {
+        app.config().identifier.clone()
+    } else {
+        Toast::POWERSHELL_APP_ID.to_owned()
+    };
+    let handle = app.clone();
+    Toast::new(&app_id)
         .title(title)
-        .body(body)
+        .text1(body)
+        .on_activated(move |_| {
+            let window = handle.clone();
+            let _ = handle.run_on_main_thread(move || show_window(&window));
+            Ok(())
+        })
         .show()
         .map_err(|error| error.to_string())
 }
