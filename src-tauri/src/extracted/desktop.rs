@@ -1,8 +1,44 @@
 //! Acciones de escritorio originales de harness-app 96dba061, Apache-2.0.
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 #[tauri::command]
 pub(super) fn request_close(window: tauri::WebviewWindow) -> Result<(), String> {
     window.close().map_err(|error| error.to_string())
+}
+
+static CLOSE_CONFIRMED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static CLOSE_ASKED: std::sync::Mutex<Option<std::time::Instant>> = std::sync::Mutex::new(None);
+
+/// El front ya decidió qué hacer con los turnos vivos; ahora sí se cierra.
+#[tauri::command]
+pub(super) fn close_confirmed(window: tauri::WebviewWindow) -> Result<(), String> {
+    CLOSE_CONFIRMED.store(true, std::sync::atomic::Ordering::SeqCst);
+    window.close().map_err(|error| error.to_string())
+}
+
+/// Todo cierre de la ventana (X, Alt+F4, barra de tareas, menú) pregunta antes
+/// al front si hay agentes trabajando. Un segundo intento seguido cierra igual:
+/// un front colgado no puede dejar la ventana imposible de cerrar.
+pub(super) fn on_close_requested(window: &tauri::Window, api: &tauri::CloseRequestApi) {
+    use std::sync::atomic::Ordering;
+    if CLOSE_CONFIRMED.load(Ordering::SeqCst) {
+        return;
+    }
+    // Sin motor (traspaso o arranque fallido) no hay turnos que cuidar.
+    if window
+        .app_handle()
+        .try_state::<std::sync::Arc<super::proxy::State>>()
+        .is_none()
+    {
+        return;
+    }
+    let now = std::time::Instant::now();
+    let mut asked = CLOSE_ASKED.lock().unwrap_or_else(|p| p.into_inner());
+    if asked.is_some_and(|at| now.duration_since(at) < std::time::Duration::from_secs(4)) {
+        return;
+    }
+    *asked = Some(now);
+    api.prevent_close();
+    let _ = window.emit("close-requested", ());
 }
 
 pub(super) static STARTED: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();

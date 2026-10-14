@@ -10,8 +10,8 @@ import { isWindows } from "../../lib/window";
  * macOS conserva su semáforo: esta fila solo existe en Windows. Ahí
  * `decorations: false` deja a la app responsable de minimizar, maximizar y
  * cerrar; los dos primeros van al comando nativo de Tauri. Cerrar pasa por
- * Rust, que es donde se conoce un turno vivo y se puede negar sin perder su
- * transcripción ni su consumo.
+ * Rust, que detiene el cierre y deja decidir a `CloseGuard` si hay agentes
+ * trabajando.
  */
 export default function ControlesDeVentana() {
   const [maximizada, setMaximizada] = createSignal(false);
