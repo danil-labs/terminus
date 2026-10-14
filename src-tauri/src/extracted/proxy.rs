@@ -558,8 +558,9 @@ pub(super) fn service_poll(
             }
         }
     }
+    // Un stream de comando cortado no pierde eventos del diario: va aparte de `gap`.
     Ok(
-        json!({"cursor":page["cursor"],"gap":page["gap"] == true || state.stream_gap.swap(false, Ordering::SeqCst),"replay":page["replay"],"runtime":state.client().runtime(),"reset":false}),
+        json!({"cursor":page["cursor"],"gap":page["gap"] == true,"streams":state.stream_gap.swap(false, Ordering::SeqCst),"replay":page["replay"],"runtime":state.client().runtime(),"reset":false}),
     )
 }
 #[tauri::command]

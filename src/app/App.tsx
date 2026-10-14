@@ -2014,13 +2014,14 @@ export default function App() {
       await serviceListenersReady;
       if (disposed) return;
       try {
-        const page = await invoke<{ cursor: number | null; gap: boolean; replay: boolean; runtime: string; reset: boolean }>("service_poll", { cursor, workspace: null, replay, runtime });
+        const page = await invoke<{ cursor: number | null; gap: boolean; streams?: boolean; replay: boolean; runtime: string; reset: boolean }>("service_poll", { cursor, workspace: null, replay, runtime });
         if (disposed) return;
         cursor = page.cursor;
         replay = page.replay;
         runtime = page.runtime;
-        if (page.reset || page.gap || failingSince !== null) window.dispatchEvent(new CustomEvent("harness:service-resync"));
-        if (page.reset || page.gap) releerTrasHueco();
+        if (page.reset || page.gap || page.streams || failingSince !== null) window.dispatchEvent(new CustomEvent("harness:service-resync"));
+        // Un stream de comando cortado (árbol, git) se relee, pero no es salida en vivo perdida.
+        if (page.reset || page.gap || page.streams) releerTrasHueco();
         if (page.reset) {
           liveThreads.clear();
           workspaceThreads.clear();
