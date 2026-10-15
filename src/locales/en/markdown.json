@@ -14,5 +14,6 @@
   "markdown.diagram.reset_view": "Reset view",
   "markdown.diagram.close": "Exit whole-window view",
   "markdown.code.copy": "Copy code",
-  "markdown.code.copied": "Copied"
+  "markdown.code.copied": "Copied",
+  "markdown.table.resize_column": "Drag to resize the column; double-click to fit it automatically"
 }

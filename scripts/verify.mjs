@@ -306,6 +306,12 @@ const steps = [
     root,
   ],
   [
+    "Las columnas de una tabla se reparten según su texto",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/markdown-table.test.ts")],
+    root,
+  ],
+  [
     "El diff numera las líneas donde están",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/diff.test.ts")],
