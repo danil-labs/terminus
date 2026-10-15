@@ -55,6 +55,7 @@ import {
   seguirPluginTypst,
   salto,
   saltarA,
+  pedirReapertura,
   vivaDe,
 } from "./typst";
 
@@ -539,7 +540,8 @@ export default function VisorDeArchivo(props: {
         await invoke("typst_live_change", { key: envio.key, path, text: envio.texto });
         abiertoEn = { key: envio.key, path };
       } catch {
-        // La vista se apagó o se está rehaciendo: el siguiente cambio o la vista nueva lo vuelven a mandar.
+        // Sin reabrir, los errores que se ven son los de un texto que ya no es: la vista nueva lo vuelve a mandar.
+        pedirReapertura(props.session, props.arbol);
       }
     }
     enviando = false;

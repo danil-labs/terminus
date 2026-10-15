@@ -46,6 +46,7 @@ import PreviousAgentChat from "../features/chat/PreviousAgentChat";
 import type { AlmacenDePreguntas, PreguntasAMedias, Respuesta, RespuestaEnviada } from "../features/chat/Questions";
 import { contestaALaTerminal, despachable, esDeLaTerminal, guardable, inyectable, type RazonDeRetencion, retencionAlCargar, siguienteLote, sueltaElBorrador } from "../features/chat/queue";
 import type { ComandoEnVivo } from "../features/chat/ShellCard";
+import { comandoDeTerminal } from "../features/chat/terminalIndent";
 import type { AlMargen } from "../features/chat/SideQuestion";
 import { comandoEscrito } from "../features/chat/slashOutput";
 import { ThreadSearch, type ThreadSearchTarget } from "../features/chat/ThreadSearch";
@@ -88,6 +89,7 @@ import { DEFAULT_PROFILE, displayName, notifyProfiles, watchProfiles } from "../
 import RecentAgentChats from "../features/projects/RecentAgentChats";
 import { type SessionRow, threadTitle } from "../features/projects/Sessions";
 import TabStrip, { NewTabButton } from "../features/projects/Tabs";
+import { veilTabs } from "../features/projects/tabVeil";
 import { createTaskWork, ResumeTask } from "../features/projects/TaskHistory";
 import type { Etapa } from "../features/projects/TaskStage";
 import { esChatDeAgente } from "../features/projects/taskTree";
@@ -2018,13 +2020,14 @@ export default function App() {
       await serviceListenersReady;
       if (disposed) return;
       try {
-        const page = await invoke<{ cursor: number | null; gap: boolean; replay: boolean; runtime: string; reset: boolean }>("service_poll", { cursor, workspace: null, replay, runtime });
+        const page = await invoke<{ cursor: number | null; gap: boolean; streams?: boolean; replay: boolean; runtime: string; reset: boolean }>("service_poll", { cursor, workspace: null, replay, runtime });
         if (disposed) return;
         cursor = page.cursor;
         replay = page.replay;
         runtime = page.runtime;
-        if (page.reset || page.gap || failingSince !== null) window.dispatchEvent(new CustomEvent("harness:service-resync"));
-        if (page.reset || page.gap) releerTrasHueco();
+        if (page.reset || page.gap || page.streams || failingSince !== null) window.dispatchEvent(new CustomEvent("harness:service-resync"));
+        // Un stream de comando cortado (árbol, git) se relee, pero no es salida en vivo perdida.
+        if (page.reset || page.gap || page.streams) releerTrasHueco();
         if (page.reset) {
           liveThreads.clear();
           workspaceThreads.clear();
@@ -5262,22 +5265,23 @@ export default function App() {
       return true;
     }
     if (prompt.startsWith("!")) {
-      if (!prompt.slice(1).trim()) return false;
+      const comando = comandoDeTerminal(prompt);
+      if (!comando.trim()) return false;
       setInput("");
       // Con el agente trabajando espera su turno, como en Claude Code. Los
       // adjuntos se quedan en el borrador: un comando no los lleva.
       if (queueBusy() || cola().length > 0) {
-        encolar(prompt, []);
+        encolar(`!${comando}`, []);
         return true;
       }
       const id = sessionId();
       if (!id) {
-        const corrio = await abrirConComando(prompt.slice(1));
+        const corrio = await abrirConComando(comando);
         if (!corrio && !input()) setInput(prompt);
         return corrio;
       }
       const lanzado = { project: project(), agent: agent(), model: model() || null, effort: effort() || null, permission_mode: modo() || null };
-      return (await ejecutarComando(id, lanzado, prompt.slice(1), null)) === null;
+      return (await ejecutarComando(id, lanzado, comando, null)) === null;
     }
     if (queueBusy() || cola().length > 0) {
       encolarYSoltar(prompt, attachments, message.task_mentions, message.recipients);
@@ -6190,8 +6194,11 @@ export default function App() {
           fila lleva el conmutador para traerlo de vuelta. Antes flotaba
           con `position: absolute`, sin compartir eje con nada. */}
       <div
-        ref={cabeceraDeConversacion}
-        class={cn("relative flex shrink-0 items-center gap-3 pr-4",
+        ref={(el) => {
+          cabeceraDeConversacion = el;
+          veilTabs(el);
+        }}
+        class={cn("tab-veil flex shrink-0 items-center gap-3 pr-4",
           HEADER_HEIGHT,
           "pl-4",
         )}
@@ -6443,7 +6450,8 @@ export default function App() {
         <For each={ventanas().filter((sitio) => sitio.fila > 0)}>
           {(sitio) => (
             <div
-              class="z-30 flex h-8 min-w-0 items-center self-start px-2"
+              ref={veilTabs}
+              class="tab-veil z-30 flex h-8 min-w-0 items-center self-start px-2"
               style={estiloDeLaCelda(sitio)}
               // Cómo la encuentra el arrastre: `ventanaBajo` pregunta al
               // documento por estos dos atributos, que es lo que hace que soltar

@@ -580,7 +580,7 @@ pub(super) fn service_poll(
                 };
                 return Err(failure(&shown));
             }
-            if let Some(window) = app.get_webview_window("main") {
+            if let Some(window) = app.get_window("main") {
                 let _ = window.set_title(&super::title(&app));
             }
             return Ok(
@@ -605,8 +605,9 @@ pub(super) fn service_poll(
             }
         }
     }
+    // Un stream de comando cortado no pierde eventos del diario: va aparte de `gap`.
     Ok(
-        json!({"cursor":page["cursor"],"gap":page["gap"] == true || state.stream_gap.swap(false, Ordering::SeqCst),"replay":page["replay"],"runtime":state.client().runtime(),"reset":false}),
+        json!({"cursor":page["cursor"],"gap":page["gap"] == true,"streams":state.stream_gap.swap(false, Ordering::SeqCst),"replay":page["replay"],"runtime":state.client().runtime(),"reset":false}),
     )
 }
 #[tauri::command]

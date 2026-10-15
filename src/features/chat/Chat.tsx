@@ -1,4 +1,5 @@
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 import ArrowDown from "lucide-solid/icons/arrow-down";
 import ArrowUp from "lucide-solid/icons/arrow-up";
@@ -36,6 +37,7 @@ import type { ThreadSearchTarget } from "./ThreadSearch";
 import { taskChatPresentation } from "./TaskChatPresentation";
 import { CHUNK, blockOfMessage, chunkIds, chunkOf, tailChunk, type Lectura } from "./threadWindow";
 import { workLabel } from "../projects/branchLabel";
+import { sangrarTerminal } from "./terminalIndent";
 import { claseDelTramo, finishEdit, highlightSpans, placeLabel, referenceId, searchPlaces, searchTasks, taskLabel, type MentionTarget, type PendingEdit, type PlaceCandidate, type TextEdit, type TaskCandidate, type TaskMention, tramosDelMensaje } from "../../lib/taskMentions";
 import {
   type Recipient,
@@ -117,7 +119,7 @@ import {
   TooltipRoot,
   TooltipTrigger,
 } from "../../ui/Tooltip";
-import Adjuntos, { Adjunto } from "./Attachments";
+import Adjuntos, { Adjunto, rodarEnHorizontal } from "./Attachments";
 import VentanaDeContexto from "./ContextWindow";
 import Entrega, { type Producido } from "./Delivery";
 import {
@@ -360,7 +362,7 @@ type BloqueDeTrabajo = Extract<Bloque, { tipo: "trabajo" }>;
 const METRICA_DEL_CAMPO =
   "border border-transparent px-2 py-1.5 text-[0.8125rem] leading-[1.4] [font-family:inherit] [scrollbar-gutter:stable]";
 // Del mismo tipo que el `inherit` de arriba, para que `cn` lo reemplace.
-const FUENTE_DE_TERMINAL = "[font-family:var(--font-mono)]";
+const FUENTE_DE_TERMINAL = "[font-family:var(--font-mono)] [tab-size:4]";
 
 const mensajeDe = (bloque: Bloque): BloqueDeMensaje | null =>
   bloque.tipo === "msg" ? bloque : null;
@@ -721,7 +723,9 @@ export default function Chat(props: ChatProps) {
   const [copiado, setCopiado] = createSignal<string | null>(null);
   const [forkeando, setForkeando] = createSignal<string | null>(null);
   /** Hay archivos encima de la ventana, sin soltar todavía. */
-  const [soltando, setSoltando] = createSignal(false);
+  /** La caja de esta conversación mientras un archivo pasa por encima de ella. */
+  const [soltando, setSoltando] = createSignal<DOMRect | null>(null);
+  let ancla: HTMLSpanElement | undefined;
   /**
    * Qué bloque de «Trabajó durante…» está desplegado, por turno. No se
    * persiste: qué bloque tenías abierto en una conversación no es una
@@ -1255,6 +1259,30 @@ export default function Chat(props: ChatProps) {
    */
   onMount(() => {
     let disposed = false;
+    // Con la pantalla partida cada conversación es su propia zona: el archivo va a la
+    // que está bajo el puntero. macOS manda puntos y el resto píxeles físicos.
+    const enPuntos = navigator.userAgent.includes("Macintosh");
+    let escala = 1;
+    const medirEscala = () =>
+      void getCurrentWindow()
+        .scaleFactor()
+        .then((f) => {
+          escala = f;
+        })
+        .catch(() => {});
+    medirEscala();
+    const bajoElPuntero = (pos: { x: number; y: number }) => {
+      const caja = ancla?.parentElement?.getBoundingClientRect();
+      if (!caja) return null;
+      // Sin maquetación no hay cajas que medir: la conversación montada recibe, como antes.
+      if (document.documentElement.clientWidth === 0) return caja;
+      // Con maquetación, una caja vacía es una conversación escondida.
+      if (caja.width === 0 || caja.height === 0) return null;
+      const f = enPuntos ? 1 : escala;
+      const x = pos.x / f;
+      const y = pos.y / f;
+      return x >= caja.left && x <= caja.right && y >= caja.top && y <= caja.bottom ? caja : null;
+    };
     const un = getCurrentWebview().onDragDropEvent((e) => {
       // La suscripción dura lo mismo que el componente. `puedeAdjuntar()` se
       // lee al recibir cada evento para no conservar el valor que tenía al
@@ -1262,19 +1290,21 @@ export default function Chat(props: ChatProps) {
       // cambia la señal.
       if (disposed) return;
       if (props.soloLectura || !puedeAdjuntar()) {
-        setSoltando(false);
+        setSoltando(null);
         return;
       }
-      if (e.payload.type === "over") {
-        setSoltando(true);
+      if (e.payload.type === "enter") medirEscala();
+      if (e.payload.type === "enter" || e.payload.type === "over") {
+        setSoltando(bajoElPuntero(e.payload.position));
         return;
       }
       if (e.payload.type === "drop") {
-        setSoltando(false);
-        agregar(e.payload.paths);
+        const aqui = bajoElPuntero(e.payload.position);
+        setSoltando(null);
+        if (aqui) agregar(e.payload.paths);
         return;
       }
-      setSoltando(false);
+      setSoltando(null);
     });
 
     // La promesa puede no resolver a nada, y hay que contar con ello:
@@ -2044,17 +2074,12 @@ export default function Chat(props: ChatProps) {
               el campo de texto. */}
           <div
             class="flex gap-2 overflow-x-auto overflow-y-hidden px-1 pt-1 pb-1 select-none"
-            onWheel={(e) => {
-              const fila = e.currentTarget;
-              if (e.deltaX !== 0 || fila.scrollWidth <= fila.clientWidth) return;
-              fila.scrollLeft += e.deltaY;
-              e.preventDefault();
-            }}
+            onWheel={rodarEnHorizontal}
           >
             <For each={props.adjuntos}>
               {(p) => (
                 <div class="group relative shrink-0">
-                  <Adjunto rel={p} miniatura={props.onMiniatura} compacto />
+                  <Adjunto rel={p} miniatura={props.onMiniatura} />
                   {/* Dentro de la esquina: fuera de ella, el scroll horizontal la recorta. */}
                   <button
                     type="button"
@@ -2184,11 +2209,17 @@ export default function Chat(props: ChatProps) {
               end: e.currentTarget.selectionEnd, inputType: e.inputType };
           }}
           onInput={(e) => {
-            props.onInput(e.currentTarget.value, e.inputType, finishEdit(pendingEdit, e.currentTarget.value));
+            const valor = e.currentTarget.value;
+            const caret = e.currentTarget.selectionStart ?? valor.length;
+            const sangrado = sangrarTerminal(props.input, valor, caret, e.inputType);
+            if (sangrado.text === valor) {
+              props.onInput(valor, e.inputType, finishEdit(pendingEdit, valor));
+            } else {
+              pendingCaret = sangrado.caret;
+              props.onInput(sangrado.text, e.inputType);
+            }
             pendingEdit = undefined;
-            setCaret(
-              e.currentTarget.selectionStart ?? e.currentTarget.value.length,
-            );
+            setCaret(sangrado.caret);
           }}
           // El cursor se mueve con el ratón y con las flechas sin que cambie el
           // texto, y de dónde esté depende qué menú corresponde.
@@ -2483,15 +2514,16 @@ export default function Chat(props: ChatProps) {
           </div>
         </DialogContent>
       </Dialog>
-      {/* El velo cubre la ventana entera: la zona de soltar es la ventana
-          entera (arriba, en el manejador). Dice lo que va a pasar al
-          soltar —lo único que la app puede decir con el archivo en el
-          aire—: sin él el gesto no acusa recibo hasta que ya se soltó.
-          `pointer-events-none`: el arrastre nativo no pasa por el DOM, y
-          un nodo capturando el puntero estorbaría al `leave`. */}
-      <Show when={soltando() && !props.soloLectura}>
+      {/* Mide la caja de la conversación: el padre es su ventana del reparto. */}
+      <span ref={ancla} class="hidden" aria-hidden="true" />
+      {/* El velo cubre solo esta conversación, la que recibe al soltar. Va fijo con
+          la medida de su caja: el padre no siempre es `relative`. Sin
+          `pointer-events`: un nodo capturando el puntero estorbaría al `leave`. */}
+      <Show when={!props.soloLectura && soltando()}>
+        {(caja) => (
         <div
-          class="pointer-events-none fixed inset-0 z-50 grid place-items-center bg-black/40 p-6"
+          class="pointer-events-none fixed z-50 grid place-items-center rounded-md bg-black/40 p-6"
+          style={{ left: `${caja().left}px`, top: `${caja().top}px`, width: `${caja().width}px`, height: `${caja().height}px` }}
           aria-hidden="true"
         >
           <div class="flex items-center gap-2 rounded-lg border-2 border-dashed border-primary bg-surface px-4 py-3 shadow-lg">
@@ -2499,6 +2531,7 @@ export default function Chat(props: ChatProps) {
             <span class="text-sm font-medium">{t("chat.drop.hint")}</span>
           </div>
         </div>
+        )}
       </Show>
 
     {/* El esqueleto se pinta contra la caja (`justify-end`), donde va a

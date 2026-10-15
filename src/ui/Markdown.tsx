@@ -23,6 +23,7 @@ import { Button } from "./Button";
 import { EnlargeableImage } from "./EnlargeableImage";
 import { prosaDe } from "./Failure";
 import { FilePreview } from "./FilePreview";
+import { BordeDeColumna, MarkdownTable } from "./MarkdownTable";
 import { MermaidDiagram } from "./Mermaid";
 import { bloquesDeMarkdown } from "./markdown-blocks";
 import { textoDelBloque } from "./markdown-code";
@@ -239,16 +240,11 @@ const COMPONENTES = {
       class="mr-1.5 align-middle"
     />
   ),
-  table: (p) => (
-    <div class="my-3 max-w-full overflow-auto rounded-md border border-border bg-surface">
-      <table class="w-full min-w-[520px] border-collapse text-left text-[0.82rem]">
-        {p.children}
-      </table>
-    </div>
-  ),
+  table: (p) => <MarkdownTable>{p.children}</MarkdownTable>,
   th: (p) => (
-    <th class="border-b border-r border-border bg-neutral-950/[0.045] px-3 py-2 text-[0.72rem] font-bold uppercase text-neutral-700 last:border-r-0">
+    <th class="relative border-b border-r border-border bg-neutral-950/[0.045] px-3 py-2 text-[0.72rem] font-bold uppercase text-neutral-700 last:border-r-0">
       {p.children}
+      <BordeDeColumna />
     </th>
   ),
   td: (p) => (

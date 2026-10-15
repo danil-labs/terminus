@@ -92,6 +92,14 @@ export function elegirPrincipal(project: string, ruta: string | null) {
 
 const claveDe = (session: string, arbol: string) => `${session}\n${arbol}`;
 
+/** Un cambio que no llegó a Tinymist pide reabrir la vista de su árbol; la vuelven a pedir sus visores. */
+const [reaperturas, setReaperturas] = createSignal<Record<string, number>>({});
+export const reaperturaDe = (session: string, arbol: string) => reaperturas()[claveDe(session, arbol)] ?? 0;
+export function pedirReapertura(session: string, arbol: string) {
+  const clave = claveDe(session, arbol);
+  setReaperturas((r) => ({ ...r, [clave]: (r[clave] ?? 0) + 1 }));
+}
+
 /** La vista viva de cada árbol de tarea: la arranca el primer visor y la comparten los demás. */
 const [vivas, setVivas] = createSignal<Record<string, VistaViva>>({});
 

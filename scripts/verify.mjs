@@ -144,6 +144,12 @@ const steps = [
     root,
   ],
   [
+    "Los comandos `!` quedan alineados en la caja y se corren sin la sangría",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "scripts/terminal-indent.test.ts")],
+    root,
+  ],
+  [
     "El menú de la arroba propone encargados por nombre, sin chocar con el material",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/recipient-menu.test.ts")],
@@ -297,6 +303,12 @@ const steps = [
     "El markdown se parte sin cambiar lo que se ve",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/markdown.test.ts")],
+    root,
+  ],
+  [
+    "Las columnas de una tabla se reparten según su texto",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/markdown-table.test.ts")],
     root,
   ],
   [
