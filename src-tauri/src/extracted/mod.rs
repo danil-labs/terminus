@@ -111,7 +111,10 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
     };
     let launcher = Arc::new(launcher);
     let starting = launcher.clone();
+    // Con TRACE y 40 KB, rustls y el updater borraban los avisos de `[transport]` en un minuto.
     let log = tauri_plugin_log::Builder::default()
+        .level(log::LevelFilter::Info)
+        .max_file_size(2_000_000)
         .targets([tauri_plugin_log::Target::new(
             tauri_plugin_log::TargetKind::Folder {
                 path: window_data.clone(),
@@ -121,6 +124,11 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
         .build();
     tauri::Builder::default()
         .manage(launcher)
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                desktop::on_close_requested(window, api);
+            }
+        })
         .setup(move |app| {
             if let Some(state) = state {
                 app.manage(state);
@@ -161,6 +169,7 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
         .plugin(log)
         .invoke_handler(proxy::with_desktop(tauri::generate_handler![
             desktop::request_close,
+            desktop::close_confirmed,
             desktop::window_ready,
             desktop::window_vitals,
             launcher::launcher_state,

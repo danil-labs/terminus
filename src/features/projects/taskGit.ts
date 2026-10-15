@@ -67,6 +67,26 @@ type Entry = {
   interests: Map<symbol, string[]>;
 };
 const projects = new Map<string, Entry>();
+// Cerrar una ventana desmonta la tira y el riel antes de montar los nuevos: el
+// observador muere entre medias y el que nace hereda lo visto, no un registro vacío.
+const parked = new Map<string, { rows: Record<string, GitStatus>; forget: () => void }>();
+function park(project: string, rows: Record<string, GitStatus>) {
+  parked.get(project)?.forget();
+  const target = window;
+  const forget = () => {
+    clearTimeout(timer);
+    target.removeEventListener("harness:workspace", forget);
+    if (parked.get(project)?.rows === rows) parked.delete(project);
+  };
+  const timer = setTimeout(forget, 3_000);
+  target.addEventListener("harness:workspace", forget);
+  parked.set(project, { rows, forget });
+}
+function unpark(project: string) {
+  const held = parked.get(project);
+  held?.forget();
+  return held?.rows ?? {};
+}
 const remoteQueue = new Map<symbol, { rank: () => number; run: () => Promise<void> }>();
 let remoteRunning = 0;
 function drainRemote() {
@@ -81,7 +101,7 @@ function drainRemote() {
 export function watchSessionGit(project: string) {
   let entry = projects.get(project);
   if (!entry) {
-    const [rows, setRows] = createSignal<Record<string, GitStatus>>({});
+    const [rows, setRows] = createSignal<Record<string, GitStatus>>(unpark(project));
     const interests = new Map<symbol, string[]>();
     let disposed = false;
     let generation = 0;
@@ -201,7 +221,11 @@ export function watchSessionGit(project: string) {
     },
     release: () => {
       current.interests.delete(token);
-      if (current.interests.size === 0) { current.dispose(); projects.delete(project); }
+      if (current.interests.size === 0 && projects.get(project) === current) {
+        current.dispose();
+        projects.delete(project);
+        park(project, current.rows());
+      }
     },
   };
 }

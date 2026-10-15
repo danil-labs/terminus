@@ -36,6 +36,7 @@ import type { ThreadSearchTarget } from "./ThreadSearch";
 import { taskChatPresentation } from "./TaskChatPresentation";
 import { CHUNK, blockOfMessage, chunkIds, chunkOf, tailChunk, type Lectura } from "./threadWindow";
 import { workLabel } from "../projects/branchLabel";
+import { sangrarTerminal } from "./terminalIndent";
 import { claseDelTramo, finishEdit, highlightSpans, placeLabel, referenceId, searchPlaces, searchTasks, taskLabel, type MentionTarget, type PendingEdit, type PlaceCandidate, type TextEdit, type TaskCandidate, type TaskMention, tramosDelMensaje } from "../../lib/taskMentions";
 import {
   type Recipient,
@@ -117,7 +118,7 @@ import {
   TooltipRoot,
   TooltipTrigger,
 } from "../../ui/Tooltip";
-import Adjuntos, { Adjunto } from "./Attachments";
+import Adjuntos, { Adjunto, rodarEnHorizontal } from "./Attachments";
 import VentanaDeContexto from "./ContextWindow";
 import Entrega, { type Producido } from "./Delivery";
 import {
@@ -360,7 +361,7 @@ type BloqueDeTrabajo = Extract<Bloque, { tipo: "trabajo" }>;
 const METRICA_DEL_CAMPO =
   "border border-transparent px-2 py-1.5 text-[0.8125rem] leading-[1.4] [font-family:inherit] [scrollbar-gutter:stable]";
 // Del mismo tipo que el `inherit` de arriba, para que `cn` lo reemplace.
-const FUENTE_DE_TERMINAL = "[font-family:var(--font-mono)]";
+const FUENTE_DE_TERMINAL = "[font-family:var(--font-mono)] [tab-size:4]";
 
 const mensajeDe = (bloque: Bloque): BloqueDeMensaje | null =>
   bloque.tipo === "msg" ? bloque : null;
@@ -2044,17 +2045,12 @@ export default function Chat(props: ChatProps) {
               el campo de texto. */}
           <div
             class="flex gap-2 overflow-x-auto overflow-y-hidden px-1 pt-1 pb-1 select-none"
-            onWheel={(e) => {
-              const fila = e.currentTarget;
-              if (e.deltaX !== 0 || fila.scrollWidth <= fila.clientWidth) return;
-              fila.scrollLeft += e.deltaY;
-              e.preventDefault();
-            }}
+            onWheel={rodarEnHorizontal}
           >
             <For each={props.adjuntos}>
               {(p) => (
                 <div class="group relative shrink-0">
-                  <Adjunto rel={p} miniatura={props.onMiniatura} compacto />
+                  <Adjunto rel={p} miniatura={props.onMiniatura} />
                   {/* Dentro de la esquina: fuera de ella, el scroll horizontal la recorta. */}
                   <button
                     type="button"
@@ -2184,11 +2180,17 @@ export default function Chat(props: ChatProps) {
               end: e.currentTarget.selectionEnd, inputType: e.inputType };
           }}
           onInput={(e) => {
-            props.onInput(e.currentTarget.value, e.inputType, finishEdit(pendingEdit, e.currentTarget.value));
+            const valor = e.currentTarget.value;
+            const caret = e.currentTarget.selectionStart ?? valor.length;
+            const sangrado = sangrarTerminal(props.input, valor, caret, e.inputType);
+            if (sangrado.text === valor) {
+              props.onInput(valor, e.inputType, finishEdit(pendingEdit, valor));
+            } else {
+              pendingCaret = sangrado.caret;
+              props.onInput(sangrado.text, e.inputType);
+            }
             pendingEdit = undefined;
-            setCaret(
-              e.currentTarget.selectionStart ?? e.currentTarget.value.length,
-            );
+            setCaret(sangrado.caret);
           }}
           // El cursor se mueve con el ratón y con las flechas sin que cambie el
           // texto, y de dónde esté depende qué menú corresponde.
