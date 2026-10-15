@@ -165,7 +165,10 @@ pub fn typst_live_change(key: String, path: String, text: String) -> Result<(), 
             )
         }
     };
-    resultado.map_err(fallo)
+    resultado.map_err(|error| {
+        log::warn!("[typst] un cambio no llegó a Tinymist: {error}");
+        fallo(error)
+    })
 }
 
 /// Lleva la vista al lugar del documento que sale de esa línea y columna del código (desde 1).

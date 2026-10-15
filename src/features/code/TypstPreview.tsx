@@ -23,6 +23,7 @@ import {
   type DiagnosticoTypst,
   type ExportacionTypst,
   abrirVista,
+  reaperturaDe,
   ampliadaDe,
   ampliarVista,
   asegurarCapa,
@@ -88,16 +89,32 @@ export default function VistaPreviaTypst(props: {
   onCleanup(() => soltarVista(tomada.session, tomada.arbol));
 
   let pedido = 0;
+  // Un fallo de transporte (motor ocupado) no deja la vista muerta: se reintenta unas veces.
+  let reintentos = 0;
+  let reintento: ReturnType<typeof setTimeout> | undefined;
+  onCleanup(() => clearTimeout(reintento));
   async function abrir() {
     const n = ++pedido;
+    clearTimeout(reintento);
     setFallo(null);
     try {
       await abrirVista(props.project, props.session, props.arbol, props.ruta);
+      reintentos = 0;
     } catch (e) {
-      if (n === pedido) setFallo(asFailure(e));
+      if (n !== pedido) return;
+      setFallo(asFailure(e));
+      if (reintentos < 5) {
+        reintentos++;
+        reintento = setTimeout(() => setIntento((i) => i + 1), 3000);
+      }
     }
   }
-  createEffect(on([() => props.ruta, () => principalElegido(props.project), intento], () => void abrir()));
+  createEffect(
+    on(
+      [() => props.ruta, () => principalElegido(props.project), intento, () => reaperturaDe(props.session, props.arbol)],
+      () => void abrir(),
+    ),
+  );
 
   // Activar o actualizar Typst en Ajustes con este archivo abierto lo pinta sin reabrirlo.
   const integraciones = listen("integrations-changed", () => void abrir());
