@@ -135,7 +135,11 @@ pub(super) fn desktop_command(name: &str) -> bool {
     command(name).is_some_and(|c| c["kind"] == "desktop")
         || matches!(
             name,
-            "launcher_state" | "launcher_continue" | "update_install" | "update_pending"
+            "launcher_state"
+                | "launcher_continue"
+                | "update_install"
+                | "update_pending"
+                | "close_confirmed"
         )
 }
 pub(super) fn with_desktop(
@@ -259,6 +263,19 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
             return;
         };
         Some(workspace.to_owned())
+    } else if matches!(
+        name.as_str(),
+        "stop_turn" | "stop_shell_command" | "pending_requests"
+    ) {
+        // Cerrar con tareas vivas detiene también las de otros workspaces.
+        invoke
+            .message
+            .headers()
+            .get("x-terminus-workspace")
+            .and_then(|value| value.to_str().ok())
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned)
+            .or_else(|| state.workspace())
     } else if name == "unwatch_task_tree" {
         let watchers = state.watchers.lock().unwrap_or_else(|p| p.into_inner());
         args["id"]

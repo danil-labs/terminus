@@ -110,6 +110,7 @@ import SpaceBar from "../features/shell/SpaceBar";
 import TitleBar from "../features/shell/TitleBar";
 import UsageBar from "../features/shell/UsageBar";
 import AvisoDeVersion from "../features/shell/VersionNotice";
+import CloseGuard from "../features/shell/CloseGuard";
 import WorkspaceColumn from "../features/shell/WorkspaceColumn";
 import Sitio from "../features/sites/Site";
 import { claseDeFondo } from "../lib/chat-background";
@@ -6859,6 +6860,7 @@ export default function App() {
     // Sin cabecera y sin título de app, como Claude: la ventana ya se
     // llama Terminus.
     <div class="relative flex h-full flex-col overflow-hidden bg-surface">
+      <CloseGuard title={(id) => filaDe(id)?.title} />
       <ToastStack>
         {/* Aquí y no en Configuración: ahí no entra nadie a buscar
             actualizaciones. El panel de «Estado del entorno» dice lo

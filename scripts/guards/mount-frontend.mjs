@@ -1674,6 +1674,34 @@ if (!roto) {
     assert.ok(row("p"));
     assert.equal(sidebar.comandos.slice(beforeClose).some(c => ["request_close", "stop_turn", "delete_session"].includes(c)), false);
   }
+  // Cerrar la ventana pasa por CloseGuard: sin agentes cierra en el acto; con
+  // agentes pregunta, y «Detenerlas y salir» detiene cada turno antes de cerrar.
+  {
+    let vivos = [];
+    const cierre = await boot("listo", "cierre-con-vivos", {
+      ...CON_TAREA,
+      list_live_turns: () => vivos,
+      pending_requests: () => ({ questions: [], permissions: [{ request_id: "r", tool: "Write", target: "hola.txt" }] }),
+      close_confirmed: null,
+      stop_turn: null,
+    });
+    cierre.emit("close-requested", null);
+    await sleep(100);
+    assert.ok(cierre.comandos.includes("close_confirmed"), "sin agentes trabajando, cerrar no pregunta");
+    const antes = cierre.comandos.length;
+    vivos = [{ session: "p", workspace: "otro", project: "q", started_at: Date.now() }];
+    cierre.emit("close-requested", null);
+    await sleep(150);
+    const dialogo = cierre.w.document.querySelector("[data-close-guard]");
+    assert.ok(dialogo, "con agentes trabajando, cerrar pregunta");
+    assert.match(dialogo.textContent, /espera tu respuesta/);
+    assert.equal(cierre.comandos.slice(antes).includes("close_confirmed"), false);
+    [...dialogo.querySelectorAll("button")].find(b => b.textContent.includes("Detenerlas y salir")).click();
+    await sleep(150);
+    assert.ok(cierre.comandos.slice(antes).includes("stop_turn"));
+    assert.ok(cierre.comandos.slice(antes).includes("close_confirmed"));
+    assert.deepEqual(cierre.fallos, []);
+  }
   // Abrir una tarea que ya contestaba con una herramienta en curso lanzaba
   // «Stale read from <Match>» en el hilo; Solid abortaba esa actualización
   // y la fila abierta de la barra se quedaba marcada para siempre.
