@@ -10,6 +10,7 @@ mod linux_engine;
 mod local_image;
 #[cfg(target_os = "macos")]
 mod master_handoff;
+mod placement;
 mod proxy;
 mod sites;
 mod startup;
@@ -111,6 +112,8 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
     };
     let launcher = Arc::new(launcher);
     let starting = launcher.clone();
+    let placed = window_data.clone();
+    let placed_on_exit = window_data.clone();
     // Con TRACE y 40 KB, rustls y el updater borraban los avisos de `[transport]` en un minuto.
     let log = tauri_plugin_log::Builder::default()
         .level(log::LevelFilter::Info)
@@ -124,7 +127,9 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
         .build();
     tauri::Builder::default()
         .manage(launcher)
-        .on_window_event(|window, event| {
+        // Tauri guarda un solo manejador: colocación y cierre van juntos.
+        .on_window_event(move |window, event| {
+            placement::track(window, event, &placed);
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 desktop::on_close_requested(window, api);
             }
@@ -140,8 +145,12 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
             if app.try_state::<Arc<proxy::State>>().is_some() {
                 config.title = title(app.handle());
             }
+            let saved = placement::read(&window_data);
+            if saved.is_some() {
+                config.visible = false;
+            }
             let handle = app.handle().clone();
-            tauri::WebviewWindowBuilder::from_config(app.handle(), &config)?
+            let window = tauri::WebviewWindowBuilder::from_config(app.handle(), &config)?
                 // Sin incógnito: `localStorage`, con el tema, debe durar entre arranques.
                 .data_directory(window_data.join("webview"))
                 .on_navigation(move |url| {
@@ -155,6 +164,9 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
                     false
                 })
                 .build()?;
+            if let Some(saved) = saved {
+                placement::restore(&window, saved);
+            }
             launcher::start(app.handle().clone(), starting.clone());
             Ok(())
         })
@@ -200,6 +212,7 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
         .expect("tauri extracted client")
         .run(move |app, event| {
             if matches!(event, tauri::RunEvent::Exit) {
+                placement::write(&placed_on_exit);
                 if let Some(state) = app.try_state::<Arc<proxy::State>>() {
                     state.close();
                 }
