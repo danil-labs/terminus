@@ -1,7 +1,6 @@
 import { invoke } from "../../lib/invoke.ts";
 import { For, Match, Show, Switch, createSignal, onMount } from "solid-js";
 import { check, type Update } from "@tauri-apps/plugin-updater";
-import { relaunch } from "@tauri-apps/plugin-process";
 import { getVersion } from "@tauri-apps/api/app";
 import { TriangleAlert } from "lucide-solid";
 import RefreshCw from "lucide-solid/icons/refresh-cw";
@@ -268,7 +267,7 @@ export default function Actualizacion(props: { build?: string }) {
                   variant="secondary"
                   size="sm"
                   class="justify-self-start"
-                  onClick={() => void relaunch()}
+                  onClick={() => void invoke("restart_app")}
                 >
                   {t("settings.update.relaunch")}
                 </Button>

@@ -100,6 +100,7 @@ import {
 import Settings from "../features/settings/Settings";
 import type { Startup } from "../features/settings/workspaces-store";
 import { createAttention, topState } from "../features/shell/attention";
+import TaskNotifier from "../features/shell/TaskNotifier";
 import DeleteSpace from "../features/shell/DeleteSpace";
 import AvisoDeCarpeta from "../features/shell/FolderNotice";
 import PantallaDeBloqueo from "../features/shell/LockScreen";
@@ -6877,6 +6878,19 @@ export default function App() {
         <AvisoDeMaterial />
         <AvisoDeCarpeta project={project()} session={sessionId()} />
         <McpSignInNotice session={sessionId()} />
+        <TaskNotifier
+          attention={attention.list()}
+          workspace={workspaceActivo()}
+          inView={(id) =>
+            !proyectoAbierto() &&
+            (id === sessionId() ||
+              ventanas().some((sitio) => {
+                const tab = pestanas.open().find((p) => p.id === paneles.activeTabAt(sitio));
+                return !!tab && isTaskTab(tab) && tab.session === id;
+              }))}
+          title={(id) => filaDe(id)?.title}
+          open={(project, id) => void abrirSesion(project, id)}
+        />
         {/* El error del último gesto, y no caduca solo: uno que se va a los
             segundos no se llega a leer. Lo quita su cruz o el cambio de
             workspace. */}

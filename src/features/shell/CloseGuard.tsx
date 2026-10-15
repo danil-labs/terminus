@@ -5,6 +5,7 @@ import { escribirPref, leerPref } from "../../lib/prefs";
 import { t } from "../../lib/i18n";
 import { Button } from "../../ui/Button";
 import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
+import { quietFinished } from "./TaskNotifier";
 
 /** Qué hacer al cerrar la ventana con agentes trabajando. */
 export type CloseChoice = "ask" | "background" | "stop";
@@ -36,6 +37,7 @@ export async function stopTurns(turns: LiveTurn[]) {
 /**
  * Rust detiene todo cierre de la ventana y emite `close-requested`. Sin agentes
  * trabajando se cierra en el acto; con ellos decide la preferencia o la persona.
+ * En segundo plano la ventana se oculta y el icono junto al reloj la gobierna.
  */
 export default function CloseGuard(props: { title: (session: string) => string | undefined }) {
   const [shown, setShown] = createSignal<Shown[] | null>(null);
@@ -44,16 +46,8 @@ export default function CloseGuard(props: { title: (session: string) => string |
 
   const close = () => void invoke("close_confirmed").catch(() => {});
 
-  async function onCloseRequested() {
-    const turns = await invoke<LiveTurn[]>("list_live_turns").catch(() => []);
-    if (turns.length === 0) return close();
-    const choice = leerPref<CloseChoice>(CLOSE_PREF, "ask");
-    if (choice === "background") return close();
-    if (choice === "stop") {
-      await stopTurns(turns);
-      return close();
-    }
-    const rows = await Promise.all(
+  async function titled(turns: LiveTurn[]): Promise<Shown[]> {
+    return Promise.all(
       turns.map(async (turn) => {
         const pending = await invoke<Pending>(
           "pending_requests",
@@ -67,9 +61,52 @@ export default function CloseGuard(props: { title: (session: string) => string |
         };
       }),
     );
+  }
+
+  /** Lo que dice el icono junto al reloj; los textos van traducidos desde aquí. */
+  async function trayPayload(rows?: Shown[]) {
+    rows ??= await titled(await invoke<LiveTurn[]>("list_live_turns").catch(() => []));
+    const count = rows.length;
+    return {
+      labels: {
+        tooltip: count ? t("shell.tray.header", { count }) : t("shell.tray.idle"),
+        header: count ? t("shell.tray.header", { count }) : t("shell.tray.idle"),
+        open: t("shell.tray.open"),
+        stop_all: t("shell.tray.stop_all"),
+        quit: t("shell.tray.quit"),
+      },
+      items: rows.map((row) => ({
+        title: row.waiting ? `${row.title} · ${t("shell.close.waiting")}` : row.title,
+      })),
+    };
+  }
+
+  let refresh: ReturnType<typeof setInterval> | undefined;
+  async function tick() {
+    const rows = await titled(await invoke<LiveTurn[]>("list_live_turns").catch(() => []));
+    await invoke("tray_update", await trayPayload(rows));
+  }
+
+  async function toBackground() {
+    const rows = await titled(await invoke<LiveTurn[]>("list_live_turns").catch(() => []));
+    await invoke("window_to_background", await trayPayload(rows));
+    clearInterval(refresh);
+    refresh = setInterval(() => void tick().catch(() => {}), 5000);
+  }
+
+  async function onCloseRequested() {
+    const turns = await invoke<LiveTurn[]>("list_live_turns").catch(() => []);
+    if (turns.length === 0) return close();
+    const choice = leerPref<CloseChoice>(CLOSE_PREF, "ask");
+    if (choice === "background") return void toBackground();
+    if (choice === "stop") {
+      quietFinished();
+      await stopTurns(turns);
+      return close();
+    }
     setRemember(false);
     setStopping(false);
-    setShown(rows);
+    setShown(await titled(turns));
   }
 
   async function decide(choice: Exclude<CloseChoice, "ask">) {
@@ -77,16 +114,37 @@ export default function CloseGuard(props: { title: (session: string) => string |
     if (remember()) escribirPref(CLOSE_PREF, choice);
     if (choice === "stop") {
       setStopping(true);
+      quietFinished();
       await stopTurns(turns);
       setStopping(false);
     }
     setShown(null);
+    if (choice === "background") return void toBackground();
     close();
   }
 
   onMount(() => {
-    const unlisten = listen("close-requested", () => void onCloseRequested());
-    onCleanup(() => void unlisten.then((u) => u()));
+    // Volver a la ventana (desde el icono o abriendo Terminus otra vez) quita el icono.
+    const back = () => clearInterval(refresh);
+    window.addEventListener("focus", back);
+    const unlisten = [
+      listen("close-requested", () => void onCloseRequested()),
+      listen("tray-stop-all", async () => {
+        quietFinished();
+        await stopTurns(await invoke<LiveTurn[]>("list_live_turns").catch(() => []));
+        void trayPayload().then((payload) => invoke("tray_update", payload)).catch(() => {});
+      }),
+      listen("tray-quit", async () => {
+        quietFinished();
+        await stopTurns(await invoke<LiveTurn[]>("list_live_turns").catch(() => []));
+        void invoke("quit_completely").catch(() => {});
+      }),
+    ];
+    onCleanup(() => {
+      clearInterval(refresh);
+      window.removeEventListener("focus", back);
+      for (const u of unlisten) void u.then((off) => off());
+    });
   });
 
   return (

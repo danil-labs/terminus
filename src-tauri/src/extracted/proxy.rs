@@ -140,6 +140,11 @@ pub(super) fn desktop_command(name: &str) -> bool {
                 | "update_install"
                 | "update_pending"
                 | "close_confirmed"
+                | "window_to_background"
+                | "tray_update"
+                | "quit_completely"
+                | "restart_app"
+                | "tray_notify"
         )
 }
 pub(super) fn with_desktop(

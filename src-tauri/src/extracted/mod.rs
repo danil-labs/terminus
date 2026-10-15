@@ -3,6 +3,7 @@
 mod desktop;
 mod engine;
 pub mod env;
+mod instance;
 mod launcher;
 mod legacy;
 #[cfg(target_os = "linux")]
@@ -14,6 +15,7 @@ mod placement;
 mod proxy;
 mod sites;
 mod startup;
+mod tray;
 mod typst_live;
 mod update;
 pub mod util;
@@ -31,7 +33,14 @@ pub fn launch() -> Result<()> {
 }
 
 fn open() -> Result<()> {
-    let args: Vec<_> = std::env::args_os().collect();
+    let mut args: Vec<_> = std::env::args_os().collect();
+    if let Some(key) = args.get(1).and_then(|arg| tray::notice_key(arg)) {
+        if instance::open_notice(&engine::paths()?.window, &key) {
+            return Ok(());
+        }
+        // Sin ventana abierta, el enlace arranca Terminus como siempre.
+        args.truncate(1);
+    }
     let autostart = args.len() == 1;
     let mut paths = None;
     let selection = match args.as_slice() {
@@ -110,6 +119,11 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
     else {
         return;
     };
+    let listener = match instance::claim(&window_data) {
+        instance::Claim::Shown => return,
+        instance::Claim::First(listener) => Some(listener),
+        instance::Claim::Alone => None,
+    };
     let launcher = Arc::new(launcher);
     let starting = launcher.clone();
     let placed = window_data.clone();
@@ -167,7 +181,18 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
             if let Some(saved) = saved {
                 placement::restore(&window, saved);
             }
+            #[cfg(windows)]
+            tray::register_notice_scheme();
             launcher::start(app.handle().clone(), starting.clone());
+            if let Some(listener) = listener {
+                let handle = app.handle().clone();
+                instance::serve(listener, move |key| {
+                    tray::show_window(&handle);
+                    if let Some(key) = key {
+                        let _ = handle.emit("notice-clicked", key);
+                    }
+                });
+            }
             Ok(())
         })
         .register_asynchronous_uri_scheme_protocol(
@@ -177,11 +202,17 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(log)
         .invoke_handler(proxy::with_desktop(tauri::generate_handler![
             desktop::request_close,
             desktop::close_confirmed,
+            tray::window_to_background,
+            tray::tray_update,
+            tray::quit_completely,
+            tray::restart_app,
+            tray::tray_notify,
             desktop::window_ready,
             desktop::window_vitals,
             launcher::launcher_state,
@@ -212,6 +243,7 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
         .expect("tauri extracted client")
         .run(move |app, event| {
             if matches!(event, tauri::RunEvent::Exit) {
+                instance::exiting();
                 placement::write(&placed_on_exit);
                 if let Some(state) = app.try_state::<Arc<proxy::State>>() {
                     state.close();
