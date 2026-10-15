@@ -89,6 +89,7 @@ import { DEFAULT_PROFILE, displayName, notifyProfiles, watchProfiles } from "../
 import RecentAgentChats from "../features/projects/RecentAgentChats";
 import { type SessionRow, threadTitle } from "../features/projects/Sessions";
 import TabStrip, { NewTabButton } from "../features/projects/Tabs";
+import { veilTabs } from "../features/projects/tabVeil";
 import { createTaskWork, ResumeTask } from "../features/projects/TaskHistory";
 import type { Etapa } from "../features/projects/TaskStage";
 import { esChatDeAgente } from "../features/projects/taskTree";
@@ -6192,8 +6193,11 @@ export default function App() {
           fila lleva el conmutador para traerlo de vuelta. Antes flotaba
           con `position: absolute`, sin compartir eje con nada. */}
       <div
-        ref={cabeceraDeConversacion}
-        class={cn("relative flex shrink-0 items-center gap-3 pr-4",
+        ref={(el) => {
+          cabeceraDeConversacion = el;
+          veilTabs(el);
+        }}
+        class={cn("tab-veil flex shrink-0 items-center gap-3 pr-4",
           HEADER_HEIGHT,
           "pl-4",
         )}
@@ -6445,7 +6449,8 @@ export default function App() {
         <For each={ventanas().filter((sitio) => sitio.fila > 0)}>
           {(sitio) => (
             <div
-              class="z-30 flex h-8 min-w-0 items-center self-start px-2"
+              ref={veilTabs}
+              class="tab-veil z-30 flex h-8 min-w-0 items-center self-start px-2"
               style={estiloDeLaCelda(sitio)}
               // Cómo la encuentra el arrastre: `ventanaBajo` pregunta al
               // documento por estos dos atributos, que es lo que hace que soltar

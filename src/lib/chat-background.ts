@@ -9,6 +9,11 @@ export type FondoDeChat = (typeof FONDOS)[number];
 /** El mismo velo que el fondo de un agente, para que el texto siga leyéndose. */
 export const VELO_DE_FONDO = 0.82;
 
+/** El velo de la cabecera de pestañas: por debajo del mínimo deja de verse la banda. */
+export const VELO_DE_PESTANAS = 0.3;
+export const VELO_DE_PESTANAS_MIN = 0.15;
+export const VELO_DE_PESTANAS_MAX = 0.6;
+
 const CLASE: Partial<Record<FondoDeChat, string>> = {
   dusk: "chat-bg-dusk",
 };
