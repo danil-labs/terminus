@@ -1,4 +1,5 @@
-import { For, createEffect, createSignal, on } from "solid-js";
+import { For, createEffect, createSignal, on, onCleanup, onMount } from "solid-js";
+import { listen } from "@tauri-apps/api/event";
 import { invoke } from "../../lib/invoke.ts";
 import { leerPref } from "../../lib/prefs";
 import { t } from "../../lib/i18n";
@@ -39,6 +40,8 @@ export default function TaskNotifier(props: {
   const ws = createWorkspaces();
   const [notices, setNotices] = createSignal<Notice[]>([]);
   let before: Map<string, AttentionState> | null = null;
+  /** Los avisos del sistema recientes, para abrir su tarea al pulsarlos. */
+  const sent = new Map<string, Notice>();
 
   const titleOf = (workspace: string, session: string) => {
     if (workspace === props.workspace) return props.title(session)?.trim() || t("shell.close.untitled");
@@ -66,7 +69,13 @@ export default function TaskNotifier(props: {
       title: heading(notice.state, notice.title),
       body: hint(notice.state),
       needsYou: NEEDS_YOU.includes(notice.state),
+      key: notice.key,
     }).catch(() => "focused");
+    if (where === "system") {
+      sent.delete(notice.key);
+      sent.set(notice.key, notice);
+      if (sent.size > 20) sent.delete(sent.keys().next().value!);
+    }
     if (where !== "focused") return;
     // Con la tarea delante ya se ve; un turno que cierra en otra lo pinta su pestaña.
     if (notice.workspace === props.workspace && notice.session === props.session) return;
@@ -98,6 +107,14 @@ export default function TaskNotifier(props: {
       },
     ),
   );
+
+  onMount(() => {
+    const unlisten = listen<string>("notice-clicked", (e) => {
+      const notice = sent.get(e.payload);
+      if (notice) go(notice);
+    });
+    onCleanup(() => void unlisten.then((off) => off()));
+  });
 
   function go(notice: Notice) {
     setNotices((list) => list.filter((n) => n.key !== notice.key));
