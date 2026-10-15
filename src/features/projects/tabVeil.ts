@@ -33,10 +33,16 @@ function hole(box: HTMLElement): string | null {
 export function veilTabs(box: HTMLElement) {
   let frame = 0;
   let last = "";
-  // Mover el divisor entre ventanas cambia el ancho de cada tira, no el de la caja.
-  const watched = new WeakSet<Element>();
+  // Mover el divisor entre ventanas cambia el ancho de cada tira, no el de la caja. La
+  // tira se remonta en cada activación: la que salió se deja de observar o queda retenida.
+  const watched = new Set<Element>();
   const draw = () => {
     frame = 0;
+    for (const strip of watched) {
+      if (strip.isConnected) continue;
+      resize?.unobserve(strip);
+      watched.delete(strip);
+    }
     for (const strip of box.querySelectorAll('[role="tablist"]')) {
       if (watched.has(strip)) continue;
       watched.add(strip);
@@ -62,6 +68,7 @@ export function veilTabs(box: HTMLElement) {
     box.removeEventListener("scroll", schedule, true);
     window.removeEventListener("resize", schedule);
     resize?.disconnect();
+    watched.clear();
     changes.disconnect();
   });
 }
