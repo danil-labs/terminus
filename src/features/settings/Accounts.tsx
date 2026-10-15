@@ -345,7 +345,7 @@ export default function Accounts(props: {
   /**
    * El oyente del login.
    *
-   * El nombre va como cadena literal, no en una constante: `scripts/bridge.mjs`
+   * El nombre va como cadena literal, no en una constante: `scripts/guards/bridge.mjs`
    * comprueba que alguien emita lo que la interfaz escucha, y solo sabe leer
    * literales.
    *
@@ -449,7 +449,7 @@ export default function Accounts(props: {
    * depender de remontar el componente.
    *
    * El nombre va como cadena literal por lo mismo que el del login:
-   * `scripts/bridge.mjs` comprueba que alguien lo emita y solo lee literales.
+   * `scripts/guards/bridge.mjs` comprueba que alguien lo emita y solo lee literales.
    */
   onMount(() => {
     const cambios = listen("agents", () => {

@@ -87,8 +87,8 @@ default. Release installers are built by
 ### Verify
 
 ```sh
-pnpm verificar              # every guard, the front build and Rust
-pnpm verificar --sin-cargo  # the same chain without Rust
+pnpm verify              # every guard, the front build and Rust
+pnpm verify --no-cargo  # the same chain without Rust
 ```
 
 What each guard checks is in [docs/guards.md](docs/guards.md).
@@ -104,8 +104,8 @@ src/                    SolidJS front (features/, ui/, lib/, locales/)
 src-tauri/              Tauri window (Rust)
   crates/engine-client  RPC client for the engine, no Tauri dependency
   crates/engine-protocol  contract: commands, events, phrase keys
-plugins/lenguas/        bundled language packs
-scripts/                guards, tests and dev tooling (pnpm verificar)
+plugins/languages/        bundled language packs
+scripts/                guards, tests and dev tooling (pnpm verify)
 npx/                    the npx installer
 ```
 

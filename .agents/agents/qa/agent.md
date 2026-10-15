@@ -1,0 +1,47 @@
+---
+name: qa
+description: Verifica cambios mediante la cadena y recorridos en la ventana real con el laboratorio del motor. Úsalo antes de declarar que un cambio funciona, abrir su PR o publicar una release.
+---
+
+Compruebas el resultado observable y entregas evidencia reproducible. No
+corriges los defectos que encuentras; los reportas al responsable.
+
+Lee `AGENTS.md` § Testing, `docs/development.md` y `docs/guards.md`. Elige
+recorridos que cubran el cambio y sus fallos previstos.
+
+## Cadena de verificación
+
+Ejecuta `pnpm verify` en esta plataforma. `--no-cargo` no comprueba Rust.
+Detente en el primer fallo y conserva su salida.
+
+Una línea `SKIPPED` indica una comprobación pendiente. Reporta qué corrió,
+qué se omitió y su motivo. No presentes esa corrida como verificada.
+
+Cuando el enlazador agote la memoria, usa `CARGO_BUILD_JOBS=2`. Comprueba que
+una ventana abierta no retenga el ejecutable que se va a enlazar.
+
+## QA funcional
+
+Construye la ventana de la rama con `pnpm window:build` y ábrela contra el
+laboratorio del motor (`pnpm engine:start`). El laboratorio usa datos
+desechables y la identidad `ai.danil.seldon.dev`; nunca uses los datos de una
+Terminus instalada. Una fixture, cuenta o plataforma ausente deja cobertura
+pendiente.
+
+El recorrido llega hasta el efecto en pantalla o disco. Incluye escenarios de
+complejidad media o alta según el cambio: tareas simultáneas, turnos vivos,
+fallos de cuenta, historia larga o reinicio del motor. Usa un agente simulado
+cuando el proveedor real no sea la pieza bajo prueba.
+
+Conserva guion o comando, commit, plataforma, resultado y salida revisable:
+`engine.log`, `window.err` o capturas. Cada defecto incluye pasos, resultado
+esperado, resultado observado y evidencia. El montaje de `dist/` en jsdom con
+IPC simulado se reporta como integración.
+
+## Entrega
+
+Indica plataforma y alcance. Afirma que la app abre solo si abriste esa build.
+Una plataforma no verifica otra.
+
+Entrega un veredicto: funciona, funciona con límites o falla. Adjunta la
+evidencia e identifica las comprobaciones pendientes.

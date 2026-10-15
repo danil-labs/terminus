@@ -39,7 +39,7 @@ const salir = (...lineas) => {
 };
 
 if (!nueva || !/^\d+\.\d+\.\d+$/.test(nueva)) {
-  salir("Uso: pnpm version:subir 0.1.9", "Tres números y nada más — es lo que compara el updater.");
+  salir("Uso: pnpm version:bump 0.1.9", "Tres números y nada más — es lo que compara el updater.");
 }
 
 const rutaPaquete = join(raiz, "package.json");
@@ -88,7 +88,7 @@ console.log("\n  Ahora la nota, que es lo que se lee en la release:");
 console.log("      release-notes/es.md y release-notes/en.md");
 
 // **Y aquí se corre, que es lo que la cabecera prometía.** Imprimía un
-// recordatorio —«y después `pnpm verificar`»— justo debajo del párrafo que dice
+// recordatorio —«y después `pnpm verify`»— justo debajo del párrafo que dice
 // «aquí va incluida para que no dependa de acordarse». Seguía dependiendo de
 // acordarse, y de la única persona que ya tenía la versión subida en el árbol.
 //
@@ -110,7 +110,7 @@ try {
   // el árbol como estaba y el fallo sin investigar; lo que hace falta es que
   // quien publica sepa que no puede, con la versión puesta para reproducirlo.
   salir(
-    `\`pnpm verificar\` no pasó con la versión en ${nueva}.`,
+    `\`pnpm verify\` no pasó con la versión en ${nueva}.`,
     "Los cuatro archivos ya están subidos: arregla lo que falle y vuelve a",
     "correrlo, o revierte el bump si no era el momento.",
   );

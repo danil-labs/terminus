@@ -133,7 +133,19 @@ fn command(name: &str) -> Option<&'static Value> {
 }
 pub(super) fn desktop_command(name: &str) -> bool {
     command(name).is_some_and(|c| c["kind"] == "desktop")
-        || matches!(name, "launcher_state" | "launcher_continue")
+        || matches!(
+            name,
+            "launcher_state"
+                | "launcher_continue"
+                | "update_install"
+                | "update_pending"
+                | "close_confirmed"
+                | "window_to_background"
+                | "tray_update"
+                | "quit_completely"
+                | "restart_app"
+                | "tray_notify"
+        )
 }
 pub(super) fn with_desktop(
     local: impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static,
@@ -178,6 +190,13 @@ fn reply(value: Value) -> Result<Value, Value> {
     } else {
         Err(failure(&Error::new("invalid_request")))
     }
+}
+pub(super) fn invoke(state: &State, command: &str, arguments: Value) -> Result<Value, Value> {
+    state
+        .client()
+        .invoke(command, state.workspace(), arguments)
+        .map_err(|e| failure(&e))
+        .and_then(reply)
 }
 type Job = Box<dyn FnOnce() + Send>;
 fn ordered(job: Job) -> std::io::Result<()> {
@@ -234,7 +253,35 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
         return;
     }
     let slot = Slot(state.clone());
-    let workspace = if name == "unwatch_task_tree" {
+    let workspace = if name == "tree_show" && args["tree"] == "terminus-chat-visuals" {
+        // El scope pertenece al sobre RPC1, no a los parámetros congelados del comando.
+        let Some(workspace) = invoke
+            .message
+            .headers()
+            .get("x-terminus-workspace")
+            .and_then(|value| value.to_str().ok())
+            .filter(|value| !value.is_empty())
+        else {
+            invoke
+                .resolver
+                .reject(failure(&Error::new("invalid_request")));
+            return;
+        };
+        Some(workspace.to_owned())
+    } else if matches!(
+        name.as_str(),
+        "stop_turn" | "stop_shell_command" | "pending_requests"
+    ) {
+        // Cerrar con tareas vivas detiene también las de otros workspaces.
+        invoke
+            .message
+            .headers()
+            .get("x-terminus-workspace")
+            .and_then(|value| value.to_str().ok())
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned)
+            .or_else(|| state.workspace())
+    } else if name == "unwatch_task_tree" {
         let watchers = state.watchers.lock().unwrap_or_else(|p| p.into_inner());
         args["id"]
             .as_str()
@@ -280,6 +327,16 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
     let resolver = Arc::new(Mutex::new(Some(invoke.resolver)));
     let worker = resolver.clone();
     let queued = name == "set_active_workspace";
+    // Se adopta al clic: adoptado al contestar el motor, lo pedido entretanto
+    // sale con el workspace anterior y el motor lo devuelve como activo.
+    let adopted = if queued {
+        args["id"].as_str().map(str::to_owned)
+    } else {
+        None
+    };
+    if let Some(id) = &adopted {
+        *state.workspace.lock().unwrap_or_else(|p| p.into_inner()) = Some(id.clone());
+    }
     let job = move || {
         let _slot = slot;
         if let Some((key, channel)) = channel {
@@ -310,7 +367,6 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
             }
 
             let target = match name.as_str() {
-                "set_active_workspace" => args["id"].as_str(),
                 "workspaces_startup" if state.workspace().is_none() => value["active"].as_str(),
                 _ => None,
             };
@@ -320,6 +376,12 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
             }
             if name == "remove_workspace" && workspace.as_deref() == args["id"].as_str() {
                 *state.workspace.lock().unwrap_or_else(|p| p.into_inner()) = None;
+            }
+        }
+        if let (Err(_), Some(id)) = (&result, &adopted) {
+            let mut current = state.workspace.lock().unwrap_or_else(|p| p.into_inner());
+            if current.as_deref() == Some(id.as_str()) {
+                *current = workspace.clone();
             }
         }
         resolve(&worker, result);
@@ -518,7 +580,7 @@ pub(super) fn service_poll(
                 };
                 return Err(failure(&shown));
             }
-            if let Some(window) = app.get_webview_window("main") {
+            if let Some(window) = app.get_window("main") {
                 let _ = window.set_title(&super::title(&app));
             }
             return Ok(
@@ -543,8 +605,9 @@ pub(super) fn service_poll(
             }
         }
     }
+    // Un stream de comando cortado no pierde eventos del diario: va aparte de `gap`.
     Ok(
-        json!({"cursor":page["cursor"],"gap":page["gap"] == true || state.stream_gap.swap(false, Ordering::SeqCst),"replay":page["replay"],"runtime":state.client().runtime(),"reset":false}),
+        json!({"cursor":page["cursor"],"gap":page["gap"] == true,"streams":state.stream_gap.swap(false, Ordering::SeqCst),"replay":page["replay"],"runtime":state.client().runtime(),"reset":false}),
     )
 }
 #[tauri::command]

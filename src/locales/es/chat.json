@@ -369,5 +369,16 @@
   "chat.delegation.failed": "No se pudo consultar el estado de la tarea.",
   "chat.delegation.unavailable": "La tarea ya no está disponible.",
   "chat.delegation.back": "Volver a {title}",
-  "chat.delegation.retry": "Volver a consultar"
+  "chat.delegation.retry": "Volver a consultar",
+  "chat.visual.title": "Visualización interactiva",
+  "chat.visual.expand": "Ampliar visualización",
+  "chat.visual.retry": "Reintentar",
+  "chat.visual.loading": "Cargando visualización…",
+  "chat.visual.failed": "No se pudo cargar la visualización. Revisa el archivo e inténtalo de nuevo.",
+  "chat.visual.invalid": "La visualización requiere un archivo HTML válido de esta tarea.",
+  "chat.visual.too_large": "La visualización supera el límite de 512 KiB.",
+  "chat.visual.collapse": "Reducir visualización",
+  "chat.visual.budget": "Este hilo alcanzó el límite de 16 visualizaciones cargadas. Cierra una visualización para cargar otra.",
+  "chat.visual.unload": "Cerrar visualización",
+  "chat.visual.load": "Abrir visualización"
 }

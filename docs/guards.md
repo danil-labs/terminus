@@ -1,8 +1,8 @@
 # Verification guards
 
-`pnpm verificar` runs `scripts/verify.mjs` and stops at the first failure.
-`OMITIDO` (skipped) marks a check that could not run. In CI a skip fails the
-run; locally it is allowed and listed in the summary. `--sin-cargo` skips the
+`pnpm verify` runs `scripts/verify.mjs` and stops at the first failure.
+`SKIPPED` (skipped) marks a check that could not run. In CI a skip fails the
+run; locally it is allowed and listed in the summary. `--no-cargo` skips the
 Rust steps.
 
 The engine (`seldon-runtime`) is not in this repository. Guards that need to
@@ -16,35 +16,35 @@ sends).
 | Guard | File | Contract and limit |
 |---|---|---|
 | `engine` | `scripts/engine.mjs` | Before the Rust steps, places the engine pinned in `seldon-runtime.lock` (SHA-256 checked) as the `externalBin` sidecar of this platform (on macOS both architectures and their `lipo`); `tauri-build` refuses to compile without it. |
-| `reviewable` | `scripts/reviewable.mjs` | Rejects control bytes that turn a diff binary. Needs git metadata. |
-| `bridge` | `scripts/bridge.mjs` | Every event the front listens to is emitted by the window or declared in the engine contract. |
-| `commands` | `scripts/commands.mjs` | Every `invoke` name exists in the window registry or the engine contract, and every contract command has a caller or a written reason. |
-| `service-errors` | `scripts/service-errors.mjs` | Errors rejected by `invoke` are not flattened with `String()`. The per-file quota only goes down. |
-| `artifact` | `scripts/artifact.mjs`, `scripts/artifact-viewer.test.ts` | Validates the artifact container script and the CSS classes it shares with the viewer. |
-| `window` | `scripts/window.mjs` | Platform overrides keep the window structure (`label`, `create`). |
-| `console-window` | `scripts/console-window.mjs` | Production processes use `no_console_window` on Windows. |
-| `processes` | `scripts/processes.mjs` | Finds processes awaited without a timeout. Unix `exec` replaces the caller without waiting for a child. The quota only goes down. |
-| `doc-paths` | `scripts/doc-paths.mjs` | Code paths and local links in the documentation exist. Generated files are excluded. |
-| `missing-classes` | `scripts/missing-classes.mjs` | Finds written classes that Tailwind does not generate. |
-| `triggers` | `scripts/triggers.test.mjs` | A trigger keeps the handler that opens its panel. |
-| `mount-frontend` | `scripts/mount-frontend.mjs` | Runs `dist/` in jsdom with a simulated IPC and checks that it mounts. It does not open a native window. |
-| `storage-refresh` | `scripts/storage-refresh.test.ts` | Refresh batching, stale responses and workspace switches. |
-| `open-task-cost` | `scripts/open-task-cost.mjs` | Nodes, mutations and IPC when opening a 480-turn thread. The ceiling only goes down. |
-| `reread-thread` | `scripts/reread-thread.mjs` | Unmounts when re-reading an unchanged thread, with a new turn and during refreshes. The ceiling only goes down. |
-| `long-session` | `scripts/long-session.mjs` | Retained nodes, computations, listeners, intervals and observers after usage cycles. The ceiling only goes down; heap is informative. |
-| `task-history-calls` | `scripts/task-history-calls.mjs` | History and status calls during mutations and deltas. The ceiling only goes down. |
-| `drop` | `scripts/drop.mjs` | Coordinate conversion per platform for file drops. |
-| `animations` | `scripts/animations.mjs` | Restricts continuous infinite animations and their per-file quota. |
-| `csp` | `scripts/csp.mjs` | The content policy is the same in the window, the lab and the Markdown filters. |
-| `terminal-themes` | `scripts/terminal-themes.mjs` | Terminal theme tokens, identifiers and contrast, without touching the chrome. |
-| `locales` | `scripts/locales.mjs` | Used keys exist, unused keys are reported, placeholders match across catalogs. Engine keys come from `phrase-keys.json`; the window's Rust keys from `Frase::new("…")` in `src-tauri/src`. |
-| `literals` | `scripts/literals.mjs` | Interface text outside the catalog in files already migrated. |
-| `plugins` | `scripts/plugins.mjs` | Manifests and phrases of the bundled language packs. Coverage is reported, not required. |
-| `comments` | `scripts/comments.mjs` | Limits long blocks, Markdown, argument and history in comments. The baseline only goes down. |
-| `test-policy` | `scripts/test-policy.mjs` | Counts direct source reads in tests. |
+| `reviewable` | `scripts/guards/reviewable.mjs` | Rejects control bytes that turn a diff binary. Needs git metadata. |
+| `bridge` | `scripts/guards/bridge.mjs` | Every event the front listens to is emitted by the window or declared in the engine contract. |
+| `commands` | `scripts/guards/commands.mjs` | Every `invoke` name exists in the window registry or the engine contract, and every contract command has a caller or a written reason. |
+| `service-errors` | `scripts/guards/service-errors.mjs` | Errors rejected by `invoke` are not flattened with `String()`. The per-file quota only goes down. |
+| `artifact` | `scripts/guards/artifact.mjs`, `tests/unit/artifact-viewer.test.ts` | Validates the artifact container and inline chat scripts, and the CSS classes shared with the viewer. |
+| `window` | `scripts/guards/window.mjs` | Platform overrides keep the window structure (`label`, `create`). |
+| `console-window` | `scripts/guards/console-window.mjs` | Production processes use `no_console_window` on Windows. |
+| `processes` | `scripts/guards/processes.mjs` | Finds processes awaited without a timeout. Unix `exec` replaces the caller without waiting for a child. The quota only goes down. |
+| `doc-paths` | `scripts/guards/doc-paths.mjs` | Code paths and local links in the documentation exist. Generated files are excluded. |
+| `missing-classes` | `scripts/guards/missing-classes.mjs` | Finds written classes that Tailwind does not generate. |
+| `triggers` | `tests/unit/triggers.test.mjs` | A trigger keeps the handler that opens its panel. |
+| `mount-frontend` | `scripts/guards/mount-frontend.mjs` | Runs `dist/` in jsdom with a simulated IPC and checks that it mounts. It does not open a native window. |
+| `storage-refresh` | `tests/unit/storage-refresh.test.ts` | Refresh batching, stale responses and workspace switches. |
+| `open-task-cost` | `tests/perf/open-task-cost.mjs` | Nodes, mutations and IPC when opening a 480-turn thread. The ceiling only goes down. |
+| `reread-thread` | `tests/perf/reread-thread.mjs` | Unmounts when re-reading an unchanged thread, with a new turn and during refreshes. The ceiling only goes down. |
+| `long-session` | `tests/perf/long-session.mjs` | Retained nodes, computations, listeners, intervals and observers after usage cycles. The ceiling only goes down; heap is informative. |
+| `task-history-calls` | `tests/perf/task-history-calls.mjs` | History and status calls during mutations and deltas. The ceiling only goes down. |
+| `drop` | `scripts/guards/drop.mjs` | Coordinate conversion per platform for file drops. |
+| `animations` | `scripts/guards/animations.mjs` | Restricts continuous infinite animations and their per-file quota. |
+| `csp` | `scripts/guards/csp.mjs` | The content policy is the same in the window, the lab and the Markdown filters. |
+| `terminal-themes` | `scripts/guards/terminal-themes.mjs` | Terminal theme tokens, identifiers and contrast, without touching the chrome. |
+| `locales` | `scripts/guards/locales.mjs` | Used keys exist, unused keys are reported, placeholders match across catalogs. Engine keys come from `phrase-keys.json`; the window's Rust keys from `Frase::new("…")` in `src-tauri/src`. |
+| `literals` | `scripts/guards/literals.mjs` | Interface text outside the catalog in files already migrated. |
+| `plugins` | `scripts/guards/plugins.mjs` | Manifests and phrases of the bundled language packs. Coverage is reported, not required. |
+| `comments` | `scripts/guards/comments.mjs` | Limits long blocks, Markdown, argument and history in comments. The baseline only goes down. |
+| `test-policy` | `scripts/guards/test-policy.mjs` | Counts direct source reads in tests. |
 | `icons` | `scripts/icons.mjs` | File icons match the ones generated from the package. |
-| `theme-inversion` | `scripts/theme-inversion.mjs` | Rejects colors outside the theme tokens. |
-| `permissions` | `scripts/permissions.mjs` | Window permissions against the ACL manifest generated by the Rust build. Without that build it may be skipped. |
+| `theme-inversion` | `scripts/guards/theme-inversion.mjs` | Rejects colors outside the theme tokens. |
+| `permissions` | `scripts/guards/permissions.mjs` | Window permissions against the ACL manifest generated by the Rust build. Without that build it may be skipped. |
 | `clippy` | `src-tauri/Cargo.toml` § lints | Rejects `dbg!`, `todo!`, unawaited futures and `unwrap` outside tests. |
 | `rustfmt` | `src-tauri/rustfmt.toml` | Rust formatting. |
 | `biome` | `biome.json` | Unsafe types, unused imports and variables, and debug logs in the front. |
@@ -52,7 +52,7 @@ sends).
 ## Maintenance
 
 Every `.mjs` guard in the chain needs a row here, and every
-`scripts/*.test.*` must be in the chain; `scripts/verify.mjs` checks both
+`tests/unit/*.test.*` must be in the chain; `scripts/verify.mjs` checks both
 lists. Quotas are lowered after a cleanup; they are never raised to accept a
 regression.
 

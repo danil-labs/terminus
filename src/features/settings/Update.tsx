@@ -1,7 +1,6 @@
 import { invoke } from "../../lib/invoke.ts";
 import { For, Match, Show, Switch, createSignal, onMount } from "solid-js";
 import { check, type Update } from "@tauri-apps/plugin-updater";
-import { relaunch } from "@tauri-apps/plugin-process";
 import { getVersion } from "@tauri-apps/api/app";
 import { TriangleAlert } from "lucide-solid";
 import RefreshCw from "lucide-solid/icons/refresh-cw";
@@ -139,7 +138,8 @@ export default function Actualizacion(props: { build?: string }) {
       setVersion({ ...v, paso: "bajando", fallo: null, ocupan: null });
       await invoke("service_prepare_update");
       stopped = true;
-      await v.u.downloadAndInstall();
+      // En Windows `downloadAndInstall` cierra la app; Rust instala sin cerrarla.
+      await invoke("update_install");
       setVersion({ ...v, paso: "listo", fallo: null, ocupan: null });
     } catch (e) {
       if (!checked) {
@@ -267,7 +267,7 @@ export default function Actualizacion(props: { build?: string }) {
                   variant="secondary"
                   size="sm"
                   class="justify-self-start"
-                  onClick={() => void relaunch()}
+                  onClick={() => void invoke("restart_app")}
                 >
                   {t("settings.update.relaunch")}
                 </Button>

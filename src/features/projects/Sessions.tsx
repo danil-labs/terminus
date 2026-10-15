@@ -33,7 +33,7 @@ import EtapaDeTarea, { ETAPAS, type Etapa } from "./TaskStage";
 import EstadoDeTarea from "./TaskStatus";
 import { matchesTaskQuery } from "./taskSearch";
 import { canFinishTask, effectiveTaskGit, type GitStatus, sharesTaskGit, watchSessionGit } from "./taskGit";
-import { authorKey, authorKeys } from "./taskAuthors";
+import { authorKey, authorKeys, shownUnderLauncher } from "./taskAuthors";
 import { descendientes, type Rama as RamaDeTareas, taskTree } from "./taskTree";
 import type { TaskActivity } from "./taskActivity";
 
@@ -215,7 +215,7 @@ const alternarDesplegada = (id: string) =>
  * prop propia pisaría el que `PopoverTrigger` pasa dentro de `p` y el panel no
  * abriría —Kobalte no compone manejadores, gana el último—, así que **quien no
  * deja pasar el clic a la fila es la fila**, que ignora lo que venga de su
- * columna de acciones. Lo comprueba `scripts/triggers.test.mjs`.
+ * columna de acciones. Lo comprueba `tests/unit/triggers.test.mjs`.
  */
 export default function Sessions(props: {
   sessions: SessionRow[];
@@ -379,7 +379,7 @@ export default function Sessions(props: {
   // La barra enseña solo lo vivo: las archivadas no se pintan ni se observan. Con
   // cientos archivadas, pedir su git y su historial en cada barrido trababa la ventana.
   const enBarra = createMemo(() => props.sessions.filter(s => (props.includeArchived || !s.archived)
-    && (!props.sidebar || !!props.search?.trim() || s.pinned || !(s.parent || s.launched_by) || !(s.launcher_available ?? props.sessions.some(root => root.id === (s.parent ?? s.launched_by))))));
+    && (!props.sidebar || !!props.search?.trim() || s.pinned || !shownUnderLauncher(s, props.sessions))));
   const [worktrees] = createTaskHistories<EstadoDelWorktree>(() => props.de, enBarra);
   createEffect(() => {
     const watcher = watchSessionGit(props.de);

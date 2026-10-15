@@ -46,6 +46,7 @@ import PreviousAgentChat from "../features/chat/PreviousAgentChat";
 import type { AlmacenDePreguntas, PreguntasAMedias, Respuesta, RespuestaEnviada } from "../features/chat/Questions";
 import { contestaALaTerminal, despachable, esDeLaTerminal, guardable, inyectable, type RazonDeRetencion, retencionAlCargar, siguienteLote, sueltaElBorrador } from "../features/chat/queue";
 import type { ComandoEnVivo } from "../features/chat/ShellCard";
+import { comandoDeTerminal } from "../features/chat/terminalIndent";
 import type { AlMargen } from "../features/chat/SideQuestion";
 import { comandoEscrito } from "../features/chat/slashOutput";
 import { ThreadSearch, type ThreadSearchTarget } from "../features/chat/ThreadSearch";
@@ -88,6 +89,7 @@ import { DEFAULT_PROFILE, displayName, notifyProfiles, watchProfiles } from "../
 import RecentAgentChats from "../features/projects/RecentAgentChats";
 import { type SessionRow, threadTitle } from "../features/projects/Sessions";
 import TabStrip, { NewTabButton } from "../features/projects/Tabs";
+import { veilTabs } from "../features/projects/tabVeil";
 import { createTaskWork, ResumeTask } from "../features/projects/TaskHistory";
 import type { Etapa } from "../features/projects/TaskStage";
 import { esChatDeAgente } from "../features/projects/taskTree";
@@ -98,6 +100,7 @@ import {
 import Settings from "../features/settings/Settings";
 import type { Startup } from "../features/settings/workspaces-store";
 import { createAttention, topState } from "../features/shell/attention";
+import TaskNotifier from "../features/shell/TaskNotifier";
 import DeleteSpace from "../features/shell/DeleteSpace";
 import AvisoDeCarpeta from "../features/shell/FolderNotice";
 import PantallaDeBloqueo from "../features/shell/LockScreen";
@@ -109,6 +112,7 @@ import SpaceBar from "../features/shell/SpaceBar";
 import TitleBar from "../features/shell/TitleBar";
 import UsageBar from "../features/shell/UsageBar";
 import AvisoDeVersion from "../features/shell/VersionNotice";
+import CloseGuard from "../features/shell/CloseGuard";
 import WorkspaceColumn from "../features/shell/WorkspaceColumn";
 import Sitio from "../features/sites/Site";
 import { claseDeFondo } from "../lib/chat-background";
@@ -118,6 +122,7 @@ import { pedirElCampo } from "../lib/focus";
 import { lastRoster, rememberRoster } from "../lib/handlerRoster";
 import { aplicarLenguaDeWorkspace, clavesConocidas, t } from "../lib/i18n";
 import { invoke } from "../lib/invoke.ts";
+import { readChatVisual } from "../features/chat/readVisual";
 import { createPointerDrag } from "../lib/pointer-drag";
 import type { InternalTaskLink } from "../lib/links";
 import type { MentionSources } from "../lib/mentions";
@@ -135,7 +140,7 @@ import type {
 } from "../lib/model";
 import { carpetaDeTrabajo } from "../lib/model";
 import { type CatalogosDeModelos, effortAlCambiarDeModelo, type OpcionDeModelo } from "../lib/models";
-import { vistaPreviaDelHilo } from "../lib/nextSteps";
+import { threadPreview } from "../lib/nextSteps";
 import {
   createPanels,
   deleteLayout,
@@ -229,7 +234,7 @@ import { Dialog, DialogContent, DialogTitle } from "../ui/Dialog";
 import { asFailure, claveDe, prosaDe } from "../ui/Failure";
 import { BotonConAtajo } from "../ui/Shortcut";
 import { Toast, ToastStack } from "../ui/Toast";
-import { apagarVistasDe, hayVistasDe } from "../features/code/typst";
+import { apagarVistasDe, hayVistasDe, soltarVistasHuerfanas } from "../features/code/typst";
 
 // Lo que falla en el camino a la ventana y no en el comando: se vuelve a
 // preguntar en vez de pintarlo (`cli/service/mod.rs`, `para_la_ventana`).
@@ -555,9 +560,10 @@ export default function App() {
       },
     ),
   );
-  /** Las tareas repartidas, que son las que necesitan su propia transcripción. */
-  const tareasEnVentanas = createMemo(() =>
-    pestanasEnPantalla().filter(isTaskTab),
+  /** El panel conserva workspace y conversación; el título pertenece a la tira. */
+  const tareasEnVentanas = createMemo<(Pick<TaskTab, "id" | "session" | "project"> & { workspace: string | null })[]>((previous) =>
+    conservar(previous ?? [], pestanas.open().filter(isTaskTab).map(({ id, session, project }) =>
+      ({ id, session, project, workspace: workspaceActivo() })), (p) => p.id),
   );
   /** Las tareas con pestaña: la lista viva las trae aunque estén archivadas. */
   const sesionesConPestana = createMemo(
@@ -1523,7 +1529,7 @@ export default function App() {
         .filter((n) => n.project === project && !enDisco.has(n.row.id))
         .map((n) => n.row);
       return [project, [...propias, ...rows.map(row => {
-        const preview = vistaPreviaDelHilo(hilos()[row.id]?.vivo ?? []) ?? row.last_message;
+        const preview = threadPreview(hilos()[row.id]?.vivo ?? []) ?? row.last_message;
         const sinVer = unseen.has(row.id);
         return row.esperando === pending.has(row.id) && preview === row.last_message && !!row.sin_ver === sinVer ? row : {
           ...row, esperando: pending.has(row.id), last_message: preview, sin_ver: sinVer,
@@ -2014,13 +2020,14 @@ export default function App() {
       await serviceListenersReady;
       if (disposed) return;
       try {
-        const page = await invoke<{ cursor: number | null; gap: boolean; replay: boolean; runtime: string; reset: boolean }>("service_poll", { cursor, workspace: null, replay, runtime });
+        const page = await invoke<{ cursor: number | null; gap: boolean; streams?: boolean; replay: boolean; runtime: string; reset: boolean }>("service_poll", { cursor, workspace: null, replay, runtime });
         if (disposed) return;
         cursor = page.cursor;
         replay = page.replay;
         runtime = page.runtime;
-        if (page.reset || page.gap || failingSince !== null) window.dispatchEvent(new CustomEvent("harness:service-resync"));
-        if (page.reset || page.gap) releerTrasHueco();
+        if (page.reset || page.gap || page.streams || failingSince !== null) window.dispatchEvent(new CustomEvent("harness:service-resync"));
+        // Un stream de comando cortado (árbol, git) se relee, pero no es salida en vivo perdida.
+        if (page.reset || page.gap || page.streams) releerTrasHueco();
         if (page.reset) {
           liveThreads.clear();
           workspaceThreads.clear();
@@ -2104,7 +2111,7 @@ export default function App() {
   createEffect(on(workspaceActivo, () => void reconcileActiveTurns()));
 
   // Los tres oyentes de Rust. Los nombres van como cadena literal:
-  // `scripts/bridge.mjs` comprueba que alguien emita lo que la interfaz
+  // `scripts/guards/bridge.mjs` comprueba que alguien emita lo que la interfaz
   // escucha, y es lo único que sabe leer; una constante lo deja ciego sin
   // fallar. Se suscriben una vez: las funciones de respuesta leen
   // `sessionId()` y las demás señales al recibir cada evento, y copiar sus
@@ -2117,7 +2124,7 @@ export default function App() {
   // nuevo. Ver `sites::site_sweep`.
   onMount(() => void invoke("site_sweep").catch(() => {}));
   // Lo mismo con los Tinymist de la vista de Typst: sin visor que los suelte, seguirían vivos.
-  onMount(() => void invoke("typst_live_stop", { key: null, session: null }).catch(() => {}));
+  onMount(soltarVistasHuerfanas);
 
   onMount(() => {
     const chat = listen<ChatEvent>("chat", (e) => {
@@ -5258,22 +5265,23 @@ export default function App() {
       return true;
     }
     if (prompt.startsWith("!")) {
-      if (!prompt.slice(1).trim()) return false;
+      const comando = comandoDeTerminal(prompt);
+      if (!comando.trim()) return false;
       setInput("");
       // Con el agente trabajando espera su turno, como en Claude Code. Los
       // adjuntos se quedan en el borrador: un comando no los lleva.
       if (queueBusy() || cola().length > 0) {
-        encolar(prompt, []);
+        encolar(`!${comando}`, []);
         return true;
       }
       const id = sessionId();
       if (!id) {
-        const corrio = await abrirConComando(prompt.slice(1));
+        const corrio = await abrirConComando(comando);
         if (!corrio && !input()) setInput(prompt);
         return corrio;
       }
       const lanzado = { project: project(), agent: agent(), model: model() || null, effort: effort() || null, permission_mode: modo() || null };
-      return (await ejecutarComando(id, lanzado, prompt.slice(1), null)) === null;
+      return (await ejecutarComando(id, lanzado, comando, null)) === null;
     }
     if (queueBusy() || cola().length > 0) {
       encolarYSoltar(prompt, attachments, message.task_mentions, message.recipients);
@@ -5629,6 +5637,7 @@ export default function App() {
     proyecto?: string | null;
     soloLectura?: boolean;
   }) => {
+    const visualWorkspace = workspaceActivo() ?? "";
     /**
      * Mensajes de ESTA ventana, memoizados en dos pasos: leer `hilos()`
      * directo baja al fondo TODAS las ventanas al moverse una. El
@@ -6061,6 +6070,8 @@ export default function App() {
         onInput={setInput}
         onSend={mandar}
         onRespuestaRapida={mandarTexto}
+        visualScope={JSON.stringify([visualWorkspace, pp.proyecto ?? "", pp.sesion])}
+        readVisual={(file) => readChatVisual({ workspace: visualWorkspace, project: pp.proyecto ?? "", session: pp.sesion ?? "" }, file)}
         onMiniatura={miniaturaDeAdjunto}
         onPegarImagen={pegarImagen}
         onStop={detener}
@@ -6183,8 +6194,11 @@ export default function App() {
           fila lleva el conmutador para traerlo de vuelta. Antes flotaba
           con `position: absolute`, sin compartir eje con nada. */}
       <div
-        ref={cabeceraDeConversacion}
-        class={cn("relative flex shrink-0 items-center gap-3 pr-4",
+        ref={(el) => {
+          cabeceraDeConversacion = el;
+          veilTabs(el);
+        }}
+        class={cn("tab-veil flex shrink-0 items-center gap-3 pr-4",
           HEADER_HEIGHT,
           "pl-4",
         )}
@@ -6436,7 +6450,8 @@ export default function App() {
         <For each={ventanas().filter((sitio) => sitio.fila > 0)}>
           {(sitio) => (
             <div
-              class="z-30 flex h-8 min-w-0 items-center self-start px-2"
+              ref={veilTabs}
+              class="tab-veil z-30 flex h-8 min-w-0 items-center self-start px-2"
               style={estiloDeLaCelda(sitio)}
               // Cómo la encuentra el arrastre: `ventanaBajo` pregunta al
               // documento por estos dos atributos, que es lo que hace que soltar
@@ -6851,6 +6866,7 @@ export default function App() {
     // Sin cabecera y sin título de app, como Claude: la ventana ya se
     // llama Terminus.
     <div class="relative flex h-full flex-col overflow-hidden bg-surface">
+      <CloseGuard title={(id) => filaDe(id)?.title} />
       <ToastStack>
         {/* Aquí y no en Configuración: ahí no entra nadie a buscar
             actualizaciones. El panel de «Estado del entorno» dice lo
@@ -6862,6 +6878,19 @@ export default function App() {
         <AvisoDeMaterial />
         <AvisoDeCarpeta project={project()} session={sessionId()} />
         <McpSignInNotice session={sessionId()} />
+        <TaskNotifier
+          attention={attention.list()}
+          workspace={workspaceActivo()}
+          inView={(id) =>
+            !proyectoAbierto() &&
+            (id === sessionId() ||
+              ventanas().some((sitio) => {
+                const tab = pestanas.open().find((p) => p.id === paneles.activeTabAt(sitio));
+                return !!tab && isTaskTab(tab) && tab.session === id;
+              }))}
+          title={(id) => filaDe(id)?.title}
+          open={(project, id) => void abrirSesion(project, id)}
+        />
         {/* El error del último gesto, y no caduca solo: uno que se va a los
             segundos no se llega a leer. Lo quita su cruz o el cambio de
             workspace. */}

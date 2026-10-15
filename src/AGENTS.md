@@ -21,6 +21,6 @@ catalogs.
   and event names stay literal for the bridge guards.
 - The artifact viewer runtime lives as text in `features/artifacts/sandbox.ts`;
   changing its content policy requires the `artifact` and `csp` guards and the
-  tests in [attacks/](../attacks/README.md).
+  tests in [tests/security/](../tests/security/README.md).
 - Mount and cost tests use jsdom with a simulated IPC. Permissions, native drag
   and the visual result need a check in the real window.

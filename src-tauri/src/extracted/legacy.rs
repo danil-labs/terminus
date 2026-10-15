@@ -184,6 +184,59 @@ pub fn window_open(_service: u32) -> Option<bool> {
     None
 }
 
+/// El instalador aparta a `old_*` el ejecutable en uso; el sistema da la ruta actual, no la de arranque.
+#[cfg(windows)]
+pub fn set_aside(pid: u32) -> bool {
+    windows::image(pid).is_some_and(|(image, _)| {
+        Path::new(&image)
+            .file_name()
+            .is_some_and(|name| name.to_string_lossy().starts_with("old_"))
+    })
+}
+#[cfg(not(windows))]
+pub fn set_aside(_pid: u32) -> bool {
+    false
+}
+
+/// El motor vivo corre de un binario que ya no es el instalado. `deep` compara
+/// además el contenido de la copia del AppImage, que solo cambia al arrancar.
+#[cfg(windows)]
+pub fn engine_replaced(pid: u32, _deep: bool) -> bool {
+    set_aside(pid)
+}
+#[cfg(target_os = "linux")]
+pub fn engine_replaced(pid: u32, deep: bool) -> bool {
+    let Ok(running) = std::fs::read_link(format!("/proc/{pid}/exe")) else {
+        return false;
+    };
+    if running.to_string_lossy().ends_with(" (deleted)") {
+        return true;
+    }
+    let bundled = std::env::current_exe().map(|exe| exe.with_file_name("seldon-runtime"));
+    deep && std::env::var_os("APPIMAGE").is_some()
+        && bundled.is_ok_and(|bundled| {
+            bundled != running && std::fs::read(&bundled).ok() != std::fs::read(&running).ok()
+        })
+}
+#[cfg(target_os = "macos")]
+pub fn engine_replaced(pid: u32, _deep: bool) -> bool {
+    let Ok(pid) = i32::try_from(pid) else {
+        return false;
+    };
+    let mut path = vec![0u8; 4096];
+    // SAFETY: el búfer es nuestro y se le pasa su tamaño.
+    let length = unsafe { libc::proc_pidpath(pid, path.as_mut_ptr().cast(), path.len() as u32) };
+    let bundled = std::env::current_exe().map(|exe| exe.with_file_name("seldon-runtime"));
+    let Ok(bundled) = bundled else {
+        return false;
+    };
+    if length <= 0 {
+        return false;
+    }
+    let running = PathBuf::from(String::from_utf8_lossy(&path[..length as usize]).into_owned());
+    running != bundled && running.canonicalize().ok() != bundled.canonicalize().ok()
+}
+
 /// Dentro de un AppImage el motor vive en un montaje que desaparece con la ventana:
 /// se copia a una ruta fija fuera de la raíz.
 #[cfg(target_os = "linux")]

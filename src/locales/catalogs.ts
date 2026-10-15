@@ -8,14 +8,14 @@
  * glob dentro del motor cualquier módulo que llamara a `t()` —`steps.ts`,
  * `usage.ts`, `history.ts`, `limits.ts`, `format.ts`— arrastraba el motor y
  * **reventaba la prueba con `ERR_MODULE_NOT_FOUND`**. Pasó con
- * `scripts/models.test.ts` y con `scripts/turn-status.test.ts`.
+ * `tests/unit/models.test.ts` y con `tests/unit/turn-status.test.ts`.
  *
  * El glob se queda —no imports uno a uno— por lo de siempre: con imports
  * explícitos, un archivo de catálogo que nadie importara quedaría fuera del
- * bundle mientras `scripts/locales.mjs`, que lee el disco, lo daría por bueno.
+ * bundle mientras `scripts/guards/locales.mjs`, que lee el disco, lo daría por bueno.
  *
  * **Se importa antes que nada en `app/main.tsx`.** Un `t()` llamado antes de
- * esto devuelve la clave, y lo que lo caza es `scripts/mount-frontend.mjs`, que monta el
+ * esto devuelve la clave, y lo que lo caza es `scripts/guards/mount-frontend.mjs`, que monta el
  * árbol de verdad y busca los rótulos en español.
  */
 import { registrarCatalogo, type Manifiesto } from "../lib/i18n.ts";

@@ -23,6 +23,7 @@ import { Button } from "./Button";
 import { EnlargeableImage } from "./EnlargeableImage";
 import { prosaDe } from "./Failure";
 import { FilePreview } from "./FilePreview";
+import { BordeDeColumna, MarkdownTable } from "./MarkdownTable";
 import { MermaidDiagram } from "./Mermaid";
 import { bloquesDeMarkdown } from "./markdown-blocks";
 import { textoDelBloque } from "./markdown-code";
@@ -36,7 +37,7 @@ import { ITEM_DE_MENU, Popover, PopoverContent, PopoverTrigger } from "./Popover
  * el filtro de `src`/`href` en `lib/links.ts`: una imagen remota dispara el GET
  * al pintarse, sin script y sin clic, con el material en la URL.
  * `solid-markdown` 2.1.1 no trae saneador de URL. Segunda capa: la política de
- * la ventana — las dos medidas por separado en `attacks/window.mjs`.
+ * la ventana — las dos medidas por separado en `tests/security/window.mjs`.
  *
  * Límite sin cubrir: un enlace que la persona pulsa abre su navegador con la
  * URL que escribió el agente, sin pasar por `publications.jsonl`.
@@ -123,7 +124,7 @@ const COMPONENTES = {
                     /* `preventDefault` evita que el `href` navegue la ventana, y
                        reenviar el `onClick` de Kobalte es lo que abre el panel:
                        Kobalte lo pasa dentro de `props` y en JSX gana el último
-                       con el mismo nombre (`scripts/triggers.test.mjs` lo
+                       con el mismo nombre (`tests/unit/triggers.test.mjs` lo
                        comprueba). El `href` se queda aunque no navegue: enseña el
                        destino al pasar por encima. */
                     onClick={(e) =>
@@ -239,16 +240,11 @@ const COMPONENTES = {
       class="mr-1.5 align-middle"
     />
   ),
-  table: (p) => (
-    <div class="my-3 max-w-full overflow-auto rounded-md border border-border bg-surface">
-      <table class="w-full min-w-[520px] border-collapse text-left text-[0.82rem]">
-        {p.children}
-      </table>
-    </div>
-  ),
+  table: (p) => <MarkdownTable>{p.children}</MarkdownTable>,
   th: (p) => (
-    <th class="border-b border-r border-border bg-neutral-950/[0.045] px-3 py-2 text-[0.72rem] font-bold uppercase text-neutral-700 last:border-r-0">
+    <th class="relative border-b border-r border-border bg-neutral-950/[0.045] px-3 py-2 text-[0.72rem] font-bold uppercase text-neutral-700 last:border-r-0">
       {p.children}
+      <BordeDeColumna />
     </th>
   ),
   td: (p) => (

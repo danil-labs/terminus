@@ -45,7 +45,7 @@ log = "0.4"
 uuid = { version = "1", features = ["v4"] }
 # `unstable` is required for `Window::add_child`: native site webviews are
 # mounted over a tab without loosening the main window's policy.
-tauri = { version = "2.11.3", features = ["unstable"] }
+tauri = { version = "2.11.3", features = ["unstable", "tray-icon"] }
 tauri-plugin-log = "2"
 tauri-plugin-dialog = "2.7.2"
 # The startup notice is shown before the webview exists; same rfd as tauri-plugin-dialog.
@@ -53,8 +53,12 @@ rfd = { version = "0.16", default-features = false, features = ["gtk3", "common-
 dirs = "6"
 tauri-plugin-updater = "2.10.1"
 tauri-plugin-process = "2.3.1"
+# Avisos del segundo plano; se lanzan desde Rust, sin paquete ni permiso en el front.
+tauri-plugin-notification = "2"
 tauri-plugin-clipboard-manager = "2.3.3"
 ureq = { version = "3.2", features = ["json"] }
+# La vista en vivo de Typst arranca Tinymist en una carpeta de trabajo vacía.
+tempfile = "3"
 terminus-engine-client = { path = "crates/engine-client" }
 terminus-engine-protocol = { path = "crates/engine-protocol" }
 
@@ -72,7 +76,8 @@ zeroize = "1"
 gtk = "0.18.2"
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Globalization", "Win32_Storage_FileSystem", "Win32_System_Console", "Win32_System_Diagnostics_ToolHelp", "Win32_System_JobObjects", "Win32_System_Threading"] }
+windows = { version = "0.62", features = ["Win32_Foundation", "Foundation_Collections", "Data_Xml_Dom", "UI_Notifications"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Globalization", "Win32_Storage_FileSystem", "Win32_System_Console", "Win32_System_Diagnostics_ToolHelp", "Win32_System_JobObjects", "Win32_System_Registry", "Win32_System_Threading", "Win32_UI_WindowsAndMessaging"] }
 
 [features]
 # The window is always the client of an external engine (`seldon-runtime`).

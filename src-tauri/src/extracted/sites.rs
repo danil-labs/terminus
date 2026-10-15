@@ -229,7 +229,62 @@ pub fn site_open(
 ) -> Result<Sitio, String> {
     let url = abrible(&url)?;
     responde(&url)?;
+    abrir_capa(app, url, x, y, width, height, None, |u| {
+        abrible(u.as_str()).is_ok()
+    })
+}
 
+/// La vista de un servidor de esta ventana en `127.0.0.1:<port>`, como la de Typst:
+/// solo navega dentro de ese origen. `css` se añade como hoja de estilos de la página.
+#[tauri::command(async)]
+#[allow(clippy::too_many_arguments)]
+pub fn site_open_local(
+    app: tauri::AppHandle,
+    port: u16,
+    css: Option<String>,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+) -> Result<Sitio, String> {
+    let url = format!("http://127.0.0.1:{port}/");
+    responde(&url)?;
+    let origen = Url::parse(&url).map_err(|e| e.to_string())?.origin();
+    let estilo = css
+        .map(|css| {
+            serde_json::to_string(&css).map(|texto| {
+                format!(
+                    "addEventListener('DOMContentLoaded',()=>{{const s=document.createElement('style');s.textContent={texto};document.head.append(s)}})"
+                )
+            })
+        })
+        .transpose()
+        .map_err(|e| e.to_string())?;
+    abrir_capa(app, url, x, y, width, height, estilo, move |u| {
+        u.origin() == origen
+    })
+}
+
+#[tauri::command]
+pub fn site_zoom(app: tauri::AppHandle, label: String, factor: f64) -> Result<(), String> {
+    let w = app
+        .get_webview(&label)
+        .ok_or("Ese sitio ya no está abierto")?;
+    w.set_zoom(factor.clamp(0.25, 5.0))
+        .map_err(|e| e.to_string())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn abrir_capa(
+    app: tauri::AppHandle,
+    url: String,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    al_cargar: Option<String>,
+    navega: impl Fn(&Url) -> bool + Send + 'static,
+) -> Result<Sitio, String> {
     let ventana = app
         .get_window(VENTANA)
         .ok_or("La ventana principal no está")?;
@@ -240,27 +295,33 @@ pub fn site_open(
     let app_load = app.clone();
     let label_load = label.clone();
 
-    let constructor = tauri::webview::WebviewBuilder::new(&label, WebviewUrl::External(destino))
-        .incognito(true)
-        .disable_drag_drop_handler()
-        .on_navigation(move |u| abrible(u.as_str()).is_ok())
-        .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny)
-        .on_download(|_, _| false)
-        .on_page_load(move |_, carga| {
-            let estado = match carga.event() {
-                tauri::webview::PageLoadEvent::Started => "cargando",
-                tauri::webview::PageLoadEvent::Finished => "listo",
-            };
-            let _ = app_load.emit(
-                "site",
-                Estado {
-                    label: label_load.clone(),
-                    estado,
-                    url: carga.url().to_string(),
-                },
-            );
-        });
+    let mut constructor =
+        tauri::webview::WebviewBuilder::new(&label, WebviewUrl::External(destino))
+            .incognito(true)
+            // Al crearse no se queda el teclado: lo tenía el editor o el chat.
+            .focused(false)
+            .disable_drag_drop_handler()
+            .on_navigation(navega)
+            .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny)
+            .on_download(|_, _| false)
+            .on_page_load(move |_, carga| {
+                let estado = match carga.event() {
+                    tauri::webview::PageLoadEvent::Started => "cargando",
+                    tauri::webview::PageLoadEvent::Finished => "listo",
+                };
+                let _ = app_load.emit(
+                    "site",
+                    Estado {
+                        label: label_load.clone(),
+                        estado,
+                        url: carga.url().to_string(),
+                    },
+                );
+            });
 
+    if let Some(script) = al_cargar {
+        constructor = constructor.initialization_script(&script);
+    }
     ventana
         .add_child(
             constructor,

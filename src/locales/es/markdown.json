@@ -14,5 +14,6 @@
   "markdown.diagram.reset_view": "Restablecer vista",
   "markdown.diagram.close": "Salir de la vista en toda la ventana",
   "markdown.code.copy": "Copiar código",
-  "markdown.code.copied": "Copiado"
+  "markdown.code.copied": "Copiado",
+  "markdown.table.resize_column": "Arrastra para cambiar el ancho de la columna; doble clic para ajustarla sola"
 }

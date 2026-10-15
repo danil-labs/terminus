@@ -164,7 +164,7 @@ fn drive(app: &tauri::AppHandle, launcher: &Launcher, paths: &engine::Paths, rea
         match handoff(launcher, paths, reason) {
             Ok(client) => {
                 let state = Arc::new(proxy::State::new(Arc::new(client), true));
-                if let Some(window) = app.get_webview_window("main") {
+                if let Some(window) = app.get_window("main") {
                     let _ = window.set_title(&super::title(app));
                 }
                 app.manage(state);
@@ -307,6 +307,13 @@ fn watch(launcher: &Launcher, paths: &engine::Paths) {
             launcher.set(Phase::Ready {
                 blank_0274: legacy::blank_window(&paths.data),
             });
+            let connected = launcher
+                .app
+                .get()
+                .is_some_and(|app| app.try_state::<Arc<proxy::State>>().is_some());
+            if connected {
+                engine::retire_if_replaced(paths);
+            }
         }
         std::thread::sleep(Duration::from_secs(15));
     }

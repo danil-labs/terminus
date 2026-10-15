@@ -9,6 +9,7 @@ import {
   lazy,
   on,
   onCleanup,
+  untrack,
   type JSX,
 } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
@@ -25,7 +26,7 @@ import type { Preview } from "../artifacts/Preview";
 import { formaDe } from "../artifacts/sandbox";
 import { cn } from "../../lib/utils";
 import { t } from "../../lib/i18n";
-import { createPref } from "../../lib/prefs";
+import { createPref, hayPref } from "../../lib/prefs";
 import { ariaDeAtajo, textoDeAtajo } from "../../lib/shortcuts";
 import { peso } from "../../lib/format";
 import { comoDiff, parsearDiff, type ArchivoDiff } from "./diff";
@@ -44,16 +45,17 @@ import {
   ampliadaDe,
   ampliarVista,
   compiladoDe,
+  conVistaTypst,
   consumirSalto,
   diagnosticosDelArchivo,
   esTypst,
   pedirArreglo,
-  pluginTypst,
   principalElegido,
   revelarEnElArbol,
   seguirPluginTypst,
   salto,
   saltarA,
+  pedirReapertura,
   vivaDe,
 } from "./typst";
 
@@ -93,7 +95,9 @@ const disposicionRecordada = (): Disposicion => {
   return d === "lado" || d === "previa" ? d : "codigo";
 };
 
-/** Un documento Typst abre lado a lado: su PDF es para lo que se abre. */
+/** Un documento Typst abre lado a lado mientras nadie haya elegido otra cosa: su PDF es para lo que se abre. */
+const disposicionTypstRecordada = (): Disposicion =>
+  hayPref("file.layout") && disposicionRecordada() === "codigo" ? "codigo" : "lado";
 
 /** Cuánto del ancho se lleva el código con la vista lado a lado; doble clic en el divisor vuelve a la mitad. */
 const [repartoGuardado, recordarReparto] = createPref<number>("file.split", 0.5);
@@ -219,7 +223,7 @@ export default function VisorDeArchivo(props: {
    * al PDF, en un panel que no depende de la pestaña. Sin ojo, un `.typ` es solo código.
    */
   const vistaTypst = () =>
-    pluginTypst() &&
+    conVistaTypst() &&
     !previa() &&
     principalElegido(props.project) !== null &&
     !CON_VISOR_PROPIO.includes(extension(props.ruta)) &&
@@ -232,13 +236,22 @@ export default function VisorDeArchivo(props: {
   const [elegida, setElegida] = createSignal<Disposicion | null>(null);
   const disposicion = (): Disposicion => {
     if (!conPrevia()) return "codigo";
-    if (vistaTypst()) return ampliadaDe(props.session, props.arbol) ? "previa" : "lado";
+    // Con Typst, «Vista previa» es el ampliar de la tarea: lo comparten sus archivos y Esc lo deshace.
+    if (vistaTypst()) {
+      if (ampliadaDe(props.session, props.arbol)) return "previa";
+      const d = elegida() ?? disposicionTypstRecordada();
+      return d === "previa" ? "lado" : d;
+    }
     return elegida() ?? (deCodigo() === false ? "previa" : disposicionRecordada());
   };
   const ladoCodigo = () => disposicion() !== "previa";
   const ladoPrevia = () => disposicion() !== "codigo";
-  function elegir(d: Disposicion) {
+  function fijar(d: Disposicion) {
     setElegida(d);
+    if (vistaTypst()) ampliarVista(props.session, props.arbol, d === "previa");
+  }
+  function elegir(d: Disposicion) {
+    fijar(d);
     // Lo que se elige en una carpeta documental no cambia cómo abren los archivos de código.
     if (deCodigo() !== false) recordarDisposicion(d);
   }
@@ -268,7 +281,7 @@ export default function VisorDeArchivo(props: {
     return s && s.session === props.session && s.arbol === props.arbol && s.ruta === props.ruta ? s : null;
   };
   createEffect(() => {
-    if (irA() && disposicion() === "previa") setElegida("lado");
+    if (irA() && disposicion() === "previa") untrack(() => fijar("lado"));
   });
   function irAlDiagnostico(d: DiagnosticoTypst) {
     if (d.path === null || d.line === null) return;
@@ -289,7 +302,7 @@ export default function VisorDeArchivo(props: {
   function alternarCambios() {
     const ver = !verCambios();
     setVerCambios(ver);
-    if (ver && disposicion() === "previa") setElegida("codigo");
+    if (ver && disposicion() === "previa") fijar("codigo");
   }
 
   const [cursor, setCursor] = createSignal<{ linea: number; columna: number } | null>(null);
@@ -514,7 +527,7 @@ export default function VisorDeArchivo(props: {
   const vivaDelArbol = () => (typstVivo() ? vivaDe(props.session, props.arbol) : null);
   let enviando = false;
   let porEnviar: { key: string; texto: string } | null = null;
-  let abiertoEn: string | null = null;
+  let abiertoEn: { key: string; path: string } | null = null;
   async function enviar(key: string, texto: string) {
     porEnviar = { key, texto };
     if (enviando) return;
@@ -523,10 +536,12 @@ export default function VisorDeArchivo(props: {
       const envio: { key: string; texto: string } = porEnviar;
       porEnviar = null;
       try {
-        await invoke("typst_live_change", { key: envio.key, path: props.ruta, text: envio.texto });
-        abiertoEn = envio.key;
+        const path = props.ruta;
+        await invoke("typst_live_change", { key: envio.key, path, text: envio.texto });
+        abiertoEn = { key: envio.key, path };
       } catch {
-        // La vista se apagó o se está rehaciendo: el siguiente cambio o la vista nueva lo vuelven a mandar.
+        // Sin reabrir, los errores que se ven son los de un texto que ya no es: la vista nueva lo vuelve a mandar.
+        pedirReapertura(props.session, props.arbol);
       }
     }
     enviando = false;
@@ -538,7 +553,8 @@ export default function VisorDeArchivo(props: {
     void enviar(viva.key, texto);
   });
   onCleanup(() => {
-    if (abiertoEn) void invoke("typst_live_close_doc", { key: abiertoEn, path: props.ruta }).catch(() => {});
+    // Sin `props.ruta`: al desmontar puede venir de un `<Show>` que ya no se cumple y lanzar «Stale read».
+    if (abiertoEn) void invoke("typst_live_close_doc", abiertoEn).catch(() => {});
   });
 
   function mostrarEnLaVista(linea: number, columna: number) {
@@ -644,7 +660,7 @@ export default function VisorDeArchivo(props: {
           <SelectorDeDisposicion />
         </Show>
 
-        <Show when={conPrevia() && !vistaTypst()}>
+        <Show when={conPrevia()}>
           <div role="group" aria-label={t("code.file.layout.label")} class="flex shrink-0 gap-0.5">
             <BotonDeBarra pulsado={disposicion() === "codigo"} onClick={() => elegir("codigo")} titulo={t("code.file.layout.code")}>
               <IconoCodigo size={13} aria-hidden="true" />
@@ -770,10 +786,12 @@ export default function VisorDeArchivo(props: {
           <Divisor fila={() => fila} />
         </Show>
 
-        <Show when={ladoPrevia()}>
+        {/* Con «Código» la vista de Typst se esconde sin desmontarse: soltarla apagaría Tinymist y sus marcas. */}
+        <Show when={ladoPrevia() || vistaTypst()}>
           <div
             class={cn(
-              "flex min-h-0 min-w-0 flex-1 flex-col",
+              "min-h-0 min-w-0 flex-1 flex-col",
+              ladoPrevia() ? "flex" : "hidden",
               !vistaTypst() && "overflow-y-auto",
               ladoCodigo() && "border-l border-border",
             )}
@@ -788,7 +806,7 @@ export default function VisorDeArchivo(props: {
                   session={props.session}
                   arbol={props.arbol}
                   ruta={props.ruta}
-                  visible={props.visible}
+                  visible={props.visible && ladoPrevia()}
                   onIrA={irAlDiagnostico}
                 />
               </Suspense>

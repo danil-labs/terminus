@@ -25,11 +25,11 @@ import { basename, dirname, extname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 /** La raíz del repositorio, deducida de dónde está este archivo. */
-export const RAIZ = resolve(import.meta.dirname, "..");
+export const ROOT = resolve(import.meta.dirname, "..");
 
 /**
  * Con qué sale un guarda que **no pudo correr**, para distinguirlo del que
- * corrió y falló. `verify.mjs` lo lee: con este código imprime `OMITIDO`,
+ * corrió y falló. `verify.mjs` lo lee: con este código imprime `SKIPPED`,
  * sigue con el resto de la cadena y lo nombra al terminar; con cualquier otro
  * no-cero para, como siempre.
  *
@@ -38,7 +38,7 @@ export const RAIZ = resolve(import.meta.dirname, "..");
  * un módulo propio y las dos puntas la importan de ahí — lo que no puede pasar
  * es que el número se escriba dos veces.
  */
-export const SALIDA_OMITIDO = 3;
+export const SKIPPED_EXIT_CODE = 3;
 
 /**
  * Las variables que neutralizan lo que git leería de fuera del repositorio.
@@ -125,11 +125,11 @@ function controlDeTerminus(arbol) {
  * `origen` es la frase que explica de dónde salió.
  *
  * `{ ok: false, motivo }` — no hay metadata alcanzable, y `motivo` dice dónde se
- * buscó. Quien llama tiene que salir con [`SALIDA_OMITIDO`] y decirlo: dar el
+ * buscó. Quien llama tiene que salir con [`SKIPPED_EXIT_CODE`] y decirlo: dar el
  * guarda por bueno aquí es exactamente el fallo que este módulo existe para
  * quitar de en medio.
  */
-export function localizarGit(arbol = RAIZ) {
+export function locateGit(arbol = ROOT) {
   // 1. El árbol trae su git, o quien invoca ya puso `GIT_DIR` a mano. Es el
   //    caso del clon normal y el del runner de Actions, y no cuesta nada.
   const suyo = arbolDeGit(arbol, {});
@@ -168,17 +168,17 @@ export function localizarGit(arbol = RAIZ) {
 // ------------------------------------------------- helpers de toda la carpeta
 
 /**
- * Los archivos bajo `dir`, recursivo, filtrados por extensión.
+ * Los walkFiles bajo `dir`, recursivo, filtrados por extensión.
  *
  * **Una sola copia**, que es la única forma de que la próxima corrección llegue
  * a todos: repartida por `scripts/` acumuló ocho versiones con cuatro firmas, y
  * dos de ellas cargaban defectos ya arreglados en las demás — el `.pathname` que
  * revienta en Windows y el orden de `withFileTypes` a medias.
  */
-export function* archivos(dir, exts = null) {
+export function* walkFiles(dir, exts = null) {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     const p = join(dir, e.name);
-    if (e.isDirectory()) yield* archivos(p, exts);
+    if (e.isDirectory()) yield* walkFiles(p, exts);
     else if (!exts || exts.includes(extname(p))) yield p;
   }
 }
@@ -191,6 +191,6 @@ export function* archivos(dir, exts = null) {
  * — en `signing.mjs`, justo el archivo que documenta cómo los espacios rompen el
  * runner de firma.
  */
-export function esteArchivo(url, argv1 = process.argv[1]) {
+export function isMain(url, argv1 = process.argv[1]) {
   return Boolean(argv1) && url === pathToFileURL(argv1).href;
 }

@@ -613,7 +613,7 @@ export function seguirElFondo(enTurno: () => boolean = () => true): Pegado {
    * Ninguno toca `msgs`.
    *
    * El guarda de existencia cubre `node --test` y el jsdom de
-   * `scripts/mount-frontend.mjs`: ninguno de los dos implementa `ResizeObserver` ni
+   * `scripts/guards/mount-frontend.mjs`: ninguno de los dos implementa `ResizeObserver` ni
    * tiene alturas que seguir. El webview siempre lo trae.
    */
   let altoPrevio: number | undefined;
@@ -722,7 +722,7 @@ export function seguirElFondo(enTurno: () => boolean = () => true): Pegado {
    * medida del contenido nuevo se compara contra el alto de la conversación
    * anterior. Una nueva más corta da diferencia negativa, el observador lo
    * trata como «encogió» y la conversación abre a media altura. Lo fija
-   * `scripts/paste.test.ts`.
+   * `tests/unit/paste.test.ts`.
    *
    * `disconnect` y los `removeEventListener` son el contrato del módulo, no un
    * fallo observado: un observador mira un contenido, un contenedor tiene un

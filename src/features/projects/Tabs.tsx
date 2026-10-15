@@ -2,7 +2,7 @@ import Globe from "lucide-solid/icons/globe";
 import Plus from "lucide-solid/icons/plus";
 import SquarePen from "lucide-solid/icons/square-pen";
 import X from "lucide-solid/icons/x";
-import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show } from "solid-js";
 import { t } from "../../lib/i18n";
 import type { AgentProfile } from "../../lib/model";
 import { ariaDeAtajo, flechaDeLista, textoDeAtajo } from "../../lib/shortcuts";
@@ -30,6 +30,13 @@ import { readableSessionTitle, type SessionRow, threadTitle } from "./Sessions";
 import EstadoDeTarea, { taskLabel } from "./TaskStatus";
 import { taskPriority } from "./taskActivity";
 import { type GitStatus, watchSessionGit } from "./taskGit";
+
+// Lo que asoma de la pestaña vecina y el padding de la tira, en px.
+const PEEK = 56;
+const EDGE = 6;
+
+// El For de App vuelve a montar la tira al activar una pestaña; su scroll sobrevive aquí.
+const scrollBySite = new Map<string, number>();
 
 // Tira de pestañas; lib/tabs.ts determina su persistencia y el cierre en bloque.
 // Cerrar una pestaña deja su tarea y su turno vivos.
@@ -106,20 +113,88 @@ export default function TabStrip(props: {
     );
   });
 
-  // scrollIntoView puede faltar en el entorno que monta el guarda mount-frontend.
+  // Se revela el envoltorio, que incluye el botón de cerrar. Si hay que desplazar,
+  // asoma también la vecina de ese lado para poder seguir avanzando con clics.
+  function reveal(n: number) {
+    const element = strip?.querySelector<HTMLElement>(`[data-envoltorio="${n}"]`);
+    if (!strip || !element) return;
+    const start = element.offsetLeft - EDGE;
+    const end = element.offsetLeft + element.offsetWidth + EDGE;
+    const view = strip.clientWidth;
+    let target = strip.scrollLeft;
+    if (start < target) target = start - (n > 0 ? PEEK : 0);
+    else if (end > target + view) target = end + (n < props.tabs.length - 1 ? PEEK : 0) - view;
+    else return;
+    strip.scrollLeft = Math.max(0, Math.min(target, strip.scrollWidth - view));
+  }
+  const site = () => strip?.closest("[data-ventana]")?.getAttribute("data-ventana") ?? "";
+  let restored = false;
   createEffect(
     on(
       () => props.activeId,
       (id) => {
-        if (!id || !strip) return;
+        if (!restored && strip) {
+          restored = true;
+          strip.scrollLeft = scrollBySite.get(site()) ?? 0;
+        }
+        if (!id) return;
         // Los ids contienen bytes nulos y no se pueden usar como valores de un selector CSS.
         const n = props.tabs.findIndex((p) => p.id === id);
-        if (n < 0) return;
-        const element = strip.querySelector<HTMLElement>(`[data-pestana="${n}"]`);
-        element?.scrollIntoView?.({ inline: "nearest", block: "nearest" });
+        if (n >= 0) reveal(n);
       },
     ),
   );
+
+  function wheel(e: WheelEvent) {
+    const el = e.currentTarget as HTMLElement;
+    const limit = el.scrollWidth - el.clientWidth;
+    if (limit <= 0 || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+    const before = el.scrollLeft;
+    el.scrollLeft = Math.min(limit, Math.max(0, before + e.deltaY));
+    if (el.scrollLeft !== before) e.preventDefault();
+  }
+
+  // La barra nativa ocuparía alto bajo las pestañas; esta flota encima.
+  // Vive dentro del contenedor que se desplaza, así que su left suma el scrollLeft.
+  const [thumb, setThumb] = createSignal<{ left: number; width: number } | null>(null);
+  function measure() {
+    if (!strip || strip.scrollWidth <= strip.clientWidth) return setThumb(null);
+    const ratio = strip.clientWidth / strip.scrollWidth;
+    setThumb({ left: strip.scrollLeft * (1 + ratio), width: strip.clientWidth * ratio });
+  }
+  function scrolled() {
+    if (strip) scrollBySite.set(site(), strip.scrollLeft);
+    measure();
+  }
+  createEffect(on(() => props.tabs.length, () => queueMicrotask(measure)));
+  onMount(() => {
+    // ResizeObserver puede faltar en el entorno que monta el guarda mount-frontend.
+    if (!strip || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(strip);
+    onCleanup(() => observer.disconnect());
+  });
+  function dragThumb(e: PointerEvent) {
+    if (!strip) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const handle = e.currentTarget as HTMLElement;
+    handle.setPointerCapture(e.pointerId);
+    const startX = e.clientX;
+    const startLeft = strip.scrollLeft;
+    const scale = strip.scrollWidth / strip.clientWidth;
+    const move = (ev: PointerEvent) => {
+      if (strip) strip.scrollLeft = startLeft + (ev.clientX - startX) * scale;
+    };
+    const end = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", end);
+      handle.removeEventListener("pointercancel", end);
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+  }
 
   const [selected, setSelectedTab] = createSignal<string | null>(null);
   const group = (action: BatchCloseAction) => {
@@ -144,6 +219,7 @@ export default function TabStrip(props: {
     props.onPick(next.id);
     const n = (i + offset + list.length) % list.length;
     strip?.querySelector<HTMLElement>(`[data-pestana="${n}"]`)?.focus();
+    reveal(n);
   }
 
   return (
@@ -153,15 +229,17 @@ export default function TabStrip(props: {
       role="tablist"
       aria-label={t("projects.tabs.label")}
       onKeyDown={move}
+      onWheel={wheel}
+      onScroll={scrolled}
       onContextMenu={(e: MouseEvent) => {
         const element = (e.target as HTMLElement).closest<HTMLElement>("[data-envoltorio]");
         const p = element ? props.tabs[Number(element.dataset.envoltorio)] : undefined;
         if (!p) e.preventDefault();
         setSelectedTab(p?.id ?? null);
       }}
-      // La barra de scroll ocuparía el alto de las pestañas.
+      // La pestaña activa toca el borde inferior para fundirse con su panel bajo el velo.
       // flex-1 separaría el botón de añadir de la última pestaña.
-      class="flex min-w-0 items-center gap-0.5 self-stretch overflow-x-auto [scrollbar-width:none]"
+      class="group/strip relative flex min-w-0 items-end gap-0.5 self-stretch overflow-x-auto overflow-y-hidden overscroll-x-contain px-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       <For each={props.tabs}>
         {(p, i) => {
@@ -213,13 +291,13 @@ export default function TabStrip(props: {
               <Show when={startsGroup()}>
                 <span
                   aria-hidden="true"
-                  class="mx-1 h-4 w-px shrink-0 bg-border"
+                  class="mx-1 h-4 w-px shrink-0 self-center bg-border"
                 />
               </Show>
               <Show when={props.dropIndex === i()}>
                 <span
                   aria-hidden="true"
-                  class="-mx-px h-5 w-0.5 shrink-0 rounded-full bg-primary"
+                  class="-mx-px h-5 w-0.5 shrink-0 self-center rounded-full bg-primary"
                 />
               </Show>
               {/* Un botón dentro de role=tab queda oculto en algunos árboles de accesibilidad. */}
@@ -233,8 +311,8 @@ export default function TabStrip(props: {
                   "group flex h-7 shrink-0 touch-none items-center rounded-[var(--radius-sm)] pr-1 select-none",
                   task() ? "w-[220px] text-sm" : "w-[180px] text-[0.75rem]",
                   active()
-                    ? "bg-surface-muted font-semibold text-neutral-950"
-                    : "font-medium text-neutral-500 hover:bg-surface-muted hover:text-neutral-950",
+                    ? "tab-active font-semibold text-neutral-950"
+                    : "font-medium text-neutral-500 hover:bg-neutral-950/5 hover:text-neutral-950",
                 )}
               >
                 <div
@@ -252,7 +330,11 @@ export default function TabStrip(props: {
                       ? t("projects.tabs.unsaved.named", { title: text() })
                       : (description() ?? (local() ? text() : undefined)),
                   )}
-                  onClick={() => props.onPick(p.id)}
+                  onClick={() => {
+                    props.onPick(p.id);
+                    // El foco del clic solo revela el tab, sin su botón de cerrar.
+                    reveal(i());
+                  }}
                   onAuxClick={(e) => {
                     if (e.button === 1) {
                       e.preventDefault();
@@ -386,8 +468,18 @@ export default function TabStrip(props: {
       <Show when={props.dropIndex === props.tabs.length}>
         <span
           aria-hidden="true"
-          class="h-5 w-0.5 shrink-0 rounded-full bg-primary"
+          class="h-5 w-0.5 shrink-0 self-center rounded-full bg-primary"
         />
+      </Show>
+      <Show when={thumb()}>
+        {(bar) => (
+          <div
+            aria-hidden="true"
+            onPointerDown={dragThumb}
+            class="absolute bottom-0 h-1 rounded-full bg-[var(--scrollbar-thumb)] opacity-0 transition-opacity group-hover/strip:opacity-100 hover:bg-[var(--scrollbar-thumb-hover)]"
+            style={{ left: `${bar().left}px`, width: `${bar().width}px` }}
+          />
+        )}
       </Show>
     </ContextMenuTrigger>
     <ContextMenuContent>

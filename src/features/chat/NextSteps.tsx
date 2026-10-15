@@ -2,7 +2,7 @@ import ArrowRight from "lucide-solid/icons/arrow-right";
 import Check from "lucide-solid/icons/check";
 import { Index } from "solid-js";
 import { t } from "../../lib/i18n";
-import type { OpcionSiguiente } from "../../lib/nextSteps";
+import type { NextStepOption } from "../../lib/nextSteps";
 import { cn } from "../../lib/utils";
 
 /**
@@ -12,7 +12,7 @@ import { cn } from "../../lib/utils";
  * mientras llegan, cada token trae opciones nuevas y `For` remontaría los botones.
  */
 export default function NextSteps(props: {
-  options: OpcionSiguiente[];
+  options: NextStepOption[];
   usada: (texto: string) => boolean;
   /** Falso mientras el bloque llega o si esta conversación no puede escribir. */
   habilitado: boolean;

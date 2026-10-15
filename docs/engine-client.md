@@ -13,6 +13,12 @@ Terminus has two processes:
 The window never runs the domain itself. Every `invoke` that is not a window
 function travels to the engine over RPC1.
 
+Las [visualizaciones del chat](chat-visuals.md) usan el selector reservado
+`terminus-chat-visuals` de `tree_show`, sin agregar un comando al contrato.
+La ventana captura el workspace de esa lectura mediante un header IPC local
+y el proxy lo coloca en el sobre RPC1 existente. La lectura segura de archivos
+y las instrucciones nativas del agente pertenecen al motor.
+
 ## Contract
 
 `src-tauri/crates/engine-protocol/commands.json` is the frozen contract: 316
@@ -164,16 +170,54 @@ resynchronizes. A window whose selection changed under it, because another
 window already restarted the engine, takes the same path and adopts that engine.
 Reusing an engine leaves `selection.json` untouched when its content is the same. Otherwise it shows `shell.service.engine_down`.
 
+## Live Typst view
+
+The window serves the seven window functions of the contract: `site_open_local`,
+`site_zoom` and the `typst_live_*` family (`src-tauri/src/extracted/typst_live.rs`).
+For each task tree the window runs one `tinymist lsp` and shows its preview as a
+native site limited to `127.0.0.1:<port>`. The engine resolves the folder, the
+main file and the binary (`tree_typst_target`); the window never starts
+Tinymist with a path from the webview. On Windows a Job Object kills the
+Tinymist processes if the window dies.
+
+## Updating on Windows
+
+Windows does not overwrite a running `.exe`, but it renames one. The installer
+(`src-tauri/windows/hooks.nsh`) renames `terminus.exe` and `seldon-runtime.exe`
+to `old_*` and writes the new ones, so the open window and its engine keep
+working. The template's step that closes Terminus only runs on a real
+uninstall; an installer replacing the copy runs the uninstaller in place
+(`_?=$INSTDIR`), and that run also sets the files aside. The app does not use
+`downloadAndInstall`, which exits on Windows: `update_install` downloads with
+the plugin's signature check and runs the installer with `/S /UPDATE`.
+
+`update_pending` reports when this window's image was set aside and the new
+`terminus.exe` is already in its place, whether the app or a manual installer
+did it, and the front asks for a restart. A manual installer that finds
+Terminus open shows the same notice and ends there, instead of running a second
+window from its finish page. On the next start, an engine running from
+`old_seldon-runtime.exe` gets `service stop`; one that refuses keeps working
+and the new engine waits for the next start. Then the window deletes the
+`old_*` files no one holds, retrying for a few seconds while the window it
+replaces exits.
+
+An open window does not wait for a restart either: every 15 s it checks
+whether the live engine was replaced and, once that engine has no turns,
+downloads or operations, asks it for `service stop`. The next `service_poll`
+starts the installed engine. The update notice says how many tasks the old
+engine is still running and offers to stop them and restart. A replaced engine
+is one running from `old_*` on Windows, from a deleted binary or an AppImage
+copy that differs from the bundled one on Linux, and from a path other than
+the bundled engine on macOS. The Linux and macOS checks have not been tried on
+those systems.
+
 ## Not done yet
 
-- The engine is pinned for the four platforms and bundled on all of them, but
-  only Windows has been tried from an installer. The macOS universal bundle
-  carries a `lipo` of the two pinned macOS binaries.
-- `seldon-runtime.lock` pins 7fa5120, whose `seldon-endpoint.json` inherits
-  the data root's ACL. On a Windows profile that grants others access to
-  `%LOCALAPPDATA%` (the Codex sandbox) the window rejects it (`invalid_token`)
-  and the handoff fails; seldon-host #20 (`fa6d965`) fixes it and needs a new
-  pinned prerelease. A lab root hides this: the window makes it private.
-- Seven window functions (`site_open_local`, `site_zoom` and the
-  `typst_live_*` family) are in the contract but not served by the window, so
-  the live Typst view does not work.
+- The engine is pinned for the four platforms and bundled on all of them. The
+  published installers were tried on Windows 11, macOS 15.8 (Apple silicon)
+  and Linux, updating from 0.2.74 with real data (#60). The macOS universal
+  bundle carries a `lipo` of the two pinned macOS binaries.
+- The engine still installs, updates and removes the Typst plugin, while the
+  window runs its Tinymist. Settings stops every live view before touching the
+  plugin (`typst_live_stop`); moving the plugin into the window is planned in
+  seldon-host.

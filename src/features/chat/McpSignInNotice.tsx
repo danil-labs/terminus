@@ -92,7 +92,7 @@ export default function McpSignInNotice(props: { session: string | null }) {
   }
 
   onMount(() => {
-    // Nombres literales: `scripts/bridge.mjs` solo lee esos.
+    // Nombres literales: `scripts/guards/bridge.mjs` solo lee esos.
     const url = listen<string>("mcp-login", (e) => setLoginUrl(e.payload));
     const end = listen<LoginEnded>("mcp", (e) => {
       if (e.payload?.ok) forgetSignedIn(e.payload.agent, e.payload.server);

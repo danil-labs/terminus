@@ -23,6 +23,7 @@ import {
   type DiagnosticoTypst,
   type ExportacionTypst,
   abrirVista,
+  reaperturaDe,
   ampliadaDe,
   ampliarVista,
   asegurarCapa,
@@ -68,9 +69,11 @@ export default function VistaPreviaTypst(props: {
   const zoom = () => zoomDe(props.session, props.arbol);
   const ampliada = () => ampliadaDe(props.session, props.arbol);
 
-  // Esc vuelve a lado a lado, solo desde el visor que se ve.
+  // Esc vuelve a lado a lado solo con el foco en este visor: en el chat u otro panel es de ellos.
+  let raiz: HTMLDivElement | undefined;
   const alTeclear = (e: KeyboardEvent) => {
     if (e.key !== "Escape" || !props.visible || !ampliada() || e.defaultPrevented) return;
+    if (!(e.target instanceof Node) || !raiz?.contains(e.target)) return;
     ampliarVista(props.session, props.arbol, false);
   };
   window.addEventListener("keydown", alTeclear);
@@ -80,27 +83,45 @@ export default function VistaPreviaTypst(props: {
   const errores = () => compilado()?.diagnostics.filter((d) => d.severity === "error") ?? [];
   const avisos = () => compilado()?.diagnostics.filter((d) => d.severity === "warning") ?? [];
 
-  tomarVista(props.session, props.arbol);
-  onCleanup(() => soltarVista(props.session, props.arbol));
+  // Al desmontar, las props pueden venir de un `<Show>` que ya no se cumple: leerlas lanza «Stale read».
+  const tomada = { session: props.session, arbol: props.arbol };
+  tomarVista(tomada.session, tomada.arbol);
+  onCleanup(() => soltarVista(tomada.session, tomada.arbol));
 
   let pedido = 0;
+  // Un fallo de transporte (motor ocupado) no deja la vista muerta: se reintenta unas veces.
+  let reintentos = 0;
+  let reintento: ReturnType<typeof setTimeout> | undefined;
+  onCleanup(() => clearTimeout(reintento));
   async function abrir() {
     const n = ++pedido;
+    clearTimeout(reintento);
     setFallo(null);
     try {
       await abrirVista(props.project, props.session, props.arbol, props.ruta);
+      reintentos = 0;
     } catch (e) {
-      if (n === pedido) setFallo(asFailure(e));
+      if (n !== pedido) return;
+      setFallo(asFailure(e));
+      if (reintentos < 5) {
+        reintentos++;
+        reintento = setTimeout(() => setIntento((i) => i + 1), 3000);
+      }
     }
   }
-  createEffect(on([() => props.ruta, () => principalElegido(props.project), intento], () => void abrir()));
+  createEffect(
+    on(
+      [() => props.ruta, () => principalElegido(props.project), intento, () => reaperturaDe(props.session, props.arbol)],
+      () => void abrir(),
+    ),
+  );
 
   // Activar o actualizar Typst en Ajustes con este archivo abierto lo pinta sin reabrirlo.
   const integraciones = listen("integrations-changed", () => void abrir());
   onCleanup(() => void integraciones.then((dejar) => dejar()));
 
   // La capa es del árbol y la comparten sus visores: abrir otro .typ no la vuelve a dibujar.
-  const ocupante = ocuparCapa(props.session, props.arbol);
+  const ocupante = ocuparCapa(tomada.session, tomada.arbol);
   let hueco: HTMLDivElement | undefined;
   let ultimo: Hueco = { x: 0, y: 0, width: 0, height: 0 };
   const avisarHueco = () => moverOcupante(props.session, props.arbol, ocupante, { visible: props.visible, hueco: ultimo });
@@ -148,7 +169,7 @@ export default function VistaPreviaTypst(props: {
     }
   });
   createEffect(on([() => props.visible, ampliada], medirYAvisar));
-  onCleanup(() => desocuparCapa(props.session, props.arbol, ocupante));
+  onCleanup(() => desocuparCapa(tomada.session, tomada.arbol, ocupante));
 
   function arreglar() {
     const c = compilado();
@@ -203,7 +224,7 @@ export default function VistaPreviaTypst(props: {
     window.dispatchEvent(new CustomEvent("harness:open-settings", { detail: "plugins" }));
 
   return (
-    <div class="flex min-h-0 flex-1 flex-col">
+    <div ref={raiz} class="flex min-h-0 flex-1 flex-col">
       <Show when={viva()?.estado === "sin_typst"}>
         <div class="flex flex-col items-center gap-3 p-6 text-center">
           <p class="m-0 text-xs text-neutral-500">{t("code.typst.missing")}</p>

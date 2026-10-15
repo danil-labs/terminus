@@ -1,4 +1,4 @@
-# Runs the deterministic part of `pnpm verificar` on every pull request,
+# Runs the deterministic part of `pnpm verify` on every pull request,
 # including pull requests from forks.
 #
 # Safe for forks by construction:
@@ -8,7 +8,7 @@
 #   - every action is pinned to a commit SHA.
 #
 # Rust (fmt, check, clippy, test) runs in the `rust` job on Linux. Windows and
-# macOS are verified by maintainers with `pnpm verificar` on those machines.
+# macOS are verified by maintainers with `pnpm verify` on those machines.
 
 name: verify
 
@@ -45,7 +45,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm verificar --sin-cargo
+      - run: pnpm verify --no-cargo
 
   rust:
     name: verify (rust)
@@ -79,7 +79,7 @@ jobs:
         run: node scripts/engine.mjs sidecar
 
       - name: CLI forwarding and pinned command catalog
-        run: node --test scripts/cli-forward.test.mjs
+        run: node --test tests/unit/cli-forward.test.mjs
 
       - name: cargo fmt
         working-directory: src-tauri

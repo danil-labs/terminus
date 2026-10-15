@@ -3,7 +3,7 @@ import { createEffect, createRoot, createSignal, on } from "solid-js";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
 import { createPref } from "../../lib/prefs";
-import { hayCapaEncima, moviendoHueco, type Hueco } from "../../lib/sites";
+import { hayCapaEncima, moviendoHueco, zonasEncima, type Hueco } from "../../lib/sites";
 
 /** `environment/typst.rs` · `Diagnostico`. */
 export type DiagnosticoTypst = {
@@ -41,16 +41,33 @@ export function esTypst(ruta: string) {
 
 /** Si el plugin Typst está activo en este workspace: sin él, un `.typ` es un archivo de texto más. */
 const [pluginTypst, setPluginTypst] = createSignal(false);
-export { pluginTypst };
+
+/** Si esta ventana registra `typst_live_*`: hasta saberlo, no hay vista que ofrecer. */
+const [vistaServida, setVistaServida] = createSignal(false);
+export { vistaServida };
+
+/** El ojo y el PDF al lado: el plugin activo y una ventana que sirve la vista. */
+export const conVistaTypst = () => pluginTypst() && vistaServida();
+
+/** Al montar la ventana: suelta los Tinymist que dejó una recarga y, de paso, sabe si la vista existe. */
+export function soltarVistasHuerfanas() {
+  // `typst_live_stop` no devuelve error: si se rechaza, es que la ventana no lo registra.
+  void invoke("typst_live_stop", { key: null, session: null }).then(
+    () => setVistaServida(true),
+    () => setVistaServida(false),
+  );
+}
 
 let consultado = false;
+/** Desactivar y reactivar seguido cruza dos consultas: solo cuenta la última que se pidió. */
+let consulta = 0;
 async function consultarPlugin() {
-  try {
-    const catalogo = await invoke<{ plugins: { id: string; enabled: boolean }[] }>("list_integrations");
-    setPluginTypst(catalogo.plugins.some((p) => p.id === "typst" && p.enabled));
-  } catch {
-    setPluginTypst(false);
-  }
+  const n = ++consulta;
+  const activo = await invoke<{ plugins: { id: string; enabled: boolean }[] }>("list_integrations").then(
+    (catalogo) => catalogo.plugins.some((p) => p.id === "typst" && p.enabled),
+    () => false,
+  );
+  if (n === consulta) setPluginTypst(activo);
 }
 
 /** Pide el estado una vez y lo sigue con cada cambio de plugins o de workspace. */
@@ -74,6 +91,14 @@ export function elegirPrincipal(project: string, ruta: string | null) {
 }
 
 const claveDe = (session: string, arbol: string) => `${session}\n${arbol}`;
+
+/** Un cambio que no llegó a Tinymist pide reabrir la vista de su árbol; la vuelven a pedir sus visores. */
+const [reaperturas, setReaperturas] = createSignal<Record<string, number>>({});
+export const reaperturaDe = (session: string, arbol: string) => reaperturas()[claveDe(session, arbol)] ?? 0;
+export function pedirReapertura(session: string, arbol: string) {
+  const clave = claveDe(session, arbol);
+  setReaperturas((r) => ({ ...r, [clave]: (r[clave] ?? 0) + 1 }));
+}
 
 /** La vista viva de cada árbol de tarea: la arranca el primer visor y la comparten los demás. */
 const [vivas, setVivas] = createSignal<Record<string, VistaViva>>({});
@@ -201,7 +226,7 @@ let reaccionando = false;
 function reaccionar() {
   if (reaccionando) return;
   reaccionando = true;
-  createRoot(() => createEffect(on([hayCapaEncima, moviendoHueco], () => capas.forEach((_, clave) => colocarCapa(clave)))));
+  createRoot(() => createEffect(on([zonasEncima, moviendoHueco], () => capas.forEach((_, clave) => colocarCapa(clave)))));
 }
 
 // Cambiar de pestaña esconde un visor y enseña otro en el mismo cuadro: se junta todo y sale
@@ -224,7 +249,7 @@ function colocarAhora(clave: string) {
   if (!capa?.label) return;
   const label = capa.label;
   const visible = [...(ocupantes.get(clave)?.values() ?? [])].find((o) => o.visible && o.hueco.width >= 1);
-  const esconder = !visible || hayCapaEncima() || moviendoHueco();
+  const esconder = !visible || hayCapaEncima(visible.hueco) || moviendoHueco();
   const destino = esconder ? "escondida" : JSON.stringify(visible.hueco);
   if (destino === capa.ultima) return;
   capa.ultima = destino;

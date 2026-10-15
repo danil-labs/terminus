@@ -17,7 +17,7 @@ src-tauri/gen/
 tsconfig.tsbuildinfo
 dist-min
 dist-solid
-docs/FRASES.md
+docs/PHRASES.md
 
 src-tauri/crates/*/target/
 

@@ -369,5 +369,16 @@
   "chat.delegation.failed": "Could not load the task status.",
   "chat.delegation.unavailable": "This task is no longer available.",
   "chat.delegation.back": "Back to {title}",
-  "chat.delegation.retry": "Retry"
+  "chat.delegation.retry": "Retry",
+  "chat.visual.title": "Interactive visualization",
+  "chat.visual.expand": "Expand visualization",
+  "chat.visual.retry": "Retry",
+  "chat.visual.loading": "Loading visualization…",
+  "chat.visual.failed": "Could not load the visualization. Check the file and try again.",
+  "chat.visual.invalid": "The visualization requires a valid HTML file from this task.",
+  "chat.visual.too_large": "The visualization exceeds the 512 KiB limit.",
+  "chat.visual.collapse": "Collapse visualization",
+  "chat.visual.budget": "This thread reached its limit of 16 loaded visualizations. Close a visualization to load another.",
+  "chat.visual.unload": "Close visualization",
+  "chat.visual.load": "Open visualization"
 }

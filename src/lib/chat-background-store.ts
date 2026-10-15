@@ -1,10 +1,40 @@
 import { createPref } from "./prefs.ts";
 import { invoke } from "./invoke.ts";
-import { fondoDe, VELO_DE_FONDO, type FondoDeChat } from "./chat-background.ts";
+import {
+  fondoDe,
+  VELO_DE_FONDO,
+  VELO_DE_PESTANAS,
+  VELO_DE_PESTANAS_MAX,
+  VELO_DE_PESTANAS_MIN,
+  type FondoDeChat,
+} from "./chat-background.ts";
 
 const [guardado, setGuardado] = createPref<string>("chat-background", "dusk");
 const [rutaPropia, setRutaPropia] = createPref<string | null>("chat-background-custom", null);
 const [veloGuardado, setVeloGuardado] = createPref<number>("chat-background-veil", VELO_DE_FONDO);
+const [veloDePestanasGuardado, setVeloDePestanasGuardado] = createPref<number>("tabs-veil", VELO_DE_PESTANAS);
+
+function acotarVeloDePestanas(valor: unknown): number {
+  return typeof valor === "number" && Number.isFinite(valor)
+    ? Math.min(VELO_DE_PESTANAS_MAX, Math.max(VELO_DE_PESTANAS_MIN, valor))
+    : VELO_DE_PESTANAS;
+}
+
+export function veloDePestanas(): number {
+  return acotarVeloDePestanas(veloDePestanasGuardado());
+}
+
+export function elegirVeloDePestanas(valor: number): number {
+  const siguiente = acotarVeloDePestanas(valor);
+  setVeloDePestanasGuardado(siguiente);
+  aplicarVeloDePestanas();
+  return siguiente;
+}
+
+/** Pinta el velo guardado. La llama el arranque, antes del primer pintado. */
+export function aplicarVeloDePestanas() {
+  document.documentElement.style.setProperty("--tab-veil", String(veloDePestanas()));
+}
 
 export function veloDeFondo(): number {
   const valor = veloGuardado();
