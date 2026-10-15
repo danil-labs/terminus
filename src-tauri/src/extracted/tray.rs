@@ -24,8 +24,10 @@ pub(super) struct Item {
     title: String,
 }
 
+/// `get_window`: con Typst o un sitio abiertos la ventana tiene varias vistas y
+/// `get_webview_window` ya no la devuelve.
 pub(super) fn show_window(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
+    if let Some(window) = app.get_window("main") {
         let _ = window.show();
         let _ = window.unminimize();
         let _ = window.set_focus();
@@ -108,7 +110,7 @@ pub(super) fn window_to_background(
         }
         builder.build(&app).map_err(|error| error.to_string())?;
     }
-    if let Some(window) = app.get_webview_window("main") {
+    if let Some(window) = app.get_window("main") {
         window.hide().map_err(|error| error.to_string())?;
     }
     Ok(())
@@ -157,7 +159,7 @@ pub(super) fn tray_notify(
     #[cfg(not(windows))]
     use tauri_plugin_notification::NotificationExt;
     // El foco lo dice la ventana nativa: el del documento no ve el de las vistas hijas.
-    if let Some(window) = app.get_webview_window("main") {
+    if let Some(window) = app.get_window("main") {
         let on_screen =
             window.is_visible().unwrap_or(false) && !window.is_minimized().unwrap_or(false);
         let focused = in_front(&window);
@@ -195,7 +197,7 @@ pub(super) fn tray_notify(
 
 /// En Windows `is_focused` dice que no cuando el foco está dentro del WebView2;
 /// la ventana del frente sí lo sabe.
-fn in_front(window: &tauri::WebviewWindow) -> bool {
+fn in_front(window: &tauri::Window) -> bool {
     #[cfg(windows)]
     {
         use windows_sys::Win32::UI::WindowsAndMessaging::{
