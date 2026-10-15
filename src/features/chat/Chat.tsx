@@ -118,7 +118,7 @@ import {
   TooltipRoot,
   TooltipTrigger,
 } from "../../ui/Tooltip";
-import Adjuntos, { Adjunto } from "./Attachments";
+import Adjuntos, { Adjunto, rodarEnHorizontal } from "./Attachments";
 import VentanaDeContexto from "./ContextWindow";
 import Entrega, { type Producido } from "./Delivery";
 import {
@@ -2045,17 +2045,12 @@ export default function Chat(props: ChatProps) {
               el campo de texto. */}
           <div
             class="flex gap-2 overflow-x-auto overflow-y-hidden px-1 pt-1 pb-1 select-none"
-            onWheel={(e) => {
-              const fila = e.currentTarget;
-              if (e.deltaX !== 0 || fila.scrollWidth <= fila.clientWidth) return;
-              fila.scrollLeft += e.deltaY;
-              e.preventDefault();
-            }}
+            onWheel={rodarEnHorizontal}
           >
             <For each={props.adjuntos}>
               {(p) => (
                 <div class="group relative shrink-0">
-                  <Adjunto rel={p} miniatura={props.onMiniatura} compacto />
+                  <Adjunto rel={p} miniatura={props.onMiniatura} />
                   {/* Dentro de la esquina: fuera de ella, el scroll horizontal la recorta. */}
                   <button
                     type="button"
