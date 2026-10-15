@@ -4272,12 +4272,12 @@ dependencies = [
  "tauri-plugin-notification",
  "tauri-plugin-process",
  "tauri-plugin-updater",
- "tauri-winrt-notification",
  "tempfile",
  "terminus-engine-client",
  "terminus-engine-protocol",
  "ureq",
  "uuid",
+ "windows 0.62.2",
  "windows-sys 0.61.2",
  "zeroize",
 ]
