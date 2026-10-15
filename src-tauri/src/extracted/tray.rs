@@ -144,31 +144,38 @@ pub(super) fn restart_app(app: AppHandle) {
 }
 
 /// Una tarea terminó o necesita a la persona. Con la ventana fuera de la pantalla
-/// sale un aviso del sistema; a la vista solo parpadea, y solo si la necesita.
+/// sale un aviso del sistema; a la vista solo parpadea, y solo si la necesita. Con
+/// foco responde `focused` y el aviso lo pinta la ventana.
 #[tauri::command]
 pub(super) fn tray_notify(
     app: AppHandle,
     title: String,
     body: String,
     needs_you: bool,
-) -> Result<(), String> {
+) -> Result<&'static str, String> {
     #[cfg(not(windows))]
     use tauri_plugin_notification::NotificationExt;
+    // El foco lo dice la ventana nativa: el del documento no ve el de las vistas hijas.
     if let Some(window) = app.get_webview_window("main") {
         let on_screen =
             window.is_visible().unwrap_or(false) && !window.is_minimized().unwrap_or(false);
-        log::info!("[aviso] needs_you={needs_you} on_screen={on_screen}");
+        let focused = window.is_focused().unwrap_or(false);
+        log::info!("[aviso] needs_you={needs_you} on_screen={on_screen} focused={focused}");
+        if on_screen && focused {
+            return Ok("focused");
+        }
         if on_screen {
-            if needs_you && !window.is_focused().unwrap_or(true) {
+            if needs_you {
                 let _ =
                     window.request_user_attention(Some(tauri::UserAttentionType::Informational));
+                return Ok("flash");
             }
-            return Ok(());
+            return Ok("none");
         }
     }
     #[cfg(windows)]
     {
-        windows_toast(&app, &title, &body)
+        windows_toast(&app, &title, &body).map(|()| "system")
     }
     #[cfg(not(windows))]
     {
@@ -177,6 +184,7 @@ pub(super) fn tray_notify(
             .title(title)
             .body(body)
             .show()
+            .map(|()| "system")
             .map_err(|error| error.to_string())
     }
 }

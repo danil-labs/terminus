@@ -57,20 +57,17 @@ export default function TaskNotifier(props: {
     : state === "failed" ? t("shell.notify.failed_hint")
     : t("shell.notify.finished_hint");
 
-  function announce(notice: Notice) {
+  async function announce(notice: Notice) {
     const choice = leerPref<NotifyChoice>(NOTIFY_PREF, "all");
     if (choice === "off" || (choice === "needs_you" && !NEEDS_YOU.includes(notice.state))) return;
     if (notice.state === "unseen" && Date.now() < quietUntil) return;
-    const focused = document.visibilityState === "visible" && document.hasFocus();
-    if (!focused) {
-      // Rust decide: oculta o minimizada, aviso del sistema; a la vista, solo parpadeo.
-      void invoke("tray_notify", {
-        title: heading(notice.state, notice.title),
-        body: hint(notice.state),
-        needsYou: NEEDS_YOU.includes(notice.state),
-      }).catch(() => {});
-      return;
-    }
+    // Rust decide con el foco nativo: aviso del sistema, parpadeo, o este panel.
+    const where = await invoke<string>("tray_notify", {
+      title: heading(notice.state, notice.title),
+      body: hint(notice.state),
+      needsYou: NEEDS_YOU.includes(notice.state),
+    }).catch(() => "focused");
+    if (where !== "focused") return;
     // Con la tarea delante ya se ve; un turno que cierra en otra lo pinta su pestaña.
     if (notice.workspace === props.workspace && notice.session === props.session) return;
     if (!NEEDS_YOU.includes(notice.state)) return;
@@ -89,7 +86,7 @@ export default function TaskNotifier(props: {
             for (const task of w.tasks) {
               const key = `${w.workspace}/${task.session}`;
               if (before.get(key) === task.state) continue;
-              announce({ key, workspace: w.workspace, session: task.session, project: task.project, state: task.state, title: titleOf(w.workspace, task.session) });
+              void announce({ key, workspace: w.workspace, session: task.session, project: task.project, state: task.state, title: titleOf(w.workspace, task.session) });
             }
           }
         }
