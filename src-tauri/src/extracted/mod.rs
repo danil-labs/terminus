@@ -32,7 +32,14 @@ pub fn launch() -> Result<()> {
 }
 
 fn open() -> Result<()> {
-    let args: Vec<_> = std::env::args_os().collect();
+    let mut args: Vec<_> = std::env::args_os().collect();
+    if let Some(key) = args.get(1).and_then(|arg| tray::notice_key(arg)) {
+        if instance::open_notice(&engine::paths()?.window, &key) {
+            return Ok(());
+        }
+        // Sin ventana abierta, el enlace arranca Terminus como siempre.
+        args.truncate(1);
+    }
     let autostart = args.len() == 1;
     let mut paths = None;
     let selection = match args.as_slice() {
@@ -159,10 +166,17 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
                     false
                 })
                 .build()?;
+            #[cfg(windows)]
+            tray::register_notice_scheme();
             launcher::start(app.handle().clone(), starting.clone());
             if let Some(listener) = listener {
                 let handle = app.handle().clone();
-                instance::serve(listener, move || tray::show_window(&handle));
+                instance::serve(listener, move |key| {
+                    tray::show_window(&handle);
+                    if let Some(key) = key {
+                        let _ = handle.emit("notice-clicked", key);
+                    }
+                });
             }
             Ok(())
         })
