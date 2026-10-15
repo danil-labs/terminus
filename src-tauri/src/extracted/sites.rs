@@ -298,6 +298,8 @@ fn abrir_capa(
     let mut constructor =
         tauri::webview::WebviewBuilder::new(&label, WebviewUrl::External(destino))
             .incognito(true)
+            // Al crearse no se queda el teclado: lo tenía el editor o el chat.
+            .focused(false)
             .disable_drag_drop_handler()
             .on_navigation(navega)
             .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny)
