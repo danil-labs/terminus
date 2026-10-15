@@ -75,7 +75,10 @@ pub fn serve(listener: TcpListener, show: impl Fn(Option<String>) + Send + 'stat
                     continue;
                 };
                 let mut line = String::new();
-                if BufReader::new(reader.take(256)).read_line(&mut line).is_err() {
+                if BufReader::new(reader.take(256))
+                    .read_line(&mut line)
+                    .is_err()
+                {
                     continue;
                 }
                 let key = match line.strip_suffix('\n') {
