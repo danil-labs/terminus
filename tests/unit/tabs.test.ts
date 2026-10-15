@@ -612,6 +612,51 @@ test("local progress paints before completion and rejects superseded channels", 
   }
 });
 
+test("remounting the tabs and the sidebar keeps the last Git rows instead of painting none", async () => {
+  const { watchSessionGit } = await import("../../src/features/projects/taskGit.ts");
+  const previousWindow = globalThis.window;
+  const previousDocument = globalThis.document;
+  const row = { ...UNKNOWN_GIT, kind: "branch" as const, branch: "feature", head: "a", repository: "repo" };
+  const pending: (() => void)[] = [];
+  let answer: Record<string, typeof row> = { s: row };
+  const fake = Object.assign(new EventTarget(), { __TAURI_INTERNALS__: { transformCallback: () => 1,
+    invoke: async (_: string, args: { remote: boolean }) => {
+      if (args.remote) return {};
+      const value = structuredClone(answer);
+      return new Promise(resolve => pending.push(() => resolve(value)));
+    },
+  } });
+  Object.defineProperty(globalThis, "window", { configurable: true, value: fake, writable: true });
+  Object.defineProperty(globalThis, "document", { configurable: true, value: Object.assign(new EventTarget(), { hidden: false }), writable: true });
+  const tick = () => new Promise(resolve => setTimeout(resolve, 0));
+  const answerAll = async () => { while (pending.length) pending.shift()!(); await tick(); };
+  const watchers = [watchSessionGit("remount-test"), watchSessionGit("remount-test")];
+  try {
+    await tick();
+    await answerAll();
+    const seen = watchers[0].rows();
+    assert.equal(seen.s.branch, "feature");
+    // Cerrar una ventana: los viejos se sueltan antes de que pidan los nuevos.
+    watchers.splice(0).forEach(w => w.release());
+    watchers.push(watchSessionGit("remount-test"), watchSessionGit("remount-test"));
+    assert.equal(watchers[0].rows(), seen, "the new strip paints what was already known");
+    await tick();
+    await answerAll();
+    assert.equal(watchers[0].rows(), seen, "an equal read does not repaint");
+    watchers.splice(0).forEach(w => w.release());
+    answer = {};
+    fake.dispatchEvent(new Event("harness:workspace"));
+    watchers.push(watchSessionGit("remount-test"));
+    assert.deepEqual(watchers[0].rows(), {}, "another workspace inherits nothing");
+  } finally {
+    watchers.forEach(w => w.release());
+    fake.dispatchEvent(new Event("harness:workspace"));
+    await answerAll();
+    Object.defineProperty(globalThis, "window", { configurable: true, value: previousWindow, writable: true });
+    Object.defineProperty(globalThis, "document", { configurable: true, value: previousDocument, writable: true });
+  }
+});
+
 const { idProvisional } = await import("../../src/lib/taskDraft.ts");
 
 // La tarea se pinta antes de que Rust le dé su id. Guardar ese id provisional
