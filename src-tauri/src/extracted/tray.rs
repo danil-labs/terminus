@@ -176,7 +176,8 @@ pub(super) fn tray_notify(
     }
     #[cfg(windows)]
     {
-        windows_toast(&app, &title, &body, key).map(|()| "system")
+        windows_toast(&app, &title, &body, &key);
+        Ok("system")
     }
     #[cfg(not(windows))]
     {
@@ -208,41 +209,106 @@ fn in_front(window: &tauri::WebviewWindow) -> bool {
     window.is_focused().unwrap_or(false)
 }
 
-/// El plugin no deja reaccionar al clic en Windows; aquí el clic trae la ventana.
+/// Esquema con el que Windows abre `terminus.exe` al pulsar un aviso, aunque ya
+/// esté en el centro de notificaciones; la ventana abierta recibe la tarea.
+pub(super) const NOTICE_SCHEME: &str = "terminus-notice";
+
+/// La clave del aviso en `terminus-notice://open?key=<espacio>/<tarea>`.
+pub(super) fn notice_key(arg: &std::ffi::OsStr) -> Option<String> {
+    let key = arg
+        .to_str()?
+        .strip_prefix(NOTICE_SCHEME)?
+        .strip_prefix("://open?key=")?
+        .trim_end_matches('/');
+    let valid = !key.is_empty()
+        && key.len() <= 200
+        && key.chars().all(|c| c.is_ascii_alphanumeric() || "-_/".contains(c));
+    valid.then(|| key.to_owned())
+}
+
 #[cfg(windows)]
-fn windows_toast(app: &AppHandle, title: &str, body: &str, key: String) -> Result<(), String> {
-    use tauri_winrt_notification::Toast;
-    // Sin instalar no hay AppUserModelID registrado y Windows descarta el aviso.
-    let installed = tauri::utils::platform::current_exe()
+fn installed() -> bool {
+    tauri::utils::platform::current_exe()
         .ok()
         .and_then(|exe| exe.parent().map(|dir| dir.to_path_buf()))
-        .is_some_and(|dir| !dir.ends_with("target/debug") && !dir.ends_with("target/release"));
-    let app_id = if installed {
-        app.config().identifier.clone()
-    } else {
-        Toast::POWERSHELL_APP_ID.to_owned()
+        .is_some_and(|dir| !dir.ends_with("target/debug") && !dir.ends_with("target/release"))
+}
+
+/// Solo la copia instalada: una de desarrollo no se queda con los enlaces.
+#[cfg(windows)]
+pub(super) fn register_notice_scheme() {
+    use windows_sys::Win32::System::Registry::{RegSetKeyValueW, HKEY_CURRENT_USER, REG_SZ};
+    let Ok(exe) = std::env::current_exe() else {
+        return;
     };
-    let handle = app.clone();
-    let (title, body) = (title.to_owned(), body.to_owned());
-    // Como el plugin: WinRT fuera del hilo de la ventana, que no acepta el aviso.
-    std::thread::spawn(move || {
-        let clicked = handle.clone();
-        let shown = Toast::new(&app_id)
-            .title(&title)
-            .text1(&body)
-            .on_activated(move |_| {
-                log::info!("[aviso] clic");
-                let window = clicked.clone();
-                let _ = clicked.run_on_main_thread(move || show_window(&window));
-                // La ventana sabe qué tarea era y la abre, como el botón de su aviso.
-                let _ = clicked.emit("notice-clicked", key.clone());
-                Ok(())
-            })
-            .show();
-        match shown {
-            Ok(()) => log::info!("[aviso] mostrado app_id={app_id}"),
-            Err(error) => log::warn!("[aviso] no se pudo mostrar app_id={app_id}: {error}"),
-        }
+    if !installed() {
+        return;
+    }
+    let wide = |text: &str| text.encode_utf16().chain(Some(0)).collect::<Vec<u16>>();
+    let set = |key: &str, name: Option<&str>, value: &str| {
+        let (key, value) = (wide(key), wide(value));
+        let name = name.map(wide);
+        let name = name.as_ref().map_or(std::ptr::null(), |name| name.as_ptr());
+        let size = (value.len() * 2) as u32;
+        unsafe {
+            RegSetKeyValueW(
+                HKEY_CURRENT_USER,
+                key.as_ptr(),
+                name,
+                REG_SZ,
+                value.as_ptr().cast(),
+                size,
+            )
+        };
+    };
+    let base = format!(r"Software\Classes\{NOTICE_SCHEME}");
+    set(&base, None, "URL:Terminus");
+    set(&base, Some("URL Protocol"), "");
+    let command = format!("\"{}\" \"%1\"", exe.display());
+    set(&format!(r"{base}\shell\open\command"), None, &command);
+}
+
+#[cfg(windows)]
+fn windows_toast(app: &AppHandle, title: &str, body: &str, key: &str) {
+    let escape = |text: &str| {
+        text.replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;")
+            .replace('"', "&quot;")
+    };
+    // Sin instalar no hay AppUserModelID ni esquema registrados: avisa sin abrir nada.
+    let (app_id, launch) = if installed() {
+        let link = format!("{NOTICE_SCHEME}://open?key={key}");
+        let launch = format!(r#" activationType="protocol" launch="{}""#, escape(&link));
+        (app.config().identifier.clone(), launch)
+    } else {
+        (POWERSHELL_APP_ID.to_owned(), String::new())
+    };
+    let xml = format!(
+        r#"<toast{launch}><visual><binding template="ToastGeneric"><text>{}</text><text>{}</text></binding></visual></toast>"#,
+        escape(title),
+        escape(body)
+    );
+    // Como el plugin: WinRT fuera del hilo de la ventana, que no publica el aviso.
+    std::thread::spawn(move || match show_toast(&app_id, &xml) {
+        Ok(()) => log::info!("[aviso] mostrado app_id={app_id}"),
+        Err(error) => log::warn!("[aviso] no se pudo mostrar app_id={app_id}: {error}"),
     });
-    Ok(())
+}
+
+#[cfg(windows)]
+const POWERSHELL_APP_ID: &str =
+    "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe";
+
+#[cfg(windows)]
+fn show_toast(app_id: &str, xml: &str) -> windows::core::Result<()> {
+    use windows::{
+        core::HSTRING,
+        Data::Xml::Dom::XmlDocument,
+        UI::Notifications::{ToastNotification, ToastNotificationManager},
+    };
+    let document = XmlDocument::new()?;
+    document.LoadXml(&HSTRING::from(xml))?;
+    let toast = ToastNotification::CreateToastNotification(&document)?;
+    ToastNotificationManager::CreateToastNotifierWithId(&HSTRING::from(app_id))?.Show(&toast)
 }
