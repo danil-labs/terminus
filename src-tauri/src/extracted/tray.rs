@@ -159,7 +159,7 @@ pub(super) fn tray_notify(
     if let Some(window) = app.get_webview_window("main") {
         let on_screen =
             window.is_visible().unwrap_or(false) && !window.is_minimized().unwrap_or(false);
-        let focused = window.is_focused().unwrap_or(false);
+        let focused = in_front(&window);
         log::info!("[aviso] needs_you={needs_you} on_screen={on_screen} focused={focused}");
         if on_screen && focused {
             return Ok("focused");
@@ -187,6 +187,22 @@ pub(super) fn tray_notify(
             .map(|()| "system")
             .map_err(|error| error.to_string())
     }
+}
+
+/// En Windows `is_focused` dice que no cuando el foco está dentro del WebView2;
+/// la ventana del frente sí lo sabe.
+fn in_front(window: &tauri::WebviewWindow) -> bool {
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            GetAncestor, GetForegroundWindow, GA_ROOT,
+        };
+        if let Ok(hwnd) = window.hwnd() {
+            let front = unsafe { GetAncestor(GetForegroundWindow(), GA_ROOT) };
+            return !front.is_null() && front == hwnd.0;
+        }
+    }
+    window.is_focused().unwrap_or(false)
 }
 
 /// El plugin no deja reaccionar al clic en Windows; aquí el clic trae la ventana.
