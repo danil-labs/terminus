@@ -1,6 +1,6 @@
 //! Una sola ventana por carpeta de datos: abrir Terminus otra vez muestra la que
-//! ya existe. No se usa el plugin de Tauri porque se identifica por `identifier`,
-//! que comparten la app instalada y la del laboratorio.
+//! ya existe. El plugin de Tauri no sirve: se identifica por `identifier`, que
+//! comparten la app instalada y la del laboratorio.
 use std::{
     io::{BufRead, BufReader, Read, Write},
     net::{TcpListener, TcpStream},
