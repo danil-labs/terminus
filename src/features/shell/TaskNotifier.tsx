@@ -33,7 +33,8 @@ export function quietFinished(ms = 15000) {
 export default function TaskNotifier(props: {
   attention: WorkspaceAttention[];
   workspace: string | null;
-  session: string | null;
+  /** Si la tarea se ve en alguna ventana del reparto, no solo en la activa. */
+  inView: (session: string) => boolean;
   title: (session: string) => string | undefined;
   open: (project: string, session: string) => void;
 }) {
@@ -78,7 +79,7 @@ export default function TaskNotifier(props: {
     }
     if (where !== "focused") return;
     // Con la tarea delante ya se ve; un turno que cierra en otra lo pinta su pestaña.
-    if (notice.workspace === props.workspace && notice.session === props.session) return;
+    if (notice.workspace === props.workspace && props.inView(notice.session)) return;
     if (!NEEDS_YOU.includes(notice.state)) return;
     setNotices((list) => [...list.filter((n) => n.key !== notice.key), notice].slice(-3));
   }
