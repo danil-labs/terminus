@@ -6873,7 +6873,13 @@ export default function App() {
         <TaskNotifier
           attention={attention.list()}
           workspace={workspaceActivo()}
-          session={proyectoAbierto() ? null : sessionId()}
+          inView={(id) =>
+            !proyectoAbierto() &&
+            (id === sessionId() ||
+              ventanas().some((sitio) => {
+                const tab = pestanas.open().find((p) => p.id === paneles.activeTabAt(sitio));
+                return !!tab && isTaskTab(tab) && tab.session === id;
+              }))}
           title={(id) => filaDe(id)?.title}
           open={(project, id) => void abrirSesion(project, id)}
         />
