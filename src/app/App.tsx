@@ -46,6 +46,7 @@ import PreviousAgentChat from "../features/chat/PreviousAgentChat";
 import type { AlmacenDePreguntas, PreguntasAMedias, Respuesta, RespuestaEnviada } from "../features/chat/Questions";
 import { contestaALaTerminal, despachable, esDeLaTerminal, guardable, inyectable, type RazonDeRetencion, retencionAlCargar, siguienteLote, sueltaElBorrador } from "../features/chat/queue";
 import type { ComandoEnVivo } from "../features/chat/ShellCard";
+import { comandoDeTerminal } from "../features/chat/terminalIndent";
 import type { AlMargen } from "../features/chat/SideQuestion";
 import { comandoEscrito } from "../features/chat/slashOutput";
 import { ThreadSearch, type ThreadSearchTarget } from "../features/chat/ThreadSearch";
@@ -5260,22 +5261,23 @@ export default function App() {
       return true;
     }
     if (prompt.startsWith("!")) {
-      if (!prompt.slice(1).trim()) return false;
+      const comando = comandoDeTerminal(prompt);
+      if (!comando.trim()) return false;
       setInput("");
       // Con el agente trabajando espera su turno, como en Claude Code. Los
       // adjuntos se quedan en el borrador: un comando no los lleva.
       if (queueBusy() || cola().length > 0) {
-        encolar(prompt, []);
+        encolar(`!${comando}`, []);
         return true;
       }
       const id = sessionId();
       if (!id) {
-        const corrio = await abrirConComando(prompt.slice(1));
+        const corrio = await abrirConComando(comando);
         if (!corrio && !input()) setInput(prompt);
         return corrio;
       }
       const lanzado = { project: project(), agent: agent(), model: model() || null, effort: effort() || null, permission_mode: modo() || null };
-      return (await ejecutarComando(id, lanzado, prompt.slice(1), null)) === null;
+      return (await ejecutarComando(id, lanzado, comando, null)) === null;
     }
     if (queueBusy() || cola().length > 0) {
       encolarYSoltar(prompt, attachments, message.task_mentions, message.recipients);
