@@ -1,4 +1,4 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
 import ArrowDown from "lucide-solid/icons/arrow-down";
 import ArrowUp from "lucide-solid/icons/arrow-up";
@@ -1255,8 +1255,7 @@ export default function Chat(props: ChatProps) {
    */
   onMount(() => {
     let disposed = false;
-    // De la ventana y no de la vista: con Typst o un sitio abiertos Tauri manda el evento solo a la ventana.
-    const un = getCurrentWindow().onDragDropEvent((e) => {
+    const un = getCurrentWebview().onDragDropEvent((e) => {
       // La suscripción dura lo mismo que el componente. `puedeAdjuntar()` se
       // lee al recibir cada evento para no conservar el valor que tenía al
       // montar. El acceso sigue siendo reactivo sin volver a suscribirse cuando
