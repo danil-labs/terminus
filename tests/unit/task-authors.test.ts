@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-const { authorKey, authorKeys } = await import(
+const { authorKey, authorKeys, shownUnderLauncher } = await import(
   "../../src/features/projects/taskAuthors.ts"
 );
 
@@ -69,4 +69,16 @@ test("con el agrupado por encargado, Mis tareas va arriba", () => {
     ),
     ["unassigned", "agent:Ana", "agent:Beto"],
   );
+});
+
+// Una tarea lanzada desde otra carpeta se escondía en la suya con solo existir su
+// lanzador, aunque no estuviera en esa lista (#97).
+test("la barra solo agrupa una tarea bajo un lanzador de la misma carpeta", () => {
+  const lanzador = { id: "chat-a" };
+  const delegada = { id: "t1", launched_by: "chat-a", launcher_available: true };
+  assert.equal(shownUnderLauncher(delegada, [lanzador, delegada]), true);
+  assert.equal(shownUnderLauncher(delegada, [delegada]), false);
+  assert.equal(shownUnderLauncher({ ...delegada, launcher_available: false }, [lanzador, delegada]), false);
+  assert.equal(shownUnderLauncher({ parent: "chat-a" }, [lanzador]), true);
+  assert.equal(shownUnderLauncher({ launched_by: null }, [lanzador]), false);
 });
