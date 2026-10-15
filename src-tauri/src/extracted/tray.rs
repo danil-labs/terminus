@@ -152,6 +152,7 @@ pub(super) fn tray_notify(
     title: String,
     body: String,
     needs_you: bool,
+    key: String,
 ) -> Result<&'static str, String> {
     #[cfg(not(windows))]
     use tauri_plugin_notification::NotificationExt;
@@ -175,10 +176,12 @@ pub(super) fn tray_notify(
     }
     #[cfg(windows)]
     {
-        windows_toast(&app, &title, &body).map(|()| "system")
+        windows_toast(&app, &title, &body, key).map(|()| "system")
     }
     #[cfg(not(windows))]
     {
+        // Fuera de Windows el plugin no avisa del clic.
+        let _ = key;
         app.notification()
             .builder()
             .title(title)
@@ -207,7 +210,7 @@ fn in_front(window: &tauri::WebviewWindow) -> bool {
 
 /// El plugin no deja reaccionar al clic en Windows; aquí el clic trae la ventana.
 #[cfg(windows)]
-fn windows_toast(app: &AppHandle, title: &str, body: &str) -> Result<(), String> {
+fn windows_toast(app: &AppHandle, title: &str, body: &str, key: String) -> Result<(), String> {
     use tauri_winrt_notification::Toast;
     // Sin instalar no hay AppUserModelID registrado y Windows descarta el aviso.
     let installed = tauri::utils::platform::current_exe()
@@ -231,6 +234,8 @@ fn windows_toast(app: &AppHandle, title: &str, body: &str) -> Result<(), String>
                 log::info!("[aviso] clic");
                 let window = clicked.clone();
                 let _ = clicked.run_on_main_thread(move || show_window(&window));
+                // La ventana sabe qué tarea era y la abre, como el botón de su aviso.
+                let _ = clicked.emit("notice-clicked", key.clone());
                 Ok(())
             })
             .show();
