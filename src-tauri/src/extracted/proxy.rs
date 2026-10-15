@@ -575,7 +575,7 @@ pub(super) fn service_poll(
                 };
                 return Err(failure(&shown));
             }
-            if let Some(window) = app.get_webview_window("main") {
+            if let Some(window) = app.get_window("main") {
                 let _ = window.set_title(&super::title(&app));
             }
             return Ok(
