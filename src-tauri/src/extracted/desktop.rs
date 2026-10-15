@@ -1,7 +1,7 @@
 //! Acciones de escritorio originales de harness-app 96dba061, Apache-2.0.
 use tauri::{Emitter, Manager};
 #[tauri::command]
-pub(super) fn request_close(window: tauri::WebviewWindow) -> Result<(), String> {
+pub(super) fn request_close(window: tauri::Window) -> Result<(), String> {
     window.close().map_err(|error| error.to_string())
 }
 
@@ -114,7 +114,7 @@ pub(super) fn configure_close_menu(app: &tauri::App) -> tauri::Result<()> {
     }
     app.set_menu(menu)?;
     app.on_menu_event(|app, event| {
-        let Some(window) = app.get_webview_window("main") else {
+        let Some(window) = app.get_window("main") else {
             return;
         };
         match event.id().as_ref() {
