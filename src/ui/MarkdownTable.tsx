@@ -25,11 +25,16 @@ export function MarkdownTable(props: { children: JSX.Element }) {
   const cols = () => Array.from(grupo.children) as HTMLTableColElement[];
 
   const aplicar = () => {
+    const total = anchos.reduce((a, b) => a + b, 0);
+    // Ajustada y cabiendo, en porcentajes: un cambio de ancho que no llegó a medirse
+    // no deja hueco a la derecha ni corta la última columna.
+    const proporcional = !manual && total !== 0 && marco.clientWidth >= total;
     cols().forEach((col, i) => {
-      col.style.width = `${anchos[i] ?? ANCHO_MINIMO}px`;
+      const ancho = anchos[i] ?? ANCHO_MINIMO;
+      col.style.width = proporcional ? `${(ancho / total) * 100}%` : `${ancho}px`;
     });
     tabla.style.tableLayout = "fixed";
-    tabla.style.width = `${anchos.reduce((a, b) => a + b, 0)}px`;
+    tabla.style.width = proporcional ? "100%" : `${total}px`;
   };
 
   const ajustar = () => {
