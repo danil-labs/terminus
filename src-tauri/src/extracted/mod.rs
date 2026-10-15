@@ -114,7 +114,10 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
     let starting = launcher.clone();
     let placed = window_data.clone();
     let placed_on_exit = window_data.clone();
+    // Con TRACE y 40 KB, rustls y el updater borraban los avisos de `[transport]` en un minuto.
     let log = tauri_plugin_log::Builder::default()
+        .level(log::LevelFilter::Info)
+        .max_file_size(2_000_000)
         .targets([tauri_plugin_log::Target::new(
             tauri_plugin_log::TargetKind::Folder {
                 path: window_data.clone(),
@@ -124,6 +127,13 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
         .build();
     tauri::Builder::default()
         .manage(launcher)
+        // Tauri guarda un solo manejador: colocación y cierre van juntos.
+        .on_window_event(move |window, event| {
+            placement::track(window, event, &placed);
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                desktop::on_close_requested(window, api);
+            }
+        })
         .setup(move |app| {
             if let Some(state) = state {
                 app.manage(state);
@@ -160,7 +170,6 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
             launcher::start(app.handle().clone(), starting.clone());
             Ok(())
         })
-        .on_window_event(move |window, event| placement::track(window, event, &placed))
         .register_asynchronous_uri_scheme_protocol(
             local_image::SCHEME,
             |_ctx, request, responder| local_image::atender(request, responder),
@@ -172,6 +181,7 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
         .plugin(log)
         .invoke_handler(proxy::with_desktop(tauri::generate_handler![
             desktop::request_close,
+            desktop::close_confirmed,
             desktop::window_ready,
             desktop::window_vitals,
             launcher::launcher_state,

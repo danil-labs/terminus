@@ -164,7 +164,7 @@ fn drive(app: &tauri::AppHandle, launcher: &Launcher, paths: &engine::Paths, rea
         match handoff(launcher, paths, reason) {
             Ok(client) => {
                 let state = Arc::new(proxy::State::new(Arc::new(client), true));
-                if let Some(window) = app.get_webview_window("main") {
+                if let Some(window) = app.get_window("main") {
                     let _ = window.set_title(&super::title(app));
                 }
                 app.manage(state);

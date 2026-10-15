@@ -135,7 +135,11 @@ pub(super) fn desktop_command(name: &str) -> bool {
     command(name).is_some_and(|c| c["kind"] == "desktop")
         || matches!(
             name,
-            "launcher_state" | "launcher_continue" | "update_install" | "update_pending"
+            "launcher_state"
+                | "launcher_continue"
+                | "update_install"
+                | "update_pending"
+                | "close_confirmed"
         )
 }
 pub(super) fn with_desktop(
@@ -259,6 +263,19 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
             return;
         };
         Some(workspace.to_owned())
+    } else if matches!(
+        name.as_str(),
+        "stop_turn" | "stop_shell_command" | "pending_requests"
+    ) {
+        // Cerrar con tareas vivas detiene también las de otros workspaces.
+        invoke
+            .message
+            .headers()
+            .get("x-terminus-workspace")
+            .and_then(|value| value.to_str().ok())
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned)
+            .or_else(|| state.workspace())
     } else if name == "unwatch_task_tree" {
         let watchers = state.watchers.lock().unwrap_or_else(|p| p.into_inner());
         args["id"]
@@ -558,7 +575,7 @@ pub(super) fn service_poll(
                 };
                 return Err(failure(&shown));
             }
-            if let Some(window) = app.get_webview_window("main") {
+            if let Some(window) = app.get_window("main") {
                 let _ = window.set_title(&super::title(&app));
             }
             return Ok(
@@ -583,8 +600,9 @@ pub(super) fn service_poll(
             }
         }
     }
+    // Un stream de comando cortado no pierde eventos del diario: va aparte de `gap`.
     Ok(
-        json!({"cursor":page["cursor"],"gap":page["gap"] == true || state.stream_gap.swap(false, Ordering::SeqCst),"replay":page["replay"],"runtime":state.client().runtime(),"reset":false}),
+        json!({"cursor":page["cursor"],"gap":page["gap"] == true,"streams":state.stream_gap.swap(false, Ordering::SeqCst),"replay":page["replay"],"runtime":state.client().runtime(),"reset":false}),
     )
 }
 #[tauri::command]

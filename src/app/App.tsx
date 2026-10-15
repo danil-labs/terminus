@@ -46,6 +46,7 @@ import PreviousAgentChat from "../features/chat/PreviousAgentChat";
 import type { AlmacenDePreguntas, PreguntasAMedias, Respuesta, RespuestaEnviada } from "../features/chat/Questions";
 import { contestaALaTerminal, despachable, esDeLaTerminal, guardable, inyectable, type RazonDeRetencion, retencionAlCargar, siguienteLote, sueltaElBorrador } from "../features/chat/queue";
 import type { ComandoEnVivo } from "../features/chat/ShellCard";
+import { comandoDeTerminal } from "../features/chat/terminalIndent";
 import type { AlMargen } from "../features/chat/SideQuestion";
 import { comandoEscrito } from "../features/chat/slashOutput";
 import { ThreadSearch, type ThreadSearchTarget } from "../features/chat/ThreadSearch";
@@ -109,6 +110,7 @@ import SpaceBar from "../features/shell/SpaceBar";
 import TitleBar from "../features/shell/TitleBar";
 import UsageBar from "../features/shell/UsageBar";
 import AvisoDeVersion from "../features/shell/VersionNotice";
+import CloseGuard from "../features/shell/CloseGuard";
 import WorkspaceColumn from "../features/shell/WorkspaceColumn";
 import Sitio from "../features/sites/Site";
 import { claseDeFondo } from "../lib/chat-background";
@@ -2016,13 +2018,14 @@ export default function App() {
       await serviceListenersReady;
       if (disposed) return;
       try {
-        const page = await invoke<{ cursor: number | null; gap: boolean; replay: boolean; runtime: string; reset: boolean }>("service_poll", { cursor, workspace: null, replay, runtime });
+        const page = await invoke<{ cursor: number | null; gap: boolean; streams?: boolean; replay: boolean; runtime: string; reset: boolean }>("service_poll", { cursor, workspace: null, replay, runtime });
         if (disposed) return;
         cursor = page.cursor;
         replay = page.replay;
         runtime = page.runtime;
-        if (page.reset || page.gap || failingSince !== null) window.dispatchEvent(new CustomEvent("harness:service-resync"));
-        if (page.reset || page.gap) releerTrasHueco();
+        if (page.reset || page.gap || page.streams || failingSince !== null) window.dispatchEvent(new CustomEvent("harness:service-resync"));
+        // Un stream de comando cortado (árbol, git) se relee, pero no es salida en vivo perdida.
+        if (page.reset || page.gap || page.streams) releerTrasHueco();
         if (page.reset) {
           liveThreads.clear();
           workspaceThreads.clear();
@@ -5260,22 +5263,23 @@ export default function App() {
       return true;
     }
     if (prompt.startsWith("!")) {
-      if (!prompt.slice(1).trim()) return false;
+      const comando = comandoDeTerminal(prompt);
+      if (!comando.trim()) return false;
       setInput("");
       // Con el agente trabajando espera su turno, como en Claude Code. Los
       // adjuntos se quedan en el borrador: un comando no los lleva.
       if (queueBusy() || cola().length > 0) {
-        encolar(prompt, []);
+        encolar(`!${comando}`, []);
         return true;
       }
       const id = sessionId();
       if (!id) {
-        const corrio = await abrirConComando(prompt.slice(1));
+        const corrio = await abrirConComando(comando);
         if (!corrio && !input()) setInput(prompt);
         return corrio;
       }
       const lanzado = { project: project(), agent: agent(), model: model() || null, effort: effort() || null, permission_mode: modo() || null };
-      return (await ejecutarComando(id, lanzado, prompt.slice(1), null)) === null;
+      return (await ejecutarComando(id, lanzado, comando, null)) === null;
     }
     if (queueBusy() || cola().length > 0) {
       encolarYSoltar(prompt, attachments, message.task_mentions, message.recipients);
@@ -6856,6 +6860,7 @@ export default function App() {
     // Sin cabecera y sin título de app, como Claude: la ventana ya se
     // llama Terminus.
     <div class="relative flex h-full flex-col overflow-hidden bg-surface">
+      <CloseGuard title={(id) => filaDe(id)?.title} />
       <ToastStack>
         {/* Aquí y no en Configuración: ahí no entra nadie a buscar
             actualizaciones. El panel de «Estado del entorno» dice lo
