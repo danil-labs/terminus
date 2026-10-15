@@ -224,7 +224,9 @@ pub(super) fn notice_key(arg: &std::ffi::OsStr) -> Option<String> {
         .trim_end_matches('/');
     let valid = !key.is_empty()
         && key.len() <= 200
-        && key.chars().all(|c| c.is_ascii_alphanumeric() || "-_/".contains(c));
+        && key
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || "-_/".contains(c));
     valid.then(|| key.to_owned())
 }
 
