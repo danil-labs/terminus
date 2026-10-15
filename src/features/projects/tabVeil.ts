@@ -33,8 +33,15 @@ function hole(box: HTMLElement): string | null {
 export function veilTabs(box: HTMLElement) {
   let frame = 0;
   let last = "";
+  // Mover el divisor entre ventanas cambia el ancho de cada tira, no el de la caja.
+  const watched = new WeakSet<Element>();
   const draw = () => {
     frame = 0;
+    for (const strip of box.querySelectorAll('[role="tablist"]')) {
+      if (watched.has(strip)) continue;
+      watched.add(strip);
+      resize?.observe(strip);
+    }
     const clip = hole(box);
     if (clip === null || clip === last) return;
     last = clip;
