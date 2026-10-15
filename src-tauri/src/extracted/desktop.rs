@@ -10,7 +10,7 @@ static CLOSE_ASKED: std::sync::Mutex<Option<std::time::Instant>> = std::sync::Mu
 
 /// El front ya decidió qué hacer con los turnos vivos; ahora sí se cierra.
 #[tauri::command]
-pub(super) fn close_confirmed(window: tauri::WebviewWindow) -> Result<(), String> {
+pub(super) fn close_confirmed(window: tauri::Window) -> Result<(), String> {
     CLOSE_CONFIRMED.store(true, std::sync::atomic::Ordering::SeqCst);
     window.close().map_err(|error| error.to_string())
 }
