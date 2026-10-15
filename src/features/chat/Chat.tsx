@@ -1272,7 +1272,11 @@ export default function Chat(props: ChatProps) {
     medirEscala();
     const bajoElPuntero = (pos: { x: number; y: number }) => {
       const caja = ancla?.parentElement?.getBoundingClientRect();
-      if (!caja || caja.width === 0 || caja.height === 0) return null;
+      if (!caja) return null;
+      // Sin maquetación no hay cajas que medir: la conversación montada recibe, como antes.
+      if (document.documentElement.clientWidth === 0) return caja;
+      // Con maquetación, una caja vacía es una conversación escondida.
+      if (caja.width === 0 || caja.height === 0) return null;
       const f = enPuntos ? 1 : escala;
       const x = pos.x / f;
       const y = pos.y / f;
