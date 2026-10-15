@@ -182,6 +182,11 @@
   "shell.tray.open": "Abrir Terminus",
   "shell.tray.stop_all": "Detener todas las tareas",
   "shell.tray.quit": "Salir por completo",
+  "shell.update.waiting_tasks": {
+    "one": "El motor nuevo entra cuando termine {count} tarea que sigue trabajando.",
+    "other": "El motor nuevo entra cuando terminen {count} tareas que siguen trabajando."
+  },
+  "shell.update.stop_and_apply": "Detener y aplicar ya",
   "shell.notify.finished": "Terminó «{title}»",
   "shell.notify.finished_hint": "Ábrela en Terminus para ver lo que hizo.",
   "shell.notify.waiting": "«{title}» espera tu respuesta",

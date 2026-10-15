@@ -201,6 +201,16 @@ and the new engine waits for the next start. Then the window deletes the
 `old_*` files no one holds, retrying for a few seconds while the window it
 replaces exits.
 
+An open window does not wait for a restart either: every 15 s it checks
+whether the live engine was replaced and, once that engine has no turns,
+downloads or operations, asks it for `service stop`. The next `service_poll`
+starts the installed engine. The update notice says how many tasks the old
+engine is still running and offers to stop them and restart. A replaced engine
+is one running from `old_*` on Windows, from a deleted binary or an AppImage
+copy that differs from the bundled one on Linux, and from a path other than
+the bundled engine on macOS. The Linux and macOS checks have not been tried on
+those systems.
+
 ## Not done yet
 
 - The engine is pinned for the four platforms and bundled on all of them. The
