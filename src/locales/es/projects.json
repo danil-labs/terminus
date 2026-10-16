@@ -289,6 +289,7 @@
   "projects.tabs.close_others": "Cerrar las demás",
   "projects.tabs.close_right": "Cerrar las de la derecha",
   "projects.tabs.label": "Tareas abiertas",
+  "projects.tabs.reopen": "Reabrir la pestaña cerrada",
   "projects.view.add": "Añadir",
   "projects.view.agents_broken": "No se pudo leer «{origin}»: {reason}",
   "projects.view.agents_empty": "Este proyecto no declara ninguno. Se declaran en «.agents/agents/» del repositorio.",

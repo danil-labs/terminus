@@ -6,6 +6,7 @@ const ATAJOS = {
   workTree: { mac: "⌘⌥B", windows: "Ctrl+Alt+B", ariaMac: "Meta+Alt+B", ariaWindows: "Control+Alt+B" },
   newTask: { mac: "⌘T", windows: "Ctrl+T", ariaMac: "Meta+T", ariaWindows: "Control+T" },
   closeTab: { mac: "⌘W", windows: "Ctrl+W", ariaMac: "Meta+W", ariaWindows: "Control+W" },
+  reopenTab: { mac: "⌘⇧T", windows: "Ctrl+Shift+T", ariaMac: "Meta+Shift+T", ariaWindows: "Control+Shift+T" },
   // Solo rótulo: lo atiende el editor (`CodeEditor.tsx`, `Mod-s`).
   saveFile: { mac: "⌘S", windows: "Ctrl+S", ariaMac: "Meta+S", ariaWindows: "Control+S" },
   // Solo rótulos: los atiende la tarjeta de preguntas, no `accionDeAtajo`.
@@ -22,8 +23,9 @@ export const ariaDeAtajo = (accion: AccionDeAtajo) =>
   ATAJOS[accion][isMac() ? "ariaMac" : "ariaWindows"];
 
 export function accionDeAtajo(e: KeyboardEvent): AccionDeAtajo | null {
-  if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.defaultPrevented) return null;
+  if (!(e.metaKey || e.ctrlKey) || e.defaultPrevented) return null;
   const tecla = e.key.toLowerCase();
+  if (e.shiftKey) return !e.altKey && tecla === "t" ? "reopenTab" : null;
   // Option puede producir «∫» en macOS: con Alt se reconoce la tecla física.
   if (e.altKey) return tecla === "b" || e.code === "KeyB" ? "workTree" : null;
   if (tecla === "b") return "sidebar";

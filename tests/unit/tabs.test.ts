@@ -783,3 +783,63 @@ test("un archivo sin tarea conserva solo a sí mismo", () => {
   t.closeMany(tabsToClose(t.open(), id, "demas"));
   assert.deepEqual(t.open().map((p) => p.id), [id]);
 });
+
+const todas = () => true;
+
+test("reabrir devuelve la tarea con sus archivos en su sitio y delante", () => {
+  const t = tiraDeTres("reabrir-bloque");
+  t.activate(archivo("s1", "b.ts").id);
+  t.closeMany(["s1"], { remember: true });
+  assert.deepEqual(sesiones(t), ["s2", "s2/c.ts", "s3"]);
+  const delante = t.reopen(todas);
+  assert.deepEqual(sesiones(t), ["s1", "s1/a.ts", "s1/b.ts", "s2", "s2/c.ts", "s3"]);
+  assert.equal(delante?.id, archivo("s1", "b.ts").id);
+  assert.equal(t.canReopen(), false);
+});
+
+test("reabrir va del último cierre al primero", () => {
+  const t = tiraDeTres("reabrir-orden");
+  t.closeMany(["s3"], { remember: true });
+  t.closeMany(["s2"], { remember: true });
+  // Al cerrar s2 se miraba su archivo: vuelve ese, no la conversación.
+  assert.equal(t.reopen(todas)?.id, archivo("s2", "c.ts").id);
+  assert.equal(t.reopen(todas)?.id, "s3");
+  assert.deepEqual(sesiones(t), ["s1", "s1/a.ts", "s1/b.ts", "s2", "s2/c.ts", "s3"]);
+  assert.equal(t.reopen(todas), null);
+});
+
+// Mover una tarea a otro escritorio o borrarla también cierra su pestaña;
+// deshacer eso la traería de vuelta a la tira equivocada o rota.
+test("solo vuelve lo que se cerró a mano", () => {
+  const t = tiraDeTres("reabrir-a-mano");
+  t.close("s3");
+  t.sync((id) => (id === "s1" ? { project: "p", titulo: "s1" } : null));
+  assert.equal(t.canReopen(), false);
+  assert.equal(t.reopen(todas), null);
+});
+
+test("lo que ya no existe se salta y cede al cierre anterior", () => {
+  const t = tiraDeTres("reabrir-borrada");
+  t.closeMany(["s3"], { remember: true });
+  t.closeMany(["s2"], { remember: true });
+  assert.equal(t.reopen((p) => p.session !== "s2")?.id, "s3");
+  assert.deepEqual(sesiones(t), ["s1", "s1/a.ts", "s1/b.ts", "s3"]);
+});
+
+test("lo cerrado es de su tira: otro escritorio no lo reabre", () => {
+  const t = createTabs();
+  t.load("reabrir-tiras", "a");
+  t.ensure(tarea("s1"));
+  t.closeMany(["s1"], { remember: true });
+  t.load("reabrir-tiras", "b");
+  assert.equal(t.canReopen(), false);
+  t.load("reabrir-tiras", "a");
+  assert.equal(t.reopen(todas)?.id, "s1");
+});
+
+test("una tarea que aún nace no se recuerda al cerrarla", () => {
+  const t = tira("reabrir-provisional");
+  t.ensure({ id: idProvisional(), project: "p", titulo: "borrador" });
+  t.closeMany(t.open().map((p) => p.id), { remember: true });
+  assert.equal(t.canReopen(), false);
+});

@@ -93,6 +93,14 @@ test("las flechas ciclan y no chocan con el árbol", () => {
   assert.equal(accionDeAtajo(cmd({ key: "b", code: "KeyB", altKey: true })), "workTree");
 });
 
+test("con Shift, la T reabre lo cerrado y lo demás no es atajo", () => {
+  assert.equal(accionDeAtajo(cmd({ key: "T", code: "KeyT", shiftKey: true })), "reopenTab");
+  assert.equal(accionDeAtajo(tecla({ ctrlKey: true, key: "T", code: "KeyT", shiftKey: true })), "reopenTab");
+  assert.equal(accionDeAtajo(cmd({ key: "t", code: "KeyT" })), "newTask");
+  assert.equal(accionDeAtajo(cmd({ key: "W", code: "KeyW", shiftKey: true })), null);
+  assert.equal(accionDeAtajo(cmd({ key: "T", code: "KeyT", shiftKey: true, altKey: true })), null);
+});
+
 test("un número fuera de la tira no hace nada", () => {
   assert.equal(destinoDePestana({ tipo: "indice", n: 4 }, ["a", "b"], "a"), null);
   assert.equal(destinoDePestana({ tipo: "indice", n: 0 }, [], null), null);

@@ -289,6 +289,7 @@
   "projects.tabs.close_others": "Close others",
   "projects.tabs.close_right": "Close to the right",
   "projects.tabs.label": "Open tasks",
+  "projects.tabs.reopen": "Reopen closed tab",
   "projects.view.add": "Add",
   "projects.view.agents_broken": "Could not read “{origin}”: {reason}",
   "projects.view.agents_empty": "This project declares none. They are declared in “.agents/agents/” in the repository.",

@@ -1425,6 +1425,7 @@ export default function App() {
         e.preventDefault();
         if (accion === "newTask") nuevaSesion();
         else if (accion === "closeTab") closeActiveTab();
+        else if (accion === "reopenTab") reabrirPestana();
         else if (accion === "sidebar") sidebar.alternar();
         else alternarElArbol();
         return;
@@ -3908,7 +3909,7 @@ export default function App() {
     const cerradas = pestanas.open().filter((x) => pedidas.has(x.id));
     if (cerradas.length === 0) return;
     const activaAntes = pestanaActiva();
-    const vecina = pestanas.closeMany(ids);
+    const vecina = pestanas.closeMany(ids, { remember: true });
     // Closing a task also removes its documents, which can empty several panels.
     paneles.sync(pestanas.open().map((x) => x.id));
     // El borrador y el hilo son de la tarea: cerrar un archivo o un
@@ -3927,6 +3928,15 @@ export default function App() {
     if (pestanas.open().some((x) => x.id === activaAntes)) return;
     if (vecina) void activarPestana(vecina);
     else irAlBlanco(carpetaDelEscritorio(project()));
+  }
+
+  /**
+   * Lo último que se cerró a mano vuelve a la tira, salvo lo que ya no existe:
+   * una tarea borrada mientras tanto no reaparece como pestaña rota.
+   */
+  function reabrirPestana() {
+    const p = pestanas.reopen((x) => x.session === "" || filaDe(x.session) !== undefined);
+    if (p) void activarPestana(p);
   }
 
   /**
@@ -6270,6 +6280,8 @@ export default function App() {
                   onClose={cerrarPestana}
                   dirtyIds={pestanas.dirty()}
                   onCloseMany={cerrarPestanas}
+                  canReopen={pestanas.canReopen()}
+                  onReopen={reabrirPestana}
                   onDrag={arrastrarPestana}
                   dropIndex={marcaDe(sitio)}
                 />
@@ -6318,6 +6330,8 @@ export default function App() {
                     onClose={cerrarPestana}
                     dirtyIds={pestanas.dirty()}
                     onCloseMany={cerrarPestanas}
+                    canReopen={pestanas.canReopen()}
+                    onReopen={reabrirPestana}
                     onDrag={arrastrarPestana}
                     dropIndex={marcaDe(sitio)}
                   />
@@ -6479,6 +6493,8 @@ export default function App() {
                 onClose={cerrarPestana}
                 dirtyIds={pestanas.dirty()}
                 onCloseMany={cerrarPestanas}
+                canReopen={pestanas.canReopen()}
+                onReopen={reabrirPestana}
                 onDrag={arrastrarPestana}
                 dropIndex={marcaDe(sitio)}
               />
