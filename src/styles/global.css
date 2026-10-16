@@ -720,7 +720,11 @@
   border-bottom-right-radius: 0;
 }
 
+/* Nace en la tobera del icono de 15 px centrado en 20 px, sobre el eje del
+   cohete (x + y = 20); arriba-centro de la llama queda en (6, 14). */
 .finish-task-flame {
+  top: 14px;
+  left: 4px;
   transform: rotate(45deg);
   transform-origin: center top;
 }
