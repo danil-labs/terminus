@@ -463,7 +463,9 @@ export default function Settings(props: {
                 </DialogTitle>
               </SidebarHeader>
 
-              <SidebarContent class="flex flex-col gap-6 overflow-y-auto px-0 pb-4 pl-2">
+              {/* Sin barra visible: su canal separaba la pestaña activa del panel
+                  en cuanto el riel desbordaba, por ejemplo con zoom. */}
+              <SidebarContent class="flex flex-col gap-6 overflow-y-auto px-0 pb-4 pl-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 <For each={GRUPOS}>
                   {(g) => (
                     <div role="presentation" class="flex flex-col gap-3">
