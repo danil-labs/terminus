@@ -8,7 +8,6 @@ import { prosa, type Frase } from "../../lib/prose";
 import { Badge } from "../../ui/Badge";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
-import Plus from "lucide-solid/icons/plus";
 import { SettingsBlock, SettingsPanel, SettingsRow, SettingsSection } from "./layout";
 
 /**
@@ -33,8 +32,8 @@ type Campo = { id: string; label: Frase; help: Frase; falta: Frase; required: bo
 type Identidad = { user: string; name: string };
 
 type Connection = {
-  selected_area: { key: string; installation_id: number | null } | null;
-  selected_areas: { key: string; installation_id: number | null }[];
+  selected_area: { key: string; installation_id: number | null; repository_ids?: number[] | null } | null;
+  selected_areas: { key: string; installation_id: number | null; repository_ids?: number[] | null }[];
   data: Record<string, string>;
   workspace: string;
   identity: Identidad;
@@ -128,6 +127,23 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
       if (state === "esperando" || state === "instalando") void cancelarNavegador(id);
     }
   });
+  const [cli, setCli] = createSignal<{ available: boolean; version: string | null; managed_supported: boolean; installable: boolean } | null>(null);
+  const [installingCli, setInstallingCli] = createSignal(false);
+  const [cliFailure, setCliFailure] = createSignal<Failure | null>(null);
+  async function installCli() {
+    setInstallingCli(true);
+    setCliFailure(null);
+    try {
+      await invoke("install_gh");
+      await refreshCli();
+    } catch (e) { setCliFailure(asFailure(e)); }
+    finally { setInstallingCli(false); }
+  }
+  async function refreshCli() {
+    const report = await invoke<{ githubCli?: NonNullable<ReturnType<typeof cli>> }>("check_environment");
+    setCli(report.githubCli ?? null);
+  }
+  onMount(() => { void refreshCli().catch((e) => setCliFailure(asFailure(e))); });
   const [lista, setLista] = createSignal<Provider[] | null>(null);
   const [cargando, setCargando] = createSignal(true);
   const [fallo, setFallo] = createSignal<Failure | null>(null);
@@ -179,7 +195,11 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
   onMount(() => {
     const refresh = () => {
       for (const p of lista() ?? []) {
-        if (p.connected && p.select_area && !ocupado()[p.id]) void verAreas(p.id);
+        if (montajes()[p.id]) void actualizarAcceso(p.id);
+        else if (p.connected && p.select_area && !ocupado()[p.id]) {
+          setRepos({});
+          void verAreas(p.id);
+        }
       }
     };
     window.addEventListener("focus", refresh);
@@ -295,9 +315,9 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
       reemplazar(fresco);
       setEsperas((current) => ({ ...current, [p.id]: null }));
       setChoosing((current) => ({ ...current, [p.id]: true }));
-      await terminarDeDarAcceso(p);
-      if (p.connected && p.setup_url) {
-        await invoke("open_external", { target: p.setup_url });
+      if (fresco.setup_url) {
+        await configurarAcceso(fresco);
+        return;
       }
       if (disposed) return;
       // Conectar termina enseñando lo que se aprobó, no un estado: lo que la
@@ -308,36 +328,41 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
       setFallas((f) => ({ ...f, [p.id]: asFailure(e) }));
     } finally {
       setEsperas((x) => ({ ...x, [p.id]: null }));
-      setMontajes((x) => ({ ...x, [p.id]: null }));
       setOcupado((o) => ({ ...o, [p.id]: null }));
     }
   }
 
-  /**
-   * El segundo viaje al navegador, cuando el proveedor separa identificarse
-   * de dar acceso.
-   *
-   * Va aquí dentro y no en un aviso aparte: una GitHub App recién autorizada
-   * emite un token válido que no ve ni un repositorio hasta que alguien
-   * elige dónde se instala. Enseñar eso como un error con una URL dentro le
-   * devuelve a quien opera el negocio la tarea que este producto existe para
-   * quitarle. Dos páginas en el navegador, un solo gesto: la app abre la
-   * segunda sola y se entera sola de que terminó.
-   *
-   * Quien no tenga nada pendiente —Bitbucket, o un token pegado a mano— no
-   * pasa por aquí: `provider_pending_setup` contesta `null`.
-   */
-  async function terminarDeDarAcceso(p: Provider) {
-    const url = await invoke<string | null>("provider_pending_setup", { id: p.id, scope: await scope });
-    if (!url || disposed) return;
+  async function configurarAcceso(p: Provider) {
+    if (!p.setup_url || disposed) return;
     setOcupado((o) => ({ ...o, [p.id]: "instalando" }));
-    setMontajes((x) => ({ ...x, [p.id]: url }));
-    invoke("open_external", { target: url }).catch(() => {});
-    reemplazar(await invoke<Provider>("finish_provider_setup", { id: p.id, scope: await scope }));
+    setMontajes((x) => ({ ...x, [p.id]: p.setup_url }));
+    setChoosing((x) => ({ ...x, [p.id]: true }));
+    setFallas((x) => ({ ...x, [p.id]: null }));
+    try {
+      await invoke("open_external", { target: p.setup_url });
+    } catch (e) {
+      setMontajes((x) => ({ ...x, [p.id]: null }));
+      setFallas((x) => ({ ...x, [p.id]: asFailure(e) }));
+    } finally {
+      setOcupado((o) => ({ ...o, [p.id]: null }));
+    }
+  }
+
+  async function actualizarAcceso(id: string) {
+    if (ocupado()[id] || disposed) return;
+    setRepos({});
+    setAbierta({});
+    setChoosing((x) => ({ ...x, [id]: true }));
+    const actualizado = await verAreas(id);
+    if (actualizado) setMontajes((x) => ({ ...x, [id]: null }));
   }
 
   async function cancelarNavegador(id: string) {
+    const setup = montajes()[id];
+    setMontajes((x) => ({ ...x, [id]: null }));
+    setChoosing((x) => ({ ...x, [id]: false }));
     invoke("cancel_browser_login", { id, scope: await scope }).catch(() => {});
+    if (setup && !disposed) await verAreas(id);
   }
 
   async function desconectar(id: string) {
@@ -364,9 +389,12 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
       const r = choosing()[id]
         ? await invoke<Area[]>("provider_available_areas", { id, scope: await scope })
         : await invoke<Area[]>("provider_areas", { id, scope: await scope });
+      if (disposed) return false;
       setAreas((a) => ({ ...a, [id]: r }));
+      return true;
     } catch (e) {
       setFallas((f) => ({ ...f, [id]: asFailure(e) }));
+      return false;
     } finally {
       setOcupado((o) => ({ ...o, [id]: null }));
     }
@@ -512,6 +540,20 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                     </Switch>
                   }
                 >
+                  <Show when={p.id === "github"}>
+                    <SettingsRow label={t("providers.github.cli.title")} description={t("providers.github.cli.help")}>
+                      <Show when={cli()}>{(info) => <>
+                        <span>{info().version ?? t("providers.github.cli.absent")}</span>
+                        <Show when={!info().managed_supported && info().installable}>
+                          <Button variant="secondary" disabled={installingCli()} onClick={() => void installCli()}>
+                            {installingCli() ? t("providers.github.cli.installing") : t("providers.github.cli.install")}
+                          </Button>
+                        </Show>
+                        <Show when={info().managed_supported}><Badge>{t("providers.github.cli.ready")}</Badge></Show>
+                      </>}</Show>
+                    </SettingsRow>
+                    <Show when={cliFailure()}>{(f) => <FailureNote f={f()} />}</Show>
+                  </Show>
                   <Switch>
                     <Match when={p.connected && !esperaAqui() && !montajes()[p.id] ? p.connected : null}>
                       {(c) => (
@@ -594,25 +636,30 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                               description={
                                 elegidas().length === 0
                                   ? t("settings.providers.no_selected_areas")
-                                  : undefined
+                                  : t("settings.providers.workspace_access_help")
                               }
                             >
                               <div class="flex flex-wrap items-center justify-end gap-1.5">
                                 <For each={elegidas()}>
                                   {(area) => <Badge>{area.key}</Badge>}
                                 </For>
+                                <Button variant="outline" size="compact" disabled={estado() !== null} onClick={() => {
+                                  setChoosing((x) => ({ ...x, [p.id]: true }));
+                                  void verAreas(p.id);
+                                }}>
+                                  {t("settings.providers.choose_access")}
+                                </Button>
                                 <Show when={p.setup_url}>
                                   {(url) => (
                                     <Button
                                       variant="ghost"
                                       size="compact"
-                                      class="w-6 px-0"
                                       aria-label={t("settings.providers.add_area")}
                                       title={t("settings.providers.add_area")}
                                       disabled={estado() !== null}
-                                      onClick={() => void conectarEnNavegador({ ...p, setup_url: url() })}
+                                      onClick={() => void configurarAcceso({ ...p, setup_url: url() })}
                                     >
-                                      <Plus size={14} aria-hidden="true" />
+                                      {t("settings.providers.configure_access")}
                                     </Button>
                                   )}
                                 </Show>
@@ -681,6 +728,9 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                             </a>
                           }
                         >
+                          <Button size="compact" disabled={estado() !== null} onClick={() => void actualizarAcceso(p.id)}>
+                            {t("settings.providers.refresh_access")}
+                          </Button>
                           <Button
                             variant="outline"
                             size="compact"
@@ -883,6 +933,11 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                                         onClick={() => void verProyectos(p.id, a.key)}
                                       >
                                         {abierto() ? t("settings.providers.hide") : t("settings.providers.show")}
+                                      </Button>
+                                    </Show>
+                                    <Show when={p.select_area && selected() && choosing()[p.id]}>
+                                      <Button variant="outline" size="compact" disabled={estado() !== null} onClick={() => void seleccionar(p.id, a.key, true)}>
+                                        {t("settings.providers.confirm_repositories")}
                                       </Button>
                                     </Show>
                                     <Show when={p.select_area}>

@@ -12,6 +12,7 @@ const COMMANDS: &[&str] = &[
     "config",
     "context",
     "folder",
+    "github",
     "guide",
     "handler",
     "help",

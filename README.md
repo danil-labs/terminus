@@ -73,11 +73,11 @@ the engine with `pnpm engine:stop` (it also stops by itself five minutes after
 the last window closes). `node scripts/engine.mjs help` lists every command.
 
 The engine is published as a prerelease of this repository
-([`seldon-runtime-v0.2.73-d6ab489`](https://github.com/danil-labs/terminus/releases/tag/seldon-runtime-v0.2.73-d6ab489)).
-By downloading it you accept its [terms](https://github.com/danil-labs/terminus/releases/download/seldon-runtime-v0.2.73-d6ab489/TERMS.md). Today it is published
-for **Windows x86_64 only**; on macOS and Linux `pnpm engine:download` stops
-with "No seldon-runtime has been published for <platform> yet". If you have an
-engine binary, use it with `node scripts/engine.mjs download --from <path>`.
+([`seldon-runtime-v0.2.73-4b8714c`](https://github.com/danil-labs/terminus/releases/tag/seldon-runtime-v0.2.73-4b8714c)).
+By downloading it you accept its [terms](https://github.com/danil-labs/terminus/releases/download/seldon-runtime-v0.2.73-4b8714c/TERMS.md).
+The lock pins builds for Windows x86_64, macOS arm64/x86_64 and Linux x86_64.
+To use a local engine build instead, run
+`node scripts/engine.mjs download --from <path>`.
 
 The window build uses the Cargo feature `extracted-client`, which is the
 default. Release installers are built by
@@ -92,6 +92,10 @@ pnpm verify --no-cargo  # the same chain without Rust
 ```
 
 What each guard checks is in [docs/guards.md](docs/guards.md).
+
+La [conexión de GitHub por workspace](docs/github.md) distingue la selección
+local de las instalaciones de la App en GitHub y describe la coordinación con
+el motor.
 
 ## How it fits together
 
@@ -123,8 +127,8 @@ and generated dependency notices.
 
 The `seldon-runtime` engine is proprietary software by Danil and is not covered
 by this license. Its terms and third-party notices are published with each
-engine release: [TERMS.md](https://github.com/danil-labs/terminus/releases/download/seldon-runtime-v0.2.73-d6ab489/TERMS.md) and
-[THIRD-PARTY-NOTICES (Windows x86_64)](https://github.com/danil-labs/terminus/releases/download/seldon-runtime-v0.2.73-d6ab489/THIRD-PARTY-NOTICES-x86_64-pc-windows-msvc.txt)
+engine release: [TERMS.md](https://github.com/danil-labs/terminus/releases/download/seldon-runtime-v0.2.73-4b8714c/TERMS.md) and
+[third-party notices by platform](https://github.com/danil-labs/terminus/releases/tag/seldon-runtime-v0.2.73-4b8714c)
 for the version pinned in `seldon-runtime.lock`.
 
 "Terminus", "Danil" and their logos are trademarks of Danil;

@@ -2629,10 +2629,12 @@ if (!roto) {
   providerButton("Control de Fuentes")?.click();
   await sleep(100);
   assert.ok(providerButton("Quitar del workspace"), "la conexión previa permite retirar su organización");
-  assert.equal(providerButton("Usar en este workspace"), undefined, "agregar requiere autenticación");
-  providerButton("Agregar desde GitHub")?.click();
+  assert.equal(providerButton("Usar en este workspace"), undefined, "agregar requiere abrir el selector");
+  providerButton("Agregar o configurar en GitHub")?.click();
+  await sleep(30);
+  providerButton("Actualizar acceso")?.click();
   await sleep(100);
-  assert.equal(authentications, 1);
+  assert.equal(authentications, 0);
   assert.ok(providerButton("Usar en este workspace"), "GitHub permite elegir las instalaciones disponibles");
   assert.deepEqual(selectedKeys("ws-a"), ["acme"], "ampliar GitHub no cambia la selección");
   clickArea("other", "Usar en este workspace");
@@ -2644,7 +2646,9 @@ if (!roto) {
   await sleep(100);
   assert.deepEqual(selectedKeys("ws-a"), ["other"]);
   assert.equal(providerButton("Usar en este workspace"), undefined, "quitar no vuelve a ofrecer la organización");
-  providerButton("Agregar desde GitHub")?.click();
+  providerButton("Agregar o configurar en GitHub")?.click();
+  await sleep(30);
+  providerButton("Actualizar acceso")?.click();
   await sleep(100);
   let finishOldAreas;
   pendingAreas = new Promise((resolve) => { finishOldAreas = resolve; });
@@ -2654,7 +2658,9 @@ if (!roto) {
   providers.w.dispatchEvent(new providers.w.CustomEvent("harness:workspace"));
   await sleep(100);
   assert.ok(providers.w.document.body.textContent.includes("Sin organizaciones en este workspace"));
-  providerButton("Agregar desde GitHub")?.click();
+  providerButton("Agregar o configurar en GitHub")?.click();
+  await sleep(30);
+  providerButton("Actualizar acceso")?.click();
   await sleep(100);
   clickArea("acme", "Usar en este workspace");
   await sleep(100);
@@ -2663,7 +2669,7 @@ if (!roto) {
   assert.ok(!providers.w.document.body.textContent.includes("stale"), "una respuesta vieja no cruza de workspace");
   assert.deepEqual(selectedKeys("ws-b"), ["acme"]);
   assert.deepEqual(selectedKeys("ws-a"), ["other"]);
-  assert.equal(authentications, 3);
+  assert.equal(authentications, 0);
   assert.ok(providerCalls.includes("ws-a") && providerCalls.includes("ws-b"));
   assert.deepEqual(providers.fallos, []);
   let integrationStatus = { installed: true, enabled: false };
