@@ -3935,8 +3935,14 @@ export default function App() {
    * una tarea borrada mientras tanto no reaparece como pestaña rota.
    */
   function reabrirPestana() {
+    const antes = new Set(pestanas.open().map((x) => x.id));
     const p = pestanas.reopen((x) => x.session === "" || filaDe(x.session) !== undefined);
-    if (p) void activarPestana(p);
+    if (!p) return;
+    // La tira que se pinta es la de la ventana: sin colocarlas, volverían al final.
+    const tira = pestanas.open().map((x) => x.id);
+    paneles.sync(tira);
+    paneles.placeLikeStrip(tira.filter((id) => !antes.has(id)), tira);
+    void activarPestana(p);
   }
 
   /**

@@ -301,6 +301,27 @@ export function createPanels() {
       );
       persist();
     },
+    // Lo reabierto vuelve tras su vecina izquierda de la tira; sync lo deja al final de la ventana.
+    placeLikeStrip(ids: string[], strip: string[]) {
+      const placed = new Set(ids);
+      for (const id of strip.filter((x) => placed.has(x))) {
+        const site = siteOf(id);
+        if (!site) continue;
+        updateGroup(site, (g) => {
+          const rest = g.pestanas.filter((x) => x !== id);
+          let at = 0;
+          for (let n = strip.indexOf(id) - 1; n >= 0; n--) {
+            const i = rest.indexOf(strip[n]);
+            if (i >= 0) {
+              at = i + 1;
+              break;
+            }
+          }
+          return { ...g, pestanas: [...rest.slice(0, at), id, ...rest.slice(at)] };
+        });
+      }
+      persist();
+    },
     sync(ids: string[]): boolean {
       const liveIds = new Set(ids);
       const assigned = new Set(columns().flatMap((c) => c.flatMap((g) => g.pestanas)));
