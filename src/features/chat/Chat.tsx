@@ -2103,7 +2103,7 @@ export default function Chat(props: ChatProps) {
         <Show when={modoAlMargen() && props.sideCommand}>
           {(comando) => (
             <div class="flex min-w-0 items-center gap-2 px-2 pt-1.5">
-              <span class="inline-flex h-5 items-center gap-1 rounded-[5px] bg-primary/10 px-[7px] text-xs font-medium text-primary">
+              <span class="inline-flex h-5 items-center gap-1 rounded-[5px] bg-side/10 px-[7px] text-xs font-medium text-side">
                 <MessageCircleQuestion size={12} aria-hidden="true" />
                 /{comando()}
               </span>

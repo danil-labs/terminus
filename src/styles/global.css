@@ -219,6 +219,8 @@
      —violeta en claro, teal en oscuro— y por eso el oscuro repite la regla. */
   --color-chat-user: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface-raised));
   --color-chat-user-border: color-mix(in srgb, var(--color-primary) 20%, transparent);
+  /* La pregunta al margen (`/btw`). Sigue al primario salvo en grafito oscuro. */
+  --color-side: var(--color-primary);
   /* El globo de un agente u otra tarea. En claro `surface-raised` es blanco como el chat (1,00:1). */
   --color-chat-incoming: var(--color-surface-muted);
   --color-surface-muted: #f3f4f8;
@@ -542,6 +544,8 @@
 
   --color-emphasis: #ececef;
   --color-link: #f4eb7b;
+  /* El teal del navy: el blanco roto del primario no la distingue del hilo. */
+  --color-side: #4fe3d8;
 
   /* Tinte amarillo: sin él el globo de la persona es igual al de un agente (`surface-raised`). */
   --color-chat-user: color-mix(in srgb, var(--color-brand-yellow) 8%, var(--color-surface-raised));
