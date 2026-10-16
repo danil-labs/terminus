@@ -3288,7 +3288,9 @@ export default function App() {
       const primera = s.find((x) => x.usable);
       batch(() => {
         setSuperficies(s);
-        if (!inicial) return;
+        // Al cambiar de workspace la tarea del frente se reabre mientras esta
+        // consulta sigue en vuelo; su agente lo fija `load_session`.
+        if (!inicial || sessionId()) return;
         // El arranque no hereda el agente ni el modelo del workspace anterior.
         // Si nada sirve, no se fabrica una selección con la primera fila del
         // catálogo: la caja ofrece conectar algo y ningún modelo se finge.
