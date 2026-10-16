@@ -129,6 +129,11 @@ function belongsToBlock(list: readonly Tab[], ids: readonly string[]): (p: Tab) 
 
 type StoredTabs = { abiertas: TaskTab[]; activa: string | null };
 
+// El índice es el de la tira al cerrar; reinsertar en orden ascendente la reconstruye.
+type ClosedBlock = { tabs: { tab: Tab; index: number }[]; active: string | null };
+
+const MAX_CLOSED_BLOCKS = 20;
+
 const key = (workspace: string, space: string | null) =>
   space ? `pestanas.${workspace}.${space}` : `pestanas.${workspace}`;
 
@@ -182,8 +187,16 @@ export function createTabs() {
   const [dirty, setDirtyTabs] = createSignal<ReadonlySet<string>>(new Set());
   const savers = new Map<string, () => Promise<boolean>>();
   const [active, setActive] = createSignal<string | null>(null);
+  // Solo en memoria y por tira: al arrancar ya vuelven las pestañas de tarea.
+  const closedByStrip = new Map<string, ClosedBlock[]>();
+  const [closed, setClosed] = createSignal<ClosedBlock[]>([]);
   let workspace: string | null = null;
   let space: string | null = null;
+
+  const setClosedStack = (stack: ClosedBlock[]) => {
+    if (workspace) closedByStrip.set(key(workspace, space), stack);
+    setClosed(stack);
+  };
 
   const taskOf = (id: string | null) =>
     openTabs().find((p) => p.id === id)?.session ?? null;
@@ -199,13 +212,23 @@ export function createTabs() {
     escribirPref(key(workspace, space), g);
   };
 
-  function closeMany(ids: readonly string[]): Tab | null {
+  // Solo recuerda el cierre que pide la persona; mover o borrar una tarea no se deshace así.
+  function closeMany(ids: readonly string[], opts: { remember?: boolean } = {}): Tab | null {
     const list = openTabs();
     const removed = belongsToBlock(list, ids);
     const currentTab = active();
     let i = list.findIndex((p) => p.id === currentTab && removed(p));
     if (i < 0) i = list.findIndex(removed);
     if (i < 0) return null;
+    if (opts.remember && workspace) {
+      const tabs = list.flatMap((tab, index) =>
+        removed(tab) && !esProvisional(tab.session) ? [{ tab, index }] : [],
+      );
+      const back = tabs.find((x) => x.tab.id === currentTab) ?? tabs.find((x) => ids.includes(x.tab.id));
+      if (tabs.length > 0) {
+        setClosedStack([...closed(), { tabs, active: back?.tab.id ?? null }].slice(-MAX_CLOSED_BLOCKS));
+      }
+    }
     const remaining = list.filter((p) => !removed(p));
     // El índice pertenece a la lista original; usarlo en quedan elegiría otra vecina.
     let after: Tab | null = null;
@@ -244,6 +267,7 @@ export function createTabs() {
       workspace = ws;
       space = desk;
       setActive(null);
+      setClosed(ws ? (closedByStrip.get(key(ws, desk)) ?? []) : []);
       if (!ws) {
         setOpenTabs([]);
         return null;
@@ -322,6 +346,30 @@ export function createTabs() {
     activate: activateAndPersist,
     close: (id: string): Tab | null => closeMany([id]),
     closeMany: closeMany,
+    canReopen: () => closed().length > 0,
+    /**
+     * Vuelve el último bloque cerrado a mano, en su sitio de la tira, y
+     * devuelve la pestaña que debe quedar delante. Lo que ya está abierto o
+     * dejó de existir se salta; un bloque sin nada que volver cede al anterior.
+     */
+    reopen(alive: (p: Tab) => boolean): Tab | null {
+      let stack = closed();
+      while (stack.length > 0) {
+        const block = stack[stack.length - 1];
+        stack = stack.slice(0, -1);
+        const open = new Set(openTabs().map((p) => p.id));
+        const back = block.tabs.filter(({ tab }) => !open.has(tab.id) && alive(tab));
+        if (back.length === 0) continue;
+        const list = [...openTabs()];
+        for (const { tab, index } of back) list.splice(Math.min(index, list.length), 0, tab);
+        setOpenTabs(list);
+        setClosedStack(stack);
+        save();
+        return back.find((x) => x.tab.id === block.active)?.tab ?? back[0].tab;
+      }
+      setClosedStack(stack);
+      return null;
+    },
     // El nuevo id debe propagarse a lib/panels.ts o la pestaña perdería su ventana.
     attachPreviewFiles(project: string, session: string, tree: string): [string, string][] {
       const changes: [string, string][] = [];

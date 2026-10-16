@@ -700,3 +700,18 @@ test("cada cambio del reparto se guarda bajo el espacio encuadrado", () => {
   p.split("a");
   assert.equal(readLayout("w", "i1")?.columnas.length, 1, "sin encuadrar se pisó lo guardado");
 });
+
+// Reabrir con Ctrl+Shift+T: la tira que se pinta es la de la ventana, y `sync`
+// deja lo que entra al final aunque fuera la primera pestaña.
+test("lo reabierto vuelve tras su vecina izquierda, no al final", () => {
+  const p = con("b", "c");
+  p.sync(["a", "b", "c"]);
+  assert.deepEqual(p.tabsAt(p.activeSite()), ["b", "c", "a"]);
+  p.placeLikeStrip(["a"], ["a", "b", "c"]);
+  assert.deepEqual(p.tabsAt(p.activeSite()), ["a", "b", "c"]);
+  const q = con("a", "d");
+  q.sync(["a", "b", "c", "d"]);
+  q.placeLikeStrip(["b", "c"], ["a", "b", "c", "d"]);
+  assert.deepEqual(q.tabsAt(q.activeSite()), ["a", "b", "c", "d"]);
+  sano(q);
+});

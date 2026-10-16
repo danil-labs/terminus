@@ -10,6 +10,7 @@ import { corta } from "../../lib/sites";
 import { type BatchCloseAction, isTaskTab, type Tab, tabsToClose } from "../../lib/tabs";
 import { cn } from "../../lib/utils";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "../../ui/ContextMenu";
+import { Atajo } from "../../ui/Shortcut";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,6 +52,8 @@ export default function TabStrip(props: {
   onClose: (id: string) => void;
   dirtyIds: ReadonlySet<string>;
   onCloseMany: (ids: string[]) => void;
+  canReopen: boolean;
+  onReopen: () => void;
   // El arrastre nativo de Tauri intercepta dragstart/drop; las pestañas usan eventos de puntero.
   onDrag?: (id: string, e: PointerEvent) => void;
   dropIndex?: number | null;
@@ -500,6 +503,9 @@ export default function TabStrip(props: {
       </ContextMenuItem>
       <ContextMenuItem onSelect={() => closeBatch("todas")}>
         {t("projects.tabs.close_all")}
+      </ContextMenuItem>
+      <ContextMenuItem disabled={!props.canReopen} onSelect={() => props.onReopen()}>
+        <Atajo accion="reopenTab" etiqueta={t("projects.tabs.reopen")} />
       </ContextMenuItem>
     </ContextMenuContent>
     </ContextMenu>
