@@ -29,12 +29,18 @@ export function AltoMonotono(props: { vivo: boolean; children: JSX.Element; sear
 
   const medir = (el: HTMLElement) => {
     if (typeof ResizeObserver === "undefined") return;
+    let anchoPrevio: number | undefined;
     const ojo = new ResizeObserver(([entrada]) => {
-      const alto = entrada.contentRect.height;
+      const { width: ancho, height: alto } = entrada.contentRect;
+      // Con otro ancho el texto se re-envuelve de verdad y el máximo anterior no
+      // vale: minimizada en Windows la ventana mide 144 px, y conservarlo deja
+      // miles de píxeles en blanco al restaurar.
+      const otroAncho = anchoPrevio !== undefined && ancho !== anchoPrevio;
+      anchoPrevio = ancho;
       // `vivo` se lee aquí dentro y no se captura: el observador es uno
       // solo para toda la vida del componente, y el turno se cierra mientras
       // sigue mirando.
-      setMinimo((previo) => (vivo() ? Math.max(previo, alto) : 0));
+      setMinimo((previo) => (!vivo() ? 0 : otroAncho ? alto : Math.max(previo, alto)));
     });
     ojo.observe(el);
     onCleanup(() => ojo.disconnect());
