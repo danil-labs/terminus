@@ -10,10 +10,11 @@ Terminus 0.2.82 te deja cerrar la ventana sin detener a tus agentes, te avisa cu
 - **Vista viva de Typst.** El documento compila mientras escribes, al lado del código, y la vista se recupera sola si pierde contacto con el motor. Esc en el chat ya no la saca de la vista previa, y el editor conserva el teclado al abrirla.
 - **Gráficas interactivas en el chat**, con filtros y deslizadores.
 - **Tablas que se ajustan a su contenido.** Las columnas ya no parten palabras cortas, y sus bordes se pueden arrastrar.
-- **Pestañas.** La activa se funde con su conversación, la tira no salta al pulsar una pestaña y se recorre con la rueda o arrastrando su barra.
+- **Pestañas.** La activa se funde con su conversación, la tira no salta al pulsar una pestaña y se recorre con la rueda o arrastrando su barra. Ctrl+Shift+T reabre la última pestaña que cerraste.
 - **Soltar un archivo lo adjunta a la conversación que está debajo**, también con la pantalla partida.
 - **Adjuntos compactos.** Las imágenes de un mensaje enviado se ven como miniaturas en una fila.
 - **Comandos `!` alineados.** La caja sangra los comandos de terminal detrás del `!`.
 - **Las skills de los plugins llegan a los agentes** aunque haya varias tareas trabajando a la vez. Con Typst activo, el agente usa el Typst de Terminus.
 - **El comando `!` en macOS y Linux** encuentra `npm` y las demás herramientas de tu terminal, y muestra si el comando falló.
+- **Restaurar Terminus minimizado ya no deja un hueco en blanco** sobre la respuesta que se está escribiendo.
 - **Arreglos menores:** la tarea conserva su proveedor al cambiar de workspace; `/btw` conserva su color en el tema oscuro grafito; la pestaña activa de Configuración ya no se separa del panel con zoom; las tareas lanzadas desde otra carpeta salen en su carpeta; los indicadores de Git no desaparecen al cerrar una ventana; se conserva el tema al reiniciar; el aviso de «falta una parte de la salida en vivo» ya no sale en falso; las rutas de Windows escritas como `/C:/` se abren; la llama del cohete queda alineada con su tobera.
