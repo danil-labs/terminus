@@ -68,6 +68,10 @@ workflow without publishing:
 gh workflow run publish.yml -R danil-labs/terminus --ref <branch> -f dry_run=true
 ```
 
+A dry run spends no eSigner signatures: Windows builds without
+`signCommand` and its installed files are checked for presence, not for
+Authenticode. eSigner itself is only exercised by a real release.
+
 `node tests/release/publish.test.mjs` (macOS or Linux, needs Ruby and jq)
 runs the packaging steps of the workflow with fixtures and temporary signing
 keys.

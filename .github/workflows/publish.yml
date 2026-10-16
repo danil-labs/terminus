@@ -83,8 +83,12 @@ on:
       #
       #     gh workflow run publish.yml -R danil-labs/terminus --ref <rama> -f dry_run=true
       #
-      # Cada ensayo gasta las firmas de eSigner de una release (ver «Construir y
-      # firmar en Windows»).
+      # **Un ensayo no firma Windows.** El plan de eSigner cobra cada firma, y un
+      # ensayo gastaba las de una release para un instalador que nadie baja. Sin
+      # sus secrets el paso de Windows no puede firmar aunque algo falle: Tauri
+      # construye sin `signCommand` y se comprueba que lo instalado esté, no su
+      # Authenticode. La firma de minisign, macOS y Linux siguen igual. Lo que
+      # solo prueba eSigner se ve en la primera release real.
       dry_run:
         description: "Construir y comprobar sin publicar nada"
         type: boolean
@@ -437,16 +441,22 @@ jobs:
       # cuesta una firma por versión del motor, no por release: la primera release
       # que lo empaqueta sin firma lo firma y deja la copia firmada en el artefacto
       # `seldon-runtime-windows-signed`, que se sube a la release del motor y se fija.
+      #
+      # **En un ensayo, cero.** Los secrets de eSigner llegan vacíos y no se
+      # pasa `signCommand`; el `.sig` de minisign sí se escribe, porque `publish`
+      # arma `latest.json` con él. En un push de tag `inputs.dry_run` es nulo y
+      # `!inputs.dry_run` da verdadero: una release real recibe los secrets.
       - name: Construir y firmar en Windows
         if: runner.os == 'Windows'
         shell: bash
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          ES_USERNAME: ${{ secrets.ES_USERNAME }}
-          ES_PASSWORD: ${{ secrets.ES_PASSWORD }}
-          ES_CREDENTIAL_ID: ${{ secrets.ES_CREDENTIAL_ID }}
-          ES_TOTP_SECRET: ${{ secrets.ES_TOTP_SECRET }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          ES_USERNAME: ${{ !inputs.dry_run && secrets.ES_USERNAME || '' }}
+          ES_PASSWORD: ${{ !inputs.dry_run && secrets.ES_PASSWORD || '' }}
+          ES_CREDENTIAL_ID: ${{ !inputs.dry_run && secrets.ES_CREDENTIAL_ID || '' }}
+          ES_TOTP_SECRET: ${{ !inputs.dry_run && secrets.ES_TOTP_SECRET || '' }}
           CST_URL: https://github.com/SSLcom/CodeSignTool/releases/download/v1.3.2/CodeSignTool-v1.3.2-windows.zip
           CST_SHA256: 4afc32e8b7f79bbe1de7e4e7049aaad4e0f754357613b9bbec0e3052f06fd36b
           SSLCOM_ROOT_URL: http://cert.ssl.com/SSLcom-TLS-Root-2022-RSA.cer
@@ -454,26 +464,31 @@ jobs:
         run: |
           set -euo pipefail
 
-          for v in ES_USERNAME ES_PASSWORD ES_CREDENTIAL_ID ES_TOTP_SECRET; do
-            [ -n "${!v}" ] || { echo "::error title=Falta el secret $v::Sin él no se firma la release de Windows. Va en Settings → Secrets and variables → Actions de este repo."; exit 1; }
-          done
-
           T=$(cygpath -u "$RUNNER_TEMP")
           export T
-          curl -fsSL -o "$T/cst.zip" "$CST_URL"
-          echo "$CST_SHA256  $T/cst.zip" | sha256sum -c -
-          pwsh -NoProfile -Command "Expand-Archive -LiteralPath '$(cygpath -w "$T/cst.zip")' -DestinationPath '$(cygpath -w "$T/cst")'"
 
-          # JDK 11.0.2 (2019) bundled en CodeSignTool no incluye la raíz
-          # "SSL.com TLS RSA Root CA 2022" que cs.ssl.com empezó a usar en
-          # septiembre de 2026. Sin ella, el handshake TLS cae por PKIX.
-          curl -fsSL -o "$T/sslcom-root.cer" "$SSLCOM_ROOT_URL"
-          echo "$SSLCOM_ROOT_SHA256  $T/sslcom-root.cer" | sha256sum -c -
-          "$T/cst/jdk-11.0.2/bin/keytool.exe" -import -noprompt -trustcacerts \
-            -alias sslcomtlsroot2022 \
-            -file "$(cygpath -w "$T/sslcom-root.cer")" \
-            -keystore "$(cygpath -w "$T/cst/jdk-11.0.2/lib/security/cacerts")" \
-            -storepass changeit
+          if [ "${DRY_RUN:-false}" = "true" ]; then
+            echo "Ensayo: no se prepara eSigner ni se pasa signCommand. Windows sale sin Authenticode."
+          else
+            for v in ES_USERNAME ES_PASSWORD ES_CREDENTIAL_ID ES_TOTP_SECRET; do
+              [ -n "${!v}" ] || { echo "::error title=Falta el secret $v::Sin él no se firma la release de Windows. Va en Settings → Secrets and variables → Actions de este repo."; exit 1; }
+            done
+
+            curl -fsSL -o "$T/cst.zip" "$CST_URL"
+            echo "$CST_SHA256  $T/cst.zip" | sha256sum -c -
+            pwsh -NoProfile -Command "Expand-Archive -LiteralPath '$(cygpath -w "$T/cst.zip")' -DestinationPath '$(cygpath -w "$T/cst")'"
+
+            # JDK 11.0.2 (2019) bundled en CodeSignTool no incluye la raíz
+            # "SSL.com TLS RSA Root CA 2022" que cs.ssl.com empezó a usar en
+            # septiembre de 2026. Sin ella, el handshake TLS cae por PKIX.
+            curl -fsSL -o "$T/sslcom-root.cer" "$SSLCOM_ROOT_URL"
+            echo "$SSLCOM_ROOT_SHA256  $T/sslcom-root.cer" | sha256sum -c -
+            "$T/cst/jdk-11.0.2/bin/keytool.exe" -import -noprompt -trustcacerts \
+              -alias sslcomtlsroot2022 \
+              -file "$(cygpath -w "$T/sslcom-root.cer")" \
+              -keystore "$(cygpath -w "$T/cst/jdk-11.0.2/lib/security/cacerts")" \
+              -storepass changeit
+          fi
 
           # Lo llama Tauri, un archivo por vez, con la ruta de Windows como único
           # argumento. Hereda del paso los secrets de eSigner y `T`.
@@ -538,12 +553,16 @@ jobs:
           # Rutas absolutas y con `/`: el mismo comando lo ejecuta Tauri y, para
           # el desinstalador, makensis desde otra carpeta. `bash` con ruta
           # completa porque, sin ella, Windows puede encontrar antes el de WSL
-          # en System32.
-          CONFIG=$(jq -nc \
-            --arg bash "$(cygpath -m "$(command -v bash)")" \
-            --arg sign_script "$(cygpath -m "$T/sign-authenticode.sh")" \
-            '{bundle: {windows: {signCommand: {cmd: $bash, args: [$sign_script, "%1"]}}}}')
-          echo "signCommand: $CONFIG"
+          # en System32. En un ensayo el script existe pero nadie lo llama.
+          SIGN_CONFIG=()
+          if [ "${DRY_RUN:-false}" != "true" ]; then
+            CONFIG=$(jq -nc \
+              --arg bash "$(cygpath -m "$(command -v bash)")" \
+              --arg sign_script "$(cygpath -m "$T/sign-authenticode.sh")" \
+              '{bundle: {windows: {signCommand: {cmd: $bash, args: [$sign_script, "%1"]}}}}')
+            echo "signCommand: $CONFIG"
+            SIGN_CONFIG=(--config "$CONFIG")
+          fi
           : > "$T/signed.txt"
 
           # El motor como sidecar: Tauri lo busca en `src-tauri/<entrada>-<triple>.exe`
@@ -561,12 +580,13 @@ jobs:
               "Valid|"*"Software y Servicios Danil"*) echo "seldon-runtime ya llega firmado por Danil: Tauri no lo vuelve a firmar." ;;
               *)
                 ENGINE_SIDECAR=$(basename "$ENGINE_FILE")
-                echo "ENGINE_SIGNED_HERE=true" >> "$GITHUB_ENV"
-                echo "::warning title=Motor sin firma en el lock::seldon-runtime llega sin la firma de Danil ($engine_signer): lo firma eSigner. Sube el artefacto seldon-runtime-windows-signed a la release del motor y fíjalo en seldon-runtime.lock para no volver a gastar esta firma." ;;
+                # En un ensayo no se firma: no hay copia firmada que guardar.
+                [ "${DRY_RUN:-false}" = "true" ] || echo "ENGINE_SIGNED_HERE=true" >> "$GITHUB_ENV"
+                echo "::warning title=Motor sin firma en el lock::seldon-runtime llega sin la firma de Danil ($engine_signer): lo firma eSigner (en un ensayo, no). Sube el artefacto seldon-runtime-windows-signed a la release del motor y fíjalo en seldon-runtime.lock para no volver a gastar esta firma." ;;
             esac
           fi
 
-          pnpm desktop:build --bundles nsis --config "$CONFIG"
+          pnpm desktop:build --bundles nsis "${SIGN_CONFIG[@]}"
 
           INSTALLER=$(find src-tauri/target/release/bundle -type f -name '*_x64-setup.exe' | head -1)
           [ -n "$INSTALLER" ] || { echo "::error::No se construyó ningún *_x64-setup.exe."; exit 1; }
@@ -574,6 +594,15 @@ jobs:
           # Tauri ya escribe el `.sig` después de la firma Authenticode. Se
           # rehace de todos modos: sale gratis y no depende de ese orden interno.
           pnpm tauri signer sign "$INSTALLER"
+
+          if [ "${DRY_RUN:-false}" = "true" ]; then
+            {
+              echo "### Authenticode — Windows"
+              echo ""
+              echo "Ensayo: firmas de eSigner en esta corrida: **0**. Se construyó sin signCommand; lo instalado no se exige firmado."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
 
           # Lo que se firmó, y cuántas firmas de eSigner costó.
           echo "Firmado con eSigner:"
@@ -600,12 +629,16 @@ jobs:
       # salió del build: v0.2.6 pasó todas las comprobaciones del build con un
       # `terminus.exe` que, instalado, daba `HashMismatch`. Aquí se instala en
       # silencio, como usuario, igual que lo hace una persona, y se mira lo que
-      # quedó en `%LOCALAPPDATA%\Terminus`.
+      # quedó en `%LOCALAPPDATA%\Terminus`. En un ensayo no hubo Authenticode:
+      # se exige que esté todo y la marca de NSIS, y la firma solo se muestra.
       - name: Comprobar las firmas de lo que se instala
         if: runner.os == 'Windows'
         shell: pwsh
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
           $ErrorActionPreference = 'Stop'
+          $dryRun = $env:DRY_RUN -eq 'true'
           $installer = Get-ChildItem -Recurse -File src-tauri/target/release/bundle -Filter '*_x64-setup.exe' | Select-Object -First 1
           if (-not $installer) { throw 'No se construyó ningún *_x64-setup.exe.' }
 
@@ -627,6 +660,8 @@ jobs:
             $s = Get-AuthenticodeSignature -LiteralPath $_.FullName
             $rel = $_.FullName.Substring($dir.Length + 1)
             Write-Output ("{0}: {1} | {2} | sello: {3}" -f $rel, $s.Status, $s.SignerCertificate.Subject, [bool]$s.TimeStamperCertificate)
+            # Dentro de ForEach-Object, `return` pasa al siguiente archivo.
+            if ($dryRun) { return }
             if ($rel -eq 'uninstall.exe' -and $s.Status -eq 'NotSigned') {
               # Sin firmar a propósito: ver «Construir y firmar en Windows».
             } elseif ($s.Status -ne 'Valid') {
@@ -648,7 +683,11 @@ jobs:
           }
 
           if ($failed) { exit 1 }
-          Write-Output ("Lo instalado: {0} presentes; los firmados, por Danil, válidos y con sello de tiempo." -f ($required -join ', '))
+          if ($dryRun) {
+            Write-Output ("Ensayo: lo instalado está completo ({0}); su Authenticode no se exige." -f ($required -join ', '))
+          } else {
+            Write-Output ("Lo instalado: {0} presentes; los firmados, por Danil, válidos y con sello de tiempo." -f ($required -join ', '))
+          }
 
           if ($env:ENGINE_SIGNED_HERE -eq 'true') {
             $out = Join-Path $env:RUNNER_TEMP 'engine-signed'
