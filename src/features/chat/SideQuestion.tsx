@@ -29,11 +29,11 @@ export function PanelAlMargen(props: {
     <section
       aria-label={t("chat.side.title")}
       aria-live="polite"
-      class="mx-1 mt-1 flex min-w-0 flex-col gap-2 rounded-[10px] border border-primary/35 bg-primary/4 px-3 pt-2 pb-3"
+      class="mx-1 mt-1 flex min-w-0 flex-col gap-2 rounded-[10px] border border-side/35 bg-side/4 px-3 pt-2 pb-3"
     >
       <div class="flex min-w-0 items-center gap-2">
-        <MessageCircleQuestion size={14} class="shrink-0 text-primary" aria-hidden="true" />
-        <span class="text-[0.8125rem] font-semibold text-primary">{t("chat.side.title")}</span>
+        <MessageCircleQuestion size={14} class="shrink-0 text-side" aria-hidden="true" />
+        <span class="text-[0.8125rem] font-semibold text-side">{t("chat.side.title")}</span>
         <span class="rounded-[5px] bg-surface px-1.5 py-0.5 text-[0.6875rem] text-neutral-700">
           {t("chat.side.off_thread")}
         </span>
@@ -62,7 +62,7 @@ export function PanelAlMargen(props: {
             when={props.estado.failure}
             fallback={
               <span class="flex items-center gap-1.5 text-[0.8125rem] text-neutral-500">
-                <Loader2 size={13} class="animate-spin-steps text-primary" aria-hidden="true" />
+                <Loader2 size={13} class="animate-spin-steps text-side" aria-hidden="true" />
                 {t("chat.side.waiting")}
               </span>
             }
