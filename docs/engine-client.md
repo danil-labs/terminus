@@ -19,6 +19,11 @@ La ventana captura el workspace de esa lectura mediante un header IPC local
 y el proxy lo coloca en el sobre RPC1 existente. La lectura segura de archivos
 y las instrucciones nativas del agente pertenecen al motor.
 
+La [integración de GitHub](github.md) usa los comandos existentes de proveedores,
+`check_environment` e `install_gh`. El motor añade `githubCli` al reporte de
+entorno; la ventana anterior ignora ese inventario opcional. Su distribución
+requiere actualizar el motor fijado en `seldon-runtime.lock`.
+
 ## Contract
 
 `src-tauri/crates/engine-protocol/commands.json` is the frozen contract: 316

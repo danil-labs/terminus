@@ -57,5 +57,13 @@
   "providers.http.timeout": "{name} no contestó a tiempo. Revisa tu conexión y vuelve a intentar.",
   "providers.http.token_expired": "La conexión con {name} dejó de valer: el token se venció o alguien lo revocó. Crea uno nuevo y vuelve a conectar.",
   "providers.http.token_unknown": "{name} no reconoce ese token. Revisa que lo hayas copiado completo y que no esté vencido, y pégalo otra vez.",
-  "providers.http.unreadable": "{name} contestó algo que no supe leer. Vuelve a intentar en un momento."
+  "providers.http.unreadable": "{name} contestó algo que no supe leer. Vuelve a intentar en un momento.",
+  "providers.github.error.confirm_repositories": "Confirma los repositorios de esta cuenta para usarlos en este workspace.",
+  "providers.github.cli.title": "GitHub CLI (gh)",
+  "providers.github.cli.help": "Opcional. Usa la conexión y los repositorios confirmados de este workspace para las operaciones admitidas. Se descarga directamente bajo demanda; no requiere otro login.",
+  "providers.github.cli.absent": "No instalado",
+  "providers.github.cli.install": "Descargar gh compatible",
+  "providers.github.cli.installing": "Descargando…",
+  "providers.github.cli.ready": "Compatible",
+  "providers.error.connection_changed": "La conexión cambió durante esta operación. Vuelve a intentarlo con la selección actual."
 }

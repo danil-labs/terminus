@@ -65,6 +65,8 @@ const ARBOLES = [WEB].filter((d) => existsSync(d));
  * normal: el registro es la lista de lo que la app hace, no de lo que podría.
  */
 const SIN_INTERFAZ = {
+  provider_pending_setup: "el CLI del motor lo usa para completar la conexión; permanece en el contrato congelado",
+  finish_provider_setup: "el CLI del motor espera la instalación; la ventana actualiza al regresar",
   set_session_pinned: "el gesto de fijar lo implementa la tarea de frontend en paralelo",
   // El backend prepara los árboles; esta lectura aún no tiene pantalla.
   session_worktree: "el árbol y sus notas aún no se pintan en ninguna pantalla",
@@ -72,7 +74,6 @@ const SIN_INTERFAZ = {
   worktree_rename_branch: "el renombre al entregar aún no tiene gesto en pantalla",
   install_tool: "pnpm y Bun los instala bootstrap::prepare_runtime desde Rust; ninguna pantalla lo invoca",
   tree_typst_target: "lo pide typst_live::typst_live_open desde el Rust de la ventana: el webview nunca da la ruta de arranque",
-  install_gh: "se quitó ToolsNotice; instalar bajo pedido aún no tiene otro gesto en pantalla",
   remove_agent: "sin forma confiable de saber qué instaló Terminus, se quitó el botón",
   remove_gh: "sin forma confiable de saber qué instaló Terminus, se quitó el botón",
   remove_tool: "sin forma confiable de saber qué instaló Terminus, se quitó el botón",
