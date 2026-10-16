@@ -58,7 +58,7 @@ export function FinishTaskButton(props: {
   >
     <span class="relative flex size-5 items-center justify-center" aria-hidden="true">
       <Show when={props.busy}>
-        <span class="finish-task-flame absolute bottom-0 left-0 h-2 w-1 rounded-full bg-warning" />
+        <span class="finish-task-flame absolute h-2 w-1 rounded-full bg-warning" />
       </Show>
       <Rocket size={15} class="finish-task-rocket relative" />
     </span>
