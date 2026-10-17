@@ -330,7 +330,6 @@
     "other": "Delete with its {count} tasks"
   },
   "settings.providers.account": "Account",
-  "settings.providers.add_area": "Add from GitHub",
   "settings.providers.already": "already here",
   "settings.providers.already_title": "It is already in this workspace",
   "settings.providers.area_count": "{count} {label}",
@@ -344,7 +343,7 @@
   "settings.providers.busy_listing": "Querying {name}",
   "settings.providers.cancel": "cancel",
   "settings.providers.check": "check",
-  "settings.providers.choose_area": "Workspace organizations",
+  "settings.providers.choose_area": "Access for this workspace",
   "settings.providers.connect": "Connect",
   "settings.providers.connecting": "Checking…",
   "settings.providers.create_token": "Create one in {name} and paste it here.",
@@ -472,7 +471,7 @@
   "settings.workspaces.menu_label": "Workspace: {name}",
   "settings.workspaces.none": "none",
   "settings.providers.finish_selection": "Done",
-  "settings.providers.no_selected_areas": "No organizations in this workspace",
+  "settings.providers.no_selected_areas": "No access selected",
   "settings.providers.remove_area": "Remove from workspace",
   "settings.workspaces.rename": "Rename “{name}”",
   "settings.workspaces.rename_label": "New name for “{name}”",
@@ -603,9 +602,8 @@
   "settings.integrations.typst.scope": "The compiler is installed once for Terminus. Once enabled, Typst documents compile in this workspace and later turns receive its skill.",
   "settings.integrations.typst.size": "Downloads about 20 MB and takes about 55 MB installed.",
   "settings.integrations.typst.no_live_view": "The Typst live preview isn't available in this version yet; the agent can still compile your documents.",
-  "settings.providers.configure_access": "Add or configure on GitHub",
+  "settings.providers.configure_access": "Manage permissions on GitHub",
   "settings.providers.refresh_access": "Refresh access",
-  "settings.providers.choose_access": "Choose local access",
-  "settings.providers.confirm_repositories": "Confirm available repositories",
-  "settings.providers.workspace_access_help": "Access is confirmed for this workspace. New repositories require confirmation again."
+  "settings.providers.choose_access": "Change",
+  "settings.providers.confirm_repositories": "Confirm available repositories"
 }

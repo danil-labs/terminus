@@ -163,6 +163,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
    */
   const [montajes, setMontajes] = createSignal<Record<string, string | null>>({});
   const [choosing, setChoosing] = createSignal<Record<string, boolean>>({});
+  const [inspecting, setInspecting] = createSignal<Record<string, boolean>>({});
   const [areas, setAreas] = createSignal<Record<string, Area[] | null>>({});
   const [abierta, setAbierta] = createSignal<Record<string, string | null>>({});
   const [repos, setRepos] = createSignal<
@@ -361,6 +362,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
     const setup = montajes()[id];
     setMontajes((x) => ({ ...x, [id]: null }));
     setChoosing((x) => ({ ...x, [id]: false }));
+    setInspecting((x) => ({ ...x, [id]: false }));
     invoke("cancel_browser_login", { id, scope: await scope }).catch(() => {});
     if (setup && !disposed) await verAreas(id);
   }
@@ -369,6 +371,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
     try {
       await invoke("disconnect_provider", { id, scope: await scope });
       setChoosing((current) => ({ ...current, [id]: false }));
+      setInspecting((current) => ({ ...current, [id]: false }));
       setAreas((a) => ({ ...a, [id]: null }));
       setAbierta((a) => ({ ...a, [id]: null }));
       setFallas((f) => ({ ...f, [id]: null }));
@@ -490,8 +493,9 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
               // es falsy lo que viaja es `false`, no el valor. Un accesor
               // derivado conserva el tipo. Ver `SYSTEM.md` § Las reglas de
               // Solid, regla 7 bis.
+              const mostrarAreas = () => !p.select_area || choosing()[p.id] || inspecting()[p.id];
               const areasVisibles = () =>
-                estado() === "listando" ? null : misAreas();
+                estado() === "listando" || !mostrarAreas() ? null : misAreas();
               const abiertaAqui = () => abierta()[p.id];
               const esperaAqui = () => esperas()[p.id];
               // Un control deshabilitado dice por qué lo está. Mientras hay una
@@ -612,7 +616,10 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                               size="compact"
                               disabled={estado() !== null}
                               title={espera()}
-                              onClick={() => void verAreas(p.id)}
+                              onClick={() => {
+                                setInspecting((x) => ({ ...x, [p.id]: true }));
+                                void verAreas(p.id);
+                              }}
                             >
                               {t("settings.providers.scope")}
                             </Button>
@@ -636,17 +643,14 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                               description={
                                 elegidas().length === 0
                                   ? t("settings.providers.no_selected_areas")
-                                  : t("settings.providers.workspace_access_help")
+                                  : new Intl.ListFormat(manifiesto().formato).format(elegidas().map((area) => area.key))
                               }
                             >
                               <div class="flex flex-wrap items-center justify-end gap-1.5">
-                                <For each={elegidas()}>
-                                  {(area) => <Badge>{area.key}</Badge>}
-                                </For>
                                 <Button variant="outline" size="compact" disabled={estado() !== null} onClick={() => {
                                   setChoosing((x) => ({ ...x, [p.id]: true }));
                                   void verAreas(p.id);
-                                }}>
+                                }} aria-expanded={!!choosing()[p.id]}>
                                   {t("settings.providers.choose_access")}
                                 </Button>
                                 <Show when={p.setup_url}>
@@ -654,8 +658,6 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                                     <Button
                                       variant="ghost"
                                       size="compact"
-                                      aria-label={t("settings.providers.add_area")}
-                                      title={t("settings.providers.add_area")}
                                       disabled={estado() !== null}
                                       onClick={() => void configurarAcceso({ ...p, setup_url: url() })}
                                     >
@@ -881,7 +883,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                     )}
                   </Show>
 
-                  <Show when={estado() === "listando"}>
+                  <Show when={estado() === "listando" && mostrarAreas()}>
                     <SettingsBlock>
                       <Skeleton filas={2} class="h-6" />
                     </SettingsBlock>
@@ -906,6 +908,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                         <Show when={choosing()[p.id]}>
                           <Button variant="outline" size="compact" class="self-start" onClick={() => {
                             setChoosing((current) => ({ ...current, [p.id]: false }));
+                            setInspecting((current) => ({ ...current, [p.id]: false }));
                             void verAreas(p.id);
                           }}>
                             {t("settings.providers.finish_selection")}
@@ -940,7 +943,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                                         {t("settings.providers.confirm_repositories")}
                                       </Button>
                                     </Show>
-                                    <Show when={p.select_area}>
+                                    <Show when={p.select_area && choosing()[p.id]}>
                                       <Button
                                         variant="outline"
                                         size="compact"

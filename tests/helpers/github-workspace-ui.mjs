@@ -13,11 +13,11 @@ const base = {
   service_poll: { cursor: 0, gap: false, replay: false, runtime: "fixture", reset: false },
 };
 const install = "https://github.com/apps/terminus-app/installations/new";
-for (const scenario of ["existing-installation", "no-installation", "cancel-login"]) {
-  let connected = false;
+for (const scenario of ["connected-workspace", "existing-installation", "no-installation", "cancel-login"]) {
+  let connected = scenario === "connected-workspace";
   let loginCount = 0;
-  let selected = [];
-  let available = scenario === "existing-installation" ? [{ key: "acme", name: "acme" }] : [];
+  let selected = connected ? [{ key: "acme", installation_id: 42, repository_ids: [1] }] : [];
+  let available = connected || scenario === "existing-installation" ? [{ key: "acme", name: "acme" }] : [];
   let finishLogin;
   const opens = [];
   const info = () => ({ id: "github", name: "GitHub", fields: [], browser_login: true,
@@ -44,6 +44,38 @@ for (const scenario of ["existing-installation", "no-installation", "cancel-logi
   const button = text => [...app.w.document.querySelectorAll("button")].find(b => b.textContent?.trim() === text || b.getAttribute("aria-label") === text);
   button("Configuración")?.click(); await espera(100);
   button("Control de Fuentes")?.click(); await espera(100);
+  if (scenario === "connected-workspace") {
+    const rows = () => app.w.document.querySelectorAll("section li");
+    assert.ok(app.w.document.body.textContent.includes("Acceso de este workspace"));
+    assert.ok(app.w.document.body.textContent.includes("acme"));
+    assert.equal(rows().length, 0, "el acceso guardado se resume sin desplegar organizaciones");
+    app.w.dispatchEvent(new app.w.Event("focus")); await espera(100);
+    button("comprobar").click(); await espera(100);
+    assert.equal(rows().length, 0, "comprobar o volver al foco conserva el resumen");
+    available.push({ key: "other", name: "other" });
+    button("Cambiar").click(); await espera(100);
+    assert.equal(rows().length, 2);
+    assert.equal(button("Cambiar").getAttribute("aria-expanded"), "true");
+    button("Usar en este workspace").click(); await espera(100);
+    assert.deepEqual(selected.map(({ key }) => key), ["acme", "other"]);
+    button("Listo").click(); await espera(100);
+    assert.equal(rows().length, 0, "Listo oculta el selector");
+    assert.equal(button("Cambiar").getAttribute("aria-expanded"), "false");
+    assert.ok(app.w.document.body.textContent.includes("acme y other"));
+    button("ver qué alcanza").click(); await espera(100);
+    assert.equal(rows().length, 2, "la consulta de repositorios sigue disponible");
+    assert.equal(button("Quitar del workspace"), undefined, "editar acceso requiere Cambiar");
+    button("Cambiar").click(); await espera(100);
+    button("Quitar del workspace").click(); await espera(100);
+    button("Listo").click(); await espera(100);
+    assert.deepEqual(selected.map(({ key }) => key), ["other"]);
+    assert.equal(rows().length, 0);
+    assert.equal(loginCount, 0);
+    assert.deepEqual(opens, []);
+    assert.deepEqual(app.fallos, []);
+    console.log("PASS connected-workspace: resumen, edición, cierre y consulta");
+    continue;
+  }
   assert.ok(button("Conectar con GitHub"));
   button("Conectar con GitHub").click(); await espera(150);
   if (scenario === "cancel-login") {
@@ -56,8 +88,10 @@ for (const scenario of ["existing-installation", "no-installation", "cancel-logi
     button("cancelar").click(); await espera(100);
     assert.equal(connected, true);
     assert.equal(selected.length, 0);
-    assert.ok(button("Agregar o configurar en GitHub"));
-    button("Agregar o configurar en GitHub").click(); await espera(100);
+    assert.ok(app.w.document.body.textContent.includes("Sin acceso seleccionado"));
+    assert.equal(button("Usar en este workspace"), undefined);
+    assert.ok(button("Administrar permisos en GitHub"));
+    button("Administrar permisos en GitHub").click(); await espera(100);
     assert.equal(loginCount, 1, "configurar no repite login");
     available = [{ key: "acme", name: "acme" }, { key: "other", name: "other" }];
     app.w.dispatchEvent(new app.w.Event("focus")); await espera(100);
@@ -68,6 +102,8 @@ for (const scenario of ["existing-installation", "no-installation", "cancel-logi
     assert.ok(button("Confirmar repositorios disponibles"));
     button("Listo").click(); await espera(100);
     assert.deepEqual(selected.map(({ key }) => key), ["acme"]);
+    assert.equal(button("Usar en este workspace"), undefined, "Listo oculta las opciones disponibles");
+    assert.equal(button("Confirmar repositorios disponibles"), undefined);
   }
   assert.deepEqual(app.fallos, []);
   console.log(`PASS ${scenario}: selector, regreso, cancelación y confirmación local`);
