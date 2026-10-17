@@ -253,6 +253,17 @@ export function OpenCodeMark(props: { size?: number }) {
   );
 }
 
+/** Marca de la cabecera oficial de https://zcode.z.ai/en. */
+export function ZCodeMark(props: { size?: number }) {
+  return (
+    <svg class="block shrink-0" width={props.size ?? 14} height={props.size ?? 14} viewBox="0 0 256 218" fill="currentColor" aria-hidden="true">
+      <path d="M134.4 0.130152L116.48 25.6022C113.665 29.5699 109.054 32.0019 104.064 32.0019H6.3999V0C6.3999 0.130149 134.4 0.130152 134.4 0.130152Z" />
+      <path d="M256 0.130127L102.401 217.732H0L153.599 0.130127H256Z" />
+      <path d="M121.601 217.732L139.65 192.134C142.465 188.166 147.076 185.734 152.067 185.734H249.604V217.736H121.601V217.732Z" />
+    </svg>
+  );
+}
+
 /**
  * La marca de un agente, por su id — el único sitio que decide esto. Cuatro
  * pantallas la piden; repartir el `switch` deja a un agente nuevo con marca en
@@ -264,6 +275,7 @@ export function MarcaAgente(props: { id: string; size?: number }) {
     <Switch>
       <Match when={props.id === "claude"}><ClaudeMark size={props.size} /></Match>
       <Match when={props.id === "codex"}><CodexMark size={props.size} /></Match>
+      <Match when={props.id === "zcode"}><ZCodeMark size={props.size} /></Match>
       <Match when={props.id === "grok"}><GrokMark size={props.size} /></Match>
       <Match when={props.id === "antigravity"}><GeminiMark size={props.size} /></Match>
       <Match when={props.id === "opencode" || props.id.startsWith("opencode-")}>
