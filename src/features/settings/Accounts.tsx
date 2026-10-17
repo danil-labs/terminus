@@ -153,6 +153,24 @@ export default function Accounts(props: {
     }
   }
 
+  const proveedor = () => agentes().find((a) => a.id === agente());
+  const externalInstallUrl = () => proveedor()?.external_install_url;
+  const faltaExterno = () => !proveedor() || Boolean(externalInstallUrl()) && !proveedor()?.available;
+  const [revisandoCli, setRevisandoCli] = createSignal(false);
+
+  async function comprobarCli() {
+    setRevisandoCli(true);
+    try {
+      await invoke("check_environment", { force: true });
+      setAgentes(await invoke<AgentOpt[]>("list_agents"));
+      setFallo(null);
+    } catch (e) {
+      setFallo({ what: t("settings.accounts.error.check_provider"), detail: detalleDe(e) });
+    } finally {
+      setRevisandoCli(false);
+    }
+  }
+
   const etiqueta = () =>
     agentes().find((a) => a.id === agente())?.label ?? t("settings.accounts.agent_fallback");
 
@@ -166,13 +184,15 @@ export default function Accounts(props: {
 
   // Nombrar un proveedor durante la preparación local atribuiría una salida de datos.
   const acto = () =>
-    inferencia() === "en_la_maquina"
+    !proveedor()
+      ? { boton: t("settings.accounts.check_provider"), curso: t("settings.accounts.preparing") }
+      : inferencia() === "en_la_maquina"
       ? {
           boton: t("settings.accounts.local_models.prepare"),
           curso: t("settings.accounts.preparing"),
         }
       : {
-          boton: t("settings.accounts.install_agent", { agent: etiqueta() }),
+          boton: externalInstallUrl() ? t("settings.accounts.official_download", { agent: etiqueta() }) : t("settings.accounts.install_agent", { agent: etiqueta() }),
           curso: t("settings.accounts.installing_agent", { agent: etiqueta() }),
         };
 
@@ -247,7 +267,7 @@ export default function Accounts(props: {
         const primero = a.find((x) => x.available);
         if (primero) setAgente(primero.id);
       })
-      .catch(() => setAgentes([]));
+      .catch((e) => setFallo({ what: t("settings.accounts.error.check_provider"), detail: detalleDe(e) }));
   });
 
   /**
@@ -260,8 +280,15 @@ export default function Accounts(props: {
    * cualquiera deja a las dos utilizables.
    */
   async function instalarCli() {
+    if (!proveedor()) { await comprobarCli(); return; }
     setInstalando(agente());
     try {
+      const external = externalInstallUrl();
+      if (external) {
+        await invoke("open_external", { target: external });
+        setFallo(null);
+        return;
+      }
       await invoke("install_agent", { agent: agente() });
       setAgentes(await invoke<AgentOpt[]>("list_agents"));
       setFallo(null);
@@ -531,6 +558,7 @@ export default function Accounts(props: {
   }
 
   async function agregar() {
+    if (faltaExterno()) return;
     try {
       const a = await invoke<Account>("add_account", {
         agent: agente(),
@@ -562,6 +590,7 @@ export default function Accounts(props: {
   }
 
   async function conectar(id: string, modo: "tuberia" | "terminal" = "tuberia") {
+    if (faltaExterno()) { await instalarCli(); return; }
     // El que se conecta con una clave no lanza nada: su CLI la pide en una
     // interfaz de texto que necesita un terminal, y conducirla sería enseñar
     // ese menú crudo a quien no programa. OpenCode ya no entra por aquí: su
@@ -787,7 +816,7 @@ export default function Accounts(props: {
       variant={forma === "aside" ? "ghost" : forma === "fila" ? "secondary" : "primary"}
       size={forma === "aside" ? "compact" : "sm"}
       onClick={() => void agregar()}
-      disabled={enCurso() !== null || segunda() !== null}
+      disabled={enCurso() !== null || segunda() !== null || faltaExterno()}
       /* **La segunda cuenta de un agente que no aísla su credencial no se
          ofrece.** No es una advertencia encima del botón: el botón no se
          puede usar y dice por qué. Conectarla reemplazaría la sesión de la
@@ -833,7 +862,7 @@ export default function Accounts(props: {
           <SettingsBlock class="justify-items-start">
             <Button
               size="sm"
-              disabled={Boolean(instalando())}
+              disabled={Boolean(instalando()) || revisandoCli()}
               onClick={() => void instalarCli()}
             >
               {instalando() ? acto().curso : acto().boton}
@@ -880,11 +909,17 @@ export default function Accounts(props: {
         <SettingsBlock class="justify-items-start">
           <Button
             size="sm"
-            disabled={Boolean(instalando())}
+            disabled={Boolean(instalando()) || revisandoCli()}
             onClick={() => void instalarCli()}
           >
             {instalando() ? acto().curso : acto().boton}
           </Button>
+          <Show when={externalInstallUrl()}>
+            <p class="text-xs text-neutral-500">{t("settings.accounts.external_required", { agent: etiqueta() })}</p>
+            <Button variant="secondary" size="sm" disabled={revisandoCli()} onClick={() => void comprobarCli()}>
+              {t("settings.accounts.check_installed")}
+            </Button>
+          </Show>
         </SettingsBlock>
       </Show>
 
@@ -913,7 +948,7 @@ export default function Accounts(props: {
               {(a) => (
                 <option value={a.id}>
                   {a.label}
-                  {a.available ? "" : t("settings.accounts.installs_on_connect")}
+                  {a.available ? "" : (a.external_install_url ? t("settings.accounts.external_missing") : t("settings.accounts.installs_on_connect"))}
                 </option>
               )}
             </For>

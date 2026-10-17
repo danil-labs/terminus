@@ -605,5 +605,11 @@
   "settings.providers.configure_access": "Administrar permisos en GitHub",
   "settings.providers.refresh_access": "Actualizar acceso",
   "settings.providers.choose_access": "Cambiar",
-  "settings.providers.confirm_repositories": "Confirmar repositorios disponibles"
+  "settings.providers.confirm_repositories": "Confirmar repositorios disponibles",
+  "settings.accounts.official_download": "Descargar {agent} oficial",
+  "settings.accounts.external_missing": " (requiere la app oficial)",
+  "settings.accounts.external_required": "Instala la app oficial de {agent} y comprueba la instalación antes de conectar una cuenta. ZCode requiere macOS y Node.js 22 o posterior.",
+  "settings.accounts.check_installed": "Ya la instalé · Comprobar",
+  "settings.accounts.check_provider": "Comprobar proveedor",
+  "settings.accounts.error.check_provider": "No pude comprobar el proveedor. Vuelve a intentar."
 }
