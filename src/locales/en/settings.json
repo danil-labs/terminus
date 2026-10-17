@@ -607,5 +607,11 @@
   "settings.providers.refresh_access": "Refresh access",
   "settings.providers.choose_access": "Choose local access",
   "settings.providers.confirm_repositories": "Confirm available repositories",
-  "settings.providers.workspace_access_help": "Access is confirmed for this workspace. New repositories require confirmation again."
+  "settings.providers.workspace_access_help": "Access is confirmed for this workspace. New repositories require confirmation again.",
+  "settings.accounts.official_download": "Download official {agent}",
+  "settings.accounts.external_missing": " (requires the official app)",
+  "settings.accounts.external_required": "Install the official {agent} app and check the installation before connecting an account. ZCode requires macOS and Node.js 22 or later.",
+  "settings.accounts.check_installed": "Installed · Check again",
+  "settings.accounts.check_provider": "Check provider",
+  "settings.accounts.error.check_provider": "Could not check the provider. Try again."
 }

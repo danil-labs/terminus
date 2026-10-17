@@ -16,6 +16,11 @@ The logos inside `file-icons.ts` belong to their owners; MIT covers the
 package, not the trademarks. They identify file formats (nominative use) and do
 not imply endorsement.
 
+The ZCode mark in `src/ui/icons.tsx` reproduces the SVG in the header of the
+[official ZCode website](https://zcode.z.ai/en).
+It identifies the provider; the mark belongs to its owner and does not imply
+endorsement. It is separate from the license of Terminus and from Simple Icons.
+
 ## Fonts bundled in the app
 
 All three families are embedded and used offline.

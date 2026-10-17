@@ -115,6 +115,7 @@ export type AgentOpt = {
   id: string;
   label: string;
   available: boolean;
+  external_install_url?: string | null;
   /** Si se puede leer cuánto le queda a su plan (`runtime/agents/`). */
   limits: boolean;
   /**

@@ -31,6 +31,11 @@ All commands accept `--lab <dir>` to use another lab folder. The engine's log is
 On a machine with little memory, limit Rust parallelism:
 `CARGO_BUILD_JOBS=2 pnpm window:build`.
 
+After `pnpm build`, `node tests/helpers/zcode-provider-ui.mjs` checks external
+provider installation, account gating and retry recovery in the compiled front
+with simulated IPC. It runs manually, outside `pnpm verify`, and does not check
+the native window or a real ZCode account.
+
 ## The engine pin
 
 `seldon-runtime.lock` pins the engine release for each platform, keyed by Rust
