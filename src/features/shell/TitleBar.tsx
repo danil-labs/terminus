@@ -2,8 +2,11 @@ import Check from "lucide-solid/icons/check";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import Plus from "lucide-solid/icons/plus";
 import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
+import X from "lucide-solid/icons/x";
 import { For, type JSX, Show } from "solid-js";
 import { t } from "../../lib/i18n";
+import { invoke } from "../../lib/invoke.ts";
+import { createPref } from "../../lib/prefs";
 import { cn } from "../../lib/utils";
 import {
   createFullscreen,
@@ -26,10 +29,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../../ui/DropdownMenu";
+import { GitHubMark } from "../../ui/icons";
+import { RETARDO_TOOLTIP, TooltipContent, TooltipRoot, TooltipTrigger } from "../../ui/Tooltip";
 import { createWorkspaces } from "../settings/workspaces-store";
 import { topState, type WorkspaceAttention } from "./attention";
 import WindowControls from "./WindowControls";
 import { AttentionBadge, MarcaDeWorkspace } from "./WorkspaceColumn";
+
+const TERMINUS_REPOSITORY_URL = "https://github.com/danil-labs/terminus";
 
 /**
  * La fila del título, a todo lo ancho: el nombre del workspace al principio y
@@ -43,6 +50,11 @@ export default function TitleBar(props: {
   escritorios?: (workspace: () => string) => JSX.Element;
 }) {
   const ws = createWorkspaces();
+  const [starDismissed, setStarDismissed] = createPref("github.star.dismissed", false);
+  const openRepository = () =>
+    void invoke("site_open_external", { url: TERMINUS_REPOSITORY_URL })
+      .then(() => setStarDismissed(true))
+      .catch(() => {});
   const apartarSemaforo = needsTrafficLightPadding(() => true, createFullscreen());
   const titulo = createWindowTitle();
   const segmentoFinal = () => {
@@ -74,6 +86,36 @@ export default function TitleBar(props: {
               {texto()}
             </span>
           )}
+        </Show>
+        <Show when={!starDismissed()}>
+          <div class="mx-2 flex shrink-0 items-center gap-0.5">
+            <TooltipRoot openDelay={RETARDO_TOOLTIP} placement="bottom-end" gutter={8}>
+              <TooltipTrigger
+                as={Button}
+                type="button"
+                variant="chrome"
+                size="compact"
+                class="h-6.5 gap-1.5"
+                aria-label={t("shell.github.star.title")}
+                onClick={openRepository}
+              >
+                <span aria-hidden="true"><GitHubMark size={14} /></span>
+                {t("shell.github.star")}
+              </TooltipTrigger>
+              <TooltipContent>{t("shell.github.star.help")}</TooltipContent>
+            </TooltipRoot>
+            <Button
+              type="button"
+              variant="chrome"
+              size="compact"
+              class="size-6 p-0 text-neutral-500"
+              aria-label={t("shell.github.star.dismiss")}
+              title={t("shell.github.star.dismiss")}
+              onClick={() => setStarDismissed(true)}
+            >
+              <X size={12} aria-hidden="true" />
+            </Button>
+          </div>
         </Show>
         <WindowControls />
       </div>
@@ -151,6 +193,17 @@ function WorkspaceMenu(props: {
               <SlidersHorizontal size={14} aria-hidden="true" class="shrink-0 text-neutral-500" />
               {t("settings.workspaces.manage")}
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuGroupLabel>{t("shell.help")}</DropdownMenuGroupLabel>
+              <DropdownMenuItem
+                class="flex items-center gap-2"
+                onSelect={() => void invoke("site_open_external", { url: TERMINUS_REPOSITORY_URL }).catch(() => {})}
+              >
+                <span aria-hidden="true"><GitHubMark size={14} /></span>
+                {t("shell.github.repository")}
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
       )}
