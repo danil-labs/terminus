@@ -51,10 +51,22 @@ export default function TitleBar(props: {
 }) {
   const ws = createWorkspaces();
   const [starDismissed, setStarDismissed] = createPref("github.star.dismissed", false);
-  const openRepository = () =>
+  let titleBar: HTMLDivElement | undefined;
+  let starInvitation: HTMLDivElement | undefined;
+  let openingRepository = false;
+  const dismissStar = () => {
+    const restoreFocus = document.hasFocus() && starInvitation?.contains(document.activeElement);
+    setStarDismissed(true);
+    if (restoreFocus) titleBar?.querySelector<HTMLButtonElement>("[data-workspace-name]")?.focus();
+  };
+  const openRepository = () => {
+    if (openingRepository) return;
+    openingRepository = true;
     void invoke("site_open_external", { url: TERMINUS_REPOSITORY_URL })
-      .then(() => setStarDismissed(true))
-      .catch(() => {});
+      .then(dismissStar)
+      .catch(() => {})
+      .finally(() => { openingRepository = false; });
+  };
   const apartarSemaforo = needsTrafficLightPadding(() => true, createFullscreen());
   const titulo = createWindowTitle();
   const segmentoFinal = () => {
@@ -67,6 +79,7 @@ export default function TitleBar(props: {
 
   return (
     <div
+      ref={titleBar}
       data-title-bar=""
       class={cn(
         "flex shrink-0 items-center border-b border-border bg-surface-muted",
@@ -88,7 +101,7 @@ export default function TitleBar(props: {
           )}
         </Show>
         <Show when={!starDismissed()}>
-          <div class="mx-2 flex shrink-0 items-center gap-0.5">
+          <div ref={starInvitation} class="mx-2 flex shrink-0 items-center gap-0.5">
             <TooltipRoot openDelay={RETARDO_TOOLTIP} placement="bottom-end" gutter={8}>
               <TooltipTrigger
                 as={Button}
@@ -111,7 +124,7 @@ export default function TitleBar(props: {
               class="size-6 p-0 text-neutral-500"
               aria-label={t("shell.github.star.dismiss")}
               title={t("shell.github.star.dismiss")}
-              onClick={() => setStarDismissed(true)}
+              onClick={dismissStar}
             >
               <X size={12} aria-hidden="true" />
             </Button>
