@@ -161,7 +161,8 @@ export default function TabStrip(props: {
       }}
       // La barra de scroll ocuparía el alto de las pestañas.
       // flex-1 separaría el botón de añadir de la última pestaña.
-      class="flex min-w-0 items-center gap-0.5 self-stretch overflow-x-auto [scrollbar-width:none]"
+      // Con touchpad en Windows, el rebote elástico al tope desplaza el texto sin el fondo de la pestaña.
+      class="flex min-w-0 items-center gap-0.5 self-stretch overflow-x-auto overscroll-x-none [scrollbar-width:none]"
     >
       <For each={props.tabs}>
         {(p, i) => {
