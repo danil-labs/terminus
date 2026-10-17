@@ -172,7 +172,6 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
    */
   const [montajes, setMontajes] = createSignal<Record<string, string | null>>({});
   const [choosing, setChoosing] = createSignal<Record<string, boolean>>({});
-  const [inspecting, setInspecting] = createSignal<Record<string, boolean>>({});
   const [areas, setAreas] = createSignal<Record<string, Area[] | null>>({});
   const [abierta, setAbierta] = createSignal<Record<string, string | null>>({});
   const [repos, setRepos] = createSignal<
@@ -371,7 +370,6 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
     const setup = montajes()[id];
     setMontajes((x) => ({ ...x, [id]: null }));
     setChoosing((x) => ({ ...x, [id]: false }));
-    setInspecting((x) => ({ ...x, [id]: false }));
     invoke("cancel_browser_login", { id, scope: await scope }).catch(() => {});
     if (setup && !disposed) await verAreas(id);
   }
@@ -380,7 +378,6 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
     try {
       await invoke("disconnect_provider", { id, scope: await scope });
       setChoosing((current) => ({ ...current, [id]: false }));
-      setInspecting((current) => ({ ...current, [id]: false }));
       setAreas((a) => ({ ...a, [id]: null }));
       setAbierta((a) => ({ ...a, [id]: null }));
       setFallas((f) => ({ ...f, [id]: null }));
@@ -502,7 +499,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
               // es falsy lo que viaja es `false`, no el valor. Un accesor
               // derivado conserva el tipo. Ver `SYSTEM.md` § Las reglas de
               // Solid, regla 7 bis.
-              const mostrarAreas = () => !p.select_area || choosing()[p.id] || inspecting()[p.id];
+              const mostrarAreas = () => !p.select_area || choosing()[p.id];
               const areasVisibles = () =>
                 estado() === "listando" || !mostrarAreas() ? null : misAreas();
               const abiertaAqui = () => abierta()[p.id];
@@ -610,7 +607,6 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                                 disabled={estado() !== null}
                                 title={espera()}
                                 onClick={() => {
-                                  setInspecting((x) => ({ ...x, [p.id]: true }));
                                   void verAreas(p.id);
                                 }}
                               >
@@ -679,13 +675,6 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                                 : new Intl.ListFormat(manifiesto().formato).format(elegidas().map((area) => area.key))}
                             >
                               <div class="flex flex-wrap items-center gap-1.5">
-                                <Button variant="ghost" size="compact" disabled={estado() !== null} title={espera()}
-                                  onClick={() => {
-                                    setInspecting((x) => ({ ...x, [p.id]: true }));
-                                    void verAreas(p.id);
-                                  }}>
-                                  {t("providers.github.view_repositories")}
-                                </Button>
                                 <Button variant="outline" size="compact" disabled={estado() !== null}
                                   aria-expanded={!!choosing()[p.id]} onClick={() => {
                                     setChoosing((x) => ({ ...x, [p.id]: true }));
@@ -702,15 +691,15 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent class="z-[90]" data-owns-escape>
                                     <Show when={p.setup_url}>
-                                      {(url) => <DropdownMenuItem onSelect={() => void configurarAcceso({ ...p, setup_url: url() })}>
+                                      {(url) => <DropdownMenuItem disabled={estado() !== null} onSelect={() => void configurarAcceso({ ...p, setup_url: url() })}>
                                         {t("settings.providers.configure_access")}
                                       </DropdownMenuItem>}
                                     </Show>
-                                    <DropdownMenuItem onSelect={() => void comprobar(p.id)}>
+                                    <DropdownMenuItem disabled={estado() !== null} onSelect={() => void comprobar(p.id)}>
                                       {t("providers.github.check_connection")}
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem class="text-error-strong"
+                                    <DropdownMenuItem class="text-error-strong" disabled={estado() !== null}
                                       title={t("settings.providers.disconnect_title", { name: p.name })}
                                       onSelect={() => void desconectar(p.id)}>
                                       {t("providers.github.disconnect")}
@@ -960,7 +949,6 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                         <Show when={choosing()[p.id]}>
                           <Button variant="outline" size="compact" class="self-start" onClick={() => {
                             setChoosing((current) => ({ ...current, [p.id]: false }));
-                            setInspecting((current) => ({ ...current, [p.id]: false }));
                             void verAreas(p.id);
                           }}>
                             {t("settings.providers.finish_selection")}
@@ -979,7 +967,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                                   <div class="flex items-center gap-2 rounded-sm border border-border bg-surface px-2 py-1.5 text-xs">
                                     <span class="min-w-0 flex-1 truncate">{a.name}</span>
                                     <span class="font-mono text-[0.6875rem] text-neutral-500">{a.key}</span>
-                                    <Show when={!p.select_area || selected()}>
+                                    <Show when={p.id !== "github" && (!p.select_area || selected())}>
                                       <Button
                                         variant="outline"
                                         size="compact"

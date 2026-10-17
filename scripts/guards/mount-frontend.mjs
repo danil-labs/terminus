@@ -2665,7 +2665,7 @@ if (!roto) {
   await sleep(100);
   let finishOldAreas;
   pendingAreas = new Promise((resolve) => { finishOldAreas = resolve; });
-  providerButton("Ver repositorios")?.click();
+  providerButton("Cambiar acceso")?.click();
   await sleep(50);
   providerWorkspace = "ws-b";
   providers.w.dispatchEvent(new providers.w.CustomEvent("harness:workspace"));

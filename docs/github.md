@@ -11,7 +11,13 @@ solo la selección de otro workspace.
 2. El selector oficial de GitHub permite instalar o configurar la App en una
    cuenta personal u organización, aunque existan instalaciones previas.
 3. Al volver a Terminus, actualiza el acceso y confirma las áreas que usará
-   este workspace. Agregar/configurar no repite el inicio de sesión.
+   este workspace. Administrar permisos en GitHub no repite el inicio de sesión.
+
+La cuenta conectada y «Acceso de este workspace» resumen la selección guardada.
+«Cambiar acceso» abre el selector y «Listo» lo oculta. La selección de
+repositorios como fuentes corresponde al compositor. El menú «Más acciones de
+GitHub» reúne «Administrar permisos en GitHub», «Comprobar conexión» y
+«Desconectar».
 
 Cancelar conserva la selección confirmada. Desconectar afecta solo al workspace
 actual; no desinstala la App en GitHub. Una conexión anterior sin repositorios
@@ -19,8 +25,10 @@ confirmados necesita confirmar su selección antes del acceso gestionado.
 
 ## gh opcional
 
-La conexión de GitHub no necesita `gh`. Configuración permite descargar una
-versión compatible si un agente la necesita. El motor descarga el artefacto
+La conexión de GitHub no necesita `gh`. En Configuración, «Herramientas para
+agentes» está plegado y permite descargar una versión compatible si un agente
+la necesita. Los errores de descarga siguen visibles al plegarlo y una versión
+incompatible muestra «Requiere atención». El motor descarga el artefacto
 oficial y comprueba su SHA-256; no depende de Homebrew ni winget. El agente
 puede solicitarlo con `terminus github install` y consultar su disponibilidad
 con `terminus github status`.
@@ -46,5 +54,6 @@ acredita aislamiento por workspace ni soporte del intermediario. Los PRs de
 ventana y motor se revisan coordinadamente antes de una release.
 
 `node tests/helpers/github-workspace-ui.mjs`, después de `pnpm build`, comprueba
-los tres recorridos del selector sobre el frontend compilado con IPC simulado.
+el selector, el resumen y las herramientas opcionales sobre el frontend
+compilado con IPC simulado.
 Es integración; no prueba el navegador nativo, login o permisos reales de GitHub.

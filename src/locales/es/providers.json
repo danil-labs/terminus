@@ -66,7 +66,6 @@
   "providers.github.cli.installing": "Descargando…",
   "providers.github.cli.ready": "Compatible",
   "providers.error.connection_changed": "La conexión cambió durante esta operación. Vuelve a intentarlo con la selección actual.",
-  "providers.github.view_repositories": "Ver repositorios",
   "providers.github.change_access": "Cambiar acceso",
   "providers.github.more_actions": "Más acciones de GitHub",
   "providers.github.check_connection": "Comprobar conexión",

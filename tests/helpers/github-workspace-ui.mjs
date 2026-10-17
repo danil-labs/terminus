@@ -19,6 +19,7 @@ for (const scenario of ["connected-workspace", "existing-installation", "no-inst
   let selected = connected ? [{ key: "acme", installation_id: 42, repository_ids: [1] }] : [];
   let available = connected || scenario === "existing-installation" ? [{ key: "acme", name: "acme" }] : [];
   let finishLogin;
+  let pendingAreas = null;
   const opens = [];
   const info = () => ({ id: "github", name: "GitHub", fields: [], browser_login: true,
     select_area: true, setup_url: install, token_label: "Token", token_help: "",
@@ -32,7 +33,7 @@ for (const scenario of ["connected-workspace", "existing-installation", "no-inst
     cancel_browser_login: () => { if (finishLogin) finishLogin(new Error("cancelled")); },
     provider_pending_setup: null,
     provider_available_areas: () => available,
-    provider_areas: () => selected.map(({ key }) => ({ key, name: key })),
+    provider_areas: () => pendingAreas ?? selected.map(({ key }) => ({ key, name: key })),
     select_provider_area: ({ scope, area, enabled }) => {
       assert.equal(scope, "fixture-a");
       selected = selected.filter(({ key }) => key !== area);
@@ -70,11 +71,25 @@ for (const scenario of ["connected-workspace", "existing-installation", "no-inst
     assert.equal(tools.open, true);
     assert.ok(tools.textContent.includes("gh version 2.102.0"));
     tools.querySelector("summary").click(); await espera(30);
+    button("Más acciones de GitHub").dispatchEvent(new app.w.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })); await espera(50);
+    let finishAreas;
+    pendingAreas = new Promise(resolve => { finishAreas = resolve; });
+    app.w.dispatchEvent(new app.w.Event("focus")); await espera(30);
+    const items = [...app.w.document.querySelectorAll('[role="menuitem"]')];
+    assert.equal(items.length, 3);
+    assert.ok(items.every(item => item.getAttribute("aria-disabled") === "true"), "un menú abierto bloquea acciones mientras se actualiza el acceso");
+    pendingAreas = null;
+    finishAreas(selected.map(({ key }) => ({ key, name: key }))); await espera(100);
+    assert.equal(menuItem("Desconectar").getAttribute("aria-disabled"), "false");
+    app.w.document.querySelector('[role="menu"]').dispatchEvent(new app.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); await espera(50);
+    assert.equal(app.w.document.querySelector('[role="menu"]'), null);
+    assert.ok(button("Cambiar acceso"), "Escape conserva abierta Configuración");
     await action("Comprobar conexión");
     assert.equal(rows().length, 0, "comprobar o volver al foco conserva el resumen");
     available.push({ key: "other", name: "other" });
     button("Cambiar acceso").click(); await espera(100);
     assert.equal(rows().length, 2);
+    assert.equal(button("ver qué trae"), undefined);
     assert.equal(button("Cambiar acceso").getAttribute("aria-expanded"), "true");
     button("Usar en este workspace").click(); await espera(100);
     assert.deepEqual(selected.map(({ key }) => key), ["acme", "other"]);
@@ -82,9 +97,10 @@ for (const scenario of ["connected-workspace", "existing-installation", "no-inst
     assert.equal(rows().length, 0, "Listo oculta el selector");
     assert.equal(button("Cambiar acceso").getAttribute("aria-expanded"), "false");
     assert.ok(app.w.document.body.textContent.includes("acme y other"));
-    button("Ver repositorios").click(); await espera(100);
-    assert.equal(rows().length, 2, "la consulta de repositorios sigue disponible");
-    assert.equal(button("Quitar del workspace"), undefined, "editar acceso requiere Cambiar");
+    assert.equal(button("Ver repositorios"), undefined);
+    assert.equal(button("ver qué trae"), undefined);
+    assert.equal(app.comandos.includes("provider_projects"), false, "Configuración no consulta repositorios");
+    assert.equal(app.comandos.includes("attach_repo"), false, "las fuentes se agregan desde el compositor");
     button("Cambiar acceso").click(); await espera(100);
     button("Quitar del workspace").click(); await espera(100);
     button("Listo").click(); await espera(100);
@@ -96,7 +112,7 @@ for (const scenario of ["connected-workspace", "existing-installation", "no-inst
     assert.equal(connected, false);
     assert.ok(button("Conectar con GitHub"));
     assert.deepEqual(app.fallos, []);
-    console.log("PASS connected-workspace: resumen, edición, cierre y consulta");
+    console.log("PASS connected-workspace: resumen, edición y administración sin explorar repositorios");
     continue;
   }
   assert.ok(button("Conectar con GitHub"));
