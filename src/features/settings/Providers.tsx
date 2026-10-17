@@ -8,6 +8,11 @@ import { prosa, type Frase } from "../../lib/prose";
 import { Badge } from "../../ui/Badge";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
+import Ellipsis from "lucide-solid/icons/ellipsis";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "../../ui/DropdownMenu";
 import { SettingsBlock, SettingsPanel, SettingsRow, SettingsSection } from "./layout";
 
 /**
@@ -128,6 +133,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
     }
   });
   const [cli, setCli] = createSignal<{ available: boolean; version: string | null; managed_supported: boolean; installable: boolean } | null>(null);
+  const [loadingCli, setLoadingCli] = createSignal(true);
   const [installingCli, setInstallingCli] = createSignal(false);
   const [cliFailure, setCliFailure] = createSignal<Failure | null>(null);
   async function installCli() {
@@ -140,8 +146,11 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
     finally { setInstallingCli(false); }
   }
   async function refreshCli() {
-    const report = await invoke<{ githubCli?: NonNullable<ReturnType<typeof cli>> }>("check_environment");
-    setCli(report.githubCli ?? null);
+    setLoadingCli(true);
+    try {
+      const report = await invoke<{ githubCli?: NonNullable<ReturnType<typeof cli>> }>("check_environment");
+      setCli(report.githubCli ?? null);
+    } finally { setLoadingCli(false); }
   }
   onMount(() => { void refreshCli().catch((e) => setCliFailure(asFailure(e))); });
   const [lista, setLista] = createSignal<Provider[] | null>(null);
@@ -544,127 +553,170 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                     </Switch>
                   }
                 >
-                  <Show when={p.id === "github"}>
-                    <SettingsRow label={t("providers.github.cli.title")} description={t("providers.github.cli.help")}>
-                      <Show when={cli()}>{(info) => <>
-                        <span>{info().version ?? t("providers.github.cli.absent")}</span>
-                        <Show when={!info().managed_supported && info().installable}>
-                          <Button variant="secondary" disabled={installingCli()} onClick={() => void installCli()}>
-                            {installingCli() ? t("providers.github.cli.installing") : t("providers.github.cli.install")}
-                          </Button>
-                        </Show>
-                        <Show when={info().managed_supported}><Badge>{t("providers.github.cli.ready")}</Badge></Show>
-                      </>}</Show>
-                    </SettingsRow>
-                    <Show when={cliFailure()}>{(f) => <FailureNote f={f()} />}</Show>
-                  </Show>
                   <Switch>
                     <Match when={p.connected && !esperaAqui() && !montajes()[p.id] ? p.connected : null}>
                       {(c) => (
                         <>
-                          <SettingsRow
-                            label={t("settings.providers.account")}
-                            description={
-                              <Show
-                                when={c().data.correo}
-                                fallback={
-                                  /* GitHub no publica el correo de autenticación.
-                                     Su nombre, identificador y espacio se deduplican
-                                     para no pintar la misma palabra tres veces. */
-                                  <span>
-                                    {t("settings.providers.as")}{" "}
-                                    <strong>{c().identity.name}</strong>
-                                    <Show
-                                      when={c().identity.user !== c().identity.name}
-                                    >
-                                      {" "}
-                                      <span class="font-mono text-[0.6875rem]">{c().identity.user}</span>
-                                    </Show>
-                                    <Show
-                                      when={
-                                        c().workspace &&
-                                        c().workspace !== c().identity.user
-                                      }
-                                    >
-                                      {" · "}
-                                      <span class="font-mono text-[0.6875rem]">{c().workspace}</span>
-                                    </Show>
+                          <Show when={p.id === "github"} fallback={<>
+                            <SettingsRow
+                              label={t("settings.providers.account")}
+                              description={
+                                <Show
+                                  when={c().data.correo}
+                                  fallback={
+                                    <span>
+                                      {t("settings.providers.as")}{" "}
+                                      <strong>{c().identity.name}</strong>
+                                      <Show
+                                        when={c().identity.user !== c().identity.name}
+                                      >
+                                        {" "}
+                                        <span class="font-mono text-[0.6875rem]">{c().identity.user}</span>
+                                      </Show>
+                                      <Show
+                                        when={
+                                          c().workspace &&
+                                          c().workspace !== c().identity.user
+                                        }
+                                      >
+                                        {" · "}
+                                        <span class="font-mono text-[0.6875rem]">{c().workspace}</span>
+                                      </Show>
+                                    </span>
+                                  }
+                                >
+                                  <span class="flex flex-col gap-0.5">
+                                    <span class="font-mono text-[0.6875rem]">{c().data.correo}</span>
+                                    <strong class="text-neutral-950">
+                                      {c().identity.name}
+                                    </strong>
+                                    <span class="font-mono text-[0.6875rem]">{c().workspace}</span>
                                   </span>
+                                </Show>
+                              }
+                            >
+                              <Button
+                                variant="ghost"
+                                size="compact"
+                                disabled={estado() !== null}
+                                title={espera()}
+                                onClick={() => void comprobar(p.id)}
+                              >
+                                {t("settings.providers.check")}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="compact"
+                                disabled={estado() !== null}
+                                title={espera()}
+                                onClick={() => {
+                                  setInspecting((x) => ({ ...x, [p.id]: true }));
+                                  void verAreas(p.id);
+                                }}
+                              >
+                                {t("settings.providers.scope")}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="compact"
+                                class="hover:text-error-strong"
+                                disabled={estado() !== null}
+                                title={
+                                  espera() ??
+                                  t("settings.providers.disconnect_title", { name: p.name })
+                                }
+                                onClick={() => void desconectar(p.id)}
+                              >
+                                {t("settings.providers.disconnect")}
+                              </Button>
+                            </SettingsRow>
+                            <Show when={p.select_area}>
+                              <SettingsRow
+                                label={t("settings.providers.choose_area")}
+                                description={
+                                  elegidas().length === 0
+                                    ? t("settings.providers.no_selected_areas")
+                                    : new Intl.ListFormat(manifiesto().formato).format(elegidas().map((area) => area.key))
                                 }
                               >
-                                <span class="flex flex-col gap-0.5">
-                                  <span class="font-mono text-[0.6875rem]">{c().data.correo}</span>
-                                  <strong class="text-neutral-950">
-                                    {c().identity.name}
-                                  </strong>
-                                  <span class="font-mono text-[0.6875rem]">{c().workspace}</span>
-                                </span>
-                              </Show>
-                            }
-                          >
-                            <Button
-                              variant="ghost"
-                              size="compact"
-                              disabled={estado() !== null}
-                              title={espera()}
-                              onClick={() => void comprobar(p.id)}
-                            >
-                              {t("settings.providers.check")}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="compact"
-                              disabled={estado() !== null}
-                              title={espera()}
-                              onClick={() => {
-                                setInspecting((x) => ({ ...x, [p.id]: true }));
-                                void verAreas(p.id);
-                              }}
-                            >
-                              {t("settings.providers.scope")}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="compact"
-                              class="hover:text-error-strong"
-                              disabled={estado() !== null}
-                              title={
-                                espera() ??
-                                t("settings.providers.disconnect_title", { name: p.name })
-                              }
-                              onClick={() => void desconectar(p.id)}
-                            >
-                              {t("settings.providers.disconnect")}
-                            </Button>
-                          </SettingsRow>
-                          <Show when={p.select_area}>
-                            <SettingsRow
-                              label={t("settings.providers.choose_area")}
-                              description={
-                                elegidas().length === 0
-                                  ? t("settings.providers.no_selected_areas")
-                                  : new Intl.ListFormat(manifiesto().formato).format(elegidas().map((area) => area.key))
-                              }
-                            >
-                              <div class="flex flex-wrap items-center justify-end gap-1.5">
-                                <Button variant="outline" size="compact" disabled={estado() !== null} onClick={() => {
-                                  setChoosing((x) => ({ ...x, [p.id]: true }));
-                                  void verAreas(p.id);
-                                }} aria-expanded={!!choosing()[p.id]}>
-                                  {t("settings.providers.choose_access")}
-                                </Button>
-                                <Show when={p.setup_url}>
-                                  {(url) => (
-                                    <Button
-                                      variant="ghost"
-                                      size="compact"
-                                      disabled={estado() !== null}
-                                      onClick={() => void configurarAcceso({ ...p, setup_url: url() })}
-                                    >
-                                      {t("settings.providers.configure_access")}
-                                    </Button>
-                                  )}
+                                <div class="flex flex-wrap items-center justify-end gap-1.5">
+                                  <Button variant="outline" size="compact" disabled={estado() !== null} onClick={() => {
+                                    setChoosing((x) => ({ ...x, [p.id]: true }));
+                                    void verAreas(p.id);
+                                  }} aria-expanded={!!choosing()[p.id]}>
+                                    {t("settings.providers.choose_access")}
+                                  </Button>
+                                  <Show when={p.setup_url}>
+                                    {(url) => (
+                                      <Button
+                                        variant="ghost"
+                                        size="compact"
+                                        disabled={estado() !== null}
+                                        onClick={() => void configurarAcceso({ ...p, setup_url: url() })}
+                                      >
+                                        {t("settings.providers.configure_access")}
+                                      </Button>
+                                    )}
+                                  </Show>
+                                </div>
+                              </SettingsRow>
+                            </Show>
+                          </>}>
+                            <SettingsRow label={
+                              <span>
+                                <strong>{c().identity.name}</strong>
+                                <Show when={c().identity.user !== c().identity.name}>
+                                  {" · "}
+                                  <span class="font-mono text-xs">@{c().identity.user}</span>
                                 </Show>
+                              </span>
+                            } />
+                            <SettingsRow
+                              class="flex-wrap gap-x-8 gap-y-3"
+                              label={t("settings.providers.choose_area")}
+                              description={elegidas().length === 0
+                                ? t("settings.providers.no_selected_areas")
+                                : new Intl.ListFormat(manifiesto().formato).format(elegidas().map((area) => area.key))}
+                            >
+                              <div class="flex flex-wrap items-center gap-1.5">
+                                <Button variant="ghost" size="compact" disabled={estado() !== null} title={espera()}
+                                  onClick={() => {
+                                    setInspecting((x) => ({ ...x, [p.id]: true }));
+                                    void verAreas(p.id);
+                                  }}>
+                                  {t("providers.github.view_repositories")}
+                                </Button>
+                                <Button variant="outline" size="compact" disabled={estado() !== null}
+                                  aria-expanded={!!choosing()[p.id]} onClick={() => {
+                                    setChoosing((x) => ({ ...x, [p.id]: true }));
+                                    void verAreas(p.id);
+                                  }}>
+                                  {t("providers.github.change_access")}
+                                </Button>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger as={Button} variant="ghost" size="iconCompact"
+                                    aria-label={t("providers.github.more_actions")}
+                                    title={espera() ?? t("providers.github.more_actions")}
+                                    disabled={estado() !== null}>
+                                    <Ellipsis size={16} aria-hidden />
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent class="z-[90]" data-owns-escape>
+                                    <Show when={p.setup_url}>
+                                      {(url) => <DropdownMenuItem onSelect={() => void configurarAcceso({ ...p, setup_url: url() })}>
+                                        {t("settings.providers.configure_access")}
+                                      </DropdownMenuItem>}
+                                    </Show>
+                                    <DropdownMenuItem onSelect={() => void comprobar(p.id)}>
+                                      {t("providers.github.check_connection")}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem class="text-error-strong"
+                                      title={t("settings.providers.disconnect_title", { name: p.name })}
+                                      onSelect={() => void desconectar(p.id)}>
+                                      {t("providers.github.disconnect")}
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </div>
                             </SettingsRow>
                           </Show>
@@ -1010,6 +1062,35 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                         </ul>
                       </SettingsBlock>
                     )}
+                  </Show>
+                  <Show when={p.id === "github"}>
+                    <SettingsBlock>
+                      <details>
+                        <summary class="cursor-pointer rounded-sm text-sm text-neutral-500 outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                          {t("providers.github.agent_tools")}
+                          <Show when={cliFailure() || (cli()?.available && !cli()?.managed_supported)}>
+                            {" "}
+                            <Badge tone="warning">{t("providers.github.cli.attention")}</Badge>
+                          </Show>
+                        </summary>
+                        <SettingsRow label={t("providers.github.cli.title")} description={t("providers.github.cli.help")}>
+                          <Show when={cli()} fallback={
+                            <Show when={loadingCli()} fallback={
+                              <Show when={!cliFailure()}><span class="text-xs text-neutral-500">{t("providers.github.cli.unavailable")}</span></Show>
+                            }><Skeleton filas={1} class="h-6" /></Show>
+                          }>{(info) => <>
+                            <span class="text-xs text-neutral-500">{info().version ?? t("providers.github.cli.absent")}</span>
+                            <Show when={!info().managed_supported && info().installable}>
+                              <Button variant="secondary" size="compact" disabled={installingCli()} onClick={() => void installCli()}>
+                                {installingCli() ? t("providers.github.cli.installing") : t("providers.github.cli.install")}
+                              </Button>
+                            </Show>
+                            <Show when={info().managed_supported}><Badge>{t("providers.github.cli.ready")}</Badge></Show>
+                          </>}</Show>
+                        </SettingsRow>
+                      </details>
+                      <Show when={cliFailure()}>{(f) => <FailureNote f={f()} />}</Show>
+                    </SettingsBlock>
                   </Show>
                 </SettingsSection>
               );

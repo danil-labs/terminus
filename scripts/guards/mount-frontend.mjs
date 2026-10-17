@@ -2618,6 +2618,13 @@ if (!roto) {
   });
   const providerButton = (text) => [...providers.w.document.querySelectorAll("button")]
     .find((button) => button.textContent?.trim() === text || button.getAttribute("aria-label") === text);
+  const providerAction = async (text) => {
+    providerButton("Más acciones de GitHub").dispatchEvent(new providers.w.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    await sleep(50);
+    const item = [...providers.w.document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.trim() === text);
+    assert.ok(item, text);
+    item.dispatchEvent(new providers.w.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  };
   const areaButton = (key) => [...providers.w.document.querySelectorAll("li")]
     .find((li) => li.textContent?.startsWith(key))
     ?.querySelectorAll("button");
@@ -2631,7 +2638,7 @@ if (!roto) {
   assert.equal(providerButton("Quitar del workspace"), undefined, "la conexión previa muestra solo el resumen");
   assert.ok(providers.w.document.body.textContent.includes("acme"));
   assert.equal(providerButton("Usar en este workspace"), undefined, "agregar requiere abrir el selector");
-  providerButton("Administrar permisos en GitHub")?.click();
+  await providerAction("Administrar permisos en GitHub");
   await sleep(30);
   providerButton("Actualizar acceso")?.click();
   await sleep(100);
@@ -2644,7 +2651,7 @@ if (!roto) {
   providerButton("Listo")?.click();
   await sleep(50);
   assert.equal(providerButton("Quitar del workspace"), undefined, "Listo oculta las acciones de selección");
-  providerButton("Cambiar")?.click();
+  providerButton("Cambiar acceso")?.click();
   await sleep(50);
   clickArea("acme", "Quitar del workspace");
   await sleep(100);
@@ -2652,19 +2659,19 @@ if (!roto) {
   providerButton("Listo")?.click();
   await sleep(50);
   assert.equal(providerButton("Usar en este workspace"), undefined, "Listo conserva la selección y oculta las opciones");
-  providerButton("Administrar permisos en GitHub")?.click();
+  await providerAction("Administrar permisos en GitHub");
   await sleep(30);
   providerButton("Actualizar acceso")?.click();
   await sleep(100);
   let finishOldAreas;
   pendingAreas = new Promise((resolve) => { finishOldAreas = resolve; });
-  providerButton("ver qué alcanza")?.click();
+  providerButton("Ver repositorios")?.click();
   await sleep(50);
   providerWorkspace = "ws-b";
   providers.w.dispatchEvent(new providers.w.CustomEvent("harness:workspace"));
   await sleep(100);
   assert.ok(providers.w.document.body.textContent.includes("Sin acceso seleccionado"));
-  providerButton("Administrar permisos en GitHub")?.click();
+  await providerAction("Administrar permisos en GitHub");
   await sleep(30);
   providerButton("Actualizar acceso")?.click();
   await sleep(100);
