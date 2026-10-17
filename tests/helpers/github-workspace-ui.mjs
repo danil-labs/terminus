@@ -13,12 +13,13 @@ const base = {
   service_poll: { cursor: 0, gap: false, replay: false, runtime: "fixture", reset: false },
 };
 const install = "https://github.com/apps/terminus-app/installations/new";
-for (const scenario of ["existing-installation", "no-installation", "cancel-login"]) {
-  let connected = false;
+for (const scenario of ["connected-workspace", "existing-installation", "no-installation", "cancel-login"]) {
+  let connected = scenario === "connected-workspace";
   let loginCount = 0;
-  let selected = [];
-  let available = scenario === "existing-installation" ? [{ key: "acme", name: "acme" }] : [];
+  let selected = connected ? [{ key: "acme", installation_id: 42, repository_ids: [1] }] : [];
+  let available = connected || scenario === "existing-installation" ? [{ key: "acme", name: "acme" }] : [];
   let finishLogin;
+  let pendingAreas = null;
   const opens = [];
   const info = () => ({ id: "github", name: "GitHub", fields: [], browser_login: true,
     select_area: true, setup_url: install, token_label: "Token", token_help: "",
@@ -32,18 +33,88 @@ for (const scenario of ["existing-installation", "no-installation", "cancel-logi
     cancel_browser_login: () => { if (finishLogin) finishLogin(new Error("cancelled")); },
     provider_pending_setup: null,
     provider_available_areas: () => available,
-    provider_areas: () => selected.map(({ key }) => ({ key, name: key })),
+    provider_areas: () => pendingAreas ?? selected.map(({ key }) => ({ key, name: key })),
     select_provider_area: ({ scope, area, enabled }) => {
       assert.equal(scope, "fixture-a");
       selected = selected.filter(({ key }) => key !== area);
       if (enabled) selected.push({ key: area, installation_id: 42, repository_ids: [1] });
       return info();
     },
+    disconnect_provider: ({ scope }) => { assert.equal(scope, "fixture-a"); connected = false; },
     open_external: ({ target }) => { opens.push(target); },
   });
   const button = text => [...app.w.document.querySelectorAll("button")].find(b => b.textContent?.trim() === text || b.getAttribute("aria-label") === text);
+  const menuItem = text => [...app.w.document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.trim() === text);
+  const action = async text => {
+    assert.ok(button("Más acciones de GitHub"));
+    button("Más acciones de GitHub").dispatchEvent(new app.w.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })); await espera(50);
+    assert.ok(menuItem(text), text);
+    menuItem(text).dispatchEvent(new app.w.KeyboardEvent("keydown", { key: "Enter", bubbles: true })); await espera(100);
+  };
   button("Configuración")?.click(); await espera(100);
   button("Control de Fuentes")?.click(); await espera(100);
+  if (scenario === "connected-workspace") {
+    const rows = () => app.w.document.querySelectorAll("section li");
+    assert.ok(app.w.document.body.textContent.includes("Acceso de este workspace"));
+    assert.ok(app.w.document.body.textContent.includes("acme"));
+    assert.equal(rows().length, 0, "el acceso guardado se resume sin desplegar organizaciones");
+    app.w.dispatchEvent(new app.w.Event("focus")); await espera(100);
+    assert.equal(button("comprobar"), undefined);
+    assert.equal(button("desconectar"), undefined);
+    assert.equal(menuItem("Administrar permisos en GitHub"), undefined);
+    assert.ok(app.w.document.body.textContent.includes("Person · @person"));
+    const tools = [...app.w.document.querySelectorAll("details")].find(el => el.querySelector("summary")?.textContent === "Herramientas para agentes");
+    assert.ok(tools);
+    assert.equal(tools.open, false);
+    assert.equal(app.w.document.body.textContent.includes("Requiere atención"), false);
+    tools.querySelector("summary").click(); await espera(30);
+    assert.equal(tools.open, true);
+    assert.ok(tools.textContent.includes("gh version 2.102.0"));
+    tools.querySelector("summary").click(); await espera(30);
+    button("Más acciones de GitHub").dispatchEvent(new app.w.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })); await espera(50);
+    let finishAreas;
+    pendingAreas = new Promise(resolve => { finishAreas = resolve; });
+    app.w.dispatchEvent(new app.w.Event("focus")); await espera(30);
+    const items = [...app.w.document.querySelectorAll('[role="menuitem"]')];
+    assert.equal(items.length, 3);
+    assert.ok(items.every(item => item.getAttribute("aria-disabled") === "true"), "un menú abierto bloquea acciones mientras se actualiza el acceso");
+    pendingAreas = null;
+    finishAreas(selected.map(({ key }) => ({ key, name: key }))); await espera(100);
+    assert.equal(menuItem("Desconectar").getAttribute("aria-disabled"), "false");
+    app.w.document.querySelector('[role="menu"]').dispatchEvent(new app.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); await espera(50);
+    assert.equal(app.w.document.querySelector('[role="menu"]'), null);
+    assert.ok(button("Cambiar acceso"), "Escape conserva abierta Configuración");
+    await action("Comprobar conexión");
+    assert.equal(rows().length, 0, "comprobar o volver al foco conserva el resumen");
+    available.push({ key: "other", name: "other" });
+    button("Cambiar acceso").click(); await espera(100);
+    assert.equal(rows().length, 2);
+    assert.equal(button("ver qué trae"), undefined);
+    assert.equal(button("Cambiar acceso").getAttribute("aria-expanded"), "true");
+    button("Usar en este workspace").click(); await espera(100);
+    assert.deepEqual(selected.map(({ key }) => key), ["acme", "other"]);
+    button("Listo").click(); await espera(100);
+    assert.equal(rows().length, 0, "Listo oculta el selector");
+    assert.equal(button("Cambiar acceso").getAttribute("aria-expanded"), "false");
+    assert.ok(app.w.document.body.textContent.includes("acme y other"));
+    assert.equal(button("Ver repositorios"), undefined);
+    assert.equal(button("ver qué trae"), undefined);
+    assert.equal(app.comandos.includes("provider_projects"), false, "Configuración no consulta repositorios");
+    assert.equal(app.comandos.includes("attach_repo"), false, "las fuentes se agregan desde el compositor");
+    button("Cambiar acceso").click(); await espera(100);
+    button("Quitar del workspace").click(); await espera(100);
+    button("Listo").click(); await espera(100);
+    assert.deepEqual(selected.map(({ key }) => key), ["other"]);
+    assert.equal(rows().length, 0);
+    assert.equal(loginCount, 0);
+    assert.deepEqual(opens, []);
+    await action("Desconectar");
+    assert.equal(connected, false);
+    assert.ok(button("Conectar con GitHub"));
+    assert.deepEqual(app.fallos, []);
+    console.log("PASS connected-workspace: resumen, edición y administración sin explorar repositorios");
+    continue;
+  }
   assert.ok(button("Conectar con GitHub"));
   button("Conectar con GitHub").click(); await espera(150);
   if (scenario === "cancel-login") {
@@ -56,8 +127,10 @@ for (const scenario of ["existing-installation", "no-installation", "cancel-logi
     button("cancelar").click(); await espera(100);
     assert.equal(connected, true);
     assert.equal(selected.length, 0);
-    assert.ok(button("Agregar o configurar en GitHub"));
-    button("Agregar o configurar en GitHub").click(); await espera(100);
+    assert.ok(app.w.document.body.textContent.includes("Sin acceso seleccionado"));
+    assert.equal(button("Usar en este workspace"), undefined);
+    assert.equal(button("Administrar permisos en GitHub"), undefined);
+    await action("Administrar permisos en GitHub");
     assert.equal(loginCount, 1, "configurar no repite login");
     available = [{ key: "acme", name: "acme" }, { key: "other", name: "other" }];
     app.w.dispatchEvent(new app.w.Event("focus")); await espera(100);
@@ -68,8 +141,55 @@ for (const scenario of ["existing-installation", "no-installation", "cancel-logi
     assert.ok(button("Confirmar repositorios disponibles"));
     button("Listo").click(); await espera(100);
     assert.deepEqual(selected.map(({ key }) => key), ["acme"]);
+    assert.equal(button("Usar en este workspace"), undefined, "Listo oculta las opciones disponibles");
+    assert.equal(button("Confirmar repositorios disponibles"), undefined);
   }
   assert.deepEqual(app.fallos, []);
   console.log(`PASS ${scenario}: selector, regreso, cancelación y confirmación local`);
+}
+for (const scenario of ["absent", "incompatible", "unknown"]) {
+  let supported = false;
+  let failInstall = true;
+  let installCount = 0;
+  const app = await arrancar("listo", `github-cli-${scenario}`, { ...base,
+    check_environment: () => ({ ready: true, blocked: false, reason: null, items: [],
+      ...(scenario === "unknown" ? {} : { githubCli: { available: scenario !== "absent" || supported,
+        version: scenario === "absent" && !supported ? null : "gh version fixture",
+        managed_supported: supported, installable: true } }) }),
+    list_providers: [{ id: "github", name: "GitHub", fields: [], browser_login: true,
+      select_area: true, setup_url: install, token_label: "Token", token_help: "", token_url: "",
+      login_help: "", area_label: "cuenta", areas_label: "cuentas", area_help: "", connected: null, unverified: null }],
+    install_gh: () => { installCount++; if (failInstall) throw { what: "No se pudo descargar gh", detail: "fixture" }; supported = true; },
+  });
+  const button = text => [...app.w.document.querySelectorAll("button")].find(el => el.textContent?.trim() === text || el.getAttribute("aria-label") === text);
+  button("Configuración").click(); await espera(100);
+  button("Control de Fuentes").click(); await espera(100);
+  const tools = [...app.w.document.querySelectorAll("details")].find(el => el.querySelector("summary")?.textContent.startsWith("Herramientas para agentes"));
+  const summary = tools.querySelector("summary");
+  assert.equal(tools.open, false);
+  assert.equal(summary.textContent.includes("Requiere atención"), scenario === "incompatible", "la ausencia opcional no dispara alertas");
+  summary.click(); await espera(30);
+  assert.equal(tools.open, true);
+  if (scenario === "unknown") {
+    assert.ok(tools.textContent.includes("Estado no disponible"));
+  } else {
+    button("Descargar gh compatible").click(); await espera(100);
+    summary.click(); await espera(30);
+    assert.equal(tools.open, false);
+    const error = [...app.w.document.querySelectorAll("span")].find(el => el.textContent === "No se pudo descargar gh");
+    assert.ok(error);
+    assert.equal(error.closest("details"), null, "el error se ve aunque las herramientas estén plegadas");
+    assert.ok(summary.textContent.includes("Requiere atención"));
+    summary.click(); await espera(30);
+    failInstall = false;
+    button("Descargar gh compatible").click(); await espera(100);
+    assert.equal(installCount, 2);
+    assert.equal(summary.textContent.includes("Requiere atención"), false);
+    assert.equal(button("Descargar gh compatible"), undefined);
+    assert.ok(tools.textContent.includes("Compatible"));
+    assert.equal(app.w.document.body.textContent.includes("No se pudo descargar gh"), false);
+  }
+  assert.deepEqual(app.fallos, []);
+  console.log(`PASS github-cli-${scenario}: herramientas plegadas y estado visible`);
 }
 process.exit(0);
