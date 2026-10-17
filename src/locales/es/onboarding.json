@@ -79,5 +79,9 @@
   "onboarding.workdir.summary_clone": "Se clonará el repositorio en una carpeta nueva dentro de {path}.",
   "onboarding.workdir.cloning": "Clonando…",
   "onboarding.workdir.creating": "Creando…",
-  "onboarding.workdir.footer": "La fuente de contexto y esta carpeta tienen funciones distintas."
+  "onboarding.workdir.footer": "La fuente de contexto y esta carpeta tienen funciones distintas.",
+  "onboarding.agent.external_required": "Instala la app oficial de {agent}. ZCode requiere macOS y Node.js 22 o posterior.",
+  "onboarding.agent.official_download": "Descargar app oficial",
+  "onboarding.agent.check_installed": "Ya la instalé · Comprobar",
+  "onboarding.agent.external_error": "No pude abrir el enlace o comprobar la instalación. Vuelve a intentar."
 }
