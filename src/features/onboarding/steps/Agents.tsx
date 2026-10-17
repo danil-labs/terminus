@@ -29,8 +29,8 @@ export default function Proveedores(props: { alta: Alta }) {
 
   const cargar = () =>
     invoke<Agente[]>("list_agents")
-      .then(setAgentes)
-      .catch(() => { setAgentes([]); setError(true); });
+      .then((as) => { setAgentes(as); setError(false); })
+      .catch(() => setError(true));
 
   async function comprobar() {
     setComprobando(true);
@@ -139,7 +139,7 @@ export default function Proveedores(props: { alta: Alta }) {
           )}
         </For>
       </div>
-      <Show when={agentes().some((a) => !a.available && a.external_install_url)}>
+      <Show when={error() || agentes().some((a) => !a.available && a.external_install_url)}>
         <Button variant="secondary" size="sm" disabled={comprobando()} onClick={() => void comprobar()}>
           {t("onboarding.agent.check_installed")}
         </Button>

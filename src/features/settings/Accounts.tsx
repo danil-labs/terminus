@@ -153,8 +153,9 @@ export default function Accounts(props: {
     }
   }
 
-  const externalInstallUrl = () => agentes().find((a) => a.id === agente())?.external_install_url;
-  const faltaExterno = () => Boolean(externalInstallUrl()) && !agentes().find((a) => a.id === agente())?.available;
+  const proveedor = () => agentes().find((a) => a.id === agente());
+  const externalInstallUrl = () => proveedor()?.external_install_url;
+  const faltaExterno = () => !proveedor() || Boolean(externalInstallUrl()) && !proveedor()?.available;
   const [revisandoCli, setRevisandoCli] = createSignal(false);
 
   async function comprobarCli() {
@@ -164,7 +165,7 @@ export default function Accounts(props: {
       setAgentes(await invoke<AgentOpt[]>("list_agents"));
       setFallo(null);
     } catch (e) {
-      setFallo({ what: t("settings.accounts.error.install"), detail: detalleDe(e) });
+      setFallo({ what: t("settings.accounts.error.check_provider"), detail: detalleDe(e) });
     } finally {
       setRevisandoCli(false);
     }
@@ -183,7 +184,9 @@ export default function Accounts(props: {
 
   // Nombrar un proveedor durante la preparación local atribuiría una salida de datos.
   const acto = () =>
-    inferencia() === "en_la_maquina"
+    !proveedor()
+      ? { boton: t("settings.accounts.check_provider"), curso: t("settings.accounts.preparing") }
+      : inferencia() === "en_la_maquina"
       ? {
           boton: t("settings.accounts.local_models.prepare"),
           curso: t("settings.accounts.preparing"),
@@ -264,7 +267,7 @@ export default function Accounts(props: {
         const primero = a.find((x) => x.available);
         if (primero) setAgente(primero.id);
       })
-      .catch(() => setAgentes([]));
+      .catch((e) => setFallo({ what: t("settings.accounts.error.check_provider"), detail: detalleDe(e) }));
   });
 
   /**
@@ -277,6 +280,7 @@ export default function Accounts(props: {
    * cualquiera deja a las dos utilizables.
    */
   async function instalarCli() {
+    if (!proveedor()) { await comprobarCli(); return; }
     setInstalando(agente());
     try {
       const external = externalInstallUrl();
@@ -858,7 +862,7 @@ export default function Accounts(props: {
           <SettingsBlock class="justify-items-start">
             <Button
               size="sm"
-              disabled={Boolean(instalando())}
+              disabled={Boolean(instalando()) || revisandoCli()}
               onClick={() => void instalarCli()}
             >
               {instalando() ? acto().curso : acto().boton}
@@ -905,7 +909,7 @@ export default function Accounts(props: {
         <SettingsBlock class="justify-items-start">
           <Button
             size="sm"
-            disabled={Boolean(instalando())}
+            disabled={Boolean(instalando()) || revisandoCli()}
             onClick={() => void instalarCli()}
           >
             {instalando() ? acto().curso : acto().boton}
