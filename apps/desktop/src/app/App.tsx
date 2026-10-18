@@ -2119,15 +2119,17 @@ export default function App() {
         if (page.gap && vivas().length > 0) setError(t("chat.error.service_gap"));
         if (failingSince !== null) {
           failingSince = null;
-          if (error() === t("chat.error.service_unavailable") || error() === t("shell.service.engine_down") || error() === t("shell.service.engine_missing")) setError(null);
+          if (error() === t("chat.error.service_unavailable") || error() === t("shell.service.engine_down") || error() === t("shell.service.engine_missing") || error() === t("shell.service.machine_off")) setError(null);
         }
       } catch (e) {
         // Un sondeo suelto falla al empezar un turno y el siguiente ya contesta.
         failingSince ??= Date.now();
         const sinMotor = claveDe(e) === "shell.service.engine_missing";
-        const caido = sinMotor || claveDe(e) === "shell.service.engine_down";
+        // Una máquina remota apagada no es un fallo: se enciende al enviar algo.
+        const apagada = claveDe(e) === "shell.service.machine_off";
+        const caido = sinMotor || apagada || claveDe(e) === "shell.service.engine_down";
         if (!disposed && Date.now() - failingSince > (caido ? 2_000 : 10_000)) {
-          setError(sinMotor ? t("shell.service.engine_missing") : t(caido ? "shell.service.engine_down" : "chat.error.service_unavailable"));
+          setError(sinMotor ? t("shell.service.engine_missing") : apagada ? t("shell.service.machine_off") : t(caido ? "shell.service.engine_down" : "chat.error.service_unavailable"));
         }
       } finally {
         if (!disposed) timer = setTimeout(() => void poll(), 250);

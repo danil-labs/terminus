@@ -14,11 +14,30 @@ use terminus_engine_protocol::{Error, StreamPage};
 
 type OwnedWatch = (Option<String>, Arc<AtomicBool>);
 
+/// `--wake <programa>`: el programa enciende la máquina remota y reescribe la
+/// selección. Solo lo disparan las acciones de la persona; el sondeo no la enciende.
+pub(super) static WAKE: OnceLock<(std::path::PathBuf, std::path::PathBuf)> = OnceLock::new();
+const WAKES: &[&str] = &[
+    "send_message",
+    "inject_message",
+    "create_project",
+    "create_encargado",
+    "respond_permission",
+    "answer_question",
+    "answer_shell_output",
+    "run_shell_command",
+    "queue_ready",
+    "resume_awaiting_quota",
+    "recreate_task_work",
+];
+
 pub(super) struct State {
     client: RwLock<Arc<Client>>,
     autostart: bool,
     restarts: Mutex<Vec<Instant>>,
     restart_failure: Mutex<Option<Error>>,
+    waking: Mutex<()>,
+    woke: AtomicBool,
     workspace: Mutex<Option<String>>,
     closed: AtomicBool,
     in_flight: AtomicUsize,
@@ -34,6 +53,8 @@ impl State {
             autostart,
             restarts: Mutex::new(Vec::new()),
             restart_failure: Mutex::new(None),
+            waking: Mutex::new(()),
+            woke: AtomicBool::new(false),
             workspace: Mutex::new(None),
             closed: AtomicBool::new(false),
             in_flight: AtomicUsize::new(0),
@@ -81,6 +102,34 @@ impl State {
                 Err(error)
             }
         }
+    }
+    /// Enciende la máquina con el programa de `--wake` y adopta el motor que publica.
+    fn wake(&self) -> Result<(), Error> {
+        let Some((program, selection)) = WAKE.get() else {
+            return Err(Error::new("app_unavailable"));
+        };
+        let _turn = self.waking.lock().unwrap_or_else(|p| p.into_inner());
+        // Otra acción pudo encenderla mientras esta esperaba su turno.
+        if self
+            .client()
+            .request("status", None, json!({}), Duration::from_secs(3))
+            .is_ok()
+        {
+            return Ok(());
+        }
+        let status = std::process::Command::new(program)
+            .arg(selection)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()?;
+        if !status.success() {
+            return Err(Error::new("app_unavailable"));
+        }
+        let client = Client::select(selection)?;
+        *self.client.write().unwrap_or_else(|p| p.into_inner()) = Arc::new(client);
+        self.woke.store(true, Ordering::SeqCst);
+        Ok(())
     }
     pub fn close(&self) {
         self.closed.store(true, Ordering::SeqCst);
@@ -345,11 +394,19 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
             stream(state, &name, args, workspace, key, channel, worker);
             return;
         }
-        let mut result = state
+        let mut sent = state
             .client()
-            .invoke(&name, workspace.clone(), args.clone())
-            .map_err(|e| failure(&e))
-            .and_then(reply);
+            .invoke(&name, workspace.clone(), args.clone());
+        // `app_unavailable` es no haber conectado: reintentar no duplica la acción.
+        if matches!(&sent, Err(e) if e.code == "app_unavailable")
+            && WAKES.contains(&name.as_str())
+            && state.wake().is_ok()
+        {
+            sent = state
+                .client()
+                .invoke(&name, workspace.clone(), args.clone());
+        }
+        let mut result = sent.map_err(|e| failure(&e)).and_then(reply);
         if name == "check_environment" {
             if let Ok(value) = &mut result {
                 value["engineBuild"] = json!(super::startup::engine_build(state.client().status()));
@@ -556,6 +613,14 @@ pub(super) fn service_poll(
     let state = app
         .try_state::<Arc<State>>()
         .ok_or_else(|| failure(&Error::new("app_unavailable")))?;
+    if state.woke.swap(false, Ordering::SeqCst) {
+        if let Some(window) = app.get_window("main") {
+            let _ = window.set_title(&super::title(&app));
+        }
+        return Ok(
+            json!({"cursor":null,"gap":false,"replay":true,"runtime":state.client().runtime(),"reset":true}),
+        );
+    }
     if runtime
         .as_ref()
         .is_some_and(|id| id != state.client().runtime())
@@ -573,6 +638,11 @@ pub(super) fn service_poll(
         Err(error)
             if error.code == "app_unavailable" || state.client().check_selection().is_err() =>
         {
+            if WAKE.get().is_some() {
+                return Err(
+                    json!({"what":{"clave":"shell.service.machine_off"},"detail":"machine_off"}),
+                );
+            }
             // Sin motor que relanzar (un antivirus puede apartarlo), el aviso dice eso y no «no responde».
             if let Err(restart) = state.restart() {
                 let shown = if restart.code == "engine_missing" {

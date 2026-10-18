@@ -56,6 +56,10 @@ fn open() -> Result<()> {
             return Ok(());
         }
         [_, flag, path] if flag == "--external-host" => PathBuf::from(path),
+        [_, flag, path, wake, program] if flag == "--external-host" && wake == "--wake" => {
+            let _ = proxy::WAKE.set((PathBuf::from(program), PathBuf::from(path)));
+            PathBuf::from(path)
+        }
         _ => return Err(Error::new("invalid_request")),
     };
     start(
