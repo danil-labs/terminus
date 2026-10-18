@@ -6173,6 +6173,26 @@
         }
       ],
       "path": "memory::commands::write_memory_entry"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "write_shell_input",
+      "output": "-> bool",
+      "parameters": [
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "input",
+          "name": "input",
+          "type": "String"
+        }
+      ],
+      "path": "chat::write_shell_input"
     }
   ],
   "events": [

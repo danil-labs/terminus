@@ -198,6 +198,12 @@ const steps = [
     root,
   ],
   [
+    "Lo que se le teclea a un `!` oculta las claves",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/command-input.test.ts")],
+    root,
+  ],
+  [
     "El fragmento tardío de un mensaje vuelve a su globo",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/chat-delta.test.ts")],

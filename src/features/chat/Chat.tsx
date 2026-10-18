@@ -38,6 +38,7 @@ import { taskChatPresentation } from "./TaskChatPresentation";
 import { CHUNK, blockOfMessage, chunkIds, chunkOf, tailChunk, type Lectura } from "./threadWindow";
 import { workLabel } from "../projects/branchLabel";
 import { sangrarTerminal } from "./terminalIndent";
+import { FIN_DE_ARCHIVO, TECLAS_DE_TERMINAL, pideClave } from "./commandInput";
 import { claseDelTramo, finishEdit, highlightSpans, placeLabel, referenceId, searchPlaces, searchTasks, taskLabel, type MentionTarget, type PendingEdit, type PlaceCandidate, type TextEdit, type TaskCandidate, type TaskMention, tramosDelMensaje } from "../../lib/taskMentions";
 import {
   type Recipient,
@@ -584,6 +585,11 @@ export type ChatProps = {
   onSend: (attachments: string[]) => Promise<boolean>;
   /** Manda una respuesta rápida del agente tal cual, por el camino de `onSend`. */
   onRespuestaRapida?: (texto: string) => Promise<boolean>;
+  /**
+   * Le teclea al `!` en marcha. `eco` dice si lo escrito se pinta en su
+   * tarjeta: una clave no. `false` si ya no había comando que lo recibiera.
+   */
+  onEntradaDeComando?: (texto: string, eco: boolean) => Promise<boolean>;
   visualScope?: string;
   readVisual?: (file: string) => Promise<string>;
   /**
@@ -1405,6 +1411,10 @@ export default function Chat(props: ChatProps) {
   // al borrador de esa tarea si el envío falla: sin eso, un archivo por encima
   // del tope obliga a volver a buscarlo en el disco.
   async function mandar() {
+    if (entradaActiva()) {
+      void teclearAlComando(`${entrada()}\r`);
+      return;
+    }
     if ((!props.input.trim() && props.adjuntos.length === 0) || !listo()) return;
     // Mandar es volver al final, se estuviera donde se estuviera: lo que se
     // acaba de escribir va abajo, y quedarse leyendo arriba mientras aparece
@@ -1738,7 +1748,22 @@ export default function Chat(props: ChatProps) {
     if (props.contestandoALaTerminal) return t("chat.shell.reply", { agent: nombreDelAgente() });
     return t("chat.shell.pending", { agent: nombreDelAgente() });
   };
-  const modoTerminal = () => props.input.startsWith("!");
+  // Mientras corre un `!`, la caja le escribe a él; Esc la devuelve al agente
+  // hasta el siguiente comando. Lo tecleado no pasa por el borrador: puede ser una clave.
+  const [soltadoDe, setSoltadoDe] = createSignal<string | null>(null);
+  const [entrada, setEntrada] = createSignal("");
+  const entradaActiva = () =>
+    Boolean(props.onEntradaDeComando && props.terminal?.id && soltadoDe() !== props.terminal.id);
+  const entradaOculta = () => entradaActiva() && pideClave(props.terminal?.output ?? "");
+  createEffect(on(() => props.terminal?.id, () => setEntrada("")));
+  async function teclearAlComando(texto: string) {
+    const mandarla = props.onEntradaDeComando;
+    if (!mandarla) return;
+    const eco = !entradaOculta();
+    setEntrada("");
+    if (!(await mandarla(texto, eco))) setSoltadoDe(props.terminal?.id ?? null);
+  }
+  const modoTerminal = () => entradaActiva() || props.input.startsWith("!");
   const modoAlMargen = () =>
     Boolean(props.sideCommand) && props.input.toLowerCase().startsWith(`/${props.sideCommand} `);
   const carpetaDeTerminal = () => {
@@ -2126,13 +2151,33 @@ export default function Chat(props: ChatProps) {
           )}
         </Show>
 
-        <Show when={modoTerminal()}>
+        <Show when={modoTerminal() || (props.terminal?.id && props.onEntradaDeComando)}>
           <div class="flex min-w-0 items-center gap-2 px-2 pt-1.5">
-            <Badge forma="dato" tone="terminal" class="h-5 gap-1 rounded-[5px] px-[7px] py-0 font-sans font-medium">
-              <SquareTerminal size={12} aria-hidden="true" />
-              {t("chat.composer.terminal")}
-            </Badge>
-            <Show when={carpetaDeTerminal()}>
+            <Show
+              when={modoTerminal()}
+              fallback={
+                <button
+                  type="button"
+                  class="flex h-5 items-center gap-1 rounded-[5px] px-[7px] text-[0.6875rem] font-medium text-neutral-700 outline-none hover:bg-surface-muted focus-visible:ring-2 focus-visible:ring-primary"
+                  onClick={() => {
+                    setSoltadoDe(null);
+                    if (campo) enfocar(campo);
+                  }}
+                >
+                  <SquareTerminal size={12} aria-hidden="true" />
+                  {t("chat.composer.stdin.attach")}
+                </button>
+              }
+            >
+              <Badge forma="dato" tone="terminal" class="h-5 gap-1 rounded-[5px] px-[7px] py-0 font-sans font-medium">
+                <SquareTerminal size={12} aria-hidden="true" />
+                {entradaActiva() ? t("chat.composer.stdin") : t("chat.composer.terminal")}
+              </Badge>
+            </Show>
+            <Show when={entradaActiva()}>
+              <span class="min-w-0 truncate text-[0.6875rem] text-neutral-500">{t("chat.composer.stdin.hint")}</span>
+            </Show>
+            <Show when={!entradaActiva() && carpetaDeTerminal()}>
               {(carpeta) => (
                 <span class="min-w-0 truncate font-mono text-[0.6875rem] text-neutral-500" title={carpeta()}>
                   {carpeta()}
@@ -2145,7 +2190,7 @@ export default function Chat(props: ChatProps) {
         <div class="relative min-w-0">
         {/* La capa y el campo salen de `METRICA_DEL_CAMPO`, y de ahí los dos:
             escribirla dos veces es lo que las dejó con tamaños distintos. */}
-        <Show when={hasHighlight()}>
+        <Show when={hasHighlight() && !entradaActiva()}>
           <div
             ref={mirror}
             aria-hidden="true"
@@ -2181,17 +2226,24 @@ export default function Chat(props: ChatProps) {
             "relative block max-h-[11.25rem] min-h-10 overflow-y-auto",
             METRICA_DEL_CAMPO,
             modoTerminal() && FUENTE_DE_TERMINAL,
-            hasHighlight() && "text-transparent caret-neutral-950",
+            hasHighlight() && !entradaActiva() && "text-transparent caret-neutral-950",
+            entradaOculta() && "[-webkit-text-security:disc]",
           )}
+          autocomplete="off"
+          spellcheck={!entradaActiva()}
           onScroll={(e) => {
             if (mirror) mirror.scrollTop = e.currentTarget.scrollTop;
           }}
-          value={props.input}
+          value={entradaActiva() ? entrada() : props.input}
           // El placeholder invita a escribir. El motivo por el que no se puede
           // mandar vive abajo, junto a la superficie que lo provoca: aquí se
           // cortaba y desaparecía en cuanto alguien escribía una letra.
           placeholder={
-            dirigido()
+            entradaActiva()
+              ? entradaOculta()
+                ? t("chat.composer.placeholder.secret")
+                : t("chat.composer.placeholder.stdin")
+              : dirigido()
               ? t("chat.composer.placeholder.deliver")
               : props.esperando
                 ? t("chat.composer.placeholder.answer")
@@ -2209,6 +2261,10 @@ export default function Chat(props: ChatProps) {
               end: e.currentTarget.selectionEnd, inputType: e.inputType };
           }}
           onInput={(e) => {
+            if (entradaActiva()) {
+              setEntrada(e.currentTarget.value);
+              return;
+            }
             const valor = e.currentTarget.value;
             const caret = e.currentTarget.selectionStart ?? valor.length;
             const sangrado = sangrarTerminal(props.input, valor, caret, e.inputType);
@@ -2226,6 +2282,28 @@ export default function Chat(props: ChatProps) {
           onKeyUp={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
           onClick={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
           onKeyDown={(e) => {
+            if (entradaActiva() && !e.isComposing) {
+              const tecla = !entrada() ? TECLAS_DE_TERMINAL[e.key] : undefined;
+              if (tecla && !e.shiftKey && !e.metaKey && !e.altKey && !e.ctrlKey) {
+                e.preventDefault();
+                void teclearAlComando(tecla);
+              } else if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void teclearAlComando(`${entrada()}\r`);
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                e.stopPropagation();
+                setSoltadoDe(props.terminal?.id ?? null);
+              } else if (e.ctrlKey && e.key.toLowerCase() === "d" && !entrada()) {
+                e.preventDefault();
+                void teclearAlComando(FIN_DE_ARCHIVO);
+              } else if (e.ctrlKey && e.key.toLowerCase() === "c" && !props.stopping) {
+                // En esta terminal `Ctrl+C` mataría también al shell: se detiene el `!`.
+                e.preventDefault();
+                void props.onStop();
+              }
+              return;
+            }
             if (!e.isComposing && (e.metaKey || e.ctrlKey) &&
               (e.key.toLowerCase() === "z" || (e.ctrlKey && e.key.toLowerCase() === "y")) &&
               props.onMentionHistory?.(e.shiftKey || e.key.toLowerCase() === "y")) {
