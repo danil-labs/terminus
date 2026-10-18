@@ -13,6 +13,13 @@ import { ITEM_DE_MENU, Popover, PopoverContent, PopoverTrigger } from "../../ui/
 import { Badge } from "../../ui/Badge";
 import { lockedBy } from "../../lib/governance";
 import { GovernedNotice } from "./Governed";
+import {
+  mcpLoginUrl,
+  mcpPendingSignIn,
+  mcpSignIn,
+  mcpSignInFailure,
+  mcpSignInState,
+} from "../chat/McpSignInNotice";
 
 /**
  * Conectar una herramienta al agente: Figma, Jira, Confluence.
@@ -868,7 +875,57 @@ export function ConexionesMenu(props: {
   /** Igual que `aMano` de arriba: de `conocidos()`, no de una lista aparte. */
   const declaradas = () => new Set(conocidos().map((c) => c.clave));
   const manuales = () => puestos().filter((p) => !declaradas().has(p.name));
-  const total = () => conectados().length + manuales().length;
+  const pendientes = () => new Set(mcpPendingSignIn().map((s) => s.name));
+  /** Los que piden sesión y no aparecen en ninguna de las dos listas. */
+  const sueltos = () => {
+    const vistos = new Set([...conectados().map((c) => c.clave), ...manuales().map((p) => p.name)]);
+    return mcpPendingSignIn().filter((s) => !vistos.has(s.name));
+  };
+  const total = () => conectados().length + manuales().length + sueltos().length;
+
+  /** Punto verde si está conectado; rojo y clicable si pide sesión. */
+  const Senal = (p: { name: string; muerto?: boolean }) => (
+    <Show
+      when={pendientes().has(p.name)}
+      fallback={
+        <span
+          class={cn(
+            "size-1.5 shrink-0 rounded-full",
+            p.muerto ? "bg-warning-strong" : "bg-success-strong",
+          )}
+          title={p.muerto ? t("settings.tools.dead_now") : undefined}
+        />
+      }
+    >
+      <Show
+        when={mcpSignInState(p.name) !== "waiting"}
+        fallback={
+          <Show
+            when={mcpLoginUrl()}
+            fallback={<span class="text-[0.6875rem] text-neutral-500">{t("settings.tools.opening")}</span>}
+          >
+            {(u) => (
+              <button
+                class="text-[0.6875rem] text-neutral-500 underline"
+                onClick={() => void invoke("open_external", { target: u() })}
+              >
+                {t("settings.tools.open_login")}
+              </button>
+            )}
+          </Show>
+        }
+      >
+        <button
+          class="grid size-4 shrink-0 place-items-center rounded-full"
+          title={mcpSignInState(p.name) === "retry" ? t("mcp.task.sign_in_again") : t("mcp.task.sign_in")}
+          aria-label={t("mcp.task.sign_in")}
+          onClick={() => void mcpSignIn(p.name)}
+        >
+          <span class="size-1.5 rounded-full bg-error-strong" />
+        </button>
+      </Show>
+    </Show>
+  );
 
   return (
     <Popover
@@ -892,6 +949,9 @@ export function ConexionesMenu(props: {
             title={t("shell.sidebar.mcp.trigger")}
           >
             <Plug size={15} />
+            <Show when={pendientes().size > 0}>
+              <span class="absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full bg-error-strong" />
+            </Show>
             <Show when={total() > 0}>
               <span class="ui-sidebar-menu-badge absolute -top-1 -right-1 min-w-3.5 rounded-full bg-neutral-200 px-1 text-center text-[0.625rem] font-semibold text-neutral-950">
                 {total()}
@@ -927,12 +987,7 @@ export function ConexionesMenu(props: {
                       componente. Puesto y sano no lleva marca — es el estado
                       tranquilo, igual que `.tag.puesto` en la pantalla
                       completa. */}
-                  <Show when={c.escuchando === false}>
-                    <span
-                      class="size-1.5 shrink-0 rounded-full bg-warning-strong"
-                      title={t("settings.tools.dead_now")}
-                    />
-                  </Show>
+                  <Senal name={c.clave} muerto={c.escuchando === false} />
                 </li>
               )}
             </For>
@@ -943,11 +998,21 @@ export function ConexionesMenu(props: {
                   <span class="max-w-[40%] shrink-0 truncate font-mono text-[0.6875rem] text-neutral-500">
                     {p.detalle || t("settings.tools.no_source")}
                   </span>
+                  <Senal name={p.name} />
+                </li>
+              )}
+            </For>
+            <For each={sueltos()}>
+              {(p) => (
+                <li class="flex min-h-8 items-center gap-2 px-2 py-1 text-[0.8125rem]">
+                  <span class="min-w-0 flex-1 truncate">{p.name}</span>
+                  <Senal name={p.name} />
                 </li>
               )}
             </For>
           </ul>
         </Show>
+        <Show when={mcpSignInFailure()}>{(f) => <FailureNote f={f()} />}</Show>
 
         <span class="my-1 h-px bg-border" />
         <button

@@ -32,10 +32,7 @@
   "mcp.error.no_servers_in_block": "No encontré ningún servidor en ese bloque. Tiene que ser un objeto, con o sin «mcpServers» alrededor.",
   "mcp.error.block_declares_none": "Ese bloque no declara ningún servidor.",
   "mcp.session.cli_has_none": "su CLI no la ofrece",
-  "mcp.task.title": "Hay herramientas que piden iniciar sesión",
-  "mcp.task.body": "El agente no puede abrir el inicio de sesión desde la tarea. Ábrelo tú aquí: se autoriza en tu navegador y tu siguiente mensaje ya tendrá las herramientas.",
   "mcp.task.sign_in": "Iniciar sesión",
   "mcp.task.sign_in_again": "Volver a intentar",
-  "mcp.task.next_turn": "Si lo autorizaste, tu siguiente mensaje ya lo usa, en esta misma conversación.",
   "mcp.error.login_not_needed": "Ese servidor no tiene inicio de sesión por OAuth."
 }
