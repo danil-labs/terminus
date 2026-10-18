@@ -2972,7 +2972,10 @@ export default function App() {
       anexar(id, (m) => [...m, { role: "system", text: prosaDe(e), meta: "fallo" }]);
       return false;
     }
-    const pintado = eco ? texto.replace(/\u0004/g, "") : texto.endsWith("\n") ? "\n" : "";
+    // Una tecla suelta (flecha, Enter de menú) no se pinta: la dibuja el propio programa.
+    const tecla = texto.length <= 3 && !/^[^\u001b\r\t ]+\r$/.test(texto);
+    const linea = tecla ? "" : texto.replace(/\u0004/g, "").replace(/\r$/, "\n");
+    const pintado = eco ? linea : linea && "\n";
     if (pintado) {
       setTerminales((ts) => {
         const actual = ts[id];

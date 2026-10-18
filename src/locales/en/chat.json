@@ -60,7 +60,7 @@
   "chat.composer.send": "Ask",
   "chat.composer.terminal": "terminal",
   "chat.composer.stdin": "command input",
-  "chat.composer.stdin.hint": "Enter sends · Esc back to the agent · Ctrl+D end of input",
+  "chat.composer.stdin.hint": "Enter sends · arrows and space drive menus · Esc back to the agent · Ctrl+D end of input",
   "chat.composer.stdin.attach": "Type to the command",
   "chat.composer.placeholder.stdin": "Type the answer for the command",
   "chat.composer.placeholder.secret": "Type the password; it is not shown or saved",

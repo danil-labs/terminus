@@ -38,7 +38,7 @@ import { taskChatPresentation } from "./TaskChatPresentation";
 import { CHUNK, blockOfMessage, chunkIds, chunkOf, tailChunk, type Lectura } from "./threadWindow";
 import { workLabel } from "../projects/branchLabel";
 import { sangrarTerminal } from "./terminalIndent";
-import { FIN_DE_ARCHIVO, pideClave } from "./commandInput";
+import { FIN_DE_ARCHIVO, TECLAS_DE_TERMINAL, pideClave } from "./commandInput";
 import { claseDelTramo, finishEdit, highlightSpans, placeLabel, referenceId, searchPlaces, searchTasks, taskLabel, type MentionTarget, type PendingEdit, type PlaceCandidate, type TextEdit, type TaskCandidate, type TaskMention, tramosDelMensaje } from "../../lib/taskMentions";
 import {
   type Recipient,
@@ -1412,7 +1412,7 @@ export default function Chat(props: ChatProps) {
   // del tope obliga a volver a buscarlo en el disco.
   async function mandar() {
     if (entradaActiva()) {
-      void teclearAlComando(`${entrada()}\n`);
+      void teclearAlComando(`${entrada()}\r`);
       return;
     }
     if ((!props.input.trim() && props.adjuntos.length === 0) || !listo()) return;
@@ -2283,9 +2283,13 @@ export default function Chat(props: ChatProps) {
           onClick={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
           onKeyDown={(e) => {
             if (entradaActiva() && !e.isComposing) {
-              if (e.key === "Enter" && !e.shiftKey) {
+              const tecla = !entrada() ? TECLAS_DE_TERMINAL[e.key] : undefined;
+              if (tecla && !e.shiftKey && !e.metaKey && !e.altKey && !e.ctrlKey) {
                 e.preventDefault();
-                void teclearAlComando(`${entrada()}\n`);
+                void teclearAlComando(tecla);
+              } else if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void teclearAlComando(`${entrada()}\r`);
               } else if (e.key === "Escape") {
                 e.preventDefault();
                 e.stopPropagation();
