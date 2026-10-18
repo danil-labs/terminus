@@ -1,10 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
-import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
+import { createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
-import { t } from "../../lib/i18n";
-import { Button } from "../../ui/Button";
-import { asFailure, type Failure, FailureNote } from "../../ui/Failure";
-import { Toast } from "../../ui/Toast";
+import { asFailure, type Failure } from "../../ui/Failure";
 
 /** Espeja `dialects::claude::mcp_sin_sesion`. */
 type PendingServer = { name: string; source: string };
@@ -14,8 +11,17 @@ type PendingSignIn = { agent: string; servers: PendingServer[] };
 type LoginEnded = { agent: string; server: string; ok: boolean } | null;
 
 // Por sesión y fuera del componente: el evento llega al arrancar el turno,
-// se esté mirando esa tarea o no. Una lista vacía quita el aviso.
+// se esté mirando esa tarea o no. Una lista vacía quita la señal.
 const [pendingBySession, setPendingBySession] = createSignal<Record<string, PendingSignIn>>({});
+// La tarea a la vista: la fija `McpSignInNotice` desde App, y la lee el menú
+// de Conexiones del riel, que no sabe de sesiones.
+const [activeSession, setActiveSession] = createSignal<string | null>(null);
+const [inProgress, setInProgress] = createSignal<Set<string>>(new Set());
+const [finished, setFinished] = createSignal<Set<string>>(new Set());
+const [loginUrl, setLoginUrl] = createSignal<string | null>(null);
+const [failure, setFailure] = createSignal<Failure | null>(null);
+// Sin tope, un navegador cerrado sin autorizar deja el renglón bloqueado: `mcp` no llega.
+const timers = new Map<string, number>();
 
 export function noteMcpSignIn(session: string, text: string) {
   let parsed: PendingSignIn;
@@ -40,63 +46,64 @@ function forgetSignedIn(agent: string, server: string) {
   );
 }
 
+const current = () => {
+  const s = activeSession();
+  return s ? pendingBySession()[s] : undefined;
+};
+const loginKey = (name: string) => `${activeSession() ?? ""}:${name}`;
+
+/** Los servidores de la tarea a la vista que piden sesión. */
+export const mcpPendingSignIn = () => current()?.servers ?? [];
+export const mcpSignInState = (name: string): "idle" | "waiting" | "retry" =>
+  inProgress().has(loginKey(name)) ? "waiting" : finished().has(loginKey(name)) ? "retry" : "idle";
+export const mcpLoginUrl = loginUrl;
+export const mcpSignInFailure = failure;
+
+function stopWaiting(key: string) {
+  const timer = timers.get(key);
+  if (timer !== undefined) {
+    clearTimeout(timer);
+    timers.delete(key);
+  }
+  setInProgress((s) => {
+    const n = new Set(s);
+    n.delete(key);
+    return n;
+  });
+}
+
 /**
- * Las herramientas MCP de la tarea que piden sesión, con su botón. El turno no
- * es interactivo y el agente no puede abrir el OAuth; lo corre `mcp_login` con
- * el CLI y la cuenta de la tarea, sin que ningún token pase por aquí.
+ * El turno no es interactivo y el agente no puede abrir el OAuth; lo corre
+ * `mcp_login` con el CLI y la cuenta de la tarea, sin que ningún token pase
+ * por aquí.
+ */
+export async function mcpSignIn(name: string) {
+  const agent = current()?.agent;
+  if (!agent) return;
+  const key = loginKey(name);
+  if (inProgress().has(key)) return;
+  setFailure(null);
+  setLoginUrl(null);
+  setInProgress((s) => new Set(s).add(key));
+  timers.set(key, window.setTimeout(() => stopWaiting(key), 120_000));
+  try {
+    await invoke("mcp_login", { agent, id: name });
+  } catch (e) {
+    setFailure(asFailure(e));
+    stopWaiting(key);
+  }
+}
+
+/**
+ * Sin interfaz: ya no hay aviso flotante. Fija la tarea a la vista y escucha
+ * el login; la señal y el botón viven en el menú de Conexiones del riel.
  */
 export default function McpSignInNotice(props: { session: string | null }) {
-  // Todos los cerrados, no el último: cerrar el de otra tarea no reabre este.
-  const [dismissed, setDismissed] = createSignal<Set<string>>(new Set());
-  const [inProgress, setInProgress] = createSignal<Set<string>>(new Set());
-  const [finished, setFinished] = createSignal<Set<string>>(new Set());
-  const [loginUrl, setLoginUrl] = createSignal<string | null>(null);
-  const [failure, setFailure] = createSignal<Failure | null>(null);
-  // Sin tope, un navegador cerrado sin autorizar deja el botón bloqueado: `mcp` no llega.
-  const timers = new Map<string, number>();
-
-  const current = () => (props.session ? pendingBySession()[props.session] : undefined);
-  const servers = () => current()?.servers ?? [];
-  // Con otra lista de servidores, un aviso descartado vuelve.
-  const noticeKey = () =>
-    props.session ? `${props.session}:${servers().map((s) => s.name).sort().join(",")}` : "";
-  const loginKey = (name: string) => `${props.session ?? ""}:${name}`;
-
-  function stopWaiting(key: string) {
-    const timer = timers.get(key);
-    if (timer !== undefined) {
-      clearTimeout(timer);
-      timers.delete(key);
-    }
-    setInProgress((s) => {
-      const n = new Set(s);
-      n.delete(key);
-      return n;
-    });
-  }
-
-  async function signIn(name: string) {
-    const agent = current()?.agent;
-    if (!agent) return;
-    const key = loginKey(name);
-    setFailure(null);
-    setLoginUrl(null);
-    setInProgress((s) => new Set(s).add(key));
-    timers.set(key, window.setTimeout(() => stopWaiting(key), 120_000));
-    try {
-      await invoke("mcp_login", { agent, id: name });
-    } catch (e) {
-      setFailure(asFailure(e));
-      stopWaiting(key);
-    }
-  }
-
   onMount(() => {
     // Nombres literales: `scripts/guards/bridge.mjs` solo lee esos.
     const url = listen<string>("mcp-login", (e) => setLoginUrl(e.payload));
     const end = listen<LoginEnded>("mcp", (e) => {
       if (e.payload?.ok) forgetSignedIn(e.payload.agent, e.payload.server);
-      // Si salió mal, lo dice el turno siguiente: el botón pasa a «otra vez».
       const done = Array.from(inProgress());
       setFinished((s) => new Set([...s, ...done]));
       for (const key of done) stopWaiting(key);
@@ -108,50 +115,6 @@ export default function McpSignInNotice(props: { session: string | null }) {
       for (const timer of timers.values()) clearTimeout(timer);
     });
   });
-
-  return (
-    <Show when={servers().length > 0 && !dismissed().has(noticeKey())}>
-      <Toast tone="status" onDismiss={() => setDismissed((s) => new Set(s).add(noticeKey()))}>
-        <p class="m-0 text-[0.8125rem] font-semibold">{t("mcp.task.title")}</p>
-        <p class="m-0 text-xs text-neutral-500">{t("mcp.task.body")}</p>
-        <ul class="m-0 flex list-none flex-col gap-1.5 p-0">
-          <For each={servers()}>
-            {(s) => (
-              <li class="flex items-center justify-between gap-2">
-                <span class="min-w-0 truncate text-xs font-medium">{s.name}</span>
-                <Show
-                  when={inProgress().has(loginKey(s.name))}
-                  fallback={
-                    <Button size="sm" variant="outline" onClick={() => void signIn(s.name)}>
-                      {finished().has(loginKey(s.name)) ? t("mcp.task.sign_in_again") : t("mcp.task.sign_in")}
-                    </Button>
-                  }
-                >
-                  <Show
-                    when={loginUrl()}
-                    fallback={<span class="text-xs text-neutral-500">{t("settings.tools.opening")}</span>}
-                  >
-                    {(u) => (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        class="px-2 text-xs"
-                        onClick={() => void invoke("open_external", { target: u() })}
-                      >
-                        {t("settings.tools.open_login")}
-                      </Button>
-                    )}
-                  </Show>
-                </Show>
-              </li>
-            )}
-          </For>
-        </ul>
-        <Show when={finished().size > 0}>
-          <p class="m-0 text-xs text-neutral-500">{t("mcp.task.next_turn")}</p>
-        </Show>
-        <Show when={failure()}>{(f) => <FailureNote f={f()} />}</Show>
-      </Toast>
-    </Show>
-  );
+  createEffect(() => setActiveSession(props.session));
+  return null;
 }
