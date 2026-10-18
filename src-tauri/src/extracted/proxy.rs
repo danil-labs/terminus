@@ -270,7 +270,7 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
         Some(workspace.to_owned())
     } else if matches!(
         name.as_str(),
-        "stop_turn" | "stop_shell_command" | "pending_requests"
+        "stop_turn" | "stop_shell_command" | "write_shell_input" | "pending_requests"
     ) {
         // Cerrar con tareas vivas detiene también las de otros workspaces.
         invoke

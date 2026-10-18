@@ -2962,6 +2962,27 @@ export default function App() {
     } else if (sessionId() === abierta) setRetenida("fallo");
   }
 
+  /** Le teclea al `!` en marcha de una tarea. La terminal no hace eco: lo pinta la ventana. */
+  async function teclearAlComando(id: string | null | undefined, texto: string, eco: boolean): Promise<boolean> {
+    const vivo = id ? terminales()[id] : null;
+    if (!id || !vivo?.id) return false;
+    try {
+      if (!(await invoke<boolean>("write_shell_input", { session: id, input: texto }))) return false;
+    } catch (e) {
+      anexar(id, (m) => [...m, { role: "system", text: prosaDe(e), meta: "fallo" }]);
+      return false;
+    }
+    const pintado = eco ? texto.replace(/\u0004/g, "") : texto.endsWith("\n") ? "\n" : "";
+    if (pintado) {
+      setTerminales((ts) => {
+        const actual = ts[id];
+        if (!actual || actual.id !== vivo.id) return ts;
+        return { ...ts, [id]: { ...actual, output: actual.output + pintado } };
+      });
+    }
+    return true;
+  }
+
   async function detener() {
     const id = sessionId();
     if (!busy() || !id || stopping()) return;
@@ -6037,6 +6058,7 @@ export default function App() {
         inicioDelTurno={desdeDeTurno()[pp.sesion ?? ""] ?? null}
         terminal={terminales()[pp.sesion ?? ""] ?? null}
         carpetaDeTerminal={carpetasDeTerminal()[pp.sesion ?? ""] ?? null}
+        onEntradaDeComando={(texto, eco) => teclearAlComando(pp.sesion, texto, eco)}
         models={models()}
         catalogos={catalogos()}
         model={model()}
