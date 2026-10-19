@@ -7386,12 +7386,10 @@ export default function App() {
                     spaces={spaces()}
                     activa={escritorio()}
                     proyectos={projectList()}
-                    sesiones={sesiones()}
                     senal={(id) => senalDe(id)}
                     onElegir={cambiarEscritorio}
                     onCrear={createSpace}
                     onRenombrar={renameSpace}
-                    onCarpetas={updateSpaceFolders}
                     onEliminar={(id) => setDeletingSpace(id)}
                   />
                 )
