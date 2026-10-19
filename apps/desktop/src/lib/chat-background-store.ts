@@ -6,6 +6,9 @@ import {
   VELO_DE_PESTANAS,
   VELO_DE_PESTANAS_MAX,
   VELO_DE_PESTANAS_MIN,
+  VELO_DE_PANELES,
+  VELO_DE_PANELES_MAX,
+  VELO_DE_PANELES_MIN,
   type FondoDeChat,
 } from "./chat-background.ts";
 
@@ -13,6 +16,7 @@ const [guardado, setGuardado] = createPref<string>("chat-background", "dusk");
 const [rutaPropia, setRutaPropia] = createPref<string | null>("chat-background-custom", null);
 const [veloGuardado, setVeloGuardado] = createPref<number>("chat-background-veil", VELO_DE_FONDO);
 const [veloDePestanasGuardado, setVeloDePestanasGuardado] = createPref<number>("tabs-veil", VELO_DE_PESTANAS);
+const [veloDePanelesGuardado, setVeloDePanelesGuardado] = createPref<number>("panels-veil", VELO_DE_PANELES);
 
 function acotarVeloDePestanas(valor: unknown): number {
   return typeof valor === "number" && Number.isFinite(valor)
@@ -31,9 +35,23 @@ export function elegirVeloDePestanas(valor: number): number {
   return siguiente;
 }
 
-/** Pinta el velo guardado. La llama el arranque, antes del primer pintado. */
+/** Pinta los velos guardados (pestañas y paneles). La llama el arranque, antes del primer pintado. */
 export function aplicarVeloDePestanas() {
   document.documentElement.style.setProperty("--tab-veil", String(veloDePestanas()));
+  document.documentElement.style.setProperty("--panel-veil", String(veloDePaneles()));
+}
+
+export function veloDePaneles(): number {
+  const valor = veloDePanelesGuardado();
+  return typeof valor === "number" && Number.isFinite(valor)
+    ? Math.min(VELO_DE_PANELES_MAX, Math.max(VELO_DE_PANELES_MIN, valor))
+    : VELO_DE_PANELES;
+}
+
+export function elegirVeloDePaneles(valor: number): number {
+  setVeloDePanelesGuardado(Number.isFinite(valor) ? valor : VELO_DE_PANELES);
+  aplicarVeloDePestanas();
+  return veloDePaneles();
 }
 
 export function veloDeFondo(): number {

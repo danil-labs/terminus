@@ -14,6 +14,11 @@ export const VELO_DE_PESTANAS = 0.3;
 export const VELO_DE_PESTANAS_MIN = 0.15;
 export const VELO_DE_PESTANAS_MAX = 0.6;
 
+/** El vidrio de las columnas y barras (`.glass-panel`): a 0 se ve el fondo entero, a 1 son sólidas. */
+export const VELO_DE_PANELES = 0.4;
+export const VELO_DE_PANELES_MIN = 0;
+export const VELO_DE_PANELES_MAX = 1;
+
 const CLASE: Partial<Record<FondoDeChat, string>> = {
   dusk: "chat-bg-dusk",
 };
