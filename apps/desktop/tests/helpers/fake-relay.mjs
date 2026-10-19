@@ -35,8 +35,11 @@ export const engine = {
 /** The relay's wake list (protocol v1): only these start an off computer. */
 const INTENT = new Set(["send_message", "inject_message", "create_project", "create_agent", "respond_permission", "answer_question", "answer_shell_output", "run_shell_command", "queue_ready", "resume_awaiting_quota", "recreate_task_work"]);
 
-/** `cachedAt`: with the computer off, the relay answers every known read from its copy of that time. */
-export function relay({ state: initial = "online", wakeAfter = 300, cachedAt = null } = {}) {
+/**
+ * `cachedAt`: with the computer off, the relay answers every known read from its copy of that time.
+ * `table`: this computer's engine replies; `outdated`: its engine speaks another contract.
+ */
+export function relay({ state: initial = "online", wakeAfter = 300, cachedAt = null, table = engine, outdated = false } = {}) {
   const sockets = [];
   const calls = [];
   const subscriptions = [];
@@ -60,15 +63,17 @@ export function relay({ state: initial = "online", wakeAfter = 300, cachedAt = n
       if (m.type !== "call") return;
       calls.push(m);
       const respond = () => {
-        const answer = engine[m.command];
-        const reply = answer === undefined
+        const answer = table[m.command];
+        const reply = outdated
+          ? { type: "result", id: m.id, error: { code: "version_mismatch" } }
+          : answer === undefined
           ? { type: "result", id: m.id, error: { code: "command" } }
           : { type: "result", id: m.id, value: typeof answer === "function" ? answer(m.args) : answer };
         if (this.readyState === 1) this.onmessage?.({ data: JSON.stringify(reply) });
       };
       if (state === "online") return void setTimeout(respond, 0);
-      if (!INTENT.has(m.command) && cachedAt && engine[m.command] !== undefined) {
-        const answer = engine[m.command];
+      if (!INTENT.has(m.command) && cachedAt && table[m.command] !== undefined) {
+        const answer = table[m.command];
         const value = typeof answer === "function" ? answer(m.args) : answer;
         const reply = { type: "result", id: m.id, value, cached: { updated_at: cachedAt } };
         return void setTimeout(() => this.readyState === 1 && this.onmessage?.({ data: JSON.stringify(reply) }), 0);
@@ -99,3 +104,17 @@ export function relay({ state: initial = "online", wakeAfter = 300, cachedAt = n
   return { Socket, sockets, calls, subscriptions, push, drop, setState };
 }
 
+
+/** Several computers behind one relay origin: each session socket reaches the computer in its URL. */
+export function fleet(computers) {
+  const relays = Object.fromEntries(Object.entries(computers).map(([id, options]) => [id, relay(options)]));
+  class Socket {
+    constructor(url, protocols) {
+      const id = decodeURIComponent(/\/v1\/computers\/([^/]+)\/session/.exec(url)?.[1] ?? "");
+      const target = relays[id];
+      if (!target) throw new Error(`no fake computer ${id}`);
+      return new target.Socket(url, protocols);
+    }
+  }
+  return { Socket, relays };
+}

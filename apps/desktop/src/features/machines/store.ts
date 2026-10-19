@@ -3,6 +3,7 @@ import { invoke } from "../../lib/invoke";
 import { t } from "../../lib/i18n";
 import { createPref } from "../../lib/prefs";
 import { isMac } from "../../lib/window";
+import { capabilities } from "../../lib/platform";
 
 /** `machine_list`: `linked` es si tiene el workspace abierto; `null`, que no se sabe sin encenderla. */
 export type Machine = { id: string; local: boolean; active: boolean; on: boolean; linked: boolean | null };
@@ -46,4 +47,4 @@ export function runOnOptions(workspace: string | null) {
 }
 
 export const machineName = (id: string, local = id === "local") =>
-  local ? (isMac() ? t("shell.machines.this_mac") : t("shell.machines.this_computer")) : id;
+  local ? (isMac() ? t("shell.machines.this_mac") : t("shell.machines.this_computer")) : (capabilities().machineName?.(id) ?? id);

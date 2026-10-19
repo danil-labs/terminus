@@ -6,6 +6,7 @@ import { confirm } from "@tauri-apps/plugin-dialog";
 import AccountCard, { accountPresentation } from "./AccountCard";
 import { FailureNote, type Failure, detalleDe, prosaDe } from "../../ui/Failure";
 import { cn } from "../../lib/utils";
+import { capabilities } from "../../lib/platform";
 import { Skeleton } from "../../ui/Skeleton";
 import { ProgressBar } from "../../ui/ProgressBar";
 import { Badge } from "../../ui/Badge";
@@ -557,13 +558,13 @@ export default function Accounts(props: {
     }
   }
 
-  async function agregar() {
+  async function agregar(options?: { headers: Record<string, string> }) {
     if (faltaExterno()) return;
     try {
       const a = await invoke<Account>("add_account", {
         provider: agente(),
         label: "",
-      });
+      }, options);
       // Agregar crea la carpeta antes del login: ahí escribe el CLI la
       // credencial. Si el login no llega a nada, esto permite deshacerlo en
       // vez de dejar un objeto vacío en la lista.
@@ -1009,6 +1010,7 @@ export default function Accounts(props: {
             const estado = () => estados()[a.id];
 
             return (
+              <>
               <CuentaConfigurada
                 account={a}
                 agent={agente()}
@@ -1092,7 +1094,7 @@ export default function Accounts(props: {
                             <Show when={!caida() && !props.enAlta}>
                               <DropdownMenuSeparator />
                             </Show>
-                            <Show when={!props.enAlta}>
+                            <Show when={!props.enAlta && !a.machines}>
                               <DropdownMenuItem
                                 class="flex items-center gap-2 text-error-strong"
                                 onSelect={() => setPorQuitar(a.id)}
@@ -1127,6 +1129,8 @@ export default function Accounts(props: {
                   ) : undefined
                 }
               />
+              {capabilities().accountMachines?.({ account: a, provider: agente(), add: agregar, refresh: () => void refrescar() })}
+              </>
             );
           }}
         </For>

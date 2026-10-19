@@ -11,6 +11,7 @@ import { Input } from "../../ui/Input";
 import { ProgressBar } from "../../ui/ProgressBar";
 import { enfocar } from "../../lib/focus";
 import { t } from "../../lib/i18n";
+import { capabilities } from "../../lib/platform";
 import type { Project } from "../../lib/model";
 
 /**
@@ -255,6 +256,7 @@ export default function AnadirCarpeta(props: {
         <DialogTitle class="m-0 text-[0.9375rem] font-semibold">
           {t("projects.add.title")}
         </DialogTitle>
+        {capabilities().machineOnCreate?.(props.workspace)}
 
         <div class="grid gap-2 pt-3">
           <Show when={camino() === null}>

@@ -31,6 +31,8 @@ export type Account = {
   identity: string | null;
   /** Si alguna vez terminó bien una conexión. No se borra al perder la credencial. */
   authenticated_at: number | null;
+  /** En la web con varias máquinas: dónde tiene sesión esta misma cuenta. */
+  machines?: { machine: string; id: string; on: boolean }[];
 };
 
 /** Una tarea parada por cupo que la cuenta puesta puede retomar (`chat::relevo`). */

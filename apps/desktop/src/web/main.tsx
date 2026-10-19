@@ -1,17 +1,21 @@
 /**
  * The browser entry (`web.html`, `pnpm web:build`), served by the Danil app on
- * its own origin. It reads the Supabase session that app stored, picks the
- * computer and mounts the app over the relay. A page that sets
- * `window.terminusWeb` before this module loads can replace any setting, or
- * give `computerId` and `getToken` and skip the session and the picker.
+ * its own origin. It reads the Supabase session that app stored, lists the
+ * person's computers and mounts the app over one relay session each. A page
+ * that sets `window.terminusWeb` before this module loads can replace any
+ * setting, or give `getToken` with `computerId` or `computers` and skip the session.
  */
-import { createSignal } from "solid-js";
+import { createSignal, lazy, Suspense } from "solid-js";
+import { t } from "../lib/i18n";
 import { setCapabilities } from "../lib/platform";
 // In the page, not in the lazy app chunk: the stylesheet loads with the HTML.
 import "../styles/global.css";
+import type { Computer } from "./computers";
+import { wakes } from "./fleet";
 import { HomeLink } from "./HomeLink";
 import { installIpc } from "./ipc";
 import { type RelayConfig, RelaySession } from "./relay";
+import type { MachineRow } from "./SyncNote";
 import { type BrowserHost, createWebTransport } from "./transport";
 
 declare const __TERMINUS_VERSION__: string;
@@ -20,7 +24,11 @@ declare const __TERMINUS_WEB__: WebSettings;
 
 type WebSettings = { endpoint: string; supabaseUrl: string; supabaseKey: string; login: string };
 
-export type TerminusWebConfig = Partial<WebSettings> & Partial<RelayConfig>;
+export type TerminusWebConfig = Partial<WebSettings & RelayConfig & { computers: Computer[] }>;
+type Base = Omit<RelayConfig, "computerId" | "beforeReconnect">;
+
+const Picker = lazy(() => import("../features/machines/MachinePicker").then((m) => ({ default: m.MachinePicker })));
+const AccountMachines = lazy(() => import("./AccountMachines"));
 
 const browser: BrowserHost = {
   openUrl: (url) => void window.open(url, "_blank", "noopener,noreferrer"),
@@ -31,19 +39,55 @@ const browser: BrowserHost = {
   readText: () => navigator.clipboard.readText(),
 };
 
-function mountApp(name: string, config: RelayConfig) {
-  setCapabilities({ nativeWindow: false, updater: false, localSetup: false, computerStatus: true, sidebarExtra: () => <HomeLink /> });
-  const relay = new RelaySession(config);
-  const [syncedAt, setSyncedAt] = createSignal<number | null>(null);
-  const [state, setState] = createSignal(relay.state());
-  relay.onState(setState);
-  installIpc(window, createWebTransport(relay, config.computerId, __TERMINUS_VERSION__, browser, setSyncedAt));
-  relay.start();
+function mountApp(computers: Computer[], base: Base, before?: (id: string) => () => Promise<boolean>) {
+  const [changed, bump] = createSignal(0);
+  const links = computers.map((c) => {
+    const [at, setAt] = createSignal<number | null>(null);
+    const relay = new RelaySession({ ...base, computerId: c.computer_id, beforeReconnect: before?.(c.computer_id) });
+    relay.onState(() => bump((n) => n + 1));
+    return { info: { id: c.computer_id, name: c.name || c.computer_id, wakes: wakes(c) }, relay, onSync: setAt, at };
+  });
+  const transport = createWebTransport(links, __TERMINUS_VERSION__, browser, () => bump((n) => n + 1));
+  const machines = (): MachineRow[] => {
+    changed();
+    return transport.fleet.machines.map((m) => {
+      const l = links.find((x) => x.info.id === m.id);
+      return { id: m.id, name: m.name, status: transport.status(m.id), at: l?.at() ?? null };
+    });
+  };
+  const multi = transport.fleet.multi;
+  setCapabilities({
+    nativeWindow: false,
+    updater: false,
+    localSetup: false,
+    computerStatus: true,
+    sidebarExtra: () => <HomeLink />,
+    machineName: (id) => transport.fleet.name(id),
+    machineOnCreate: multi
+      ? (workspace) => (
+          <Suspense fallback={null}>
+            <div class="flex items-center gap-1 pt-2 text-xs text-neutral-500" data-create-on="">
+              <span>{t("web.machines.create_on")}</span>
+              <Picker workspace={workspace} />
+            </div>
+          </Suspense>
+        )
+      : undefined,
+    accountMachines: multi
+      ? (props) => (
+          <Suspense fallback={null}>
+            <AccountMachines {...props} machines={machines} />
+          </Suspense>
+        )
+      : undefined,
+  });
+  installIpc(window, transport);
+  for (const l of links) l.relay.start();
   void import("../app/main");
   void Promise.all([import("solid-js/web"), import("./SyncNote"), import("./phrases")]).then(([{ render }, { SyncNote }]) => {
     const layer = document.createElement("div");
     document.body.append(layer);
-    render(() => <SyncNote name={name} at={syncedAt} state={state} />, layer);
+    render(() => <SyncNote machines={machines} />, layer);
   });
 }
 
@@ -65,7 +109,10 @@ async function start(settings: WebSettings) {
   const session = supabaseSession(settings.supabaseUrl, settings.supabaseKey, leave);
 
   /** A refusal found after mounting covers the app: retrying the socket would not change it. */
+  let blocked = false;
   const block = (initial: { t: "license" } | { t: "not_yours" }) => {
+    if (blocked) return;
+    blocked = true;
     const layer = document.createElement("div");
     layer.className = "fixed inset-0 z-50";
     document.body.append(layer);
@@ -77,21 +124,22 @@ async function start(settings: WebSettings) {
       <Gate
         session={session}
         endpoint={endpoint}
-        onOpen={(computerId, name) => {
+        onOpen={(computers) => {
           dispose();
-          mountApp(name, {
-            endpoint,
-            computerId,
-            getToken: () => session.getToken(),
-            onUnauthorized: () => void session.unauthorized(),
-            beforeReconnect: async () => {
+          const several = computers.length > 1;
+          mountApp(
+            computers,
+            { endpoint, getToken: () => session.getToken(), onUnauthorized: () => void session.unauthorized() },
+            (computerId) => async () => {
               const answer = await computersOf(endpoint, session);
               if (answer.kind === "license") block({ t: "license" });
-              else if (answer.kind === "ok" && !answer.value.some((c) => c.computer_id === computerId)) block({ t: "not_yours" });
-              else return answer.kind !== "unauthorized";
+              // One computer gone from several only stops its own session.
+              else if (answer.kind === "ok" && !answer.value.some((c) => c.computer_id === computerId)) {
+                if (!several) block({ t: "not_yours" });
+              } else return answer.kind !== "unauthorized";
               return false;
             },
-          });
+          );
         }}
       />
     ),
@@ -100,5 +148,6 @@ async function start(settings: WebSettings) {
 }
 
 const given = (window as Window & { terminusWeb?: TerminusWebConfig }).terminusWeb ?? {};
-if (given.computerId && given.getToken) mountApp(given.computerId, { ...__TERMINUS_WEB__, ...given } as RelayConfig);
+const preset = given.computers ?? (given.computerId ? [{ computer_id: given.computerId, state: "unknown" }] : null);
+if (preset && given.getToken) mountApp(preset, { ...__TERMINUS_WEB__, ...given } as Base);
 else void start({ ...__TERMINUS_WEB__, ...given } as WebSettings);
