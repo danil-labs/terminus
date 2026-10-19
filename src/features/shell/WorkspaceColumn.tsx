@@ -149,7 +149,9 @@ export default function WorkspaceColumn(props: {
               </Show>
             </span>
           </TooltipTrigger>
-          <TooltipContent>{label()}</TooltipContent>
+          {/* Solo el nombre: el estado ya lo dice el distintivo, y repetirlo en
+              palabras estorbaba. `aria-label` sí lo lleva, que no ve el distintivo. */}
+          <TooltipContent>{p.w.name}</TooltipContent>
           </TooltipRoot>
         </PopoverAnchor>
         {/* Sin `Popover.Trigger` el foco no vuelve solo al cuadro. */}
