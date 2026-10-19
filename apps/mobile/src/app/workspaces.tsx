@@ -81,7 +81,11 @@ export default function WorkspaceSwitcher() {
             <Text style={{ color: theme.failedMark, fontWeight: "600" }}>{t("account.sign_out")}</Text>
           </Pressable>
         </>
-      ) : null}
+      ) : (
+        <Pressable testID="sign-in" style={[styles.button, { borderColor: theme.primary }]} onPress={() => router.push("/signin")}>
+          <Text style={{ color: theme.primary, fontWeight: "600" }}>{t("signin.title")}</Text>
+        </Pressable>
+      )}
 
       {BRIDGE_ENABLED ? (
         <>
