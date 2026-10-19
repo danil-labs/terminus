@@ -10,22 +10,26 @@ import { type Machine, machineName, machines, refetchMachines, runOn, setRunOn }
 let pedida = false;
 
 /**
- * «Ejecutar en»: la máquina donde corre la tarea que se va a crear. La ventana
- * sigue en su workspace; elegir una apagada no la enciende, la enciende enviar.
+ * «Ejecutar en»: la máquina donde corre la tarea que se va a crear, recordada por
+ * workspace. La ventana sigue en su workspace; elegir una apagada no la enciende,
+ * la enciende enviar.
  */
-export function MachinePicker() {
+export function MachinePicker(props: { workspace: string | null }) {
   if (!pedida) {
     pedida = true;
     void refetchMachines();
   }
 
   const [abierto, setAbierto] = createSignal(false);
-  const elegida = () => machines().find((m) => (runOn() ? m.id === runOn() : m.active));
+  const elegida = () => {
+    const id = runOn(props.workspace);
+    return machines().find((m) => (id ? m.id === id : m.active));
+  };
   const nombre = (m: Machine) => machineName(m.id, m.local);
 
   function elegir(m: Machine) {
     setAbierto(false);
-    setRunOn(m.active ? null : m.id);
+    setRunOn(props.workspace, m.active ? null : m.id);
   }
 
   const punto = (m: Machine) =>

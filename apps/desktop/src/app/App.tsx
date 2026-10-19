@@ -88,7 +88,8 @@ import ArchivedTasks from "../features/projects/ArchivedTasks";
 import BaseBranchPicker from "../features/projects/BaseBranchPicker";
 import { watchHandlerStatus, watchHandlerStatuses } from "../features/projects/handlerPresence";
 import { EmptyContext, ProjectPicker } from "../features/projects/Projects";
-import { runOnOptions } from "../features/machines/store";
+import { MachineChip } from "../features/machines/MachineChip";
+import { machineName, runOnOptions } from "../features/machines/store";
 // Chunk aparte: solo lo carga quien crea una tarea, no la carga inicial.
 const MachinePicker = lazy(() =>
   import("../features/machines/MachinePicker").then((m) => ({ default: m.MachinePicker })),
@@ -1122,6 +1123,16 @@ export default function App() {
   };
   // Por tarea: `undefined` es que aún no se abrió, `null` que salió de `session.json`.
   const [origenes, setOrigenes] = createSignal<Readonly<Record<string, TranscriptOrigin | null>>>({});
+  // Por tarea, la máquina apagada que la corre (`offline` de la lectura) y la que se está
+  // encendiendo porque se le mandó algo.
+  const [apagadas, setApagadas] = createSignal<Readonly<Record<string, string>>>({});
+  const [encendiendo, setEncendiendo] = createSignal<Readonly<Record<string, string>>>({});
+  const anotar = (set: typeof setApagadas, id: string, machine: string | null) =>
+    set((all) => {
+      if ((all[id] ?? null) === machine) return all;
+      const { [id]: _, ...resto } = all;
+      return machine ? { ...resto, [id]: machine } : resto;
+    });
   // Los turnos de cada tarea que trajo `service history`, desde `start`; lo anterior se pide al subir.
   const historias = new Map<string, LoadedHistory<Session["turns"][number]>>();
   const [conAntiguos, setConAntiguos] = createSignal<Readonly<Record<string, boolean>>>({});
@@ -1165,8 +1176,26 @@ export default function App() {
       pidiendoAntiguos.delete(id);
     }
   }
+  /** Lo que se dice de la máquina de la tarea abierta mientras está apagada o encendiéndose. */
+  const avisoDeMaquina = () => {
+    const id = sessionId();
+    const waking = id ? encendiendo()[id] : undefined;
+    if (waking) return t("shell.machines.waking", { name: machineName(waking) });
+    const off = id ? apagadas()[id] : undefined;
+    return off ? t("shell.machines.asleep_notice", { name: machineName(off) }) : null;
+  };
+  // Encendida por otra vía (otra ventana, otra acción), la tarea se vuelve a leer de su motor.
+  createEffect(on(() => {
+    const id = sessionId();
+    return id && apagadas()[id] && filaDe(id)?.machine_on === true ? id : null;
+  }, (id) => {
+    if (!id) return;
+    const generation = sessionGeneration;
+    void leerTarea(project(), id).then((s) => loadResult(id, s, false, generation)).catch(() => {});
+  }));
   function loadResult(id: string, session: Session, clear: boolean, generation: number) {
     if (generation !== sessionGeneration) return;
+    anotar(setApagadas, id, session.offline?.machine ?? null);
     const loaded = refreshHistory(historias.get(id), session.turns, session.history);
     historias.set(id, loaded);
     marcarAntiguos(id, loaded);
@@ -3127,7 +3156,7 @@ export default function App() {
         encargado,
         baseRef: draftBases()[claveBorrador] ?? null,
         runId,
-      }, runOnOptions());
+      }, runOnOptions(workspaceActivo()));
       // Sin su `shell_started` no hay nada pintado: se adopta aquí y se lee del disco.
       if (adoptarComando(runId, corrida.session) && nace.generation === sessionGeneration) void settleTurn(corrida.session, true);
       return true;
@@ -5183,6 +5212,10 @@ export default function App() {
     // que releer el disco lo trae — y si estuviera en `vivo` se pintaría dos
     // veces al volver a esta tarea mientras contesta.
     asentar(clave, (ms) => [...ms, ...entrando, turnoPropio]);
+    // Mandar a una tarea de una máquina apagada la enciende: el proxy espera a que
+    // conteste y entrega una sola vez.
+    const dormida = abierta ? apagadas()[abierta] ?? null : null;
+    if (abierta && dormida) anotar(setEncendiendo, abierta, dormida);
     try {
       // La respuesta de una persona no existe en la interfaz hasta que Rust la
       // validó y la escribió: primero persistir, y solo entonces pintarla.
@@ -5228,7 +5261,15 @@ export default function App() {
         // El escritorio que la persona tenía delante al escribirlo, sellado en el
         // mensaje; lo que llega de otro canal no trae ninguno.
         space: m.space ?? null,
-      }, abierta ? undefined : runOnOptions());
+      }, abierta ? undefined : runOnOptions(workspaceActivo()));
+      if (abierta && dormida) {
+        anotar(setEncendiendo, abierta, null);
+        anotar(setApagadas, abierta, null);
+        void refreshSessions(grupos());
+        void leerTarea(proyecto, abierta)
+          .then((s) => loadResult(abierta, s, false, generation))
+          .catch(() => {});
+      }
       if (generation !== sessionGeneration) return true;
       if (respuestas) {
         asentar(clave, (ms) =>
@@ -5284,6 +5325,7 @@ export default function App() {
       if (finishedTurns.has(id)) void settleTurn(id, finishedTurns.get(id));
       return true;
     } catch (e) {
+      if (abierta && dormida) anotar(setEncendiendo, abierta, null);
       // Sin esto queda una tarea que nadie creó: la fila y la pestaña se
       // pintaron contando con que Rust aceptara el turno.
       if (provisional) {
@@ -5842,7 +5884,7 @@ export default function App() {
             <Show when={props.nueva && !props.locked}>
               {/* Su propio límite: mientras carga, el resto de la vista sigue. */}
               <Suspense fallback={null}>
-                <MachinePicker />
+                <MachinePicker workspace={workspaceActivo()} />
               </Suspense>
             </Show>
           }
@@ -6627,6 +6669,15 @@ export default function App() {
         {/* Solo con la columna cerrada: abierta, su conmutador vive en la
             cabecera del panel derecho (`features/shell/RightPanelHeader.tsx`). */}
         <div ref={controlesDerechos} class="relative z-40 ml-auto flex shrink-0 items-center gap-3">
+        <Show when={filaDe(sessionId() ?? "")?.machine}>
+          {(machine) => (
+            <MachineChip
+              machine={machine()}
+              on={!apagadas()[sessionId() ?? ""] && filaDe(sessionId() ?? "")?.machine_on !== false}
+              class="max-w-[140px] text-xs text-neutral-500"
+            />
+          )}
+        </Show>
         <Show when={!artOpen() && !paginaDeAgente()}>
           <BotonConAtajo
             variant="ghost"
@@ -6644,6 +6695,13 @@ export default function App() {
         </Show>
         </div>
       </div>
+      <Show when={avisoDeMaquina()}>
+        {(aviso) => (
+          <p role="status" data-machine-notice="" class="mx-4 mb-2 shrink-0 rounded-[var(--radius-sm)] bg-surface px-3 py-2 text-xs text-neutral-500 shadow-sm">
+            {aviso()}
+          </p>
+        )}
+      </Show>
 
       {/* La columna del árbol de trabajo no reemplaza al chat: lo angosta. La
           vista de proyecto sí, y es la única cosa que lo hace: es lo que

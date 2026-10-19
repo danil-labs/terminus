@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
     collections::BTreeMap,
-    path::PathBuf,
-    sync::{Mutex, MutexGuard},
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex, MutexGuard},
 };
 use terminus_engine_client::Client;
 use terminus_engine_protocol::Error;
@@ -80,8 +80,14 @@ struct Memory {
     known: BTreeMap<String, BTreeMap<String, Vec<Value>>>,
 }
 
+// La copia de lo último que se leyó de cada tarea remota, para enseñarla con su máquina
+// apagada: como mucho tantas tareas, y ninguna más grande que esto.
+const CACHED_TASKS: usize = 40;
+const CACHED_TASK_BYTES: usize = 2 * 1024 * 1024;
+
 pub(super) struct Fleet {
     file: Option<PathBuf>,
+    tasks: Option<PathBuf>,
     memory: Mutex<Memory>,
     /// `(workspace de la ventana, tarea)` → máquina. La de la ventana no se apunta.
     owners: Mutex<BTreeMap<(String, String), String>>,
@@ -92,7 +98,11 @@ fn key(workspace: &str, project: &str) -> String {
 }
 
 impl Fleet {
-    pub fn load(file: Option<PathBuf>) -> Self {
+    /// Lo que recuerda la ventana en `window_data`: enlaces y listas en `machines.json`,
+    /// transcripciones en `machine-tasks/`.
+    pub fn load(window_data: Option<&Path>) -> Self {
+        let file = window_data.map(|d| d.join("machines.json"));
+        let tasks = window_data.map(|d| d.join("machine-tasks"));
         let memory: Memory = file
             .as_ref()
             .and_then(|f| std::fs::read(f).ok())
@@ -109,6 +119,7 @@ impl Fleet {
         }
         Self {
             file,
+            tasks,
             memory: Mutex::new(memory),
             owners: Mutex::new(owners),
         }
@@ -151,9 +162,10 @@ impl Fleet {
             .is_some_and(|m| m.contains_key(workspace))
     }
 
-    /// El workspace de `there` que es `local` en la ventana: el enlazado, o el único
-    /// con el mismo proveedor y organización, o el único con el mismo nombre.
-    pub fn workspace_on(
+    /// El workspace de `there` que es `local` en la ventana: el enlazado a mano en
+    /// `machines.json`, o el único con el mismo `provider` y `remote`. Un nombre igual no
+    /// basta. Lo reemplazará el id de workspace de la cuenta, el mismo en cada máquina.
+    pub fn counterpart_workspace(
         &self,
         machine: &str,
         local: &str,
@@ -182,9 +194,7 @@ impl Fleet {
                 && w["provider"] == mine["provider"]
                 && w["remote"] == mine["remote"]
         };
-        let same_name = |w: &&Value| mine["name"].is_string() && w["name"] == mine["name"];
-        let found = unique(theirs.iter().filter(same_remote))
-            .or_else(|| unique(theirs.iter().filter(same_name)))?["id"]
+        let found = unique(theirs.iter().filter(same_remote))?["id"]
             .as_str()?
             .to_owned();
         let mut memory = self.memory();
@@ -249,7 +259,7 @@ impl Fleet {
         home: &dyn Engine,
         there: &dyn Engine,
     ) -> Option<(String, Value)> {
-        let remote = self.workspace_on(machine, local, home, there)?;
+        let remote = self.counterpart_workspace(machine, local, home, there)?;
         let mut args = args.clone();
         if let Some(project) = args["project"].as_str().map(str::to_owned) {
             args["project"] =
@@ -383,6 +393,105 @@ impl Fleet {
         Some(sent)
     }
 
+    /// Una acción de la persona sobre una tarea de otra máquina. Si no contesta, `wake` la
+    /// enciende y la orden sale una vez, ya con el motor contestando: `app_unavailable`
+    /// y no poder traducirla son no haberla mandado.
+    #[allow(clippy::too_many_arguments)]
+    pub fn deliver<E: Engine>(
+        &self,
+        machine: &str,
+        local: &str,
+        spec: &Value,
+        args: &Value,
+        home: &dyn Engine,
+        there: Option<Arc<E>>,
+        wake: impl FnOnce() -> Result<Arc<E>, Error>,
+    ) -> Result<Option<Result<Value, Error>>, Error> {
+        if let Some(there) = there {
+            match self.forward(machine, local, spec, args, home, &*there) {
+                Some(Err(e)) if e.code == "app_unavailable" => {}
+                None => {}
+                sent => return Ok(sent),
+            }
+        }
+        let there = wake()?;
+        Ok(self.forward(machine, local, spec, args, home, &*there))
+    }
+
+    fn task_file(&self, machine: &str, session: &str) -> Option<PathBuf> {
+        let plain = |s: &str| {
+            !s.is_empty()
+                && s.chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        };
+        (plain(machine) && plain(session))
+            .then(|| {
+                self.tasks
+                    .as_ref()
+                    .map(|d| d.join(format!("{machine}--{session}.json")))
+            })
+            .flatten()
+    }
+    /// Guarda lo que se acaba de leer de una tarea remota; se borran las más viejas.
+    pub fn remember_task(&self, machine: &str, session: &str, transcript: &Value) {
+        let (Some(file), Some(dir)) = (self.task_file(machine, session), &self.tasks) else {
+            return;
+        };
+        let Ok(bytes) = serde_json::to_vec(transcript) else {
+            return;
+        };
+        if bytes.len() > CACHED_TASK_BYTES {
+            let _ = std::fs::remove_file(&file);
+            return;
+        }
+        let partial = file.with_extension("partial");
+        if std::fs::create_dir_all(dir).is_err() || std::fs::write(&partial, bytes).is_err() {
+            return;
+        }
+        let _ = std::fs::rename(&partial, &file);
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        let mut saved: Vec<_> = entries
+            .flatten()
+            .filter_map(|e| Some((e.metadata().ok()?.modified().ok()?, e.path())))
+            .filter(|(_, path)| path.extension().is_some_and(|x| x == "json"))
+            .collect();
+        saved.sort_by_key(|entry| std::cmp::Reverse(entry.0));
+        for (_, old) in saved.into_iter().skip(CACHED_TASKS) {
+            let _ = std::fs::remove_file(old);
+        }
+    }
+    /// Una tarea de una máquina apagada: lo último que se leyó de ella, o solo su fila,
+    /// con `offline` para que la ventana lo diga y no la trate como un fallo.
+    pub fn offline_task(&self, machine: &str, local: &str, session: &str) -> Value {
+        let cached = self
+            .task_file(machine, session)
+            .and_then(|f| std::fs::read(f).ok())
+            .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok());
+        let mut task = cached.unwrap_or_else(|| {
+            let memory = self.memory();
+            let prefix = key(local, "");
+            let row = memory
+                .known
+                .get(machine)
+                .into_iter()
+                .flat_map(|lists| lists.iter())
+                .filter(|(place, _)| place.starts_with(&prefix))
+                .flat_map(|(_, rows)| rows.iter())
+                .find(|row| row["id"] == session)
+                .cloned()
+                .unwrap_or_default();
+            json!({
+                "id": session, "agent": row["agent"].as_str().unwrap_or_default(),
+                "model": row["model"], "effort": null, "turns": [],
+                "history": {"total":0,"start":0,"end":0,"limit":0,"has_more":false},
+            })
+        });
+        task["offline"] = json!({ "machine": machine });
+        task
+    }
+
     /// `list_live_sessions` de la ventana más el de cada otra máquina; `None` es una
     /// máquina que no contesta sin encenderla.
     pub fn list(
@@ -475,14 +584,17 @@ fn newest_first(a: Vec<Value>, b: Vec<Value>) -> Vec<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::cell::RefCell;
+    use std::cell::{Cell, RefCell};
 
     /// Un motor de laboratorio con sus propios ids: contesta lo suyo y apunta lo que recibe.
+    /// Apagado, no contesta nada y la orden no le llega.
+    #[derive(Default)]
     struct Fake {
         workspaces: Value,
         projects: Value,
         sessions: Value,
         created: &'static str,
+        off: bool,
         seen: RefCell<Vec<(String, Option<String>, Value)>>,
     }
     impl Engine for Fake {
@@ -492,6 +604,9 @@ mod tests {
             workspace: Option<String>,
             args: Value,
         ) -> Result<Value, Error> {
+            if self.off {
+                return Err(Error::new("app_unavailable"));
+            }
             self.seen
                 .borrow_mut()
                 .push((command.to_owned(), workspace, args.clone()));
@@ -505,22 +620,32 @@ mod tests {
             Ok(json!({ "value": value }))
         }
     }
+    impl Fake {
+        fn sent(&self, command: &str) -> Vec<(Option<String>, Value)> {
+            self.seen
+                .borrow()
+                .iter()
+                .filter(|(c, _, _)| c == command)
+                .map(|(_, w, a)| (w.clone(), a.clone()))
+                .collect()
+        }
+    }
     fn mac() -> Fake {
         Fake {
-            workspaces: json!({"workspaces":[{"id":"wmac","name":"Danil","provider":"github","remote":"danil-labs"}],"active":"wmac"}),
+            workspaces: json!({"workspaces":[{"id":"wmac","name":"Danil","provider":"github","remote":"danil-labs"},{"id":"wsolo","name":"Notas"}],"active":"wmac"}),
             projects: json!([{"id":"pmac","name":"terminus"}]),
             sessions: json!([{"id":"t1","created_at":30},{"id":"t2","created_at":10}]),
             created: "t9",
-            seen: RefCell::default(),
+            ..Fake::default()
         }
     }
     fn vm() -> Fake {
         Fake {
-            workspaces: json!({"workspaces":[{"id":"other","name":"Danil"},{"id":"wvm","name":"Danil copia","provider":"github","remote":"danil-labs"}],"active":"wvm"}),
+            workspaces: json!({"workspaces":[{"id":"other","name":"Danil"},{"id":"notas","name":"Notas"},{"id":"wvm","name":"Danil copia","provider":"github","remote":"danil-labs"}],"active":"wvm"}),
             projects: json!([{"id":"pvm","name":"terminus"}]),
-            sessions: json!([{"id":"r1","created_at":20}]),
+            sessions: json!([{"id":"r1","created_at":20,"agent":"codex","model":"gpt-5.6"}]),
             created: "r2",
-            seen: RefCell::default(),
+            ..Fake::default()
         }
     }
     fn spec(name: &str) -> Value {
@@ -539,8 +664,7 @@ mod tests {
         let fleet = Fleet::load(None);
         let others: [(String, Option<&dyn Engine>); 1] = [("vm".into(), Some(&vm))];
 
-        // La lista de la ventana junta las dos máquinas y marca la de cada tarea; el
-        // workspace se enlaza por proveedor y organización, no por el nombre repetido.
+        // La lista de la ventana junta las dos máquinas y marca la de cada tarea.
         let args = json!({"project":"pmac","open":[]});
         let mine = value(
             &mac,
@@ -564,12 +688,8 @@ mod tests {
             ]
         );
         assert_eq!(
-            vm.seen.borrow().last().cloned(),
-            Some((
-                "list_live_sessions".into(),
-                Some("wvm".into()),
-                json!({"project":"pvm","open":[]})
-            ))
+            vm.sent("list_live_sessions"),
+            vec![(Some("wvm".into()), json!({"project":"pvm","open":[]}))]
         );
 
         // Una orden sobre la tarea remota va a su motor, con sus ids; una local, no.
@@ -582,12 +702,8 @@ mod tests {
             .expect("linked")
             .expect("sent");
         assert_eq!(
-            vm.seen.borrow().last().cloned(),
-            Some((
-                "stop_turn".into(),
-                Some("wvm".into()),
-                json!({"project":"pvm","session":"r1"})
-            ))
+            vm.sent("stop_turn"),
+            vec![(Some("wvm".into()), json!({"project":"pvm","session":"r1"}))]
         );
         let rename = json!({"project":"pmac","id":"t1","title":"x"});
         assert_eq!(
@@ -612,20 +728,42 @@ mod tests {
                 .as_deref(),
             Some("vm")
         );
-        assert!(mac
-            .seen
-            .borrow()
-            .iter()
-            .all(|(c, _, _)| c != "send_message"));
+        assert!(mac.sent("send_message").is_empty());
+    }
+
+    #[test]
+    fn a_name_alone_does_not_link_a_saved_link_does() {
+        let (mac, vm) = (mac(), vm());
+        let dir = tempfile::tempdir().expect("dir");
+        // «Notas» se llama igual en las dos y no tiene proveedor: no se enlaza sola.
+        let fleet = Fleet::load(Some(dir.path()));
+        assert_eq!(fleet.counterpart_workspace("vm", "wsolo", &mac, &vm), None);
+        assert!(!fleet.linked("vm", "wsolo"));
+        // Un enlace guardado en `machines.json` sí vale, sin preguntarle a nadie.
+        std::fs::write(
+            dir.path().join("machines.json"),
+            json!({"workspaces":{"vm":{"wsolo":"notas"}}}).to_string(),
+        )
+        .expect("write");
+        let fleet = Fleet::load(Some(dir.path()));
+        let off = Fake {
+            off: true,
+            ..Fake::default()
+        };
+        assert_eq!(
+            fleet
+                .counterpart_workspace("vm", "wsolo", &mac, &off)
+                .as_deref(),
+            Some("notas")
+        );
     }
 
     #[test]
     fn asleep_machine_keeps_its_tasks_and_events_come_home() {
         let dir = tempfile::tempdir().expect("dir");
-        let file = dir.path().join("machines.json");
         let (mac, vm) = (mac(), vm());
         let args = json!({"project":"pmac"});
-        Fleet::load(Some(file.clone())).list(
+        Fleet::load(Some(dir.path())).list(
             "wmac",
             &args,
             json!([]),
@@ -633,7 +771,7 @@ mod tests {
             &[("vm".into(), Some(&vm as &dyn Engine))],
         );
         // Otra sesión de la ventana, con la VM apagada: la tarea sigue listada y enrutada.
-        let fleet = Fleet::load(Some(file));
+        let fleet = Fleet::load(Some(dir.path()));
         let merged = fleet.list("wmac", &args, json!([]), &mac, &[("vm".into(), None)]);
         assert_eq!(
             (&merged[0]["id"], &merged[0]["machine_on"]),
@@ -659,5 +797,93 @@ mod tests {
         assert!(fleet
             .localize("vm", "chat", &json!({"workspace":"other","session":"x"}))
             .is_none());
+    }
+
+    #[test]
+    fn an_asleep_task_opens_from_its_last_copy() {
+        let dir = tempfile::tempdir().expect("dir");
+        let (mac, vm) = (mac(), vm());
+        let fleet = Fleet::load(Some(dir.path()));
+        fleet.list(
+            "wmac",
+            &json!({"project":"pmac"}),
+            json!([]),
+            &mac,
+            &[("vm".into(), Some(&vm as &dyn Engine))],
+        );
+        // Nunca leída: solo su fila, sin turnos, y dice qué máquina falta.
+        let task = fleet.offline_task("vm", "wmac", "r1");
+        assert_eq!(
+            (&task["agent"], &task["turns"], &task["offline"]),
+            (&json!("codex"), &json!([]), &json!({"machine":"vm"}))
+        );
+        // Leída antes: lo que se leyó, aunque la ventana se haya cerrado entretanto.
+        let read = json!({"id":"r1","agent":"codex","turns":[{"role":"user","text":"hola"}]});
+        fleet.remember_task("vm", "r1", &read);
+        let task = Fleet::load(Some(dir.path())).offline_task("vm", "wmac", "r1");
+        assert_eq!(task["turns"], read["turns"]);
+        assert_eq!(task["offline"]["machine"], "vm");
+        // Acotada: las más viejas se van, y una transcripción enorme no se guarda.
+        for n in 0..CACHED_TASKS + 5 {
+            fleet.remember_task("vm", &format!("x{n}"), &read);
+        }
+        let saved = std::fs::read_dir(dir.path().join("machine-tasks"))
+            .expect("dir")
+            .count();
+        assert_eq!(saved, CACHED_TASKS);
+        let huge = json!({"turns":[{"text":"x".repeat(CACHED_TASK_BYTES)}]});
+        fleet.remember_task("vm", "big", &huge);
+        assert_eq!(fleet.offline_task("vm", "wmac", "big")["turns"], json!([]));
+        assert!(fleet.task_file("vm", "../fuera").is_none());
+    }
+
+    #[test]
+    fn acting_on_an_asleep_task_wakes_it_and_sends_once() {
+        let mac = mac();
+        let fleet = Fleet::load(None);
+        let send = spec("send_message");
+        let args = json!({"project":"pmac","session":"r1","prompt":"sigue"});
+        // El motor que la ventana tenía de la VM ya no contesta: se enciende y sale una vez.
+        let asleep = Arc::new(Fake { off: true, ..vm() });
+        let awake = Arc::new(vm());
+        let woken = Cell::new(0);
+        let sent = fleet
+            .deliver("vm", "wmac", &send, &args, &mac, Some(asleep), || {
+                woken.set(woken.get() + 1);
+                Ok(awake.clone())
+            })
+            .expect("woken")
+            .expect("linked")
+            .expect("sent");
+        assert_eq!(sent["value"]["ok"], "send_message");
+        assert_eq!(woken.get(), 1);
+        assert_eq!(
+            awake.sent("send_message"),
+            vec![(
+                Some("wvm".into()),
+                json!({"project":"pvm","session":"r1","prompt":"sigue"})
+            )]
+        );
+        // Encendida, no se vuelve a encender; si no enciende, no sale nada.
+        fleet
+            .deliver(
+                "vm",
+                "wmac",
+                &send,
+                &args,
+                &mac,
+                Some(awake.clone()),
+                || {
+                    woken.set(woken.get() + 1);
+                    Ok(awake.clone())
+                },
+            )
+            .expect("sent");
+        assert_eq!((woken.get(), awake.sent("send_message").len()), (1, 2));
+        let failed = fleet.deliver::<Fake>("vm", "wmac", &send, &args, &mac, None, || {
+            Err(Error::new("app_unavailable"))
+        });
+        assert!(failed.is_err());
+        assert_eq!(awake.sent("send_message").len(), 2);
     }
 }

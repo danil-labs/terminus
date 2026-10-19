@@ -104,6 +104,8 @@ fn machines(autostart: bool) -> Vec<Machine> {
     }
     all
 }
+/// La máquina de la ventana, la primera: da los workspaces y nunca cambia.
+const HOME: usize = 0;
 const WAKES: &[&str] = &[
     "send_message",
     "inject_message",
@@ -137,7 +139,6 @@ pub(super) struct State {
     waking: Mutex<()>,
     woke: AtomicBool,
     machines: Vec<Machine>,
-    active: AtomicUsize,
     workspace: Mutex<Option<String>>,
     closed: AtomicBool,
     in_flight: AtomicUsize,
@@ -151,7 +152,7 @@ pub(super) struct State {
 }
 impl State {
     pub fn new(client: Arc<Client>, autostart: bool) -> Self {
-        let fleet = Fleet::load(Some(client.selection().window_data.join("machines.json")));
+        let fleet = Fleet::load(Some(&client.selection().window_data));
         Self {
             client: RwLock::new(client),
             autostart,
@@ -160,7 +161,6 @@ impl State {
             waking: Mutex::new(()),
             woke: AtomicBool::new(false),
             machines: machines(autostart),
-            active: AtomicUsize::new(0),
             workspace: Mutex::new(None),
             closed: AtomicBool::new(false),
             in_flight: AtomicUsize::new(0),
@@ -213,7 +213,7 @@ impl State {
         }
     }
     fn machine(&self) -> &Machine {
-        &self.machines[self.active.load(Ordering::SeqCst)]
+        &self.machines[HOME]
     }
     /// La máquina activa es remota: apagada se enciende al actuar, no al sondear.
     fn remote(&self) -> bool {
@@ -243,13 +243,13 @@ impl State {
     }
     /// Otra máquina distinta de la activa, si la orden es suya (`fleet.rs`).
     fn elsewhere(&self, id: Option<String>) -> Option<usize> {
-        let active = self.active.load(Ordering::SeqCst);
+        let active = HOME;
         id.and_then(|id| self.index(&id)).filter(|&i| i != active)
     }
     /// El motor de una máquina sin encenderla: el activo, el aparcado o el que publica
     /// su selección. Una que no contestó no se vuelve a probar enseguida.
     fn reach(&self, i: usize) -> Option<Arc<Client>> {
-        if i == self.active.load(Ordering::SeqCst) {
+        if i == HOME {
             return Some(self.client());
         }
         let machine = &self.machines[i];
@@ -280,24 +280,25 @@ impl State {
             }
         }
     }
-    /// Como `reach`, pero es una acción de la persona: apagada, se enciende.
-    fn reach_waking(&self, i: usize) -> Result<Arc<Client>, Error> {
+    /// Enciende una máquina con su programa y adopta el motor que publica. Otra acción
+    /// pudo encenderla mientras esta esperaba su turno: entonces vale la suya.
+    fn wake_now(&self, i: usize) -> Result<Arc<Client>, Error> {
         let machine = &self.machines[i];
-        *machine.unanswered.lock().unwrap_or_else(|p| p.into_inner()) = None;
-        if let Some(client) = self.reach(i) {
-            return Ok(client);
-        }
         let Some((program, selection)) = &machine.wake else {
             return Err(Error::new("app_unavailable"));
         };
         let _turn = self.waking.lock().unwrap_or_else(|p| p.into_inner());
+        *machine.unanswered.lock().unwrap_or_else(|p| p.into_inner()) = None;
+        if let Some(client) = self.reach(i).filter(|c| answers(c)) {
+            return Ok(client);
+        }
         let client = woken(program, selection)?;
         *machine.parked.lock().unwrap_or_else(|p| p.into_inner()) = Some(client.clone());
         Ok(client)
     }
     /// Las demás máquinas con su motor si contesta sin encenderla.
     fn others(&self) -> Vec<(String, Option<Arc<Client>>)> {
-        let active = self.active.load(Ordering::SeqCst);
+        let active = HOME;
         (0..self.machines.len())
             .filter(|&i| i != active)
             .map(|i| (self.machines[i].id.clone(), self.reach(i)))
@@ -737,15 +738,32 @@ fn routed(
     workspace: Option<&str>,
 ) -> Result<Routed, Value> {
     let name = spec["name"].as_str().unwrap_or_default();
-    let there = if WAKES.contains(&name) {
-        state.reach_waking(i).ok()
-    } else {
-        state.reach(i)
-    }
-    .ok_or_else(machine_off)?;
     let local = workspace.ok_or_else(|| failure(&Error::new("invalid_request")))?;
     let home = state.client();
     let id = &state.machines[i].id;
+    if WAKES.contains(&name) {
+        *state.machines[i]
+            .unanswered
+            .lock()
+            .unwrap_or_else(|p| p.into_inner()) = None;
+        let sent = state
+            .fleet
+            .deliver(id, local, spec, args, &*home, state.reach(i), || {
+                state.wake_now(i)
+            })
+            .map_err(|_| machine_off())?
+            .ok_or_else(unlinked)?;
+        return Ok(Routed::Done(sent.map_err(|e| failure(&e)).and_then(reply)));
+    }
+    let Some(there) = state.reach(i) else {
+        // Abrir una tarea de una máquina apagada no es un fallo: se enseña lo último leído.
+        return match (name, args["id"].as_str()) {
+            ("load_session", Some(session)) => Ok(Routed::Done(Ok(state
+                .fleet
+                .offline_task(id, local, session)))),
+            _ => Err(machine_off()),
+        };
+    };
     if spec["channel"].is_string() {
         let (remote, args) = state
             .fleet
@@ -757,6 +775,11 @@ fn routed(
         .fleet
         .forward(id, local, spec, args, &*home, &*there)
         .ok_or_else(unlinked)?;
+    if let (Ok(task), "load_session", Some(session)) = (&sent, name, args["id"].as_str()) {
+        if let Some(task) = task.get("value") {
+            state.fleet.remember_task(id, session, task);
+        }
+    }
     Ok(Routed::Done(sent.map_err(|e| failure(&e)).and_then(reply)))
 }
 /// Lo que la ventana lista de este workspace incluye lo de las demás máquinas.
@@ -787,7 +810,7 @@ fn side_feeds(app: &tauri::AppHandle, state: &Arc<State>) {
     let Some(local) = state.workspace() else {
         return;
     };
-    let active = state.active.load(Ordering::SeqCst);
+    let active = HOME;
     for (i, machine) in state.machines.iter().enumerate() {
         if i == active
             || !state.fleet.linked(&machine.id, &local)
@@ -812,7 +835,7 @@ fn side_feed(app: &tauri::AppHandle, state: &State, i: usize) {
         return;
     };
     let machine = &state.machines[i];
-    let done = || state.closed.load(Ordering::SeqCst) || state.active.load(Ordering::SeqCst) == i;
+    let done = || state.closed.load(Ordering::SeqCst);
     let emit = |events: &Value| {
         for event in events.as_array().into_iter().flatten() {
             let Some(name) = event["name"].as_str() else {
@@ -1222,48 +1245,67 @@ pub(super) fn load_history(
     let state = app
         .try_state::<Arc<State>>()
         .ok_or_else(|| failure(&Error::new("app_unavailable")))?;
-    let mut client = state.client();
-    let mut workspace = state.workspace();
-    let mut project = project;
-    // Una tarea de otra máquina se lee de su motor, sin encenderla.
+    let client = state.client();
+    let workspace = state.workspace();
+    // Una tarea de otra máquina se lee de su motor, sin encenderla; apagada, se enseña
+    // lo último que se leyó de ella.
     if let Some(i) = state.elsewhere(state.fleet.owner(workspace.as_deref(), &id)) {
-        let there = state.reach(i).ok_or_else(machine_off)?;
-        let local = workspace.clone().unwrap_or_default();
-        let (remote, args) = state
-            .fleet
-            .translate(
-                &state.machines[i].id,
-                &local,
-                &json!({"project":project}),
-                &*client,
-                &*there,
-            )
-            .ok_or_else(unlinked)?;
-        project = args["project"].as_str().unwrap_or_default().to_owned();
-        (client, workspace) = (there, Some(remote));
+        let machine = state.machines[i].id.clone();
+        let local = workspace.unwrap_or_default();
+        let read = state.reach(i).and_then(|there| {
+            let wanted = json!({ "project": project });
+            let (remote, args) = state
+                .fleet
+                .translate(&machine, &local, &wanted, &*client, &*there)?;
+            let project = args["project"].as_str().unwrap_or_default();
+            Some(read_history(&there, Some(remote), project, &id, before))
+        });
+        return match (read, before) {
+            (Some(Ok(task)), _) => {
+                if before.is_none() {
+                    state.fleet.remember_task(&machine, &id, &task);
+                }
+                Ok(task)
+            }
+            (Some(Err(e)), None) if e.code == "app_unavailable" => {
+                Ok(state.fleet.offline_task(&machine, &local, &id))
+            }
+            (None, None) => Ok(state.fleet.offline_task(&machine, &local, &id)),
+            (Some(Err(e)), _) => Err(failure(&e)),
+            (None, Some(_)) => Err(machine_off()),
+        };
     }
+    read_history(&client, workspace, &project, &id, before).map_err(|e| failure(&e))
+}
+fn read_history(
+    client: &Client,
+    workspace: Option<String>,
+    project: &str,
+    id: &str,
+    before: Option<u64>,
+) -> Result<Value, Error> {
     if !client.push_stream() {
-        let mut session = client
-            .invoke(
-                "load_session",
-                workspace,
-                json!({"project":project,"id":id}),
-            )
-            .map_err(|e| failure(&e))
-            .and_then(reply)?;
+        let reply = client.invoke(
+            "load_session",
+            workspace,
+            json!({"project":project,"id":id}),
+        )?;
+        let Some(mut session) = reply.get("value").cloned() else {
+            let mut error = Error::new("operation_failed");
+            error.detail = reply.get("error").cloned().unwrap_or_default();
+            return Err(error);
+        };
         let total = session["turns"].as_array().map_or(0, Vec::len);
         session["history"] =
             json!({"total":total,"start":0,"end":total,"limit":total,"has_more":false});
         return Ok(session);
     }
-    client
-        .request(
-            "service history",
-            workspace,
-            json!({"project":project,"id":id,"turns":HISTORY_TURNS,"before":before}),
-            Duration::from_secs(30),
-        )
-        .map_err(|e| failure(&e))
+    client.request(
+        "service history",
+        workspace,
+        json!({"project":project,"id":id,"turns":HISTORY_TURNS,"before":before}),
+        Duration::from_secs(30),
+    )
 }
 #[tauri::command]
 pub(super) fn service_prepare_update() -> Result<(), Value> {
@@ -1282,7 +1324,7 @@ pub(super) fn machine_list(app: tauri::AppHandle) -> Result<Value, Value> {
     let state = app
         .try_state::<Arc<State>>()
         .ok_or_else(|| failure(&Error::new("app_unavailable")))?;
-    let active = state.active.load(Ordering::SeqCst);
+    let active = HOME;
     let workspace = state.workspace();
     let list: Vec<Value> = state
         .machines
@@ -1305,7 +1347,7 @@ pub(super) fn machine_list(app: tauri::AppHandle) -> Result<Value, Value> {
                 Some(local) if state.fleet.linked(&m.id, local) => Some(true),
                 Some(local) if on => state.reach(i).map(|there| {
                     let home = state.client();
-                    state.fleet.workspace_on(&m.id, local, &*home, &*there).is_some()
+                    state.fleet.counterpart_workspace(&m.id, local, &*home, &*there).is_some()
                 }),
                 _ => None,
             };

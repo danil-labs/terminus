@@ -3,7 +3,6 @@ import ChevronRight from "lucide-solid/icons/chevron-right";
 import MoreVertical from "lucide-solid/icons/more-vertical";
 import Pin from "lucide-solid/icons/pin";
 import PinOff from "lucide-solid/icons/pin-off";
-import Server from "lucide-solid/icons/server";
 import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from "solid-js";
 import { arrastrar, fueArrastre, tareaEnVuelo } from "../../lib/drag";
 import { enfocarYSeleccionar } from "../../lib/focus";
@@ -26,7 +25,7 @@ import {
   PopoverTrigger,
 } from "../../ui/Popover";
 import { WithMentions } from "../chat/WithMentions";
-import { machineName } from "../machines/store";
+import { MachineChip } from "../machines/MachineChip";
 import SessionGit from "./SessionGit";
 import { createTaskHistories } from "./taskHistories";
 import { AstroAvatar } from "./AstroAvatar";
@@ -679,17 +678,7 @@ export default function Sessions(props: {
                 </Show>
                 <span class="flex shrink-0" title={f.s.agent} aria-label={f.s.agent}><MarcaAgente id={f.s.agent} size={13} /></span>
                 <Show when={f.s.machine}>
-                  {(machine) => {
-                    const label = () => f.s.machine_on === false
-                      ? t("shell.machines.task_off", { name: machineName(machine()) })
-                      : t("shell.machines.task_on", { name: machineName(machine()) });
-                    return (
-                      <span data-machine={machine()} class={cn("flex max-w-[96px] shrink-0 items-center gap-0.5", f.s.machine_on === false && "opacity-60")} title={label()} aria-label={label()}>
-                        <Server size={11} aria-hidden="true" />
-                        <span class="truncate">{machineName(machine())}</span>
-                      </span>
-                    );
-                  }}
+                  {(machine) => <MachineChip machine={machine()} on={f.s.machine_on !== false} class="max-w-[96px]" />}
                 </Show>
                 {/* El botón del cohete es translúcido: sin desvanecer, el mensaje se lee a
                     través. Máscara y no velo: el fondo del riel cambia con el tema y el wallpaper. */}
