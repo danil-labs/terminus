@@ -20,7 +20,7 @@ export type Capabilities = {
   nativeWindow: boolean;
   /** El actualizador firmado de la app. */
   updater: boolean;
-  /** La preparación del entorno con su instalador a la vista. */
+  /** La preparación del entorno con su instalador a la vista, y el paso del alta que instala asistentes. */
   localSetup: boolean;
   /** Una computadora apagada o encendiéndose se ve en su indicador, no como error. */
   computerStatus: boolean;
