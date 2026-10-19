@@ -3,7 +3,7 @@ import ChevronRight from "lucide-solid/icons/chevron-right";
 import MoreVertical from "lucide-solid/icons/more-vertical";
 import Pin from "lucide-solid/icons/pin";
 import PinOff from "lucide-solid/icons/pin-off";
-import { createEffect, createMemo, createSignal, For, type JSX, mapArray, on, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, type JSX, lazy, mapArray, on, onCleanup, Show, Suspense } from "solid-js";
 import { arrastrar, fueArrastre, tareaEnVuelo } from "../../lib/drag";
 import { enfocarYSeleccionar } from "../../lib/focus";
 import { t } from "../../lib/i18n";
@@ -11,7 +11,6 @@ import { createPref } from "../../lib/prefs";
 import { SESSION_TITLE_MAX_LENGTH } from "../../lib/projectNames";
 import { cn } from "../../lib/utils";
 import { Button } from "../../ui/Button";
-import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
 import { asFailure, type Failure, FailureNote } from "../../ui/Failure";
 import { celebrateFinishedTask, FinishTaskButton } from "../../ui/FinishTaskButton";
 import { KeyedList } from "../../ui/KeyedList";
@@ -31,6 +30,9 @@ import { WithTaskHoverCard } from "./TaskHoverCardTrigger";
 import { hoverCardPull } from "./hoverCardPull";
 import { MachineChip } from "../machines/MachineChip";
 import { createTaskHistories } from "./taskHistories";
+
+// Solo hace falta cuando algo estorba al terminar o archivar: fuera de la carga inicial.
+const TaskBlockersDialog = lazy(() => import("./TaskBlockersDialog"));
 import { AstroAvatar } from "./AstroAvatar";
 import { displayName, watchProfiles } from "./profiles";
 import EtapaDeTarea, { ETAPAS, type Etapa } from "./TaskStage";
@@ -47,13 +49,13 @@ export function readableSessionTitle(title: string): string {
 }
 
 /** Lo que devuelve `task_blockers`: qué estorba para terminar o archivar. */
-type Blockers = {
+export type Blockers = {
   unsaved: { session: string; title: string; files: string[] }[];
   not_finished: boolean;
 };
 
 /** El gesto que quedó esperando a que la persona decida qué hacer con eso. */
-type Aviso = { id: string; finish: boolean; rect?: DOMRect; blockers: Blockers };
+export type Aviso = { id: string; finish: boolean; rect?: DOMRect; blockers: Blockers };
 
 /** El título de un tema; el de la Bandeja sale del catálogo, no de `session.json`. */
 /** El nombre del agente en la pastilla de la fila: diez caracteres como mucho,
@@ -305,6 +307,8 @@ export default function Sessions(props: {
   carpetaDe?: (row: SessionRow) => string | undefined;
   /** En el riel: dos líneas por tarea, o una sola en «Compacta». */
   density?: "comfortable" | "compact";
+  /** Bajo la cabecera de su carpeta, la fila no repite la carpeta. */
+  hideFolder?: boolean;
 }) {
   const compacta = () => props.density === "compact";
   const projectOf = (row: SessionRow) => props.projectOf?.(row) ?? props.de;
@@ -556,7 +560,7 @@ export default function Sessions(props: {
               when={teNecesita()}
               fallback={
                 <>
-                  <Show when={props.carpetaDe?.(r.s)}>
+                  <Show when={!props.hideFolder && props.carpetaDe?.(r.s)}>
                     {(nombre) => <FolderChip id={projectOf(r.s)} name={nombre()} class="max-w-[108px] shrink-0" />}
                   </Show>
                   <Show when={r.s.agent && !r.s.chat_de_agente ? r.s.agent : null}>
@@ -582,7 +586,9 @@ export default function Sessions(props: {
             >
               <span data-session-request class="min-w-0 flex-1 truncate text-neutral-700">{r.s.last_message}</span>
               <ChipDeGit />
-              <span title={props.carpetaDe?.(r.s)} class="flex shrink-0"><FolderSquare id={projectOf(r.s)} /></span>
+              <Show when={!props.hideFolder}>
+                <span title={props.carpetaDe?.(r.s)} class="flex shrink-0"><FolderSquare id={projectOf(r.s)} /></span>
+              </Show>
             </Show>
           </div>
         </Show>
@@ -654,7 +660,7 @@ export default function Sessions(props: {
             <Show when={fijada(f.s) && !props.sidebar}>{marcaDeFijada()}</Show>
             <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"><WithMentions>{f.s.subagent ? readableSessionTitle(title()) : title()}</WithMentions></span>
                 <Show when={props.sidebar && fijada(f.s)}>{marcaDeFijada()}</Show>
-                <Show when={props.sidebar && compacta()}>
+                <Show when={props.sidebar && compacta() && !props.hideFolder}>
                   <span title={props.carpetaDe?.(f.s)} class="ml-auto flex shrink-0 pl-1"><FolderSquare id={projectOf(f.s)} /></span>
                 </Show>
           </div>
@@ -1305,59 +1311,14 @@ export default function Sessions(props: {
         </p>
       </Show>
       <Show when={aviso()}>{a => (
-        <Dialog open onOpenChange={(abierto) => { if (!abierto) setAviso(null); }}>
-          <DialogContent class="flex flex-col gap-3">
-            <DialogTitle class="text-sm font-semibold">
-              {a().finish ? t("projects.sessions.blockers_finish_title") : t("projects.sessions.blockers_archive_title")}
-            </DialogTitle>
-            <Show when={a().blockers.unsaved.length > 0}>
-              <p class="m-0 text-[13px] text-neutral-700">
-                {t("projects.sessions.blockers_unsaved")}
-              </p>
-              <ul class="m-0 flex max-h-[40vh] list-none flex-col gap-2 overflow-y-auto p-0">
-                <For each={a().blockers.unsaved}>{(work) => (
-                  <li class="min-w-0">
-                    <span class="flex min-w-0 items-baseline gap-2 text-[13px] font-medium text-neutral-950">
-                      <span class="min-w-0 truncate">{readableSessionTitle(work.title)}</span>
-                      <span class="shrink-0 text-[11px] font-normal text-neutral-500">
-                        {t("projects.sessions.blockers_files", { count: work.files.length })}
-                      </span>
-                    </span>
-                    <ul class="m-0 list-none p-0">
-                      <For each={work.files}>{(file) => (
-                        <li class="font-mono text-[11px] break-all text-neutral-500">{file}</li>
-                      )}</For>
-                    </ul>
-                  </li>
-                )}</For>
-              </ul>
-            </Show>
-            <Show when={a().blockers.not_finished}>
-              <p class="m-0 text-[13px] text-neutral-700">
-                {t("projects.sessions.blockers_not_finished")}
-              </p>
-            </Show>
-            <div class="flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => setAviso(null)}>
-                {t("projects.sessions.blockers_cancel")}
-              </Button>
-              <Show when={a().finish && a().blockers.not_finished}>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => { const id = a().id; setAviso(null); void intentar(id, false); }}
-                >
-                  {t("projects.sessions.archive")}
-                </Button>
-              </Show>
-              <Show when={a().blockers.unsaved.length > 0 && !a().blockers.not_finished}>
-                <Button variant="danger" size="sm" onClick={() => void descartarYSeguir()}>
-                  {t("projects.sessions.blockers_discard")}
-                </Button>
-              </Show>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Suspense>
+          <TaskBlockersDialog
+            aviso={a()}
+            onCerrar={() => setAviso(null)}
+            onArchivar={(id) => { setAviso(null); void intentar(id, false); }}
+            onDescartar={() => void descartarYSeguir()}
+          />
+        </Suspense>
       )}</Show>
       <Show when={activas().length > 0}>
         <AuthorGroups branches={activas()} />

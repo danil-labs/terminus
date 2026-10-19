@@ -326,9 +326,10 @@ export default function Sidebar(props: {
    * sitios —expandida y en el desplegable—; una variable contendría un solo
    * nodo del DOM y colocarlo dos veces lo movería del primero al segundo.
    */
-  const Historial = (p: { filas: SessionRow[]; clave: string }) => (
+  const Historial = (p: { filas: SessionRow[]; clave: string; sinCarpeta?: boolean }) => (
     <Sessions sidebar
       density={vista().density}
+      hideFolder={p.sinCarpeta}
       sessions={p.filas}
       relatedSessions={relacionadas()}
       groupByAuthor={false}
@@ -475,7 +476,7 @@ export default function Sidebar(props: {
             )}
           </Show>
           <Show when={abierto()}>
-            <Historial filas={g().tasks} clave={clave()} />
+            <Historial filas={g().tasks} clave={clave()} sinCarpeta={g().kind === "folder" && !!g().key} />
           </Show>
         </section>
       </Show>

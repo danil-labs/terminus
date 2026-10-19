@@ -15,6 +15,7 @@ import { cn } from "../../lib/utils";
 import { Button } from "../../ui/Button";
 import { ITEM_DE_MENU, Popover, PopoverContent, PopoverTrigger } from "../../ui/Popover";
 import { AstroAvatar } from "../projects/AstroAvatar";
+import { FolderSquare } from "../projects/FolderChip";
 
 export type SidebarFilterFolder = { id: string; name: string; count: number };
 export type SidebarFilterAgent = { name: string; body?: string | null; avatar?: string | null };
@@ -138,7 +139,7 @@ export function SidebarFilter(props: SidebarFilterProps) {
           <For each={props.folders}>
             {(f) => (
               <Opcion role="menuitemcheckbox" on={props.view.folders.includes(f.id)} onSelect={() => alternarCarpeta(f.id)} aside={f.count}>
-                <span class="truncate">{f.name}</span>
+                <span class="flex min-w-0 items-center gap-1.5"><FolderSquare id={f.id} /><span class="truncate">{f.name}</span></span>
               </Opcion>
             )}
           </For>
