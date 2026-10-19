@@ -93,7 +93,7 @@ Los avisos salen en la app, igual para los dos caminos: una tarea que entra en
 
 | Ruta | Qué es |
 |---|---|
-| `signin` | Entrar con la cuenta de Danil; en desarrollo, el enlace al bridge |
+| `signin` | Entrar con la cuenta de Danil; en desarrollo, el enlace al bridge. Siempre va primero: un bridge emparejado no la salta, salvo con `EXPO_PUBLIC_TERMINUS_BRIDGE_ONLY=1` (lab sin cuenta) |
 | `(tabs)/index` | Tareas: workspace, spaces, alcance y filtro, dock de agentes y la lista plana |
 | `(tabs)/notifications` | «Ahora» de todas las máquinas y «Antes», lo que llegó con la app abierta |
 | `(tabs)/new` | Nueva tarea: máquina (la última usada, si no la VM), carpeta, agente opcional y encargo |
