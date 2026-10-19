@@ -723,14 +723,10 @@ if (!roto) {
   const agentsMenu = mentionAgentsDoc.querySelector("button[aria-selected]")?.closest("ul");
   const menuLines = [...agentsMenu.querySelectorAll("li")].map(li => li.textContent.replace(/\s+/g, " ").trim());
   assert.match(menuLines[0], /^Del repositorio Proyecto ?vía PR ?Holmes/, menuLines.join(" | "));
-  assert.match(menuLines[1], /^Tuyos ?Holmes.*Tapado/, menuLines.join(" | "));
-  assert.match(menuLines[2], /^Watson/, menuLines.join(" | "));
+  assert.match(menuLines[1], /^Tuyos ?Watson/, menuLines.join(" | "));
+  assert.equal(menuLines.filter(line => line.includes("Holmes")).length, 1, "el tuyo que el repositorio tapa no sale");
+  assert.equal(menuLines.some(line => /Tapado|Encargado/.test(line)), false, "las filas dicen «Agente», sin «Tapado»");
   assert.equal(menuLines.some(line => line.includes("Hudson")), false, "un agente oculto no sale en el menú, como en el riel");
-  const agentButtons = [...agentsMenu.querySelectorAll("button")];
-  assert.equal(agentButtons[1].disabled, true, "el tuyo tapado informa y no se elige");
-  agentsField.dispatchEvent(new mentionAgentsApp.w.KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "ArrowDown" }));
-  await sleep(30);
-  assert.equal(agentButtons[2].getAttribute("aria-selected"), "true", "el teclado salta la fila tapada");
   assert.deepEqual(mentionAgentsApp.fallos, []);
   mentionAgentsApp.w.close();
 
