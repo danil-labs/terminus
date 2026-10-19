@@ -38,10 +38,12 @@ se agregan con `npx expo install <paquete>`, que elige la versión compatible.
 - Los nombres de comandos y campos son los del motor (`task list`,
   `respond_permission`, `encargado`); no se traducen en la app.
 - Todo texto que se lee viene de `src/lib/i18n.ts`, en `es` y `en`.
-- Los colores salen de `src/ui/theme.ts`, que copia los tokens de
-  `src/styles/global.css` del escritorio, en claro y oscuro.
-- El estado de una tarea se pinta solo con `src/ui/TaskStatus.tsx`, espejo de
-  las marcas del sidebar de escritorio; no se inventan marcas propias.
+- Lo que comparte con el escritorio viene de `packages/`: colores, estado de
+  tarea, íconos y frases de `@terminus/design`, y tipos y comandos del bridge de
+  `@terminus/protocol`. No se copian aquí: el guard `shared-design` compara
+  `@terminus/design` con el escritorio.
+- El estado de una tarea se pinta solo con `src/ui/TaskStatus.tsx`, sobre
+  `@terminus/design`; no se inventan marcas propias.
 - `package.json` fija `react-dom` a la versión de `react` en `overrides`: sin
   eso npm no resuelve ninguna instalación nueva.
 - Nunca apuntes el bridge a los datos de un Terminus instalado: usa el lab.

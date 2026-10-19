@@ -76,6 +76,7 @@ const steps = [
   ["La ventana no deja salir material", process.execPath, [join(root, "scripts/guards/csp.mjs")], root],
   ["El tema de terminal no repinta el chrome", process.execPath, [join(root, "scripts/guards/terminal-themes.mjs")], root],
   ["El catálogo define lo que el código pide", process.execPath, [join(root, "scripts/guards/locales.mjs")], root],
+  ["El paquete de diseño dice lo mismo que el escritorio", process.execPath, ["--experimental-strip-types", join(root, "scripts/guards/shared-design.mjs")], root],
   ["Lo ya traducido no se vuelve a soldar", process.execPath, [join(root, "scripts/guards/literals.mjs")], root],
   ["Los comentarios no crecen ni argumentan", process.execPath, [join(root, "scripts/guards/comments.mjs")], root],
   ["Las lecturas de fuente en pruebas respetan el cupo revisado", process.execPath, [join(root, "scripts/guards/test-policy.mjs")], root],

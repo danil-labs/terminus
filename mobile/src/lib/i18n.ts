@@ -12,12 +12,6 @@ const es = {
   "folder.new_task": "Nueva tarea en {name}",
   "folder.empty": "Sin tareas abiertas.",
   "space.no_folders": "Este space no tiene carpetas.",
-  "status.approving": "Espera que apruebes una acción",
-  "status.asked": "Te preguntó algo",
-  "status.working": "Está trabajando",
-  "status.failed": "Fallo o interrupción",
-  "status.unseen": "Terminó y no la has abierto",
-  "status.delivered": "Resultado entregado",
   "tabs.notifications": "Notificaciones",
   "notifications.now": "Ahora",
   "notifications.earlier": "Antes",
@@ -83,12 +77,6 @@ const en: Record<Key, string> = {
   "folder.new_task": "New task in {name}",
   "folder.empty": "No open tasks.",
   "space.no_folders": "This space has no folders.",
-  "status.approving": "Waiting for you to approve an action",
-  "status.asked": "Asked you something",
-  "status.working": "Working",
-  "status.failed": "Failure or interruption",
-  "status.unseen": "Finished and not opened yet",
-  "status.delivered": "Result delivered",
   "tabs.notifications": "Notifications",
   "notifications.now": "Now",
   "notifications.earlier": "Earlier",
@@ -140,7 +128,10 @@ const en: Record<Key, string> = {
   "notify.enable_button": "Turn on",
 };
 
-const catalog: Record<Key, string> = getLocales()[0]?.languageCode === "es" ? es : en;
+/** The language the app speaks, also for the words that come from `@terminus/design`. */
+export const lang: "es" | "en" = getLocales()[0]?.languageCode === "es" ? "es" : "en";
+
+const catalog: Record<Key, string> = lang === "es" ? es : en;
 
 export function t(key: Key, vars: Record<string, string | number> = {}): string {
   return catalog[key].replace(/\{(\w+)\}/g, (_, name: string) => String(vars[name] ?? ""));
