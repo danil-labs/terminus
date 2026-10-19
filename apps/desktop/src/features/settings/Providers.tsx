@@ -37,6 +37,7 @@ type Campo = { id: string; label: Frase; help: Frase; falta: Frase; required: bo
 type Identidad = { user: string; name: string };
 
 type Connection = {
+  /** `repository_ids` es de conexiones anteriores: el motor ya no lo usa. */
   selected_area: { key: string; installation_id: number | null; repository_ids?: number[] | null } | null;
   selected_areas: { key: string; installation_id: number | null; repository_ids?: number[] | null }[];
   data: Record<string, string>;
@@ -708,6 +709,21 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                                 </DropdownMenu>
                               </div>
                             </SettingsRow>
+                            {/* El alcance por repositorio lo decide GitHub: la cuenta elegida
+                                aporta todo lo que su instalación alcanza, también lo nuevo. */}
+                            <Show when={elegidas().length > 0}>
+                              <SettingsRow label={t("settings.providers.repositories")} description={t("settings.providers.inherited_access")}>
+                                <Show when={p.setup_url}>
+                                  {(url) => (
+                                    <Button variant="ghost" size="compact" disabled={estado() !== null}
+                                      title={espera()}
+                                      onClick={() => void configurarAcceso({ ...p, setup_url: url() })}>
+                                      {t("settings.providers.change_on_github")}
+                                    </Button>
+                                  )}
+                                </Show>
+                              </SettingsRow>
+                            </Show>
                           </Show>
                         </>
                       )}
@@ -976,11 +992,6 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                                         onClick={() => void verProyectos(p.id, a.key)}
                                       >
                                         {abierto() ? t("settings.providers.hide") : t("settings.providers.show")}
-                                      </Button>
-                                    </Show>
-                                    <Show when={p.select_area && selected() && choosing()[p.id]}>
-                                      <Button variant="outline" size="compact" disabled={estado() !== null} onClick={() => void seleccionar(p.id, a.key, true)}>
-                                        {t("settings.providers.confirm_repositories")}
                                       </Button>
                                     </Show>
                                     <Show when={p.select_area && choosing()[p.id]}>
