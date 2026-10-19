@@ -2081,7 +2081,11 @@ export default function App() {
     // Y el otro aviso, que se parece y no es el mismo: cambió el material
     // de este workspace, no el workspace. Son dos eventos: dos
     // consecuencias distintas, una mudanza y un estante nuevo.
-    const alCambiarMaterial = () => void recargarMaterial();
+    // Las fuentes de skills también avisan por aquí y cambian el menú de `/`.
+    const alCambiarMaterial = () => {
+      void recargarMaterial();
+      cargarComandos(agent());
+    };
     window.addEventListener("harness:sources", alCambiarMaterial);
     onCleanup(() =>
       window.removeEventListener("harness:sources", alCambiarMaterial),
@@ -2756,6 +2760,11 @@ export default function App() {
       void cargarSuperficies(false);
     });
     onCleanup(() => void agentsEv.then((f) => f()));
+
+    // Un plugin instalado o activado trae skills: sin esto `/typst` no se
+    // reconoce hasta el siguiente turno.
+    const pluginsEv = listen("integrations-changed", () => cargarComandos(agent()));
+    onCleanup(() => void pluginsEv.then((f) => f()));
 
     // Cambió qué cuenta va a correr: cambió qué se puede usar.
     // `surfaces::sin_cuenta` pregunta por la cuenta activa, y la sonda de
