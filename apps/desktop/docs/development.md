@@ -86,7 +86,7 @@ session and the picker.
 What the window does locally (native sites, Typst live, tray, updater, local
 file pickers, opening files on the host) answers with `web.desktop_only` or a
 browser equivalent. `tests/unit/web-transport.test.mjs` and
-`tests/unit/web-gate.test.mjs`, `tests/unit/web-setup.test.mjs`, `tests/unit/web-off.test.mjs` and `tests/unit/web-cached.test.mjs` mount `dist-web/` against a relay simulated in
+`tests/unit/web-gate.test.mjs`, `tests/unit/web-setup.test.mjs`, `tests/unit/web-off.test.mjs`, `tests/unit/web-cached.test.mjs` and `tests/unit/web-onboarding.test.mjs` mount `dist-web/` against a relay simulated in
 Node (`tests/helpers/fake-relay.mjs`).
 
 `wrangler.web.toml` deploys `dist-web/` as the private assets Worker

@@ -1,5 +1,6 @@
-import { Match, Show, Switch } from "solid-js";
+import { lazy, Match, Show, Switch } from "solid-js";
 import { t } from "../../lib/i18n";
+import { capabilities } from "../../lib/platform";
 import { cn } from "../../lib/utils";
 import {
   createFullscreen,
@@ -20,6 +21,9 @@ import Repositorios from "./steps/Sources";
 import CarpetaDeTrabajo from "./steps/WorkFolder";
 import Espacio from "./steps/Workspace";
 
+// Una computadora gestionada llega preparada y con sus asistentes: en el navegador el alta es otra.
+const AltaGestionada = lazy(() => import("../../web/Onboarding"));
+
 /**
  * El alta, en el orden de la propuesta de `design/onboarding-review`: proveedores
  * (globales), workspace, sus cuentas, sus repositorios, el contexto principal y la
@@ -31,6 +35,7 @@ export default function Onboarding(props: {
   onListo: () => void;
   onCancelar?: () => void;
 }) {
+  if (!capabilities().localSetup) return <AltaGestionada {...props} />;
   const alta = crearAlta(Boolean(props.nuevo));
   const apartarSemaforo = needsTrafficLightPadding(() => true, createFullscreen());
 
