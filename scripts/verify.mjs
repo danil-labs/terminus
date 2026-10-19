@@ -204,6 +204,12 @@ const steps = [
     root,
   ],
   [
+    "Lo metido con el turno corriendo no se pinta dos veces al releer",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/injected-reread.test.ts")],
+    root,
+  ],
+  [
     "El fragmento tardío de un mensaje vuelve a su globo",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/chat-delta.test.ts")],

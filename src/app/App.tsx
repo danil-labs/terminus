@@ -68,6 +68,7 @@ import {
   type TranscriptOrigin,
   type Turn,
   transcripcion,
+  vivoSinPersistir,
 } from "../features/chat/transcript";
 import VisorDeArchivo from "../features/code/FileViewer";
 import { avisarDeLosArboles } from "../features/code/refresh";
@@ -1062,9 +1063,7 @@ export default function App() {
             );
       // El chat identifica filas por referencia: un objeto nuevo por mensaje remonta el hilo entero.
       const base = conservarEnOrden(previo?.base ?? [], atada);
-      const vivo = vaciarVivo
-        ? []
-        : vivoPrevio.filter((m) => !m.turno || !persistidos.has(m.turno));
+      const vivo = vaciarVivo ? [] : vivoSinPersistir(vivoPrevio, persistidos);
       const mismoVivo = vivo.length === vivoPrevio.length;
       if (previo && base === previo.base && mismoVivo) return hs;
       return { ...hs, [session]: { base, vivo: mismoVivo ? vivoPrevio : vivo } };
@@ -5521,7 +5520,8 @@ export default function App() {
     const sourceWorkspace = workspaceActivo();
     setInjecting((items) => [...items, { session: abierta, id }]);
     try {
-      await invoke("inject_message", {
+      // El id con el que el motor guarda el mensaje: `releer` lo reconoce en disco.
+      const turno = await invoke<string>("inject_message", {
         project: sourceProject,
         session: abierta,
         prompt: m.text,
@@ -5538,7 +5538,7 @@ export default function App() {
       const saved = savedQueues.get(abierta);
       if (saved) savedQueues.set(abierta, { ...saved, items: saved.items.filter((item) => item.id !== id) });
       if (sessionId() === abierta && project() === sourceProject) setCola((c) => c.filter((q) => q.id !== id));
-      anexar(abierta, (ms) => [...ms, { role: "user", text: m.text, task_mentions: m.task_mentions, attachments: m.attachments.length ? m.attachments : undefined }]);
+      anexar(abierta, (ms) => [...ms, { role: "user", text: m.text, task_mentions: m.task_mentions, attachments: m.attachments.length ? m.attachments : undefined, turno: turno || undefined }]);
     } catch (e) {
       anexar(abierta, (ms) => [
         ...ms,

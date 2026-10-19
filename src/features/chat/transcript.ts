@@ -215,6 +215,19 @@ export function anexarDeltas(msgs: Msg[], deltas: readonly Delta[]): Msg[] {
 }
 
 /**
+ * Lo de `vivo` que el disco todavía no tiene. Un mensaje metido con el turno
+ * corriendo y ya guardado (`guardar_inyeccion`) se lleva todo lo anterior: el
+ * motor guarda antes el tramo del agente que lo precede.
+ */
+export function vivoSinPersistir(vivo: Msg[], persistidos: ReadonlySet<string>): Msg[] {
+  let corte = -1;
+  vivo.forEach((m, i) => {
+    if (m.role === "user" && m.turno && persistidos.has(m.turno)) corte = i;
+  });
+  return vivo.slice(corte + 1).filter((m) => !m.turno || !persistidos.has(m.turno));
+}
+
+/**
  * Pega imágenes a la respuesta que se está escribiendo.
  *
  * Van en el último globo del agente que todavía no cerró. Si la herramienta

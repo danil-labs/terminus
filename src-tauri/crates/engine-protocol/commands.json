@@ -1360,7 +1360,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "inject_message",
-      "output": "-> Result < () , String >",
+      "output": "-> Result < String , String >",
       "parameters": [
         {
           "key": "project",
