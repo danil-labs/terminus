@@ -8,13 +8,14 @@ import { invoke } from "../../lib/invoke";
 import { t } from "../../lib/i18n";
 import { enfocar } from "../../lib/focus";
 import { mergeRepositories, repositoryCloneUrl, repositoryIdentity, type ProjectRepository } from "../../lib/projectRepositories";
-import { MarcaProveedor } from "../../ui/icons";
+import { MarcaGitHost } from "../../ui/icons";
+import { listGitHosts, type GitHost } from "../../lib/gitHosts";
 import { Input } from "../../ui/Input";
 import { Button } from "../../ui/Button";
 import { Select } from "../../ui/Select";
 import { FailureNote, asFailure, type Failure } from "../../ui/Failure";
 
-type Provider = { id: string; name: string; connected: { identity: { user: string } } | null };
+type Provider = GitHost & { connected: { identity: { user: string } } | null };
 type Area = { key: string; name: string };
 type RemoteRepository = { name: string; slug: string; clone_url: string };
 type AvailableRepository = ProjectRepository & { area: string };
@@ -46,7 +47,7 @@ export default function RepositoryPicker(props: {
     const local = invoke<ProjectRepository[]>("list_project_repositories", { workspace: scope })
       .then(repos => { if (active) setHistory(repos); }).catch(fail);
     const remote = (async () => {
-      const connections = await invoke<Provider[]>("list_git_hosts", { scope });
+      const connections = await listGitHosts<Provider>(scope);
       if (!active) return;
       setProviders(connections);
       await Promise.all(connections.filter(p => p.connected).map(async p => {
@@ -69,7 +70,7 @@ export default function RepositoryPicker(props: {
 
   const choices = () => [
     { id: "url", name: t("projects.add.git_url"), detail: t("projects.add.git_url_help"), run: props.onUrl },
-    ...providers().filter(p => p.connected && ["github", "bitbucket"].includes(p.id)).map(p => ({ id: p.id, name: p.name,
+    ...providers().filter(p => p.connected).map(p => ({ id: p.id, name: p.name, host: true,
       detail: p.connected?.identity.user ?? "",
       run: () => { setProvider(p.id); setArea(""); setQuery(""); },
     })),
@@ -103,7 +104,7 @@ export default function RepositoryPicker(props: {
     return <For each={section.repositories}>{repo => <button type="button" disabled={props.disabled}
       class="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left hover:bg-surface-muted focus-visible:bg-surface-muted"
       onClick={() => props.onRepository({ ...repo, git_host: providers().some(p => p.id === repo.git_host && p.connected) && repo.url.startsWith("https://") ? repo.git_host : null })}>
-      <Show when={repo.git_host} fallback={<GitBranch size={18} class="text-neutral-500" />}><MarcaProveedor id={repo.git_host ?? ""} size={18} /></Show>
+      <Show when={repo.git_host} fallback={<GitBranch size={18} class="text-neutral-500" />}><MarcaGitHost id={repo.git_host ?? ""} size={18} /></Show>
       <span class="min-w-0 flex-1"><span class="block truncate text-[0.8125rem]">{repo.name}</span>
         <span class="block truncate text-xs text-neutral-500">{repo.local_path ? t("projects.add.on_this_machine", { path: repo.local_path }) : repo.url}</span></span>
       <ChevronRight size={14} class="shrink-0 text-neutral-500" />
@@ -122,7 +123,7 @@ export default function RepositoryPicker(props: {
     <Show when={provider()}>
       <div class="flex items-center gap-2">
         <Button size="sm" variant="ghost" onClick={() => { setProvider(null); setArea(""); setQuery(""); }}>{t("projects.add.back")}</Button>
-        <MarcaProveedor id={provider() ?? "git"} size={16} /><span class="text-xs">{selectedProvider()?.name}</span>
+        <MarcaGitHost id={provider() ?? "git"} size={16} /><span class="text-xs">{selectedProvider()?.name}</span>
         <Show when={areas().length > 0}>
           <Select class="ml-auto max-w-[220px]" aria-label={t("projects.add.repository_area")} onChange={e => setArea(e.currentTarget.value)}>
             <option value="">{t("projects.add.all_areas")}</option><For each={areas()}>{a => <option value={a}>{a}</option>}</For>
@@ -135,7 +136,7 @@ export default function RepositoryPicker(props: {
         <For each={visibleChoices()}>{choice => <button type="button" disabled={props.disabled}
           class="flex w-full items-center gap-3 rounded-md px-3 py-3 text-left hover:bg-surface-muted focus-visible:bg-surface-muted" onClick={choice.run}>
           <Show when={choice.id === "url"}><GitBranch size={18} class="text-neutral-500" /></Show>
-          <Show when={choice.id === "github" || choice.id === "bitbucket"}><MarcaProveedor id={choice.id} size={18} /></Show>
+          <Show when={"host" in choice}><MarcaGitHost id={choice.id} size={18} /></Show>
           <Show when={choice.id === "folder"}><FolderOpen size={18} class="text-neutral-500" /></Show>
           <Show when={choice.id === "empty"}><Plus size={18} class="text-neutral-500" /></Show>
           <span class="text-[0.8125rem]">{choice.name}</span><span class="ml-auto max-w-[50%] truncate text-xs text-neutral-500">{choice.detail}</span>

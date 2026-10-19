@@ -23,7 +23,10 @@ SHA-256:
 `2ae5ba8e263252c80622f0706d3a5a3a534b48ab9364c724d1fea96bebab029b`.
 
 `phrase-keys.json`: the catalog keys the engine sends as `Frase` values, taken
-from the engine source at `fdf4dd9863a80363a0dd7b15ea21fd6b69e1f4bd`.
+from the engine source at `fdf4dd9863a80363a0dd7b15ea21fd6b69e1f4bd`. The 24
+`providers.*` keys for GitLab, `providers.error.other_host`, and each host's
+`summary` and `vocabulary` come from seldon-host `34ebefa`
+(`feat/gitlab-git-host`).
 
 Endpoint, selection and StreamPage extend the transport; they do not convert
 domain data. The token travels in RPC1 only between authenticated local

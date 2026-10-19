@@ -1,19 +1,24 @@
-import { For, Show, createSignal } from "solid-js";
+import { For, Show, createSignal, onMount } from "solid-js";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import { t } from "../../../lib/i18n";
 import { cn } from "../../../lib/utils";
-import { MarcaProveedor } from "../../../ui/icons";
+import { MarcaGitHost } from "../../../ui/icons";
+import { FailureNote, asFailure, type Failure } from "../../../ui/Failure";
+import { Skeleton } from "../../../ui/Skeleton";
+import { listGitHosts, type GitHost } from "../../../lib/gitHosts.ts";
+import { prosa } from "../../../lib/prose";
 import Providers from "../../settings/Providers";
 import { Pantalla } from "../Screen";
 import type { Alta } from "../onboarding-store";
 
-/** Paso 5, opcional: GitHub y Bitbucket lado a lado; la tarjeta elegida despliega su conexión. */
+/** Paso 5, opcional: los servicios que declara el motor, lado a lado; la tarjeta elegida despliega su conexión. */
 export default function Repositorios(props: { alta: Alta }) {
   const [abierto, setAbierto] = createSignal<string | null>(null);
-  const fuentes = () => [
-    { id: "github", nombre: "GitHub", como: t("onboarding.sources.github_how") },
-    { id: "bitbucket", nombre: "Bitbucket", como: t("onboarding.sources.bitbucket_how") },
-  ];
+  const [fuentes, setFuentes] = createSignal<GitHost[] | null>(null);
+  const [fallo, setFallo] = createSignal<Failure | null>(null);
+  onMount(() => {
+    listGitHosts().then(setFuentes, (e) => { setFuentes([]); setFallo(asFailure(e)); });
+  });
 
   return (
     <Pantalla
@@ -23,8 +28,10 @@ export default function Repositorios(props: { alta: Alta }) {
       atras={() => props.alta.set("paso", "accounts")}
       primario={{ rotulo: t("onboarding.continue"), onClick: () => props.alta.set("paso", "context") }}
     >
-      <div class="grid gap-3 sm:grid-cols-2">
-        <For each={fuentes()}>
+      <Show when={fuentes() !== null} fallback={<Skeleton class="h-16 w-full" />}>
+      <Show when={fallo()}>{(f) => <FailureNote f={f()} />}</Show>
+      <div class="grid gap-3 sm:grid-cols-[repeat(auto-fit,minmax(12rem,1fr))]">
+        <For each={fuentes() ?? []}>
           {(f) => (
             <button
               type="button"
@@ -37,10 +44,10 @@ export default function Repositorios(props: { alta: Alta }) {
               )}
               onClick={() => setAbierto((x) => (x === f.id ? null : f.id))}
             >
-              <MarcaProveedor id={f.id} size={20} />
+              <MarcaGitHost id={f.id} size={20} />
               <span class="grid min-w-0 flex-1 gap-0.5">
-                <strong class="text-sm font-semibold text-neutral-950">{f.nombre}</strong>
-                <span class="text-xs text-neutral-500">{f.como}</span>
+                <strong class="text-sm font-semibold text-neutral-950">{f.name}</strong>
+                <span class="text-xs text-neutral-500">{prosa(f.summary)}</span>
               </span>
               <ChevronDown
                 size={16}
@@ -51,6 +58,7 @@ export default function Repositorios(props: { alta: Alta }) {
           )}
         </For>
       </div>
+      </Show>
       <Show when={abierto()} keyed>
         {(id) => (
           <div class="mt-4">
