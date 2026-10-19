@@ -29,6 +29,7 @@ import FolderChip, { FolderSquare } from "./FolderChip";
 import SessionGit, { gitAppearance, sessionGitDescription } from "./SessionGit";
 import { WithTaskHoverCard } from "./TaskHoverCardTrigger";
 import { hoverCardPull } from "./hoverCardPull";
+import { MachineChip } from "../machines/MachineChip";
 import { createTaskHistories } from "./taskHistories";
 import { AstroAvatar } from "./AstroAvatar";
 import { displayName, watchProfiles } from "./profiles";
@@ -135,6 +136,9 @@ export type SessionRow = {
   chat_de_agente: boolean;
   /** De qué espacio es (`spaces::of_rows`). Ver `lib/spaces.ts`. */
   space?: string | null;
+  /** La máquina que la corre si no es la de la ventana (`fleet.rs`); apagada, `machine_on` es `false`. */
+  machine?: string;
+  machine_on?: boolean;
 };
 
 type EstadoDelWorktree = { available: boolean; owned: boolean };
@@ -568,6 +572,10 @@ export default function Sessions(props: {
                       </span>
                     )}
                   </Show>
+                  {/* En qué máquina corre, si no es esta. */}
+                  <Show when={r.s.machine}>
+                    {(machine) => <MachineChip machine={machine()} on={r.s.machine_on !== false} class="max-w-[96px]" />}
+                  </Show>
                   <ChipDeGit />
                 </>
               }
@@ -826,6 +834,9 @@ export default function Sessions(props: {
                   <span class="flex shrink-0 text-error-strong" title={t("projects.sessions.worktree_missing")} aria-label={t("projects.sessions.worktree_missing")}><WorktreeRoto size={13} /></span>
                 </Show>
                 <span class="flex shrink-0" title={f.s.provider} aria-label={f.s.provider}><MarcaAgente id={f.s.provider} size={13} /></span>
+                <Show when={f.s.machine}>
+                  {(machine) => <MachineChip machine={machine()} on={f.s.machine_on !== false} class="max-w-[96px]" />}
+                </Show>
                 {/* El botón del cohete es translúcido: sin desvanecer, el mensaje se lee a
                     través. Máscara y no velo: el fondo del riel cambia con el tema y el wallpaper. */}
                 <span class="min-w-0 flex-1 truncate [:has(>[data-finish-slot])_&]:[mask-image:linear-gradient(to_left,transparent_56px,black_88px)]">{f.s.last_message}</span>

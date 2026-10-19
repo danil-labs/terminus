@@ -62,17 +62,8 @@
   "spaces.error.none": "This workspace has no readable space. Check the spaces folder before continuing.",
   "spaces.error.outside": "Ephemeral tasks don't belong to any space.",
   "spaces.error.storage": "The spaces couldn't be read or saved. Keep the files and try again.",
-  "spaces.folders.hint": "A project you did not add appears while it has tasks in this space.",
-  "spaces.folders.tasks": {
-    "one": "1 task",
-    "other": "{count} tasks"
-  },
-  "spaces.folders.title": "Projects in “{name}”",
-  "spaces.folders.toggle": "Include {name} in the space",
-  "spaces.menu.actions": "{name} actions",
   "spaces.menu.delete": "Delete…",
   "spaces.menu.delete_last": "A workspace has at least one space. Create another one before deleting this one.",
-  "spaces.menu.folders": "Projects…",
   "spaces.menu.rename": "Rename",
   "spaces.move.folder_stays": "The project stays where it is: {folder}.",
   "spaces.move.to": "Move to another space",

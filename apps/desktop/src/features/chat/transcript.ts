@@ -408,6 +408,8 @@ export type Session = {
   observed_model?: string | null;
   /** Solo de `load_history`: qué tramo de la transcripción entera son estos `turns`. */
   history?: HistoryPage | null;
+  /** Su máquina está apagada: esto es lo último que se leyó de ella (`fleet.rs`). */
+  offline?: { machine: string } | null;
 };
 
 /** De qué archivo del CLI salió lo que dijo el agente, y en cuántas respuestas. */
