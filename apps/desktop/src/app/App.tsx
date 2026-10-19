@@ -82,7 +82,8 @@ import Observability from "../features/observability/Observability";
 import Onboarding from "../features/onboarding/Onboarding";
 import AnadirCarpeta, { type ClonEnCurso } from "../features/projects/AddWorkdir";
 import AgentPageTasks from "../features/projects/AgentPageTasks";
-import AgentProfile from "../features/projects/AgentProfile";
+// Chunk aparte: el perfil completo de un agente solo se carga al abrirlo.
+const AgentProfile = lazy(() => import("../features/projects/AgentProfile"));
 import AgentTasks, { createdTasks } from "../features/projects/AgentTasks";
 import ArchivedTasks from "../features/projects/ArchivedTasks";
 import BaseBranchPicker from "../features/projects/BaseBranchPicker";

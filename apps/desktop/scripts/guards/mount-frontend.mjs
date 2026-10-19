@@ -573,7 +573,8 @@ if (!roto) {
   filaDelAgente.querySelector('[aria-label="Opciones de Holmes"]').click();
   await sleep(80);
   itemDeMenu("Configuración del agente").click();
-  await sleep(150);
+  // El perfil llega en su propio trozo: se espera a que pinte.
+  for (let i = 0; i < 120 && !bubbleDocument.querySelector('button[aria-label="Volver a la conversación"]'); i++) await sleep(25);
   assert.equal(bubbleApp.comandos.filter((c) => c === "send_message").length, 0, "Configuración abre el perfil sin crear chat");
   assert.equal(bubbleDocument.querySelector('[role="menu"]'), null);
   const volverDelPerfil = bubbleDocument.querySelector('button[aria-label="Volver a la conversación"]');
