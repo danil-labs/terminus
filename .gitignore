@@ -25,3 +25,4 @@ apps/desktop/src-tauri/crates/*/target/
 .engine/
 # Engine copied for bundle.externalBin (`pnpm engine:sidecar`)
 apps/desktop/src-tauri/binaries/
+apps/desktop/dist-web/

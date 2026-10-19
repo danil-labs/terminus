@@ -51,6 +51,7 @@
   "shell.service.command": "Esta ventana pide algo que el Seldon Plan Host al que está conectada no sabe hacer.",
   "shell.service.engine_down": "El motor de Terminus no responde. Puede haberse cerrado: vuelve a abrirlo y reinicia esta ventana.",
   "shell.service.machine_off": "La máquina de este host está apagada. Se enciende sola cuando envíes un mensaje o crees una tarea.",
+  "shell.service.machine_starting": "La máquina de este host se está encendiendo. Lo que envíes espera y se entrega en cuanto esté lista.",
   "shell.service.engine_missing": "Terminus no encuentra su motor (seldon-runtime) junto a la app; puede que el antivirus lo haya puesto en cuarentena. Restáuralo desde la cuarentena o reinstala Terminus, y vuelve a abrir la ventana.",
   "shell.service.failed": "El Seldon Plan Host no pudo completar la operación.",
   "shell.service.no_host": "No hay ningún Terminus corriendo sobre estos datos. Abre Terminus y vuelve a intentar.",

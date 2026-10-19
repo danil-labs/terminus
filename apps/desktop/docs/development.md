@@ -36,6 +36,65 @@ provider installation, account gating and retry recovery in the compiled front
 with simulated IPC. It runs manually, outside `pnpm verify`, and does not check
 the native window or a real ZCode account.
 
+## The browser build
+
+The same front runs in a browser against Danil Computers instead of the Tauri
+window. `src/web/` holds only that entry: it answers the globals of
+`@tauri-apps/api` with a transport over the relay session socket, so the desktop
+bundle never imports it, and its phrases live in `src/locales/*/web.json`,
+which the desktop catalogs leave out. `options.headers` of `invoke` reach the
+transport (`x-terminus-workspace` is honored; other headers are ignored for now).
+
+```sh
+TERMINUS_WEB_SUPABASE_URL=https://<project>.supabase.co \
+TERMINUS_WEB_SUPABASE_KEY=<publishable key> \
+pnpm web:build      # dist-web/<base>/ plus dist-web/index.html and dist-web/_headers
+pnpm web:dev        # Vite on <base>web.html with the same settings
+```
+
+Build-time settings (environment variables; all are public values):
+
+| Variable | Default | Effect |
+|---|---|---|
+| `TERMINUS_WEB_BASE` | `/terminus/` | Path the page is served under |
+| `TERMINUS_WEB_ENDPOINT` | `https://computers.danil.ai` | Control plane and relay; added to `connect-src` as `https` and `wss` |
+| `TERMINUS_WEB_SUPABASE_URL` | none | The Danil app's Supabase project; added to `connect-src` |
+| `TERMINUS_WEB_SUPABASE_KEY` | none | Its publishable (anon) key |
+| `TERMINUS_WEB_LOGIN` | `/` | Where to go when there is no session |
+| `TERMINUS_WEB_CONNECT` | empty | Extra `connect-src` sources |
+
+The page is served on the Danil app's origin, so it reads the Supabase session
+that app stored (`supabase.auth.getSession()`); it never signs in. After a 401
+from the API or a relay close 4003 it calls `refreshSession()` and, if that
+fails, goes to the login. It lists the person's computers (`GET
+/v1/computers`), opens the only one or the remembered one, or shows a picker
+that can also start a computer; `?computer=<id>` opens that one. Opening does
+not start a computer: an off one mounts as it is, with the machine-off notice.
+While the relay says it is off, a read still asks it: the relay may answer
+from its own copy with `cached: {updated_at}`, which the page passes through
+and shows as "last synced" next to the off notice. A miss answers from the
+page's last copy (`src/web/reads.ts`) or waits, and other commands wait; only the relay's
+intent commands (send a message, create a task, answer a permission…) wake it. The installer screen never shows: a managed computer is prepared at
+install, so `Setup` shows only the preparation's progress, or a support note
+if an essential stage failed (`localSetup` in `lib/platform.ts`). Before
+reconnecting the socket it asks the API again, so a missing license or a
+computer that is not theirs shows a notice instead of a blind retry. A page
+that sets `window.terminusWeb` before the script loads can override any of the
+settings above, or give `{ endpoint, computerId, getToken }` and skip the
+session and the picker.
+
+What the window does locally (native sites, Typst live, tray, updater, local
+file pickers, opening files on the host) answers with `web.desktop_only` or a
+browser equivalent. `tests/unit/web-transport.test.mjs` and
+`tests/unit/web-gate.test.mjs`, `tests/unit/web-setup.test.mjs`, `tests/unit/web-off.test.mjs` and `tests/unit/web-cached.test.mjs` mount `dist-web/` against a relay simulated in
+Node (`tests/helpers/fake-relay.mjs`).
+
+`wrangler.web.toml` deploys `dist-web/` as the private assets Worker
+`terminus-web` (no route, no `workers.dev`); the Danil app forwards
+`/terminus/*` to it through a Service Binding. `dist-web/_headers` carries the
+policy with `frame-ancestors 'none'`, and `dist-web/index.html` is the
+single-page fallback for paths under the base.
+
 ## The engine pin
 
 `seldon-runtime.lock` pins the engine release for each platform, keyed by Rust

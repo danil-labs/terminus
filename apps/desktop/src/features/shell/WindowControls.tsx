@@ -2,6 +2,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
+import { capabilities } from "../../lib/platform";
 import { isWindows } from "../../lib/window";
 
 /**
@@ -47,7 +48,7 @@ export default function ControlesDeVentana() {
   const pedirCierre = () => void invoke("request_close").catch(() => {});
 
   return (
-    <Show when={isWindows()}>
+    <Show when={isWindows() && capabilities().nativeWindow}>
       {/* **Sin `ml-auto` aquí, y no es un detalle.** Un margen automático se
           reparte el hueco libre con los demás márgenes automáticos de la misma
           fila: si quien pone estos controles ya tiene otro —el conmutador de la
