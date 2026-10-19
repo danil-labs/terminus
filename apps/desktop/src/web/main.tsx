@@ -151,5 +151,7 @@ async function start(settings: WebSettings) {
 
 const given = (window as Window & { terminusWeb?: TerminusWebConfig }).terminusWeb ?? {};
 const preset = given.computers ?? (given.computerId ? [{ computer_id: given.computerId, state: "unknown" }] : null);
-if (preset && given.getToken) mountApp(preset, { ...__TERMINUS_WEB__, ...given } as Base);
+const connecting = window.location.pathname.replace(/\/+$/, "") === `${import.meta.env.BASE_URL}connect`;
+if (connecting) void import("./connect/main").then((m) => m.startConnect({ ...__TERMINUS_WEB__, ...given } as WebSettings, document.getElementById("root") as HTMLElement));
+else if (preset && given.getToken) mountApp(preset, { ...__TERMINUS_WEB__, ...given } as Base);
 else void start({ ...__TERMINUS_WEB__, ...given } as WebSettings);

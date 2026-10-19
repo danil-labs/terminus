@@ -520,6 +520,8 @@ const steps = [
   ["La franja de consumo sigue a la cuenta activa cuando cambia por cupo", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/usage-active-account.test.mjs")], root],
   ["La cuenta de Danil entra con un correo conocido o con el navegador, y cierra sesión", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/danil-account-panel.test.mjs")], root],
   ["La cuenta de Danil habla con el motor por danil_connect_*", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/danil-account.test.ts")], root],
+  ["En el navegador la página de aprobación conecta una computadora a la cuenta", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-connect.test.mjs")], root],
+  ["La página de aprobación y la compatibilidad de contrato hablan con el plano de control", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/danil-connect-web.test.ts")], root],
   ["Con el stream empujado los lotes llegan a los oyentes y el historial se pagina", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/push-stream.test.mjs")], root],
   ["Una tarea de una máquina apagada abre y se enciende al mandarle algo", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/machine-task.test.mjs")], root],
   ["Sin el stream empujado la ventana sondea como siempre", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/push-fallback.test.mjs")], root],
