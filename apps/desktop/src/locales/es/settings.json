@@ -324,9 +324,9 @@
   "settings.output.enable": "Responder en {language}",
   "settings.output.error_save": "No se pudo guardar el idioma de salida.",
   "settings.output.title": "Lengua del agente",
-  "settings.projects.delete": "Borrar el proyecto «{name}»",
+  "settings.projects.delete": "Borrar el proyecto",
   "settings.projects.delete_now": "Borrar",
-  "settings.projects.delete_title": "Borra sus tareas y sus artefactos. No se puede deshacer.",
+  "settings.projects.delete_title": "¿Borrar «{name}»?",
   "settings.projects.delete_with": {
     "one": "Borrar con su tarea",
     "other": "Borrar con sus {count} tareas"
@@ -615,5 +615,38 @@
   "settings.accounts.external_required": "Instala la app oficial de {agent} y comprueba la instalación antes de conectar una cuenta. ZCode requiere macOS y Node.js 22 o posterior.",
   "settings.accounts.check_installed": "Ya la instalé · Comprobar",
   "settings.accounts.check_provider": "Comprobar proveedor",
-  "settings.accounts.error.check_provider": "No pude comprobar el proveedor. Vuelve a intentar."
+  "settings.accounts.error.check_provider": "No pude comprobar el proveedor. Vuelve a intentar.",
+  "settings.nav.projects": "Proyectos",
+  "settings.projects.title": "Proyectos",
+  "settings.projects.add": "Añadir un proyecto",
+  "settings.projects.lead": "Las carpetas con las que trabajan las tareas de este espacio. El color es el del chip que se ve en cada tarea.",
+  "settings.projects.empty": "Este espacio todavía no tiene proyectos.",
+  "settings.projects.column.name": "Nombre",
+  "settings.projects.column.kind": "Tipo",
+  "settings.projects.column.location": "Ubicación",
+  "settings.projects.column.tasks": "Tareas",
+  "settings.projects.column.actions": "Acciones",
+  "settings.projects.kind.git_help": "Carpeta con historial de versiones",
+  "settings.projects.kind.folder_help": "Carpeta normal de tu disco",
+  "settings.projects.kind.cloud_help": "Carpeta de Google Drive, iCloud, OneDrive u otro servicio en la nube",
+  "settings.projects.no_location": "Sin carpeta",
+  "settings.projects.tasks": {
+    "one": "{count} tarea",
+    "other": "{count} tareas"
+  },
+  "settings.projects.no_tasks": "sin tareas",
+  "settings.projects.actions": "Acciones de «{name}»",
+  "settings.projects.rename": "Cambiar nombre",
+  "settings.projects.rename_label": "Nuevo nombre de «{name}»",
+  "settings.projects.reveal_finder": "Abrir en Finder",
+  "settings.projects.reveal_other": "Mostrar en el explorador de archivos",
+  "settings.projects.material": "Material que lee",
+  "settings.projects.remove": "Quitar de este espacio",
+  "settings.projects.delete_empty": "Se borrará el proyecto.",
+  "settings.projects.delete_with_tasks": {
+    "one": "También se borrarán su tarea, el chat y sus artefactos.",
+    "other": "También se borrarán sus {count} tareas, chats y artefactos."
+  },
+  "settings.projects.delete_no_undo": "No hay deshacer.",
+  "settings.projects.keep": "Conservarlo"
 }

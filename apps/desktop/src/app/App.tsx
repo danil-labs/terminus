@@ -108,6 +108,7 @@ import {
   DEFAULT_PERMISSION_MODE_EVENT,
   type DefaultPermissionModeChange,
 } from "../features/settings/DefaultPermissions";
+import type { ContextoDeProyectos } from "../features/settings/ManageProjects";
 import Settings from "../features/settings/Settings";
 import type { Startup } from "../features/settings/workspaces-store";
 import { createAttention, topState } from "../features/shell/attention";
@@ -118,6 +119,7 @@ import PantallaDeBloqueo from "../features/shell/LockScreen";
 import AvisoDeMaterial from "../features/shell/MaterialNotice";
 import Paneles from "../features/shell/Panels";
 import Sidebar, { createSidebar } from "../features/shell/Sidebar";
+import { sidebarViewKey } from "../lib/sidebarView";
 import ColumnaLateral from "../features/shell/SideColumn";
 import SpaceBar from "../features/shell/SpaceBar";
 import TitleBar from "../features/shell/TitleBar";
@@ -147,6 +149,7 @@ import type {
   HandlerDefinition,
   HandlerList,
   HandlerStatusRow,
+  CatalogoDeAgentes,
   ModoDePermiso,
   Project,
   Source,
@@ -170,7 +173,7 @@ import {
 } from "../lib/panels";
 import { createPref, escribirPref, leerPref } from "../lib/prefs";
 import type { Frase } from "../lib/prose";
-import { editDraft, insertMention, insertRecipient, type Recipient, type RecipientCandidate, type SenderTask, trimDraft } from "../lib/recipients";
+import { editDraft, insertMention, insertRecipient, type Recipient, type RecipientCandidate, recipientCandidatesOf, type SenderTask, trimDraft } from "../lib/recipients";
 import { conservar, conservarEnOrden, conservarPorElFinal, sessionRefresh } from "../lib/sessionRefresh";
 import { readShellCache, shellCacheWriter } from "../lib/shellCache";
 import {
@@ -1513,14 +1516,33 @@ export default function App() {
     const filas = watchHandlerStatuses(id);
     createEffect(() => setPresenciaDeEncargados(filas()));
   });
+  // Los ocultos salen del menú como salen del riel; sin carpeta no hay perfiles que leer.
+  const perfilesDeLaCarpeta = createMemo(() => {
+    const id = project();
+    return id ? watchProfiles(id) : () => ({});
+  });
+  // Quién está tapado solo lo dice el catálogo. Se lee al abrir el menú de `@`
+  // y no al cambiar de carpeta: lo pide quien va a llamar a alguien.
+  const [catalogoDeAgentes, setCatalogoDeAgentes] = createSignal<CatalogoDeAgentes | null>(null);
+  let catalogoRequest = 0;
+  const refreshCatalogoDeAgentes = async () => {
+    const request = ++catalogoRequest;
+    if (!project()) return;
+    try {
+      const catalogo = await invoke<CatalogoDeAgentes>("list_machine_agents");
+      if (request === catalogoRequest) setCatalogoDeAgentes(catalogo);
+    } catch {
+      // Sin catálogo el menú sigue, solo que sin marcar a los tapados.
+    }
+  };
   const recipientCandidates = createMemo<RecipientCandidate[]>(() =>
-    (rosterDelProyecto() ?? lastRoster(project()) ?? []).map((e) => ({
-      name: e.name,
-      description: e.description,
+    recipientCandidatesOf(project(), rosterDelProyecto() ?? lastRoster(project()) ?? [], {
+      profiles: perfilesDeLaCarpeta()(),
       // `undefined` no es un estado: es que todavía no se sabe, y el menú
       // pinta la cara despierta en vez de inventar que duerme.
-      status: presenciaDeEncargados().find((r) => r.name === e.name)?.status,
-    })),
+      statuses: presenciaDeEncargados(),
+      catalog: catalogoDeAgentes(),
+    }),
   );
   const placeCandidates = createMemo<PlaceCandidate[]>(() => {
     return projectList().map(f => ({ target: { kind: "folder" as const, projectId: f.id }, name: f.name, detail: "", updatedAt: f.updated_at }));
@@ -4052,6 +4074,23 @@ export default function App() {
     name: string;
   } | null>(null);
 
+  /** Ajustes → Proyectos usa las carpetas y las acciones del riel. Un solo objeto: la hoja no se remonta. */
+  const proyectosEnAjustes: ContextoDeProyectos = {
+    get projects() {
+      return proyectosDelRiel();
+    },
+    onAdd: () => setAnadiendoCarpeta(true),
+    onRename: (id, name) => void renombrarProyecto(id, name),
+    onDelete: (id) => void borrarProyecto(id),
+    get onRemoveFromSpace() {
+      return multipleSpaces() ? removeFromActiveSpace : undefined;
+    },
+    onOpenMaterial: (id) => {
+      cerrarAjustes();
+      abrirProyecto(id);
+    },
+  };
+
   function cerrarAjustes() {
     setSettings(null);
     setCuentasTocadas((n) => n + 1);
@@ -5884,6 +5923,7 @@ export default function App() {
           sources={sources()}
           onPick={elegirProyecto}
           onNuevoProyecto={() => setAnadiendoCarpeta(true)}
+          onAdministrar={() => setSettings("proyectos")}
           // Solo al crear: una tarea abierta ya vive en la máquina que la corre.
           machine={
             <Show when={props.nueva && !props.locked}>
@@ -6371,13 +6411,14 @@ export default function App() {
         mentionSources={mentionSources()}
         input={input()}
         taskCandidates={taskCandidates()}
-        onTaskMenuOpen={() => void refreshTaskCandidates()}
+        onTaskMenuOpen={() => { void refreshTaskCandidates(); void refreshCatalogoDeAgentes(); }}
         taskMentions={borrador().task_mentions}
         mentionProject={project()}
         mentionSession={sessionId()}
         onMentionHistory={navigateMentionHistory}
         placeCandidates={placeCandidates()}
         recipientCandidates={recipientCandidates()}
+        recipientFolder={projectList().find((p) => p.id === project())?.name}
         recipients={borrador().recipients}
         /* Llamar a alguien y adjuntar material entran por caminos distintos y
            acaban en listas distintas; lo que comparten es que insertar en el
@@ -7428,6 +7469,9 @@ export default function App() {
               projects={proyectosDelRiel()}
               modelos={modelosParaAgentes()}
               sessions={sesionesDelRiel()}
+              viewKey={sidebarViewKey(workspaceActivo(), escritorio())}
+              onHablarCon={hablarConEncargado}
+              onAgentProfile={openAgentProfile}
               escritorio={activeSpace() ? spaceName(activeSpace()) : null}
               viendoArchivadas={viendoArchivadas()}
               onArchivadas={spaces().length > 0 ? alternarArchivadas : undefined}
@@ -7458,9 +7502,6 @@ export default function App() {
               onAbrirClon={() => setAnadiendoCarpeta(true)}
               proyectoAbierto={proyectoAbierto()}
               onAbrirProyecto={abrirProyecto}
-              hablandoCon={agenteSenalado()}
-              onHablarCon={hablarConEncargado}
-              onAgentProfile={openAgentProfile}
               /* El proyecto viaja en el mismo gesto que abre el borrador. */
               onNuevaTareaEn={(id) => nuevaSesion(id)}
               onDelete={(p, id) => borrarSesion(p, id)}
@@ -7630,6 +7671,7 @@ export default function App() {
           proyecto={proyectoAbierto() ?? project()}
           agentesEnUso={agentesEnUso()}
           onClose={cerrarAjustes}
+          proyectos={proyectosEnAjustes}
           onAgentProfile={(enProyecto, name) => {
             cerrarAjustes();
             openAgentProfile(enProyecto, name);

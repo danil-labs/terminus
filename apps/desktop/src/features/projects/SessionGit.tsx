@@ -108,7 +108,7 @@ function gitLabels(status: GitStatus | undefined, shared: boolean) {
   return { branch, summary };
 }
 
-function gitAppearance(status?: GitStatus) {
+export function gitAppearance(status?: GitStatus) {
   if (status?.kind === "kn") {
     switch (status.kn) {
       case "draft": return { icon: FilePenLine, color: "text-neutral-500" };

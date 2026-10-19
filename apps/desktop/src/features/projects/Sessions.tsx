@@ -3,7 +3,7 @@ import ChevronRight from "lucide-solid/icons/chevron-right";
 import MoreVertical from "lucide-solid/icons/more-vertical";
 import Pin from "lucide-solid/icons/pin";
 import PinOff from "lucide-solid/icons/pin-off";
-import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, type JSX, lazy, mapArray, on, onCleanup, Show, Suspense } from "solid-js";
 import { arrastrar, fueArrastre, tareaEnVuelo } from "../../lib/drag";
 import { enfocarYSeleccionar } from "../../lib/focus";
 import { t } from "../../lib/i18n";
@@ -11,12 +11,12 @@ import { createPref } from "../../lib/prefs";
 import { SESSION_TITLE_MAX_LENGTH } from "../../lib/projectNames";
 import { cn } from "../../lib/utils";
 import { Button } from "../../ui/Button";
-import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
 import { asFailure, type Failure, FailureNote } from "../../ui/Failure";
 import { celebrateFinishedTask, FinishTaskButton } from "../../ui/FinishTaskButton";
 import { KeyedList } from "../../ui/KeyedList";
 import { Input } from "../../ui/Input";
 import { Toast, ToastPortal } from "../../ui/Toast";
+import { RETARDO_TOOLTIP, TooltipContent, TooltipRoot, TooltipTrigger } from "../../ui/Tooltip";
 import { MarcaAgente, WorktreeRoto } from "../../ui/icons";
 import {
   ITEM_DE_MENU,
@@ -25,9 +25,15 @@ import {
   PopoverTrigger,
 } from "../../ui/Popover";
 import { WithMentions } from "../chat/WithMentions";
+import FolderChip, { FolderSquare } from "./FolderChip";
+import SessionGit, { gitAppearance, sessionGitDescription } from "./SessionGit";
+import { WithTaskHoverCard } from "./TaskHoverCardTrigger";
+import { hoverCardPull } from "./hoverCardPull";
 import { MachineChip } from "../machines/MachineChip";
-import SessionGit from "./SessionGit";
 import { createTaskHistories } from "./taskHistories";
+
+// Solo hace falta cuando algo estorba al terminar o archivar: fuera de la carga inicial.
+const TaskBlockersDialog = lazy(() => import("./TaskBlockersDialog"));
 import { AstroAvatar } from "./AstroAvatar";
 import { displayName, watchProfiles } from "./profiles";
 import EtapaDeTarea, { ETAPAS, type Etapa } from "./TaskStage";
@@ -36,7 +42,7 @@ import { matchesTaskQuery } from "./taskSearch";
 import { canFinishTask, effectiveTaskGit, type GitStatus, sharesTaskGit, watchSessionGit } from "./taskGit";
 import { authorKey, authorKeys, shownUnderLauncher } from "./taskAuthors";
 import { descendientes, type Rama as RamaDeTareas, taskTree } from "./taskTree";
-import type { TaskActivity } from "@terminus/design";
+import { type TaskActivity, taskPriority } from "@terminus/design";
 
 export function readableSessionTitle(title: string): string {
   if (!title.startsWith("/root/")) return title;
@@ -44,13 +50,13 @@ export function readableSessionTitle(title: string): string {
 }
 
 /** Lo que devuelve `task_blockers`: qué estorba para terminar o archivar. */
-type Blockers = {
+export type Blockers = {
   unsaved: { session: string; title: string; files: string[] }[];
   not_finished: boolean;
 };
 
 /** El gesto que quedó esperando a que la persona decida qué hacer con eso. */
-type Aviso = { id: string; finish: boolean; rect?: DOMRect; blockers: Blockers };
+export type Aviso = { id: string; finish: boolean; rect?: DOMRect; blockers: Blockers };
 
 /** El título de un tema; el de la Bandeja sale del catálogo, no de `session.json`. */
 /** El nombre del agente en la pastilla de la fila: diez caracteres como mucho,
@@ -296,7 +302,23 @@ export default function Sessions(props: {
   /** El nombre de la carpeta, que no cambia al moverla de espacio. */
   carpeta?: string;
   onMoveToSpace?: (id: string, space: string) => void;
+  /** Con tareas de varias carpetas en la misma lista, la de cada fila. Sin esto es `de`. */
+  projectOf?: (row: SessionRow) => string;
+  destinosDe?: (row: SessionRow) => { id: string; name: string }[];
+  carpetaDe?: (row: SessionRow) => string | undefined;
+  /** En el riel: dos líneas por tarea, o una sola en «Compacta». */
+  density?: "comfortable" | "compact";
+  /** Bajo la cabecera de su carpeta, la fila no repite la carpeta. */
+  hideFolder?: boolean;
 }) {
+  const compacta = () => props.density === "compact";
+  const projectOf = (row: SessionRow) => props.projectOf?.(row) ?? props.de;
+  const projectOfId = (id: string) => {
+    const row = props.sessions.find((s) => s.id === id);
+    return row ? projectOf(row) : props.de;
+  };
+  const avisarCambio = (project: string) =>
+    window.dispatchEvent(new CustomEvent("harness:tasks-changed", { detail: { project } }));
   const otherSpaces = (row: SessionRow) =>
     row.chat_de_agente || row.agent_thread || row.inbox
       ? []
@@ -310,11 +332,12 @@ export default function Sessions(props: {
     setFinishing(ids => [...ids, id]);
     setActionFailure(null);
     try {
-      await invoke("finish_task", { project: props.de, id });
+      const project = projectOfId(id);
+      await invoke("finish_task", { project, id });
       // `anunciar` no actualiza esta ventana: su firma es la de quien
       // escribió, y el sondeo la descarta. Sin este aviso el archivado
       // queda en disco y la lista de aquí sigue mostrando la fila.
-      window.dispatchEvent(new CustomEvent("harness:tasks-changed", { detail: { project: props.de } }));
+      avisarCambio(project);
       celebrateFinishedTask(rect);
     } catch (error) {
       setActionFailure(asFailure(error));
@@ -327,8 +350,9 @@ export default function Sessions(props: {
     setArchiving(ids => [...ids, id]);
     setActionFailure(null);
     try {
-      await invoke("set_task_archived", { project: props.de, id, archived: true });
-      window.dispatchEvent(new CustomEvent("harness:tasks-changed", { detail: { project: props.de } }));
+      const project = projectOfId(id);
+      await invoke("set_task_archived", { project, id, archived: true });
+      avisarCambio(project);
       setMenu(null);
     } catch (error) {
       setActionFailure(asFailure(error));
@@ -346,7 +370,7 @@ export default function Sessions(props: {
     setActionFailure(null);
     let blockers: Blockers;
     try {
-      blockers = await invoke<Blockers>("task_blockers", { project: props.de, id, finish });
+      blockers = await invoke<Blockers>("task_blockers", { project: projectOfId(id), id, finish });
     } catch (error) {
       setActionFailure(asFailure(error));
       return;
@@ -367,7 +391,7 @@ export default function Sessions(props: {
     marcar(ids => [...ids, a.id]);
     try {
       for (const work of a.blockers.unsaved) {
-        await invoke("discard_task_changes", { project: props.de, id: work.session, files: work.files });
+        await invoke("discard_task_changes", { project: projectOfId(a.id), id: work.session, files: work.files });
       }
     } catch (error) {
       setActionFailure(asFailure(error));
@@ -379,24 +403,44 @@ export default function Sessions(props: {
     // queda en disco, y tiene que verse en el aviso y no en un error plegado.
     await intentar(a.id, a.finish, a.rect);
   };
-  const [gitRows, setGitRows] = createSignal<Record<string, GitStatus>>({});
   // La barra enseña solo lo vivo: las archivadas no se pintan ni se observan. Con
   // cientos archivadas, pedir su git y su historial en cada barrido trababa la ventana.
   const enBarra = createMemo(() => props.sessions.filter(s => (props.includeArchived || !s.archived)
     && (!props.sidebar || !!props.search?.trim() || s.pinned || !shownUnderLauncher(s, props.sessions))));
-  const [worktrees] = createTaskHistories<EstadoDelWorktree>(() => props.de, enBarra);
-  createEffect(() => {
-    const watcher = watchSessionGit(props.de);
-    createEffect(() => setGitRows(watcher.rows()));
+  // Un observador de git, de perfiles y de historiales por carpeta de la
+  // lista: las cachés son por carpeta y se comparten con las demás vistas.
+  const carpetasVistas = createMemo(
+    () => props.projectOf ? [...new Set(enBarra().map(projectOf))].sort() : [props.de],
+    [],
+    { equals: (a, b) => a.length === b.length && a.every((x, i) => x === b[i]) },
+  );
+  const porCarpeta = createMemo(mapArray(carpetasVistas, (project) => {
+    const filas = createMemo(() => props.projectOf ? enBarra().filter((s) => projectOf(s) === project) : enBarra());
+    const watcher = watchSessionGit(project);
     const gitInput = createMemo(() => JSON.stringify([
-      enBarra().map(s => [s.id, s.updated_at]), props.vivas, props.current,
+      filas().map(s => [s.id, s.updated_at]), props.vivas, props.current,
     ]));
     createEffect(on(gitInput, () => {
-      watcher.prioritize([...(props.current ? [props.current] : []), ...props.vivas, ...enBarra().map(s => s.id)]);
+      watcher.prioritize([...(props.current ? [props.current] : []), ...props.vivas, ...filas().map(s => s.id)]);
       watcher.refresh();
     }));
     onCleanup(watcher.release);
+    const [historiales] = createTaskHistories<EstadoDelWorktree>(() => project, filas);
+    return { git: watcher.rows, profiles: watchProfiles(project), historiales };
+  }));
+  // Con una sola carpeta se devuelve su registro tal cual: un objeto nuevo
+  // repintaría todas las filas aunque git no hubiera cambiado.
+  const gitRows = createMemo<Record<string, GitStatus>>(() => {
+    const todas = porCarpeta();
+    return todas.length === 1 ? todas[0].git() : Object.assign({}, ...todas.map((c) => c.git()));
   });
+  const worktreeDe = (id: string) => {
+    for (const c of porCarpeta()) {
+      const estado = c.historiales()?.get(id);
+      if (estado) return estado;
+    }
+    return undefined;
+  };
   // Borrar se lleva la carpeta de trabajo entera, y esos documentos no están
   // commiteados en ningún lado: no tienen de dónde volver. Por eso la
   // confirmación vive en la propia fila, con lo que se pierde escrito.
@@ -431,7 +475,10 @@ export default function Sessions(props: {
    * Activas y archivadas se arman cada una por el `archived` de la fila, no
    * por el de su raíz: finalizar una hija no espera al padre.
    */
-  const profiles = watchProfiles(props.de);
+  const profiles = createMemo<ReturnType<ReturnType<typeof watchProfiles>>>(() => {
+    const todas = porCarpeta();
+    return todas.length === 1 ? todas[0].profiles() : Object.assign({}, ...todas.map((c) => c.profiles()));
+  });
   const query = createMemo(() => (props.search ?? "").trim());
   const filteredSessions = createMemo(() => !query() ? enBarra() : enBarra().filter(session => {
     const git = effectiveTaskGit(session, gitRows(), props.relatedSessions ?? props.sessions);
@@ -445,6 +492,7 @@ export default function Sessions(props: {
   const activas = createMemo<RamaDeTareas<SessionRow>[]>((previas) => props.flat || props.sidebar
     ? filteredSessions().map(tarea => ({ tarea, hijas: [] }))
     : taskTree(filteredSessions(), props.includeArchived ? null : false, previas, props.groupByHandler === true));
+  const destinosDe = (row: SessionRow) => props.destinosDe?.(row) ?? props.destinos;
   const fijada = (row: SessionRow) => row.pinned ?? (row.chat_de_agente || row.inbox === true);
   const setPinned = async (row: SessionRow) => {
     if (!props.onPin) return;
@@ -452,7 +500,7 @@ export default function Sessions(props: {
     setActionFailure(null);
     try {
       await props.onPin(row.id, !fijada(row));
-      window.dispatchEvent(new CustomEvent("harness:tasks-changed", { detail: { project: props.de } }));
+      avisarCambio(projectOf(row));
     } catch (error) {
       setActionFailure(asFailure(error));
     }
@@ -465,6 +513,118 @@ export default function Sessions(props: {
    * árbol, así que aquí no hace falta saber si esta tarea tiene encargos — y una
    * fila que no las conoce no puede volver a reservarles sitio.
    */
+  const gitDe = (row: SessionRow) => effectiveTaskGit(row, gitRows(), props.relatedSessions ?? props.sessions);
+
+  /**
+   * El cuerpo de una fila del riel. Línea 1: estado en su columna fija,
+   * título y chincheta. Línea 2: lo que te piden si te necesita; si no,
+   * carpeta, cara del agente y PR. Lo demás vive en la tarjeta flotante.
+   */
+  const FilaDelRiel = (r: { s: SessionRow; actividad: TaskActivity; titulo: JSX.Element }) => {
+    const estado = () => taskPriority(r.actividad);
+    const teNecesita = () => estado() === "approving" || estado() === "asked" || estado() === "failed";
+    const pull = () => hoverCardPull(gitDe(r.s));
+    // Rojo si el CI falló; si no, el color del estado del PR, como su icono.
+    const colorDelPr = () => pull()?.checks === "failure" && !gitDe(r.s).stale ? "text-error-strong"
+      : gitDe(r.s).stale ? "text-neutral-500" : gitAppearance(gitDe(r.s)).color;
+    // La rama de quien comparte el árbol de su padre se dice en la fila del padre.
+    const propioDeOtra = () => !!gitDe(r.s).shared_with || sharesTaskGit(r.s, gitRows(), props.relatedSessions ?? props.sessions);
+    /** El PR, o el estado de una carpeta de conocimiento; la rama sola va a la tarjeta. */
+    // Va después de la carpeta: dice qué le falta a esa tarea, no la encabeza.
+    const WorktreeFaltante = () => (
+      <Show when={worktreeDe(r.s.id)?.owned && !worktreeDe(r.s.id)?.available}>
+        <span class="flex shrink-0 text-error-strong" title={t("projects.sessions.worktree_missing")} aria-label={t("projects.sessions.worktree_missing")}><WorktreeRoto size={13} /></span>
+      </Show>
+    );
+    const ChipDeGit = () => (
+      <Show when={(pull() || gitDe(r.s).kind === "kn") && !propioDeOtra()}>
+        <span data-session-pr class="inline-flex shrink-0 items-center gap-0.5" title={sessionGitDescription(gitDe(r.s))}>
+          <SessionGit status={gitDe(r.s)} compact />
+          <Show when={pull()}>
+            {(pr) => <span class={colorDelPr()}>#{pr().number}</span>}
+          </Show>
+        </span>
+      </Show>
+    );
+    const nombreDelAgente = () => r.s.agent ? displayName(r.s.agent, profiles()[r.s.agent]) : "";
+    return (
+      <div class="grid min-w-0 grid-cols-[14px_minmax(0,1fr)] items-center gap-x-1.5">
+        <span data-session-status class="grid size-3.5 place-items-center">
+          <Show
+            when={estado() || r.actividad.outcome === "delivered"}
+            fallback={<span aria-hidden="true" class="size-[9px] rounded-full border-[1.5px] border-neutral-300" />}
+          >
+            <EstadoDeTarea {...r.actividad} size={13} />
+          </Show>
+        </span>
+        <div class="min-w-0">{r.titulo}</div>
+        <Show when={!compacta()}>
+          <div data-session-preview class="col-start-2 mt-0.5 flex h-4 min-w-0 items-center gap-1.5 text-[0.6875rem] font-normal leading-tight text-neutral-500">
+            <Show
+              when={teNecesita()}
+              fallback={
+                <>
+                  <Show when={!props.hideFolder && props.carpetaDe?.(r.s)}>
+                    {(nombre) => <FolderChip id={projectOf(r.s)} name={nombre()} class="max-w-[108px] shrink-0" />}
+                  </Show>
+                  <WorktreeFaltante />
+                  <Show when={r.s.agent && !r.s.chat_de_agente ? r.s.agent : null}>
+                    {(agente) => (
+                      <TooltipRoot openDelay={RETARDO_TOOLTIP} placement="top" gutter={4}>
+                        <TooltipTrigger as="span" data-session-agent class="flex shrink-0" aria-label={nombreDelAgente()}>
+                          <AstroAvatar
+                            name={agente()}
+                            status={props.vivas.includes(r.s.id) ? "working" : "asleep"}
+                            body={profiles()[agente()]?.body}
+                            avatar={profiles()[agente()]?.avatar}
+                            size={13}
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent class="pointer-events-none">{nombreDelAgente()}</TooltipContent>
+                      </TooltipRoot>
+                    )}
+                  </Show>
+                  {/* En qué máquina corre, si no es esta. */}
+                  <Show when={r.s.machine}>
+                    {(machine) => <MachineChip machine={machine()} on={r.s.machine_on !== false} class="max-w-[96px]" />}
+                  </Show>
+                  <ChipDeGit />
+                </>
+              }
+            >
+              <span data-session-request class="min-w-0 flex-1 truncate text-neutral-700">{r.s.last_message}</span>
+              <ChipDeGit />
+              <Show when={!props.hideFolder}>
+                <span title={props.carpetaDe?.(r.s)} class="flex shrink-0"><FolderSquare id={projectOf(r.s)} /></span>
+              </Show>
+              <WorktreeFaltante />
+            </Show>
+          </div>
+        </Show>
+      </div>
+    );
+  };
+
+  /** En el riel la fila lleva su tarjeta flotante; en las demás listas, no. */
+  const ConTarjeta = (c: { s: SessionRow; children: JSX.Element }) => (
+    <Show when={props.sidebar} fallback={c.children}>
+      <WithTaskHoverCard
+        task={c.s}
+        folderName={props.carpetaDe?.(c.s)}
+        folderId={projectOf(c.s) || undefined}
+        git={gitDe(c.s)}
+        agentProfile={c.s.agent ? profiles()[c.s.agent] : undefined}
+        agentStatus={props.vivas.includes(c.s.id) ? "working" : undefined}
+        disabled={renombrando() === c.s.id || menu() === c.s.id || !!tareaEnVuelo()}
+        onOpen={() => props.onPick(c.s.id)}
+        onPin={() => void setPinned(c.s)}
+        onArchive={() => void intentar(c.s.id, false)}
+      >
+        {c.children}
+      </WithTaskHoverCard>
+    </Show>
+  );
+
   const Fila = (f: { s: SessionRow; hija?: boolean }) => {
     const activity = (): TaskActivity => f.s.delegated_activity ?? {
       aprobando: props.aprobando.includes(f.s.id),
@@ -495,6 +655,59 @@ export default function Sessions(props: {
       if (n && n !== f.s.title) props.onRenombrar(f.s.id, n);
     };
 
+    const marcaDeFijada = () => <span role="img" aria-label={t("projects.sessions.pinned")} title={t("projects.sessions.pinned")} class="shrink-0 text-neutral-500"><Pin size={12} /></span>;
+    /** El título, o el campo que lo renombra en su sitio y con su misma medida. */
+    const Titulo = () => (
+      <>
+      {/* El campo debe conservar la altura y tipografía del título para no desplazar el historial al editar. */}
+      <Show
+        when={renombrando() === f.s.id}
+        fallback={
+          // El cohete es absoluto: sin este hueco el título se mete debajo. Por
+          // `:has`, no por clase reactiva: cada fila mutaría al llegar git.
+          <div class="flex min-w-0 items-center gap-1 text-[0.8125rem] leading-[1.35] [:has(>[data-finish-slot])_&]:pr-16">
+            <Show when={fijada(f.s) && !props.sidebar}>{marcaDeFijada()}</Show>
+            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"><WithMentions>{f.s.subagent ? readableSessionTitle(title()) : title()}</WithMentions></span>
+                <Show when={props.sidebar && fijada(f.s)}>{marcaDeFijada()}</Show>
+                <Show when={props.sidebar && compacta() && !props.hideFolder}>
+                  <span title={props.carpetaDe?.(f.s)} class="ml-auto flex shrink-0 pl-1"><FolderSquare id={projectOf(f.s)} /></span>
+                </Show>
+          </div>
+        }
+      >
+        <form
+          data-session-rename
+          class="min-w-0"
+          onSubmit={(e) => {
+            e.preventDefault();
+            guardarNombre();
+          }}
+        >
+          <Input
+            ref={enfocarYSeleccionar}
+            variant="ghost"
+            // `font-sans` conserva la letra del título, y
+            // `p-0`/`min-h-0` devuelve su altura: 13 px por 1,35, los
+            // mismos que el título. El peso lo hereda, para que
+            // la tarea abierta siga en negrita mientras se renombra.
+            class="block h-auto min-h-0 rounded-none border-0 p-0 font-sans text-[0.8125rem] leading-[1.35] text-inherit [font-weight:inherit]"
+            maxlength={SESSION_TITLE_MAX_LENGTH}
+            value={borrador()}
+            aria-label={t("projects.sessions.rename_label", {
+              title: f.s.title,
+            })}
+            onInput={(e) => setBorrador(e.currentTarget.value)}
+            onBlur={guardarNombre}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setRenombrando(null);
+              }
+            }}
+          />
+        </form>
+      </Show>
+      </>
+    );
     /** El cohete es el único de los dos controles que ocupa sitio en la fila. */
     const puedeFinalizar = () =>
       !props.readOnly && !fijada(f.s) && canFinishTask(
@@ -504,7 +717,7 @@ export default function Sessions(props: {
       );
 
     return (
-      <>
+      <ConTarjeta s={f.s}>
         {/* `aria-current` además de la clase, y no es adorno: la fila
           abierta se marcaba solo con fondo y negrita, así que un
           lector de pantalla recorría veinte tareas sin saber cuál
@@ -566,7 +779,7 @@ export default function Sessions(props: {
             // seleccionar texto, y sin esta línea seleccionar media palabra
             // levantaría la tarea y la movería de proyecto al soltar.
             if (en.closest("[data-session-rename]")) return;
-            arrastrar(e, { id: f.s.id, de: props.de, titulo: f.s.title }, (a) =>
+            arrastrar(e, { id: f.s.id, de: projectOf(f.s), titulo: f.s.title }, (a) =>
               props.onMove(f.s.id, a),
             );
           }}
@@ -614,6 +827,7 @@ export default function Sessions(props: {
             Y las menciones del título se pintan COMO MENCIONES: el
             nombre de una tarea referencia entidades reales, y
             aplanarlo a texto en el historial es donde se perdería. */}
+          <Show when={props.sidebar} fallback={
           <div class="flex items-start gap-1.5">
             {/* **El hueco se reserva aunque no haya nada que plegar**, igual
               que en la fila de un proyecto: sin él, la fila con hijas
@@ -628,52 +842,10 @@ export default function Sessions(props: {
               una sola vez, para que la fila y la pestaña no puedan decir
               cosas distintas de la misma tarea. */}
             <div class="min-w-0 flex-1">
-              {/* El campo debe conservar la altura y tipografía del título para no desplazar el historial al editar. */}
-              <Show
-                when={renombrando() === f.s.id}
-                fallback={
-                  // El cohete es absoluto: sin este hueco el título se mete debajo. Por
-                  // `:has`, no por clase reactiva: cada fila mutaría al llegar git.
-                  <div class="flex min-w-0 items-center gap-1 text-[0.8125rem] leading-[1.35] [:has(>[data-finish-slot])_&]:pr-16">
-                    <Show when={fijada(f.s)}><span role="img" aria-label={t("projects.sessions.pinned")} title={t("projects.sessions.pinned")} class="shrink-0 text-neutral-500"><Pin size={12} /></span></Show>
-                    <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"><WithMentions>{f.s.subagent ? readableSessionTitle(title()) : title()}</WithMentions></span>
-                  </div>
-                }
-              >
-                <form
-                  data-session-rename
-                  class="min-w-0"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    guardarNombre();
-                  }}
-                >
-                  <Input
-                    ref={enfocarYSeleccionar}
-                    variant="ghost"
-                    // `font-sans` conserva la letra del título, y
-                    // `p-0`/`min-h-0` devuelve su altura: 13 px por 1,35, los
-                    // mismos que el título. El peso lo hereda, para que
-                    // la tarea abierta siga en negrita mientras se renombra.
-                    class="block h-auto min-h-0 rounded-none border-0 p-0 font-sans text-[0.8125rem] leading-[1.35] text-inherit [font-weight:inherit]"
-                    maxlength={SESSION_TITLE_MAX_LENGTH}
-                    value={borrador()}
-                    aria-label={t("projects.sessions.rename_label", {
-                      title: f.s.title,
-                    })}
-                    onInput={(e) => setBorrador(e.currentTarget.value)}
-                    onBlur={guardarNombre}
-                    onKeyDown={(e) => {
-                      if (e.key === "Escape") {
-                        setRenombrando(null);
-                      }
-                    }}
-                  />
-                </form>
-              </Show>
+              <Titulo />
               {/* Proveedor, mensaje y estado del modelo en una línea. */}
               <div data-session-preview class="mt-1 flex min-w-0 items-center gap-1.5 text-[0.6875rem] font-normal leading-tight text-neutral-500">
-                <Show when={worktrees()?.get(f.s.id)?.owned && !worktrees()?.get(f.s.id)?.available}>
+                <Show when={worktreeDe(f.s.id)?.owned && !worktreeDe(f.s.id)?.available}>
                   <span class="flex shrink-0 text-error-strong" title={t("projects.sessions.worktree_missing")} aria-label={t("projects.sessions.worktree_missing")}><WorktreeRoto size={13} /></span>
                 </Show>
                 <span class="flex shrink-0" title={f.s.provider} aria-label={f.s.provider}><MarcaAgente id={f.s.provider} size={13} /></span>
@@ -730,6 +902,9 @@ export default function Sessions(props: {
                 la palabra corta. */}
             <EtapaDeTarea etapa={f.s.stage} class="mt-[3px]" />
           </div>
+          }>
+            <FilaDelRiel s={f.s} actividad={activity()} titulo={<Titulo />} />
+          </Show>
 
           {/* 24 px en la línea del título se salen por arriba. Al centro y fuera de
               flujo: en columna se corren la rama y el PR. `right-8` deja el menú. */}
@@ -858,7 +1033,7 @@ export default function Sessions(props: {
                     </button>
                     <span class="my-1 block h-px bg-border" />
 
-                    <Show when={!f.hija && !f.s.parent && props.destinos.length > 0}>
+                    <Show when={!f.hija && !f.s.parent && destinosDe(f.s).length > 0}>
                       <Popover placement="right-start" gutter={6}>
                         <div onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
                           <PopoverTrigger as={(trigger: object) => (
@@ -868,7 +1043,7 @@ export default function Sessions(props: {
                           )} />
                         </div>
                         <PopoverContent role="menu" class="max-h-72 w-56 overflow-y-auto p-1">
-                          <For each={props.destinos}>
+                          <For each={destinosDe(f.s)}>
                             {(d) => (
                               <button
                                 role="menuitem"
@@ -911,14 +1086,14 @@ export default function Sessions(props: {
                               </button>
                             )}
                           </For>
-                          <Show when={props.carpeta}>
+                          <Show when={props.carpetaDe?.(f.s) ?? props.carpeta}>
                             {(c) => <p class="m-0 px-2 pt-1 pb-1.5 text-[0.6875rem] text-neutral-500">{t("spaces.move.folder_stays", { folder: c() })}</p>}
                           </Show>
                         </PopoverContent>
                       </Popover>
                     </Show>
 
-                    <Show when={!f.hija && !f.s.parent && props.de !== ""}>
+                    <Show when={!f.hija && !f.s.parent && projectOf(f.s) !== ""}>
                       <button
                         role="menuitem"
                         class={ITEM_DE_MENU}
@@ -1006,7 +1181,7 @@ export default function Sessions(props: {
             </Show>
           </div></Show>
         </div>
-      </>
+      </ConTarjeta>
     );
   };
 
@@ -1145,59 +1320,14 @@ export default function Sessions(props: {
         </p>
       </Show>
       <Show when={aviso()}>{a => (
-        <Dialog open onOpenChange={(abierto) => { if (!abierto) setAviso(null); }}>
-          <DialogContent class="flex flex-col gap-3">
-            <DialogTitle class="text-sm font-semibold">
-              {a().finish ? t("projects.sessions.blockers_finish_title") : t("projects.sessions.blockers_archive_title")}
-            </DialogTitle>
-            <Show when={a().blockers.unsaved.length > 0}>
-              <p class="m-0 text-[13px] text-neutral-700">
-                {t("projects.sessions.blockers_unsaved")}
-              </p>
-              <ul class="m-0 flex max-h-[40vh] list-none flex-col gap-2 overflow-y-auto p-0">
-                <For each={a().blockers.unsaved}>{(work) => (
-                  <li class="min-w-0">
-                    <span class="flex min-w-0 items-baseline gap-2 text-[13px] font-medium text-neutral-950">
-                      <span class="min-w-0 truncate">{readableSessionTitle(work.title)}</span>
-                      <span class="shrink-0 text-[11px] font-normal text-neutral-500">
-                        {t("projects.sessions.blockers_files", { count: work.files.length })}
-                      </span>
-                    </span>
-                    <ul class="m-0 list-none p-0">
-                      <For each={work.files}>{(file) => (
-                        <li class="font-mono text-[11px] break-all text-neutral-500">{file}</li>
-                      )}</For>
-                    </ul>
-                  </li>
-                )}</For>
-              </ul>
-            </Show>
-            <Show when={a().blockers.not_finished}>
-              <p class="m-0 text-[13px] text-neutral-700">
-                {t("projects.sessions.blockers_not_finished")}
-              </p>
-            </Show>
-            <div class="flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => setAviso(null)}>
-                {t("projects.sessions.blockers_cancel")}
-              </Button>
-              <Show when={a().finish && a().blockers.not_finished}>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => { const id = a().id; setAviso(null); void intentar(id, false); }}
-                >
-                  {t("projects.sessions.archive")}
-                </Button>
-              </Show>
-              <Show when={a().blockers.unsaved.length > 0 && !a().blockers.not_finished}>
-                <Button variant="danger" size="sm" onClick={() => void descartarYSeguir()}>
-                  {t("projects.sessions.blockers_discard")}
-                </Button>
-              </Show>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Suspense>
+          <TaskBlockersDialog
+            aviso={a()}
+            onCerrar={() => setAviso(null)}
+            onArchivar={(id) => { setAviso(null); void intentar(id, false); }}
+            onDescartar={() => void descartarYSeguir()}
+          />
+        </Suspense>
       )}</Show>
       <Show when={activas().length > 0}>
         <AuthorGroups branches={activas()} />

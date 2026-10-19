@@ -2,6 +2,7 @@ import { invoke } from "../../lib/invoke.ts";
 import Blocks from "lucide-solid/icons/blocks";
 import Palette from "lucide-solid/icons/palette";
 import Bot from "lucide-solid/icons/bot";
+import Folders from "lucide-solid/icons/folders";
 import Puzzle from "lucide-solid/icons/puzzle";
 import Radar from "lucide-solid/icons/radar";
 import GitBranch from "lucide-solid/icons/git-branch";
@@ -9,7 +10,7 @@ import Monitor from "lucide-solid/icons/monitor";
 import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
 import Sparkles from "lucide-solid/icons/sparkles";
 import { listen } from "../../lib/serviceEvents";
-import { createSignal, For, type JSX, onCleanup, onMount, Show } from "solid-js";
+import { createSignal, For, type JSX, lazy, onCleanup, onMount, Show, Suspense } from "solid-js";
 import { t } from "../../lib/i18n";
 import { type Superficie } from "../../lib/surfaces";
 import { Button } from "../../ui/Button";
@@ -24,11 +25,11 @@ import {
   SidebarMenuItem,
 } from "../../ui/sidebar";
 import type { ModelChoices } from "../projects/NewAgent";
-import Agents from "./Agents";
 import Appearance from "./Appearance";
 import AIProviders from "./AIProviders";
 import Environment from "./Environment";
 import General from "./General";
+import type { ContextoDeProyectos } from "./ManageProjects";
 import Plugins from "./Plugins";
 import Providers from "./Providers";
 import Radiant from "./Radiant";
@@ -98,9 +99,15 @@ type ContextoDeAgentes = {
   onAgentProfile: (project: string, name: string) => void;
 };
 
+// Fuera de la carga inicial: solo pesa cuando se abre la página.
+const ManageProjects = lazy(() => import("./ManageProjects"));
+// Como Proyectos: Agentes llega en su propio trozo, fuera de la carga inicial.
+const Agents = lazy(() => import("./Agents"));
+
 const destinosDe = (
   superficies: () => Superficie[],
   agentes: ContextoDeAgentes,
+  proyectos: ContextoDeProyectos | undefined,
 ): Destino[] => [
   {
     id: "general",
@@ -144,12 +151,28 @@ const destinosDe = (
     },
     icono: () => <Bot size={15} />,
     panel: () => (
-      <Agents
-        modelos={agentes.modelos}
-        proyecto={agentes.proyecto}
-        onAgentProfile={agentes.onAgentProfile}
-      />
+      <Suspense fallback={null}>
+        <Agents
+          modelos={agentes.modelos}
+          proyecto={agentes.proyecto}
+          onAgentProfile={agentes.onAgentProfile}
+        />
+      </Suspense>
     ),
+  },
+  {
+    id: "proyectos",
+    get name() {
+      return t("settings.nav.projects");
+    },
+    icono: () => <Folders size={15} />,
+    panel: proyectos
+      ? () => (
+          <Suspense fallback={null}>
+            <ManageProjects contexto={proyectos} />
+          </Suspense>
+        )
+      : null,
   },
   {
     id: "plugins",
@@ -187,7 +210,7 @@ const destinosDe = (
 
 const GRUPOS: { nombre: () => string; ids: string[] }[] = [
   { nombre: () => t("settings.nav.group_app"), ids: ["general", "appearance", "entorno"] },
-  { nombre: () => t("settings.nav.group_custom"), ids: ["skills", "agentes", "plugins"] },
+  { nombre: () => t("settings.nav.group_custom"), ids: ["skills", "agentes", "proyectos", "plugins"] },
   {
     nombre: () => t("settings.nav.group_connections"),
     ids: ["proveedores-ia", "fuentes", "radiant"],
@@ -208,6 +231,8 @@ export default function Settings(props: {
   agentesEnUso?: string[];
   /** Abre el perfil de un agente en esa carpeta; quien llama cierra la hoja. */
   onAgentProfile?: (project: string, name: string) => void;
+  /** Los proyectos del espacio y lo que se puede hacer con ellos. */
+  proyectos?: ContextoDeProyectos;
 }) {
   // Lo que se puede elegir para trabajar, que es lo que decide qué proveedores
   // tienen pantalla. Con su estado: aquí no apaga nada, lo enseña.
@@ -288,9 +313,10 @@ export default function Settings(props: {
         return props.agentesEnUso ?? [];
       },
       onAgentProfile: (project, name) => props.onAgentProfile?.(project, name),
-    });
+    }, props.proyectos);
 
   const [activo, setActivo] = createSignal(props.panel ?? "general");
+  let hoja: HTMLDivElement | undefined;
   // El foco viaja con las flechas sin arrastrar la selección: así se puede
   // recorrer la lista entera —incluidos los que aún no existen, que sí se
   // enfocan y anuncian por qué no— sin cambiar de panel en cada paso.
@@ -301,6 +327,9 @@ export default function Settings(props: {
         // Un campo marcado cancela lo suyo con Esc y se queda con la tecla:
         // esta escucha va en captura y de otro modo llega antes que él.
         if ((e.target as Element | null)?.closest?.("[data-owns-escape]")) return;
+        // Un diálogo abierto encima, como «Añadir un proyecto», cierra él solo.
+        const otro = (e.target as Element | null)?.closest?.("[role=dialog]");
+        if (otro && otro !== hoja) return;
         // La superficie está encima de todo: se queda con el Esc y no deja que
         // llegue a cerrar la columna de artefactos que hay detrás.
         e.stopPropagation();
@@ -439,6 +468,7 @@ export default function Settings(props: {
           // controles: pasado el ancho de una columna legible, estirarlo no
           // añade nada. El alto sí crece con la ventana, porque lo que crece
           // aquí es el riel — un agente más es una fila más.
+          ref={hoja}
           class="flex h-[min(900px,100%)] w-[min(1120px,100%)] max-w-[1120px] flex-col overflow-hidden p-0"
           aria-label={t("settings.title")}
         >

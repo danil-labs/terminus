@@ -5,6 +5,14 @@ import FolderGit from "lucide-solid/icons/folder-git-2";
 import { t } from "../../lib/i18n";
 import { workdirIconKind } from "./workdirKind";
 
+/** El tipo dicho como lo reconoce la persona: «Código», «Archivos» o «Nube». */
+export function workdirKindLabel(kind: string, cloud?: string | null): string {
+  const icon = workdirIconKind(kind, cloud);
+  if (icon === "git") return t("code.tree.kind.git");
+  if (icon === "cloud") return t("code.tree.kind.cloud");
+  return t("code.tree.kind.folder");
+}
+
 export default function WorkdirIcon(props: {
   kind: string;
   cloud?: string | null;

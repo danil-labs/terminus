@@ -125,6 +125,7 @@ const sembrar = (prefs) => () => {
 
 const tira = (ids, activa) => ({ abiertas: ids.map((id) => ({ id, project: "pa", titulo: `Tarea ${id}` })), activa });
 
+/** `boot` arranca con el riel agrupado por carpeta: el orden de las carpetas es lo que se mira. */
 export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
   const salida = process.env.TERMINUS_E2E_DIR ? join(process.env.TERMINUS_E2E_DIR, "spaces") : null;
   if (salida) mkdirSync(salida, { recursive: true });
@@ -136,7 +137,11 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
   const base = (s, prefs) => ({
     ...CON_TAREA,
     ...s.respuestas,
-    workspaces_startup: sembrar(prefs),
+    // Cada espacio guarda su vista del riel; aquí todas empiezan agrupadas por carpeta.
+    workspaces_startup: sembrar({
+      ...Object.fromEntries(s.spaces.map((i) => [`sidebar.view.w.${i.id}`, { group: "folder" }])),
+      ...prefs,
+    }),
     list_workspaces: () => ({ workspaces: [{ id: "w", name: "Danil", context_root: null, lengua: "es" }], active: "w" }),
     load_session: ({ id }) => ({ ...CON_TAREA.load_session, id }),
     task_history: CON_TAREA.task_history,
@@ -150,12 +155,24 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
       tecla,
       pildoras: () => [...doc.querySelectorAll("[data-space-pill]")],
       pildora: (id) => doc.querySelector(`[data-space-pill="${id}"]`),
+      // Con el riel agrupado por carpeta: una cabecera por carpeta con tareas.
       carpetasEnTareas: () =>
-        [...doc.querySelectorAll("[data-folder-row]")].filter((el) => !el.hidden).map((el) => el.dataset.folderRow),
+        [...doc.querySelectorAll("[data-folder-group]")].map((el) => el.dataset.folderGroup),
       pestanas: () => [...doc.querySelectorAll('[data-tira] [role="tab"]')].map((el) => el.textContent.trim()),
       pref: (k) => JSON.parse(app.w.localStorage.getItem(`harness.layout.${k}`) ?? "null"),
       caja: () =>
         [...doc.querySelectorAll("[data-ventana]")].find((el) => !el.classList.contains("hidden") && el.querySelector("textarea"))?.querySelector("textarea"),
+      /** Elige un agente en el menú de filtro del riel; `null` es «Todos». */
+      filtrarPorAgente: async (nombre) => {
+        doc.querySelector('button[aria-haspopup="menu"][aria-label^="Filtrar y agrupar"]').click();
+        await sleep(80);
+        const grupo = doc.querySelector('[role="menu"] [role="group"][aria-label="Agente"]');
+        assert.ok(grupo, "el menú de filtro ofrece agentes");
+        [...grupo.querySelectorAll('[role="menuitemradio"]')].find((b) => b.textContent.trim() === (nombre ?? "Todos")).click();
+        await sleep(80);
+        tecla(doc.activeElement ?? doc.body, "Escape");
+        await sleep(80);
+      },
       boton: (texto) => [...doc.querySelectorAll("button")].find((b) => b.textContent.trim() === texto),
       abrirMenu: async (id) => {
         doc.querySelector(`[data-space-pill="${id}"]`).dispatchEvent(new app.w.MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
@@ -182,7 +199,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     assert.equal(u.pildora("i1").dataset.selected, "true");
     assert.equal(u.pildora("i1").querySelector("[data-attention-badge]"), null, "la elegida no lleva señal");
     assert.ok(u.doc.querySelector("[data-new-space]"), "el «+» sigue a las píldoras");
-    assert.deepEqual(u.carpetasEnTareas(), ["pa", "pb", "pc"], "las carpetas en el orden de hoy");
+    assert.deepEqual(u.carpetasEnTareas(), ["pa", "pb"], "las carpetas con tareas, en el orden de hoy: «pc» solo tiene una archivada");
     assert.equal(u.doc.querySelector("[data-main-folder]"), null, "ninguna carpeta es la principal");
     assert.deepEqual(u.pestanas(), ["Tarea t1", "Tarea t2"], "la tira de antes sigue abierta");
     assert.deepEqual(u.pref("pestanas.w")?.abiertas.map((p) => p.id), ["t1", "t2"], "la clave vieja se queda para un build anterior");
@@ -269,7 +286,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
         { id: "i2", name: "Facturación", folders: ["pb"], created_at: 2, updated_at: 2 },
       ],
       filas: [
-        fila("t1", "pa", "i1"), fila("t2", "pb", "i1"), fila("t3", "pb", "i2"), fila("t4", "pa", "i2"),
+        fila("t1", "pa", "i1", { agent: "ada" }), fila("t2", "pb", "i1"), fila("t3", "pb", "i2"), fila("t4", "pa", "i2"),
         fila("t5", "pc", null), fila("c1", "pa", null, { chat_de_agente: true, agent: "design" }),
       ],
       atencion: [{ session: "t3", project: "pb", state: "asked" }, { session: "t1", project: "pa", state: "failed" }],
@@ -304,8 +321,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     assert.equal(u.doc.querySelector('[data-sesion="t1"]'), null);
     assert.equal(u.pildora("i1").querySelector("[data-attention-badge]")?.dataset.attentionBadge, "failed");
     assert.equal(u.pildora("i2").querySelector("[data-attention-badge]"), null, "la elegida pierde la señal");
-    assert.ok(u.doc.querySelector('[data-folder-row="pb"] [data-sidebar-agents]'));
-    assert.ok(u.doc.querySelector('[data-folder-row="pb"] [data-sidebar-tasks]'));
+    assert.ok(u.doc.querySelector('[data-sidebar-group="pb"] [data-sesion]'));
     // Volver a un escritorio monta solo la pestaña de delante, y en su celda: una
     // montada escondida gasta su lectura sin caja y reabre al final.
     const pestana = (titulo) => [...u.doc.querySelectorAll('[data-tira] [role="tab"]')].find((el) => el.textContent.trim() === titulo);
@@ -333,6 +349,22 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     assert.equal(u.doc.querySelector('[data-tira] [role="tab"][aria-selected="true"]')?.textContent.trim(), "Tarea t3");
     u.doc.querySelector('[data-space="i1"]').click();
     await sleep(400);
+
+    // La vista del riel es de cada espacio: el filtro de uno no sale en el otro.
+    await u.filtrarPorAgente("ada");
+    assert.ok(u.doc.querySelector('[data-sesion="t1"]') && !u.doc.querySelector('[data-sesion="t2"]'), "el filtro por agente se aplica");
+    u.doc.querySelector('[data-space="i2"]').click();
+    await sleep(400);
+    assert.ok(u.doc.querySelector('[data-sesion="t3"]') && u.doc.querySelector('[data-sesion="t4"]'), "otro espacio no hereda el filtro");
+    assert.doesNotMatch(u.doc.querySelector("[data-sidebar-scope]").textContent, /ada/);
+    u.doc.querySelector('[data-space="i1"]').click();
+    await sleep(400);
+    assert.ok(u.doc.querySelector('[data-sesion="t1"]') && !u.doc.querySelector('[data-sesion="t2"]'), "volver al espacio recupera su filtro");
+    assert.match(u.doc.querySelector("[data-sidebar-scope]").textContent, /ada/);
+    assert.equal(u.pref("sidebar.view.w.i1").agent, "ada");
+    assert.equal(u.pref("sidebar.view.w.i2")?.agent ?? null, null);
+    await u.filtrarPorAgente(null);
+    assert.ok(u.doc.querySelector('[data-sesion="t2"]'));
     guarda("two-spaces", app, s);
 
     // Mover: solo a las otras, y la pestaña se va con la tarea.
@@ -689,7 +721,8 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
         { id: "i1", name: null, folders: ["pa", "pc"], created_at: 1, updated_at: 1 },
         { id: "i2", name: "Facturación", folders: ["pb", "pc"], created_at: 2, updated_at: 2 },
       ],
-      filas: [fila("t3", "pb", "i2")],
+      // El riel solo enseña carpetas con tareas: cada una lleva la suya.
+      filas: [fila("t1", "pa", "i1"), fila("t2", "pc", "i1"), fila("t3", "pb", "i2"), fila("t4", "pc", "i2")],
     });
     const app = await boot("listo", "spaces-folders", base(s, { "space.w": "i1" }));
     await sleep(500);
@@ -705,7 +738,8 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
       [{ id: "i1", folders: ["pa"] }],
     );
     assert.equal(s.llamadas.some(([c]) => c === "delete_project"), false, "removing it does not delete the project");
-    assert.deepEqual(u.carpetasEnTareas(), ["pa"], "it leaves this space's rail");
+    // El riel lista tareas, no carpetas: la tarea de «pc» que es de este espacio sigue a la vista.
+    assert.ok(u.doc.querySelector('[data-sesion="t2"]'), "its task stays in this space's rail");
     u.doc.querySelector('[data-space="i2"]').click();
     await sleep(400);
     assert.deepEqual(u.carpetasEnTareas(), ["pb", "pc"], "and stays in the other one");

@@ -1,10 +1,6 @@
 import Archive from "lucide-solid/icons/archive";
-import ChevronRight from "lucide-solid/icons/chevron-right";
-import Clock from "lucide-solid/icons/clock";
-import FolderPlus from "lucide-solid/icons/folder-plus";
 import History from "lucide-solid/icons/history";
 import Loader2 from "lucide-solid/icons/loader-2";
-import MoreVertical from "lucide-solid/icons/more-vertical";
 import PanelLeftClose from "lucide-solid/icons/panel-left-close";
 import Plus from "lucide-solid/icons/plus";
 import Search from "lucide-solid/icons/search";
@@ -12,27 +8,20 @@ import SettingsIcon from "lucide-solid/icons/settings";
 import SquarePen from "lucide-solid/icons/square-pen";
 import TriangleAlert from "lucide-solid/icons/triangle-alert";
 import X from "lucide-solid/icons/x";
-import { createEffect, createResource, createSignal, on, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createResource, createSignal, type JSX, lazy, mapArray, on, onCleanup, Show, Suspense } from "solid-js";
 import { destinoEnVuelo, puntoDelArrastre, tareaEnVuelo } from "../../lib/drag";
 import { enfocarYSeleccionar } from "../../lib/focus";
-import { lastRoster, rememberRoster } from "../../lib/handlerRoster";
 import { t } from "../../lib/i18n";
+import { lastRoster, rememberRoster } from "../../lib/handlerRoster";
 import { invoke } from "../../lib/invoke.ts";
-import type { HandlerList, Project } from "../../lib/model";
+import type { AgentProfile, HandlerList, HandlerStatus, Project } from "../../lib/model";
 import { createPref } from "../../lib/prefs";
-import { PROJECT_NAME_MAX_LENGTH } from "../../lib/projectNames";
 import { ariaDeAtajo } from "../../lib/shortcuts";
 import { capabilities } from "../../lib/platform";
 import { cn } from "../../lib/utils";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
 import { KeyedList } from "../../ui/KeyedList";
-import {
-  ITEM_DE_MENU,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "../../ui/Popover";
 import { BotonConAtajo, TeclaDeAtajo } from "../../ui/Shortcut";
 import {
   SidebarContent,
@@ -43,14 +32,30 @@ import {
   SidebarMenuItem,
   Sidebar as SidebarShell,
 } from "../../ui/sidebar";
-import WorkdirIcon from "../code/WorkdirIcon";
 import { type ClonEnCurso, faseDeClon } from "../projects/AddWorkdir";
-import AgentRows from "../projects/AgentRows";
+import { AstroAvatar } from "../projects/AstroAvatar";
+import { watchHandlerStatuses } from "../projects/handlerPresence";
 import NewAgent, { type ModelChoices } from "../projects/NewAgent";
+import { watchProfiles } from "../projects/profiles";
 import Sessions, { type SessionRow } from "../projects/Sessions";
 import type { Etapa } from "../projects/TaskStage";
-import EstadoDeTarea from "../projects/TaskStatus";
 import { ConexionesMenu } from "../settings/Tools";
+import {
+  applySidebarView,
+  groupLabel,
+  loadSidebarView,
+  saveSidebarView,
+  scopeLabel,
+  type SidebarGroup,
+  type SidebarView,
+} from "../../lib/sidebarView";
+import type { DockAgent } from "./dockLayout";
+import { flattenTasks, folderCounts } from "./sidebarTasks";
+
+// Fuera de la carga inicial: el botón y el dock llegan un instante después de la lista.
+const SidebarFilter = lazy(() => import("./SidebarFilter").then((m) => ({ default: m.SidebarFilter })));
+const AgentDock = lazy(() => import("./AgentDock"));
+const FolderGroupHeader = lazy(() => import("./FolderGroupHeader"));
 
 /* El ancho vive en `ColumnaLateral`, que es la columna que envuelve a esta
    barra. Aquí había cuatro constantes —expandido, mínimo, máximo y el riel— que
@@ -58,21 +63,11 @@ import { ConexionesMenu } from "../settings/Tools";
    la única razón de que el ancho fuera un número en este archivo. */
 
 /**
- * La clave con la que se recuerda si «Recientes» está plegado.
- *
- * **No puede ser `""`**, que es como Rust nombra al grupo sin proyecto: la
- * preferencia guarda ids de proyecto, y una cadena vacía en esa lista no se
- * distingue de un id que se perdió. Lleva un prefijo que ningún `short_id`
- * puede producir.
- */
-const SUELTAS = "@recientes";
-
-/**
- * El rasgo que enciende la fila sobre la que se soltaría la tarea que va en la
- * mano. Lo llevan las dos filas que aceptan soltar —un proyecto y «Recientes»—
- * y escrito dos veces se separan sin que nada avise.
+ * El rasgo que enciende la cabecera sobre la que se soltaría la tarea que va en
+ * la mano. Solo agrupando por carpeta hay cabeceras que reciben tareas.
  */
 const RECIBE_LA_TAREA = ["ring-2", "ring-primary"];
+
 
 /**
  * Abierto o cerrado, y nada más.
@@ -93,10 +88,12 @@ export function createSidebar() {
 }
 
 /**
- * La columna izquierda, montada sobre el shell de `ui/sidebar.tsx`. Antes esto
- * era `.side-btn` y sus cinco modificadores escritos aquí: la casilla de 22px
- * para el ícono, el truncado de la etiqueta, el tooltip solo cuando está
- * colapsado. Sale del átomo en vez de mantenerse dos veces.
+ * La columna izquierda, montada sobre el shell de `ui/sidebar.tsx`.
+ *
+ * **Solo tareas, en una lista plana de todas las carpetas.** La carpeta es un
+ * dato de cada fila y no un nivel de la lista: una carpeta sin tareas no
+ * aparece nunca. Arriba lo que te necesita, en medio lo demás y lo asentado
+ * plegado al final.
  */
 export default function Sidebar(props: {
   projects: Project[];
@@ -124,12 +121,8 @@ export default function Sidebar(props: {
   proyectoAbierto: string | null;
   /** Abre el proyecto en el panel principal: sus tareas y su contexto fijo. */
   onAbrirProyecto: (id: string) => void;
-  /** Con qué encargado se está hablando ahora, para marcar su fila. */
-  hablandoCon?: { project: string; name: string } | null;
-  onHablarCon: (project: string, name: string) => void;
   /** Lo que se ofrece como modelo por defecto al crear un agente. */
   modelos: ModelChoices;
-  onAgentProfile: (project: string, name: string) => void;
   /** Empezar una tarea dentro de ese proyecto, sin pasar por su vista. */
   onNuevaTareaEn: (id: string) => void;
   onDelete: (project: string, id: string) => Promise<boolean | void> | boolean | void;
@@ -138,6 +131,11 @@ export default function Sidebar(props: {
   onRenombrar: (project: string, id: string, title: string) => Promise<boolean | void> | boolean | void;
   onPin?: (project: string, id: string, pinned: boolean) => void | Promise<void>;
   onSettings: (panel?: string) => void;
+  /** Abre el chat con un agente de esa carpeta, como su fila de antes. */
+  onHablarCon: (project: string, name: string) => void;
+  onAgentProfile: (project: string, name: string) => void;
+  /** Dónde se guarda la vista del riel: una por workspace y espacio (`sidebarViewKey`). */
+  viewKey: string;
   /** El nombre del escritorio activo, para su riel vacío. */
   escritorio?: string | null;
   viendoArchivadas?: boolean;
@@ -149,15 +147,6 @@ export default function Sidebar(props: {
   let listViewport: HTMLDivElement | undefined;
   // Colapsado, el historial no desaparece: se abre al lado del riel.
   const [desplegado, setDesplegado] = createSignal(false);
-  // El alta de proyecto, en línea: un nombre no merece una hoja aparte.
-  const [nombre, setNombre] = createSignal("");
-  // Qué proyecto tiene el menú abierto, y en qué vista: las acciones o la
-  // confirmación de borrado. **Un solo Popover con dos contenidos**, no dos
-  // anidados: un panel que se abre desde dentro de otro se cierra con el
-  // primero, y la advertencia de lo que se pierde se iría con él.
-  const [menu, setMenu] = createSignal<string | null>(null);
-  const [confirmando, setConfirmando] = createSignal<string | null>(null);
-  const [renombrando, setRenombrando] = createSignal<string | null>(null);
   let riel: HTMLDivElement | undefined;
 
   // Expandir vuelve redundante el desplegable: la lista ya está a la vista.
@@ -191,18 +180,8 @@ export default function Sidebar(props: {
     }),
   );
 
-  /* Aquí vivía `withHistory`: la lista se filtraba a los proyectos que ya
-     tenían conversación, con una razón escrita —«el historial es de lo que se
-     hizo, no de lo que existe»— que era buena cuando los proyectos salían de
-     leer una carpeta con 25 subrepos.
-
-     Ya no salen de ahí: se crean a mano, uno por uno, y uno recién creado que no
-     aparece en el sidebar es un proyecto que no existe para quien lo acaba de
-     nombrar. La regla se conserva donde sí valía: su historial solo se despliega
-     si tiene algo dentro. */
-
-  // Se despliegan solos, porque son pocos y son justo los que importan. Cerrar
-  // uno se recuerda; nada se abre por estar activo si no tiene nada dentro.
+  // Los grupos por carpeta plegados; la clave es la de siempre para no perder
+  // lo que alguien ya había plegado.
   const [cerrados, setCerrados] = createPref<string[]>("historial.cerrados", []);
   const alternarGrupo = (p: string) =>
     setCerrados(
@@ -210,26 +189,135 @@ export default function Sidebar(props: {
         ? cerrados().filter((x) => x !== p)
         : [...cerrados(), p],
     );
-
-  const [agentesPlegados, setAgentesPlegados] = createPref<string[]>(
-    "sidebar.agentes.plegados",
-    [],
-  );
-  const alternarAgentes = (p: string) =>
-    setAgentesPlegados(
-      agentesPlegados().includes(p)
-        ? agentesPlegados().filter((x) => x !== p)
-        : [...agentesPlegados(), p],
-    );
+  // Cada espacio guarda su vista: cambiar de espacio relee la suya.
+  const [vista, setVista] = createSignal<SidebarView>(loadSidebarView(props.viewKey));
+  createEffect(on(() => props.viewKey, (key) => setVista(loadSidebarView(key)), { defer: true }));
+  const cambiarVista = (siguiente: SidebarView) => {
+    setVista(siguiente);
+    saveSidebarView(props.viewKey, siguiente);
+  };
 
   const [searchOpen, setSearchOpen] = createSignal(false);
   const [searchText, setSearchText] = createSignal("");
   const query = () => searchText().trim();
   const [searchCounts, setSearchCounts] = createSignal<Record<string, number>>({});
   const reportResults = (key: string, count: number) => setSearchCounts(previous => previous[key] === count ? previous : { ...previous, [key]: count });
-  const resultCount = (project: string) => (searchCounts()[`tasks:${project}`] ?? 0) + (searchCounts()[`agents:${project}`] ?? 0);
   const closeSearch = () => { setSearchText(""); setSearchOpen(false); };
   createEffect(() => { if (props.collapsed) closeSearch(); });
+
+  /** De qué carpeta es cada tarea, por id: las acciones de la fila llegan con el id. */
+  const carpetaDeTarea = createMemo(() => {
+    const mapa = new Map<string, string>();
+    for (const [project, rows] of Object.entries(props.sessions)) for (const row of rows) if (!mapa.get(row.id)) mapa.set(row.id, project);
+    return mapa;
+  });
+  const carpetaDe = (id: string) => carpetaDeTarea().get(id) ?? "";
+  const nombreDe = (project: string) => props.projects.find((p) => p.id === project)?.name;
+  const relacionadas = createMemo(() => Object.values(props.sessions).flat());
+
+  const todas = createMemo(() => flattenTasks(props.sessions, !!query()));
+  const cuentas = createMemo(() => folderCounts(todas()));
+  /**
+   * La vista que se aplica: de las carpetas elegidas, las que siguen teniendo
+   * tareas. Si ninguna sigue, son todas: un filtro que deja la lista vacía sin
+   * decir por qué parece que se borró el trabajo.
+   */
+  const vistaEfectiva = createMemo<SidebarView>(() => {
+    const v = vista();
+    const carpetas = v.folders.filter((f) => (cuentas().get(f) ?? 0) > 0);
+    return carpetas.length === v.folders.length ? v : { ...v, folders: carpetas };
+  });
+  const grupos = createMemo(() => {
+    const todosLosGrupos = applySidebarView(todas().map((x) => x.row), vistaEfectiva(), {
+      live: props.vivas,
+      approving: props.aprobando,
+      folderOf: (row) => carpetaDe(row.id),
+    });
+    // Por carpeta, en el orden del riel (la principal primero) y «sin carpeta» al final.
+    const orden = (g: SidebarGroup<SessionRow>) => {
+      if (g.kind !== "folder") return Number.MAX_SAFE_INTEGER;
+      const i = props.projects.findIndex((p) => p.id === g.key);
+      return i === -1 ? props.projects.length : i;
+    };
+    return vistaEfectiva().group === "folder"
+      ? todosLosGrupos.map((g, i) => ({ g, i })).sort((a, b) => orden(a.g) - orden(b.g) || a.i - b.i).map(({ g }) => g)
+      : todosLosGrupos;
+  });
+  const carpetasDelFiltro = createMemo(() => props.projects
+    .filter((p) => (cuentas().get(p.id) ?? 0) > 0)
+    .map((p) => ({ id: p.id, name: p.name, count: cuentas().get(p.id) ?? 0 })));
+
+  /**
+   * Los agentes del dock: los de las carpetas que tienen tareas, con su
+   * presencia. Un mismo agente propio sale en cada carpeta y se junta por
+   * nombre; manda el estado más despierto y se suman sus tareas vivas.
+   */
+  const carpetasConTareas = createMemo(
+    () => [...cuentas().keys()].filter((k) => k !== "").sort(),
+    [],
+    { equals: (a, b) => a.length === b.length && a.every((x, i) => x === b[i]) },
+  );
+  const [altas, setAltas] = createSignal(0);
+  const alCrearAgente = () => setAltas((n) => n + 1);
+  window.addEventListener("harness:encargados", alCrearAgente);
+  onCleanup(() => window.removeEventListener("harness:encargados", alCrearAgente));
+  const porCarpeta = createMemo(mapArray(carpetasConTareas, (project) => {
+    const [roster] = createResource(() => `${project}:${altas()}`, async () => {
+      try {
+        const listado = (await invoke<HandlerList>("list_agents", { project })).agents;
+        rememberRoster(project, listado);
+        return listado;
+      } catch {
+        return lastRoster(project) ?? [];
+      }
+    });
+    return {
+      project,
+      roster: () => roster() ?? lastRoster(project) ?? [],
+      estados: watchHandlerStatuses(project),
+      perfiles: watchProfiles(project),
+    };
+  }));
+  const RANGO: Record<HandlerStatus, number> = { working: 2, awake: 1, asleep: 0 };
+  const agentesDelDock = createMemo<DockAgent[]>(() => {
+    const juntos = new Map<string, DockAgent>();
+    for (const c of porCarpeta()) {
+      const estados = new Map(c.estados().map((r) => [r.name, r] as const));
+      for (const a of c.roster()) {
+        const fila = estados.get(a.name);
+        const antes = juntos.get(a.name);
+        const status = fila?.status;
+        juntos.set(a.name, {
+          name: a.name,
+          status: !antes?.status || (status && RANGO[status] > RANGO[antes.status]) ? status ?? antes?.status : antes.status,
+          liveTasks: (antes?.liveTasks ?? 0) + (fila?.live_tasks ?? 0),
+          minutesSinceLastTurn: fila?.minutes_since_last_turn ?? antes?.minutesSinceLastTurn ?? null,
+        });
+      }
+    }
+    return [...juntos.values()];
+  });
+  const perfilDe = (name: string): AgentProfile | undefined => {
+    for (const c of porCarpeta()) {
+      const perfil = c.perfiles()[name];
+      if (perfil) return perfil;
+    }
+    return undefined;
+  };
+  /** Carpetas donde está el agente, en el orden del riel. */
+  const carpetasDelAgente = (name: string) => {
+    const orden = (id: string) => { const i = props.projects.findIndex((p) => p.id === id); return i === -1 ? props.projects.length : i; };
+    return porCarpeta()
+      .filter((c) => c.roster().some((a) => a.name === name))
+      .map((c) => ({ id: c.project, name: nombreDe(c.project) ?? c.project }))
+      .sort((a, b) => orden(a.id) - orden(b.id));
+  };
+  const agentesDelFiltro = createMemo(() => {
+    const nombres = new Set([...agentesDelDock().map((a) => a.name), ...todas().flatMap((x) => x.row.agent ? [x.row.agent] : [])]);
+    return [...nombres].sort().map((name) => ({ name, body: perfilDe(name)?.body, avatar: perfilDe(name)?.avatar }));
+  });
+  const alcance = () => scopeLabel(vistaEfectiva(), (id) => nombreDe(id) ?? id);
+  const conResultados = (clave: string) => (searchCounts()[clave] ?? 0) > 0;
 
   /**
    * A qué proyectos puede irse una tarea que hoy está en `de`.
@@ -244,58 +332,64 @@ export default function Sidebar(props: {
       .map((p) => ({ id: p.id, name: p.name }));
 
   /**
-   * El historial de un grupo.
+   * Un tramo de la lista: las tareas de varias carpetas en una sola lista.
    *
-   * **Es un componente y no una variable con JSX.** Se pinta en dos sitios —la
-   * lista expandida y el desplegable—; una variable contendría un solo nodo del
-   * DOM y colocarlo dos veces lo movería del primero al segundo.
+   * **Es un componente y no una variable con JSX.** La lista se pinta en dos
+   * sitios —expandida y en el desplegable—; una variable contendría un solo
+   * nodo del DOM y colocarlo dos veces lo movería del primero al segundo.
    */
-  const EncabezadoDeTareas = () => (
-    <div data-tasks-header class="mx-1 mt-2 mb-0.5 flex h-7 min-w-0 items-center pl-1">
-      <span class="min-w-0 flex-1 truncate px-1 text-[0.6875rem] font-medium text-neutral-500 uppercase">{t("shell.sidebar.tasks")}</span>
-    </div>
-  );
-
-  const Historial = (p: { de: string }) => (
+  const Historial = (p: { filas: SessionRow[]; clave: string; sinCarpeta?: boolean }) => (
     <Sessions sidebar
-      sessions={props.sessions[p.de] ?? []}
-      groupByHandler={p.de !== ""}
+      density={vista().density}
+      hideFolder={p.sinCarpeta}
+      sessions={p.filas}
+      relatedSessions={relacionadas()}
       groupByAuthor={false}
       search={query()}
-      onSearchResults={count => reportResults(`tasks:${p.de}`, count)}
+      onSearchResults={count => reportResults(p.clave, count)}
       current={props.current}
       vivas={props.vivas}
       aprobando={props.aprobando}
-      destinos={destinos(p.de)}
-      de={p.de}
+      de=""
+      projectOf={(row) => carpetaDe(row.id)}
+      destinos={[]}
+      destinosDe={(row) => destinos(carpetaDe(row.id))}
+      carpetaDe={(row) => nombreDe(carpetaDe(row.id))}
       onPick={(s) => {
-        props.onPick(p.de, s);
+        props.onPick(carpetaDe(s), s);
         setDesplegado(false);
       }}
-      onDelete={(s) => props.onDelete(p.de, s)}
-      onEtapa={(s, etapa) => props.onEtapa(p.de, s, etapa)}
-      onRenombrar={(s, title) => props.onRenombrar(p.de, s, title)}
-      onPin={props.onPin ? (s, pinned) => props.onPin?.(p.de, s, pinned) : undefined}
+      onDelete={(s) => props.onDelete(carpetaDe(s), s)}
+      onEtapa={(s, etapa) => props.onEtapa(carpetaDe(s), s, etapa)}
+      onRenombrar={(s, title) => props.onRenombrar(carpetaDe(s), s, title)}
+      onPin={props.onPin ? (s, pinned) => props.onPin?.(carpetaDe(s), s, pinned) : undefined}
       spaces={props.spaces}
-      carpeta={props.projects.find((x) => x.id === p.de)?.name}
-      onMoveToSpace={(s, space) => props.onMoveToSpace?.(p.de, s, space)}
+      onMoveToSpace={(s, space) => props.onMoveToSpace?.(carpetaDe(s), s, space)}
       onMove={(s, to) => {
-        // El grupo de destino se abre: una tarea que se mueve a un proyecto
-        // plegado desaparece de la pantalla, y eso se lee como que se borró.
-        setCerrados(cerrados().filter((x) => x !== (to === "" ? SUELTAS : to)));
-        props.onMove(p.de, s, to);
+        // El grupo de destino se abre: una tarea que se mueve a una carpeta
+        // plegada desaparece de la pantalla, y eso se lee como que se borró.
+        setCerrados(cerrados().filter((x) => x !== to));
+        props.onMove(carpetaDe(s), s, to);
       }}
     />
   );
 
-  // Las tareas que todavía no están en ningún proyecto. **Van al final y no
-  // arriba**: son las que aún no se han ordenado, no las importantes. Es el
-  // reparto de ChatGPT —los proyectos mandan, lo suelto se acumula debajo— y
-  // sale de que preguntar no exige haber nombrado el trabajo primero.
-  const sueltas = () => props.sessions[""] ?? [];
+  /** El rótulo de un tramo, con su cuenta a la derecha. */
+  const Rotulo = (p: { children: JSX.Element; cuenta: number; tono?: "need" }) => (
+    <div class={cn(
+      "flex h-7 min-w-0 items-center gap-1.5 px-2 pt-1 text-[0.6875rem] font-medium",
+      p.tono === "need" ? "text-warning" : "text-neutral-500",
+    )}>
+      {p.children}
+      <span class={cn("ml-auto shrink-0 tabular-nums", p.tono !== "need" && "text-neutral-700")}>{p.cuenta}</span>
+    </div>
+  );
+
+  /** Cuántas filas enseña un tramo: buscando, las que encontró. */
+  const cuentaDe = (clave: string, filas: SessionRow[]) => query() ? (searchCounts()[clave] ?? 0) : filas.length;
 
   /**
-   * La carpeta que se está clonando, en el sitio donde va a aparecer.
+   * La carpeta que se está clonando, encima de la lista.
    *
    * No se puede abrir ni recibe tareas: no hay proyecto hasta que `git clone`
    * termina. Pulsarla devuelve el diálogo, que es donde viven el progreso y la
@@ -340,395 +434,93 @@ export default function Sidebar(props: {
     </button>
   );
 
-  /** Una carpeta de trabajo en el riel, con sus tareas debajo. */
-  const FilaDeCarpeta = (pp: { p: Project }) => {
-          const p = () => pp.p;
-          const delProyecto = () => props.sessions[p().id] ?? [];
-          // Del material del proyecto, no de la app: sale con la misma
-          // llamada que ya usa `ProjectView.tsx`, releída al cambiar de carpeta.
-          // Se recarga al crear uno: sin esto el riel solo mira el id del
-          // proyecto, que no cambia, y quien crea su primer agente no lo ve
-          // aparecer y concluye que no se creó.
-          const [creados, setCreados] = createSignal(0);
-          const alCrear = () => setCreados((n) => n + 1);
-          window.addEventListener("harness:encargados", alCrear);
-          onCleanup(() => window.removeEventListener("harness:encargados", alCrear));
-          const [encargados] = createResource(
-            () => `${p().id}:${creados()}`,
-            async (clave) => {
-              const id = clave.split(":")[0];
-              try {
-                const listado = (await invoke<HandlerList>("list_agents", { project: id })).agents;
-                rememberRoster(id, listado);
-                return listado;
-              } catch {
-                return lastRoster(id) ?? [];
-              }
-            },
-          );
-          const roster = () => encargados() ?? lastRoster(p().id);
-          const abierto = () => !!query() || !cerrados().includes(p().id);
-          const plegadas = () => delProyecto().filter((s) => !s.archived);
-          /** Si soltar aquí la tarea que va en la mano la movería a este. */
-          const recibiendo = () => destinoEnVuelo() === p().id;
-
-          return (
-            <div data-folder-row={p().id} classList={{ hidden: !!query() && resultCount(p().id) === 0 }}>
-              {/* **La fila es el destino del arrastre**, y por eso el
-                  `data-destino` va aquí y no en el botón: soltar sobre el
-                  espacio del chevron o del menú cuenta igual. Cómo se resuelve
-                  está en `lib/drag.ts`. */}
+  const Grupo = (p: { grupo: SidebarGroup<SessionRow> }) => {
+    const g = () => p.grupo;
+    const clave = () => g().kind === "section" ? g().key : `${g().kind}:${g().key}`;
+    const titulo = () => groupLabel(g(), (id) => nombreDe(id) ?? id);
+    const proyecto = () => g().kind === "folder" ? props.projects.find((x) => x.id === g().key) : undefined;
+    const abierto = () => !!query() || g().kind !== "folder" || !cerrados().includes(g().key);
+    const necesita = () => (g().kind === "section" && g().key === "needs_you")
+      || (g().kind === "status" && ["approving", "asked", "failed"].includes(g().key));
+    return (
+      <Show when={g().tasks.length > 0}>
+        <section
+          data-sidebar-section={g().kind === "section" ? g().key : undefined}
+          data-sidebar-group={g().kind === "section" ? undefined : g().key}
+          aria-label={titulo()}
+          classList={{ hidden: !!query() && !conResultados(clave()) }}
+        >
+          <Show
+            when={proyecto()}
+            fallback={
               <div
-                class={cn(
-                  "group grid min-w-0 grid-cols-[20px_minmax(0,1fr)_auto_auto] items-center rounded-[var(--radius-sm)]",
-                  recibiendo() && RECIBE_LA_TAREA,
-                )}
-                data-destino={p().id}
+                data-destino={g().kind === "folder" ? "" : undefined}
+                class={cn("rounded-[var(--radius-sm)]", g().kind === "folder" && destinoEnVuelo() === "" && RECIBE_LA_TAREA)}
               >
-                <button
-                  class="group/project-icon relative grid size-5 place-items-center rounded-sm text-neutral-500 outline-none hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:pointer-events-none"
-                  aria-expanded={abierto()}
-                  aria-label={
-                    abierto()
-                      ? t("shell.sidebar.collapse_group", { name: p().name })
-                      : t("shell.sidebar.expand_group", { name: p().name })
-                  }
-                  onClick={() => alternarGrupo(p().id)}
-                >
-                  <span class="transition-opacity group-hover:opacity-0 group-focus-visible/project-icon:opacity-0">
-                    <WorkdirIcon kind={p().kind} cloud={p().cloud} />
-                  </span>
-                  <ChevronRight size={14} class={cn("absolute opacity-0 transition-[opacity,transform] group-hover:opacity-100 group-focus-visible/project-icon:opacity-100", abierto() && "rotate-90")} />
-                </button>
-
-                {/* **Renombrar pasa dentro de la fila, y antes la
-                    sustituía.** El formulario ocupaba el sitio del proyecto
-                    entero —sin chevron, sin carpeta y con la caja del átomo,
-                    más alta que la fila—, así que al empezar a escribir el
-                    nombre se movía de sitio y todo lo de abajo con él. En el
-                    historial, ese mismo campo llevaba la fila de 27,55 px a
-                    47,50 px. Ahora
-                    el campo se pinta en la columna del nombre, con la misma
-                    altura, la misma sangría y la misma letra: lo único que
-                    cambia es que el texto se puede escribir, y llega
-                    seleccionado. Es el mismo arreglo que el renombrado de
-                    tareas (`tareas/Sessions.tsx`) porque es el mismo gesto.
-
-                    Y el nombre no lleva `font-mono` ni cuando se lee ni
-                    cuando se escribe: era el nombre de una carpeta y ahora es
-                    el nombre que alguien le puso a su trabajo. */}
-                <Show
-                  when={renombrando() === p().id}
-                  fallback={
-                    <SidebarMenuButton
-                      // **La jerarquía estaba al revés, y medida.** El proyecto
-                      // —que es el contenedor— iba en el gris de lo secundario y sus
-                      // tareas en el color del texto normal: **4,10:1 contra
-                      // 20,12:1 en oscuro**, o sea que el contenedor pesaba cinco
-                      // veces menos que lo contenido. Y sobre la fila rellena
-                      // —hover o abierta— ese gris quedaba en 4,13:1 en claro, por
-                      // debajo de AA.
-                      //
-                      // Ahora comparte la tinta con sus tareas y se separa por peso,
-                      // que es el escalón que la escala tipográfica reserva a
-                      // los rótulos de interfaz. Lo que dice «esto contiene» es la
-                      // carpeta y la sangría de lo que cuelga, no que se lea peor.
-                      class="h-8 min-h-8 grid-cols-[minmax(0,1fr)_auto] font-semibold"
-                      isActive={props.proyectoAbierto === p().id}
-                      // **Sin la barra de acento, y es el segundo sitio que la
-                      // pierde** —el primero fue el historial de tareas, por lo
-                      // mismo—. A la izquierda del nombre ya hay dos cosas: el
-                      // chevron que pliega y la carpeta. Una barra vertical
-                      // pegada al borde añade una tercera raya en la misma banda
-                      // de 20 px y se lee como decoración, no como estado. Lo que
-                      // dice cuál está abierto es el relleno de la fila más la
-                      // negrita, con lo que eso cuesta escrito en
-                      // `styles/selection.css`.
-                      selectionMark={false}
-                      onDblClick={() => { setNombre(p().name); setRenombrando(p().id); }}
-                      onKeyDown={(e) => { if (e.key === "F2") { e.preventDefault(); setNombre(p().name); setRenombrando(p().id); } }}
-                      onClick={() => {
-                        props.onAbrirProyecto(p().id);
-                        setDesplegado(false);
-                      }}
-                    >
-                      <span class="flex min-w-0 items-baseline gap-1.5">
-                        <span class="truncate">{p().name}</span>
-                      </span>
-                      <Show when={!abierto()}>
-                        <EstadoDeTarea
-                          ambito="plegadas"
-                          aprobando={plegadas().some((s) => props.aprobando.includes(s.id))}
-                          viva={plegadas().some((s) => props.vivas.includes(s.id))}
-                          esperando={plegadas().some((s) => s.esperando)}
-                          outcome={plegadas().some((s) => s.sin_ver && s.outcome === "failed") ? "failed" : null}
-                          sinVer={plegadas().some((s) => s.sin_ver)}
-                        />
-                      </Show>
-                    </SidebarMenuButton>
-                  }
-                >
-                  <form
-                    class="grid h-8 min-w-0 grid-cols-[minmax(0,1fr)] items-center gap-0.5 rounded-[var(--radius-sm)] bg-neutral-200 px-2 font-semibold"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      const n = nombre().trim();
-                      setRenombrando(null);
-                      if (n && n !== p().name)
-                        void props.onRenombrarProyecto(p().id, n);
-                    }}
-                  >
-                    <Input
-                      ref={enfocarYSeleccionar}
-                      variant="ghost"
-                      // Sin caja y con `font-sans`: el nombre conserva la misma
-                      // tipografía al pasar de lectura a edición.
-                      class="block h-auto min-h-0 rounded-none border-0 p-0 font-sans text-[0.8125rem] leading-[1.25] text-inherit [font-weight:inherit]"
-                      maxlength={PROJECT_NAME_MAX_LENGTH}
-                      value={nombre()}
-                      aria-label={t("shell.sidebar.rename_label", { name: p().name })}
-                      onInput={(e) => setNombre(e.currentTarget.value)}
-                      onBlur={() => setRenombrando(null)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Escape") setRenombrando(null);
-                      }}
-                    />
-                  </form>
-                </Show>
-
-                {/* **Borrar dejó de estar a un clic.** Era un bote de basura
-                    suelto en la fila: el gesto irreversible del sidebar era el
-                    más fácil de pulsar sin querer. Ahora vive dentro del menú,
-                    con su nombre escrito, y la confirmación se pinta en este
-                    mismo panel. */}
-                <Popover
-                  open={menu() === p().id}
-                  onOpenChange={(abre) => {
-                    setMenu(abre ? p().id : null);
-                    if (!abre) setConfirmando(null);
-                  }}
-                  placement="right-start"
-                  gutter={6}
-                >
-                  {/* Sin `onClick` propio: pisaría el que abre el panel. Ver
-                      la cabecera de `Sessions.tsx`. */}
-                  <PopoverTrigger
-                    as={(disparador: object) => (
-                      <button
-                        {...disparador}
-                        class="mr-1 grid size-6 shrink-0 place-items-center rounded-sm text-neutral-500 opacity-0 outline-none hover:bg-surface-muted hover:text-neutral-950 focus-visible:opacity-100 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary group-hover:opacity-100 group-focus-within:opacity-100 data-[expanded]:opacity-100"
-                        aria-label={t("shell.sidebar.project_actions", { name: p().name })}
-                        aria-haspopup="menu"
-                        title={t("shell.sidebar.actions")}
-                      >
-                        <MoreVertical size={15} />
-                      </button>
-                    )}
-                  />
-                  {/* **Un solo `PopoverContent` con dos vistas dentro**, y no
-                      uno por vista: el panel es el mismo objeto flotante, y
-                      cambiarlo por otro lo desmonta y lo vuelve a montar —
-                      parpadea y se reposiciona a mitad de una decisión que es
-                      irreversible. */}
-                  <PopoverContent
-                    role={confirmando() === p().id ? undefined : "menu"}
-                    class={confirmando() === p().id ? "w-80 p-3" : "w-56 p-1"}
-                  >
-                    <Show
-                      when={confirmando() === p().id}
-                      fallback={
-                        <>
-                          <button role="menuitem" class={ITEM_DE_MENU} onClick={() => {
-                            setMenu(null);
-                            setCreatingAgentIn({ id: p().id, name: p().name });
-                          }}>{t("projects.agents.new_open")}</button>
-                          <button
-                            role="menuitem"
-                            class={ITEM_DE_MENU}
-                            onClick={() => {
-                              setMenu(null);
-                              setNombre(p().name);
-                              setRenombrando(p().id);
-                            }}
-                          >
-                            {t("shell.sidebar.rename")}
-                          </button>
-                          <Show
-                            when={props.onRemoveFromSpace}
-                            fallback={
-                              <button
-                                role="menuitem"
-                                class={`${ITEM_DE_MENU} text-error-strong`}
-                                onClick={() => setConfirmando(p().id)}
-                              >
-                                {t("shell.sidebar.delete_project")}
-                              </button>
-                            }
-                          >
-                            {(quitar) => (
-                              <button
-                                role="menuitem"
-                                class={ITEM_DE_MENU}
-                                onClick={() => {
-                                  setMenu(null);
-                                  quitar()(p().id);
-                                }}
-                              >
-                                {t("shell.sidebar.remove_from_space")}
-                              </button>
-                            )}
-                          </Show>
-                        </>
-                      }
-                    >
-                      <p class="m-0 text-sm font-semibold text-neutral-950">
-                        {t("shell.sidebar.delete_title", { name: p().name })}
-                      </p>
-                      <p class="mt-1 mb-3 text-xs leading-relaxed text-neutral-700">
-                        {p().sessions === 0
-                          ? t("shell.sidebar.delete_empty")
-                          : t("shell.sidebar.delete_with_tasks", {
-                              count: p().sessions,
-                            })}{" "}
-                        {t("shell.sidebar.delete_no_undo")}
-                      </p>
-                      <div class="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          class="shrink-0"
-                          onClick={() => setMenu(null)}
-                        >
-                          {t("shell.sidebar.keep")}
-                        </Button>
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          class="shrink-0"
-                          onClick={() => {
-                            setMenu(null);
-                            void props.onBorrarProyecto(p().id);
-                          }}
-                        >
-                          {t("shell.sidebar.delete_project")}
-                        </Button>
-                      </div>
-                    </Show>
-                  </PopoverContent>
-                </Popover>
-
-                {/* Va después del menú: delante movería de sitio el control que ya
-                    estaba. El nombre va en `aria-label` y `title` — la fila no
-                    tiene ancho para un rótulo. */}
-                <button
-                  class="mr-1 grid size-6 shrink-0 place-items-center rounded-sm text-neutral-500 opacity-0 outline-none hover:bg-surface-muted hover:text-neutral-950 focus-visible:opacity-100 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary group-hover:opacity-100 group-focus-within:opacity-100"
-                  aria-label={t("shell.sidebar.new_task_in", { name: p().name })}
-                  title={t("shell.sidebar.new_task_in", { name: p().name })}
-                  onClick={(e) => {
-                    // La fila entera abre el proyecto; esto es otra cosa.
-                    e.stopPropagation();
-                    props.onNuevaTareaEn(p().id);
-                  }}
-                >
-                  <SquarePen size={15} />
-                </button>
+                <Rotulo cuenta={cuentaDe(clave(), g().tasks)} tono={necesita() ? "need" : undefined}>
+                  <Show when={g().kind === "agent" && g().key}>
+                    <AstroAvatar name={g().key} status="asleep" size={14} />
+                  </Show>
+                  <span class="min-w-0 truncate">{titulo()}</span>
+                </Rotulo>
               </div>
-              <Show when={abierto()}>
-                <div data-project-sessions={p().id} class="my-0.5 ml-2 min-w-0 border-l border-border pl-1.5">
-                  <div data-sidebar-agents classList={{ hidden: !!query() && !searchCounts()[`agents:${p().id}`] }}>
-                    <button
-                      type="button"
-                      class="flex w-full min-w-0 items-center gap-1 rounded-sm px-2 pt-2 pb-1 text-left text-[0.6875rem] font-medium text-neutral-500 uppercase outline-none hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                      aria-expanded={(!!query() || !agentesPlegados().includes(p().id))}
-                      onClick={() => alternarAgentes(p().id)}
-                    >
-                      <span class="min-w-0 truncate">{t("shell.sidebar.agents")}</span>
-                      <ChevronRight size={12} aria-hidden="true" class={cn("shrink-0 transition-transform", (!!query() || !agentesPlegados().includes(p().id)) && "rotate-90")} />
-                    </button>
-                    <Show when={(!!query() || !agentesPlegados().includes(p().id))}>
-                      <AgentRows project={p().id} onNewAgent={() => setCreatingAgentIn({ id: p().id, name: p().name })}
-                        agents={roster() ?? []} search={query()} onSearchResults={count => reportResults(`agents:${p().id}`, count)} hablando={props.hablandoCon?.project === p().id ? props.hablandoCon.name : null} onHablar={props.onHablarCon} onProfile={props.onAgentProfile} />
-                    </Show>
-                  </div>
-                  <div data-sidebar-tasks classList={{ hidden: !!query() && !searchCounts()[`tasks:${p().id}`] }}>
-                    <EncabezadoDeTareas />
-                    <Show when={delProyecto().length > 0} fallback={<Button variant="ghost" size="compact" class="w-full justify-start text-neutral-500" onClick={() => props.onNuevaTareaEn(p().id)}><Plus size={14} />{t("shell.sidebar.new_task")}</Button>}>
-                      <Historial de={p().id} />
-                    </Show>
-                  </div>
-                </div>
-              </Show>
-            </div>
-          );
-
+            }
+          >
+            {(proj) => (
+              <Suspense>
+                <FolderGroupHeader
+                  p={proj()}
+                  abierto={abierto()}
+                  cuenta={cuentaDe(clave(), g().tasks)}
+                  tareas={g().tasks}
+                  vivas={props.vivas}
+                  aprobando={props.aprobando}
+                  proyectoAbierto={props.proyectoAbierto}
+                  onToggle={() => alternarGrupo(proj().id)}
+                  onAbrir={() => { props.onAbrirProyecto(proj().id); setDesplegado(false); }}
+                  onRenombrar={(name) => props.onRenombrarProyecto(proj().id, name)}
+                  onBorrar={() => props.onBorrarProyecto(proj().id)}
+                  onQuitarDelEspacio={props.onRemoveFromSpace ? () => props.onRemoveFromSpace?.(proj().id) : undefined}
+                  onNuevaTarea={() => props.onNuevaTareaEn(proj().id)}
+                  onNuevoAgente={() => setCreatingAgentIn({ id: proj().id, name: proj().name })}
+                />
+              </Suspense>
+            )}
+          </Show>
+          <Show when={abierto()}>
+            <Historial filas={g().tasks} clave={clave()} sinCarpeta={g().kind === "folder" && !!g().key} />
+          </Show>
+        </section>
+      </Show>
+    );
   };
+
+  const hayResultados = () => Object.values(searchCounts()).some((n) => n > 0);
 
   /** La misma lista, montada en dos sitios: expandida y en el desplegable. */
   const Lista = () => (
-    <div class="grid min-w-0 gap-1">
-      <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center pr-1">
-        <span class="min-w-0 truncate px-2 text-[0.6875rem] font-medium text-neutral-500">
-          {t("shell.sidebar.projects")}
-        </span>
-        <button
-          class="grid size-5 shrink-0 place-items-center rounded-sm text-neutral-500 hover:bg-surface-muted hover:text-neutral-950"
-          aria-label={t("shell.sidebar.add_workdir")}
-          title={t("shell.sidebar.add_workdir")}
-          onClick={props.onAnadirCarpeta}
-        >
-          <FolderPlus size={14} />
-        </button>
-      </div>
-
+    <div data-sidebar-tasks class="grid min-w-0 gap-1">
       <Show when={props.clon}>{(c) => <FilaDeClon clon={c()} />}</Show>
 
-      <Show when={props.projects.length === 0}>
-        <Show when={props.escritorio}>
-          <p class="m-0 px-2 pt-1 text-xs text-neutral-500" data-desk-empty="">
-            {t("spaces.rail.empty", { name: props.escritorio ?? "" })}
-          </p>
-        </Show>
-        <Button variant="ghost" size="compact" class="w-full justify-start text-neutral-500" onClick={props.onAnadirCarpeta}><Plus size={14} />{t("shell.sidebar.new_folder")}</Button>
-      </Show>
-
-      <KeyedList each={props.projects} by={p => p.id}>
-        {p => <FilaDeCarpeta p={p()} />}
-      </KeyedList>
-
-      {/* **Se ve además mientras se arrastra una tarea que está en un
-          proyecto**, aunque el grupo esté vacío: si no, sacarla de su proyecto
-          no tendría dónde soltarse y el gesto solo funcionaría cuando ya hubiera
-          tareas sueltas. */}
-      <Show
-        when={
-          sueltas().length > 0 ||
-          (tareaEnVuelo() !== null && tareaEnVuelo()?.de !== "")
-        }
-      >
-        <div data-sidebar-tasks classList={{ hidden: !!query() && resultCount("") === 0 }}>
-          <div
-            class={cn("grid min-w-0 grid-cols-[20px_minmax(0,1fr)] items-center rounded-[var(--radius-sm)]",
-              destinoEnVuelo() === "" && RECIBE_LA_TAREA,
-            )}
-            data-destino=""
-          >
-            <SidebarMenuButton
-              class="col-span-2 grid-cols-[20px_22px_minmax(0,1fr)] pl-0 font-medium"
-              aria-expanded={(!!query() || !cerrados().includes(SUELTAS))}
-              onClick={() => alternarGrupo(SUELTAS)}
-            >
-              <ChevronRight size={14} aria-hidden="true" class={cn("transition-transform text-neutral-500", (!!query() || !cerrados().includes(SUELTAS)) && "rotate-90")} />
-              <Clock size={14} />
-              <span class="truncate">{t("shell.sidebar.recent")}</span>
-            </SidebarMenuButton>
-          </div>
-          <Show when={(!!query() || !cerrados().includes(SUELTAS))}>
-            <div class="min-w-0 pl-2">
-              <Historial de="" />
-            </div>
+      <Show when={todas().length === 0 && !query()}>
+        <Show
+          when={props.projects.length === 0}
+          fallback={<p class="m-0 px-2 pt-1 text-xs text-neutral-500" data-sidebar-empty="">{t("shell.sidebar.empty")}</p>}
+        >
+          <Show when={props.escritorio}>
+            <p class="m-0 px-2 pt-1 text-xs text-neutral-500" data-desk-empty="">
+              {t("spaces.rail.empty", { name: props.escritorio ?? "" })}
+            </p>
           </Show>
-        </div>
+          <Button variant="ghost" size="compact" class="w-full justify-start text-neutral-500" onClick={props.onAnadirCarpeta}><Plus size={14} />{t("shell.sidebar.new_folder")}</Button>
+        </Show>
       </Show>
+
+      <Show when={todas().length > 0 && !query() && grupos().every((g) => g.tasks.length === 0)}>
+        <p class="m-0 px-2 pt-1 text-xs text-neutral-500" data-sidebar-filtered-empty="">{t("shell.sidebar.filter_empty")}</p>
+      </Show>
+
+      <KeyedList each={grupos()} by={(g) => `${g.kind}:${g.key}`}>{(g) => <Grupo grupo={g()} />}</KeyedList>
     </div>
   );
 
@@ -817,8 +609,8 @@ export default function Sidebar(props: {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={desplegado()}
-                  tooltip={t("shell.sidebar.projects")}
-                  aria-label={t("shell.sidebar.projects")}
+                  tooltip={t("shell.sidebar.tasks")}
+                  aria-label={t("shell.sidebar.tasks")}
                   aria-expanded={desplegado()}
                   onClick={() => setDesplegado((v) => !v)}
                 >
@@ -835,24 +627,33 @@ export default function Sidebar(props: {
           </SidebarMenu>
 
           <Show when={!props.collapsed}>
-            {/* **`overflow-y-auto` y NO `overflow-auto`.** Aquél es de los dos
-                ejes: el contenido dejaba de recortarse en horizontal y pasaba a
-                poder desplazarse, así que los títulos llegaban al borde sin
-                puntos suspensivos y el «+» de proyectos quedaba a la derecha del
-                scroll — presente y fuera de la vista.
+            {/* Qué se enseña, y el único botón que lo cambia. */}
+            <div data-sidebar-scope class="-mt-1 flex min-w-0 items-center gap-1 pl-2">
+              <span class="min-w-0 flex-1 truncate text-[0.6875rem] text-neutral-500" title={alcance()}>{alcance()}</span>
+              <Suspense>
+                <SidebarFilter
+                  view={vistaEfectiva()}
+                  onChange={cambiarVista}
+                  folders={carpetasDelFiltro()}
+                  agents={agentesDelFiltro()}
+                />
+              </Suspense>
+            </div>
+          </Show>
 
-                `SidebarContent` de `ui/sidebar.tsx` ya trae
-                `overflow-hidden min-w-0`, que es lo correcto; esto lo reabría.
-                La librería estaba bien: el envoltorio no. */}
+          <Show when={!props.collapsed}>
+            {/* **`overflow-y-auto` y NO `overflow-auto`.** Aquél es de los dos
+                ejes: los títulos llegaban al borde sin puntos suspensivos y lo
+                de la derecha quedaba fuera de la vista. */}
             {/* `data-arrastre-scroll`: con la lista larga, arrastrar una tarea
-                hasta un proyecto que está fuera de la vista exige que el panel
+                hasta un grupo que está fuera de la vista exige que el panel
                 se desplace solo al llegar a sus bordes (`lib/drag.ts`). */}
             <div
               ref={listViewport}
               class="-mr-2 min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto pr-2"
               data-arrastre-scroll=""
             >
-              <Show when={query() && !["", ...props.projects.map(project => project.id)].some(project => resultCount(project) > 0)}>
+              <Show when={query() && !hayResultados()}>
                 <p role="status" class="m-0 px-2 py-1 text-xs text-neutral-500">{t("shell.sidebar.no_results")}</p>
               </Show>
               <Lista />
@@ -863,6 +664,21 @@ export default function Sidebar(props: {
         {/* El de MCP es chico a propósito: es una consulta de un vistazo, del
             peso del botón que oculta el historial. «Archivadas» va primero: abre
             una página, no levanta un panel. */}
+        <Show when={!props.collapsed && agentesDelDock().length > 0}>
+          <Suspense>
+            <AgentDock
+              agents={agentesDelDock()}
+              selected={vista().agent}
+              foldersOf={carpetasDelAgente}
+              currentFolder={(props.current ? carpetaDe(props.current) : "") || props.proyectoAbierto}
+              onTalk={props.onHablarCon}
+              onShowTasks={(agent) => cambiarVista({ ...vista(), agent })}
+              onProfile={props.onAgentProfile}
+              onSeeAll={() => props.onSettings("agentes")}
+              profileOf={perfilDe}
+            />
+          </Suspense>
+        </Show>
         <SidebarFooter class="border-t border-border p-2">
           <div class={cn("flex items-center justify-end gap-1", props.collapsed && "flex-col")}>
             <Show when={!props.collapsed && props.onArchivadas}>
@@ -912,9 +728,7 @@ export default function Sidebar(props: {
       {/* Lo que va en la mano mientras se arrastra una tarea.
 
           **Sin esto el gesto no se ve.** El puntero cambia de forma y el
-          proyecto de debajo se enciende, pero nada dice QUÉ se está moviendo:
-          con dos tareas de título parecido, soltar en el sitio correcto la
-          equivocada no se nota hasta que la lista se recompone.
+          grupo de debajo se enciende, pero nada dice QUÉ se está moviendo.
 
           `pointer-events-none` no es cosmético: `lib/drag.ts` resuelve el
           destino con `elementFromPoint`, y un nodo pegado al puntero sería
