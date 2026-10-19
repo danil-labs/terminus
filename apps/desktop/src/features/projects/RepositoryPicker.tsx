@@ -46,18 +46,18 @@ export default function RepositoryPicker(props: {
     const local = invoke<ProjectRepository[]>("list_project_repositories", { workspace: scope })
       .then(repos => { if (active) setHistory(repos); }).catch(fail);
     const remote = (async () => {
-      const connections = await invoke<Provider[]>("list_code_providers", { scope });
+      const connections = await invoke<Provider[]>("list_git_hosts", { scope });
       if (!active) return;
       setProviders(connections);
       await Promise.all(connections.filter(p => p.connected).map(async p => {
         try {
-          const areas = await invoke<Area[]>("provider_areas", { id: p.id, scope });
+          const areas = await invoke<Area[]>("git_host_areas", { id: p.id, scope });
           for (const a of areas) {
             if (!active) return;
             try {
-              const repos = await invoke<RemoteRepository[]>("provider_projects", { id: p.id, area: a.key, scope, includeSkills: true });
+              const repos = await invoke<RemoteRepository[]>("git_host_projects", { id: p.id, area: a.key, scope, includeSkills: true });
               if (active) setAvailable(previous => [...previous, ...repos.filter(r => r.clone_url).map(r => ({
-                name: repositoryIdentity(r.clone_url).split("/").slice(1).join("/") || `${a.name}/${r.slug || r.name}`, url: repositoryCloneUrl(r.clone_url), provider: p.id, area: a.key, last_used: 0,
+                name: repositoryIdentity(r.clone_url).split("/").slice(1).join("/") || `${a.name}/${r.slug || r.name}`, url: repositoryCloneUrl(r.clone_url), git_host: p.id, area: a.key, last_used: 0,
               }))]);
             } catch (error) { fail(error); }
           }
@@ -77,10 +77,10 @@ export default function RepositoryPicker(props: {
     ...(props.onEmpty ? [{ id: "empty", name: t("projects.add.empty"), detail: t("projects.add.empty_help"), run: props.onEmpty }] : []),
   ];
   const visibleChoices = () => choices().filter(c => c.name.toLowerCase().includes(query().trim().toLowerCase()));
-  const areas = createMemo(() => [...new Set(available().filter(r => r.provider === provider()).map(r => r.area))]);
+  const areas = createMemo(() => [...new Set(available().filter(r => r.git_host === provider()).map(r => r.area))]);
   const repositories = createMemo(() => mergeRepositories(history(), available(), query()).filter(r => {
     if (!provider()) return !query().trim() ? r.last_used > 0 : true;
-    return r.provider === provider() && (!area() || available().some(a => a.area === area() && a.url === r.url));
+    return r.git_host === provider() && (!area() || available().some(a => a.area === area() && a.url === r.url));
   }));
   const recent = () => repositories().filter(r => r.last_used > 0);
   const accessible = () => repositories().filter(r => !r.last_used);
@@ -102,8 +102,8 @@ export default function RepositoryPicker(props: {
   function RepositoryRows(section: { repositories: ProjectRepository[] }) {
     return <For each={section.repositories}>{repo => <button type="button" disabled={props.disabled}
       class="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left hover:bg-surface-muted focus-visible:bg-surface-muted"
-      onClick={() => props.onRepository({ ...repo, provider: providers().some(p => p.id === repo.provider && p.connected) && repo.url.startsWith("https://") ? repo.provider : null })}>
-      <Show when={repo.provider} fallback={<GitBranch size={18} class="text-neutral-500" />}><MarcaProveedor id={repo.provider ?? ""} size={18} /></Show>
+      onClick={() => props.onRepository({ ...repo, git_host: providers().some(p => p.id === repo.git_host && p.connected) && repo.url.startsWith("https://") ? repo.git_host : null })}>
+      <Show when={repo.git_host} fallback={<GitBranch size={18} class="text-neutral-500" />}><MarcaProveedor id={repo.git_host ?? ""} size={18} /></Show>
       <span class="min-w-0 flex-1"><span class="block truncate text-[0.8125rem]">{repo.name}</span>
         <span class="block truncate text-xs text-neutral-500">{repo.local_path ? t("projects.add.on_this_machine", { path: repo.local_path }) : repo.url}</span></span>
       <ChevronRight size={14} class="shrink-0 text-neutral-500" />

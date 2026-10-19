@@ -276,7 +276,7 @@ export type Msg = {
    * «OpenCode Go»). Lo guarda el cierre; la línea del turno lo enseña tras la
    * hora. Ausente en los turnos anteriores al campo.
    */
-  provider?: string;
+  model_vendor?: string;
   /**
    * El modelo que reportó el CLI al cerrar, para el turno que lo observó. Es
    * distinto del modelo elegido ahora: la transcripción guarda con qué se
@@ -3496,7 +3496,7 @@ function TrabajoDeAgente(props: {
         <HoraDelTurno at={props.msg.at} />
         <LineaDeProveedor
           agent={props.msg.agent ?? props.agenteDelTurno}
-          provider={props.msg.provider}
+          provider={props.msg.model_vendor}
           model={props.msg.reported_model}
           catalogo={props.catalogo}
           agentLabel={props.agentLabel}

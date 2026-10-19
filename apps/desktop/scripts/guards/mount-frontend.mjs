@@ -450,14 +450,14 @@ if (!roto) {
       id,
       turns: [
         { role: "user", text: "¿Cómo vas?" },
-        { role: "agent", text: "Voy bien.", duration_ms: 1200, author: { kind: "codex", name: null, verified_by: null, account: null }, provider: "Codex", model: "gpt-5.6", tools: id === "s-chat" ? [
+        { role: "agent", text: "Voy bien.", duration_ms: 1200, author: { kind: "codex", name: null, verified_by: null, account: null }, model_vendor: "Codex", model: "gpt-5.6", tools: id === "s-chat" ? [
           { name: "mcp__canvas__draw", ok: true, mcp_app: { server: "canvas", tool: "draw", result: { content: [] } } },
           { name: "mcp__canvas__lookup", ok: true, mcp_app: { server: "canvas", tool: "lookup", result: { content: [] } } },
           { name: "atlassian·getConfluencePage", ok: true, mcp_app: { server: "atlassian", tool: "getConfluencePage", result: { content: [] } } },
         ] : [] },
         ...(id === "s-task" ? [
           { role: "user", text: "Continúa con Claude." },
-          { role: "agent", text: "Listo tras el traspaso.", author: { kind: "claude", name: null, verified_by: null, account: null }, provider: "Claude Code", model: "claude-sonnet-5" },
+          { role: "agent", text: "Listo tras el traspaso.", author: { kind: "claude", name: null, verified_by: null, account: null }, model_vendor: "Claude Code", model: "claude-sonnet-5" },
         ] : []),
       ],
     }),
@@ -1817,13 +1817,13 @@ if (!roto) {
     get_project_directory: "/lab",
     list_project_repositories: ({ workspace }) => {
       assert.equal(workspace, "w");
-      return [{ name: "acme/app", url: "git@github.com:acme/app.git", provider: "github", last_used: 2 },
-        { name: "legacy/offline", url: "https://git.example.org/legacy/offline.git", provider: null, last_used: 1 }];
+      return [{ name: "acme/app", url: "git@github.com:acme/app.git", git_host: "github", last_used: 2 },
+        { name: "legacy/offline", url: "https://git.example.org/legacy/offline.git", git_host: null, last_used: 1 }];
     },
-    list_code_providers: [{ id: "github", name: "GitHub", connected: { identity: { user: "acme" } } },
+    list_git_hosts: [{ id: "github", name: "GitHub", connected: { identity: { user: "acme" } } },
       { id: "bitbucket", name: "Bitbucket", connected: { identity: { user: "team" } } }],
-    provider_areas: ({ id, scope }) => { assert.equal(scope, "w"); return [{ key: id === "github" ? "acme" : "team", name: id === "github" ? "acme" : "team" }]; },
-    provider_projects: ({ id, scope }) => {
+    git_host_areas: ({ id, scope }) => { assert.equal(scope, "w"); return [{ key: id === "github" ? "acme" : "team", name: id === "github" ? "acme" : "team" }]; },
+    git_host_projects: ({ id, scope }) => {
       assert.equal(scope, "w");
       if (id === "bitbucket") throw { what: "Sin red en Bitbucket", detail: "offline" };
       if (holdRepositoryReply) return new Promise(resolve => { finishRepositoryReply = resolve; });
@@ -1951,7 +1951,7 @@ if (!roto) {
   await sleep(50);
   controlsDoc.querySelector('[role="dialog"] form').dispatchEvent(new sidebarControls.w.Event("submit", { bubbles: true, cancelable: true }));
   await sleep(50);
-  assert.equal(cloneRequest.provider, "github");
+  assert.equal(cloneRequest.gitHost, "github");
   assert.equal(cloneRequest.url, "https://github.com/acme/app.git");
   finishClone({ id: "provider-clone", name: "App", kind: "git", sources: [] });
   await sleep(100);
@@ -1994,7 +1994,7 @@ if (!roto) {
   };
   await openClone();
   assert.equal(cloneRequest.workspace, "w");
-  assert.equal(cloneRequest.provider, null);
+  assert.equal(cloneRequest.gitHost, null);
   assert.equal(controlsDoc.querySelector('[role="progressbar"]'), null);
   cloneRequest.progress.onmessage({ phase: "receiving", percent: 42 });
   await sleep(50);
@@ -2591,17 +2591,17 @@ if (!roto) {
   const providers = await boot("listo", "provider-workspaces", {
     ...RESPUESTAS,
     list_workspaces: () => ({ ...RESPUESTAS.list_workspaces, active: providerWorkspace }),
-    list_code_providers: ({ scope }) => [providerInfo(scope)],
-    check_provider: ({ scope }) => providerInfo(scope),
-    provider_areas: ({ scope }) => (selections.get(scope) ?? []).map(({ key }) => ({ key, name: key })),
-    provider_available_areas: ({ scope }) => { providerCalls.push(scope); return scope === "ws-a" && pendingAreas ? pendingAreas : available; },
-    select_provider_area: ({ scope, area, enabled }) => {
+    list_git_hosts: ({ scope }) => [providerInfo(scope)],
+    check_git_host: ({ scope }) => providerInfo(scope),
+    git_host_areas: ({ scope }) => (selections.get(scope) ?? []).map(({ key }) => ({ key, name: key })),
+    git_host_available_areas: ({ scope }) => { providerCalls.push(scope); return scope === "ws-a" && pendingAreas ? pendingAreas : available; },
+    select_git_host_area: ({ scope, area, enabled }) => {
       const next = (selections.get(scope) ?? []).filter(({ key }) => key !== area);
       if (enabled) next.push({ key: area, installation_id: area === "acme" ? 42 : 43 });
       selections.set(scope, next);
       return providerInfo(scope);
     },
-    provider_projects: ({ scope, area }) => {
+    git_host_projects: ({ scope, area }) => {
       assert.ok(selections.get(scope)?.some(({ key }) => key === area));
       return [];
     },
@@ -2610,7 +2610,7 @@ if (!roto) {
       return { code: "ABCD", url: "https://github.com/login/device", expires_at: 9999999999999 };
     },
     finish_browser_login: ({ scope }) => providerInfo(scope),
-    provider_pending_setup: null,
+    git_host_pending_setup: null,
     open_external: ({ target }) => {
       assert.ok(["https://github.com/login/device", "https://github.com/apps/terminus-app/installations/new"].includes(target));
       if (target.endsWith("/installations/new")) available = [{ key: "acme", name: "acme" }, { key: "other", name: "other" }];
@@ -4019,7 +4019,7 @@ if (!roto) {
     set_workspace_language: null,
     rename_workspace: ({ id, name }) => ({ id, name }),
     list_accounts: { provider: "codex", env_var: "", shared_credential: null, secret_note: null, active: null, accounts: [] },
-    list_code_providers: [],
+    list_git_hosts: [],
     "plugin:dialog|open": "/tmp/contexto",
     set_workspace_source: ({ locator }) => ({ id: "ctx", kind: "folder", name: "contexto", identity: locator, locator }),
     get_project_directory: "/tmp/terminus",

@@ -91,7 +91,7 @@ export default function CarpetaDeTrabajo(props: { alta: Alta; onListo: () => voi
               directory: null,
               operation: crypto.randomUUID(),
               workspace: props.alta.estado.workspace?.id ?? "",
-              provider: w().proveedor,
+              gitHost: w().proveedor,
               progress: new Channel<Avance>((v) => setAvance(v)),
             })
           : await invoke<Project>("create_project", {
@@ -138,7 +138,7 @@ export default function CarpetaDeTrabajo(props: { alta: Alta; onListo: () => voi
                   props.alta.set("carpeta", {
                     modo: "clone",
                     url: repo.url,
-                    proveedor: repo.provider,
+                    proveedor: repo.git_host,
                     repositorio: repo.name,
                   })
                 }
