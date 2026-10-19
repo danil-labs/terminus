@@ -80,7 +80,7 @@ export default function ProveedorDeMemoria() {
   }
 
   return (
-    <section class="grid gap-2">
+    <section class="grid grid-cols-[minmax(0,1fr)] gap-2">
       <h3 class="m-0 text-[0.8125rem] font-semibold">{t("settings.memory.title")}</h3>
       <p class="m-0 text-xs text-neutral-500">{t("settings.memory.hint")}</p>
 

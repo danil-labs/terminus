@@ -405,33 +405,38 @@ export default function Herramientas(props: { solo?: string | string[] }) {
   const noReciben = () => instalados().filter((a) => !a.recibe);
 
   return (
-    <div class="grid gap-5">
+    // Cada cuadrícula acota su columna, igual que `SettingsPanel`.
+    <div class="grid grid-cols-[minmax(0,1fr)] gap-5">
       <GovernedNotice section="mcp_servers" />
-      <section class="grid gap-2">
+      <section class="grid grid-cols-[minmax(0,1fr)] gap-2">
         {/* Una línea, solo de lo que está en esta máquina: nombrar lo que no
             está no ayuda a nadie, para eso está el riel, que ya lo marca.
             Solo importa a qué llega lo que conectes.
+
+            Un chip por agente: siete nombres unidos por «y» no se leían de
+            un vistazo.
 
             Encabeza la sección sin título encima: el renglón activo del riel
             ya nombra esta pantalla, y repetirlo arriba es el rótulo
             redundante que el sistema visual descarta. */}
         <Show when={instalados().length > 0}>
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <p class="m-0 text-xs text-neutral-500">
-              {t("settings.tools.reaches")}{" "}
-              <span class="font-medium text-neutral-950">
-                {reciben()
-                  .map((a) => a.label)
-                  .join(t("settings.tools.and")) || t("settings.tools.nobody")}
-              </span>
-              <Show when={noReciben().length > 0}>
-                {t("settings.tools.not_yet", {
-                  agents: noReciben()
-                    .map((a) => a.label)
-                    .join(t("settings.tools.and")),
-                })}
+            <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-xs text-neutral-500">
+              <span>{t("settings.tools.reaches")}</span>
+              <Show
+                when={reciben().length > 0}
+                fallback={<span class="font-medium text-neutral-950">{t("settings.tools.nobody")}</span>}
+              >
+                <For each={reciben()}>{(a) => <Badge tone="active">{a.label}</Badge>}</For>
               </Show>
-            </p>
+              {/* Juntos, para que el rótulo no quede huérfano al partir. */}
+              <Show when={noReciben().length > 0}>
+                <span class="ml-1.5 flex flex-wrap items-center gap-1.5">
+                  <span>{t("settings.tools.not_yet")}</span>
+                  <For each={noReciben()}>{(a) => <Badge>{a.label}</Badge>}</For>
+                </span>
+              </Show>
+            </div>
             <Show when={puestos().length > 0}>
               <Button
                 variant="ghost"
@@ -448,7 +453,7 @@ export default function Herramientas(props: { solo?: string | string[] }) {
           </div>
         </Show>
 
-        <ul class="m-0 grid list-none gap-2 p-0">
+        <ul class="m-0 grid list-none grid-cols-[minmax(0,1fr)] gap-2 p-0">
           <For each={servicios()}>
             {(formas) => {
               /** El camino del que habla la tarjeta. Ver `activaDe`. */
@@ -458,15 +463,25 @@ export default function Herramientas(props: { solo?: string | string[] }) {
               const muerta = () => c().escuchando === false;
 
               return (
-                <li class="grid gap-1.5 rounded-md border border-border bg-surface-raised px-3 py-2.5">
-                  <div class="flex items-center gap-2">
+                <li class="grid grid-cols-[minmax(0,1fr)] gap-1.5 rounded-md border border-border bg-surface-raised px-3 py-2.5">
+                  {/* En angosto, chip y botón bajan de renglón. */}
+                  <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5">
                     {/* El servicio, una vez. Las filas del grupo comparten
                         `name` — el camino lo dice el control de abajo. */}
-                    <span class="flex min-w-0 flex-1 items-center gap-2 truncate text-[0.8125rem] font-semibold">
+                    {/* Base propia, no `flex-1`: con base cero el nombre se
+                        encogía hasta «F…» en vez de bajar el chip. */}
+                    <span class="flex min-w-0 flex-[1_1_10rem] items-center gap-2 text-[0.8125rem] font-semibold">
                       <MarcaProveedor id={formas[0].grupo} size={16} />
-                      {formas[0].name}
+                      <span class="truncate">{formas[0].name}</span>
                     </span>
-                    <Badge tone={chip().tono} class="shrink-0">{chip().texto}</Badge>
+                    {/* `active` rellena con `neutral-200`, el color de la
+                        tarjeta en oscuro: «conectado» se quedaba sin chip. */}
+                    <Badge
+                      tone={chip().tono}
+                      class={cn("shrink-0", chip().tono === "active" && "bg-neutral-300")}
+                    >
+                      {chip().texto}
+                    </Badge>
                     {/* Ni conectar ni quitar son acciones del agente: ninguno
                         va en morado. La forma la da la jerarquía: conectar es
                         la acción de la fila y quitar es lo que se hace una
@@ -616,7 +631,7 @@ export default function Herramientas(props: { solo?: string | string[] }) {
                             <Show
                               when={a.login}
                               fallback={
-                                <span class="shrink-0 text-xs text-neutral-500">
+                                <span class="min-w-0 text-right text-xs text-neutral-500">
                                   {a.sin_login
                                     ? prosa(a.sin_login)
                                     : t("settings.tools.login_unknown")}
@@ -721,7 +736,7 @@ export default function Herramientas(props: { solo?: string | string[] }) {
           que puso alguien a mano — sin él el botón quedaba colgando debajo
           de la última tarjeta como si le perteneciera. */}
       <Show when={!props.solo}>
-        <section class="grid gap-2">
+        <section class="grid grid-cols-[minmax(0,1fr)] gap-2">
           <div class="flex items-center justify-between gap-2">
             <h3 class="m-0 text-[0.8125rem] font-semibold">{t("settings.tools.others")}</h3>
             <Button
@@ -770,16 +785,22 @@ export default function Herramientas(props: { solo?: string | string[] }) {
           </Show>
 
           <Show when={aMano().length > 0}>
-            <ul class="m-0 grid list-none gap-2 p-0">
+            <ul class="m-0 grid list-none grid-cols-[minmax(0,1fr)] gap-2 p-0">
               <For each={aMano()}>
                 {(p) => (
                   <li class="flex items-center gap-2 rounded-md border border-border bg-surface-raised px-3 py-2.5">
-                    <span class="min-w-0 flex-1 truncate text-[0.8125rem]">
-                      {p.name}
-                    </span>
-                    {/* De dónde sale, nunca su credencial. */}
-                    <span class="max-w-[45%] shrink-0 truncate font-mono text-[0.6875rem] text-neutral-500">
-                      {p.detalle || t("settings.tools.no_source")}
+                    {/* Origen debajo del nombre: en su renglón, la URL
+                        `shrink-0` ensanchaba la pantalla y sacaba «Quitar» de
+                        la hoja. Lo que no cabe se corta; entera en `title`. */}
+                    <span class="grid min-w-0 flex-1 gap-0.5">
+                      <span class="truncate text-[0.8125rem] font-semibold">{p.name}</span>
+                      {/* De dónde sale, nunca su credencial. */}
+                      <span
+                        class="truncate font-mono text-[0.6875rem] text-neutral-500"
+                        title={p.detalle || undefined}
+                      >
+                        {p.detalle || t("settings.tools.no_source")}
+                      </span>
                     </span>
                     <Show when={p.managed}>
                       <Badge forma="dato" class="shrink-0">
