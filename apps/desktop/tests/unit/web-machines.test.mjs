@@ -7,6 +7,8 @@
  * email. Mounts `dist-web/`.
  */
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { engine, fleet } from "../helpers/fake-relay.mjs";
 import { boot, sleep } from "../helpers/jsdom-app.mjs";
@@ -127,8 +129,8 @@ test("a machine with another engine contract needs an update and never breaks th
 });
 
 test("AI accounts are grouped by provider and email with the machines they are signed in on", async () => {
-  const vmAccounts = { provider: "claude", env_var: "", shared_credential: null, secret_note: null, active: "a1", accounts: [account("a1", "ana@danil.ai"), account("a2", null, "Cuenta 2")] };
-  const macAccounts = { provider: "claude", env_var: "", shared_credential: null, secret_note: null, active: "m1", accounts: [account("m1", "Ana@Danil.ai")] };
+  const vmAccounts = { provider: "claude", env_var: "", shared_credential: null, secret_note: null, active: "a1", accounts: [account("a1", "ana@example.com"), account("a2", null, "Cuenta 2")] };
+  const macAccounts = { provider: "claude", env_var: "", shared_credential: null, secret_note: null, active: "m1", accounts: [account("m1", "Ana@Example.com")] };
   const { app, invoke, calls } = await open("web-machines-accounts", [VM, MAC], {
     cmp_vm: { table: table("Panel", "Tarea de la VM", { list_accounts: vmAccounts }) },
     cmp_mac: { table: table("Notas", "Tarea del Mac", { list_accounts: macAccounts }) },
@@ -148,5 +150,34 @@ test("AI accounts are grouped by provider and email with the machines they are s
   assert.equal(calls("cmp_vm", "remove_account").length, 0);
   await invoke("add_account", { provider: "claude", label: "" }, { headers: { "x-terminus-machine": "cmp_mac" } }).catch(() => {});
   assert.equal(calls("cmp_mac", "add_account").length, 1, "signing in on another machine goes to that machine");
+  assert.deepEqual(app.fallos, []);
+});
+
+test("the computer list says which engine needs an update before anything is asked", async () => {
+  const own = createHash("sha256").update(readFileSync(new URL("../../src-tauri/crates/engine-protocol/commands.json", import.meta.url))).digest("hex");
+  const { app, calls, doc, text } = await open("web-machines-contract", [{ ...VM, contract: own }, { ...MAC, contract: "0".repeat(64) }], {
+    cmp_vm: { table: table("Panel", "Tarea de la VM") },
+    cmp_mac: { table: table("Notas", "Tarea del Mac") },
+  });
+  assert.equal(doc.querySelector('[data-machine-row="cmp_vm"]')?.dataset.state, "online", "the same contract works as usual");
+  assert.equal(doc.querySelector('[data-machine-row="cmp_mac"]')?.dataset.state, "outdated", "another contract needs an update");
+  assert.equal(calls("cmp_mac", "list_projects").length, 0, "it is never asked for panel reads");
+  assert.ok(text().includes("Panel") && !text().includes("Notas"));
+  assert.deepEqual(app.fallos, []);
+});
+
+test("a computer the relay cannot start answers off at once, never starting", async () => {
+  // Without `provider` the list does not say it is the person's own: the relay does.
+  const OWN = { computer_id: "cmp_own", name: "Portátil", state: "offline" };
+  const { app, invoke, calls, doc } = await open("web-machines-not-startable", [VM, OWN], {
+    cmp_vm: { table: table("Panel", "Tarea de la VM") },
+    cmp_own: { table: table("Notas", "Tarea del portátil"), state: "offline", notStartable: true },
+  });
+  await assert.rejects(invoke("send_message", { session: "cmp_own~t1", text: "hola" }), (e) => {
+    assert.equal(e.what, "Portátil está apagada. Enciéndela para seguir.");
+    return true;
+  });
+  assert.equal(calls("cmp_own", "send_message").length, 1, "the relay was asked and refused");
+  assert.equal(doc.querySelector('[data-machine-row="cmp_own"]')?.dataset.state, "offline", "it never shows as starting");
   assert.deepEqual(app.fallos, []);
 });

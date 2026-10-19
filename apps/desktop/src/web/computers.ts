@@ -14,6 +14,8 @@ export type Computer = {
   kind?: string | null;
   wakeable?: boolean | null;
   host_version?: string | null;
+  /** The engine contract of its last hello (`compatibility.ts`). */
+  contract?: string | null;
 };
 
 export type Answer<T> =

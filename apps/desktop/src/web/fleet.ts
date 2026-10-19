@@ -9,7 +9,8 @@
  * from each machine, each row marked with its machine.
  */
 
-export type MachineInfo = { id: string; name: string; wakes: boolean };
+/** `outdated`: its engine speaks another contract, known before asking it anything. */
+export type MachineInfo = { id: string; name: string; wakes: boolean; outdated?: boolean };
 export type MachineStatus = "online" | "offline" | "starting" | "outdated";
 
 type Row = Record<string, unknown>;
@@ -32,6 +33,7 @@ const OWN_ID = new Set(["load_session", "create_project", "clone_project", "add_
 /** Rows the sidebar marks with their machine. */
 const TAGGED = new Set(["list_projects", "list_live_sessions"]);
 
+// `self` is the person's own machine: the relay cannot start it.
 const MANAGED_PROVIDERS = new Set(["aws-ec2"]);
 const UNWAKEABLE_KINDS = new Set(["physical", "computer", "vps", "self_hosted", "byo"]);
 
@@ -65,6 +67,7 @@ export class Fleet {
   constructor(machines: MachineInfo[], private readonly on: (machine: string) => boolean = () => true) {
     this.machines = ordered(machines);
     this.multi = this.machines.length > 1;
+    for (const m of machines) if (m.outdated) this.outdated.add(m.id);
   }
 
   info(id: string): MachineInfo | undefined {

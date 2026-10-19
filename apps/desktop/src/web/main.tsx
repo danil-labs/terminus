@@ -11,6 +11,7 @@ import { setCapabilities } from "../lib/platform";
 // In the page, not in the lazy app chunk: the stylesheet loads with the HTML.
 import "../styles/global.css";
 import type { Computer } from "./computers";
+import { machineCompatibility } from "./compatibility";
 import { wakes } from "./fleet";
 import { HomeLink } from "./HomeLink";
 import { installIpc } from "./ipc";
@@ -45,7 +46,8 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
     const [at, setAt] = createSignal<number | null>(null);
     const relay = new RelaySession({ ...base, computerId: c.computer_id, beforeReconnect: before?.(c.computer_id) });
     relay.onState(() => bump((n) => n + 1));
-    return { info: { id: c.computer_id, name: c.name || c.computer_id, wakes: wakes(c) }, relay, onSync: setAt, at };
+    const info = { id: c.computer_id, name: c.name || c.computer_id, wakes: wakes(c), outdated: machineCompatibility(c.contract) === "outdated" };
+    return { info, relay, onSync: setAt, at };
   });
   const transport = createWebTransport(links, __TERMINUS_VERSION__, browser, () => bump((n) => n + 1));
   const machines = (): MachineRow[] => {

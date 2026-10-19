@@ -347,6 +347,8 @@ export function createWebTransport(machines: MachineLink[], version: string, hos
       return value;
     } catch (error) {
       if (fleet.isOutdated(machine)) throw outdated(machine);
+      // The relay cannot start the person's own computer: off, said plainly.
+      if ((error as Failure | undefined)?.detail === "not_remotely_startable") throw off(machine);
       throw error;
     }
   }
