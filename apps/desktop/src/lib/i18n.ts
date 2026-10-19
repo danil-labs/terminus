@@ -141,6 +141,14 @@ export function registrarCatalogo(manifiesto: Manifiesto, frases: Record<string,
   setRevision((n) => n + 1);
 }
 
+/** Frases que trae solo una entrada, sumadas a una lengua ya registrada. */
+export function sumarFrases(codigo: string, frases: Record<string, string | Plural>) {
+  const actual = catalogos.get(codigo);
+  if (!actual) return;
+  catalogos.set(codigo, { ...actual, frases: { ...actual.frases, ...normalizar(frases) } });
+  setRevision((n) => n + 1);
+}
+
 /**
  * Saca del motor una lengua de disco y vuelve al respaldo si era la puesta:
  * `t()` seguiría contestando desde el `Map` y el cambio se vería solo en el

@@ -451,6 +451,7 @@
   "settings.update.ready": "Lista. Se aplica al reiniciar; las tareas que están corriendo siguen trabajando.",
   "settings.update.relaunch": "Reiniciar ahora",
   "settings.update.title": "Versión",
+  "settings.update.web": "En el navegador, Terminus se actualiza con la página que lo sirve.",
   "settings.update.unreachable": "No pude comprobar si hay una versión nueva.",
   "settings.update.unreachable_hint": "Revisa tu conexión a internet y vuelve a intentar.",
   "settings.update.uptodate": "Tienes la versión más reciente.",

@@ -1458,7 +1458,11 @@ if (!roto) {
     local: gitRow(null, { kind: "none" }),
     native: gitRow(null, { kind: "unknown" }),
   };
+  const vocabulary = (id, prefix) => ({ change: { clave: `providers.${id}.change` }, change_short: { clave: `providers.${id}.change_short` },
+    change_prefix: prefix, checks: { clave: `providers.${id}.checks` } });
   const sidebarResponses = { ...CON_TAREA,
+    list_git_hosts: [{ id: "github", name: "GitHub", connected: null, summary: { clave: "providers.github.summary" }, vocabulary: vocabulary("github", "#") },
+      { id: "gitlab", name: "GitLab", connected: null, summary: { clave: "providers.gitlab.summary" }, vocabulary: vocabulary("gitlab", "!") }],
     list_live_sessions: [task("p", null, "delivered"), task("shared", "p", null), task("own", "p", "failed"), task("local", "p", null), { ...task("native", "p", null), title: "/root/prueba_sidebar", subagent: "native-id" }],
     list_session_git: ({ remote }) => { if (!remote) { gitLocalCalls++; if (cause.getStore() === "delta") gitDeltaCalls++; } if (remote && blockRemote) return new Promise(resolve => { releaseRemote = resolve; }); return rejectGit ? Promise.reject(new Error("offline")) : structuredClone(gitRows); },
   };
@@ -1649,9 +1653,16 @@ if (!roto) {
       assert.ok(tab("p").querySelector('[data-git-checks].text-neutral-500[data-git-stale]'));
     }
     if (overrides.head_sha) assert.match(tab("p").title, /otro commit/);
-    if (checks === "unknown") assert.match(tab("p").title, /Comprobaciones desconocidas/);
+    if (checks === "unknown") assert.match(tab("p").title, /Comprobaciones: sin dato/);
     if (overrides.state === "draft") assert.ok(tab("p").querySelector('.text-neutral-500 > svg.lucide-git-pull-request-draft'));
   }
+  // GitLab nombra lo suyo: `!12`, «Pipeline» y «MR», dichos por el motor.
+  gitRows.p = gitRow("feature/parent", { pull: { git_host: "gitlab", number: 12, state: "merged", head_sha: "abc", checks: "success", review: "approved" }, pull_known: true });
+  sidebar.w.dispatchEvent(new sidebar.w.Event("focus"));
+  await sleep(100);
+  assert.match(tab("p").title, /MR integrado/);
+  assert.match(tab("p").title, /!12/);
+  assert.doesNotMatch(tab("p").title, /#12/);
   gitRows.p = gitRow("feature/parent", { pull: { number: 12, state: "merged", head_sha: "abc" }, pull_known: true });
   sidebar.w.dispatchEvent(new sidebar.w.Event("focus"));
   await sleep(100);
@@ -4033,7 +4044,12 @@ if (!roto) {
     set_workspace_language: null,
     rename_workspace: ({ id, name }) => ({ id, name }),
     list_accounts: { provider: "codex", env_var: "", shared_credential: null, secret_note: null, active: null, accounts: [] },
-    list_git_hosts: [],
+    list_git_hosts: [["github", "GitHub", "#"], ["bitbucket", "Bitbucket", "#"], ["gitlab", "GitLab", "!"]].map(([id, name, prefix]) => ({
+      id, name, fields: [], browser_login: false, select_area: false, setup_url: null, token_label: "Token", token_help: "", token_url: "",
+      login_help: "", area_label: "área", areas_label: "áreas", area_help: "", connected: null, unverified: null,
+      summary: { clave: `providers.${id}.summary` },
+      vocabulary: { change: { clave: `providers.${id}.change` }, change_short: { clave: `providers.${id}.change_short` }, change_prefix: prefix, checks: { clave: `providers.${id}.checks` } },
+    })),
     "plugin:dialog|open": "/tmp/contexto",
     set_workspace_source: ({ locator }) => ({ id: "ctx", kind: "folder", name: "contexto", identity: locator, locator }),
     get_project_directory: "/tmp/terminus",
@@ -4069,6 +4085,12 @@ if (!roto) {
   altaBoton("Continuar").click();
   await sleep(120);
   assert.equal(altaTitulo(), "Conecta tus repositorios.");
+  assert.deepEqual(
+    [...altaDoc.querySelectorAll("button[aria-expanded] strong")].map((el) => el.textContent),
+    ["GitHub", "Bitbucket", "GitLab"],
+    "las tarjetas son las que declara el motor",
+  );
+  assert.ok(altaDoc.body.textContent.includes("en gitlab.com o en el GitLab de tu empresa"), "cada tarjeta dice cómo se conecta con la frase del motor");
   altaDoc.querySelector("button[aria-expanded]")?.click();
   await sleep(80);
   assert.ok(

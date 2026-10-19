@@ -15,7 +15,8 @@ import {
   TooltipRoot,
   TooltipTrigger,
 } from "../../ui/Tooltip";
-import { MarcaProveedor } from "../../ui/icons";
+import { MarcaGitHost } from "../../ui/icons";
+import { listGitHosts, type GitHost } from "../../lib/gitHosts";
 import { repoDe } from "../../ui/sources";
 import { enfocar } from "../../lib/focus";
 import { t } from "../../lib/i18n";
@@ -44,17 +45,7 @@ import { Badge } from "../../ui/Badge";
  * proveedor, eligiendo organización, o la lista de repos.
  */
 
-/** Los que se pueden conectar, para poder enseñarlos apagados cuando no lo están. */
-const SIN_CONECTAR = [
-  { id: "github", name: "GitHub" },
-  { id: "bitbucket", name: "Bitbucket" },
-];
-
-type Proveedor = {
-  id: string;
-  name: string;
-  connected: unknown | null;
-};
+type Proveedor = GitHost;
 type Area = { key: string; name: string };
 type RepoRemoto = {
   slug: string;
@@ -96,6 +87,8 @@ export default function MaterialPicker(props: {
 }) {
   const soloUrl = () => props.modo === "clonar";
   const [proveedores, setProveedores] = createSignal<Proveedor[] | null>(null);
+  /** Todos los que el motor sabe conectar, para enseñarlos apagados cuando ninguno lo está. */
+  const [sinConectar, setSinConectar] = createSignal<Proveedor[]>([]);
   const [proveedor, setProveedor] = createSignal<string | null>(null);
   const [areas, setAreas] = createSignal<Area[] | null>(null);
   const [area, setArea] = createSignal<string | null>(null);
@@ -134,7 +127,8 @@ export default function MaterialPicker(props: {
   onMount(() => {
     void (async () => {
       try {
-        const ps = await invoke<Proveedor[]>("list_git_hosts");
+        const ps = await listGitHosts();
+        setSinConectar(ps);
         // Solo los conectados: uno sin conexión no puede listar nada, y
         // ofrecerlo es un clic que acaba en un error que ya se sabía.
         const vivos = ps.filter((p) => p.connected);
@@ -421,7 +415,7 @@ export default function MaterialPicker(props: {
                a esperar (#137). */}
         <Match when={proveedores()?.length === 0}>
           <div class="flex gap-1.5" aria-label={t("settings.material.not_connected")}>
-            <For each={SIN_CONECTAR}>
+            <For each={sinConectar()}>
               {(p) => (
                 <TooltipRoot openDelay={RETARDO_TOOLTIP}>
                   <TooltipTrigger
@@ -434,7 +428,7 @@ export default function MaterialPicker(props: {
                         })}
                         class="grid size-8 cursor-help place-items-center rounded-sm bg-surface-muted text-neutral-500 opacity-50 grayscale"
                       >
-                        <MarcaProveedor id={p.id} size={16} />
+                        <MarcaGitHost id={p.id} size={16} />
                       </span>
                     )}
                   />
@@ -463,7 +457,7 @@ export default function MaterialPicker(props: {
                   size="sm"
                   onClick={() => void verAreas(p.id)}
                 >
-                  <MarcaProveedor id={p.id} size={15} />
+                  <MarcaGitHost id={p.id} size={15} />
                   {p.name}
                 </Button>
               )}
@@ -490,7 +484,7 @@ export default function MaterialPicker(props: {
                       <ChevronLeft size={14} />
                     </button>
                   </Show>
-                  <MarcaProveedor id={p().id} size={14} />
+                  <MarcaGitHost id={p().id} size={14} />
                   <span class="text-[0.8125rem] font-medium text-neutral-950">
                     {p().name}
                   </span>
@@ -548,7 +542,7 @@ export default function MaterialPicker(props: {
                       <ChevronLeft size={14} />
                     </button>
                   </Show>
-                  <MarcaProveedor id={p().id} size={14} />
+                  <MarcaGitHost id={p().id} size={14} />
                   <span class="text-[0.8125rem] font-medium text-neutral-950">
                     {p().name}
                   </span>

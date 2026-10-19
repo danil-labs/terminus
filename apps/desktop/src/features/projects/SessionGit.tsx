@@ -15,6 +15,7 @@ import UserCheck from "lucide-solid/icons/user-check";
 import { type JSX, Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { t } from "../../lib/i18n";
+import { changeNumber, changeShort, checksName } from "../../lib/gitHosts";
 import { workLabel } from "./branchLabel";
 import { type CheckState, compactGitKind, type GitStatus, gitReviewSignals, type KnState, type ReviewState } from "./taskGit";
 
@@ -26,13 +27,14 @@ function knLabel(state: KnState) {
   }
 }
 
-function checkLabel(state: CheckState) {
+function checkLabel(state: CheckState, gitHost: string | undefined) {
+  const checks = checksName(gitHost);
   switch (state) {
-    case "unknown": return t("projects.git.checks_unknown");
-    case "none": return t("projects.git.checks_none");
-    case "pending": return t("projects.git.checks_pending");
-    case "success": return t("projects.git.checks_success");
-    case "failure": return t("projects.git.checks_failure");
+    case "unknown": return t("projects.git.checks_unknown", { checks });
+    case "none": return t("projects.git.checks_none", { checks });
+    case "pending": return t("projects.git.checks_pending", { checks });
+    case "success": return t("projects.git.checks_success", { checks });
+    case "failure": return t("projects.git.checks_failure", { checks });
   }
 }
 
@@ -64,7 +66,7 @@ function ReviewSignals(props: { status?: GitStatus; size: number }) {
     }
   };
   return <>
-    <Show when={check()}>{value => <span data-git-checks={signals()?.checks} class={`inline-flex shrink-0 ${props.status?.stale ? "text-neutral-500" : value().color}`} data-git-stale={props.status?.stale || undefined} title={label(checkLabel(signals()?.checks ?? "unknown"))} aria-label={label(checkLabel(signals()?.checks ?? "unknown"))}>
+    <Show when={check()}>{value => <span data-git-checks={signals()?.checks} class={`inline-flex shrink-0 ${props.status?.stale ? "text-neutral-500" : value().color}`} data-git-stale={props.status?.stale || undefined} title={label(checkLabel(signals()?.checks ?? "unknown", props.status?.pull?.git_host))} aria-label={label(checkLabel(signals()?.checks ?? "unknown", props.status?.pull?.git_host))}>
       <Dynamic component={value().icon} size={props.size} aria-hidden="true" />
     </span>}</Show>
     <Show when={review()}>{value => <span data-git-review={signals()?.review} class={`inline-flex shrink-0 ${props.status?.stale ? "text-neutral-500" : value().color}`} data-git-stale={props.status?.stale || undefined} title={label(reviewLabel(signals()?.review ?? "unknown"))} aria-label={label(reviewLabel(signals()?.review ?? "unknown"))}>
@@ -82,7 +84,9 @@ function gitLabels(status: GitStatus | undefined, shared: boolean) {
       case "open": return t("projects.git.open");
       case "draft": return t("projects.git.draft");
       case "closed": return t("projects.git.closed");
-      case "merged": return s.head === s.pull.head_sha ? t("projects.git.merged") : t("projects.git.merged_other_head");
+      case "merged": return s.head === s.pull.head_sha
+        ? t("projects.git.merged", { change: changeShort(s.pull.git_host) })
+        : t("projects.git.merged_other_head", { change: changeShort(s.pull.git_host) });
     }
   };
   const branch = () => {
@@ -95,12 +99,12 @@ function gitLabels(status: GitStatus | undefined, shared: boolean) {
   };
   const signalLabels = () => {
     const signals = gitReviewSignals(status);
-    if (signals) return [checkLabel(signals.checks), reviewLabel(signals.review)].join(" · ");
+    if (signals) return [checkLabel(signals.checks, status?.pull?.git_host), reviewLabel(signals.review)].join(" · ");
     return status?.pull_known && status.pull
       && (status.pull.state === "open" || status.pull.state === "draft") && status.head !== status.pull.head_sha
       ? t("projects.git.review_other_head") : "";
   };
-  const summary = () => [status?.stale ? t("projects.git.stale") : "", branch(), stateLabel(), signalLabels(), status?.pull ? `#${status.pull.number}` : "", shared ? t("projects.git.shared") : ""].filter(Boolean).join(" · ");
+  const summary = () => [status?.stale ? t("projects.git.stale") : "", branch(), stateLabel(), signalLabels(), status?.pull ? changeNumber(status.pull.git_host, status.pull.number) : "", shared ? t("projects.git.shared") : ""].filter(Boolean).join(" · ");
   return { branch, summary };
 }
 
@@ -158,7 +162,7 @@ export default function SessionGit(props: { status?: GitStatus; compact?: boolea
             <ReviewSignals status={props.status} size={13} />
             <Show when={props.status?.pull}>
               {/* Del color del estado del PR, como su icono. */}
-              <span class={`shrink-0 ${appearance().color}`}>#{props.status?.pull?.number}</span>
+              {(pull) => <span class={`shrink-0 ${appearance().color}`}>{changeNumber(pull().git_host, pull().number)}</span>}
             </Show>
           </span>
         </Show>

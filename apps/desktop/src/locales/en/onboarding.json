@@ -46,8 +46,6 @@
   "onboarding.accounts.footer": "You can connect the remaining accounts later.",
   "onboarding.sources.title": "Connect your repositories.",
   "onboarding.sources.lede": "This step is optional. It lets you search the repositories your account can access.",
-  "onboarding.sources.github_how": "Authorize in the browser and choose the access",
-  "onboarding.sources.bitbucket_how": "Connect with a credential",
   "onboarding.sources.footer": "Repository credentials are separate from AI accounts.",
   "onboarding.context.title": "Choose your main context source.",
   "onboarding.context.later": "Add later",

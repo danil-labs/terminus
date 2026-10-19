@@ -2,7 +2,8 @@ import { For, Match, Show, Switch, createEffect, createSignal, on, onCleanup, on
 import { invoke } from "../../lib/invoke.ts";
 import { FailureNote, asFailure, type Failure } from "../../ui/Failure";
 import { Skeleton } from "../../ui/Skeleton";
-import { MarcaProveedor } from "../../ui/icons";
+import { MarcaGitHost } from "../../ui/icons";
+import { listGitHosts, type GitHost } from "../../lib/gitHosts.ts";
 import { manifiesto, t } from "../../lib/i18n";
 import { prosa, type Frase } from "../../lib/prose";
 import { Badge } from "../../ui/Badge";
@@ -46,11 +47,9 @@ type Connection = {
   connected_at: number;
 };
 
-type Provider = {
+type Provider = GitHost & {
   select_area: boolean;
   setup_url: string | null;
-  id: string;
-  name: string;
   fields: Campo[];
   /**
    * Los rótulos del formulario son claves, no frases: las declara el módulo
@@ -186,7 +185,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
   async function cargar() {
     setCargando(true);
     try {
-      setLista(await invoke<Provider[]>("list_git_hosts", { scope: await scope }));
+      setLista(await listGitHosts<Provider>(await scope));
       setFallo(null);
     } catch (e) {
       // Cargando, vacío y error son tres pantallas distintas: dejar la lista
@@ -525,7 +524,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                 <SettingsSection
                   title={
                     <span class="inline-flex items-center gap-2">
-                      <MarcaProveedor id={p.id} size={16} />
+                      <MarcaGitHost id={p.id} size={16} />
                       {p.name}
                     </span>
                   }

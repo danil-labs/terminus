@@ -196,7 +196,7 @@ const destinosDe = (
       return t("settings.nav.sources");
     },
     icono: () => <GitBranch size={15} />,
-    panel: () => <Providers solo={["github", "bitbucket"]} />,
+    panel: () => <Providers />,
   },
   {
     id: "radiant",

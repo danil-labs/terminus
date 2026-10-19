@@ -17,7 +17,8 @@ import Plus from "lucide-solid/icons/plus";
 import Search from "lucide-solid/icons/search";
 import X from "lucide-solid/icons/x";
 import { MarcaFuente } from "../../ui/sources";
-import { MarcaProveedor } from "../../ui/icons";
+import { MarcaGitHost } from "../../ui/icons";
+import { listGitHosts, type GitHost } from "../../lib/gitHosts";
 import { Popover, PopoverContent, PopoverTrigger } from "../../ui/Popover";
 import { enfocar } from "../../lib/focus";
 import type { Source } from "../../lib/model";
@@ -44,7 +45,7 @@ type RepoRemoto = {
   /** `null` es «no lo sé», que no es «no puedes». */
   can_push: boolean | null;
 };
-type Proveedor = { id: string; name: string; connected: unknown | null };
+type Proveedor = GitHost;
 type Area = { key: string; name: string };
 
 /** Por dónde va el panel de añadir. */
@@ -203,7 +204,7 @@ export default function Alcance(props: {
     const ya = proveedores();
     if (ya) return saltarSiUnico(ya);
     try {
-      const ps = await invoke<Proveedor[]>("list_git_hosts");
+      const ps = await listGitHosts();
       // Solo los conectados: uno sin conexión no puede listar nada, y ofrecerlo
       // es un clic que acaba en un error que ya se sabía.
       const vivos = ps.filter((p) => p.connected);
@@ -538,7 +539,7 @@ export default function Alcance(props: {
                                 class="flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left hover:bg-surface-muted hover:text-neutral-950"
                                 onClick={() => void verAreas(pr.id)}
                               >
-                                <MarcaProveedor id={pr.id} size={12} />
+                                <MarcaGitHost id={pr.id} size={12} />
                                 <span class="min-w-0 flex-1 truncate">
                                   {pr.name}
                                 </span>

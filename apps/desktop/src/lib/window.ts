@@ -1,5 +1,6 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { type Accessor, createSignal, onCleanup, onMount } from "solid-js";
+import { capabilities } from "./platform.ts";
 
 // Resolver macOS de forma asíncrona taparía los controles durante el primer render.
 export const isMac = () =>
@@ -28,7 +29,7 @@ export const HEADER_HEIGHT = "h-8";
 export const needsTrafficLightPadding = (
   ownsCorner: () => boolean,
   fullscreen: Accessor<boolean>,
-) => () => isMac() && !fullscreen() && ownsCorner();
+) => () => isMac() && capabilities().nativeWindow && !fullscreen() && ownsCorner();
 
 // El título nativo con Overlay se superpone a los controles; hiddenTitle deja pintarlo aquí.
 export function createWindowTitle(): Accessor<string> {
