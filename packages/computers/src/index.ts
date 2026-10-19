@@ -5,11 +5,15 @@ export {
   INTENT_COMMANDS,
   MANAGED_PROVIDERS,
   MIRROR_COMMANDS,
+  UNWAKEABLE_KINDS,
   canAct,
   defaultComputer,
   isManaged,
+  orderComputers,
   powerOf,
+  wakes,
 } from "./machine.ts";
+export { type WorkspaceGroup, type WorkspaceRow, groupWorkspaces } from "./fleet.ts";
 export {
   type Cached,
   type CallResult,

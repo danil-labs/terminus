@@ -11,7 +11,7 @@ export default function Agents() {
   const theme = useTheme();
   const { current, snapshot, space, view, setView } = useWorkspaces();
   const agents = orderDockAgents(
-    (snapshot?.agents ?? []).filter((a) => !space || a.places.some((p) => space.folders.includes(p.folder))),
+    (snapshot?.agents ?? []).filter((a) => !space || a.places.some((p) => space.folders.includes(`${p.host}/${p.folder}`))),
   );
   return (
     <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ paddingVertical: 8 }}>

@@ -25,7 +25,8 @@ export default function Notifications() {
   const { attention, activity, titleOf, hostOf, hosts } = useMachines();
   const { list } = useWorkspaces();
   const [titles, setTitles] = useState<Record<string, string>>({});
-  const nameOf = (id: string) => list.find((w) => w.id === id)?.name ?? id;
+  // El nombre del workspace por el id que le da su máquina.
+  const nameOf = (host: string, id: string) => list.find((w) => w.members.get(host) === id)?.name ?? id;
   const several = hosts.length > 1;
 
   const now: Entry[] = Object.entries(attention)
@@ -70,7 +71,7 @@ export default function Notifications() {
         testID={`notification-${entry.session}`}
         left={
           <View>
-            <Avatar name={nameOf(entry.workspace)} size={36} />
+            <Avatar name={nameOf(entry.host, entry.workspace)} size={36} />
             <View style={[styles.mark, { backgroundColor: theme.bg }]}>
               <TaskMark state={entry.state} size={16} />
             </View>
@@ -78,7 +79,7 @@ export default function Notifications() {
         }
         title={titleOf(id) ?? titles[id] ?? t("notify.untitled")}
         bold={entry.state !== "unseen"}
-        subtitle={[stateText(entry.state), nameOf(entry.workspace), machine, time].filter(Boolean).join(" · ")}
+        subtitle={[stateText(entry.state), nameOf(entry.host, entry.workspace), machine, time].filter(Boolean).join(" · ")}
         onPress={() => openTask(entry.host, entry.workspace, entry.folder ?? "", entry.session)}
       />
     );

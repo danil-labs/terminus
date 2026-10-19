@@ -12,8 +12,12 @@ export type Computer = {
   computer_id: string;
   name?: string | null;
   plan?: string | null;
-  /** Adaptador del orquestador (`aws-ec2`) en una VM administrada; vacío en una máquina propia. */
+  /** Adaptador del orquestador (`aws-ec2`) en una VM administrada. */
   provider?: string | null;
+  /** Qué es (`physical`, `vps`…), si el plano de control lo dice. */
+  kind?: string | null;
+  /** Si el relay puede encenderla, si el plano de control lo dice: manda sobre lo demás. */
+  wakeable?: boolean | null;
   /** `online | offline | starting | stopped | provisioning`. */
   state: string;
   last_seen?: string | null;

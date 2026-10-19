@@ -27,13 +27,13 @@ export default function WorkspaceSwitcher() {
   const several = hosts.length > 1;
   const labelOf = (id: string) => hosts.find((h) => h.id === id)?.label ?? id;
   const power = (host: Host) =>
-    host.power() === "on" ? w("web.computers.state.online") : host.power() === "starting" ? w("web.computers.state.starting") : w("web.computers.state.offline");
+    host.power() === "on" ? w("web.computers.state.online") : host.power() === "starting" ? w("web.computers.state.starting") : host.power() === "outdated" ? w("web.computers.state.outdated") : w("web.computers.state.offline");
   const dot = (host: Host) => (host.power() === "on" ? theme.success : host.power() === "starting" ? theme.info : theme.border);
 
   return (
     <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ paddingVertical: 8 }}>
       {list.map((workspace) => {
-        const tasks = Object.entries(attention).flatMap(([, ws]) => ws.filter((x) => x.workspace === workspace.id).flatMap((x) => x.tasks));
+        const tasks = Object.entries(attention).flatMap(([host, ws]) => ws.filter((x) => x.workspace === workspace.members.get(host)).flatMap((x) => x.tasks));
         const pending = tasks.filter((task) => NEEDS_YOU.has(task.state)).length;
         const folded = topState(tasks.map((task) => task.state as TaskState));
         return (

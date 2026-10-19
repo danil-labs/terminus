@@ -57,6 +57,14 @@ const es = {
   "web.computers.state.online": "Encendida",
   "web.computers.state.offline": "Apagada",
   "web.computers.state.starting": "Encendiéndose",
+  "web.computers.state.outdated": "Necesita actualizarse",
+  "web.computers.error": "No se pudo hablar con Danil Computers.",
+  "web.computers.license": "Tu cuenta no tiene licencia de Terminus. Pide acceso a quien administra tu cuenta de Danil.",
+  "web.computers.none": "Todavía no tienes ninguna computadora en Danil.",
+  "web.computers.retry": "Reintentar",
+  "web.machines.create_on": "Se crea en",
+  "web.machines.off_action": "{name} está apagada. Enciéndela para seguir.",
+  "web.machines.outdated_action": "{name} necesita actualizarse antes de usarla desde aquí.",
 } as const satisfies Record<string, Word>;
 
 export type WordKey = keyof typeof es;
@@ -110,6 +118,14 @@ const en: Record<WordKey, Word> = {
   "web.computers.state.online": "On",
   "web.computers.state.offline": "Off",
   "web.computers.state.starting": "Starting",
+  "web.computers.state.outdated": "Needs an update",
+  "web.computers.error": "Could not reach Danil Computers.",
+  "web.computers.license": "Your account has no Terminus license. Ask whoever manages your Danil account for access.",
+  "web.computers.none": "You do not have any computer in Danil yet.",
+  "web.computers.retry": "Retry",
+  "web.machines.create_on": "Created on",
+  "web.machines.off_action": "{name} is off. Turn it on to continue.",
+  "web.machines.outdated_action": "{name} needs an update before you can use it from here.",
 };
 
 export const WORDS: Record<"es" | "en", Record<WordKey, Word>> = { es, en };

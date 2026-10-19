@@ -1,4 +1,4 @@
-import { type Answer, type Computer, listComputers } from "@terminus/computers";
+import { type Answer, type Computer, listComputers, orderComputers } from "@terminus/computers";
 import type { EngineEvent, WorkspaceAttention } from "@terminus/protocol";
 import * as SecureStore from "expo-secure-store";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -124,7 +124,8 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
 
   // Una sesión de relay por computadora y el bridge si está emparejado.
   useEffect(() => {
-    const next: Host[] = computers.map((computer) =>
+    // En el orden de la web: las administradas primero; la primera encabeza un workspace compartido.
+    const next: Host[] = orderComputers(computers).map((computer) =>
       relayHost(computer, {
         endpoint: COMPUTERS,
         getToken: account.getToken,

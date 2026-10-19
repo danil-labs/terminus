@@ -7,9 +7,9 @@
  *
  *   node apps/mobile/scripts/fake-computers.mjs [--port 8787] [--mac-off] [--license]
  *
- * Dos máquinas comparten el workspace «Producto»: la VM de Danil (`aws-ec2`,
- * apagada, con copia en el espejo) y una Mac propia (sin proveedor, encendida;
- * apagada con `--mac-off`). Cada una tiene su motor en memoria: tareas, un
+ * Dos máquinas comparten el workspace «Producto» (cada motor con sus ids): la VM
+ * de Danil (`aws-ec2`, apagada, con copia en el espejo) y una Mac propia
+ * (`kind: physical`, encendida; apagada con `--mac-off`). Cada una tiene su motor en memoria: tareas, un
  * agente, permisos y eventos. Para la app:
  *
  *   EXPO_PUBLIC_SUPABASE_URL=http://<ip>:8787 EXPO_PUBLIC_COMPUTERS_ENDPOINT=http://<ip>:8787 npm start
@@ -32,27 +32,27 @@ const MIRROR = new Set(["workspaces_startup", "list_workspaces", "list_projects"
 
 // --- Motores --------------------------------------------------------------------
 
-function engine(name, projects, tasks) {
+function engine(name, ws, projects, tasks) {
   const now = Date.now();
   const sessions = new Map(tasks.map((t, i) => [t.id, { ...t, created_at: now - (i + 1) * 60_000, updated_at: now - i * 60_000, turns: [{ id: `${t.id}-u`, role: "user", text: t.title }, { id: `${t.id}-a`, role: "agent", text: `Hecho en ${name}.` }], pending: null }]));
-  return { name, projects, sessions, live: new Set(), cursor: 0, events: [] };
+  return { name, ws, projects, sessions, live: new Set(), cursor: 0, events: [] };
 }
 
 const machines = {
   cmp_vm: {
     row: { computer_id: "cmp_vm", name: "VM de Danil", plan: "standard", provider: "aws-ec2", host_version: "0.3.0" },
     state: "offline",
-    engine: engine("la VM", [{ id: "p1", name: "web" }], [
-      { id: "t-vm-1", project: "p1", title: "Revisar el checkout", agent: "Ada", provider: "codex", model: "gpt-5.6" },
-      { id: "t-vm-2", project: "p1", title: "Arreglar el login", agent: null, provider: "codex", model: "gpt-5.6", esperando: true },
+    engine: engine("la VM", "w-vm", [{ id: "p-vm-web", name: "web" }], [
+      { id: "t-vm-1", project: "p-vm-web", title: "Revisar el checkout", agent: "Ada", provider: "codex", model: "gpt-5.6" },
+      { id: "t-vm-2", project: "p-vm-web", title: "Arreglar el login", agent: null, provider: "codex", model: "gpt-5.6", esperando: true },
     ]),
     mirror: new Map(),
   },
   cmp_mac: {
-    row: { computer_id: "cmp_mac", name: "Mac de Alberto", plan: null, provider: null, host_version: "0.3.0" },
+    row: { computer_id: "cmp_mac", name: "Mac de Alberto", plan: null, provider: null, kind: "physical", host_version: "0.3.0" },
     state: process.argv.includes("--mac-off") ? "offline" : "online",
-    engine: engine("la Mac", [{ id: "p1", name: "web" }, { id: "p2", name: "api" }], [
-      { id: "t-mac-1", project: "p2", title: "Subir la API a v2", agent: null, provider: "claude", model: null },
+    engine: engine("la Mac", "w-mac", [{ id: "p-mac-web", name: "web" }, { id: "p-mac-api", name: "api" }], [
+      { id: "t-mac-1", project: "p-mac-api", title: "Subir la API a v2", agent: null, provider: "claude", model: null },
     ]),
     mirror: new Map(),
   },
@@ -65,7 +65,7 @@ const row = (s) => ({
 
 function attentionOf(e) {
   const tasks = [...e.sessions.values()].flatMap((s) => (s.pending ? [{ session: s.id, project: s.project, state: "approving" }] : s.esperando ? [{ session: s.id, project: s.project, state: "asked" }] : []));
-  return [{ workspace: "w", tasks }];
+  return [{ workspace: e.ws, tasks }];
 }
 
 function emit(m, name, payload) {
@@ -79,12 +79,12 @@ function turn(m, s, prompt) {
   const e = m.engine;
   s.turns.push({ id: randomUUID(), role: "user", text: prompt });
   e.live.add(s.id);
-  emit(m, "chat", { workspace: "w", session: s.id, kind: "started", text: "", meta: null, ok: null, request_id: null });
+  emit(m, "chat", { workspace: m.engine.ws, session: s.id, kind: "started", text: "", meta: null, ok: null, request_id: null });
   setTimeout(() => {
-    emit(m, "chat", { workspace: "w", session: s.id, kind: "delta", text: "Trabajando en ello", meta: null, ok: null, request_id: null });
+    emit(m, "chat", { workspace: m.engine.ws, session: s.id, kind: "delta", text: "Trabajando en ello", meta: null, ok: null, request_id: null });
     if (/permiso/i.test(prompt)) {
       s.pending = { request_id: randomUUID(), tool: "Bash", target: "rm -rf build" };
-      emit(m, "chat", { workspace: "w", session: s.id, kind: "permission", text: "Bash", meta: null, ok: null, request_id: s.pending.request_id, target: "rm -rf build" });
+      emit(m, "chat", { workspace: m.engine.ws, session: s.id, kind: "permission", text: "Bash", meta: null, ok: null, request_id: s.pending.request_id, target: "rm -rf build" });
       emit(m, "attention", attentionOf(e));
       return;
     }
@@ -96,19 +96,19 @@ function finish(m, s) {
   s.turns.push({ id: randomUUID(), role: "agent", text: "Listo." });
   s.updated_at = Date.now();
   m.engine.live.delete(s.id);
-  emit(m, "chat", { workspace: "w", session: s.id, kind: "done", text: "", meta: null, ok: true, request_id: null });
+  emit(m, "chat", { workspace: m.engine.ws, session: s.id, kind: "done", text: "", meta: null, ok: true, request_id: null });
   emit(m, "attention", attentionOf(m.engine));
 }
 
 function invoke(m, command, args) {
   const e = m.engine;
   switch (command) {
-    case "list_workspaces": return { workspaces: [{ id: "w", name: "Producto" }], active: "w" };
+    case "list_workspaces": return { workspaces: [{ id: e.ws, name: "Producto" }], active: e.ws };
     case "list_projects": return e.projects.map((p) => ({ ...p, working_directory: `/lab/${p.name}` }));
     case "list_spaces": return [{ id: "s1", name: null, folders: e.projects.map((p) => p.id) }];
     case "list_live_sessions": return [...e.sessions.values()].filter((s) => s.project === args.project).map(row);
-    case "list_agents": return { agents: args.project === "p1" && m.row.provider ? [{ name: "Ada", description: "Revisa PRs" }] : [] };
-    case "list_agent_status": return args.project === "p1" && m.row.provider ? [{ name: "Ada", status: "awake", minutes_since_last_turn: 3, live_tasks: 0 }] : [];
+    case "list_agents": return { agents: args.project === "p-vm-web" ? [{ name: "Ada", description: "Revisa PRs" }] : [] };
+    case "list_agent_status": return args.project === "p-vm-web" ? [{ name: "Ada", status: "awake", minutes_since_last_turn: 3, live_tasks: 0 }] : [];
     case "list_providers": return [{ id: "codex", label: "Codex", available: true, driver: true }];
     case "list_active_turns": return [...e.live];
     case "list_workspace_attention": return attentionOf(e);
@@ -127,7 +127,7 @@ function invoke(m, command, args) {
         const id = `t-${randomUUID().slice(0, 8)}`;
         s = { id, project: args.project, title: String(args.prompt).slice(0, 40), agent: args.agent ?? null, provider: args.provider, model: args.model ?? null, created_at: Date.now(), updated_at: Date.now(), turns: [], pending: null };
         e.sessions.set(id, s);
-        emit(m, "session", { workspace: "w", project: args.project, session: id });
+        emit(m, "session", { workspace: e.ws, project: args.project, session: id });
       }
       turn(m, s, String(args.prompt));
       return s.id;
@@ -151,11 +151,12 @@ const keyOf = (c) => JSON.stringify([c.command, c.workspace ?? null, c.folder ??
 
 // Antes de apagarse, la VM dejó en el espejo lo que se leía: la lista y sus tareas.
 function seedMirror(m) {
+  const W = m.engine.ws;
   const reads = [
-    ["list_workspaces", null, {}], ["list_projects", "w", {}], ["list_spaces", "w", {}], ["list_active_turns", "w", { workspace: "w" }],
-    ["list_workspace_attention", null, {}], ["list_providers", "w", {}],
-    ...["", ...m.engine.projects.map((p) => p.id)].flatMap((project) => [["list_live_sessions", "w", { project, open: [] }], ...(project ? [["list_agents", "w", { project }], ["list_agent_status", "w", { project }]] : [])]),
-    ...[...m.engine.sessions.values()].flatMap((s) => [["load_session", "w", { project: s.project, id: s.id }], ["pending_requests", "w", { session: s.id }]]),
+    ["list_workspaces", null, {}], ["list_projects", W, {}], ["list_spaces", W, {}], ["list_active_turns", W, { workspace: W }],
+    ["list_workspace_attention", null, {}], ["list_providers", W, {}],
+    ...["", ...m.engine.projects.map((p) => p.id)].flatMap((project) => [["list_live_sessions", W, { project, open: [] }], ...(project ? [["list_agents", W, { project }], ["list_agent_status", W, { project }]] : [])]),
+    ...[...m.engine.sessions.values()].flatMap((s) => [["load_session", W, { project: s.project, id: s.id }], ["pending_requests", W, { session: s.id }]]),
   ];
   for (const [command, workspace, args] of reads) m.mirror.set(keyOf({ command, workspace, folder: null, args }), { value: invoke(m, command, args), at: new Date(Date.now() - 3_600_000).toISOString() });
 }
@@ -172,7 +173,7 @@ function setState(m, state) {
 
 function wake(m) {
   if (m.state === "starting" || m.state === "online") return true;
-  if (!m.row.provider) return false;
+  if (m.row.kind === "physical") return false;
   setState(m, "starting");
   setTimeout(() => {
     setState(m, "online");

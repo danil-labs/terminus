@@ -30,8 +30,10 @@ export type Task = SessionRow & {
   /** `computer_id` o `bridge`. */
   host: string;
   workspace: string;
-  /** Id de la carpeta; `""` es sin carpeta. */
+  /** Id de la carpeta en su máquina; `""` es sin carpeta. */
   folder: string;
+  /** `host/folder`: cada motor tiene sus ids, así que entre máquinas la carpeta se nombra con la suya. */
+  folderKey: string;
   /** La máquina, solo cuando la persona tiene más de una (para la tarjeta). */
   machine?: string | null;
   machine_on?: boolean;
@@ -49,9 +51,11 @@ export type Agent = {
 };
 
 /** Lo que una máquina sabe de un workspace. */
+export type Folder = Project & { key: string; host: string };
+
 export type HostSnapshot = {
   host: string;
-  folders: Project[];
+  folders: Folder[];
   spaces: Space[];
   tasks: Task[];
   agents: Agent[];
@@ -107,7 +111,7 @@ export async function snapshotOf(host: Host, workspace: string): Promise<HostSna
   );
   const byProject: Record<string, (SessionRow & FlatRow)[]> = {};
   for (const { project, rows } of perFolder) byProject[project] = rows;
-  const tasks: Task[] = flattenTasks(byProject).map(({ project, row }) => ({ ...row, host: host.id, workspace, folder: project }));
+  const tasks: Task[] = flattenTasks(byProject).map(({ project, row }) => ({ ...row, host: host.id, workspace, folder: project, folderKey: `${host.id}/${project}` }));
 
   const agents = new Map<string, Agent>();
   for (const { project, agents: list, status } of perFolder) {
@@ -130,30 +134,34 @@ export async function snapshotOf(host: Host, workspace: string): Promise<HostSna
       }
     }
   }
-  return { host: host.id, folders, spaces, tasks, agents: [...agents.values()], live, cachedAt: at.cachedAt };
+  return {
+    host: host.id,
+    folders: folders.map((f) => ({ ...f, key: `${host.id}/${f.id}`, host: host.id })),
+    spaces,
+    tasks,
+    agents: [...agents.values()],
+    live,
+    cachedAt: at.cachedAt,
+  };
 }
 
 const rank = (s: Agent["status"]) => (s === "working" ? 0 : s === "awake" ? 1 : 2);
 
-/** Junta lo que cada máquina sabe de un mismo workspace. */
+/**
+ * Junta lo que cada máquina sabe de un mismo workspace, como el panel de la
+ * web: las carpetas y tareas de cada una, marcadas con su máquina (sus ids no
+ * se parecen entre motores). Los spaces son los de la primera máquina; las
+ * carpetas de las demás se ven en todos.
+ */
 export function mergeSnapshots(parts: HostSnapshot[], tagMachines: (host: string) => { machine: string; on: boolean } | null) {
-  const folders = new Map<string, Project & { hosts: string[] }>();
-  const spaces = new Map<string, Space>();
+  const lead = parts[0];
+  const others = parts.slice(1).flatMap((p) => p.folders.map((f) => f.key));
+  const spaces: Space[] = (lead?.spaces ?? []).map((s) => ({ ...s, folders: [...s.folders.map((f) => `${lead.host}/${f}`), ...others] }));
   const agents = new Map<string, Agent>();
   const tasks: Task[] = [];
   const live = new Set<string>();
   let cached: number | null = null;
   for (const part of parts) {
-    for (const f of part.folders) {
-      const known = folders.get(f.id);
-      if (known) known.hosts.push(part.host);
-      else folders.set(f.id, { ...f, hosts: [part.host] });
-    }
-    for (const s of part.spaces) {
-      const known = spaces.get(s.id);
-      if (known) known.folders = [...new Set([...known.folders, ...s.folders])];
-      else spaces.set(s.id, { ...s, folders: [...s.folders] });
-    }
     for (const a of part.agents) {
       const known = agents.get(a.name);
       if (known) {
@@ -168,7 +176,7 @@ export function mergeSnapshots(parts: HostSnapshot[], tagMachines: (host: string
     if (part.cachedAt !== null) cached = Math.max(cached ?? 0, part.cachedAt);
   }
   tasks.sort((a, b) => b.created_at - a.created_at);
-  return { folders: [...folders.values()], spaces: [...spaces.values()], agents: [...agents.values()], tasks, live, cachedAt: cached };
+  return { folders: parts.flatMap((p) => p.folders), spaces, agents: [...agents.values()], tasks, live, cachedAt: cached };
 }
 
 /** La clave de una tarea entre máquinas: el mismo id puede repetirse en dos. */

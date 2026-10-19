@@ -13,7 +13,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { listComputers } from "@terminus/computers";
+import { groupWorkspaces, listComputers, orderComputers } from "@terminus/computers";
 import type { EngineEvent } from "@terminus/protocol";
 import { type Notice, createTask, defaultsFor, loadTask, mergeSnapshots, noticer, respondPermission, snapshotOf, workspacesOf } from "../src/lib/engine.ts";
 import { type Host, HostError, relayHost } from "../src/lib/hosts.ts";
@@ -39,7 +39,7 @@ async function hostsAt(endpoint: string) {
   const answer = await listComputers(endpoint, "fake-jwt");
   assert.equal(answer.kind, "ok");
   const computers = answer.kind === "ok" ? answer.value : [];
-  const hosts = computers.map((c) => relayHost(c, { endpoint, getToken: () => "fake-jwt" }));
+  const hosts = orderComputers(computers).map((c) => relayHost(c, { endpoint, getToken: () => "fake-jwt" }));
   const events = new Map<string, EngineEvent[]>();
   for (const h of hosts) h.onEvents((list) => events.set(h.id, [...(events.get(h.id) ?? []), ...list]));
   await sleep(200);
@@ -68,38 +68,43 @@ const ok = (step: string) => {
     assert.equal(mac.power(), "on");
     ok("lista de máquinas: VM administrada apagada, Mac propia encendida; abrirlas no enciende nada");
 
-    await assert.rejects(vm.call("delete_workspace" as never, "w", {}), (e: HostError) => e.code === "command_not_allowed");
+    await assert.rejects(vm.call("delete_workspace" as never, "w-vm", {}), (e: HostError) => e.code === "command_not_allowed");
     ok("la lista cerrada: un comando fuera de APP_COMMANDS ni se envía");
 
+    assert.deepEqual(hosts.map((h) => h.id), ["cmp_vm", "cmp_mac"], "la VM administrada encabeza");
     const [vmWs, macWs] = await Promise.all([workspacesOf(vm), workspacesOf(mac)]);
-    assert.deepEqual(vmWs.list.map((w) => w.id), ["w"]);
     assert.ok(vmWs.cachedAt !== null, "la VM contesta desde el espejo");
     assert.equal(macWs.cachedAt, null);
-    const parts = await Promise.all([snapshotOf(vm, "w"), snapshotOf(mac, "w")]);
+    const groups = groupWorkspaces([{ machine: "cmp_vm", rows: vmWs.list }, { machine: "cmp_mac", rows: macWs.list }]);
+    assert.equal(groups.length, 1, "el mismo workspace con otro id en cada motor se ve una vez");
+    const members = groups[0].members;
+    assert.deepEqual([...members], [["cmp_vm", "w-vm"], ["cmp_mac", "w-mac"]]);
+    const parts = await Promise.all([snapshotOf(vm, "w-vm"), snapshotOf(mac, "w-mac")]);
     const merged = mergeSnapshots(parts, (id) => ({ machine: byId(id).label, on: byId(id).power() === "on" }));
-    assert.deepEqual(merged.folders.map((f) => [f.id, f.hosts.length]), [["p1", 2], ["p2", 1]]);
+    assert.deepEqual(merged.folders.map((f) => f.key), ["cmp_vm/p-vm-web", "cmp_mac/p-mac-web", "cmp_mac/p-mac-api"]);
+    assert.ok(merged.spaces[0].folders.includes("cmp_mac/p-mac-api"), "las carpetas de las demás máquinas entran en los spaces");
     assert.equal(merged.tasks.length, 3);
     assert.ok(merged.tasks.every((t) => t.machine));
     assert.equal(merged.tasks.find((t) => t.id === "t-vm-1")?.machine_on, false);
     assert.deepEqual(merged.agents.map((a) => a.name), ["Ada"]);
     assert.ok(merged.cachedAt !== null);
     assert.equal(vm.power(), "off", "leer no enciende la VM");
-    ok("reparto: el workspace de las dos máquinas, tareas etiquetadas con su máquina, copia del espejo con la VM apagada");
+    ok("reparto: el mismo workspace (otro id en cada motor) se junta, carpetas y tareas de cada máquina con su etiqueta, copia del espejo con la VM apagada");
 
-    const cached = await loadTask(vm, "w", "p1", "t-vm-1");
+    const cached = await loadTask(vm, "w-vm", "p-vm-web", "t-vm-1");
     assert.ok(cached.cachedAt !== null);
     assert.equal(cached.session.turns.length, 2);
     ok("una tarea de la VM apagada se lee de la copia, con su hora");
 
     const vmNotices = noticer("cmp_vm");
-    const defaults = await defaultsFor(vm, "w", merged.tasks, null);
+    const defaults = await defaultsFor(vm, "w-vm", merged.tasks, null);
     assert.equal(defaults.provider, "codex");
-    const created = createTask(vm, "w", { folder: "p1", prompt: "Escribe el changelog", ...defaults, agent: null, space: null });
+    const created = createTask(vm, "w-vm", { folder: "p-vm-web", prompt: "Escribe el changelog", ...defaults, agent: null, space: null });
     await until("la VM se enciende", () => vm.power() === "starting" || vm.power() === "on");
     const id = await created;
     assert.equal(vm.power(), "on");
     await until("el turno termina", () => (events.get("cmp_vm") ?? []).some((e) => e.name === "chat" && (e.payload as { kind: string; session: string }).kind === "done" && (e.payload as { session: string }).session === id));
-    const live = await loadTask(vm, "w", "p1", id);
+    const live = await loadTask(vm, "w-vm", "p-vm-web", id);
     assert.equal(live.cachedAt, null);
     assert.equal(live.session.turns.at(-1)?.text, "Listo.");
     const notices: Notice[] = (events.get("cmp_vm") ?? []).flatMap((e) => vmNotices.take(e));
@@ -107,17 +112,17 @@ const ok = (step: string) => {
     ok("Nueva tarea en la VM apagada: la enciende el relay, el turno corre y llega el aviso de terminada");
 
     const macNotices = noticer("cmp_mac");
-    const pid = await createTask(mac, "w", { folder: "p2", prompt: "Pide permiso para borrar build", provider: "claude", model: null, agent: null, space: null });
+    const pid = await createTask(mac, "w-mac", { folder: "p-mac-api", prompt: "Pide permiso para borrar build", provider: "claude", model: null, agent: null, space: null });
     await until("pide permiso", () => (events.get("cmp_mac") ?? []).some((e) => e.name === "chat" && (e.payload as { kind: string }).kind === "permission"));
-    const waiting = await loadTask(mac, "w", "p2", pid);
+    const waiting = await loadTask(mac, "w-mac", "p-mac-api", pid);
     assert.equal(waiting.permissions.length, 1);
     assert.equal(waiting.running, true);
-    await respondPermission(mac, "w", pid, waiting.permissions[0].request_id, true);
+    await respondPermission(mac, "w-mac", pid, waiting.permissions[0].request_id, true);
     await until("termina tras aprobar", () => (events.get("cmp_mac") ?? []).some((e) => e.name === "chat" && (e.payload as { kind: string; session: string }).kind === "done" && (e.payload as { session: string }).session === pid));
     const after = (events.get("cmp_mac") ?? []).flatMap((e) => macNotices.take(e));
     assert.ok(after.some((n) => n.state === "approving" && n.session === pid));
     assert.ok(after.some((n) => n.state === "finished" && n.session === pid));
-    assert.equal((await loadTask(mac, "w", "p2", pid)).permissions.length, 0);
+    assert.equal((await loadTask(mac, "w-mac", "p-mac-api", pid)).permissions.length, 0);
     ok("en la Mac: la tarea pide permiso, se aprueba desde el teléfono y termina; avisos de aprobación y de terminada");
 
     for (const h of hosts) h.close();
@@ -139,7 +144,7 @@ const ok = (step: string) => {
     const ws = await workspacesOf(mac);
     assert.deepEqual(ws.list, [], "sin copia, una lectura apagada es vacía, no un error");
     await assert.rejects(
-      createTask(mac, "w", { folder: "p2", prompt: "hola", provider: "claude", model: null, agent: null, space: null }),
+      createTask(mac, "w-mac", { folder: "p-mac-api", prompt: "hola", provider: "claude", model: null, agent: null, space: null }),
       (e: HostError) => e.code === "machine_asleep",
     );
     assert.equal(mac.power(), "off");

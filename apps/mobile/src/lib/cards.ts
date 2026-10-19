@@ -14,10 +14,13 @@ export type Marks = {
   live: Set<string>;
 };
 
-export function marksOf(attention: Record<string, WorkspaceAttention[]>, workspace: string | null | undefined, live: Set<string>): Marks {
+/** `members`: el id local del workspace en cada máquina; sin él, todos. */
+export function marksOf(attention: Record<string, WorkspaceAttention[]>, members: Map<string, string> | null | undefined, live: Set<string>): Marks {
   const map = new Map<string, AttentionState>();
   for (const [host, list] of Object.entries(attention)) {
-    for (const w of list) if (!workspace || w.workspace === workspace) for (const task of w.tasks) map.set(`${host}/${task.session}`, task.state);
+    const local = members?.get(host);
+    if (members && local === undefined) continue;
+    for (const w of list) if (local === undefined || w.workspace === local) for (const task of w.tasks) map.set(`${host}/${task.session}`, task.state);
   }
   return { attention: map, live };
 }
@@ -30,6 +33,7 @@ export function cardTask(task: Task, marks: Marks): CardTask & { key: string } {
     ...task,
     id: key,
     key,
+    folder: task.folderKey,
     esperando: task.esperando || state === "asked",
     outcome: state === "failed" ? "failed" : task.outcome,
     sin_ver: state === "unseen",

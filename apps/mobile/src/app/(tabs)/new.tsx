@@ -37,35 +37,39 @@ export default function NewTask() {
   }, [params.folder, params.agent, params.host]);
 
   const host = hostsOfCurrent.find((h) => h.id === hostId) ?? preferred(hostsOfCurrent);
-  const folders = (snapshot?.folders ?? []).filter((f) => (!space || space.folders.includes(f.id)) && host && f.hosts.includes(host.id));
+  const folders = (snapshot?.folders ?? []).filter((f) => (!space || space.folders.includes(f.key)) && f.host === host?.id);
   const target = folders.some((f) => f.id === folder) ? folder : (folders[0]?.id ?? null);
+  // El id del workspace en esa máquina: cada motor tiene el suyo.
+  const workspace = host ? (current?.members.get(host.id) ?? null) : null;
   const agents = (snapshot?.agents ?? []).filter((a) => a.places.some((p) => p.host === host?.id && p.folder === target));
   const chosenAgent = agents.some((a) => a.name === agent) ? agent : null;
   const act = host?.canAct();
-  const ready = Boolean(host && current && target && message.trim()) && act !== "asleep" && !busy;
+  const ready = Boolean(host && workspace && target && message.trim()) && act !== "asleep" && act !== "outdated" && !busy;
   void tick;
 
   async function start() {
-    if (!host || !current || !target) return;
+    if (!host || !workspace || !target) return;
     setBusy(true);
     setNote(act === "wakes" ? w("shell.machines.waking", { name: host.label }) : null);
     try {
-      const defaults = await defaultsFor(host, current.id, snapshot?.tasks ?? [], chosenAgent);
-      const id = await createTask(host, current.id, {
+      const defaults = await defaultsFor(host, workspace, snapshot?.tasks ?? [], chosenAgent);
+      const id = await createTask(host, workspace, {
         folder: target,
         prompt: message.trim(),
         provider: defaults.provider,
         model: defaults.model,
         agent: chosenAgent,
-        space: space?.id ?? null,
+        // Los spaces son de la primera máquina: en otra, el id no significaría nada.
+        space: host.id === hostsOfCurrent[0]?.id ? (space?.id ?? null) : null,
       });
       rememberMachine(host.id);
       setMessage("");
       setNote(null);
-      openTask(host.id, current.id, target, id);
+      openTask(host.id, workspace, target, id);
     } catch (error) {
       if (error instanceof HostError && error.code === "no_provider") setNote(t("new.no_provider"));
-      else if (error instanceof HostError && error.code === "machine_asleep") setNote(t("machines.asleep", { name: host.label }));
+      else if (error instanceof HostError && error.code === "machine_asleep") setNote(w("web.machines.off_action", { name: host.label }));
+      else if (error instanceof HostError && error.code === "machine_outdated") setNote(w("web.machines.outdated_action", { name: host.label }));
       else if (error instanceof HostError && (error.code === "start_failed" || error.code === "start_timeout")) setNote(t("machines.start_failed", { name: host.label }));
       else setNote(t("task.error", { detail: error instanceof Error ? error.message : String(error) }));
     } finally {
@@ -76,7 +80,7 @@ export default function NewTask() {
   const chip = (active: boolean) => [styles.chip, { borderColor: theme.border, backgroundColor: active ? theme.primary : theme.surface }];
   const chipText = (active: boolean) => ({ color: active ? theme.onPrimary : theme.text, fontWeight: active ? ("700" as const) : ("500" as const) });
   const power = (h: typeof host) =>
-    !h ? "" : h.power() === "on" ? w("web.computers.state.online") : h.power() === "starting" ? w("web.computers.state.starting") : w("web.computers.state.offline");
+    !h ? "" : h.power() === "on" ? w("web.computers.state.online") : h.power() === "starting" ? w("web.computers.state.starting") : h.power() === "outdated" ? w("web.computers.state.outdated") : w("web.computers.state.offline");
 
   return (
     <KeyboardScreen style={{ backgroundColor: theme.bg }}>
@@ -89,7 +93,7 @@ export default function NewTask() {
 
         {hostsOfCurrent.length > 1 ? (
           <>
-            <Text style={[styles.label, { color: theme.textMuted }]}>{w("shell.machines.label")}</Text>
+            <Text style={[styles.label, { color: theme.textMuted }]}>{w("web.machines.create_on")}</Text>
             <View style={styles.chips}>
               {hostsOfCurrent.map((h) => (
                 <Pressable key={h.id} testID={`machine-${h.id}`} style={chip(h.id === host?.id)} onPress={() => setHostId(h.id)}>
@@ -137,7 +141,8 @@ export default function NewTask() {
           placeholderTextColor={theme.textMuted}
           multiline
         />
-        {host && act === "asleep" ? <Text style={{ color: theme.textMuted }}>{t("machines.asleep", { name: host.label })}</Text> : null}
+        {host && act === "asleep" ? <Text style={{ color: theme.textMuted }}>{w("web.machines.off_action", { name: host.label })}</Text> : null}
+        {host && act === "outdated" ? <Text style={{ color: theme.textMuted }}>{w("web.machines.outdated_action", { name: host.label })}</Text> : null}
         {host && act === "wakes" && host.power() === "off" && !busy ? (
           <Text style={{ color: theme.textMuted }}>{w("shell.machines.asleep_notice", { name: host.label })}</Text>
         ) : null}

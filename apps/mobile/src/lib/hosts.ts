@@ -20,7 +20,7 @@ import {
   powerOf,
   requestId,
 } from "@terminus/computers";
-import { type AppCommand, type EngineError, type EngineEvent, isAppCommand } from "@terminus/protocol";
+import { type AppCommand, type EngineError, type EngineEvent, APP_ACTIONS, isAppCommand } from "@terminus/protocol";
 
 export class HostError extends Error {
   code: string;
@@ -43,8 +43,8 @@ export type Host = {
   /** La VM que Danil administra: una acción la enciende. */
   readonly managed: boolean;
   power(): Power;
-  /** Si una acción se puede mandar ya, enciende la máquina o no tiene cómo. */
-  canAct(): "now" | "wakes" | "asleep";
+  /** Si una acción se puede mandar ya, enciende la máquina, no tiene cómo o su motor está desactualizado. */
+  canAct(): "now" | "wakes" | "asleep" | "outdated";
   onChange(listener: () => void): () => void;
   /** Eventos del motor; `gap` dice que se perdieron algunos y hay que releer. */
   onEvents(listener: (events: EngineEvent[], gap: boolean) => void): () => void;
@@ -86,6 +86,8 @@ export function relayHost(computer: Computer, config: Omit<RelayConfig, "compute
       const intent = INTENT_COMMANDS.has(command);
       // Una máquina propia apagada no se puede despertar: ni se intenta, el relay contestaría `start_failed`.
       if (intent && host.canAct() === "asleep") throw new HostError("machine_asleep", host.label);
+      // Un motor que no habla este contrato no recibe acciones, como en la web.
+      if ((APP_ACTIONS as readonly string[]).includes(command) && host.canAct() === "outdated") throw new HostError("machine_outdated", host.label);
       try {
         const { value, cached } = await relay.call(requestId(), command, workspace, null, args, intent ? WAKE_TIMEOUT : CALL_TIMEOUT);
         return { value: value as T, cachedAt: cachedAt(cached) };

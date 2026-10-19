@@ -15,18 +15,19 @@ export function MachineNote({ hosts, fleet, cachedAt }: { hosts: Host[]; fleet: 
   const theme = useTheme();
   const { reloadComputers } = useMachines();
   const lines: string[] = [];
-  if (fleet === "license") lines.push(t("machines.license"));
-  if (fleet === "error") lines.push(t("machines.error"));
-  if (fleet === "ok" && !hosts.length) lines.push(t("machines.none"));
+  if (fleet === "license") lines.push(w("web.computers.license"));
+  if (fleet === "error") lines.push(w("web.computers.error"));
+  if (fleet === "ok" && !hosts.length) lines.push(w("web.computers.none"));
   for (const host of hosts) {
     if (host.power() === "starting") lines.push(w("shell.machines.waking", { name: host.label }));
+    else if (host.power() === "outdated") lines.push(w("web.machines.outdated_action", { name: host.label }));
     else if (host.power() === "off" && host.kind === "computer") {
       lines.push(
         cachedAt !== null
           ? t("machines.cached", { name: host.label, time: time(cachedAt) })
           : host.managed
             ? w("shell.machines.asleep_notice", { name: host.label })
-            : t("machines.asleep", { name: host.label }),
+            : w("web.machines.off_action", { name: host.label }),
       );
     }
   }
@@ -40,7 +41,7 @@ export function MachineNote({ hosts, fleet, cachedAt }: { hosts: Host[]; fleet: 
       ))}
       {fleet === "error" ? (
         <Pressable onPress={() => void reloadComputers()}>
-          <Text style={{ color: theme.primary, fontWeight: "600" }}>{t("machines.retry")}</Text>
+          <Text style={{ color: theme.primary, fontWeight: "600" }}>{w("web.computers.retry")}</Text>
         </Pressable>
       ) : null}
     </View>

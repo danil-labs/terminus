@@ -5,7 +5,7 @@ import { FlatList, StyleSheet, Text, View } from "react-native";
 import { cardOf, marksOf } from "../../../lib/cards";
 import { createTask, defaultsFor, taskKey } from "../../../lib/engine";
 import { HostError } from "../../../lib/hosts";
-import { lang, t } from "../../../lib/i18n";
+import { lang, t, w } from "../../../lib/i18n";
 import { useMachines } from "../../../lib/machines";
 import { useWorkspaces } from "../../../lib/workspaces";
 import { Avatar, Composer, openTask } from "../../../ui/components";
@@ -18,28 +18,31 @@ export default function AgentScreen() {
   const theme = useTheme();
   const { workspace, name } = useLocalSearchParams<{ workspace: string; name: string }>();
   const { attention, preferred, rememberMachine } = useMachines();
-  const { snapshot, hostsOfCurrent, view } = useWorkspaces();
+  const { snapshot, hostsOfCurrent, view, current } = useWorkspaces();
   const agent = snapshot?.agents.find((a) => a.name === name);
   const [note, setNote] = useState<string | null>(null);
-  const marks = useMemo(() => marksOf(attention, workspace, snapshot?.live ?? new Set()), [attention, workspace, snapshot?.live]);
+  const marks = useMemo(() => marksOf(attention, current?.members, snapshot?.live ?? new Set()), [attention, current?.members, snapshot?.live]);
   const tasks = (snapshot?.tasks ?? []).filter((task) => task.agent === name);
   const folderName = (id: string) => snapshot?.folders.find((f) => f.id === id)?.name;
   // En qué máquina se habla con él: la preferida entre las que lo tienen.
   const host = preferred(hostsOfCurrent.filter((h) => agent?.places.some((p) => p.host === h.id)));
   const places = agent?.places.filter((p) => p.host === host?.id).map((p) => p.folder) ?? [];
   const folder = agentFolder(places, null) ?? places[0] ?? null;
+  // El id del workspace en esa máquina: la ruta lleva el del grupo.
+  const local = host ? (current?.members.get(host.id) ?? workspace) : workspace;
 
   async function message(text: string) {
     if (!host || folder === null) return false;
     setNote(null);
     try {
-      const defaults = await defaultsFor(host, workspace, snapshot?.tasks ?? [], name);
-      const id = await createTask(host, workspace, { folder, prompt: text, provider: defaults.provider, model: defaults.model, agent: name, space: null });
+      const defaults = await defaultsFor(host, local, snapshot?.tasks ?? [], name);
+      const id = await createTask(host, local, { folder, prompt: text, provider: defaults.provider, model: defaults.model, agent: name, space: null });
       rememberMachine(host.id);
-      openTask(host.id, workspace, folder, id);
+      openTask(host.id, local, folder, id);
       return true;
     } catch (error) {
-      if (error instanceof HostError && error.code === "machine_asleep") setNote(t("machines.asleep", { name: host.label }));
+      if (error instanceof HostError && error.code === "machine_asleep") setNote(w("web.machines.off_action", { name: host.label }));
+      else if (error instanceof HostError && error.code === "machine_outdated") setNote(w("web.machines.outdated_action", { name: host.label }));
       else setNote(t("task.error", { detail: error instanceof Error ? error.message : String(error) }));
       return false;
     }

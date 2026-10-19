@@ -36,27 +36,28 @@ export default function Tasks() {
     void Notifications?.getPermissionsAsync().then((p) => setAskNotifications(p.canAskAgain && !p.granted));
   }, []);
 
-  const marks = useMemo(() => marksOf(attention, current?.id, snapshot?.live ?? new Set()), [attention, current?.id, snapshot?.live]);
+  const marks = useMemo(() => marksOf(attention, current?.members, snapshot?.live ?? new Set()), [attention, current?.members, snapshot?.live]);
   const otherPending = Object.values(attention)
     .flat()
-    .filter((w) => w.workspace !== current?.id)
+    .filter((w) => !Object.values(Object.fromEntries(current?.members ?? [])).includes(w.workspace))
     .reduce((sum, w) => sum + w.tasks.filter((task) => NEEDS_YOU.has(task.state)).length, 0);
 
   const spaces = snapshot?.spaces ?? [];
-  const inSpace = (folder: string) => !space || folder === "" || space.folders.includes(folder);
-  const tasks = (snapshot?.tasks ?? []).filter((task) => inSpace(task.folder) && (!task.space || !space || task.space === space.id));
-  const folderName = (id: string) => snapshot?.folders.find((f) => f.id === id)?.name;
-  const counts = folderCounts(tasks.map((task) => ({ project: task.folder, row: task })));
+  // Las carpetas se nombran `host/id`: cada máquina tiene sus ids.
+  const inSpace = (key: string) => !space || key.endsWith("/") || space.folders.includes(key);
+  const tasks = (snapshot?.tasks ?? []).filter((task) => inSpace(task.folderKey));
+  const folderName = (key: string) => snapshot?.folders.find((f) => f.key === key)?.name;
+  const counts = folderCounts(tasks.map((task) => ({ project: task.folderKey, row: task })));
   // Como el escritorio: de las carpetas elegidas, las que siguen teniendo tareas.
   const kept = view.folders.filter((f) => (counts.get(f) ?? 0) > 0);
   const effective: SidebarView = kept.length === view.folders.length ? view : { ...view, folders: kept };
   const groups = applySidebarView(tasks.map((task) => ({ ...cardTask(task, marks), task })), effective, {
     live: marks.live,
     approving: [...marks.attention].filter(([, s]) => s === "approving").map(([k]) => k),
-    folderOf: (row) => row.task.folder,
+    folderOf: (row) => row.task.folderKey,
   });
   const visibleGroups = groups.filter((g) => g.kind !== "section" || g.tasks.length || g.key === "active");
-  const agents = (snapshot?.agents ?? []).filter((a) => a.places.some((p) => inSpace(p.folder)));
+  const agents = (snapshot?.agents ?? []).filter((a) => a.places.some((p) => inSpace(`${p.host}/${p.folder}`)));
   const changed = nonDefaultCount(view);
 
   return (
@@ -74,7 +75,7 @@ export default function Tasks() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.spaces}>
             {spaces.map((s) => {
               const active = s.id === space?.id;
-              const folded = active ? null : topState((snapshot?.tasks ?? []).filter((task) => s.folders.includes(task.folder)).map((task) => cardOf(task, marks).state));
+              const folded = active ? null : topState((snapshot?.tasks ?? []).filter((task) => s.folders.includes(task.folderKey)).map((task) => cardOf(task, marks).state));
               return (
                 <Pressable
                   key={s.id}

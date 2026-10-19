@@ -1,17 +1,23 @@
-import type { Project, Space, Workspace } from "@terminus/protocol";
+import { groupWorkspaces } from "@terminus/computers";
+import type { Space, Workspace } from "@terminus/protocol";
 import { DEFAULT_SIDEBAR_VIEW, type SidebarView, sanitizeSidebarView } from "@terminus/tasks";
 import * as SecureStore from "expo-secure-store";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { type Agent, type Task, mergeSnapshots, snapshotOf, taskKey, workspacesOf } from "./engine";
+import { type Agent, type Folder, type Task, mergeSnapshots, snapshotOf, taskKey, workspacesOf } from "./engine";
 import type { Host } from "./hosts";
 import { useMachines } from "./machines";
 
-/** Un workspace, quizá abierto en varias máquinas. */
-export type WorkspaceEntry = Workspace & { hosts: string[] };
+/**
+ * Un workspace, quizá abierto en varias máquinas: el mismo si tiene el mismo
+ * remoto o, si no, el mismo nombre (`groupWorkspaces`, la regla de la web).
+ * `id` es la clave del grupo; `members`, su id local en cada máquina.
+ */
+export type WorkspaceEntry = { id: string; name: string; members: Map<string, string>; hosts: string[] };
 
 /** Lo que el teléfono enseña de un workspace, juntando todas sus máquinas. */
 export type Snapshot = {
-  folders: (Project & { hosts: string[] })[];
+  /** Carpetas de cada máquina; `key` es `host/id`. */
+  folders: Folder[];
   spaces: Space[];
   tasks: Task[];
   agents: Agent[];
@@ -65,17 +71,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     void SecureStore.getItemAsync(KEY).then((saved) => saved && setCurrentId((id) => id ?? saved));
   }, []);
 
-  const list = useMemo<WorkspaceEntry[]>(() => {
-    const merged = new Map<string, WorkspaceEntry>();
-    for (const host of hosts) {
-      for (const w of perHost[host.id] ?? []) {
-        const known = merged.get(w.id);
-        if (known) known.hosts.push(host.id);
-        else merged.set(w.id, { ...w, hosts: [host.id] });
-      }
-    }
-    return [...merged.values()];
-  }, [hosts, perHost]);
+  const list = useMemo<WorkspaceEntry[]>(() => grouped(hosts, perHost), [hosts, perHost]);
 
   const machineCount = hosts.length;
   const reload = useCallback(async () => {
@@ -86,12 +82,13 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
       if (mine !== asked.current) return;
       const byHost = Object.fromEntries(answers);
       setPerHost(byHost);
-      const all = answers.flatMap(([, ws]) => ws);
-      const id = all.some((w) => w.id === currentId) ? currentId : (all[0]?.id ?? null);
-      if (id !== currentId) setCurrentId(id);
-      if (!id) return setSnapshot(null);
-      const having = hosts.filter((h) => byHost[h.id]?.some((w: Workspace) => w.id === id));
-      const parts = await Promise.all(having.map((host) => snapshotOf(host, id).catch(() => null)));
+      const groups = grouped(hosts, byHost);
+      const entry = groups.find((g) => g.id === currentId) ?? groups[0] ?? null;
+      if ((entry?.id ?? null) !== currentId) setCurrentId(entry?.id ?? null);
+      if (!entry) return setSnapshot(null);
+      // En el orden de las máquinas: la primera pone los spaces.
+      const having = hosts.filter((h) => entry.members.has(h.id));
+      const parts = await Promise.all(having.map((host) => snapshotOf(host, entry.members.get(host.id) as string).catch(() => null)));
       if (mine !== asked.current) return;
       // La máquina de cada tarea solo se dice con más de una máquina.
       const tag = (hostId: string) => {
@@ -121,13 +118,14 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
             const payload = event.payload as { workspace?: string | null; kind?: string } | null;
             const turn = event.name === "chat" && (payload?.kind === "started" || payload?.kind === "done");
             if (!REFRESH_ON.has(event.name) && !turn) return false;
-            return !payload?.workspace || payload.workspace === currentId;
+            const local = list.find((g) => g.id === currentId)?.members.get(_host);
+            return !payload?.workspace || payload.workspace === local;
           });
         if (!relevant) return;
         if (pending.current) clearTimeout(pending.current);
         pending.current = setTimeout(() => void reload(), 600);
       }),
-    [subscribe, reload, currentId],
+    [subscribe, reload, currentId, list],
   );
 
   const select = useCallback((id: string) => {
@@ -171,7 +169,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   );
 
   const current = list.find((w) => w.id === currentId) ?? null;
-  const hostsOfCurrent = useMemo(() => hosts.filter((h) => current?.hosts.includes(h.id)), [hosts, current]);
+  const hostsOfCurrent = useMemo(() => hosts.filter((h) => current?.members.has(h.id)), [hosts, current]);
 
   const value = useMemo<Workspaces>(
     () => ({ list, current, snapshot, loading, select, space, selectSpace, view, setView, hostsOfCurrent, reload }),
@@ -183,4 +181,13 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
 /** El nombre del space, o el del space por defecto. */
 export function spaceName(space: Space | undefined | null, fallback: string) {
   return space?.name?.trim() || fallback;
+}
+
+function grouped(hosts: { id: string }[], perHost: Record<string, Workspace[]>): WorkspaceEntry[] {
+  return groupWorkspaces(hosts.map((h) => ({ machine: h.id, rows: perHost[h.id] ?? [] }))).map((g) => ({
+    id: g.key,
+    name: g.row.name ?? g.key,
+    members: g.members,
+    hosts: [...g.members.keys()],
+  }));
 }

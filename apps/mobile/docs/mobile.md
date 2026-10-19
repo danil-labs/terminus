@@ -26,7 +26,11 @@ como la web.
   nunca enciende una máquina; cada máquina se ve solo encendida, apagada o
   encendiéndose, nunca como error; escribir, crear una tarea, aprobar o
   contestar despiertan una VM administrada por el relay; una máquina propia
-  apagada no se puede despertar y se dice en tono neutro. Con la VM apagada las
+  apagada no se puede despertar y se dice en tono neutro. Qué se puede
+  encender lo decide `wakes()`, la misma regla que la web (#154): manda
+  `wakeable` si el plano de control lo da, luego `kind` (`physical`, `vps`…),
+  luego el proveedor (`aws-ec2`, o ninguno en filas viejas). Un motor que no
+  habla el contrato (`outdated`) no recibe acciones. Con la VM apagada las
   lecturas vienen de la copia del relay (`cached: {updated_at}`) y la app dice
   de qué hora es; sin copia, `machine_off` es una lista vacía.
 - **Lista cerrada de comandos en los dos caminos** (`APP_COMMANDS` en
@@ -76,8 +80,12 @@ como la web.
   salen de `list_live_sessions` por carpeta y para `""`, como la ventana; una
   tarea nueva es `send_message` sin sesión; la conversación, `load_session`;
   aprobaciones y preguntas, `pending_requests` y el turno de la pregunta.
-- `apps/mobile/src/lib/workspaces.tsx`: el reparto entre máquinas. Un workspace abierto en
-  varias se ve una vez; sus tareas vienen de todas, cada una con su máquina.
+- `apps/mobile/src/lib/workspaces.tsx`: el reparto entre máquinas, con la regla de la web
+  (`groupWorkspaces`): cada motor tiene sus ids, así que dos workspaces son el
+  mismo si tienen el mismo proveedor y remoto o, si no, el mismo nombre. Se ven
+  una vez; sus carpetas y tareas vienen de cada máquina, marcadas con ella
+  (`host/id`), y cada acción va a la máquina de la tarea con el id que ella le
+  da al workspace. Los spaces son los de la primera máquina (la VM administrada).
 
 Los avisos salen en la app, igual para los dos caminos: una tarea que entra en
 `approving`, `asked` o `failed` (evento `attention`) o un turno que termina bien
@@ -104,7 +112,7 @@ máquina (o del agente); si no hay ninguna, el primer proveedor disponible.
 
 Sin la sesión de nadie, contra el Danil Computers falso (`apps/mobile/scripts/fake-computers.mjs`:
 login de Supabase, `/v1/computers`, `/start` y el relay con espejo, con una VM
-apagada y una Mac propia que comparten un workspace):
+apagada y una Mac propia que comparten un workspace, cada motor con sus ids):
 
 ```bash
 cd apps/mobile
@@ -155,11 +163,11 @@ no se abrió la app. Se comprobó:
    `terminus-mobile://auth/callback` para los builds y, en desarrollo con Expo
    Go, `exp://**`. Sin eso Google y Microsoft no vuelven a la app; correo y
    contraseña funcionan igual.
-2. **Saber qué máquina se puede encender.** `GET /v1/computers` solo da
-   `provider`; la app trata como administrada la que tiene un proveedor del
-   orquestador (`aws-ec2`). Un campo explícito (`managed` o `wakeable`) sería
-   más firme. Hoy una intención a una máquina propia apagada llega a
-   `startMachine` y vuelve `start_failed`; la app no la manda.
+2. **Decir qué máquina se puede encender.** `GET /v1/computers` hoy da
+   `provider`; la web y la app ya leen `wakeable` y `kind` si llegan. Sin
+   ellos, una máquina propia registrada sin proveedor se tomaría por VM. Con
+   `kind: "physical"` (o `wakeable: false`) la app no le manda intenciones; sin
+   eso, el relay la intentaría encender y volvería `start_failed`.
 3. **Lista de permiso por cliente en el relay.** El relay solo bloquea funciones
    de escritorio; la lista cerrada del teléfono la hace cumplir el cliente. Si
    se quiere que el servidor también la imponga, el relay necesita saber que la
@@ -171,6 +179,7 @@ no se abrió la app. Se comprobó:
    `terminus-mobile://` (también para la vuelta de Google y Microsoft).
 2. **Gateway de push.** Un servicio que guarda la llave de APNs y la cuenta de
    FCM; las máquinas le piden enviar. Los avisos ya se calculan en la app.
-3. **La web al paquete compartido.** `apps/desktop/src/web/relay.ts` y
-   `computers.ts` son el origen de `@terminus/computers`; la web debería
-   importarlo en vez de su copia.
+3. **La web al paquete compartido.** `apps/desktop/src/web/relay.ts`,
+   `computers.ts` y las reglas de `fleet.ts` (`wakes`, el orden y el grupo de
+   workspaces) están en `@terminus/computers`; la web debería importarlo en
+   vez de su copia.

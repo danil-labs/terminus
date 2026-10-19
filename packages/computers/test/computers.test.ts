@@ -8,7 +8,9 @@ import {
   cachedAt,
   canAct,
   defaultComputer,
+  groupWorkspaces,
   isManaged,
+  wakes,
   listComputers,
   powerOf,
   sessionUrl,
@@ -123,12 +125,17 @@ test("solo una VM administrada se despierta; apagado es neutro", () => {
   assert.equal(powerOf("online"), "on");
   assert.equal(powerOf("stopped"), "off");
   assert.equal(powerOf("provisioning"), "off");
+  assert.equal(powerOf("version_mismatch"), "outdated");
   assert.equal(isManaged({ provider: "aws-ec2" }), true);
-  assert.equal(isManaged({ provider: null }), false);
+  // La regla de la web: sin proveedor es una VM de antes; `kind` y `wakeable` mandan.
+  assert.equal(wakes({ provider: null }), true);
+  assert.equal(wakes({ provider: null, kind: "physical" }), false);
+  assert.equal(wakes({ provider: "aws-ec2", wakeable: false }), false);
   assert.equal(canAct({ provider: "aws-ec2" }, "offline"), "wakes");
-  assert.equal(canAct({ provider: null }, "offline"), "asleep");
-  assert.equal(canAct({ provider: null }, "online"), "now");
-  const mac = { computer_id: "cmp_mac", provider: null };
+  assert.equal(canAct({ kind: "physical" }, "offline"), "asleep");
+  assert.equal(canAct({ kind: "physical" }, "online"), "now");
+  assert.equal(canAct({ provider: "aws-ec2" }, "outdated"), "outdated");
+  const mac = { computer_id: "cmp_mac", provider: null, kind: "physical" };
   const vm = { computer_id: "cmp_vm", provider: "aws-ec2" };
   assert.equal(defaultComputer([mac, vm]), vm);
   assert.equal(defaultComputer([mac]), mac);
@@ -147,4 +154,15 @@ test("la API dice licencia, no tuya y error sin confundirlos", async () => {
     return { status: 200, ok: true, json: async () => [] };
   });
   assert.equal(seen?.authorization, "Bearer tok");
+});
+
+test("un workspace es el mismo en dos máquinas por remoto o, si no, por nombre único", () => {
+  const groups = groupWorkspaces([
+    { machine: "vm", rows: [{ id: "a", name: "Producto", provider: "github", remote: "org/app" }, { id: "b", name: "Notas" }] },
+    { machine: "mac", rows: [{ id: "x", name: "Otro nombre", provider: "github", remote: "org/app" }, { id: "y", name: "notas" }, { id: "z", name: "Solo Mac" }] },
+  ]);
+  assert.deepEqual(
+    groups.map((g) => [g.key, [...g.members]]),
+    [["vm~a", [["vm", "a"], ["mac", "x"]]], ["vm~b", [["vm", "b"], ["mac", "y"]]], ["mac~z", [["mac", "z"]]]],
+  );
 });

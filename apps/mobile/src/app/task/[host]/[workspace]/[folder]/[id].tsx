@@ -51,7 +51,8 @@ export default function TaskScreen() {
   const fail = useCallback(
     (error: unknown) => {
       const name = host?.label ?? "";
-      if (error instanceof HostError && error.code === "machine_asleep") return setNote(t("machines.asleep", { name }));
+      if (error instanceof HostError && error.code === "machine_asleep") return setNote(w("web.machines.off_action", { name }));
+      if (error instanceof HostError && error.code === "machine_outdated") return setNote(w("web.machines.outdated_action", { name }));
       if (error instanceof HostError && error.code === "machine_off") return setNote(w("shell.machines.task_off", { name }));
       if (error instanceof HostError && (error.code === "start_failed" || error.code === "start_timeout")) return setNote(t("machines.start_failed", { name }));
       setNote(t("task.error", { detail: error instanceof Error ? error.message : String(error) }));
@@ -137,7 +138,7 @@ export default function TaskScreen() {
   const running = view?.running ?? false;
   const permissions = view?.permissions ?? [];
   const questions = view?.questions ?? [];
-  const asleep = host?.canAct() === "asleep";
+  const asleep = host?.canAct() === "asleep" || host?.canAct() === "outdated";
   const lines = linesOf(view?.session.turns ?? []);
   const cachedNote =
     view?.cachedAt && host ? t("machines.cached", { name: host.label, time: new Date(view.cachedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }) : null;
@@ -159,7 +160,11 @@ export default function TaskScreen() {
             {streaming ? <Bubble line={{ key: "live", role: "agent", text: streaming, tools: 0 }} theme={theme} /> : null}
             {running && !streaming ? <Text style={{ color: theme.textMuted }}>{t("state.working")}…</Text> : null}
             {waking && host ? <Text style={{ color: theme.textMuted }}>{w("shell.machines.waking", { name: host.label })}</Text> : null}
-            {asleep && host ? <Text style={{ color: theme.textMuted }}>{t("machines.asleep", { name: host.label })}</Text> : null}
+            {asleep && host ? (
+              <Text style={{ color: theme.textMuted }}>
+                {host.canAct() === "outdated" ? w("web.machines.outdated_action", { name: host.label }) : w("web.machines.off_action", { name: host.label })}
+              </Text>
+            ) : null}
             {note ? <Text style={{ color: theme.textMuted }}>{note}</Text> : null}
           </View>
         }

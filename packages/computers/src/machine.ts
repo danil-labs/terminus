@@ -13,32 +13,47 @@
 import type { Computer } from "./api.ts";
 
 /** Lo que manda el relay más lo que pone la fila de `/v1/computers`. */
-export type MachineState = "unknown" | "starting" | "online" | "offline" | "stopped" | "provisioning";
+export type MachineState = "unknown" | "starting" | "online" | "offline" | "stopped" | "provisioning" | "version_mismatch" | "outdated";
 
-/** Lo único que se le muestra a la persona. */
-export type Power = "on" | "off" | "starting";
+/** Lo único que se le muestra a la persona; `outdated` es que su motor no habla el contrato de este cliente. */
+export type Power = "on" | "off" | "starting" | "outdated";
 
 export function powerOf(state: string): Power {
   if (state === "online") return "on";
   if (state === "starting") return "starting";
+  if (state === "outdated" || state === "version_mismatch") return "outdated";
   return "off";
 }
 
-/**
- * Adaptadores del orquestador del plano de control (`KNOWN_PROVIDERS` en
- * `computers/src/orchestrator`). Solo una computadora de uno de ellos se puede
- * encender desde la nube.
- */
+/** Adaptadores del orquestador del plano de control (`KNOWN_PROVIDERS` en `computers/src/orchestrator`). */
 export const MANAGED_PROVIDERS: ReadonlySet<string> = new Set(["aws-ec2"]);
+/** Tipos de máquina propia que la nube no puede encender. */
+export const UNWAKEABLE_KINDS: ReadonlySet<string> = new Set(["physical", "computer", "vps", "self_hosted", "byo"]);
+
+/**
+ * Si el relay puede encender esta computadora: una VM administrada sí, una
+ * máquina propia no. Manda `wakeable` si el plano de control lo dice; si no,
+ * `kind`; si no, el proveedor (una fila sin proveedor es de antes de que
+ * existiera y es una VM). Misma regla que `wakes()` de la web (`web/fleet.ts`).
+ */
+export function wakes(c: Pick<Computer, "provider" | "kind" | "wakeable">): boolean {
+  if (typeof c.wakeable === "boolean") return c.wakeable;
+  if (c.kind && UNWAKEABLE_KINDS.has(c.kind)) return false;
+  return !c.provider || MANAGED_PROVIDERS.has(c.provider);
+}
 
 /** La VM que Danil administra para la persona, frente a una máquina suya conectada. */
-export function isManaged(computer: Pick<Computer, "provider">): boolean {
-  return typeof computer.provider === "string" && MANAGED_PROVIDERS.has(computer.provider);
+export const isManaged = wakes;
+
+/** Las administradas primero y luego por nombre: el orden decide qué máquina encabeza un workspace compartido. */
+export function orderComputers<T extends Pick<Computer, "provider" | "kind" | "wakeable" | "name" | "computer_id">>(computers: readonly T[]): T[] {
+  const label = (c: T) => c.name?.trim() || c.computer_id;
+  return [...computers].sort((a, b) => Number(wakes(b)) - Number(wakes(a)) || label(a).localeCompare(label(b)));
 }
 
 /** La máquina por omisión: la VM administrada, si hay; si no, la primera. */
-export function defaultComputer<T extends Pick<Computer, "provider" | "computer_id">>(computers: readonly T[]): T | null {
-  return computers.find(isManaged) ?? computers[0] ?? null;
+export function defaultComputer<T extends Pick<Computer, "provider" | "kind" | "wakeable">>(computers: readonly T[]): T | null {
+  return computers.find(wakes) ?? computers[0] ?? null;
 }
 
 /**
@@ -89,10 +104,11 @@ export const MIRROR_COMMANDS: ReadonlySet<string> = new Set([
 ]);
 
 /** Qué hacer con una acción según la máquina, antes de mandarla. */
-export function canAct(computer: Pick<Computer, "provider">, state: string): "now" | "wakes" | "asleep" {
+export function canAct(computer: Pick<Computer, "provider" | "kind" | "wakeable">, state: string): "now" | "wakes" | "asleep" | "outdated" {
   const power = powerOf(state);
   if (power === "on") return "now";
-  if (isManaged(computer)) return "wakes";
+  if (power === "outdated") return "outdated";
+  if (wakes(computer)) return "wakes";
   // Encendiéndose sin orquestador: el conector de la máquina está llegando solo.
   return power === "starting" ? "wakes" : "asleep";
 }

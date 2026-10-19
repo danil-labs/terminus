@@ -5,7 +5,8 @@
  */
 export type EngineError = { code: string; message_key?: string; detail?: unknown };
 
-export type Workspace = { id: string; name: string };
+/** `provider` y `remote` dicen si dos workspaces de máquinas distintas son el mismo (`groupWorkspaces`). */
+export type Workspace = { id: string; name: string; provider?: string | null; remote?: string | null };
 /** `list_workspaces`. */
 export type Startup = { workspaces: Workspace[]; active: string | null };
 /** `list_projects`: una carpeta del workspace. */

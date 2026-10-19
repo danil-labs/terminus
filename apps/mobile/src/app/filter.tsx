@@ -2,6 +2,7 @@ import { DEFAULT_SIDEBAR_VIEW, DENSITIES, GROUPINGS, type SidebarView, folderCou
 import type { ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { lang, w } from "../lib/i18n";
+import { useMachines } from "../lib/machines";
 import { useWorkspaces } from "../lib/workspaces";
 import { Avatar } from "../ui/components";
 import { FolderSquare } from "../ui/TaskCard";
@@ -15,12 +16,15 @@ import { useTheme } from "../ui/theme";
 export default function Filter() {
   const theme = useTheme();
   const { snapshot, space, view, setView } = useWorkspaces();
+  const { hostOf } = useMachines();
   const set = (patch: Partial<SidebarView>) => setView({ ...view, ...patch });
-  const tasks = (snapshot?.tasks ?? []).filter((task) => !space || task.folder === "" || space.folders.includes(task.folder));
-  const counts = folderCounts(tasks.map((task) => ({ project: task.folder, row: task })));
-  // Solo las carpetas que tienen tareas, como en el escritorio.
-  const folders = (snapshot?.folders ?? []).filter((f) => (counts.get(f.id) ?? 0) > 0);
-  const agents = (snapshot?.agents ?? []).filter((a) => !space || a.places.some((p) => space.folders.includes(p.folder)));
+  const tasks = (snapshot?.tasks ?? []).filter((task) => !space || task.folder === "" || space.folders.includes(task.folderKey));
+  const counts = folderCounts(tasks.map((task) => ({ project: task.folderKey, row: task })));
+  // Solo las carpetas que tienen tareas, como en el escritorio. Con varias máquinas, cada una con la suya.
+  const folders = (snapshot?.folders ?? []).filter((f) => (counts.get(f.key) ?? 0) > 0);
+  const several = new Set(folders.map((f) => f.host)).size > 1;
+  const hostLabel = (id: string) => hostOf(id)?.label ?? id;
+  const agents = (snapshot?.agents ?? []).filter((a) => !space || a.places.some((p) => space.folders.includes(`${p.host}/${p.folder}`)));
   const toggleFolder = (id: string) =>
     set({ folders: view.folders.includes(id) ? view.folders.filter((f) => f !== id) : [...view.folders, id] });
 
@@ -59,9 +63,9 @@ export default function Filter() {
         {text(w("shell.sidebar.view.all_folders"))}
       </Option>
       {folders.map((f) => (
-        <Option key={f.id} testID={`filter-folder-${f.id}`} check on={view.folders.includes(f.id)} onPress={() => toggleFolder(f.id)} aside={counts.get(f.id) ?? 0}>
-          <FolderSquare id={f.id} size={10} />
-          {text(f.name)}
+        <Option key={f.key} testID={`filter-folder-${f.id}`} check on={view.folders.includes(f.key)} onPress={() => toggleFolder(f.key)} aside={counts.get(f.key) ?? 0}>
+          <FolderSquare id={f.key} size={10} />
+          {text(several ? `${f.name} · ${hostLabel(f.host)}` : f.name)}
         </Option>
       ))}
 
