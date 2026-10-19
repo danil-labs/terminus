@@ -125,6 +125,7 @@ const sembrar = (prefs) => () => {
 
 const tira = (ids, activa) => ({ abiertas: ids.map((id) => ({ id, project: "pa", titulo: `Tarea ${id}` })), activa });
 
+/** `boot` arranca con el riel agrupado por carpeta: el orden de las carpetas es lo que se mira. */
 export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
   const salida = process.env.TERMINUS_E2E_DIR ? join(process.env.TERMINUS_E2E_DIR, "spaces") : null;
   if (salida) mkdirSync(salida, { recursive: true });
@@ -150,8 +151,9 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
       tecla,
       pildoras: () => [...doc.querySelectorAll("[data-space-pill]")],
       pildora: (id) => doc.querySelector(`[data-space-pill="${id}"]`),
+      // Con el riel agrupado por carpeta: una cabecera por carpeta con tareas.
       carpetasEnTareas: () =>
-        [...doc.querySelectorAll("[data-folder-row]")].filter((el) => !el.hidden).map((el) => el.dataset.folderRow),
+        [...doc.querySelectorAll("[data-folder-group]")].map((el) => el.dataset.folderGroup),
       pestanas: () => [...doc.querySelectorAll('[data-tira] [role="tab"]')].map((el) => el.textContent.trim()),
       pref: (k) => JSON.parse(app.w.localStorage.getItem(`harness.layout.${k}`) ?? "null"),
       caja: () =>
@@ -298,8 +300,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     assert.equal(u.doc.querySelector('[data-sesion="t1"]'), null);
     assert.equal(u.pildora("i1").querySelector("[data-attention-badge]")?.dataset.attentionBadge, "failed");
     assert.equal(u.pildora("i2").querySelector("[data-attention-badge]"), null, "la elegida pierde la señal");
-    assert.ok(u.doc.querySelector('[data-folder-row="pb"] [data-sidebar-agents]'));
-    assert.ok(u.doc.querySelector('[data-folder-row="pb"] [data-sidebar-tasks]'));
+    assert.ok(u.doc.querySelector('[data-sidebar-group="pb"] [data-sesion]'));
     // Volver a un escritorio monta solo la pestaña de delante, y en su celda: una
     // montada escondida gasta su lectura sin caja y reabre al final.
     const pestana = (titulo) => [...u.doc.querySelectorAll('[data-tira] [role="tab"]')].find((el) => el.textContent.trim() === titulo);

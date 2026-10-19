@@ -149,6 +149,36 @@ const SIN_USABLE = {
 const boot = (entorno, version, respuestas = RESPUESTAS, userAgent) =>
   mount(entorno, version, respuestas, userAgent);
 
+/** El riel agrupado por carpeta: es donde una carpeta tiene cabecera y se abre su vista. */
+const POR_CARPETA = { "harness.layout.sidebar.filtro": JSON.stringify({ group: "folder" }) };
+const bootPorCarpeta = (entorno, version, respuestas = RESPUESTAS) =>
+  mount(entorno, version, respuestas, undefined, POR_CARPETA);
+/** Con «Asentadas» abierta: lo entregado y visto vive ahí. */
+const bootConAsentadas = (entorno, version, respuestas = RESPUESTAS) =>
+  mount(entorno, version, respuestas, undefined, { "harness.layout.sidebar.asentadas.abiertas": "true" });
+
+/** Añadir un proyecto se abre desde el selector de la caja de una tarea nueva. */
+async function abrirAnadirProyecto(app) {
+  const doc = app.w.document;
+  doc.querySelector('button[aria-label="Nueva tarea"]').click();
+  await sleep(50);
+  doc.querySelector('button[aria-label="Proyecto"]').click();
+  await sleep(50);
+  [...doc.querySelectorAll("button")].find((b) => b.textContent.trim() === "Nuevo proyecto…").click();
+  await sleep(50);
+}
+
+/** Abre la vista de la carpeta desde su cabecera y empieza a hablar con uno de sus agentes. */
+async function hablarDesdeLaCarpeta(app, carpeta, nombre) {
+  const doc = app.w.document;
+  doc.querySelector(`[data-folder-group="${carpeta}"] [data-folder-open]`).click();
+  await sleep(120);
+  const agente = [...doc.querySelectorAll("li > button")].find((b) => b.querySelector(".astro-face") && b.textContent.trim().startsWith(nombre));
+  assert.ok(agente, `la vista de la carpeta lista a ${nombre}`);
+  agente.click();
+  await sleep(100);
+}
+
 /**
  * **El esqueleto de `Setup` es el síntoma exacto**, no una pantalla más.
  *
@@ -411,8 +441,6 @@ if (!roto) {
     parent: null, subagent: null, esperando: false, stage: null,
     agent: "Holmes", parent_agent: null, last_message: "Listo.",
   };
-  const awakeModes = [];
-  const profileSaves = [];
   const bubbleResponses = {
     ...CON_TAREA,
     list_projects: [{ id: "p", name: "Proyecto", node: null, sources: [] }],
@@ -432,11 +460,9 @@ if (!roto) {
     list_agent_profiles: {},
     keep_awake_status: { mode: "agent", active: false, supported: true },
     save_agent_profile: (args) => {
-      profileSaves.push(args);
       return { display_name: args.displayName, body: args.body, background: null, avatar: null, veil: args.veil, provider: null, model: null, effort: null, hidden: false };
     },
     set_keep_awake: ({ mode }) => {
-      awakeModes.push(mode);
       return { mode, active: mode === "on", supported: true };
     },
     has_mcp_app: ({ server, tool }) => server === "canvas" && tool === "draw",
@@ -481,36 +507,11 @@ if (!roto) {
   });
   const bubbleDocument = bubbleApp.w.document;
   await sleep(80);
-  let filaDelAgente = [...bubbleDocument.querySelectorAll("li > div[aria-label]")].find((fila) =>
-    fila.getAttribute("aria-label").startsWith("Holmes"),
-  );
-  assert.ok(filaDelAgente, "el riel no lista al agent: sin su fila no hay chat que abrir");
-  const controlDelAvatar = filaDelAgente.querySelector("button");
-  assert.ok(controlDelAvatar.className.includes("size-6"), "el avatar conserva un área de clic de 24 px, el mínimo");
-  assert.equal(controlDelAvatar.querySelector(".astro-face svg, .astro-face img")?.getAttribute("width"), "20", "solo el avatar del riel baja a 20 px");
-
-  // Doble clic en el nombre lo cambia en la fila; Escape deja el que había.
-  const nombreEnElRiel = () => [...filaDelAgente.querySelectorAll("button")].find((b) => b.textContent.trim() === "Holmes");
-  const campoDelAgente = () => filaDelAgente.querySelector("[data-agent-rename] input");
-  nombreEnElRiel().dispatchEvent(new bubbleApp.w.MouseEvent("dblclick", { bubbles: true }));
-  await sleep(50);
-  assert.ok(campoDelAgente(), "doble clic en el agente abre su nombre para editarlo");
-  campoDelAgente().dispatchEvent(new bubbleApp.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-  await sleep(50);
-  assert.equal(campoDelAgente(), null);
-  assert.equal(profileSaves.length, 0, "Escape no guarda nada");
-  nombreEnElRiel().dispatchEvent(new bubbleApp.w.MouseEvent("dblclick", { bubbles: true }));
-  await sleep(50);
-  campoDelAgente().value = "Sherlock";
-  campoDelAgente().dispatchEvent(new bubbleApp.w.Event("input", { bubbles: true }));
-  campoDelAgente().closest("form").dispatchEvent(new bubbleApp.w.Event("submit", { bubbles: true, cancelable: true }));
-  await sleep(80);
-  assert.deepEqual(profileSaves.map((p) => [p.name, p.displayName]), [["Holmes", "Sherlock"]], "Enter guarda el nombre visible y no toca la clave del agente");
-
-  // La búsqueda del sidebar también encuentra tareas por agente.
-  const filasDelRiel = () => [...bubbleDocument.querySelectorAll('[data-project-sessions="p"] [data-sidebar-tasks] [data-sesion]')].map((f) => f.dataset.sesion);
+  // El riel solo lista tareas, de todas las carpetas en una lista: los agentes ya no tienen sección.
+  assert.equal(bubbleDocument.querySelector("[data-sidebar-agents]"), null, "el riel no lista agentes");
+  const filasDelRiel = () => [...bubbleDocument.querySelectorAll('[data-sidebar-tasks] [data-sesion]')].map((f) => f.dataset.sesion);
   assert.ok(bubbleDocument.querySelector('[data-sidebar-tasks] [data-sesion="s-task"] [data-session-agent]'), "sin agrupar, la tarea lleva la pastilla de su agente");
-  bubbleDocument.querySelector('button[aria-label="Buscar tareas o agentes"]').click();
+  bubbleDocument.querySelector('button[aria-label="Buscar tareas"]').click();
   await sleep(50);
   const buscadorDelRiel = bubbleDocument.querySelector('[data-sidebar-search] input[role="searchbox"]');
   assert.ok(buscadorDelRiel, "la lupa abre el buscador bajo los controles del sidebar");
@@ -518,75 +519,15 @@ if (!roto) {
   buscadorDelRiel.dispatchEvent(new bubbleApp.w.Event("input", { bubbles: true }));
   await sleep(80);
   assert.deepEqual(filasDelRiel(), ["s-transfer"], "busca sin importar mayúsculas");
-  assert.match(bubbleDocument.querySelector('[data-project-sessions="p"] [data-search-results]').textContent, /1 resultado/);
+  assert.match(bubbleDocument.querySelector('[data-sidebar-tasks] [data-search-results]').textContent, /1 resultado/);
   buscadorDelRiel.value = "watson";
   buscadorDelRiel.dispatchEvent(new bubbleApp.w.Event("input", { bubbles: true }));
   await sleep(80);
   assert.deepEqual(filasDelRiel(), ["s-transfer"], "encuentra la tarea por el nombre de su agente");
-  buscadorDelRiel.value = "Holmes";
-  buscadorDelRiel.dispatchEvent(new bubbleApp.w.Event("input", { bubbles: true }));
-  await sleep(80);
-  assert.ok([...bubbleDocument.querySelectorAll('[data-sidebar-agents] li > div[aria-label]')].some(fila => fila.getAttribute("aria-label").startsWith("Holmes")), "la búsqueda incluye los agentes");
-  const folderToggleForSearch = bubbleDocument.querySelector('[data-destino="p"] button[aria-expanded]');
-  folderToggleForSearch.click();
-  buscadorDelRiel.value = "";
-  buscadorDelRiel.dispatchEvent(new bubbleApp.w.Event("input", { bubbles: true }));
-  await sleep(80);
-  assert.equal(bubbleDocument.querySelector('[data-project-sessions="p"]'), null, "la carpeta conserva su plegado fuera de la búsqueda");
-  buscadorDelRiel.value = "REVISAR";
-  buscadorDelRiel.dispatchEvent(new bubbleApp.w.Event("input", { bubbles: true }));
-  await sleep(80);
-  assert.deepEqual(filasDelRiel(), ["s-transfer"], "buscar alcanza las tareas de una carpeta plegada");
   buscadorDelRiel.dispatchEvent(new bubbleApp.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   await sleep(80);
   assert.equal(bubbleDocument.querySelector('[data-sidebar-search] input[role="searchbox"]'), null, "Escape cierra el buscador");
-  assert.equal(bubbleDocument.querySelector('[data-project-sessions="p"]'), null, "cerrar la búsqueda restaura la carpeta plegada");
-  folderToggleForSearch.click();
-  await sleep(80);
   assert.ok(filasDelRiel().includes("s-task") && filasDelRiel().includes("s-plain"), "cerrar la búsqueda devuelve la lista entera");
-
-  filaDelAgente = [...bubbleDocument.querySelectorAll("li > div[aria-label]")].find(fila => fila.getAttribute("aria-label").startsWith("Holmes"));
-
-  // ⋮ abre un menú, no el perfil ni el chat, y el reposo se cambia y se deshace.
-  const itemDeMenu = (texto) => [...bubbleDocument.querySelectorAll('[role="menu"] [role^="menuitem"]')]
-    .find((item) => item.textContent.includes(texto));
-  filaDelAgente.querySelector('[aria-label="Opciones de Holmes"]').click();
-  await sleep(80);
-  assert.ok(itemDeMenu("Configuración del agente"), "⋮ abre el menú con la configuración");
-  assert.equal(bubbleApp.comandos.includes("send_message"), false, "⋮ no abre el chat del agente");
-  const reposo = itemDeMenu("Mantener despierta la computadora");
-  assert.match(reposo.textContent, /Con agentes/, "el menú enseña el modo de ahora");
-  reposo.click();
-  await sleep(80);
-  itemDeMenu("Siempre").click();
-  await sleep(80);
-  assert.deepEqual(awakeModes, ["on"]);
-  assert.equal(bubbleDocument.querySelector('[role="menu"]'), null, "elegir un modo cierra el menú");
-  filaDelAgente.querySelector('[aria-label="Opciones de Holmes"]').click();
-  await sleep(80);
-  assert.match(itemDeMenu("Mantener despierta la computadora").textContent, /Siempre/);
-  itemDeMenu("Mantener despierta la computadora").click();
-  await sleep(80);
-  itemDeMenu("Con agentes").click();
-  await sleep(80);
-  assert.deepEqual(awakeModes, ["on", "agent"], "el modo se puede quitar desde el mismo menú");
-  filaDelAgente.querySelector('[aria-label="Opciones de Holmes"]').click();
-  await sleep(80);
-  itemDeMenu("Configuración del agente").click();
-  await sleep(150);
-  assert.equal(bubbleApp.comandos.filter((c) => c === "send_message").length, 0, "Configuración abre el perfil sin crear chat");
-  assert.equal(bubbleDocument.querySelector('[role="menu"]'), null);
-  const volverDelPerfil = bubbleDocument.querySelector('button[aria-label="Volver a la conversación"]');
-  assert.ok(volverDelPerfil, "la configuración del riel abre AgentProfile, no un perfil reducido");
-  const perfilCompleto = volverDelPerfil.parentElement.parentElement;
-  for (const seccion of ["Perfil del agente", "Modelo", "Cara", "Fondo de la conversación", "Instrucciones", "Telegram"])
-    assert.ok(perfilCompleto.textContent.includes(seccion), `falta ${seccion} en el perfil abierto desde el riel`);
-  assert.ok(perfilCompleto.querySelector('button[aria-label="La que sale de su nombre"]'), "el perfil conserva la edición de la cara");
-  assert.ok([...perfilCompleto.querySelectorAll("button")].some(button => button.textContent.includes("Elegir imagen")), "el perfil conserva la edición del fondo");
-  assert.ok(perfilCompleto.querySelector("textarea"), "las instrucciones del agente propio siguen editables");
-  assert.ok(perfilCompleto.querySelector('input[aria-label="Token del bot"]'), "Telegram conserva la configuración del bot");
-  volverDelPerfil.click();
-  await sleep(80);
 
   bubbleDocument.querySelector('[data-sidebar-tasks] [data-sesion="s-chat"]').click();
   await sleep(300);
@@ -665,11 +606,18 @@ if (!roto) {
   cabeceraTransferida.querySelector("button").click();
   await sleep(150);
   assert.match(bubbleDocument.querySelector('button[aria-label="Volver a la conversación"]')?.parentElement.parentElement.textContent ?? "", /Watson/, "la cabecera abre el perfil del responsable actual");
+  const perfilCompleto = bubbleDocument.querySelector('button[aria-label="Volver a la conversación"]').parentElement.parentElement;
+  for (const seccion of ["Perfil del agente", "Modelo", "Cara", "Fondo de la conversación", "Instrucciones", "Telegram"])
+    assert.ok(perfilCompleto.textContent.includes(seccion), `falta ${seccion} en el perfil abierto desde la cabecera`);
+  assert.ok(perfilCompleto.querySelector('button[aria-label="La que sale de su nombre"]'), "el perfil conserva la edición de la cara");
+  assert.ok([...perfilCompleto.querySelectorAll("button")].some(button => button.textContent.includes("Elegir imagen")), "el perfil conserva la edición del fondo");
+  assert.ok(perfilCompleto.querySelector("textarea"), "las instrucciones del agente propio siguen editables");
+  assert.ok(perfilCompleto.querySelector('input[aria-label="Token del bot"]'), "Telegram conserva la configuración del bot");
   assert.deepEqual(bubbleApp.fallos, []);
   bubbleApp.w.close();
 
   const agentSends = [];
-  const draftApp = await boot("listo", "agent-task-draft", {
+  const draftApp = await bootPorCarpeta("listo", "agent-task-draft", {
     ...bubbleResponses,
     list_projects: [{ id: "p", name: "Proyecto", kind: "folder", working_directory: "/lab", sources: [] }],
     list_agents: { ...bubbleResponses.list_agents, agents: [
@@ -681,8 +629,7 @@ if (!roto) {
   });
   const draftDoc = draftApp.w.document;
   await sleep(80);
-  [...draftDoc.querySelectorAll('[data-sidebar-agents] button')].find(button => button.textContent.trim() === "Holmes").click();
-  await sleep(100);
+  await hablarDesdeLaCarpeta(draftApp, "p", "Holmes");
   assert.match(draftDoc.querySelector("h1")?.textContent ?? "", /Holmes/);
   assert.equal(draftDoc.querySelector("h1")?.closest("header")?.querySelector("[data-astro-status]")?.dataset.astroStatus, "awake", "a new agent task opens with the agent awake and without the pulse");
   assert.match(draftDoc.body.textContent, /Revisa cambios del proyecto/);
@@ -692,14 +639,12 @@ if (!roto) {
   const draftField = draftDoc.querySelector("textarea");
   draftField.value = "Revisa el cambio de login";
   draftField.dispatchEvent(new draftApp.w.Event("input", { bubbles: true }));
-  [...draftDoc.querySelectorAll('[data-sidebar-agents] button')].find(button => button.textContent.trim() === "Watson").click();
-  await sleep(100);
+  await hablarDesdeLaCarpeta(draftApp, "p", "Watson");
   assert.equal(draftDoc.querySelector("textarea").value, "", "Watson no recibe el borrador sin enviar de Holmes");
   const watsonField = draftDoc.querySelector("textarea");
   watsonField.value = "Documenta el despliegue";
   watsonField.dispatchEvent(new draftApp.w.Event("input", { bubbles: true }));
-  [...draftDoc.querySelectorAll('[data-sidebar-agents] button')].find(button => button.textContent.trim() === "Holmes").click();
-  await sleep(100);
+  await hablarDesdeLaCarpeta(draftApp, "p", "Holmes");
   assert.equal(draftDoc.querySelector("textarea").value, "Revisa el cambio de login", "volver al agente conserva su encargo");
   draftDoc.querySelector("textarea").dispatchEvent(new draftApp.w.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
   await sleep(150);
@@ -725,7 +670,7 @@ if (!roto) {
   const threadLoads = [];
   const pinChanges = [];
   let threadProjects = bubbleResponses.list_projects;
-  const threadApp = await boot("listo", "agent-threads", {
+  const threadApp = await bootPorCarpeta("listo", "agent-threads", {
     ...bubbleResponses,
     list_projects: () => threadProjects,
     list_delegated_sessions: ({ id }) => threadRows.filter(row => row.launched_by === id).map(row => ({ ...row, folder: "p" })),
@@ -763,7 +708,7 @@ if (!roto) {
   assert.equal(threadDoc.querySelector('[data-sidebar-tasks] [data-task-author]'), null, "el riel no agrupa por agente");
   assert.equal(sidebarTask("dm-work"), null, "el trabajo delegado se consulta desde su coordinador");
   assert.ok(sidebarTask("topic-work").querySelector("[data-session-agent]"), "la tarea delegada fijada conserva la tarjeta compartida");
-  const taskOrder = [...threadDoc.querySelectorAll('[data-project-sessions="p"] [data-sidebar-tasks] [data-sesion]')].map(row => row.dataset.sesion);
+  const taskOrder = [...threadDoc.querySelectorAll('[data-sidebar-tasks] [data-sesion]')].map(row => row.dataset.sesion);
   assert.ok(taskOrder.indexOf("topic-work") < taskOrder.indexOf("topic"), "las fijadas van antes que las demás sin alterar sus turnos");
   const openPinnedTaskMenu = id => sidebarTask(id).querySelector('[data-session-actions] button[aria-haspopup="menu"]').click();
   const pinMenuItem = label => [...threadDoc.querySelectorAll('[role="menu"] [role="menuitem"]')].find(item => item.textContent.trim() === label);
@@ -843,8 +788,7 @@ if (!roto) {
   await sleep(200);
   assert.equal(threadLoads.at(-1), "topic", "la tarea delegada regresa al coordinador");
   assert.equal(threadDoc.querySelector("textarea"), null, "el tema anterior no abre turnos nuevos");
-  [...threadDoc.querySelectorAll('[data-sidebar-agents] button')].find(button => button.textContent.trim() === "Holmes").click();
-  await sleep(50);
+  await hablarDesdeLaCarpeta(threadApp, "p", "Holmes");
   assert.equal(threadDoc.querySelector('[role="dialog"]'), null, "una conversación nueva abre el borrador del agente");
   assert.match(threadDoc.querySelector("h1")?.textContent ?? "", /Holmes/);
   assert.ok(threadDoc.querySelector("textarea"), "la conversación nueva tiene composer");
@@ -1085,11 +1029,9 @@ if (!roto) {
       { id: "local-folder", name: "Local", sources: [], kind: "folder", cloud: null },
     ],
   });
-  const projectIconRow = name => [...cloudIcons.w.document.querySelectorAll("button")].find(b => b.textContent.trim() === name)?.closest("[data-destino]");
-  assert.ok(projectIconRow("Nube")?.querySelector("svg.lucide-folder-cloud"));
-  assert.ok(projectIconRow("Git en nube")?.querySelector("svg.lucide-folder-git-2"));
-  assert.equal(projectIconRow("Git en nube")?.querySelector("svg.lucide-folder-cloud"), null);
-  assert.equal(projectIconRow("Local")?.querySelector("svg.lucide-folder-cloud"), null);
+  // Sin tareas, ninguna carpeta aparece en el riel: lista tareas, no carpetas.
+  assert.equal(cloudIcons.w.document.querySelector("[data-folder-group]"), null, "una carpeta sin tareas no aparece en el riel");
+  assert.ok(!/Nube|Git en nube|Local/.test(cloudIcons.w.document.querySelector("[data-sidebar-tasks]")?.textContent ?? ""));
   assert.doesNotMatch(cloudIcons.w.document.body.textContent, /google_drive|one_drive/);
   assert.deepEqual(cloudIcons.fallos, []);
   const forkCalls = [];
@@ -1450,7 +1392,7 @@ if (!roto) {
   assert.equal(row("own"), null, "la delegación no llena el sidebar");
   assert.equal(row("p").querySelectorAll('[aria-label="Fallo o interrupción"]').length, 1,
     "una subtarea fallida ocupa el único indicador del coordinador");
-  sidebar.w.document.querySelector('button[aria-label="Buscar tareas o agentes"]').click();
+  sidebar.w.document.querySelector('button[aria-label="Buscar tareas"]').click();
   await sleep(50);
   const taskSearch = sidebar.w.document.querySelector('[data-sidebar-search] input[role="searchbox"]');
   const searchTasks = async value => {
@@ -1738,15 +1680,20 @@ if (!roto) {
   assert.deepEqual(marcadas(), ["viva"]);
   assert.deepEqual(seleccion.fallos, []);
   seleccion.w.close();
-  const grouped = await boot("listo", 5, {
+  const groupedResponses = {
     ...CON_TAREA,
     list_projects: [{ id: "folder", name: "Carpeta", sources: [], portfolio: null }],
     list_live_sessions: ({ project }) => project === "folder" ? sidebarResponses.list_live_sessions : [],
     list_session_git: {},
-  });
-  const guide = grouped.w.document.querySelector('[data-project-sessions="folder"]');
+  };
+  const flat = await boot("listo", "5-flat", groupedResponses);
+  assert.equal(flat.w.document.querySelector("[data-folder-group]"), null, "sin agrupar no hay filas de carpeta");
+  assert.equal(flat.w.document.querySelector('[data-sesion="p"] [data-folder-chip="folder"]')?.textContent, "Carpeta", "la carpeta va como dato de la fila");
+  assert.deepEqual(flat.fallos, []);
+  flat.w.close();
+  const grouped = await bootPorCarpeta("listo", 5, groupedResponses);
+  const guide = grouped.w.document.querySelector('[data-sidebar-group="folder"]');
   assert.ok(guide);
-  assert.equal(guide.classList.contains("border-l"), true);
   assert.ok(guide.querySelector('[data-sesion="p"]'));
   assert.equal(guide.querySelector('[data-sesion="shared"]'), null, "la rama nace plegada");
   const folderToggle = grouped.w.document.querySelector('[data-destino="folder"] button[aria-expanded]');
@@ -1756,9 +1703,9 @@ if (!roto) {
   assert.equal(projectRow.children.length, 4);
   assert.equal(projectRow.lastElementChild.getAttribute("aria-label"), "Nueva tarea en Carpeta");
   folderToggle.click(); await sleep(30);
-  assert.equal(grouped.w.document.querySelector('[data-project-sessions="folder"]'), null);
+  assert.equal(grouped.w.document.querySelector('[data-sidebar-group="folder"] [data-sesion]'), null);
   folderToggle.click(); await sleep(30);
-  assert.ok(grouped.w.document.querySelector('[data-project-sessions="folder"] [data-sesion="p"]'));
+  assert.ok(grouped.w.document.querySelector('[data-sidebar-group="folder"] [data-sesion="p"]'));
   assert.deepEqual(grouped.fallos, []);
   const newTaskClick = await boot("listo", "new-task-click", CON_TAREA);
   let newTaskRequests = 0;
@@ -1800,7 +1747,7 @@ if (!roto) {
   let cloneCancellations = 0;
   let holdRepositoryReply = false;
   let finishRepositoryReply;
-  const sidebarControls = await boot("listo", "sidebar-controls", {
+  const sidebarControls = await bootPorCarpeta("listo", "sidebar-controls", {
     ...CON_TAREA,
     list_agent_profiles: { Giskard: { display_name: "Giskard PO", body: "moon" } },
     list_projects: () => structuredClone(folders),
@@ -1845,32 +1792,15 @@ if (!roto) {
   assert.equal(controlsDoc.querySelector("[data-task-author]"), null, "el riel no agrupa por agente, tampoco «Recientes»");
   assert.equal(controlsDoc.querySelector('[data-tasks-header] button[aria-pressed]'), null, "no hay botón de agrupar");
 
-  const agentSection = controlsDoc.querySelector('[data-sidebar-agents]');
-  const agentSectionToggle = agentSection.querySelector("button");
-  assert.equal(agentSectionToggle.getAttribute("aria-expanded"), "true");
-  agentSectionToggle.click();
-  await sleep(20);
-  assert.ok(!controlsDoc.querySelector('[data-sidebar-agents] ul'), "plegar la sección de agentes esconde sus filas");
-  assert.equal(controlsDoc.querySelector("[data-sidebar-agents] button").getAttribute("aria-expanded"), "false");
-  controlsDoc.querySelector("[data-sidebar-agents] button").click();
-  await sleep(20);
-  assert.ok(controlsDoc.querySelector('[data-sidebar-agents] ul'));
-
   assert.equal(controlsDoc.querySelector("[data-session-origin]"), null);
   const savedTaskRow = controlsDoc.querySelector('[data-sesion="recent"]');
   const sidebarViewport = savedTaskRow.closest("[data-arrastre-scroll]");
-  const savedAgentList = controlsDoc.querySelector('[data-sidebar-agents]');
-  assert.ok(savedAgentList, "los agentes están en el mismo riel que las tareas");
   assert.ok(controlsDoc.querySelector('[data-sidebar-tasks] [data-sesion="agent-root"]'));
   assert.ok(controlsDoc.querySelector('[data-destino="p1"]'));
   assert.equal(controlsDoc.querySelector('[data-portfolio]'), null);
-  assert.match(savedAgentList.textContent, /Nuevo agente/);
-  const agentLoads = sidebarControls.comandos.filter(c => c === "list_agents").length;
   sidebarViewport.scrollTop = 120;
   await sleep(80);
   assert.equal(controlsDoc.querySelector('[data-sesion="recent"]'), savedTaskRow);
-  assert.equal(controlsDoc.querySelector('[data-sidebar-agents]'), savedAgentList);
-  assert.equal(sidebarControls.comandos.filter(c => c === "list_agents").length, agentLoads);
   controlsDoc.querySelector('[data-destino="p1"] button[aria-haspopup="menu"]').click();
   await sleep(50);
   [...controlsDoc.querySelectorAll('[role="menuitem"]')].find(item => item.textContent === "Nuevo agente").click();
@@ -1878,7 +1808,7 @@ if (!roto) {
   assert.match(controlsDoc.querySelector('[role="dialog"]').textContent, /Nuevo agente/);
   [...controlsDoc.querySelectorAll('[role="dialog"] button')].find(button => button.textContent === "Cancelar").click();
   await sleep(50);
-  [...controlsDoc.querySelectorAll('[data-destino="p1"] button')].find(b => b.textContent === "Carpeta A").dispatchEvent(new sidebarControls.w.MouseEvent("dblclick", { bubbles: true }));
+  controlsDoc.querySelector('[data-destino="p1"] [data-folder-open]').dispatchEvent(new sidebarControls.w.MouseEvent("dblclick", { bubbles: true }));
   assert.ok(controlsDoc.querySelector('[data-destino="p1"] input'));
   const folderEditor = controlsDoc.querySelector('[data-destino="p1"] input');
   await sleep(30);
@@ -1924,16 +1854,8 @@ if (!roto) {
   await sleep(50);
   assert.deepEqual(taskRenames, [{ project: "", id: "recent", title: "Nombre confirmado" }], "confirmar guarda una sola vez durante el turno");
   sidebarControls.emit("chat", { kind: "done", workspace: "w", session: "recent", ok: true });
-  const recentArrow = () => controlsDoc.querySelector('[data-destino=""] button svg.lucide-chevron-right');
   assert.ok(controlsDoc.querySelector('[data-sesion="recent"]'));
-  recentArrow().dispatchEvent(new sidebarControls.w.MouseEvent("click", { bubbles: true }));
-  await sleep(50);
-  assert.equal(controlsDoc.querySelector('[data-sesion="recent"]'), null);
-  recentArrow().dispatchEvent(new sidebarControls.w.MouseEvent("click", { bubbles: true }));
-  await sleep(50);
-  assert.ok(controlsDoc.querySelector('[data-sesion="recent"]'));
-  controlsDoc.querySelector('button[aria-label="Añadir un proyecto"]').click();
-  await sleep(50);
+  await abrirAnadirProyecto(sidebarControls);
   const repositorySearch = controlsDoc.querySelector('input[placeholder="Buscar proyecto"]');
   assert.ok(repositorySearch);
   const sourceButtons = [...controlsDoc.querySelectorAll('[role="dialog"] button')];
@@ -1956,13 +1878,11 @@ if (!roto) {
   finishClone({ id: "provider-clone", name: "App", kind: "git", sources: [] });
   await sleep(100);
   holdRepositoryReply = true;
-  controlsDoc.querySelector('button[aria-label="Añadir un proyecto"]').click();
-  await sleep(50);
+  await abrirAnadirProyecto(sidebarControls);
   controlsDoc.dispatchEvent(new sidebarControls.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   await sleep(50);
   holdRepositoryReply = false;
-  controlsDoc.querySelector('button[aria-label="Añadir un proyecto"]').click();
-  await sleep(50);
+  await abrirAnadirProyecto(sidebarControls);
   finishRepositoryReply([{ name: "stale", slug: "stale", clone_url: "https://github.com/acme/stale.git" }]);
   await sleep(50);
   const newRepositorySearch = controlsDoc.querySelector('input[placeholder="Buscar proyecto"]');
@@ -1979,11 +1899,10 @@ if (!roto) {
   folderName.dispatchEvent(new sidebarControls.w.Event("input", { bubbles: true }));
   folderName.closest("form").dispatchEvent(new sidebarControls.w.Event("submit", { bubbles: true, cancelable: true }));
   await sleep(100);
-  assert.ok(controlsDoc.querySelector('[data-destino="loose"]'));
+  assert.equal(controlsDoc.querySelector('[data-destino="loose"]'), null, "una carpeta recién creada y sin tareas no aparece en el riel");
   assert.deepEqual(sidebarControls.fallos, []);
   const openClone = async () => {
-    controlsDoc.querySelector('button[aria-label="Añadir un proyecto"]').click();
-    await sleep(50);
+    await abrirAnadirProyecto(sidebarControls);
     [...controlsDoc.querySelectorAll('[role="dialog"] button')].find(button => button.textContent.includes("Git URL")).click();
     await sleep(50);
     const input = controlsDoc.querySelector('[role="dialog"] input');
@@ -2037,7 +1956,7 @@ if (!roto) {
     { reference: "refs/heads/dev", name: "dev", remote: false, commit: "abc", ahead: 1, behind: 0 },
     { reference: "refs/remotes/origin/dev", name: "origin/dev", remote: true, commit: "def", ahead: null, behind: null },
   ] };
-  const branchPicker = await boot("listo", "task-base-picker", {
+  const branchPicker = await bootPorCarpeta("listo", "task-base-picker", {
     ...RESPUESTAS,
     list_projects: [{ id: "git-project", name: "Laboratorio", kind: "git", working_directory: "/lab", sources: [] }],
     list_live_sessions: CON_TAREA.list_live_sessions,
@@ -2055,7 +1974,7 @@ if (!roto) {
     send_message: args => { branchSubmissions.push(args); return "branch-task"; },
   });
   const branchDoc = branchPicker.w.document;
-  [...branchDoc.querySelectorAll('[data-destino="git-project"] button')].find(b => b.textContent.trim() === "Laboratorio").click();
+  branchDoc.querySelector('[data-destino="git-project"] [data-folder-open]').click();
   await sleep(100);
   [...branchDoc.querySelectorAll("header button")].find(b => b.textContent.trim() === "Nueva tarea").click();
   await sleep(100);
@@ -2117,7 +2036,7 @@ if (!roto) {
   assert.equal(branchSubmissions[0]?.baseRef, "refs/remotes/origin/dev");
   assert.equal(branchSubmissions[0]?.model, "gpt-alternate");
   assert.equal(branchSubmissions[0]?.effort, "high");
-  [...branchDoc.querySelectorAll('[data-destino="git-project"] button')].find(b => b.textContent.trim() === "Laboratorio").click();
+  branchDoc.querySelector('[data-destino="git-project"] [data-folder-open]').click();
   await sleep(100);
   [...branchDoc.querySelectorAll("header button")].find(b => b.textContent.trim() === "Nueva tarea").click();
   await sleep(100);
@@ -2132,13 +2051,14 @@ if (!roto) {
   const deadBase = { selected: "refs/heads/borrada", fetched_at: null, branches: [
     { reference: "refs/heads/dev", name: "dev", remote: false, commit: "abc", ahead: null, behind: null },
   ] };
-  const missingBase = await boot("listo", "task-base-missing", {
+  const missingBase = await bootPorCarpeta("listo", "task-base-missing", {
     ...RESPUESTAS,
+    list_live_sessions: CON_TAREA.list_live_sessions,
     list_projects: [{ id: "git-project", name: "Laboratorio", kind: "git", working_directory: "/lab", sources: [] }],
     project_base_branches: () => deadBase,
   });
   const missingDoc = missingBase.w.document;
-  [...missingDoc.querySelectorAll('[data-destino="git-project"] button')].find(b => b.textContent.trim() === "Laboratorio").click();
+  missingDoc.querySelector('[data-destino="git-project"] [data-folder-open]').click();
   await sleep(100);
   [...missingDoc.querySelectorAll("header button")].find(b => b.textContent.trim() === "Nueva tarea").click();
   await sleep(100);
@@ -2239,6 +2159,10 @@ if (!roto) {
   registeredTurns = [];
   pendingTurnApp.w.dispatchEvent(new pendingTurnApp.w.Event("focus"));
   await sleep(80);
+  // Entregada y vista, la tarea se asienta: baja a «Asentadas», que nace plegada.
+  assert.equal(hiddenRow(), null, "lo entregado y visto sale de «Tareas»");
+  pendingDoc.querySelector('[data-sidebar-section="settled"] button[aria-expanded="false"]').click();
+  await sleep(50);
   assert.equal(hiddenRow().querySelector('[aria-label="Está trabajando"]'), null);
   assert.ok(hiddenRow().querySelector('[aria-label="Resultado entregado"]'), "recovering a missed done refreshes the hidden task result");
   assert.deepEqual(pendingTurnApp.fallos, []);
@@ -2476,7 +2400,7 @@ if (!roto) {
 
   // El menú del proyecto no ofrece un historial de tareas, y nadie pide las
   // archivadas por proyecto.
-  const historia = await boot("listo", 6, {
+  const historia = await bootPorCarpeta("listo", 6, {
     ...CON_TAREA,
     list_projects: [{ id: "p1", name: "Laboratorio", node: null, sources: [], working_directory: "/lab", created_at: 1, updated_at: 1, sessions: 1, kind: "folder" }],
   });
@@ -3510,7 +3434,7 @@ if (!roto) {
     { id: "w3", name: "gamma-labs", context_root: null },
     { id: "w4", name: "Delta", context_root: null },
   ], active: "w" };
-  const columna = await boot("listo", "workspace-column", { ...CON_TAREA,
+  const columna = await bootPorCarpeta("listo", "workspace-column", { ...CON_TAREA,
     list_workspaces: () => structuredClone(espaciosDeColumna),
     workspaces_startup: () => structuredClone(espaciosDeColumna),
     list_projects: () => [{ id: "pa", name: "Proyecto", kind: "folder", working_directory: "/lab", sources: [] }],
@@ -3539,7 +3463,9 @@ if (!roto) {
   assert.equal(cuadro("w4").dataset.attention, undefined, "un estado que la ventana no conoce no se pinta");
   const filaDeColumna = (id) => doc.querySelector(`[data-sesion="${id}"]`);
   assert.ok(filaDeColumna("s1").querySelector('[aria-label="Terminó y no la has abierto"].text-success-strong svg.lucide-check'), "la fila dice terminada sin ver");
-  assert.ok(filaDeColumna("s3").querySelector('[aria-label="Resultado entregado"].text-neutral-500'), "una entregada ya vista queda en gris");
+  doc.querySelector('[data-sidebar-section="settled"] button[aria-expanded="false"]').click();
+  await sleep(50);
+  assert.ok(filaDeColumna("s3").querySelector('[aria-label="Resultado entregado"].text-neutral-500'), "una entregada ya vista queda en gris, en «Asentadas»");
   const pliegue = doc.querySelector('button[aria-label="Plegar «Proyecto»"]');
   pliegue.click();
   await sleep(50);
@@ -3657,11 +3583,11 @@ if (!roto) {
   const d2 = plegado.w.document;
   const ocultarRiel = d2.querySelector('button[aria-label="Ocultar el historial"]');
   assert.equal(ocultarRiel.parentElement.querySelector('button[aria-label="Proyectos"]'), null, "el encabezado del riel no repite «Proyectos»: ya lo dice la sección de abajo");
-  assert.equal(ocultarRiel.nextElementSibling?.getAttribute("aria-label"), "Buscar tareas o agentes", "la lupa comparte la fila con el control del sidebar");
+  assert.equal(ocultarRiel.nextElementSibling?.getAttribute("aria-label"), "Buscar tareas", "la lupa comparte la fila con el control del sidebar");
   assert.equal(d2.querySelector("[data-title-bar]").classList.contains("pl-[84px]"), false, "en pantalla completa la fila no reserva el semáforo");
   ocultarRiel.click();
   await sleep(100);
-  assert.equal(d2.querySelector('button[aria-label="Buscar tareas o agentes"]'), null, "la lupa desaparece cuando el sidebar está cerrado");
+  assert.equal(d2.querySelector('button[aria-label="Buscar tareas"]'), null, "la lupa desaparece cuando el sidebar está cerrado");
   assert.ok(d2.querySelector('[data-conversacion] button[aria-label="Mostrar el historial"]'), "con el riel oculto, la fila de pestañas lo trae de vuelta");
   assert.equal(d2.querySelector("[data-title-bar] [data-workspace-name]")?.textContent.trim(), LARGO, "y la fila del título no cambia");
   assert.equal(d2.querySelector("[data-window-branch]"), null, "sin título de ventana no se nombra ninguna build");
@@ -3773,7 +3699,7 @@ if (!roto) {
     task("saved", null, "delivered"), task("pending", null, null),
     task("local", null, "delivered"), task("local-pending", null, null),
   ];
-  const finishApp = await boot("listo", "finish-task", {
+  const finishApp = await bootConAsentadas("listo", "finish-task", {
     ...CON_TAREA,
     list_projects: [{ id: "finish-project", name: "Finalización", node: null, sources: [], working_directory: "/lab", created_at: 1, updated_at: 1, sessions: 3, kind: "folder" }],
     list_live_sessions: ({ project }) => project === "finish-project" ? finishRows() : [],
@@ -3828,7 +3754,7 @@ if (!roto) {
   assert.ok(finishButton("merged"));
   assert.equal(finishApp.w.document.querySelector('[role="alertdialog"]'), null);
   rejectFinish = false;
-  finishApp.w.document.querySelector('button[aria-label="Buscar tareas o agentes"]').click();
+  finishApp.w.document.querySelector('button[aria-label="Buscar tareas"]').click();
   await sleep(50);
   const finishSearch = finishApp.w.document.querySelector('[data-sidebar-search] input[role="searchbox"]');
   finishSearch.value = "Tarea";
@@ -3874,7 +3800,7 @@ if (!roto) {
   const discarded = [];
   const blockedFinishes = [];
   let blockers = { unsaved: [{ session: "blocked", title: "Tarea blocked", files: ["src/a.ts"] }], not_finished: false };
-  const blockedApp = await boot("listo", "task-blockers", {
+  const blockedApp = await bootConAsentadas("listo", "task-blockers", {
     ...CON_TAREA,
     list_projects: [{ id: "blocked-project", name: "Avisos", node: null, sources: [], working_directory: "/lab", created_at: 1, updated_at: 1, sessions: 1, kind: "folder" }],
     list_live_sessions: ({ project }) => project === "blocked-project" ? [task("blocked", null, "delivered")] : [],
@@ -4922,8 +4848,10 @@ if (!roto) {
 
   // Un primer turno que Rust niega deja su aviso en el blanco, y solo ahí: la
   // tarea nueva siguiente, de este proyecto o de otro, sale limpia.
-  const unstarted = await boot("listo", "first-turn-rejected", {
+  const unstarted = await bootPorCarpeta("listo", "first-turn-rejected", {
     ...RESPUESTAS,
+    // Una tarea por carpeta: sin tareas una carpeta no tiene cabecera en el riel.
+    list_live_sessions: ({ project }) => project ? [{ ...CON_TAREA.list_live_sessions[0], id: `t-${project}` }] : [],
     list_projects: [
       { id: "vm", name: "VM", kind: "folder", working_directory: "/vm", sources: [] },
       { id: "calc", name: "calc", kind: "folder", working_directory: "/calc", sources: [] },
@@ -4943,7 +4871,7 @@ if (!roto) {
   await sleep(150);
   assert.ok(ghost(), "the rejection is said where it happened");
   assert.equal(unstartedDoc.querySelector("textarea").value, rejectedPrompt, "the text comes back to retry");
-  assert.equal(unstartedDoc.querySelector("[data-sesion]"), null, "no row is left for a task that was not created");
+  assert.equal(unstartedDoc.querySelector("[data-sesion]:not([data-sesion^=\"t-\"])"), null, "no row is left for a task that was not created");
   unstarted.w.dispatchEvent(new unstarted.w.KeyboardEvent("keydown", { key: "t", ctrlKey: true, metaKey: true, bubbles: true }));
   await sleep(150);
   assert.equal(ghost(), false, "a new task after a rejected first turn starts clean");
@@ -5066,7 +4994,7 @@ if (!roto) {
     notice.w.close();
   }
 
-  await spaceScenarios({ boot, sleep, CON_TAREA });
+  await spaceScenarios({ boot: bootPorCarpeta, sleep, CON_TAREA });
 
   console.log(`El front monta — ${normal.pintado.length} bytes en #root, ${((Date.now() - t0) / 1000).toFixed(1)}s`);
   process.exit(0);

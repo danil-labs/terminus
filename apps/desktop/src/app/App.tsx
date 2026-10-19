@@ -7396,9 +7396,6 @@ export default function App() {
               onAbrirClon={() => setAnadiendoCarpeta(true)}
               proyectoAbierto={proyectoAbierto()}
               onAbrirProyecto={abrirProyecto}
-              hablandoCon={agenteSenalado()}
-              onHablarCon={hablarConEncargado}
-              onAgentProfile={openAgentProfile}
               /* El proyecto viaja en el mismo gesto que abre el borrador. */
               onNuevaTareaEn={(id) => nuevaSesion(id)}
               onDelete={(p, id) => borrarSesion(p, id)}

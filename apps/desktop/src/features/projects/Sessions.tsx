@@ -3,7 +3,7 @@ import ChevronRight from "lucide-solid/icons/chevron-right";
 import MoreVertical from "lucide-solid/icons/more-vertical";
 import Pin from "lucide-solid/icons/pin";
 import PinOff from "lucide-solid/icons/pin-off";
-import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, mapArray, on, onCleanup, Show } from "solid-js";
 import { arrastrar, fueArrastre, tareaEnVuelo } from "../../lib/drag";
 import { enfocarYSeleccionar } from "../../lib/focus";
 import { t } from "../../lib/i18n";
@@ -25,6 +25,7 @@ import {
   PopoverTrigger,
 } from "../../ui/Popover";
 import { WithMentions } from "../chat/WithMentions";
+import FolderChip from "./FolderChip";
 import SessionGit from "./SessionGit";
 import { createTaskHistories } from "./taskHistories";
 import { AstroAvatar } from "./AstroAvatar";
@@ -292,7 +293,18 @@ export default function Sessions(props: {
   /** El nombre de la carpeta, que no cambia al moverla de espacio. */
   carpeta?: string;
   onMoveToSpace?: (id: string, space: string) => void;
+  /** Con tareas de varias carpetas en la misma lista, la de cada fila. Sin esto es `de`. */
+  projectOf?: (row: SessionRow) => string;
+  destinosDe?: (row: SessionRow) => { id: string; name: string }[];
+  carpetaDe?: (row: SessionRow) => string | undefined;
 }) {
+  const projectOf = (row: SessionRow) => props.projectOf?.(row) ?? props.de;
+  const projectOfId = (id: string) => {
+    const row = props.sessions.find((s) => s.id === id);
+    return row ? projectOf(row) : props.de;
+  };
+  const avisarCambio = (project: string) =>
+    window.dispatchEvent(new CustomEvent("harness:tasks-changed", { detail: { project } }));
   const otherSpaces = (row: SessionRow) =>
     row.chat_de_agente || row.agent_thread || row.inbox
       ? []
@@ -306,11 +318,12 @@ export default function Sessions(props: {
     setFinishing(ids => [...ids, id]);
     setActionFailure(null);
     try {
-      await invoke("finish_task", { project: props.de, id });
+      const project = projectOfId(id);
+      await invoke("finish_task", { project, id });
       // `anunciar` no actualiza esta ventana: su firma es la de quien
       // escribió, y el sondeo la descarta. Sin este aviso el archivado
       // queda en disco y la lista de aquí sigue mostrando la fila.
-      window.dispatchEvent(new CustomEvent("harness:tasks-changed", { detail: { project: props.de } }));
+      avisarCambio(project);
       celebrateFinishedTask(rect);
     } catch (error) {
       setActionFailure(asFailure(error));
@@ -323,8 +336,9 @@ export default function Sessions(props: {
     setArchiving(ids => [...ids, id]);
     setActionFailure(null);
     try {
-      await invoke("set_task_archived", { project: props.de, id, archived: true });
-      window.dispatchEvent(new CustomEvent("harness:tasks-changed", { detail: { project: props.de } }));
+      const project = projectOfId(id);
+      await invoke("set_task_archived", { project, id, archived: true });
+      avisarCambio(project);
       setMenu(null);
     } catch (error) {
       setActionFailure(asFailure(error));
@@ -342,7 +356,7 @@ export default function Sessions(props: {
     setActionFailure(null);
     let blockers: Blockers;
     try {
-      blockers = await invoke<Blockers>("task_blockers", { project: props.de, id, finish });
+      blockers = await invoke<Blockers>("task_blockers", { project: projectOfId(id), id, finish });
     } catch (error) {
       setActionFailure(asFailure(error));
       return;
@@ -363,7 +377,7 @@ export default function Sessions(props: {
     marcar(ids => [...ids, a.id]);
     try {
       for (const work of a.blockers.unsaved) {
-        await invoke("discard_task_changes", { project: props.de, id: work.session, files: work.files });
+        await invoke("discard_task_changes", { project: projectOfId(a.id), id: work.session, files: work.files });
       }
     } catch (error) {
       setActionFailure(asFailure(error));
@@ -375,24 +389,44 @@ export default function Sessions(props: {
     // queda en disco, y tiene que verse en el aviso y no en un error plegado.
     await intentar(a.id, a.finish, a.rect);
   };
-  const [gitRows, setGitRows] = createSignal<Record<string, GitStatus>>({});
   // La barra enseña solo lo vivo: las archivadas no se pintan ni se observan. Con
   // cientos archivadas, pedir su git y su historial en cada barrido trababa la ventana.
   const enBarra = createMemo(() => props.sessions.filter(s => (props.includeArchived || !s.archived)
     && (!props.sidebar || !!props.search?.trim() || s.pinned || !shownUnderLauncher(s, props.sessions))));
-  const [worktrees] = createTaskHistories<EstadoDelWorktree>(() => props.de, enBarra);
-  createEffect(() => {
-    const watcher = watchSessionGit(props.de);
-    createEffect(() => setGitRows(watcher.rows()));
+  // Un observador de git, de perfiles y de historiales por carpeta de la
+  // lista: las cachés son por carpeta y se comparten con las demás vistas.
+  const carpetasVistas = createMemo(
+    () => props.projectOf ? [...new Set(enBarra().map(projectOf))].sort() : [props.de],
+    [],
+    { equals: (a, b) => a.length === b.length && a.every((x, i) => x === b[i]) },
+  );
+  const porCarpeta = createMemo(mapArray(carpetasVistas, (project) => {
+    const filas = createMemo(() => props.projectOf ? enBarra().filter((s) => projectOf(s) === project) : enBarra());
+    const watcher = watchSessionGit(project);
     const gitInput = createMemo(() => JSON.stringify([
-      enBarra().map(s => [s.id, s.updated_at]), props.vivas, props.current,
+      filas().map(s => [s.id, s.updated_at]), props.vivas, props.current,
     ]));
     createEffect(on(gitInput, () => {
-      watcher.prioritize([...(props.current ? [props.current] : []), ...props.vivas, ...enBarra().map(s => s.id)]);
+      watcher.prioritize([...(props.current ? [props.current] : []), ...props.vivas, ...filas().map(s => s.id)]);
       watcher.refresh();
     }));
     onCleanup(watcher.release);
+    const [historiales] = createTaskHistories<EstadoDelWorktree>(() => project, filas);
+    return { git: watcher.rows, profiles: watchProfiles(project), historiales };
+  }));
+  // Con una sola carpeta se devuelve su registro tal cual: un objeto nuevo
+  // repintaría todas las filas aunque git no hubiera cambiado.
+  const gitRows = createMemo<Record<string, GitStatus>>(() => {
+    const todas = porCarpeta();
+    return todas.length === 1 ? todas[0].git() : Object.assign({}, ...todas.map((c) => c.git()));
   });
+  const worktreeDe = (id: string) => {
+    for (const c of porCarpeta()) {
+      const estado = c.historiales()?.get(id);
+      if (estado) return estado;
+    }
+    return undefined;
+  };
   // Borrar se lleva la carpeta de trabajo entera, y esos documentos no están
   // commiteados en ningún lado: no tienen de dónde volver. Por eso la
   // confirmación vive en la propia fila, con lo que se pierde escrito.
@@ -427,7 +461,10 @@ export default function Sessions(props: {
    * Activas y archivadas se arman cada una por el `archived` de la fila, no
    * por el de su raíz: finalizar una hija no espera al padre.
    */
-  const profiles = watchProfiles(props.de);
+  const profiles = createMemo<ReturnType<ReturnType<typeof watchProfiles>>>(() => {
+    const todas = porCarpeta();
+    return todas.length === 1 ? todas[0].profiles() : Object.assign({}, ...todas.map((c) => c.profiles()));
+  });
   const query = createMemo(() => (props.search ?? "").trim());
   const filteredSessions = createMemo(() => !query() ? enBarra() : enBarra().filter(session => {
     const git = effectiveTaskGit(session, gitRows(), props.relatedSessions ?? props.sessions);
@@ -441,6 +478,7 @@ export default function Sessions(props: {
   const activas = createMemo<RamaDeTareas<SessionRow>[]>((previas) => props.flat || props.sidebar
     ? filteredSessions().map(tarea => ({ tarea, hijas: [] }))
     : taskTree(filteredSessions(), props.includeArchived ? null : false, previas, props.groupByHandler === true));
+  const destinosDe = (row: SessionRow) => props.destinosDe?.(row) ?? props.destinos;
   const fijada = (row: SessionRow) => row.pinned ?? (row.chat_de_agente || row.inbox === true);
   const setPinned = async (row: SessionRow) => {
     if (!props.onPin) return;
@@ -448,7 +486,7 @@ export default function Sessions(props: {
     setActionFailure(null);
     try {
       await props.onPin(row.id, !fijada(row));
-      window.dispatchEvent(new CustomEvent("harness:tasks-changed", { detail: { project: props.de } }));
+      avisarCambio(projectOf(row));
     } catch (error) {
       setActionFailure(asFailure(error));
     }
@@ -562,7 +600,7 @@ export default function Sessions(props: {
             // seleccionar texto, y sin esta línea seleccionar media palabra
             // levantaría la tarea y la movería de proyecto al soltar.
             if (en.closest("[data-session-rename]")) return;
-            arrastrar(e, { id: f.s.id, de: props.de, titulo: f.s.title }, (a) =>
+            arrastrar(e, { id: f.s.id, de: projectOf(f.s), titulo: f.s.title }, (a) =>
               props.onMove(f.s.id, a),
             );
           }}
@@ -669,8 +707,11 @@ export default function Sessions(props: {
               </Show>
               {/* Proveedor, mensaje y estado del modelo en una línea. */}
               <div data-session-preview class="mt-1 flex min-w-0 items-center gap-1.5 text-[0.6875rem] font-normal leading-tight text-neutral-500">
-                <Show when={worktrees()?.get(f.s.id)?.owned && !worktrees()?.get(f.s.id)?.available}>
+                <Show when={worktreeDe(f.s.id)?.owned && !worktreeDe(f.s.id)?.available}>
                   <span class="flex shrink-0 text-error-strong" title={t("projects.sessions.worktree_missing")} aria-label={t("projects.sessions.worktree_missing")}><WorktreeRoto size={13} /></span>
+                </Show>
+                <Show when={props.sidebar && props.carpetaDe?.(f.s)}>
+                  {(nombre) => <FolderChip id={projectOf(f.s)} name={nombre()} class="max-w-[108px] shrink-0" />}
                 </Show>
                 <span class="flex shrink-0" title={f.s.provider} aria-label={f.s.provider}><MarcaAgente id={f.s.provider} size={13} /></span>
                 {/* El botón del cohete es translúcido: sin desvanecer, el mensaje se lee a
@@ -851,7 +892,7 @@ export default function Sessions(props: {
                     </button>
                     <span class="my-1 block h-px bg-border" />
 
-                    <Show when={!f.hija && !f.s.parent && props.destinos.length > 0}>
+                    <Show when={!f.hija && !f.s.parent && destinosDe(f.s).length > 0}>
                       <Popover placement="right-start" gutter={6}>
                         <div onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
                           <PopoverTrigger as={(trigger: object) => (
@@ -861,7 +902,7 @@ export default function Sessions(props: {
                           )} />
                         </div>
                         <PopoverContent role="menu" class="max-h-72 w-56 overflow-y-auto p-1">
-                          <For each={props.destinos}>
+                          <For each={destinosDe(f.s)}>
                             {(d) => (
                               <button
                                 role="menuitem"
@@ -904,14 +945,14 @@ export default function Sessions(props: {
                               </button>
                             )}
                           </For>
-                          <Show when={props.carpeta}>
+                          <Show when={props.carpetaDe?.(f.s) ?? props.carpeta}>
                             {(c) => <p class="m-0 px-2 pt-1 pb-1.5 text-[0.6875rem] text-neutral-500">{t("spaces.move.folder_stays", { folder: c() })}</p>}
                           </Show>
                         </PopoverContent>
                       </Popover>
                     </Show>
 
-                    <Show when={!f.hija && !f.s.parent && props.de !== ""}>
+                    <Show when={!f.hija && !f.s.parent && projectOf(f.s) !== ""}>
                       <button
                         role="menuitem"
                         class={ITEM_DE_MENU}
