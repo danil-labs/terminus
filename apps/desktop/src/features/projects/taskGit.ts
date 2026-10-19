@@ -14,7 +14,7 @@ export type GitStatus = {
   head: string | null;
   repository: string;
   shared_with: string | null;
-  pull: { number: number; state: "open" | "draft" | "merged" | "closed"; head_sha: string; checks?: CheckState; review?: ReviewState } | null;
+  pull: { git_host?: string; number: number; state: "open" | "draft" | "merged" | "closed"; head_sha: string; checks?: CheckState; review?: ReviewState } | null;
   pull_known: boolean;
   checked_at: number | null;
   stale: boolean;
