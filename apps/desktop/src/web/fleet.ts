@@ -30,6 +30,9 @@ export const CREATE = new Set(["send_message", "run_shell_command", "create_proj
 const ROW_IDS = new Set(["list_projects", "list_portfolios", "list_live_sessions"]);
 /** Answers that are one object with its own id. */
 const OWN_ID = new Set(["load_session", "create_project", "clone_project", "add_account"]);
+/** Keys whose value is an image file on the machine that sent it: `preview_file` must read it there. */
+const FILES = new Set(["logo", "background", "avatar"]);
+const isPath = (v: string) => /^(\/|~\/|[a-z]:[\\/])/i.test(v);
 /** Rows the sidebar marks with their machine. */
 const TAGGED = new Set(["list_projects", "list_live_sessions"]);
 
@@ -181,7 +184,7 @@ export class Fleet {
       if (typeof v === "string") {
         if (!key || !v) return v;
         if (key === "workspace") return this.workspaceId(machine, v);
-        return KEYS.has(key) ? this.wrap(machine, v) : v;
+        return KEYS.has(key) || (FILES.has(key) && isPath(v)) ? this.wrap(machine, v) : v;
       }
       if (Array.isArray(v)) return v.map((x) => walk(x, key));
       if (isRow(v)) return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x, k)]));
@@ -230,7 +233,7 @@ export class Fleet {
       .map((a) => ({ machine: a.machine, value: a.value as Row, rows: ((a.value as Row).workspaces as Row[]).filter((w) => typeof w?.id === "string") }));
     const order = (m: string) => this.machines.findIndex((x) => x.id === m);
     lists.sort((a, b) => order(a.machine) - order(b.machine));
-    const groups: (Group & { row: Row })[] = [];
+    const groups: (Group & { row: Row; rows: Map<string, Row> })[] = [];
     for (const { machine, rows } of lists) {
       this.seen.set(machine, rows.map((w) => w.id as string));
       const free = groups.filter((g) => !g.members.has(machine));
@@ -245,14 +248,29 @@ export class Fleet {
         const g = pick(remote, w) ?? pick(named, w);
         if (g) {
           g.members.set(machine, w.id as string);
+          g.rows.set(machine, w);
           free.splice(free.indexOf(g), 1);
-        } else groups.push({ id: this.wrap(machine, w.id as string), members: new Map([[machine, w.id as string]]), row: w });
+        } else groups.push({ id: this.wrap(machine, w.id as string), members: new Map([[machine, w.id as string]]), row: w, rows: new Map([[machine, w]]) });
       }
+    }
+    // A machine that joins a workspace later keeps its panel id and row: the open workspace does not change under the person.
+    const kept = new Set<string>();
+    for (const g of groups) {
+      const before = this.groups.find((b) => !kept.has(b.id) && [...g.members].some(([m, raw]) => b.members.get(m) === raw));
+      if (!before) continue;
+      kept.add(before.id);
+      g.id = before.id;
+      const owner = this.unwrap(before.id)?.machine;
+      if (owner && g.rows.has(owner)) g.row = g.rows.get(owner) as Row;
     }
     this.groups = groups.map(({ id, members }) => ({ id, members }));
     const lead = lists[0];
     if (!lead) return answers[0]?.value ?? null;
-    const workspaces = groups.map((g) => ({ ...g.row, id: g.id, machines: [...g.members.keys()] }));
+    const fileOf = (g: (typeof groups)[number]) => {
+      const owner = [...g.rows].find(([, r]) => r === g.row)?.[0];
+      return typeof g.row.logo === "string" && owner && isPath(g.row.logo) ? { logo: this.wrap(owner, g.row.logo) } : {};
+    };
+    const workspaces = groups.map((g) => ({ ...g.row, ...fileOf(g), id: g.id, machines: [...g.members.keys()] }));
     const active = lists.map((l) => (typeof l.value.active === "string" ? this.workspaceId(l.machine, l.value.active) : null)).find(Boolean) ?? null;
     return { ...(this.encode(lead.machine, lead.value) as Row), workspaces, active };
   }

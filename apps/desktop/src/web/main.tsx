@@ -65,6 +65,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
     computerStatus: true,
     sidebarExtra: () => <HomeLink />,
     machineName: (id) => transport.fleet.name(id),
+    workspaceOnMachine: multi,
     machineOnCreate: multi
       ? (workspace) => (
           <Suspense fallback={null}>
