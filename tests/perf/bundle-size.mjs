@@ -7,7 +7,9 @@
  *   node tests/perf/bundle-size.mjs --update    baja el techo a lo que pesa hoy
  *
  * Los chunks perezosos (mermaid, pdf.js, excalidraw) no cuentan. El techo va en
- * KiB enteros y solo baja: lo nuevo que pese entra por un `import()`.
+ * KiB enteros y solo baja: lo nuevo que pese entra por un `import()`. El mismo
+ * commit pesa ~1 KiB distinto en macOS y en el CI de Linux, así que la guarda
+ * solo falla si se pasa del techo por más de `MARGIN_KIB`.
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -17,6 +19,7 @@ const root = join(import.meta.dirname, "../..");
 const dist = join(root, "dist");
 const BASELINE = join(import.meta.dirname, "bundle-size-baseline.json");
 const ADJUST = process.argv.includes("--update");
+const MARGIN_KIB = 2;
 
 if (!existsSync(join(dist, "index.html"))) {
   console.error("No hay dist/. Corre `pnpm build` antes que este guarda.");
@@ -49,9 +52,9 @@ if (ADJUST) {
   console.log(`techo: ${JSON.stringify(lowered)}`);
   process.exit(0);
 }
-const over = Object.entries(ceiling).filter(([k, v]) => counters[k] > v);
+const over = Object.entries(ceiling).filter(([k, v]) => counters[k] > v + MARGIN_KIB);
 if (over.length > 0) {
-  console.error("La carga inicial pesa más que el techo de bundle-size-baseline.json:");
+  console.error(`La carga inicial pesa más que el techo de bundle-size-baseline.json (+${MARGIN_KIB} KiB de margen):`);
   for (const [k, v] of over) console.error(`  ${k}: ${counters[k]} > ${v}`);
   process.exit(1);
 }
