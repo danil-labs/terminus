@@ -38,29 +38,54 @@ the native window or a real ZCode account.
 
 ## The browser build
 
-The same front runs in a browser against a Danil Computers relay instead of the
-Tauri window. `src/web/` holds only that entry: it answers the globals of
+The same front runs in a browser against Danil Computers instead of the Tauri
+window. `src/web/` holds only that entry: it answers the globals of
 `@tauri-apps/api` with a transport over the relay session socket, so the desktop
-bundle never imports it.
+bundle never imports it, and its phrases live in `src/locales/*/web.json`,
+which the desktop catalogs leave out. `options.headers` of `invoke` reach the
+transport (`x-terminus-workspace` is honored; other headers are ignored for now).
 
 ```sh
-pnpm web:build                                   # dist-web/, relative paths
-TERMINUS_WEB_CONNECT="wss://relay.example" pnpm web:build   # adds the relay to connect-src
-pnpm web:dev                                     # Vite on /web.html
+TERMINUS_WEB_SUPABASE_URL=https://<project>.supabase.co \
+TERMINUS_WEB_SUPABASE_KEY=<publishable key> \
+pnpm web:build      # dist-web/<base>/ plus dist-web/index.html and dist-web/_headers
+pnpm web:dev        # Vite on <base>web.html with the same settings
 ```
 
-The host page sets the configuration before or after loading the script:
+Build-time settings (environment variables; all are public values):
 
-```js
-window.terminusWeb = { endpoint: "relay.example", computerId: "cmp_…", getToken: async () => jwt, onUnauthorized: () => {} };
-```
+| Variable | Default | Effect |
+|---|---|---|
+| `TERMINUS_WEB_BASE` | `/terminus/` | Path the page is served under |
+| `TERMINUS_WEB_ENDPOINT` | `https://computers.danil.ai` | Control plane and relay; added to `connect-src` as `https` and `wss` |
+| `TERMINUS_WEB_SUPABASE_URL` | none | The Danil app's Supabase project; added to `connect-src` |
+| `TERMINUS_WEB_SUPABASE_KEY` | none | Its publishable (anon) key |
+| `TERMINUS_WEB_LOGIN` | `/` | Where to go when there is no session |
+| `TERMINUS_WEB_CONNECT` | empty | Extra `connect-src` sources |
 
-`getToken` runs on every connection; the token travels as the WebSocket
-subprotocol `bearer.<token>` next to `danil.computers.v1`. What the window does
-locally (native sites, Typst live, tray, updater, local file pickers, opening
-files on the host) answers with `shell.web.desktop_only` or a browser
-equivalent. `tests/unit/web-transport.test.mjs` mounts `dist-web/` against a
-relay simulated in Node.
+The page is served on the Danil app's origin, so it reads the Supabase session
+that app stored (`supabase.auth.getSession()`); it never signs in. After a 401
+from the API or a relay close 4003 it calls `refreshSession()` and, if that
+fails, goes to the login. It lists the person's computers (`GET
+/v1/computers`), opens the only one or the remembered one, or shows a picker
+that can also start a computer; `?computer=<id>` opens that one. Before
+reconnecting the socket it asks the API again, so a missing license or a
+computer that is not theirs shows a notice instead of a blind retry. A page
+that sets `window.terminusWeb` before the script loads can override any of the
+settings above, or give `{ endpoint, computerId, getToken }` and skip the
+session and the picker.
+
+What the window does locally (native sites, Typst live, tray, updater, local
+file pickers, opening files on the host) answers with `web.desktop_only` or a
+browser equivalent. `tests/unit/web-transport.test.mjs` and
+`tests/unit/web-gate.test.mjs` mount `dist-web/` against a relay simulated in
+Node (`tests/helpers/fake-relay.mjs`).
+
+`wrangler.web.toml` deploys `dist-web/` as the private assets Worker
+`terminus-web` (no route, no `workers.dev`); the Danil app forwards
+`/terminus/*` to it through a Service Binding. `dist-web/_headers` carries the
+policy with `frame-ancestors 'none'`, and `dist-web/index.html` is the
+single-page fallback for paths under the base.
 
 ## The engine pin
 

@@ -1,0 +1,20 @@
+{
+  "web.computers.error": "Could not reach Danil Computers.",
+  "web.computers.license": "Your account has no Terminus license. Ask whoever manages your Danil account for access.",
+  "web.computers.none": "You do not have any computer in Danil yet.",
+  "web.computers.not_yours": "This computer is not yours or no longer exists.",
+  "web.computers.open": "Open",
+  "web.computers.retry": "Retry",
+  "web.computers.start": "Start",
+  "web.computers.state.offline": "Off",
+  "web.computers.state.online": "On",
+  "web.computers.state.provisioning": "Being set up",
+  "web.computers.state.starting": "Starting",
+  "web.computers.state.stopped": "Stopped",
+  "web.computers.title": "Choose the computer to open Terminus on.",
+  "web.computers.waiting": "Connecting to your Danil account…",
+  "web.desktop_only": "This is only available in the Terminus desktop app.",
+  "web.local_files": "The browser cannot pick files or folders on this device. Use the Terminus desktop app for that.",
+  "web.revoked": "You no longer have access to this computer. Sign in again.",
+  "web.start_failed": "The computer could not start. Try again in a moment."
+}

@@ -32,7 +32,7 @@ if (!bundle || !existsSync(join(dist, "assets", bundle))) {
 // Sin propagarla, Node lo evalúa otra vez y monta una segunda app dentro de #root.
 /** La entrada del navegador (`pnpm web:build`), que trae su propio IPC: `boot(..., { web: true })`. */
 export const distWeb = join(raiz, "dist-web");
-const assetsUrls = [dist, distWeb].map((dir) => `${pathToFileURL(join(dir, "assets")).href}/`);
+const assetsUrls = [join(dist, "assets"), distWeb].map((dir) => `${pathToFileURL(dir).href}/`);
 registerHooks({
   resolve(specifier, context, next) {
     const resolved = next(specifier, context);
@@ -80,7 +80,7 @@ export const cause = new AsyncLocalStorage();
 export async function boot(entorno, version, respuestas, userAgent, storage = {}, { web = false, antes } = {}) {
   const dir = web ? distWeb : dist;
   const pagina = web ? readFileSync(join(distWeb, "index.html"), "utf8") : indice;
-  const entrada = web ? /<script\b[^>]*\bsrc="\.\/assets\/([^"?]+\.js)"/.exec(pagina)?.[1] : bundle;
+  const entrada = web ? /<script\b[^>]*\bsrc="\/?([^"?]*assets\/[^"?]+\.js)"/.exec(pagina)?.[1] : `assets/${bundle}`;
   if (!entrada) throw new Error(`No está el script principal de ${dir}.`);
   const fallos = [];
   const comandos = [];
@@ -336,7 +336,7 @@ export async function boot(entorno, version, respuestas, userAgent, storage = {}
   // La query hace que Node vuelva a evaluar el módulo en la segunda pasada; sin
   // ella devuelve el de la caché y no monta nada sobre este documento nuevo.
   antes?.(w);
-  await import(`${pathToFileURL(join(dir, "assets", entrada)).href}?v=${version}`).catch((e) =>
+  await import(`${pathToFileURL(join(dir, entrada)).href}?v=${version}`).catch((e) =>
     fallos.push(`al evaluar el módulo: ${e?.stack ?? e}`),
   );
   await sleep(500);

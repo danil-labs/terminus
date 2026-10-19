@@ -48,13 +48,13 @@ export function failureOf(error: unknown): Failure {
   if (code === "operation_failed" && (typeof detail === "string" || detail?.what)) return detail as unknown as Failure;
   if (code === "machine_off") return { what: { clave: "shell.service.machine_off" }, detail: "machine_off" };
   if (code === "app_unavailable") return { what: { clave: "shell.service.engine_down" }, detail: "engine_down" };
-  if (code === "start_failed" || code === "start_timeout") return { what: t("shell.web.start_failed"), detail: code };
-  if (code === "revoked") return { what: t("shell.web.revoked"), detail: code };
+  if (code === "start_failed" || code === "start_timeout") return { what: t("web.start_failed"), detail: code };
+  if (code === "revoked") return { what: t("web.revoked"), detail: code };
   if (code === "engine_missing") return { what: { clave: "shell.service.engine_missing" }, detail: e.detail ?? code };
   return { what: { clave: KEYS[code] ?? "shell.service.failed" }, detail: code };
 }
 
-const desktopOnly = (command: string): Failure => ({ what: t("shell.web.desktop_only"), detail: command });
+const desktopOnly = (command: string): Failure => ({ what: t("web.desktop_only"), detail: command });
 
 /** The workspace travels in a header for these, as in the window. */
 const HEADER_SCOPED = new Set(["stop_turn", "stop_shell_command", "write_shell_input", "pending_requests"]);
@@ -247,7 +247,7 @@ export function createWebTransport(relay: RelaySession, computerId: string, vers
         return action === "version" ? version : action === "name" ? "Terminus" : null;
       case "dialog":
         if (action === "message") return dialog(args);
-        host.alert(t("shell.web.local_files"));
+        host.alert(t("web.local_files"));
         return null;
       case "clipboard-manager":
         if (action === "write_text") return host.writeText(String(args.text ?? ""));

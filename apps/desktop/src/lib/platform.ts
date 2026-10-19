@@ -1,6 +1,6 @@
 /**
  * Lo que este front puede hacer donde corre. El escritorio lo puede todo y es
- * el valor por defecto; la entrada web (`src/web/main.ts`) lo fija antes de
+ * el valor por defecto; la entrada web (`src/web/main.tsx`) lo fija antes de
  * importar la app y no cambia después.
  */
 export type Capabilities = {

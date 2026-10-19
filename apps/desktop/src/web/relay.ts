@@ -12,6 +12,8 @@ export type RelayConfig = {
   getToken: () => string | Promise<string>;
   /** Called when the relay revokes the session (4003), so the host can sign in again. */
   onUnauthorized?: () => void;
+  /** Before each reconnection: a failed upgrade has no body, so the host asks the API why. False stops. */
+  beforeReconnect?: () => Promise<boolean>;
 };
 
 export type MachineState = "unknown" | "starting" | "online" | "offline" | "stopped" | "provisioning";
@@ -145,6 +147,11 @@ export class RelaySession {
 
   private async connect() {
     if (this.closed) return;
+    if (this.attempt > 0 && this.config.beforeReconnect) {
+      const go = await this.config.beforeReconnect().catch(() => true);
+      if (!go) return this.close();
+      if (this.closed) return;
+    }
     let token: string;
     try {
       token = await this.config.getToken();

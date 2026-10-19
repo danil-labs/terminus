@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { copyFileSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, mergeConfig, type Plugin, type UserConfig } from "vite";
@@ -44,27 +44,63 @@ function excalidrawFonts(): Plugin {
   };
 }
 
-// La entrada del navegador (`src/web/main.ts`): sale a `dist-web/` con rutas
-// relativas, para servirse bajo cualquier prefijo. El origen del relay entra en
-// la política al compilar, nunca escrito aquí.
-function webBuild(): UserConfig {
-  const connect = (process.env.TERMINUS_WEB_CONNECT ?? "").replace(/[^\w:/.* -]/g, "").trim();
+// La entrada del navegador (`src/web/main.tsx`). Sale a `dist-web/<base>` para
+// que el Worker de assets sirva las mismas rutas que reenvía la app de Danil;
+// plano de control, Supabase (valores públicos) y política se fijan al compilar.
+function webBuild(serve: boolean): UserConfig {
+  const env = process.env;
+  const origin = (value: string | undefined) => (value ? new URL(value).origin : "");
+  const base = `/${(env.TERMINUS_WEB_BASE ?? "/terminus/").replace(/^\/+|\/+$/g, "")}/`.replace("//", "/");
+  const endpoint = origin(env.TERMINUS_WEB_ENDPOINT || "https://computers.danil.ai");
+  const supabaseUrl = origin(env.TERMINUS_WEB_SUPABASE_URL);
+  const supabaseKey = (env.TERMINUS_WEB_SUPABASE_KEY ?? "").trim();
+  const login = env.TERMINUS_WEB_LOGIN || "/";
+  const extra = (env.TERMINUS_WEB_CONNECT ?? "").replace(/[^\w:/.* -]/g, " ").split(/\s+/).filter(Boolean);
+  const connect = [endpoint, endpoint.replace(/^http/, "ws"), supabaseUrl, ...extra].filter(Boolean).join(" ");
   const version = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")).version as string;
+  const root = fileURLToPath(new URL("./dist-web/", import.meta.url));
+  const outDir = join(root, base);
+  let policy = "";
   const page: Plugin = {
     name: "terminus-web-page",
     enforce: "post",
-    transformIndexHtml: (html) => html.replace("%TERMINUS_WEB_CONNECT%", connect),
+    buildStart() {
+      if (!serve) rmSync(root, { recursive: true, force: true });
+    },
+    transformIndexHtml(html) {
+      const out = html.replace("%TERMINUS_WEB_CONNECT%", connect);
+      policy = /http-equiv="Content-Security-Policy"\s*content="([^"]*)"/.exec(out)?.[1] ?? "";
+      return out;
+    },
     generateBundle(_, bundle) {
       const html = bundle["web.html"];
       if (html) html.fileName = "index.html";
+      if (!policy) this.error("web.html sin Content-Security-Policy");
+    },
+    // `_headers` lleva lo que un `<meta>` no puede (frame-ancestors). La copia de
+    // la raíz es el respaldo de página única: un 404 bajo la base sirve la app.
+    writeBundle() {
+      if (serve) return;
+      const headers = [
+        `${base}*`,
+        `  Content-Security-Policy: ${policy}; frame-ancestors 'none'`,
+        "  X-Content-Type-Options: nosniff",
+        "  Referrer-Policy: strict-origin-when-cross-origin",
+        "",
+      ];
+      writeFileSync(join(root, "_headers"), headers.join("\n"));
+      if (base !== "/") copyFileSync(join(outDir, "index.html"), join(root, "index.html"));
     },
   };
   return {
-    base: "./",
-    define: { __TERMINUS_VERSION__: JSON.stringify(version) },
+    base,
+    define: {
+      __TERMINUS_VERSION__: JSON.stringify(version),
+      __TERMINUS_WEB__: JSON.stringify({ endpoint, supabaseUrl, supabaseKey, login }),
+    },
     plugins: [page],
     build: {
-      outDir: "dist-web",
+      outDir,
       emptyOutDir: true,
       rollupOptions: { input: fileURLToPath(new URL("./web.html", import.meta.url)) },
     },
@@ -130,4 +166,4 @@ const desktop: UserConfig = {
   },
 };
 
-export default defineConfig(({ mode }) => (mode === "web" ? mergeConfig(desktop, webBuild()) : desktop));
+export default defineConfig(({ mode, command }) => (mode === "web" ? mergeConfig(desktop, webBuild(command === "serve")) : desktop));
