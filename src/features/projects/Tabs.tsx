@@ -29,7 +29,7 @@ import { displayName, watchProfiles } from "./profiles";
 import SessionGit, { sessionGitDescription } from "./SessionGit";
 import { readableSessionTitle, type SessionRow, threadTitle } from "./Sessions";
 import EstadoDeTarea, { taskLabel } from "./TaskStatus";
-import { taskPriority } from "./taskActivity";
+import { taskPriority } from "@terminus/design";
 import { type GitStatus, watchSessionGit } from "./taskGit";
 
 // Lo que asoma de la pestaña vecina y el padding de la tira, en px.

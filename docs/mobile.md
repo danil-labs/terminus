@@ -19,12 +19,13 @@ el dueño de todo; el teléfono es otro cliente más.
 - **Barra de pestañas del sistema** (`expo-router/native-tabs`): Liquid Glass en
   iOS 26 y Material 3 en Android. Tiene Tareas y Notificaciones, más "Nueva"
   aparte con `role="search"`, como en t3code. No se dibuja una barra propia.
-- **Las marcas de tarea son las del sidebar.** `mobile/src/ui/TaskStatus.tsx`
-  copia `src/features/projects/TaskStatus.tsx` y `taskActivity.ts`: la misma
+- **Las marcas de tarea son las del sidebar.** `packages/design` tiene la
+  prioridad, los íconos, los colores y las frases que usan la ventana y la app,
+  y el guard `shared-design` falla si se apartan del escritorio: la misma
   prioridad (aprobando, preguntó, trabajando, falló, sin ver), los mismos
   íconos de Lucide, los mismos colores por tema y los mismos textos. Un space,
   un agente o un workspace muestran la marca más urgente de sus tareas, como
-  una fila plegada. Si cambian en el escritorio, se cambian en los dos lados.
+  una fila plegada. Si cambian en el escritorio, se cambia el paquete.
 - **Tema claro y oscuro** según el sistema, con los tokens por omisión del
   escritorio en `src/styles/global.css`: Violeta en claro y Grafito en oscuro
   (`[data-dark-style="graphite"]`), no el navy.

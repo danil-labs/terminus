@@ -224,7 +224,7 @@ function Bubble({ record, theme }: { record: TaskRecord; theme: Theme }) {
 
 function PermissionCard({ permission, theme, onDecide }: { permission: Permission; theme: Theme; onDecide: (allow: boolean) => void }) {
   return (
-    <View style={[styles.card, { borderColor: theme.warning, backgroundColor: theme.surface }]} testID="permission">
+    <View style={[styles.card, { borderColor: theme.approving, backgroundColor: theme.surface }]} testID="permission">
       <Text style={{ color: theme.text, fontWeight: "600" }}>{t("task.permission", { tool: permission.tool })}</Text>
       {permission.target ? (
         <Text selectable style={[styles.code, { color: theme.text, backgroundColor: theme.muted }]}>

@@ -6,7 +6,7 @@ import { Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { t } from "../../lib/i18n";
 import { cn } from "../../lib/utils";
-import { type TaskActivity, taskPriority } from "./taskActivity";
+import { type TaskActivity, taskPriority } from "@terminus/design";
 
 export function taskLabel(state: ReturnType<typeof taskPriority>, folded = false) {
     switch (state) {

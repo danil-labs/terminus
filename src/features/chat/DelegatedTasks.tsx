@@ -6,7 +6,7 @@ import { Button } from "../../ui/Button";
 import { asFailure, FailureNote } from "../../ui/Failure";
 import { Popover, PopoverContent, PopoverTrigger } from "../../ui/Popover";
 import Sessions, { type SessionRow } from "../projects/Sessions";
-import { taskPriority, type TaskActivity } from "../projects/taskActivity";
+import { taskPriority, type TaskActivity } from "@terminus/design";
 
 export type DelegatedListProps = Omit<ComponentProps<typeof Sessions>, "sessions" | "flat" | "includeArchived" | "groupByAuthor" | "groupByHandler">;
 

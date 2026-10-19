@@ -24,6 +24,7 @@ import { createConnection } from "node:net";
 import { networkInterfaces } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { CLI_COMMANDS, INVOKE_COMMANDS, NEEDS_YOU as NEEDS_YOU_STATES } from "../../packages/protocol/src/commands.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const option = (name, fallback) => {
@@ -38,25 +39,10 @@ const MAX_BODY = 1 << 20;
 const LONG_POLL_MS = 25_000;
 const MAX_FRAME = 16 * 1024 * 1024;
 
-/** CLI-level commands, the same surface as the Terminus CLI. */
-const CLI = new Set([
-  "workspace list",
-  "folder list",
-  "space list",
-  "handler list",
-  "agent list",
-  "agent models",
-  "task list",
-  "task show",
-  "task read",
-  "task create",
-  "task send",
-  "task stop",
-  "operation show",
-]);
-/** Window commands that a person answers; they go through `service invoke`. */
-const INVOKE = new Set(["respond_permission", "answer_question", "mark_task_seen", "list_workspace_attention", "list_active_turns"]);
-const NEEDS_YOU = new Set(["approving", "asked", "failed"]);
+// The allowlist is the contract with the app; Node strips the types on import.
+const CLI = new Set(CLI_COMMANDS);
+const INVOKE = new Set(INVOKE_COMMANDS);
+const NEEDS_YOU = new Set(NEEDS_YOU_STATES);
 
 function bridgeToken() {
   if (existsSync(STATE)) {

@@ -1,0 +1,10 @@
+{
+  "name": "@terminus/protocol",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The contract between a Terminus host bridge and its remote clients.",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

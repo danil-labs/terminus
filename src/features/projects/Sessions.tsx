@@ -35,7 +35,7 @@ import { matchesTaskQuery } from "./taskSearch";
 import { canFinishTask, effectiveTaskGit, type GitStatus, sharesTaskGit, watchSessionGit } from "./taskGit";
 import { authorKey, authorKeys, shownUnderLauncher } from "./taskAuthors";
 import { descendientes, type Rama as RamaDeTareas, taskTree } from "./taskTree";
-import type { TaskActivity } from "./taskActivity";
+import type { TaskActivity } from "@terminus/design";
 
 export function readableSessionTitle(title: string): string {
   if (!title.startsWith("/root/")) return title;

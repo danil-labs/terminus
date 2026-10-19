@@ -8,6 +8,7 @@
       "scripts/**/*.mjs",
       "tests/**/*.ts",
       "tests/**/*.mjs",
+      "packages/**/*.ts",
       "!src/features/code/file-icons.ts"
     ]
   },
