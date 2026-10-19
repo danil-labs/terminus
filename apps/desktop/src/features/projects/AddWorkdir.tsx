@@ -124,7 +124,7 @@ export default function AnadirCarpeta(props: {
     setIntentado(true);
     await terminar(invoke<Project>("clone_project", {
       url: url(), name: nombre(), directory: destino(), operation: id,
-      workspace: props.workspace, provider: provider(), space: props.space ?? undefined,
+      workspace: props.workspace, gitHost: provider(), space: props.space ?? undefined,
       progress: new Channel<{ phase: string; percent: number | null }>(value => {
         if (operation() === id) setProgress(value);
       }),
@@ -244,7 +244,7 @@ export default function AnadirCarpeta(props: {
       return;
     }
     setUrl(repo.url);
-    setProvider(repo.provider);
+    setProvider(repo.git_host);
     setRepositoryName(repo.name);
     await elegirCamino("clonar");
   }

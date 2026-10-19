@@ -65,8 +65,8 @@ const ARBOLES = [WEB].filter((d) => existsSync(d));
  * normal: el registro es la lista de lo que la app hace, no de lo que podría.
  */
 const SIN_INTERFAZ = {
-  provider_pending_setup: "el CLI del motor lo usa para completar la conexión; permanece en el contrato congelado",
-  finish_provider_setup: "el CLI del motor espera la instalación; la ventana actualiza al regresar",
+  git_host_pending_setup: "el CLI del motor lo usa para completar la conexión; permanece en el contrato congelado",
+  finish_git_host_setup: "el CLI del motor espera la instalación; la ventana actualiza al regresar",
   set_session_pinned: "el gesto de fijar lo implementa la tarea de frontend en paralelo",
   // El backend prepara los árboles; esta lectura aún no tiene pantalla.
   session_worktree: "el árbol y sus notas aún no se pintan en ninguna pantalla",

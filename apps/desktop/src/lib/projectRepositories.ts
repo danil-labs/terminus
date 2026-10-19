@@ -1,7 +1,7 @@
 export type ProjectRepository = {
   name: string;
   url: string;
-  provider: string | null;
+  git_host: string | null;
   last_used: number;
   /** El proyecto de este workspace que ya tiene el repositorio clonado, y dónde. */
   project?: string | null;

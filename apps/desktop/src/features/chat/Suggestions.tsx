@@ -1,3 +1,4 @@
+import Lock from "lucide-solid/icons/lock";
 import Sparkles from "lucide-solid/icons/sparkles";
 import { For, Show, createEffect, on } from "solid-js";
 import { t } from "../../lib/i18n";
@@ -18,6 +19,8 @@ export type Suggestion = {
    * seguidas: la cabecera se pinta sobre la primera.
    */
   group?: string;
+  /** Lo que la cabecera del grupo avisa con un candado: sus filas no se cambian aquí. */
+  groupHint?: string;
   /** Quién resuelve la fila: el CLI de ese agente, o una skill que el agente carga. */
   mark?: { agent: string } | "skill";
   /**
@@ -71,8 +74,16 @@ export default function Suggestions(props: {
             {(s, i) => (
               <li>
                 <Show when={s.group && s.group !== props.items[i() - 1]?.group}>
-                  <p class="m-0 px-2.5 pt-1.5 pb-0.5 text-[0.6875rem] font-semibold tracking-[0.3px] text-neutral-500 uppercase">
-                    {s.group}
+                  <p class="m-0 flex items-center gap-2 px-2.5 pt-1.5 pb-0.5 text-[0.6875rem] font-semibold tracking-[0.3px] text-neutral-500 uppercase">
+                    <span class="min-w-0 truncate">{s.group}</span>
+                    <Show when={s.groupHint}>
+                      {(hint) => (
+                        <span class="ml-auto flex shrink-0 items-center gap-1 font-medium tracking-normal normal-case">
+                          <Lock size={10} aria-hidden="true" />
+                          {hint()}
+                        </span>
+                      )}
+                    </Show>
                   </p>
                 </Show>
                 <button
@@ -87,6 +98,7 @@ export default function Suggestions(props: {
                   aria-selected={i() === props.index}
                   class={cn(
                     "flex w-full items-baseline gap-2 rounded-md px-2 py-1.5 text-left",
+                    s.disabled && "cursor-default opacity-60",
                     s.mark && "h-[34px] items-center gap-2.5 px-2.5 py-0",
                     i() === props.index
                       ? s.mark ? "bg-primary/[0.08]" : "bg-surface-muted"

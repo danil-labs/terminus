@@ -42,11 +42,11 @@ import { sangrarTerminal } from "./terminalIndent";
 import { FIN_DE_ARCHIVO, TECLAS_DE_TERMINAL, pideClave } from "./commandInput";
 import { claseDelTramo, finishEdit, highlightSpans, placeLabel, referenceId, searchPlaces, searchTasks, taskLabel, type MentionTarget, type PendingEdit, type PlaceCandidate, type TextEdit, type TaskCandidate, type TaskMention, tramosDelMensaje } from "../../lib/taskMentions";
 import {
+  groupRecipients,
   type Recipient,
   type RecipientCandidate,
   recipientId,
   recipientLabel,
-  searchRecipients,
   type SenderTask,
 } from "../../lib/recipients";
 import { base64De, copyText, imagenPegada } from "../../lib/clipboard";
@@ -276,7 +276,7 @@ export type Msg = {
    * «OpenCode Go»). Lo guarda el cierre; la línea del turno lo enseña tras la
    * hora. Ausente en los turnos anteriores al campo.
    */
-  provider?: string;
+  model_vendor?: string;
   /**
    * El modelo que reportó el CLI al cerrar, para el turno que lo observó. Es
    * distinto del modelo elegido ahora: la transcripción guarda con qué se
@@ -574,6 +574,8 @@ export type ChatProps = {
    * a una letra más de distancia.
    */
   recipientCandidates?: RecipientCandidate[];
+  /** El nombre de la carpeta de la tarea, para la cabecera de los del repositorio. */
+  recipientFolder?: string;
   /** A quién va lo que hay escrito ahora mismo. No es material: no se adjunta. */
   recipients?: Recipient[];
   onRecipient?: (name: string, label: string, trigger: import("../../lib/mentions").Trigger) => void;
@@ -1024,27 +1026,45 @@ export default function Chat(props: ChatProps) {
     // Primero los encargados, y no por jerarquía: los llama un nombre corto,
     // que es el que choca con el de un archivo. Quien busca material tiene
     // una barra o una extensión a mano para distinguirlo.
-    const handlers = searchRecipients(props.recipientCandidates ?? [], d.query).map(c => ({
+    // Los del repositorio primero y con candado: se cambian con un PR, no aquí.
+    const grupos = groupRecipients(props.recipientCandidates ?? [], d.query);
+    const fila = (c: RecipientCandidate, group: string, groupHint?: string): Suggestion => ({
       value: recipientId(c.name),
       title: c.name,
-      detail: c.description || undefined,
-      label: t("chat.mentions.handler"),
+      detail: c.shadowed ? t("chat.mentions.shadowed_detail") : c.description || undefined,
+      label: c.shadowed ? t("chat.mentions.shadowed") : t("chat.mentions.handler"),
+      group,
+      groupHint,
+      // `@nombre` llegaría al del repositorio: la fila informa, no se elige.
+      disabled: c.shadowed || undefined,
       // Despierto mientras no se sepa: la presencia ayuda cuando está, y una
       // cara dormida por falta de dato diría que no está quien sí está.
       avatar: { name: c.name, status: c.status ?? ("awake" as const), image: props.avatarOf?.(c.name) },
-    }));
+    });
+    const delRepositorio = props.recipientFolder
+      ? t("chat.mentions.group_repository", { folder: props.recipientFolder })
+      : t("chat.mentions.group_repository_unnamed");
+    const handlers = [
+      ...grupos.repository.map(c => fila(c, delRepositorio, t("chat.mentions.via_pr"))),
+      ...grupos.own.map(c => fila(c, t("chat.mentions.group_own"))),
+    ];
+    // Con cabeceras arriba, el material lleva la suya: si no, se leería como
+    // parte del último grupo de encargados.
+    const material = handlers.length ? t("chat.mentions.group_material") : undefined;
     const tasks = searchTasks(props.taskCandidates ?? [], d.query, props.mentionProject ?? "", props.mentionSession)
       .slice(0, 40).map(task => ({
         value: referenceId(task.target),
         title: task.title || workLabel(task.branch, task.alias) || task.target.sessionId,
         detail: [workLabel(task.branch, task.alias), task.projectName].filter(Boolean).join(" · "),
         label: task.available ? (task.archived ? t("chat.mentions.archived_task") : t("chat.mentions.task")) : t("chat.mentions.no_worktree"),
+        group: material,
       }));
     const places = searchPlaces(props.placeCandidates ?? [], d.query).map(place => ({
       value: referenceId(place.target),
       title: place.name,
       detail: place.detail || undefined,
       label: t("chat.mentions.folder"),
+      group: material,
     }));
     return [...handlers, ...tasks, ...places, ...filterMentionSources(props.mentionSources?.fuentes ?? [], d.query).map((f) => ({
       value: f.ruta,
@@ -1053,6 +1073,7 @@ export default function Chat(props: ChatProps) {
       // implícita y una columna `tree` no dice de cuál archivo se trata.
       detail: f.fuente || undefined,
       label: f.tipo,
+      group: material,
     }))];
   });
 
@@ -1062,8 +1083,17 @@ export default function Chat(props: ChatProps) {
     const d = trigger();
     return d?.kind === "/" ? slashPick(slashGroups(), d.query) : 0;
   };
+  // Una fila deshabilitada informa y no se elige: el teclado la salta.
+  const habilitada = (desde: number, paso: 1 | -1) => {
+    const filas = suggestions();
+    for (let n = 0; n < filas.length; n++) {
+      const i = (((desde + paso * n) % filas.length) + filas.length) % filas.length;
+      if (!filas[i]?.disabled) return i;
+    }
+    return desde;
+  };
   const picked = () =>
-    Math.max(0, Math.min(pick() ?? filaDeArranque(), suggestions().length - 1));
+    habilitada(Math.max(0, Math.min(pick() ?? filaDeArranque(), suggestions().length - 1)), 1);
 
   // Un menú que solo puede decir «no hay nada» no se abre: la caja tiene que
   // dejar escribir `@` y `/` como caracteres cuando no hay a qué apuntar.
@@ -1948,7 +1978,9 @@ export default function Chat(props: ChatProps) {
                     ? t("chat.mentions.no_match")
                     : t("chat.commands.no_match")
                 }
-                onPick={(s) => insertSuggestion(s.value)}
+                onPick={(s) => {
+                  if (!s.disabled) insertSuggestion(s.value);
+                }}
               />
             </div>
           </Portal>
@@ -2373,18 +2405,18 @@ export default function Chat(props: ChatProps) {
             if (menuOpen() && suggestions().length > 0) {
               if (e.key === "ArrowDown") {
                 e.preventDefault();
-                setPick((picked() + 1) % suggestions().length);
+                setPick(habilitada((picked() + 1) % suggestions().length, 1));
                 return;
               }
               if (e.key === "ArrowUp") {
                 e.preventDefault();
-                setPick((picked() - 1 + suggestions().length) % suggestions().length);
+                setPick(habilitada((picked() - 1 + suggestions().length) % suggestions().length, -1));
                 return;
               }
               if (e.key === "Tab" || e.key === "Enter") {
                 e.preventDefault();
                 const suggestion = suggestions()[picked()];
-                if (suggestion) insertSuggestion(suggestion.value);
+                if (suggestion && !suggestion.disabled) insertSuggestion(suggestion.value);
                 return;
               }
             }
@@ -3496,7 +3528,7 @@ function TrabajoDeAgente(props: {
         <HoraDelTurno at={props.msg.at} />
         <LineaDeProveedor
           agent={props.msg.agent ?? props.agenteDelTurno}
-          provider={props.msg.provider}
+          provider={props.msg.model_vendor}
           model={props.msg.reported_model}
           catalogo={props.catalogo}
           agentLabel={props.agentLabel}

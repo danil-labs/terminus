@@ -9,7 +9,7 @@
  * La aritmética de intervalos se importa de `taskMentions.ts`: las dos
  * gramáticas comparten convención de `start` y `end`.
  */
-import type { HandlerStatus } from "./model.ts";
+import type { AgentProfile, CatalogoDeAgentes, HandlerDefinition, HandlerStatus, HandlerStatusRow } from "./model.ts";
 import type { Trigger } from "./mentions.ts";
 import {
   editMentions,
@@ -106,7 +106,44 @@ export function insertMention(before: RecipientDraft, trigger: Trigger, target: 
  * que `list_agent_status` publica si está a mano: `undefined` no es un
  * estado, es «todavía no se sabe», y la cara se pinta despierta igual.
  */
-export type RecipientCandidate = { name: string; description: string; status?: HandlerStatus };
+export type RecipientCandidate = {
+  name: string;
+  description: string;
+  status?: HandlerStatus;
+  // Declarado por el repositorio de la carpeta: solo cambia con un PR.
+  repository?: boolean;
+  // Uno tuyo con el mismo nombre que uno del repositorio; `@nombre` llega al del repositorio.
+  shadowed?: boolean;
+};
+
+/**
+ * Los encargados que el menú ofrece en una carpeta. Los ocultos no salen, como
+ * en el riel; los tuyos tapados sí, para decir por qué `@nombre` no llega a
+ * ellos. El catálogo es opcional: sin él no se sabe quién está tapado.
+ */
+export function recipientCandidatesOf(
+  folder: string,
+  roster: readonly HandlerDefinition[],
+  options: {
+    profiles?: Record<string, AgentProfile>;
+    statuses?: readonly HandlerStatusRow[];
+    catalog?: CatalogoDeAgentes | null;
+  } = {},
+): RecipientCandidate[] {
+  const visibles: RecipientCandidate[] = roster
+    .filter(e => !options.profiles?.[e.name]?.hidden)
+    .map(e => ({
+      name: e.name,
+      description: e.description,
+      status: options.statuses?.find(r => r.name === e.name)?.status,
+      repository: e.own_scope === null,
+    }));
+  const tapados: RecipientCandidate[] = (options.catalog?.own ?? [])
+    .filter(a => a.blocked.some(b => b.folder === folder && b.repository))
+    .filter(a => roster.some(e => e.name === a.agent.name && e.own_scope === null))
+    .map(a => ({ name: a.agent.name, description: a.agent.description, repository: false, shadowed: true }));
+  return [...visibles, ...tapados];
+}
 
 /**
  * Los encargados que casan con lo tecleado, el exacto primero.
@@ -122,4 +159,19 @@ export function searchRecipients(candidates: readonly RecipientCandidate[], quer
   };
   return candidates.filter(c => c.name.toLowerCase().includes(query))
     .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+}
+
+/**
+ * Los mismos encargados en dos grupos: primero los del repositorio, luego los
+ * tuyos, cada uno con el orden de `searchRecipients`.
+ */
+export function groupRecipients(candidates: readonly RecipientCandidate[], query: string): {
+  repository: RecipientCandidate[];
+  own: RecipientCandidate[];
+} {
+  const found = searchRecipients(candidates, query);
+  return {
+    repository: found.filter(c => c.repository),
+    own: found.filter(c => !c.repository),
+  };
 }

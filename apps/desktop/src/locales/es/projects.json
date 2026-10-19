@@ -202,13 +202,21 @@
   "projects.new.cancel": "Cancelar",
   "projects.new.placeholder": "Revamp de scoring",
   "projects.picker.label": "Proyecto",
-  "projects.picker.new": "Nuevo proyecto…",
   "projects.picker.no_match": "Ninguna se llama así.",
   "projects.picker.none": "Sin proyecto",
   "projects.picker.search": "Buscar proyecto",
   "projects.picker.source_missing": "{name} · no está",
   "projects.sessions.actions": "Acciones",
   "projects.sessions.actions_named": "Acciones de la tarea «{title}»",
+  "projects.hover_card.folder": "Carpeta",
+  "projects.hover_card.agent": "Agente",
+  "projects.hover_card.provider": "Proveedor",
+  "projects.hover_card.branch": "Rama",
+  "projects.hover_card.pr": "PR",
+  "projects.hover_card.stage": "Etapa",
+  "projects.hover_card.default_model": "Modelo por omisión",
+  "projects.hover_card.open": "Abrir",
+  "projects.hover_card.archive": "Archivar",
   "projects.sessions.pin": "Fijar",
   "projects.sessions.unpin": "Desfijar",
   "projects.sessions.pinned": "Fijada",
@@ -346,5 +354,13 @@
   "projects.agents.profile_prompt_radiant": "Lo instaló el gobierno de Radiant; se cambia en su repositorio fuente.",
   "projects.tabs.new": "Abrir una pestaña",
   "projects.tabs.new_task_in": "Nueva tarea en",
-  "projects.tabs.new_browser": "Navegador"
+  "projects.tabs.new_browser": "Navegador",
+  "projects.picker.add": "Añadir un proyecto…",
+  "projects.picker.manage": "Administrar proyectos",
+  "projects.picker.manage_where": "Ajustes",
+  "projects.picker.tasks": {
+    "one": "{count} tarea",
+    "other": "{count} tareas"
+  },
+  "projects.picker.no_tasks": "sin tareas"
 }

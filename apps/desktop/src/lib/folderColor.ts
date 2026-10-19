@@ -1,4 +1,4 @@
-// Color estable por carpeta mientras no haya uno guardado: FNV-1a de 32 bits sobre el id.
+// Color estable de una carpeta: FNV-1a de 32 bits sobre su id, sin guardar nada.
 const PALETTE = ["#a78bfa", "#38bdf8", "#f59e0b", "#f472b6", "#34d399", "#fb7185", "#60a5fa", "#facc15"];
 
 export function folderColor(id: string): string {

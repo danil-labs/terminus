@@ -357,7 +357,7 @@ export type Turn = {
   reported_model?: string | null;
   /** El proveedor de modelos del turno («OpenCode Zen», «OpenCode Go»).
    *  Ausente en los turnos anteriores al campo y en los que no lanzan nada. */
-  provider?: string | null;
+  model_vendor?: string | null;
 
   native_id?: string | null;
   questions?: Pregunta[] | null;
@@ -463,7 +463,7 @@ export function transcripcion(turns: Turn[]): Msg[] {
   let ofrecido: Set<string> | null = null;
   // Las respuestas guardadas antes de que su fila llevara modelo y proveedor
   // los toman del turno de la persona que las lanzó (`closing.rs`).
-  let delLanzamiento: Pick<Turn, "reported_model" | "provider"> = {};
+  let delLanzamiento: Pick<Turn, "reported_model" | "model_vendor"> = {};
 
   return turns.flatMap((t) => {
     if (t.role === "user") delLanzamiento = t;
@@ -574,7 +574,7 @@ export function transcripcion(turns: Turn[]): Msg[] {
       // importa es este, porque es el que lleva la fila de acciones. Sin esto la
       // línea no puede decir de dónde salió la respuesta, y el dato ya viaja
       // desde Rust.
-      provider: t.provider ?? delLanzamiento.provider ?? undefined,
+      model_vendor: t.model_vendor ?? delLanzamiento.model_vendor ?? undefined,
       // El observado antes que el pedido: el pedido puede ser un alias sin
       // versión («opus») y el del lanzamiento sí la trae («claude-opus-5-5»).
       reported_model: t.reported_model ?? delLanzamiento.reported_model ?? t.model ?? undefined,

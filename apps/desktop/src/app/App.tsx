@@ -82,7 +82,8 @@ import Observability from "../features/observability/Observability";
 import Onboarding from "../features/onboarding/Onboarding";
 import AnadirCarpeta, { type ClonEnCurso } from "../features/projects/AddWorkdir";
 import AgentPageTasks from "../features/projects/AgentPageTasks";
-import AgentProfile from "../features/projects/AgentProfile";
+// Chunk aparte: el perfil completo de un agente solo se carga al abrirlo.
+const AgentProfile = lazy(() => import("../features/projects/AgentProfile"));
 import AgentTasks, { createdTasks } from "../features/projects/AgentTasks";
 import ArchivedTasks from "../features/projects/ArchivedTasks";
 import BaseBranchPicker from "../features/projects/BaseBranchPicker";
@@ -105,6 +106,7 @@ import {
   DEFAULT_PERMISSION_MODE_EVENT,
   type DefaultPermissionModeChange,
 } from "../features/settings/DefaultPermissions";
+import type { ContextoDeProyectos } from "../features/settings/ManageProjects";
 import Settings from "../features/settings/Settings";
 import type { Startup } from "../features/settings/workspaces-store";
 import { createAttention, topState } from "../features/shell/attention";
@@ -143,6 +145,7 @@ import type {
   HandlerDefinition,
   HandlerList,
   HandlerStatusRow,
+  CatalogoDeAgentes,
   ModoDePermiso,
   Project,
   Source,
@@ -166,7 +169,7 @@ import {
 } from "../lib/panels";
 import { createPref, escribirPref, leerPref } from "../lib/prefs";
 import type { Frase } from "../lib/prose";
-import { editDraft, insertMention, insertRecipient, type Recipient, type RecipientCandidate, type SenderTask, trimDraft } from "../lib/recipients";
+import { editDraft, insertMention, insertRecipient, type Recipient, type RecipientCandidate, recipientCandidatesOf, type SenderTask, trimDraft } from "../lib/recipients";
 import { conservar, conservarEnOrden, conservarPorElFinal, sessionRefresh } from "../lib/sessionRefresh";
 import { readShellCache, shellCacheWriter } from "../lib/shellCache";
 import {
@@ -1481,14 +1484,33 @@ export default function App() {
     const filas = watchHandlerStatuses(id);
     createEffect(() => setPresenciaDeEncargados(filas()));
   });
+  // Los ocultos salen del menú como salen del riel; sin carpeta no hay perfiles que leer.
+  const perfilesDeLaCarpeta = createMemo(() => {
+    const id = project();
+    return id ? watchProfiles(id) : () => ({});
+  });
+  // Quién está tapado solo lo dice el catálogo. Se lee al abrir el menú de `@`
+  // y no al cambiar de carpeta: lo pide quien va a llamar a alguien.
+  const [catalogoDeAgentes, setCatalogoDeAgentes] = createSignal<CatalogoDeAgentes | null>(null);
+  let catalogoRequest = 0;
+  const refreshCatalogoDeAgentes = async () => {
+    const request = ++catalogoRequest;
+    if (!project()) return;
+    try {
+      const catalogo = await invoke<CatalogoDeAgentes>("list_machine_agents");
+      if (request === catalogoRequest) setCatalogoDeAgentes(catalogo);
+    } catch {
+      // Sin catálogo el menú sigue, solo que sin marcar a los tapados.
+    }
+  };
   const recipientCandidates = createMemo<RecipientCandidate[]>(() =>
-    (rosterDelProyecto() ?? lastRoster(project()) ?? []).map((e) => ({
-      name: e.name,
-      description: e.description,
+    recipientCandidatesOf(project(), rosterDelProyecto() ?? lastRoster(project()) ?? [], {
+      profiles: perfilesDeLaCarpeta()(),
       // `undefined` no es un estado: es que todavía no se sabe, y el menú
       // pinta la cara despierta en vez de inventar que duerme.
-      status: presenciaDeEncargados().find((r) => r.name === e.name)?.status,
-    })),
+      statuses: presenciaDeEncargados(),
+      catalog: catalogoDeAgentes(),
+    }),
   );
   const placeCandidates = createMemo<PlaceCandidate[]>(() => {
     return projectList().map(f => ({ target: { kind: "folder" as const, projectId: f.id }, name: f.name, detail: "", updatedAt: f.updated_at }));
@@ -4017,6 +4039,23 @@ export default function App() {
     name: string;
   } | null>(null);
 
+  /** Ajustes → Proyectos usa las carpetas y las acciones del riel. Un solo objeto: la hoja no se remonta. */
+  const proyectosEnAjustes: ContextoDeProyectos = {
+    get projects() {
+      return proyectosDelRiel();
+    },
+    onAdd: () => setAnadiendoCarpeta(true),
+    onRename: (id, name) => void renombrarProyecto(id, name),
+    onDelete: (id) => void borrarProyecto(id),
+    get onRemoveFromSpace() {
+      return multipleSpaces() ? removeFromActiveSpace : undefined;
+    },
+    onOpenMaterial: (id) => {
+      cerrarAjustes();
+      abrirProyecto(id);
+    },
+  };
+
   function cerrarAjustes() {
     setSettings(null);
     setCuentasTocadas((n) => n + 1);
@@ -5836,6 +5875,7 @@ export default function App() {
           sources={sources()}
           onPick={elegirProyecto}
           onNuevoProyecto={() => setAnadiendoCarpeta(true)}
+          onAdministrar={() => setSettings("proyectos")}
           // Solo al crear: una tarea abierta ya vive en la máquina que la corre.
           machine={
             <Show when={props.nueva && !props.locked}>
@@ -6323,13 +6363,14 @@ export default function App() {
         mentionSources={mentionSources()}
         input={input()}
         taskCandidates={taskCandidates()}
-        onTaskMenuOpen={() => void refreshTaskCandidates()}
+        onTaskMenuOpen={() => { void refreshTaskCandidates(); void refreshCatalogoDeAgentes(); }}
         taskMentions={borrador().task_mentions}
         mentionProject={project()}
         mentionSession={sessionId()}
         onMentionHistory={navigateMentionHistory}
         placeCandidates={placeCandidates()}
         recipientCandidates={recipientCandidates()}
+        recipientFolder={projectList().find((p) => p.id === project())?.name}
         recipients={borrador().recipients}
         /* Llamar a alguien y adjuntar material entran por caminos distintos y
            acaban en listas distintas; lo que comparten es que insertar en el
@@ -7565,6 +7606,7 @@ export default function App() {
           proyecto={proyectoAbierto() ?? project()}
           agentesEnUso={agentesEnUso()}
           onClose={cerrarAjustes}
+          proyectos={proyectosEnAjustes}
           onAgentProfile={(enProyecto, name) => {
             cerrarAjustes();
             openAgentProfile(enProyecto, name);

@@ -73,6 +73,8 @@ const steps = [
   ["La nota de la versión sale en el idioma de la app", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/release-notes.test.ts")], root],
   ["Las tareas de la página de un agente se paginan sin separar subtareas de su padre", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/agent-page-tasks.test.ts")], root],
   ["La búsqueda de tareas ignora acentos y encuentra varias palabras", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/task-search.test.ts")], root],
+  ["El dock de agentes ordena por estado y cabe en una fila", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/agent-dock.test.ts")], root],
+  ["El sidebar filtra por carpeta y agente y reparte en secciones o grupos", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/sidebar-view.test.ts")], root],
   ["El visor conserva navegación y rechaza los canales retirados", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/artifact-viewer.test.ts")], root],
   ["La ventana no deja salir material", process.execPath, [join(root, "scripts/guards/csp.mjs")], root],
   ["El tema de terminal no repinta el chrome", process.execPath, [join(root, "scripts/guards/terminal-themes.mjs")], root],
@@ -253,6 +255,12 @@ const steps = [
     root,
   ],
   [
+    "La tarjeta de una tarea colorea su carpeta y afirma solo el PR confirmado",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/task-hover-card.test.ts")],
+    root,
+  ],
+  [
     "La fila enseña el comando, no cómo se lanzó",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/step-command.test.ts")],
@@ -370,6 +378,12 @@ const steps = [
     "Un repositorio en la nube se pinta como repositorio",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/workdir-icon.test.ts")],
+    root,
+  ],
+  [
+    "Un proyecto tiene color estable y una ubicación legible",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/project-settings.test.ts")],
     root,
   ],
   [
