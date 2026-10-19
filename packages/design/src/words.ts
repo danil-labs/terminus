@@ -1,0 +1,122 @@
+/**
+ * Las palabras de la lista de tareas, su filtro, el dock de agentes y el
+ * estado de una máquina, con la misma clave que en los catálogos del
+ * escritorio (`apps/desktop/src/locales/<lengua>/*.json`).
+ * `scripts/guards/shared-design.mjs` falla si una se aparta del escritorio.
+ */
+
+export type Plural = { one: string; other: string };
+export type Word = string | Plural;
+
+const es = {
+  "shell.sidebar.view.trigger": "Filtrar y agrupar",
+  "shell.sidebar.view.trigger_count": "Filtrar y agrupar ({count} cambiados)",
+  "shell.sidebar.view.folders": "Carpetas",
+  "shell.sidebar.view.all_folders": "Todas las carpetas",
+  "shell.sidebar.view.all": "Todas",
+  "shell.sidebar.view.agent": "Agente",
+  "shell.sidebar.view.all_agents": "Todos",
+  "shell.sidebar.view.group": "Agrupar",
+  "shell.sidebar.view.group_none": "Sin agrupar",
+  "shell.sidebar.view.group_folder": "Por carpeta",
+  "shell.sidebar.view.group_status": "Por estado",
+  "shell.sidebar.view.group_agent": "Por agente",
+  "shell.sidebar.view.default": "por defecto",
+  "shell.sidebar.view.density": "Densidad",
+  "shell.sidebar.view.density_comfortable": "Cómoda",
+  "shell.sidebar.view.density_compact": "Compacta",
+  "shell.sidebar.view.scope_by_folder": "por carpeta",
+  "shell.sidebar.view.scope_by_status": "por estado",
+  "shell.sidebar.view.scope_by_agent": "por agente",
+  "shell.sidebar.view.section_needs_you": "Te necesitan",
+  "shell.sidebar.view.section_active": "Tareas",
+  "shell.sidebar.view.status_approving": "Esperan tu aprobación",
+  "shell.sidebar.view.status_asked": "Te preguntaron",
+  "shell.sidebar.view.status_working": "Trabajando",
+  "shell.sidebar.view.status_failed": "Fallaron",
+  "shell.sidebar.view.status_unseen": "Sin ver",
+  "shell.sidebar.view.status_idle": "En pausa",
+  "shell.sidebar.view.status_finished": "Terminadas",
+  "shell.sidebar.view.no_folder": "Sin carpeta",
+  "shell.sidebar.view.no_agent": "Sin agente",
+  "shell.agent_dock.title": "Agentes",
+  "shell.agent_dock.see_all": "Ver todos",
+  "shell.agent_dock.see_tasks": "Ver sus tareas",
+  "shell.agent_dock.pick_folder": "Hablar con {name} en…",
+  "shell.agent_dock.more": { one: "{count} agente más", other: "{count} agentes más" },
+  "projects.sessions.pinned": "Fijada",
+  "projects.sessions.agent_asleep": "Dormido",
+  "projects.sessions.agent_awake": "Despierto",
+  "projects.sessions.agent_awake_since": "Despierto · {minutes} min",
+  "projects.sessions.agent_working": { one: "Trabajando · {count} tarea", other: "Trabajando · {count} tareas" },
+  "projects.sessions.agent_working_alone": "Trabajando",
+  "shell.machines.label": "Ejecutar en",
+  "shell.machines.task_off": "Corre en {name}, apagada: se enciende cuando actúes sobre esta tarea.",
+  "shell.machines.asleep_notice": "{name} está apagada: se enciende cuando envíes un mensaje.",
+  "shell.machines.waking": "Encendiendo {name}…",
+  "web.computers.state.online": "Encendida",
+  "web.computers.state.offline": "Apagada",
+  "web.computers.state.starting": "Encendiéndose",
+} as const satisfies Record<string, Word>;
+
+export type WordKey = keyof typeof es;
+
+const en: Record<WordKey, Word> = {
+  "shell.sidebar.view.trigger": "Filter and group",
+  "shell.sidebar.view.trigger_count": "Filter and group ({count} changed)",
+  "shell.sidebar.view.folders": "Folders",
+  "shell.sidebar.view.all_folders": "All folders",
+  "shell.sidebar.view.all": "All",
+  "shell.sidebar.view.agent": "Agent",
+  "shell.sidebar.view.all_agents": "All",
+  "shell.sidebar.view.group": "Group",
+  "shell.sidebar.view.group_none": "No grouping",
+  "shell.sidebar.view.group_folder": "By folder",
+  "shell.sidebar.view.group_status": "By status",
+  "shell.sidebar.view.group_agent": "By agent",
+  "shell.sidebar.view.default": "default",
+  "shell.sidebar.view.density": "Density",
+  "shell.sidebar.view.density_comfortable": "Comfortable",
+  "shell.sidebar.view.density_compact": "Compact",
+  "shell.sidebar.view.scope_by_folder": "by folder",
+  "shell.sidebar.view.scope_by_status": "by status",
+  "shell.sidebar.view.scope_by_agent": "by agent",
+  "shell.sidebar.view.section_needs_you": "Need you",
+  "shell.sidebar.view.section_active": "Tasks",
+  "shell.sidebar.view.status_approving": "Waiting for your approval",
+  "shell.sidebar.view.status_asked": "Asked you",
+  "shell.sidebar.view.status_working": "Working",
+  "shell.sidebar.view.status_failed": "Failed",
+  "shell.sidebar.view.status_unseen": "Unseen",
+  "shell.sidebar.view.status_idle": "Idle",
+  "shell.sidebar.view.status_finished": "Finished",
+  "shell.sidebar.view.no_folder": "No folder",
+  "shell.sidebar.view.no_agent": "No agent",
+  "shell.agent_dock.title": "Agents",
+  "shell.agent_dock.see_all": "See all",
+  "shell.agent_dock.see_tasks": "See their tasks",
+  "shell.agent_dock.pick_folder": "Talk to {name} in…",
+  "shell.agent_dock.more": { one: "{count} more agent", other: "{count} more agents" },
+  "projects.sessions.pinned": "Pinned",
+  "projects.sessions.agent_asleep": "Asleep",
+  "projects.sessions.agent_awake": "Awake",
+  "projects.sessions.agent_awake_since": "Awake · {minutes} min",
+  "projects.sessions.agent_working": { one: "Working · {count} task", other: "Working · {count} tasks" },
+  "projects.sessions.agent_working_alone": "Working",
+  "shell.machines.label": "Run on",
+  "shell.machines.task_off": "Runs on {name}, which is off: it starts when you act on this task.",
+  "shell.machines.asleep_notice": "{name} is off: it starts when you send a message.",
+  "shell.machines.waking": "Starting {name}…",
+  "web.computers.state.online": "On",
+  "web.computers.state.offline": "Off",
+  "web.computers.state.starting": "Starting",
+};
+
+export const WORDS: Record<"es" | "en", Record<WordKey, Word>> = { es, en };
+
+/** La frase de `key` en `lang`, con `{name}` sustituidos; `count` elige singular o plural. */
+export function word(lang: "es" | "en", key: WordKey, vars: Record<string, string | number> = {}): string {
+  const entry = WORDS[lang][key];
+  const text = typeof entry === "string" ? entry : vars.count === 1 ? entry.one : entry.other;
+  return text.replace(/\{(\w+)\}/g, (_, name: string) => String(vars[name] ?? ""));
+}

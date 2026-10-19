@@ -43,15 +43,5 @@ export function authorKeys(rows: AuthorRow[], groupByHandler = false): string[] 
   );
 }
 
-/**
- * Si la barra esconde una tarea para mostrarla bajo su lanzador. Solo cuenta un
- * lanzador de la misma lista: el de otra carpeta no la muestra en esta.
- */
-export function shownUnderLauncher(
-  session: AuthorRow & { launcher_available?: boolean },
-  rows: readonly { id: string }[],
-): boolean {
-  const launcher = session.parent ?? session.launched_by;
-  return !!launcher && session.launcher_available !== false
-    && rows.some((row) => row.id === launcher);
-}
+// Si la lista esconde una tarea bajo su lanzador: la misma regla en el teléfono (`@terminus/tasks`).
+export { shownUnderLauncher } from "@terminus/tasks";

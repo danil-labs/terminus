@@ -113,8 +113,10 @@ apps/desktop/             the window (this is what the installers ship)
   scripts/                guards, tests and dev tooling (pnpm verify)
   npx/                    the npx installer
 apps/mobile/              the iOS and Android app (Expo) and its dev bridge
-packages/design           task states, marks, words and theme colors both apps share
-packages/protocol         the contract between the bridge and its remote clients
+packages/design           task states, marks, words, folder colors and theme colors both apps share
+packages/tasks            the task list both apps derive: flat list, filter, two-line card, agents dock
+packages/computers        Danil Computers client: control-plane API, relay session, wake rules
+packages/protocol         the commands the mobile app may send to a machine, and their answers
 ```
 
 `pnpm <script>` at the root runs the desktop's script (`apps/desktop/package.json`).

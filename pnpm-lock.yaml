@@ -79,6 +79,9 @@ importers:
       '@terminus/design':
         specifier: workspace:*
         version: link:../../packages/design
+      '@terminus/tasks':
+        specifier: workspace:*
+        version: link:../../packages/tasks
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -165,9 +168,13 @@ importers:
         specifier: ^2.11.14
         version: 2.11.14(solid-js@1.9.17)(vite@6.4.4(@types/node@26.4.0)(jiti@2.7.0)(lightningcss@1.32.0))
 
+  packages/computers: {}
+
   packages/design: {}
 
   packages/protocol: {}
+
+  packages/tasks: {}
 
 packages:
 
