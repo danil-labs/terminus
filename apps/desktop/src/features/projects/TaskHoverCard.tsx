@@ -13,6 +13,7 @@ import { t } from "../../lib/i18n";
 import type { AgentModels, AgentProfile, HandlerStatus } from "../../lib/model";
 import { nombreDeModelo } from "../../lib/models";
 import { MarcaAgente } from "../../ui/icons";
+import { machineName } from "../machines/store";
 import { AstroAvatar } from "./AstroAvatar";
 import { workLabel } from "./branchLabel";
 import { displayName } from "./profiles";
@@ -118,6 +119,19 @@ export function TaskHoverCard(props: TaskHoverCardProps) {
               size={14}
             />
             <span class="truncate">{displayName(agente(), props.agentProfile)}</span>
+          </Fila>
+        )}
+      </Show>
+      {/* Solo con más de una máquina: la fila trae `machine` cuando hay varias, como su chip. */}
+      <Show when={props.task.machine}>
+        {(machine) => (
+          <Fila label={t("projects.hover_card.machine")}>
+            <span
+              data-hover-machine={machine()}
+              class={`inline-block size-1.5 shrink-0 rounded-full ${props.task.machine_on === false ? "bg-neutral-300" : "bg-success"}`}
+              aria-label={props.task.machine_on === false ? t("shell.machines.off") : t("shell.machines.on")}
+            />
+            <span class="truncate">{machineName(machine())}</span>
           </Fila>
         )}
       </Show>

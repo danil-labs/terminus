@@ -76,6 +76,9 @@ importers:
       '@tauri-apps/plugin-updater':
         specifier: ^2.10.1
         version: 2.10.1
+      '@terminus/computers':
+        specifier: workspace:*
+        version: link:../../packages/computers
       '@terminus/design':
         specifier: workspace:*
         version: link:../../packages/design

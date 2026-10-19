@@ -7,6 +7,9 @@
  * Workspaces of different computers that are the same (same provider and
  * remote, or else the same name) show as one; its projects and tasks come
  * from each machine, each row marked with its machine.
+ *
+ * `home` (the desktop's own engine) keeps its raw ids and leads every
+ * workspace it has: what its window already shows never changes name.
  */
 
 /** `outdated`: its engine speaks another contract, known before asking it anything. */
@@ -67,8 +70,14 @@ export class Fleet {
   private outdated = new Set<string>();
 
   /** `on`: whether a machine answers now; rows from one that does not are marked off. */
-  constructor(machines: MachineInfo[], private readonly on: (machine: string) => boolean = () => true) {
-    this.machines = ordered(machines);
+  constructor(
+    machines: MachineInfo[],
+    private readonly on: (machine: string) => boolean = () => true,
+    readonly home: string | null = null,
+  ) {
+    const rest = ordered(machines.filter((m) => m.id !== home));
+    const own = machines.find((m) => m.id === home);
+    this.machines = own ? [own, ...rest] : rest;
     this.multi = this.machines.length > 1;
     for (const m of machines) if (m.outdated) this.outdated.add(m.id);
   }
@@ -95,13 +104,18 @@ export class Fleet {
   }
 
   wrap(machine: string, id: string): string {
-    return this.multi && id ? `${machine}${SEP}${id}` : id;
+    return this.multi && id && machine !== this.home ? `${machine}${SEP}${id}` : id;
   }
 
   unwrap(value: string): { machine: string; id: string } | null {
     if (!this.multi) return null;
-    const m = this.machines.find((x) => value.startsWith(`${x.id}${SEP}`));
+    const m = this.machines.find((x) => x.id !== this.home && value.startsWith(`${x.id}${SEP}`));
     return m ? { machine: m.id, id: value.slice(m.id.length + SEP.length) } : null;
+  }
+
+  /** The machine a workspace id outside every group belongs to: the one in its prefix, else `home`. */
+  private ownerOf(workspace: string): { machine: string; id: string } | null {
+    return this.unwrap(workspace) ?? (this.home ? { machine: this.home, id: workspace } : null);
   }
 
   private group(id: string | null | undefined): Group | undefined {
@@ -112,7 +126,7 @@ export class Fleet {
   membersOf(workspace: string | null): string[] {
     const g = this.group(workspace);
     if (!g) {
-      const own = workspace ? this.unwrap(workspace) : null;
+      const own = workspace ? this.ownerOf(workspace) : null;
       return own ? [own.machine] : this.multi ? [] : this.usable();
     }
     return this.usable().filter((m) => g.members.has(m));
@@ -123,7 +137,7 @@ export class Fleet {
     if (!this.multi) return workspace;
     const g = this.group(workspace);
     if (g?.members.has(machine)) return g.members.get(machine) ?? null;
-    const own = workspace ? this.unwrap(workspace) : null;
+    const own = workspace ? this.ownerOf(workspace) : null;
     if (own?.machine === machine) return own.id;
     return this.seen.get(machine)?.[0] ?? null;
   }
@@ -135,17 +149,21 @@ export class Fleet {
   }
 
   /** The args as `machine` understands them; `machines` collects every machine an id in them names. */
-  private decode(value: unknown, target: string | null, machines: Set<string>): unknown {
+  private decode(value: unknown, target: string | null, machines: Set<string>, key: string | null = null): unknown {
     if (typeof value === "string") {
       const g = this.group(value);
       if (g) return target ? (g.members.get(target) ?? value) : value;
       const own = this.unwrap(value);
-      if (!own) return value;
+      if (!own) {
+        // A bare id of a workspace, folder or task is the home machine's: only its ids go unprefixed.
+        if (this.home && this.multi && value && key && KEYS.has(key)) machines.add(this.home);
+        return value;
+      }
       machines.add(own.machine);
       return own.id;
     }
-    if (Array.isArray(value)) return value.map((v) => this.decode(v, target, machines));
-    if (isRow(value)) return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, this.decode(v, target, machines)]));
+    if (Array.isArray(value)) return value.map((v) => this.decode(v, target, machines, key));
+    if (isRow(value)) return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, this.decode(v, target, machines, k)]));
     return value;
   }
 
@@ -159,7 +177,7 @@ export class Fleet {
     const named = new Set<string>();
     this.decode(args, null, named);
     const g = this.group(workspace);
-    const own = !g && workspace ? this.unwrap(workspace) : null;
+    const own = !g && workspace ? this.ownerOf(workspace) : null;
     if (own) named.add(own.machine);
     if (named.size > 1) throw new Error("cross_machine");
     let machine = [...named][0] ?? null;

@@ -372,5 +372,6 @@
     "one": "{count} task",
     "other": "{count} tasks"
   },
-  "projects.picker.no_tasks": "no tasks"
+  "projects.picker.no_tasks": "no tasks",
+  "projects.hover_card.machine": "Machine"
 }

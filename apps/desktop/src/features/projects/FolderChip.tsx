@@ -15,13 +15,16 @@ export function FolderSquare(props: { id: string; size?: number; class?: string 
   );
 }
 
-/** Cuadrado y nombre de la carpeta; sin nombre, el cuadrado lleva el nombre en el `title`. */
-export default function FolderChip(props: { id: string; name: string; bare?: boolean; class?: string }) {
+/**
+ * Cuadrado y nombre de la carpeta; sin nombre, el cuadrado lleva el nombre en el `title`.
+ * `untitled`: la fila ya saca su tarjeta flotante, y un `title` nativo saldría encima de ella.
+ */
+export default function FolderChip(props: { id: string; name: string; bare?: boolean; untitled?: boolean; class?: string }) {
   return (
     <span
       data-folder-chip={props.id}
       class={cn("inline-flex min-w-0 items-center gap-1 text-[0.6875rem] text-neutral-700", props.class)}
-      title={props.name}
+      title={props.untitled ? undefined : props.name}
     >
       <FolderSquare id={props.id} />
       <Show when={!props.bare}>

@@ -405,6 +405,7 @@ pub(super) fn desktop_command(name: &str) -> bool {
                 | "restart_app"
                 | "tray_notify"
                 | "machine_list"
+                | "account_relay_token"
                 | "service_filter"
                 | "load_history"
         )
@@ -1315,6 +1316,17 @@ pub(super) fn service_prepare_update() -> Result<(), Value> {
 #[tauri::command]
 pub(super) fn service_cancel_update() -> Result<(), Value> {
     Ok(())
+}
+
+/// El token de cliente de vida corta de la cuenta de Danil, con el que la ventana
+/// lista las otras computadoras de la persona y les abre una sesión del relay. La
+/// credencial de la máquina no sale del motor; uno sin `danil_client_token` lo rechaza.
+#[tauri::command(async)]
+pub(super) fn account_relay_token(app: tauri::AppHandle) -> Result<Value, Value> {
+    let state = app
+        .try_state::<Arc<State>>()
+        .ok_or_else(|| failure(&Error::new("app_unavailable")))?;
+    invoke(&state, "danil_client_token", json!({}))
 }
 
 /// Las máquinas de esta ventana y cuál está activa. Una remota inactiva cuenta

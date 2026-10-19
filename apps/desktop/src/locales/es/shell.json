@@ -287,5 +287,8 @@
   "shell.machines.here.cancelled": "Se canceló el inicio de sesión en Radiant.",
   "shell.machines.here.login_stopped": "El inicio de sesión en Radiant terminó sin completarse.",
   "shell.machines.here.dismiss": "Cerrar",
-  "shell.machines.here.logo": "logo"
+  "shell.machines.here.logo": "logo",
+  "shell.machines.now_on": "{name} se encendió",
+  "shell.machines.now_off": "{name} se apagó",
+  "shell.machines.local_only": "Esto se abre en la máquina de la tarea, no en esta."
 }

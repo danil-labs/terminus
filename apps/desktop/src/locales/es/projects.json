@@ -372,5 +372,6 @@
     "one": "{count} tarea",
     "other": "{count} tareas"
   },
-  "projects.picker.no_tasks": "sin tareas"
+  "projects.picker.no_tasks": "sin tareas",
+  "projects.hover_card.machine": "Máquina"
 }

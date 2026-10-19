@@ -13,6 +13,7 @@ import { activarBarrasAlDesplazar } from "../lib/scrollbars";
 import { aplicarVeloDePestanas } from "../lib/chat-background-store";
 import { aplicarLengua, elegirLengua, lenguasDisponibles, semillaDelAlta } from "../lib/i18n";
 import { cargarPaquetes } from "../locales/packs";
+import { capabilities } from "../lib/platform";
 import "../styles/global.css";
 
 /**
@@ -81,3 +82,7 @@ if (laQueTocaYaEstaDentro()) montar();
 // Si la lectura falla, se monta igual y en el respaldo: una ventana sin texto no
 // deja hacer nada, y una en español sí.
 else void lenguasDeDisco.catch(() => {}).then(montar);
+
+// Las otras computadoras de la cuenta de Danil, en un trozo aparte: sin sesión no instala nada.
+// La web trae su propio transporte (`web/main.tsx`).
+if (capabilities().nativeWindow) void import("../features/machines/account").then((m) => m.startAccountMachines());

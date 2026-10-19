@@ -526,6 +526,7 @@ const steps = [
   ["La página de aprobación y la compatibilidad de contrato hablan con el plano de control", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/danil-connect-web.test.ts")], root],
   ["Con el stream empujado los lotes llegan a los oyentes y el historial se pagina", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/push-stream.test.mjs")], root],
   ["Una tarea de una máquina apagada abre y se enciende al mandarle algo", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/machine-task.test.mjs")], root],
+  ["Con la cuenta de Danil el escritorio junta las tareas de todas sus computadoras", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/desktop-account-machines.test.mjs")], root],
   ["Sin el stream empujado la ventana sondea como siempre", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/push-fallback.test.mjs")], root],
   ["Abrir una tarea larga no cuesta más que su techo", process.execPath, [join(root, "tests/perf/open-task-cost.mjs")], root],
   ["Releer una tarea abierta no remonta su hilo", process.execPath, [join(root, "tests/perf/reread-thread.mjs")], root],
