@@ -129,8 +129,8 @@ test("a machine with another engine contract needs an update and never breaks th
 });
 
 test("AI accounts are grouped by provider and email with the machines they are signed in on", async () => {
-  const vmAccounts = { provider: "claude", env_var: "", shared_credential: null, secret_note: null, active: "a1", accounts: [account("a1", "ana@danil.ai"), account("a2", null, "Cuenta 2")] };
-  const macAccounts = { provider: "claude", env_var: "", shared_credential: null, secret_note: null, active: "m1", accounts: [account("m1", "Ana@Danil.ai")] };
+  const vmAccounts = { provider: "claude", env_var: "", shared_credential: null, secret_note: null, active: "a1", accounts: [account("a1", "ana@example.com"), account("a2", null, "Cuenta 2")] };
+  const macAccounts = { provider: "claude", env_var: "", shared_credential: null, secret_note: null, active: "m1", accounts: [account("m1", "Ana@Example.com")] };
   const { app, invoke, calls } = await open("web-machines-accounts", [VM, MAC], {
     cmp_vm: { table: table("Panel", "Tarea de la VM", { list_accounts: vmAccounts }) },
     cmp_mac: { table: table("Notas", "Tarea del Mac", { list_accounts: macAccounts }) },
