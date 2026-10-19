@@ -9,14 +9,16 @@
  * - cada token con fuente en `CSS_SOURCE` contra `src/styles/global.css`, en el
  *   orden de bloques de `CSS_THEME_BLOCKS`;
  * - cada frase de `STATUS_LABELS` contra `projects.status.*` de los catálogos;
- * - cada ícono de `STATUS_ICONS` contra el que importa `TaskStatus.tsx`.
+ * - cada ícono de `STATUS_ICONS` contra el que importa `TaskStatus.tsx`;
+ * - cada palabra de `WORDS` (lista de tareas, dock, máquinas) contra la misma
+ *   clave en los catálogos de su lengua.
  */
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const { CSS_SOURCE, CSS_THEME_BLOCKS, STATUS_ICONS, STATUS_LABELS, THEMES } = await import(
+const { CSS_SOURCE, CSS_THEME_BLOCKS, STATUS_ICONS, STATUS_LABELS, THEMES, WORDS } = await import(
   join(ROOT, "..", "..", "packages/design/src/index.ts")
 );
 
@@ -88,6 +90,17 @@ for (const lang of Object.keys(STATUS_LABELS)) {
   }
 }
 
+// Las palabras de la lista de tareas, el dock y las máquinas, contra cualquier catálogo de su lengua.
+for (const lang of Object.keys(WORDS)) {
+  const dir = join(ROOT, `src/locales/${lang}`);
+  const catalog = Object.assign({}, ...readdirSync(dir).filter((f) => f.endsWith(".json")).map((f) => JSON.parse(readFileSync(join(dir, f), "utf8"))));
+  for (const [key, text] of Object.entries(WORDS[lang])) {
+    if (JSON.stringify(catalog[key]) !== JSON.stringify(text)) {
+      failures.push(`${lang}: WORDS["${key}"] es ${JSON.stringify(text)}; el catálogo dice ${JSON.stringify(catalog[key])}`);
+    }
+  }
+}
+
 // lucide-solid conserva los nombres viejos como alias de los renombrados.
 const ALIASES = { "circle-help": "circle-question-mark", "shield-question": "shield-question-mark" };
 const status = readFileSync(join(ROOT, "src/features/projects/TaskStatus.tsx"), "utf8");
@@ -107,4 +120,4 @@ if (failures.length) {
   console.error(`packages/design se apartó del escritorio:\n  ${failures.join("\n  ")}`);
   process.exit(1);
 }
-console.log("packages/design coincide con global.css, los catálogos y TaskStatus.tsx.");
+console.log("packages/design coincide con global.css, los catálogos (estados y palabras) y TaskStatus.tsx.");

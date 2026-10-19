@@ -2,9 +2,11 @@ import type { NotificationResponse } from "expo-notifications";
 import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { ConnectionProvider } from "../lib/connection";
+import * as WebBrowser from "expo-web-browser";
+import { AccountProvider } from "../lib/account";
+import { MachinesProvider } from "../lib/machines";
 import { Notifications } from "../lib/notifications";
-import { t } from "../lib/i18n";
+import { t, w } from "../lib/i18n";
 import { WorkspacesProvider } from "../lib/workspaces";
 import { useTheme } from "../ui/theme";
 
@@ -17,12 +19,18 @@ Notifications?.setNotificationHandler({
   }),
 });
 
-type Target = { workspace?: string; folder?: string | null; task?: string };
+// Cierra la ventana del navegador del inicio de sesión si vuelve aquí (solo hace algo en web).
+WebBrowser.maybeCompleteAuthSession();
+
+type Target = { host?: string; workspace?: string; folder?: string | null; task?: string };
 
 function openTarget(response: NotificationResponse | null) {
   const target = response?.notification.request.content.data as Target | undefined;
-  if (!target?.workspace || !target.folder || !target.task) return;
-  router.push({ pathname: "/task/[workspace]/[folder]/[id]", params: { workspace: target.workspace, folder: target.folder, id: target.task } });
+  if (!target?.host || !target.workspace || !target.task) return;
+  router.push({
+    pathname: "/task/[host]/[workspace]/[folder]/[id]",
+    params: { host: target.host, workspace: target.workspace, folder: target.folder || "_", id: target.task },
+  });
 }
 
 export default function RootLayout() {
@@ -37,7 +45,8 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <ConnectionProvider>
+    <AccountProvider>
+    <MachinesProvider>
       <WorkspacesProvider>
         <StatusBar style="auto" />
         <Stack
@@ -53,8 +62,19 @@ export default function RootLayout() {
             name="workspaces"
             options={{ presentation: "formSheet", sheetAllowedDetents: [0.6, 0.95], sheetGrabberVisible: true, title: t("workspaces.title") }}
           />
+          <Stack.Screen
+            name="filter"
+            options={{ presentation: "formSheet", sheetAllowedDetents: [0.6, 0.95], sheetGrabberVisible: true, title: w("shell.sidebar.view.trigger") }}
+          />
+          <Stack.Screen
+            name="agents"
+            options={{ presentation: "formSheet", sheetAllowedDetents: [0.5, 0.95], sheetGrabberVisible: true, title: w("shell.agent_dock.title") }}
+          />
+          <Stack.Screen name="signin" options={{ headerShown: false }} />
+          <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
         </Stack>
       </WorkspacesProvider>
-    </ConnectionProvider>
+    </MachinesProvider>
+    </AccountProvider>
   );
 }

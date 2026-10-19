@@ -1,15 +1,18 @@
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { BridgeError, status } from "../lib/bridge";
-import { useConnection } from "../lib/connection";
+import { HostError, bridgeStatus } from "../lib/hosts";
+import { useMachines } from "../lib/machines";
 import { t } from "../lib/i18n";
 import { useTheme } from "../ui/theme";
 
-/** Also opened by `terminus-mobile://pair?url=…&token=…`, the link the bridge prints. */
+/**
+ * El camino de desarrollo: un Terminus de la red local por el bridge. También
+ * se abre con `terminus-mobile://pair?url=…&token=…`, el enlace que imprime el bridge.
+ */
 export default function Pair() {
   const theme = useTheme();
-  const { pair } = useConnection();
+  const { pair } = useMachines();
   const params = useLocalSearchParams<{ url?: string; token?: string }>();
   const [url, setUrl] = useState("");
   const [token, setToken] = useState("");
@@ -20,12 +23,12 @@ export default function Pair() {
     setBusy(true);
     setMessage(null);
     try {
-      const answer = await status(pairing);
+      const answer = await bridgeStatus(pairing);
       await pair(pairing);
       setMessage(t("pair.connected", { version: answer.engine.version }));
       router.replace("/");
     } catch (error) {
-      setMessage(t("pair.failed", { detail: error instanceof BridgeError ? error.message : String(error) }));
+      setMessage(t("pair.failed", { detail: error instanceof HostError ? error.message : String(error) }));
     } finally {
       setBusy(false);
     }

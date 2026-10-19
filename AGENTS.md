@@ -8,8 +8,10 @@ which is not here.
 |---|---|---|
 | `apps/desktop/` | The window: Tauri 2 (Rust) with a SolidJS front. The installers ship it. | [apps/desktop/AGENTS.md](apps/desktop/AGENTS.md) |
 | `apps/mobile/` | The iOS and Android app (Expo) and its development bridge. | [apps/mobile/AGENTS.md](apps/mobile/AGENTS.md) |
-| `packages/design` | Task states, marks, status words and theme colors both apps use. | — |
-| `packages/protocol` | Types and allowed commands between the bridge and its clients. | — |
+| `packages/design` | Task states, marks, status and list words, folder colors and theme colors both apps use. | — |
+| `packages/tasks` | The task list both apps derive: flat list, filter and grouping, two-line card, agents dock. | — |
+| `packages/computers` | Danil Computers from any client: control-plane API, relay session (WebSocket injected) and wake rules. | — |
+| `packages/protocol` | The closed list of commands the mobile app sends to a machine (relay or bridge) and their answers. | — |
 
 Read the guide of the area before editing it.
 

@@ -43,6 +43,7 @@ import { canFinishTask, effectiveTaskGit, type GitStatus, sharesTaskGit, watchSe
 import { authorKey, authorKeys, shownUnderLauncher } from "./taskAuthors";
 import { descendientes, type Rama as RamaDeTareas, taskTree } from "./taskTree";
 import { type TaskActivity, taskPriority } from "@terminus/design";
+import { taskCard } from "@terminus/tasks";
 
 export function readableSessionTitle(title: string): string {
   if (!title.startsWith("/root/")) return title;
@@ -521,8 +522,10 @@ export default function Sessions(props: {
    * carpeta, cara del agente y PR. Lo demás vive en la tarjeta flotante.
    */
   const FilaDelRiel = (r: { s: SessionRow; actividad: TaskActivity; titulo: JSX.Element }) => {
+    // Qué lleva la línea 2 lo decide la tarjeta compartida con el teléfono (`@terminus/tasks`).
+    const tarjeta = () => taskCard(r.s, { live: props.vivas, approving: props.aprobando, hideFolder: props.hideFolder });
     const estado = () => taskPriority(r.actividad);
-    const teNecesita = () => estado() === "approving" || estado() === "asked" || estado() === "failed";
+    const teNecesita = () => tarjeta().needsYou;
     const pull = () => hoverCardPull(gitDe(r.s));
     // Rojo si el CI falló; si no, el color del estado del PR, como su icono.
     const colorDelPr = () => pull()?.checks === "failure" && !gitDe(r.s).stale ? "text-error-strong"
@@ -568,7 +571,7 @@ export default function Sessions(props: {
                     {(nombre) => <FolderChip id={projectOf(r.s)} name={nombre()} class="max-w-[108px] shrink-0" />}
                   </Show>
                   <WorktreeFaltante />
-                  <Show when={r.s.agent && !r.s.chat_de_agente ? r.s.agent : null}>
+                  <Show when={tarjeta().agent}>
                     {(agente) => (
                       <TooltipRoot openDelay={RETARDO_TOOLTIP} placement="top" gutter={4}>
                         <TooltipTrigger as="span" data-session-agent class="flex shrink-0" aria-label={nombreDelAgente()}>
@@ -585,8 +588,8 @@ export default function Sessions(props: {
                     )}
                   </Show>
                   {/* En qué máquina corre, si no es esta. */}
-                  <Show when={r.s.machine}>
-                    {(machine) => <MachineChip machine={machine()} on={r.s.machine_on !== false} class="max-w-[96px]" />}
+                  <Show when={tarjeta().machine}>
+                    {(machine) => <MachineChip machine={machine().id} on={machine().on} class="max-w-[96px]" />}
                   </Show>
                   <ChipDeGit />
                 </>

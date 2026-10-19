@@ -1,6 +1,7 @@
 import { Redirect } from "expo-router";
 import { NativeTabs } from "expo-router/native-tabs";
-import { useConnection } from "../../lib/connection";
+import { useAccount } from "../../lib/account";
+import { useMachines } from "../../lib/machines";
 import { t } from "../../lib/i18n";
 import { useTheme } from "../../ui/theme";
 
@@ -12,10 +13,15 @@ const NEEDS_YOU = new Set(["approving", "asked", "failed"]);
  */
 export default function TabsLayout() {
   const theme = useTheme();
-  const { ready, pairing, attention } = useConnection();
+  const { session } = useAccount();
+  const { ready, pairing, attention } = useMachines();
   if (!ready) return null;
-  if (!pairing) return <Redirect href="/pair" />;
-  const pending = attention.flatMap((w) => w.tasks).filter((task) => NEEDS_YOU.has(task.state)).length;
+  // Sin cuenta de Danil solo se entra por el bridge de desarrollo.
+  if (!session && !pairing) return <Redirect href="/signin" />;
+  const pending = Object.values(attention)
+    .flat()
+    .flatMap((w) => w.tasks)
+    .filter((task) => NEEDS_YOU.has(task.state)).length;
   return (
     <NativeTabs tintColor={theme.primary} minimizeBehavior="onScrollDown">
       <NativeTabs.Trigger name="index">

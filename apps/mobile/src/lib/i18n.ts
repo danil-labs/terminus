@@ -1,6 +1,29 @@
+import { type WordKey, word } from "@terminus/design";
 import { getLocales } from "expo-localization";
 
 const es = {
+  "signin.title": "Entra con tu cuenta de Danil",
+  "signin.hint": "Aquí ves y diriges tus tareas en tus máquinas: tu VM de Danil y cualquier Mac o servidor conectado a tu cuenta.",
+  "signin.email": "Correo",
+  "signin.password": "Contraseña",
+  "signin.submit": "Entrar",
+  "signin.google": "Continuar con Google",
+  "signin.microsoft": "Continuar con Microsoft",
+  "signin.failed": "No se pudo entrar: {detail}",
+  "signin.dev_bridge": "Conectar a un Terminus en mi red (desarrollo)",
+  "account.title": "Cuenta",
+  "account.sign_out": "Cerrar sesión",
+  "machines.title": "Máquinas",
+  "machines.managed": "Tu VM de Danil",
+  "machines.own": "Conectada a tu cuenta",
+  "machines.network": "Terminus en mi red",
+  "machines.chip_off": "{name} · apagada",
+  "machines.cached": "{name} está apagada: esto es lo último que guardó, de las {time}.",
+  "machines.start_failed": "No se pudo encender {name}. Prueba otra vez en un momento.",
+  "machines.pick": "Máquina",
+  "new.no_provider": "Esta máquina no tiene ningún proveedor listo (Codex, Claude…): configúralo desde Terminus.",
+  "new.no_workspace": "Elige una máquina con este workspace.",
+  "dock.long_press": "Mantén pulsado para ver sus tareas",
   "tabs.tasks": "Tareas",
   "tabs.new": "Nueva",
   "new.title": "Nueva tarea",
@@ -66,6 +89,28 @@ const es = {
 type Key = keyof typeof es;
 
 const en: Record<Key, string> = {
+  "signin.title": "Sign in with your Danil account",
+  "signin.hint": "See and steer your tasks on your machines here: your Danil VM and any Mac or server connected to your account.",
+  "signin.email": "Email",
+  "signin.password": "Password",
+  "signin.submit": "Sign in",
+  "signin.google": "Continue with Google",
+  "signin.microsoft": "Continue with Microsoft",
+  "signin.failed": "Could not sign in: {detail}",
+  "signin.dev_bridge": "Connect to a Terminus on my network (development)",
+  "account.title": "Account",
+  "account.sign_out": "Sign out",
+  "machines.title": "Machines",
+  "machines.managed": "Your Danil VM",
+  "machines.own": "Connected to your account",
+  "machines.network": "Terminus on my network",
+  "machines.chip_off": "{name} · off",
+  "machines.cached": "{name} is off: this is the last copy it saved, from {time}.",
+  "machines.start_failed": "Could not start {name}. Try again in a moment.",
+  "machines.pick": "Machine",
+  "new.no_provider": "This machine has no provider ready (Codex, Claude…): set one up from Terminus.",
+  "new.no_workspace": "Pick a machine that has this workspace.",
+  "dock.long_press": "Long press to see their tasks",
   "tabs.tasks": "Tasks",
   "tabs.new": "New",
   "new.title": "New task",
@@ -135,4 +180,9 @@ const catalog: Record<Key, string> = lang === "es" ? es : en;
 
 export function t(key: Key, vars: Record<string, string | number> = {}): string {
   return catalog[key].replace(/\{(\w+)\}/g, (_, name: string) => String(vars[name] ?? ""));
+}
+
+/** Las palabras que comparte con el escritorio (`WORDS` de `@terminus/design`), con su misma clave. */
+export function w(key: WordKey, vars: Record<string, string | number> = {}): string {
+  return word(lang, key, vars);
 }

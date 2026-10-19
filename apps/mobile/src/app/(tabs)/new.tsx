@@ -2,54 +2,76 @@ import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { BridgeError } from "../../lib/bridge";
-import { useConnection } from "../../lib/connection";
-import { t } from "../../lib/i18n";
-import { startTask } from "../../lib/start";
-import { lastAgent, spaceName, useWorkspaces } from "../../lib/workspaces";
+import { createTask, defaultsFor } from "../../lib/engine";
+import { HostError } from "../../lib/hosts";
+import { t, w } from "../../lib/i18n";
+import { useMachines } from "../../lib/machines";
+import { spaceName, useWorkspaces } from "../../lib/workspaces";
 import { openTask } from "../../ui/components";
+import { FolderSquare } from "../../ui/TaskCard";
 import { useTheme } from "../../ui/theme";
 import { KeyboardScreen } from "../../ui/KeyboardScreen";
 
-/** "Nueva" of the tab bar, and the "+" of a folder: where, with whom, and what. */
+/**
+ * «Nueva» de la barra: en qué máquina, en qué carpeta, con quién y qué. La
+ * máquina por omisión es la última usada o la VM de Danil; una VM apagada se
+ * enciende al empezar, una máquina propia apagada no.
+ */
 export default function NewTask() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ folder?: string; handler?: string }>();
-  const { pairing } = useConnection();
-  const { current, snapshot, space } = useWorkspaces();
-  const folders = (snapshot?.folders ?? []).filter((f) => space?.folders.includes(f.id));
+  const params = useLocalSearchParams<{ folder?: string; agent?: string; host?: string }>();
+  const { preferred, rememberMachine, tick } = useMachines();
+  const { current, snapshot, space, hostsOfCurrent } = useWorkspaces();
+  const [hostId, setHostId] = useState<string | null>(null);
   const [folder, setFolder] = useState<string | null>(null);
-  const [handler, setHandler] = useState<string | null>(null);
+  const [agent, setAgent] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 
   useEffect(() => {
     if (params.folder) setFolder(params.folder);
-    setHandler(params.handler ?? null);
-  }, [params.folder, params.handler]);
+    if (params.host) setHostId(params.host);
+    setAgent(params.agent ?? null);
+  }, [params.folder, params.agent, params.host]);
 
+  const host = hostsOfCurrent.find((h) => h.id === hostId) ?? preferred(hostsOfCurrent);
+  const folders = (snapshot?.folders ?? []).filter((f) => (!space || space.folders.includes(f.key)) && f.host === host?.id);
   const target = folders.some((f) => f.id === folder) ? folder : (folders[0]?.id ?? null);
-  const agents = (snapshot?.handlers ?? []).filter((h) => target && h.folders.includes(target));
-  const tasks = snapshot?.tasks ?? [];
-  const defaults = lastAgent(handler ? tasks.filter((task) => task.agent === handler) : []) ?? lastAgent(tasks);
-  const ready = Boolean(pairing && current && target && defaults && message.trim()) && !busy;
+  // El id del workspace en esa máquina: cada motor tiene el suyo.
+  const workspace = host ? (current?.members.get(host.id) ?? null) : null;
+  const agents = (snapshot?.agents ?? []).filter((a) => a.places.some((p) => p.host === host?.id && p.folder === target));
+  const chosenAgent = agents.some((a) => a.name === agent) ? agent : null;
+  const act = host?.canAct();
+  const ready = Boolean(host && workspace && target && message.trim()) && act !== "asleep" && act !== "outdated" && !busy;
+  void tick;
 
   async function start() {
-    if (!pairing || !current || !target || !defaults) return;
+    if (!host || !workspace || !target) return;
     setBusy(true);
-    setNote(null);
+    setNote(act === "wakes" ? w("shell.machines.waking", { name: host.label }) : null);
     try {
-      const task = await startTask(
-        pairing,
-        { workspace: current.id, folder: target },
-        { message: message.trim(), space: space?.id, ...(handler ? { handler } : {}), ...defaults },
-      );
+      const defaults = await defaultsFor(host, workspace, snapshot?.tasks ?? [], chosenAgent);
+      const id = await createTask(host, workspace, {
+        folder: target,
+        prompt: message.trim(),
+        provider: defaults.provider,
+        model: defaults.model,
+        agent: chosenAgent,
+        // Los spaces son de la primera máquina: en otra, el id no significaría nada.
+        space: host.id === hostsOfCurrent[0]?.id ? (space?.id ?? null) : null,
+      });
+      rememberMachine(host.id);
       setMessage("");
-      openTask(current.id, target, task);
+      setNote(null);
+      openTask(host.id, workspace, target, id);
     } catch (error) {
-      setNote(t("task.error", { detail: error instanceof BridgeError ? error.message : String(error) }));
+      if (error instanceof HostError && error.code === "no_provider") setNote(t("new.no_provider"));
+      else if (error instanceof HostError && error.code === "machine_asleep") setNote(w("web.machines.off_action", { name: host.label }));
+      else if (error instanceof HostError && error.code === "machine_outdated") setNote(w("web.machines.outdated_action", { name: host.label }));
+      else if (error instanceof HostError && (error.code === "start_failed" || error.code === "start_timeout")) setNote(t("machines.start_failed", { name: host.label }));
+      else setNote(t("task.error", { detail: error instanceof Error ? error.message : String(error) }));
     } finally {
       setBusy(false);
     }
@@ -57,6 +79,8 @@ export default function NewTask() {
 
   const chip = (active: boolean) => [styles.chip, { borderColor: theme.border, backgroundColor: active ? theme.primary : theme.surface }];
   const chipText = (active: boolean) => ({ color: active ? theme.onPrimary : theme.text, fontWeight: active ? ("700" as const) : ("500" as const) });
+  const power = (h: typeof host) =>
+    !h ? "" : h.power() === "on" ? w("web.computers.state.online") : h.power() === "starting" ? w("web.computers.state.starting") : h.power() === "outdated" ? w("web.computers.state.outdated") : w("web.computers.state.offline");
 
   return (
     <KeyboardScreen style={{ backgroundColor: theme.bg }}>
@@ -67,10 +91,26 @@ export default function NewTask() {
           {space ? ` · ${spaceName(space, t("space.general"))}` : ""}
         </Text>
 
+        {hostsOfCurrent.length > 1 ? (
+          <>
+            <Text style={[styles.label, { color: theme.textMuted }]}>{w("web.machines.create_on")}</Text>
+            <View style={styles.chips}>
+              {hostsOfCurrent.map((h) => (
+                <Pressable key={h.id} testID={`machine-${h.id}`} style={chip(h.id === host?.id)} onPress={() => setHostId(h.id)}>
+                  <Text style={chipText(h.id === host?.id)}>{h.label}</Text>
+                  <Text style={[chipText(h.id === host?.id), { fontSize: 11, fontWeight: "400" }]}>{power(h)}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        ) : null}
+        {!host && current ? <Text style={{ color: theme.textMuted }}>{t("new.no_workspace")}</Text> : null}
+
         <Text style={[styles.label, { color: theme.textMuted }]}>{t("new.folder")}</Text>
         <View style={styles.chips}>
           {folders.map((f) => (
-            <Pressable key={f.id} testID={`folder-${f.id}`} style={chip(f.id === target)} onPress={() => setFolder(f.id)}>
+            <Pressable key={f.id} testID={`folder-${f.id}`} style={[chip(f.id === target), styles.folderChip]} onPress={() => setFolder(f.id)}>
+              <FolderSquare id={f.id} />
               <Text style={chipText(f.id === target)}>{f.name}</Text>
             </Pressable>
           ))}
@@ -80,12 +120,12 @@ export default function NewTask() {
           <>
             <Text style={[styles.label, { color: theme.textMuted }]}>{t("new.agent")}</Text>
             <View style={styles.chips}>
-              <Pressable style={chip(!handler)} onPress={() => setHandler(null)}>
-                <Text style={chipText(!handler)}>{t("new.no_agent")}</Text>
+              <Pressable style={chip(!chosenAgent)} onPress={() => setAgent(null)}>
+                <Text style={chipText(!chosenAgent)}>{t("new.no_agent")}</Text>
               </Pressable>
-              {agents.map((h) => (
-                <Pressable key={h.name} testID={`handler-${h.name}`} style={chip(handler === h.name)} onPress={() => setHandler(h.name)}>
-                  <Text style={chipText(handler === h.name)}>{h.name}</Text>
+              {agents.map((a) => (
+                <Pressable key={a.name} testID={`agent-${a.name}`} style={chip(chosenAgent === a.name)} onPress={() => setAgent(a.name)}>
+                  <Text style={chipText(chosenAgent === a.name)}>{a.name}</Text>
                 </Pressable>
               ))}
             </View>
@@ -101,7 +141,11 @@ export default function NewTask() {
           placeholderTextColor={theme.textMuted}
           multiline
         />
-        {!defaults ? <Text style={{ color: theme.textMuted }}>{t("space.no_agent")}</Text> : null}
+        {host && act === "asleep" ? <Text style={{ color: theme.textMuted }}>{w("web.machines.off_action", { name: host.label })}</Text> : null}
+        {host && act === "outdated" ? <Text style={{ color: theme.textMuted }}>{w("web.machines.outdated_action", { name: host.label })}</Text> : null}
+        {host && act === "wakes" && host.power() === "off" && !busy ? (
+          <Text style={{ color: theme.textMuted }}>{w("shell.machines.asleep_notice", { name: host.label })}</Text>
+        ) : null}
         {note ? <Text style={{ color: theme.textMuted }}>{note}</Text> : null}
         <Pressable testID="new-start" disabled={!ready} onPress={start} style={[styles.start, { backgroundColor: theme.primary, opacity: ready ? 1 : 0.5 }]}>
           <Text style={{ color: theme.onPrimary, fontWeight: "700", fontSize: 16 }}>{t("new.start")}</Text>
@@ -112,12 +156,12 @@ export default function NewTask() {
 }
 
 const styles = StyleSheet.create({
-  page: { flex: 1 },
   body: { paddingHorizontal: 16, gap: 8 },
   title: { fontSize: 28, fontWeight: "800" },
   label: { fontSize: 13, fontWeight: "700", textTransform: "uppercase", marginTop: 14 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7 },
+  folderChip: { flexDirection: "row", alignItems: "center", gap: 6 },
   input: { marginTop: 16, minHeight: 140, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, padding: 12, fontSize: 16, textAlignVertical: "top" },
   start: { marginTop: 8, borderRadius: 12, paddingVertical: 13, alignItems: "center" },
 });

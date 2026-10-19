@@ -2,8 +2,6 @@ import { router } from "expo-router";
 import { useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { TaskRow } from "../lib/bridge";
-import { TaskMark, type TaskState, stateText } from "./TaskStatus";
 import { t } from "../lib/i18n";
 import { useTheme } from "./theme";
 
@@ -74,32 +72,9 @@ export function Dot({ color }: { color: string }) {
   return <View style={[styles.dot, { backgroundColor: color }]} />;
 }
 
-/** One task, as a row of a channel, with the same mark as the desktop sidebar. */
-export function TaskItem({ task, state }: { task: TaskRow; state: TaskState | null }) {
-  const theme = useTheme();
-  return (
-    <Row
-      testID={`task-${task.id}`}
-      title={task.title}
-      bold={Boolean(state && state !== "working")}
-      left={<TaskMark state={state} delivered={task.outcome === "delivered"} />}
-      subtitle={
-        <View>
-          {state ? <Text style={{ color: theme.textMuted, fontSize: 13, fontWeight: "600" }}>{stateText(state)}</Text> : null}
-          {task.last_message ? (
-            <Text numberOfLines={2} style={{ color: theme.textMuted, fontSize: 13 }}>
-              {task.last_message}
-            </Text>
-          ) : null}
-        </View>
-      }
-      onPress={() => openTask(task.workspace, task.folder, task.id)}
-    />
-  );
-}
-
-export function openTask(workspace: string, folder: string, id: string) {
-  router.push({ pathname: "/task/[workspace]/[folder]/[id]", params: { workspace, folder, id } });
+/** Abre una tarea en la máquina que la corre. */
+export function openTask(host: string, workspace: string, folder: string, id: string) {
+  router.push({ pathname: "/task/[host]/[workspace]/[folder]/[id]", params: { host, workspace, folder: folder || "_", id } });
 }
 
 /** The box at the bottom of a channel or a conversation. */

@@ -1,30 +1,42 @@
-/** CLI-level commands a remote client may ask for: the Terminus CLI surface. */
-export const CLI_COMMANDS = [
-  "workspace list",
-  "folder list",
-  "space list",
-  "handler list",
-  "agent list",
-  "agent models",
-  "task list",
-  "task show",
-  "task read",
-  "task create",
-  "task send",
-  "task stop",
-  "operation show",
+/**
+ * Los comandos que la app móvil manda al motor de una máquina, por cualquiera
+ * de sus dos caminos: el relay de Danil Computers y el bridge de desarrollo.
+ * Son funciones de ventana (`service invoke`, `commands.json`), con los nombres
+ * del contrato renombrado (`agent` = agente con nombre, `provider` = Codex,
+ * Claude…). Es una lista cerrada: el bridge rechaza el resto con 403 y el
+ * cliente del relay ni lo envía (`command_not_allowed`). Un comando nuevo se
+ * agrega aquí a propósito, nunca un pase genérico al motor.
+ */
+export const APP_READS = [
+  "list_workspaces",
+  "list_projects",
+  "list_spaces",
+  "list_live_sessions",
+  "list_agents",
+  "list_agent_status",
+  "list_providers",
+  "load_session",
+  "pending_requests",
+  "list_active_turns",
+  "list_workspace_attention",
 ] as const;
 
-/** Window commands a person answers; the bridge sends them through `service invoke`. */
-export const INVOKE_COMMANDS = [
+export const APP_ACTIONS = [
+  "send_message",
+  "inject_message",
+  "stop_turn",
   "respond_permission",
   "answer_question",
   "mark_task_seen",
-  "list_workspace_attention",
-  "list_active_turns",
 ] as const;
 
-export type BridgeCommand = (typeof CLI_COMMANDS)[number] | (typeof INVOKE_COMMANDS)[number];
+export const APP_COMMANDS: readonly AppCommand[] = [...APP_READS, ...APP_ACTIONS];
 
-/** Attention states that become a notice when a task enters them. */
+export type AppCommand = (typeof APP_READS)[number] | (typeof APP_ACTIONS)[number];
+
+export function isAppCommand(command: string): command is AppCommand {
+  return (APP_COMMANDS as readonly string[]).includes(command);
+}
+
+/** Estados de atención que avisan cuando una tarea entra en ellos. */
 export const NEEDS_YOU = ["approving", "asked", "failed"] as const;
