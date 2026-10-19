@@ -150,9 +150,13 @@ const boot = (entorno, version, respuestas = RESPUESTAS, userAgent) =>
   mount(entorno, version, respuestas, userAgent);
 
 /** El riel agrupado por carpeta: es donde una carpeta tiene cabecera y se abre su vista. */
-const POR_CARPETA = { "harness.layout.sidebar.filtro": JSON.stringify({ group: "folder" }) };
-const bootPorCarpeta = (entorno, version, respuestas = RESPUESTAS) =>
-  mount(entorno, version, respuestas, undefined, POR_CARPETA);
+const POR_CARPETA = { "harness.layout.sidebar.view": JSON.stringify({ group: "folder" }) };
+const bootPorCarpeta = async (entorno, version, respuestas = RESPUESTAS) => {
+  const app = await mount(entorno, version, respuestas, undefined, POR_CARPETA);
+  // La cabecera de carpeta llega en su propio trozo: se espera a que pinte.
+  for (let i = 0; i < 80 && !app.w.document.querySelector("[data-folder-open]"); i++) await sleep(25);
+  return app;
+};
 /** Con «Asentadas» abierta: lo entregado y visto vive ahí. */
 const bootConAsentadas = (entorno, version, respuestas = RESPUESTAS) =>
   mount(entorno, version, respuestas, undefined, { "harness.layout.sidebar.asentadas.abiertas": "true" });
@@ -164,13 +168,14 @@ async function abrirAnadirProyecto(app) {
   await sleep(50);
   doc.querySelector('button[aria-label="Proyecto"]').click();
   await sleep(50);
-  [...doc.querySelectorAll("button")].find((b) => b.textContent.trim() === "Nuevo proyecto…").click();
+  [...doc.querySelectorAll("button")].find((b) => b.textContent.trim().startsWith("Añadir un proyecto…")).click();
   await sleep(50);
 }
 
 /** Abre la vista de la carpeta desde su cabecera y empieza a hablar con uno de sus agentes. */
 async function hablarDesdeLaCarpeta(app, carpeta, nombre) {
   const doc = app.w.document;
+  for (let i = 0; i < 80 && !doc.querySelector(`[data-folder-group="${carpeta}"] [data-folder-open]`); i++) await sleep(25);
   doc.querySelector(`[data-folder-group="${carpeta}"] [data-folder-open]`).click();
   await sleep(120);
   const agente = [...doc.querySelectorAll("li > button")].find((b) => b.querySelector(".astro-face") && b.textContent.trim().startsWith(nombre));
@@ -529,6 +534,22 @@ if (!roto) {
   assert.equal(bubbleDocument.querySelector('[data-sidebar-search] input[role="searchbox"]'), null, "Escape cierra el buscador");
   assert.ok(filasDelRiel().includes("s-task") && filasDelRiel().includes("s-plain"), "cerrar la búsqueda devuelve la lista entera");
 
+  // Los agentes están en el dock del pie: pulsar uno filtra la lista por él y
+  // lo dice la línea de alcance; pulsarlo otra vez quita el filtro.
+  const dock = () => bubbleDocument.querySelector('[role="group"][aria-label="Agentes"]');
+  for (let i = 0; i < 80 && !dock(); i++) await sleep(25);
+  const caraDe = (nombre) => [...(dock()?.querySelectorAll("button[aria-pressed]") ?? [])].find((b) => b.getAttribute("aria-label").startsWith(nombre));
+  assert.ok(caraDe("Holmes"), "el dock enseña a Holmes");
+  assert.match(caraDe("Holmes").getAttribute("aria-label"), /Despierto/, "su cara dice cómo está");
+  caraDe("Holmes").click();
+  await sleep(80);
+  assert.equal(caraDe("Holmes").getAttribute("aria-pressed"), "true");
+  assert.ok(filasDelRiel().includes("s-task") && !filasDelRiel().includes("s-plain"), "el dock filtra por el agente");
+  assert.match(bubbleDocument.querySelector("[data-sidebar-scope]").textContent, /Holmes/, "la línea de alcance dice el filtro");
+  caraDe("Holmes").click();
+  await sleep(80);
+  assert.ok(filasDelRiel().includes("s-plain"), "pulsarlo otra vez quita el filtro");
+
   bubbleDocument.querySelector('[data-sidebar-tasks] [data-sesion="s-chat"]').click();
   await sleep(300);
   const globos = () => [...bubbleDocument.querySelectorAll("[data-bubble]")];
@@ -661,7 +682,7 @@ if (!roto) {
   // El menú de `@` separa los del repositorio de los tuyos, no enseña a los
   // ocultos y marca al tuyo que el repositorio tapa sin dejar elegirlo.
   const holmes = bubbleResponses.list_agents.agents[0];
-  const mentionAgentsApp = await boot("listo", "agent-mentions", {
+  const mentionAgentsApp = await bootPorCarpeta("listo", "agent-mentions", {
     ...bubbleResponses,
     list_projects: [{ id: "p", name: "Proyecto", kind: "folder", working_directory: "/lab", sources: [] }],
     list_agents: { ...bubbleResponses.list_agents, agents: [
@@ -677,8 +698,7 @@ if (!roto) {
   });
   const mentionAgentsDoc = mentionAgentsApp.w.document;
   await sleep(80);
-  [...mentionAgentsDoc.querySelectorAll('[data-sidebar-agents] button')].find(button => button.textContent.trim() === "Holmes").click();
-  await sleep(100);
+  await hablarDesdeLaCarpeta(mentionAgentsApp, "p", "Holmes");
   const agentsField = mentionAgentsDoc.querySelector("textarea");
   agentsField.value = "@";
   agentsField.selectionStart = agentsField.selectionEnd = 1;
@@ -795,15 +815,16 @@ if (!roto) {
     "el rótulo antecede a la primera tarea creada");
   const delegatedToolbar = threadDoc.querySelector('[data-delegated-trigger="toolbar"]');
   assert.ok(delegatedToolbar, "la barra derecha permite consultar subtareas de una conversación existente");
-  const previewOfCoordinator = () => sidebarTask("topic").querySelector("[data-session-preview]");
+  // En el riel el estado va en su columna fija, delante del título.
+  const previewOfCoordinator = () => sidebarTask("topic").querySelector("[data-session-status]");
   threadApp.emit("chat", { kind: "started", session: "topic-work", workspace: "w" });
   await sleep(100);
   assert.equal(previewOfCoordinator().querySelectorAll('[aria-label="Está trabajando"]').length, 1,
     "el coordinador conserva un foco de actividad cuando solo trabaja su subtarea");
   threadApp.emit("chat", { kind: "started", session: "topic", workspace: "w" });
   await sleep(100);
-  assert.equal(previewOfCoordinator().querySelectorAll("[aria-label]").length, 2,
-    "el proveedor y un solo estado ocupan la vista previa, sin contador de subtareas");
+  assert.equal(previewOfCoordinator().querySelectorAll("[aria-label]").length, 1,
+    "un solo estado ocupa su columna, sin contador de subtareas");
   threadApp.emit("chat", { kind: "done", session: "topic", workspace: "w", ok: true });
   await sleep(200);
   assert.equal(previewOfCoordinator().querySelectorAll('[aria-label="Está trabajando"]').length, 1,
@@ -1167,8 +1188,9 @@ if (!roto) {
 
   const conTarea = await boot("listo", 2, CON_TAREA);
   const sessionPreview = conTarea.w.document.querySelector('[data-sesion="s1"] [data-session-preview]');
-  assert.ok(sessionPreview?.querySelector('svg'));
-  assert.match(sessionPreview.textContent, /La última respuesta de esta tarea/);
+  // Sin nada que pedirte, la segunda línea es carpeta, agente y PR: ni el mensaje ni el modelo.
+  assert.ok(sessionPreview, "la fila del riel tiene segunda línea");
+  assert.doesNotMatch(sessionPreview.textContent, /La última respuesta de esta tarea/);
   assert.doesNotMatch(sessionPreview.textContent, /gpt-5.6/);
 
   conTarea.w.document.querySelector('[data-sesion="s1"]')?.click();
@@ -1427,8 +1449,11 @@ if (!roto) {
   };
   const sidebar = await boot("listo", 4, sidebarResponses);
   const row = id => sidebar.w.document.querySelector(`[data-sesion="${id}"]`);
-  assert.match(row("p").textContent, /Tarea p.*feature\/parent.*#12/s);
-  assert.ok(row("p").querySelector('[data-session-git] svg.lucide-git-branch'));
+  // La fila del riel dice el PR; la rama y el resto van en su `title` y en la tarjeta flotante.
+  const gitDeFila = id => row(id)?.querySelector("[data-session-pr]")?.getAttribute("title") ?? "";
+  assert.match(row("p").textContent, /Tarea p.*#12/s);
+  assert.match(gitDeFila("p"), /feature\/parent.*#12/);
+  assert.ok(row("p").querySelector('[data-session-pr] svg.lucide-git-branch'));
   assert.equal(row("p").querySelector('[aria-label="Resultado entregado"]'), null,
     "el fallo delegado tiene prioridad sobre la entrega del coordinador en el indicador común");
   assert.equal(row("own"), null, "la delegación no llena el sidebar");
@@ -1449,7 +1474,7 @@ if (!roto) {
   // Compartir carpeta y rama con la tarea padre no dice nada propio: no se pinta nada.
   assert.equal(row("shared").querySelector("[data-session-git]"), null);
   assert.equal(row("native").querySelector("[data-session-git]"), null);
-  assert.match(row("own").textContent, /feature\/child.*#13/s);
+  assert.match(gitDeFila("own"), /feature\/child.*#13/);
   assert.ok(row("own").querySelector('.text-neutral-500 > svg.lucide-git-pull-request-draft'));
   assert.ok(row("own").querySelector('[aria-label="Fallo o interrupción"]'));
   assert.equal(row("local").querySelector("[data-session-git]"), null);
@@ -1472,14 +1497,14 @@ if (!roto) {
   sidebarResponses.list_live_sessions = sidebarResponses.list_live_sessions.map(s => ({ ...s, updated_at: 2 }));
   sidebar.emit("session", { project: "", session: "p", workspace: "w" });
   await sleep(350);
-  assert.match(row("p").textContent, /renamed/);
+  assert.match(gitDeFila("p"), /renamed/);
   assert.ok(row("p").querySelector('.text-brand-purple > svg.lucide-git-merge'));
   assert.doesNotMatch(row("p").textContent, /HEAD distinto/);
   assert.doesNotMatch(row("shared").textContent, /Sin PR|desconocido|obsoleta/);
   rejectGit = true;
   sidebar.w.dispatchEvent(new sidebar.w.Event("focus"));
   await sleep(100);
-  assert.match(row("p").textContent, /renamed.*#12/s);
+  assert.match(gitDeFila("p"), /renamed.*#12/);
   assert.doesNotMatch(row("p").textContent, /obsoleta|Integrado/);
   assert.equal(row("p").querySelector('svg.lucide-clock'), null);
   assert.match(row("p").innerHTML, /Último estado conocido/);
@@ -1572,13 +1597,13 @@ if (!roto) {
       assert.ok(surface.querySelector(`.${color} > svg.lucide-${icon}`), kn);
       assert.equal(surface.querySelector("svg.lucide-git-branch"), null);
     }
-    assert.match(row("p").textContent, /Cone/);
+    assert.match(gitDeFila("p"), /Cone/);
     assert.match(tab("p").title, label);
   }
   gitRows.p = gitRow(null, { kind: "kn", kn: "saved", alias: "gbsxhmdk" });
   sidebar.w.dispatchEvent(new sidebar.w.Event("focus"));
   await sleep(100);
-  assert.match(row("p").textContent, /gbsxhmdk/);
+  assert.match(gitDeFila("p"), /gbsxhmdk/);
   assert.doesNotMatch(row("p").textContent, /desconocido/);
   for (const [checks, review, visible, overrides] of [
     ["success", "approved", true, {}],
@@ -1624,7 +1649,7 @@ if (!roto) {
   sidebar.emit("question", { session: "p", workspace: "w", turno: "question-turn", preguntas: [{ id: "choose", question: "¿Qué opción?", options: [], free_text: true }] });
   await sleep(100);
   assert.match(tab("p").getAttribute("aria-label"), /Te preguntó algo/);
-  assert.ok(row("p").querySelector('[data-session-preview] [aria-label="Te preguntó algo"]'));
+  assert.ok(row("p").querySelector('[data-session-status] [aria-label="Te preguntó algo"]'));
   assert.ok(tab("p").querySelector("svg.lucide-git-merge"));
   assert.equal(tab("p").querySelector("svg.lucide-loader-circle"), null);
   assert.equal(tab("p").querySelector("svg.lucide-git-branch"), null);
@@ -1730,7 +1755,9 @@ if (!roto) {
   };
   const flat = await boot("listo", "5-flat", groupedResponses);
   assert.equal(flat.w.document.querySelector("[data-folder-group]"), null, "sin agrupar no hay filas de carpeta");
-  assert.equal(flat.w.document.querySelector('[data-sesion="p"] [data-folder-chip="folder"]')?.textContent, "Carpeta", "la carpeta va como dato de la fila");
+  // `p` te necesita: su segunda línea es lo que pide, con el color de la carpeta al final.
+  assert.ok(flat.w.document.querySelector('[data-sesion="p"] [data-session-request]'), "lo que te piden ocupa la segunda línea");
+  assert.ok(flat.w.document.querySelector('[data-sesion="p"] [data-folder-square="folder"]'), "la carpeta va como dato de la fila");
   assert.deepEqual(flat.fallos, []);
   flat.w.close();
   const grouped = await bootPorCarpeta("listo", 5, groupedResponses);
@@ -1883,7 +1910,7 @@ if (!roto) {
   assert.equal(taskEditor.value, "Borrador de tarea");
   assert.equal(taskEditor.selectionStart, 2);
   assert.equal(taskEditor.selectionEnd, 5);
-  assert.match(controlsDoc.querySelector('[data-sesion="recent"] [data-session-preview]').textContent, /El agente sigue trabajando/);
+  assert.ok(controlsDoc.querySelector('[data-sesion="recent"] [data-session-status] [aria-label="Está trabajando"]'), "la fila se actualiza sin recrear su editor");
   assert.deepEqual(taskRenames, [], "refrescar no guarda un nombre a medio escribir");
   taskEditor.dispatchEvent(new sidebarControls.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   assert.deepEqual(taskRenames, [], "Escape descarta el borrador aunque el agente esté trabajando");

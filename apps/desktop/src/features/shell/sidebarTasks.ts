@@ -1,4 +1,4 @@
-import { shownUnderLauncher } from "../projects/taskAuthors";
+import { shownUnderLauncher } from "../projects/taskAuthors.ts";
 
 /** Lo mínimo de una tarea para juntarla con las de las demás carpetas. */
 export type FlatRow = {

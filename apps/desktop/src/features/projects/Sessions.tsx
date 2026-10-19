@@ -3,7 +3,6 @@ import ChevronRight from "lucide-solid/icons/chevron-right";
 import MoreVertical from "lucide-solid/icons/more-vertical";
 import Pin from "lucide-solid/icons/pin";
 import PinOff from "lucide-solid/icons/pin-off";
-import GitPullRequest from "lucide-solid/icons/git-pull-request";
 import { createEffect, createMemo, createSignal, For, type JSX, mapArray, on, onCleanup, Show } from "solid-js";
 import { arrastrar, fueArrastre, tareaEnVuelo } from "../../lib/drag";
 import { enfocarYSeleccionar } from "../../lib/focus";
@@ -27,8 +26,8 @@ import {
 } from "../../ui/Popover";
 import { WithMentions } from "../chat/WithMentions";
 import FolderChip, { FolderSquare } from "./FolderChip";
-import SessionGit, { sessionGitDescription } from "./SessionGit";
-import { WithTaskHoverCard } from "./TaskHoverCard";
+import SessionGit, { gitAppearance, sessionGitDescription } from "./SessionGit";
+import { WithTaskHoverCard } from "./TaskHoverCardTrigger";
 import { hoverCardPull } from "./hoverCardPull";
 import { createTaskHistories } from "./taskHistories";
 import { AstroAvatar } from "./AstroAvatar";
@@ -516,11 +515,22 @@ export default function Sessions(props: {
     const estado = () => taskPriority(r.actividad);
     const teNecesita = () => estado() === "approving" || estado() === "asked" || estado() === "failed";
     const pull = () => hoverCardPull(gitDe(r.s));
-    const colorDelPr = () => pull()?.checks === "failure" ? "text-error-strong"
-      : pull()?.state === "open" ? "text-success-strong"
-      : pull()?.state === "merged" ? "text-brand-purple"
-      : pull()?.state === "closed" ? "text-error-strong"
-      : "text-neutral-500";
+    // Rojo si el CI falló; si no, el color del estado del PR, como su icono.
+    const colorDelPr = () => pull()?.checks === "failure" && !gitDe(r.s).stale ? "text-error-strong"
+      : gitDe(r.s).stale ? "text-neutral-500" : gitAppearance(gitDe(r.s)).color;
+    // La rama de quien comparte el árbol de su padre se dice en la fila del padre.
+    const propioDeOtra = () => !!gitDe(r.s).shared_with || sharesTaskGit(r.s, gitRows(), props.relatedSessions ?? props.sessions);
+    /** El PR, o el estado de una carpeta de conocimiento; la rama sola va a la tarjeta. */
+    const ChipDeGit = () => (
+      <Show when={(pull() || gitDe(r.s).kind === "kn") && !propioDeOtra()}>
+        <span data-session-pr class="inline-flex shrink-0 items-center gap-0.5" title={sessionGitDescription(gitDe(r.s))}>
+          <SessionGit status={gitDe(r.s)} compact />
+          <Show when={pull()}>
+            {(pr) => <span class={colorDelPr()}>#{pr().number}</span>}
+          </Show>
+        </span>
+      </Show>
+    );
     const nombreDelAgente = () => r.s.agent ? displayName(r.s.agent, profiles()[r.s.agent]) : "";
     return (
       <div class="grid min-w-0 grid-cols-[14px_minmax(0,1fr)] items-center gap-x-1.5">
@@ -558,17 +568,12 @@ export default function Sessions(props: {
                       </span>
                     )}
                   </Show>
-                  <Show when={pull()}>
-                    {(pr) => (
-                      <span data-session-pr class={cn("inline-flex shrink-0 items-center gap-0.5", colorDelPr())} title={sessionGitDescription(gitDe(r.s))}>
-                        <GitPullRequest size={11} aria-hidden="true" />#{pr().number}
-                      </span>
-                    )}
-                  </Show>
+                  <ChipDeGit />
                 </>
               }
             >
               <span data-session-request class="min-w-0 flex-1 truncate text-neutral-700">{r.s.last_message}</span>
+              <ChipDeGit />
               <span title={props.carpetaDe?.(r.s)} class="flex shrink-0"><FolderSquare id={projectOf(r.s)} /></span>
             </Show>
           </div>

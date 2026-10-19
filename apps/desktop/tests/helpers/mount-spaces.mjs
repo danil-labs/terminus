@@ -184,7 +184,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     assert.equal(u.pildora("i1").dataset.selected, "true");
     assert.equal(u.pildora("i1").querySelector("[data-attention-badge]"), null, "la elegida no lleva señal");
     assert.ok(u.doc.querySelector("[data-new-space]"), "el «+» sigue a las píldoras");
-    assert.deepEqual(u.carpetasEnTareas(), ["pa", "pb", "pc"], "las carpetas en el orden de hoy");
+    assert.deepEqual(u.carpetasEnTareas(), ["pa", "pb"], "las carpetas con tareas, en el orden de hoy: «pc» solo tiene una archivada");
     assert.equal(u.doc.querySelector("[data-main-folder]"), null, "ninguna carpeta es la principal");
     assert.deepEqual(u.pestanas(), ["Tarea t1", "Tarea t2"], "la tira de antes sigue abierta");
     assert.deepEqual(u.pref("pestanas.w")?.abiertas.map((p) => p.id), ["t1", "t2"], "la clave vieja se queda para un build anterior");
@@ -676,7 +676,8 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
         { id: "i1", name: null, folders: ["pa", "pc"], created_at: 1, updated_at: 1 },
         { id: "i2", name: "Facturación", folders: ["pb", "pc"], created_at: 2, updated_at: 2 },
       ],
-      filas: [fila("t3", "pb", "i2")],
+      // El riel solo enseña carpetas con tareas: cada una lleva la suya.
+      filas: [fila("t1", "pa", "i1"), fila("t2", "pc", "i1"), fila("t3", "pb", "i2"), fila("t4", "pc", "i2")],
     });
     const app = await boot("listo", "spaces-folders", base(s, { "space.w": "i1" }));
     await sleep(500);
@@ -692,7 +693,8 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
       [{ id: "i1", folders: ["pa"] }],
     );
     assert.equal(s.llamadas.some(([c]) => c === "delete_project"), false, "removing it does not delete the project");
-    assert.deepEqual(u.carpetasEnTareas(), ["pa"], "it leaves this space's rail");
+    // El riel lista tareas, no carpetas: la tarea de «pc» que es de este espacio sigue a la vista.
+    assert.ok(u.doc.querySelector('[data-sesion="t2"]'), "its task stays in this space's rail");
     u.doc.querySelector('[data-space="i2"]').click();
     await sleep(400);
     assert.deepEqual(u.carpetasEnTareas(), ["pb", "pc"], "and stays in the other one");

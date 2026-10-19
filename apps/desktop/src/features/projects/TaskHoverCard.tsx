@@ -6,14 +6,13 @@ import GitMerge from "lucide-solid/icons/git-merge";
 import GitPullRequest from "lucide-solid/icons/git-pull-request";
 import GitPullRequestClosed from "lucide-solid/icons/git-pull-request-closed";
 import GitPullRequestDraft from "lucide-solid/icons/git-pull-request-draft";
-import { createSignal, createUniqueId, type JSX, onCleanup, Show } from "solid-js";
+import { type JSX, Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { folderColor } from "../../lib/folderColor";
 import { t } from "../../lib/i18n";
 import type { AgentModels, AgentProfile, HandlerStatus } from "../../lib/model";
 import { nombreDeModelo } from "../../lib/models";
 import { MarcaAgente } from "../../ui/icons";
-import { Popover, PopoverContent } from "../../ui/Popover";
 import { AstroAvatar } from "./AstroAvatar";
 import { workLabel } from "./branchLabel";
 import { displayName } from "./profiles";
@@ -22,8 +21,6 @@ import EtapaDeTarea from "./TaskStage";
 import { type GitStatus } from "./taskGit";
 import { type HoverCardPull, hoverCardPull } from "./hoverCardPull";
 
-export const TASK_HOVER_CARD_DELAY = 400;
-const CLOSE_DELAY = 150;
 
 export type TaskHoverCardProps = {
   task: SessionRow;
@@ -173,117 +170,6 @@ export function TaskHoverCard(props: TaskHoverCardProps) {
           <button type="button" class={BOTON} onClick={() => props.onArchive()}>{t("projects.hover_card.archive")}</button>
         </Show>
       </div>
-    </div>
-  );
-}
-
-/**
- * Envuelve la fila de una tarea y saca su tarjeta a la derecha tras una pausa
- * del puntero o al llegar con el teclado. Solo escucha: no cancela ningún evento
- * de la fila, así que el clic, el menú y el arrastre siguen siendo suyos.
- */
-export function WithTaskHoverCard(props: TaskHoverCardProps & {
-  children: JSX.Element;
-  class?: string;
-  disabled?: boolean;
-}) {
-  let fila: HTMLDivElement | undefined;
-  let tarjeta: HTMLDivElement | undefined;
-  let abrir: ReturnType<typeof setTimeout> | undefined;
-  let cerrar: ReturnType<typeof setTimeout> | undefined;
-  let descrito: Element | null = null;
-  const id = createUniqueId();
-  const [open, setOpen] = createSignal(false);
-
-  const describir = (el: Element | null) => {
-    descrito?.removeAttribute("aria-describedby");
-    descrito = el;
-    descrito?.setAttribute("aria-describedby", id);
-  };
-  const ocultar = () => {
-    clearTimeout(abrir);
-    clearTimeout(cerrar);
-    describir(null);
-    setOpen(false);
-  };
-  const programar = (destino: Element | null) => {
-    if (props.disabled) return;
-    clearTimeout(cerrar);
-    if (open()) return;
-    clearTimeout(abrir);
-    abrir = setTimeout(() => {
-      describir(destino);
-      setOpen(true);
-    }, TASK_HOVER_CARD_DELAY);
-  };
-  const soltar = () => {
-    clearTimeout(abrir);
-    clearTimeout(cerrar);
-    cerrar = setTimeout(ocultar, CLOSE_DELAY);
-  };
-  onCleanup(ocultar);
-
-  // El portal de Solid hace burbujear los eventos delegados de la tarjeta hasta aquí.
-  const deLaFila = (e: Event) => !!fila?.contains(e.target as Node);
-  const dentro = (el: EventTarget | null) =>
-    !!el && (!!fila?.contains(el as Node) || !!tarjeta?.contains(el as Node));
-  const aislar = (e: Event) => e.stopPropagation();
-
-  const accion = (fn: () => void) => () => {
-    ocultar();
-    fn();
-  };
-
-  return (
-    <div
-      ref={fila}
-      class={props.class}
-      onPointerEnter={(e) => { if (e.pointerType !== "touch") programar(null); }}
-      onPointerLeave={soltar}
-      onPointerDown={(e) => { if (deLaFila(e)) ocultar(); }}
-      onFocusIn={(e) => {
-        const el = e.target as Element;
-        if (deLaFila(e) && el.matches?.(":focus-visible")) programar(el);
-      }}
-      onFocusOut={(e) => { if (!dentro(e.relatedTarget)) soltar(); }}
-      onKeyDown={(e) => { if (e.key === "Escape" && open()) ocultar(); }}
-    >
-      {props.children}
-      <Popover
-        open={open()}
-        onOpenChange={(next) => { if (!next) ocultar(); }}
-        anchorRef={() => fila}
-        placement="right-start"
-        gutter={8}
-      >
-        <PopoverContent
-          id={id}
-          aria-label={threadTitle(props.task)}
-          class="w-64 border-border-strong p-2.5"
-          onOpenAutoFocus={(e) => e.preventDefault()}
-          onCloseAutoFocus={(e) => e.preventDefault()}
-          onPointerEnter={() => clearTimeout(cerrar)}
-          onPointerLeave={soltar}
-        >
-          <div
-            ref={tarjeta}
-            onClick={aislar}
-            onDblClick={aislar}
-            onContextMenu={aislar}
-            onPointerDown={aislar}
-            onMouseDown={aislar}
-            onFocusOut={(e) => { aislar(e); if (!dentro(e.relatedTarget)) soltar(); }}
-            onFocusIn={aislar}
-          >
-            <TaskHoverCard
-              {...props}
-              onOpen={accion(() => props.onOpen())}
-              onPin={accion(() => props.onPin())}
-              onArchive={accion(() => props.onArchive())}
-            />
-          </div>
-        </PopoverContent>
-      </Popover>
     </div>
   );
 }
