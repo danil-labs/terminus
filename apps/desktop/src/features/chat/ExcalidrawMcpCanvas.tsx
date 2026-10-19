@@ -95,7 +95,7 @@ export default function ExcalidrawMcpCanvas(props: { call: McpAppCall; connectio
       const scene = sceneFrom(result);
       if (closed || !node) return;
       (window as Window & { EXCALIDRAW_ASSET_PATH?: string }).EXCALIDRAW_ASSET_PATH =
-        new URL("/excalidraw/", window.location.href).href;
+        new URL(`${import.meta.env.BASE_URL}excalidraw/`, window.location.href).href;
       const { mountExcalidraw } = await import("./excalidrawReact");
       if (closed || !node) return;
       dispose = mountExcalidraw(node, scene, (next) => {

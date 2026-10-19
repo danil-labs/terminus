@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "pnpm -C apps/desktop dev",
     "build": "pnpm -C apps/desktop build",
+    "web:build": "pnpm -C apps/desktop web:build",
     "verify": "pnpm -C apps/desktop verify",
     "lint": "pnpm -C apps/desktop lint",
     "tauri": "pnpm -C apps/desktop tauri",
