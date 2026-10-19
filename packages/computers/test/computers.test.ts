@@ -9,6 +9,7 @@ import {
   canAct,
   defaultComputer,
   groupWorkspaces,
+  machineCompatibility,
   isManaged,
   wakes,
   listComputers,
@@ -165,4 +166,10 @@ test("un workspace es el mismo en dos máquinas por remoto o, si no, por nombre 
     groups.map((g) => [g.key, [...g.members]]),
     [["vm~a", [["vm", "a"], ["mac", "x"]]], ["vm~b", [["vm", "b"], ["mac", "y"]]], ["mac~z", [["mac", "z"]]]],
   );
+});
+
+test("el contrato: igual es ok, distinto es desactualizado, sin dato no se sabe", () => {
+  assert.equal(machineCompatibility("ABC", "abc"), "ok");
+  assert.equal(machineCompatibility("abc", "def"), "outdated");
+  assert.equal(machineCompatibility(null, "abc"), "unknown");
 });

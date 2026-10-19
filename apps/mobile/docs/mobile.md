@@ -168,6 +168,13 @@ no se abrió la app. Se comprobó:
    ellos, una máquina propia registrada sin proveedor se tomaría por VM. Con
    `kind: "physical"` (o `wakeable: false`) la app no le manda intenciones; sin
    eso, el relay la intentaría encender y volvería `start_failed`.
+4. **Contrato del motor y el teléfono.** La web marca desactualizada una
+   computadora cuyo `contract` no es el hash de su `commands.json` (#157) y le
+   niega acciones. El teléfono, que se publica por tienda, solo la marca así
+   cuando el relay lo dice (`version_mismatch`/`outdated`): con el hash exacto,
+   cada cambio de contrato del motor lo dejaría sin acciones hasta la próxima
+   versión de la app. `machineCompatibility` ya está en `@terminus/computers`
+   por si se decide otra cosa (p. ej. un rango de contratos aceptados).
 3. **Lista de permiso por cliente en el relay.** El relay solo bloquea funciones
    de escritorio; la lista cerrada del teléfono la hace cumplir el cliente. Si
    se quiere que el servidor también la imponga, el relay necesita saber que la

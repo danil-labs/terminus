@@ -14,6 +14,7 @@ export {
   wakes,
 } from "./machine.ts";
 export { type WorkspaceGroup, type WorkspaceRow, groupWorkspaces } from "./fleet.ts";
+export { type Compatibility, machineCompatibility } from "./compatibility.ts";
 export {
   type Cached,
   type CallResult,

@@ -22,6 +22,8 @@ export type Computer = {
   state: string;
   last_seen?: string | null;
   host_version?: string | null;
+  /** El contrato del motor en su último `hello` (hash de `commands.json`), si lo dijo. */
+  contract?: string | null;
 };
 
 export type Answer<T> =
