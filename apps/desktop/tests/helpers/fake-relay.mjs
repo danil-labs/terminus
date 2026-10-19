@@ -32,11 +32,14 @@ export const engine = {
 };
 
 /** One relay session socket per connection, speaking protocol v1 to the page. */
-export function relay() {
+/** The relay's wake list (protocol v1): only these start an off computer. */
+const INTENT = new Set(["send_message", "inject_message", "create_project", "create_encargado", "respond_permission", "answer_question", "answer_shell_output", "run_shell_command", "queue_ready", "resume_awaiting_quota", "recreate_task_work"]);
+
+export function relay({ state: initial = "online", wakeAfter = 300 } = {}) {
   const sockets = [];
   const calls = [];
   const subscriptions = [];
-  let state = "online";
+  let state = initial;
   const push = (message) => {
     for (const s of sockets) if (s.readyState === 1) s.onmessage?.({ data: JSON.stringify(message) });
   };
@@ -55,20 +58,37 @@ export function relay() {
       if (m.type === "subscribe") subscriptions.push(m.after);
       if (m.type !== "call") return;
       calls.push(m);
-      const answer = engine[m.command];
-      const reply = answer === undefined
-        ? { type: "result", id: m.id, error: { code: "command" } }
-        : { type: "result", id: m.id, value: typeof answer === "function" ? answer(m.args) : answer };
-      setTimeout(() => this.readyState === 1 && this.onmessage?.({ data: JSON.stringify(reply) }), 0);
+      const respond = () => {
+        const answer = engine[m.command];
+        const reply = answer === undefined
+          ? { type: "result", id: m.id, error: { code: "command" } }
+          : { type: "result", id: m.id, value: typeof answer === "function" ? answer(m.args) : answer };
+        if (this.readyState === 1) this.onmessage?.({ data: JSON.stringify(reply) });
+      };
+      if (state === "online") return void setTimeout(respond, 0);
+      if (!INTENT.has(m.command)) {
+        const off = { type: "result", id: m.id, error: { code: "machine_off" } };
+        return void setTimeout(() => this.readyState === 1 && this.onmessage?.({ data: JSON.stringify(off) }), 0);
+      }
+      // An intent starts the computer and is delivered once it says hello.
+      setState("starting");
+      setTimeout(() => {
+        setState("online");
+        respond();
+      }, wakeAfter);
     }
     close(code = 1000) {
       this.readyState = 3;
       setTimeout(() => this.onclose?.({ code }), 0);
     }
   }
+  function setState(next) {
+    state = next;
+    push({ type: "state", state });
+  }
   const drop = (code) => {
     for (const s of sockets) if (s.readyState === 1) s.close(code);
   };
-  return { Socket, sockets, calls, subscriptions, push, drop, setState: (next) => { state = next; push({ type: "state", state }); } };
+  return { Socket, sockets, calls, subscriptions, push, drop, setState };
 }
 

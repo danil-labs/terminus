@@ -7,6 +7,7 @@
  */
 import { t } from "../lib/i18n";
 import { deliver } from "../lib/serviceEvents.ts";
+import { ReadCache } from "./reads";
 import type { EventsPage, MachineState, RelayFailure, RelaySession } from "./relay";
 
 type Args = Record<string, unknown>;
@@ -79,6 +80,24 @@ const QUIET = new Set([
   "update_pending",
 ]);
 const OFF: MachineState[] = ["offline", "stopped", "provisioning"];
+/** What wakes an off computer at the relay (protocol v1); anything else waits for it to be on. */
+const INTENT = new Set([
+  "send_message",
+  "inject_message",
+  "create_project",
+  "create_encargado",
+  "respond_permission",
+  "answer_question",
+  "answer_shell_output",
+  "run_shell_command",
+  "queue_ready",
+  "resume_awaiting_quota",
+  "recreate_task_work",
+]);
+const READ = /^(list_|load_|read_|get_|preview_)|_status$|^(workspaces_startup|session_usage|task_history|session_folder|setup_required|check_environment|account_limits)$/;
+/** With the computer off and nothing read before: a managed computer is prepared at install. */
+const OFF_ANSWERS: Record<string, unknown> = { setup_required: false };
+const RETRY_OFF = 5_000;
 const POLL_WAIT = 20_000;
 const LINK_WAIT = 5_000;
 const STATE_WAIT = 2_000;
@@ -131,11 +150,41 @@ export function createWebTransport(relay: RelaySession, computerId: string, vers
       wakers.add(finish);
     });
 
+  const reads = new ReadCache(computerId);
+
+  /** Until the relay says the computer is on, or a while if it never said it was off. */
+  async function untilOn() {
+    if (!OFF.includes(relay.state()) && relay.state() !== "starting") return changeOr(RETRY_OFF);
+    while (relay.state() !== "online") await changeOr(POLL_WAIT);
+  }
+
+  /** With the computer off a read answers from its last copy and anything else waits: never an error. */
   async function send(command: string, workspace: string | null, args: Args): Promise<unknown> {
-    try {
-      return await relay.call(requestId(), command, workspace, null, args);
-    } catch (error) {
-      throw failureOf(error);
+    const waits = !INTENT.has(command);
+    const key = READ.test(command) ? JSON.stringify([command, workspace, args]) : null;
+    const offline = async () => {
+      const kept = key ? reads.get(key) : null;
+      if (kept) return kept;
+      if (command in OFF_ANSWERS) return { value: OFF_ANSWERS[command] };
+      await untilOn();
+      return null;
+    };
+    for (;;) {
+      if (waits && OFF.includes(relay.state())) {
+        const answer = await offline();
+        if (answer) return answer.value;
+        continue;
+      }
+      try {
+        const value = await relay.call(requestId(), command, workspace, null, args);
+        if (key) reads.put(key, value);
+        return value;
+      } catch (error) {
+        const failure = failureOf(error);
+        if (!waits || failure.detail !== "machine_off") throw failure;
+        const answer = await offline();
+        if (answer) return answer.value;
+      }
     }
   }
 

@@ -16,5 +16,10 @@
   "web.desktop_only": "This is only available in the Terminus desktop app.",
   "web.local_files": "The browser cannot pick files or folders on this device. Use the Terminus desktop app for that.",
   "web.revoked": "You no longer have access to this computer. Sign in again.",
+  "web.setup.connecting": "Connecting to your computer…",
+  "web.setup.detail": "Detail",
+  "web.setup.failed": "Your computer could not be prepared. Contact support and we will help you.",
+  "web.setup.preparing": "Preparing your computer…",
+  "web.setup.preparing_percent": "Preparing your computer… {percent}%",
   "web.start_failed": "The computer could not start. Try again in a moment."
 }

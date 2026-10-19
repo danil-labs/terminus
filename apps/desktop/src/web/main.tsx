@@ -30,7 +30,7 @@ const browser: BrowserHost = {
 };
 
 function mountApp(config: RelayConfig) {
-  setCapabilities({ nativeWindow: false, updater: false });
+  setCapabilities({ nativeWindow: false, updater: false, localSetup: false });
   const relay = new RelaySession(config);
   installIpc(window, createWebTransport(relay, config.computerId, __TERMINUS_VERSION__, browser));
   relay.start();

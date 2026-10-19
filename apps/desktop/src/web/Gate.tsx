@@ -48,9 +48,10 @@ export function Gate(props: { session: Session; endpoint: string; initial?: Gate
   const [view, setView] = createSignal<GateView>(props.initial ?? { t: "waiting" });
   const [starting, setStarting] = createSignal<string | null>(null);
 
-  const open = (id: string) => {
-    remember(id);
-    props.onOpen?.(id);
+  /** Opening is not intent to work: an off computer mounts as it is and wakes with the first message. */
+  const open = (computer: Computer) => {
+    remember(computer.computer_id);
+    props.onOpen?.(computer.computer_id);
   };
 
   async function load() {
@@ -60,13 +61,13 @@ export function Gate(props: { session: Session; endpoint: string; initial?: Gate
     if (answer.kind === "license") return setView({ t: "license" });
     if (answer.kind !== "ok") return setView({ t: "error" });
     const computers = answer.value;
-    const ids = computers.map((c) => c.computer_id);
+    const byId = (id: string | null) => computers.find((c) => c.computer_id === id);
     const asked = new URLSearchParams(window.location.search).get("computer");
-    if (asked) return ids.includes(asked) ? open(asked) : setView({ t: "not_yours" });
+    if (asked) return byId(asked) ? open(byId(asked) as Computer) : setView({ t: "not_yours" });
     if (computers.length === 0) return setView({ t: "none" });
-    if (computers.length === 1) return open(ids[0]);
-    const known = rememberedComputer();
-    if (known && ids.includes(known)) return open(known);
+    if (computers.length === 1) return open(computers[0]);
+    const known = byId(rememberedComputer());
+    if (known) return open(known);
     setView({ t: "pick", computers });
   }
 
@@ -121,7 +122,7 @@ export function Gate(props: { session: Session; endpoint: string; initial?: Gate
                       {t("web.computers.start")}
                     </Button>
                   </Show>
-                  <Button size="sm" onClick={() => open(c.computer_id)}>
+                  <Button size="sm" onClick={() => open(c)}>
                     {t("web.computers.open")}
                   </Button>
                 </li>

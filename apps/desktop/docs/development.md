@@ -68,7 +68,13 @@ that app stored (`supabase.auth.getSession()`); it never signs in. After a 401
 from the API or a relay close 4003 it calls `refreshSession()` and, if that
 fails, goes to the login. It lists the person's computers (`GET
 /v1/computers`), opens the only one or the remembered one, or shows a picker
-that can also start a computer; `?computer=<id>` opens that one. Before
+that can also start a computer; `?computer=<id>` opens that one. Opening does
+not start a computer: an off one mounts as it is, with the machine-off notice.
+While the relay says it is off, a read answers from its last copy in the page
+(`src/web/reads.ts`) or waits, and other commands wait; only the relay's
+intent commands (send a message, create a task, answer a permission…) wake it. The installer screen never shows: a managed computer is prepared at
+install, so `Setup` shows only the preparation's progress, or a support note
+if an essential stage failed (`localSetup` in `lib/platform.ts`). Before
 reconnecting the socket it asks the API again, so a missing license or a
 computer that is not theirs shows a notice instead of a blind retry. A page
 that sets `window.terminusWeb` before the script loads can override any of the
@@ -78,7 +84,7 @@ session and the picker.
 What the window does locally (native sites, Typst live, tray, updater, local
 file pickers, opening files on the host) answers with `web.desktop_only` or a
 browser equivalent. `tests/unit/web-transport.test.mjs` and
-`tests/unit/web-gate.test.mjs` mount `dist-web/` against a relay simulated in
+`tests/unit/web-gate.test.mjs`, `tests/unit/web-setup.test.mjs` and `tests/unit/web-off.test.mjs` mount `dist-web/` against a relay simulated in
 Node (`tests/helpers/fake-relay.mjs`).
 
 `wrangler.web.toml` deploys `dist-web/` as the private assets Worker

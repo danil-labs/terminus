@@ -16,5 +16,10 @@
   "web.desktop_only": "Esto solo está disponible en la app de escritorio de Terminus.",
   "web.local_files": "Desde el navegador no se eligen archivos ni carpetas de este equipo. Para eso usa la app de escritorio de Terminus.",
   "web.revoked": "Ya no tienes acceso a esta computadora. Vuelve a iniciar sesión.",
+  "web.setup.connecting": "Conectando con tu computadora…",
+  "web.setup.detail": "Detalle",
+  "web.setup.failed": "No se pudo preparar tu computadora. Escríbenos a soporte y te ayudamos.",
+  "web.setup.preparing": "Preparando tu computadora…",
+  "web.setup.preparing_percent": "Preparando tu computadora… {percent} %",
   "web.start_failed": "La computadora no pudo encenderse. Vuelve a intentarlo en un momento."
 }

@@ -89,7 +89,9 @@ export async function boot(entorno, version, respuestas, userAgent, storage = {}
   consola.on("jsdomError", (e) => fallos.push(`jsdomError: ${e.stack ?? e.message}`));
   consola.on("error", (...a) => fallos.push(`console.error: ${a.join(" ")}`));
 
-  const dom = new JSDOM(web ? pagina.replace(/<script\b[^>]*><\/script>/g, "").replace(/<link\b[^>]*>/g, "") : HTML, { url: "http://localhost/", pretendToBeVisual: true, virtualConsole: consola });
+  // La hoja de la web se queda: sin ella, la precarga de Vite de cada trozo perezoso
+  // la añade y espera un `load` que jsdom no emite. jsdom no la pide.
+  const dom = new JSDOM(web ? pagina.replace(/<script\b[^>]*><\/script>/g, "") : HTML, { url: "http://localhost/", pretendToBeVisual: true, virtualConsole: consola });
   const w = dom.window;
   if (userAgent) Object.defineProperty(w.navigator, "userAgent", { value: userAgent, configurable: true });
 

@@ -1,9 +1,10 @@
 import { listen } from "../../lib/serviceEvents";
-import { createEffect, createSignal, For, type JSX, Match, on, onCleanup, onMount, Show, Switch } from "solid-js";
+import { createEffect, createSignal, For, type JSX, lazy, Match, on, onCleanup, onMount, Show, Switch } from "solid-js";
 import { connected } from "../../lib/engineConnection";
 import { peso } from "../../lib/format";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
+import { capabilities } from "../../lib/platform";
 import { hasShellCache } from "../../lib/shellCache";
 import { cn } from "../../lib/utils";
 import {
@@ -58,7 +59,11 @@ const COLOR: Record<Tono, string> = {
   err: "text-terminal-muted/70",
 };
 
+// Una computadora gestionada llega preparada: en el navegador solo se ve su estado.
+const PreparacionGestionada = lazy(() => import("../../web/ManagedSetup"));
+
 export default function Setup(props: { children: JSX.Element }) {
+  if (!capabilities().localSetup) return <PreparacionGestionada>{props.children}</PreparacionGestionada>;
   const [reporte, setReporte] = createSignal<EnvReport | null>(null);
   const [mostrar, setMostrar] = createSignal<boolean | null>(null);
   const [seguir, setSeguir] = createSignal(false);

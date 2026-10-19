@@ -8,9 +8,11 @@ export type Capabilities = {
   nativeWindow: boolean;
   /** El actualizador firmado de la app. */
   updater: boolean;
+  /** La preparación del entorno con su instalador a la vista. */
+  localSetup: boolean;
 };
 
-const DESKTOP: Capabilities = { nativeWindow: true, updater: true };
+const DESKTOP: Capabilities = { nativeWindow: true, updater: true, localSetup: true };
 
 let current = DESKTOP;
 
