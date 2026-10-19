@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { activeTrigger } from "../../src/lib/mentions.ts";
-import type { AgenteDeMaquina, AgentProfile, CatalogoDeAgentes, HandlerDefinition } from "../../src/lib/model.ts";
+import type { AgentProfile, HandlerDefinition } from "../../src/lib/model.ts";
 import {
   groupRecipients,
   insertRecipient,
@@ -72,13 +72,9 @@ const perfil = (hidden: boolean): AgentProfile => ({
   display_name: null, body: null, background: null, avatar: null, veil: 0.82,
   provider: null, model: null, effort: null, hidden,
 });
-const propio = (name: string, blocked: AgenteDeMaquina["blocked"]): AgenteDeMaquina => ({
-  agent: declarado(name, { kind: "workspace" }), profile: perfil(false),
-  folders: [], all_folders: true, blocked, catalog_taken: null,
-});
 
-// El repositorio declara `release`; tú tienes otro `release` que en esta
-// carpeta pierde, y uno oculto que el riel tampoco pinta.
+// El repositorio declara `release` y `qa-visual`; hay uno oculto que el riel
+// tampoco pinta. Uno tuyo que el repositorio tapa no llega en la lista.
 const roster = [
   declarado("release", null),
   declarado("qa-visual", null),
@@ -86,50 +82,27 @@ const roster = [
   declarado("revisor", { kind: "workspace" }),
   declarado("redactor", { kind: "project", id: "terminus" }),
 ];
-const catalogo: CatalogoDeAgentes = {
-  own: [
-    propio("release", [{ folder: "terminus", origin: ".agents/release.md", repository: true }]),
-    propio("revisor", []),
-    // Tapado en otra carpeta: aquí no dice nada.
-    propio("qa-visual", [{ folder: "billing", origin: ".agents/qa-visual.md", repository: true }]),
-  ],
-  repository: [],
-};
-
 test("los ocultos no salen y los del repositorio se distinguen de los tuyos", () => {
-  const candidatos = recipientCandidatesOf("terminus", roster, {
+  const candidatos = recipientCandidatesOf(roster, {
     profiles: { oculto: perfil(true) },
     statuses: [{ name: "revisor", status: "working", minutes_since_last_turn: 1, live_tasks: 1 }],
   });
   assert.deepEqual(
-    candidatos.map((c) => [c.name, c.repository, c.shadowed ?? false, c.status]),
+    candidatos.map((c) => [c.name, c.repository, c.status]),
     [
-      ["release", true, false, undefined],
-      ["qa-visual", true, false, undefined],
-      ["revisor", false, false, "working"],
-      ["redactor", false, false, undefined],
+      ["release", true, undefined],
+      ["qa-visual", true, undefined],
+      ["revisor", false, "working"],
+      ["redactor", false, undefined],
     ],
   );
 });
 
-test("un agente tuyo que el repositorio tapa en esta carpeta se marca, y solo en ella", () => {
-  const aqui = recipientCandidatesOf("terminus", roster, { catalog: catalogo });
-  assert.deepEqual(aqui.filter((c) => c.shadowed).map((c) => [c.name, c.repository]), [["release", false]]);
-  const enOtra = recipientCandidatesOf("billing", roster, { catalog: catalogo });
-  assert.deepEqual(enOtra.filter((c) => c.shadowed).map((c) => c.name), ["qa-visual"]);
-  // Sin catálogo no se sabe quién está tapado, y no se inventa.
-  assert.equal(recipientCandidatesOf("terminus", roster).some((c) => c.shadowed), false);
-});
-
 test("los del repositorio van en su grupo y los tuyos en el suyo, cada uno con su orden", () => {
-  const candidatos = recipientCandidatesOf("terminus", roster, { catalog: catalogo });
+  const candidatos = recipientCandidatesOf(roster);
   const { repository, own } = groupRecipients(candidatos, "re");
   assert.deepEqual(repository.map((c) => c.name), ["release"]);
-  assert.deepEqual(own.map((c) => [c.name, c.shadowed ?? false]), [
-    ["redactor", false],
-    ["release", true],
-    ["revisor", false],
-  ]);
+  assert.deepEqual(own.map((c) => c.name), ["redactor", "revisor"]);
   const exacto = groupRecipients([...candidatos, { name: "re", description: "" }], "re");
   assert.equal(exacto.own[0]?.name, "re");
   assert.deepEqual(groupRecipients(candidatos, "visual").repository.map((c) => c.name), ["qa-visual"]);

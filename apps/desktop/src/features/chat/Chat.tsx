@@ -1031,12 +1031,10 @@ export default function Chat(props: ChatProps) {
     const fila = (c: RecipientCandidate, group: string, groupHint?: string): Suggestion => ({
       value: recipientId(c.name),
       title: c.name,
-      detail: c.shadowed ? t("chat.mentions.shadowed_detail") : c.description || undefined,
-      label: c.shadowed ? t("chat.mentions.shadowed") : t("chat.mentions.handler"),
+      detail: c.description || undefined,
+      label: t("chat.mentions.handler"),
       group,
       groupHint,
-      // `@nombre` llegaría al del repositorio: la fila informa, no se elige.
-      disabled: c.shadowed || undefined,
       // Despierto mientras no se sepa: la presencia ayuda cuando está, y una
       // cara dormida por falta de dato diría que no está quien sí está.
       avatar: { name: c.name, status: c.status ?? ("awake" as const), image: props.avatarOf?.(c.name) },

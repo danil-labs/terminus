@@ -149,7 +149,6 @@ import type {
   HandlerDefinition,
   HandlerList,
   HandlerStatusRow,
-  CatalogoDeAgentes,
   ModoDePermiso,
   Project,
   Source,
@@ -1521,27 +1520,12 @@ export default function App() {
     const id = project();
     return id ? watchProfiles(id) : () => ({});
   });
-  // Quién está tapado solo lo dice el catálogo. Se lee al abrir el menú de `@`
-  // y no al cambiar de carpeta: lo pide quien va a llamar a alguien.
-  const [catalogoDeAgentes, setCatalogoDeAgentes] = createSignal<CatalogoDeAgentes | null>(null);
-  let catalogoRequest = 0;
-  const refreshCatalogoDeAgentes = async () => {
-    const request = ++catalogoRequest;
-    if (!project()) return;
-    try {
-      const catalogo = await invoke<CatalogoDeAgentes>("list_machine_agents");
-      if (request === catalogoRequest) setCatalogoDeAgentes(catalogo);
-    } catch {
-      // Sin catálogo el menú sigue, solo que sin marcar a los tapados.
-    }
-  };
   const recipientCandidates = createMemo<RecipientCandidate[]>(() =>
-    recipientCandidatesOf(project(), rosterDelProyecto() ?? lastRoster(project()) ?? [], {
+    recipientCandidatesOf(rosterDelProyecto() ?? lastRoster(project()) ?? [], {
       profiles: perfilesDeLaCarpeta()(),
       // `undefined` no es un estado: es que todavía no se sabe, y el menú
       // pinta la cara despierta en vez de inventar que duerme.
       statuses: presenciaDeEncargados(),
-      catalog: catalogoDeAgentes(),
     }),
   );
   const placeCandidates = createMemo<PlaceCandidate[]>(() => {
@@ -6411,7 +6395,7 @@ export default function App() {
         mentionSources={mentionSources()}
         input={input()}
         taskCandidates={taskCandidates()}
-        onTaskMenuOpen={() => { void refreshTaskCandidates(); void refreshCatalogoDeAgentes(); }}
+        onTaskMenuOpen={() => void refreshTaskCandidates()}
         taskMentions={borrador().task_mentions}
         mentionProject={project()}
         mentionSession={sessionId()}

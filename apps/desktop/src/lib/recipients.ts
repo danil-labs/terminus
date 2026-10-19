@@ -9,7 +9,7 @@
  * La aritmética de intervalos se importa de `taskMentions.ts`: las dos
  * gramáticas comparten convención de `start` y `end`.
  */
-import type { AgentProfile, CatalogoDeAgentes, HandlerDefinition, HandlerStatus, HandlerStatusRow } from "./model.ts";
+import type { AgentProfile, HandlerDefinition, HandlerStatus, HandlerStatusRow } from "./model.ts";
 import type { Trigger } from "./mentions.ts";
 import {
   editMentions,
@@ -112,25 +112,20 @@ export type RecipientCandidate = {
   status?: HandlerStatus;
   // Declarado por el repositorio de la carpeta: solo cambia con un PR.
   repository?: boolean;
-  // Uno tuyo con el mismo nombre que uno del repositorio; `@nombre` llega al del repositorio.
-  shadowed?: boolean;
 };
 
 /**
- * Los encargados que el menú ofrece en una carpeta. Los ocultos no salen, como
- * en el riel; los tuyos tapados sí, para decir por qué `@nombre` no llega a
- * ellos. El catálogo es opcional: sin él no se sabe quién está tapado.
+ * Los agentes que el menú ofrece en una carpeta. Los ocultos no salen, como
+ * en el riel, ni los tuyos que el repositorio tapa: `@nombre` llega al suyo.
  */
 export function recipientCandidatesOf(
-  folder: string,
   roster: readonly HandlerDefinition[],
   options: {
     profiles?: Record<string, AgentProfile>;
     statuses?: readonly HandlerStatusRow[];
-    catalog?: CatalogoDeAgentes | null;
   } = {},
 ): RecipientCandidate[] {
-  const visibles: RecipientCandidate[] = roster
+  return roster
     .filter(e => !options.profiles?.[e.name]?.hidden)
     .map(e => ({
       name: e.name,
@@ -138,11 +133,6 @@ export function recipientCandidatesOf(
       status: options.statuses?.find(r => r.name === e.name)?.status,
       repository: e.own_scope === null,
     }));
-  const tapados: RecipientCandidate[] = (options.catalog?.own ?? [])
-    .filter(a => a.blocked.some(b => b.folder === folder && b.repository))
-    .filter(a => roster.some(e => e.name === a.agent.name && e.own_scope === null))
-    .map(a => ({ name: a.agent.name, description: a.agent.description, repository: false, shadowed: true }));
-  return [...visibles, ...tapados];
 }
 
 /**
