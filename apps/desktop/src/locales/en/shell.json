@@ -219,9 +219,11 @@
   "shell.machines.label": "Run on",
   "shell.machines.this_mac": "This Mac",
   "shell.machines.this_computer": "This computer",
-  "shell.machines.starting": "Starting {name}…",
-  "shell.machines.active": "in use",
   "shell.machines.on": "on",
   "shell.machines.off": "off",
-  "shell.machines.failed": "That machine could not be started."
+  "shell.machines.unlinked": "lacks this workspace",
+  "shell.machines.task_on": "Runs on {name}",
+  "shell.machines.task_off": "Runs on {name}, which is off: it starts when you act on this task.",
+  "shell.machines.asleep_notice": "{name} is off: it starts when you send a message.",
+  "shell.machines.waking": "Starting {name}…"
 }
