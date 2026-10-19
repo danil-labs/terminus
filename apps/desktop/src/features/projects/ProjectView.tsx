@@ -206,7 +206,7 @@ export default function VistaDeProyecto(props: {
   >(null);
 
   const [encargados, setEncargados] = createSignal<HandlerList>({
-    encargados: [],
+    agents: [],
     rechazados: [],
   });
   // Quien no aparece en el estado está dormido: la ausencia en los dos
@@ -230,12 +230,12 @@ export default function VistaDeProyecto(props: {
   // Uno del repositorio lo edita quien quiera, y aparece al volver aquí.
   function releerEncargados() {
     const id = props.proyecto.id;
-    void invoke<HandlerList>("list_encargados", { project: id })
+    void invoke<HandlerList>("list_agents", { project: id })
       .then((listado) => {
-        rememberRoster(id, listado.encargados);
+        rememberRoster(id, listado.agents);
         setEncargados(listado);
       })
-      .catch(() => setEncargados({ encargados: [], rechazados: [] }));
+      .catch(() => setEncargados({ agents: [], rechazados: [] }));
   }
 
   createEffect(on(() => props.proyecto.id, releerEncargados));
@@ -246,8 +246,8 @@ export default function VistaDeProyecto(props: {
 
   const perfiles = watchProfiles(props.proyecto.id);
   const oculto = (name: string) => perfiles()[name]?.hidden === true;
-  const visibles = createMemo(() => encargados().encargados.filter((e) => !oculto(e.name)));
-  const ocultos = createMemo(() => encargados().encargados.filter((e) => oculto(e.name)));
+  const visibles = createMemo(() => encargados().agents.filter((e) => !oculto(e.name)));
+  const ocultos = createMemo(() => encargados().agents.filter((e) => oculto(e.name)));
 
   async function mostrar(name: string) {
     try {
@@ -620,7 +620,7 @@ export default function VistaDeProyecto(props: {
                     </span>
                     <span class="col-start-2 text-[0.625rem] text-neutral-500">
                       {t("projects.view.agents_read_by", {
-                        agents: uno.agents.join(", "),
+                        agents: uno.providers.join(", "),
                       })}
                     </span>
                     </button>
@@ -701,7 +701,7 @@ export default function VistaDeProyecto(props: {
         <Memoria
           project={props.proyecto.id}
           agents={props.agents}
-          encargados={encargados().encargados.map((e) => e.name)}
+          encargados={encargados().agents.map((e) => e.name)}
         />
       </div>
     </div>

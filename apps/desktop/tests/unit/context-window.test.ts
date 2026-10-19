@@ -8,7 +8,7 @@ import test from "node:test";
 import { type UsageRecord, ventanaDe } from "../../src/lib/usage.ts";
 
 const turno = (extra: Partial<UsageRecord>): UsageRecord => ({
-  schema: 1, at: 0, workspace: "", agent: "x", account: null, model: null, project: "p", session: "s",
+  schema: 1, at: 0, workspace: "", provider: "x", account: null, model: null, project: "p", session: "s",
   turn: 0, tokens: { input_uncached: 0, cache_read: 0, cache_write: 0, output: 0, reasoning: 0 },
   cost_usd: null, context_used: null, context_limit: null, context_source: null, raw: null, ...extra,
 });

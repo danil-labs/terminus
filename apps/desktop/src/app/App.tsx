@@ -260,7 +260,7 @@ const TRANSPORTE = new Set([
 /** Un turno que sigue contestando, tal como lo cuenta `turn::list_live_turns`. */
 type TerminalLanzada = {
   project: string;
-  agent: string;
+  provider: string;
   model: string | null;
   effort: string | null;
   permission_mode: string | null;
@@ -552,7 +552,7 @@ export default function App() {
   const tareaDelRiel = (id: string): SenderTask | null => {
     for (const [folder, filas] of Object.entries(sesiones())) {
       const fila = filas.find((r) => r.id === id);
-      if (fila) return { folder, task: id, title: fila.title.trim() || id, agent: fila.agent };
+      if (fila) return { folder, task: id, title: fila.title.trim() || id, provider: fila.provider };
     }
     return null;
   };
@@ -565,7 +565,7 @@ export default function App() {
       if (!isTaskTab(p)) return p;
       const fila = filaDe(p.id);
       const titulo =
-        fila && esChatDeAgente(fila) && !fila.agent_thread ? (fila.encargado ?? p.titulo) : fila?.inbox ? threadTitle(fila) : (fila?.title ?? p.titulo);
+        fila && esChatDeAgente(fila) && !fila.agent_thread ? (fila.agent ?? p.titulo) : fila?.inbox ? threadTitle(fila) : (fila?.title ?? p.titulo);
       // La misma fila si el título no cambió, lo que arregla la ×: esto
       // devolvía `{ ...p }` siempre, y cualquier recálculo del memo —activar
       // una ventana lo dispara— daba filas NUEVAS. `Pestanas` las pinta con
@@ -632,7 +632,7 @@ export default function App() {
     const abiertas = new Set(sesionesConPestana());
     const agentes = new Set<string>();
     for (const filas of Object.values(sesiones())) {
-      for (const fila of filas) if (abiertas.has(fila.id)) agentes.add(fila.agent);
+      for (const fila of filas) if (abiertas.has(fila.id)) agentes.add(fila.provider);
     }
     return [...agentes];
   };
@@ -1429,7 +1429,7 @@ export default function App() {
       setSkills(menu.skills);
       setSideCommand(menu.side_question ?? null);
     };
-    void invoke<SlashMenu>("list_slash_menu", { agent: a })
+    void invoke<SlashMenu>("list_slash_menu", { provider: a })
       .then(poner)
       .catch(() => poner({ commands: [], skills: [] }));
   };
@@ -1491,7 +1491,7 @@ export default function App() {
   const [rosterDelProyecto] = createResource(project, async (id) => {
     if (!id) return [] as HandlerDefinition[];
     try {
-      const listado = (await invoke<HandlerList>("list_encargados", { project: id })).encargados;
+      const listado = (await invoke<HandlerList>("list_agents", { project: id })).agents;
       rememberRoster(id, listado);
       return listado;
     } catch {
@@ -2011,7 +2011,7 @@ export default function App() {
     const closeTab = listen("close-tab", closeActiveTab);
     onCleanup(() => void closeTab.then((unlisten) => unlisten()));
 
-    void invoke<Agent[]>("list_agents").then(setAgents);
+    void invoke<Agent[]>("list_providers").then(setAgents);
     // Lo primero de todo: sin workspace no hay dónde leer ni escribir. El
     // arranque migra lo que hubiera suelto de antes y devuelve cuál quedó
     // activo. Lo que el workspace tiene es su fuente de contexto, no «dónde
@@ -2638,7 +2638,7 @@ export default function App() {
           role: "system",
           text,
           meta: kind === "command_running" ? kind : (meta ?? "command_output"),
-          agent: filaDe(session)?.agent ?? (session === sessionId() ? agent() : undefined),
+          agent: filaDe(session)?.provider ?? (session === sessionId() ? agent() : undefined),
         };
         append((m) => [...m.filter((x) => x.meta !== "command_running"), fila]);
         return;
@@ -2692,7 +2692,7 @@ export default function App() {
       // Con qué agente se contesta: el de ESA tarea, que puede no ser la
       // abierta. El historial lo sabe por fila; el selector solo sabe el de la
       // que se mira.
-      const conAgente = filaDe(session)?.agent ?? (session === sessionId() ? agent() : undefined);
+      const conAgente = filaDe(session)?.provider ?? (session === sessionId() ? agent() : undefined);
       anexar(session, (m) => {
         const ultimo = m[m.length - 1];
         if (ultimo?.role === "agent" && !ultimo.turno)
@@ -2740,8 +2740,8 @@ export default function App() {
     // conectaba una cuenta desde Ajustes veía ahí su consumo, y en el
     // chat el mismo agente seguía diciendo «no está instalado», con el
     // campo muerto hasta cerrar y volver a abrir la app.
-    const agentsEv = listen("agents", () => {
-      void invoke<Agent[]>("list_agents").then(setAgents);
+    const agentsEv = listen("providers", () => {
+      void invoke<Agent[]>("list_providers").then(setAgents);
       // Y qué se puede usar, que es lo que decide el menú. Conectar una cuenta
       // desde Configuración añade una entrada aquí; desinstalar un CLI se la
       // lleva. Sin esto había que cerrar la app para verlo.
@@ -3006,7 +3006,7 @@ export default function App() {
     const codigo = ev.meta ? Number(ev.meta) : null;
     const restantes = session === sessionId() ? cola() : savedQueues.get(session)?.items ?? [];
     // Sin superficie utilizable nadie contesta: la salida viaja con el primer mensaje.
-    const hayQuienConteste = (superficies() ?? []).some((s) => s.usable && s.agent === lanzado?.agent);
+    const hayQuienConteste = (superficies() ?? []).some((s) => s.usable && s.provider === lanzado?.provider);
     const contestar = lanzado && codigo !== null && contestaALaTerminal(restantes, detenido, hayQuienConteste) ? lanzado : null;
     // Hasta que se relea el disco: sin esto la tarjeta desaparece un instante.
     if (vivo && codigo !== null) anexar(session, (ms) => [...ms, mensajeDeTerminal(vivo, codigo)]);
@@ -3053,7 +3053,7 @@ export default function App() {
     marcarViva(session);
     try {
       const abrio = await invoke<boolean>("answer_shell_output", {
-        agent: lanzado.agent,
+        provider: lanzado.provider,
         project: lanzado.project,
         session,
         model: lanzado.model,
@@ -3061,7 +3061,7 @@ export default function App() {
         permissionMode: lanzado.permission_mode,
       });
       if (abrio) {
-        asentar(session, (ms) => [...ms, { role: "system", text: "", meta: "shell_reply", agent: lanzado.agent }]);
+        asentar(session, (ms) => [...ms, { role: "system", text: "", meta: "shell_reply", agent: lanzado.provider }]);
         return;
       }
     } catch (error) {
@@ -3129,7 +3129,7 @@ export default function App() {
     const proyecto = project();
     const claveBorrador = claveAbierta();
     const encargado = hablandoCon()?.name ?? null;
-    const lanzado = { project: proyecto, agent: agent(), model: model() || null, effort: effort() || null, permission_mode: modo() || null };
+    const lanzado = { project: proyecto, provider: agent(), model: model() || null, effort: effort() || null, permission_mode: modo() || null };
     const titulo = tituloProvisional(command);
     const runId = crypto.randomUUID();
     const nace: ComandoQueNace = {
@@ -3152,12 +3152,12 @@ export default function App() {
         session: null,
         command,
         queueId: null,
-        agent: lanzado.agent,
+        provider: lanzado.provider,
         model: lanzado.model,
         effort: lanzado.effort,
         permissionMode: lanzado.permission_mode,
         space: escritorio(),
-        encargado,
+        agent: encargado,
         baseRef: draftBases()[claveBorrador] ?? null,
         runId,
       }, runOnOptions(workspaceActivo()));
@@ -3177,7 +3177,7 @@ export default function App() {
       });
       if (nace.generation !== sessionGeneration) return false;
       // La frase de un modo que el agente no sostiene nombra al agente.
-      const label = agents().find((a) => a.id === lanzado.agent)?.label ?? lanzado.agent;
+      const label = agents().find((a) => a.id === lanzado.provider)?.label ?? lanzado.provider;
       anexar("", (ms) => [...ms, { role: "system", text: prosaDe(error, { agent: label }), meta: "fallo" }]);
       return false;
     }
@@ -3192,7 +3192,7 @@ export default function App() {
     comandosDeLaCola.set(abierta, item.id);
     const lanzado = {
       project: project(),
-      agent: item.agent,
+      provider: item.provider,
       model: item.model,
       effort: item.effort,
       permission_mode: item.permission_mode,
@@ -3469,7 +3469,7 @@ export default function App() {
     if (!forzar && untrack(() => catalogos()[a])) return Promise.resolve();
     const yaVa = catalogosEnVuelo.get(a);
     if (yaVa) return yaVa;
-    const pedido = invoke<AgentModels>("list_models", { agent: a })
+    const pedido = invoke<AgentModels>("list_models", { provider: a })
       .then((catalogo) => {
         setCatalogos((actuales) => ({ ...actuales, [a]: catalogo }));
         // La primera carga tiene que dejar una elección ejecutable. Este punto
@@ -3509,7 +3509,7 @@ export default function App() {
         setModos([]);
         return;
       }
-      void invoke<ModoDePermiso[]>("list_permission_modes", { agent: a })
+      void invoke<ModoDePermiso[]>("list_permission_modes", { provider: a })
         .then((lista) => {
           if (a !== agent()) return;
           batch(() => {
@@ -3568,14 +3568,14 @@ export default function App() {
         if (!primera) {
           setModel("");
           setEffort("");
-        } else if (primera.agent !== agent()) {
-          setAgent(primera.agent);
+        } else if (primera.provider !== agent()) {
+          setAgent(primera.provider);
           setModel("");
           setEffort("");
         }
       });
       const agentes = new Set(
-        s.filter((x) => x.usable || x.agent === agent()).map((x) => x.agent),
+        s.filter((x) => x.usable || x.provider === agent()).map((x) => x.provider),
       );
       // Envuelto por lo mismo que el efecto de arriba: `map` le pasaría el
       // índice como `forzar`, y el primero de la lista no forzaría nunca.
@@ -3605,8 +3605,8 @@ export default function App() {
           const primera = sups.find((s) => s.usable);
           batch(() => {
             setSuperficie(primera?.id ?? "");
-            if (primera && primera.agent !== a) {
-              setAgent(primera.agent);
+            if (primera && primera.provider !== a) {
+              setAgent(primera.provider);
               setModel("");
               setEffort("");
             }
@@ -3895,22 +3895,22 @@ export default function App() {
       if (!current()) return;
       // Reanudar conserva con qué corrió: una sesión continuada con otro agente
       // o con otro modelo ya no es la misma sesión.
-      setAgent(s.agent);
+      setAgent(s.provider);
       setModel(modeloDeSubtarea(s) ?? "");
       setEffort(s.effort ?? "");
       // El chat de un encargado no es una tarea que se reabre para releer
       // su historial: es su conversación de siempre, y su perfil dice con
       // qué prefiere seguir. Una preferencia guardada gana a lo último que
       // corrió — sin tocar los turnos ya escritos, solo la caja.
-      if (s.chat_de_agente && s.encargado) {
+      if (s.chat_de_agente && s.agent) {
         try {
           const perfiles = await invoke<Record<string, AgentProfileData>>(
             "list_agent_profiles",
             { project: proyecto },
           );
-          const perfil = perfiles[s.encargado];
+          const perfil = perfiles[s.agent];
           if (!current()) return;
-          if (perfil?.agent) setAgent(perfil.agent);
+          if (perfil?.provider) setAgent(perfil.provider);
           if (perfil?.model) setModel(perfil.model);
           if (perfil?.effort) setEffort(perfil.effort);
         } catch {
@@ -4033,7 +4033,7 @@ export default function App() {
         const perfil = perfiles[name];
         if (!perfil) return;
         batch(() => {
-          if (perfil.agent) setAgent(perfil.agent);
+          if (perfil.provider) setAgent(perfil.provider);
           if (perfil.model) setModel(perfil.model);
           if (perfil.effort) setEffort(perfil.effort);
         });
@@ -4074,8 +4074,8 @@ export default function App() {
       for (const [proyecto, filas] of Object.entries(sesiones())) {
         const fila = filas.find((r) => r.id === id);
         if (fila)
-          return fila.chat_de_agente && fila.encargado
-            ? { project: proyecto, name: fila.encargado }
+          return fila.chat_de_agente && fila.agent
+            ? { project: proyecto, name: fila.agent }
             : null;
       }
       return null;
@@ -4968,11 +4968,11 @@ export default function App() {
     }
     // Como el modelo en `elegirModelo`: es lo que heredan sus temas nuevos.
     const fila = sessionId() ? filaDe(sessionId()!) : undefined;
-    if (fila && esChatDeAgente(fila) && fila.encargado) {
+    if (fila && esChatDeAgente(fila) && fila.agent) {
       void invoke("set_agent_model", {
         project: project(),
-        name: fila.encargado,
-        agent: agent(),
+        name: fila.agent,
+        provider: agent(),
         model: model() || null,
         effort: id || null,
       }).then(notifyProfiles).catch((error) => setError(prosaDe(error)));
@@ -4998,11 +4998,11 @@ export default function App() {
       setEffort(nivel);
       saveDraftConfiguration();
     });
-    if (chatDeAgente && fila.encargado) {
+    if (chatDeAgente && fila.agent) {
       void invoke("set_agent_model", {
         project: project(),
-        name: fila.encargado,
-        agent: opcion.agent,
+        name: fila.agent,
+        provider: opcion.agent,
         model: opcion.model.id,
         effort: nivel || null,
       }).then(notifyProfiles).catch((error) => setError(prosaDe(error)));
@@ -5050,7 +5050,7 @@ export default function App() {
   }
 
   /** La fila y la pestaña de una tarea que Rust todavía no creó. Devuelve su id provisional. */
-  function pintarNaciendo(proyecto: string, titulo: string, con: { agent: string; model: string | null }, encargado: string | null): string {
+  function pintarNaciendo(proyecto: string, titulo: string, con: { provider: string; model: string | null }, encargado: string | null): string {
     const provisional = idProvisional();
     const ahora = Date.now();
     setNaciendo((ns) => [
@@ -5060,7 +5060,7 @@ export default function App() {
         row: {
           id: provisional,
           title: titulo,
-          agent: con.agent,
+          provider: con.provider,
           model: con.model,
           refs: [],
           created_at: ahora,
@@ -5070,8 +5070,8 @@ export default function App() {
           subagent: null,
           esperando: false,
           stage: null,
-          encargado,
-          encargado_del_padre: null,
+          agent: encargado,
+          parent_agent: null,
           chat_de_agente: false,
         },
       },
@@ -5178,7 +5178,7 @@ export default function App() {
     // moverlo a mitad de un turno no puede reescribir hacia atrás quién
     // contestó los que ya estaban esperando.
     const signatureReady = invoke<Signatures>("turn_authors", {
-      agent: m.agent,
+      provider: m.provider,
     }).catch(() => null);
     const firmaDelTurno = respuestas ? await signatureReady : null;
     firmas[abierta ?? ""] = firmaDelTurno?.agent ?? null;
@@ -5224,7 +5224,7 @@ export default function App() {
       // La respuesta de una persona no existe en la interfaz hasta que Rust la
       // validó y la escribió: primero persistir, y solo entonces pintarla.
       const id = await invoke<string>("send_message", {
-        agent: m.agent,
+        provider: m.provider,
         project: proyecto,
         session: abierta,
         prompt: m.text,
@@ -5246,12 +5246,12 @@ export default function App() {
         // Solo al crear: el encargado sale de haber pulsado su fila en el
         // riel, no de un selector. Una tarea ya abierta lleva el suyo
         // sellado y volver a mandarlo lo reescribiría.
-        encargado: agenteDelBorrador,
+        agent: agenteDelBorrador,
         taskFromAgent: !!agenteDelBorrador,
         // Quién escribió esto, cuando no fue la persona: una entrega que la
         // cola guardó mientras el chat contestaba sale por aquí, y sin este
         // renglón aterriza firmada por quien mira la pantalla.
-        fromEncargado: m.encargado ?? null,
+        fromAgent: m.agent ?? null,
         // Y por dónde lo escribió la persona: sin esto, lo que llegó por
         // Telegram mientras el chat contestaba ya no vuelve por Telegram.
         fromChannel: m.channel ?? null,
@@ -5364,7 +5364,7 @@ export default function App() {
           // Una negativa de comando llega como clave: la frase nombra lo escrito.
           text: prosaDe(e, {
             command: comandoEscrito(m.text),
-            agent: agents().find((a) => a.id === m.agent)?.label ?? m.agent,
+            agent: agents().find((a) => a.id === m.provider)?.label ?? m.provider,
           }),
           meta: "fallo",
         },
@@ -5535,7 +5535,7 @@ export default function App() {
     const salio = await enviar(
       {
         text: "",
-        agent: mensaje.agent ?? agent(),
+        provider: mensaje.agent ?? agent(),
         model: model() || null,
         effort: effortDelTurno(),
         permission_mode: modo() || null,
@@ -5581,7 +5581,7 @@ export default function App() {
         if (!corrio && !input()) setInput(prompt);
         return corrio;
       }
-      const lanzado = { project: project(), agent: agent(), model: model() || null, effort: effort() || null, permission_mode: modo() || null };
+      const lanzado = { project: project(), provider: agent(), model: model() || null, effort: effort() || null, permission_mode: modo() || null };
       return (await ejecutarComando(id, lanzado, comando, null)) === null;
     }
     if (queueBusy() || cola().length > 0) {
@@ -5600,7 +5600,7 @@ export default function App() {
       text: prompt,
       task_mentions: message.task_mentions,
       recipients: message.recipients,
-      agent: agent(),
+      provider: agent(),
       model: model() || null,
       effort: effortDelTurno(),
       permission_mode: modo() || null,
@@ -5630,7 +5630,7 @@ export default function App() {
     }
     return enviar({
       text: texto,
-      agent: agent(),
+      provider: agent(),
       model: model() || null,
       effort: effortDelTurno(),
       permission_mode: modo() || null,
@@ -5705,7 +5705,7 @@ export default function App() {
         text,
         task_mentions,
         recipients,
-        agent: agent(),
+        provider: agent(),
         model: model() || null,
         effort: effortDelTurno(),
         permission_mode: modo() || null,
@@ -6056,10 +6056,10 @@ export default function App() {
         return conversacion.name;
       }
       const fila = filaDe(pp.sesion ?? "");
-      return fila && esChatDeAgente(fila) ? (fila.encargado ?? null) : null;
+      return fila && esChatDeAgente(fila) ? (fila.agent ?? null) : null;
     });
     const identidadVisualDeLaCelda = () => pp.sesion
-      ? (filaDe(pp.sesion)?.encargado ?? null)
+      ? (filaDe(pp.sesion)?.agent ?? null)
       : encargadoDeLaCelda();
     /**
      * El estado que enseña la cabecera es el MISMO que pinta su fila del riel.
@@ -6115,8 +6115,8 @@ export default function App() {
       async (clave) => {
         const [id, name] = clave.split("\u0000");
         try {
-          const listado = await invoke<HandlerList>("list_encargados", { project: id });
-          return listado.encargados.find((e) => e.name === name) ?? null;
+          const listado = await invoke<HandlerList>("list_agents", { project: id });
+          return listado.agents.find((e) => e.name === name) ?? null;
         } catch {
           return null;
         }
@@ -6313,7 +6313,7 @@ export default function App() {
            respuesta se llevaría una conversación sin ella. */
         onForkDesde={sessionId() ? forkDesde : null}
         forkAgents={(rosterDelProyecto() ?? []).map((e) => e.name)}
-        forkAgent={sessionId() ? (filaDe(sessionId()!)?.encargado ?? null) : null}
+        forkAgent={sessionId() ? (filaDe(sessionId()!)?.agent ?? null) : null}
         onError={setError}
         adjuntos={archivos()}
         onAdjuntos={setArchivos}
@@ -6440,13 +6440,13 @@ export default function App() {
       {(e) => (
         <AgentProfile
           project={proyectoDeLaCelda()?.id ?? ""}
-          encargado={e()}
+          agent={e()}
           profile={cellProfile()}
           status={estadoDelEncargado()}
           background={chatBackground() ?? null}
           superficies={superficies() ?? []}
           catalogos={catalogos()}
-          currentAgent={filaDe(pp.sesion ?? "")?.agent ?? null}
+          currentAgent={filaDe(pp.sesion ?? "")?.provider ?? null}
           onModelChosen={(elegidoAgent, elegidoModel) => {
             // Solo si es la conversación que tiene el mando: las demás
             // celdas no tienen composer propio con quien aplicarlo, y

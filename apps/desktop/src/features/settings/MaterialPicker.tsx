@@ -67,7 +67,7 @@ type RepoRemoto = {
    * **`null` es «no lo sé», no «no puedes».** No todos los proveedores lo
    * publican en el listado, y marcar como de solo lectura lo que no se sabe le
    * diría a alguien con escritura que no la tiene. Espeja
-   * `providers::RemoteRepo::can_push`.
+   * `git_hosts::RemoteRepo::can_push`.
    */
   can_push: boolean | null;
 };
@@ -134,7 +134,7 @@ export default function MaterialPicker(props: {
   onMount(() => {
     void (async () => {
       try {
-        const ps = await invoke<Proveedor[]>("list_providers");
+        const ps = await invoke<Proveedor[]>("list_git_hosts");
         // Solo los conectados: uno sin conexión no puede listar nada, y
         // ofrecerlo es un clic que acaba en un error que ya se sabía.
         const vivos = ps.filter((p) => p.connected);
@@ -156,7 +156,7 @@ export default function MaterialPicker(props: {
     setArea(null);
     setRepos(null);
     try {
-      const as = await invoke<Area[]>("provider_areas", { id });
+      const as = await invoke<Area[]>("git_host_areas", { id });
       setAreas(as);
       if (as.length === 1) void verRepos(id, as[0].key);
     } catch (e) {
@@ -169,7 +169,7 @@ export default function MaterialPicker(props: {
     setRepos(null);
     setBusca("");
     try {
-      setRepos(await invoke<RepoRemoto[]>("provider_projects", { id, area: a }));
+      setRepos(await invoke<RepoRemoto[]>("git_host_projects", { id, area: a }));
     } catch (e) {
       setFallo(asFailure(e));
     }
@@ -225,7 +225,7 @@ export default function MaterialPicker(props: {
       setRamas(
         await invoke<RamasRemotas>("repo_branches", {
           cloneUrl: objetivo.cloneUrl,
-          provider: objetivo.provider,
+          gitHost: objetivo.provider,
           defaultBranch: objetivo.defaultBranch,
         }),
       );
@@ -592,7 +592,7 @@ export default function MaterialPicker(props: {
                             void traer(() =>
                               invoke<{ id: string }>("attach_repo", {
                                 project: "",
-                                provider: proveedor(),
+                                gitHost: proveedor(),
                                 cloneUrl: r.clone_url,
                                 branch: ramaDe(r) || undefined,
                                 name: r.name,

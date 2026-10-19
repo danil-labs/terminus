@@ -251,7 +251,7 @@ export default function TabStrip(props: {
           const row = () => props.session(p.session);
           const agentProfile = () => {
             const s = row();
-            return s?.encargado ?? null;
+            return s?.agent ?? null;
           };
           const legacyConversation = () => !!row()?.chat_de_agente;
           const fullTitle = () => {
@@ -390,7 +390,7 @@ export default function TabStrip(props: {
                       <Show
                         when={agentProfile()}
                         fallback={
-                          <Show when={row()?.agent}>
+                          <Show when={row()?.provider}>
                             {(agent) => (
                               <span class="inline-flex shrink-0" title={agent()} aria-label={agent()}>
                                 <MarcaAgente id={agent()} size={12} />

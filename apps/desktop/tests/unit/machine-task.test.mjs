@@ -10,25 +10,25 @@ import { boot, sleep } from "../helpers/jsdom-app.mjs";
 const turn = (n, text) => (n % 2 === 0
   ? { role: "user", id: `u${n}`, at: n, text }
   : { role: "agent", id: `a${n}`, at: n, text });
-const row = (id, extra) => ({ id, title: `Tarea ${id}`, last_message: "", agent: "codex", model: "gpt-5.6", refs: [], created_at: 0, updated_at: 0, turns: 2, parent: null, esperando: false, ...extra });
-const session = (id, turns, extra) => ({ id, agent: "codex", sources: [], model: "gpt-5.6", effort: null, permission_mode: null, turns, ...extra });
+const row = (id, extra) => ({ id, title: `Tarea ${id}`, last_message: "", provider: "codex", model: "gpt-5.6", refs: [], created_at: 0, updated_at: 0, turns: 2, parent: null, esperando: false, ...extra });
+const session = (id, turns, extra) => ({ id, provider: "codex", sources: [], model: "gpt-5.6", effort: null, permission_mode: null, turns, ...extra });
 
 function responses(overrides) {
   return {
     window_ready: null,
     window_vitals: null,
     setup_required: false,
-    list_agents: [{ id: "codex", label: "Codex", available: true, driver: true }],
+    list_providers: [{ id: "codex", label: "Codex", available: true, driver: true }],
     list_workspaces: { workspaces: [{ id: "w", name: "W", context_root: null }], active: "w" },
     workspaces_startup: { workspaces: [{ id: "w", name: "W", context_root: null }], active: "w" },
     list_projects: () => [{ id: "p1", name: "P1", working_directory: "/lab/p1", kind: "git", portfolio: null, sources: [] }],
     list_portfolios: [],
     list_sources: [],
-    list_encargados: { encargados: [], rechazados: [] },
-    list_encargado_status: [],
+    list_agents: { agents: [], rechazados: [] },
+    list_agent_status: [],
     list_mentions: { fuentes: [], archivos: [] },
-    list_models: { agent: "codex", models: [{ id: "gpt-5.6", label: "GPT-5.6", gratis: null, note: null, efforts: [], default_effort: null }], fallback: false },
-    list_surfaces: [{ id: "codex", agent: "codex", label: "Codex", catalogo: "todo", usable: true, marca: null, porque: null }],
+    list_models: { provider: "codex", models: [{ id: "gpt-5.6", label: "GPT-5.6", gratis: null, note: null, efforts: [], default_effort: null }], fallback: false },
+    list_surfaces: [{ id: "codex", provider: "codex", label: "Codex", catalogo: "todo", usable: true, marca: null, porque: null }],
     session_folder: "/tmp",
     list_task_trees: [],
     watch_task_tree: "watch",

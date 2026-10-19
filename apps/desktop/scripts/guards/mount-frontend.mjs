@@ -48,7 +48,7 @@ const RESPUESTAS = {
   update_pending: false,
   // La compuerta del primer pintado. `false` monta la app sin esperar nada.
   setup_required: false,
-  list_agents: [
+  list_providers: [
     { id: "claude", label: "Claude Code", available: true, driver: true },
     { id: "codex", label: "Codex", available: true, driver: true },
   ],
@@ -59,7 +59,7 @@ const RESPUESTAS = {
   list_live_sessions: [],
   list_mentions: { fuentes: [], archivos: [] },
   list_models: {
-    agent: "codex",
+    provider: "codex",
     models: [
       {
         id: "gpt-5.6", label: "GPT-5.6", gratis: null, efforts: [], default_effort: null,
@@ -71,8 +71,8 @@ const RESPUESTAS = {
   // La primera coincide con el agente que trae el estado inicial, pero no se
   // puede usar. Codex sí: el selector y su modelo tienen que arrancar ahí.
   list_surfaces: [
-    { id: "claude", agent: "claude", label: "Claude Code", catalogo: "todo", usable: false, marca: "sin conectar", porque: "Falta conectar la cuenta." },
-    { id: "codex", agent: "codex", label: "Codex", catalogo: "todo", usable: true, marca: null, porque: null },
+    { id: "claude", provider: "claude", label: "Claude Code", catalogo: "todo", usable: false, marca: "sin conectar", porque: "Falta conectar la cuenta." },
+    { id: "codex", provider: "codex", label: "Codex", catalogo: "todo", usable: true, marca: null, porque: null },
   ],
   send_message: "sesion-1",
   session_folder: "/tmp",
@@ -109,7 +109,7 @@ const CON_TAREA = {
       id: "s1",
       title: "Una tarea",
       last_message: "La última respuesta de esta tarea",
-      agent: "codex",
+      provider: "codex",
       model: "gpt-5.6",
       refs: [],
       updated_at: 0,
@@ -121,7 +121,7 @@ const CON_TAREA = {
   task_history: { history: { archived: false, events: [], recovery: null }, branch: null, path: "/lab", available: true, owned: false, restorable: false, incomplete: false },
   load_session: {
     id: "s1",
-    agent: "codex",
+    provider: "codex",
     sources: [],
     model: "gpt-5.6",
     effort: null,
@@ -142,7 +142,7 @@ const CON_TAREA = {
 
 const SIN_USABLE = {
   ...RESPUESTAS,
-  list_models: { agent: "claude", models: [], fallback: false },
+  list_models: { provider: "claude", models: [], fallback: false },
   list_surfaces: [RESPUESTAS.list_surfaces[0]],
 };
 
@@ -407,9 +407,9 @@ if (!roto) {
   treeApp.w.close();
 
   const filaDeAgente = {
-    agent: "codex", model: "gpt-5.6", refs: [], created_at: 0, updated_at: 0, turns: 1,
+    provider: "codex", model: "gpt-5.6", refs: [], created_at: 0, updated_at: 0, turns: 1,
     parent: null, subagent: null, esperando: false, stage: null,
-    encargado: "Holmes", encargado_del_padre: null, last_message: "Listo.",
+    agent: "Holmes", parent_agent: null, last_message: "Listo.",
   };
   const awakeModes = [];
   const profileSaves = [];
@@ -419,21 +419,21 @@ if (!roto) {
     list_live_sessions: [
       { ...filaDeAgente, id: "s-chat", title: "Holmes", chat_de_agente: true },
       { ...filaDeAgente, id: "s-task", title: "Una tarea", chat_de_agente: false },
-      { ...filaDeAgente, id: "s-plain", title: "Tarea suelta", encargado: null, chat_de_agente: false },
+      { ...filaDeAgente, id: "s-plain", title: "Tarea suelta", agent: null, chat_de_agente: false },
     ],
-    list_encargados: {
-      encargados: [{
+    list_agents: {
+      agents: [{
         name: "Holmes", description: "", instructions: "", tools: [], model: null,
-        origin: ".danil/agents/holmes.md", folder: null, agents: ["codex"], own: false, own_scope: null,
+        origin: ".danil/agents/holmes.md", folder: null, providers: ["codex"], own: false, own_scope: null,
       }],
       rechazados: [],
     },
-    list_encargado_status: [{ name: "Holmes", status: "awake", minutes_since_last_turn: 1, live_tasks: 0 }],
+    list_agent_status: [{ name: "Holmes", status: "awake", minutes_since_last_turn: 1, live_tasks: 0 }],
     list_agent_profiles: {},
     keep_awake_status: { mode: "agent", active: false, supported: true },
     save_agent_profile: (args) => {
       profileSaves.push(args);
-      return { display_name: args.displayName, body: args.body, background: null, avatar: null, veil: args.veil, agent: null, model: null, effort: null, hidden: false };
+      return { display_name: args.displayName, body: args.body, background: null, avatar: null, veil: args.veil, provider: null, model: null, effort: null, hidden: false };
     },
     set_keep_awake: ({ mode }) => {
       awakeModes.push(mode);
@@ -450,14 +450,14 @@ if (!roto) {
       id,
       turns: [
         { role: "user", text: "¿Cómo vas?" },
-        { role: "agent", text: "Voy bien.", duration_ms: 1200, author: { kind: "codex", name: null, verified_by: null, account: null }, provider: "Codex", model: "gpt-5.6", tools: id === "s-chat" ? [
+        { role: "agent", text: "Voy bien.", duration_ms: 1200, author: { kind: "codex", name: null, verified_by: null, account: null }, model_vendor: "Codex", model: "gpt-5.6", tools: id === "s-chat" ? [
           { name: "mcp__canvas__draw", ok: true, mcp_app: { server: "canvas", tool: "draw", result: { content: [] } } },
           { name: "mcp__canvas__lookup", ok: true, mcp_app: { server: "canvas", tool: "lookup", result: { content: [] } } },
           { name: "atlassian·getConfluencePage", ok: true, mcp_app: { server: "atlassian", tool: "getConfluencePage", result: { content: [] } } },
         ] : [] },
         ...(id === "s-task" ? [
           { role: "user", text: "Continúa con Claude." },
-          { role: "agent", text: "Listo tras el traspaso.", author: { kind: "claude", name: null, verified_by: null, account: null }, provider: "Claude Code", model: "claude-sonnet-5" },
+          { role: "agent", text: "Listo tras el traspaso.", author: { kind: "claude", name: null, verified_by: null, account: null }, model_vendor: "Claude Code", model: "claude-sonnet-5" },
         ] : []),
       ],
     }),
@@ -466,16 +466,16 @@ if (!roto) {
     ...bubbleResponses,
     list_live_sessions: [
       ...bubbleResponses.list_live_sessions,
-      { ...filaDeAgente, id: "s-transfer", title: "Revisar entrega", encargado: "Watson", chat_de_agente: false },
+      { ...filaDeAgente, id: "s-transfer", title: "Revisar entrega", agent: "Watson", chat_de_agente: false },
     ],
-    list_encargados: { ...bubbleResponses.list_encargados, encargados: [
-      { ...bubbleResponses.list_encargados.encargados[0], own: true },
-      { ...bubbleResponses.list_encargados.encargados[0], name: "Watson", own: true },
+    list_agents: { ...bubbleResponses.list_agents, agents: [
+      { ...bubbleResponses.list_agents.agents[0], own: true },
+      { ...bubbleResponses.list_agents.agents[0], name: "Watson", own: true },
     ] },
     telegram_status: { token_saved: false, bot_username: null, enabled: false, paired_chats: 0, pairing: null, topics_enabled: false, topics: 0 },
     queue_ready: false,
     load_queue: ({ session }) => session === "s-chat" ? [{
-      id: "compact-queue", text: "Mensaje pendiente", agent: "codex", model: null,
+      id: "compact-queue", text: "Mensaje pendiente", provider: "codex", model: null,
       effort: null, permission_mode: null, attachments: [],
     }] : [],
   });
@@ -484,7 +484,7 @@ if (!roto) {
   let filaDelAgente = [...bubbleDocument.querySelectorAll("li > div[aria-label]")].find((fila) =>
     fila.getAttribute("aria-label").startsWith("Holmes"),
   );
-  assert.ok(filaDelAgente, "el riel no lista al encargado: sin su fila no hay chat que abrir");
+  assert.ok(filaDelAgente, "el riel no lista al agent: sin su fila no hay chat que abrir");
   const controlDelAvatar = filaDelAgente.querySelector("button");
   assert.ok(controlDelAvatar.className.includes("size-6"), "el avatar conserva un área de clic de 24 px, el mínimo");
   assert.equal(controlDelAvatar.querySelector(".astro-face svg, .astro-face img")?.getAttribute("width"), "20", "solo el avatar del riel baja a 20 px");
@@ -672,11 +672,11 @@ if (!roto) {
   const draftApp = await boot("listo", "agent-task-draft", {
     ...bubbleResponses,
     list_projects: [{ id: "p", name: "Proyecto", kind: "folder", working_directory: "/lab", sources: [] }],
-    list_encargados: { ...bubbleResponses.list_encargados, encargados: [
-      { ...bubbleResponses.list_encargados.encargados[0], description: "Revisa cambios del proyecto." },
-      { ...bubbleResponses.list_encargados.encargados[0], name: "Watson" },
+    list_agents: { ...bubbleResponses.list_agents, agents: [
+      { ...bubbleResponses.list_agents.agents[0], description: "Revisa cambios del proyecto." },
+      { ...bubbleResponses.list_agents.agents[0], name: "Watson" },
     ] },
-    list_encargado_status: [{ name: "Holmes", status: "asleep", minutes_since_last_turn: 90, live_tasks: 0 }],
+    list_agent_status: [{ name: "Holmes", status: "asleep", minutes_since_last_turn: 90, live_tasks: 0 }],
     send_message: args => { agentSends.push(args); return "new-agent-task"; },
   });
   const draftDoc = draftApp.w.document;
@@ -705,7 +705,7 @@ if (!roto) {
   await sleep(150);
   assert.equal(agentSends.length, 1);
   assert.equal(agentSends[0].project, "p");
-  assert.equal(agentSends[0].encargado, "Holmes");
+  assert.equal(agentSends[0].agent, "Holmes");
   assert.equal(agentSends[0].taskFromAgent, true);
   assert.equal(agentSends[0].baseRef, null);
   assert.ok(draftDoc.querySelector('[data-sidebar-tasks] [data-sesion="new-agent-task"] [data-session-agent]'), "el primer mensaje crea una tarea visible con la pastilla de su arquetipo");
@@ -720,7 +720,7 @@ if (!roto) {
     { ...filaDeAgente, id: "dm-work", title: "DM task", chat_de_agente: false, launched_by: "dm", launcher_name: "Holmes" },
     { ...filaDeAgente, id: "topic-work", title: "Topic task", last_message: "Topic task progress", chat_de_agente: false, pinned: true, launched_by: "topic", launcher_name: "Holmes" },
     { ...filaDeAgente, id: "topic-work-2", title: "Second topic task", chat_de_agente: false, pinned: false, launched_by: "topic", launcher_name: "Holmes" },
-    { ...filaDeAgente, id: "unrelated-work", title: "Other task", encargado: null, chat_de_agente: false, launched_by: "other-chat", launcher_name: "Other agent" },
+    { ...filaDeAgente, id: "unrelated-work", title: "Other task", agent: null, chat_de_agente: false, launched_by: "other-chat", launcher_name: "Other agent" },
   ];
   const threadLoads = [];
   const pinChanges = [];
@@ -732,7 +732,7 @@ if (!roto) {
     task_coordinator: ({ id }) => {
       const row = threadRows.find(row => row.id === id);
       const root = threadRows.find(root => root.id === row?.launched_by);
-      return root ? { folder: "p", task: root.id, title: root.title, agent: root.agent } : null;
+      return root ? { folder: "p", task: root.id, title: root.title, provider: root.provider } : null;
     },
     list_live_sessions: ({ project }) => project === "p" ? threadRows : [],
     set_session_pinned: ({ project, id, pinned }) => {
@@ -746,9 +746,9 @@ if (!roto) {
       return { ...CON_TAREA.load_session, ...threadRows.find(row => row.id === id), id,
         turns: id === "topic" ? [
           { role: "system", id: "topic-launch", text: "", meta: "task_launched",
-            from_task: { folder: "p", task: "topic-work", title: "Topic task", agent: "codex" } },
+            from_task: { folder: "p", task: "topic-work", title: "Topic task", provider: "codex" } },
           { role: "system", id: "topic-launch-2", text: "", meta: "task_launched",
-            from_task: { folder: "p", task: "topic-work-2", title: "Second topic task", agent: "codex" } },
+            from_task: { folder: "p", task: "topic-work-2", title: "Second topic task", provider: "codex" } },
         ] : [] };
     },
   });
@@ -861,9 +861,9 @@ if (!roto) {
   const inboxLoads = [];
   const inboxTurns = [
     { role: "system", meta: "recibido", text: "Mensaje de @Watson. Salto 1." },
-    { role: "user", text: "Revisa el diseño", encargado: "Watson", from_task: { folder: "p", task: "watson-chat", title: "Watson", agent: "claude" } },
+    { role: "user", text: "Revisa el diseño", agent: "Watson", from_task: { folder: "p", task: "watson-chat", title: "Watson", provider: "claude" } },
     { role: "system", meta: "recibido", text: "Mensaje de la tarea «Corregir login». Salto 1." },
-    { role: "user", text: "Ya quedó el login", from_task: { folder: "p", task: "login", title: "Corregir login", agent: "codex" } },
+    { role: "user", text: "Ya quedó el login", from_task: { folder: "p", task: "login", title: "Corregir login", provider: "codex" } },
     { role: "agent", text: "Recibido." },
   ];
   const inboxApp = await boot("listo", "agent-inbox", {
@@ -1059,11 +1059,11 @@ if (!roto) {
   // dejó en el `.cola.json` del buzón con quién la manda y dónde se contesta;
   // sin devolver el remitente aterriza firmada como de la persona (PR #800).
   const entrega = {
-    id: "d1", text: "Revisa el acceso", agent: "codex", model: null, effort: null,
-    permission_mode: null, attachments: [], encargado: "arquitecto",
+    id: "d1", text: "Revisa el acceso", provider: "codex", model: null, effort: null,
+    permission_mode: null, attachments: [], agent: "arquitecto",
     reply_to: { folder: "p", task: "t9" }, hops: 2,
   };
-  queueFiles.set("s3", [entrega, { ...entrega, id: "d2", encargado: null, reply_to: null, hops: null, text: "Y esto lo escribo yo" }]);
+  queueFiles.set("s3", [entrega, { ...entrega, id: "d2", agent: null, reply_to: null, hops: null, text: "Y esto lo escribo yo" }]);
   await selectQueuedTask("s3");
   const mandarCola = [...queueDocument.querySelectorAll("button")].find((b) => b.textContent.trim() === "mandar");
   assert.ok(mandarCola, "una cola leída del disco espera a que alguien la suelte");
@@ -1071,8 +1071,8 @@ if (!roto) {
   await sleep(200);
   assert.equal(queuedSends.length, 3);
   assert.equal(queuedSends[2].prompt, "Revisa el acceso", "un lote no mezcla remitentes");
-  assert.equal(queuedSends[2].fromEncargado, "arquitecto", "la entrega encolada conserva quién la manda");
-  assert.deepEqual(queueFiles.get("s3"), [{ ...entrega, id: "d2", encargado: null, reply_to: null, hops: null, text: "Y esto lo escribo yo" }],
+  assert.equal(queuedSends[2].fromAgent, "arquitecto", "la entrega encolada conserva quién la manda");
+  assert.deepEqual(queueFiles.get("s3"), [{ ...entrega, id: "d2", agent: null, reply_to: null, hops: null, text: "Y esto lo escribo yo" }],
     "lo que no salió sigue en su cola, no se pierde ni se cuela en el lote ajeno");
   assert.equal(queuedApp.fallos.length, 0);
   queuedApp.w.close();
@@ -1371,7 +1371,7 @@ if (!roto) {
   }
 
   const task = (id, parent, outcome) => ({ id, parent, title: `Tarea ${id}`, outcome,
-    agent: "codex", model: null, refs: [], stage: null, esperando: false, updated_at: 1, created_at: 1, turns: 1 });
+    provider: "codex", model: null, refs: [], stage: null, esperando: false, updated_at: 1, created_at: 1, turns: 1 });
   for (const [platform, userAgent] of [
     ["macOS", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"],
     ["Windows", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"],
@@ -1805,11 +1805,11 @@ if (!roto) {
     list_agent_profiles: { Giskard: { display_name: "Giskard PO", body: "moon" } },
     list_projects: () => structuredClone(folders),
     list_live_sessions: ({ project }) => project === "p1" ? [
-      { ...CON_TAREA.list_live_sessions[0], launched_by: null, encargado: "executor" },
-      { ...CON_TAREA.list_live_sessions[0], id: "agent-root", launched_by: "agent-chat", launcher_name: "Giskard", encargado: "Giskard" },
+      { ...CON_TAREA.list_live_sessions[0], launched_by: null, agent: "executor" },
+      { ...CON_TAREA.list_live_sessions[0], id: "agent-root", launched_by: "agent-chat", launcher_name: "Giskard", agent: "Giskard" },
       { ...CON_TAREA.list_live_sessions[0], id: "orphan-root", launched_by: "deleted-chat", launcher_name: null },
       { ...CON_TAREA.list_live_sessions[0], id: "old-root" },
-      { ...CON_TAREA.list_live_sessions[0], id: "same-author", launched_by: "another-topic", launcher_name: "Giskard", encargado: "Giskard" },
+      { ...CON_TAREA.list_live_sessions[0], id: "same-author", launched_by: "another-topic", launcher_name: "Giskard", agent: "Giskard" },
     ] : project === "" ? [{ ...CON_TAREA.list_live_sessions[0], id: "recent", title: recentTitle, last_message: recentPreview },
       ...(recentChild ? [{ ...CON_TAREA.list_live_sessions[0], id: "recent-child", parent: "recent" }] : [])] : [],
     rename_session: args => { taskRenames.push(args); recentTitle = args.title; },
@@ -1817,13 +1817,13 @@ if (!roto) {
     get_project_directory: "/lab",
     list_project_repositories: ({ workspace }) => {
       assert.equal(workspace, "w");
-      return [{ name: "acme/app", url: "git@github.com:acme/app.git", provider: "github", last_used: 2 },
-        { name: "legacy/offline", url: "https://git.example.org/legacy/offline.git", provider: null, last_used: 1 }];
+      return [{ name: "acme/app", url: "git@github.com:acme/app.git", git_host: "github", last_used: 2 },
+        { name: "legacy/offline", url: "https://git.example.org/legacy/offline.git", git_host: null, last_used: 1 }];
     },
-    list_providers: [{ id: "github", name: "GitHub", connected: { identity: { user: "acme" } } },
+    list_git_hosts: [{ id: "github", name: "GitHub", connected: { identity: { user: "acme" } } },
       { id: "bitbucket", name: "Bitbucket", connected: { identity: { user: "team" } } }],
-    provider_areas: ({ id, scope }) => { assert.equal(scope, "w"); return [{ key: id === "github" ? "acme" : "team", name: id === "github" ? "acme" : "team" }]; },
-    provider_projects: ({ id, scope }) => {
+    git_host_areas: ({ id, scope }) => { assert.equal(scope, "w"); return [{ key: id === "github" ? "acme" : "team", name: id === "github" ? "acme" : "team" }]; },
+    git_host_projects: ({ id, scope }) => {
       assert.equal(scope, "w");
       if (id === "bitbucket") throw { what: "Sin red en Bitbucket", detail: "offline" };
       if (holdRepositoryReply) return new Promise(resolve => { finishRepositoryReply = resolve; });
@@ -1865,12 +1865,12 @@ if (!roto) {
   assert.ok(controlsDoc.querySelector('[data-destino="p1"]'));
   assert.equal(controlsDoc.querySelector('[data-portfolio]'), null);
   assert.match(savedAgentList.textContent, /Nuevo agente/);
-  const agentLoads = sidebarControls.comandos.filter(c => c === "list_encargados").length;
+  const agentLoads = sidebarControls.comandos.filter(c => c === "list_agents").length;
   sidebarViewport.scrollTop = 120;
   await sleep(80);
   assert.equal(controlsDoc.querySelector('[data-sesion="recent"]'), savedTaskRow);
   assert.equal(controlsDoc.querySelector('[data-sidebar-agents]'), savedAgentList);
-  assert.equal(sidebarControls.comandos.filter(c => c === "list_encargados").length, agentLoads);
+  assert.equal(sidebarControls.comandos.filter(c => c === "list_agents").length, agentLoads);
   controlsDoc.querySelector('[data-destino="p1"] button[aria-haspopup="menu"]').click();
   await sleep(50);
   [...controlsDoc.querySelectorAll('[role="menuitem"]')].find(item => item.textContent === "Nuevo agente").click();
@@ -1951,7 +1951,7 @@ if (!roto) {
   await sleep(50);
   controlsDoc.querySelector('[role="dialog"] form').dispatchEvent(new sidebarControls.w.Event("submit", { bubbles: true, cancelable: true }));
   await sleep(50);
-  assert.equal(cloneRequest.provider, "github");
+  assert.equal(cloneRequest.gitHost, "github");
   assert.equal(cloneRequest.url, "https://github.com/acme/app.git");
   finishClone({ id: "provider-clone", name: "App", kind: "git", sources: [] });
   await sleep(100);
@@ -1994,7 +1994,7 @@ if (!roto) {
   };
   await openClone();
   assert.equal(cloneRequest.workspace, "w");
-  assert.equal(cloneRequest.provider, null);
+  assert.equal(cloneRequest.gitHost, null);
   assert.equal(controlsDoc.querySelector('[role="progressbar"]'), null);
   cloneRequest.progress.onmessage({ phase: "receiving", percent: 42 });
   await sleep(50);
@@ -2180,7 +2180,7 @@ if (!roto) {
       { role: "agent", id: "answer", text: "Revisé todo." },
       { role: "system", text: "Se guardó el árbol.", meta: null },
       { role: "system", text: "La tarea «Revisión» terminó: listo.", meta: "task_completed",
-        from_task: { folder: "", task: "child", title: "Revisión", agent: "claude" } },
+        from_task: { folder: "", task: "child", title: "Revisión", provider: "claude" } },
     ] },
   });
   const lateDoc = lateNotice.w.document;
@@ -2393,7 +2393,7 @@ if (!roto) {
     let accept;
     let reject;
     const calls = [];
-    const queued = { id: "attached", text: "", agent: "codex", model: null, effort: null, attachments: [attachment] };
+    const queued = { id: "attached", text: "", provider: "codex", model: null, effort: null, attachments: [attachment] };
     const app = await boot("listo", `steer-attachment-${attachment}`, {
       ...CON_TAREA, load_queue: [queued], save_queue: null, queue_ready: false,
       list_active_turns: ["s1"],
@@ -2591,17 +2591,17 @@ if (!roto) {
   const providers = await boot("listo", "provider-workspaces", {
     ...RESPUESTAS,
     list_workspaces: () => ({ ...RESPUESTAS.list_workspaces, active: providerWorkspace }),
-    list_providers: ({ scope }) => [providerInfo(scope)],
-    check_provider: ({ scope }) => providerInfo(scope),
-    provider_areas: ({ scope }) => (selections.get(scope) ?? []).map(({ key }) => ({ key, name: key })),
-    provider_available_areas: ({ scope }) => { providerCalls.push(scope); return scope === "ws-a" && pendingAreas ? pendingAreas : available; },
-    select_provider_area: ({ scope, area, enabled }) => {
+    list_git_hosts: ({ scope }) => [providerInfo(scope)],
+    check_git_host: ({ scope }) => providerInfo(scope),
+    git_host_areas: ({ scope }) => (selections.get(scope) ?? []).map(({ key }) => ({ key, name: key })),
+    git_host_available_areas: ({ scope }) => { providerCalls.push(scope); return scope === "ws-a" && pendingAreas ? pendingAreas : available; },
+    select_git_host_area: ({ scope, area, enabled }) => {
       const next = (selections.get(scope) ?? []).filter(({ key }) => key !== area);
       if (enabled) next.push({ key: area, installation_id: area === "acme" ? 42 : 43 });
       selections.set(scope, next);
       return providerInfo(scope);
     },
-    provider_projects: ({ scope, area }) => {
+    git_host_projects: ({ scope, area }) => {
       assert.ok(selections.get(scope)?.some(({ key }) => key === area));
       return [];
     },
@@ -2610,7 +2610,7 @@ if (!roto) {
       return { code: "ABCD", url: "https://github.com/login/device", expires_at: 9999999999999 };
     },
     finish_browser_login: ({ scope }) => providerInfo(scope),
-    provider_pending_setup: null,
+    git_host_pending_setup: null,
     open_external: ({ target }) => {
       assert.ok(["https://github.com/login/device", "https://github.com/apps/terminus-app/installations/new"].includes(target));
       if (target.endsWith("/installations/new")) available = [{ key: "acme", name: "acme" }, { key: "other", name: "other" }];
@@ -2840,13 +2840,13 @@ if (!roto) {
     list_radiant_connections: () => structuredClone(GOBERNADO().summary.connections),
     list_governed_mcp_logins: () =>
       gobierno.governed ? [{ id: "atlassian", name: "Atlassian", sesiones: radiantSesiones.slice() }] : [],
-    list_mcp_agents: () => [
+    list_mcp_providers: () => [
       { id: "claude", label: "Claude Code", recibe: true, instalado: true, login: true },
       { id: "grok", label: "Grok", recibe: true, instalado: true, login: false,
         sin_login: { clave: "mcp.session.cli_has_none" } },
       { id: "codex", label: "Codex", recibe: false, instalado: false, login: true },
     ],
-    mcp_login: ({ agent, id }) => {
+    mcp_login: ({ provider: agent, id }) => {
       radiantCalls.push(["mcp_login", agent, id]);
       return { clave: "mcp.login.opened_browser", datos: { service: "Atlassian" } };
     },
@@ -3184,9 +3184,9 @@ if (!roto) {
   ];
   const declaracion = (a) => {
     const base = a.scope.kind === "project" ? `/ws/projects/${a.scope.id}/agents/${a.name}` : `/ws/agents/${a.name}`;
-    return { name: a.name, description: a.description, instructions: "Trabaja.", tools: [], model: null, origin: `${base}/agent.md`, folder: base, agents: ["claude"], own: true, own_scope: a.scope };
+    return { name: a.name, description: a.description, instructions: "Trabaja.", tools: [], model: null, origin: `${base}/agent.md`, folder: base, providers: ["claude"], own: true, own_scope: a.scope };
   };
-  const perfilDe = (display) => ({ display_name: display, body: null, background: null, veil: 0.82, agent: null, model: null, effort: null, hidden: false });
+  const perfilDe = (display) => ({ display_name: display, body: null, background: null, veil: 0.82, provider: null, model: null, effort: null, hidden: false });
   const cambiosDeCarpetas = [];
   const creados = [];
   const agentesApp = await boot("listo", "settings-agents", {
@@ -3207,7 +3207,7 @@ if (!roto) {
         }))
         .sort((x, y) => x.agent.name.localeCompare(y.agent.name)),
       repository: [{
-        agent: { name: "qa", description: "Verifica que un cambio funcione.", instructions: "", tools: [], model: null, origin: qaDelRepositorio, folder: "/repo/app/.agents/agents/qa", agents: ["claude"], own: false, own_scope: null },
+        agent: { name: "qa", description: "Verifica que un cambio funcione.", instructions: "", tools: [], model: null, origin: qaDelRepositorio, folder: "/repo/app/.agents/agents/qa", providers: ["claude"], own: false, own_scope: null },
         profile: perfilDe(null),
         folders: ["app"],
       }],
@@ -3239,11 +3239,11 @@ if (!roto) {
       a.list = change.folders;
       return structuredClone(a.list);
     },
-    create_encargado: ({ name, description, scope }) => {
+    create_agent: ({ name, description, scope }) => {
       creados.push([name, scope]);
       const a = { name, scope, list: [scope.id], display: null, description };
       agentesPropios.push(a);
-      return { encargado: declaracion(a), eclipsado_por: null };
+      return { agent: declaracion(a), eclipsado_por: null };
     },
     save_agent_profile: ({ name, displayName }) => {
       const a = agentesPropios.find((x) => x.name === name);
@@ -4010,7 +4010,7 @@ if (!roto) {
     list_workspaces: altaEspacios,
     workspaces_startup: altaEspacios,
     list_language_packs: [], list_bundled_language_packs: [],
-    list_agents: [
+    list_providers: [
       { id: "codex", label: "Codex", available: true, driver: true, sin_cuenta: false, source: null },
       { id: "opencode-local", label: "Locales", available: true, driver: true, sin_cuenta: true, source: null },
     ],
@@ -4018,8 +4018,8 @@ if (!roto) {
     set_active_workspace: ({ id }) => { altaActiva = id; },
     set_workspace_language: null,
     rename_workspace: ({ id, name }) => ({ id, name }),
-    list_accounts: { agent: "codex", env_var: "", shared_credential: null, secret_note: null, active: null, accounts: [] },
-    list_providers: [],
+    list_accounts: { provider: "codex", env_var: "", shared_credential: null, secret_note: null, active: null, accounts: [] },
+    list_git_hosts: [],
     "plugin:dialog|open": "/tmp/contexto",
     set_workspace_source: ({ locator }) => ({ id: "ctx", kind: "folder", name: "contexto", identity: locator, locator }),
     get_project_directory: "/tmp/terminus",
@@ -4593,7 +4593,7 @@ if (!roto) {
     load_session: ({ id }) => ({
       ...CON_TAREA.load_session,
       id,
-      agent: "codex",
+      provider: "codex",
       permission_mode: "manual",
       turns: [],
     }),

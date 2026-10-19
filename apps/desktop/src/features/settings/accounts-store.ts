@@ -42,7 +42,7 @@ export type EnEspera = {
 };
 
 export type AccountList = {
-  agent: string;
+  provider: string;
   env_var: string;
   /**
    * Por qué las cuentas de este agente **no** son sesiones independientes.
@@ -182,7 +182,7 @@ export function createAccountLimit(props: {
     setPreguntando(true);
     try {
       const r = await invoke<Query>("account_limits", {
-        agent: props.agent,
+        provider: props.agent,
         id: props.id,
         force,
       });

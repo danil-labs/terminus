@@ -33,7 +33,7 @@ export default function NewTask() {
   const target = folders.some((f) => f.id === folder) ? folder : (folders[0]?.id ?? null);
   const agents = (snapshot?.handlers ?? []).filter((h) => target && h.folders.includes(target));
   const tasks = snapshot?.tasks ?? [];
-  const defaults = lastAgent(handler ? tasks.filter((task) => task.encargado === handler) : []) ?? lastAgent(tasks);
+  const defaults = lastAgent(handler ? tasks.filter((task) => task.agent === handler) : []) ?? lastAgent(tasks);
   const ready = Boolean(pairing && current && target && defaults && message.trim()) && !busy;
 
   async function start() {

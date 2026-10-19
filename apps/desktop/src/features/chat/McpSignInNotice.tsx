@@ -6,9 +6,9 @@ import { asFailure, type Failure } from "../../ui/Failure";
 /** Espeja `dialects::claude::mcp_sin_sesion`. */
 type PendingServer = { name: string; source: string };
 /** El evento `mcp_auth` de una tarea. */
-type PendingSignIn = { agent: string; servers: PendingServer[] };
+type PendingSignIn = { provider: string; servers: PendingServer[] };
 /** Lo que emite `mcp::lanzar_login` al terminar; los demás `mcp` no traen nada. */
-type LoginEnded = { agent: string; server: string; ok: boolean } | null;
+type LoginEnded = { provider: string; server: string; ok: boolean } | null;
 
 // Por sesión y fuera del componente: el evento llega al arrancar el turno,
 // se esté mirando esa tarea o no. Una lista vacía quita la señal.
@@ -40,7 +40,7 @@ function forgetSignedIn(agent: string, server: string) {
     Object.fromEntries(
       Object.entries(all).map(([session, p]) => [
         session,
-        p.agent === agent ? { ...p, servers: p.servers.filter((s) => s.name !== server) } : p,
+        p.provider === agent ? { ...p, servers: p.servers.filter((s) => s.name !== server) } : p,
       ]),
     ),
   );
@@ -78,7 +78,7 @@ function stopWaiting(key: string) {
  * por aquí.
  */
 export async function mcpSignIn(name: string) {
-  const agent = current()?.agent;
+  const agent = current()?.provider;
   if (!agent) return;
   const key = loginKey(name);
   if (inProgress().has(key)) return;
@@ -87,7 +87,7 @@ export async function mcpSignIn(name: string) {
   setInProgress((s) => new Set(s).add(key));
   timers.set(key, window.setTimeout(() => stopWaiting(key), 120_000));
   try {
-    await invoke("mcp_login", { agent, id: name });
+    await invoke("mcp_login", { provider: agent, id: name });
   } catch (e) {
     setFailure(asFailure(e));
     stopWaiting(key);
@@ -103,7 +103,7 @@ export default function McpSignInNotice(props: { session: string | null }) {
     // Nombres literales: `scripts/guards/bridge.mjs` solo lee esos.
     const url = listen<string>("mcp-login", (e) => setLoginUrl(e.payload));
     const end = listen<LoginEnded>("mcp", (e) => {
-      if (e.payload?.ok) forgetSignedIn(e.payload.agent, e.payload.server);
+      if (e.payload?.ok) forgetSignedIn(e.payload.provider, e.payload.server);
       const done = Array.from(inProgress());
       setFinished((s) => new Set([...s, ...done]));
       for (const key of done) stopWaiting(key);

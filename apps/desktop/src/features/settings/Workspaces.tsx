@@ -152,7 +152,7 @@ export function WorkspaceMenu(props: {
             })}
             title={props.compact ? ws.actual()?.name : undefined}
           >
-            <Show when={ws.actual()?.provider} fallback={<Laptop size={15} />}>
+            <Show when={ws.actual()?.git_host} fallback={<Laptop size={15} />}>
               <Cloud size={15} />
             </Show>
             <Show when={!props.compact}>
@@ -225,7 +225,7 @@ export function WorkspaceMenu(props: {
 function GlifoDeWorkspace(props: { w: Workspace }) {
   return (
     <Show
-      when={props.w.provider}
+      when={props.w.git_host}
       fallback={<Laptop size={15} class="shrink-0 text-neutral-500" />}
     >
       <Cloud size={15} class="shrink-0 text-neutral-500" />

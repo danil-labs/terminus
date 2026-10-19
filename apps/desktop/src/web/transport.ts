@@ -88,7 +88,7 @@ const INTENT = new Set([
   "send_message",
   "inject_message",
   "create_project",
-  "create_encargado",
+  "create_agent",
   "respond_permission",
   "answer_question",
   "answer_shell_output",

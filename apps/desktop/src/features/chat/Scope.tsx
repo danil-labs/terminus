@@ -156,7 +156,7 @@ export default function Alcance(props: {
     try {
       const r = await invoke<{ default: string; branches: string[] }>(
         "repo_branches",
-        // Sin `provider`: el backend mira el host y usa la conexión del
+        // Sin `gitHost`: el backend mira el host y usa la conexión del
         // workspace si existe, y si no lo intenta como público. Quien adjuntó
         // no tiene por qué saber cuál de los dos es.
         { cloneUrl: f.location },
@@ -203,7 +203,7 @@ export default function Alcance(props: {
     const ya = proveedores();
     if (ya) return saltarSiUnico(ya);
     try {
-      const ps = await invoke<Proveedor[]>("list_providers");
+      const ps = await invoke<Proveedor[]>("list_git_hosts");
       // Solo los conectados: uno sin conexión no puede listar nada, y ofrecerlo
       // es un clic que acaba en un error que ya se sabía.
       const vivos = ps.filter((p) => p.connected);
@@ -220,7 +220,7 @@ export default function Alcance(props: {
     setAreas(null);
     setBusca("");
     try {
-      const as = await invoke<Area[]>("provider_areas", { id: proveedor });
+      const as = await invoke<Area[]>("git_host_areas", { id: proveedor });
       setAreas(as);
       if (as.length === 1) void verRepos(proveedor, as[0].key);
     } catch (e) {
@@ -234,7 +234,7 @@ export default function Alcance(props: {
     setBusca("");
     try {
       setRepos(
-        await invoke<RepoRemoto[]>("provider_projects", { id: proveedor, area }),
+        await invoke<RepoRemoto[]>("git_host_projects", { id: proveedor, area }),
       );
     } catch (e) {
       decir(e);
@@ -267,7 +267,7 @@ export default function Alcance(props: {
     void traer(() =>
       invoke<{ id: string }>("attach_repo", {
         project: "",
-        provider: proveedor,
+        gitHost: proveedor,
         cloneUrl: r.clone_url,
         // **La principal, y sin preguntar.** La rama se cambia después desde su
         // chip; preguntarla aquí sería decidir dos veces lo mismo.

@@ -17,7 +17,7 @@ const PROYECTOS = [
 ];
 
 const fila = (id, folder, space, extra = {}) => ({
-  id, folder, space, parent: null, title: `Tarea ${id}`, outcome: null, agent: "codex", model: null,
+  id, folder, space, parent: null, title: `Tarea ${id}`, outcome: null, provider: "codex", model: null,
   refs: [], stage: null, esperando: false, updated_at: 1, created_at: 1, turns: 1, archived: false,
   chat_de_agente: false, ...extra,
 });
@@ -270,7 +270,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
       ],
       filas: [
         fila("t1", "pa", "i1"), fila("t2", "pb", "i1"), fila("t3", "pb", "i2"), fila("t4", "pa", "i2"),
-        fila("t5", "pc", null), fila("c1", "pa", null, { chat_de_agente: true, encargado: "design" }),
+        fila("t5", "pc", null), fila("c1", "pa", null, { chat_de_agente: true, agent: "design" }),
       ],
       atencion: [{ session: "t3", project: "pb", state: "asked" }, { session: "t1", project: "pa", state: "failed" }],
     });
@@ -551,7 +551,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
       fila("old-chat", "pa", null, { chat_de_agente: true }),
       fila("old-thread", "pa", null, { chat_de_agente: true, agent_thread: true }),
       fila("old-inbox", "pa", null, { chat_de_agente: true, agent_thread: true, inbox: true }),
-    ].map((row) => ({ ...row, archived: true, pinned: false, encargado: "design" }));
+    ].map((row) => ({ ...row, archived: true, pinned: false, agent: "design" }));
     const s = servicio({
       spaces: [{ id: "i1", name: null, folders: ["pa"], created_at: 1, updated_at: 1 }],
       filas: legacy,
@@ -583,7 +583,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
   {
     const s = servicio({
       spaces: [{ id: "i1", name: null, folders: ["pa"], created_at: 1, updated_at: 1 }],
-      filas: [fila("old-chat", "pa", "i1", { chat_de_agente: true, encargado: "design", title: "Design" })],
+      filas: [fila("old-chat", "pa", "i1", { chat_de_agente: true, agent: "design", title: "Design" })],
     });
     const app = await boot("listo", "spaces-previous-agent-chat", base(s, {
       "space.w": "i1",

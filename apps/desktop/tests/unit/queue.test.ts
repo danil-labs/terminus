@@ -62,11 +62,11 @@ test("un borrador leído de disco se suelta mientras su tarea contesta", () => {
 });
 
 test("el lote conserva el orden, los adjuntos y la última configuración explícita", () => {
-  const first = { id: "a", text: "Haz los cambios", agent: "codex", model: "first", effort: null, permission_mode: "auto", attachments: ["/a", "/b"] };
+  const first = { id: "a", text: "Haz los cambios", provider: "codex", model: "first", effort: null, permission_mode: "auto", attachments: ["/a", "/b"] };
   const last = { ...first, id: "b", text: "Y agrega las pruebas", model: "last", permission_mode: "ask", attachments: ["/b", "/c"] };
   assert.deepEqual(groupQueue([first, last]), {
     text: "Haz los cambios\n\nY agrega las pruebas",
-    agent: "codex", model: "last", effort: null, permission_mode: "ask",
+    provider: "codex", model: "last", effort: null, permission_mode: "ask",
     attachments: ["/a", "/b", "/c"],
   });
   assert.equal(groupQueue([]), null);
@@ -75,7 +75,7 @@ test("el lote conserva el orden, los adjuntos y la última configuración explí
 
 test("agrupar menciones reajusta sus posiciones UTF-16 y conserva su identidad", () => {
   const target = { kind: "task" as const, projectId: "project", sessionId: "task" };
-  const message = { agent: "codex", model: null, effort: null, permission_mode: null, attachments: [] };
+  const message = { provider: "codex", model: null, effort: null, permission_mode: null, attachments: [] };
   const combined = groupQueue([
     { ...message, id: "a", text: "🦊 primero" },
     { ...message, id: "b", text: "@Login", task_mentions: [{ target, start: 0, end: 6, text: "@Login" }] },
@@ -87,7 +87,7 @@ test("agrupar menciones reajusta sus posiciones UTF-16 y conserva su identidad",
 });
 
 test("el lote rebasa también los destinatarios, que el backend valida contra el texto", () => {
-  const message = { agent: "codex", model: null, effort: null, permission_mode: null, attachments: [] };
+  const message = { provider: "codex", model: null, effort: null, permission_mode: null, attachments: [] };
   const combined = groupQueue([
     { ...message, id: "a", text: "🦊 primero" },
     { ...message, id: "b", text: "@arquitecto revisa", recipients: [{ name: "arquitecto", start: 0, end: 11, text: "@arquitecto" }] },
@@ -103,19 +103,19 @@ test("el lote rebasa también los destinatarios, que el backend valida contra el
 const delivery = {
   id: "d1",
   text: "Revisa el acceso",
-  agent: "codex",
+  provider: "codex",
   model: null,
   effort: null,
   permission_mode: null,
   attachments: [],
-  encargado: "arquitecto",
+  agent: "arquitecto",
   reply_to: { folder: "p", task: "t9" },
   hops: 2,
 };
 
 test("vaciar la cola devuelve el remitente y la dirección de vuelta de la entrega", () => {
   const { mensaje: message, lote: batch, resto: remaining } = nextBatch([delivery, { ...delivery, id: "d2", text: "Y el registro" }]);
-  assert.equal(message!.encargado, "arquitecto");
+  assert.equal(message!.agent, "arquitecto");
   assert.deepEqual(message!.reply_to, { folder: "p", task: "t9" });
   assert.equal(message!.hops, 2);
   assert.equal(message!.text, ["Revisa el acceso", "Y el registro"].join("\n\n"));
@@ -124,30 +124,30 @@ test("vaciar la cola devuelve el remitente y la dirección de vuelta de la entre
 });
 
 test("un lote no mezcla remitentes: lo que viene de otro sobre espera al turno siguiente", () => {
-  const own = { ...delivery, id: "p1", text: "Y esto lo escribo yo", encargado: null, reply_to: null, hops: null };
+  const own = { ...delivery, id: "p1", text: "Y esto lo escribo yo", agent: null, reply_to: null, hops: null };
   const first = nextBatch([delivery, own]);
   assert.equal(first.mensaje!.text, "Revisa el acceso");
-  assert.equal(first.mensaje!.encargado, "arquitecto");
+  assert.equal(first.mensaje!.agent, "arquitecto");
   assert.deepEqual(first.resto.map((i) => i.id), ["p1"]);
   // Y al siguiente turno sale lo de la persona, sin la firma de nadie.
   const second = nextBatch(first.resto);
   assert.equal(second.mensaje!.text, "Y esto lo escribo yo");
-  assert.equal("encargado" in second.mensaje!, false);
+  assert.equal("agent" in second.mensaje!, false);
   assert.equal("reply_to" in second.mensaje!, false);
   // Dos entregas del mismo remitente sí van juntas: es un solo turno suyo.
   assert.deepEqual(nextBatch([delivery, { ...delivery, id: "d2" }]).resto, []);
   assert.deepEqual(nextBatch([]).mensaje, null);
-  assert.equal("encargado" in groupQueue([own])!, false);
+  assert.equal("agent" in groupQueue([own])!, false);
 });
 
 // Lo que llegó por Telegram mientras el chat contestaba espera en la cola sin
 // firma de encargado, y sale con su canal para que la respuesta vuelva por él.
 test("un mensaje encolado de un canal conserva su canal sin firma de agente", () => {
-  const telegram = { ...delivery, id: "c1", text: "hola", encargado: null, reply_to: null, hops: 1, channel: "Telegram" };
+  const telegram = { ...delivery, id: "c1", text: "hola", agent: null, reply_to: null, hops: 1, channel: "Telegram" };
   const window = { ...telegram, id: "p1", text: "y esto desde la ventana", channel: null };
   const first = nextBatch([telegram, window]);
   assert.equal(first.mensaje!.channel, "Telegram");
-  assert.equal("encargado" in first.mensaje!, false);
+  assert.equal("agent" in first.mensaje!, false);
   assert.deepEqual(first.resto.map((i) => i.id), ["p1"]);
   assert.equal("channel" in nextBatch(first.resto).mensaje!, false);
 
@@ -156,8 +156,8 @@ test("un mensaje encolado de un canal conserva su canal sin firma de agente", ()
 // Lo que mandó una tarea por el CLI y esperó en la cola sale firmado por ella, y
 // no se junta en un turno con lo que mandó otra.
 test("una entrega encolada conserva la tarea remitente", () => {
-  const login = { folder: "p", task: "login", title: "Corregir login", agent: "codex" };
-  const fromTask = { ...delivery, id: "t1", encargado: null, reply_to: null, from_task: login };
+  const login = { folder: "p", task: "login", title: "Corregir login", provider: "codex" };
+  const fromTask = { ...delivery, id: "t1", agent: null, reply_to: null, from_task: login };
   const fromOther = { ...fromTask, id: "t2", from_task: { ...login, task: "otra", title: "Otra" } };
   const first = nextBatch([fromTask, fromOther]);
   assert.deepEqual(first.mensaje!.from_task, login);
@@ -168,7 +168,7 @@ test("una entrega encolada conserva la tarea remitente", () => {
 // Lo que se encoló desde dos escritorios sale en dos turnos, cada uno con el
 // suyo: juntarlos lanzaría lo pedido en A dentro del escritorio B.
 test("un lote conserva su escritorio y separa mensajes de otro escritorio", () => {
-  const own = { ...delivery, id: "a1", encargado: null, reply_to: null, hops: null };
+  const own = { ...delivery, id: "a1", agent: null, reply_to: null, hops: null };
   const inA = { ...own, space: "iniA" };
   const inA2 = { ...own, id: "a2", text: "y otra cosa", space: "iniA" };
   const inB = { ...own, id: "b1", text: "desde B", space: "iniB" };
@@ -184,7 +184,7 @@ test("un lote conserva su escritorio y separa mensajes de otro escritorio", () =
 
 });
 
-const written = { agent: "claude", model: null, effort: null, permission_mode: null, attachments: [] };
+const written = { provider: "claude", model: null, effort: null, permission_mode: null, attachments: [] };
 
 // Juntar un `!` o un `/` con otro renglón los manda como un solo comando: el
 // mensaje de detrás se ejecuta en la terminal o llega al CLI como argumento.

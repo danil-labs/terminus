@@ -8,8 +8,8 @@
       "output": "-> Query",
       "parameters": [
         {
-          "key": "agent",
-          "name": "agent",
+          "key": "provider",
+          "name": "provider",
           "type": "String"
         },
         {
@@ -33,8 +33,8 @@
       "output": "-> Result < AccountStatus , String >",
       "parameters": [
         {
-          "key": "agent",
-          "name": "agent",
+          "key": "provider",
+          "name": "provider",
           "type": "String"
         },
         {
@@ -53,8 +53,8 @@
       "output": "-> Result < Account , String >",
       "parameters": [
         {
-          "key": "agent",
-          "name": "agent",
+          "key": "provider",
+          "name": "provider",
           "type": "String"
         },
         {
@@ -70,7 +70,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "add_folder",
-      "output": "-> Result < Source , String >",
+      "output": "-> Result < Wire < Source > , String >",
       "parameters": [
         {
           "key": "locator",
@@ -100,7 +100,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "add_repo_url",
-      "output": "-> Result < Source , Failure >",
+      "output": "-> Result < Wire < Source > , Failure >",
       "parameters": [
         {
           "key": "cloneUrl",
@@ -120,7 +120,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "add_skill_source",
-      "output": "-> Result < Fuente , Failure >",
+      "output": "-> Result < Wire < Fuente > , Failure >",
       "parameters": [
         {
           "key": "url",
@@ -138,8 +138,8 @@
           "type": "Rotulo"
         },
         {
-          "key": "provider",
-          "name": "provider",
+          "key": "gitHost",
+          "name": "git_host",
           "type": "Option < String >"
         }
       ],
@@ -150,7 +150,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "add_workspace",
-      "output": "-> Result < Workspace , String >",
+      "output": "-> Result < Wire < Workspace > , String >",
       "parameters": [
         {
           "key": "name",
@@ -163,8 +163,8 @@
           "type": "Option < String >"
         },
         {
-          "key": "provider",
-          "name": "provider",
+          "key": "gitHost",
+          "name": "git_host",
           "type": "Option < String >"
         },
         {
@@ -174,21 +174,6 @@
         }
       ],
       "path": "workspaces::add_workspace"
-    },
-    {
-      "async": false,
-      "channel": null,
-      "kind": "invoke",
-      "name": "agent_download_size",
-      "output": "-> Result < u64 , String >",
-      "parameters": [
-        {
-          "key": "agent",
-          "name": "agent",
-          "type": "String"
-        }
-      ],
-      "path": "agents::agent_download_size"
     },
     {
       "async": false,
@@ -204,7 +189,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "answer_question",
-      "output": "-> Result < Turn , String >",
+      "output": "-> Result < Wire < Turn > , String >",
       "parameters": [
         {
           "key": "session",
@@ -232,8 +217,8 @@
       "output": "-> Result < bool , String >",
       "parameters": [
         {
-          "key": "agent",
-          "name": "agent",
+          "key": "provider",
+          "name": "provider",
           "type": "String"
         },
         {
@@ -338,7 +323,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "attach_repo",
-      "output": "-> Result < Source , Failure >",
+      "output": "-> Result < Wire < Source > , Failure >",
       "parameters": [
         {
           "key": "project",
@@ -346,8 +331,8 @@
           "type": "String"
         },
         {
-          "key": "provider",
-          "name": "provider",
+          "key": "gitHost",
+          "name": "git_host",
           "type": "String"
         },
         {
@@ -456,7 +441,7 @@
           "type": "Option < String >"
         }
       ],
-      "path": "providers::cancel_browser_login"
+      "path": "git_hosts::cancel_browser_login"
     },
     {
       "async": false,
@@ -502,7 +487,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "cancel_question",
-      "output": "-> Result < Turn , String >",
+      "output": "-> Result < Wire < Turn > , String >",
       "parameters": [
         {
           "key": "project",
@@ -566,6 +551,26 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "check_git_host",
+      "output": "-> Result < GitHostInfo , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "git_hosts::check_git_host"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "check_integration",
       "output": "-> Result < serde_json :: Value , Failure >",
       "parameters": [
@@ -585,26 +590,6 @@
       "output": "-> Result < Vec < (String , Salud) > , Failure >",
       "parameters": [],
       "path": "mcp::check_mcp"
-    },
-    {
-      "async": false,
-      "channel": null,
-      "kind": "invoke",
-      "name": "check_provider",
-      "output": "-> Result < ProviderInfo , Failure >",
-      "parameters": [
-        {
-          "key": "id",
-          "name": "id",
-          "type": "String"
-        },
-        {
-          "key": "scope",
-          "name": "scope",
-          "type": "Option < String >"
-        }
-      ],
-      "path": "providers::check_provider"
     },
     {
       "async": false,
@@ -664,8 +649,8 @@
           "type": "Option < String >"
         },
         {
-          "key": "provider",
-          "name": "provider",
+          "key": "gitHost",
+          "name": "git_host",
           "type": "Option < String >"
         },
         {
@@ -754,23 +739,8 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
-      "name": "connect_known_mcp",
-      "output": "-> Result < () , Failure >",
-      "parameters": [
-        {
-          "key": "id",
-          "name": "id",
-          "type": "String"
-        }
-      ],
-      "path": "mcp::connect_known_mcp"
-    },
-    {
-      "async": false,
-      "channel": null,
-      "kind": "invoke",
-      "name": "connect_provider",
-      "output": "-> Result < ProviderInfo , Failure >",
+      "name": "connect_git_host",
+      "output": "-> Result < GitHostInfo , Failure >",
       "parameters": [
         {
           "key": "id",
@@ -793,7 +763,22 @@
           "type": "Option < String >"
         }
       ],
-      "path": "providers::connect_provider"
+      "path": "git_hosts::connect_git_host"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "connect_known_mcp",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "mcp::connect_known_mcp"
     },
     {
       "async": false,
@@ -803,6 +788,36 @@
       "output": "-> (Vec < Frase > , u32)",
       "parameters": [],
       "path": "workspaces::consent_text"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "create_agent",
+      "output": "-> Result < Creado , String >",
+      "parameters": [
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "key": "description",
+          "name": "description",
+          "type": "String"
+        },
+        {
+          "key": "instructions",
+          "name": "instructions",
+          "type": "String"
+        },
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Alcance"
+        }
+      ],
+      "path": "handlers::create_agent"
     },
     {
       "async": false,
@@ -827,8 +842,8 @@
           "type": "String"
         },
         {
-          "key": "agent",
-          "name": "agent",
+          "key": "provider",
+          "name": "provider",
           "type": "String"
         },
         {
@@ -838,36 +853,6 @@
         }
       ],
       "path": "sessions::create_agent_thread"
-    },
-    {
-      "async": false,
-      "channel": null,
-      "kind": "invoke",
-      "name": "create_encargado",
-      "output": "-> Result < Creado , String >",
-      "parameters": [
-        {
-          "key": "name",
-          "name": "name",
-          "type": "String"
-        },
-        {
-          "key": "description",
-          "name": "description",
-          "type": "String"
-        },
-        {
-          "key": "instructions",
-          "name": "instructions",
-          "type": "String"
-        },
-        {
-          "key": "scope",
-          "name": "scope",
-          "type": "Alcance"
-        }
-      ],
-      "path": "handlers::create_encargado"
     },
     {
       "async": false,
@@ -918,7 +903,7 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
-      "name": "delete_encargado",
+      "name": "delete_agent",
       "output": "-> Result < () , String >",
       "parameters": [
         {
@@ -932,7 +917,7 @@
           "type": "String"
         }
       ],
-      "path": "handlers::delete_encargado"
+      "path": "handlers::delete_agent"
     },
     {
       "async": false,
@@ -1072,8 +1057,8 @@
       "output": "-> Result < bool , String >",
       "parameters": [
         {
-          "key": "agent",
-          "name": "agent",
+          "key": "provider",
+          "name": "provider",
           "type": "String"
         },
         {
@@ -1113,22 +1098,7 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
-      "name": "disconnect_known_mcp",
-      "output": "-> Result < () , Failure >",
-      "parameters": [
-        {
-          "key": "id",
-          "name": "id",
-          "type": "String"
-        }
-      ],
-      "path": "mcp::disconnect_known_mcp"
-    },
-    {
-      "async": false,
-      "channel": null,
-      "kind": "invoke",
-      "name": "disconnect_provider",
+      "name": "disconnect_git_host",
       "output": "-> Result < () , Failure >",
       "parameters": [
         {
@@ -1142,7 +1112,22 @@
           "type": "Option < String >"
         }
       ],
-      "path": "providers::disconnect_provider"
+      "path": "git_hosts::disconnect_git_host"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "disconnect_known_mcp",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "mcp::disconnect_known_mcp"
     },
     {
       "async": false,
@@ -1218,7 +1203,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "finish_browser_login",
-      "output": "-> Result < ProviderInfo , Failure >",
+      "output": "-> Result < GitHostInfo , Failure >",
       "parameters": [
         {
           "key": "id",
@@ -1231,14 +1216,14 @@
           "type": "Option < String >"
         }
       ],
-      "path": "providers::finish_browser_login"
+      "path": "git_hosts::finish_browser_login"
     },
     {
       "async": false,
       "channel": null,
       "kind": "invoke",
-      "name": "finish_provider_setup",
-      "output": "-> Result < ProviderInfo , Failure >",
+      "name": "finish_git_host_setup",
+      "output": "-> Result < GitHostInfo , Failure >",
       "parameters": [
         {
           "key": "id",
@@ -1251,7 +1236,7 @@
           "type": "Option < String >"
         }
       ],
-      "path": "providers::finish_provider_setup"
+      "path": "git_hosts::finish_git_host_setup"
     },
     {
       "async": false,
@@ -1299,6 +1284,96 @@
       "output": "-> Result < Identity , Failure >",
       "parameters": [],
       "path": "radiant::get_radiant_identity"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "git_host_areas",
+      "output": "-> Result < Vec < Project > , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "git_hosts::git_host_areas"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "git_host_available_areas",
+      "output": "-> Result < Vec < Project > , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "git_hosts::git_host_available_areas"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "git_host_pending_setup",
+      "output": "-> Result < Option < String > , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "git_hosts::git_host_pending_setup"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "git_host_projects",
+      "output": "-> Result < Vec < RemoteRepo > , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "area",
+          "name": "area",
+          "type": "String"
+        },
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Option < String >"
+        },
+        {
+          "key": "includeSkills",
+          "name": "include_skills",
+          "type": "Option < bool >"
+        }
+      ],
+      "path": "git_hosts::git_host_projects"
     },
     {
       "async": false,
@@ -1404,21 +1479,6 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
-      "name": "install_agent",
-      "output": "-> Result < String , String >",
-      "parameters": [
-        {
-          "key": "agent",
-          "name": "agent",
-          "type": "String"
-        }
-      ],
-      "path": "agents::install_agent"
-    },
-    {
-      "async": false,
-      "channel": null,
-      "kind": "invoke",
       "name": "install_base_tool",
       "output": "-> Result < String , String >",
       "parameters": [
@@ -1507,6 +1567,21 @@
       "output": "-> Result < () , Failure >",
       "parameters": [],
       "path": "models::install_local_runtime"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "install_provider",
+      "output": "-> Result < String , String >",
+      "parameters": [
+        {
+          "key": "provider",
+          "name": "provider",
+          "type": "String"
+        }
+      ],
+      "path": "agents::install_provider"
     },
     {
       "async": false,
@@ -1655,8 +1730,8 @@
       "output": "-> Result < AccountList , String >",
       "parameters": [
         {
-          "key": "agent",
-          "name": "agent",
+          "key": "provider",
+          "name": "provider",
           "type": "String"
         }
       ],
@@ -1682,7 +1757,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "list_agent_profiles",
-      "output": "-> Result < std :: collections :: HashMap < String , Profile > , String >",
+      "output": "-> Result < Wire < std :: collections :: HashMap < String , Profile > > , String >",
       "parameters": [
         {
           "key": "project",
@@ -1696,10 +1771,31 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "list_agent_status",
+      "output": "-> Result < Vec < HandlerStatusRow > , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        }
+      ],
+      "path": "handlers::list_agent_status"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "list_agents",
-      "output": "-> Vec < AgentInfo >",
-      "parameters": [],
-      "path": "agents::list_agents"
+      "output": "-> Listado",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        }
+      ],
+      "path": "handlers::list_agents"
     },
     {
       "async": false,
@@ -1764,31 +1860,16 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
-      "name": "list_encargado_status",
-      "output": "-> Result < Vec < HandlerStatusRow > , String >",
+      "name": "list_git_hosts",
+      "output": "-> Result < Vec < GitHostInfo > , Failure >",
       "parameters": [
         {
-          "key": "project",
-          "name": "project",
-          "type": "String"
+          "key": "scope",
+          "name": "scope",
+          "type": "Option < String >"
         }
       ],
-      "path": "handlers::list_encargado_status"
-    },
-    {
-      "async": false,
-      "channel": null,
-      "kind": "invoke",
-      "name": "list_encargados",
-      "output": "-> Listado",
-      "parameters": [
-        {
-          "key": "project",
-          "name": "project",
-          "type": "String"
-        }
-      ],
-      "path": "handlers::list_encargados"
+      "path": "git_hosts::list_git_hosts"
     },
     {
       "async": false,
@@ -1877,10 +1958,10 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
-      "name": "list_mcp_agents",
+      "name": "list_mcp_providers",
       "output": "-> Vec < AgenteMcp >",
       "parameters": [],
-      "path": "mcp::list_mcp_agents"
+      "path": "mcp::list_mcp_providers"
     },
     {
       "async": false,
@@ -1949,8 +2030,8 @@
       "output": "-> Result < AgentModels , String >",
       "parameters": [
         {
-          "key": "agent",
-          "name": "agent",
+          "key": "provider",
+          "name": "provider",
           "type": "String"
         }
       ],
@@ -1964,8 +2045,8 @@
       "output": "-> Result < Vec < ModoInfo > , String >",
       "parameters": [
         {
-          "key": "agent",
-          "name": "agent",
+          "key": "provider",
+          "name": "provider",
           "type": "String"
         }
       ],
@@ -1985,7 +2066,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "list_project_repositories",
-      "output": "-> Result < Vec < ProjectRepository > , Failure >",
+      "output": "-> Result < Wire < Vec < ProjectRepository > > , Failure >",
       "parameters": [
         {
           "key": "workspace",
@@ -2009,15 +2090,9 @@
       "channel": null,
       "kind": "invoke",
       "name": "list_providers",
-      "output": "-> Result < Vec < ProviderInfo > , Failure >",
-      "parameters": [
-        {
-          "key": "scope",
-          "name": "scope",
-          "type": "Option < String >"
-        }
-      ],
-      "path": "providers::list_providers"
+      "output": "-> Vec < AgentInfo >",
+      "parameters": [],
+      "path": "agents::list_providers"
     },
     {
       "async": false,
@@ -2084,8 +2159,8 @@
       "output": "-> MenuDeBarra",
       "parameters": [
         {
-          "key": "agent",
-          "name": "agent",
+          "key": "provider",
+          "name": "provider",
           "type": "String"
         }
       ],
@@ -2209,7 +2284,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "load_queue",
-      "output": "-> Result < Vec < Queued > , String >",
+      "output": "-> Result < Wire < Vec < Queued > > , String >",
       "parameters": [
         {
           "key": "project",
@@ -2270,8 +2345,8 @@
       "output": "-> Result < () , String >",
       "parameters": [
         {
-          "key": "agent",
-          "name": "agent",
+          "key": "provider",
+          "name": "provider",
           "type": "String"
         },
         {
@@ -2315,8 +2390,8 @@
       "output": "-> Result < Frase , Failure >",
       "parameters": [
         {
-          "key": "agent",
-          "name": "agent",
+          "key": "provider",
+          "name": "provider",
           "type": "String"
         },
         {
@@ -2335,8 +2410,8 @@
       "output": "-> Result < () , Failure >",
       "parameters": [
         {
-          "key": "agent",
-          "name": "agent",
+          "key": "provider",
+          "name": "provider",
           "type": "String"
         },
         {
@@ -2664,91 +2739,16 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
-      "name": "provider_areas",
-      "output": "-> Result < Vec < Project > , Failure >",
+      "name": "provider_download_size",
+      "output": "-> Result < u64 , String >",
       "parameters": [
         {
-          "key": "id",
-          "name": "id",
+          "key": "provider",
+          "name": "provider",
           "type": "String"
-        },
-        {
-          "key": "scope",
-          "name": "scope",
-          "type": "Option < String >"
         }
       ],
-      "path": "providers::provider_areas"
-    },
-    {
-      "async": false,
-      "channel": null,
-      "kind": "invoke",
-      "name": "provider_available_areas",
-      "output": "-> Result < Vec < Project > , Failure >",
-      "parameters": [
-        {
-          "key": "id",
-          "name": "id",
-          "type": "String"
-        },
-        {
-          "key": "scope",
-          "name": "scope",
-          "type": "Option < String >"
-        }
-      ],
-      "path": "providers::provider_available_areas"
-    },
-    {
-      "async": false,
-      "channel": null,
-      "kind": "invoke",
-      "name": "provider_pending_setup",
-      "output": "-> Result < Option < String > , Failure >",
-      "parameters": [
-        {
-          "key": "id",
-          "name": "id",
-          "type": "String"
-        },
-        {
-          "key": "scope",
-          "name": "scope",
-          "type": "Option < String >"
-        }
-      ],
-      "path": "providers::provider_pending_setup"
-    },
-    {
-      "async": false,
-      "channel": null,
-      "kind": "invoke",
-      "name": "provider_projects",
-      "output": "-> Result < Vec < RemoteRepo > , Failure >",
-      "parameters": [
-        {
-          "key": "id",
-          "name": "id",
-          "type": "String"
-        },
-        {
-          "key": "area",
-          "name": "area",
-          "type": "String"
-        },
-        {
-          "key": "scope",
-          "name": "scope",
-          "type": "Option < String >"
-        },
-        {
-          "key": "includeSkills",
-          "name": "include_skills",
-          "type": "Option < bool >"
-        }
-      ],
-      "path": "providers::provider_projects"
+      "path": "agents::provider_download_size"
     },
     {
       "async": false,
@@ -3119,8 +3119,8 @@
       "output": "-> Result < () , String >",
       "parameters": [
         {
-          "key": "agent",
-          "name": "agent",
+          "key": "provider",
+          "name": "provider",
           "type": "String"
         },
         {
@@ -3130,21 +3130,6 @@
         }
       ],
       "path": "accounts::remove_account"
-    },
-    {
-      "async": false,
-      "channel": null,
-      "kind": "invoke",
-      "name": "remove_agent",
-      "output": "-> Result < () , String >",
-      "parameters": [
-        {
-          "key": "agent",
-          "name": "agent",
-          "type": "String"
-        }
-      ],
-      "path": "agents::remove_agent"
     },
     {
       "async": false,
@@ -3208,6 +3193,21 @@
         }
       ],
       "path": "mcp::remove_mcp_server"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "remove_provider",
+      "output": "-> Result < () , String >",
+      "parameters": [
+        {
+          "key": "provider",
+          "name": "provider",
+          "type": "String"
+        }
+      ],
+      "path": "agents::remove_provider"
     },
     {
       "async": false,
@@ -3339,7 +3339,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "rename_workspace",
-      "output": "-> Result < Workspace , String >",
+      "output": "-> Result < Wire < Workspace > , String >",
       "parameters": [
         {
           "key": "id",
@@ -3359,7 +3359,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "repo_branches",
-      "output": "-> Result < crate :: providers :: RemoteBranches , Failure >",
+      "output": "-> Result < crate :: git_hosts :: RemoteBranches , Failure >",
       "parameters": [
         {
           "key": "cloneUrl",
@@ -3367,8 +3367,8 @@
           "type": "String"
         },
         {
-          "key": "provider",
-          "name": "provider",
+          "key": "gitHost",
+          "name": "git_host",
           "type": "Option < String >"
         },
         {
@@ -3393,7 +3393,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "respond_permission",
-      "output": "-> Result < Turn , String >",
+      "output": "-> Result < Wire < Turn > , String >",
       "parameters": [
         {
           "key": "session",
@@ -3461,8 +3461,8 @@
       "output": "-> Result < usize , String >",
       "parameters": [
         {
-          "key": "agent",
-          "name": "agent",
+          "key": "provider",
+          "name": "provider",
           "type": "String"
         }
       ],
@@ -3546,8 +3546,8 @@
           "type": "Option < String >"
         },
         {
-          "key": "agent",
-          "name": "agent",
+          "key": "provider",
+          "name": "provider",
           "type": "Option < String >"
         },
         {
@@ -3571,8 +3571,8 @@
           "type": "Option < String >"
         },
         {
-          "key": "encargado",
-          "name": "encargado",
+          "key": "agent",
+          "name": "agent",
           "type": "Option < String >"
         },
         {
@@ -3623,7 +3623,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "save_agent_profile",
-      "output": "-> Result < Profile , String >",
+      "output": "-> Result < Wire < Profile > , String >",
       "parameters": [
         {
           "key": "project",
@@ -3673,7 +3673,7 @@
         {
           "key": "queued",
           "name": "queued",
-          "type": "Vec < Queued >"
+          "type": "Wire < Vec < Queued > >"
         }
       ],
       "path": "chat::save_queue"
@@ -3682,8 +3682,8 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
-      "name": "select_provider_area",
-      "output": "-> Result < ProviderInfo , Failure >",
+      "name": "select_git_host_area",
+      "output": "-> Result < GitHostInfo , Failure >",
       "parameters": [
         {
           "key": "id",
@@ -3706,7 +3706,7 @@
           "type": "Option < String >"
         }
       ],
-      "path": "providers::select_provider_area"
+      "path": "git_hosts::select_git_host_area"
     },
     {
       "async": false,
@@ -3716,8 +3716,8 @@
       "output": "-> Result < String , String >",
       "parameters": [
         {
-          "key": "agent",
-          "name": "agent",
+          "key": "provider",
+          "name": "provider",
           "type": "String"
         },
         {
@@ -3776,8 +3776,8 @@
           "type": "Option < String >"
         },
         {
-          "key": "encargado",
-          "name": "encargado",
+          "key": "agent",
+          "name": "agent",
           "type": "Option < String >"
         },
         {
@@ -3786,8 +3786,8 @@
           "type": "Option < bool >"
         },
         {
-          "key": "fromEncargado",
-          "name": "from_encargado",
+          "key": "fromAgent",
+          "name": "from_agent",
           "type": "Option < String >"
         },
         {
@@ -3818,7 +3818,7 @@
         {
           "key": "fromTask",
           "name": "from_task",
-          "type": "Option < crate :: sessions :: SenderTask >"
+          "type": "Option < crate :: wire :: Wire < crate :: sessions :: SenderTask > >"
         },
         {
           "key": "space",
@@ -3949,8 +3949,8 @@
       "output": "-> Result < () , String >",
       "parameters": [
         {
-          "key": "agent",
-          "name": "agent",
+          "key": "provider",
+          "name": "provider",
           "type": "String"
         },
         {
@@ -3981,7 +3981,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "set_agent_avatar",
-      "output": "-> Result < Profile , String >",
+      "output": "-> Result < Wire < Profile > , String >",
       "parameters": [
         {
           "key": "project",
@@ -4006,7 +4006,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "set_agent_background",
-      "output": "-> Result < Profile , String >",
+      "output": "-> Result < Wire < Profile > , String >",
       "parameters": [
         {
           "key": "project",
@@ -4030,28 +4030,8 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
-      "name": "set_agent_consent",
-      "output": "-> Result < Workspace , String >",
-      "parameters": [
-        {
-          "key": "agent",
-          "name": "agent",
-          "type": "String"
-        },
-        {
-          "key": "accepted",
-          "name": "accepted",
-          "type": "bool"
-        }
-      ],
-      "path": "workspaces::set_agent_consent"
-    },
-    {
-      "async": false,
-      "channel": null,
-      "kind": "invoke",
       "name": "set_agent_hidden",
-      "output": "-> Result < Profile , String >",
+      "output": "-> Result < Wire < Profile > , String >",
       "parameters": [
         {
           "key": "project",
@@ -4076,7 +4056,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "set_agent_model",
-      "output": "-> Result < Profile , String >",
+      "output": "-> Result < Wire < Profile > , String >",
       "parameters": [
         {
           "key": "project",
@@ -4089,8 +4069,8 @@
           "type": "String"
         },
         {
-          "key": "agent",
-          "name": "agent",
+          "key": "provider",
+          "name": "provider",
           "type": "Option < String >"
         },
         {
@@ -4114,8 +4094,8 @@
       "output": "-> Result < () , String >",
       "parameters": [
         {
-          "key": "agent",
-          "name": "agent",
+          "key": "provider",
+          "name": "provider",
           "type": "String"
         },
         {
@@ -4164,8 +4144,8 @@
       "output": "-> Result < () , String >",
       "parameters": [
         {
-          "key": "agent",
-          "name": "agent",
+          "key": "provider",
+          "name": "provider",
           "type": "String"
         },
         {
@@ -4226,7 +4206,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "set_memory_provider",
-      "output": "-> Result < Workspace , String >",
+      "output": "-> Result < Wire < Workspace > , String >",
       "parameters": [
         {
           "key": "id",
@@ -4365,6 +4345,26 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "set_provider_consent",
+      "output": "-> Result < Wire < Workspace > , String >",
+      "parameters": [
+        {
+          "key": "provider",
+          "name": "provider",
+          "type": "String"
+        },
+        {
+          "key": "accepted",
+          "name": "accepted",
+          "type": "bool"
+        }
+      ],
+      "path": "workspaces::set_provider_consent"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "set_root",
       "output": "-> Result < () , String >",
       "parameters": [
@@ -4451,7 +4451,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "set_source_branch",
-      "output": "-> Result < Source , Failure >",
+      "output": "-> Result < Wire < Source > , Failure >",
       "parameters": [
         {
           "key": "project",
@@ -4551,7 +4551,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "set_workspace_language",
-      "output": "-> Result < Workspace , String >",
+      "output": "-> Result < Wire < Workspace > , String >",
       "parameters": [
         {
           "key": "id",
@@ -4611,7 +4611,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "set_workspace_output_language",
-      "output": "-> Result < Workspace , String >",
+      "output": "-> Result < Wire < Workspace > , String >",
       "parameters": [
         {
           "key": "id",
@@ -4631,7 +4631,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "set_workspace_permission_mode",
-      "output": "-> Result < Workspace , Failure >",
+      "output": "-> Result < Wire < Workspace > , Failure >",
       "parameters": [
         {
           "key": "id",
@@ -4651,7 +4651,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "set_workspace_source",
-      "output": "-> Result < Source , String >",
+      "output": "-> Result < Wire < Source > , String >",
       "parameters": [
         {
           "key": "kind",
@@ -4671,7 +4671,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "set_workspace_terminal_theme",
-      "output": "-> Result < Workspace , String >",
+      "output": "-> Result < Wire < Workspace > , String >",
       "parameters": [
         {
           "key": "id",
@@ -4691,7 +4691,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "set_workspace_worktrees_root",
-      "output": "-> Result < Workspace , Failure >",
+      "output": "-> Result < Wire < Workspace > , Failure >",
       "parameters": [
         {
           "key": "id",
@@ -5054,7 +5054,7 @@
           "type": "Option < String >"
         }
       ],
-      "path": "providers::start_browser_login"
+      "path": "git_hosts::start_browser_login"
     },
     {
       "async": false,
@@ -5165,7 +5165,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "task_coordinator",
-      "output": "-> Result < Option < SenderTask > , String >",
+      "output": "-> Result < Option < crate :: wire :: Wire < SenderTask > > , String >",
       "parameters": [
         {
           "key": "project",
@@ -5208,8 +5208,8 @@
       "output": "-> Result < Vec < EnEspera > , String >",
       "parameters": [
         {
-          "key": "agent",
-          "name": "agent",
+          "key": "provider",
+          "name": "provider",
           "type": "String"
         }
       ],
@@ -5798,8 +5798,8 @@
       "output": "-> Signatures",
       "parameters": [
         {
-          "key": "agent",
-          "name": "agent",
+          "key": "provider",
+          "name": "provider",
           "type": "String"
         }
       ],
@@ -6198,7 +6198,6 @@
   "events": [
     "account",
     "account-rejected",
-    "agents",
     "agentsview-changed",
     "attention",
     "bootstrap",
@@ -6214,6 +6213,7 @@
     "local-model",
     "mcp",
     "mcp-login",
+    "providers",
     "question",
     "radiant",
     "session",

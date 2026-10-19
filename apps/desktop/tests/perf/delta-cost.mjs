@@ -60,7 +60,7 @@ const history = Array.from({ length: 20 }, (_, n) => [
   { role: "agent", id: `a${n}`, at: n * 60_000 + 30_000, text: `Respuesta ${n}.\n\n- uno\n- dos` },
 ]).flat();
 const row = (id) => ({
-  id, title: id, last_message: "", agent: "codex", model: "gpt-5.6", refs: [],
+  id, title: id, last_message: "", provider: "codex", model: "gpt-5.6", refs: [],
   updated_at: 0, turns: history.length, parent: null, esperando: false,
 });
 let live = false;
@@ -86,7 +86,7 @@ const app = await boot("listo", "delta-cost", {
   window_ready: null,
   window_vitals: null,
   setup_required: false,
-  list_agents: [{ id: "codex", label: "Codex", available: true, driver: true }],
+  list_providers: [{ id: "codex", label: "Codex", available: true, driver: true }],
   list_workspaces: { workspaces: [{ id: "w", name: "W", context_root: null }], active: "w" },
   workspaces_startup: { workspaces: [{ id: "w", name: "W", context_root: null }], active: "w" },
   list_projects: [],
@@ -96,11 +96,11 @@ const app = await boot("listo", "delta-cost", {
   list_skills: [],
   list_mentions: { fuentes: [], archivos: [] },
   list_models: {
-    agent: "codex",
+    provider: "codex",
     models: [{ id: "gpt-5.6", label: "GPT-5.6", gratis: null, note: null, efforts: [], default_effort: null }],
     fallback: false,
   },
-  list_surfaces: [{ id: "codex", agent: "codex", label: "Codex", catalogo: "todo", usable: true, marca: null, porque: null }],
+  list_surfaces: [{ id: "codex", provider: "codex", label: "Codex", catalogo: "todo", usable: true, marca: null, porque: null }],
   session_folder: "/tmp",
   list_task_trees: [],
   watch_task_tree: "watch",
@@ -110,7 +110,7 @@ const app = await boot("listo", "delta-cost", {
   service_poll: { cursor: 0, gap: false, replay: false, runtime: "bench", reset: false },
   task_history: { history: { archived: false, events: [], recovery: null }, branch: null, path: "/lab", available: true, owned: false, restorable: false, incomplete: false },
   load_session: ({ id }) => ({
-    id, agent: "codex", sources: [], model: "gpt-5.6", effort: null, permission_mode: null, turns: structuredClone(history),
+    id, provider: "codex", sources: [], model: "gpt-5.6", effort: null, permission_mode: null, turns: structuredClone(history),
   }),
   load_queue: [],
   save_queue: null,

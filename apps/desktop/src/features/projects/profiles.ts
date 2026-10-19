@@ -17,7 +17,7 @@ export const DEFAULT_PROFILE: AgentProfile = {
   background: null,
   avatar: null,
   veil: 0.82,
-  agent: null,
+  provider: null,
   model: null,
   effort: null,
   hidden: false,

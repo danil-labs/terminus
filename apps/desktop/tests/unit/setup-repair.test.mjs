@@ -45,7 +45,7 @@ function servicio({ setupRequired, entorno, preparar, reset = () => false }) {
     window_ready: null,
     window_vitals: null,
     setup_required: setupRequired,
-    list_agents: [],
+    list_providers: [],
     list_workspaces: { workspaces: [{ id: "w", name: "W", context_root: null }], active: "w" },
     workspaces_startup: { workspaces: [{ id: "w", name: "W", context_root: null }], active: "w" },
     list_projects: [],

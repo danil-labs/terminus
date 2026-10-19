@@ -92,7 +92,7 @@ export default function Tasks() {
         {folders.map((folder) => {
           const inFolder = tasks.filter((task) => task.folder === folder.id);
           const agents = (snapshot?.handlers ?? []).filter((h) => h.folders.includes(folder.id));
-          const own = inFolder.filter((task) => !task.encargado);
+          const own = inFolder.filter((task) => !task.agent);
           return (
             <View key={folder.id} style={styles.folder}>
               <View style={styles.folderHead}>
@@ -122,7 +122,7 @@ export default function Tasks() {
                   }
                   title={handler.name}
                   subtitle={handler.live_tasks ? t("agent.live", { count: handler.live_tasks }) : (handler.description ?? undefined)}
-                  right={<TaskMark state={topState(inFolder.filter((task) => task.encargado === handler.name).map(stateOf))} />}
+                  right={<TaskMark state={topState(inFolder.filter((task) => task.agent === handler.name).map(stateOf))} />}
                   onPress={() => router.push({ pathname: "/agent/[workspace]/[name]", params: { workspace: current!.id, name: handler.name } })}
                 />
               ))}

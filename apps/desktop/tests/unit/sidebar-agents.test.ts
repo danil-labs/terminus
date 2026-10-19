@@ -14,7 +14,7 @@ const encargado = (name: string): HandlerDefinition => ({
   model: null,
   origin: "repo",
   folder: null,
-  agents: [],
+  providers: [],
   own: false,
   own_scope: null,
 });

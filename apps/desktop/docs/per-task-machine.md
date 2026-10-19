@@ -14,7 +14,7 @@ Las referencias al motor son de `danil-labs/seldon-host` (privado), rama
 ### 1. Identidad de un workspace entre máquinas
 
 - Los ids de workspace son al azar y por máquina. No hay `create_workspace`:
-  `add_workspace(name, folder?, provider?, remote?)`
+  `add_workspace(name, folder?, git_host?, remote?)`
   (`existing-runtime/src/workspace/workspaces.rs:1083`) llama a `create()`, que
   pone `id: free_id(...)` (`:336`); `free_id` usa `util::id_libre`
   (`existing-runtime/src/util.rs:454-461`) sobre `short_id()`
@@ -22,7 +22,7 @@ Las referencias al motor son de `danil-labs/seldon-host` (privado), rama
 - El id no se puede elegir: es también el nombre de la carpeta
   (`workspaces.rs:35`, `scope_dir` en `:243`), y `add_workspace` no lo recibe.
 - El registro (`struct Workspace`, `workspaces.rs:34-105`) lleva `id`, `name`,
-  `provider` y `remote` («la clave del workspace u organización en el
+  `git_host` y `remote` («la clave del workspace u organización en el
   proveedor», `:72`), entre otros. `list_workspaces` (`:1064`) y
   `workspaces_startup` (`:862`) devuelven `{workspaces: [WorkspaceInfo], active}`
   con esos campos aplanados (`:124-150`).
@@ -80,7 +80,7 @@ corren las tareas que se crearon en ellas.
    corresponde al de la ventana:
    - el enlace guardado a mano en `<window_data>/machines.json`
      (`workspaces.<máquina>.<workspace de la ventana>`), sin interfaz;
-   - si no hay, el único workspace con el mismo `provider` y `remote`, ambos no
+   - si no hay, el único workspace con el mismo `git_host` y `remote`, ambos no
      vacíos.
 
    Un nombre igual **no** enlaza: dos workspaces «Notas» de dos personas no son
@@ -208,6 +208,6 @@ corren las tareas que se crearon en ellas.
 1. Abrir una tarea de una máquina apagada no la enciende. Se ve lo último leído
    con un aviso, y mandarle un mensaje la enciende.
 2. Se quita para siempre el cambio de motor de toda la ventana.
-3. El enlace es por `provider` + `remote` o por un enlace guardado. El destino
+3. El enlace es por `git_host` + `remote` o por un enlace guardado. El destino
    es el id de workspace de la cuenta, y no hay interfaz para enlazar.
 4. «Ejecutar en» se recuerda por workspace.

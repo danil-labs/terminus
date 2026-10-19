@@ -76,7 +76,7 @@ const history = (id) =>
     { role: "agent", id: `${id}a${n}`, at: n * 60_000 + 30_000, text: `Respuesta ${n} de ${id}.\n\n- uno\n- dos` },
   ]).flat();
 const row = (id) => ({
-  id, title: `Tarea ${id}`, last_message: "", agent: "codex", model: "gpt-5.6", refs: [],
+  id, title: `Tarea ${id}`, last_message: "", provider: "codex", model: "gpt-5.6", refs: [],
   updated_at: 0, turns: 24, parent: null, esperando: false,
 });
 
@@ -90,7 +90,7 @@ const responses = {
     return null;
   },
   setup_required: false,
-  list_agents: [{ id: "codex", label: "Codex", available: true, driver: true }],
+  list_providers: [{ id: "codex", label: "Codex", available: true, driver: true }],
   list_workspaces: { workspaces: [{ id: "w", name: "W", context_root: null }], active: "w" },
   workspaces_startup: { workspaces: [{ id: "w", name: "W", context_root: null }], active: "w" },
   list_projects: [],
@@ -99,11 +99,11 @@ const responses = {
   list_live_sessions: () => [...TASKS, ...TABS].map(row),
   list_mentions: { fuentes: [], archivos: [] },
   list_models: {
-    agent: "codex",
+    provider: "codex",
     models: [{ id: "gpt-5.6", label: "GPT-5.6", gratis: null, note: null, efforts: [], default_effort: null }],
     fallback: false,
   },
-  list_surfaces: [{ id: "codex", agent: "codex", label: "Codex", catalogo: "todo", usable: true, marca: null, porque: null }],
+  list_surfaces: [{ id: "codex", provider: "codex", label: "Codex", catalogo: "todo", usable: true, marca: null, porque: null }],
   session_folder: "/tmp",
   list_task_trees: [],
   watch_task_tree: "watch",
@@ -113,7 +113,7 @@ const responses = {
   service_poll: { cursor: 0, gap: false, replay: false, runtime: "bench", reset: false },
   task_history: { history: { archived: false, events: [], recovery: null }, branch: null, path: "/lab", available: true, owned: false, restorable: false, incomplete: false },
   load_session: ({ id }) => ({
-    id, agent: "codex", sources: [], model: "gpt-5.6", effort: null, permission_mode: null, turns: history(id),
+    id, provider: "codex", sources: [], model: "gpt-5.6", effort: null, permission_mode: null, turns: history(id),
   }),
   load_queue: [],
   save_queue: null,

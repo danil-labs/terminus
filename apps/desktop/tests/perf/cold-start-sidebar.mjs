@@ -24,7 +24,7 @@ const ENGINE_DOWN = { what: { clave: "shell.service.engine_down" }, detail: "eng
 const FOLDERS = ["p1", "p2"];
 const TASKS = Array.from({ length: 6 }, (_, n) => `t${n}`);
 const row = (id) => ({
-  id, title: `Tarea ${id}`, last_message: "", agent: "codex", model: "gpt-5.6", refs: [],
+  id, title: `Tarea ${id}`, last_message: "", provider: "codex", model: "gpt-5.6", refs: [],
   updated_at: 0, turns: 2, parent: null, esperando: false,
 });
 const folder = (id) => ({ id, name: id.toUpperCase(), working_directory: `/lab/${id}`, kind: "git", portfolio: null, sources: [] });
@@ -49,7 +49,7 @@ async function run(name, storage) {
     launcher_state: () => (state.connected ? { phase: "ready", blank_0274: false } : { phase: "connecting" }),
     setup_required: engine(false),
     check_environment: engine({ ready: true, blocked: false, reason: null, items: [] }),
-    list_agents: engine([{ id: "codex", label: "Codex", available: true, driver: true }]),
+    list_providers: engine([{ id: "codex", label: "Codex", available: true, driver: true }]),
     list_workspaces: engine(startup),
     workspaces_startup: engine(startup),
     list_projects: engine(() => FOLDERS.map(folder)),
@@ -57,10 +57,10 @@ async function run(name, storage) {
     list_sources: engine([]),
     list_spaces: engine([]),
     list_live_sessions: engine(({ project }) => (project === "" ? TASKS.map(row) : FOLDERS.includes(project) ? [row(`${project}a`), row(`${project}b`)] : [])),
-    list_encargados: engine({ encargados: [], rechazados: [] }),
-    list_encargado_status: engine([]),
+    list_agents: engine({ agents: [], rechazados: [] }),
+    list_agent_status: engine([]),
     list_mentions: engine({ fuentes: [], archivos: [] }),
-    list_models: engine({ agent: "codex", models: [], fallback: false }),
+    list_models: engine({ provider: "codex", models: [], fallback: false }),
     list_surfaces: engine([]),
     list_live_turns: engine([]),
     list_active_turns: engine([]),

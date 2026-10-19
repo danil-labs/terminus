@@ -163,7 +163,7 @@ impl Fleet {
     }
 
     /// El workspace de `there` que es `local` en la ventana: el enlazado a mano en
-    /// `machines.json`, o el único con el mismo `provider` y `remote`. Un nombre igual no
+    /// `machines.json`, o el único con el mismo `git_host` y `remote`. Un nombre igual no
     /// basta. Lo reemplazará el id de workspace de la cuenta, el mismo en cada máquina.
     pub fn counterpart_workspace(
         &self,
@@ -189,9 +189,9 @@ impl Fleet {
         let theirs = value(there, "list_workspaces", None, json!({}))?;
         let theirs = theirs["workspaces"].as_array()?;
         let same_remote = |w: &&Value| {
-            mine["provider"].as_str().is_some_and(|p| !p.is_empty())
+            mine["git_host"].as_str().is_some_and(|p| !p.is_empty())
                 && mine["remote"].as_str().is_some_and(|r| !r.is_empty())
-                && w["provider"] == mine["provider"]
+                && w["git_host"] == mine["git_host"]
                 && w["remote"] == mine["remote"]
         };
         let found = unique(theirs.iter().filter(same_remote))?["id"]
@@ -483,7 +483,7 @@ impl Fleet {
                 .cloned()
                 .unwrap_or_default();
             json!({
-                "id": session, "agent": row["agent"].as_str().unwrap_or_default(),
+                "id": session, "provider": row["provider"].as_str().unwrap_or_default(),
                 "model": row["model"], "effort": null, "turns": [],
                 "history": {"total":0,"start":0,"end":0,"limit":0,"has_more":false},
             })
@@ -632,7 +632,7 @@ mod tests {
     }
     fn mac() -> Fake {
         Fake {
-            workspaces: json!({"workspaces":[{"id":"wmac","name":"Danil","provider":"github","remote":"danil-labs"},{"id":"wsolo","name":"Notas"}],"active":"wmac"}),
+            workspaces: json!({"workspaces":[{"id":"wmac","name":"Danil","git_host":"github","remote":"danil-labs"},{"id":"wsolo","name":"Notas"}],"active":"wmac"}),
             projects: json!([{"id":"pmac","name":"terminus"}]),
             sessions: json!([{"id":"t1","created_at":30},{"id":"t2","created_at":10}]),
             created: "t9",
@@ -641,9 +641,9 @@ mod tests {
     }
     fn vm() -> Fake {
         Fake {
-            workspaces: json!({"workspaces":[{"id":"other","name":"Danil"},{"id":"notas","name":"Notas"},{"id":"wvm","name":"Danil copia","provider":"github","remote":"danil-labs"}],"active":"wvm"}),
+            workspaces: json!({"workspaces":[{"id":"other","name":"Danil"},{"id":"notas","name":"Notas"},{"id":"wvm","name":"Danil copia","git_host":"github","remote":"danil-labs"}],"active":"wvm"}),
             projects: json!([{"id":"pvm","name":"terminus"}]),
-            sessions: json!([{"id":"r1","created_at":20,"agent":"codex","model":"gpt-5.6"}]),
+            sessions: json!([{"id":"r1","created_at":20,"provider":"codex","model":"gpt-5.6"}]),
             created: "r2",
             ..Fake::default()
         }
@@ -814,11 +814,11 @@ mod tests {
         // Nunca leída: solo su fila, sin turnos, y dice qué máquina falta.
         let task = fleet.offline_task("vm", "wmac", "r1");
         assert_eq!(
-            (&task["agent"], &task["turns"], &task["offline"]),
+            (&task["provider"], &task["turns"], &task["offline"]),
             (&json!("codex"), &json!([]), &json!({"machine":"vm"}))
         );
         // Leída antes: lo que se leyó, aunque la ventana se haya cerrado entretanto.
-        let read = json!({"id":"r1","agent":"codex","turns":[{"role":"user","text":"hola"}]});
+        let read = json!({"id":"r1","provider":"codex","turns":[{"role":"user","text":"hola"}]});
         fleet.remember_task("vm", "r1", &read);
         let task = Fleet::load(Some(dir.path())).offline_task("vm", "wmac", "r1");
         assert_eq!(task["turns"], read["turns"]);

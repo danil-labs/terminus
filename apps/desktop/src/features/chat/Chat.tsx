@@ -276,7 +276,7 @@ export type Msg = {
    * «OpenCode Go»). Lo guarda el cierre; la línea del turno lo enseña tras la
    * hora. Ausente en los turnos anteriores al campo.
    */
-  provider?: string;
+  model_vendor?: string;
   /**
    * El modelo que reportó el CLI al cerrar, para el turno que lo observó. Es
    * distinto del modelo elegido ahora: la transcripción guarda con qué se
@@ -1657,7 +1657,7 @@ export default function Chat(props: ChatProps) {
           || m.attachments?.map((rel) => rel.split("/").pop()).join(", ")
           || (m.meta === "hidden_task" ? t("chat.subagent.hidden_task") : "");
         const sender = m.encargado ? { kind: "agent" as const, name: m.encargado }
-          : m.fromTask ? { kind: "task" as const, agent: m.fromTask.agent, model: m.fromTask.model }
+          : m.fromTask ? { kind: "task" as const, agent: m.fromTask.provider, model: m.fromTask.model }
           : m.author && m.author.kind !== "person" ? { kind: "agent" as const, name: m.author.kind }
           : undefined;
         return texto ? [{ block: j, text: texto, sender }] : [];
@@ -2522,7 +2522,7 @@ export default function Chat(props: ChatProps) {
                   y «Modelos Free» son dos entradas del mismo proveedor. */}
               <SelectorDeModelo
                 pildora
-                marca={actual()?.agent ?? props.agent}
+                marca={actual()?.provider ?? props.agent}
                 models={opciones()}
                 superficie={props.superficie}
                 model={props.model}
@@ -2965,9 +2965,9 @@ export default function Chat(props: ChatProps) {
                         <div class="shrink-0 self-end pb-9">
                           <div
                             class="flex size-11 items-center justify-center rounded-full bg-neutral-200"
-                            title={sender().model ?? sender().agent}
+                            title={sender().model ?? sender().provider}
                           >
-                            <MarcaAgente id={sender().agent} size={22} />
+                            <MarcaAgente id={sender().provider} size={22} />
                           </div>
                         </div>
                       )}
@@ -3496,7 +3496,7 @@ function TrabajoDeAgente(props: {
         <HoraDelTurno at={props.msg.at} />
         <LineaDeProveedor
           agent={props.msg.agent ?? props.agenteDelTurno}
-          provider={props.msg.provider}
+          provider={props.msg.model_vendor}
           model={props.msg.reported_model}
           catalogo={props.catalogo}
           agentLabel={props.agentLabel}

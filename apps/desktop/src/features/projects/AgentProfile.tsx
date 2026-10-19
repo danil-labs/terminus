@@ -36,7 +36,7 @@ const LABEL = "text-xs font-semibold text-neutral-500";
  */
 export default function AgentProfile(props: {
   project: string;
-  encargado: HandlerDefinition;
+  agent: HandlerDefinition;
   profile: Profile;
   status: HandlerStatus;
   /** La imagen de fondo ya leída, o `null` mientras no haya ninguna. */
@@ -56,14 +56,14 @@ export default function AgentProfile(props: {
   onClose: () => void;
 }) {
   const [name, setName] = createSignal(props.profile.display_name ?? "");
-  const [description, setDescription] = createSignal(props.encargado.description);
-  const [instructions, setInstructions] = createSignal(props.encargado.instructions);
+  const [description, setDescription] = createSignal(props.agent.description);
+  const [instructions, setInstructions] = createSignal(props.agent.instructions);
   const [failure, setFailure] = createSignal<string | null>(null);
   const profile = () => props.profile ?? DEFAULT_PROFILE;
   const body = createMemo(() => profile().body ?? null);
   const visibility = () => Math.round((1 - profile().veil) * 100);
 
-  const [agentChoice, setAgentChoice] = createSignal(props.profile.agent);
+  const [agentChoice, setAgentChoice] = createSignal(props.profile.provider);
   const [modelChoice, setModelChoice] = createSignal(props.profile.model);
   // `terminus handler update` cambia el perfil con esta pantalla abierta. Solo
   // el campo cuyo valor cambió: cualquier recarga trae un objeto nuevo, y
@@ -73,8 +73,8 @@ export default function AgentProfile(props: {
       () => props.profile,
       (p, prev) => {
         if (p.display_name !== prev?.display_name) setName(p.display_name ?? "");
-        if (p.agent !== prev?.agent || p.model !== prev?.model) {
-          setAgentChoice(p.agent);
+        if (p.provider !== prev?.provider || p.model !== prev?.model) {
+          setAgentChoice(p.provider);
           setModelChoice(p.model);
         }
       },
@@ -82,10 +82,10 @@ export default function AgentProfile(props: {
     ),
   );
   // Mismo cuidado que el nombre, pero con la declaración: `avisar()` trae un
-  // `encargado` nuevo tras guardar, y no debe pisar lo que se está tecleando.
+  // `agent` nuevo tras guardar, y no debe pisar lo que se está tecleando.
   createEffect(
     on(
-      () => props.encargado,
+      () => props.agent,
       (e, prev) => {
         if (e.description !== prev?.description) setDescription(e.description);
         if (e.instructions !== prev?.instructions) setInstructions(e.instructions);
@@ -100,7 +100,7 @@ export default function AgentProfile(props: {
   const superficieElegida = createMemo(() => {
     const agent = agentChoice();
     if (!agent) return "";
-    const suyas = props.superficies.filter((s) => s.agent === agent);
+    const suyas = props.superficies.filter((s) => s.provider === agent);
     const modelo = modelChoice();
     const conModelo = modelo
       ? opciones().find((o) => o.agent === agent && o.model.id === modelo)?.superficie
@@ -113,8 +113,8 @@ export default function AgentProfile(props: {
     try {
       await invoke<Profile>("set_agent_model", {
         project: props.project,
-        name: props.encargado.name,
-        agent,
+        name: props.agent.name,
+        provider: agent,
         model,
         effort: null,
       });
@@ -143,7 +143,7 @@ export default function AgentProfile(props: {
     try {
       await invoke<Profile>("save_agent_profile", {
         project: props.project,
-        name: props.encargado.name,
+        name: props.agent.name,
         displayName:
           change.display_name !== undefined ? change.display_name : base.display_name,
         body: change.body !== undefined ? change.body : base.body,
@@ -162,7 +162,7 @@ export default function AgentProfile(props: {
     try {
       await invoke<HandlerDefinition>("save_agent_declaration", {
         project: props.project,
-        name: props.encargado.name,
+        name: props.agent.name,
         description: change.description ?? description(),
         instructions: change.instructions ?? instructions(),
       });
@@ -179,9 +179,9 @@ export default function AgentProfile(props: {
     setFailure(null);
     setBorrando(true);
     try {
-      await invoke("delete_encargado", {
+      await invoke("delete_agent", {
         project: props.project,
-        name: props.encargado.name,
+        name: props.agent.name,
       });
       avisar();
       props.onDeleted?.();
@@ -199,7 +199,7 @@ export default function AgentProfile(props: {
     try {
       await invoke<Profile>("set_agent_hidden", {
         project: props.project,
-        name: props.encargado.name,
+        name: props.agent.name,
         hidden,
       });
       avisar();
@@ -234,7 +234,7 @@ export default function AgentProfile(props: {
     try {
       await invoke<Profile>("set_agent_avatar", {
         project: props.project,
-        name: props.encargado.name,
+        name: props.agent.name,
         source,
       });
       notifyProfiles();
@@ -255,7 +255,7 @@ export default function AgentProfile(props: {
     try {
       await invoke<Profile>("set_agent_background", {
         project: props.project,
-        name: props.encargado.name,
+        name: props.agent.name,
         source,
       });
       notifyProfiles();
@@ -292,7 +292,7 @@ export default function AgentProfile(props: {
         <div class="mx-auto grid w-full max-w-[560px] gap-7 px-6 py-8">
           <div class="grid justify-items-center gap-3">
             <AstroAvatar
-              name={props.encargado.name}
+              name={props.agent.name}
               status={props.status}
               body={body()}
               avatar={profile().avatar}
@@ -303,19 +303,19 @@ export default function AgentProfile(props: {
               <Input
                 class="text-center text-base font-semibold"
                 value={name()}
-                placeholder={props.encargado.name}
+                placeholder={props.agent.name}
                 onInput={(e) => setName(e.currentTarget.value)}
                 onChange={() => void save({ display_name: name().trim() || null })}
               />
             </label>
             <span class="font-mono text-[0.6875rem] text-neutral-500">
-              {props.encargado.name}
+              {props.agent.name}
             </span>
             <Show
-              when={props.encargado.own}
+              when={props.agent.own}
               fallback={
                 <p class="m-0 text-center text-[0.8125rem] text-neutral-700">
-                  {props.encargado.description}
+                  {props.agent.description}
                 </p>
               }
             >
@@ -366,7 +366,7 @@ export default function AgentProfile(props: {
           <section class={SECTION}>
             <span class={LABEL}>{t("projects.agents.profile_face")}</span>
             <BodyPicker
-              name={props.encargado.name}
+              name={props.agent.name}
               value={profile().avatar ? "" : body()}
               onChange={(option) => void elegirCara(option)}
             />
@@ -432,14 +432,14 @@ export default function AgentProfile(props: {
           <section class={SECTION}>
             <span class={LABEL}>{t("projects.agents.profile_prompt")}</span>
             <Show
-              when={props.encargado.own}
+              when={props.agent.own}
               fallback={
                 <>
                   <pre class="m-0 max-h-80 overflow-auto rounded-md border border-border bg-surface-muted p-3 font-mono text-[0.6875rem] leading-relaxed whitespace-pre-wrap text-neutral-700">
-                    {props.encargado.instructions}
+                    {props.agent.instructions}
                   </pre>
                   <span class="text-[0.6875rem] text-neutral-500">
-                    {props.encargado.managed
+                    {props.agent.managed
                       ? t("projects.agents.profile_prompt_radiant")
                       : t("projects.agents.profile_prompt_where")}
                   </span>
@@ -456,11 +456,11 @@ export default function AgentProfile(props: {
               />
             </Show>
             <span class="font-mono text-[0.625rem] break-all text-neutral-500">
-              {props.encargado.origin}
+              {props.agent.origin}
             </span>
             {/* Solo con carpeta suya: la declaración suelta comparte carpeta
                 con los demás agentes, y abrirla entregaría su material. */}
-            <Show when={props.encargado.folder}>
+            <Show when={props.agent.folder}>
               {(folder) => (
                 <div class="flex flex-wrap items-center gap-2">
                   <Button
@@ -479,11 +479,11 @@ export default function AgentProfile(props: {
             </Show>
           </section>
 
-          <TelegramSection project={props.project} name={props.encargado.name} />
+          <TelegramSection project={props.project} name={props.agent.name} />
 
           <section class={SECTION}>
             <Show
-              when={props.encargado.own}
+              when={props.agent.own}
               fallback={
                 <>
                   <span class="text-[0.8125rem] text-neutral-700">
@@ -524,7 +524,7 @@ export default function AgentProfile(props: {
             <DialogContent>
               <DialogTitle class="text-sm font-semibold">
                 {t("projects.agents.profile_delete_title", {
-                  name: props.profile.display_name || props.encargado.name,
+                  name: props.profile.display_name || props.agent.name,
                 })}
               </DialogTitle>
               <Dialog.Description class="my-4 text-sm leading-6 text-neutral-500">

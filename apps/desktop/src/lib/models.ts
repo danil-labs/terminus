@@ -49,7 +49,7 @@ export function proveedorDe(
   superficie: Superficie,
   model: ModelOption,
 ) {
-  if (superficie.agent === "opencode-zen") {
+  if (superficie.provider === "opencode-zen") {
     if (superficie.catalogo === "gratuitos") {
       return { id: "opencode-free", label: "OpenCode Free", logo: "opencode" };
     }
@@ -58,13 +58,13 @@ export function proveedorDe(
     }
     return { id: "opencode-zen", label: "OpenCode Zen", logo: "opencode" };
   }
-  if (superficie.agent === "opencode-local") {
+  if (superficie.provider === "opencode-local") {
     return { id: "opencode-local", label: "OpenCode Local", logo: "opencode" };
   }
   return {
     id: superficie.id,
     label: superficie.label,
-    logo: superficie.agent,
+    logo: superficie.provider,
   };
 }
 
@@ -78,14 +78,14 @@ export function opcionesDeModelos(
   agente?: string,
 ): OpcionDeModelo[] {
   return superficies
-    .filter((superficie) => !agente || superficie.agent === agente)
+    .filter((superficie) => !agente || superficie.provider === agente)
     .flatMap((superficie) =>
-      (catalogos[superficie.agent]?.models ?? [])
+      (catalogos[superficie.provider]?.models ?? [])
         .filter((model) => esDe(superficie, model))
         .map((model) => ({
           key: `${superficie.id}\u0000${model.id}`,
           superficie: superficie.id,
-          agent: superficie.agent,
+          agent: superficie.provider,
           usable: superficie.usable,
           proveedor: proveedorDe(superficie, model),
           model,

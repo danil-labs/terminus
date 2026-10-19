@@ -85,7 +85,7 @@ export type SessionRow = {
   outcome?: "delivered" | "failed" | null;
   id: string;
   title: string;
-  agent: string;
+  provider: string;
   /** Con qué modelo corrió. `null` es "el que el agente traiga por omisión". */
   model: string | null;
   last_message?: string | null;
@@ -119,16 +119,16 @@ export type SessionRow = {
    */
   stage: Etapa | null;
   /** Con qué criterio corre esta tarea (`workspace/handlers.rs`). */
-  encargado: string | null;
+  agent: string | null;
   /**
    * El encargado del padre, cuando esta tarea es una hija de orquestación.
    * Derivado, solo para pintar quién la lanzó: NO es el criterio de esta
    * tarea, que no hereda el encargado del padre.
    */
-  encargado_del_padre: string | null;
+  parent_agent: string | null;
   /**
    * Si esta sesión es el chat persistente de un encargado. El historial la
-   * muestra junto a sus tareas en la carpeta; una tarea con `encargado` no lleva esto.
+   * muestra junto a sus tareas en la carpeta; una tarea con `agent` no lleva esto.
    */
   chat_de_agente: boolean;
   /** De qué espacio es (`spaces::of_rows`). Ver `lib/spaces.ts`. */
@@ -435,7 +435,7 @@ export default function Sessions(props: {
   const query = createMemo(() => (props.search ?? "").trim());
   const filteredSessions = createMemo(() => !query() ? enBarra() : enBarra().filter(session => {
     const git = effectiveTaskGit(session, gitRows(), props.relatedSessions ?? props.sessions);
-    const agente = session.encargado ? displayName(session.encargado, profiles()[session.encargado]) : null;
+    const agente = session.agent ? displayName(session.agent, profiles()[session.agent]) : null;
     return matchesTaskQuery([session.title, session.last_message, git?.branch, git?.alias, agente], query());
   }));
   if (props.onSearchResults) {
@@ -474,7 +474,7 @@ export default function Sessions(props: {
       sinVer: f.s.sin_ver,
     };
     // Agrupando por agente la cabecera ya lo dice; en el chat del agente, también.
-    const conPastilla = () => !(props.groupByHandler && props.groupByAuthor !== false) && !f.s.chat_de_agente && !!f.s.encargado;
+    const conPastilla = () => !(props.groupByHandler && props.groupByAuthor !== false) && !f.s.chat_de_agente && !!f.s.agent;
     const title = () => f.s.inbox ? t("projects.threads.inbox")
       : f.s.chat_de_agente && !f.s.agent_thread ? t("projects.threads.persistent_chat")
       : f.s.title;
@@ -676,7 +676,7 @@ export default function Sessions(props: {
                 <Show when={worktrees()?.get(f.s.id)?.owned && !worktrees()?.get(f.s.id)?.available}>
                   <span class="flex shrink-0 text-error-strong" title={t("projects.sessions.worktree_missing")} aria-label={t("projects.sessions.worktree_missing")}><WorktreeRoto size={13} /></span>
                 </Show>
-                <span class="flex shrink-0" title={f.s.agent} aria-label={f.s.agent}><MarcaAgente id={f.s.agent} size={13} /></span>
+                <span class="flex shrink-0" title={f.s.provider} aria-label={f.s.provider}><MarcaAgente id={f.s.provider} size={13} /></span>
                 <Show when={f.s.machine}>
                   {(machine) => <MachineChip machine={machine()} on={f.s.machine_on !== false} class="max-w-[96px]" />}
                 </Show>
@@ -695,7 +695,7 @@ export default function Sessions(props: {
                 shared={sharesTaskGit(f.s, gitRows(), props.relatedSessions ?? props.sessions)}
                 hasLead={conPastilla()}
                 lead={
-                  <Show when={conPastilla() && f.s.encargado}>
+                  <Show when={conPastilla() && f.s.agent}>
                   {(nombre) => {
                     const visible = () => displayName(nombre(), profiles()[nombre()]);
                     return (

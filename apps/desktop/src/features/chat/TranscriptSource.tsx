@@ -9,7 +9,7 @@ export default function TranscriptSource(props: { origin: TranscriptOrigin | nul
   return (
     <p class="m-0 w-full max-w-[860px] px-3 pb-1 text-xs text-neutral-500" title={props.origin?.file}>
       <Show when={props.origin} fallback={t("chat.transcript.saved")}>
-        {(o) => t("chat.transcript.cli", { agent: label(o().agent), from: o().from_cli, count: o().agent_turns })}
+        {(o) => t("chat.transcript.cli", { agent: label(o().provider), from: o().from_cli, count: o().agent_turns })}
       </Show>
     </p>
   );

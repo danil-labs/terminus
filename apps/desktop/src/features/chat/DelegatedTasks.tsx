@@ -72,9 +72,9 @@ export function DelegatedLaunch(props: {
   const row = () => props.rows.find(row => row.id === props.reference.task);
   const referenceRow = (): SessionRow => ({
     id: props.reference.task, folder: props.reference.folder, title: props.reference.title,
-    agent: props.reference.agent, model: props.reference.model ?? null, refs: [],
+    provider: props.reference.provider, model: props.reference.model ?? null, refs: [],
     created_at: 0, updated_at: 0, turns: 0, parent: null, subagent: null,
-    esperando: false, stage: null, encargado: null, encargado_del_padre: null, chat_de_agente: false,
+    esperando: false, stage: null, agent: null, parent_agent: null, chat_de_agente: false,
   });
   return <div data-delegated-launch={props.reference.task} class="my-2 min-w-0 border-l border-border pl-2">
     <DelegatedTaskList rows={[row() ?? referenceRow()]} list={props.list} readOnly={!row()} />

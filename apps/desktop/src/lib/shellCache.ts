@@ -16,7 +16,8 @@ export type ShellSnapshot = {
   desk: string | null;
 };
 
-type Stored = { version: 1; last: string; workspaces: Record<string, { saved: number; snapshot: string }> };
+// La versión 2 trae filas con `provider` y `agent`; una foto de la 1 se descarta.
+type Stored = { version: 2; last: string; workspaces: Record<string, { saved: number; snapshot: string }> };
 
 const KEY = "harness:shell-cache";
 const WORKSPACES = 4;
@@ -28,7 +29,7 @@ function stored(): Stored | null {
   try {
     const raw = localStorage.getItem(KEY);
     const value = raw === null ? null : (JSON.parse(raw) as Stored);
-    return value?.version === 1 && typeof value.last === "string" ? value : null;
+    return value?.version === 2 && typeof value.last === "string" ? value : null;
   } catch {
     return null;
   }
@@ -71,7 +72,7 @@ export function encodeSnapshot(snapshot: ShellSnapshot, rows: number): string {
 
 export function writeShellCache(snapshot: ShellSnapshot, now = Date.now()) {
   const text = ROWS.map((rows) => encodeSnapshot(snapshot, rows)).find((t) => t.length <= BYTES);
-  const value = stored() ?? { version: 1 as const, last: snapshot.workspace, workspaces: {} };
+  const value = stored() ?? { version: 2 as const, last: snapshot.workspace, workspaces: {} };
   if (text === undefined) {
     delete value.workspaces[snapshot.workspace];
   } else {

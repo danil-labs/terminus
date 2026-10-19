@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Cuántas veces pide la ventana `task_history`, `list_live_sessions` y `list_encargados`: al arrancar,
+ * Cuántas veces pide la ventana `task_history`, `list_live_sessions` y `list_agents`: al arrancar,
  * ante los avisos del CLI con la ventana quieta y mientras un turno largo transmite.
  *
  *   node tests/perf/task-history-calls.mjs              guarda: compara con task-history-calls-baseline.json
@@ -28,7 +28,7 @@ const TABS = TASKS.slice(0, 6);
 // Lo que mueve `updated_at` en el servicio: guardar un turno (`sessions::push_turn`).
 const saved = new Map();
 const row = (id) => ({
-  id, title: `Tarea ${id}`, last_message: "", agent: "codex", model: "gpt-5.6", refs: [],
+  id, title: `Tarea ${id}`, last_message: "", provider: "codex", model: "gpt-5.6", refs: [],
   updated_at: saved.get(id) ?? 0, turns: 4, parent: null, esperando: false,
 });
 const folderRows = (folder) => Array.from({ length: PER_FOLDER }, (_, n) => row(`${folder}t${n}`));
@@ -46,22 +46,22 @@ const responses = {
   window_ready: null,
   window_vitals: null,
   setup_required: false,
-  list_agents: [{ id: "codex", label: "Codex", available: true, driver: true }],
+  list_providers: [{ id: "codex", label: "Codex", available: true, driver: true }],
   list_workspaces: { workspaces: [{ id: "w", name: "W", context_root: null }], active: "w" },
   workspaces_startup: { workspaces: [{ id: "w", name: "W", context_root: null }], active: "w" },
   list_projects: () => fresh(FOLDERS.map(folder)),
   list_portfolios: () => fresh([{ id: "g", name: "G", created_at: 0, updated_at: 0 }]),
   list_sources: [],
   list_live_sessions: ({ project }) => fresh(project === "" ? TASKS.map(row) : FOLDERS.includes(project) ? folderRows(project) : []),
-  list_encargados: () => fresh({ encargados: [], rechazados: [] }),
-  list_encargado_status: [],
+  list_agents: () => fresh({ agents: [], rechazados: [] }),
+  list_agent_status: [],
   list_mentions: { fuentes: [], archivos: [] },
   list_models: {
-    agent: "codex",
+    provider: "codex",
     models: [{ id: "gpt-5.6", label: "GPT-5.6", gratis: null, note: null, efforts: [], default_effort: null }],
     fallback: false,
   },
-  list_surfaces: [{ id: "codex", agent: "codex", label: "Codex", catalogo: "todo", usable: true, marca: null, porque: null }],
+  list_surfaces: [{ id: "codex", provider: "codex", label: "Codex", catalogo: "todo", usable: true, marca: null, porque: null }],
   session_folder: "/tmp",
   list_task_trees: [],
   watch_task_tree: "watch",
@@ -71,7 +71,7 @@ const responses = {
   service_poll: { cursor: 0, gap: false, replay: false, runtime: "bench", reset: false },
   // Lo que tarda git en el servicio: una respuesta que llega después del siguiente delta.
   task_history: ({ id }) => sleep(40).then(() => (id === BROKEN ? Promise.reject(new Error("sin árbol")) : work)),
-  load_session: ({ id }) => ({ id, agent: "codex", sources: [], model: "gpt-5.6", effort: null, permission_mode: null, turns: history(id) }),
+  load_session: ({ id }) => ({ id, provider: "codex", sources: [], model: "gpt-5.6", effort: null, permission_mode: null, turns: history(id) }),
   load_queue: [],
   save_queue: null,
   session_usage: null,
@@ -93,7 +93,7 @@ const startup = { task_history: count("task_history"), list_live_sessions: count
 // La vista de agentes del riel pide la lista de encargados de cada carpeta una vez.
 doc.querySelector('div[role=group] button[aria-pressed="false"]')?.click();
 await sleep(500);
-const quiet = { task_history: count("task_history"), list_live_sessions: count("list_live_sessions"), list_encargados: count("list_encargados") };
+const quiet = { task_history: count("task_history"), list_live_sessions: count("list_live_sessions"), list_agents: count("list_agents") };
 // Lo que emite el servicio por cada mutación del CLI (`cli::server::notify`), con la ventana quieta.
 for (let n = 0; n < MUTATIONS; n++) {
   app.emit("session", { instance: "cli", workspace: "w", project: FOLDERS[0], session: `${FOLDERS[0]}t0`, seq: n, when: n });
@@ -104,7 +104,7 @@ await sleep(500);
 const idle = {
   task_history: count("task_history") - quiet.task_history,
   list_live_sessions: count("list_live_sessions") - quiet.list_live_sessions,
-  list_encargados: count("list_encargados") - quiet.list_encargados,
+  list_agents: count("list_agents") - quiet.list_agents,
 };
 
 for (const id of TABS) {
@@ -147,7 +147,7 @@ const measured = {
   "startup.list_live_sessions": startup.list_live_sessions,
   "cli.task_history": idle.task_history,
   "cli.list_live_sessions": idle.list_live_sessions,
-  "cli.list_encargados": idle.list_encargados,
+  "cli.list_agents": idle.list_agents,
   task_history: count("task_history") - before.task_history,
   list_live_sessions: count("list_live_sessions") - before.list_live_sessions,
 };

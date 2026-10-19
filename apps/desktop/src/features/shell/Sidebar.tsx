@@ -358,7 +358,7 @@ export default function Sidebar(props: {
             async (clave) => {
               const id = clave.split(":")[0];
               try {
-                const listado = (await invoke<HandlerList>("list_encargados", { project: id })).encargados;
+                const listado = (await invoke<HandlerList>("list_agents", { project: id })).agents;
                 rememberRoster(id, listado);
                 return listado;
               } catch {
@@ -647,7 +647,7 @@ export default function Sidebar(props: {
                     </button>
                     <Show when={(!!query() || !agentesPlegados().includes(p().id))}>
                       <AgentRows project={p().id} onNewAgent={() => setCreatingAgentIn({ id: p().id, name: p().name })}
-                        encargados={roster() ?? []} search={query()} onSearchResults={count => reportResults(`agents:${p().id}`, count)} hablando={props.hablandoCon?.project === p().id ? props.hablandoCon.name : null} onHablar={props.onHablarCon} onProfile={props.onAgentProfile} />
+                        agents={roster() ?? []} search={query()} onSearchResults={count => reportResults(`agents:${p().id}`, count)} hablando={props.hablandoCon?.project === p().id ? props.hablandoCon.name : null} onHablar={props.onHablarCon} onProfile={props.onAgentProfile} />
                     </Show>
                   </div>
                   <div data-sidebar-tasks classList={{ hidden: !!query() && !searchCounts()[`tasks:${p().id}`] }}>

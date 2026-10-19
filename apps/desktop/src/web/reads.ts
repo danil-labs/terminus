@@ -16,8 +16,10 @@ export class ReadCache {
   private readonly key: string;
 
   constructor(computerId: string) {
-    this.key = `terminus-web:reads:${computerId}`;
+    this.key = `terminus-web:reads:v2:${computerId}`;
     try {
+      // v1 kept reads with the old wire names (`agent` for the CLI, `encargado`); drop it.
+      localStorage.removeItem(`terminus-web:reads:${computerId}`);
       const raw = localStorage.getItem(this.key);
       if (raw) this.entries = new Map(Object.entries(JSON.parse(raw) as Record<string, Entry>));
     } catch {}

@@ -56,9 +56,9 @@ export function crearAlta(nueva: boolean) {
       set("instalacion", id, { estado: "instalando", error: undefined });
       fila = fila.then(async () => {
         try {
-          const agentes = await invoke<{ id: string; available: boolean }[]>("list_agents");
+          const agentes = await invoke<{ id: string; available: boolean }[]>("list_providers");
           if (!agentes.find((a) => a.id === id)?.available) {
-            await invoke("install_agent", { agent: id });
+            await invoke("install_provider", { provider: id });
           }
           set("instalacion", id, { estado: "lista", error: undefined });
         } catch (e) {

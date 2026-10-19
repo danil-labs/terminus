@@ -18,7 +18,7 @@ export default function AgentScreen() {
   const { snapshot } = useWorkspaces();
   const handler = snapshot?.handlers.find((h) => h.name === name);
   const [note, setNote] = useState<string | null>(null);
-  const tasks = (snapshot?.tasks ?? []).filter((task) => task.encargado === name);
+  const tasks = (snapshot?.tasks ?? []).filter((task) => task.agent === name);
   const stateOf = useTaskStates(workspace);
   const folder = handler?.folders[0] ?? null;
   const defaults = lastAgent(tasks) ?? lastAgent(snapshot?.tasks ?? []);

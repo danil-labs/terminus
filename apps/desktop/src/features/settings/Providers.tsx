@@ -30,7 +30,7 @@ import { SettingsBlock, SettingsPanel, SettingsRow, SettingsSection } from "./la
  * Un dato no secreto del formulario. Los tres textos son claves que declara
  * el módulo del proveedor; `falta` es lo que se dice cuando el campo va
  * vacío, escrito entero y no compuesto con los otros dos: el orden de las
- * palabras cambia con la lengua (`providers::Field`).
+ * palabras cambia con la lengua (`git_hosts::Field`).
  */
 type Campo = { id: string; label: Frase; help: Frase; falta: Frase; required: boolean };
 
@@ -186,7 +186,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
   async function cargar() {
     setCargando(true);
     try {
-      setLista(await invoke<Provider[]>("list_providers", { scope: await scope }));
+      setLista(await invoke<Provider[]>("list_git_hosts", { scope: await scope }));
       setFallo(null);
     } catch (e) {
       // Cargando, vacío y error son tres pantallas distintas: dejar la lista
@@ -255,7 +255,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
     setOcupado((o) => ({ ...o, [id]: "comprobando" }));
     setFallas((f) => ({ ...f, [id]: null }));
     try {
-      const fresco = await invoke<Provider>("check_provider", { id, scope: await scope });
+      const fresco = await invoke<Provider>("check_git_host", { id, scope: await scope });
       if (fresco.unverified) {
         setFallas((f) => ({ ...f, [id]: fresco.unverified! }));
       }
@@ -279,7 +279,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
     setOcupado((o) => ({ ...o, [p.id]: "conectando" }));
     setFallas((f) => ({ ...f, [p.id]: null }));
     try {
-      const fresco = await invoke<Provider>("connect_provider", {
+      const fresco = await invoke<Provider>("connect_git_host", {
         scope: await scope,
         id: p.id,
         data: b.data,
@@ -377,7 +377,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
 
   async function desconectar(id: string) {
     try {
-      await invoke("disconnect_provider", { id, scope: await scope });
+      await invoke("disconnect_git_host", { id, scope: await scope });
       setChoosing((current) => ({ ...current, [id]: false }));
       setAreas((a) => ({ ...a, [id]: null }));
       setAbierta((a) => ({ ...a, [id]: null }));
@@ -397,8 +397,8 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
     setAreas((a) => ({ ...a, [id]: null }));
     try {
       const r = choosing()[id]
-        ? await invoke<Area[]>("provider_available_areas", { id, scope: await scope })
-        : await invoke<Area[]>("provider_areas", { id, scope: await scope });
+        ? await invoke<Area[]>("git_host_available_areas", { id, scope: await scope })
+        : await invoke<Area[]>("git_host_areas", { id, scope: await scope });
       if (disposed) return false;
       setAreas((a) => ({ ...a, [id]: r }));
       return true;
@@ -414,7 +414,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
     setOcupado((o) => ({ ...o, [id]: "listando" }));
     setFallas((f) => ({ ...f, [id]: null }));
     try {
-      const result = await invoke<Provider>("select_provider_area", { id, area, enabled, scope: await scope });
+      const result = await invoke<Provider>("select_git_host_area", { id, area, enabled, scope: await scope });
       if (disposed) return;
       reemplazar(result);
       setAbierta({});
@@ -438,7 +438,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
     setOcupado((o) => ({ ...o, [id]: "listando" }));
     setFallas((f) => ({ ...f, [id]: null }));
     try {
-      const r = await invoke<ProyectoRemoto[]>("provider_projects", { id, area, scope: await scope });
+      const r = await invoke<ProyectoRemoto[]>("git_host_projects", { id, area, scope: await scope });
       setRepos((x) => ({ ...x, [clave]: r }));
     } catch (e) {
       setFallas((f) => ({ ...f, [id]: asFailure(e) }));
@@ -461,7 +461,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
     try {
       await invoke("attach_repo", {
         project: "",
-        provider: id,
+        gitHost: id,
         cloneUrl: r.clone_url,
         branch: r.branch || undefined,
         name: r.name,

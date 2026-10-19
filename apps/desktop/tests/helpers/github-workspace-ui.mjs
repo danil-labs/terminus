@@ -5,7 +5,7 @@ const base = {
   launcher_state: { phase: "ready", blank_0274: false },
   check_environment: () => ({ ready: true, blocked: false, reason: null, items: [], githubCli: { available: true, version: "gh version 2.102.0", managed_supported: true, installable: true } }),
   list_language_packs: [], list_bundled_language_packs: [], window_ready: null,
-  window_vitals: null, setup_required: false, list_agents: [],
+  window_vitals: null, setup_required: false, list_providers: [],
   list_workspaces: { workspaces: [{ id: "fixture-a", name: "A" }], active: "fixture-a" },
   workspaces_startup: { workspaces: [{ id: "fixture-a", name: "A" }], active: "fixture-a" },
   list_projects: [], list_sources: [], list_surfaces: [], list_live_sessions: [],
@@ -27,20 +27,20 @@ for (const scenario of ["connected-workspace", "existing-installation", "no-inst
     connected: connected ? { data: {}, workspace: "person", identity: { user: "person", name: "Person" },
       selected_area: null, selected_areas: selected, connected_at: 1 } : null, unverified: null });
   const app = await arrancar("listo", `github-${scenario}`, { ...base,
-    list_providers: () => [info()], check_provider: () => info(),
+    list_git_hosts: () => [info()], check_git_host: () => info(),
     start_browser_login: () => { loginCount++; return { code: "ABCD", url: "https://github.com/login/device", expires_at: 9999999999999 }; },
     finish_browser_login: () => scenario === "cancel-login" ? new Promise((_resolve, reject) => { finishLogin = reject; }) : (connected = true, info()),
     cancel_browser_login: () => { if (finishLogin) finishLogin(new Error("cancelled")); },
-    provider_pending_setup: null,
-    provider_available_areas: () => available,
-    provider_areas: () => pendingAreas ?? selected.map(({ key }) => ({ key, name: key })),
-    select_provider_area: ({ scope, area, enabled }) => {
+    git_host_pending_setup: null,
+    git_host_available_areas: () => available,
+    git_host_areas: () => pendingAreas ?? selected.map(({ key }) => ({ key, name: key })),
+    select_git_host_area: ({ scope, area, enabled }) => {
       assert.equal(scope, "fixture-a");
       selected = selected.filter(({ key }) => key !== area);
       if (enabled) selected.push({ key: area, installation_id: 42 });
       return info();
     },
-    disconnect_provider: ({ scope }) => { assert.equal(scope, "fixture-a"); connected = false; },
+    disconnect_git_host: ({ scope }) => { assert.equal(scope, "fixture-a"); connected = false; },
     open_external: ({ target }) => { opens.push(target); },
   });
   const button = text => [...app.w.document.querySelectorAll("button")].find(b => b.textContent?.trim() === text || b.getAttribute("aria-label") === text);
@@ -101,7 +101,7 @@ for (const scenario of ["connected-workspace", "existing-installation", "no-inst
     assert.ok(app.w.document.body.textContent.includes("acme y other"));
     assert.equal(button("Ver repositorios"), undefined);
     assert.equal(button("ver qué trae"), undefined);
-    assert.equal(app.comandos.includes("provider_projects"), false, "Configuración no consulta repositorios");
+    assert.equal(app.comandos.includes("git_host_projects"), false, "Configuración no consulta repositorios");
     assert.equal(app.comandos.includes("attach_repo"), false, "las fuentes se agregan desde el compositor");
     button("Cambiar acceso").click(); await espera(100);
     button("Quitar del workspace").click(); await espera(100);
@@ -159,7 +159,7 @@ for (const scenario of ["absent", "incompatible", "unknown"]) {
       ...(scenario === "unknown" ? {} : { githubCli: { available: scenario !== "absent" || supported,
         version: scenario === "absent" && !supported ? null : "gh version fixture",
         managed_supported: supported, installable: true } }) }),
-    list_providers: [{ id: "github", name: "GitHub", fields: [], browser_login: true,
+    list_git_hosts: [{ id: "github", name: "GitHub", fields: [], browser_login: true,
       select_area: true, setup_url: install, token_label: "Token", token_help: "", token_url: "",
       login_help: "", area_label: "cuenta", areas_label: "cuentas", area_help: "", connected: null, unverified: null }],
     install_gh: () => { installCount++; if (failInstall) throw { what: "No se pudo descargar gh", detail: "fixture" }; supported = true; },

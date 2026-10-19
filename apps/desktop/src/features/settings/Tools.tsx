@@ -206,7 +206,7 @@ export default function Herramientas(props: { solo?: string | string[] }) {
     setFallo(null);
     temporizadores.set(k, window.setTimeout(() => quitarEnCurso(k), 120_000));
     try {
-      const m = await invoke<Frase>("mcp_login", { agent: agentId, id: servicioId });
+      const m = await invoke<Frase>("mcp_login", { provider: agentId, id: servicioId });
       setAviso(prosa(m));
     } catch (e) {
       setFallo(asFailure(e));
@@ -222,7 +222,7 @@ export default function Herramientas(props: { solo?: string | string[] }) {
   async function cerrarSesion(agentId: string, servicioId: string) {
     setFallo(null);
     try {
-      await invoke("mcp_logout", { agent: agentId, id: servicioId });
+      await invoke("mcp_logout", { provider: agentId, id: servicioId });
     } catch (e) {
       setFallo(asFailure(e));
     }
@@ -234,7 +234,7 @@ export default function Herramientas(props: { solo?: string | string[] }) {
       const [c, p, a] = await Promise.all([
         invoke<Conocido[]>("list_known_mcp"),
         invoke<Puesto[]>("list_mcp_servers"),
-        invoke<AgenteMcp[]>("list_mcp_agents"),
+        invoke<AgenteMcp[]>("list_mcp_providers"),
       ]);
       setConocidos(c);
       setPuestos(p);

@@ -215,7 +215,7 @@ export default function Memoria(props: { project: string; agents: Agent[]; encar
   }
 
   function quien(e: MemoriaEntrada) {
-    return e.origin.agent ? nombreDeAgente(e.origin.agent) : t("projects.memory.person");
+    return e.origin.provider ? nombreDeAgente(e.origin.provider) : t("projects.memory.person");
   }
 
   async function retirar(file: string) {

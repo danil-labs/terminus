@@ -17,16 +17,16 @@ export default function AIProviders(props: { superficies: Superficie[]; agentesE
   const grupos = createMemo(() => {
     const vistos = new Map<string, Superficie[]>();
     for (const superficie of props.superficies) {
-      const grupo = vistos.get(superficie.agent);
+      const grupo = vistos.get(superficie.provider);
       if (grupo) grupo.push(superficie);
-      else vistos.set(superficie.agent, [superficie]);
+      else vistos.set(superficie.provider, [superficie]);
     }
     return [...vistos.values()];
   });
 
   const nombreDe = (superficie: Superficie, enGrupo: boolean) => {
     if (!enGrupo) return undefined;
-    return superficie.agent === "opencode-zen" && superficie.catalogo === "de_pago"
+    return superficie.provider === "opencode-zen" && superficie.catalogo === "de_pago"
       ? t("settings.ai_providers.zen_go")
       : rotuloDeSuperficie(superficie);
   };
@@ -40,17 +40,17 @@ export default function AIProviders(props: { superficies: Superficie[]; agentesE
       <Index each={grupos()}>
         {(grupo) => (
           <Accounts
-            agente={grupo()[0].agent}
+            agente={grupo()[0].provider}
             soloGratuitos={grupo()[0].catalogo === "gratuitos"}
             titulo={grupo().length > 1 ? grupo()[0].label : rotuloDeSuperficie(grupo()[0])}
             nombre={nombreDe(grupo()[0], grupo().length > 1)}
             marca={<Marca superficie={grupo()[0]} />}
-            desplegado={props.agentesEnUso.includes(grupo()[0].agent)}
+            desplegado={props.agentesEnUso.includes(grupo()[0].provider)}
           >
             <Index each={grupo().slice(1)}>
               {(superficie) => (
                 <Accounts
-                  agente={superficie().agent}
+                  agente={superficie().provider}
                   soloGratuitos={superficie().catalogo === "gratuitos"}
                   nombre={nombreDe(superficie(), true)}
                   marca={<Marca superficie={superficie()} />}

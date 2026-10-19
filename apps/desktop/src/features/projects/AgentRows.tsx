@@ -38,7 +38,7 @@ function textoDeEstado(row: HandlerStatusRow | undefined): string {
 export default function AgentRows(props: {
   project: string;
   onNewAgent: () => void;
-  encargados: HandlerDefinition[];
+  agents: HandlerDefinition[];
   search?: string;
   onSearchResults?: (count: number) => void;
   /** El nombre del encargado con el que se va a hablar, si es de este proyecto. */
@@ -55,7 +55,7 @@ export default function AgentRows(props: {
   // Los ocultos no se pintan aquí. Se vuelven a ver —y a mostrar— desde la
   // vista del proyecto, que es donde está la lista completa.
   const visibles = createMemo(() =>
-    props.encargados.filter((e) => !profiles()[e.name]?.hidden && matchesTaskQuery([e.name, displayName(e.name, profiles()[e.name])], props.search ?? "")),
+    props.agents.filter((e) => !profiles()[e.name]?.hidden && matchesTaskQuery([e.name, displayName(e.name, profiles()[e.name])], props.search ?? "")),
   );
   if (props.onSearchResults) {
     createEffect(() => props.onSearchResults?.(visibles().length));

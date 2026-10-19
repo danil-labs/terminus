@@ -1,6 +1,6 @@
 /**
  * What the bridge answers, in the engine's own field names (`task list`,
- * `encargado`, `esperando`): the bridge forwards RPC1 results without renaming.
+ * `esperando`, `sin_ver`): the bridge forwards RPC1 results without renaming.
  */
 export type EngineError = { code: string; message_key?: string; detail?: string | null };
 export type Workspace = { id: string; name: string };
@@ -20,7 +20,7 @@ export type TaskRow = {
   folder: string;
   workspace: string;
   title: string;
-  agent: string;
+  provider: string;
   model: string | null;
   last_message: string | null;
   outcome: string | null;
@@ -28,7 +28,7 @@ export type TaskRow = {
   esperando: boolean;
   archived: boolean;
   space: string | null;
-  encargado: string | null;
+  agent: string | null;
 };
 export type TaskRecord = {
   id: string;
@@ -47,7 +47,7 @@ export type QuestionSet = { request_id?: string | null; turno?: string; turn?: s
 export type TaskShow = {
   running: boolean;
   requests: { permissions: Permission[]; questions: QuestionSet[] };
-  task: { id: string; title: string; agent: string; model: string | null };
+  task: { id: string; title: string; provider: string; model: string | null };
 };
 export type Receipt = { id: string; status: string; result: { queued?: boolean; ahead?: number } | null; error: EngineError | null };
 export type AttentionState = "approving" | "asked" | "failed" | "unseen";
