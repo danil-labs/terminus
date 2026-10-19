@@ -5692,7 +5692,7 @@ export default function App() {
    * Componente y no variable con JSX (SYSTEM.md § Las reglas de Solid,
    * regla 9): se pasa como prop a `Chat`.
    */
-  const SelectorDeProyecto = (props: { branch?: JSX.Element; locked?: boolean }) => (
+  const SelectorDeProyecto = (props: { branch?: JSX.Element; locked?: boolean; nueva?: boolean }) => (
     // Del ancho de la caja, no del contenido: `justify-items-center` encoge
     // la rejilla a su hijo más ancho —el aviso «sin fuente de contexto»,
     // 416 px— y la franja del proyecto (`w-full`) queda a esos 416 px bajo
@@ -5706,7 +5706,8 @@ export default function App() {
           sources={sources()}
           onPick={elegirProyecto}
           onNuevoProyecto={() => setAnadiendoCarpeta(true)}
-          machine={<Show when={!props.locked}><MachinePicker /></Show>}
+          // Solo al crear: una tarea abierta ya vive en la máquina que la corre.
+          machine={<Show when={props.nueva && !props.locked}><MachinePicker /></Show>}
         />
       {/* A General, no a GitHub: la fuente principal del workspace se elige
           en Configuración → General; mandar a GitHub lleva a conectar un
@@ -6063,7 +6064,7 @@ export default function App() {
         stopping={deteniendo() !== null && deteniendo() === pp.sesion}
         agents={agents()}
         proyecto={
-          <SelectorDeProyecto locked={!!encargadoDeLaCelda()} branch={
+          <SelectorDeProyecto nueva={!pp.sesion} locked={!!encargadoDeLaCelda()} branch={
             <Show when={!pp.sesion && esRepositorio()}>
               <BaseBranchPicker
                 project={project()}

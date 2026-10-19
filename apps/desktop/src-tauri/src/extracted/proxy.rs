@@ -303,12 +303,11 @@ fn answers(client: &Client) -> bool {
 
 /// Corre el programa de encendido, que reabre el túnel y reescribe la selección.
 fn woken(program: &std::path::Path, selection: &std::path::Path) -> Result<Arc<Client>, Error> {
-    let status = std::process::Command::new(program)
-        .arg(selection)
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()?;
+    // Medido: de VM apagada a motor listo, unos 20 s; EC2 puede tardar minutos.
+    let status = crate::util::output_with_timeout(
+        crate::util::no_console_window(&mut std::process::Command::new(program)).arg(selection),
+        Duration::from_secs(300),
+    )?;
     if !status.success() {
         return Err(Error::new("app_unavailable"));
     }

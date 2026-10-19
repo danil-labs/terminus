@@ -1,4 +1,4 @@
-import { For, Show, createSignal, onMount } from "solid-js";
+import { For, Show, createRoot, createSignal } from "solid-js";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import Server from "lucide-solid/icons/server";
 import Laptop from "lucide-solid/icons/laptop";
@@ -10,7 +10,21 @@ import { isMac } from "../../lib/window";
 type Machine = { id: string; local: boolean; active: boolean; on: boolean };
 
 const nombre = (m: Machine) =>
-  m.local ? t(isMac() ? "machines.this_mac" : "machines.this_computer") : m.id;
+  m.local
+    ? isMac()
+      ? t("shell.machines.this_mac")
+      : t("shell.machines.this_computer")
+    : m.id;
+
+// Una sola lista para toda la ventana: se pide la primera vez que se monta el
+// selector y de nuevo al abrir el menú. Señal y no
+// `createResource`, que suspendería la vista entera mientras contestan.
+const [machines, setMachines] = createRoot(() => createSignal<Machine[]>([]));
+const refetch = () =>
+  invoke<Machine[]>("machine_list")
+    .then(setMachines)
+    .catch(() => setMachines([]));
+let pedida = false;
 
 /**
  * «Ejecutar en»: la máquina donde corren las tareas que ves y las que crees.
@@ -18,14 +32,11 @@ const nombre = (m: Machine) =>
  * mientras tanto, preguntar el estado no enciende nada.
  */
 export function MachinePicker() {
-  // Señal y no `createResource`: un recurso suspende la vista entera mientras
-  // la lista pregunta a cada máquina.
-  const [machines, setMachines] = createSignal<Machine[]>([]);
-  const refetch = () =>
-    invoke<Machine[]>("machine_list")
-      .then(setMachines)
-      .catch(() => setMachines([]));
-  onMount(() => void refetch());
+  if (!pedida) {
+    pedida = true;
+    void refetch();
+  }
+
   const [abierto, setAbierto] = createSignal(false);
   const [cambiando, setCambiando] = createSignal<string | null>(null);
   const [error, setError] = createSignal(false);
@@ -48,24 +59,24 @@ export function MachinePicker() {
   }
 
   const punto = (m: Machine) =>
-    `inline-block size-1.5 shrink-0 rounded-full ${m.on ? "bg-emerald-500" : "bg-neutral-400"}`;
+    `inline-block size-1.5 shrink-0 rounded-full ${m.on ? "bg-success" : "bg-neutral-300"}`;
 
   return (
     <Show when={(machines()?.length ?? 0) > 1}>
       <Popover open={abierto()} onOpenChange={(v) => { setAbierto(v); if (v) void refetch(); }} placement="top-start" gutter={4}>
         <PopoverTrigger
           class="flex min-h-7 max-w-[260px] items-center gap-1.5 rounded-sm px-1 text-left text-xs text-neutral-500 hover:text-neutral-950"
-          aria-label={t("machines.label")}
+          aria-label={t("shell.machines.label")}
         >
           <Show when={actual()?.local} fallback={<Server size={12} aria-hidden="true" />}>
             <Laptop size={12} aria-hidden="true" />
           </Show>
           <span class="truncate">
             {cambiando()
-              ? t("machines.starting", { name: cambiando() ?? "" })
+              ? t("shell.machines.starting", { name: cambiando() ?? "" })
               : actual()
                 ? nombre(actual() as Machine)
-                : t("machines.label")}
+                : t("shell.machines.label")}
           </span>
           <Show when={actual() && !cambiando()}>
             <span class={punto(actual() as Machine)} aria-hidden="true" />
@@ -73,7 +84,7 @@ export function MachinePicker() {
           <ChevronDown size={11} aria-hidden="true" />
         </PopoverTrigger>
         <PopoverContent class="w-[260px] overflow-hidden p-0 text-[0.6875rem] text-neutral-500 shadow-lg">
-          <p class="m-0 border-b border-border px-2 py-1.5">{t("machines.label")}</p>
+          <p class="m-0 border-b border-border px-2 py-1.5">{t("shell.machines.label")}</p>
           <div class="py-1">
             <For each={machines()}>
               {(m) => (
@@ -81,7 +92,7 @@ export function MachinePicker() {
                   <span class={punto(m)} aria-hidden="true" />
                   <span class="flex-1 truncate">{nombre(m)}</span>
                   <span class="text-[0.625rem]">
-                    {m.active ? t("machines.active") : m.on ? t("machines.on") : t("machines.off")}
+                    {m.active ? t("shell.machines.active") : m.on ? t("shell.machines.on") : t("shell.machines.off")}
                   </span>
                 </button>
               )}
@@ -90,7 +101,7 @@ export function MachinePicker() {
         </PopoverContent>
       </Popover>
       <Show when={error()}>
-        <span class="text-xs text-red-600">{t("machines.failed")}</span>
+        <span class="text-xs text-error-strong">{t("shell.machines.failed")}</span>
       </Show>
     </Show>
   );

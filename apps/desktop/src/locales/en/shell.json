@@ -216,12 +216,12 @@
   "shell.folder.copied": "Path copied",
   "shell.engine.connecting": "Connecting to the engine…",
   "shell.sidebar.cached": "Connecting to the engine: these tasks are from last time and update as soon as it answers.",
-  "machines.label": "Run on",
-  "machines.this_mac": "This Mac",
-  "machines.this_computer": "This computer",
-  "machines.starting": "Starting {name}…",
-  "machines.active": "in use",
-  "machines.on": "on",
-  "machines.off": "off",
-  "machines.failed": "That machine could not be started."
+  "shell.machines.label": "Run on",
+  "shell.machines.this_mac": "This Mac",
+  "shell.machines.this_computer": "This computer",
+  "shell.machines.starting": "Starting {name}…",
+  "shell.machines.active": "in use",
+  "shell.machines.on": "on",
+  "shell.machines.off": "off",
+  "shell.machines.failed": "That machine could not be started."
 }
