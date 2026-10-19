@@ -2,7 +2,9 @@ import { For, Show, createSignal, type JSX } from "solid-js";
 import FolderOpen from "lucide-solid/icons/folder-open";
 import { Button } from "../../ui/Button";
 import ChevronDown from "lucide-solid/icons/chevron-down";
+import Plus from "lucide-solid/icons/plus";
 import Search from "lucide-solid/icons/search";
+import SettingsIcon from "lucide-solid/icons/settings";
 import {
   ITEM_DE_MENU,
   Popover,
@@ -11,10 +13,11 @@ import {
 } from "../../ui/Popover";
 import { enfocar } from "../../lib/focus";
 import { t } from "../../lib/i18n";
+import { cn } from "../../lib/utils";
 import { type Project, type Source } from "../../lib/model";
 import { lineaDeProcedencia, procedencia } from "../../lib/sourceOrigin";
 import { Badge } from "../../ui/Badge";
-import WorkdirIcon from "../code/WorkdirIcon";
+import WorkdirIcon, { workdirKindLabel } from "../code/WorkdirIcon";
 
 
 /**
@@ -62,8 +65,10 @@ export function ProjectPicker(props: {
   /** Las fuentes del workspace, para poder nombrar las que este proyecto lee. */
   sources: Source[];
   onPick: (id: string) => void;
-  /** Abre el diálogo de nombre. El nombre no se decide aquí. */
+  /** Abre el diálogo «Añadir un proyecto». */
   onNuevoProyecto: () => void;
+  /** Abre Ajustes → Proyectos, donde se renombra, se quita y se borra. */
+  onAdministrar?: () => void;
   /** Dónde corre la tarea: va antes del proyecto, que es de esa máquina. */
   machine?: JSX.Element;
 }) {
@@ -140,10 +145,21 @@ export function ProjectPicker(props: {
             <For each={filtradas()}>
               {(p) => (
                 <button
-                  class={`${ITEM_DE_MENU} truncate`}
+                  class={cn(ITEM_DE_MENU, "grid grid-cols-[14px_minmax(0,1fr)_auto] items-center gap-2")}
                   onClick={() => elegir(p.id)}
                 >
-                  {p.name}
+                  <WorkdirIcon kind={p.kind} cloud={p.cloud} size={13} class="text-neutral-500" />
+                  <span
+                    class={cn("truncate", p.sessions === 0 && "text-neutral-500")}
+                    title={workdirKindLabel(p.kind, p.cloud)}
+                  >
+                    {p.name}
+                  </span>
+                  <span class="text-[0.6875rem] whitespace-nowrap text-neutral-500">
+                    {p.sessions > 0
+                      ? t("projects.picker.tasks", { count: p.sessions })
+                      : t("projects.picker.no_tasks")}
+                  </span>
                 </button>
               )}
             </For>
@@ -155,15 +171,35 @@ export function ProjectPicker(props: {
             </Show>
           </div>
 
-          <button
-            class={`${ITEM_DE_MENU} border-t border-border`}
-            onClick={() => {
-              setAbierto(false);
-              props.onNuevoProyecto();
-            }}
-          >
-            {t("projects.picker.new")}
-          </button>
+          <div class="border-t border-border py-1">
+            <button
+              class={cn(ITEM_DE_MENU, "flex items-center gap-2 text-neutral-700")}
+              onClick={() => {
+                setAbierto(false);
+                props.onNuevoProyecto();
+              }}
+            >
+              <Plus size={13} aria-hidden="true" />
+              {t("projects.picker.add")}
+            </button>
+            <Show when={props.onAdministrar}>
+              {(administrar) => (
+                <button
+                  class={cn(ITEM_DE_MENU, "grid grid-cols-[14px_minmax(0,1fr)_auto] items-center gap-2 text-neutral-700")}
+                  onClick={() => {
+                    setAbierto(false);
+                    administrar()();
+                  }}
+                >
+                  <SettingsIcon size={13} aria-hidden="true" />
+                  <span class="truncate">{t("projects.picker.manage")}</span>
+                  <span class="text-[0.6875rem] text-neutral-500">
+                    {t("projects.picker.manage_where")}
+                  </span>
+                </button>
+              )}
+            </Show>
+          </div>
         </PopoverContent>
       </Popover>
       </Show>

@@ -207,7 +207,6 @@
   "projects.new.cancel": "Cancel",
   "projects.new.placeholder": "Scoring revamp",
   "projects.picker.label": "Project",
-  "projects.picker.new": "New project…",
   "projects.picker.no_match": "None is called that.",
   "projects.picker.none": "No project",
   "projects.picker.search": "Search projects",
@@ -359,5 +358,13 @@
   "projects.agents.profile_prompt_radiant": "Installed by Radiant's governance; it is changed in its source repository.",
   "projects.tabs.new": "Open a tab",
   "projects.tabs.new_task_in": "New task in",
-  "projects.tabs.new_browser": "Browser"
+  "projects.tabs.new_browser": "Browser",
+  "projects.picker.add": "Add a project…",
+  "projects.picker.manage": "Manage projects",
+  "projects.picker.manage_where": "Settings",
+  "projects.picker.tasks": {
+    "one": "{count} task",
+    "other": "{count} tasks"
+  },
+  "projects.picker.no_tasks": "no tasks"
 }

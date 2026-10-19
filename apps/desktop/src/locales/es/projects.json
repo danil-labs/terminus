@@ -207,7 +207,6 @@
   "projects.new.cancel": "Cancelar",
   "projects.new.placeholder": "Revamp de scoring",
   "projects.picker.label": "Proyecto",
-  "projects.picker.new": "Nuevo proyecto…",
   "projects.picker.no_match": "Ninguna se llama así.",
   "projects.picker.none": "Sin proyecto",
   "projects.picker.search": "Buscar proyecto",
@@ -359,5 +358,13 @@
   "projects.agents.profile_prompt_radiant": "Lo instaló el gobierno de Radiant; se cambia en su repositorio fuente.",
   "projects.tabs.new": "Abrir una pestaña",
   "projects.tabs.new_task_in": "Nueva tarea en",
-  "projects.tabs.new_browser": "Navegador"
+  "projects.tabs.new_browser": "Navegador",
+  "projects.picker.add": "Añadir un proyecto…",
+  "projects.picker.manage": "Administrar proyectos",
+  "projects.picker.manage_where": "Ajustes",
+  "projects.picker.tasks": {
+    "one": "{count} tarea",
+    "other": "{count} tareas"
+  },
+  "projects.picker.no_tasks": "sin tareas"
 }

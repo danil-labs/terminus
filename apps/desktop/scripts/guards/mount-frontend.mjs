@@ -3282,7 +3282,14 @@ if (!roto) {
   await sleep(100);
   const pestanas = [...agDoc.querySelectorAll('[role="tab"][id^="cfg-tab-"]')].map((b) => b.id);
   const skills = pestanas.indexOf("cfg-tab-skills");
-  assert.deepEqual(pestanas.slice(skills, skills + 3), ["cfg-tab-skills", "cfg-tab-agentes", "cfg-tab-plugins"]);
+  assert.deepEqual(pestanas.slice(skills, skills + 4), ["cfg-tab-skills", "cfg-tab-agentes", "cfg-tab-proyectos", "cfg-tab-plugins"]);
+  agDoc.querySelector("#cfg-tab-proyectos").click();
+  // La página llega en su propio trozo: se espera a que pinte sus filas.
+  for (let i = 0; i < 40 && !agDoc.querySelector("#cfg-panel [data-settings-project]"); i++) await sleep(25);
+  const filasDeProyectos = [...agDoc.querySelectorAll("#cfg-panel [data-settings-project]")];
+  assert.deepEqual(filasDeProyectos.map((f) => f.getAttribute("data-settings-project")), idsDelCatalogo, "Ajustes › Proyectos lista las carpetas del espacio");
+  assert.ok(filasDeProyectos.every((f) => f.textContent.includes("Archivos") && f.textContent.includes("sin tareas")), "cada fila dice su tipo en palabras y que no tiene tareas");
+  assert.doesNotMatch(panelDeAjustes().textContent, /\bgit\b/i, "la página no le habla de git a la persona");
   agDoc.querySelector("#cfg-tab-agentes").click();
   await sleep(120);
 
