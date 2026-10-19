@@ -99,6 +99,27 @@ caso("lo esencial que falta con la app pintada se repara detrás, sin abrir la p
   assert.deepEqual(s.llamadas.prepare_runtime, ["arrancar"]);
 });
 
+caso("el aviso de la reparación se cierra y vuelve si la reparación falla", async () => {
+  const fallida = () => foto((name) => (name === "node" ? "failed" : "succeeded"), false);
+  const s = servicio({
+    setupRequired: false,
+    entorno: reporte(true, ["node", "npm"]),
+    preparar: (n) => (n === 1 ? enCurso() : fallida()),
+  });
+  const app = await boot("listo", "reparacion-cerrar", s.respuestas);
+  s.conectar(app);
+  await sleep(400);
+
+  const cruz = aviso(app)?.querySelector('button[aria-label]');
+  assert.ok(cruz, "el aviso de la reparación en curso no tiene cruz");
+  cruz.click();
+  await sleep(50);
+  assert.equal(aviso(app), null, "la cruz no cerró el aviso");
+
+  await sleep(6000);
+  assert.equal(aviso(app)?.getAttribute("role"), "alert", "el fallo de la reparación no volvió a avisar");
+});
+
 caso("la primera vez la pantalla avanza con la foto aunque no llegue ningún evento", async () => {
   const s = servicio({
     setupRequired: true,
