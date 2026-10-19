@@ -13,6 +13,11 @@ export type DanilConnectStatus = {
   /** Conectada: el nombre de esta computadora. Desconectada: el sugerido (su hostname). */
   name?: string | null;
   email?: string | null;
+  /** Nombre de la persona en su cuenta de Danil (`name` es el de la computadora). */
+  account_name?: string | null;
+  /** Ruta de la foto de la cuenta que el motor guardó en esta computadora. */
+  avatar?: string | null;
+  avatar_source?: "danil" | "provider" | null;
   user_code?: string | null;
   verification_uri?: string | null;
   verification_uri_complete?: string | null;

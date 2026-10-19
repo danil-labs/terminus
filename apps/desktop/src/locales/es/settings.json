@@ -219,6 +219,7 @@
   "settings.general.extra.search": "Buscar",
   "settings.general.name": "Nombre",
   "settings.general.name_hint": "Cómo quieres que se te llame.",
+  "settings.general.name_from_account": "Vacío, se usa el de tu cuenta de Danil: {name}.",
   "settings.general.root.empty": "Sin material. El agente contesta con lo que sepa y con lo que le des en el mensaje.",
   "settings.general.root.pick": "Elegir material",
   "settings.general.root.title": "Contexto principal",

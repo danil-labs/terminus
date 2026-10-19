@@ -187,6 +187,7 @@ export default function General() {
   const [savingDirectory, setSavingDirectory] = createSignal(false);
   const [directoryFailure, setDirectoryFailure] = createSignal<Failure | null>(null);
   const [name, setName] = createSignal("");
+  const [accountName, setAccountName] = createSignal<string | null>(null);
   const [storedName, setStoredName] = createSignal("");
   const [nameFailure, setNameFailure] = createSignal<string | null>(null);
   const [sources, setSources] = createSignal<Source[]>([]);
@@ -266,10 +267,11 @@ export default function General() {
     void invoke<string>("get_project_directory")
       .then(setDirectory)
       .catch((e) => setDirectoryFailure(asFailure(e)));
-    invoke<{ name: string }>("get_profile")
+    invoke<{ name: string; account_name?: string | null }>("get_profile")
       .then((p) => {
         setName(p.name);
         setStoredName(p.name);
+        setAccountName(p.account_name?.trim() || null);
       })
       .catch(() => {});
   });
@@ -327,6 +329,9 @@ export default function General() {
           description={
             <>
               {t("settings.general.name_hint")}
+              <Show when={!name().trim() && accountName()}>
+                {(account) => <> {t("settings.general.name_from_account", { name: account() })}</>}
+              </Show>
               <Show when={nameFailure()}>
                 {(d) => (
                   <FailureNote f={{ what: t("settings.general.error_name"), detail: d() }} />
@@ -339,6 +344,7 @@ export default function General() {
             class="w-[260px]"
             aria-label={t("settings.general.name")}
             value={name()}
+            placeholder={accountName() ?? undefined}
             onInput={(e) => setName(e.currentTarget.value)}
             onBlur={() => void save()}
             onKeyDown={(e) => {

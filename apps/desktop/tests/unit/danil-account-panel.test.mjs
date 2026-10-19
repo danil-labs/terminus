@@ -65,6 +65,8 @@ test("la cuenta de Danil entra con el navegador, muestra el código y cierra ses
   assert.ok(w.document.getElementById("cfg-tab-cuenta-danil")?.textContent.includes("Cuenta de Danil"), "the rail shows the section");
   assert.equal(panel()?.dataset.danilAccount, "disconnected");
   assert.equal(panel().querySelector("input")?.value, "alberto-mbp", "the name defaults to the hostname the engine suggests");
+  assert.ok(text().includes("Nombre de esta computadora"), "the field names the machine, not the account");
+  assert.ok(text().includes("No cambia tu nombre en la cuenta."), text());
   assert.ok(!text().includes("Continuar como"), "one-click sign-in stays off while the account is Supabase only");
   assert.ok(!calls.some((c) => c.command === "danil_connect_options"), "nor are the known emails asked for");
   assert.ok(button("Iniciar sesión con Danil"), "the browser is the way in");
@@ -95,7 +97,8 @@ test("la cuenta de Danil entra con el navegador, muestra el código y cierra ses
   // La página de aprobación confirma y el motor avisa por el evento.
   app.emit("danil-connect", { state: "connected", computer_id: "cmp_1", name: "Mac de Alberto", email: "alberto@danil.ai", online: true });
   await settle();
-  assert.ok(text().includes("alberto@danil.ai · esta computadora: Mac de Alberto"), text());
+  assert.equal(panel().querySelector("[data-account-name]")?.textContent, "alberto@danil.ai", "without a name the email stands for the person");
+  assert.ok(text().includes("Esta computadora: Mac de Alberto"), text());
   assert.ok(text().includes("En línea con Danil."));
 
   app.emit("danil-connect", { state: "error", error: "revoked", online: false });
@@ -107,7 +110,8 @@ test("la cuenta de Danil entra con el navegador, muestra el código y cierra ses
   // Por el navegador el motor puede no conocer el correo.
   app.emit("danil-connect", { state: "connected", computer_id: "cmp_1", name: "Mac", online: false });
   await settle();
-  assert.ok(text().includes("Tu cuenta de Danil · esta computadora: Mac"), text());
+  assert.equal(panel().querySelector("[data-account-name]")?.textContent, "Tu cuenta de Danil");
+  assert.ok(text().includes("Esta computadora: Mac"), text());
   assert.ok(text().includes("Sin conexión con Danil por ahora."));
   button("Cerrar sesión").click();
   await settle();
@@ -124,4 +128,74 @@ test("con un motor que no trae el flujo, la sección lo dice en vez de fallar", 
   await sleep(800);
   const panel = w.document.querySelector("[data-danil-account]");
   assert.equal(panel?.dataset.danilAccount, "unavailable", panel?.outerHTML);
+});
+
+test("la cuenta muestra nombre y foto, cambia la foto en la cuenta y la quita", async () => {
+  const PROVIDER = "/data/danil-computers/avatar-v1.png";
+  const OWN = "/data/danil-computers/avatar-up1.png";
+  const connected = (extra) => ({
+    state: "connected",
+    computer_id: "cmp_1",
+    name: "Mac de Alberto",
+    email: "alberto@danil.ai",
+    account_name: "Alberto Ceballos",
+    online: true,
+    ...extra,
+  });
+  let status = connected({ avatar: PROVIDER, avatar_source: "provider" });
+  const calls = [];
+  const record = (command, reply) => (args) => {
+    calls.push({ command, args });
+    return reply(args);
+  };
+  const app = await boot("listo", "danil-account-photo", {
+    ...BASE,
+    danil_connect_status: () => status,
+    danil_account_refresh: record("danil_account_refresh", () => status),
+    danil_account_set_photo: record("danil_account_set_photo", () => (status = connected({ avatar: OWN, avatar_source: "danil" }))),
+    danil_account_remove_photo: record("danil_account_remove_photo", () => (status = connected({}))),
+    preview_file: ({ path }) => ({ data_url: path === OWN ? "data:image/png;base64,T1dO" : "data:image/png;base64,UFJPVg==" }),
+  });
+  const { w } = app;
+  w.dispatchEvent(new w.CustomEvent("harness:open-settings", { detail: "cuenta-danil" }));
+  await sleep(800);
+  const panel = () => w.document.querySelector("[data-danil-account]");
+  const text = () => panel()?.textContent ?? "";
+  const photo = () => panel()?.querySelector("[data-account-identity] img")?.getAttribute("src") ?? null;
+  const button = (label) => [...(panel()?.querySelectorAll("button") ?? [])].find((b) => b.textContent.trim() === label);
+  const pick = async (bytes, type, name = "yo") => {
+    const input = panel().querySelector("[data-account-photo-input]");
+    Object.defineProperty(input, "files", { value: [new w.File([bytes], name, { type })], configurable: true });
+    input.dispatchEvent(new w.Event("change", { bubbles: true }));
+    await sleep(300);
+  };
+
+  assert.ok(calls.some((c) => c.command === "danil_account_refresh"), "opening the section asks the engine for the account again");
+  assert.equal(panel().querySelector("[data-account-name]")?.textContent, "Alberto Ceballos");
+  assert.ok(text().includes("alberto@danil.ai") && text().includes("Esta computadora: Mac de Alberto"), text());
+  assert.equal(photo(), "data:image/png;base64,UFJPVg==", "the provider photo the engine saved");
+  assert.ok(!button("Quitar foto"), "a provider photo is not the account's to remove");
+
+  await pick(new Uint8Array([0x47, 0x49, 0x46, 0x38]), "image/gif");
+  assert.ok(text().includes("Esa foto no es PNG, JPEG ni WebP."), text());
+  await pick(new Uint8Array(2 * 1024 * 1024 + 1), "image/png");
+  assert.ok(text().includes("La foto pesa más de 2 MB."), text());
+  assert.ok(!calls.some((c) => c.command === "danil_account_set_photo"), "a refused photo never reaches the engine");
+
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+  await pick(png, "image/png");
+  const sent = calls.find((c) => c.command === "danil_account_set_photo")?.args?.image ?? "";
+  assert.ok(sent.startsWith("data:image/png;base64,"), sent.slice(0, 40));
+  assert.deepEqual([...Buffer.from(sent.split(",")[1], "base64")], [...png]);
+  app.emit("danil-connect", status);
+  await sleep(300);
+  assert.equal(photo(), "data:image/png;base64,T1dO", "the new photo shows at once");
+  assert.ok(!text().includes("La foto pesa"), "a new attempt clears the old failure");
+
+  button("Quitar foto").click();
+  await sleep(300);
+  assert.equal(calls.at(-1)?.command, "danil_account_remove_photo");
+  assert.equal(photo(), null);
+  assert.equal(panel().querySelector("[data-account-avatar]")?.textContent, "AC", "back to the initials");
+  assert.deepEqual(app.fallos, []);
 });

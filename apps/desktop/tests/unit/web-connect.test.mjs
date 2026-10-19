@@ -63,6 +63,8 @@ test("the page shows the computer, takes a new name and approves the code", asyn
 
     const input = root().querySelector("input");
     assert.equal(input.value, "alberto-mbp");
+    assert.ok(text().includes("Nombre de esta computadora"), "the field names the machine, not the account");
+    assert.ok(text().includes("No cambia tu nombre en la cuenta."), text());
     input.value = "Mac de Alberto";
     input.dispatchEvent(new w.Event("input", { bubbles: true }));
     root().querySelector("form").dispatchEvent(new w.Event("submit", { bubbles: true, cancelable: true }));

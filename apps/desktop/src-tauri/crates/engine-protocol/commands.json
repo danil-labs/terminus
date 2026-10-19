@@ -927,6 +927,48 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "danil_account_refresh",
+      "output": "-> Result < Status , Failure >",
+      "parameters": [],
+      "path": "danil::danil_account_refresh"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "danil_account_remove_photo",
+      "output": "-> Result < Status , Failure >",
+      "parameters": [],
+      "path": "danil::danil_account_remove_photo"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "danil_account_set_photo",
+      "output": "-> Result < Status , Failure >",
+      "parameters": [
+        {
+          "key": "image",
+          "name": "image",
+          "type": "String"
+        }
+      ],
+      "path": "danil::danil_account_set_photo"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "danil_client_token",
+      "output": "-> Result < ClientToken , Failure >",
+      "parameters": [],
+      "path": "danil::danil_client_token"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "danil_connect_options",
       "output": "-> Result < Vec < ConnectOption > , Failure >",
       "parameters": [],

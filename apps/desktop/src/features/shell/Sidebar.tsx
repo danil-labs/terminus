@@ -682,7 +682,7 @@ export default function Sidebar(props: {
         </Show>
         <SidebarFooter class="border-t border-border p-2">
           <div class={cn("flex items-center justify-end gap-1", props.collapsed && "flex-col")}>
-            <Show when={capabilities().danilAccount}>
+            <Show when={capabilities().danilAccount || capabilities().accountProfile}>
               <Suspense>
                 <DanilFooterEntry collapsed={props.collapsed} onOpen={() => props.onSettings("cuenta-danil")} />
               </Suspense>

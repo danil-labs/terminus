@@ -210,7 +210,7 @@ const destinosDe = (
     icono: () => <Radar size={15} />,
     panel: () => <Radiant />,
   },
-  ...(capabilities().danilAccount
+  ...(capabilities().danilAccount || capabilities().accountProfile
     ? [
         {
           id: "cuenta-danil",
