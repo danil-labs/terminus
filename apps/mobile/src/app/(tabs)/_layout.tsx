@@ -1,4 +1,5 @@
 import { Redirect } from "expo-router";
+import { Platform } from "react-native";
 import { NativeTabs } from "expo-router/native-tabs";
 import { useAccount } from "../../lib/account";
 import { useMachines } from "../../lib/machines";
@@ -16,9 +17,9 @@ export default function TabsLayout() {
   const { session } = useAccount();
   const { ready, pairing, attention } = useMachines();
   if (!ready) return null;
-  // La cuenta de Danil va primero: un bridge guardado de antes no la salta. Solo
-  // el lab sin cuenta entra por el bridge, y lo pide a propósito.
-  const bridgeOnly = !!pairing && process.env.EXPO_PUBLIC_TERMINUS_BRIDGE_ONLY === "1";
+  // La cuenta de Danil va primero: un bridge guardado de antes no la salta. En iOS
+  // siempre se pide; en Android el lab sin cuenta entra por el bridge a propósito.
+  const bridgeOnly = Platform.OS !== "ios" && !!pairing && process.env.EXPO_PUBLIC_TERMINUS_BRIDGE_ONLY === "1";
   if (!session && !bridgeOnly) return <Redirect href="/signin" />;
   const pending = Object.values(attention)
     .flat()
