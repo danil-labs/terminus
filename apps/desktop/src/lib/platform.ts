@@ -9,7 +9,7 @@ import type { Account } from "../features/settings/accounts-store";
 /** Una cuenta agrupada en la web: las máquinas donde tiene sesión (`web/fleet.ts`). */
 export type AccountMachinesProps = {
   account: Account;
-  agent: string;
+  provider: string;
   /** Agrega y conecta una cuenta en otra máquina con el flujo de siempre. */
   add: (options: { headers: Record<string, string> }) => Promise<void>;
   refresh: () => void;

@@ -21,7 +21,7 @@ export default function AccountMachines(props: AccountMachinesProps & { machines
   async function signOut(id: string) {
     setAsking(null);
     try {
-      await invoke("remove_account", { agent: props.agent, id });
+      await invoke("remove_account", { provider: props.provider, id });
       setFailed(false);
     } catch {
       setFailed(true);

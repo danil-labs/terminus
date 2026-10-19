@@ -1129,7 +1129,7 @@ export default function Accounts(props: {
                   ) : undefined
                 }
               />
-              {capabilities().accountMachines?.({ account: a, agent: agente(), add: agregar, refresh: () => void refrescar() })}
+              {capabilities().accountMachines?.({ account: a, provider: agente(), add: agregar, refresh: () => void refrescar() })}
               </>
             );
           }}

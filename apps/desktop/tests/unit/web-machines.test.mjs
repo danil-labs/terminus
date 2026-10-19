@@ -12,7 +12,7 @@ import { engine, fleet } from "../helpers/fake-relay.mjs";
 import { boot, sleep } from "../helpers/jsdom-app.mjs";
 
 const SAME = { id: "w", name: "W", context_root: null, provider: "github", remote: "danil/panel" };
-const row = (id, title) => ({ id, title, last_message: "", agent: "codex", model: "gpt-5.6", refs: [], updated_at: 0, turns: 0, parent: null, esperando: false });
+const row = (id, title) => ({ id, title, last_message: "", provider: "codex", model: "gpt-5.6", refs: [], updated_at: 0, turns: 0, parent: null, esperando: false });
 const account = (id, identity, label = "Cuenta 1") => ({ id, label, created_at: 0, identity, authenticated_at: 1 });
 
 /** The same raw ids on both machines: only the namespace keeps them apart. */
@@ -127,14 +127,14 @@ test("a machine with another engine contract needs an update and never breaks th
 });
 
 test("AI accounts are grouped by provider and email with the machines they are signed in on", async () => {
-  const vmAccounts = { agent: "claude", env_var: "", shared_credential: null, secret_note: null, active: "a1", accounts: [account("a1", "ana@danil.ai"), account("a2", null, "Cuenta 2")] };
-  const macAccounts = { agent: "claude", env_var: "", shared_credential: null, secret_note: null, active: "m1", accounts: [account("m1", "Ana@Danil.ai")] };
+  const vmAccounts = { provider: "claude", env_var: "", shared_credential: null, secret_note: null, active: "a1", accounts: [account("a1", "ana@danil.ai"), account("a2", null, "Cuenta 2")] };
+  const macAccounts = { provider: "claude", env_var: "", shared_credential: null, secret_note: null, active: "m1", accounts: [account("m1", "Ana@Danil.ai")] };
   const { app, invoke, calls } = await open("web-machines-accounts", [VM, MAC], {
     cmp_vm: { table: table("Panel", "Tarea de la VM", { list_accounts: vmAccounts }) },
     cmp_mac: { table: table("Notas", "Tarea del Mac", { list_accounts: macAccounts }) },
   });
 
-  const list = await invoke("list_accounts", { agent: "claude" });
+  const list = await invoke("list_accounts", { provider: "claude" });
   assert.equal(list.accounts.length, 2, "one card per provider and email, plus the one without email");
   const [ana, other] = list.accounts;
   assert.equal(ana.id, "cmp_vm~a1");
@@ -143,10 +143,10 @@ test("AI accounts are grouped by provider and email with the machines they are s
   assert.equal(other.label, "Cuenta 2 · Danil VM", "an account without email stays its own, named with its machine");
   assert.deepEqual(other.machines.map((m) => m.machine), ["cmp_vm"]);
 
-  await invoke("remove_account", { agent: "claude", id: "cmp_mac~m1" });
+  await invoke("remove_account", { provider: "claude", id: "cmp_mac~m1" });
   assert.deepEqual(calls("cmp_mac", "remove_account").map((c) => c.args.id), ["m1"], "signing out is per machine");
   assert.equal(calls("cmp_vm", "remove_account").length, 0);
-  await invoke("add_account", { agent: "claude", label: "" }, { headers: { "x-terminus-machine": "cmp_mac" } }).catch(() => {});
+  await invoke("add_account", { provider: "claude", label: "" }, { headers: { "x-terminus-machine": "cmp_mac" } }).catch(() => {});
   assert.equal(calls("cmp_mac", "add_account").length, 1, "signing in on another machine goes to that machine");
   assert.deepEqual(app.fallos, []);
 });
