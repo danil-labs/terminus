@@ -182,6 +182,33 @@ resynchronizes. A window whose selection changed under it, because another
 window already restarted the engine, takes the same path and adopts that engine.
 Reusing an engine leaves `selection.json` untouched when its content is the same. Otherwise it shows `shell.service.engine_down`.
 
+## Stream empujado
+
+Con un motor que anuncia `push_stream_v1` en `status.service_features`
+(seldon-host#52, contrato en `docs/push-stream-contract.md` de seldon-host), el
+cliente deja de abrir una conexión TCP por petición:
+
+- Hasta cuatro conexiones persistentes para peticiones, con varias en vuelo por
+  conexión, correlacionadas por `request_id`. Cada conexión nueva comprueba que
+  la selección, el descriptor y la credencial no cambiaron antes de mandar el
+  token, y pregunta `status` por ese mismo socket; el par de un socket abierto
+  no cambia. La selección se vuelve a comprobar cada 5 s y, si cambió, se
+  cierran todas las conexiones.
+- Una conexión aparte para `service subscribe`, que reconecta con espera
+  creciente (100 ms a 2 s) y reanuda desde su cursor. `resync_required` o un
+  marco `resync` se entregan como `gap`, la misma relectura que el sondeo.
+- `service_poll` espera en Rust hasta 20 s a lo empujado y devuelve `push: true`
+  con los lotes en `batches`; el front los reparte en orden a los mismos oyentes
+  (`src/lib/serviceEvents.ts`) y vuelve a llamar enseguida.
+- `service_filter` fija las tareas cuyo flujo token a token interesa (pestañas,
+  la abierta, las vivas y `liveThreads`); de las demás solo llegan inicio y fin.
+  Un `catchup` reemplaza lo vivo de la tarea que pasa a verse.
+- `load_history` abre una tarea con sus últimos 150 turnos (`service history`) y
+  el hilo pide la página anterior al llegar arriba.
+
+Sin la marca, la ventana sondea `service events` cada 250 ms y abre las tareas
+con `load_session`, como antes; Configuración sondea así siempre.
+
 ## Live Typst view
 
 The window serves the seven window functions of the contract: `site_open_local`,

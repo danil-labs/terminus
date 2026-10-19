@@ -17,6 +17,7 @@ import type {
   PermissionOrigin,
 } from "./Chat.tsx";
 import type { Producido } from "./Delivery.tsx";
+import type { HistoryPage } from "./history.ts";
 import type { Pregunta, Respuesta } from "./Questions.tsx";
 
 /** Modelo de eventos propio: Rust normaliza claude y codex a estas formas. */
@@ -405,6 +406,8 @@ export type Session = {
   transcript?: TranscriptOrigin | null;
   /** Con qué contestó la última vez una tarea raíz en la que nadie eligió modelo (`sessions::OpenedSession`). */
   observed_model?: string | null;
+  /** Solo de `load_history`: qué tramo de la transcripción entera son estos `turns`. */
+  history?: HistoryPage | null;
 };
 
 /** De qué archivo del CLI salió lo que dijo el agente, y en cuántas respuestas. */

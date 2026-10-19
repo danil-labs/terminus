@@ -3,7 +3,7 @@
  * bloquea. Espeja `src-tauri/src/workspace/governed.rs`. El backend rechaza la
  * edición igual; aquí solo se pinta de solo lectura.
  */
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "./serviceEvents";
 import { createSignal } from "solid-js";
 import { invoke } from "./invoke.ts";
 

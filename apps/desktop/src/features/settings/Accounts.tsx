@@ -1,7 +1,7 @@
 import { For, Show, createEffect, createSignal, createUniqueId, on, onCleanup, onMount, untrack, type JSX } from "solid-js";
 import { enfocar } from "../../lib/focus";
 import { invoke } from "../../lib/invoke.ts";
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "../../lib/serviceEvents";
 import { confirm } from "@tauri-apps/plugin-dialog";
 import AccountCard, { accountPresentation } from "./AccountCard";
 import { FailureNote, type Failure, detalleDe, prosaDe } from "../../ui/Failure";

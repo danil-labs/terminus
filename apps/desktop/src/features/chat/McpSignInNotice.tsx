@@ -1,4 +1,4 @@
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "../../lib/serviceEvents";
 import { createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
 import { asFailure, type Failure } from "../../ui/Failure";

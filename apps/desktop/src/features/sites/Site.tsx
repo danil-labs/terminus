@@ -1,6 +1,6 @@
 import { createEffect, createSignal, on, onCleanup, onMount, Show } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "../../lib/serviceEvents";
 import { Button } from "../../ui/Button";
 import { aDireccion, corta, hayCapaEncima, seguirHueco, zonasEncima } from "../../lib/sites";
 import { t } from "../../lib/i18n";

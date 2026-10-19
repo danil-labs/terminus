@@ -1,6 +1,6 @@
 import { For, Show, createEffect, createSignal, on, onCleanup, onMount } from "solid-js";
 import { invoke } from "../../../lib/invoke.ts";
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "../../../lib/serviceEvents";
 import { t } from "../../../lib/i18n";
 import { mb } from "../../../lib/format";
 import { cn } from "../../../lib/utils";

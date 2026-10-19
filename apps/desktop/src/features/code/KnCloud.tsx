@@ -1,6 +1,6 @@
 import { Match, Show, Switch, createEffect, createSignal, on, onCleanup } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "../../lib/serviceEvents";
 import { Button } from "../../ui/Button";
 import { FailureNote, asFailure, type Failure } from "../../ui/Failure";
 import { t } from "../../lib/i18n";

@@ -1,4 +1,4 @@
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "../../lib/serviceEvents";
 import ChartColumn from "lucide-solid/icons/chart-column";
 import FileText from "lucide-solid/icons/file-text";
 import FileType from "lucide-solid/icons/file-type";

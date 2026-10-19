@@ -18,6 +18,7 @@ import Square from "lucide-solid/icons/square";
 import TriangleAlert from "lucide-solid/icons/triangle-alert";
 import X from "lucide-solid/icons/x";
 import {
+  batch,
   createEffect,
   createMemo,
   createSignal,
@@ -35,7 +36,7 @@ import {
 import { Dynamic, Portal } from "solid-js/web";
 import type { ThreadSearchTarget } from "./ThreadSearch";
 import { taskChatPresentation } from "./TaskChatPresentation";
-import { CHUNK, blockOfMessage, chunkIds, chunkOf, tailChunk, type Lectura } from "./threadWindow";
+import { CHUNK, blockOfMessage, chunkAt, chunkIds, chunkOf, chunkStart, headChunk, tailChunk, type Lectura } from "./threadWindow";
 import { workLabel } from "../projects/branchLabel";
 import { sangrarTerminal } from "./terminalIndent";
 import { FIN_DE_ARCHIVO, TECLAS_DE_TERMINAL, pideClave } from "./commandInput";
@@ -438,6 +439,10 @@ export type ChatProps = {
    * al fondo. El salto del propio hilo lo cubre `lib/paste.ts`.
    */
   cargando?: boolean;
+  /** Si hay turnos anteriores a lo cargado que el motor puede dar por páginas. */
+  masAntiguos?: boolean;
+  /** Pide la página anterior; resuelve con lo que la pone en el hilo, o `null`. */
+  onAntiguos?: () => Promise<(() => void) | null>;
   busy: boolean;
   stopping: boolean;
   agents: Agent[];
@@ -1098,7 +1103,7 @@ export default function Chat(props: ChatProps) {
     const lectura = retomarLectura;
     retomarLectura = null;
     const bloque = lectura && bloqueDeLectura(lectura);
-    if (lectura && bloque !== null) return hilo.retomar(bloque - shownFrom() * CHUNK, lectura.desfase);
+    if (lectura && bloque !== null) return hilo.retomar(bloque - chunkStart(shownFrom(), origen()), lectura.desfase);
     hilo.recolocar();
     hilo.bajar({ animacion: "instantanea", duracion: 300, ignorarEscapes: true });
   };
@@ -1546,49 +1551,77 @@ export default function Chat(props: ChatProps) {
   );
   // Hasta qué final cabe todo en la vista: el borde de arriba volvió a anteponer lo soltado sin que nadie subiera.
   const [cabeHasta, setCabeHasta] = createSignal<number | null>(null);
+  // Bloques que entraron por delante con páginas anteriores del historial.
+  const [origen, setOrigen] = createSignal(0);
   let recienSoltado = false;
   createEffect(on(() => props.conversacion, () => {
     setFirstChunk(null);
+    setOrigen(0);
     setCabeHasta(null);
   }, { defer: true }));
   // Plegar el avance de un turno encoge el hilo: lo montado no pasa del final.
   const shownFrom = createMemo(() => {
-    if (typeof IntersectionObserver === "undefined") return 0;
-    const tail = tailChunk(bloques().length);
+    if (typeof IntersectionObserver === "undefined") return headChunk(origen());
+    const tail = tailChunk(bloques().length, origen());
     return Math.min(firstChunk() ?? tail, tail);
   });
   createEffect(() => {
     const first = firstChunk();
     if (first === null ? !props.cargando && bloques().length > 0 : first > shownFrom()) setFirstChunk(shownFrom());
   });
-  const chunks = createMemo(() => chunkIds(bloques().length, shownFrom()));
+  const chunks = createMemo(() => chunkIds(bloques().length, shownFrom(), origen()));
   // Lo leído arriba se suelta cuando se vuelve al final y se queda ahí: sin
   // esto cada tramo que alguien subió a leer queda montado hasta cerrar la pestaña.
   const sobranTramos = createMemo(() => {
-    const tail = tailChunk(bloques().length);
+    const tail = tailChunk(bloques().length, origen());
     return hilo.alFondo() && shownFrom() < tail && cabeHasta() !== tail;
   });
   createEffect(() => {
     if (!sobranTramos()) return;
     const t = setTimeout(() => {
       recienSoltado = true;
-      setFirstChunk(tailChunk(bloques().length));
+      setFirstChunk(tailChunk(bloques().length, origen()));
     }, SOLTAR_LO_LEIDO_MS);
     onCleanup(() => clearTimeout(t));
   });
   onCleanup(() => {
     const lectura = hilo.lectura();
-    const bloque = lectura && bloques()[shownFrom() * CHUNK + lectura.hijo];
+    const bloque = lectura && bloques()[chunkStart(shownFrom(), origen()) + lectura.hijo];
     props.onLectura?.(lectura && bloque ? { mensaje: bloque.i, desfase: lectura.desfase } : null);
   });
+  // Lo anterior entra por delante del tramo 0: lo montado conserva sus ids y no se remonta.
+  let pidiendo = false;
+  const pedirAntiguos = async () => {
+    if (pidiendo || !props.onAntiguos) return;
+    pidiendo = true;
+    const conversacion = props.conversacion;
+    const poner = await props.onAntiguos().finally(() => {
+      pidiendo = false;
+    });
+    if (!poner || conversacion !== props.conversacion) return;
+    const cabeza = bloques()[0];
+    const primero = cabeza && props.msgs[cabeza.i];
+    hilo.anteponer(() =>
+      batch(() => {
+        poner();
+        const at = primero ? props.msgs.indexOf(primero) : -1;
+        const bloque = at > 0 ? bloques().findIndex((b) => b.i === at) : -1;
+        if (bloque > 0) setOrigen((o) => o + bloque);
+      }),
+    );
+  };
   // Va con el borde y no con el componente: el hilo se desmonta mientras carga.
   const watchOlder = (edge: HTMLDivElement) => {
     if (typeof IntersectionObserver === "undefined") return;
     const older = new IntersectionObserver(
       (entries) => {
         // Tras volver a observar pueden llegar dos: la que vale es la última.
-        if (!entries.at(-1)?.isIntersecting || shownFrom() <= 0) return;
-        if (recienSoltado && hilo.alFondo()) setCabeHasta(tailChunk(bloques().length));
+        if (!entries.at(-1)?.isIntersecting) return;
+        if (shownFrom() <= headChunk(origen())) {
+          if (props.masAntiguos) void pedirAntiguos();
+          return;
+        }
+        if (recienSoltado && hilo.alFondo()) setCabeHasta(tailChunk(bloques().length, origen()));
         recienSoltado = false;
         hilo.anteponer(() => setFirstChunk(shownFrom() - 1));
       },
@@ -1599,7 +1632,7 @@ export default function Chat(props: ChatProps) {
     // Volver a observar entrega el estado actual: sin esto, un tramo que no
     // llena la vista deja el borde a la vista y no llega otro aviso.
     createEffect(
-      on(shownFrom, () => {
+      on([shownFrom, origen, () => props.masAntiguos], () => {
         cancelAnimationFrame(frame);
         frame = requestAnimationFrame(() => {
           older.unobserve(edge);
@@ -1645,7 +1678,7 @@ export default function Chat(props: ChatProps) {
     if (!elHilo || !lista.length) return;
     if (hilo.alFondo()) return setMensajeVisto(lista.length - 1);
     const hijos = elContenido?.children;
-    const montadoDesde = shownFrom() * CHUNK;
+    const montadoDesde = chunkStart(shownFrom(), origen());
     const corte = elHilo.getBoundingClientRect().top + (elHilo.clientHeight - altoDeLaCaja()) / 3;
     for (let k = lista.length - 1; k >= 0; k--) {
       const el = hijos?.[lista[k].block - montadoDesde];
@@ -1678,9 +1711,9 @@ export default function Chat(props: ChatProps) {
   createEffect(on([inputsDelHilo, hilo.alFondo], () => medirMensajeVisto()));
   /** Monta el tramo del mensaje si no estaba y lo deja arriba, suelto del fondo. */
   const saltarAlMensaje = (bloque: number) => {
-    const tramo = Math.floor(bloque / CHUNK);
+    const tramo = chunkAt(bloque, origen());
     if (tramo < shownFrom()) hilo.anteponer(() => setFirstChunk(tramo));
-    hilo.retomar(bloque - shownFrom() * CHUNK, DESFASE_DEL_SALTO);
+    hilo.retomar(bloque - chunkStart(shownFrom(), origen()), DESFASE_DEL_SALTO);
     medirMensajeVisto();
   };
 
@@ -2739,13 +2772,13 @@ export default function Chat(props: ChatProps) {
               `Index` conserva cada sitio del DOM y solo actualiza sus datos. */}
           <For each={chunks()}>
           {(chunk) => (
-          <Index each={chunkOf(bloques(), chunk)}>
+          <Index each={chunkOf(bloques(), chunk, origen())}>
             {(bloque, blockIndex) => {
               const b = () => bloque();
               const mensaje = () => mensajeDe(b());
               const startsLaunchGroup = () => {
-                const index = chunk * CHUNK + blockIndex;
-                if (index === shownFrom() * CHUNK) return true;
+                const index = chunkStart(chunk, origen()) + blockIndex;
+                if (index === chunkStart(shownFrom(), origen())) return true;
                 const previous = bloques()[index - 1];
                 return previous?.tipo !== "msg" || previous.msg.meta !== "task_launched" || !previous.msg.fromTask;
               };
@@ -2754,7 +2787,7 @@ export default function Chat(props: ChatProps) {
                 <Match when={trabajoDe(b())}>
                   {(trabajo) => (
                     <TrabajoDeAgente
-                      searchBlock={chunk * CHUNK + blockIndex}
+                      searchBlock={chunkStart(chunk, origen()) + blockIndex}
                       visualBudget={visualBudget}
                       visualScope={props.visualScope}
                       readVisual={props.readVisual}
@@ -3016,7 +3049,7 @@ export default function Chat(props: ChatProps) {
                             a ser texto plano, la estructura solo existiría
                             mientras se escribe. */}
                         <Show when={m().text}>
-                          <p data-thread-search-text={chunk * CHUNK + blockIndex} class="m-0 leading-[1.5] break-words whitespace-pre-wrap">
+                          <p data-thread-search-text={chunkStart(chunk, origen()) + blockIndex} class="m-0 leading-[1.5] break-words whitespace-pre-wrap">
                             {/* Index y no For: los tramos se recalculan con objetos nuevos en cada cambio del hilo, y For recrearía cada etiqueta. */}
                             <Index each={tramosDelMensaje(m().text, commandNames())}>
                               {(tramo) => (

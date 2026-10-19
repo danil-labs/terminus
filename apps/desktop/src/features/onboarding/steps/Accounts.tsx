@@ -1,6 +1,6 @@
 import { For, Match, Show, Switch, createSignal, onCleanup, onMount } from "solid-js";
 import { invoke } from "../../../lib/invoke.ts";
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "../../../lib/serviceEvents";
 import { t } from "../../../lib/i18n";
 import { Badge } from "../../../ui/Badge";
 import { Button } from "../../../ui/Button";
