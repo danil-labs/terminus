@@ -24,6 +24,12 @@ export type DanilConnectStatus = {
   online?: boolean;
 };
 
+/**
+ * «Continuar como <correo>» sin navegador. Apagado mientras la cuenta de Danil
+ * sea solo Supabase: depende del intercambio de WorkOS.
+ */
+export const ONE_CLICK_SIGN_IN = false;
+
 /** Un workspace con sesión de Radiant y ese correo: con él se entra sin navegador. */
 export type DanilConnectOption = { workspace: string; name?: string | null; email: string };
 

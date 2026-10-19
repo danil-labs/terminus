@@ -7,9 +7,10 @@
 import { createStore } from "solid-js/store";
 import { invoke } from "../../lib/invoke.ts";
 import { semillaDelAlta, t } from "../../lib/i18n";
+import { capabilities } from "../../lib/platform";
 import { prosaDe } from "../../ui/Failure";
 
-export type Paso = "agents" | "workspace" | "accounts" | "sources" | "context" | "workdir";
+export type Paso = "danil" | "agents" | "workspace" | "accounts" | "sources" | "context" | "workdir";
 export type Instalacion = { estado: "instalando" | "lista" | "fallo"; error?: string };
 
 export type EstadoDelAlta = {
@@ -39,7 +40,8 @@ export const URL_DE_REPO = /^(https:\/\/|ssh:\/\/|git@)\S+$/;
 
 export function crearAlta(nueva: boolean) {
   const [estado, set] = createStore<EstadoDelAlta>({
-    paso: nueva ? "workspace" : "agents",
+    // La cuenta de Danil es de la computadora: se ofrece una vez, en el primer arranque.
+    paso: nueva ? "workspace" : capabilities().danilAccount ? "danil" : "agents",
     elegidos: [],
     instalacion: {},
     nombre: "",
