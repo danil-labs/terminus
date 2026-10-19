@@ -33,8 +33,8 @@ el motor fijado en `seldon-runtime.lock`.
 
 ## Contract
 
-`src-tauri/crates/engine-protocol/commands.json` is the frozen contract: 316
-commands (291 domain invocations, three channels and 22 window/bridge
+`src-tauri/crates/engine-protocol/commands.json` is the frozen contract: 317
+commands (292 domain invocations, three channels and 22 window/bridge
 functions) and the events the engine emits. Its SHA-256 is recorded in
 [PROVENANCE](../src-tauri/crates/engine-protocol/PROVENANCE.md); the engine
 announces the same hash and the window refuses to connect to a different one

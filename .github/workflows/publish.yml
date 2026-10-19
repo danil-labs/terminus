@@ -225,6 +225,13 @@ jobs:
             echo "::error title=Motor sin fijar::seldon-runtime.lock no fija: $(echo $missing). Una release sin motor deja la app instalada sin abrir."
             exit 1
           fi
+          # La ventana deriva su contrato de commands.json y rechaza un motor que hable otro.
+          vendored=$(sha256sum src-tauri/crates/engine-protocol/commands.json | cut -d' ' -f1)
+          pinned=$(jq -r .contract seldon-runtime.lock)
+          if [ "$vendored" != "$pinned" ]; then
+            echo "::error title=Motor con otro contrato::seldon-runtime.lock fija el contrato $pinned y la ventana habla $vendored: la app instalada no abriría su motor."
+            exit 1
+          fi
           # Tauri suma a la base el archivo de cada plataforma; macOS no tiene archivo propio.
           for os in windows linux macos; do
             files=(src-tauri/tauri.conf.json)

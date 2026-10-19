@@ -22,6 +22,11 @@ their keys. There are no aliases. This copy is byte-identical to the engine's.
 SHA-256:
 `2ae5ba8e263252c80622f0706d3a5a3a534b48ab9364c724d1fea96bebab029b`.
 
+The source is `crates/engine-protocol/commands.json` in `danil-labs/seldon-host`
+(here, seldon-host `632f825`). The engine pinned in `seldon-runtime.lock` must
+announce this same hash as its `contract`; the `contract` guard
+(`scripts/guards/contract.mjs`) compares the three.
+
 `phrase-keys.json`: the catalog keys the engine sends as `Frase` values, taken
 from the engine source at `fdf4dd9863a80363a0dd7b15ea21fd6b69e1f4bd`. The 24
 `providers.*` keys for GitLab, `providers.error.other_host`, and each host's

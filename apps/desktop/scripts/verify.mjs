@@ -68,6 +68,7 @@ const steps = [
   ["Alguien emite lo que la interfaz escucha", process.execPath, [join(root, "scripts/guards/bridge.mjs")], root],
   ["Ningún error del backend se aplana", process.execPath, [join(root, "scripts/guards/service-errors.mjs")], root],
   ["Alguien invoca lo que el backend registra", process.execPath, [join(root, "scripts/guards/commands.mjs")], root],
+  ["El motor fijado habla el contrato copiado", process.execPath, [join(root, "scripts/guards/contract.mjs")], root],
   ["El runtime del artefacto no se rompe en silencio", process.execPath, [join(root, "scripts/guards/artifact.mjs")], root],
   ["La foto del sidebar se guarda acotada y con espera", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/shell-cache.test.ts")], root],
   ["La nota de la versión sale en el idioma de la app", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/release-notes.test.ts")], root],
