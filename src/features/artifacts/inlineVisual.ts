@@ -46,8 +46,21 @@ export const JS_INLINE = String.raw`
   var pending = false;
   function measure() {
     pending = false;
-    var height = Math.ceil(Math.max(document.documentElement.getBoundingClientRect().height,
-      document.body.getBoundingClientRect().height, document.body.scrollHeight));
+    var root = document.documentElement;
+    var overflow = root.style.getPropertyValue("overflow-y");
+    var priority = root.style.getPropertyPriority("overflow-y");
+    // La barra del viewport puede reenvolver el contenido que determina su propio alto.
+    // Se mide sin ella y se restaura antes del pintado, incluso en el visor ampliado.
+    root.style.setProperty("overflow-y", "hidden", "important");
+    var height;
+    try {
+      height = Math.ceil(Math.max(root.getBoundingClientRect().height,
+        document.body.getBoundingClientRect().height, document.body.scrollHeight) +
+        Math.max(0, window.innerHeight - root.clientHeight));
+    } finally {
+      if (overflow) root.style.setProperty("overflow-y", overflow, priority);
+      else root.style.removeProperty("overflow-y");
+    }
     height = Math.max(48, Math.min(4096, height));
     if (height === lastHeight) return;
     lastHeight = height;

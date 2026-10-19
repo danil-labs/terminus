@@ -32,10 +32,7 @@
   "mcp.error.no_servers_in_block": "I found no server in that block. It has to be an object, with or without \"mcpServers\" around it.",
   "mcp.error.block_declares_none": "That block declares no server.",
   "mcp.session.cli_has_none": "its CLI doesn't offer one",
-  "mcp.task.title": "Some tools need you to sign in",
-  "mcp.task.body": "The agent can't open the sign-in from the task. Open it here: you authorize in your browser and your next message will have the tools.",
   "mcp.task.sign_in": "Sign in",
   "mcp.task.sign_in_again": "Try again",
-  "mcp.task.next_turn": "If you authorized it, your next message uses it, in this same conversation.",
   "mcp.error.login_not_needed": "That server has no OAuth sign-in."
 }
