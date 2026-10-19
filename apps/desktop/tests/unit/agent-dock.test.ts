@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { type DockAgent, dockCapacity, orderDockAgents, planDock } from "../../src/features/shell/dockLayout.ts";
+import { agentFolder, type DockAgent, dockCapacity, orderDockAgents, planDock } from "../../src/features/shell/dockLayout.ts";
 
 const agente = (name: string, status?: DockAgent["status"]): DockAgent => ({ name, status, liveTasks: 0 });
 const nombres = (lista: { name: string }[]) => lista.map((a) => a.name);
@@ -52,4 +52,13 @@ test("el agente elegido nunca queda escondido detrás de «+k»", () => {
   const plan = planDock(lista, 4, { selected: "e" });
   assert.deepEqual(nombres(plan.shown), ["a", "b", "e"]);
   assert.equal(plan.overflow, 2);
+});
+
+test("el chat con un agente se abre en la carpeta de lo abierto, en la única que lo tiene, o se pregunta", () => {
+  assert.equal(agentFolder(["web", "terminus"], "terminus"), "terminus");
+  assert.equal(agentFolder(["web"], "terminus"), "web");
+  assert.equal(agentFolder(["web"], null), "web");
+  assert.equal(agentFolder(["web", "terminus"], "otra"), null);
+  assert.equal(agentFolder(["web", "terminus"], null), null);
+  assert.equal(agentFolder([], "web"), null);
 });

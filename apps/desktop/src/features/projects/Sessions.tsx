@@ -16,6 +16,7 @@ import { celebrateFinishedTask, FinishTaskButton } from "../../ui/FinishTaskButt
 import { KeyedList } from "../../ui/KeyedList";
 import { Input } from "../../ui/Input";
 import { Toast, ToastPortal } from "../../ui/Toast";
+import { RETARDO_TOOLTIP, TooltipContent, TooltipRoot, TooltipTrigger } from "../../ui/Tooltip";
 import { MarcaAgente, WorktreeRoto } from "../../ui/icons";
 import {
   ITEM_DE_MENU,
@@ -569,15 +570,18 @@ export default function Sessions(props: {
                   <WorktreeFaltante />
                   <Show when={r.s.agent && !r.s.chat_de_agente ? r.s.agent : null}>
                     {(agente) => (
-                      <span data-session-agent class="flex shrink-0" title={nombreDelAgente()} aria-label={nombreDelAgente()}>
-                        <AstroAvatar
-                          name={agente()}
-                          status={props.vivas.includes(r.s.id) ? "working" : "asleep"}
-                          body={profiles()[agente()]?.body}
-                          avatar={profiles()[agente()]?.avatar}
-                          size={13}
-                        />
-                      </span>
+                      <TooltipRoot openDelay={RETARDO_TOOLTIP} placement="top" gutter={4}>
+                        <TooltipTrigger as="span" data-session-agent class="flex shrink-0" aria-label={nombreDelAgente()}>
+                          <AstroAvatar
+                            name={agente()}
+                            status={props.vivas.includes(r.s.id) ? "working" : "asleep"}
+                            body={profiles()[agente()]?.body}
+                            avatar={profiles()[agente()]?.avatar}
+                            size={13}
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent class="pointer-events-none">{nombreDelAgente()}</TooltipContent>
+                      </TooltipRoot>
                     )}
                   </Show>
                   {/* En qué máquina corre, si no es esta. */}

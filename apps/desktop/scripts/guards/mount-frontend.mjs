@@ -150,16 +150,13 @@ const boot = (entorno, version, respuestas = RESPUESTAS, userAgent) =>
   mount(entorno, version, respuestas, userAgent);
 
 /** El riel agrupado por carpeta: es donde una carpeta tiene cabecera y se abre su vista. */
-const POR_CARPETA = { "harness.layout.sidebar.view": JSON.stringify({ group: "folder" }) };
+const POR_CARPETA = { "harness.layout.sidebar.view.w": JSON.stringify({ group: "folder" }) };
 const bootPorCarpeta = async (entorno, version, respuestas = RESPUESTAS) => {
   const app = await mount(entorno, version, respuestas, undefined, POR_CARPETA);
   // La cabecera de carpeta llega en su propio trozo: se espera a que pinte.
   for (let i = 0; i < 80 && !app.w.document.querySelector("[data-folder-open]"); i++) await sleep(25);
   return app;
 };
-/** Con «Asentadas» abierta: lo entregado y visto vive ahí. */
-const bootConAsentadas = (entorno, version, respuestas = RESPUESTAS) =>
-  mount(entorno, version, respuestas, undefined, { "harness.layout.sidebar.asentadas.abiertas": "true" });
 
 /** Añadir un proyecto se abre desde el selector de la caja de una tarea nueva. */
 async function abrirAnadirProyecto(app) {
@@ -534,21 +531,39 @@ if (!roto) {
   assert.equal(bubbleDocument.querySelector('[data-sidebar-search] input[role="searchbox"]'), null, "Escape cierra el buscador");
   assert.ok(filasDelRiel().includes("s-task") && filasDelRiel().includes("s-plain"), "cerrar la búsqueda devuelve la lista entera");
 
-  // Los agentes están en el dock del pie: pulsar uno filtra la lista por él y
-  // lo dice la línea de alcance; pulsarlo otra vez quita el filtro.
+  // Los agentes están en el dock del pie: pulsar uno abre su chat, como su fila
+  // de antes; el clic derecho ofrece ver sus tareas, que filtra la lista.
   const dock = () => bubbleDocument.querySelector('[role="group"][aria-label="Agentes"]');
   for (let i = 0; i < 80 && !dock(); i++) await sleep(25);
-  const caraDe = (nombre) => [...(dock()?.querySelectorAll("button[aria-pressed]") ?? [])].find((b) => b.getAttribute("aria-label").startsWith(nombre));
+  const caraDe = (nombre) => [...(dock()?.querySelectorAll("[data-dock-agent]") ?? [])].find((b) => b.getAttribute("aria-label").startsWith(nombre));
   assert.ok(caraDe("Holmes"), "el dock enseña a Holmes");
   assert.match(caraDe("Holmes").getAttribute("aria-label"), /Despierto/, "su cara dice cómo está");
+  assert.equal(caraDe("Holmes").getAttribute("title"), null, "el nombre va en un tooltip propio, no en `title`");
+  caraDe("Holmes").dispatchEvent(new bubbleApp.w.PointerEvent("pointerenter", { bubbles: false, pointerType: "mouse" }));
+  caraDe("Holmes").dispatchEvent(new bubbleApp.w.PointerEvent("pointermove", { bubbles: true, pointerType: "mouse" }));
+  await sleep(300);
+  assert.match(bubbleDocument.querySelector('[role="tooltip"]')?.textContent ?? "", /Holmes.*Despierto/, "pasar por la cara enseña su nombre y su estado");
+  caraDe("Holmes").dispatchEvent(new bubbleApp.w.PointerEvent("pointerleave", { bubbles: false, pointerType: "mouse" }));
   caraDe("Holmes").click();
-  await sleep(80);
-  assert.equal(caraDe("Holmes").getAttribute("aria-pressed"), "true");
-  assert.ok(filasDelRiel().includes("s-task") && !filasDelRiel().includes("s-plain"), "el dock filtra por el agente");
+  await sleep(150);
+  assert.match(bubbleDocument.querySelector("h1")?.textContent ?? "", /Holmes/, "pulsar la cara abre el chat con el agente");
+  assert.ok(filasDelRiel().includes("s-plain"), "pulsar la cara no filtra la lista");
+  caraDe("Holmes").dispatchEvent(new bubbleApp.w.MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+  await sleep(120);
+  const verSusTareas = [...bubbleDocument.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent.trim() === "Ver sus tareas");
+  assert.ok(verSusTareas, "el clic derecho ofrece ver sus tareas");
+  assert.ok([...bubbleDocument.querySelectorAll('[role="menuitem"]')].some((el) => el.textContent.trim() === "Configuración del agente"));
+  verSusTareas.dispatchEvent(new bubbleApp.w.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  await sleep(120);
+  assert.ok(filasDelRiel().includes("s-task") && !filasDelRiel().includes("s-plain"), "ver sus tareas filtra por el agente");
   assert.match(bubbleDocument.querySelector("[data-sidebar-scope]").textContent, /Holmes/, "la línea de alcance dice el filtro");
-  caraDe("Holmes").click();
+  bubbleDocument.querySelector('button[aria-haspopup="menu"][aria-label^="Filtrar y agrupar"]').click();
   await sleep(80);
-  assert.ok(filasDelRiel().includes("s-plain"), "pulsarlo otra vez quita el filtro");
+  [...bubbleDocument.querySelectorAll('[role="menu"] [role="group"][aria-label="Agente"] [role="menuitemradio"]')].find((b) => b.textContent.trim() === "Todos").click();
+  await sleep(80);
+  bubbleDocument.activeElement?.dispatchEvent(new bubbleApp.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  await sleep(80);
+  assert.ok(filasDelRiel().includes("s-plain"), "«Todos» en el menú de filtro quita el filtro");
 
   bubbleDocument.querySelector('[data-sidebar-tasks] [data-sesion="s-chat"]').click();
   await sleep(300);
@@ -2228,10 +2243,8 @@ if (!roto) {
   registeredTurns = [];
   pendingTurnApp.w.dispatchEvent(new pendingTurnApp.w.Event("focus"));
   await sleep(80);
-  // Entregada y vista, la tarea se asienta: baja a «Asentadas», que nace plegada.
-  assert.equal(hiddenRow(), null, "lo entregado y visto sale de «Tareas»");
-  pendingDoc.querySelector('[data-sidebar-section="settled"] button[aria-expanded="false"]').click();
-  await sleep(50);
+  // Entregada y vista, la tarea se queda donde estaba, entre las «Tareas».
+  assert.equal(pendingDoc.querySelector('[data-sidebar-section="settled"]'), null, "no hay sección «Asentadas»");
   assert.equal(hiddenRow().querySelector('[aria-label="Está trabajando"]'), null);
   assert.ok(hiddenRow().querySelector('[aria-label="Resultado entregado"]'), "recovering a missed done refreshes the hidden task result");
   assert.deepEqual(pendingTurnApp.fallos, []);
@@ -3540,9 +3553,7 @@ if (!roto) {
   assert.equal(cuadro("w4").dataset.attention, undefined, "un estado que la ventana no conoce no se pinta");
   const filaDeColumna = (id) => doc.querySelector(`[data-sesion="${id}"]`);
   assert.ok(filaDeColumna("s1").querySelector('[aria-label="Terminó y no la has abierto"].text-success-strong svg.lucide-check'), "la fila dice terminada sin ver");
-  doc.querySelector('[data-sidebar-section="settled"] button[aria-expanded="false"]').click();
-  await sleep(50);
-  assert.ok(filaDeColumna("s3").querySelector('[aria-label="Resultado entregado"].text-neutral-500'), "una entregada ya vista queda en gris, en «Asentadas»");
+  assert.ok(filaDeColumna("s3").querySelector('[aria-label="Resultado entregado"].text-neutral-500'), "una entregada ya vista queda en gris, en su sitio");
   const pliegue = doc.querySelector('button[aria-label="Plegar «Proyecto»"]');
   pliegue.click();
   await sleep(50);
@@ -3776,7 +3787,7 @@ if (!roto) {
     task("saved", null, "delivered"), task("pending", null, null),
     task("local", null, "delivered"), task("local-pending", null, null),
   ];
-  const finishApp = await bootConAsentadas("listo", "finish-task", {
+  const finishApp = await boot("listo", "finish-task", {
     ...CON_TAREA,
     list_projects: [{ id: "finish-project", name: "Finalización", node: null, sources: [], working_directory: "/lab", created_at: 1, updated_at: 1, sessions: 3, kind: "folder" }],
     list_live_sessions: ({ project }) => project === "finish-project" ? finishRows() : [],
@@ -3877,7 +3888,7 @@ if (!roto) {
   const discarded = [];
   const blockedFinishes = [];
   let blockers = { unsaved: [{ session: "blocked", title: "Tarea blocked", files: ["src/a.ts"] }], not_finished: false };
-  const blockedApp = await bootConAsentadas("listo", "task-blockers", {
+  const blockedApp = await boot("listo", "task-blockers", {
     ...CON_TAREA,
     list_projects: [{ id: "blocked-project", name: "Avisos", node: null, sources: [], working_directory: "/lab", created_at: 1, updated_at: 1, sessions: 1, kind: "folder" }],
     list_live_sessions: ({ project }) => project === "blocked-project" ? [task("blocked", null, "delivered")] : [],

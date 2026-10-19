@@ -9,6 +9,7 @@ import {
   loadSidebarView,
   nonDefaultCount,
   saveSidebarView,
+  sidebarViewKey,
   scopeLabel,
   sectionOf,
   type SidebarTask,
@@ -45,9 +46,9 @@ test("a task needs you when it waits for approval, asked something or failed", (
   assert.equal(sectionOf(task("a", { outcome: "failed" }), { live: new Set(["a"]), approving: [] }), "active", "a live turn hides the old failure");
 });
 
-test("delivered and seen, or done, settles; unseen and live stay active", () => {
-  assert.equal(sectionOf(task("a", { outcome: "delivered" }), idle), "settled");
-  assert.equal(sectionOf(task("a", { stage: "done" }), idle), "settled");
+test("finished tasks stay among the tasks; only what needs you moves up", () => {
+  assert.equal(sectionOf(task("a", { outcome: "delivered" }), idle), "active");
+  assert.equal(sectionOf(task("a", { stage: "done" }), idle), "active");
   assert.equal(sectionOf(task("a", { outcome: "delivered", sin_ver: true }), idle), "active");
   assert.equal(sectionOf(task("a", { stage: "done" }), { live: ["a"], approving: [] }), "active");
   assert.equal(sectionOf(task("a"), idle), "active");
@@ -58,7 +59,7 @@ test("delivered and seen, or done, settles; unseen and live stay active", () => 
   );
 });
 
-test("without grouping there are always three sections, pinned first, order kept", () => {
+test("without grouping there are always two sections, finished in place, pinned first", () => {
   const tasks = [
     task("new"),
     task("asks", { esperando: true }),
@@ -68,10 +69,9 @@ test("without grouping there are always three sections, pinned first, order kept
     task("chat", { chat_de_agente: true }),
   ];
   const groups = applySidebarView(tasks, DEFAULT_SIDEBAR_VIEW, idle);
-  assert.deepEqual(groups.map((g) => g.key), ["needs_you", "active", "settled"]);
+  assert.deepEqual(groups.map((g) => g.key), ["needs_you", "active"]);
   assert.deepEqual(ids(groups[0].tasks), ["asks"]);
-  assert.deepEqual(ids(groups[1].tasks), ["pinned", "chat", "new"]);
-  assert.deepEqual(ids(groups[2].tasks), ["done"]);
+  assert.deepEqual(ids(groups[1].tasks), ["pinned", "chat", "new", "done"]);
   assert.deepEqual(ids(applySidebarView([], DEFAULT_SIDEBAR_VIEW, idle)[0].tasks), []);
 });
 
@@ -93,7 +93,7 @@ test("folders and agent filter before grouping", () => {
   );
 });
 
-test("grouping keeps only non-empty groups, then the settled section", () => {
+test("grouping keeps only non-empty groups; finished tasks stay in theirs", () => {
   const tasks = [
     task("a", { folder: "web", agent: "ada" }),
     task("b", { folder: null, esperando: true }),
@@ -102,28 +102,43 @@ test("grouping keeps only non-empty groups, then the settled section", () => {
     task("e", { folder: "web", outcome: "delivered" }),
   ];
   const byFolder = applySidebarView(tasks, view({ group: "folder" }), idle);
-  assert.deepEqual(byFolder.map((g) => `${g.kind}:${g.key}`), ["folder:web", "folder:terminus", "folder:", "section:settled"]);
-  assert.deepEqual(ids(byFolder[0].tasks), ["d", "a"]);
-  assert.deepEqual(ids(byFolder[3].tasks), ["e"]);
+  assert.deepEqual(byFolder.map((g) => `${g.kind}:${g.key}`), ["folder:web", "folder:terminus", "folder:"]);
+  assert.deepEqual(ids(byFolder[0].tasks), ["d", "a", "e"]);
 
   const byStatus = applySidebarView(tasks, view({ group: "status" }), { live: ["c"], approving: [] });
-  assert.deepEqual(byStatus.map((g) => g.key), ["asked", "working", "idle", "settled"]);
+  assert.deepEqual(byStatus.map((g) => g.key), ["asked", "working", "idle", "finished"]);
+  assert.deepEqual(ids(byStatus[3].tasks), ["e"]);
+  assert.equal(groupLabel(byStatus[3], (id) => id), "Terminadas");
 
   const byAgent = applySidebarView(tasks, view({ group: "agent" }), idle);
-  assert.deepEqual(byAgent.map((g) => g.key), ["ada", "bob", "", "settled"]);
-  assert.deepEqual(ids(byAgent[2].tasks), ["d", "b"]);
+  assert.deepEqual(byAgent.map((g) => g.key), ["ada", "bob", ""]);
+  assert.deepEqual(ids(byAgent[2].tasks), ["d", "b", "e"]);
 });
 
 test("the view survives a restart and bad data falls back to the default", () => {
   store.clear();
-  assert.deepEqual(loadSidebarView(), DEFAULT_SIDEBAR_VIEW);
+  const key = sidebarViewKey("w", "s1");
+  assert.deepEqual(loadSidebarView(key), DEFAULT_SIDEBAR_VIEW);
   const chosen = view({ folders: ["terminus"], agent: "ada", group: "status", density: "compact" });
-  saveSidebarView(chosen);
-  assert.deepEqual(loadSidebarView(), chosen);
-  store.set("harness.layout.sidebar.view", "{broken");
-  assert.deepEqual(loadSidebarView(), DEFAULT_SIDEBAR_VIEW);
-  store.set("harness.layout.sidebar.view", JSON.stringify({ folders: ["a", 3, "a"], agent: 7, group: "size", density: "compact" }));
-  assert.deepEqual(loadSidebarView(), view({ folders: ["a"], density: "compact" }));
+  saveSidebarView(key, chosen);
+  assert.deepEqual(loadSidebarView(key), chosen);
+  store.set("harness.layout.sidebar.view.w.s1", "{broken");
+  assert.deepEqual(loadSidebarView(key), DEFAULT_SIDEBAR_VIEW);
+  store.set("harness.layout.sidebar.view.w.s1", JSON.stringify({ folders: ["a", 3, "a"], agent: 7, group: "size", density: "compact" }));
+  assert.deepEqual(loadSidebarView(key), view({ folders: ["a"], density: "compact" }));
+});
+
+test("each workspace and space keeps its own view; the old global one is ignored", () => {
+  store.clear();
+  store.set("harness.layout.sidebar.view", JSON.stringify({ agent: "ada", group: "agent" }));
+  const a = sidebarViewKey("w", "s1");
+  const b = sidebarViewKey("w", "s2");
+  saveSidebarView(a, view({ agent: "ada" }));
+  assert.deepEqual(loadSidebarView(a), view({ agent: "ada" }));
+  assert.deepEqual(loadSidebarView(b), DEFAULT_SIDEBAR_VIEW, "a space never seen starts from the default");
+  assert.deepEqual(loadSidebarView(sidebarViewKey("other", "s1")), DEFAULT_SIDEBAR_VIEW);
+  assert.deepEqual(loadSidebarView(sidebarViewKey("w", null)), DEFAULT_SIDEBAR_VIEW);
+  assert.notEqual(sidebarViewKey("w", null), a);
 });
 
 test("the badge counts each setting away from its default", () => {

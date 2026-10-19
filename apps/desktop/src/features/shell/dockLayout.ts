@@ -62,3 +62,12 @@ export function planDock<T extends { name: string }>(
   if (chosen && room > 0 && !shown.includes(chosen)) shown[room - 1] = chosen;
   return { shown, overflow: ordered.length - shown.length };
 }
+
+/**
+ * En qué carpeta se abre el chat con un agente del dock: la de la tarea abierta
+ * si lo tiene, o la única que lo tiene. `null` es que hay que preguntar.
+ */
+export function agentFolder(available: readonly string[], current: string | null | undefined): string | null {
+  if (current && available.includes(current)) return current;
+  return available.length === 1 ? available[0] : null;
+}

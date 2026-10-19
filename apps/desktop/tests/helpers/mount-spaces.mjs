@@ -137,7 +137,11 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
   const base = (s, prefs) => ({
     ...CON_TAREA,
     ...s.respuestas,
-    workspaces_startup: sembrar(prefs),
+    // Cada espacio guarda su vista del riel; aquí todas empiezan agrupadas por carpeta.
+    workspaces_startup: sembrar({
+      ...Object.fromEntries(s.spaces.map((i) => [`sidebar.view.w.${i.id}`, { group: "folder" }])),
+      ...prefs,
+    }),
     list_workspaces: () => ({ workspaces: [{ id: "w", name: "Danil", context_root: null, lengua: "es" }], active: "w" }),
     load_session: ({ id }) => ({ ...CON_TAREA.load_session, id }),
     task_history: CON_TAREA.task_history,
@@ -158,6 +162,17 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
       pref: (k) => JSON.parse(app.w.localStorage.getItem(`harness.layout.${k}`) ?? "null"),
       caja: () =>
         [...doc.querySelectorAll("[data-ventana]")].find((el) => !el.classList.contains("hidden") && el.querySelector("textarea"))?.querySelector("textarea"),
+      /** Elige un agente en el menú de filtro del riel; `null` es «Todos». */
+      filtrarPorAgente: async (nombre) => {
+        doc.querySelector('button[aria-haspopup="menu"][aria-label^="Filtrar y agrupar"]').click();
+        await sleep(80);
+        const grupo = doc.querySelector('[role="menu"] [role="group"][aria-label="Agente"]');
+        assert.ok(grupo, "el menú de filtro ofrece agentes");
+        [...grupo.querySelectorAll('[role="menuitemradio"]')].find((b) => b.textContent.trim() === (nombre ?? "Todos")).click();
+        await sleep(80);
+        tecla(doc.activeElement ?? doc.body, "Escape");
+        await sleep(80);
+      },
       boton: (texto) => [...doc.querySelectorAll("button")].find((b) => b.textContent.trim() === texto),
       abrirMenu: async (id) => {
         doc.querySelector(`[data-space-pill="${id}"]`).dispatchEvent(new app.w.MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
@@ -271,7 +286,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
         { id: "i2", name: "Facturación", folders: ["pb"], created_at: 2, updated_at: 2 },
       ],
       filas: [
-        fila("t1", "pa", "i1"), fila("t2", "pb", "i1"), fila("t3", "pb", "i2"), fila("t4", "pa", "i2"),
+        fila("t1", "pa", "i1", { agent: "ada" }), fila("t2", "pb", "i1"), fila("t3", "pb", "i2"), fila("t4", "pa", "i2"),
         fila("t5", "pc", null), fila("c1", "pa", null, { chat_de_agente: true, agent: "design" }),
       ],
       atencion: [{ session: "t3", project: "pb", state: "asked" }, { session: "t1", project: "pa", state: "failed" }],
@@ -334,6 +349,22 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     assert.equal(u.doc.querySelector('[data-tira] [role="tab"][aria-selected="true"]')?.textContent.trim(), "Tarea t3");
     u.doc.querySelector('[data-space="i1"]').click();
     await sleep(400);
+
+    // La vista del riel es de cada espacio: el filtro de uno no sale en el otro.
+    await u.filtrarPorAgente("ada");
+    assert.ok(u.doc.querySelector('[data-sesion="t1"]') && !u.doc.querySelector('[data-sesion="t2"]'), "el filtro por agente se aplica");
+    u.doc.querySelector('[data-space="i2"]').click();
+    await sleep(400);
+    assert.ok(u.doc.querySelector('[data-sesion="t3"]') && u.doc.querySelector('[data-sesion="t4"]'), "otro espacio no hereda el filtro");
+    assert.doesNotMatch(u.doc.querySelector("[data-sidebar-scope]").textContent, /ada/);
+    u.doc.querySelector('[data-space="i1"]').click();
+    await sleep(400);
+    assert.ok(u.doc.querySelector('[data-sesion="t1"]') && !u.doc.querySelector('[data-sesion="t2"]'), "volver al espacio recupera su filtro");
+    assert.match(u.doc.querySelector("[data-sidebar-scope]").textContent, /ada/);
+    assert.equal(u.pref("sidebar.view.w.i1").agent, "ada");
+    assert.equal(u.pref("sidebar.view.w.i2")?.agent ?? null, null);
+    await u.filtrarPorAgente(null);
+    assert.ok(u.doc.querySelector('[data-sesion="t2"]'));
     guarda("two-spaces", app, s);
 
     // Mover: solo a las otras, y la pestaña se va con la tarea.

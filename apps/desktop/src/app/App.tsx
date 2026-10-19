@@ -119,6 +119,7 @@ import PantallaDeBloqueo from "../features/shell/LockScreen";
 import AvisoDeMaterial from "../features/shell/MaterialNotice";
 import Paneles from "../features/shell/Panels";
 import Sidebar, { createSidebar } from "../features/shell/Sidebar";
+import { sidebarViewKey } from "../lib/sidebarView";
 import ColumnaLateral from "../features/shell/SideColumn";
 import SpaceBar from "../features/shell/SpaceBar";
 import TitleBar from "../features/shell/TitleBar";
@@ -7464,6 +7465,9 @@ export default function App() {
               projects={proyectosDelRiel()}
               modelos={modelosParaAgentes()}
               sessions={sesionesDelRiel()}
+              viewKey={sidebarViewKey(workspaceActivo(), escritorio())}
+              onHablarCon={hablarConEncargado}
+              onAgentProfile={openAgentProfile}
               escritorio={activeSpace() ? spaceName(activeSpace()) : null}
               viendoArchivadas={viendoArchivadas()}
               onArchivadas={spaces().length > 0 ? alternarArchivadas : undefined}

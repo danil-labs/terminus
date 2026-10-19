@@ -1,5 +1,4 @@
 import Archive from "lucide-solid/icons/archive";
-import ChevronRight from "lucide-solid/icons/chevron-right";
 import History from "lucide-solid/icons/history";
 import Loader2 from "lucide-solid/icons/loader-2";
 import PanelLeftClose from "lucide-solid/icons/panel-left-close";
@@ -48,7 +47,6 @@ import {
   scopeLabel,
   type SidebarGroup,
   type SidebarView,
-  sectionLabel,
 } from "../../lib/sidebarView";
 import type { DockAgent } from "./dockLayout";
 import { flattenTasks, folderCounts } from "./sidebarTasks";
@@ -132,6 +130,11 @@ export default function Sidebar(props: {
   onRenombrar: (project: string, id: string, title: string) => Promise<boolean | void> | boolean | void;
   onPin?: (project: string, id: string, pinned: boolean) => void | Promise<void>;
   onSettings: (panel?: string) => void;
+  /** Abre el chat con un agente de esa carpeta, como su fila de antes. */
+  onHablarCon: (project: string, name: string) => void;
+  onAgentProfile: (project: string, name: string) => void;
+  /** Dónde se guarda la vista del riel: una por workspace y espacio (`sidebarViewKey`). */
+  viewKey: string;
   /** El nombre del escritorio activo, para su riel vacío. */
   escritorio?: string | null;
   viendoArchivadas?: boolean;
@@ -185,11 +188,12 @@ export default function Sidebar(props: {
         ? cerrados().filter((x) => x !== p)
         : [...cerrados(), p],
     );
-  const [asentadasAbiertas, setAsentadasAbiertas] = createPref("sidebar.asentadas.abiertas", false);
-  const [vista, setVista] = createSignal<SidebarView>(loadSidebarView());
+  // Cada espacio guarda su vista: cambiar de espacio relee la suya.
+  const [vista, setVista] = createSignal<SidebarView>(loadSidebarView(props.viewKey));
+  createEffect(on(() => props.viewKey, (key) => setVista(loadSidebarView(key)), { defer: true }));
   const cambiarVista = (siguiente: SidebarView) => {
     setVista(siguiente);
-    saveSidebarView(siguiente);
+    saveSidebarView(props.viewKey, siguiente);
   };
 
   const [searchOpen, setSearchOpen] = createSignal(false);
@@ -238,8 +242,6 @@ export default function Sidebar(props: {
       ? todosLosGrupos.map((g, i) => ({ g, i })).sort((a, b) => orden(a.g) - orden(b.g) || a.i - b.i).map(({ g }) => g)
       : todosLosGrupos;
   });
-  const asentadas = () => grupos().find((g) => g.kind === "section" && g.key === "settled")?.tasks ?? [];
-  const abiertos = () => grupos().filter((g) => !(g.kind === "section" && g.key === "settled"));
   const carpetasDelFiltro = createMemo(() => props.projects
     .filter((p) => (cuentas().get(p.id) ?? 0) > 0)
     .map((p) => ({ id: p.id, name: p.name, count: cuentas().get(p.id) ?? 0 })));
@@ -269,6 +271,7 @@ export default function Sidebar(props: {
       }
     });
     return {
+      project,
       roster: () => roster() ?? lastRoster(project) ?? [],
       estados: watchHandlerStatuses(project),
       perfiles: watchProfiles(project),
@@ -299,6 +302,14 @@ export default function Sidebar(props: {
       if (perfil) return perfil;
     }
     return undefined;
+  };
+  /** Carpetas donde está el agente, en el orden del riel. */
+  const carpetasDelAgente = (name: string) => {
+    const orden = (id: string) => { const i = props.projects.findIndex((p) => p.id === id); return i === -1 ? props.projects.length : i; };
+    return porCarpeta()
+      .filter((c) => c.roster().some((a) => a.name === name))
+      .map((c) => ({ id: c.project, name: nombreDe(c.project) ?? c.project }))
+      .sort((a, b) => orden(a.id) - orden(b.id));
   };
   const agentesDelFiltro = createMemo(() => {
     const nombres = new Set([...agentesDelDock().map((a) => a.name), ...todas().flatMap((x) => x.row.agent ? [x.row.agent] : [])]);
@@ -508,31 +519,7 @@ export default function Sidebar(props: {
         <p class="m-0 px-2 pt-1 text-xs text-neutral-500" data-sidebar-filtered-empty="">{t("shell.sidebar.filter_empty")}</p>
       </Show>
 
-      <KeyedList each={abiertos()} by={(g) => `${g.kind}:${g.key}`}>{(g) => <Grupo grupo={g()} />}</KeyedList>
-
-      {/* Lo asentado nace plegado: entregado y visto, o marcado como hecho.
-          Buscando se abre, para que lo encontrado se vea. */}
-      <Show when={asentadas().length > 0}>
-        <section
-          data-sidebar-section="settled"
-          aria-label={sectionLabel("settled")}
-          classList={{ hidden: !!query() && !conResultados("settled") }}
-        >
-          <button
-            type="button"
-            class="flex h-7 w-full min-w-0 items-center gap-1 rounded-sm px-2 pt-1 text-left text-[0.6875rem] font-medium text-neutral-500 outline-none hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary"
-            aria-expanded={!!query() || asentadasAbiertas()}
-            onClick={() => setAsentadasAbiertas(!asentadasAbiertas())}
-          >
-            <ChevronRight size={13} aria-hidden="true" class={cn("shrink-0 transition-transform", (!!query() || asentadasAbiertas()) && "rotate-90")} />
-            <span class="min-w-0 truncate">{sectionLabel("settled")}</span>
-            <span class="ml-auto shrink-0 tabular-nums text-neutral-700">{cuentaDe("settled", asentadas())}</span>
-          </button>
-          <Show when={!!query() || asentadasAbiertas()}>
-            <Historial filas={asentadas()} clave="settled" />
-          </Show>
-        </section>
-      </Show>
+      <KeyedList each={grupos()} by={(g) => `${g.kind}:${g.key}`}>{(g) => <Grupo grupo={g()} />}</KeyedList>
     </div>
   );
 
@@ -680,7 +667,11 @@ export default function Sidebar(props: {
             <AgentDock
               agents={agentesDelDock()}
               selected={vista().agent}
-              onSelect={(agent) => cambiarVista({ ...vista(), agent })}
+              foldersOf={carpetasDelAgente}
+              currentFolder={(props.current ? carpetaDe(props.current) : "") || props.proyectoAbierto}
+              onTalk={props.onHablarCon}
+              onShowTasks={(agent) => cambiarVista({ ...vista(), agent })}
+              onProfile={props.onAgentProfile}
               onSeeAll={() => props.onSettings("agentes")}
               profileOf={perfilDe}
             />

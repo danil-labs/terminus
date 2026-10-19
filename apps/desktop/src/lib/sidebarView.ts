@@ -12,7 +12,7 @@ export type SidebarView = {
 
 export type SidebarGrouping = "none" | "folder" | "status" | "agent";
 export type SidebarDensity = "comfortable" | "compact";
-export type SidebarSection = "needs_you" | "active" | "settled";
+export type SidebarSection = "needs_you" | "active";
 
 export const DEFAULT_SIDEBAR_VIEW: SidebarView = {
   folders: [],
@@ -23,7 +23,6 @@ export const DEFAULT_SIDEBAR_VIEW: SidebarView = {
 
 const GROUPINGS: readonly SidebarGrouping[] = ["none", "folder", "status", "agent"];
 const DENSITIES: readonly SidebarDensity[] = ["comfortable", "compact"];
-const PREF = "sidebar.view";
 
 /** Lo que el sidebar sabe de una fila (`SessionRow`) y basta para colocarla. */
 export type SidebarTask = {
@@ -57,7 +56,7 @@ export type SidebarGroup<T> = {
   tasks: T[];
 };
 
-export type SidebarStatusKey = TaskState | "idle" | "settled";
+export type SidebarStatusKey = TaskState | "idle" | "finished";
 
 function sanitize(raw: unknown): SidebarView {
   if (!raw || typeof raw !== "object") return { ...DEFAULT_SIDEBAR_VIEW };
@@ -73,12 +72,17 @@ function sanitize(raw: unknown): SidebarView {
   };
 }
 
-export function loadSidebarView(): SidebarView {
-  return sanitize(leerPref<unknown>(PREF, null));
+/** La vista se guarda por workspace y espacio, como la tira de pestañas. */
+export function sidebarViewKey(workspace: string | null, space: string | null): string {
+  return space ? `sidebar.view.${workspace ?? ""}.${space}` : `sidebar.view.${workspace ?? ""}`;
 }
 
-export function saveSidebarView(view: SidebarView) {
-  escribirPref(PREF, sanitize(view));
+export function loadSidebarView(key: string): SidebarView {
+  return sanitize(leerPref<unknown>(key, null));
+}
+
+export function saveSidebarView(key: string, view: SidebarView) {
+  escribirPref(key, sanitize(view));
 }
 
 /** Igual que la fila del historial: sin valor del backend, el chat del agente y la bandeja van fijados. */
@@ -107,13 +111,11 @@ export function activityOf(task: SidebarTask, ctx: Pick<SidebarContext, "live" |
 export function sectionOf(task: SidebarTask, ctx: Pick<SidebarContext, "live" | "approving">): SidebarSection {
   const state = taskPriority(activityOf(task, ctx));
   if (state === "approving" || state === "asked" || state === "failed") return "needs_you";
-  if (state === "working" || state === "unseen") return "active";
-  if (task.stage === "done" || task.outcome === "delivered") return "settled";
   return "active";
 }
 
 function statusKey(task: SidebarTask, ctx: Pick<SidebarContext, "live" | "approving">): SidebarStatusKey {
-  return taskPriority(activityOf(task, ctx)) ?? (sectionOf(task, ctx) === "settled" ? "settled" : "idle");
+  return taskPriority(activityOf(task, ctx)) ?? (task.stage === "done" || task.outcome === "delivered" ? "finished" : "idle");
 }
 
 const pinnedFirst = <T extends SidebarTask>(tasks: T[]): T[] =>
@@ -134,8 +136,8 @@ function groupBy<T extends SidebarTask>(tasks: T[], keyOf: (task: T) => string):
 
 /**
  * Filtra por carpetas y agente y reparte en grupos, conservando el orden de
- * entrada (la más nueva primero). Sin agrupar devuelve siempre las tres
- * secciones; agrupando, solo los grupos con tareas y al final «Asentadas».
+ * entrada (la más nueva primero). Sin agrupar devuelve siempre las dos
+ * secciones; agrupando, solo los grupos con tareas.
  */
 export function applySidebarView<T extends SidebarTask>(
   tasks: readonly T[],
@@ -153,23 +155,19 @@ export function applySidebarView<T extends SidebarTask>(
     key,
     tasks: pinnedFirst(sections.get(key) ?? []),
   });
-  if (view.group === "none") return [section("needs_you"), section("active"), section("settled")];
+  if (view.group === "none") return [section("needs_you"), section("active")];
 
-  const open = visible.filter((task) => sectionOf(task, ctx) !== "settled");
   let groups: Map<string, T[]>;
   let order: string[];
   if (view.group === "status") {
-    groups = groupBy(open, (task) => statusKey(task, ctx));
-    order = [...TASK_STATES, "idle"];
+    groups = groupBy(visible, (task) => statusKey(task, ctx));
+    order = [...TASK_STATES, "idle", "finished"];
   } else {
-    groups = groupBy(open, view.group === "folder" ? folderOf : (task) => task.agent ?? "");
+    groups = groupBy(visible, view.group === "folder" ? folderOf : (task) => task.agent ?? "");
     order = [...[...groups.keys()].filter((key) => key !== ""), ""];
   }
   const kind = view.group;
-  return [
-    ...order.filter((key) => groups.has(key)).map((key) => ({ kind, key, tasks: pinnedFirst(groups.get(key)!) })),
-    section("settled"),
-  ];
+  return order.filter((key) => groups.has(key)).map((key) => ({ kind, key, tasks: pinnedFirst(groups.get(key)!) }));
 }
 
 export function nonDefaultCount(view: SidebarView): number {
@@ -203,8 +201,7 @@ export function scopeLabel(view: SidebarView, folderName: (id: string) => string
 export function sectionLabel(section: SidebarSection): string {
   switch (section) {
     case "needs_you": return t("shell.sidebar.view.section_needs_you");
-    case "active": return t("shell.sidebar.view.section_active");
-    default: return t("shell.sidebar.view.section_settled");
+    default: return t("shell.sidebar.view.section_active");
   }
 }
 
@@ -215,7 +212,7 @@ export function statusGroupLabel(key: SidebarStatusKey): string {
     case "working": return t("shell.sidebar.view.status_working");
     case "failed": return t("shell.sidebar.view.status_failed");
     case "unseen": return t("shell.sidebar.view.status_unseen");
-    case "settled": return t("shell.sidebar.view.section_settled");
+    case "finished": return t("shell.sidebar.view.status_finished");
     default: return t("shell.sidebar.view.status_idle");
   }
 }

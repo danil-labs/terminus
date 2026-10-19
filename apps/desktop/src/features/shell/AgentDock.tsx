@@ -4,9 +4,12 @@ import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-j
 import { t } from "../../lib/i18n";
 import type { AgentProfile } from "../../lib/model";
 import { cn } from "../../lib/utils";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "../../ui/ContextMenu";
+import { ITEM_DE_MENU, Popover, PopoverContent } from "../../ui/Popover";
+import { RETARDO_TOOLTIP, TooltipContent, TooltipRoot, TooltipTrigger } from "../../ui/Tooltip";
 import { AstroAvatar } from "../projects/AstroAvatar";
 import { displayName } from "../projects/profiles";
-import { DOCK_DEFAULT_CAPACITY, type DockAgent, dockCapacity, orderDockAgents, planDock } from "./dockLayout";
+import { agentFolder, DOCK_DEFAULT_CAPACITY, type DockAgent, dockCapacity, orderDockAgents, planDock } from "./dockLayout";
 
 export type { DockAgent } from "./dockLayout";
 
@@ -26,14 +29,23 @@ export function dockStatusText(agent: DockAgent): string {
 const SLOT =
   "relative grid size-[26px] shrink-0 place-items-center rounded-[7px] border border-transparent bg-transparent p-0 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-950 focus-visible:outline-2 focus-visible:outline-primary";
 
+type DockFolder = { id: string; name: string };
+
 /**
- * Dock de agentes al pie del sidebar: una sola fila de caras. Pulsar una filtra
- * por ese agente; pulsarla otra vez quita el filtro.
+ * Dock de agentes al pie del sidebar: una sola fila de caras. Pulsar una abre
+ * el chat con el agente; el clic derecho filtra sus tareas o abre su perfil.
  */
 export default function AgentDock(props: {
   agents: DockAgent[];
+  /** El agente del filtro del riel: su cara nunca queda escondida en «+k». */
   selected: string | null;
-  onSelect: (name: string | null) => void;
+  /** Carpetas donde está cada agente, en el orden del riel. */
+  foldersOf: (name: string) => DockFolder[];
+  /** La carpeta de lo que se mira ahora, que gana si el agente está en ella. */
+  currentFolder: string | null;
+  onTalk: (project: string, name: string) => void;
+  onShowTasks: (name: string) => void;
+  onProfile: (project: string, name: string) => void;
   onSeeAll: () => void;
   onNewAgent?: () => void;
   /** Perfil del agente: nombre visible, cara, imagen propia y si está oculto. */
@@ -59,6 +71,21 @@ export default function AgentDock(props: {
     planDock(ordenados(), capacidad(), { hasNew: !!props.onNewAgent, selected: props.selected }),
   );
 
+  // Un agente en varias carpetas sin ninguna obvia: se pregunta dónde, junto a su cara.
+  const [eligiendo, setEligiendo] = createSignal<{ name: string; anchor: HTMLElement; folders: DockFolder[] } | null>(null);
+  const hablar = (name: string, anchor: HTMLElement) => {
+    const folders = props.foldersOf(name);
+    const id = agentFolder(folders.map((f) => f.id), props.currentFolder);
+    if (id) props.onTalk(id, name);
+    else if (folders.length > 0) setEligiendo({ name, anchor, folders });
+  };
+  const [menuDe, setMenuDe] = createSignal<string | null>(null);
+  const perfil = (name: string) => {
+    const folders = props.foldersOf(name);
+    const id = agentFolder(folders.map((f) => f.id), props.currentFolder) ?? folders[0]?.id;
+    if (id) props.onProfile(id, name);
+  };
+
   return (
     <div class="flex flex-col gap-1 border-t border-border px-2 pt-1.5 pb-0.5" role="group" aria-label={t("shell.agent_dock.title")}>
       <div class="flex items-center text-[0.6875rem] text-neutral-500">
@@ -72,19 +99,28 @@ export default function AgentDock(props: {
           <ChevronRight size={11} aria-hidden="true" />
         </button>
       </div>
-      <div ref={fila} class="flex min-w-0 items-center gap-1.5">
+      <ContextMenu onOpenChange={(abierto) => { if (!abierto) setMenuDe(null); }}>
+      <ContextMenuTrigger
+        ref={fila}
+        class="flex min-w-0 items-center gap-1.5"
+        onContextMenu={(e: MouseEvent) => {
+          const cara = (e.target as HTMLElement).closest<HTMLElement>("[data-dock-agent]");
+          if (!cara) e.preventDefault();
+          setMenuDe(cara?.dataset.dockAgent ?? null);
+        }}
+      >
         <For each={plan().shown}>
           {(agente) => {
-            const elegido = () => props.selected === agente.name;
             const texto = () => `${label(agente.name)} · ${dockStatusText(agente)}`;
             return (
-              <button
+              <TooltipRoot openDelay={RETARDO_TOOLTIP} placement="top" gutter={6}>
+              <TooltipTrigger
+                as="button"
                 type="button"
-                class={cn(SLOT, elegido() && "border-neutral-500 bg-neutral-200 hover:bg-neutral-200")}
-                aria-pressed={elegido()}
+                class={SLOT}
+                data-dock-agent={agente.name}
                 aria-label={texto()}
-                title={texto()}
-                onClick={() => props.onSelect(elegido() ? null : agente.name)}
+                onClick={(e: MouseEvent) => hablar(agente.name, e.currentTarget as HTMLElement)}
               >
                 <AstroAvatar
                   name={agente.name}
@@ -101,7 +137,12 @@ export default function AgentDock(props: {
                     {agente.liveTasks}
                   </span>
                 </Show>
-              </button>
+              </TooltipTrigger>
+              <TooltipContent class="pointer-events-none">
+                <span class="block">{label(agente.name)}</span>
+                <span class="block font-normal opacity-80">{dockStatusText(agente)}</span>
+              </TooltipContent>
+              </TooltipRoot>
             );
           }}
         </For>
@@ -127,7 +168,42 @@ export default function AgentDock(props: {
             <Plus size={14} aria-hidden="true" />
           </button>
         </Show>
-      </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <Show when={menuDe()}>
+          {(name) => (
+            <>
+              <ContextMenuItem onSelect={() => props.onShowTasks(name())}>{t("shell.agent_dock.see_tasks")}</ContextMenuItem>
+              <ContextMenuItem onSelect={() => perfil(name())}>{t("projects.agents.profile_open")}</ContextMenuItem>
+            </>
+          )}
+        </Show>
+      </ContextMenuContent>
+      </ContextMenu>
+      <Show when={eligiendo()}>
+        {(e) => (
+          <Popover open onOpenChange={(abierto) => { if (!abierto) setEligiendo(null); }} anchorRef={() => e().anchor} placement="top-start" gutter={6}>
+            <PopoverContent role="menu" aria-label={t("shell.agent_dock.pick_folder", { name: label(e().name) })} class="w-56 p-1">
+              <p class="m-0 truncate px-2 pt-1 pb-1 text-[0.6875rem] font-medium text-neutral-500">
+                {t("shell.agent_dock.pick_folder", { name: label(e().name) })}
+              </p>
+              <For each={e().folders}>
+                {(f) => (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    class={cn(ITEM_DE_MENU, "truncate")}
+                    data-dock-folder={f.id}
+                    onClick={() => { setEligiendo(null); props.onTalk(f.id, e().name); }}
+                  >
+                    {f.name}
+                  </button>
+                )}
+              </For>
+            </PopoverContent>
+          </Popover>
+        )}
+      </Show>
     </div>
   );
 }
