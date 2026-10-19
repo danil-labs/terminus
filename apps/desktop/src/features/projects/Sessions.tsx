@@ -3,6 +3,7 @@ import ChevronRight from "lucide-solid/icons/chevron-right";
 import MoreVertical from "lucide-solid/icons/more-vertical";
 import Pin from "lucide-solid/icons/pin";
 import PinOff from "lucide-solid/icons/pin-off";
+import Server from "lucide-solid/icons/server";
 import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from "solid-js";
 import { arrastrar, fueArrastre, tareaEnVuelo } from "../../lib/drag";
 import { enfocarYSeleccionar } from "../../lib/focus";
@@ -25,6 +26,7 @@ import {
   PopoverTrigger,
 } from "../../ui/Popover";
 import { WithMentions } from "../chat/WithMentions";
+import { machineName } from "../machines/store";
 import SessionGit from "./SessionGit";
 import { createTaskHistories } from "./taskHistories";
 import { AstroAvatar } from "./AstroAvatar";
@@ -132,6 +134,9 @@ export type SessionRow = {
   chat_de_agente: boolean;
   /** De qué espacio es (`spaces::of_rows`). Ver `lib/spaces.ts`. */
   space?: string | null;
+  /** La máquina que la corre si no es la de la ventana (`fleet.rs`); apagada, `machine_on` es `false`. */
+  machine?: string;
+  machine_on?: boolean;
 };
 
 type EstadoDelWorktree = { available: boolean; owned: boolean };
@@ -673,6 +678,19 @@ export default function Sessions(props: {
                   <span class="flex shrink-0 text-error-strong" title={t("projects.sessions.worktree_missing")} aria-label={t("projects.sessions.worktree_missing")}><WorktreeRoto size={13} /></span>
                 </Show>
                 <span class="flex shrink-0" title={f.s.agent} aria-label={f.s.agent}><MarcaAgente id={f.s.agent} size={13} /></span>
+                <Show when={f.s.machine}>
+                  {(machine) => {
+                    const label = () => f.s.machine_on === false
+                      ? t("shell.machines.task_off", { name: machineName(machine()) })
+                      : t("shell.machines.task_on", { name: machineName(machine()) });
+                    return (
+                      <span data-machine={machine()} class={cn("flex max-w-[96px] shrink-0 items-center gap-0.5", f.s.machine_on === false && "opacity-60")} title={label()} aria-label={label()}>
+                        <Server size={11} aria-hidden="true" />
+                        <span class="truncate">{machineName(machine())}</span>
+                      </span>
+                    );
+                  }}
+                </Show>
                 {/* El botón del cohete es translúcido: sin desvanecer, el mensaje se lee a
                     través. Máscara y no velo: el fondo del riel cambia con el tema y el wallpaper. */}
                 <span class="min-w-0 flex-1 truncate [:has(>[data-finish-slot])_&]:[mask-image:linear-gradient(to_left,transparent_56px,black_88px)]">{f.s.last_message}</span>
