@@ -137,6 +137,8 @@ pub(super) fn desktop_command(name: &str) -> bool {
             name,
             "launcher_state"
                 | "launcher_continue"
+                | "window_painted"
+                | "window_background"
                 | "update_install"
                 | "update_pending"
                 | "close_confirmed"

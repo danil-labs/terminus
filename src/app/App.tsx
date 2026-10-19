@@ -123,6 +123,7 @@ import { pedirElCampo } from "../lib/focus";
 import { lastRoster, rememberRoster } from "../lib/handlerRoster";
 import { aplicarLenguaDeWorkspace, clavesConocidas, t } from "../lib/i18n";
 import { invoke } from "../lib/invoke.ts";
+import { connected } from "../lib/engineConnection";
 import { readChatVisual } from "../features/chat/readVisual";
 import { createPointerDrag } from "../lib/pointer-drag";
 import type { InternalTaskLink } from "../lib/links";
@@ -160,6 +161,7 @@ import { createPref, escribirPref, leerPref } from "../lib/prefs";
 import type { Frase } from "../lib/prose";
 import { editDraft, insertMention, insertRecipient, type Recipient, type RecipientCandidate, type SenderTask, trimDraft } from "../lib/recipients";
 import { conservar, conservarEnOrden, sessionRefresh } from "../lib/sessionRefresh";
+import { readShellCache, shellCacheWriter } from "../lib/shellCache";
 import {
   accionDeAtajo,
   destinoDePestana,
@@ -382,6 +384,42 @@ export default function App() {
   const [escritorio, setEscritorio] = createSignal<string | null>(null);
   const activeSpace = () => spaces().find((i) => i.id === escritorio()) ?? null;
   const multipleSpaces = () => spaces().length > 1;
+  // El sidebar de la vez anterior, pintado antes del primer IPC e inerte hasta que el motor lo confirma.
+  const shellCache = readShellCache();
+  const [enCache, setEnCache] = createSignal(shellCache !== null);
+  if (shellCache) {
+    batch(() => {
+      setProjectList(shellCache.projects);
+      setSesiones(shellCache.sessions);
+      setSpaces(shellCache.spaces);
+      setEscritorio(shellCache.desk);
+    });
+  }
+  const guardarCache = shellCacheWriter();
+  createEffect(() => {
+    const workspace = workspaceActivo();
+    const snapshot = { workspace, projects: projectList(), sessions: sesiones(), spaces: spaces(), desk: escritorio() };
+    if (enCache() || bloqueo() || !workspace) return;
+    // A mitad de un cambio de workspace las filas aún son del anterior: esa foto no se guarda.
+    const carpetas = ["", ...snapshot.projects.map((p) => p.id)];
+    const leidas = Object.keys(snapshot.sessions);
+    if (leidas.length !== carpetas.length || !carpetas.every((c) => c in snapshot.sessions)) {
+      guardarCache.cancel();
+      return;
+    }
+    guardarCache.save({ ...snapshot, workspace });
+  });
+  window.addEventListener("pagehide", guardarCache.flush);
+  onCleanup(() => window.removeEventListener("pagehide", guardarCache.flush));
+  // Cuándo enseña tareas el sidebar, en `window.log`: el arranque se mide desde aquí.
+  const pintadoDesde = new Set<string>();
+  createEffect(() => {
+    const source = enCache() ? "cache" : "engine";
+    if (pintadoDesde.has(source) || !Object.values(sesiones()).some((filas) => filas.length > 0)) return;
+    pintadoDesde.add(source);
+    requestAnimationFrame(() =>
+      void invoke("window_painted", { at: Math.round(performance.now()), source }).catch(() => {}));
+  });
   const viendoArchivadas = () => proyectoAbierto() === ARCHIVADAS;
   // Los visores se recorren por id y no por el objeto abierto: `For`
   // compara por referencia, y marcar un archivo como cambiado —al
@@ -1712,6 +1750,7 @@ export default function App() {
   // conversación y deja la anterior abandonada, sin error y sin aviso. Para
   // eso está `recargarMaterial`.
   async function aplicar(a: Startup) {
+    guardarCache.flush();
     const activo = a.workspaces.find((w) => w.id === a.active);
   // Sin workspace se abre el alta. Si ya estaba abierta no se toca: el paso 1
   // acaba de crear uno, y volver a mirar aquí la cerraría a mitad.
@@ -1746,9 +1785,14 @@ export default function App() {
     // de vaciar la tira, para que soltar sus pestañas no pise su rejilla.
     paneles.bindTo(null, null);
     pestanas.load(null);
+    // El mismo workspace que la caché: sus filas se quedan hasta que lleguen las de verdad.
+    const desdeCache = enCache() && shellCache?.workspace === a.active;
+    if (!desdeCache) setEnCache(false);
     batch(() => {
-      setSpaces([]);
-      setEscritorio(null);
+      if (!desdeCache) {
+        setSpaces([]);
+        setEscritorio(null);
+      }
       setAviso(null);
     });
     // Y la pantalla vuelve a una ventana: la rejilla que había era la del
@@ -1766,7 +1810,7 @@ export default function App() {
     lifecycleRevision++;
     setFolder(null);
     setVentana(null);
-    setSesiones({});
+    if (!desdeCache) setSesiones({});
     soltarCola();
     setAdjuntas([]);
     // Y las cuentas, que también son de este workspace: la franja de consumo las
@@ -1791,6 +1835,8 @@ export default function App() {
       return;
     }
     const pedidas = invoke<Space[]>("list_spaces").catch(() => null);
+    // Con las carpetas de la caché, sus tareas se leen a la vez que la lista de carpetas.
+    const primeras = desdeCache ? refreshSessions(grupos()) : null;
     try {
       // A la vez, no una detrás de otra: no dependen entre sí, y
       // encadenadas sumaban sus latencias en el arranque. `list_sources`
@@ -1808,6 +1854,12 @@ export default function App() {
       setProjectList([]);
       setSources([]);
       setError(prosaDe(e));
+    }
+    if (primeras) {
+      // Si cambiaron las carpetas, `grupos` relee también las nuevas; esta lectura ya vale para las de siempre.
+      await primeras;
+      if (generation !== sessionGeneration) return;
+      setEnCache(false);
     }
     // La tarea que estaba abierta en este workspace vuelve a estarlo, que es lo
     // que hace un navegador al arrancar. Si su pestaña apunta a una tarea que
@@ -1889,6 +1941,7 @@ export default function App() {
         // «primer arranque» y abren el alta — la negativa acabaría
         // invitando a crear un workspace en la carpeta que se negó a tocar.
         if (a.bloqueo) {
+          setEnCache(false);
           setBloqueo(a.bloqueo);
           return;
         }
@@ -1900,6 +1953,13 @@ export default function App() {
           return;
         }
         setError(prosaDe(e));
+        if (enCache()) {
+          batch(() => {
+            setEnCache(false);
+            setProjectList([]);
+            setSesiones({});
+          });
+        }
         // Sin arranque no hay workspace: no hay nada que ofrecer. Dejarlo
         // en «leyendo» pintaría una caja muda esperando una respuesta que
         // ya falló; vacío es lo que hay, y encima está el error.
@@ -3224,7 +3284,8 @@ export default function App() {
   // por props derivadas de la tarea (`session()`) y se repinta sola.
 
   // El historial se recarga cuando cambia la lista de proyectos, no el activo.
-  createEffect(on(grupos, (g) => void refreshSessions(g)));
+  // Antes del motor no: el arranque reinicia las lecturas y las relee en `aplicar`.
+  createEffect(on(grupos, (g) => { if (connected()) void refreshSessions(g); }));
 
   // El catálogo depende del agente. No se resetea el modelo elegido aquí: al
   // abrir una sesión se fijan agente y modelo juntos, y un efecto que limpiara
@@ -7132,6 +7193,14 @@ export default function App() {
             max={420}
             etiqueta={t("shell.column.sidebar_width")}
           >
+            <div class="relative h-full min-h-0 w-full min-w-0">
+            <div
+              class="h-full min-h-0 w-full min-w-0"
+              classList={{ "opacity-60": enCache() }}
+              ref={(el) => createEffect(() => el.toggleAttribute("inert", enCache()))}
+              aria-busy={enCache() || undefined}
+              data-shell-cache={enCache() ? "" : undefined}
+            >
             <Sidebar
               projects={proyectosDelRiel()}
               modelos={modelosParaAgentes()}
@@ -7180,6 +7249,13 @@ export default function App() {
               }
               onSettings={(panel) => setSettings(panel ?? "")}
             />
+            </div>
+            <Show when={enCache()}>
+              <p role="status" class="pointer-events-none absolute inset-x-3 bottom-3 m-0 rounded-[var(--radius-sm)] bg-surface px-3 py-2 text-xs text-neutral-500 shadow-sm">
+                {t("shell.sidebar.cached")}
+              </p>
+            </Show>
+            </div>
           </ColumnaLateral>
 
           {/* 30rem es lo que cabe en la caja sin partir el modelo ni el modo.

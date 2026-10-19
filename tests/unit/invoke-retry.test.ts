@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { canRepeat, retrying, WAITS } from "../../src/lib/invoke.ts";
+import { canRepeat, retrying, untilConnected, WAITS } from "../../src/lib/invoke.ts";
 
 function service(failures: number, code = "app_unavailable") {
   const waits: number[] = [];
@@ -47,4 +47,28 @@ test("a read is repeated after io, a write is not", () => {
   assert.equal(canRepeat("send_message", io), false, "it may have run: repeating would send twice");
   assert.equal(canRepeat("save_queue", io), false);
   assert.equal(canRepeat("delete_workspace", io), false);
+});
+
+test("antes del motor la orden espera a que conecte y se repite una vez", async () => {
+  let up = false;
+  let attempts = 0;
+  const call = async () => {
+    attempts += 1;
+    if (!up) throw { what: { clave: "shell.service.engine_down" }, detail: "engine_down" };
+    return "listo";
+  };
+  const result = untilConnected(call, () => up, async () => {
+    up = true;
+  });
+  assert.equal(await result, "listo");
+  assert.equal(attempts, 2);
+});
+
+test("con el motor ya conectado, engine_down llega a la pantalla", async () => {
+  let waited = false;
+  const call = async () => {
+    throw { detail: "engine_down" };
+  };
+  await assert.rejects(untilConnected(call, () => true, async () => void (waited = true)));
+  assert.equal(waited, false);
 });

@@ -36,6 +36,7 @@ sends).
 | `task-history-calls` | `tests/perf/task-history-calls.mjs` | History and status calls during mutations and deltas. The ceiling only goes down. |
 | `delta-cost` | `tests/perf/delta-cost.mjs` | DOM updates and mutations for a 400-delta answer arriving eight per frame. The ceiling only goes down; CPU is informative. |
 | `bundle-size` | `tests/perf/bundle-size.mjs` | Gzip KiB of the script, preloads and CSS that `dist/index.html` loads before painting. Lazy chunks don't count. The ceiling only goes down. |
+| `cold-start-sidebar` | `tests/perf/cold-start-sidebar.mjs` | Engine replies the sidebar waits for before painting its tasks on a warm start (cached shell); cold start and milliseconds are informative. The ceiling only goes down. |
 | `drop` | `scripts/guards/drop.mjs` | Coordinate conversion per platform for file drops. |
 | `animations` | `scripts/guards/animations.mjs` | Restricts continuous infinite animations and their per-file quota. |
 | `csp` | `scripts/guards/csp.mjs` | The content policy is the same in the window, the lab and the Markdown filters. |

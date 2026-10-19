@@ -1,5 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
-import { For, type JSX, Match, onCleanup, onMount, Show, Switch, createSignal } from "solid-js";
+import { createEffect, For, type JSX, Match, onCleanup, onMount, Show, Switch, createSignal } from "solid-js";
+import { markConnected } from "../../lib/engineConnection";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
 import { cn } from "../../lib/utils";
@@ -17,7 +18,8 @@ import ControlesDeVentana from "./WindowControls";
 
 /**
  * Lo que la ventana enseña antes de tener motor: el traspaso desde 0.2.74 y la
- * salida si el motor no arranca. Rust decide la fase (`launcher.rs`).
+ * salida si el motor no arranca. Rust decide la fase (`launcher.rs`). Mientras
+ * conecta se monta la app: lo que pide al motor espera (`lib/invoke.ts`).
  */
 
 type Paso = "pending" | "active" | "done";
@@ -33,6 +35,7 @@ type Traspaso = {
   done: boolean;
 };
 type Fase =
+  | { phase: "connecting" }
   | { phase: "ready"; blank_0274?: boolean }
   | Traspaso
   | { phase: "failed"; code: string; log: string; data: string };
@@ -64,6 +67,10 @@ export default function Lanzador(props: { children: JSX.Element }) {
       .catch(() => setFase({ phase: "ready" }));
     onCleanup(() => void escucha.then((f) => f()));
   });
+  createEffect(() => {
+    if (fase()?.phase === "ready") markConnected();
+  });
+  const montada = () => fase()?.phase === "ready" || fase()?.phase === "connecting";
 
   const seguir = () => void invoke("launcher_continue");
   const traspaso = () => {
@@ -110,7 +117,7 @@ export default function Lanzador(props: { children: JSX.Element }) {
 
   return (
     <Switch>
-      <Match when={fase()?.phase === "ready"}>
+      <Match when={montada()}>
         {props.children}
         <Show when={fase()?.phase === "ready" && (fase() as { blank_0274?: boolean }).blank_0274}>
           <ToastPortal>
@@ -123,7 +130,7 @@ export default function Lanzador(props: { children: JSX.Element }) {
       <Match when={fase() === null}>
         <div class="h-full bg-bg" />
       </Match>
-      <Match when={fase()?.phase !== "ready"}>
+      <Match when={!montada()}>
         <main class="flex h-full flex-col overflow-hidden bg-bg" data-launcher={fase()?.phase}>
           <Cabecera apartar={apartarSemaforo()} />
           <section class="flex min-h-0 flex-1 flex-col items-start overflow-y-auto px-10 py-10">

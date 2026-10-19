@@ -53,6 +53,16 @@ pub(super) fn window_ready(at: u64) {
     log::warn!("[tiempo] startup_document — {at} ms");
 }
 
+/// El sidebar ya enseña tareas: de la caché de la ventana anterior o del motor.
+#[tauri::command]
+pub(super) fn window_painted(at: u64, source: String) {
+    let proceso = STARTED
+        .get()
+        .map(|t| t.elapsed().as_millis() as u64)
+        .unwrap_or_default();
+    log::warn!("[tiempo] sidebar_{source} — {proceso} ms (documento {at} ms)");
+}
+
 #[tauri::command]
 pub(super) fn window_vitals(
     webview: tauri::Webview,

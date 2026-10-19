@@ -1,8 +1,10 @@
 import { listen } from "@tauri-apps/api/event";
 import { createEffect, createSignal, For, type JSX, Match, on, onCleanup, onMount, Show, Switch } from "solid-js";
+import { connected } from "../../lib/engineConnection";
 import { peso } from "../../lib/format";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
+import { hasShellCache } from "../../lib/shellCache";
 import { cn } from "../../lib/utils";
 import {
   createFullscreen,
@@ -286,20 +288,27 @@ export default function Setup(props: { children: JSX.Element }) {
    */
   async function empezar() {
     setFallo(null);
+    // Con la foto del sidebar de la vez anterior la preparación ya se hizo: la app
+    // monta sin esperar al motor y esta pantalla vuelve solo si el motor dice que falta.
+    const optimista = mostrar() === null && !connected() && hasShellCache();
+    if (optimista) setMostrar(false);
+    // A la vez: el reporte no depende de si hace falta la preparación.
+    const reporteEnCurso = invoke<EnvReport>("check_environment", { force: false });
+    reporteEnCurso.catch(() => {});
     let primera = false;
     try {
       primera = await invoke<boolean>("setup_required");
     } catch (e) {
       setFallo(prosaDe(e));
-      setMostrar(true);
+      if (!optimista) setMostrar(true);
       return;
     }
-    if (mostrar() === null) setMostrar(primera);
+    if (mostrar() === null || (optimista && primera)) setMostrar(primera);
     if (mostrar()) contarEspacios();
 
     let r: EnvReport;
     try {
-      r = await invoke<EnvReport>("check_environment", { force: false });
+      r = await reporteEnCurso;
       if (!r) throw new Error(t("setup.error_check"));
     } catch (e) {
       // Con la app pintada no se cambia de pantalla: Estado del entorno enseña su propio error.
@@ -400,7 +409,11 @@ export default function Setup(props: { children: JSX.Element }) {
       }
     >
       <Match when={mostrar() === null}>
-        <div class="h-full bg-bg" />
+        <div class="flex h-full items-center justify-center bg-bg">
+          <Show when={!connected()}>
+            <p role="status" class="m-0 text-sm text-neutral-500">{t("shell.engine.connecting")}</p>
+          </Show>
+        </div>
       </Match>
       <Match when={mostrar() && !seguir()}>
         <main class="flex h-full flex-col overflow-hidden bg-bg">

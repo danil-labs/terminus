@@ -212,5 +212,7 @@
   "shell.work_tree.open": "Ver el árbol de trabajo",
   "shell.folder.open": "Abrir carpeta",
   "shell.folder.copy": "Copiar ruta",
-  "shell.folder.copied": "Ruta copiada"
+  "shell.folder.copied": "Ruta copiada",
+  "shell.engine.connecting": "Conectando con el motor…",
+  "shell.sidebar.cached": "Conectando con el motor: estas tareas son de la última vez y se actualizan en cuanto conteste."
 }

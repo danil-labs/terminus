@@ -1,5 +1,6 @@
-//! El traspaso desde 0.2.74 antes de tener motor: cerrar su ventana, esperar sus
-//! turnos y adoptar. El arranque y la reutilización son de `engine::ensure`.
+//! Lo que pasa antes de tener motor, con la ventana ya abierta: conectar con el motor
+//! o el traspaso desde 0.2.74 (cerrar su ventana, esperar sus turnos y adoptar).
+//! El arranque y la reutilización son de `engine::ensure`.
 use super::{engine, legacy, proxy};
 use serde::Serialize;
 use std::{
@@ -35,6 +36,7 @@ pub struct Handoff {
 #[derive(Serialize, Clone, PartialEq)]
 #[serde(tag = "phase", rename_all = "snake_case")]
 pub enum Phase {
+    Connecting,
     Ready {
         blank_0274: bool,
     },
@@ -58,6 +60,10 @@ impl Launcher {
     /// Una ventana que ya tiene motor; con `paths`, vigila si 0.2.74 quedó abierta en blanco.
     pub fn ready(paths: Option<engine::Paths>) -> Self {
         Self::new(paths, None, Phase::Ready { blank_0274: false })
+    }
+    /// Una ventana que todavía no tiene motor y lo busca o lo lanza en segundo plano.
+    pub fn connecting(paths: engine::Paths) -> Self {
+        Self::new(Some(paths), None, Phase::Connecting)
     }
     pub fn handoff(paths: engine::Paths, reason: &'static str) -> Self {
         let steps = Handoff {
@@ -126,6 +132,8 @@ pub fn start(app: tauri::AppHandle, launcher: Arc<Launcher>) {
         .spawn(move || {
             if let Some(reason) = launcher.reason {
                 drive(&app, &launcher, &paths, reason);
+            } else if launcher.phase() == Phase::Connecting {
+                connect(&app, &launcher, &paths);
             }
             watch(&launcher, &paths);
         });
@@ -159,15 +167,52 @@ pub fn reason(paths: &engine::Paths) -> Option<&'static str> {
     })
 }
 
+fn attach(app: &tauri::AppHandle, client: Client) {
+    let state = Arc::new(proxy::State::new(Arc::new(client), true));
+    if let Some(window) = app.get_window("main") {
+        let _ = window.set_title(&super::title(app));
+    }
+    app.manage(state);
+    let elapsed = super::desktop::STARTED
+        .get()
+        .map(|t| t.elapsed().as_millis() as u64)
+        .unwrap_or_default();
+    log::warn!("[tiempo] engine — {elapsed} ms");
+}
+
+/// Sin traspaso pendiente: el motor vivo de la raíz o uno recién lanzado, con la ventana ya pintando.
+fn connect(app: &tauri::AppHandle, launcher: &Launcher, paths: &engine::Paths) {
+    loop {
+        let selected = engine::ensure(paths, false);
+        if matches!(&selected, Err(error) if error.code == "adoption_required") {
+            drive(app, launcher, paths, "readopt");
+            return;
+        }
+        match selected.and_then(|selection| super::connect(&selection)) {
+            Ok(client) => {
+                attach(app, client);
+                launcher.set(Phase::Ready { blank_0274: false });
+                return;
+            }
+            Err(error) => {
+                log::error!("[launcher] engine did not start: {}", error.code);
+                launcher.ask(Phase::Failed {
+                    code: error.code,
+                    log: paths.launch_log.clone(),
+                    data: paths.data.clone(),
+                });
+                launcher.wait_consent();
+                launcher.set(Phase::Connecting);
+            }
+        }
+    }
+}
+
 fn drive(app: &tauri::AppHandle, launcher: &Launcher, paths: &engine::Paths, reason: &'static str) {
     loop {
         match handoff(launcher, paths, reason) {
             Ok(client) => {
-                let state = Arc::new(proxy::State::new(Arc::new(client), true));
-                if let Some(window) = app.get_window("main") {
-                    let _ = window.set_title(&super::title(app));
-                }
-                app.manage(state);
+                attach(app, client);
                 if let Phase::Handoff(mut steps) = launcher.phase() {
                     steps.done = true;
                     launcher.ask(Phase::Handoff(steps));

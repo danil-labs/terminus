@@ -1,4 +1,5 @@
 import { invoke as tauri, type InvokeArgs, type InvokeOptions } from "@tauri-apps/api/core";
+import { connected, whenConnected } from "./engineConnection.ts";
 
 /**
  * El único `invoke` de la ventana: el de Tauri, que espera al servicio en vez
@@ -56,5 +57,23 @@ export async function retrying<T>(
   return await call();
 }
 
+/**
+ * Antes de que la ventana tenga motor (`launcher.rs`, fase `connecting`) el proxy
+ * contesta `engine_down` sin correr nada: la orden espera al motor y se repite.
+ */
+export async function untilConnected<T>(
+  call: () => Promise<T>,
+  isConnected: () => boolean = connected,
+  wait: () => Promise<void> = whenConnected,
+): Promise<T> {
+  try {
+    return await call();
+  } catch (e) {
+    if (isConnected() || detailOf(e) !== "engine_down") throw e;
+    await wait();
+    return await call();
+  }
+}
+
 export const invoke = <T>(command: string, args?: InvokeArgs, options?: InvokeOptions): Promise<T> =>
-  retrying(() => tauri<T>(command, args, options), sleep, (e) => canRepeat(command, e));
+  untilConnected(() => retrying(() => tauri<T>(command, args, options), sleep, (e) => canRepeat(command, e)));
