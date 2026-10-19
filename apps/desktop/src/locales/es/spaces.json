@@ -62,17 +62,8 @@
   "spaces.error.none": "Este workspace no tiene ningún espacio legible. Revisa la carpeta spaces antes de seguir.",
   "spaces.error.outside": "Las tareas efímeras no pertenecen a ningún espacio.",
   "spaces.error.storage": "No se pudieron leer o guardar los espacios. Conserva los archivos y vuelve a intentarlo.",
-  "spaces.folders.hint": "Un proyecto que no agregaste aparece mientras tenga tareas de este espacio.",
-  "spaces.folders.tasks": {
-    "one": "1 tarea",
-    "other": "{count} tareas"
-  },
-  "spaces.folders.title": "Proyectos de «{name}»",
-  "spaces.folders.toggle": "Incluir {name} en el espacio",
-  "spaces.menu.actions": "Acciones de {name}",
   "spaces.menu.delete": "Eliminar…",
   "spaces.menu.delete_last": "Un workspace tiene al menos un espacio. Crea otro antes de eliminar este.",
-  "spaces.menu.folders": "Proyectos…",
   "spaces.menu.rename": "Renombrar",
   "spaces.move.folder_stays": "El proyecto no cambia: {folder}.",
   "spaces.move.to": "Mover a otro espacio",

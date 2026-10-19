@@ -1,28 +1,25 @@
-import Ellipsis from "lucide-solid/icons/ellipsis";
-import Folder from "lucide-solid/icons/folder";
 import Plus from "lucide-solid/icons/plus";
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { enfocarYSeleccionar } from "../../lib/focus";
 import { t } from "../../lib/i18n";
-import { carpetasDelEscritorio, ordenDelEscritorio, type Space, spaceName } from "../../lib/spaces";
+import { type Space, spaceName } from "../../lib/spaces";
 import type { Project } from "../../lib/model";
 import { cn } from "../../lib/utils";
 import { createNavigationOrder, createNavigationReorder } from "../../lib/navigation-order";
 import { Button } from "../../ui/Button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuGroupLabel,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "../../ui/DropdownMenu";
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuGroup,
+  ContextMenuGroupLabel,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "../../ui/ContextMenu";
 import { asFailure, type Failure, FailureNote } from "../../ui/Failure";
 import { KeyedList } from "../../ui/KeyedList";
 import { Input } from "../../ui/Input";
-import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "../../ui/Popover";
-import type { SessionRow } from "../projects/Sessions";
+import { Popover, PopoverContent, PopoverTrigger } from "../../ui/Popover";
 import type { AttentionState } from "./attention";
 import { AttentionBadge } from "./WorkspaceColumn";
 
@@ -33,7 +30,8 @@ const NOMBRE_MAX = 30;
  * Los escritorios del workspace, en la fila del título. La elegida no lleva
  * señal: sus tareas ya están en el riel. Las flechas mueven el foco entre
  * píldoras y Enter elige; cambiar de escritorio remonta la pestaña de delante,
- * y no se hace por pasar el foco.
+ * y no se hace por pasar el foco. Renombrar es doble clic o F2; el clic derecho
+ * (o Mayús+F10) abre el menú con renombrar y eliminar.
  */
 export default function SpaceBar(props: {
   workspace: string;
@@ -41,19 +39,17 @@ export default function SpaceBar(props: {
   spaces: Space[];
   activa: string | null;
   proyectos: Project[];
-  sesiones: Record<string, SessionRow[]>;
   senal: (id: string) => AttentionState | null;
   onElegir: (id: string) => void;
   onCrear: (name: string, folders: string[]) => Promise<void>;
   onRenombrar: (id: string, name: string) => Promise<void>;
-  onCarpetas: (id: string, folders: string[]) => Promise<void>;
   onEliminar: (id: string) => void;
 }) {
   const [menuDe, setMenuDe] = createSignal<string | null>(null);
-  const [carpetasDe, setCarpetasDe] = createSignal<string | null>(null);
   const [renombrando, setRenombrando] = createSignal<string | null>(null);
   const [nombre, setNombre] = createSignal("");
   let lista: HTMLDivElement | undefined;
+  let renombrarAlCerrar = false;
   const order = createNavigationOrder(() => `spaces.order.${props.workspaceId}`);
   const orderedSpaces = createMemo(() => order.arrange(props.spaces));
   const reorder = createNavigationReorder({
@@ -74,6 +70,10 @@ export default function SpaceBar(props: {
     setRenombrando(null);
     if (n && n !== spaceName(i)) void props.onRenombrar(i.id, n);
     queueMicrotask(() => lista?.querySelector<HTMLElement>(`[data-space="${i.id}"]`)?.focus());
+  };
+  const abrirMenuDesdeTeclado = (tab: HTMLElement) => {
+    const r = tab.getBoundingClientRect();
+    tab.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: r.left, clientY: r.bottom }));
   };
   const moverFoco = (desde: HTMLElement, paso: number) => {
     const tabs = [...(lista?.querySelectorAll<HTMLElement>('[role="tab"]') ?? [])];
@@ -99,26 +99,21 @@ export default function SpaceBar(props: {
             const unica = () => props.spaces.length === 1;
             const senal = () => (elegida() ? null : props.senal(i().id));
             return (
-              <Popover
-                open={carpetasDe() === i().id}
-                onOpenChange={(abierta) => setCarpetasDe(abierta ? i().id : null)}
-                placement="bottom-start"
-                gutter={4}
+              <ContextMenu
+                onOpenChange={(abierto) => setMenuDe(abierto ? i().id : null)}
               >
-                <PopoverAnchor
+                <ContextMenuTrigger
                   data-space-pill={i().id}
                   data-selected={elegida() ? "true" : "false"}
+                  disabled={renombrando() === i().id}
                   class={cn(
                     "group relative inline-flex h-6.5 min-w-0 items-center rounded-md border text-xs whitespace-nowrap select-none",
                     reorder.source() === i().id && "cursor-grabbing opacity-40",
                     elegida()
                       ? "shrink-0 border-border-strong bg-surface-raised font-semibold text-neutral-950 shadow-sm"
                       : "border-transparent font-medium text-neutral-500 hover:bg-neutral-200 hover:text-neutral-950",
+                    menuDe() === i().id && !elegida() && "bg-neutral-200 text-neutral-950",
                   )}
-                  onContextMenu={(e: MouseEvent) => {
-                    e.preventDefault();
-                    setMenuDe(i().id);
-                  }}
                 >
                   <Show when={reorder.edge(i().id)}>
                     {(edge) => <span aria-hidden="true" class={cn("pointer-events-none absolute top-0 bottom-0 w-0.5 bg-primary", edge() === "before" ? "-left-0.5" : "-right-0.5")} />}
@@ -131,9 +126,10 @@ export default function SpaceBar(props: {
                         role="tab"
                         data-space={i().id}
                         aria-selected={elegida()}
+                        aria-haspopup="menu"
                         tabIndex={elegida() ? 0 : -1}
                         title={spaceName(i())}
-                        class="inline-flex h-full min-w-0 touch-none items-center gap-1.5 rounded-[inherit] pr-0.5 pl-2.5 outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        class="inline-flex h-full min-w-0 touch-none items-center gap-1.5 rounded-[inherit] px-2.5 outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                         onPointerDown={(e) => reorder.start(i().id, e)}
                         onClick={() => props.onElegir(i().id)}
                         // El primer clic elige la píldora y el segundo ya no hace
@@ -147,6 +143,11 @@ export default function SpaceBar(props: {
                           } else if (e.key === "F2") {
                             e.preventDefault();
                             empezarARenombrar(i());
+                          } else if (e.key === "ContextMenu" || (e.key === "F10" && e.shiftKey)) {
+                            // El menú es de clic derecho; desde el teclado se
+                            // abre con las teclas de siempre, bajo la píldora.
+                            e.preventDefault();
+                            abrirMenuDesdeTeclado(e.currentTarget);
                           }
                         }}
                       >
@@ -175,133 +176,55 @@ export default function SpaceBar(props: {
                       }}
                     />
                   </Show>
-                  <Show when={renombrando() !== i().id}>
-                    <DropdownMenu
-                      open={menuDe() === i().id}
-                      onOpenChange={(abierto) => setMenuDe(abierto ? i().id : null)}
-                      placement="bottom-start"
-                      gutter={4}
+                </ContextMenuTrigger>
+                <ContextMenuContent
+                  class="w-60"
+                  data-space-menu={i().id}
+                  // El menú retiene el foco mientras está abierto: la caja de
+                  // Renombrar se abre al cerrarse, y el foco ya no vuelve a la píldora.
+                  onCloseAutoFocus={(e: Event) => {
+                    if (!renombrarAlCerrar) return;
+                    renombrarAlCerrar = false;
+                    e.preventDefault();
+                    empezarARenombrar(i());
+                  }}
+                >
+                  <ContextMenuGroup>
+                    <ContextMenuGroupLabel>{spaceName(i())}</ContextMenuGroupLabel>
+                    <ContextMenuItem class="flex items-center justify-between gap-2" onSelect={() => (renombrarAlCerrar = true)}>
+                      {t("spaces.menu.rename")}
+                      <kbd class="font-sans text-[0.6875rem] text-neutral-500">F2</kbd>
+                    </ContextMenuItem>
+                  </ContextMenuGroup>
+                  <ContextMenuSeparator />
+                  <Show
+                    when={unica()}
+                    fallback={
+                      <ContextMenuItem class="text-error-strong" onSelect={() => props.onEliminar(i().id)}>
+                        {t("spaces.menu.delete")}
+                      </ContextMenuItem>
+                    }
+                  >
+                    <ContextMenuItem
+                      class="text-neutral-500"
+                      closeOnSelect={false}
+                      aria-disabled="true"
+                      aria-describedby={`por-que-no-${i().id}`}
                     >
-                      <DropdownMenuTrigger
-                        data-space-actions={i().id}
-                        tabIndex={elegida() ? 0 : -1}
-                        aria-label={t("spaces.menu.actions", { name: spaceName(i()) })}
-                        title={t("spaces.menu.actions", { name: spaceName(i()) })}
-                        class={cn(
-                          "mr-0.75 grid size-5 place-items-center rounded-sm text-neutral-500 outline-none hover:bg-neutral-200 hover:text-neutral-950 focus-visible:opacity-100 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary data-[expanded]:bg-neutral-200 data-[expanded]:text-neutral-950 data-[expanded]:opacity-100",
-                          elegida() ? "opacity-100" : "opacity-0 group-hover:opacity-100",
-                        )}
-                      >
-                        <Ellipsis size={14} aria-hidden="true" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent class="w-60" data-space-menu={i().id}>
-                        <DropdownMenuGroup>
-                          <DropdownMenuGroupLabel>{spaceName(i())}</DropdownMenuGroupLabel>
-                          <DropdownMenuItem class="flex items-center justify-between gap-2" onSelect={() => empezarARenombrar(i())}>
-                            {t("spaces.menu.rename")}
-                            <kbd class="font-sans text-[0.6875rem] text-neutral-500">F2</kbd>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem class="flex items-center justify-between gap-2" onSelect={() => setCarpetasDe(i().id)}>
-                            {t("spaces.menu.folders")}
-                            <span class="text-[0.6875rem] text-neutral-500">{i().folders.length}</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuGroup>
-                        <DropdownMenuSeparator />
-                        <Show
-                          when={unica()}
-                          fallback={
-                            <DropdownMenuItem class="text-error-strong" onSelect={() => props.onEliminar(i().id)}>
-                              {t("spaces.menu.delete")}
-                            </DropdownMenuItem>
-                          }
-                        >
-                          <DropdownMenuItem
-                            class="text-neutral-500"
-                            closeOnSelect={false}
-                            aria-disabled="true"
-                            aria-describedby={`por-que-no-${i().id}`}
-                          >
-                            {t("spaces.menu.delete")}
-                          </DropdownMenuItem>
-                          <p id={`por-que-no-${i().id}`} class="m-0 max-w-56 px-2 pt-0.5 pb-1.5 text-[0.6875rem] leading-snug text-neutral-500">
-                            {t("spaces.menu.delete_last")}
-                          </p>
-                        </Show>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                      {t("spaces.menu.delete")}
+                    </ContextMenuItem>
+                    <p id={`por-que-no-${i().id}`} class="m-0 max-w-56 px-2 pt-0.5 pb-1.5 text-[0.6875rem] leading-snug text-neutral-500">
+                      {t("spaces.menu.delete_last")}
+                    </p>
                   </Show>
-                </PopoverAnchor>
-                <PopoverContent class="w-80 p-3" aria-label={t("spaces.folders.title", { name: spaceName(i()) })}>
-                  <CarpetasDe
-                    space={i()}
-                    proyectos={props.proyectos}
-                    sesiones={props.sesiones}
-                    onCambiar={(folders) => props.onCarpetas(i().id, folders)}
-                  />
-                </PopoverContent>
-              </Popover>
+                </ContextMenuContent>
+              </ContextMenu>
             );
           }}
         </KeyedList>
       </div>
       <NewSpace workspace={props.workspace} proyectos={props.proyectos} onCrear={props.onCrear} />
     </>
-  );
-}
-
-/** Los proyectos del espacio, con casilla: marcado está agregado. Ninguno manda. */
-function CarpetasDe(props: {
-  space: Space;
-  proyectos: Project[];
-  sesiones: Record<string, SessionRow[]>;
-  onCambiar: (folders: string[]) => Promise<void>;
-}) {
-  const [fallo, setFallo] = createSignal<Failure | null>(null);
-  const filas = () =>
-    ordenDelEscritorio(props.proyectos, carpetasDelEscritorio(props.proyectos, props.space, props.sesiones));
-  const added = (id: string) => props.space.folders.includes(id);
-  const tareas = (folder: string) =>
-    (props.sesiones[folder] ?? []).filter((r) => !r.archived && r.space === props.space.id && !r.chat_de_agente).length;
-  const alternar = async (id: string, marcar: boolean) => {
-    setFallo(null);
-    const folders = marcar ? [...props.space.folders, id] : props.space.folders.filter((f) => f !== id);
-    try {
-      await props.onCambiar(folders);
-    } catch (e) {
-      setFallo(asFailure(e));
-    }
-  };
-
-  return (
-    <div class="grid gap-2" data-space-folders={props.space.id}>
-      <h3 class="m-0 truncate text-[0.8125rem] font-semibold">
-        {t("spaces.folders.title", { name: spaceName(props.space) })}
-      </h3>
-      <ul class="m-0 grid max-h-60 list-none gap-0.5 overflow-y-auto p-0">
-        <For each={filas()}>
-          {(p) => (
-            <li class="grid min-h-7 grid-cols-[auto_16px_minmax(0,1fr)_auto] items-center gap-2 text-[0.8125rem]" data-folder-line={p.id}>
-              <input
-                type="checkbox"
-                class="size-4 shrink-0 accent-primary"
-                checked={added(p.id)}
-                aria-label={t("spaces.folders.toggle", { name: p.name })}
-                onChange={(e) => void alternar(p.id, e.currentTarget.checked)}
-              />
-              <Folder size={14} aria-hidden="true" class="text-neutral-500" />
-              <span class="truncate" title={p.name}>{p.name}</span>
-              <Show when={!added(p.id) && tareas(p.id) > 0}>
-                <span class="shrink-0 text-[0.6875rem] text-neutral-500">
-                  {t("spaces.folders.tasks", { count: tareas(p.id) })}
-                </span>
-              </Show>
-            </li>
-          )}
-        </For>
-      </ul>
-      <p class="m-0 text-[0.6875rem] leading-snug text-neutral-500">{t("spaces.folders.hint")}</p>
-      <Show when={fallo()}>{(f) => <FailureNote f={f()} />}</Show>
-    </div>
   );
 }
 

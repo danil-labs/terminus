@@ -1,7 +1,7 @@
 import { DropdownMenu as Kobalte } from "@kobalte/core/dropdown-menu";
 import { splitProps, type ComponentProps } from "solid-js";
 import { cn } from "../lib/utils";
-import { PANEL_DE_MENU, RENGLON_DE_MENU } from "./ContextMenu";
+import { PANEL_DE_MENU, RENGLON_DE_MENU, SEPARADOR_DE_MENU, TITULO_DE_GRUPO } from "./ContextMenu";
 
 /**
  * Menú que abre un botón, sobre `@kobalte/core` 0.13.13, con el panel y los
@@ -38,14 +38,11 @@ export function DropdownMenuRadioItem(props: ComponentProps<typeof Kobalte.Radio
 export function DropdownMenuGroupLabel(props: ComponentProps<typeof Kobalte.GroupLabel>) {
   const [propios, resto] = splitProps(props, ["class"]);
   return (
-    <Kobalte.GroupLabel
-      class={cn("block truncate px-2 pt-1 pb-1 text-[0.6875rem] font-medium text-neutral-500", propios.class)}
-      {...resto}
-    />
+    <Kobalte.GroupLabel class={cn(TITULO_DE_GRUPO, propios.class)} {...resto} />
   );
 }
 
 export function DropdownMenuSeparator(props: ComponentProps<typeof Kobalte.Separator>) {
   const [propios, resto] = splitProps(props, ["class"]);
-  return <Kobalte.Separator class={cn("my-1 h-px border-0 bg-border", propios.class)} {...resto} />;
+  return <Kobalte.Separator class={cn(SEPARADOR_DE_MENU, propios.class)} {...resto} />;
 }
