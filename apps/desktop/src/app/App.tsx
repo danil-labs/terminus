@@ -1,6 +1,7 @@
 import { deliver, type JournalEvent, listen } from "../lib/serviceEvents";
 import { open } from "@tauri-apps/plugin-dialog";
 import Archive from "lucide-solid/icons/archive";
+import ArrowLeft from "lucide-solid/icons/arrow-left";
 import Check from "lucide-solid/icons/check";
 import Columns2 from "lucide-solid/icons/columns-2";
 import Copy from "lucide-solid/icons/copy";
@@ -6221,9 +6222,10 @@ export default function App() {
         delegatedTask={reference => <DelegatedLaunch reference={reference} rows={delegatedRows()}
           list={delegatedList} loading={delegation.loading} error={delegationData()?.error} />}
         coordinator={coordinatingTask() ? <div class="shrink-0 px-4 py-1">
-          <Button variant="ghost" size="sm" class="max-w-full truncate text-xs" data-task-coordinator
+          <Button variant="ghost" size="sm" class="max-w-full min-w-0 shrink text-xs" data-task-coordinator
             onClick={() => void abrirSesion(coordinatingTask()!.folder, coordinatingTask()!.task)}>
-            {t("chat.delegation.back", { title: coordinatingTask()!.title })}
+            <ArrowLeft size={14} class="shrink-0" aria-hidden="true" />
+            <span class="truncate">{t("chat.delegation.back", { title: coordinatingTask()!.title })}</span>
           </Button>
         </div> : undefined}
         msgs={mensajes()}
