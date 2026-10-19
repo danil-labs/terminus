@@ -1,11 +1,13 @@
-import { createEffect, createSignal, For, Show, type JSX } from "solid-js";
+import { createEffect, createSignal, For, lazy, Show, type JSX } from "solid-js";
 import ChevronLeft from "lucide-solid/icons/chevron-left";
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import X from "lucide-solid/icons/x";
-import ZoomableImage from "../features/viewers/ImageViewer";
 import { t } from "../lib/i18n";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, type EmblaApi } from "./Carousel";
 import { Dialog, DialogContent, DialogTitle } from "./Dialog";
+
+// Solo dentro del diálogo ampliado: no entra en la carga inicial.
+const ZoomableImage = lazy(() => import("../features/viewers/ImageViewer"));
 
 /**
  * La miniatura es una caja fija; el clic la abre con el zoom del visor.
