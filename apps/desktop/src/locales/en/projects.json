@@ -220,6 +220,14 @@
   "projects.sessions.pin": "Pin",
   "projects.sessions.unpin": "Unpin",
   "projects.sessions.pinned": "Pinned",
+  "projects.sessions.agent_asleep": "Asleep",
+  "projects.sessions.agent_awake": "Awake",
+  "projects.sessions.agent_awake_since": "Awake · {minutes} min",
+  "projects.sessions.agent_working": {
+    "one": "Working · {count} task",
+    "other": "Working · {count} tasks"
+  },
+  "projects.sessions.agent_working_alone": "Working",
   "projects.sessions.archive": "Archive task",
   "projects.sessions.blockers_archive_title": "Can't archive yet",
   "projects.sessions.blockers_cancel": "Cancel",

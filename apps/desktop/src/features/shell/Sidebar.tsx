@@ -10,11 +10,13 @@ import SettingsIcon from "lucide-solid/icons/settings";
 import SquarePen from "lucide-solid/icons/square-pen";
 import TriangleAlert from "lucide-solid/icons/triangle-alert";
 import X from "lucide-solid/icons/x";
-import { createEffect, createMemo, createSignal, type JSX, on, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createResource, createSignal, type JSX, mapArray, on, onCleanup, Show } from "solid-js";
 import { destinoEnVuelo, puntoDelArrastre, tareaEnVuelo } from "../../lib/drag";
 import { enfocarYSeleccionar } from "../../lib/focus";
 import { t } from "../../lib/i18n";
-import type { Project } from "../../lib/model";
+import { lastRoster, rememberRoster } from "../../lib/handlerRoster";
+import { invoke } from "../../lib/invoke.ts";
+import type { AgentProfile, HandlerList, HandlerStatus, Project } from "../../lib/model";
 import { createPref } from "../../lib/prefs";
 import { PROJECT_NAME_MAX_LENGTH } from "../../lib/projectNames";
 import { ariaDeAtajo } from "../../lib/shortcuts";
@@ -41,24 +43,26 @@ import {
 import { type ClonEnCurso, faseDeClon } from "../projects/AddWorkdir";
 import { AstroAvatar } from "../projects/AstroAvatar";
 import { FolderSquare } from "../projects/FolderChip";
+import { watchHandlerStatuses } from "../projects/handlerPresence";
 import NewAgent, { type ModelChoices } from "../projects/NewAgent";
+import { watchProfiles } from "../projects/profiles";
 import Sessions, { type SessionRow } from "../projects/Sessions";
 import type { Etapa } from "../projects/TaskStage";
 import EstadoDeTarea from "../projects/TaskStatus";
 import { ConexionesMenu } from "../settings/Tools";
 import {
-  applyFilter,
-  bucketOf,
-  DEFAULT_SIDEBAR_FILTER,
-  effectiveFolders,
-  type FlatTask,
-  flattenTasks,
-  folderCounts,
-  groupTasks,
-  normalizeFilter,
-  rowActivity,
-  type SidebarFilter,
-} from "./sidebarTasks";
+  applySidebarView,
+  groupLabel,
+  loadSidebarView,
+  saveSidebarView,
+  scopeLabel,
+  type SidebarGroup,
+  type SidebarView,
+  sectionLabel,
+} from "../../lib/sidebarView";
+import AgentDock, { type DockAgent } from "./AgentDock";
+import { flattenTasks, folderCounts } from "./sidebarTasks";
+import { SidebarFilter } from "./SidebarFilter";
 
 /* El ancho vive en `ColumnaLateral`, que es la columna que envuelve a esta
    barra. Aquí había cuatro constantes —expandido, mínimo, máximo y el riel— que
@@ -71,7 +75,6 @@ import {
  */
 const RECIBE_LA_TAREA = ["ring-2", "ring-primary"];
 
-type Tarea = FlatTask<SessionRow>;
 
 /**
  * Abierto o cerrado, y nada más.
@@ -198,8 +201,11 @@ export default function Sidebar(props: {
         : [...cerrados(), p],
     );
   const [asentadasAbiertas, setAsentadasAbiertas] = createPref("sidebar.asentadas.abiertas", false);
-  const [filtroGuardado] = createPref<SidebarFilter>("sidebar.filtro", DEFAULT_SIDEBAR_FILTER);
-  const filtro = createMemo(() => normalizeFilter(filtroGuardado()));
+  const [vista, setVista] = createSignal<SidebarView>(loadSidebarView());
+  const cambiarVista = (siguiente: SidebarView) => {
+    setVista(siguiente);
+    saveSidebarView(siguiente);
+  };
 
   const [searchOpen, setSearchOpen] = createSignal(false);
   const [searchText, setSearchText] = createSignal("");
@@ -221,19 +227,88 @@ export default function Sidebar(props: {
 
   const todas = createMemo(() => flattenTasks(props.sessions, !!query()));
   const cuentas = createMemo(() => folderCounts(todas()));
-  const visibles = createMemo(() =>
-    applyFilter(todas(), effectiveFolders(filtro(), cuentas()), filtro().agent));
-  const actividad = (row: SessionRow) => rowActivity(row, props.vivas, props.aprobando);
-  const cubos = createMemo(() => {
-    const out: Record<"need" | "tasks" | "settled", Tarea[]> = { need: [], tasks: [], settled: [] };
-    for (const tarea of visibles()) out[bucketOf(tarea.row, actividad(tarea.row))].push(tarea);
-    return out;
+  /**
+   * La vista que se aplica: de las carpetas elegidas, las que siguen teniendo
+   * tareas. Si ninguna sigue, son todas: un filtro que deja la lista vacía sin
+   * decir por qué parece que se borró el trabajo.
+   */
+  const vistaEfectiva = createMemo<SidebarView>(() => {
+    const v = vista();
+    const carpetas = v.folders.filter((f) => (cuentas().get(f) ?? 0) > 0);
+    return carpetas.length === v.folders.length ? v : { ...v, folders: carpetas };
   });
-  const grupos = createMemo(() => {
-    const agrupar = filtro().group;
-    if (agrupar === "none") return [];
-    return groupTasks([...cubos().need, ...cubos().tasks], agrupar, actividad, props.projects.map((p) => p.id));
+  const grupos = createMemo(() => applySidebarView(todas().map((x) => x.row), vistaEfectiva(), {
+    live: props.vivas,
+    approving: props.aprobando,
+    folderOf: (row) => carpetaDe(row.id),
+  }));
+  const asentadas = () => grupos().find((g) => g.kind === "section" && g.key === "settled")?.tasks ?? [];
+  const abiertos = () => grupos().filter((g) => !(g.kind === "section" && g.key === "settled"));
+  const carpetasDelFiltro = createMemo(() => props.projects
+    .filter((p) => (cuentas().get(p.id) ?? 0) > 0)
+    .map((p) => ({ id: p.id, name: p.name, count: cuentas().get(p.id) ?? 0 })));
+
+  /**
+   * Los agentes del dock: los de las carpetas que tienen tareas, con su
+   * presencia. Un mismo agente propio sale en cada carpeta y se junta por
+   * nombre; manda el estado más despierto y se suman sus tareas vivas.
+   */
+  const carpetasConTareas = createMemo(
+    () => [...cuentas().keys()].filter((k) => k !== "").sort(),
+    [],
+    { equals: (a, b) => a.length === b.length && a.every((x, i) => x === b[i]) },
+  );
+  const [altas, setAltas] = createSignal(0);
+  const alCrearAgente = () => setAltas((n) => n + 1);
+  window.addEventListener("harness:encargados", alCrearAgente);
+  onCleanup(() => window.removeEventListener("harness:encargados", alCrearAgente));
+  const porCarpeta = createMemo(mapArray(carpetasConTareas, (project) => {
+    const [roster] = createResource(() => `${project}:${altas()}`, async () => {
+      try {
+        const listado = (await invoke<HandlerList>("list_agents", { project })).agents;
+        rememberRoster(project, listado);
+        return listado;
+      } catch {
+        return lastRoster(project) ?? [];
+      }
+    });
+    return {
+      roster: () => roster() ?? lastRoster(project) ?? [],
+      estados: watchHandlerStatuses(project),
+      perfiles: watchProfiles(project),
+    };
+  }));
+  const RANGO: Record<HandlerStatus, number> = { working: 2, awake: 1, asleep: 0 };
+  const agentesDelDock = createMemo<DockAgent[]>(() => {
+    const juntos = new Map<string, DockAgent>();
+    for (const c of porCarpeta()) {
+      const estados = new Map(c.estados().map((r) => [r.name, r] as const));
+      for (const a of c.roster()) {
+        const fila = estados.get(a.name);
+        const antes = juntos.get(a.name);
+        const status = fila?.status;
+        juntos.set(a.name, {
+          name: a.name,
+          status: !antes?.status || (status && RANGO[status] > RANGO[antes.status]) ? status ?? antes?.status : antes.status,
+          liveTasks: (antes?.liveTasks ?? 0) + (fila?.live_tasks ?? 0),
+          minutesSinceLastTurn: fila?.minutes_since_last_turn ?? antes?.minutesSinceLastTurn ?? null,
+        });
+      }
+    }
+    return [...juntos.values()];
   });
+  const perfilDe = (name: string): AgentProfile | undefined => {
+    for (const c of porCarpeta()) {
+      const perfil = c.perfiles()[name];
+      if (perfil) return perfil;
+    }
+    return undefined;
+  };
+  const agentesDelFiltro = createMemo(() => {
+    const nombres = new Set([...agentesDelDock().map((a) => a.name), ...todas().flatMap((x) => x.row.agent ? [x.row.agent] : [])]);
+    return [...nombres].sort().map((name) => ({ name, body: perfilDe(name)?.body, avatar: perfilDe(name)?.avatar }));
+  });
+  const alcance = () => scopeLabel(vistaEfectiva(), (id) => nombreDe(id) ?? id);
   const conResultados = (clave: string) => (searchCounts()[clave] ?? 0) > 0;
 
   /**
@@ -255,9 +330,10 @@ export default function Sidebar(props: {
    * sitios —expandida y en el desplegable—; una variable contendría un solo
    * nodo del DOM y colocarlo dos veces lo movería del primero al segundo.
    */
-  const Historial = (p: { tareas: Tarea[]; clave: string }) => (
+  const Historial = (p: { filas: SessionRow[]; clave: string }) => (
     <Sessions sidebar
-      sessions={p.tareas.map((tarea) => tarea.row)}
+      density={vista().density}
+      sessions={p.filas}
       relatedSessions={relacionadas()}
       groupByAuthor={false}
       search={query()}
@@ -301,22 +377,7 @@ export default function Sidebar(props: {
   );
 
   /** Cuántas filas enseña un tramo: buscando, las que encontró. */
-  const cuentaDe = (clave: string, tareas: Tarea[]) => query() ? (searchCounts()[clave] ?? 0) : tareas.length;
-
-  const Tramo = (p: { clave: string; titulo: string; tareas: Tarea[]; tono?: "need" }) => (
-    <Show when={p.tareas.length > 0}>
-      <section
-        data-sidebar-section={p.clave}
-        aria-label={p.titulo}
-        classList={{ hidden: !!query() && !conResultados(p.clave) }}
-      >
-        <Rotulo cuenta={cuentaDe(p.clave, p.tareas)} tono={p.tono}>
-          <span class="min-w-0 truncate">{p.titulo}</span>
-        </Rotulo>
-        <Historial tareas={p.tareas} clave={p.clave} />
-      </section>
-    </Show>
-  );
+  const cuentaDe = (clave: string, filas: SessionRow[]) => query() ? (searchCounts()[clave] ?? 0) : filas.length;
 
   /**
    * La carpeta que se está clonando, encima de la lista.
@@ -369,7 +430,7 @@ export default function Sidebar(props: {
    * tareas; es además el destino del arrastre y la puerta a lo que se hace
    * con la carpeta mientras eso no viva en Ajustes.
    */
-  const CabeceraDeCarpeta = (pp: { p: Project; abierto: boolean; cuenta: number; tareas: Tarea[] }) => {
+  const CabeceraDeCarpeta = (pp: { p: Project; abierto: boolean; cuenta: number; tareas: SessionRow[] }) => {
     const p = () => pp.p;
     const recibiendo = () => destinoEnVuelo() === p().id;
     return (
@@ -419,11 +480,11 @@ export default function Sidebar(props: {
               >
                 <EstadoDeTarea
                   ambito="plegadas"
-                  aprobando={pp.tareas.some((x) => props.aprobando.includes(x.row.id))}
-                  viva={pp.tareas.some((x) => props.vivas.includes(x.row.id))}
-                  esperando={pp.tareas.some((x) => x.row.esperando)}
-                  outcome={pp.tareas.some((x) => x.row.sin_ver && x.row.outcome === "failed") ? "failed" : null}
-                  sinVer={pp.tareas.some((x) => x.row.sin_ver)}
+                  aprobando={pp.tareas.some((x) => props.aprobando.includes(x.id))}
+                  viva={pp.tareas.some((x) => props.vivas.includes(x.id))}
+                  esperando={pp.tareas.some((x) => x.esperando)}
+                  outcome={pp.tareas.some((x) => x.sin_ver && x.outcome === "failed") ? "failed" : null}
+                  sinVer={pp.tareas.some((x) => x.sin_ver)}
                 />
               </Show>
             </SidebarMenuButton>
@@ -585,50 +646,45 @@ export default function Sidebar(props: {
     );
   };
 
-  /** El título de un grupo de «Agrupar». */
-  const tituloDeGrupo = (clave: string) => {
-    const agrupar = filtro().group;
-    if (agrupar === "folder") return clave === "" ? t("shell.sidebar.no_folder") : (nombreDe(clave) ?? clave);
-    if (agrupar === "status") {
-      return clave === "need" ? t("shell.sidebar.need_you")
-        : clave === "working" ? t("shell.sidebar.group_working")
-        : t("shell.sidebar.group_idle");
-    }
-    return clave.startsWith("agent:") ? clave.slice(6) : t("projects.sessions.without_agent");
-  };
-
-  const Grupo = (p: { clave: string; tareas: Tarea[] }) => {
-    const clave = () => `group:${p.clave}`;
-    const proyecto = () => filtro().group === "folder" ? props.projects.find((x) => x.id === p.clave) : undefined;
-    const abierto = () => !!query() || filtro().group !== "folder" || !cerrados().includes(p.clave);
+  const Grupo = (p: { grupo: SidebarGroup<SessionRow> }) => {
+    const g = () => p.grupo;
+    const clave = () => g().kind === "section" ? g().key : `${g().kind}:${g().key}`;
+    const titulo = () => groupLabel(g(), (id) => nombreDe(id) ?? id);
+    const proyecto = () => g().kind === "folder" ? props.projects.find((x) => x.id === g().key) : undefined;
+    const abierto = () => !!query() || g().kind !== "folder" || !cerrados().includes(g().key);
+    const necesita = () => (g().kind === "section" && g().key === "needs_you")
+      || (g().kind === "status" && ["approving", "asked", "failed"].includes(g().key));
     return (
-      <section
-        data-sidebar-group={p.clave}
-        aria-label={tituloDeGrupo(p.clave)}
-        classList={{ hidden: !!query() && !conResultados(clave()) }}
-      >
-        <Show
-          when={proyecto()}
-          fallback={
-            <div
-              data-destino={filtro().group === "folder" ? "" : undefined}
-              class={cn("rounded-[var(--radius-sm)]", filtro().group === "folder" && destinoEnVuelo() === "" && RECIBE_LA_TAREA)}
-            >
-              <Rotulo cuenta={cuentaDe(clave(), p.tareas)} tono={filtro().group === "status" && p.clave === "need" ? "need" : undefined}>
-                <Show when={p.clave.startsWith("agent:")}>
-                  <AstroAvatar name={p.clave.slice(6)} status="asleep" size={14} />
-                </Show>
-                <span class="min-w-0 truncate">{tituloDeGrupo(p.clave)}</span>
-              </Rotulo>
-            </div>
-          }
+      <Show when={g().tasks.length > 0}>
+        <section
+          data-sidebar-section={g().kind === "section" ? g().key : undefined}
+          data-sidebar-group={g().kind === "section" ? undefined : g().key}
+          aria-label={titulo()}
+          classList={{ hidden: !!query() && !conResultados(clave()) }}
         >
-          {(proj) => <CabeceraDeCarpeta p={proj()} abierto={abierto()} cuenta={cuentaDe(clave(), p.tareas)} tareas={p.tareas} />}
-        </Show>
-        <Show when={abierto()}>
-          <Historial tareas={p.tareas} clave={clave()} />
-        </Show>
-      </section>
+          <Show
+            when={proyecto()}
+            fallback={
+              <div
+                data-destino={g().kind === "folder" ? "" : undefined}
+                class={cn("rounded-[var(--radius-sm)]", g().kind === "folder" && destinoEnVuelo() === "" && RECIBE_LA_TAREA)}
+              >
+                <Rotulo cuenta={cuentaDe(clave(), g().tasks)} tono={necesita() ? "need" : undefined}>
+                  <Show when={g().kind === "agent" && g().key}>
+                    <AstroAvatar name={g().key} status="asleep" size={14} />
+                  </Show>
+                  <span class="min-w-0 truncate">{titulo()}</span>
+                </Rotulo>
+              </div>
+            }
+          >
+            {(proj) => <CabeceraDeCarpeta p={proj()} abierto={abierto()} cuenta={cuentaDe(clave(), g().tasks)} tareas={g().tasks} />}
+          </Show>
+          <Show when={abierto()}>
+            <Historial filas={g().tasks} clave={clave()} />
+          </Show>
+        </section>
+      </Show>
     );
   };
 
@@ -653,24 +709,18 @@ export default function Sidebar(props: {
         </Show>
       </Show>
 
-      <Show
-        when={filtro().group !== "none"}
-        fallback={
-          <>
-            <Tramo clave="need" titulo={t("shell.sidebar.need_you")} tareas={cubos().need} tono="need" />
-            <Tramo clave="tasks" titulo={t("shell.sidebar.tasks")} tareas={cubos().tasks} />
-          </>
-        }
-      >
-        <KeyedList each={grupos()} by={(g) => g.key}>{(g) => <Grupo clave={g().key} tareas={g().tasks} />}</KeyedList>
+      <Show when={todas().length > 0 && !query() && grupos().every((g) => g.tasks.length === 0)}>
+        <p class="m-0 px-2 pt-1 text-xs text-neutral-500" data-sidebar-filtered-empty="">{t("shell.sidebar.filter_empty")}</p>
       </Show>
+
+      <KeyedList each={abiertos()} by={(g) => `${g.kind}:${g.key}`}>{(g) => <Grupo grupo={g()} />}</KeyedList>
 
       {/* Lo asentado nace plegado: entregado y visto, o marcado como hecho.
           Buscando se abre, para que lo encontrado se vea. */}
-      <Show when={cubos().settled.length > 0}>
+      <Show when={asentadas().length > 0}>
         <section
           data-sidebar-section="settled"
-          aria-label={t("shell.sidebar.settled")}
+          aria-label={sectionLabel("settled")}
           classList={{ hidden: !!query() && !conResultados("settled") }}
         >
           <button
@@ -680,11 +730,11 @@ export default function Sidebar(props: {
             onClick={() => setAsentadasAbiertas(!asentadasAbiertas())}
           >
             <ChevronRight size={13} aria-hidden="true" class={cn("shrink-0 transition-transform", (!!query() || asentadasAbiertas()) && "rotate-90")} />
-            <span class="min-w-0 truncate">{t("shell.sidebar.settled")}</span>
-            <span class="ml-auto shrink-0 tabular-nums text-neutral-700">{cuentaDe("settled", cubos().settled)}</span>
+            <span class="min-w-0 truncate">{sectionLabel("settled")}</span>
+            <span class="ml-auto shrink-0 tabular-nums text-neutral-700">{cuentaDe("settled", asentadas())}</span>
           </button>
           <Show when={!!query() || asentadasAbiertas()}>
-            <Historial tareas={cubos().settled} clave="settled" />
+            <Historial filas={asentadas()} clave="settled" />
           </Show>
         </section>
       </Show>
@@ -793,6 +843,19 @@ export default function Sidebar(props: {
           </SidebarMenu>
 
           <Show when={!props.collapsed}>
+            {/* Qué se enseña, y el único botón que lo cambia. */}
+            <div data-sidebar-scope class="-mt-1 flex min-w-0 items-center gap-1 pl-2">
+              <span class="min-w-0 flex-1 truncate text-[0.6875rem] text-neutral-500" title={alcance()}>{alcance()}</span>
+              <SidebarFilter
+                view={vistaEfectiva()}
+                onChange={cambiarVista}
+                folders={carpetasDelFiltro()}
+                agents={agentesDelFiltro()}
+              />
+            </div>
+          </Show>
+
+          <Show when={!props.collapsed}>
             {/* **`overflow-y-auto` y NO `overflow-auto`.** Aquél es de los dos
                 ejes: los títulos llegaban al borde sin puntos suspensivos y lo
                 de la derecha quedaba fuera de la vista. */}
@@ -815,6 +878,15 @@ export default function Sidebar(props: {
         {/* El de MCP es chico a propósito: es una consulta de un vistazo, del
             peso del botón que oculta el historial. «Archivadas» va primero: abre
             una página, no levanta un panel. */}
+        <Show when={!props.collapsed && agentesDelDock().length > 0}>
+          <AgentDock
+            agents={agentesDelDock()}
+            selected={vista().agent}
+            onSelect={(agent) => cambiarVista({ ...vista(), agent })}
+            onSeeAll={() => props.onSettings("agentes")}
+            profileOf={perfilDe}
+          />
+        </Show>
         <SidebarFooter class="border-t border-border p-2">
           <div class={cn("flex items-center justify-end gap-1", props.collapsed && "flex-col")}>
             <Show when={!props.collapsed && props.onArchivadas}>

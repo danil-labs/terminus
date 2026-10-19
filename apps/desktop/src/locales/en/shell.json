@@ -130,11 +130,7 @@
   "shell.sidebar.rename": "Rename it",
   "shell.sidebar.rename_label": "New name for “{name}”",
   "shell.sidebar.show": "Show the history",
-  "shell.sidebar.need_you": "Need you",
-  "shell.sidebar.settled": "Settled",
-  "shell.sidebar.no_folder": "No folder",
-  "shell.sidebar.group_working": "Working",
-  "shell.sidebar.group_idle": "Paused",
+  "shell.sidebar.filter_empty": "No tasks match these filters.",
   "shell.sidebar.empty": "No tasks yet.",
   "shell.sidebar.tasks": "Tasks",
   "shell.storage.activity.days": {
