@@ -146,8 +146,8 @@ export function TaskHoverCard(props: TaskHoverCardProps) {
               <span class="truncate text-neutral-500">{aspecto().label}</span>
               <Show when={ci()}>
                 {(c) => (
-                  <span class={`inline-flex shrink-0 items-center gap-1 ${c().color}`}>
-                    <Dynamic component={c().icon} size={12} aria-hidden="true" />
+                  <span class={`inline-flex min-w-0 items-center gap-1 ${c().color}`}>
+                    <Dynamic component={c().icon} size={12} class="shrink-0" aria-hidden="true" />
                     <span class="truncate">{c().label}</span>
                   </span>
                 )}
