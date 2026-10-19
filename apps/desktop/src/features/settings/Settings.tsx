@@ -1,5 +1,6 @@
 import { invoke } from "../../lib/invoke.ts";
 import Blocks from "lucide-solid/icons/blocks";
+import CircleUserRound from "lucide-solid/icons/circle-user-round";
 import Palette from "lucide-solid/icons/palette";
 import Bot from "lucide-solid/icons/bot";
 import Folders from "lucide-solid/icons/folders";
@@ -11,6 +12,7 @@ import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
 import Sparkles from "lucide-solid/icons/sparkles";
 import { listen } from "../../lib/serviceEvents";
 import { createSignal, For, type JSX, lazy, onCleanup, onMount, Show, Suspense } from "solid-js";
+import { capabilities } from "../../lib/platform";
 import { t } from "../../lib/i18n";
 import { type Superficie } from "../../lib/surfaces";
 import { Button } from "../../ui/Button";
@@ -35,6 +37,8 @@ import Providers from "./Providers";
 import Radiant from "./Radiant";
 import Skills from "./Skills";
 import Workspaces from "./Workspaces";
+// Chunk aparte: solo lo carga quien abre la sección.
+const DanilAccount = lazy(() => import("./DanilAccount"));
 
 /**
  * Configuración: el contenedor y su navegación.
@@ -206,6 +210,22 @@ const destinosDe = (
     icono: () => <Radar size={15} />,
     panel: () => <Radiant />,
   },
+  ...(capabilities().danilAccount
+    ? [
+        {
+          id: "cuenta-danil",
+          get name() {
+            return t("settings.nav.danil_account");
+          },
+          icono: () => <CircleUserRound size={15} />,
+          panel: () => (
+            <Suspense fallback={null}>
+              <DanilAccount />
+            </Suspense>
+          ),
+        },
+      ]
+    : []),
 ];
 
 const GRUPOS: { nombre: () => string; ids: string[] }[] = [
@@ -213,7 +233,7 @@ const GRUPOS: { nombre: () => string; ids: string[] }[] = [
   { nombre: () => t("settings.nav.group_custom"), ids: ["skills", "agentes", "proyectos", "plugins"] },
   {
     nombre: () => t("settings.nav.group_connections"),
-    ids: ["proveedores-ia", "fuentes", "radiant"],
+    ids: ["cuenta-danil", "proveedores-ia", "fuentes", "radiant"],
   },
 ];
 
