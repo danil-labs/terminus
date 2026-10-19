@@ -83,6 +83,7 @@ const SIN_INTERFAZ = {
   backup_task_work: "respaldar vivía en el Historial de tareas, que salió de la ventana",
   restore_task_work: "restaurar vivía en el Historial de tareas, que salió de la ventana",
   create_agent_thread: "los temas antiguos se conservan para lectura; las conversaciones nuevas nacen como tareas",
+  sources_in_use: "traer material ya no espera a que acabe el turno que lo lee; el motor lo usa para no cambiar de rama bajo un turno",
   // `docs/agents.md` § Estado observable: el comando de agregación existe
   // para que el riel deje de sondear; el riel mismo no está construido.
 };
