@@ -56,6 +56,10 @@ fn open() -> Result<()> {
             return Ok(());
         }
         [_, flag, path] if flag == "--external-host" => PathBuf::from(path),
+        [_, flag, path, wake, program] if flag == "--external-host" && wake == "--wake" => {
+            let _ = proxy::WAKE.set((PathBuf::from(program), PathBuf::from(path)));
+            PathBuf::from(path)
+        }
         _ => return Err(Error::new("invalid_request")),
     };
     start(
@@ -221,6 +225,8 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
             launcher::launcher_state,
             launcher::launcher_continue,
             proxy::service_poll,
+            proxy::machine_list,
+            proxy::machine_select,
             proxy::service_prepare_update,
             proxy::service_cancel_update,
             sites::site_sweep,

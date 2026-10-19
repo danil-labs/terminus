@@ -64,6 +64,8 @@ export function ProjectPicker(props: {
   onPick: (id: string) => void;
   /** Abre el diálogo de nombre. El nombre no se decide aquí. */
   onNuevoProyecto: () => void;
+  /** Dónde corre la tarea: va antes del proyecto, que es de esa máquina. */
+  machine?: JSX.Element;
 }) {
   const [abierto, setAbierto] = createSignal(false);
   const [busca, setBusca] = createSignal("");
@@ -91,6 +93,7 @@ export function ProjectPicker(props: {
 
   return (
     <div class="flex w-full max-w-[860px] flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-1.5">
+      {props.machine}
       <WorkdirIcon
         kind={actual()?.kind ?? "folder"} cloud={actual()?.cloud}
         class="shrink-0 text-neutral-500"

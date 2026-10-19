@@ -21,7 +21,9 @@ import {
   onCleanup,
   onMount,
   Show,
+  Suspense,
   Switch,
+  lazy,
   untrack,
 } from "solid-js";
 import VisorDeArtefacto from "../features/artifacts/ArtifactViewer";
@@ -85,6 +87,10 @@ import ArchivedTasks from "../features/projects/ArchivedTasks";
 import BaseBranchPicker from "../features/projects/BaseBranchPicker";
 import { watchHandlerStatus, watchHandlerStatuses } from "../features/projects/handlerPresence";
 import { EmptyContext, ProjectPicker } from "../features/projects/Projects";
+// Chunk aparte: solo lo carga quien crea una tarea, no la carga inicial.
+const MachinePicker = lazy(() =>
+  import("../features/machines/MachinePicker").then((m) => ({ default: m.MachinePicker })),
+);
 import VistaDeProyecto from "../features/projects/ProjectView";
 import { DEFAULT_PROFILE, displayName, notifyProfiles, watchProfiles } from "../features/projects/profiles";
 import RecentAgentChats from "../features/projects/RecentAgentChats";
@@ -2119,15 +2125,17 @@ export default function App() {
         if (page.gap && vivas().length > 0) setError(t("chat.error.service_gap"));
         if (failingSince !== null) {
           failingSince = null;
-          if (error() === t("chat.error.service_unavailable") || error() === t("shell.service.engine_down") || error() === t("shell.service.engine_missing")) setError(null);
+          if (error() === t("chat.error.service_unavailable") || error() === t("shell.service.engine_down") || error() === t("shell.service.engine_missing") || error() === t("shell.service.machine_off")) setError(null);
         }
       } catch (e) {
         // Un sondeo suelto falla al empezar un turno y el siguiente ya contesta.
         failingSince ??= Date.now();
         const sinMotor = claveDe(e) === "shell.service.engine_missing";
-        const caido = sinMotor || claveDe(e) === "shell.service.engine_down";
+        // Una máquina remota apagada no es un fallo: se enciende al enviar algo.
+        const apagada = claveDe(e) === "shell.service.machine_off";
+        const caido = sinMotor || apagada || claveDe(e) === "shell.service.engine_down";
         if (!disposed && Date.now() - failingSince > (caido ? 2_000 : 10_000)) {
-          setError(sinMotor ? t("shell.service.engine_missing") : t(caido ? "shell.service.engine_down" : "chat.error.service_unavailable"));
+          setError(sinMotor ? t("shell.service.engine_missing") : apagada ? t("shell.service.machine_off") : t(caido ? "shell.service.engine_down" : "chat.error.service_unavailable"));
         }
       } finally {
         if (!disposed) timer = setTimeout(() => void poll(), 250);
@@ -5689,7 +5697,7 @@ export default function App() {
    * Componente y no variable con JSX (SYSTEM.md § Las reglas de Solid,
    * regla 9): se pasa como prop a `Chat`.
    */
-  const SelectorDeProyecto = (props: { branch?: JSX.Element; locked?: boolean }) => (
+  const SelectorDeProyecto = (props: { branch?: JSX.Element; locked?: boolean; nueva?: boolean }) => (
     // Del ancho de la caja, no del contenido: `justify-items-center` encoge
     // la rejilla a su hijo más ancho —el aviso «sin fuente de contexto»,
     // 416 px— y la franja del proyecto (`w-full`) queda a esos 416 px bajo
@@ -5703,6 +5711,15 @@ export default function App() {
           sources={sources()}
           onPick={elegirProyecto}
           onNuevoProyecto={() => setAnadiendoCarpeta(true)}
+          // Solo al crear: una tarea abierta ya vive en la máquina que la corre.
+          machine={
+            <Show when={props.nueva && !props.locked}>
+              {/* Su propio límite: mientras carga, el resto de la vista sigue. */}
+              <Suspense fallback={null}>
+                <MachinePicker />
+              </Suspense>
+            </Show>
+          }
         />
       {/* A General, no a GitHub: la fuente principal del workspace se elige
           en Configuración → General; mandar a GitHub lleva a conectar un
@@ -6059,7 +6076,7 @@ export default function App() {
         stopping={deteniendo() !== null && deteniendo() === pp.sesion}
         agents={agents()}
         proyecto={
-          <SelectorDeProyecto locked={!!encargadoDeLaCelda()} branch={
+          <SelectorDeProyecto nueva={!pp.sesion} locked={!!encargadoDeLaCelda()} branch={
             <Show when={!pp.sesion && esRepositorio()}>
               <BaseBranchPicker
                 project={project()}
