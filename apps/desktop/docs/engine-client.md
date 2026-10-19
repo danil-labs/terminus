@@ -31,10 +31,18 @@ omiten `install_provider` y vuelven a consultar la disponibilidad después de
 un motor que lo anuncie en `list_providers`; estos cambios de interfaz no actualizan
 el motor fijado en `seldon-runtime.lock`.
 
+La cuenta de Danil (Configuración → Cuenta de Danil) usa `danil_connect_start`,
+`danil_connect_status`, `danil_connect_options`, `danil_disconnect` y el evento
+`danil-connect` (seldon-host#66, [connector.md](https://github.com/danil-labs/seldon-host/blob/dev/docs/connector.md)). Iniciar sesión registra
+esta computadora en la cuenta: con un workspace de Radiant entra sin navegador;
+sin él, la ventana abre `verification_uri_complete` y la persona aprueba en
+`app.danil.ai/terminus/connect`. Un motor sin estos comandos recibe `command` del
+proxy y la sección lo dice. La web no muestra la sección (`danilAccount`).
+
 ## Contract
 
-`src-tauri/crates/engine-protocol/commands.json` is the frozen contract: 316
-commands (291 domain invocations, three channels and 22 window/bridge
+`src-tauri/crates/engine-protocol/commands.json` is the frozen contract: 321
+commands (296 domain invocations, three channels and 22 window/bridge
 functions) and the events the engine emits. Its SHA-256 is recorded in
 [PROVENANCE](../src-tauri/crates/engine-protocol/PROVENANCE.md); the engine
 announces the same hash and the window refuses to connect to a different one

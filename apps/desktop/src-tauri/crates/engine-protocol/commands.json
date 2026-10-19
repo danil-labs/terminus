@@ -903,6 +903,53 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "danil_connect_options",
+      "output": "-> Result < Vec < ConnectOption > , Failure >",
+      "parameters": [],
+      "path": "danil::danil_connect_options"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "danil_connect_start",
+      "output": "-> Result < Start , Failure >",
+      "parameters": [
+        {
+          "key": "name",
+          "name": "name",
+          "type": "Option < String >"
+        },
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "danil::danil_connect_start"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "danil_connect_status",
+      "output": "-> Result < Status , Failure >",
+      "parameters": [],
+      "path": "danil::danil_connect_status"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "danil_disconnect",
+      "output": "-> Result < Status , Failure >",
+      "parameters": [],
+      "path": "danil::danil_disconnect"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "delete_agent",
       "output": "-> Result < () , String >",
       "parameters": [
@@ -6206,6 +6253,7 @@
     "cli-changed",
     "cli-open-task",
     "close-tab",
+    "danil-connect",
     "integrations-changed",
     "keep-awake-changed",
     "kn-cloud",

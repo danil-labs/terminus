@@ -19,6 +19,7 @@ sends).
 | `reviewable` | `scripts/guards/reviewable.mjs` | Rejects control bytes that turn a diff binary. Needs git metadata. |
 | `bridge` | `scripts/guards/bridge.mjs` | Every event the front listens to is emitted by the window or declared in the engine contract. |
 | `commands` | `scripts/guards/commands.mjs` | Every `invoke` name exists in the window registry or the engine contract, and every contract command has a caller or a written reason. |
+| `contract` | `scripts/guards/contract.mjs` | `commands.json` hashes to the SHA-256 in PROVENANCE, and `seldon-runtime.lock` pins an engine with that `contract`. A lock behind the contract passes only while `MOTOR_PENDIENTE` in the guard names it with what is missing; `publish.yml` refuses to publish in that state. |
 | `service-errors` | `scripts/guards/service-errors.mjs` | Errors rejected by `invoke` are not flattened with `String()`. The per-file quota only goes down. |
 | `artifact` | `scripts/guards/artifact.mjs`, `tests/unit/artifact-viewer.test.ts` | Validates the artifact container and inline chat scripts, and the CSS classes shared with the viewer. |
 | `window` | `scripts/guards/window.mjs` | Platform overrides keep the window structure (`label`, `create`). |

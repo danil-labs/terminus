@@ -24,6 +24,8 @@ export type Capabilities = {
   localSetup: boolean;
   /** Una computadora apagada o encendiéndose se ve en su indicador, no como error. */
   computerStatus: boolean;
+  /** Iniciar sesión en Danil desde Configuración: la web ya entra con esa cuenta. */
+  danilAccount?: boolean;
   /** Botón extra al lado de la búsqueda de la barra lateral (en la web, volver a Danil Agents). */
   sidebarExtra?: () => JSX.Element;
   /** El nombre de una máquina por su id. */
@@ -34,7 +36,7 @@ export type Capabilities = {
   accountMachines?: (props: AccountMachinesProps) => JSX.Element;
 };
 
-const DESKTOP: Capabilities = { nativeWindow: true, updater: true, localSetup: true, computerStatus: false };
+const DESKTOP: Capabilities = { nativeWindow: true, updater: true, localSetup: true, computerStatus: false, danilAccount: true };
 
 let current = DESKTOP;
 

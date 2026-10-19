@@ -113,6 +113,14 @@ file. `contract` must match the hash in
 [PROVENANCE](../src-tauri/crates/engine-protocol/PROVENANCE.md); the window
 refuses an engine that speaks another contract.
 
+The contract comes from seldon-host (`crates/engine-protocol/commands.json`),
+copied byte for byte. Copying a newer one is not enough: the window computes
+its contract from those bytes, so it refuses the pinned engine until a
+`seldon-runtime` release with the same contract is published
+([runtime-binary-release.md](https://github.com/danil-labs/seldon-host/blob/dev/docs/runtime-binary-release.md)) and pinned here. Until then
+the `contract` guard requires the pending contract to be named in
+`MOTOR_PENDIENTE`, and `publish.yml` refuses to publish.
+
 ## Releases
 
 Maintainers publish with a version tag:
