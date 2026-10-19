@@ -158,7 +158,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
         [...doc.querySelectorAll("[data-ventana]")].find((el) => !el.classList.contains("hidden") && el.querySelector("textarea"))?.querySelector("textarea"),
       boton: (texto) => [...doc.querySelectorAll("button")].find((b) => b.textContent.trim() === texto),
       abrirMenu: async (id) => {
-        tecla(doc.querySelector(`[data-space-actions="${id}"]`), "ArrowDown");
+        doc.querySelector(`[data-space-pill="${id}"]`).dispatchEvent(new app.w.MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
         await sleep(120);
         return doc.querySelector(`[data-space-menu="${id}"]`);
       },
@@ -199,8 +199,14 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
       ["Archivadas", "Herramientas MCP", "Configuración"],
       "Archivadas va antes que MCP y que Configuración",
     );
+    assert.equal(u.pildora("i1").querySelector("[data-space-actions]"), null, "la píldora no lleva ⋯");
     const menu = await u.abrirMenu("i1");
-    assert.ok(menu, "el ⋯ abre el menú del espacio");
+    assert.ok(menu, "el clic derecho abre el menú del espacio");
+    assert.deepEqual(
+      [...menu.querySelectorAll('[role="menuitem"]')].map((el) => el.firstChild.textContent.trim()),
+      ["Renombrar", "Eliminar…"],
+      "el menú solo renombra y elimina",
+    );
     const eliminar = [...menu.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent.trim() === "Eliminar…");
     assert.equal(eliminar?.getAttribute("aria-disabled"), "true", "la última no se elimina");
     const motivo = u.doc.getElementById(eliminar.getAttribute("aria-describedby"));
@@ -659,6 +665,14 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     );
     assert.match(u.pildora("i2").textContent, /Cobros/, "la píldora se lee con el nombre nuevo");
     assert.equal(u.doc.querySelector('[data-space-pill="i2"] input'), null, "Enter cierra el campo");
+    const menu = await u.abrirMenu("i2");
+    u.tecla([...menu.querySelectorAll('[role="menuitem"]')].find((el) => el.firstChild.textContent.trim() === "Renombrar"), "Enter");
+    await sleep(300);
+    const otra = u.doc.querySelector('[data-space-pill="i2"] input');
+    assert.ok(otra, "Renombrar del clic derecho abre el mismo campo");
+    assert.equal(u.doc.activeElement, otra, "y cerrar el menú no le quita el foco");
+    u.tecla(otra, "Escape");
+    await sleep(50);
     guarda("renombrar", app, s);
     assert.deepEqual(app.fallos, []);
     app.w.close();

@@ -5,6 +5,7 @@ mod appearance;
 mod desktop;
 mod engine;
 pub mod env;
+mod fleet;
 mod instance;
 mod launcher;
 mod legacy;
@@ -226,7 +227,6 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
             launcher::launcher_continue,
             proxy::service_poll,
             proxy::machine_list,
-            proxy::machine_select,
             proxy::service_filter,
             proxy::load_history,
             proxy::service_prepare_update,

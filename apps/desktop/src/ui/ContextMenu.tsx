@@ -9,6 +9,7 @@ import { cn } from "../lib/utils";
  */
 export const ContextMenu = Kobalte;
 export const ContextMenuTrigger = Kobalte.Trigger;
+export const ContextMenuGroup = Kobalte.Group;
 
 /** El panel flotante de un menú de Kobalte; lo comparte `DropdownMenu.tsx`. */
 export const PANEL_DE_MENU =
@@ -40,4 +41,20 @@ export function ContextMenuItem(props: ComponentProps<typeof Kobalte.Item>) {
       {...resto}
     />
   );
+}
+
+/** El título de un grupo de un menú de Kobalte; lo comparte `DropdownMenu.tsx`. */
+export const TITULO_DE_GRUPO = "block truncate px-2 pt-1 pb-1 text-[0.6875rem] font-medium text-neutral-500";
+
+export function ContextMenuGroupLabel(props: ComponentProps<typeof Kobalte.GroupLabel>) {
+  const [propios, resto] = splitProps(props, ["class"]);
+  return <Kobalte.GroupLabel class={cn(TITULO_DE_GRUPO, propios.class)} {...resto} />;
+}
+
+/** La raya entre grupos de un menú de Kobalte; la comparte `DropdownMenu.tsx`. */
+export const SEPARADOR_DE_MENU = "my-1 h-px border-0 bg-border";
+
+export function ContextMenuSeparator(props: ComponentProps<typeof Kobalte.Separator>) {
+  const [propios, resto] = splitProps(props, ["class"]);
+  return <Kobalte.Separator class={cn(SEPARADOR_DE_MENU, propios.class)} {...resto} />;
 }

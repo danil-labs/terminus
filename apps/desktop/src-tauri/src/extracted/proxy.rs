@@ -15,7 +15,11 @@ use terminus_engine_client::{
 };
 use terminus_engine_protocol::{Error, StreamPage};
 
-type OwnedWatch = (Option<String>, Arc<AtomicBool>);
+use super::fleet::{Engine, Fleet};
+
+/// Su workspace, su corte y, si la tarea vive en otra máquina, el motor de esa máquina.
+type OwnedWatch = (Option<String>, Arc<AtomicBool>, Option<Arc<Client>>);
+type OpenStream = (String, Option<String>, Option<Arc<Client>>);
 
 /// `--wake <programa>`: el programa enciende la máquina remota y reescribe la
 /// selección. Solo lo disparan las acciones de la persona; el sondeo no la enciende.
@@ -23,13 +27,36 @@ pub(super) static WAKE: OnceLock<(std::path::PathBuf, std::path::PathBuf)> = Onc
 
 /// Una máquina con su motor: la de esta ventana, o un host remoto que
 /// `remote-host.py connect` dejó en `<datos>/ai.danil.seldon.remote/<nombre>/`
-/// con su selección y su programa `wake`. Solo una está activa a la vez.
+/// con su selección y su programa `wake`. La activa da los workspaces; las demás
+/// corren las tareas que se crearon en ellas (`fleet.rs`).
 struct Machine {
     id: String,
     local: bool,
     wake: Option<(std::path::PathBuf, std::path::PathBuf)>,
-    /// El cliente de una máquina inactiva, para volver sin reconectar.
+    /// El motor ya conectado de una máquina que no es la activa.
     parked: Mutex<Option<Arc<Client>>>,
+    /// Cuándo no contestó por última vez: no se le vuelve a preguntar enseguida.
+    unanswered: Mutex<Option<Instant>>,
+    /// La suscripción a sus eventos mientras no es la activa.
+    side: Mutex<Option<Feed>>,
+    feeding: AtomicBool,
+}
+impl Machine {
+    fn new(
+        id: String,
+        local: bool,
+        wake: Option<(std::path::PathBuf, std::path::PathBuf)>,
+    ) -> Self {
+        Self {
+            id,
+            local,
+            wake,
+            parked: Mutex::new(None),
+            unanswered: Mutex::new(None),
+            side: Mutex::new(None),
+            feeding: AtomicBool::new(false),
+        }
+    }
 }
 
 fn remote_machines() -> Vec<(String, std::path::PathBuf, std::path::PathBuf)> {
@@ -59,35 +86,26 @@ fn remote_machines() -> Vec<(String, std::path::PathBuf, std::path::PathBuf)> {
 
 fn machines(autostart: bool) -> Vec<Machine> {
     let first = match WAKE.get() {
-        Some((program, selection)) => Machine {
-            id: selection
+        Some((program, selection)) => Machine::new(
+            selection
                 .parent()
                 .and_then(|d| d.file_name())
                 .map_or("remote".into(), |n| n.to_string_lossy().into_owned()),
-            local: false,
-            wake: Some((program.clone(), selection.clone())),
-            parked: Mutex::new(None),
-        },
-        None => Machine {
-            id: "local".into(),
-            local: autostart,
-            wake: None,
-            parked: Mutex::new(None),
-        },
+            false,
+            Some((program.clone(), selection.clone())),
+        ),
+        None => Machine::new("local".into(), autostart, None),
     };
     let mut all = vec![first];
     for (id, program, selection) in remote_machines() {
         if all.iter().all(|m| m.id != id) {
-            all.push(Machine {
-                id,
-                local: false,
-                wake: Some((program, selection)),
-                parked: Mutex::new(None),
-            });
+            all.push(Machine::new(id, false, Some((program, selection))));
         }
     }
     all
 }
+/// La máquina de la ventana, la primera: da los workspaces y nunca cambia.
+const HOME: usize = 0;
 const WAKES: &[&str] = &[
     "send_message",
     "inject_message",
@@ -109,6 +127,8 @@ struct Fed {
 }
 // Cuánto espera `service_poll` lo empujado antes de contestar sin eventos.
 const PUSH_WAIT: Duration = Duration::from_secs(20);
+// Una máquina que no contestó no se vuelve a probar al listar hasta pasado esto.
+const UNANSWERED_WAIT: Duration = Duration::from_secs(15);
 const HISTORY_TURNS: u64 = 150;
 
 pub(super) struct State {
@@ -119,19 +139,20 @@ pub(super) struct State {
     waking: Mutex<()>,
     woke: AtomicBool,
     machines: Vec<Machine>,
-    active: AtomicUsize,
     workspace: Mutex<Option<String>>,
     closed: AtomicBool,
     in_flight: AtomicUsize,
     stream_gap: AtomicBool,
     watchers: Mutex<std::collections::BTreeMap<String, OwnedWatch>>,
     clones: Mutex<std::collections::BTreeMap<String, Option<String>>>,
-    streams: Mutex<Vec<(String, Option<String>)>>,
+    streams: Mutex<Vec<OpenStream>>,
     feed: Mutex<Option<Fed>>,
     sessions: Mutex<Option<Vec<String>>>,
+    fleet: Fleet,
 }
 impl State {
     pub fn new(client: Arc<Client>, autostart: bool) -> Self {
+        let fleet = Fleet::load(Some(&client.selection().window_data));
         Self {
             client: RwLock::new(client),
             autostart,
@@ -140,7 +161,6 @@ impl State {
             waking: Mutex::new(()),
             woke: AtomicBool::new(false),
             machines: machines(autostart),
-            active: AtomicUsize::new(0),
             workspace: Mutex::new(None),
             closed: AtomicBool::new(false),
             in_flight: AtomicUsize::new(0),
@@ -150,6 +170,7 @@ impl State {
             streams: Mutex::new(Vec::new()),
             feed: Mutex::new(None),
             sessions: Mutex::new(None),
+            fleet,
         }
     }
     pub fn client(&self) -> Arc<Client> {
@@ -192,7 +213,7 @@ impl State {
         }
     }
     fn machine(&self) -> &Machine {
-        &self.machines[self.active.load(Ordering::SeqCst)]
+        &self.machines[HOME]
     }
     /// La máquina activa es remota: apagada se enciende al actuar, no al sondear.
     fn remote(&self) -> bool {
@@ -217,50 +238,71 @@ impl State {
         self.woke.store(true, Ordering::SeqCst);
         Ok(())
     }
-    /// Cambia la máquina activa. Elegir una máquina es querer trabajar en ella:
-    /// si está apagada, se enciende aquí.
-    fn select(&self, id: &str) -> Result<(), Error> {
-        let _turn = self.waking.lock().unwrap_or_else(|p| p.into_inner());
-        let target = self
-            .machines
-            .iter()
-            .position(|m| m.id == id)
-            .ok_or_else(|| Error::new("invalid_request"))?;
-        let current = self.active.load(Ordering::SeqCst);
-        if target == current {
-            return Ok(());
+    fn index(&self, id: &str) -> Option<usize> {
+        self.machines.iter().position(|m| m.id == id)
+    }
+    /// Otra máquina distinta de la activa, si la orden es suya (`fleet.rs`).
+    fn elsewhere(&self, id: Option<String>) -> Option<usize> {
+        let active = HOME;
+        id.and_then(|id| self.index(&id)).filter(|&i| i != active)
+    }
+    /// El motor de una máquina sin encenderla: el activo, el aparcado o el que publica
+    /// su selección. Una que no contestó no se vuelve a probar enseguida.
+    fn reach(&self, i: usize) -> Option<Arc<Client>> {
+        if i == HOME {
+            return Some(self.client());
         }
-        let machine = &self.machines[target];
-        let parked = machine
-            .parked
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .take()
-            .filter(|c| answers(c));
-        let client = match (parked, &machine.wake) {
-            (Some(client), _) => client,
-            (None, Some((program, selection))) => match Client::select(selection) {
-                Ok(client) => Arc::new(client),
-                Err(_) => woken(program, selection)?,
-            },
-            (None, None) => Arc::new(
-                super::engine::paths()
-                    .and_then(|paths| super::engine::ensure(&paths, false))
-                    .and_then(|selection| Client::select(&selection))?,
-            ),
+        let machine = &self.machines[i];
+        let mut parked = machine.parked.lock().unwrap_or_else(|p| p.into_inner());
+        if let Some(client) = parked.as_ref().filter(|c| c.check_selection().is_ok()) {
+            return Some(client.clone());
+        }
+        let mut unanswered = machine.unanswered.lock().unwrap_or_else(|p| p.into_inner());
+        if unanswered.is_some_and(|at| at.elapsed() < UNANSWERED_WAIT) {
+            return None;
+        }
+        let selected = match &machine.wake {
+            Some((_, selection)) => Client::select(selection),
+            None => super::engine::paths()
+                .and_then(|paths| super::engine::ensure(&paths, false))
+                .and_then(|selection| Client::select(&selection)),
         };
-        let previous = std::mem::replace(
-            &mut *self.client.write().unwrap_or_else(|p| p.into_inner()),
-            client,
-        );
-        *self.machines[current]
-            .parked
-            .lock()
-            .unwrap_or_else(|p| p.into_inner()) = Some(previous);
-        *self.workspace.lock().unwrap_or_else(|p| p.into_inner()) = None;
-        self.active.store(target, Ordering::SeqCst);
-        self.woke.store(true, Ordering::SeqCst);
-        Ok(())
+        match selected {
+            Ok(client) => {
+                let client = Arc::new(client);
+                *parked = Some(client.clone());
+                *unanswered = None;
+                Some(client)
+            }
+            Err(_) => {
+                *unanswered = Some(Instant::now());
+                None
+            }
+        }
+    }
+    /// Enciende una máquina con su programa y adopta el motor que publica. Otra acción
+    /// pudo encenderla mientras esta esperaba su turno: entonces vale la suya.
+    fn wake_now(&self, i: usize) -> Result<Arc<Client>, Error> {
+        let machine = &self.machines[i];
+        let Some((program, selection)) = &machine.wake else {
+            return Err(Error::new("app_unavailable"));
+        };
+        let _turn = self.waking.lock().unwrap_or_else(|p| p.into_inner());
+        *machine.unanswered.lock().unwrap_or_else(|p| p.into_inner()) = None;
+        if let Some(client) = self.reach(i).filter(|c| answers(c)) {
+            return Ok(client);
+        }
+        let client = woken(program, selection)?;
+        *machine.parked.lock().unwrap_or_else(|p| p.into_inner()) = Some(client.clone());
+        Ok(client)
+    }
+    /// Las demás máquinas con su motor si contesta sin encenderla.
+    fn others(&self) -> Vec<(String, Option<Arc<Client>>)> {
+        let active = HOME;
+        (0..self.machines.len())
+            .filter(|&i| i != active)
+            .map(|i| (self.machines[i].id.clone(), self.reach(i)))
+            .collect()
     }
     fn stop_feed(&self) {
         if let Some(fed) = self.feed.lock().unwrap_or_else(|p| p.into_inner()).take() {
@@ -274,23 +316,33 @@ impl State {
         let deadline = std::time::Instant::now() + Duration::from_secs(3);
         let watchers =
             std::mem::take(&mut *self.watchers.lock().unwrap_or_else(|p| p.into_inner()));
-        for (id, (workspace, cancel)) in watchers {
+        for machine in &self.machines {
+            if let Some(feed) = machine
+                .side
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
+                .take()
+            {
+                feed.stop();
+            }
+        }
+        for (id, (workspace, cancel, there)) in watchers {
             cancel.store(true, Ordering::SeqCst);
             if std::time::Instant::now() >= deadline {
                 break;
             }
-            let _ = self.client().request(
+            let _ = there.unwrap_or_else(|| self.client()).request(
                 "service invoke",
                 workspace,
                 json!({"command":"unwatch_task_tree","arguments":{"id":id}}),
                 Duration::from_millis(300),
             );
         }
-        for (id, workspace) in streams {
+        for (id, workspace, there) in streams {
             if std::time::Instant::now() >= deadline {
                 break;
             }
-            let _ = self.client().request(
+            let _ = there.unwrap_or_else(|| self.client()).request(
                 "service stream cancel",
                 workspace,
                 json!({"stream_id":id}),
@@ -353,7 +405,6 @@ pub(super) fn desktop_command(name: &str) -> bool {
                 | "restart_app"
                 | "tray_notify"
                 | "machine_list"
-                | "machine_select"
                 | "service_filter"
                 | "load_history"
         )
@@ -497,7 +548,7 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
         args["id"]
             .as_str()
             .and_then(|id| watchers.get(id))
-            .map(|(scope, _)| scope.clone())
+            .map(|(scope, _, _)| scope.clone())
             .unwrap_or_else(|| state.workspace())
     } else if name == "cancel_project_clone" {
         args["operation"]
@@ -514,6 +565,37 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
     } else {
         state.workspace()
     };
+    // Lo que nombra una tarea de otra máquina va a esa máquina; crear, a la elegida.
+    let chosen = invoke
+        .message
+        .headers()
+        .get("x-terminus-machine")
+        .and_then(|value| value.to_str().ok())
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned);
+    let elsewhere = if state.machines.len() > 1 && name != "unwatch_task_tree" {
+        state.elsewhere(
+            state
+                .fleet
+                .target(spec, &args, workspace.as_deref(), chosen.as_deref()),
+        )
+    } else {
+        None
+    };
+    // El corte de un árbol que se vigila en otra máquina va al motor que lo vigila.
+    let watched_there = if name == "unwatch_task_tree" {
+        args["id"].as_str().and_then(|id| {
+            state
+                .watchers
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
+                .get(id)
+                .and_then(|(_, _, there)| there.clone())
+        })
+    } else {
+        None
+    };
+    let app = webview.app_handle().clone();
     let channel = if let Some(key) = spec["channel"].as_str() {
         let id = match args
             .get(key)
@@ -550,13 +632,30 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
     }
     let job = move || {
         let _slot = slot;
-        if let Some((key, channel)) = channel {
-            stream(state, &name, args, workspace, key, channel, worker);
+        if let Some(i) = elsewhere {
+            let routed = routed(&state, i, spec, &args, workspace.as_deref());
+            match (routed, channel) {
+                (Err(error), _) => resolve(&worker, Err(error)),
+                (Ok(Routed::Stream(there, remote, args)), Some((key, channel))) => {
+                    let to = (Some(remote), Some(there));
+                    stream(state.clone(), &name, args, to, key, channel, worker);
+                }
+                (Ok(Routed::Stream(..)), None) => {
+                    resolve(&worker, Err(failure(&Error::new("invalid_request"))))
+                }
+                (Ok(Routed::Done(result)), _) => resolve(&worker, result),
+            }
+            if WAKES.contains(&name.as_str()) {
+                side_feeds(&app, &state);
+            }
             return;
         }
-        let mut sent = state
-            .client()
-            .invoke(&name, workspace.clone(), args.clone());
+        if let Some((key, channel)) = channel {
+            stream(state, &name, args, (workspace, None), key, channel, worker);
+            return;
+        }
+        let via = watched_there.unwrap_or_else(|| state.client());
+        let mut sent = via.invoke(&name, workspace.clone(), args.clone());
         // `app_unavailable` es no haber conectado: reintentar no duplica la acción.
         if matches!(&sent, Err(e) if e.code == "app_unavailable")
             && WAKES.contains(&name.as_str())
@@ -567,6 +666,11 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
                 .invoke(&name, workspace.clone(), args.clone());
         }
         let mut result = sent.map_err(|e| failure(&e)).and_then(reply);
+        if let (Ok(mine), Some(local)) = (&mut result, &workspace) {
+            if state.machines.len() > 1 {
+                gathered(&state, &name, local, &args, mine);
+            }
+        }
         if name == "check_environment" {
             if let Ok(value) = &mut result {
                 value["engineBuild"] = json!(super::startup::engine_build(state.client().status()));
@@ -574,7 +678,7 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
         }
         if let Ok(value) = &result {
             if name == "unwatch_task_tree" {
-                if let Some((_, cancel)) = args["id"].as_str().and_then(|id| {
+                if let Some((_, cancel, _)) = args["id"].as_str().and_then(|id| {
                     state
                         .watchers
                         .lock()
@@ -614,6 +718,179 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
         resolve(&resolver, Err(failure(&Error::new("service_busy"))));
     }
 }
+enum Routed {
+    Done(Result<Value, Value>),
+    /// Una orden con canal: el stream se abre contra ese motor, con sus ids.
+    Stream(Arc<Client>, String, Value),
+}
+fn machine_off() -> Value {
+    json!({"what":{"clave":"shell.service.machine_off"},"detail":"machine_off"})
+}
+fn unlinked() -> Value {
+    json!({"what":{"clave":"shell.machines.unlinked"},"detail":"machine_unlinked"})
+}
+/// Una orden de una tarea de otra máquina. Solo una acción de la persona la enciende.
+fn routed(
+    state: &State,
+    i: usize,
+    spec: &Value,
+    args: &Value,
+    workspace: Option<&str>,
+) -> Result<Routed, Value> {
+    let name = spec["name"].as_str().unwrap_or_default();
+    let local = workspace.ok_or_else(|| failure(&Error::new("invalid_request")))?;
+    let home = state.client();
+    let id = &state.machines[i].id;
+    if WAKES.contains(&name) {
+        *state.machines[i]
+            .unanswered
+            .lock()
+            .unwrap_or_else(|p| p.into_inner()) = None;
+        let sent = state
+            .fleet
+            .deliver(id, local, spec, args, &*home, state.reach(i), || {
+                state.wake_now(i)
+            })
+            .map_err(|_| machine_off())?
+            .ok_or_else(unlinked)?;
+        return Ok(Routed::Done(sent.map_err(|e| failure(&e)).and_then(reply)));
+    }
+    let Some(there) = state.reach(i) else {
+        // Abrir una tarea de una máquina apagada no es un fallo: se enseña lo último leído.
+        return match (name, args["id"].as_str()) {
+            ("load_session", Some(session)) => Ok(Routed::Done(Ok(state
+                .fleet
+                .offline_task(id, local, session)))),
+            _ => Err(machine_off()),
+        };
+    };
+    if spec["channel"].is_string() {
+        let (remote, args) = state
+            .fleet
+            .translate(id, local, args, &*home, &*there)
+            .ok_or_else(unlinked)?;
+        return Ok(Routed::Stream(there, remote, args));
+    }
+    let sent = state
+        .fleet
+        .forward(id, local, spec, args, &*home, &*there)
+        .ok_or_else(unlinked)?;
+    if let (Ok(task), "load_session", Some(session)) = (&sent, name, args["id"].as_str()) {
+        if let Some(task) = task.get("value") {
+            state.fleet.remember_task(id, session, task);
+        }
+    }
+    Ok(Routed::Done(sent.map_err(|e| failure(&e)).and_then(reply)))
+}
+/// Lo que la ventana lista de este workspace incluye lo de las demás máquinas.
+fn gathered(state: &State, name: &str, local: &str, args: &Value, mine: &mut Value) {
+    if !matches!(
+        name,
+        "list_live_sessions" | "list_active_turns" | "list_live_turns"
+    ) {
+        return;
+    }
+    let others = state.others();
+    let engines: Vec<(String, Option<&dyn Engine>)> = others
+        .iter()
+        .map(|(id, client)| (id.clone(), client.as_deref().map(|c| c as &dyn Engine)))
+        .collect();
+    let home = state.client();
+    *mine = if name == "list_live_sessions" {
+        state.fleet.list(local, args, mine.take(), &*home, &engines)
+    } else {
+        state
+            .fleet
+            .turns(name, local, args, mine.take(), &*home, &engines)
+    };
+}
+/// Los eventos de las tareas de las demás máquinas llegan a los mismos oyentes, con
+/// los ids de la ventana: una suscripción por máquina que tenga este workspace.
+fn side_feeds(app: &tauri::AppHandle, state: &Arc<State>) {
+    let Some(local) = state.workspace() else {
+        return;
+    };
+    let active = HOME;
+    for (i, machine) in state.machines.iter().enumerate() {
+        if i == active
+            || !state.fleet.linked(&machine.id, &local)
+            || machine.feeding.swap(true, Ordering::SeqCst)
+        {
+            continue;
+        }
+        let (app, owned) = (app.clone(), state.clone());
+        let spawned = std::thread::Builder::new()
+            .name("machine-feed".into())
+            .spawn(move || {
+                side_feed(&app, &owned, i);
+                owned.machines[i].feeding.store(false, Ordering::SeqCst);
+            });
+        if spawned.is_err() {
+            machine.feeding.store(false, Ordering::SeqCst);
+        }
+    }
+}
+fn side_feed(app: &tauri::AppHandle, state: &State, i: usize) {
+    let Some(client) = state.reach(i) else {
+        return;
+    };
+    let machine = &state.machines[i];
+    let done = || state.closed.load(Ordering::SeqCst);
+    let emit = |events: &Value| {
+        for event in events.as_array().into_iter().flatten() {
+            let Some(name) = event["name"].as_str() else {
+                continue;
+            };
+            if let Some(payload) = state.fleet.localize(&machine.id, name, &event["payload"]) {
+                let _ = app.emit(name, payload);
+            }
+        }
+    };
+    if client.push_stream() {
+        let sessions = state
+            .sessions
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .clone();
+        let start = Start {
+            cursor: None,
+            replay: false,
+            runtime: None,
+            sessions,
+        };
+        let feed = Feed::start(client, start);
+        *machine.side.lock().unwrap_or_else(|p| p.into_inner()) = Some(feed.clone());
+        while !done() {
+            let page = feed.next(PUSH_WAIT);
+            if page.failure.is_some() {
+                break;
+            }
+            // Un reenvío (`catchup`) reemplaza el turno en curso; aquí solo se suma lo nuevo.
+            for batch in page.batches.iter().filter(|b| b.get("catchup").is_none()) {
+                emit(&batch["events"]);
+            }
+        }
+        feed.stop();
+        *machine.side.lock().unwrap_or_else(|p| p.into_inner()) = None;
+        return;
+    }
+    let mut cursor: Option<u64> = None;
+    while !done() {
+        let Ok(page) = client.request(
+            "service events",
+            None,
+            json!({"cursor":cursor,"replay":false,"desktop":true,"desktop_pid":std::process::id()}),
+            Duration::from_secs(3),
+        ) else {
+            return;
+        };
+        if cursor.is_some() {
+            emit(&page["events"]);
+        }
+        cursor = page["cursor"].as_u64();
+        std::thread::sleep(Duration::from_millis(500));
+    }
+}
 fn resolve(
     resolver: &Arc<Mutex<Option<tauri::ipc::InvokeResolver>>>,
     result: Result<Value, Value>,
@@ -625,15 +902,17 @@ fn resolve(
         }
     }
 }
+/// El workspace del sobre y, si la tarea vive en otra máquina, su motor.
 fn stream(
     state: Arc<State>,
     name: &str,
     arguments: Value,
-    workspace: Option<String>,
+    (workspace, there): (Option<String>, Option<Arc<Client>>),
     key: String,
     channel: tauri::ipc::Channel<Value>,
     resolver: Arc<Mutex<Option<tauri::ipc::InvokeResolver>>>,
 ) {
+    let client = there.clone().unwrap_or_else(|| state.client());
     let clone_operation = if name == "clone_project" {
         arguments["operation"].as_str().map(str::to_owned)
     } else {
@@ -647,7 +926,7 @@ fn stream(
             .insert(operation.clone(), workspace.clone());
     }
     let id = uuid::Uuid::new_v4().to_string();
-    let start = state.client().request(
+    let start = client.request(
         "service stream start",
         workspace.clone(),
         json!({"command":name,"arguments":arguments,"stream_id":id,"channel":key}),
@@ -677,13 +956,12 @@ fn stream(
         .streams
         .lock()
         .unwrap_or_else(|p| p.into_inner())
-        .push((id.clone(), workspace.clone()));
+        .push((id.clone(), workspace.clone(), there.clone()));
     let cancel = Arc::new(AtomicBool::new(false));
     let mut cursor = None;
     let result = (|| -> Result<(), Value> {
         while !state.closed.load(Ordering::SeqCst) && !cancel.load(Ordering::SeqCst) {
-            let value = state
-                .client()
+            let value = client
                 .request(
                     "service stream read",
                     workspace.clone(),
@@ -715,7 +993,7 @@ fn stream(
                             .lock()
                             .unwrap_or_else(|p| p.into_inner())
                             .entry(watcher.to_owned())
-                            .or_insert_with(|| (workspace.clone(), cancel.clone()));
+                            .or_insert_with(|| (workspace.clone(), cancel.clone(), there.clone()));
                     }
                 }
                 resolve(&resolver, reply(completion));
@@ -736,7 +1014,7 @@ fn stream(
         resolve(&resolver, Err(error.clone()));
         log::warn!("[transport] stream={name} code={}", error["detail"]);
     }
-    let _ = state.client().request(
+    let _ = client.request(
         "service stream cancel",
         workspace,
         json!({"stream_id":id}),
@@ -753,12 +1031,12 @@ fn stream(
         .watchers
         .lock()
         .unwrap_or_else(|p| p.into_inner())
-        .retain(|_, (_, value)| !Arc::ptr_eq(value, &cancel));
+        .retain(|_, (_, value, _)| !Arc::ptr_eq(value, &cancel));
     state
         .streams
         .lock()
         .unwrap_or_else(|p| p.into_inner())
-        .retain(|(key, _)| key != &id);
+        .retain(|(key, _, _)| key != &id);
 }
 
 #[tauri::command(async)]
@@ -773,6 +1051,9 @@ pub(super) fn service_poll(
     let state = app
         .try_state::<Arc<State>>()
         .ok_or_else(|| failure(&Error::new("app_unavailable")))?;
+    if state.machines.len() > 1 {
+        side_feeds(&app, state.inner());
+    }
     if state.woke.swap(false, Ordering::SeqCst) {
         if let Some(window) = app.get_window("main") {
             let _ = window.set_title(&super::title(&app));
@@ -832,7 +1113,7 @@ fn known_event(name: &str) -> bool {
 }
 fn restarted(app: &tauri::AppHandle, state: &State, error: Error) -> Result<Value, Value> {
     if state.remote() {
-        return Err(json!({"what":{"clave":"shell.service.machine_off"},"detail":"machine_off"}));
+        return Err(machine_off());
     }
     // Sin motor que relanzar (un antivirus puede apartarlo), el aviso dice eso y no «no responde».
     if let Err(restart) = state.restart() {
@@ -932,6 +1213,16 @@ pub(super) fn service_filter(
         .try_state::<Arc<State>>()
         .ok_or_else(|| failure(&Error::new("app_unavailable")))?;
     *state.sessions.lock().unwrap_or_else(|p| p.into_inner()) = sessions.clone();
+    for machine in &state.machines {
+        if let Some(feed) = machine
+            .side
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .as_ref()
+        {
+            feed.filter(sessions.clone());
+        }
+    }
     if let Some(fed) = state
         .feed
         .lock()
@@ -955,21 +1246,66 @@ pub(super) fn load_history(
         .try_state::<Arc<State>>()
         .ok_or_else(|| failure(&Error::new("app_unavailable")))?;
     let client = state.client();
+    let workspace = state.workspace();
+    // Una tarea de otra máquina se lee de su motor, sin encenderla; apagada, se enseña
+    // lo último que se leyó de ella.
+    if let Some(i) = state.elsewhere(state.fleet.owner(workspace.as_deref(), &id)) {
+        let machine = state.machines[i].id.clone();
+        let local = workspace.unwrap_or_default();
+        let read = state.reach(i).and_then(|there| {
+            let wanted = json!({ "project": project });
+            let (remote, args) = state
+                .fleet
+                .translate(&machine, &local, &wanted, &*client, &*there)?;
+            let project = args["project"].as_str().unwrap_or_default();
+            Some(read_history(&there, Some(remote), project, &id, before))
+        });
+        return match (read, before) {
+            (Some(Ok(task)), _) => {
+                if before.is_none() {
+                    state.fleet.remember_task(&machine, &id, &task);
+                }
+                Ok(task)
+            }
+            (Some(Err(e)), None) if e.code == "app_unavailable" => {
+                Ok(state.fleet.offline_task(&machine, &local, &id))
+            }
+            (None, None) => Ok(state.fleet.offline_task(&machine, &local, &id)),
+            (Some(Err(e)), _) => Err(failure(&e)),
+            (None, Some(_)) => Err(machine_off()),
+        };
+    }
+    read_history(&client, workspace, &project, &id, before).map_err(|e| failure(&e))
+}
+fn read_history(
+    client: &Client,
+    workspace: Option<String>,
+    project: &str,
+    id: &str,
+    before: Option<u64>,
+) -> Result<Value, Error> {
     if !client.push_stream() {
-        let mut session = invoke(&state, "load_session", json!({"project":project,"id":id}))?;
+        let reply = client.invoke(
+            "load_session",
+            workspace,
+            json!({"project":project,"id":id}),
+        )?;
+        let Some(mut session) = reply.get("value").cloned() else {
+            let mut error = Error::new("operation_failed");
+            error.detail = reply.get("error").cloned().unwrap_or_default();
+            return Err(error);
+        };
         let total = session["turns"].as_array().map_or(0, Vec::len);
         session["history"] =
             json!({"total":total,"start":0,"end":total,"limit":total,"has_more":false});
         return Ok(session);
     }
-    client
-        .request(
-            "service history",
-            state.workspace(),
-            json!({"project":project,"id":id,"turns":HISTORY_TURNS,"before":before}),
-            Duration::from_secs(30),
-        )
-        .map_err(|e| failure(&e))
+    client.request(
+        "service history",
+        workspace,
+        json!({"project":project,"id":id,"turns":HISTORY_TURNS,"before":before}),
+        Duration::from_secs(30),
+    )
 }
 #[tauri::command]
 pub(super) fn service_prepare_update() -> Result<(), Value> {
@@ -988,7 +1324,8 @@ pub(super) fn machine_list(app: tauri::AppHandle) -> Result<Value, Value> {
     let state = app
         .try_state::<Arc<State>>()
         .ok_or_else(|| failure(&Error::new("app_unavailable")))?;
-    let active = state.active.load(Ordering::SeqCst);
+    let active = HOME;
+    let workspace = state.workspace();
     let list: Vec<Value> = state
         .machines
         .iter()
@@ -1004,20 +1341,18 @@ pub(super) fn machine_list(app: tauri::AppHandle) -> Result<Value, Value> {
             } else {
                 true
             };
-            json!({"id": m.id, "local": m.wake.is_none(), "active": i == active, "on": on})
+            // Si tiene este workspace: solo se sabe preguntándole, y apagada no se pregunta.
+            let linked = match &workspace {
+                _ if i == active => Some(true),
+                Some(local) if state.fleet.linked(&m.id, local) => Some(true),
+                Some(local) if on => state.reach(i).map(|there| {
+                    let home = state.client();
+                    state.fleet.counterpart_workspace(&m.id, local, &*home, &*there).is_some()
+                }),
+                _ => None,
+            };
+            json!({"id": m.id, "local": m.wake.is_none(), "active": i == active, "on": on, "linked": linked})
         })
         .collect();
     Ok(json!(list))
-}
-
-#[tauri::command(async)]
-pub(super) fn machine_select(app: tauri::AppHandle, id: String) -> Result<Value, Value> {
-    let state = app
-        .try_state::<Arc<State>>()
-        .ok_or_else(|| failure(&Error::new("app_unavailable")))?;
-    state.select(&id).map_err(|e| failure(&e))?;
-    if let Some(window) = app.get_window("main") {
-        let _ = window.set_title(&super::title(&app));
-    }
-    Ok(json!({"runtime": state.client().runtime()}))
 }
