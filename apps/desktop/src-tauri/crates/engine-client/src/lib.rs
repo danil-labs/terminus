@@ -7,13 +7,26 @@ use std::{
     io::{BufRead, BufReader, Read, Write},
     net::TcpStream,
     path::{Path, PathBuf},
-    time::Duration,
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
 };
+mod link;
+pub mod push;
 #[cfg(windows)]
 mod windows;
+use link::{Failure, Link, Pushes};
 use terminus_engine_protocol::{
-    Endpoint, Error, Request, Response, Result, Selection, MAX_FRAME, PRODUCT, VERSION,
+    Endpoint, Error, Request, Response, Result, Selection, MAX_FRAME, PRODUCT,
+    PUSH_STREAM_FEATURE, VERSION,
 };
+
+// Una conexión con más peticiones en vuelo que esto abre otra: pasadas 32 el
+// motor deja de leer y una orden lenta frenaría a las demás.
+const PER_LINK: usize = 16;
+const MAX_LINKS: usize = 4;
+// El motor cierra a los 120 s una conexión sin nada en vuelo ni suscripciones.
+const LINK_IDLE: Duration = Duration::from_secs(90);
+const RECHECK: Duration = Duration::from_secs(5);
 
 pub fn contract() -> String {
     format!(
@@ -171,6 +184,11 @@ fn exchange(
     }
     Ok(response)
 }
+fn announces_push(status: &Value) -> bool {
+    status["service_features"]
+        .as_array()
+        .is_some_and(|features| features.iter().any(|f| f == PUSH_STREAM_FEATURE))
+}
 fn reply(response: Response) -> Result<Value> {
     match (response.result, response.error) {
         (Some(value), None) => Ok(value),
@@ -254,6 +272,47 @@ pub struct Client {
     credential: Snapshot,
     token: String,
     status: Value,
+    push: bool,
+    links: Mutex<Links>,
+}
+
+#[derive(Default)]
+struct Links {
+    pool: Vec<Arc<Link>>,
+    backoff: Backoff,
+    checked: Option<Instant>,
+}
+
+/// Espera entre conexiones fallidas: 100 ms que se doblan hasta 2 s.
+#[derive(Default)]
+pub(crate) struct Backoff {
+    failures: u32,
+    until: Option<Instant>,
+}
+impl Backoff {
+    pub(crate) fn delay(&self) -> Duration {
+        if self.failures == 0 {
+            return Duration::ZERO;
+        }
+        Duration::from_millis(100 << self.failures.min(5).saturating_sub(1)).min(Duration::from_secs(2))
+    }
+    fn waiting(&self) -> bool {
+        self.until.is_some_and(|until| Instant::now() < until)
+    }
+    pub(crate) fn fail(&mut self) {
+        self.failures = self.failures.saturating_add(1);
+        self.until = Some(Instant::now() + self.delay());
+    }
+    pub(crate) fn reset(&mut self) {
+        *self = Self::default();
+    }
+}
+impl Drop for Client {
+    fn drop(&mut self) {
+        for link in self.links.lock().unwrap_or_else(|p| p.into_inner()).pool.drain(..) {
+            link.close();
+        }
+    }
 }
 impl Client {
     pub fn select(path: &Path) -> Result<Self> {
@@ -294,21 +353,30 @@ impl Client {
             credential,
             token,
             status: Value::Null,
+            push: false,
+            links: Mutex::default(),
         };
         let status = client.request("status", None, json!({}), Duration::from_secs(3))?;
-        if status["runtime"] != client.selection.runtime
-            || status["product"] != PRODUCT
-            || status["contract"] != client.selection.contract
-            || status["service"] != true
-            || status["protocol_version"] != VERSION
-            || status["service_build"] != client.selection.service_build
-            || status["data_directory"]
-                != client.selection.data_directory.to_string_lossy().as_ref()
-        {
+        if !client.selected_engine(&status) {
             return Err(Error::new("version_mismatch"));
         }
+        client.push = announces_push(&status);
         client.status = status;
         Ok(client)
+    }
+    fn selected_engine(&self, status: &Value) -> bool {
+        status["runtime"] == self.selection.runtime
+            && status["product"] == PRODUCT
+            && status["contract"] == self.selection.contract
+            && status["service"] == true
+            && status["protocol_version"] == VERSION
+            && status["service_build"] == self.selection.service_build
+            && status["data_directory"] == self.selection.data_directory.to_string_lossy().as_ref()
+    }
+    /// Si el motor anunció `push_stream_v1`: conexión persistente, `service subscribe` y
+    /// `service history`. Sin la marca, una conexión por petición como siempre.
+    pub fn push_stream(&self) -> bool {
+        self.push
     }
     pub fn status(&self) -> &Value {
         &self.status
@@ -343,6 +411,9 @@ impl Client {
         self.request_exact(&request, timeout)
     }
     pub fn request_exact(&self, request: &Request, timeout: Duration) -> Result<Value> {
+        if self.push {
+            return self.linked(request, timeout);
+        }
         self.check_selection()?;
         if request.token != self.token || request.version != VERSION {
             return Err(Error::new("invalid_token"));
@@ -350,6 +421,114 @@ impl Client {
         let response = exchange(&self.endpoint.address, request, timeout)?;
         self.check_selection().map_err(|_| Error::new("io"))?;
         reply(response)
+    }
+
+    /// Por una conexión ya validada. El par de un socket abierto no cambia: la
+    /// selección se comprueba al abrir cada conexión y, como mucho, cada `RECHECK`.
+    fn linked(&self, request: &Request, timeout: Duration) -> Result<Value> {
+        if request.token != self.token || request.version != VERSION {
+            return Err(Error::new("invalid_token"));
+        }
+        self.recheck()?;
+        let mut retried = false;
+        loop {
+            let link = self.pooled()?;
+            match link.call(request, timeout) {
+                Ok(response) => return reply(response),
+                // Lo que no llegó a salir se manda una vez más por otra conexión.
+                Err(Failure::Unsent(_)) if !retried => {
+                    link.close();
+                    retried = true;
+                }
+                Err(Failure::Unsent(error) | Failure::Lost(error)) => return Err(error),
+            }
+        }
+    }
+    fn recheck(&self) -> Result<()> {
+        let mut links = self.links.lock().unwrap_or_else(|p| p.into_inner());
+        if links.checked.is_some_and(|at| at.elapsed() < RECHECK) {
+            return Ok(());
+        }
+        if let Err(error) = self.check_selection() {
+            for link in links.pool.drain(..) {
+                link.close();
+            }
+            return Err(error);
+        }
+        links.checked = Some(Instant::now());
+        Ok(())
+    }
+    fn pooled(&self) -> Result<Arc<Link>> {
+        let mut links = self.links.lock().unwrap_or_else(|p| p.into_inner());
+        links.pool.retain(|link| {
+            let keep = link.is_open() && !(link.in_flight() == 0 && link.idle_for() > LINK_IDLE);
+            if !keep {
+                link.close();
+            }
+            keep
+        });
+        if let Some(link) = links.pool.iter().find(|link| link.in_flight() < PER_LINK) {
+            return Ok(link.clone());
+        }
+        if links.pool.len() >= MAX_LINKS {
+            if let Some(link) = links.pool.iter().min_by_key(|link| link.in_flight()) {
+                return Ok(link.clone());
+            }
+        }
+        if links.backoff.waiting() {
+            return Err(Error::new("app_unavailable"));
+        }
+        match self.open_link(None) {
+            Ok(link) => {
+                links.backoff.reset();
+                links.checked = Some(Instant::now());
+                links.pool.push(link.clone());
+                Ok(link)
+            }
+            Err(error) => {
+                links.backoff.fail();
+                Err(error)
+            }
+        }
+    }
+    /// Una conexión nueva al motor seleccionado: la selección sin cambios antes
+    /// de mandar el token, y un `status` por ese socket que sea el mismo motor.
+    pub(crate) fn open_link(&self, pushes: Option<Pushes>) -> Result<Arc<Link>> {
+        self.check_selection()?;
+        let link = Link::connect(&self.endpoint.address, pushes)?;
+        let status = self.call_on(&link, "status", json!({}), Duration::from_secs(3));
+        match status {
+            Ok(status) if self.selected_engine(&status) && announces_push(&status) => Ok(link),
+            Ok(_) => {
+                link.close();
+                Err(Error::new("version_mismatch"))
+            }
+            Err(error) => {
+                link.close();
+                Err(error)
+            }
+        }
+    }
+    pub(crate) fn call_on(
+        &self,
+        link: &Link,
+        command: &str,
+        args: Value,
+        timeout: Duration,
+    ) -> Result<Value> {
+        let request = Request {
+            version: VERSION,
+            token: self.token.clone(),
+            workspace: None,
+            folder: None,
+            command: command.to_owned(),
+            args,
+            request_id: uuid::Uuid::new_v4().to_string(),
+        };
+        match link.call(&request, timeout) {
+            Ok(response) => reply(response),
+            Err(Failure::Unsent(error) | Failure::Lost(error)) => Err(error),
+        }
     }
     pub fn invoke(
         &self,
@@ -368,13 +547,16 @@ impl Client {
             request_id: uuid::Uuid::new_v4().to_string(),
         };
         let deadline = std::time::Instant::now() + Duration::from_secs(3600);
+        // Por una conexión abierta preguntar cuesta poco: se empieza pronto y se espacia.
+        let mut wait = Duration::from_millis(if self.push { 25 } else { 200 });
         loop {
             let value = self.request_exact(&request, Duration::from_secs(30))?;
             if value["pending"] == true {
                 if std::time::Instant::now() > deadline {
                     return Err(Error::new("io"));
                 }
-                std::thread::sleep(Duration::from_millis(200));
+                std::thread::sleep(wait);
+                wait = (wait * 2).min(Duration::from_millis(200));
                 continue;
             }
             return Ok(value);

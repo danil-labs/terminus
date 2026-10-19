@@ -126,3 +126,26 @@ pub struct StreamPage {
     pub completion: Option<Value>,
     pub done: bool,
 }
+
+/// Lo que el motor anuncia en `status.service_features` cuando habla el stream
+/// empujado. Un motor sin esta marca cierra la conexión tras la primera respuesta.
+pub const PUSH_STREAM_FEATURE: &str = "push_stream_v1";
+
+/// Un marco que el motor manda sin petición por la conexión suscrita: trae
+/// `push` y no `request_id`.
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct Push {
+    pub version: u32,
+    pub push: String,
+    pub subscription: String,
+    #[serde(default)]
+    pub events: Vec<Value>,
+    #[serde(default)]
+    pub cursor: Option<u64>,
+    #[serde(default)]
+    pub latest: Option<u64>,
+    #[serde(default)]
+    pub session: Option<String>,
+    #[serde(default)]
+    pub detail: Value,
+}

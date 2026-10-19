@@ -1,4 +1,4 @@
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "../../lib/serviceEvents";
 import Bug from "lucide-solid/icons/bug";
 import ChartNoAxesCombined from "lucide-solid/icons/chart-no-axes-combined";
 import RefreshCw from "lucide-solid/icons/refresh-cw";

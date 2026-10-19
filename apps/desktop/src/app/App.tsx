@@ -1,4 +1,4 @@
-import { listen } from "@tauri-apps/api/event";
+import { deliver, type JournalEvent, listen } from "../lib/serviceEvents";
 import { open } from "@tauri-apps/plugin-dialog";
 import Archive from "lucide-solid/icons/archive";
 import Check from "lucide-solid/icons/check";
@@ -55,6 +55,7 @@ import { ThreadSearch, type ThreadSearchTarget } from "../features/chat/ThreadSe
 import TranscriptSource from "../features/chat/TranscriptSource";
 import type { Lectura } from "../features/chat/threadWindow";
 import { lotesDeDeltas } from "../features/chat/deltaFrames";
+import { type LoadedHistory, prependHistory, refreshHistory } from "../features/chat/history";
 import {
   anexarDeltas,
   anexarImagen,
@@ -166,7 +167,7 @@ import {
 import { createPref, escribirPref, leerPref } from "../lib/prefs";
 import type { Frase } from "../lib/prose";
 import { editDraft, insertMention, insertRecipient, type Recipient, type RecipientCandidate, type SenderTask, trimDraft } from "../lib/recipients";
-import { conservar, conservarEnOrden, sessionRefresh } from "../lib/sessionRefresh";
+import { conservar, conservarEnOrden, conservarPorElFinal, sessionRefresh } from "../lib/sessionRefresh";
 import { readShellCache, shellCacheWriter } from "../lib/shellCache";
 import {
   accionDeAtajo,
@@ -1083,7 +1084,7 @@ export default function App() {
   // (`guardar_segmento_pregunta`): ese turno llega por partida doble, de
   // `base` y de `vivo`. Se identifican por `turno`; a `base` se le copia
   // su `questionRequestId`, o la respuesta cae al canal de archivo.
-  const releer = (session: string, leida: Msg[], vaciarVivo: boolean) => {
+  const releer = (session: string, leida: Msg[], vaciarVivo: boolean, antepuesta = false) => {
     deltasPorCuadro.vaciar();
     setHilos((hs) => {
       const previo = hs[session];
@@ -1105,7 +1106,7 @@ export default function App() {
                 : m,
             );
       // El chat identifica filas por referencia: un objeto nuevo por mensaje remonta el hilo entero.
-      const base = conservarEnOrden(previo?.base ?? [], atada);
+      const base = (antepuesta ? conservarPorElFinal : conservarEnOrden)(previo?.base ?? [], atada);
       const vivo = vaciarVivo
         ? []
         : vivoPrevio.filter((m) => !m.turno || !persistidos.has(m.turno));
@@ -1116,9 +1117,55 @@ export default function App() {
   };
   // Por tarea: `undefined` es que aún no se abrió, `null` que salió de `session.json`.
   const [origenes, setOrigenes] = createSignal<Readonly<Record<string, TranscriptOrigin | null>>>({});
+  // Los turnos de cada tarea que trajo `service history`, desde `start`; lo anterior se pide al subir.
+  const historias = new Map<string, LoadedHistory<Session["turns"][number]>>();
+  const [conAntiguos, setConAntiguos] = createSignal<Readonly<Record<string, boolean>>>({});
+  const marcarAntiguos = (id: string, loaded: LoadedHistory<unknown>) =>
+    setConAntiguos((all) => (!!all[id] === loaded.start > 0 ? all : { ...all, [id]: loaded.start > 0 }));
+  // Con el stream empujado el motor sabe paginar: abrir trae los últimos turnos y no la transcripción entera.
+  let historialPaginado = false;
+  const leerTarea = (project: string, id: string, before: number | null = null) => {
+    if (historialPaginado) return invoke<Session>("load_history", { project, id, before });
+    return invoke<Session>("load_session", { project, id });
+  };
+  /**
+   * La página anterior a lo cargado de `id`, lista para anteponerse: devuelve con qué
+   * ponerla, para que el hilo la monte sin mover lo que se lee. `null` si no hay o ya no encaja.
+   */
+  const pidiendoAntiguos = new Set<string>();
+  async function cargarAntiguos(project: string, id: string): Promise<(() => void) | null> {
+    const loaded = historias.get(id);
+    if (!historialPaginado || !loaded || loaded.start === 0 || pidiendoAntiguos.has(id)) return null;
+    pidiendoAntiguos.add(id);
+    const generation = sessionGeneration;
+    try {
+      const page = await leerTarea(project, id, loaded.start);
+      if (generation !== sessionGeneration || historias.get(id) !== loaded) return null;
+      const merged = prependHistory(loaded, page.turns, page.history);
+      if (!merged) {
+        // Se reescribió entre páginas: se vuelve a la primera.
+        historias.delete(id);
+        void leerTarea(project, id).then((s) => loadResult(id, s, false, generation)).catch(() => {});
+        return null;
+      }
+      return () => {
+        if (generation !== sessionGeneration || historias.get(id) !== loaded) return;
+        historias.set(id, merged);
+        marcarAntiguos(id, merged);
+        releer(id, transcripcion(merged.turns), false, true);
+      };
+    } catch {
+      return null;
+    } finally {
+      pidiendoAntiguos.delete(id);
+    }
+  }
   function loadResult(id: string, session: Session, clear: boolean, generation: number) {
     if (generation !== sessionGeneration) return;
-    releer(id, transcripcion(session.turns), clear);
+    const loaded = refreshHistory(historias.get(id), session.turns, session.history);
+    historias.set(id, loaded);
+    marcarAntiguos(id, loaded);
+    releer(id, transcripcion(loaded.turns), clear);
     const origen = session.transcript ?? null;
     setOrigenes((o) =>
       id in o && o[id]?.file === origen?.file && o[id]?.from_cli === origen?.from_cli ? o : { ...o, [id]: origen },
@@ -1202,6 +1249,7 @@ export default function App() {
     batch(() => {
       const workspace = workspaceActivo();
       if (workspace) liveThreads.add(liveThreadKey(workspace, id));
+      enviarFiltro();
       // Otro turno: el `done` que llegue ya no es del que cerró sin desenlace.
       sinDesenlace.delete(id);
       setVivas((v) => (v.includes(id) ? v : [...v, id]));
@@ -1211,6 +1259,7 @@ export default function App() {
     batch(() => {
       const workspace = workspaceActivo();
       if (workspace) liveThreads.delete(liveThreadKey(workspace, id));
+      enviarFiltro();
       setVivas((v) => v.filter((x) => x !== id));
       setDesdeDeTurno((d) => {
         if (!(id in d)) return d;
@@ -1630,7 +1679,7 @@ export default function App() {
     const abierta = sessionId();
     if (!abierta || vivas().includes(abierta)) return;
     avisarDeLosArboles(abierta);
-    void invoke<Session>("load_session", { project: project(), id: abierta })
+    void leerTarea(project(), abierta)
       .then((s) => loadResult(abierta, s, true, generation))
       .catch(() => {});
   }
@@ -2073,7 +2122,7 @@ export default function App() {
     const projectId = session === sessionId() ? project() : tab?.project ?? savedQueues.get(session)?.project;
     try {
       if (projectId !== undefined) {
-        const result = await invoke<Session>("load_session", { project: projectId, id: session });
+        const result = await leerTarea(projectId, session);
         if (generation === sessionGeneration && revision === turnRevisions.get(session))
           loadResult(session, result, true, generation);
       } else soltarHilo(session);
@@ -2090,6 +2139,68 @@ export default function App() {
     }
   }
 
+  // Lo que reconstruye el turno en curso de una tarea que pasa a verse: lo filtrado y lo que lo acompaña.
+  const REPUESTO = new Set(["delta", "tool", "tool_done", "command_output", "command_running", "shell_started", "shell_output", "image", "retry", "notice", "task_launched"]);
+  type PushedBatch = { events?: JournalEvent[]; catchup?: string; resync?: string };
+  function applyPushed(batches: PushedBatch[]) {
+    for (const lote of batches) {
+      if (lote.resync) {
+        releerUna(lote.resync);
+        continue;
+      }
+      if (lote.catchup) {
+        const session = lote.catchup;
+        const events = (lote.events ?? []).filter((e) => {
+          const payload = e.payload as Partial<ChatEvent> | null;
+          return e.name === "chat" && payload?.session === session && REPUESTO.has(payload.kind ?? "");
+        });
+        const workspace = (events[0]?.payload as Partial<ChatEvent> | undefined)?.workspace;
+        // Reemplaza lo vivo de la tarea, salvo lo que escribió la persona: el motor no lo repite.
+        anexar(session, (messages) => {
+          const kept = messages.filter((m) => m.role === "user");
+          return kept.length === messages.length ? messages : kept;
+        }, workspace);
+        deliver(events);
+        continue;
+      }
+      // Al mismo oyente y uno a uno, como llegaban de Tauri: lo que agrupa el pintado es del oyente.
+      deliver(lote.events ?? []);
+    }
+  }
+  /** `session_resync`: el turno en curso no cupo en el reenvío; se relee lo guardado y se conserva lo vivo. */
+  function releerUna(session: string) {
+    const generation = sessionGeneration;
+    const projectId = esDeLaAbierta(session) ? project() : pestanas.open().find((p) => p.id === session)?.project;
+    if (projectId === undefined) return;
+    void leerTarea(projectId, session)
+      .then((s) => loadResult(session, s, false, generation))
+      .catch(() => {});
+  }
+  // El filtro de la suscripción: de las demás tareas solo llegan inicio y fin, no su flujo token a token.
+  let filtroEnviado: string | null = null;
+  let filtroEnCola = false;
+  const tareasQueSeVen = () => {
+    const ids = new Set([...sesionesConPestana(), sessionId() ?? "", ...vivas()]);
+    for (const key of liveThreads) ids.add(key.slice(key.indexOf("/") + 1));
+    return [...ids].filter((id) => id !== "" && !esProvisional(id)).sort();
+  };
+  function enviarFiltro() {
+    if (!historialPaginado || filtroEnCola) return;
+    filtroEnCola = true;
+    queueMicrotask(() => {
+      filtroEnCola = false;
+      if (!historialPaginado) return;
+      const sessions = tareasQueSeVen();
+      const key = sessions.join("\n");
+      if (key === filtroEnviado) return;
+      filtroEnviado = key;
+      void invoke("service_filter", { sessions }).catch(() => {
+        filtroEnviado = null;
+      });
+    });
+  }
+  createEffect(on([sesionesConPestana, sessionId, vivas], enviarFiltro, { defer: true }));
+
   let serviceListenersReady: Promise<unknown> = Promise.resolve();
   onMount(() => {
     let disposed = false;
@@ -2098,13 +2209,23 @@ export default function App() {
     let runtime: string | null = null;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let failingSince: number | null = null;
+    // Con el stream empujado `service_poll` espera en Rust a que haya algo: se vuelve a pedir enseguida.
+    let pushed = false;
     const poll = async () => {
       await Promise.resolve();
       await serviceListenersReady;
       if (disposed) return;
+      pushed = false;
       try {
-        const page = await invoke<{ cursor: number | null; gap: boolean; streams?: boolean; replay: boolean; runtime: string; reset: boolean }>("service_poll", { cursor, workspace: null, replay, runtime });
+        const page = await invoke<{ cursor: number | null; gap: boolean; streams?: boolean; replay: boolean; runtime: string; reset: boolean; push?: boolean; batches?: PushedBatch[] }>("service_poll", { cursor, workspace: null, replay, runtime });
         if (disposed) return;
+        if (page.batches) applyPushed(page.batches);
+        pushed = page.push === true;
+        if (pushed !== historialPaginado) {
+          historialPaginado = pushed;
+          filtroEnviado = null;
+          enviarFiltro();
+        }
         cursor = page.cursor;
         replay = page.replay;
         runtime = page.runtime;
@@ -2114,6 +2235,7 @@ export default function App() {
         if (page.reset) {
           deltasPorCuadro.vaciar();
           liveThreads.clear();
+          enviarFiltro();
           workspaceThreads.clear();
           setHilos((threads) => Object.fromEntries(Object.entries(threads).map(([id, thread]) => [id, { ...thread, vivo: [] }])));
           setPermissions([]);
@@ -2138,7 +2260,7 @@ export default function App() {
           setError(sinMotor ? t("shell.service.engine_missing") : apagada ? t("shell.service.machine_off") : t(caido ? "shell.service.engine_down" : "chat.error.service_unavailable"));
         }
       } finally {
-        if (!disposed) timer = setTimeout(() => void poll(), 250);
+        if (!disposed) timer = setTimeout(() => void poll(), pushed ? 0 : 250);
       }
     };
     void poll();
@@ -2246,6 +2368,7 @@ export default function App() {
           advanceTurn(session);
           if (workspace) {
             liveThreads.delete(liveThreadKey(workspace, session));
+            enviarFiltro();
             const threads = workspaceThreads.get(workspace);
             if (threads) delete threads[session];
           }
@@ -2280,6 +2403,7 @@ export default function App() {
       // que no se está mirando, para que deje de decir que trabaja—.
       if (kind === "started" || kind === "done") {
         if (kind === "started" && workspace) liveThreads.add(liveThreadKey(workspace, session));
+        enviarFiltro();
         if (kind === "started" && esDelWorkspaceAbierto(workspace)) {
           pendingStarts.delete(session);
           advanceTurn(session);
@@ -2639,7 +2763,7 @@ export default function App() {
         setError(t("markdown.link.other_workspace"));
         return;
       }
-      void invoke<Session>("load_session", { project: target.folder, id: target.task })
+      void leerTarea(target.folder, target.task)
         .then(() => {
           if (target.workspace === workspaceActivo()) void abrirSesion(target.folder, target.task);
         })
@@ -2726,20 +2850,17 @@ export default function App() {
       avisarDeLosArboles(session);
       // Borrada desde el CLI con su vista de Typst abierta: su Tinymist no tiene ya árbol que servir.
       if (hayVistasDe(session))
-        void invoke<Session>("load_session", { project, id: session }).catch(() => void apagarVistasDe(session));
+        void leerTarea(project, session).catch(() => void apagarVistasDe(session));
       if (vivas().includes(session)) return;
       if (esDeLaAbierta(session)) {
-        void invoke<Session>("load_session", { project, id: session })
+        void leerTarea(project, session)
           .then((s) => loadResult(session, s, true, generation))
           .catch(() => {});
         return;
       }
       const pestana = pestanas.open().find((p) => p.id === session);
       if (pestana)
-        void invoke<Session>("load_session", {
-          project: pestana.project,
-          id: session,
-        })
+        void leerTarea(pestana.project, session)
           .then((s) => loadResult(session, s, true, generation))
           .catch(() => {});
     });
@@ -3732,7 +3853,7 @@ export default function App() {
     const generation = sessionGeneration;
     const current = () => generation === sessionGeneration && sessionId() === id && project() === proyecto;
     try {
-      const s = await invoke<Session>("load_session", { project: proyecto, id });
+      const s = await leerTarea(proyecto, id);
       if (!current()) return;
       // Reanudar conserva con qué corrió: una sesión continuada con otro agente
       // o con otro modelo ya no es la misma sesión.
@@ -3833,7 +3954,7 @@ export default function App() {
     if (esProvisional(id) || hilos()[id]) return;
     const generation = sessionGeneration;
     try {
-      const s = await invoke<Session>("load_session", { project, id });
+      const s = await leerTarea(project, id);
       if (generation !== sessionGeneration) return;
       loadResult(id, s, false, generation);
     } catch {
@@ -6066,6 +6187,8 @@ export default function App() {
            abierta—: una celda separada tiene su propia lectura en vuelo. Es
            opcional: `tsc` no avisa si se pierde. */
         cargando={cargandoHilo() !== null && cargandoHilo() === pp.sesion}
+        masAntiguos={!!conAntiguos()[pp.sesion ?? ""]}
+        onAntiguos={() => cargarAntiguos(proyectoDeLaCelda()?.id ?? "", pp.sesion ?? "")}
         /* El medidor de memoria es de la sesión abierta —`ventana` se
            recalcula al abrir otra—: una celda separada no tiene el suyo. Va
            `null`, que el contrato lee como «todavía no hay ninguno». Pasarle

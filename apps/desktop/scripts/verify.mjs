@@ -391,6 +391,12 @@ const steps = [
     root,
   ],
   [
+    "Las páginas del historial se juntan sin mezclar transcripciones distintas",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/push-history.test.ts")],
+    root,
+  ],
+  [
     "Abrir un hilo largo monta su final y lo de arriba llega al subir",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/thread-window.test.ts")],
@@ -488,6 +494,8 @@ const steps = [
   ["La preparación en curso deja seguir a quien llega tarde", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/setup-in-flight.test.mjs")], root],
   ["La preparación no se abre con la app pintada ni se queda ciega", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/setup-repair.test.mjs")], root],
   ["La franja de consumo sigue a la cuenta activa cuando cambia por cupo", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/usage-active-account.test.mjs")], root],
+  ["Con el stream empujado los lotes llegan a los oyentes y el historial se pagina", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/push-stream.test.mjs")], root],
+  ["Sin el stream empujado la ventana sondea como siempre", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/push-fallback.test.mjs")], root],
   ["Abrir una tarea larga no cuesta más que su techo", process.execPath, [join(root, "tests/perf/open-task-cost.mjs")], root],
   ["Releer una tarea abierta no remonta su hilo", process.execPath, [join(root, "tests/perf/reread-thread.mjs")], root],
   ["Una sesión larga no deja memoria detrás", process.execPath, ["--expose-gc", join(root, "tests/perf/long-session.mjs")], root],

@@ -1,4 +1,4 @@
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "../../lib/serviceEvents";
 import Copy from "lucide-solid/icons/copy";
 import { createEffect, createSignal, Match, onCleanup, Show, Switch } from "solid-js";
 import { copyText } from "../../lib/clipboard";

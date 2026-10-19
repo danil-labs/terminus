@@ -1,4 +1,4 @@
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "../../lib/serviceEvents";
 import Coffee from "lucide-solid/icons/coffee";
 import { createSignal, For, onCleanup, Show } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";

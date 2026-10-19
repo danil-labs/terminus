@@ -9,7 +9,10 @@ use std::{
     time::{Duration, Instant},
 };
 use tauri::{Emitter, Manager};
-use terminus_engine_client::Client;
+use terminus_engine_client::{
+    push::{Feed, Start},
+    Client,
+};
 use terminus_engine_protocol::{Error, StreamPage};
 
 type OwnedWatch = (Option<String>, Arc<AtomicBool>);
@@ -98,6 +101,15 @@ const WAKES: &[&str] = &[
     "resume_awaiting_quota",
     "recreate_task_work",
 ];
+/// La suscripción viva y el cursor que la ventana ya recibió de ella.
+struct Fed {
+    client: Arc<Client>,
+    feed: Feed,
+    delivered: Option<u64>,
+}
+// Cuánto espera `service_poll` lo empujado antes de contestar sin eventos.
+const PUSH_WAIT: Duration = Duration::from_secs(20);
+const HISTORY_TURNS: u64 = 150;
 
 pub(super) struct State {
     client: RwLock<Arc<Client>>,
@@ -115,6 +127,8 @@ pub(super) struct State {
     watchers: Mutex<std::collections::BTreeMap<String, OwnedWatch>>,
     clones: Mutex<std::collections::BTreeMap<String, Option<String>>>,
     streams: Mutex<Vec<(String, Option<String>)>>,
+    feed: Mutex<Option<Fed>>,
+    sessions: Mutex<Option<Vec<String>>>,
 }
 impl State {
     pub fn new(client: Arc<Client>, autostart: bool) -> Self {
@@ -134,6 +148,8 @@ impl State {
             watchers: Mutex::new(Default::default()),
             clones: Mutex::new(Default::default()),
             streams: Mutex::new(Vec::new()),
+            feed: Mutex::new(None),
+            sessions: Mutex::new(None),
         }
     }
     pub fn client(&self) -> Arc<Client> {
@@ -246,8 +262,14 @@ impl State {
         self.woke.store(true, Ordering::SeqCst);
         Ok(())
     }
+    fn stop_feed(&self) {
+        if let Some(fed) = self.feed.lock().unwrap_or_else(|p| p.into_inner()).take() {
+            fed.feed.stop();
+        }
+    }
     pub fn close(&self) {
         self.closed.store(true, Ordering::SeqCst);
+        self.stop_feed();
         let streams = std::mem::take(&mut *self.streams.lock().unwrap_or_else(|p| p.into_inner()));
         let deadline = std::time::Instant::now() + Duration::from_secs(3);
         let watchers =
@@ -332,6 +354,8 @@ pub(super) fn desktop_command(name: &str) -> bool {
                 | "tray_notify"
                 | "machine_list"
                 | "machine_select"
+                | "service_filter"
+                | "load_history"
         )
 }
 pub(super) fn with_desktop(
@@ -763,7 +787,12 @@ pub(super) fn service_poll(
     {
         return Err(failure(&Error::new("version_mismatch")));
     }
-    let polled = state.client().request(
+    let client = state.client();
+    // Configuración sondea a la vez que la app: con su propio cursor, por el camino de siempre.
+    if client.push_stream() && setup != Some(true) {
+        return pushed(&app, &state, client, cursor, replay, runtime);
+    }
+    let polled = client.request(
         "service events",
         workspace.clone(),
         json!({"cursor":cursor,"workspace":workspace,"replay":replay,"desktop":true,"desktop_pid":std::process::id(),"tail":setup==Some(true)&&cursor.is_none()}),
@@ -774,26 +803,7 @@ pub(super) fn service_poll(
         Err(error)
             if error.code == "app_unavailable" || state.client().check_selection().is_err() =>
         {
-            if state.remote() {
-                return Err(
-                    json!({"what":{"clave":"shell.service.machine_off"},"detail":"machine_off"}),
-                );
-            }
-            // Sin motor que relanzar (un antivirus puede apartarlo), el aviso dice eso y no «no responde».
-            if let Err(restart) = state.restart() {
-                let shown = if restart.code == "engine_missing" {
-                    restart
-                } else {
-                    error
-                };
-                return Err(failure(&shown));
-            }
-            if let Some(window) = app.get_window("main") {
-                let _ = window.set_title(&super::title(&app));
-            }
-            return Ok(
-                json!({"cursor":null,"gap":false,"replay":true,"runtime":state.client().runtime(),"reset":true}),
-            );
+            return restarted(&app, &state, error);
         }
         other => other.map_err(|e| failure(&e))?,
     };
@@ -802,10 +812,7 @@ pub(super) fn service_poll(
             let Some(name) = event["name"].as_str() else {
                 return Err(failure(&Error::new("invalid_request")));
             };
-            if !manifest()["events"]
-                .as_array()
-                .is_some_and(|names| names.iter().any(|v| v == name))
-            {
+            if !known_event(name) {
                 return Err(failure(&Error::new("invalid_request")));
             }
             if setup != Some(true) || matches!(name, "bootstrap" | "bootstrap-run" | "toolchain") {
@@ -817,6 +824,152 @@ pub(super) fn service_poll(
     Ok(
         json!({"cursor":page["cursor"],"gap":page["gap"] == true,"streams":state.stream_gap.swap(false, Ordering::SeqCst),"replay":page["replay"],"runtime":state.client().runtime(),"reset":false}),
     )
+}
+fn known_event(name: &str) -> bool {
+    manifest()["events"]
+        .as_array()
+        .is_some_and(|names| names.iter().any(|v| v == name))
+}
+fn restarted(app: &tauri::AppHandle, state: &State, error: Error) -> Result<Value, Value> {
+    if state.remote() {
+        return Err(json!({"what":{"clave":"shell.service.machine_off"},"detail":"machine_off"}));
+    }
+    // Sin motor que relanzar (un antivirus puede apartarlo), el aviso dice eso y no «no responde».
+    if let Err(restart) = state.restart() {
+        let shown = if restart.code == "engine_missing" {
+            restart
+        } else {
+            error
+        };
+        return Err(failure(&shown));
+    }
+    if let Some(window) = app.get_window("main") {
+        let _ = window.set_title(&super::title(app));
+    }
+    Ok(
+        json!({"cursor":null,"gap":false,"replay":true,"runtime":state.client().runtime(),"reset":true}),
+    )
+}
+/// Lo empujado desde la última llamada, en lotes que la ventana reparte a sus
+/// oyentes. La suscripción sigue al cursor que manda la ventana: otro, una recarga.
+fn pushed(
+    app: &tauri::AppHandle,
+    state: &State,
+    client: Arc<Client>,
+    cursor: Option<u64>,
+    replay: bool,
+    runtime: Option<String>,
+) -> Result<Value, Value> {
+    let feed = {
+        let mut fed = state.feed.lock().unwrap_or_else(|p| p.into_inner());
+        let current = fed
+            .as_ref()
+            .filter(|fed| Arc::ptr_eq(&fed.client, &client) && fed.delivered == cursor)
+            .map(|fed| fed.feed.clone());
+        match current {
+            Some(feed) => feed,
+            None => {
+                if let Some(old) = fed.take() {
+                    old.feed.stop();
+                }
+                let sessions = state
+                    .sessions
+                    .lock()
+                    .unwrap_or_else(|p| p.into_inner())
+                    .clone();
+                let feed = Feed::start(
+                    client.clone(),
+                    Start {
+                        cursor,
+                        replay,
+                        runtime,
+                        sessions,
+                    },
+                );
+                *fed = Some(Fed {
+                    client: client.clone(),
+                    feed: feed.clone(),
+                    delivered: cursor,
+                });
+                feed
+            }
+        }
+    };
+    let page = feed.next(PUSH_WAIT);
+    if let Some(error) = page.failure {
+        if error.code == "app_unavailable" || client.check_selection().is_err() {
+            state.stop_feed();
+            return restarted(app, state, error);
+        }
+        return Err(failure(&error));
+    }
+    if let Some(fed) = state
+        .feed
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .as_mut()
+        .filter(|fed| Arc::ptr_eq(&fed.client, &client))
+    {
+        fed.delivered = page.cursor;
+    }
+    let mut batches = page.batches;
+    for batch in &mut batches {
+        if let Some(events) = batch["events"].as_array_mut() {
+            events.retain(|event| event["name"].as_str().is_some_and(known_event));
+        }
+    }
+    Ok(
+        json!({"cursor":page.cursor,"gap":page.gap,"streams":state.stream_gap.swap(false, Ordering::SeqCst),"replay":false,"runtime":client.runtime(),"reset":false,"push":true,"batches":batches}),
+    )
+}
+/// Las tareas cuyo flujo token a token quiere la ventana: las visibles y las que corren.
+#[tauri::command]
+pub(super) fn service_filter(
+    app: tauri::AppHandle,
+    sessions: Option<Vec<String>>,
+) -> Result<(), Value> {
+    let state = app
+        .try_state::<Arc<State>>()
+        .ok_or_else(|| failure(&Error::new("app_unavailable")))?;
+    *state.sessions.lock().unwrap_or_else(|p| p.into_inner()) = sessions.clone();
+    if let Some(fed) = state
+        .feed
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .as_ref()
+    {
+        fed.feed.filter(sessions);
+    }
+    Ok(())
+}
+/// Una tarea con sus últimos turnos (`service history`) y su lugar en la
+/// transcripción entera. Un motor sin el stream empujado la manda entera.
+#[tauri::command(async)]
+pub(super) fn load_history(
+    app: tauri::AppHandle,
+    project: String,
+    id: String,
+    before: Option<u64>,
+) -> Result<Value, Value> {
+    let state = app
+        .try_state::<Arc<State>>()
+        .ok_or_else(|| failure(&Error::new("app_unavailable")))?;
+    let client = state.client();
+    if !client.push_stream() {
+        let mut session = invoke(&state, "load_session", json!({"project":project,"id":id}))?;
+        let total = session["turns"].as_array().map_or(0, Vec::len);
+        session["history"] =
+            json!({"total":total,"start":0,"end":total,"limit":total,"has_more":false});
+        return Ok(session);
+    }
+    client
+        .request(
+            "service history",
+            state.workspace(),
+            json!({"project":project,"id":id,"turns":HISTORY_TURNS,"before":before}),
+            Duration::from_secs(30),
+        )
+        .map_err(|e| failure(&e))
 }
 #[tauri::command]
 pub(super) fn service_prepare_update() -> Result<(), Value> {

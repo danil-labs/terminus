@@ -1,4 +1,4 @@
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "../../lib/serviceEvents";
 import { createEffect, For, type JSX, Match, onCleanup, onMount, Show, Switch, createSignal } from "solid-js";
 import { markConnected } from "../../lib/engineConnection";
 import { t } from "../../lib/i18n";

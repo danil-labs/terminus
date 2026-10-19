@@ -1,5 +1,5 @@
 import { invoke } from "../../lib/invoke.ts";
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "../../lib/serviceEvents";
 import { createEffect, createSignal, For, on, onCleanup, Show } from "solid-js";
 import {
   adoptGovernance,

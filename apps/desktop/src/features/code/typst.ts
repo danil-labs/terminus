@@ -1,4 +1,4 @@
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "../../lib/serviceEvents";
 import { createEffect, createRoot, createSignal, on } from "solid-js";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";

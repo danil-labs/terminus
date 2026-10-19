@@ -227,6 +227,8 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
             proxy::service_poll,
             proxy::machine_list,
             proxy::machine_select,
+            proxy::service_filter,
+            proxy::load_history,
             proxy::service_prepare_update,
             proxy::service_cancel_update,
             sites::site_sweep,

@@ -1,4 +1,4 @@
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "../../lib/serviceEvents";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { copyText } from "../../lib/clipboard";
 import { t } from "../../lib/i18n";

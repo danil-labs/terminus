@@ -8,7 +8,7 @@ import GitBranch from "lucide-solid/icons/git-branch";
 import Monitor from "lucide-solid/icons/monitor";
 import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
 import Sparkles from "lucide-solid/icons/sparkles";
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "../../lib/serviceEvents";
 import { createSignal, For, type JSX, onCleanup, onMount, Show } from "solid-js";
 import { t } from "../../lib/i18n";
 import { type Superficie } from "../../lib/surfaces";

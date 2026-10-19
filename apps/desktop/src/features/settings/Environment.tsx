@@ -8,7 +8,7 @@ import {
   onMount,
 } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "../../lib/serviceEvents";
 import RefreshCw from "lucide-solid/icons/refresh-cw";
 import SquareArrowOutUpRight from "lucide-solid/icons/square-arrow-out-up-right";
 import ChevronDown from "lucide-solid/icons/chevron-down";

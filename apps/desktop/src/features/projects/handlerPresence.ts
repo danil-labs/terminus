@@ -1,4 +1,4 @@
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "../../lib/serviceEvents";
 import { createEffect, createSignal, onCleanup } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
 import type { HandlerStatus, HandlerStatusRow } from "../../lib/model";

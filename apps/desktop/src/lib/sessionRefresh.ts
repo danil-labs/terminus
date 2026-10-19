@@ -68,6 +68,16 @@ export function conservarEnOrden<T>(previous: T[], incoming: T[]): T[] {
   return kept.length === previous.length && kept.every((row, i) => row === previous[i]) ? previous : kept;
 }
 
+/** Como `conservarEnOrden`, alineando por el final: para cuando se antepone lo anterior. */
+export function conservarPorElFinal<T>(previous: T[], incoming: T[]): T[] {
+  const offset = incoming.length - previous.length;
+  const kept = incoming.map((row, i) => {
+    const j = i - offset;
+    return j >= 0 && j < previous.length && mismoValor(previous[j], row) ? previous[j] : row;
+  });
+  return kept.length === previous.length && kept.every((row, i) => row === previous[i]) ? previous : kept;
+}
+
 // Descartar una respuesta cuando salió otra después deja la lista vacía si esa
 // otra no vuelve; pintar vacío ante un fallo esconde las tareas hasta el
 // siguiente aviso.
