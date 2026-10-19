@@ -1,6 +1,6 @@
 /**
  * Configuración → Cuenta de Danil contra un motor simulado: entrar con el
- * correo de un workspace, con el navegador, cancelar y cerrar sesión. Monta `dist/`.
+ * navegador, cancelar y cerrar sesión. Monta `dist/`.
  */
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -21,8 +21,9 @@ const BASE = {
   service_poll: { cursor: 0, gap: false, replay: false, runtime: "test-service", reset: false },
 };
 
-test("la cuenta de Danil entra con un correo conocido o con el navegador, y cierra sesión", async () => {
+test("la cuenta de Danil entra con el navegador, muestra el código y cierra sesión", async () => {
   let status = { state: "disconnected", name: "alberto-mbp" };
+  let refuseOnce = true;
   const calls = [];
   const record = (command, reply) => (args) => {
     calls.push({ command, args });
@@ -31,15 +32,11 @@ test("la cuenta de Danil entra con un correo conocido o con el navegador, y cier
   const app = await boot("listo", "danil-account", {
     ...BASE,
     danil_connect_status: record("danil_connect_status", () => status),
-    danil_connect_options: record("danil_connect_options", () => [
-      { workspace: "w-ok", name: "Danil", email: "alberto@danil.ai" },
-      { workspace: "w-sin", name: "Cliente", email: "sin@cuenta.mx" },
-    ]),
-    danil_connect_start: record("danil_connect_start", (args) => {
-      if (args?.workspace === "w-sin") throw Object.assign(new Error("no_danil_account"), { what: { clave: "danil.error.no_danil_account" }, detail: "no_danil_account" });
-      if (args?.workspace === "w-ok") {
-        status = { state: "connected", computer_id: "cmp_1", name: args.name, email: "alberto@danil.ai", online: true };
-        return status;
+    danil_connect_options: record("danil_connect_options", () => [{ workspace: "w-ok", name: "Danil", email: "alberto@danil.ai" }]),
+    danil_connect_start: record("danil_connect_start", () => {
+      if (refuseOnce) {
+        refuseOnce = false;
+        throw Object.assign(new Error("rate_limited"), { what: { clave: "danil.error.rate_limited" }, detail: "rate_limited" });
       }
       status = {
         state: "pending",
@@ -68,30 +65,36 @@ test("la cuenta de Danil entra con un correo conocido o con el navegador, y cier
   assert.ok(w.document.getElementById("cfg-tab-cuenta-danil")?.textContent.includes("Cuenta de Danil"), "the rail shows the section");
   assert.equal(panel()?.dataset.danilAccount, "disconnected");
   assert.equal(panel().querySelector("input")?.value, "alberto-mbp", "the name defaults to the hostname the engine suggests");
-  assert.ok(button("Continuar como alberto@danil.ai") && button("Continuar como sin@cuenta.mx"), "one button per email");
-  assert.ok(button("Iniciar sesión con otra cuenta"), "the browser stays as the other way in");
+  assert.ok(!text().includes("Continuar como"), "one-click sign-in stays off while the account is Supabase only");
+  assert.ok(!calls.some((c) => c.command === "danil_connect_options"), "nor are the known emails asked for");
+  assert.ok(button("Iniciar sesión con Danil"), "the browser is the way in");
 
-  button("Continuar como sin@cuenta.mx").click();
+  button("Iniciar sesión con Danil").click();
   await settle();
-  assert.ok(text().includes("Ese correo no tiene cuenta de Danil"), text());
+  assert.ok(text().includes("Demasiados intentos"), text());
   assert.equal(panel()?.dataset.danilAccount, "disconnected");
 
   const input = panel().querySelector("input");
   input.value = "Mac de Alberto";
   input.dispatchEvent(new w.Event("input", { bubbles: true }));
-  button("Iniciar sesión con otra cuenta").click();
+  button("Iniciar sesión con Danil").click();
   await settle();
-  assert.deepEqual(calls.find((c) => c.command === "danil_connect_start" && !c.args?.workspace)?.args, { name: "Mac de Alberto" });
+  assert.deepEqual(calls.filter((c) => c.command === "danil_connect_start").at(-1)?.args, { name: "Mac de Alberto" });
   assert.equal(calls.find((c) => c.command === "open_external")?.args?.target, "https://app.danil.ai/terminus/connect?code=WDJB-MJHT");
   assert.ok(text().includes("Confirma en el navegador · código WDJB-MJHT"), text());
+  assert.ok(!text().includes("Demasiados intentos"), "a new attempt clears the old failure");
+
+  button("Abrir de nuevo").click();
+  await settle();
+  assert.equal(calls.filter((c) => c.command === "open_external").length, 2);
 
   button("Cancelar").click();
   await settle();
   assert.equal(panel()?.dataset.danilAccount, "disconnected");
 
-  button("Continuar como alberto@danil.ai").click();
+  // La página de aprobación confirma y el motor avisa por el evento.
+  app.emit("danil-connect", { state: "connected", computer_id: "cmp_1", name: "Mac de Alberto", email: "alberto@danil.ai", online: true });
   await settle();
-  assert.equal(calls.filter((c) => c.command === "open_external").length, 1, "a known email does not open the browser");
   assert.ok(text().includes("alberto@danil.ai · esta computadora: Mac de Alberto"), text());
   assert.ok(text().includes("En línea con Danil."));
 
@@ -99,9 +102,9 @@ test("la cuenta de Danil entra con un correo conocido o con el navegador, y cier
   await settle();
   assert.equal(panel()?.dataset.danilAccount, "error", "the event carries the whole state");
   assert.ok(text().includes("Esta computadora se quitó de tu cuenta de Danil"), text());
-  assert.ok(button("Iniciar sesión con otra cuenta"), "from an error the person can sign in again");
+  assert.ok(button("Iniciar sesión con Danil"), "from an error the person can sign in again");
 
-  // Por el navegador el motor no conoce el correo.
+  // Por el navegador el motor puede no conocer el correo.
   app.emit("danil-connect", { state: "connected", computer_id: "cmp_1", name: "Mac", online: false });
   await settle();
   assert.ok(text().includes("Tu cuenta de Danil · esta computadora: Mac"), text());

@@ -16,7 +16,7 @@ export function Pantalla(props: {
   pie: string;
   atras?: () => void;
   atrasRotulo?: string;
-  primario: { rotulo: string; onClick: () => void; disabled?: boolean };
+  primario: { rotulo: string; onClick: () => void; disabled?: boolean; variant?: "primary" | "secondary" };
   error?: unknown;
 }) {
   const saltar = useContext(SaltarAlta);
@@ -76,7 +76,7 @@ export function Pantalla(props: {
             </Button>
           )}
         </Show>
-        <Button size="sm" disabled={props.primario.disabled} onClick={() => props.primario.onClick()}>
+        <Button size="sm" variant={props.primario.variant} disabled={props.primario.disabled} onClick={() => props.primario.onClick()}>
           {props.primario.rotulo}
         </Button>
       </footer>

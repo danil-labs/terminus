@@ -1,4 +1,4 @@
-import { lazy, Match, Show, Switch } from "solid-js";
+import { lazy, Match, Show, Suspense, Switch } from "solid-js";
 import { t } from "../../lib/i18n";
 import { capabilities } from "../../lib/platform";
 import { cn } from "../../lib/utils";
@@ -23,6 +23,8 @@ import Espacio from "./steps/Workspace";
 
 // Una computadora gestionada llega preparada y con sus asistentes: en el navegador el alta es otra.
 const AltaGestionada = lazy(() => import("../../web/Onboarding"));
+// Chunk aparte con las frases de Danil: la carga inicial está en su techo.
+const IniciarSesionDanil = lazy(() => import("./steps/DanilSignIn"));
 
 /**
  * El alta, en el orden de la propuesta de `design/onboarding-review`: proveedores
@@ -56,7 +58,7 @@ export default function Onboarding(props: {
         data-tauri-drag-region=""
         onDblClick={toggleMaximizeFromHeader}
       >
-        <Fases actual={alta.estado.paso === "agents" ? 1 : 2} />
+        <Fases actual={alta.estado.paso === "agents" || alta.estado.paso === "danil" ? 1 : 2} />
         <span class="flex-1 self-stretch" data-tauri-drag-region="" />
         <Show when={isWindows()}>
           <ControlesDeVentana />
@@ -65,6 +67,11 @@ export default function Onboarding(props: {
 
       <SaltarAlta.Provider value={props.nuevo ? undefined : configurarAMano}>
       <Switch>
+        <Match when={alta.estado.paso === "danil"}>
+          <Suspense fallback={<div class="flex-1" />}>
+            <IniciarSesionDanil alta={alta} />
+          </Suspense>
+        </Match>
         <Match when={alta.estado.paso === "agents"}>
           <Proveedores alta={alta} />
         </Match>

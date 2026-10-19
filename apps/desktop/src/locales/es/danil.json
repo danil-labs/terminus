@@ -3,7 +3,7 @@
   "danil.account.description": "Inicia sesión con tu cuenta de Danil. Esta computadora queda registrada en tu cuenta.",
   "danil.account.name_label": "Nombre de esta computadora",
   "danil.account.continue_as": "Continuar como {email}",
-  "danil.account.sign_in": "Iniciar sesión",
+  "danil.account.sign_in": "Iniciar sesión con Danil",
   "danil.account.sign_in_other": "Iniciar sesión con otra cuenta",
   "danil.account.pending": "Confirma en el navegador · código {code}",
   "danil.account.pending_hint": "Se abrió la página de Danil. Si no la ves, ábrela de nuevo.",
@@ -48,5 +48,13 @@
   "danil.connect.ambiguous": "Tu correo pertenece a más de una cuenta de Danil. Escríbenos a soporte y te ayudamos.",
   "danil.connect.no_account": "Tu sesión no corresponde a una cuenta de Danil.",
   "danil.connect.deny": "No conectar",
-  "danil.connect.denied": "Listo, no se conectó. Puedes cerrar esta página."
+  "danil.connect.denied": "Listo, no se conectó. Puedes cerrar esta página.",
+  "danil.onboarding.title": "Inicia sesión con Danil.",
+  "danil.onboarding.lede": "Esta computadora queda registrada en tu cuenta de Danil. Se abre Danil en tu navegador y solo confirmas.",
+  "danil.onboarding.footer": "Puedes hacerlo después en Configuración → Cuenta de Danil.",
+  "danil.onboarding.later": "Ahora no",
+  "danil.footer.sign_in": "Iniciar sesión",
+  "danil.footer.sign_in_title": "Iniciar sesión con Danil",
+  "danil.footer.online": "{who} · en línea con Danil",
+  "danil.footer.offline": "{who} · sin conexión con Danil por ahora"
 }

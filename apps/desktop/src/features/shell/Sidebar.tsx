@@ -56,6 +56,7 @@ import { flattenTasks, folderCounts } from "./sidebarTasks";
 const SidebarFilter = lazy(() => import("./SidebarFilter").then((m) => ({ default: m.SidebarFilter })));
 const AgentDock = lazy(() => import("./AgentDock"));
 const FolderGroupHeader = lazy(() => import("./FolderGroupHeader"));
+const DanilFooterEntry = lazy(() => import("./DanilFooterEntry"));
 
 /* El ancho vive en `ColumnaLateral`, que es la columna que envuelve a esta
    barra. Aquí había cuatro constantes —expandido, mínimo, máximo y el riel— que
@@ -681,6 +682,11 @@ export default function Sidebar(props: {
         </Show>
         <SidebarFooter class="border-t border-border p-2">
           <div class={cn("flex items-center justify-end gap-1", props.collapsed && "flex-col")}>
+            <Show when={capabilities().danilAccount}>
+              <Suspense>
+                <DanilFooterEntry collapsed={props.collapsed} onOpen={() => props.onSettings("cuenta-danil")} />
+              </Suspense>
+            </Show>
             <Show when={!props.collapsed && props.onArchivadas}>
               <Button
                 variant={props.viendoArchivadas ? "secondary" : "ghost"}
