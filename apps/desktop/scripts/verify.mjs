@@ -373,6 +373,12 @@ const steps = [
     root,
   ],
   [
+    "Un proyecto tiene color estable y una ubicación legible",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/project-settings.test.ts")],
+    root,
+  ],
+  [
     "Una pestaña no se pierde al cerrar otra",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/tabs.test.ts")],

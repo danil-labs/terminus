@@ -105,6 +105,7 @@ import {
   DEFAULT_PERMISSION_MODE_EVENT,
   type DefaultPermissionModeChange,
 } from "../features/settings/DefaultPermissions";
+import type { ContextoDeProyectos } from "../features/settings/ManageProjects";
 import Settings from "../features/settings/Settings";
 import type { Startup } from "../features/settings/workspaces-store";
 import { createAttention, topState } from "../features/shell/attention";
@@ -4037,6 +4038,23 @@ export default function App() {
     name: string;
   } | null>(null);
 
+  /** Ajustes → Proyectos usa las carpetas y las acciones del riel. Un solo objeto: la hoja no se remonta. */
+  const proyectosEnAjustes: ContextoDeProyectos = {
+    get projects() {
+      return proyectosDelRiel();
+    },
+    onAdd: () => setAnadiendoCarpeta(true),
+    onRename: (id, name) => void renombrarProyecto(id, name),
+    onDelete: (id) => void borrarProyecto(id),
+    get onRemoveFromSpace() {
+      return multipleSpaces() ? removeFromActiveSpace : undefined;
+    },
+    onOpenMaterial: (id) => {
+      cerrarAjustes();
+      abrirProyecto(id);
+    },
+  };
+
   function cerrarAjustes() {
     setSettings(null);
     setCuentasTocadas((n) => n + 1);
@@ -5856,6 +5874,7 @@ export default function App() {
           sources={sources()}
           onPick={elegirProyecto}
           onNuevoProyecto={() => setAnadiendoCarpeta(true)}
+          onAdministrar={() => setSettings("proyectos")}
           // Solo al crear: una tarea abierta ya vive en la máquina que la corre.
           machine={
             <Show when={props.nueva && !props.locked}>
@@ -7589,6 +7608,7 @@ export default function App() {
           proyecto={proyectoAbierto() ?? project()}
           agentesEnUso={agentesEnUso()}
           onClose={cerrarAjustes}
+          proyectos={proyectosEnAjustes}
           onAgentProfile={(enProyecto, name) => {
             cerrarAjustes();
             openAgentProfile(enProyecto, name);
