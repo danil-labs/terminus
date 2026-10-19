@@ -514,6 +514,7 @@ const steps = [
   ["En el navegador una computadora apagada monta sin encenderse y despierta al mandarle algo", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-off.test.mjs")], root],
   ["En el navegador lo que el relay guardó se ve con su hora mientras la computadora está apagada", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-cached.test.mjs")], root],
   ["En el navegador un panel junta todas las computadoras y cada orden va a su máquina", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-machines.test.mjs")], root],
+  ["En el navegador un workspace de una máquina se usa en otra y se juntan", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-workspace-here.test.mjs")], root],
   ["En el navegador el alta de una computadora gestionada no instala y conecta las cuentas de nube", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-onboarding.test.mjs")], root],
   ["La preparación en curso deja seguir a quien llega tarde", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/setup-in-flight.test.mjs")], root],
   ["La preparación no se abre con la app pintada ni se queda ciega", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/setup-repair.test.mjs")], root],

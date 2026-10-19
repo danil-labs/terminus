@@ -32,6 +32,8 @@ export type Capabilities = {
   machineName?: (id: string) => string;
   /** Dónde se crea un proyecto nuevo, en el diálogo de añadirlo. */
   machineOnCreate?: (workspace: string | null) => JSX.Element;
+  /** «Usar este workspace aquí» en una máquina que no lo tiene (`features/machines/workspace-here.ts`). */
+  workspaceOnMachine?: boolean;
   /** Bajo la tarjeta de una cuenta: sus máquinas. */
   accountMachines?: (props: AccountMachinesProps) => JSX.Element;
 };
