@@ -85,6 +85,7 @@ import ArchivedTasks from "../features/projects/ArchivedTasks";
 import BaseBranchPicker from "../features/projects/BaseBranchPicker";
 import { watchHandlerStatus, watchHandlerStatuses } from "../features/projects/handlerPresence";
 import { EmptyContext, ProjectPicker } from "../features/projects/Projects";
+import { MachinePicker } from "../features/machines/MachinePicker";
 import VistaDeProyecto from "../features/projects/ProjectView";
 import { DEFAULT_PROFILE, displayName, notifyProfiles, watchProfiles } from "../features/projects/profiles";
 import RecentAgentChats from "../features/projects/RecentAgentChats";
@@ -5705,6 +5706,7 @@ export default function App() {
           sources={sources()}
           onPick={elegirProyecto}
           onNuevoProyecto={() => setAnadiendoCarpeta(true)}
+          machine={<Show when={!props.locked}><MachinePicker /></Show>}
         />
       {/* A General, no a GitHub: la fuente principal del workspace se elige
           en Configuración → General; mandar a GitHub lleva a conectar un

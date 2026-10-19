@@ -215,5 +215,13 @@
   "shell.folder.copy": "Copiar ruta",
   "shell.folder.copied": "Ruta copiada",
   "shell.engine.connecting": "Conectando con el motor…",
-  "shell.sidebar.cached": "Conectando con el motor: estas tareas son de la última vez y se actualizan en cuanto conteste."
+  "shell.sidebar.cached": "Conectando con el motor: estas tareas son de la última vez y se actualizan en cuanto conteste.",
+  "machines.label": "Ejecutar en",
+  "machines.this_mac": "Esta Mac",
+  "machines.this_computer": "Esta computadora",
+  "machines.starting": "Encendiendo {name}…",
+  "machines.active": "en uso",
+  "machines.on": "encendida",
+  "machines.off": "apagada",
+  "machines.failed": "No se pudo encender esa máquina."
 }

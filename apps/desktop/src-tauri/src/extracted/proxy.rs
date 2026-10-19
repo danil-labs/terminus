@@ -17,6 +17,74 @@ type OwnedWatch = (Option<String>, Arc<AtomicBool>);
 /// `--wake <programa>`: el programa enciende la máquina remota y reescribe la
 /// selección. Solo lo disparan las acciones de la persona; el sondeo no la enciende.
 pub(super) static WAKE: OnceLock<(std::path::PathBuf, std::path::PathBuf)> = OnceLock::new();
+
+/// Una máquina con su motor: la de esta ventana, o un host remoto que
+/// `remote-host.py connect` dejó en `<datos>/ai.danil.seldon.remote/<nombre>/`
+/// con su selección y su programa `wake`. Solo una está activa a la vez.
+struct Machine {
+    id: String,
+    local: bool,
+    wake: Option<(std::path::PathBuf, std::path::PathBuf)>,
+    /// El cliente de una máquina inactiva, para volver sin reconectar.
+    parked: Mutex<Option<Arc<Client>>>,
+}
+
+fn remote_machines() -> Vec<(String, std::path::PathBuf, std::path::PathBuf)> {
+    let Some(root) = dirs::data_dir().map(|d| d.join("ai.danil.seldon.remote")) else {
+        return Vec::new();
+    };
+    let Ok(entries) = std::fs::read_dir(root) else {
+        return Vec::new();
+    };
+    let mut found: Vec<_> = entries
+        .flatten()
+        .filter_map(|entry| {
+            let dir = entry.path();
+            let (wake, selection) = (dir.join("wake"), dir.join("selection.json"));
+            (wake.is_file() && selection.is_file()).then(|| {
+                (
+                    entry.file_name().to_string_lossy().into_owned(),
+                    wake,
+                    selection,
+                )
+            })
+        })
+        .collect();
+    found.sort();
+    found
+}
+
+fn machines(autostart: bool) -> Vec<Machine> {
+    let first = match WAKE.get() {
+        Some((program, selection)) => Machine {
+            id: selection
+                .parent()
+                .and_then(|d| d.file_name())
+                .map_or("remote".into(), |n| n.to_string_lossy().into_owned()),
+            local: false,
+            wake: Some((program.clone(), selection.clone())),
+            parked: Mutex::new(None),
+        },
+        None => Machine {
+            id: "local".into(),
+            local: autostart,
+            wake: None,
+            parked: Mutex::new(None),
+        },
+    };
+    let mut all = vec![first];
+    for (id, program, selection) in remote_machines() {
+        if all.iter().all(|m| m.id != id) {
+            all.push(Machine {
+                id,
+                local: false,
+                wake: Some((program, selection)),
+                parked: Mutex::new(None),
+            });
+        }
+    }
+    all
+}
 const WAKES: &[&str] = &[
     "send_message",
     "inject_message",
@@ -38,6 +106,8 @@ pub(super) struct State {
     restart_failure: Mutex<Option<Error>>,
     waking: Mutex<()>,
     woke: AtomicBool,
+    machines: Vec<Machine>,
+    active: AtomicUsize,
     workspace: Mutex<Option<String>>,
     closed: AtomicBool,
     in_flight: AtomicUsize,
@@ -55,6 +125,8 @@ impl State {
             restart_failure: Mutex::new(None),
             waking: Mutex::new(()),
             woke: AtomicBool::new(false),
+            machines: machines(autostart),
+            active: AtomicUsize::new(0),
             workspace: Mutex::new(None),
             closed: AtomicBool::new(false),
             in_flight: AtomicUsize::new(0),
@@ -73,7 +145,7 @@ impl State {
     /// Relanza el motor empaquetado tras un corte, o adopta el que otra ventana relanzó;
     /// como mucho tres veces en diez minutos.
     fn restart(&self) -> Result<(), Error> {
-        if !self.autostart {
+        if !self.autostart || !self.machine().local {
             return Err(Error::new("app_unavailable"));
         }
         let mut restarts = self.restarts.lock().unwrap_or_else(|p| p.into_inner());
@@ -103,9 +175,16 @@ impl State {
             }
         }
     }
-    /// Enciende la máquina con el programa de `--wake` y adopta el motor que publica.
+    fn machine(&self) -> &Machine {
+        &self.machines[self.active.load(Ordering::SeqCst)]
+    }
+    /// La máquina activa es remota: apagada se enciende al actuar, no al sondear.
+    fn remote(&self) -> bool {
+        self.machine().wake.is_some()
+    }
+    /// Enciende la máquina activa con su programa y adopta el motor que publica.
     fn wake(&self) -> Result<(), Error> {
-        let Some((program, selection)) = WAKE.get() else {
+        let Some((program, selection)) = self.machine().wake.clone() else {
             return Err(Error::new("app_unavailable"));
         };
         let _turn = self.waking.lock().unwrap_or_else(|p| p.into_inner());
@@ -117,17 +196,53 @@ impl State {
         {
             return Ok(());
         }
-        let status = std::process::Command::new(program)
-            .arg(selection)
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status()?;
-        if !status.success() {
-            return Err(Error::new("app_unavailable"));
+        let client = woken(&program, &selection)?;
+        *self.client.write().unwrap_or_else(|p| p.into_inner()) = client;
+        self.woke.store(true, Ordering::SeqCst);
+        Ok(())
+    }
+    /// Cambia la máquina activa. Elegir una máquina es querer trabajar en ella:
+    /// si está apagada, se enciende aquí.
+    fn select(&self, id: &str) -> Result<(), Error> {
+        let _turn = self.waking.lock().unwrap_or_else(|p| p.into_inner());
+        let target = self
+            .machines
+            .iter()
+            .position(|m| m.id == id)
+            .ok_or_else(|| Error::new("invalid_request"))?;
+        let current = self.active.load(Ordering::SeqCst);
+        if target == current {
+            return Ok(());
         }
-        let client = Client::select(selection)?;
-        *self.client.write().unwrap_or_else(|p| p.into_inner()) = Arc::new(client);
+        let machine = &self.machines[target];
+        let parked = machine
+            .parked
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .take()
+            .filter(|c| answers(c));
+        let client = match (parked, &machine.wake) {
+            (Some(client), _) => client,
+            (None, Some((program, selection))) => match Client::select(selection) {
+                Ok(client) => Arc::new(client),
+                Err(_) => woken(program, selection)?,
+            },
+            (None, None) => Arc::new(
+                super::engine::paths()
+                    .and_then(|paths| super::engine::ensure(&paths, false))
+                    .and_then(|selection| Client::select(&selection))?,
+            ),
+        };
+        let previous = std::mem::replace(
+            &mut *self.client.write().unwrap_or_else(|p| p.into_inner()),
+            client,
+        );
+        *self.machines[current]
+            .parked
+            .lock()
+            .unwrap_or_else(|p| p.into_inner()) = Some(previous);
+        *self.workspace.lock().unwrap_or_else(|p| p.into_inner()) = None;
+        self.active.store(target, Ordering::SeqCst);
         self.woke.store(true, Ordering::SeqCst);
         Ok(())
     }
@@ -180,6 +295,26 @@ fn command(name: &str) -> Option<&'static Value> {
         .iter()
         .find(|c| c["name"] == name)
 }
+fn answers(client: &Client) -> bool {
+    client
+        .request("status", None, json!({}), Duration::from_secs(2))
+        .is_ok()
+}
+
+/// Corre el programa de encendido, que reabre el túnel y reescribe la selección.
+fn woken(program: &std::path::Path, selection: &std::path::Path) -> Result<Arc<Client>, Error> {
+    let status = std::process::Command::new(program)
+        .arg(selection)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()?;
+    if !status.success() {
+        return Err(Error::new("app_unavailable"));
+    }
+    Ok(Arc::new(Client::select(selection)?))
+}
+
 pub(super) fn desktop_command(name: &str) -> bool {
     command(name).is_some_and(|c| c["kind"] == "desktop")
         || matches!(
@@ -196,6 +331,8 @@ pub(super) fn desktop_command(name: &str) -> bool {
                 | "quit_completely"
                 | "restart_app"
                 | "tray_notify"
+                | "machine_list"
+                | "machine_select"
         )
 }
 pub(super) fn with_desktop(
@@ -638,7 +775,7 @@ pub(super) fn service_poll(
         Err(error)
             if error.code == "app_unavailable" || state.client().check_selection().is_err() =>
         {
-            if WAKE.get().is_some() {
+            if state.remote() {
                 return Err(
                     json!({"what":{"clave":"shell.service.machine_off"},"detail":"machine_off"}),
                 );
@@ -690,4 +827,45 @@ pub(super) fn service_prepare_update() -> Result<(), Value> {
 #[tauri::command]
 pub(super) fn service_cancel_update() -> Result<(), Value> {
     Ok(())
+}
+
+/// Las máquinas de esta ventana y cuál está activa. Una remota inactiva cuenta
+/// como encendida solo si su motor contesta ya: preguntar no la enciende.
+#[tauri::command(async)]
+pub(super) fn machine_list(app: tauri::AppHandle) -> Result<Value, Value> {
+    let state = app
+        .try_state::<Arc<State>>()
+        .ok_or_else(|| failure(&Error::new("app_unavailable")))?;
+    let active = state.active.load(Ordering::SeqCst);
+    let list: Vec<Value> = state
+        .machines
+        .iter()
+        .enumerate()
+        .map(|(i, m)| {
+            let on = if i == active {
+                answers(&state.client())
+            } else if let Some(client) = m.parked.lock().unwrap_or_else(|p| p.into_inner()).as_ref()
+            {
+                answers(client)
+            } else if let Some((_, selection)) = &m.wake {
+                Client::select(selection).is_ok()
+            } else {
+                true
+            };
+            json!({"id": m.id, "local": m.wake.is_none(), "active": i == active, "on": on})
+        })
+        .collect();
+    Ok(json!(list))
+}
+
+#[tauri::command(async)]
+pub(super) fn machine_select(app: tauri::AppHandle, id: String) -> Result<Value, Value> {
+    let state = app
+        .try_state::<Arc<State>>()
+        .ok_or_else(|| failure(&Error::new("app_unavailable")))?;
+    state.select(&id).map_err(|e| failure(&e))?;
+    if let Some(window) = app.get_window("main") {
+        let _ = window.set_title(&super::title(&app));
+    }
+    Ok(json!({"runtime": state.client().runtime()}))
 }
