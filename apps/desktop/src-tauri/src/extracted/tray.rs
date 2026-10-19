@@ -215,12 +215,24 @@ fn in_front(window: &tauri::Window) -> bool {
 /// esté en el centro de notificaciones; la ventana abierta recibe la tarea.
 pub(super) const NOTICE_SCHEME: &str = "terminus-notice";
 
-/// La clave del aviso en `terminus-notice://open?key=<espacio>/<tarea>`.
+/// Cualquier enlace del aviso, aunque su clave no se entienda: nunca es una selección de motor.
+pub(super) fn is_notice(arg: &std::ffi::OsStr) -> bool {
+    arg.to_str()
+        .and_then(|arg| arg.strip_prefix(NOTICE_SCHEME))
+        .is_some_and(|rest| rest.starts_with(':'))
+}
+
+/// La clave del aviso en `terminus-notice://open?key=<espacio>/<tarea>`; Windows
+/// normaliza el enlace antes de lanzarlo y llega como `open/?key=`.
 pub(super) fn notice_key(arg: &std::ffi::OsStr) -> Option<String> {
-    let key = arg
+    let rest = arg
         .to_str()?
         .strip_prefix(NOTICE_SCHEME)?
-        .strip_prefix("://open?key=")?
+        .strip_prefix("://open")?;
+    let key = rest
+        .strip_prefix('/')
+        .unwrap_or(rest)
+        .strip_prefix("?key=")?
         .trim_end_matches('/');
     let valid = !key.is_empty()
         && key.len() <= 200
@@ -315,4 +327,22 @@ fn show_toast(app_id: &str, xml: &str) -> windows::core::Result<()> {
     document.LoadXml(&HSTRING::from(xml))?;
     let toast = ToastNotification::CreateToastNotification(&document)?;
     ToastNotificationManager::CreateToastNotifierWithId(&HSTRING::from(app_id))?.Show(&toast)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{is_notice, notice_key};
+    use std::ffi::OsStr;
+
+    #[test]
+    fn notice_link_keeps_its_key_after_windows_normalizes_it() {
+        let key = |link: &str| notice_key(OsStr::new(link));
+        let expected = Some("x647g4vc/880mmwzk".to_owned());
+        assert_eq!(key("terminus-notice://open?key=x647g4vc/880mmwzk"), expected);
+        assert_eq!(key("terminus-notice://open/?key=x647g4vc/880mmwzk"), expected);
+        assert_eq!(key("terminus-notice://open/?key=x647g4vc/880mmwzk/"), expected);
+        assert_eq!(key("terminus-notice://open/?key=a%20b"), None);
+        assert!(is_notice(OsStr::new("terminus-notice://otra")));
+        assert!(!is_notice(OsStr::new("--external-host")));
+    }
 }
