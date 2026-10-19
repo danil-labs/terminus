@@ -37,7 +37,7 @@ como la web.
   `packages/protocol`): son funciones de ventana con el contrato renombrado.
   El relay de Danil Computers solo bloquea las funciones de escritorio, así que
   la lista la hace cumplir el cliente (`apps/mobile/src/lib/hosts.ts`, `command_not_allowed`);
-  el bridge de desarrollo contesta 403 con la misma lista.
+  el bridge de desarrollo contesta 403 con la misma lista. Ver «Lista cerrada» abajo.
 - **La lista de tareas es la del sidebar del escritorio (#151)**, adaptada al
   teléfono y derivada del mismo código (`@terminus/tasks`): lista plana de todas
   las carpetas y todas las máquinas, un solo filtro, tarjeta de dos líneas y
@@ -61,6 +61,10 @@ como la web.
 | Tarjeta de dos líneas: estado + título + chincheta; debajo, lo que pide o carpeta, agente, máquina y PR | Igual, sacado de `taskCard`; sin PR ni worktree (el teléfono no lee git); la máquina solo con más de una | Misma información en el mismo orden; lo que el teléfono no puede saber no se inventa |
 | Dock de agentes: una fila de caras al pie del sidebar; clic abre el chat, clic derecho «Ver sus tareas» | Una fila de caras **arriba de la lista**, del mismo orden y reparto (`planDock`, «+k»); tocar abre su chat, mantener pulsado filtra por sus tareas; «Ver todos» abre una hoja | Abajo choca con la barra de pestañas y «Nueva»; arriba se ve al entrar y se va al hacer scroll, sin robar alto a la lista. Mantener pulsado es el clic derecho del teléfono |
 | SpaceBar | Las píldoras de space bajo el workspace, como antes | El escritorio la conserva; es el alcance de la lista |
+| Tarjeta flotante al pasar el mouse (`TaskHoverCard`): título, último mensaje, Carpeta, Agente, Proveedor; Abrir, Fijar, Archivar | **Mantener pulsada** la tarjeta abre una hoja del sistema (`preview`, `fitToContents`) con lo mismo, de `taskPreview` (`@terminus/tasks`), más Máquina si hay más de una; Abrir, Fijar/Desfijar y Archivar con los comandos de la ventana | El teléfono no tiene hover; mantener pulsado es su gesto de vista previa, y la hoja se cierra con el gesto |
+| Cuadro de escribir (`Chat.tsx`): adjuntar y permisos a la izquierda; modelo y razonamiento, y enviar/detener a la derecha; `/`, `@`, `!`; cola con «Mandar ahora» | El mismo cuadro y la misma fila (`apps/mobile/src/ui/Composer.tsx`), con el texto que crece hasta seis líneas; los selectores son hojas desde abajo; `/` y `@` abren la lista sobre el cuadro; `!` lo vuelve terminal («Ejecutar»). En una tarea nueva, encima del cuadro: «Ejecutar en» (más de una máquina), Carpeta, Rama base (con git) y Agente | Popovers y menús no se tocan con el dedo; una fila compacta y hojas sí |
+| Ajustes → Proveedores de IA en la web (#154): una tarjeta por proveedor y correo, consumo una vez, chapas de máquina, «Iniciar sesión en otra máquina» | La misma pantalla (`accounts`), desde la hoja de workspaces (sección Máquinas); el inicio sin pantalla de la máquina (enlace y código) va en una hoja; cerrar sesión pide confirmar | Es la misma regla (`groupAccounts` en `@terminus/computers`); el teléfono abre el enlace en el navegador del sistema y ahí mismo se copia el código |
+| Íconos de Lucide | Los mismos trazos (`apps/mobile/src/ui/lucide.ts`, `apps/mobile/src/ui/Icon.tsx`) con react-native-svg; las marcas de proveedor de `apps/desktop/src/ui/icons.tsx` en `apps/mobile/src/ui/BrandMark.tsx` | Los SF Symbols no existen en Android: la chincheta y el filtro no se veían en el teléfono de prueba |
 
 ## Cómo está armado
 
@@ -96,23 +100,63 @@ Los avisos salen en la app, igual para los dos caminos: una tarea que entra en
 | `signin` | Entrar con la cuenta de Danil; en desarrollo, el enlace al bridge. Siempre va primero: un bridge emparejado no la salta, salvo en Android con `EXPO_PUBLIC_TERMINUS_BRIDGE_ONLY=1` (lab sin cuenta). En iOS siempre se inicia sesión |
 | `(tabs)/index` | Tareas: workspace, spaces, alcance y filtro, dock de agentes y la lista plana |
 | `(tabs)/notifications` | «Ahora» de todas las máquinas y «Antes», lo que llegó con la app abierta |
-| `(tabs)/new` | Nueva tarea: máquina (la última usada, si no la VM), carpeta, agente opcional y encargo |
+| `(tabs)/new` | Nueva tarea: el cuadro de escribir con «Ejecutar en» (la última usada, si no la VM), carpeta, rama base y agente; `!` la crea con un comando |
+| `preview` | Vista previa de una tarea (mantener pulsada su tarjeta): Abrir, Fijar, Archivar |
+| `accounts` | Proveedores de IA: cuentas por proveedor y correo, consumo, máquinas, iniciar y cerrar sesión |
 | `filter` | Hoja «Filtrar y agrupar» |
 | `agents` | Hoja «Ver todos» del dock |
 | `workspaces` | Hoja con los workspaces, las máquinas y su estado, la cuenta y la conexión de desarrollo |
 | `agent/[workspace]/[name]` | Conversaciones con el agente y cuadro para empezar otra |
-| `task/[host]/[workspace]/[folder]/[id]` | Conversación en la máquina de la tarea: aprobaciones, preguntas, enviar y detener |
+| `task/[host]/[workspace]/[folder]/[id]` | Conversación en la máquina de la tarea: aprobaciones, preguntas y el cuadro de escribir (modelo, permisos, adjuntos, `/`, `@`, `!`, cola y detener) |
 | `pair` | Bridge de desarrollo; también `terminus-mobile://pair?url=…&token=…` |
 | `auth/callback` | La vuelta del navegador del inicio con Google o Microsoft |
 
-Las tareas nuevas usan el proveedor y el modelo de la tarea más reciente de esa
-máquina (o del agente); si no hay ninguna, el primer proveedor disponible.
+Las tareas nuevas proponen el proveedor y el modelo de la tarea más reciente de
+esa máquina (o del agente); si no hay ninguna, el primer proveedor disponible.
+El cuadro deja cambiarlos, igual que el razonamiento y los permisos.
+
+## Lista cerrada
+
+`APP_COMMANDS` (`packages/protocol/src/commands.ts`) creció a propósito con lo
+que piden la vista previa, el cuadro de escribir y las cuentas; cada grupo
+lleva su comentario allí:
+
+| Para qué | Lecturas | Acciones |
+|---|---|---|
+| Vista previa | `task_blockers` | `set_session_pinned`, `set_task_archived` |
+| Cuadro de escribir | `list_models`, `list_permission_modes`, `list_slash_menu`, `list_mentions`, `project_base_branches` | `run_shell_command`, `stop_shell_command`, `guardar_imagen_pegada`, `prepare_attachments` |
+| Cuentas de IA | `list_accounts`, `account_status`, `account_limits` | `add_account`, `login_account`, `submit_login_code`, `cancel_login`, `discard_account`, `remove_account` |
+
+**Qué enciende la VM.** El relay solo enciende con su lista de intención
+(`INTENT_COMMANDS`: escribir, crear, aprobar, `!`, iniciar sesión…). Fijar,
+archivar, subir una imagen y agregar o quitar una cuenta no están en ella: para
+esas (`WAKES_FIRST` en `apps/mobile/src/lib/hosts.ts`) el teléfono pide encenderla al plano de
+control (`POST /v1/computers/:id/start`) y espera a que conteste antes de
+mandarlas. Marcar vista, detener o cancelar nunca encienden; abrir la app, una
+tarea, la vista previa o las cuentas tampoco.
+
+**Adjuntos.** El único camino del motor para un archivo que viene de otro
+cliente es el de pegar una imagen (`guardar_imagen_pegada`, en base64): solo
+PNG, JPEG, WebP y GIF, hasta 25 MiB, y el socket corta en 16 MiB por mensaje.
+El teléfono adjunta fotos y archivos de imagen de hasta 11 MB; un PDF u otro
+archivo no viaja por el relay (haría falta un comando del motor para eso).
+
+**Inicio de sesión sin pantalla** (#67 del motor): `add_account` deja la
+cuenta vacía y `login_account` con modo `tuberia` arranca el CLI; los eventos
+`account` de esa máquina traen el enlace (`url`), el código a comparar
+(`confirm`, Codex y Grok, que terminan solos) o la petición de pegarlo
+(`code`, Claude y Antigravity: `submit_login_code`) y el final (`done`, con
+texto si falló). Cancelar es `cancel_login` y `discard_account`, que no borra
+una cuenta que llegó a autenticarse.
 
 ## Probarla
 
 Sin la sesión de nadie, contra el Danil Computers falso (`apps/mobile/scripts/fake-computers.mjs`:
 login de Supabase, `/v1/computers`, `/start` y el relay con espejo, con una VM
-apagada y una Mac propia que comparten un workspace, cada motor con sus ids):
+apagada y una Mac propia que comparten un workspace, cada motor con sus ids;
+además fijar y archivar, el cuadro de escribir, adjuntos con las reglas del
+motor y cuentas de Claude y Codex con su consumo y el inicio sin pantalla —en
+Claude el código bueno es `good-code`—):
 
 ```bash
 cd apps/mobile
@@ -147,10 +191,24 @@ no se abrió la app. Se comprobó:
 - Las pruebas de `packages/computers` y `packages/tasks`, y la cadena del
   escritorio sin Rust (`verify.mjs --no-cargo`), con el guard `shared-design`.
 
+Paridad con el escritorio (2026-10-19, también sin teléfono ni simulador):
+`npm run typecheck`, `npm run doctor` (20/20), `npx expo export --platform
+android` y `npm run computers:smoke` con los pasos nuevos: fijar y desfijar
+(con la VM apagada la enciende antes), archivar con y sin cambios sin guardar,
+los catálogos del cuadro, una imagen adjunta mandada con modelo, razonamiento y
+permisos (un PDF no pasa), «Mandar ahora», `!` creando una tarea, las cuentas
+juntadas por correo con su consumo, el inicio de sesión sin pantalla de Codex
+y de Claude en otra máquina y cerrar la sesión en una; marcar vista y abrir
+siguen sin encender la VM.
+
 **No está comprobado:**
 
 - Ninguna pantalla: ni el inicio de sesión, ni tocar botones, ni el dock, la
-  hoja del filtro o las tarjetas en un simulador o un teléfono.
+  hoja del filtro o las tarjetas en un simulador o un teléfono. Tampoco la
+  vista previa, el cuadro de escribir (teclado, hojas, selector de fotos) ni
+  la pantalla de cuentas.
+- Adjuntos, `!`, ramas base y el inicio de sesión contra un motor de verdad
+  por el relay (solo contra el falso).
 - Google y Microsoft de verdad: necesitan la URL de vuelta en Supabase (abajo).
 - Contra `computers.danil.ai` y una VM real, y contra el bridge con el motor
   del lab después del cambio a `service invoke`.

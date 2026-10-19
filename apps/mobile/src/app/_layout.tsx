@@ -70,6 +70,11 @@ export default function RootLayout() {
             name="agents"
             options={{ presentation: "formSheet", sheetAllowedDetents: [0.5, 0.95], sheetGrabberVisible: true, title: w("shell.agent_dock.title") }}
           />
+          <Stack.Screen
+            name="preview"
+            options={{ presentation: "formSheet", sheetAllowedDetents: "fitToContents", sheetGrabberVisible: true, headerShown: false, sheetCornerRadius: 18 }}
+          />
+          <Stack.Screen name="accounts" options={{ title: w("settings.nav.ai_providers") }} />
           <Stack.Screen name="signin" options={{ headerShown: false }} />
           <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
         </Stack>

@@ -51,9 +51,12 @@ se agregan con `npx expo install <paquete>`, que elige la versión compatible.
   nuevo se agrega a esa lista a propósito, nunca un pase genérico.
 - **Abrir no enciende.** Leer nunca enciende una máquina; solo las acciones de
   la lista de intención del relay (escribir, crear tarea, aprobar, contestar)
-  despiertan una VM administrada. Una máquina propia apagada no se puede
-  despertar: no se le manda la acción (`machine_asleep`) y se dice en tono
-  neutro. Apagada nunca se pinta como error.
+  despiertan una VM administrada. Las acciones que el relay no toma por
+  intención (fijar, archivar, subir una imagen, agregar o quitar una cuenta:
+  `WAKES_FIRST` en `apps/mobile/src/lib/hosts.ts`) la encienden antes por el plano de control.
+  Una máquina propia apagada no se puede despertar: no se le manda la acción
+  (`machine_asleep`) y se dice en tono neutro. Apagada nunca se pinta como
+  error.
 - La cuenta de Danil es la sesión de Supabase y es lo único que se guarda de
   ella, en el llavero (`apps/mobile/src/lib/supabase.ts`). Nada de contraseñas ni tokens
   propios.
@@ -69,7 +72,13 @@ se agregan con `npx expo install <paquete>`, que elige la versión compatible.
   `@terminus/protocol`. Dentro de `packages/` los imports llevan `.ts` y entre
   paquetes van por ruta relativa (`../../design/src/index.ts`).
 - El estado de una tarea se pinta solo con `apps/mobile/src/ui/TaskStatus.tsx`, sobre
-  `@terminus/design`; qué lleva cada línea de la tarjeta lo decide `taskCard`.
+  `@terminus/design`; qué lleva cada línea de la tarjeta lo decide `taskCard`,
+  y la vista previa, `taskPreview`.
+- Los íconos son los de Lucide del escritorio (`apps/mobile/src/ui/Icon.tsx`) y las marcas
+  de proveedor, las de `apps/desktop/src/ui/icons.tsx` (`apps/mobile/src/ui/BrandMark.tsx`). Nada de SF
+  Symbols sin par en Android: en Android no se ven.
+- Las hojas de la pila (`formSheet`) no pintan cabecera en Android: su título
+  va en el contenido (`SheetTitle`).
 - `apps/mobile/src/lib/hosts.ts` y `apps/mobile/src/lib/engine.ts` no importan React Native: así los
   recorre `computers:smoke` en Node. Mantenlo así.
 - `package.json` fija `react-dom` a la versión de `react` en `overrides`: sin

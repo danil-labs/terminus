@@ -33,3 +33,14 @@ export {
 } from "./dock.ts";
 export { type CardOptions, type CardTask, type TaskCard, taskCard } from "./card.ts";
 export { dockStatusText, groupLabel, groupingLabel, scopeLabel, sectionLabel, statusGroupLabel } from "./labels.ts";
+export {
+  type ModelCatalog,
+  type PreviewAction,
+  type PreviewTask,
+  type TaskPreview,
+  type TitledTask,
+  modelName,
+  previewLabel,
+  taskPreview,
+  taskTitle,
+} from "./preview.ts";

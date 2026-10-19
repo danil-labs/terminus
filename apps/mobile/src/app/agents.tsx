@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { Pressable, ScrollView, Text } from "react-native";
 import { lang, w } from "../lib/i18n";
 import { useWorkspaces } from "../lib/workspaces";
-import { Avatar, Row } from "../ui/components";
+import { Avatar, Row, SheetTitle } from "../ui/components";
 import { useTheme } from "../ui/theme";
 
 /** «Ver todos» del dock: cada agente con su estado, su chat y sus tareas. */
@@ -15,6 +15,7 @@ export default function Agents() {
   );
   return (
     <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ paddingVertical: 8 }}>
+      <SheetTitle>{w("shell.agent_dock.title")}</SheetTitle>
       {agents.map((agent) => (
         <Row
           key={agent.name}

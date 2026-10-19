@@ -3,12 +3,13 @@ import { Stack, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
 import { cardOf, marksOf } from "../../../lib/cards";
-import { createTask, defaultsFor, taskKey } from "../../../lib/engine";
+import { createTask, runShell, suggestedDefaults, taskKey } from "../../../lib/engine";
 import { HostError } from "../../../lib/hosts";
 import { lang, t, w } from "../../../lib/i18n";
 import { useMachines } from "../../../lib/machines";
 import { useWorkspaces } from "../../../lib/workspaces";
-import { Avatar, Composer, openTask } from "../../../ui/components";
+import { Avatar, openPreview, openTask } from "../../../ui/components";
+import { Composer, type Submission } from "../../../ui/Composer";
 import { TaskCard } from "../../../ui/TaskCard";
 import { useTheme } from "../../../ui/theme";
 import { KeyboardScreen } from "../../../ui/KeyboardScreen";
@@ -31,12 +32,15 @@ export default function AgentScreen() {
   // El id del workspace en esa máquina: la ruta lleva el del grupo.
   const local = host ? (current?.members.get(host.id) ?? workspace) : workspace;
 
-  async function message(text: string) {
+  const defaults = host ? suggestedDefaults(snapshot?.tasks ?? [], host.id, local, name) : { provider: null, model: null };
+
+  async function message(s: Submission) {
     if (!host || folder === null) return false;
     setNote(null);
     try {
-      const defaults = await defaultsFor(host, local, snapshot?.tasks ?? [], name);
-      const id = await createTask(host, local, { folder, prompt: text, provider: defaults.provider, model: defaults.model, agent: name, space: null });
+      const id = s.shell
+        ? (await runShell(host, local, { folder, session: null, command: s.command, provider: s.provider, model: s.model, effort: s.effort, permissionMode: s.permissionMode, agent: name })).session
+        : await createTask(host, local, { folder, prompt: s.prompt, provider: s.provider, model: s.model, effort: s.effort, permissionMode: s.permissionMode, attachments: s.attachments, agent: name, space: null });
       rememberMachine(host.id);
       openTask(host.id, local, folder, id);
       return true;
@@ -71,12 +75,24 @@ export default function AgentScreen() {
             folderName={folderName}
             density={view.density}
             onPress={() => openTask(item.host, item.workspace, item.folder, item.id)}
+            onLongPress={() => openPreview(item.host, item.id)}
           />
         )}
         ListEmptyComponent={<Text style={[styles.empty, { color: theme.textMuted }]}>{t("agent.empty")}</Text>}
       />
       {note ? <Text style={[styles.note, { color: theme.textMuted }]}>{note}</Text> : null}
-      <Composer testID="agent-composer" placeholder={t("agent.message", { name })} onSend={message} />
+      <Composer
+        testID="agent-composer"
+        host={host ?? undefined}
+        workspace={host ? local : null}
+        folder={folder}
+        session={null}
+        providers={host ? (snapshot?.providers[host.id] ?? []) : []}
+        provider={defaults.provider}
+        model={defaults.model}
+        placeholder={t("agent.message", { name })}
+        onSubmit={message}
+      />
     </KeyboardScreen>
   );
 }

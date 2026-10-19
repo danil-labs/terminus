@@ -34,7 +34,15 @@
         }
       ],
       "expo-web-browser",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Terminus abre tus fotos solo para adjuntar las que elijas a un mensaje.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ]
     ],
     "scheme": "terminus-mobile",
     "experiments": {

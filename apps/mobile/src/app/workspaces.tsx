@@ -7,8 +7,9 @@ import type { Host } from "../lib/hosts";
 import { t, w } from "../lib/i18n";
 import { useMachines } from "../lib/machines";
 import { useWorkspaces } from "../lib/workspaces";
-import { Avatar, Badge, Dot, Row, SectionTitle } from "../ui/components";
+import { Avatar, Badge, Dot, Row, SectionTitle, SheetTitle } from "../ui/components";
 import { TaskMark, type TaskState, topState } from "../ui/TaskStatus";
+import { Icon } from "../ui/Icon";
 import { useTheme } from "../ui/theme";
 
 const NEEDS_YOU = new Set<AttentionState>(["approving", "asked", "failed"]);
@@ -32,6 +33,7 @@ export default function WorkspaceSwitcher() {
 
   return (
     <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ paddingVertical: 8 }}>
+      <SheetTitle>{t("workspaces.title")}</SheetTitle>
       {list.map((workspace) => {
         const tasks = Object.entries(attention).flatMap(([host, ws]) => ws.filter((x) => x.workspace === workspace.members.get(host)).flatMap((x) => x.tasks));
         const pending = tasks.filter((task) => NEEDS_YOU.has(task.state)).length;
@@ -63,6 +65,19 @@ export default function WorkspaceSwitcher() {
           subtitle={`${power(host)} · ${host.kind === "bridge" ? t("signin.dev_bridge") : host.managed ? t("machines.managed") : t("machines.own")}`}
         />
       ))}
+      {hosts.length ? (
+        <Row
+          testID="open-accounts"
+          left={<Icon name="key-round" size={20} color={theme.textMuted} />}
+          title={w("settings.nav.ai_providers")}
+          subtitle={t("accounts.subtitle")}
+          right={<Icon name="chevron-right" size={16} color={theme.textMuted} />}
+          onPress={() => {
+            router.back();
+            router.push("/accounts");
+          }}
+        />
+      ) : null}
 
       {session ? (
         <>

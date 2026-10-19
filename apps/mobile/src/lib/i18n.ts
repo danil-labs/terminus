@@ -1,4 +1,4 @@
-import { type WordKey, word } from "@terminus/design";
+import { type WordKey, WORDS, word } from "@terminus/design";
 import { getLocales } from "expo-localization";
 
 const es = {
@@ -84,6 +84,34 @@ const es = {
   "notify.channel": "Tareas",
   "notify.enable": "Activa los avisos para saber cuándo una tarea termina o te necesita.",
   "notify.enable_button": "Activar avisos",
+  "preview.machine": "Máquina",
+  "preview.blocked": "Tiene cambios sin guardar ({count} archivos): archívala desde Terminus para decidir qué hacer con ellos.",
+  "preview.long_press": "Mantén pulsada una tarea para ver su vista previa",
+  "composer.attach_photos": "Fotos",
+  "composer.attach_files": "Imagen de Archivos",
+  "composer.only_images": "Desde el teléfono se adjuntan imágenes (PNG, JPEG, WebP o GIF) de hasta 11 MB: el relay no lleva otros archivos.",
+  "composer.too_large": "{name} pesa {size} MB y el tope desde el teléfono es 11 MB.",
+  "composer.uploading": "Subiendo {name}…",
+  "composer.upload_failed": "No se pudo subir {name}: {detail}",
+  "composer.queued": "Se manda cuando termine el turno.",
+  "composer.shell_hint": "Comando de terminal en la carpeta de la tarea",
+  "composer.shell_stop": "Detener comando",
+  "composer.settings": "Modelo y permisos",
+  "composer.mention_files": "Archivos y carpetas",
+  "composer.loading": "Cargando…",
+  "composer.no_branches": "Esta carpeta no tiene git: la tarea empieza en la carpeta.",
+  "accounts.subtitle": "Tus cuentas de IA, su consumo y en qué máquinas tienen la sesión iniciada",
+  "accounts.empty": "Ninguna máquina encendida tiene cuentas de {provider} todavía.",
+  "accounts.no_usage": "El consumo se lee de una máquina encendida donde esté la cuenta.",
+  "accounts.sign_out_confirm": "¿Cerrar la sesión de {account} en {name}? En esa máquina, las tareas con {provider} dejarán de poder usar esta cuenta.",
+  "accounts.pick_machine": "¿En qué máquina?",
+  "accounts.connect": "Conectar una cuenta de {provider}",
+  "accounts.connected": "Listo: la sesión quedó iniciada en {name}.",
+  "accounts.machine_off": "{name} está apagada: sus cuentas se ven cuando se encienda.",
+  "accounts.all_signed_in": "Ya tiene la sesión iniciada en todas tus máquinas.",
+  "accounts.failed": "No se pudo iniciar sesión: {detail}",
+  "accounts.waiting": "Esperando a {provider}…",
+  "accounts.close": "Listo",
 } as const;
 
 type Key = keyof typeof es;
@@ -171,6 +199,34 @@ const en: Record<Key, string> = {
   "notify.channel": "Tasks",
   "notify.enable": "Turn on notifications to know when a task finishes or needs you.",
   "notify.enable_button": "Turn on",
+  "preview.machine": "Machine",
+  "preview.blocked": "It has unsaved changes ({count} files): archive it from Terminus to decide what to do with them.",
+  "preview.long_press": "Long press a task to preview it",
+  "composer.attach_photos": "Photos",
+  "composer.attach_files": "Image from Files",
+  "composer.only_images": "From the phone you can attach images (PNG, JPEG, WebP or GIF) up to 11 MB: the relay does not carry other files.",
+  "composer.too_large": "{name} is {size} MB and the limit from the phone is 11 MB.",
+  "composer.uploading": "Uploading {name}…",
+  "composer.upload_failed": "Could not upload {name}: {detail}",
+  "composer.queued": "Sent when the turn ends.",
+  "composer.shell_hint": "Terminal command in the task's folder",
+  "composer.shell_stop": "Stop command",
+  "composer.settings": "Model and permissions",
+  "composer.mention_files": "Files and folders",
+  "composer.loading": "Loading…",
+  "composer.no_branches": "This folder has no git: the task starts in the folder.",
+  "accounts.subtitle": "Your AI accounts, their usage and the machines where they are signed in",
+  "accounts.empty": "No machine that is on has {provider} accounts yet.",
+  "accounts.no_usage": "Usage is read from a machine that is on and has the account.",
+  "accounts.sign_out_confirm": "Sign {account} out on {name}? On that machine, {provider} tasks will no longer be able to use this account.",
+  "accounts.pick_machine": "On which machine?",
+  "accounts.connect": "Connect a {provider} account",
+  "accounts.connected": "Done: it is signed in on {name}.",
+  "accounts.machine_off": "{name} is off: its accounts show up when it starts.",
+  "accounts.all_signed_in": "It is already signed in on all your machines.",
+  "accounts.failed": "Could not sign in: {detail}",
+  "accounts.waiting": "Waiting for {provider}…",
+  "accounts.close": "Done",
 };
 
 /** The language the app speaks, also for the words that come from `@terminus/design`. */
@@ -180,6 +236,13 @@ const catalog: Record<Key, string> = lang === "es" ? es : en;
 
 export function t(key: Key, vars: Record<string, string | number> = {}): string {
   return catalog[key].replace(/\{(\w+)\}/g, (_, name: string) => String(vars[name] ?? ""));
+}
+
+/** Un texto del motor: ya escrito, o una clave del catálogo compartido (si no la tiene, la clave tal cual). */
+export function phrase(value: string | { clave: string; datos?: Record<string, string | number> | null } | null | undefined): string {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  return value.clave in WORDS[lang] ? word(lang, value.clave as WordKey, value.datos ?? {}) : value.clave;
 }
 
 /** Las palabras que comparte con el escritorio (`WORDS` de `@terminus/design`), con su misma clave. */

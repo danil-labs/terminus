@@ -31,6 +31,8 @@ export type SessionRow = {
   pinned?: boolean | null;
   archived?: boolean | null;
   chat_de_agente?: boolean;
+  /** Un hilo nuevo del agente (no su chat de siempre). */
+  agent_thread?: boolean;
   inbox?: boolean;
   parent?: string | null;
   launched_by?: string | null;
@@ -90,3 +92,43 @@ export type ChatEvent = {
 };
 /** Un evento del motor tal como llega (`service events`). */
 export type EngineEvent = { name: string; payload: unknown };
+
+// --- El cuadro de escribir ---------------------------------------------------
+
+/** Un texto del motor: ya escrito, o una clave del catálogo del escritorio con sus datos. */
+export type Frase = string | { clave: string; datos?: Record<string, string | number> | null };
+
+/** Un modelo de `list_models`; `efforts` vacío es que no se elige razonamiento. */
+export type ModelOption = { id: string; label: string; note?: Frase | null; efforts: string[]; default_effort: string | null };
+/** `list_models`. */
+export type ProviderModels = { provider: string; models: ModelOption[]; fallback?: boolean | null };
+/** `list_permission_modes`: `por_omision` es el que toma una tarea nueva; `falta` dice por qué no se puede usar. */
+export type PermissionModeOption = { id: string; label: Frase; falta?: Frase | null; por_omision?: boolean };
+/** `list_slash_menu`: los comandos del CLI y las skills. */
+export type SlashMenu = { commands: { name: string; description?: string | null }[]; skills: { name: string; description?: string | null }[]; side_question?: string | null };
+/** `list_mentions`: archivos y carpetas que se pueden nombrar con `@`. */
+export type MentionList = { fuentes: { ruta: string; tipo: string; fuente?: string | null }[]; truncado?: boolean };
+/** `project_base_branches`. */
+export type BaseBranches = { branches: { reference: string; name: string; remote?: string | null }[]; selected: string | null; fetched_at?: number | null };
+/** `task_blockers`: lo que impide archivar sin preguntar. */
+export type TaskBlockers = { unsaved: { session: string; title: string; files: string[] }[]; not_finished?: boolean };
+
+// --- Cuentas de IA ---------------------------------------------------------------
+
+/** Una cuenta de `list_accounts`; `identity` es el correo, si el CLI lo dice. */
+export type AiAccount = { id: string; label: string; created_at?: number | null; identity: string | null; authenticated_at: number | null };
+/** `list_accounts(provider)`. */
+export type AccountList = { provider: string; active: string | null; accounts: AiAccount[] };
+/** `account_status`. */
+export type AccountStatus = { id: string; authenticated: boolean; detail?: string | null };
+/** Una ventana de consumo: `used_pct` usado (0–100) y cuándo vuelve a empezar, en ms. */
+export type UsageWindow = { label: string; used_pct: number; resets_at: number | null };
+/** `account_limits`: el consumo, si se pudo leer. */
+export type AccountLimits =
+  | { mode: "read"; windows: UsageWindow[]; plan: string | null; fetched_at: number }
+  | { mode: "waiting"; retry_at: number; detail?: unknown; last?: { windows: UsageWindow[]; plan: string | null; fetched_at: number } | null }
+  | { mode: "no_account" | "revoked" | "failed" | "in_use"; what?: unknown; detail?: unknown };
+/** `run_shell_command`: la tarea (nueva si se mandó sin sesión) y su turno. */
+export type ShellRun = { session: string; turn: string };
+/** El evento `account` de un inicio de sesión por tubería (enlace y código); `account` es el id de la cuenta. */
+export type LoginEvent = { account: string; kind: "url" | "confirm" | "code" | "notice" | "done"; text: string };

@@ -1,6 +1,5 @@
 import { applySidebarView, folderCounts, groupLabel, nonDefaultCount, scopeLabel, type SidebarView } from "@terminus/tasks";
 import { router } from "expo-router";
-import { SymbolView } from "expo-symbols";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,7 +10,8 @@ import { useMachines } from "../../lib/machines";
 import { Notifications } from "../../lib/notifications";
 import { spaceName, useWorkspaces } from "../../lib/workspaces";
 import { AgentDock } from "../../ui/AgentDock";
-import { Avatar, Badge, openTask } from "../../ui/components";
+import { Avatar, Badge, openPreview, openTask } from "../../ui/components";
+import { Icon } from "../../ui/Icon";
 import { MachineNote } from "../../ui/MachineNote";
 import { TaskCard } from "../../ui/TaskCard";
 import { TaskMark, topState } from "../../ui/TaskStatus";
@@ -68,7 +68,7 @@ export default function Tasks() {
           <Text style={[styles.workspaceName, { color: theme.text }]} numberOfLines={1}>
             {current?.name ?? "Terminus"}
           </Text>
-          <Text style={{ color: theme.textMuted, fontSize: 16 }}>⌄</Text>
+          <Icon name="chevron-down" size={16} color={theme.textMuted} />
           <Badge count={otherPending} />
         </Pressable>
         {spaces.length > 1 ? (
@@ -101,7 +101,7 @@ export default function Tasks() {
             accessibilityLabel={changed ? w("shell.sidebar.view.trigger_count", { count: changed }) : w("shell.sidebar.view.trigger")}
             style={styles.filter}
           >
-            <SymbolView name="slider.horizontal.3" size={18} tintColor={theme.textMuted} fallback={<Text style={{ color: theme.textMuted }}>☰</Text>} />
+            <Icon name="sliders-horizontal" size={18} color={theme.textMuted} />
             {changed ? (
               <View style={[styles.filterBadge, { backgroundColor: theme.text }]}>
                 <Text style={{ color: theme.bg, fontSize: 10, fontWeight: "700" }}>{changed}</Text>
@@ -149,6 +149,7 @@ export default function Tasks() {
                 folderName={folderName}
                 density={effective.density}
                 onPress={() => openTask(task.host, task.workspace, task.folder, task.id)}
+                onLongPress={() => openPreview(task.host, task.id)}
               />
             ))}
             {!group.tasks.length ? <Text style={[styles.empty, { color: theme.textMuted }]}>{t("folder.empty")}</Text> : null}
