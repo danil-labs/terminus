@@ -37,9 +37,10 @@ const INTENT = new Set(["send_message", "inject_message", "create_project", "cre
 
 /**
  * `cachedAt`: with the computer off, the relay answers every known read from its copy of that time.
- * `table`: this computer's engine replies; `outdated`: its engine speaks another contract.
+ * `table`: this computer's engine replies; `outdated`: its engine speaks another contract;
+ * `notStartable`: the person's own machine, which the relay refuses to start.
  */
-export function relay({ state: initial = "online", wakeAfter = 300, cachedAt = null, table = engine, outdated = false } = {}) {
+export function relay({ state: initial = "online", wakeAfter = 300, cachedAt = null, table = engine, outdated = false, notStartable = false } = {}) {
   const sockets = [];
   const calls = [];
   const subscriptions = [];
@@ -81,6 +82,10 @@ export function relay({ state: initial = "online", wakeAfter = 300, cachedAt = n
       if (!INTENT.has(m.command)) {
         const off = { type: "result", id: m.id, error: { code: "machine_off" } };
         return void setTimeout(() => this.readyState === 1 && this.onmessage?.({ data: JSON.stringify(off) }), 0);
+      }
+      if (notStartable) {
+        const refused = { type: "result", id: m.id, error: { code: "not_remotely_startable" } };
+        return void setTimeout(() => this.readyState === 1 && this.onmessage?.({ data: JSON.stringify(refused) }), 0);
       }
       // An intent starts the computer and is delivered once it says hello.
       setState("starting");

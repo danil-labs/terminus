@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { copyFileSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -97,6 +98,10 @@ function webBuild(serve: boolean): UserConfig {
     define: {
       __TERMINUS_VERSION__: JSON.stringify(version),
       __TERMINUS_WEB__: JSON.stringify({ endpoint, supabaseUrl, supabaseKey, login }),
+      // The same hash the engine announces (`engine-client` `contract()`): a computer with another one needs an update.
+      __TERMINUS_CONTRACT__: JSON.stringify(
+        createHash("sha256").update(readFileSync(fileURLToPath(new URL("./src-tauri/crates/engine-protocol/commands.json", import.meta.url)))).digest("hex"),
+      ),
     },
     plugins: [page],
     build: {
