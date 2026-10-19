@@ -36,6 +36,32 @@ provider installation, account gating and retry recovery in the compiled front
 with simulated IPC. It runs manually, outside `pnpm verify`, and does not check
 the native window or a real ZCode account.
 
+## The browser build
+
+The same front runs in a browser against a Danil Computers relay instead of the
+Tauri window. `src/web/` holds only that entry: it answers the globals of
+`@tauri-apps/api` with a transport over the relay session socket, so the desktop
+bundle never imports it.
+
+```sh
+pnpm web:build                                   # dist-web/, relative paths
+TERMINUS_WEB_CONNECT="wss://relay.example" pnpm web:build   # adds the relay to connect-src
+pnpm web:dev                                     # Vite on /web.html
+```
+
+The host page sets the configuration before or after loading the script:
+
+```js
+window.terminusWeb = { endpoint: "relay.example", computerId: "cmp_…", getToken: async () => jwt, onUnauthorized: () => {} };
+```
+
+`getToken` runs on every connection; the token travels as the WebSocket
+subprotocol `bearer.<token>` next to `danil.computers.v1`. What the window does
+locally (native sites, Typst live, tray, updater, local file pickers, opening
+files on the host) answers with `shell.web.desktop_only` or a browser
+equivalent. `tests/unit/web-transport.test.mjs` mounts `dist-web/` against a
+relay simulated in Node.
+
 ## The engine pin
 
 `seldon-runtime.lock` pins the engine release for each platform, keyed by Rust

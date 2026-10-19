@@ -8,6 +8,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "web:dev": "vite --mode web",
+    "web:build": "tsc -b && vite build --mode web",
     "verify": "node scripts/verify.mjs",
     "lint": "biome lint src scripts",
     "tauri": "tauri",

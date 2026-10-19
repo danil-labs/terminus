@@ -27,6 +27,7 @@ import { peso } from "../../lib/format";
 import { Skeleton } from "../../ui/Skeleton";
 import { RETARDO_TOOLTIP, TooltipContent, TooltipRoot, TooltipTrigger } from "../../ui/Tooltip";
 import { t } from "../../lib/i18n";
+import { capabilities } from "../../lib/platform";
 import { cn } from "../../lib/utils";
 import { Button } from "../../ui/Button";
 import { SettingsBlock, SettingsPanel, SettingsSection } from "./layout";
@@ -173,7 +174,12 @@ export default function Environment() {
 
   return (
     <SettingsPanel>
-      <Actualizacion build={reporte()?.build} />
+      <Show
+        when={capabilities().updater}
+        fallback={<SettingsSection title={t("settings.update.title")} description={t("settings.update.web")} />}
+      >
+        <Actualizacion build={reporte()?.build} />
+      </Show>
       <Show when={reporte()?.engineBuild}>
         {(build) => <p class="text-sm text-neutral-500">{t("settings.environment.engine_build", { build: build() })}</p>}
       </Show>

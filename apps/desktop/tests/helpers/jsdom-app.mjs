@@ -30,11 +30,14 @@ if (!bundle || !existsSync(join(dist, "assets", bundle))) {
 
 // Un chunk perezoso —mermaid— importa el módulo principal sin la query de su pasada.
 // Sin propagarla, Node lo evalúa otra vez y monta una segunda app dentro de #root.
-const assetsUrl = `${pathToFileURL(join(dist, "assets")).href}/`;
+/** La entrada del navegador (`pnpm web:build`), que trae su propio IPC: `boot(..., { web: true })`. */
+export const distWeb = join(raiz, "dist-web");
+const assetsUrls = [dist, distWeb].map((dir) => `${pathToFileURL(join(dir, "assets")).href}/`);
 registerHooks({
   resolve(specifier, context, next) {
     const resolved = next(specifier, context);
-    const pass = context.parentURL?.startsWith(assetsUrl) && new URL(context.parentURL).searchParams.get("v");
+    const assetsUrl = assetsUrls.find((url) => context.parentURL?.startsWith(url));
+    const pass = assetsUrl && new URL(context.parentURL).searchParams.get("v");
     if (!pass || !resolved.url.startsWith(assetsUrl) || resolved.url.includes("?")) return resolved;
     return { ...resolved, url: `${resolved.url}?v=${pass}` };
   },
@@ -74,7 +77,11 @@ export const cause = new AsyncLocalStorage();
  *   normal sube por el `setEnv` de `Setup.revisar` y **la traga su propio
  *   `try`**, que es exactamente por qué este fallo no dejó ni un mensaje.
  */
-export async function boot(entorno, version, respuestas, userAgent, storage = {}) {
+export async function boot(entorno, version, respuestas, userAgent, storage = {}, { web = false, antes } = {}) {
+  const dir = web ? distWeb : dist;
+  const pagina = web ? readFileSync(join(distWeb, "index.html"), "utf8") : indice;
+  const entrada = web ? /<script\b[^>]*\bsrc="\.\/assets\/([^"?]+\.js)"/.exec(pagina)?.[1] : bundle;
+  if (!entrada) throw new Error(`No está el script principal de ${dir}.`);
   const fallos = [];
   const comandos = [];
   const storageQueries = [];
@@ -82,7 +89,7 @@ export async function boot(entorno, version, respuestas, userAgent, storage = {}
   consola.on("jsdomError", (e) => fallos.push(`jsdomError: ${e.stack ?? e.message}`));
   consola.on("error", (...a) => fallos.push(`console.error: ${a.join(" ")}`));
 
-  const dom = new JSDOM(HTML, { url: "http://localhost/", pretendToBeVisual: true, virtualConsole: consola });
+  const dom = new JSDOM(web ? pagina.replace(/<script\b[^>]*><\/script>/g, "").replace(/<link\b[^>]*>/g, "") : HTML, { url: "http://localhost/", pretendToBeVisual: true, virtualConsole: consola });
   const w = dom.window;
   if (userAgent) Object.defineProperty(w.navigator, "userAgent", { value: userAgent, configurable: true });
 
@@ -103,13 +110,13 @@ export async function boot(entorno, version, respuestas, userAgent, storage = {}
   const callbacks = new Map();
   const events = new Map();
   let lastId = 0;
-  w.__TAURI_EVENT_PLUGIN_INTERNALS__ = {
+  if (!web) w.__TAURI_EVENT_PLUGIN_INTERNALS__ = {
     unregisterListener: (event, eventId) => {
       callbacks.delete(events.get(event)?.get(eventId));
       events.get(event)?.delete(eventId);
     },
   };
-  w.__TAURI_INTERNALS__ = {
+  if (!web) w.__TAURI_INTERNALS__ = {
     transformCallback: (callback) => { const id = ++lastId; callbacks.set(id, callback); return id; },
     convertFileSrc: (p) => p,
     // **`getCurrentWindow()` lee esto y no pasa por `invoke`.** Sin `metadata`
@@ -277,7 +284,7 @@ export async function boot(entorno, version, respuestas, userAgent, storage = {}
   if (!globalThis.fetch.__jsdomApp) {
     const deNode = globalThis.fetch;
     const local = (url, opts) =>
-      String(url?.url ?? url).startsWith("http://localhost/")
+      /^(http:\/\/localhost\/|file:)/.test(String(url?.url ?? url))
         ? Promise.resolve(new Response(""))
         : deNode(url, opts);
     local.__jsdomApp = true;
@@ -328,7 +335,8 @@ export async function boot(entorno, version, respuestas, userAgent, storage = {}
 
   // La query hace que Node vuelva a evaluar el módulo en la segunda pasada; sin
   // ella devuelve el de la caché y no monta nada sobre este documento nuevo.
-  await import(`${pathToFileURL(join(dist, "assets", bundle)).href}?v=${version}`).catch((e) =>
+  antes?.(w);
+  await import(`${pathToFileURL(join(dir, "assets", entrada)).href}?v=${version}`).catch((e) =>
     fallos.push(`al evaluar el módulo: ${e?.stack ?? e}`),
   );
   await sleep(500);

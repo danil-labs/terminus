@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, mergeConfig, type Plugin, type UserConfig } from "vite";
 import solid from "vite-plugin-solid";
 import tailwindcss from "@tailwindcss/vite";
 
@@ -44,11 +44,38 @@ function excalidrawFonts(): Plugin {
   };
 }
 
+// La entrada del navegador (`src/web/main.ts`): sale a `dist-web/` con rutas
+// relativas, para servirse bajo cualquier prefijo. El origen del relay entra en
+// la política al compilar, nunca escrito aquí.
+function webBuild(): UserConfig {
+  const connect = (process.env.TERMINUS_WEB_CONNECT ?? "").replace(/[^\w:/.* -]/g, "").trim();
+  const version = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")).version as string;
+  const page: Plugin = {
+    name: "terminus-web-page",
+    enforce: "post",
+    transformIndexHtml: (html) => html.replace("%TERMINUS_WEB_CONNECT%", connect),
+    generateBundle(_, bundle) {
+      const html = bundle["web.html"];
+      if (html) html.fileName = "index.html";
+    },
+  };
+  return {
+    base: "./",
+    define: { __TERMINUS_VERSION__: JSON.stringify(version) },
+    plugins: [page],
+    build: {
+      outDir: "dist-web",
+      emptyOutDir: true,
+      rollupOptions: { input: fileURLToPath(new URL("./web.html", import.meta.url)) },
+    },
+  };
+}
+
 // Tauri espera un puerto fijo y falla si no está disponible. `strictPort` se
 // conserva a propósito: con varias ramas probándose a la vez, un puerto que se
 // mueve solo haría que la ventana cargue la app de OTRA rama sin decir nada.
 // Mejor que truene. Quién asigna el puerto de cada rama: `scripts/dev.mjs`.
-export default defineConfig({
+const desktop: UserConfig = {
   // Tailwind v4 es CSS-first: no hay `tailwind.config.js`, los tokens viven en
   // el `@theme` de `src/styles/global.css` y este plugin es todo el cableado.
   plugins: [solid(), tailwindcss(), excalidrawFonts()],
@@ -101,4 +128,6 @@ export default defineConfig({
       ignored: ["**/src-tauri/**"],
     },
   },
-});
+};
+
+export default defineConfig(({ mode }) => (mode === "web" ? mergeConfig(desktop, webBuild()) : desktop));
