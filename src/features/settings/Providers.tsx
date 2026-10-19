@@ -1010,9 +1010,9 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                                       <For each={rs() ?? []}>
                                         {(r) => (
                                           <li class="flex items-baseline gap-2 text-xs">
-                                            <span>{r.name}</span>
+                                            <span class="min-w-0 truncate">{r.name}</span>
                                             <Show when={r.slug !== r.name}>
-                                              <span class="font-mono text-[0.6875rem] text-neutral-500">{r.slug}</span>
+                                              <span class="min-w-0 truncate font-mono text-[0.6875rem] text-neutral-500">{r.slug}</span>
                                             </Show>
                                             {/* Traerlo es el acto: el botón
                                                 vive en la fila del repositorio
@@ -1023,7 +1023,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                                             <Button
                                               variant="outline"
                                               size="compact"
-                                              class="ml-auto"
+                                              class="ml-auto shrink-0"
                                               disabled={trayendo() !== null}
                                               title={
                                                 traidos()[r.clone_url]

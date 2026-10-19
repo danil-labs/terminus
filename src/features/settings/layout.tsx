@@ -1,10 +1,14 @@
 import { Show, children, splitProps, type JSX } from "solid-js";
 import { cn } from "../../lib/utils";
 
-/** El cuerpo de un destino de Configuración: sus secciones, una bajo otra. */
+/**
+ * El cuerpo de un destino de Configuración: sus secciones, una bajo otra.
+ * Columna `minmax(0,1fr)`: con la implícita, una URL larga ensanchaba el
+ * panel por encima de la hoja y cortaba los botones de todas las filas.
+ */
 export function SettingsPanel(props: JSX.HTMLAttributes<HTMLDivElement>) {
   const [own, rest] = splitProps(props, ["class"]);
-  return <div class={cn("grid gap-9", own.class)} {...rest} />;
+  return <div class={cn("grid grid-cols-[minmax(0,1fr)] gap-9", own.class)} {...rest} />;
 }
 
 export type SettingsSectionProps = Omit<JSX.HTMLAttributes<HTMLElement>, "title"> & {

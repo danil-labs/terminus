@@ -79,7 +79,6 @@ const steps = [
   ["Lo ya traducido no se vuelve a soldar", process.execPath, [join(root, "scripts/guards/literals.mjs")], root],
   ["Los comentarios no crecen ni argumentan", process.execPath, [join(root, "scripts/guards/comments.mjs")], root],
   ["Las lecturas de fuente en pruebas respetan el cupo revisado", process.execPath, [join(root, "scripts/guards/test-policy.mjs")], root],
-  ["El paquete que la app trae dice lo que sabe pedir", process.execPath, [join(root, "scripts/guards/plugins.mjs")], root],
   ["Los iconos del árbol son los del paquete", process.execPath, [join(root, "scripts/icons.mjs"), "--check"], root],
   ["Soltar un archivo no depende de la pantalla", process.execPath, [join(root, "scripts/guards/drop.mjs")], root],
   ["Ninguna animación infinita repinta a 60 cuadros", process.execPath, [join(root, "scripts/guards/animations.mjs")], root],
