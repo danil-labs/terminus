@@ -16,7 +16,7 @@ const install = "https://github.com/apps/terminus-app/installations/new";
 for (const scenario of ["connected-workspace", "existing-installation", "no-installation", "cancel-login"]) {
   let connected = scenario === "connected-workspace";
   let loginCount = 0;
-  let selected = connected ? [{ key: "acme", installation_id: 42, repository_ids: [1] }] : [];
+  let selected = connected ? [{ key: "acme", installation_id: 42 }] : [];
   let available = connected || scenario === "existing-installation" ? [{ key: "acme", name: "acme" }] : [];
   let finishLogin;
   let pendingAreas = null;
@@ -37,7 +37,7 @@ for (const scenario of ["connected-workspace", "existing-installation", "no-inst
     select_provider_area: ({ scope, area, enabled }) => {
       assert.equal(scope, "fixture-a");
       selected = selected.filter(({ key }) => key !== area);
-      if (enabled) selected.push({ key: area, installation_id: 42, repository_ids: [1] });
+      if (enabled) selected.push({ key: area, installation_id: 42 });
       return info();
     },
     disconnect_provider: ({ scope }) => { assert.equal(scope, "fixture-a"); connected = false; },
@@ -57,6 +57,8 @@ for (const scenario of ["connected-workspace", "existing-installation", "no-inst
     const rows = () => app.w.document.querySelectorAll("section li");
     assert.ok(app.w.document.body.textContent.includes("Acceso de este workspace"));
     assert.ok(app.w.document.body.textContent.includes("acme"));
+    assert.ok(app.w.document.body.textContent.includes("Acceso: todos los repositorios que tu GitHub permite"));
+    assert.ok(button("Cambiar en GitHub"), "el alcance por repositorio se cambia en GitHub");
     assert.equal(rows().length, 0, "el acceso guardado se resume sin desplegar organizaciones");
     app.w.dispatchEvent(new app.w.Event("focus")); await espera(100);
     assert.equal(button("comprobar"), undefined);
@@ -136,16 +138,17 @@ for (const scenario of ["connected-workspace", "existing-installation", "no-inst
     app.w.dispatchEvent(new app.w.Event("focus")); await espera(100);
     assert.equal(button("Actualizar acceso"), undefined);
     assert.equal(selected.length, 0, "volver no incorpora organizaciones");
+    assert.equal(app.w.document.body.textContent.includes("Acceso: todos los repositorios"), false, "sin cuenta elegida no se promete acceso");
     button("Usar en este workspace").click(); await espera(100);
     assert.equal(selected.length, 1);
-    assert.ok(button("Confirmar repositorios disponibles"));
+    assert.equal(button("Confirmar repositorios disponibles"), undefined, "no hay paso de confirmación de repositorios");
     button("Listo").click(); await espera(100);
     assert.deepEqual(selected.map(({ key }) => key), ["acme"]);
     assert.equal(button("Usar en este workspace"), undefined, "Listo oculta las opciones disponibles");
-    assert.equal(button("Confirmar repositorios disponibles"), undefined);
+    assert.ok(app.w.document.body.textContent.includes("Acceso: todos los repositorios que tu GitHub permite"));
   }
   assert.deepEqual(app.fallos, []);
-  console.log(`PASS ${scenario}: selector, regreso, cancelación y confirmación local`);
+  console.log(`PASS ${scenario}: selector, regreso, cancelación y acceso heredado sin confirmar`);
 }
 for (const scenario of ["absent", "incompatible", "unknown"]) {
   let supported = false;
