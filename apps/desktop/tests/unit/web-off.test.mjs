@@ -44,7 +44,8 @@ test("an off computer mounts as it is and wakes with the first message", async (
     await sleep(6000);
     assert.deepEqual(posts, [], "opening does not start the computer");
     assert.equal(fake.sockets.length, 1, "the panel mounts against the off computer");
-    assert.ok(text().includes("La máquina de este host está apagada"), "the off notice shows");
+    assert.equal(w.document.querySelector("[data-web-sync]")?.dataset.state, "offline", "the indicator shows it off");
+    assert.ok(!text().includes("La máquina de este host está apagada"), "no error notice");
     assert.ok(!text().includes("Algo se rompió"), "no generic failure");
     assert.ok(!text().includes("Preparemos tu entorno"), "no installer");
     assert.ok(!fake.calls.some((c) => c.command === "prepare_runtime"));
@@ -55,7 +56,7 @@ test("an off computer mounts as it is and wakes with the first message", async (
     await sleep(6000);
     assert.ok(fake.calls.filter((c) => c.command === "list_projects").length > before, "waiting reads go out once it is on");
     assert.ok(text().includes("Tarea t1"), "and the panel fills in");
-    assert.ok(!text().includes("La máquina de este host está apagada"), "the off notice leaves");
+    assert.equal(w.document.querySelector("[data-web-sync]")?.dataset.state, "online", "the indicator shows it on");
     assert.deepEqual(app.fallos, []);
   } finally {
     globalThis.fetch = own;

@@ -128,6 +128,7 @@ import Sitio from "../features/sites/Site";
 import { claseDeFondo, VELO_DE_FONDO } from "../lib/chat-background";
 import { fondoDeChat, fondoPropio, veloDeFondo } from "../lib/chat-background-store";
 import { copyText } from "../lib/clipboard";
+import { capabilities } from "../lib/platform";
 import { pedirElCampo } from "../lib/focus";
 import { lastRoster, rememberRoster } from "../lib/handlerRoster";
 import { aplicarLenguaDeWorkspace, clavesConocidas, t } from "../lib/i18n";
@@ -2291,6 +2292,8 @@ export default function App() {
         const apagada = claveDe(e) === "shell.service.machine_off";
         const encendiendo = claveDe(e) === "shell.service.machine_starting";
         const caido = sinMotor || apagada || encendiendo || claveDe(e) === "shell.service.engine_down";
+        // En la web la computadora en reposo tiene su indicador: no es un error.
+        if ((apagada || encendiendo) && capabilities().computerStatus) return;
         if (!disposed && Date.now() - failingSince > (caido ? 2_000 : 10_000)) {
           setError(sinMotor ? t("shell.service.engine_missing") : apagada ? t("shell.service.machine_off") : encendiendo ? t("shell.service.machine_starting") : t(caido ? "shell.service.engine_down" : "chat.error.service_unavailable"));
         }

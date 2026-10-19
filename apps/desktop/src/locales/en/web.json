@@ -14,6 +14,7 @@
   "web.computers.title": "Choose the computer to open Terminus on.",
   "web.computers.waiting": "Connecting to your Danil account…",
   "web.desktop_only": "This is only available in the Terminus desktop app.",
+  "web.home": "Back to Danil Agents",
   "web.local_files": "The browser cannot pick files or folders on this device. Use the Terminus desktop app for that.",
   "web.revoked": "You no longer have access to this computer. Sign in again.",
   "web.setup.connecting": "Connecting to your computer…",

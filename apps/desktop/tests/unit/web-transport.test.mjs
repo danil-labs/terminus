@@ -51,10 +51,11 @@ test("the web build talks to the relay: calls, events and machine state", async 
 
   fake.setState("offline");
   await sleep(5500);
-  assert.ok(text().includes("La máquina de este host está apagada"), "the machine_off notice did not show");
+  assert.equal(app.w.document.querySelector("[data-web-sync]")?.dataset.state, "offline", "the indicator did not show it off");
+  assert.ok(!text().includes("La máquina de este host está apagada"), "machine_off showed as an error");
   fake.setState("online");
   fake.push({ type: "events", cursor: 3, gap: false, replay: false, runtime: "rt1", events: [] });
   await sleep(1200);
-  assert.ok(!text().includes("La máquina de este host está apagada"), "the notice stayed after the machine came back");
+  assert.equal(app.w.document.querySelector("[data-web-sync]")?.dataset.state, "online", "the indicator stayed off after the machine came back");
   assert.deepEqual(app.fallos, []);
 });

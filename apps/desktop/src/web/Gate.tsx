@@ -44,14 +44,14 @@ const STATES: Record<string, () => string> = {
   provisioning: () => t("web.computers.state.provisioning"),
 };
 
-export function Gate(props: { session: Session; endpoint: string; initial?: GateView; onOpen?: (id: string) => void }) {
+export function Gate(props: { session: Session; endpoint: string; initial?: GateView; onOpen?: (id: string, name: string) => void }) {
   const [view, setView] = createSignal<GateView>(props.initial ?? { t: "waiting" });
   const [starting, setStarting] = createSignal<string | null>(null);
 
   /** Opening is not intent to work: an off computer mounts as it is and wakes with the first message. */
   const open = (computer: Computer) => {
     remember(computer.computer_id);
-    props.onOpen?.(computer.computer_id);
+    props.onOpen?.(computer.computer_id, computer.name || computer.computer_id);
   };
 
   async function load() {

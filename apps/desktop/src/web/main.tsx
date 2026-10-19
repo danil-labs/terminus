@@ -9,6 +9,7 @@ import { createSignal } from "solid-js";
 import { setCapabilities } from "../lib/platform";
 // In the page, not in the lazy app chunk: the stylesheet loads with the HTML.
 import "../styles/global.css";
+import { HomeLink } from "./HomeLink";
 import { installIpc } from "./ipc";
 import { type RelayConfig, RelaySession } from "./relay";
 import { type BrowserHost, createWebTransport } from "./transport";
@@ -30,8 +31,8 @@ const browser: BrowserHost = {
   readText: () => navigator.clipboard.readText(),
 };
 
-function mountApp(config: RelayConfig) {
-  setCapabilities({ nativeWindow: false, updater: false, localSetup: false });
+function mountApp(name: string, config: RelayConfig) {
+  setCapabilities({ nativeWindow: false, updater: false, localSetup: false, computerStatus: true, sidebarExtra: () => <HomeLink /> });
   const relay = new RelaySession(config);
   const [syncedAt, setSyncedAt] = createSignal<number | null>(null);
   const [state, setState] = createSignal(relay.state());
@@ -42,7 +43,7 @@ function mountApp(config: RelayConfig) {
   void Promise.all([import("solid-js/web"), import("./SyncNote"), import("./phrases")]).then(([{ render }, { SyncNote }]) => {
     const layer = document.createElement("div");
     document.body.append(layer);
-    render(() => <SyncNote at={syncedAt} off={() => state() !== "online"} />, layer);
+    render(() => <SyncNote name={name} at={syncedAt} state={state} />, layer);
   });
 }
 
@@ -76,9 +77,9 @@ async function start(settings: WebSettings) {
       <Gate
         session={session}
         endpoint={endpoint}
-        onOpen={(computerId) => {
+        onOpen={(computerId, name) => {
           dispose();
-          mountApp({
+          mountApp(name, {
             endpoint,
             computerId,
             getToken: () => session.getToken(),
@@ -99,5 +100,5 @@ async function start(settings: WebSettings) {
 }
 
 const given = (window as Window & { terminusWeb?: TerminusWebConfig }).terminusWeb ?? {};
-if (given.computerId && given.getToken) mountApp({ ...__TERMINUS_WEB__, ...given } as RelayConfig);
+if (given.computerId && given.getToken) mountApp(given.computerId, { ...__TERMINUS_WEB__, ...given } as RelayConfig);
 else void start({ ...__TERMINUS_WEB__, ...given } as WebSettings);
