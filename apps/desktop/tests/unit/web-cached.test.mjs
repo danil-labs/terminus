@@ -40,12 +40,12 @@ test("reads the relay kept show with their age while the computer is off", async
   try {
     await sleep(2000);
     assert.ok(text().includes("Tarea t1"), "the relay's copy fills the panel");
-    assert.ok(w.document.querySelector("[data-web-sync]")?.textContent.includes("Última sincronización"), "with its age");
+    assert.ok(w.document.querySelector("[data-web-sync]")?.title.includes("Última sincronización"), "with its age");
     assert.ok(!fake.calls.some((c) => c.command === "send_message"));
     assert.equal(fake.sockets.length, 1);
     fake.setState("online");
     await sleep(300);
-    assert.equal(w.document.querySelector("[data-web-sync]"), null, "the note leaves once the computer is on");
+    assert.ok(!w.document.querySelector("[data-web-sync]")?.title, "the age leaves once the computer is on");
     assert.deepEqual(app.fallos, []);
   } finally {
     globalThis.fetch = own;

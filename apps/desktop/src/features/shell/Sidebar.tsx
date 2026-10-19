@@ -22,6 +22,7 @@ import type { HandlerList, Project } from "../../lib/model";
 import { createPref } from "../../lib/prefs";
 import { PROJECT_NAME_MAX_LENGTH } from "../../lib/projectNames";
 import { ariaDeAtajo } from "../../lib/shortcuts";
+import { capabilities } from "../../lib/platform";
 import { cn } from "../../lib/utils";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
@@ -778,6 +779,7 @@ export default function Sidebar(props: {
             <Button variant="chrome" size="iconCompact" class="size-7 shrink-0 text-neutral-500" aria-label={t("shell.sidebar.search")} title={t("shell.sidebar.search")} aria-expanded={searchOpen()} onClick={() => setSearchOpen(true)}>
               <Search size={16} />
             </Button>
+            {capabilities().sidebarExtra?.()}
           </Show>
           <Show when={!props.collapsed && searchOpen()}>
             <div data-sidebar-search class="flex h-7 min-w-0 flex-1 items-center gap-1 rounded-md border border-border-strong bg-surface-raised px-1 focus-within:outline-solid focus-within:outline-2 focus-within:outline-primary">
