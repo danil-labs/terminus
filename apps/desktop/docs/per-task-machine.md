@@ -211,3 +211,26 @@ corren las tareas que se crearon en ellas.
 3. El enlace es por `git_host` + `remote` o por un enlace guardado. El destino
    es el id de workspace de la cuenta, y no hay interfaz para enlazar.
 4. «Ejecutar en» se recuerda por workspace.
+
+## Con la cuenta de Danil
+
+Con la sesión de Danil abierta (`danil_connect_status` = `connected`), la
+ventana junta las tareas de todas las computadoras de la persona con las reglas
+de la web (`src/web/fleet.ts` y `src/web/transport.ts`), en un trozo perezoso
+(`src/features/machines/account.tsx`):
+
+- El motor local sigue por el IPC nativo, con sus ids tal cual: eventos de
+  Tauri, canales, lotes empujados y `load_history` paginado no cambian. Es la
+  máquina `home` del `Fleet`: encabeza los workspaces que tiene.
+- Cada otra computadora es una sesión del relay (`@terminus/computers`); sus
+  ids llevan el prefijo `cmp_x~`. Sus eventos llegan a los oyentes en cuanto
+  llegan y sus huecos viajan en la siguiente página de `service_poll`.
+- La credencial es un token de cliente de diez minutos que el motor pide al
+  plano de control con su token de máquina (`account_relay_token` →
+  `danil_client_token` → `POST /v1/computers/self/client-token`). Solo sirve
+  para listar las computadoras de la persona y abrirles sesión; la ventana no
+  guarda credenciales de Supabase.
+- Sin cuenta, con un motor sin `danil_client_token`, con un plano de control
+  sin tokens de cliente o sin otra computadora, no se instala nada.
+- En una lectura de todas las máquinas, una remota que no contesta en seis
+  segundos no aporta: las listas locales no esperan a la red.

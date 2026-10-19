@@ -227,6 +227,7 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
             launcher::launcher_continue,
             proxy::service_poll,
             proxy::machine_list,
+            proxy::account_relay_token,
             proxy::service_filter,
             proxy::load_history,
             proxy::service_prepare_update,

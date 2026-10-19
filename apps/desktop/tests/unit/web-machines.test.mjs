@@ -92,6 +92,13 @@ test("an action on a computer that is off and cannot be woken fails short and ne
 
   assert.ok(doc.querySelector('[data-sesion="cmp_mac~t1"] [data-machine="cmp_mac"][data-machine-on="false"]'), "the Mac's copy shows, marked off");
   assert.equal(doc.querySelector('[data-machine-row="cmp_mac"]')?.dataset.state, "offline");
+  const fila = doc.querySelector('[data-sesion="cmp_mac~t1"]');
+  assert.equal(fila.querySelector("[data-folder-chip]")?.getAttribute("title") ?? null, null, "no native tooltip over the task card");
+  fila.parentElement.dispatchEvent(new app.w.PointerEvent("pointerenter", { pointerType: "mouse" }));
+  await sleep(900);
+  const machine = doc.querySelector('[data-hover-machine="cmp_mac"]');
+  assert.ok(machine?.parentElement.textContent.includes("Mac de Ana"), "the task card names its machine");
+  assert.equal(machine.getAttribute("aria-label"), "apagada");
   await assert.rejects(invoke("send_message", { session: "cmp_mac~t1", text: "hola" }), (e) => {
     assert.equal(e.what, "Mac de Ana está apagada. Enciéndela para seguir.");
     return true;

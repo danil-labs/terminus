@@ -34,7 +34,17 @@ export type WebTransport = {
   status(machine: string): MachineStatus;
 };
 
-export type MachineLink = { info: MachineInfo; relay: RelaySession; onSync?: SyncListener };
+export type MachineLink = { info: MachineInfo; relay: RelayLike; onSync?: SyncListener };
+
+/** What the transport uses of a relay session (`./relay` or `@terminus/computers`). */
+export type RelayLike = Pick<RelaySession, "state" | "connected" | "onState" | "onEvents" | "onLink" | "call" | "subscribe">;
+
+/**
+ * The desktop's own engine, reached through the window's native IPC: its ids
+ * stay as they are, its calls keep their options and channels, and its feed
+ * stays the window's own `service_poll`.
+ */
+export type HomeLink = { info: MachineInfo; call(command: string, args: Args, options: Options): Promise<unknown> };
 
 const KEYS: Record<string, string> = {
   service_busy: "shell.service.busy",
@@ -115,6 +125,7 @@ const RETRY_OFF = 5_000;
 const POLL_WAIT = 20_000;
 const LINK_WAIT = 5_000;
 const STATE_WAIT = 2_000;
+const HOME_FAN_WAIT = 6_000;
 
 const isWeb = (url: unknown): url is string => typeof url === "string" && /^https?:\/\//i.test(url);
 
@@ -133,6 +144,14 @@ function headerOf(options: Options, name = "x-terminus-workspace"): string | nul
   } catch {
     return null;
   }
+}
+
+/** A relay returns only the completion of a stream command: its channel stays behind. */
+function withoutChannel(command: string, args: Args): Args {
+  const channel = CHANNELS[command];
+  if (!channel || !(channel in args)) return args;
+  const { [channel]: _dropped, ...rest } = args;
+  return rest;
 }
 
 /** Resolves when `wake` is called or after `ms`. */
@@ -173,7 +192,7 @@ const NONE = Symbol("none");
 type Link = ReturnType<typeof createLink>;
 
 /** One computer: its calls with the off rules, its read copies and its own feed. */
-function createLink(relay: RelaySession, computerId: string, onSync: SyncListener, onOutdated: () => void) {
+function createLink(relay: RelayLike, computerId: string, onSync: SyncListener, onOutdated: () => void) {
   let subscribedAt: number | null | undefined;
   const queue: EventsPage[] = [];
   const { wake, changeOr } = changes();
@@ -297,11 +316,19 @@ function createLink(relay: RelaySession, computerId: string, onSync: SyncListene
   return { relay, send, poll };
 }
 
-export function createWebTransport(machines: MachineLink[], version: string, host: BrowserHost, onStatus: () => void = () => {}): WebTransport {
+export function createWebTransport(
+  machines: MachineLink[],
+  version: string,
+  host: BrowserHost,
+  onStatus: () => void = () => {},
+  home: HomeLink | null = null,
+): WebTransport {
   const links = new Map<string, Link>();
+  const homeId = home?.info.id ?? null;
   const fleet = new Fleet(
-    machines.map((m) => m.info),
-    (id) => links.get(id)?.relay.state() === "online",
+    [...(home ? [home.info] : []), ...machines.map((m) => m.info)],
+    (id) => id === homeId || links.get(id)?.relay.state() === "online",
+    homeId,
   );
   for (const m of machines) {
     const mark = () => {
@@ -315,8 +342,9 @@ export function createWebTransport(machines: MachineLink[], version: string, hos
     links.set(m.info.id, createLink(m.relay, m.info.id, m.onSync ?? (() => {}), mark));
   }
   const link = (id: string) => links.get(id) as Link;
-  const on = (id: string) => link(id).relay.state() === "online";
+  const on = (id: string) => id === homeId || link(id).relay.state() === "online";
   const status = (id: string): MachineStatus => {
+    if (id === homeId) return "online";
     if (fleet.isOutdated(id)) return "outdated";
     const state = links.get(id)?.relay.state();
     return state === "online" ? "online" : state === "starting" ? "starting" : "offline";
@@ -341,8 +369,10 @@ export function createWebTransport(machines: MachineLink[], version: string, hos
   const outdated = (machine: string): Failure => ({ what: t("web.machines.outdated_action", { name: fleet.name(machine) }), detail: "version_mismatch" });
 
   /** One machine: an outdated one refuses, and one that cannot be woken says it is off instead of waiting. */
-  async function one(machine: string, command: string, workspace: string | null, args: Args): Promise<unknown> {
+  async function one(machine: string, command: string, workspace: string | null, args: Args, options?: Options): Promise<unknown> {
+    if (home && machine === homeId) return home.call(command, args, options);
     if (fleet.isOutdated(machine)) throw outdated(machine);
+    args = withoutChannel(command, args);
     const l = link(machine);
     const asleep = !fleet.info(machine)?.wakes && OFF.includes(l.relay.state());
     if (asleep && !READ.test(command)) throw off(machine);
@@ -358,6 +388,10 @@ export function createWebTransport(machines: MachineLink[], version: string, hos
     }
   }
 
+  /** With a home, a machine that does not answer soon adds nothing: the window's own lists never wait on the network. */
+  const late = (answer: Promise<unknown>): Promise<unknown> =>
+    home ? Promise.race([answer, new Promise((done) => setTimeout(() => done(NONE), HOME_FAN_WAIT))]) : answer;
+
   /** Every machine answers its part; one that is off without a copy adds nothing until it is on. */
   async function fan(command: string, targets: string[], args: Args, workspace: string | null): Promise<unknown> {
     if (command === "list_accounts") {
@@ -369,7 +403,10 @@ export function createWebTransport(machines: MachineLink[], version: string, hos
       const results = await Promise.all(
         usable.map(async (machine) => {
           try {
-            const value = await link(machine).send(command, fleet.workspaceOn(machine, workspace), fleet.argsFor(machine, args), false);
+            const value =
+              home && machine === homeId
+                ? await home.call(command, fleet.argsFor(machine, args), undefined)
+                : await late(link(machine).send(command, fleet.workspaceOn(machine, workspace), fleet.argsFor(machine, args), false));
             return value === NONE ? null : { machine, value };
           } catch (error) {
             return fleet.isOutdated(machine) ? null : { machine, error };
@@ -396,7 +433,7 @@ export function createWebTransport(machines: MachineLink[], version: string, hos
       throw { what: t("web.machines.cross_machine"), detail: "cross_machine" };
     }
     if ("fan" in route) return fan(command, route.fan, route.args, workspace);
-    const value = await one(route.machine, command, route.workspace, route.args);
+    const value = await one(route.machine, command, route.workspace, route.args, options);
     if (fleet.multi && CREATE.has(command) && !route.named) rememberMachine(route.machine);
     return fleet.encode(route.machine, value, command);
   }
@@ -417,11 +454,7 @@ export function createWebTransport(machines: MachineLink[], version: string, hos
       if (!header) throw failureOf({ code: "invalid_request" });
       workspace = header;
     } else if (HEADER_SCOPED.has(command)) workspace = header ?? active;
-    const channel = CHANNELS[command];
-    if (channel && channel in args) {
-      const { [channel]: _dropped, ...rest } = args;
-      args = rest;
-    }
+    if (!home) args = withoutChannel(command, args);
     if (command === "set_active_workspace" && typeof args.id === "string") {
       const id = args.id;
       active = id;
@@ -436,7 +469,8 @@ export function createWebTransport(machines: MachineLink[], version: string, hos
     }
     const value = await send(command, workspace, args, options);
     const startup = value as { active?: unknown } | null;
-    if (command === "workspaces_startup" && active === null && typeof startup?.active === "string") active = startup.active;
+    // The desktop installs this after its first read: its next `list_workspaces` says which one is open.
+    if ((command === "workspaces_startup" || command === "list_workspaces") && active === null && typeof startup?.active === "string") active = startup.active;
     if (command === "remove_workspace" && workspace !== null && workspace === args.id) active = null;
     return value;
   }
@@ -487,6 +521,48 @@ export function createWebTransport(machines: MachineLink[], version: string, hos
     return { cursor: tick, gap, replay: false, runtime: "fleet", reset: false, streams };
   }
 
+  /** Whether `args` carry an id of a machine other than home. */
+  const namesRemote = (args: Args) => {
+    try {
+      const route = fleet.route("load_session", args, null, null, homeId ?? "");
+      return "machine" in route && route.machine !== homeId;
+    } catch {
+      return true;
+    }
+  };
+
+  // With a home, the window keeps polling its own engine; the other machines'
+  // events go to the listeners as they arrive, and their gaps ride on the next page.
+  let remoteGap = false;
+  let homeSubscribed = false;
+  if (home) {
+    for (const m of machines) {
+      let was = m.relay.state();
+      m.relay.onEvents((page) => {
+        if (!homeSubscribed || fleet.isOutdated(m.info.id)) return;
+        const known = runtimes.get(m.info.id);
+        if (page.gap === true || (page.runtime && known && known !== page.runtime)) remoteGap = true;
+        if (page.runtime) runtimes.set(m.info.id, page.runtime);
+        deliver((page.events ?? []).map((e) => ({ name: e.name, payload: fleet.encodeEvent(m.info.id, e.name, e.payload) })));
+      });
+      m.relay.onState((state) => {
+        if (state === "online" && was !== "online" && homeSubscribed) remoteGap = true;
+        was = state;
+      });
+    }
+  }
+
+  async function pollHome(args: Args, options: Options): Promise<unknown> {
+    if (!homeSubscribed && fleet.multi) {
+      homeSubscribed = true;
+      for (const id of fleet.usable()) if (id !== homeId) link(id).relay.subscribe(null);
+    }
+    const page = (await (home as HomeLink).call("service_poll", args, options)) as Record<string, unknown> | null;
+    if (!remoteGap || !page || typeof page !== "object") return page;
+    remoteGap = false;
+    return { ...page, streams: true };
+  }
+
   async function history(args: Args, options: Options): Promise<unknown> {
     const session = (await engine("load_session", { project: args.project, id: args.id }, options)) as { turns?: unknown[] };
     const total = Array.isArray(session?.turns) ? session.turns.length : 0;
@@ -535,7 +611,7 @@ export function createWebTransport(machines: MachineLink[], version: string, hos
     status,
     async handle(command, args = {}, options) {
       if (command.startsWith("plugin:")) return plugin(command, args);
-      if (command === "service_poll") return fleet.multi ? pollAll() : link(fleet.machines[0].id).poll(args);
+      if (command === "service_poll") return home ? pollHome(args, options) : fleet.multi ? pollAll() : link(fleet.machines[0].id).poll(args);
       if (command === "launcher_state") return { phase: "ready" };
       if (command === "tray_notify") return "focused";
       if (command === "restart_app") return host.reload();
@@ -543,13 +619,13 @@ export function createWebTransport(machines: MachineLink[], version: string, hos
       if (command === "machine_list") {
         const lead = fallback(active);
         const members = fleet.membersOf(active);
-        return fleet.usable().map((id) => ({ id, local: false, active: id === lead, on: on(id), linked: !fleet.multi || members.includes(id) }));
+        return fleet.usable().map((id) => ({ id, local: id === homeId, active: id === lead, on: on(id), linked: !fleet.multi || members.includes(id) }));
       }
       if (command === "machine_select") {
         if (typeof args.id !== "string" || !fleet.info(args.id)) throw failureOf({ code: "command" });
         return { runtime: null };
       }
-      if (command === "load_history") return history(args, options);
+      if (command === "load_history") return home && !namesRemote(args) ? home.call(command, args, options) : history(args, options);
       if (command === "site_open_external" || command === "open_external") {
         const url = command === "open_external" ? args.target : args.url;
         if (!isWeb(url)) throw desktopOnly(command);

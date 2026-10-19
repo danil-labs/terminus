@@ -568,7 +568,7 @@ export default function Sessions(props: {
               fallback={
                 <>
                   <Show when={!props.hideFolder && props.carpetaDe?.(r.s)}>
-                    {(nombre) => <FolderChip id={projectOf(r.s)} name={nombre()} class="max-w-[108px] shrink-0" />}
+                    {(nombre) => <FolderChip id={projectOf(r.s)} name={nombre()} untitled={props.sidebar} class="max-w-[108px] shrink-0" />}
                   </Show>
                   <WorktreeFaltante />
                   <Show when={tarjeta().agent}>
@@ -589,7 +589,7 @@ export default function Sessions(props: {
                   </Show>
                   {/* En qué máquina corre, si no es esta. */}
                   <Show when={tarjeta().machine}>
-                    {(machine) => <MachineChip machine={machine().id} on={machine().on} class="max-w-[96px]" />}
+                    {(machine) => <MachineChip machine={machine().id} on={machine().on} untitled={props.sidebar} class="max-w-[96px]" />}
                   </Show>
                   <ChipDeGit />
                 </>
@@ -853,7 +853,7 @@ export default function Sessions(props: {
                 </Show>
                 <span class="flex shrink-0" title={f.s.provider} aria-label={f.s.provider}><MarcaAgente id={f.s.provider} size={13} /></span>
                 <Show when={f.s.machine}>
-                  {(machine) => <MachineChip machine={machine()} on={f.s.machine_on !== false} class="max-w-[96px]" />}
+                  {(machine) => <MachineChip machine={machine()} on={f.s.machine_on !== false} untitled={props.sidebar} class="max-w-[96px]" />}
                 </Show>
                 {/* El botón del cohete es translúcido: sin desvanecer, el mensaje se lee a
                     través. Máscara y no velo: el fondo del riel cambia con el tema y el wallpaper. */}

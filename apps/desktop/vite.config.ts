@@ -45,6 +45,11 @@ function excalidrawFonts(): Plugin {
   };
 }
 
+// The same hash the engine announces (`engine-client` `contract()`): a computer with another one needs an update.
+const CONTRACT = JSON.stringify(
+  createHash("sha256").update(readFileSync(fileURLToPath(new URL("./src-tauri/crates/engine-protocol/commands.json", import.meta.url)))).digest("hex"),
+);
+
 // La entrada del navegador (`src/web/main.tsx`). Sale a `dist-web/<base>` para
 // que el Worker de assets sirva las mismas rutas que reenvía la app de Danil;
 // plano de control, Supabase (valores públicos) y política se fijan al compilar.
@@ -98,10 +103,6 @@ function webBuild(serve: boolean): UserConfig {
     define: {
       __TERMINUS_VERSION__: JSON.stringify(version),
       __TERMINUS_WEB__: JSON.stringify({ endpoint, supabaseUrl, supabaseKey, login }),
-      // The same hash the engine announces (`engine-client` `contract()`): a computer with another one needs an update.
-      __TERMINUS_CONTRACT__: JSON.stringify(
-        createHash("sha256").update(readFileSync(fileURLToPath(new URL("./src-tauri/crates/engine-protocol/commands.json", import.meta.url)))).digest("hex"),
-      ),
     },
     plugins: [page],
     build: {
@@ -120,6 +121,7 @@ const desktop: UserConfig = {
   // Tailwind v4 es CSS-first: no hay `tailwind.config.js`, los tokens viven en
   // el `@theme` de `src/styles/global.css` y este plugin es todo el cableado.
   plugins: [solid(), tailwindcss(), excalidrawFonts()],
+  define: { __TERMINUS_CONTRACT__: CONTRACT },
   clearScreen: false,
   // **Sin esto la ventana sale en blanco en desarrollo, y sin un solo error.**
   //
