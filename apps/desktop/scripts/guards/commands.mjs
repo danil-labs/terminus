@@ -74,7 +74,7 @@ const SIN_INTERFAZ = {
   worktree_rename_branch: "el renombre al entregar aún no tiene gesto en pantalla",
   install_tool: "pnpm y Bun los instala bootstrap::prepare_runtime desde Rust; ninguna pantalla lo invoca",
   tree_typst_target: "lo pide typst_live::typst_live_open desde el Rust de la ventana: el webview nunca da la ruta de arranque",
-  remove_agent: "sin forma confiable de saber qué instaló Terminus, se quitó el botón",
+  remove_provider: "sin forma confiable de saber qué instaló Terminus, se quitó el botón",
   remove_gh: "sin forma confiable de saber qué instaló Terminus, se quitó el botón",
   remove_tool: "sin forma confiable de saber qué instaló Terminus, se quitó el botón",
   // Sin pantalla hasta el metabuscador del workspace: una archivada no se

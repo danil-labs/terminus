@@ -2,7 +2,7 @@
  * Lo que se puede elegir para trabajar, del lado del front. Espeja
  * `src-tauri/src/runtime/surfaces.rs`: una fila de agente puede dar más de una
  * superficie, así que el menú del chat y el riel de Configuración iteran esta
- * lista y no `list_agents`. Quién filtra qué es de cada pantalla — el chat
+ * lista y no `list_providers`. Quién filtra qué es de cada pantalla — el chat
  * enseña lo utilizable, Configuración lo enseña todo.
  */
 // Con extensión: este módulo se carga también desde `node --test`, que no tiene
@@ -15,7 +15,7 @@ import type { Frase } from "./prose";
 export type Superficie = {
   id: string;
   /** La fila que la sirve. **Es lo que viaja a `send_message` y lo que la sesión guarda.** */
-  agent: string;
+  provider: string;
   label: string;
   /** Qué mitad del catálogo de su agente ofrece. */
   catalogo: "todo" | "de_pago" | "gratuitos";
@@ -72,7 +72,7 @@ export function superficieDe(
   catalogo: ModelOption[],
   actual: string | undefined,
 ): string | undefined {
-  const suyas = todas.filter((s) => s.agent === agent);
+  const suyas = todas.filter((s) => s.provider === agent);
   if (suyas.length === 0) return undefined;
 
   const elegido = catalogo.find((m) => m.id === model);
@@ -100,6 +100,6 @@ export function superficieDe(
  */
 export function rotuloDeSuperficie(s: Superficie): string {
   if (s.catalogo === "gratuitos") return t("surfaces.label.free");
-  if (s.agent === "opencode-local") return t("surfaces.label.local");
+  if (s.provider === "opencode-local") return t("surfaces.label.local");
   return s.label;
 }

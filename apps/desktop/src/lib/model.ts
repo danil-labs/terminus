@@ -62,7 +62,7 @@ export type MemoriaOrigen = {
   workspace: string;
   project: string;
   task: string | null;
-  agent: string | null;
+  provider: string | null;
   handler: string | null;
   branch: string | null;
   commit: string | null;
@@ -156,7 +156,7 @@ export type ModelOption = {
 };
 
 export type AgentModels = {
-  agent: string;
+  provider: string;
   models: ModelOption[];
   // El catálogo de respaldo no es una respuesta reciente del agente.
   fallback: boolean;
@@ -184,7 +184,7 @@ export type HandlerDefinition = {
   origin: string;
   // null representa una declaración suelta, sin carpeta propia.
   folder: string | null;
-  agents: string[];
+  providers: string[];
   own: boolean;
   // null para declaraciones del repositorio; no implica alcance del workspace.
   own_scope: HandlerScope | null;
@@ -204,7 +204,7 @@ export type AgentProfile = {
   // Fracción de opacidad de 0 a 1, no porcentaje.
   veil: number;
   // null conserva la selección del chat; modificar el perfil no reinicia la conversación.
-  agent: string | null;
+  provider: string | null;
   model: string | null;
   effort: string | null;
   hidden: boolean;
@@ -216,13 +216,13 @@ export type HandlerScope =
 
 // eclipsado_por significa que otra declaración gana el nombre; la nueva no será la que se lea.
 export type CreatedHandler = {
-  encargado: HandlerDefinition;
+  agent: HandlerDefinition;
   eclipsado_por: { origin: string; reason: string } | null;
 };
 
 // Los archivos rechazados deben seguir visibles para no confundir un error de lectura con ausencia.
 export type HandlerList = {
-  encargados: HandlerDefinition[];
+  agents: HandlerDefinition[];
   rechazados: { origin: string; reason: string }[];
 };
 

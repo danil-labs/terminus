@@ -55,7 +55,7 @@ function turns(exchanges, from = 0) {
 }
 
 const row = (id, count) => ({
-  id, title: id, last_message: "", agent: "codex", model: "gpt-5.6", refs: [],
+  id, title: id, last_message: "", provider: "codex", model: "gpt-5.6", refs: [],
   updated_at: 0, turns: count, parent: null, esperando: false,
 });
 
@@ -66,7 +66,7 @@ function responses() {
     window_ready: null,
     window_vitals: null,
     setup_required: false,
-    list_agents: [{ id: "codex", label: "Codex", available: true, driver: true }],
+    list_providers: [{ id: "codex", label: "Codex", available: true, driver: true }],
     list_workspaces: { workspaces: [{ id: "w", name: "W", context_root: null }], active: "w" },
     workspaces_startup: { workspaces: [{ id: "w", name: "W", context_root: null }], active: "w" },
     list_projects: [],
@@ -76,11 +76,11 @@ function responses() {
     list_skills: [],
     list_mentions: { fuentes: [], archivos: [] },
     list_models: {
-      agent: "codex",
+      provider: "codex",
       models: [{ id: "gpt-5.6", label: "GPT-5.6", gratis: null, note: null, efforts: [], default_effort: null }],
       fallback: false,
     },
-    list_surfaces: [{ id: "codex", agent: "codex", label: "Codex", catalogo: "todo", usable: true, marca: null, porque: null }],
+    list_surfaces: [{ id: "codex", provider: "codex", label: "Codex", catalogo: "todo", usable: true, marca: null, porque: null }],
     session_folder: "/tmp",
     list_task_trees: [],
     watch_task_tree: "watch",
@@ -91,7 +91,7 @@ function responses() {
     task_history: { history: { archived: false, events: [], recovery: null }, branch: null, path: "/lab", available: true, owned: false, restorable: false, incomplete: false },
     // Cada lectura trae objetos nuevos, como por IPC.
     load_session: ({ id }) => ({
-      id, agent: "codex", sources: [], model: "gpt-5.6", effort: null, permission_mode: null,
+      id, provider: "codex", sources: [], model: "gpt-5.6", effort: null, permission_mode: null,
       turns: structuredClone(disco[id]),
     }),
     load_queue: [],

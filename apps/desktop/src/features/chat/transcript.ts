@@ -328,7 +328,7 @@ export type Turn = {
   /** Vacío en las sesiones escritas antes de que el turno llevara autor. */
   author?: Author | null;
   /** HandlerDefinition que escribió este input, si no fue la persona. */
-  encargado?: string | null;
+  agent?: string | null;
   /** Por qué canal lo escribió la persona (`Turn::channel`). */
   channel?: string | null;
   /** A quién iba dirigido (`Turn::recipients`). */
@@ -384,7 +384,7 @@ export type Turn = {
 
 export type Session = {
   id: string;
-  agent: string;
+  provider: string;
   /** El material adjunto a esta tarea, por id de fuente. */
   sources?: string[];
   /** Fuentes heredadas del proyecto que esta tarea deja fuera. */
@@ -396,8 +396,8 @@ export type Session = {
   /** Ver `SessionRow.subagent`. */
   subagent?: string | null;
   parent?: string | null;
-  /** Con qué criterio trabaja. Ver `SessionRow.encargado`. */
-  encargado?: string | null;
+  /** Con qué criterio trabaja. Ver `SessionRow.agent`. */
+  agent?: string | null;
   /** Si esta sesión es el chat persistente de un encargado, no una tarea. */
   chat_de_agente?: boolean;
   agent_thread?: boolean;
@@ -412,7 +412,7 @@ export type Session = {
 
 /** De qué archivo del CLI salió lo que dijo el agente, y en cuántas respuestas. */
 export type TranscriptOrigin = {
-  agent: string;
+  provider: string;
   file: string;
   from_cli: number;
   agent_turns: number;
@@ -535,7 +535,7 @@ export function transcripcion(turns: Turn[]): Msg[] {
       quota: t.quota ?? undefined,
       resume: t.resume ?? undefined,
       author: t.author ?? undefined,
-      encargado: t.encargado ?? undefined,
+      encargado: t.agent ?? undefined,
       channel: t.channel ?? undefined,
       // El sobre se relee del disco con el turno. Sin estos tres renglones la
       // transcripción reabierta pierde a quién se entregó, dónde se contesta y

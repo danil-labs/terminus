@@ -162,7 +162,7 @@ export default function Accounts(props: {
     setRevisandoCli(true);
     try {
       await invoke("check_environment", { force: true });
-      setAgentes(await invoke<AgentOpt[]>("list_agents"));
+      setAgentes(await invoke<AgentOpt[]>("list_providers"));
       setFallo(null);
     } catch (e) {
       setFallo({ what: t("settings.accounts.error.check_provider"), detail: detalleDe(e) });
@@ -224,7 +224,7 @@ export default function Accounts(props: {
     if (!id) return;
     setGuardandoClaveGo(true);
     try {
-      await invoke("set_go_usage_key", { agent: agente(), id, key: claveGo() });
+      await invoke("set_go_usage_key", { provider: agente(), id, key: claveGo() });
       setPidiendoClaveGo(null);
       setClaveGo("");
       setConectadaVez((c) => ({ ...c, [id]: (c[id] ?? 0) + 1 }));
@@ -240,7 +240,7 @@ export default function Accounts(props: {
     if (!id || !clave().trim()) return;
     setGuardandoClave(true);
     try {
-      await invoke("set_api_key", { agent: agente(), id, key: clave() });
+      await invoke("set_api_key", { provider: agente(), id, key: clave() });
       setPidiendoClave(null);
       // No se conserva ni un instante más de lo necesario: ya está en el
       // llavero, y dejarla en una señal la mantendría en memoria sin uso.
@@ -260,7 +260,7 @@ export default function Accounts(props: {
   }
 
   onMount(() => {
-    invoke<AgentOpt[]>("list_agents")
+    invoke<AgentOpt[]>("list_providers")
       .then((a) => {
         setAgentes(a);
         if (props.agente) return;
@@ -275,7 +275,7 @@ export default function Accounts(props: {
    *
    * Vale para los dos sitios donde hace falta: el que se conecta lo llama
    * desde `conectar` antes del login, y el que no tiene cuenta lo llama desde
-   * su botón. Es el mismo `install_agent`, y las dos filas de OpenCode
+   * su botón. Es el mismo `install_provider`, y las dos filas de OpenCode
    * comparten paquete y carpeta (`agents::Install::carpeta`): instalar desde
    * cualquiera deja a las dos utilizables.
    */
@@ -289,8 +289,8 @@ export default function Accounts(props: {
         setFallo(null);
         return;
       }
-      await invoke("install_agent", { agent: agente() });
-      setAgentes(await invoke<AgentOpt[]>("list_agents"));
+      await invoke("install_provider", { provider: agente() });
+      setAgentes(await invoke<AgentOpt[]>("list_providers"));
       setFallo(null);
     } catch (e) {
       setFallo({ what: t("settings.accounts.error.install"), detail: detalleDe(e) });
@@ -302,7 +302,7 @@ export default function Accounts(props: {
   async function refrescar() {
     setCargando(true);
     try {
-      setLista(await invoke<AccountList>("list_accounts", { agent: agente() }));
+      setLista(await invoke<AccountList>("list_accounts", { provider: agente() }));
       setFallo(null);
       await mirarEspera();
     } catch (e) {
@@ -441,11 +441,11 @@ export default function Accounts(props: {
         void comprobar(account)
           .then(() => descartarSiVacia(account, Boolean(text)))
           .then(() => refrescar());
-        // Y volver a pedir `list_agents`: conectar una cuenta instala el CLI
+        // Y volver a pedir `list_providers`: conectar una cuenta instala el CLI
         // si faltaba, y sin esto el botón «Instalar» se quedaba pegado tras
-        // conectar. El listener de `"agents"` cubre cuando la conexión
+        // conectar. El listener de `"providers"` cubre cuando la conexión
         // instaló algo; esta línea cierra el caso de un agente ya instalado.
-        void invoke<AgentOpt[]>("list_agents").then(setAgentes).catch(() => {});
+        void invoke<AgentOpt[]>("list_providers").then(setAgentes).catch(() => {});
         setConectadaVez((c) => ({ ...c, [account]: (c[account] ?? 0) + 1 }));
         return;
       }
@@ -468,19 +468,19 @@ export default function Accounts(props: {
   /**
    * El oyente de los cambios de instalación.
    *
-   * Instalar o quitar el CLI de un agente termina en un evento `"agents"`
+   * Instalar o quitar el CLI de un agente termina en un evento `"providers"`
    * (`runtime/agents/` · `aviso_de_cambio`), que además ya invalidó la caché de sondas.
    * Sin escucharlo, esta pantalla se quedaba con el «instalando…» hasta que
    * alguien la cerraba y la reabría: el estado no pasaba solo a instalado. Al
-   * recibirlo se vuelve a pedir `list_agents`, que ya lee fresco, y así deja de
+   * recibirlo se vuelve a pedir `list_providers`, que ya lee fresco, y así deja de
    * depender de remontar el componente.
    *
    * El nombre va como cadena literal por lo mismo que el del login:
    * `scripts/guards/bridge.mjs` comprueba que alguien lo emita y solo lee literales.
    */
   onMount(() => {
-    const cambios = listen("agents", () => {
-      void invoke<AgentOpt[]>("list_agents").then(setAgentes).catch(() => {});
+    const cambios = listen("providers", () => {
+      void invoke<AgentOpt[]>("list_providers").then(setAgentes).catch(() => {});
     });
     onCleanup(() => void cambios.then((f) => f()));
   });
@@ -511,7 +511,7 @@ export default function Accounts(props: {
     setComprobando((c) => ({ ...c, [id]: true }));
     try {
       const st = await invoke<AccountStatus>("account_status", {
-        agent: agente(),
+        provider: agente(),
         id,
       });
       setEstados((e) => ({ ...e, [id]: st }));
@@ -548,7 +548,7 @@ export default function Accounts(props: {
     if (recienCreada !== id || !hubaFallo) return;
     recienCreada = null;
     try {
-      if (await invoke<boolean>("discard_account", { agent: agente(), id })) {
+      if (await invoke<boolean>("discard_account", { provider: agente(), id })) {
         await refrescar();
       }
     } catch {
@@ -561,7 +561,7 @@ export default function Accounts(props: {
     if (faltaExterno()) return;
     try {
       const a = await invoke<Account>("add_account", {
-        agent: agente(),
+        provider: agente(),
         label: "",
       });
       // Agregar crea la carpeta antes del login: ahí escribe el CLI la
@@ -634,7 +634,7 @@ export default function Accounts(props: {
       if (!agentes().find((a) => a.id === agente())?.available) {
         await instalarCli();
       }
-      await invoke("login_account", { agent: agente(), id, mode: modo });
+      await invoke("login_account", { provider: agente(), id, mode: modo });
       if (modo === "terminal") {
         // El login ocurre fuera de la app: no llega ningún evento aquí, y no
         // hay nada que esperar ni panel que sostener.
@@ -686,7 +686,7 @@ export default function Accounts(props: {
   async function usar(id: string) {
     try {
       setRepuestas(null);
-      await invoke("set_active_account", { agent: agente(), id });
+      await invoke("set_active_account", { provider: agente(), id });
       await refrescar();
     } catch (e) {
       setFallo({ what: t("settings.accounts.error.activate"), detail: detalleDe(e) });
@@ -695,7 +695,7 @@ export default function Accounts(props: {
 
   async function mirarEspera() {
     try {
-      setEsperando(await invoke<EnEspera[]>("tasks_awaiting_quota", { agent: agente() }));
+      setEsperando(await invoke<EnEspera[]>("tasks_awaiting_quota", { provider: agente() }));
     } catch {
       setEsperando([]);
     }
@@ -704,7 +704,7 @@ export default function Accounts(props: {
   async function reponer() {
     setReponiendo(true);
     try {
-      const n = await invoke<number>("resume_awaiting_quota", { agent: agente() });
+      const n = await invoke<number>("resume_awaiting_quota", { provider: agente() });
       setRepuestas(n);
       await mirarEspera();
     } catch (e) {
@@ -717,7 +717,7 @@ export default function Accounts(props: {
   async function quitar(id: string) {
     setPorQuitar(null);
     try {
-      await invoke("remove_account", { agent: agente(), id });
+      await invoke("remove_account", { provider: agente(), id });
       await refrescar();
     } catch (e) {
       setFallo({ what: t("settings.accounts.error.remove"), detail: detalleDe(e) });
@@ -857,7 +857,7 @@ export default function Accounts(props: {
 
             Las tres comparten paquete y carpeta (`agents::Install::carpeta`):
             instalar desde cualquiera las quita de las tres, con el evento
-            `agents` haciéndolas releer `list_agents`. */}
+            `providers` haciéndolas releer `list_providers`. */}
         <Show when={!agentes().find((a) => a.id === agente())?.available}>
           <SettingsBlock class="justify-items-start">
             <Button
@@ -1352,7 +1352,7 @@ export default function Accounts(props: {
                 setClave("");
                 // El alta creó la cuenta antes de tener la clave, igual que con
                 // el login del CLI. Sin esto queda un objeto vacío en la lista.
-                if (id) void invoke("discard_account", { agent: agente(), id }).then(refrescar);
+                if (id) void invoke("discard_account", { provider: agente(), id }).then(refrescar);
               }}
             >
               {t("settings.accounts.cancel")}
@@ -1447,7 +1447,7 @@ export default function Accounts(props: {
  * no es igual para todos: los que entrenan con lo que les mandes se marcan
  * en la propia lista (`runtime/models.rs`).
  *
- * Es del workspace, no de la máquina: lo guarda `workspaces::set_agent_consent`,
+ * Es del workspace, no de la máquina: lo guarda `workspaces::set_provider_consent`,
  * y lo consultan el catálogo y el camino del chat. Lo que sale es material
  * de un cliente, y una decisión tomada para uno no aplica al trabajo de otro.
  */
@@ -1883,7 +1883,7 @@ function ModelosGratuitos(props: {
           active: string | null;
           workspaces: {
             id: string;
-            consents?: { agent: string; version: number }[];
+            consents?: { provider: string; version: number }[];
           }[];
         }>("workspaces_startup");
         const activo = s.workspaces.find((w) => w.id === s.active);
@@ -1893,7 +1893,7 @@ function ModelosGratuitos(props: {
         // lanzar un turno (`workspaces::consintio`); aquí solo se pinta.
         setAceptado(
           activo?.consents?.some(
-            (c) => c.agent === props.agente && c.version === version,
+            (c) => c.provider === props.agente && c.version === version,
           ) ?? false,
         );
       } catch {
@@ -1905,13 +1905,13 @@ function ModelosGratuitos(props: {
   async function cambiar(valor: boolean) {
     setGuardando(true);
     try {
-      const w = await invoke<{ consents?: { agent: string; version: number }[] }>(
-        "set_agent_consent",
-        { agent: props.agente, accepted: valor },
+      const w = await invoke<{ consents?: { provider: string; version: number }[] }>(
+        "set_provider_consent",
+        { provider: props.agente, accepted: valor },
       );
       // Lo que quedó guardado, no lo que se pidió: si el backend rechaza algo,
       // la pantalla tiene que enseñar su estado y no el nuestro.
-      setAceptado(w.consents?.some((c) => c.agent === props.agente) ?? false);
+      setAceptado(w.consents?.some((c) => c.provider === props.agente) ?? false);
       setPreguntando(false);
       setFallo(null);
       // Sin binario, activar deja el interruptor en verde y el chat sin poder

@@ -57,7 +57,7 @@ test("los historiales antiguos siguen disponibles y las tareas con arquetipo son
   const withArchetype = {
     id: "con-arquetipo",
     parent: null,
-    encargado: "Holmes",
+    agent: "Holmes",
     chat_de_agente: false,
     archived: false,
   };

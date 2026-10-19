@@ -17,15 +17,15 @@ test("tras el cambio de cuenta por cupo, la franja lee el consumo de la cuenta n
     window_ready: null,
     window_vitals: null,
     setup_required: false,
-    list_agents: [{ id: "claude", label: "Claude Code", available: true, driver: true, limits: true }],
+    list_providers: [{ id: "claude", label: "Claude Code", available: true, driver: true, limits: true }],
     list_workspaces: { workspaces: [{ id: "w", name: "W", context_root: null }], active: "w" },
     workspaces_startup: { workspaces: [{ id: "w", name: "W", context_root: null }], active: "w" },
     list_projects: [],
     list_sources: [],
     list_live_sessions: [],
     list_live_turns: [],
-    list_surfaces: [{ id: "claude", agent: "claude", label: "Claude Code", catalogo: "todo", usable: true, marca: null, porque: null }],
-    list_accounts: ({ agent }) => ({ agent, env_var: "", accounts: [AGOTADA, CON_CUPO], active: activa }),
+    list_surfaces: [{ id: "claude", provider: "claude", label: "Claude Code", catalogo: "todo", usable: true, marca: null, porque: null }],
+    list_accounts: ({ provider }) => ({ provider, env_var: "", accounts: [AGOTADA, CON_CUPO], active: activa }),
     account_limits: ({ id }) => {
       leidas.push(id);
       return { mode: "read", windows: [], at: Date.now() };

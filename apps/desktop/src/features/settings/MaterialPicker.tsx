@@ -134,7 +134,7 @@ export default function MaterialPicker(props: {
   onMount(() => {
     void (async () => {
       try {
-        const ps = await invoke<Proveedor[]>("list_providers");
+        const ps = await invoke<Proveedor[]>("list_code_providers");
         // Solo los conectados: uno sin conexión no puede listar nada, y
         // ofrecerlo es un clic que acaba en un error que ya se sabía.
         const vivos = ps.filter((p) => p.connected);

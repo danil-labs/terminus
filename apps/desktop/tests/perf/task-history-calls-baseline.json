@@ -3,7 +3,7 @@
   "startup.list_live_sessions": 4,
   "cli.task_history": 0,
   "cli.list_live_sessions": 30,
-  "cli.list_encargados": 0,
+  "cli.list_agents": 0,
   "task_history": 5,
   "list_live_sessions": 24
 }

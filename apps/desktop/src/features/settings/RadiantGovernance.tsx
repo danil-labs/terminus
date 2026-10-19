@@ -178,7 +178,7 @@ export default function RadiantGovernance(props: { remote: { id: string; name: s
     try {
       const [targets, list] = await Promise.all([
         invoke<GovernedLogin[]>("list_governed_mcp_logins"),
-        invoke<McpAgent[]>("list_mcp_agents"),
+        invoke<McpAgent[]>("list_mcp_providers"),
       ]);
       if (mine !== loginsRequest) return;
       setLogins(targets);
@@ -192,7 +192,7 @@ export default function RadiantGovernance(props: { remote: { id: string; name: s
     setFailure(null);
     setLoginNote(null);
     try {
-      setLoginNote(prosa(await invoke<Frase>("mcp_login", { agent, id })));
+      setLoginNote(prosa(await invoke<Frase>("mcp_login", { provider: agent, id })));
     } catch (error) {
       setFailure(asFailure(error));
     }

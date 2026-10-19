@@ -134,7 +134,7 @@ test("la transcripción conserva a quién se entregó, dónde se contesta y el s
 // Un mensaje de otra tarea se relee con su remitente: sin él sale a la derecha
 // como si lo hubiera escrito la persona.
 test("the transcript keeps the task that sent a message", () => {
-  const sender = { folder: "p1", task: "t3", title: "Revisa el PR", agent: "codex", model: "gpt-6-sol" };
+  const sender = { folder: "p1", task: "t3", title: "Revisa el PR", provider: "codex", model: "gpt-6-sol" };
   const [fromTask] = transcripcion([
     { role: "user", id: "u1", text: "¿terminaste?", from_task: sender },
   ]);
@@ -150,7 +150,7 @@ test("a message the person wrote through a channel carries no encargado", () => 
   assert.equal(byChannel.channel, "Telegram");
   assert.equal(byChannel.encargado, undefined);
   const [fromEncargado] = transcripcion([
-    { role: "user", id: "u2", text: "revisa", encargado: "reviewer" },
+    { role: "user", id: "u2", text: "revisa", agent: "reviewer" },
   ]);
   assert.equal(fromEncargado.encargado, "reviewer");
   assert.equal(fromEncargado.channel, undefined);

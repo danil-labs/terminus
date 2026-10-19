@@ -46,7 +46,7 @@ export default function RepositoryPicker(props: {
     const local = invoke<ProjectRepository[]>("list_project_repositories", { workspace: scope })
       .then(repos => { if (active) setHistory(repos); }).catch(fail);
     const remote = (async () => {
-      const connections = await invoke<Provider[]>("list_providers", { scope });
+      const connections = await invoke<Provider[]>("list_code_providers", { scope });
       if (!active) return;
       setProviders(connections);
       await Promise.all(connections.filter(p => p.connected).map(async p => {

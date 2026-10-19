@@ -6,10 +6,19 @@ Apache-2.0); the manifest was regenerated on
 `b40d34999d140d30a0e1192ba752b2fdb860dc90`. The generator reads the engine
 source and is not part of this repository.
 
-`commands.json`: 316 commands, 291 ordinary invocations, three channels and
+`commands.json`: 317 commands, 292 ordinary invocations, three channels and
 twenty-two window/bridge functions. Names, camelCase parameters, reference Rust
-types and literal events are kept. SHA-256:
-`2701d8c1cf79951ba997598922d44ad1bec42c85e84808bb1c09b92f57f7f827`.
+types and literal events are kept.
+
+On 2026-10-19 the contract renamed its two concepts (317 commands, 27 events):
+the CLI that runs a turn goes from `agent` to `provider` and the user agent from
+`encargado` to `agent`, in command names, parameters, fields and events.
+`list_agents` became `list_providers`, and the code-hosting list that held that
+name became `list_code_providers`. Files on disk keep their keys; the types that
+are stored and also travel cross the contract wrapped in `Wire`, which renames
+their keys. There are no aliases. This copy is byte-identical to the engine's.
+SHA-256:
+`c5d047b78499900738723ff3d06c8ba40b31cf15b05f7c8bc2724fada76dcf8c`.
 
 `phrase-keys.json`: the catalog keys the engine sends as `Frase` values, taken
 from the engine source at `fdf4dd9863a80363a0dd7b15ea21fd6b69e1f4bd`.

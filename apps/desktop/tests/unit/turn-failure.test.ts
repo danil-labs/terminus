@@ -155,7 +155,7 @@ test("la línea del cupo dice a qué cuenta pasó y por qué", () => {
 });
 
 test("las filas de la Bandeja antigua sobreviven a reabrir su historial", () => {
-  const sender = { folder: "p", task: "h1", title: "Revisión", agent: "claude" };
+  const sender = { folder: "p", task: "h1", title: "Revisión", provider: "claude" };
   const msgs = transcript([
     { role: "system", text: "Revisé el módulo.", meta: "task_finished", from_task: sender, hops: 1 },
     { role: "system", text: "", meta: "task_finished_read", from_task: sender, hops: 1 },
@@ -204,7 +204,7 @@ test("la línea con que el agente contesta a la terminal sobrevive a reabrir la 
 });
 
 test("la respuesta entregada es una fila de sistema con el título, también la guardada antes", () => {
-  const recipient = { folder: "p", task: "mfpbwsj1", title: "Revisión del contrato", agent: "claude" };
+  const recipient = { folder: "p", task: "mfpbwsj1", title: "Revisión del contrato", provider: "claude" };
   const [current, old] = transcript([
     { role: "system", text: "", meta: "respondido", from_task: recipient, hops: 2 },
     { role: "system", text: "Respuesta entregada a la tarea «mfpbwsj1». Salto 2.", meta: "respondido" },

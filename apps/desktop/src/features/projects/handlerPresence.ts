@@ -15,7 +15,7 @@ async function reload(project: string) {
   const entry = cache.get(project);
   if (!entry) return;
   try {
-    entry.setRows(await invoke<HandlerStatusRow[]>("list_encargado_status", { project }));
+    entry.setRows(await invoke<HandlerStatusRow[]>("list_agent_status", { project }));
   } catch {
   }
 }

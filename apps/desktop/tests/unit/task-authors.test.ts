@@ -20,7 +20,7 @@ test("el autor de una tarea sale de quién la lanzó", () => {
   assert.equal(authorKey(huerfana), "agent");
   assert.equal(authorKey(sinDato), "unknown");
   assert.equal(
-    authorKey({ parent: "p", encargado_del_padre: "Revisor" }),
+    authorKey({ parent: "p", parent_agent: "Revisor" }),
     "agent:Revisor",
   );
 });
@@ -54,9 +54,9 @@ test("los grupos sin autor resoluble van al final", () => {
 // «Mis tareas». Sin esta rama, esa tarea caería en `unknown` y su grupo se iría
 // al final.
 test("con el agrupado por encargado, el grupo sale del encargado", () => {
-  assert.equal(authorKey({ encargado: "Ana" }, true), "agent:Ana");
+  assert.equal(authorKey({ agent: "Ana" }, true), "agent:Ana");
   assert.equal(
-    authorKey({ encargado: null, launched_by: null }, true),
+    authorKey({ agent: null, launched_by: null }, true),
     "unassigned",
   );
 });
@@ -64,7 +64,7 @@ test("con el agrupado por encargado, el grupo sale del encargado", () => {
 test("con el agrupado por encargado, Mis tareas va arriba", () => {
   assert.deepEqual(
     authorKeys(
-      [{ encargado: "Beto" }, { encargado: null }, { encargado: "Ana" }],
+      [{ agent: "Beto" }, { agent: null }, { agent: "Ana" }],
       true,
     ),
     ["unassigned", "agent:Ana", "agent:Beto"],

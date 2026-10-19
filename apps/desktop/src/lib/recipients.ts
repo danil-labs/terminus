@@ -37,7 +37,7 @@ export type SenderTask = {
   folder: string;
   task: string;
   title: string;
-  agent: string;
+  provider: string;
   model?: string | null;
 };
 
@@ -102,8 +102,8 @@ export function insertMention(before: RecipientDraft, trigger: Trigger, target: 
 /**
  * Un encargado alcanzable desde la caja, tal como lo necesita el menú.
  *
- * Sale de la lista que el riel ya invoca (`list_encargados`), con la presencia
- * que `list_encargado_status` publica si está a mano: `undefined` no es un
+ * Sale de la lista que el riel ya invoca (`list_agents`), con la presencia
+ * que `list_agent_status` publica si está a mano: `undefined` no es un
  * estado, es «todavía no se sabe», y la cara se pinta despierta igual.
  */
 export type RecipientCandidate = { name: string; description: string; status?: HandlerStatus };

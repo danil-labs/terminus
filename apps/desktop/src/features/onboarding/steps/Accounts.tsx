@@ -20,10 +20,10 @@ export default function Cuentas(props: { alta: Alta; nueva: boolean }) {
   const e = props.alta.estado;
 
   async function cargar() {
-    const as = await invoke<AgentOpt[]>("list_agents").catch(() => [] as AgentOpt[]);
+    const as = await invoke<AgentOpt[]>("list_providers").catch(() => [] as AgentOpt[]);
     setAgentes(as);
     for (const a of as.filter((x) => x.available && !x.sin_cuenta)) {
-      invoke<AccountList>("list_accounts", { agent: a.id })
+      invoke<AccountList>("list_accounts", { provider: a.id })
         .then((l) =>
           setConectadas((c) => ({ ...c, [a.id]: l.accounts.some((x) => x.authenticated_at !== null) })),
         )
@@ -33,7 +33,7 @@ export default function Cuentas(props: { alta: Alta; nueva: boolean }) {
 
   onMount(() => {
     void cargar();
-    const instalados = listen("agents", () => void cargar());
+    const instalados = listen("providers", () => void cargar());
     const cuentas = listen<{ kind: string }>("account", (ev) => {
       if (ev.payload.kind === "done") void cargar();
     });

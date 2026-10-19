@@ -119,7 +119,7 @@ export function sueltaElBorrador(
  */
 function mismoRemite(a: Encolado, b: Encolado): boolean {
   return (
-    (a.encargado ?? null) === (b.encargado ?? null) &&
+    (a.agent ?? null) === (b.agent ?? null) &&
     (a.channel ?? null) === (b.channel ?? null) &&
     (a.reply_to?.folder ?? null) === (b.reply_to?.folder ?? null) &&
     (a.reply_to?.task ?? null) === (b.reply_to?.task ?? null) &&
@@ -179,14 +179,14 @@ export function agruparCola(items: readonly Encolado[]): Omit<Encolado, "id"> | 
     ...(recipients.length ? { recipients } : {}),
     // Solo cuando los hay: una clave escrita en `null` y una clave ausente
     // significan lo mismo, y dos formas de lo mismo se comparan mal.
-    ...(remite.encargado ? { encargado: remite.encargado } : {}),
+    ...(remite.agent ? { agent: remite.agent } : {}),
     ...(remite.channel ? { channel: remite.channel } : {}),
     ...(remite.reply_to ? { reply_to: remite.reply_to } : {}),
     ...(remite.hops != null ? { hops: remite.hops } : {}),
     ...(remite.from_task ? { from_task: remite.from_task } : {}),
     ...(remite.space ? { space: remite.space } : {}),
     text: items.map(item => item.text).join("\n\n"),
-    agent: ultimo.agent,
+    provider: ultimo.provider,
     model: ultimo.model,
     effort: ultimo.effort,
     permission_mode: ultimo.permission_mode,
@@ -208,7 +208,7 @@ export function inyectable(item: Encolado): boolean {
 export function esDeLaTerminal(item: Encolado): boolean {
   return (
     item.text.trimStart().startsWith("!") &&
-    !item.encargado && !item.channel && !item.reply_to && item.hops == null && !item.from_task
+    !item.agent && !item.channel && !item.reply_to && item.hops == null && !item.from_task
   );
 }
 

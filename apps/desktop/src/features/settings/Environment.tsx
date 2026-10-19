@@ -98,7 +98,7 @@ export default function Environment() {
   onMount(() => {
     void cargar();
 
-    const cambios = listen("agents", () => void cargar(true));
+    const cambios = listen("providers", () => void cargar(true));
     onCleanup(() => void cambios.then((f) => f()));
     const toolchain = listen("toolchain", () => void cargar(true));
     onCleanup(() => void toolchain.then((f) => f()));

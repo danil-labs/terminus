@@ -31,7 +31,7 @@ export type UsageRecord = {
    * no como un id.
    */
   workspace: string;
-  agent: string;
+  provider: string;
   /** `null` hasta que aterricen las cuentas gestionadas. */
   account: string | null;
   /** Con qué modelo corrió el turno, según el agente. `null` si no lo publicó. */

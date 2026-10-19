@@ -28,7 +28,7 @@ export default function Proveedores(props: { alta: Alta }) {
   const elegidos = () => props.alta.estado.elegidos;
 
   const cargar = () =>
-    invoke<Agente[]>("list_agents")
+    invoke<Agente[]>("list_providers")
       .then((as) => { setAgentes(as); setError(false); })
       .catch(() => setError(true));
 
@@ -55,7 +55,7 @@ export default function Proveedores(props: { alta: Alta }) {
 
   onMount(() => {
     void cargar();
-    const cambios = listen("agents", () => void cargar());
+    const cambios = listen("providers", () => void cargar());
     onCleanup(() => void cambios.then((f) => f()));
   });
 
@@ -63,7 +63,7 @@ export default function Proveedores(props: { alta: Alta }) {
   createEffect(
     on(agentes, (as) => {
       for (const a of as.filter((x) => !x.available && !x.external_install_url && pesos()[x.id] === undefined)) {
-        invoke<number>("agent_download_size", { agent: a.id })
+        invoke<number>("provider_download_size", { provider: a.id })
           .then((b) => setPesos((ps) => ({ ...ps, [a.id]: b })))
           .catch(() => {});
       }

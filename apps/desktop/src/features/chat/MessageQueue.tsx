@@ -20,7 +20,7 @@ export type Encolado = {
   id: string;
   text: string;
   task_mentions?: TaskMention[];
-  agent: string;
+  provider: string;
   model: string | null;
   effort: string | null;
   /**
@@ -43,7 +43,7 @@ export type Encolado = {
    * (`runtime/chat/queue.rs`). La cola la vacía la ventana: lo que no se
    * devuelva aquí aterriza firmado como de la persona y sin dónde contestar.
    */
-  encargado?: string | null;
+  agent?: string | null;
   /** Por qué canal lo escribió la persona (`Turn::channel`). */
   channel?: string | null;
   reply_to?: ReplyTo | null;
@@ -224,13 +224,13 @@ export default function ColaDeMensajes(props: ColaDeMensajesProps) {
                         que hay que ver, y verlo en cada renglón sería ruido. */}
                     <Show
                       when={
-                        it.agent !== props.actual.agent ||
+                        it.provider !== props.actual.agent ||
                         (it.model ?? "") !== props.actual.model
                       }
                     >
                       <span class="mt-1 shrink-0 rounded-sm bg-surface-muted px-1.5 py-0.5 text-[0.62rem] font-semibold tracking-wide text-neutral-700 uppercase">
-                        {props.agentes.find((a) => a.id === it.agent)?.label ??
-                          it.agent}
+                        {props.agentes.find((a) => a.id === it.provider)?.label ??
+                          it.provider}
                         {` · ${it.model ?? t("chat.queue.default_model")}`}
                       </span>
                     </Show>

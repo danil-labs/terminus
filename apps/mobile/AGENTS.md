@@ -37,7 +37,7 @@ se agregan con `npx expo install <paquete>`, que elige la versión compatible.
   pasar los comandos de su lista `CLI`/`INVOKE` (`bridge/bridge.mjs`): un
   comando nuevo se agrega ahí a propósito, nunca un pase genérico al motor.
 - Los nombres de comandos y campos son los del motor (`task list`,
-  `respond_permission`, `encargado`); no se traducen en la app.
+  `respond_permission`, `esperando`); no se traducen en la app.
 - Todo texto que se lee viene de `src/lib/i18n.ts`, en `es` y `en`.
 - Lo que comparte con el escritorio viene de `packages/` en la raíz: colores, estado de
   tarea, íconos y frases de `@terminus/design`, y tipos y comandos del bridge de

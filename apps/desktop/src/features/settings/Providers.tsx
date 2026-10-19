@@ -185,7 +185,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
   async function cargar() {
     setCargando(true);
     try {
-      setLista(await invoke<Provider[]>("list_providers", { scope: await scope }));
+      setLista(await invoke<Provider[]>("list_code_providers", { scope: await scope }));
       setFallo(null);
     } catch (e) {
       // Cargando, vacío y error son tres pantallas distintas: dejar la lista

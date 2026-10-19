@@ -12,7 +12,7 @@ export default function RecentAgentChats(props: {
   onPick: (id: string) => void;
 }) {
   const recent = createMemo(() => props.sessions
-    .filter(row => row.encargado === props.agent && !row.chat_de_agente && !row.subagent
+    .filter(row => row.agent === props.agent && !row.chat_de_agente && !row.subagent
       && !row.archived && row.stage !== "done")
     .sort((a, b) => b.updated_at - a.updated_at)
     .slice(0, 5));

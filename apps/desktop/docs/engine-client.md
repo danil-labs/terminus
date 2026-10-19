@@ -24,11 +24,11 @@ La [integración de GitHub](github.md) usa los comandos existentes de proveedore
 entorno; la ventana anterior ignora ese inventario opcional. Su distribución
 requiere actualizar el motor fijado en `seldon-runtime.lock`.
 
-`list_agents` puede incluir `external_install_url` para proveedores cuya app
+`list_providers` puede incluir `external_install_url` para proveedores cuya app
 oficial se instala por separado. Onboarding y Configuración abren ese enlace,
-omiten `install_agent` y vuelven a consultar la disponibilidad después de
+omiten `install_provider` y vuelven a consultar la disponibilidad después de
 `check_environment`. La ventana acepta respuestas sin ese campo. ZCode requiere
-un motor que lo anuncie en `list_agents`; estos cambios de interfaz no actualizan
+un motor que lo anuncie en `list_providers`; estos cambios de interfaz no actualizan
 el motor fijado en `seldon-runtime.lock`.
 
 ## Contract

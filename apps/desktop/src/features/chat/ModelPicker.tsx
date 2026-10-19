@@ -124,10 +124,10 @@ export default function SelectorDeModelo(props: SelectorDeModeloProps) {
     if (next) {
       setCupoGo(null);
       if (props.models.some((m) => m.proveedor.id === "opencode-go")) {
-        void invoke<AccountList>("list_accounts", { agent: "opencode-zen" })
+        void invoke<AccountList>("list_accounts", { provider: "opencode-zen" })
           .then((accounts) => {
             if (!accounts.active) return null;
-            return invoke<Query>("account_limits", { agent: "opencode-zen", id: accounts.active, force: false });
+            return invoke<Query>("account_limits", { provider: "opencode-zen", id: accounts.active, force: false });
           })
           .then(setCupoGo)
           .catch(() => setCupoGo(null));

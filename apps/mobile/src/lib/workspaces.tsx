@@ -29,7 +29,7 @@ type Workspaces = {
 const Context = createContext<Workspaces | null>(null);
 const KEY = "terminus.workspace";
 const SPACES_KEY = "terminus.spaces";
-const REFRESH_ON = new Set(["cli-changed", "session", "resync", "agents"]);
+const REFRESH_ON = new Set(["cli-changed", "session", "resync", "providers"]);
 
 export function useWorkspaces() {
   const value = useContext(Context);
@@ -166,8 +166,9 @@ export function spaceName(space: Space | undefined, fallback: string) {
 
 /** Agent and model of the newest task, the defaults for one started from the phone. */
 export function lastAgent(tasks: TaskRow[]) {
-  const newest = tasks.find((task) => task.agent);
-  return newest ? { agent: newest.agent, model: newest.model ?? undefined } : null;
+  const newest = tasks.find((task) => task.provider);
+  // `agent` is the `task create` CLI option, whose name does not change.
+  return newest ? { agent: newest.provider, model: newest.model ?? undefined } : null;
 }
 
 /** The sidebar state of each task of a workspace, from attention and the running turns. */

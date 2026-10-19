@@ -4,8 +4,8 @@ export type AuthorRow = {
   launcher_name?: string | null;
   parent?: string | null;
   subagent?: string | null;
-  encargado?: string | null;
-  encargado_del_padre?: string | null;
+  agent?: string | null;
+  parent_agent?: string | null;
 };
 
 /**
@@ -16,9 +16,9 @@ export type AuthorRow = {
  * no lanzó.
  */
 export function authorKey(session: AuthorRow, groupByHandler = false): string {
-  if (groupByHandler) return session.encargado ? `agent:${session.encargado}` : "unassigned";
+  if (groupByHandler) return session.agent ? `agent:${session.agent}` : "unassigned";
   if (session.launched_by || session.parent || session.subagent) {
-    const name = session.launcher_name ?? session.encargado_del_padre;
+    const name = session.launcher_name ?? session.parent_agent;
     return name ? `agent:${name}` : "agent";
   }
   return session.launched_by === null ? "user" : "unknown";

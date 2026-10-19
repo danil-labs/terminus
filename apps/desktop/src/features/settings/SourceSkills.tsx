@@ -22,7 +22,7 @@ type SkillDeFuente = {
   enabled: boolean;
   origin: string;
   /** Qué agentes la leen. Lo decide la carpeta en que está, no esta pantalla. */
-  agents: string[];
+  providers: string[];
 };
 
 export function SkillsDeFuentes() {
@@ -42,7 +42,7 @@ export function SkillsDeFuentes() {
       (s) =>
         s.name.toLowerCase().includes(q) ||
         s.source_name.toLowerCase().includes(q) ||
-        s.agents.some((a) => a.toLowerCase().includes(q)),
+        s.providers.some((a) => a.toLowerCase().includes(q)),
     );
   });
 
@@ -52,7 +52,7 @@ export function SkillsDeFuentes() {
   // Cuántos agentes hay en total, para saber cuándo una skill es de todos sin
   // enumerarlos. Sale de las propias filas: la lista de agentes es de Rust.
   const agentes = createMemo(() =>
-    Math.max(0, ...skills().map((s) => s.agents.length)),
+    Math.max(0, ...skills().map((s) => s.providers.length)),
   );
 
   async function refrescar() {
@@ -191,10 +191,10 @@ export function SkillsDeFuentes() {
                   enciende para Claude una skill que solo carga Codex. */}
               <span class="flex flex-wrap justify-end gap-1">
                 <Show
-                  when={s.agents.length !== agentes()}
+                  when={s.providers.length !== agentes()}
                   fallback={<Badge>{t("settings.skills.all_agents")}</Badge>}
                 >
-                  <For each={s.agents}>{(a) => <Badge forma="dato">{a}</Badge>}</For>
+                  <For each={s.providers}>{(a) => <Badge forma="dato">{a}</Badge>}</For>
                 </Show>
               </span>
               <Toggle

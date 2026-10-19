@@ -248,13 +248,13 @@ export default function Settings(props: {
    * —`superficie.marca`, que dice «no instalado» mirando si hay binario— así que
    * tras instalar desde el propio panel la fila seguía diciendo que no está,
    * mientras el botón de instalar sí desaparecía: `Accounts` vuelve a pedir
-   * `list_agents` con este mismo evento y esta lista no: quedan dos verdades
+   * `list_providers` con este mismo evento y esta lista no: quedan dos verdades
    * sobre lo mismo en la misma tarjeta, y la que se lee primero es la falsa —«se
    * instaló pero sale no instalado, y ya no sale instalar»—. `App.tsx` hace lo
    * mismo para el menú del chat.
    */
   onMount(() => {
-    const cambios = listen("agents", cargarSuperficies);
+    const cambios = listen("providers", cargarSuperficies);
     // **Y conectar una cuenta también cambia lo que esta pantalla afirma.** La
     // insignia de un proveedor dice «sin cuenta» mirando cuál está elegida
     // (`surfaces::sin_cuenta`), así que guardar una clave la deja mintiendo

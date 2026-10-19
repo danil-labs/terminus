@@ -151,7 +151,7 @@ export default function UsageBar(props: {
     setInProgress((p) => ({ ...p, [k]: true }));
     try {
       const r = await invoke<Query>("account_limits", {
-        agent,
+        provider: agent,
         id,
         // force es el nombre del parámetro del puente; otro nombre no forzaría la consulta.
         force: force,
@@ -200,7 +200,7 @@ export default function UsageBar(props: {
         const rowCount = await Promise.all(
           ids.split(",").map(async (id): Promise<AccountsByAgent | null> => {
             try {
-              const l = await invoke<AccountList>("list_accounts", { agent: id });
+              const l = await invoke<AccountList>("list_accounts", { provider: id });
               return {
                 agent: id,
                 label: accountLabel(id),
@@ -248,7 +248,7 @@ export default function UsageBar(props: {
         cards.map(async (p) => {
           try {
             const status = await invoke<AccountStatus>("account_status", {
-              agent: p.agent,
+              provider: p.agent,
               id: p.cuenta.id,
             });
             if (!alive) return;

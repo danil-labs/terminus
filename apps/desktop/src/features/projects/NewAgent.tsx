@@ -95,7 +95,7 @@ export default function NewAgent(props: {
     const project = destino();
     const scope: HandlerScope = { kind: "project", id: project };
     try {
-      const creado = await invoke<CreatedHandler>("create_encargado", {
+      const creado = await invoke<CreatedHandler>("create_agent", {
         name: id(),
         description: description().trim(),
         instructions: instructions().trim(),
@@ -119,7 +119,7 @@ export default function NewAgent(props: {
         await invoke("set_agent_model", {
           project,
           name: id(),
-          agent: elegido.agent,
+          provider: elegido.agent,
           model: elegido.model.id,
           effort: effort() || null,
         }).catch(() => {});
@@ -299,9 +299,9 @@ export default function NewAgent(props: {
           {(creado) => (
             <div class="mt-3 grid gap-3">
               <div class="flex items-center gap-3">
-                <AstroAvatar name={creado().encargado.name} status="asleep" size={34} />
+                <AstroAvatar name={creado().agent.name} status="asleep" size={34} />
                 <span class="font-mono text-xs text-neutral-950">
-                  {creado().encargado.name}
+                  {creado().agent.name}
                 </span>
               </div>
               <div class="grid gap-1 rounded-sm border border-warning-strong/30 bg-warning-strong/10 p-2">
