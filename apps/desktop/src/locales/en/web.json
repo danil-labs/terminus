@@ -21,5 +21,6 @@
   "web.setup.failed": "Your computer could not be prepared. Contact support and we will help you.",
   "web.setup.preparing": "Preparing your computer…",
   "web.setup.preparing_percent": "Preparing your computer… {percent}%",
-  "web.start_failed": "The computer could not start. Try again in a moment."
+  "web.start_failed": "The computer could not start. Try again in a moment.",
+  "web.sync.last": "Last synced: {time}"
 }

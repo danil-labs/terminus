@@ -21,5 +21,6 @@
   "web.setup.failed": "No se pudo preparar tu computadora. Escríbenos a soporte y te ayudamos.",
   "web.setup.preparing": "Preparando tu computadora…",
   "web.setup.preparing_percent": "Preparando tu computadora… {percent} %",
-  "web.start_failed": "La computadora no pudo encenderse. Vuelve a intentarlo en un momento."
+  "web.start_failed": "La computadora no pudo encenderse. Vuelve a intentarlo en un momento.",
+  "web.sync.last": "Última sincronización: {time}"
 }

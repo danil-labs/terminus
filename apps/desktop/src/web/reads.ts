@@ -23,11 +23,11 @@ export class ReadCache {
     } catch {}
   }
 
-  get(key: string): { value: unknown } | null {
+  get(key: string): { value: unknown; at: number } | null {
     const entry = this.entries.get(key);
     if (!entry) return null;
     try {
-      return { value: JSON.parse(entry.value) };
+      return { value: JSON.parse(entry.value), at: entry.at };
     } catch {
       return null;
     }

@@ -35,7 +35,8 @@ export const engine = {
 /** The relay's wake list (protocol v1): only these start an off computer. */
 const INTENT = new Set(["send_message", "inject_message", "create_project", "create_encargado", "respond_permission", "answer_question", "answer_shell_output", "run_shell_command", "queue_ready", "resume_awaiting_quota", "recreate_task_work"]);
 
-export function relay({ state: initial = "online", wakeAfter = 300 } = {}) {
+/** `cachedAt`: with the computer off, the relay answers every known read from its copy of that time. */
+export function relay({ state: initial = "online", wakeAfter = 300, cachedAt = null } = {}) {
   const sockets = [];
   const calls = [];
   const subscriptions = [];
@@ -66,6 +67,12 @@ export function relay({ state: initial = "online", wakeAfter = 300 } = {}) {
         if (this.readyState === 1) this.onmessage?.({ data: JSON.stringify(reply) });
       };
       if (state === "online") return void setTimeout(respond, 0);
+      if (!INTENT.has(m.command) && cachedAt && engine[m.command] !== undefined) {
+        const answer = engine[m.command];
+        const value = typeof answer === "function" ? answer(m.args) : answer;
+        const reply = { type: "result", id: m.id, value, cached: { updated_at: cachedAt } };
+        return void setTimeout(() => this.readyState === 1 && this.onmessage?.({ data: JSON.stringify(reply) }), 0);
+      }
       if (!INTENT.has(m.command)) {
         const off = { type: "result", id: m.id, error: { code: "machine_off" } };
         return void setTimeout(() => this.readyState === 1 && this.onmessage?.({ data: JSON.stringify(off) }), 0);

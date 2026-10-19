@@ -23,6 +23,9 @@ export type BrowserHost = {
   readText(): Promise<string>;
 };
 
+/** When the panel shows copies made while the computer was on: the newest one's time, or null. */
+export type SyncListener = (at: number | null) => void;
+
 export type WebTransport = {
   handle(command: string, args?: Args, options?: Options): Promise<unknown>;
 };
@@ -121,7 +124,13 @@ function headerOf(options: Options): string | null {
   }
 }
 
-export function createWebTransport(relay: RelaySession, computerId: string, version: string, host: BrowserHost): WebTransport {
+export function createWebTransport(
+  relay: RelaySession,
+  computerId: string,
+  version: string,
+  host: BrowserHost,
+  onSync: SyncListener = () => {},
+): WebTransport {
   let active: string | null = null;
   let ordered: Promise<unknown> = Promise.resolve();
   let subscribedAt: number | null | undefined;
@@ -136,6 +145,17 @@ export function createWebTransport(relay: RelaySession, computerId: string, vers
     wake();
   });
   relay.onState(wake);
+  let synced: number | null = null;
+  const copied = (at: number) => {
+    if (synced !== null && synced >= at) return;
+    synced = at;
+    onSync(at);
+  };
+  relay.onState((state) => {
+    if (state !== "online" || synced === null) return;
+    synced = null;
+    onSync(null);
+  });
   relay.onLink(wake);
 
   /** Resolves when something changes or after `ms`. */
@@ -164,20 +184,27 @@ export function createWebTransport(relay: RelaySession, computerId: string, vers
     const key = READ.test(command) ? JSON.stringify([command, workspace, args]) : null;
     const offline = async () => {
       const kept = key ? reads.get(key) : null;
-      if (kept) return kept;
+      if (kept) {
+        copied(kept.at);
+        return kept;
+      }
       if (command in OFF_ANSWERS) return { value: OFF_ANSWERS[command] };
       await untilOn();
       return null;
     };
     for (;;) {
-      if (waits && OFF.includes(relay.state())) {
+      // A read still asks: the relay may answer it from its own copy.
+      if (waits && !key && OFF.includes(relay.state())) {
         const answer = await offline();
         if (answer) return answer.value;
         continue;
       }
       try {
-        const value = await relay.call(requestId(), command, workspace, null, args);
-        if (key) reads.put(key, value);
+        const { value, cached } = await relay.call(requestId(), command, workspace, null, args);
+        if (cached) {
+          const at = typeof cached.updated_at === "number" ? cached.updated_at : Date.parse(cached.updated_at);
+          if (Number.isFinite(at)) copied(at < 1e12 ? at * 1000 : at);
+        } else if (key) reads.put(key, value);
         return value;
       } catch (error) {
         const failure = failureOf(error);

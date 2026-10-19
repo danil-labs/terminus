@@ -5,6 +5,7 @@
  * `window.terminusWeb` before this module loads can replace any setting, or
  * give `computerId` and `getToken` and skip the session and the picker.
  */
+import { createSignal } from "solid-js";
 import { setCapabilities } from "../lib/platform";
 // In the page, not in the lazy app chunk: the stylesheet loads with the HTML.
 import "../styles/global.css";
@@ -32,9 +33,17 @@ const browser: BrowserHost = {
 function mountApp(config: RelayConfig) {
   setCapabilities({ nativeWindow: false, updater: false, localSetup: false });
   const relay = new RelaySession(config);
-  installIpc(window, createWebTransport(relay, config.computerId, __TERMINUS_VERSION__, browser));
+  const [syncedAt, setSyncedAt] = createSignal<number | null>(null);
+  const [state, setState] = createSignal(relay.state());
+  relay.onState(setState);
+  installIpc(window, createWebTransport(relay, config.computerId, __TERMINUS_VERSION__, browser, setSyncedAt));
   relay.start();
   void import("../app/main");
+  void Promise.all([import("solid-js/web"), import("./SyncNote"), import("./phrases")]).then(([{ render }, { SyncNote }]) => {
+    const layer = document.createElement("div");
+    document.body.append(layer);
+    render(() => <SyncNote at={syncedAt} off={() => state() !== "online"} />, layer);
+  });
 }
 
 async function start(settings: WebSettings) {

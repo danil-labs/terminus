@@ -20,6 +20,10 @@ export type MachineState = "unknown" | "starting" | "online" | "offline" | "stop
 
 export type RelayFailure = { code?: string; message_key?: string; detail?: unknown; what?: unknown };
 
+/** A read the relay answered from its own copy while the computer is off. */
+export type Cached = { updated_at: string | number };
+export type CallResult = { value: unknown; cached: Cached | null };
+
 export type EventsPage = {
   cursor: number | null;
   gap?: boolean;
@@ -58,7 +62,7 @@ export function sessionUrl(endpoint: string, computerId: string): string {
 
 type Pending = {
   message: string;
-  resolve: (value: unknown) => void;
+  resolve: (result: CallResult) => void;
   reject: (error: RelayFailure) => void;
   timer: ReturnType<typeof setTimeout>;
 };
@@ -110,8 +114,8 @@ export class RelaySession {
     return () => this.linkListeners.delete(listener);
   }
 
-  /** Resolves with `value` or rejects with the relay's `error`. Resent with the same id after a reconnection. */
-  call(id: string, command: string, workspace: string | null, folder: string | null, args: unknown): Promise<unknown> {
+  /** Resolves with `value` (and `cached` when the relay answered from its copy) or rejects with `error`. Resent with the same id after a reconnection. */
+  call(id: string, command: string, workspace: string | null, folder: string | null, args: unknown): Promise<CallResult> {
     const message = JSON.stringify({ type: "call", id, command, workspace, folder, args: args ?? {} });
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -231,7 +235,10 @@ export class RelaySession {
         this.pending.delete(id);
         clearTimeout(call.timer);
         if (message.error !== undefined && message.error !== null) call.reject(message.error as RelayFailure);
-        else call.resolve(message.value ?? null);
+        else {
+          const cached = message.cached as Cached | undefined;
+          call.resolve({ value: message.value ?? null, cached: cached && typeof cached === "object" ? cached : null });
+        }
         return;
       }
       case "events": {
