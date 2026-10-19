@@ -359,7 +359,12 @@ export default function Setup(props: { children: JSX.Element }) {
     const esencial = (reporte()?.bootstrap ?? []).find((id) => reporte()?.essential?.includes(id));
     return esencial ? nombre(esencial) : "";
   };
-  const aviso = () => mostrar() === false && bloqueado() && (corriendo() || falloEsencial());
+  // Cerrar el aviso solo descarta lo que dice ahora: si la instalación pasa a
+  // fallar, el aviso de error vuelve a salir.
+  const claveDelAviso = () => `${falloEsencial() ? "failed" : "running"}:${reparando()}`;
+  const [descartado, setDescartado] = createSignal<string | null>(null);
+  const aviso = () =>
+    mostrar() === false && bloqueado() && (corriendo() || falloEsencial()) && descartado() !== claveDelAviso();
 
   function abrirEntorno() {
     window.dispatchEvent(new CustomEvent("harness:open-settings", { detail: "entorno" }));
@@ -380,7 +385,11 @@ export default function Setup(props: { children: JSX.Element }) {
           {props.children}
           <Show when={aviso()}>
             <ToastPortal>
-              <Toast tone={falloEsencial() ? "error" : "status"} data-setup-repair="">
+              <Toast
+                tone={falloEsencial() ? "error" : "status"}
+                data-setup-repair=""
+                onDismiss={() => setDescartado(claveDelAviso())}
+              >
                 <p class="m-0 break-words text-xs text-neutral-950">
                   {falloEsencial()
                     ? t("setup.repair.failed", { name: reparando() })
