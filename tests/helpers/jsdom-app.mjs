@@ -74,7 +74,7 @@ export const cause = new AsyncLocalStorage();
  *   normal sube por el `setEnv` de `Setup.revisar` y **la traga su propio
  *   `try`**, que es exactamente por qué este fallo no dejó ni un mensaje.
  */
-export async function boot(entorno, version, respuestas, userAgent) {
+export async function boot(entorno, version, respuestas, userAgent, storage = {}) {
   const fallos = [];
   const comandos = [];
   const storageQueries = [];
@@ -323,6 +323,8 @@ export async function boot(entorno, version, respuestas, userAgent) {
    * respaldo por clave— es una ampliación pendiente.
    */
   w.localStorage.setItem("harness:lengua", "es");
+  // Lo que dejó una ventana anterior: el arranque en caliente lee de aquí antes del primer IPC.
+  for (const [key, value] of Object.entries(storage)) w.localStorage.setItem(key, value);
 
   // La query hace que Node vuelva a evaluar el módulo en la segunda pasada; sin
   // ella devuelve el de la caché y no monta nada sobre este documento nuevo.

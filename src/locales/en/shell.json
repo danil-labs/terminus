@@ -212,5 +212,7 @@
   "shell.work_tree.open": "See the work tree",
   "shell.folder.open": "Open folder",
   "shell.folder.copy": "Copy path",
-  "shell.folder.copied": "Path copied"
+  "shell.folder.copied": "Path copied",
+  "shell.engine.connecting": "Connecting to the engine…",
+  "shell.sidebar.cached": "Connecting to the engine: these tasks are from last time and update as soon as it answers."
 }

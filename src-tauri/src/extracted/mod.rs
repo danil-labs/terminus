@@ -1,5 +1,7 @@
 //! Ventana habitual conectada exclusivamente al motor privado seleccionado.
-//! Sin argumentos usa el motor empaquetado; una raíz de 0.2.74 pasa antes por el traspaso.
+//! Sin argumentos usa el motor empaquetado, que se resuelve con la ventana ya abierta;
+//! una raíz de 0.2.74 pasa antes por el traspaso.
+mod appearance;
 mod desktop;
 mod engine;
 pub mod env;
@@ -41,35 +43,33 @@ fn open() -> Result<()> {
         // Sin ventana abierta, el enlace arranca Terminus como siempre.
         args.truncate(1);
     }
-    let autostart = args.len() == 1;
-    let mut paths = None;
     let selection = match args.as_slice() {
+        // La ventana abre ya; el motor se busca o se lanza detrás (`launcher::connect`).
         [_] => {
             let found = engine::paths()?;
-            let ensured = match launcher::reason(&found) {
-                Some(reason) => Err(reason),
-                None => match engine::ensure(&found, false) {
-                    Err(error) if error.code == "adoption_required" => Err("readopt"),
-                    other => Ok(other?),
-                },
+            engine::prepare(&found)?;
+            let launcher = match launcher::reason(&found) {
+                Some(reason) => launcher::Launcher::handoff(found, reason),
+                None => launcher::Launcher::connecting(found),
             };
-            match ensured {
-                Ok(selection) => {
-                    paths = Some(found);
-                    selection
-                }
-                Err(reason) => {
-                    engine::prepare(&found)?;
-                    start(None, true, launcher::Launcher::handoff(found, reason));
-                    return Ok(());
-                }
-            }
+            start(None, true, launcher);
+            return Ok(());
         }
         [_, flag, path] if flag == "--external-host" => PathBuf::from(path),
         _ => return Err(Error::new("invalid_request")),
     };
+    start(
+        Some(Arc::new(connect(&selection)?)),
+        false,
+        launcher::Launcher::ready(None),
+    );
+    Ok(())
+}
+
+/// El cliente de una selección; la carpeta de la ventana no puede estar dentro de la del motor ni al revés.
+fn connect(selection: &std::path::Path) -> Result<Client> {
     update::sweep();
-    let client = Client::select(&selection)?;
+    let client = Client::select(selection)?;
     let directory = &client.selection().window_data;
     terminus_engine_client::private_directory(directory)?;
     let window = std::fs::canonicalize(directory)?;
@@ -77,12 +77,7 @@ fn open() -> Result<()> {
     if window.starts_with(&data) || data.starts_with(&window) {
         return Err(Error::new("invalid_request"));
     }
-    start(
-        Some(Arc::new(client)),
-        autostart,
-        launcher::Launcher::ready(paths),
-    );
-    Ok(())
+    Ok(client)
 }
 
 /// `--stop-engine`, para el instalador: 0 paró, 3 trabaja (no se toca), 1 no contestó.
@@ -128,6 +123,7 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
     let starting = launcher.clone();
     let placed = window_data.clone();
     let placed_on_exit = window_data.clone();
+    appearance::remember(&window_data);
     // Con TRACE y 40 KB, rustls y el updater borraban los avisos de `[transport]` en un minuto.
     let log = tauri_plugin_log::Builder::default()
         .level(log::LevelFilter::Info)
@@ -164,7 +160,12 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
                 config.visible = false;
             }
             let handle = app.handle().clone();
-            let window = tauri::WebviewWindowBuilder::from_config(app.handle(), &config)?
+            let mut builder = tauri::WebviewWindowBuilder::from_config(app.handle(), &config)?;
+            // Del color del tema desde el primer cuadro: sin esto la ventana abre en blanco y salta.
+            if let Some(color) = appearance::background(&window_data) {
+                builder = builder.background_color(color);
+            }
+            let window = builder
                 // Sin incógnito: `localStorage`, con el tema, debe durar entre arranques.
                 .data_directory(window_data.join("webview"))
                 .on_navigation(move |url| {
@@ -215,6 +216,8 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
             tray::tray_notify,
             desktop::window_ready,
             desktop::window_vitals,
+            desktop::window_painted,
+            appearance::window_background,
             launcher::launcher_state,
             launcher::launcher_continue,
             proxy::service_poll,

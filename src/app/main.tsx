@@ -5,6 +5,7 @@ import { render } from "solid-js/web";
 import App from "./App";
 import Setup from "../features/settings/Setup";
 import Lanzador from "../features/shell/Launcher";
+import { invoke } from "../lib/invoke.ts";
 import { seguirElTema } from "../lib/theme";
 import { aplicarEscala, atajoDeEscala } from "../lib/zoom";
 import { trimNativeMenu } from "../lib/contextMenu";
@@ -20,6 +21,16 @@ import "../styles/global.css";
  * abren.
  */
 seguirElTema();
+// Rust crea la próxima ventana de este color (`appearance.rs`): sin él abre en blanco.
+const reportarFondo = () =>
+  void invoke("window_background", {
+    color: getComputedStyle(document.documentElement).getPropertyValue("--color-bg").trim(),
+  }).catch(() => {});
+reportarFondo();
+new MutationObserver(reportarFondo).observe(document.documentElement, {
+  attributes: true,
+  attributeFilter: ["data-theme", "data-dark-style", "data-light-style"],
+});
 aplicarEscala();
 aplicarVeloDePestanas();
 window.addEventListener("keydown", atajoDeEscala);
