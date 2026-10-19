@@ -3,6 +3,12 @@
   "shell.answer.options_missing": "No encontré las opciones de esta pregunta en la conversación.",
   "shell.answer.question_missing": "No encontré la pregunta pendiente en esta conversación.",
   "shell.answer.turn_busy": "El turno todavía está ocupado; la pregunta aún no se puede contestar.",
+  "shell.agent_dock.more": {
+    "one": "{count} agente más",
+    "other": "{count} agentes más"
+  },
+  "shell.agent_dock.see_all": "Ver todos",
+  "shell.agent_dock.title": "Agentes",
   "shell.column.sidebar_width": "Ancho de la barra lateral",
   "shell.column.work_tree_width": "Ancho del árbol de trabajo",
   "shell.github.repository": "Terminus en GitHub",
