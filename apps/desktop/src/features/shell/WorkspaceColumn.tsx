@@ -185,7 +185,7 @@ export default function WorkspaceColumn(props: {
     <nav
       aria-label={t("shell.workspaces.label")}
       data-workspace-column=""
-      class="flex h-full w-16 shrink-0 flex-col border-r border-border bg-surface-muted"
+      class="glass-panel flex h-full w-16 shrink-0 flex-col border-r border-border"
     >
       <div ref={list} class="flex min-h-0 flex-1 flex-col items-center gap-1 overflow-x-hidden overflow-y-auto pt-2 pb-2">
         <KeyedList each={ws.lista() ?? []} by={w => w.id}>{w => <Tile w={w()} />}</KeyedList>

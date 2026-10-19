@@ -123,7 +123,7 @@ import AvisoDeVersion from "../features/shell/VersionNotice";
 import CloseGuard from "../features/shell/CloseGuard";
 import WorkspaceColumn from "../features/shell/WorkspaceColumn";
 import Sitio from "../features/sites/Site";
-import { claseDeFondo } from "../lib/chat-background";
+import { claseDeFondo, VELO_DE_FONDO } from "../lib/chat-background";
 import { fondoDeChat, fondoPropio, veloDeFondo } from "../lib/chat-background-store";
 import { copyText } from "../lib/clipboard";
 import { pedirElCampo } from "../lib/focus";
@@ -304,6 +304,10 @@ export default function App() {
    * primero, antes de pedir proveedores de IA y source control.
    */
   const [alta, setAlta] = createSignal<null | "primera" | "nueva">(null);
+  /* El fondo propio del agente de la conversación con el mando: lo publica su
+     celda y lo pinta `FondoDeVentana` detrás de toda la ventana, no solo
+     detrás de su chat. */
+  const [fondoDelAgente, setFondoDelAgente] = createSignal<{ url: string; veil?: number } | null>(null);
   // `null` es «este workspace todavía no tiene contexto»; se enseña como un
   // renglón al lado del selector de proyecto, no como una pantalla que lo pida.
   const [contextRoot, setContextRoot] = createSignal<string | null>(null);
@@ -6044,6 +6048,17 @@ export default function App() {
         }
       },
     );
+    /* Solo la celda con el mando lleva su fondo a toda la ventana; las demás
+       celdas de una división lo siguen pintando dentro de su chat. */
+    const celdaActiva = () => (pp.sesion ?? null) === (sessionId() ?? null);
+    createEffect(() => {
+      if (!celdaActiva()) return;
+      const url = chatBackground();
+      const propio = url ? { url, veil: cellProfile().veil } : null;
+      setFondoDelAgente(propio);
+      // Solo borra el suyo: al pasar el mando, la otra celda puede publicar antes.
+      onCleanup(() => { if (fondoDelAgente() === propio) setFondoDelAgente(null); });
+    });
     const [declared] = createResource(
       () => {
         const name = identidadVisualDeLaCelda();
@@ -6178,7 +6193,7 @@ export default function App() {
         chatAvatar={cellProfile().avatar}
         bodyOf={(name) => profiles()[name]?.body ?? null}
         avatarOf={(name) => profiles()[name]?.avatar ?? null}
-        chatBackground={chatBackground() ?? null}
+        chatBackground={celdaActiva() ? null : chatBackground() ?? null}
         chatVeil={cellProfile().veil}
         onOpenProfile={() => setViewingProfile(true)}
         /* Que el hilo viene, no que no hay: sin esto el chat lee el vacío en
@@ -6417,35 +6432,38 @@ export default function App() {
     }
   });
 
+  /* El fondo de Estilo cubre la ventana entera, detrás de las columnas de
+     vidrio (`.glass-panel`): así se ve también tras el historial, el árbol y
+     las barras. Cada chat solo pinta encima el fondo propio de su agente. */
+  const FondoDeVentana = () => (
+    <Show
+      when={fondoDelAgente()?.url ?? (fondoDeChat() === "propia" ? fondoPropioUrl() : null)}
+      fallback={
+        <div class={cn("pointer-events-none absolute inset-0", claseDeFondo("dusk"))} aria-hidden="true">
+          <div
+            class="absolute inset-0 bg-surface"
+            style={{ opacity: String(veloDeFondo()) }}
+          />
+        </div>
+      }
+    >
+      {(url) => (
+        <div
+          class="pointer-events-none absolute inset-0 bg-cover bg-center"
+          style={{ "background-image": `url("${url()}")` }}
+          aria-hidden="true"
+        >
+          <div
+            class="absolute inset-0 bg-surface"
+            style={{ opacity: String(fondoDelAgente() ? (fondoDelAgente()?.veil ?? VELO_DE_FONDO) : veloDeFondo()) }}
+          />
+        </div>
+      )}
+    </Show>
+  );
+
   const Conversacion = () => (
     <section class="relative flex h-full min-h-0 flex-col overflow-hidden">
-      {/* El fondo vive aquí y no dentro de cada chat: así cubre también la
-          tira de pestañas de la cabecera, que está fuera del hilo. Cada chat
-          solo pinta encima el fondo propio de su agente, si lo tiene. */}
-      <Show
-        when={fondoDeChat() === "propia" ? fondoPropioUrl() : null}
-        fallback={
-          <div class={cn("pointer-events-none absolute inset-0", claseDeFondo("dusk"))} aria-hidden="true">
-            <div
-              class="absolute inset-0 bg-surface"
-              style={{ opacity: String(veloDeFondo()) }}
-            />
-          </div>
-        }
-      >
-        {(url) => (
-          <div
-            class="pointer-events-none absolute inset-0 bg-cover bg-center"
-            style={{ "background-image": `url("${url()}")` }}
-            aria-hidden="true"
-          >
-            <div
-              class="absolute inset-0 bg-surface"
-              style={{ opacity: String(veloDeFondo()) }}
-            />
-          </div>
-        )}
-      </Show>
       {/* Sin línea divisora y sin rótulo de sección: arriba va DE QUÉ es esta
           conversación y el único control que abre algo. El selector de agente no
           vive aquí: con qué agente corre un mensaje se decide al escribirlo. */}
@@ -7133,7 +7151,10 @@ export default function App() {
 
     // Sin cabecera y sin título de app, como Claude: la ventana ya se
     // llama Terminus.
-    <div class="relative flex h-full flex-col overflow-hidden bg-surface">
+    <div class="relative isolate flex h-full flex-col overflow-hidden bg-surface">
+      {/* Detrás de todo y sin posicionar nada encima: `-z-10` dentro del
+          `isolate` queda sobre el `bg-surface` de la raíz y bajo cada columna. */}
+      <div class="pointer-events-none absolute inset-0 -z-10" aria-hidden="true"><FondoDeVentana /></div>
       <CloseGuard title={(id) => filaDe(id)?.title} />
       <ToastStack>
         {/* Aquí y no en Configuración: ahí no entra nadie a buscar

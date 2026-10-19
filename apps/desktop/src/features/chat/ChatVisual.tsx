@@ -153,7 +153,18 @@ export default function ChatVisual(props: {
           <Button variant="ghost" size="iconCompact" onClick={close} aria-label={t("chat.visual.unload")} title={t("chat.visual.unload")}><X class="size-3.5" /></Button>
         </div>
       </Show>
-      <Show when={opened()} fallback={<Button variant="ghost" size="compact" onClick={() => setOpened(true)}>{t("chat.visual.load")} · {title()}</Button>}>
+      {/* Cerrada se lee como tarjeta y no como texto suelto: una línea gris
+          en medio de la respuesta no parecía algo que se pudiera abrir. */}
+      <Show when={opened()} fallback={
+        <button type="button" onClick={() => setOpened(true)} data-chat-visual-closed=""
+          class="flex w-full items-center gap-3 rounded-lg border border-border bg-surface-raised px-3 py-2.5 text-left outline-none hover:border-primary focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary">
+          <span class="grid size-8 shrink-0 place-items-center rounded-md bg-primary/15 text-primary"><Maximize2 class="size-4" /></span>
+          <span class="min-w-0 flex-1">
+            <span class="block truncate text-sm font-semibold text-neutral-950">{title()}</span>
+            <span class="block text-xs text-neutral-500">{t("chat.visual.load")}</span>
+          </span>
+        </button>
+      }>
         <Show when={html.error}>
           <div>
             <p class="text-sm font-semibold text-neutral-900">{title()}</p>

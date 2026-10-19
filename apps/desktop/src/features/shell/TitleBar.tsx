@@ -82,7 +82,7 @@ export default function TitleBar(props: {
       ref={titleBar}
       data-title-bar=""
       class={cn(
-        "flex shrink-0 items-center border-b border-border bg-surface-muted",
+        "glass-panel flex shrink-0 items-center border-b border-border",
         HEADER_HEIGHT,
         apartarSemaforo() ? TRAFFIC_LIGHT_PADDING : "pl-2",
       )}
