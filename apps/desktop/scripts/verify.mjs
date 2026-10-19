@@ -73,6 +73,7 @@ const steps = [
   ["La nota de la versión sale en el idioma de la app", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/release-notes.test.ts")], root],
   ["Las tareas de la página de un agente se paginan sin separar subtareas de su padre", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/agent-page-tasks.test.ts")], root],
   ["La búsqueda de tareas ignora acentos y encuentra varias palabras", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/task-search.test.ts")], root],
+  ["El dock de agentes ordena por estado y cabe en una fila", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/agent-dock.test.ts")], root],
   ["El visor conserva navegación y rechaza los canales retirados", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/artifact-viewer.test.ts")], root],
   ["La ventana no deja salir material", process.execPath, [join(root, "scripts/guards/csp.mjs")], root],
   ["El tema de terminal no repinta el chrome", process.execPath, [join(root, "scripts/guards/terminal-themes.mjs")], root],

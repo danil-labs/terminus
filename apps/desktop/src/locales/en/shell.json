@@ -3,6 +3,12 @@
   "shell.answer.options_missing": "I could not find the options for this question in the conversation.",
   "shell.answer.question_missing": "I could not find the pending question in this conversation.",
   "shell.answer.turn_busy": "The turn is still busy; the question cannot be answered yet.",
+  "shell.agent_dock.more": {
+    "one": "{count} more agent",
+    "other": "{count} more agents"
+  },
+  "shell.agent_dock.see_all": "See all",
+  "shell.agent_dock.title": "Agents",
   "shell.column.sidebar_width": "Sidebar width",
   "shell.column.work_tree_width": "Work tree column width",
   "shell.github.repository": "Terminus on GitHub",
