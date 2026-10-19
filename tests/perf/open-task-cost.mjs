@@ -7,7 +7,8 @@
  *   node tests/perf/open-task-cost.mjs --reloj 10   además, la mediana del reloj en 10 aperturas, una por proceso
  *   node tests/perf/open-task-cost.mjs --session f  con un session.json real en vez del sintético
  *
- * Los contadores son deterministas y el reloj no entra en la guarda. Un techo solo baja.
+ * Los contadores —nodos, mutaciones, llamadas y bytes por IPC— son deterministas
+ * y el reloj no entra en la guarda. Un techo solo baja.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -138,6 +139,19 @@ function responses(longTurns) {
 // Lo que un reloj dispara solo: contarlo haría depender el número de cuánto tardó la apertura.
 const PERIODIC = new Set(["service_poll", "list_active_turns", "list_live_turns", "list_storage", "window_vitals", "update_pending"]);
 
+// Los bytes que el motor manda por IPC, como JSON: lo que cuesta serializar, cruzar y parsear.
+const ipc = { bytes: 0 };
+function counted(table) {
+  return Object.fromEntries(Object.entries(table).map(([cmd, response]) => [
+    cmd,
+    PERIODIC.has(cmd) ? response : (a) => {
+      const value = typeof response === "function" ? response(a) : response;
+      if (!(cmd === "list_session_git" && a?.remote)) ipc.bytes += Buffer.byteLength(JSON.stringify(value) ?? "");
+      return value;
+    },
+  ]));
+}
+
 // El silencio se cuenta desde el gesto que se acaba de hacer, no desde la última mutación.
 async function settle(since, quiet = 300) {
   since.last = Math.max(since.last, Date.now());
@@ -198,7 +212,7 @@ async function behaves(app, turns, clock) {
 
 /** Abre la tarea corta, luego la larga, y cuenta lo que cuesta la segunda. */
 async function openLong(turns, run, check) {
-  const app = await boot("listo", `open-task-${run}`, responses(turns));
+  const app = await boot("listo", `open-task-${run}`, counted(responses(turns)));
   const doc = app.w.document;
   const clock = { last: Date.now() };
   let mutations = 0;
@@ -219,6 +233,7 @@ async function openLong(turns, run, check) {
   addedNodes = 0;
   const invokedBefore = app.comandos.length;
   const remoteBefore = remoteGit.calls;
+  const bytesBefore = ipc.bytes;
   const nodesBefore = doc.querySelectorAll("*").length;
   const start = performance.now();
   doc.querySelector('[data-sesion="long"]').click();
@@ -231,6 +246,7 @@ async function openLong(turns, run, check) {
     invokes:
       app.comandos.slice(invokedBefore).filter((c) => !PERIODIC.has(c) && !c.startsWith("plugin:")).length -
       (remoteGit.calls - remoteBefore),
+    ipcBytes: ipc.bytes - bytesBefore,
   };
   const lastAgent = turns.findLast((t) => t.role === "agent")?.text.split("\n").at(-1) ?? "";
   let failure = !short

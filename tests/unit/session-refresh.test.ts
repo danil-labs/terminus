@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { conservarEnOrden, sessionRefresh, type SessionLists } from "../../src/lib/sessionRefresh.ts";
+import { conservarEnOrden, reutilizar, sessionRefresh, type SessionLists } from "../../src/lib/sessionRefresh.ts";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -183,4 +183,22 @@ test("releer un hilo conserva los mensajes iguales y no los que cambiaron en su 
   assert.equal(despues[0], antes[0]);
   assert.equal(despues[1].questionRequestId, "q");
   assert.equal(despues[2].text, "c");
+});
+
+test("releer un mensaje que cambió conserva lo que no cambió de dentro", () => {
+  const antes = [
+    { turno: "t1", text: "a", tools: [{ name: "Read", target: "x" }], recipients: [{ id: "r" }] },
+    { turno: "t2", text: "b", tools: [{ name: "Bash", target: "ls" }, { name: "Edit", target: "y" }] },
+  ];
+  const leida = structuredClone(antes);
+  leida[1].text = "b y más";
+  leida[1].tools[1] = { name: "Edit", target: "z" };
+  const despues = conservarEnOrden(antes, leida);
+  assert.equal(despues[0], antes[0]);
+  assert.notEqual(despues[1], antes[1]);
+  assert.equal(despues[1].tools[0], antes[1].tools[0]);
+  assert.deepEqual(despues, leida);
+  // Un campo que aparece, aunque valga `undefined`, es un cambio.
+  const conCampo = reutilizar<Record<string, unknown>>({ a: 1 }, { a: 1, b: undefined });
+  assert.ok("b" in conCampo);
 });

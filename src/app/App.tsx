@@ -52,8 +52,9 @@ import { comandoEscrito } from "../features/chat/slashOutput";
 import { ThreadSearch, type ThreadSearchTarget } from "../features/chat/ThreadSearch";
 import TranscriptSource from "../features/chat/TranscriptSource";
 import type { Lectura } from "../features/chat/threadWindow";
+import { lotesDeDeltas } from "../features/chat/deltaFrames";
 import {
-  anexarDelta,
+  anexarDeltas,
   anexarImagen,
   type ChatEvent,
   type ChatExportado,
@@ -1004,7 +1005,7 @@ export default function App() {
   // tardía de la primera no debe apagar el indicador de la segunda.
   const [cargandoHilo, setCargandoHilo] = createSignal<string | null>(null);
   /** Lo que construyen los eventos del turno en curso. */
-  const anexar = (session: string, fn: (vivo: Msg[]) => Msg[], workspace = workspaceActivo()) => {
+  const escribirVivo = (session: string, fn: (vivo: Msg[]) => Msg[], workspace = workspaceActivo()) => {
     if (workspace && workspace !== workspaceActivo()) {
       const threads = workspaceThreads.get(workspace) ?? {};
       const thread = threads[session] ?? SIN_HILO;
@@ -1016,19 +1017,30 @@ export default function App() {
       return { ...hs, [session]: { ...h, vivo: fn(h.vivo) } };
     });
   };
+  // Los deltas de un cuadro entran juntos; todo lo demás que toca un hilo vacía antes lo pendiente.
+  const deltasPorCuadro = lotesDeDeltas((session, workspace, deltas) =>
+    escribirVivo(session, (m) => anexarDeltas(m, deltas), workspace),
+  );
+  const anexar = (session: string, fn: (vivo: Msg[]) => Msg[], workspace = workspaceActivo()) => {
+    deltasPorCuadro.vaciar();
+    escribirVivo(session, fn, workspace);
+  };
   /** Lo que ya está —o va a estar— en disco. */
-  const asentar = (session: string, fn: (base: Msg[]) => Msg[]) =>
+  const asentar = (session: string, fn: (base: Msg[]) => Msg[]) => {
+    deltasPorCuadro.vaciar();
     setHilos((hs) => {
       const h = hs[session] ?? SIN_HILO;
       return { ...hs, [session]: { ...h, base: fn(h.base) } };
     });
+  };
   // La transcripción recién leída del disco. `vivo` se vacía solo al
   // cerrarse el turno; al abrir una tarea que sigue contestando se
   // conserva, salvo el tramo que `AskUserQuestion` ya persistió
   // (`guardar_segmento_pregunta`): ese turno llega por partida doble, de
   // `base` y de `vivo`. Se identifican por `turno`; a `base` se le copia
   // su `questionRequestId`, o la respuesta cae al canal de archivo.
-  const releer = (session: string, leida: Msg[], vaciarVivo: boolean) =>
+  const releer = (session: string, leida: Msg[], vaciarVivo: boolean) => {
+    deltasPorCuadro.vaciar();
     setHilos((hs) => {
       const previo = hs[session];
       const vivoPrevio = previo?.vivo ?? [];
@@ -1057,6 +1069,7 @@ export default function App() {
       if (previo && base === previo.base && mismoVivo) return hs;
       return { ...hs, [session]: { base, vivo: mismoVivo ? vivoPrevio : vivo } };
     });
+  };
   // Por tarea: `undefined` es que aún no se abrió, `null` que salió de `session.json`.
   const [origenes, setOrigenes] = createSignal<Readonly<Record<string, TranscriptOrigin | null>>>({});
   function loadResult(id: string, session: Session, clear: boolean, generation: number) {
@@ -1071,12 +1084,14 @@ export default function App() {
     if (modelo) setModel(modelo);
     if (session.effort) setEffort(session.effort);
   }
-  const soltarHilo = (session: string) =>
+  const soltarHilo = (session: string) => {
+    deltasPorCuadro.vaciar();
     setHilos((hs) => {
       if (!(session in hs)) return hs;
       const { [session]: _, ...resto } = hs;
       return resto;
     });
+  };
   // Lo contestado a medias de cada pregunta, por sesión y turno: los ids
   // `q1..qN` se repiten entre turnos. Aquí y no en la tarjeta, que se desmonta
   // con su pestaña.
@@ -1713,6 +1728,7 @@ export default function App() {
     sessionLists.reset();
     const generation = sessionGeneration;
     const previousWorkspace = workspaceActivo();
+    deltasPorCuadro.vaciar();
     if (previousWorkspace) workspaceThreads.set(previousWorkspace, Object.fromEntries(
       Object.entries(hilos()).filter(([id]) => liveThreads.has(liveThreadKey(previousWorkspace, id))),
     ));
@@ -2030,6 +2046,7 @@ export default function App() {
         // Un stream de comando cortado (árbol, git) se relee, pero no es salida en vivo perdida.
         if (page.reset || page.gap || page.streams) releerTrasHueco();
         if (page.reset) {
+          deltasPorCuadro.vaciar();
           liveThreads.clear();
           workspaceThreads.clear();
           setHilos((threads) => Object.fromEntries(Object.entries(threads).map(([id, thread]) => [id, { ...thread, vivo: [] }])));
@@ -2147,6 +2164,8 @@ export default function App() {
         task,
       } = e.payload;
       const append = (fn: (messages: Msg[]) => Msg[]) => anexar(session, fn, workspace);
+      // Lo que no es texto se ordena detrás de los fragmentos que llegaron antes.
+      if (kind !== "delta") deltasPorCuadro.vaciar();
       // Que un turno terminó se apunta ANTES del filtro de abajo: es la mitad
       // que hace posible trabajar en dos tareas. El filtro descarta lo que no
       // se está mirando, correcto para pintar, pero el cierre no es pintura:
@@ -2423,15 +2442,13 @@ export default function App() {
       // mensaje pertenece el fragmento: ACP manda `message_id`, y su orden de
       // entrega puede meter una herramienta entre dos fragmentos del mismo
       // mensaje. Sin devolver el texto a su globo, el mensaje sale partido.
-      append((m) =>
-        anexarDelta(m, {
-          text,
-          messageId: message_id,
-          startsMessage: starts_message,
-          author: firmas[session] ?? firmas[""] ?? null,
-          model: modelosEnVivo[session] ?? modelosEnVivo[""] ?? null,
-        }),
-      );
+      deltasPorCuadro.meter(session, workspace ?? workspaceActivo() ?? undefined, {
+        text,
+        messageId: message_id,
+        startsMessage: starts_message,
+        author: firmas[session] ?? firmas[""] ?? null,
+        model: modelosEnVivo[session] ?? modelosEnVivo[""] ?? null,
+      });
     });
     onCleanup(() => void chat.then((f) => f()));
 
@@ -4853,6 +4870,7 @@ export default function App() {
     // eventos del turno pueden haber llegado ANTES que el id —Rust crea la
     // sesión y emite con ella mientras el `invoke` vuelve— y ya están en
     // `hilos[id]`; se conservan detrás de lo propio.
+    deltasPorCuadro.vaciar();
     setHilos((hs) => {
       const { [""]: sinId, ...resto } = hs;
       const previo = hs[id] ?? SIN_HILO;

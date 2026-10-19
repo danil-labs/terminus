@@ -22,6 +22,8 @@ type Block = { from: number; to: number; bodyFrom: number; bodyTo: number; close
 /** El mensaje partido en texto y bloques de opciones, en orden. */
 export function splitNextSteps(markdown: string, streaming: boolean): NextStepsPart[] {
   const text = streaming ? withoutPartialOpenTag(markdown) : markdown;
+  // Casi ninguna respuesta trae el bloque: sin la etiqueta no hay que leer línea por línea en cada token.
+  if (!text.includes(OPEN_TAG)) return [{ kind: "markdown", id: "markdown:0", markdown: text }];
   const parts: NextStepsPart[] = [];
   const markdownPart = (chunk: string) => {
     if (chunk) parts.push({ kind: "markdown", id: `markdown:${parts.length}`, markdown: chunk });

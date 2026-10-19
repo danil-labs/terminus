@@ -311,6 +311,12 @@ const steps = [
     root,
   ],
   [
+    "Lo que se calcula por partes en streaming da lo mismo que de una vez",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/streaming-parity.test.ts")],
+    root,
+  ],
+  [
     "Las columnas de una tabla se reparten según su texto",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/markdown-table.test.ts")],
@@ -475,6 +481,7 @@ const steps = [
     root,
   ],
   ["Empaqueta el frontend", process.execPath, [join(root, "node_modules/vite/bin/vite.js"), "build"], root],
+  ["La carga inicial no pesa más que su techo", process.execPath, [join(root, "tests/perf/bundle-size.mjs")], root],
   ["El front monta", process.execPath, [join(root, "scripts/guards/mount-frontend.mjs")], root],
   ["La preparación en curso deja seguir a quien llega tarde", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/setup-in-flight.test.mjs")], root],
   ["La preparación no se abre con la app pintada ni se queda ciega", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/setup-repair.test.mjs")], root],
@@ -483,6 +490,7 @@ const steps = [
   ["Releer una tarea abierta no remonta su hilo", process.execPath, [join(root, "tests/perf/reread-thread.mjs")], root],
   ["Una sesión larga no deja memoria detrás", process.execPath, ["--expose-gc", join(root, "tests/perf/long-session.mjs")], root],
   ["Un turno no vuelve a pedir cada historial", process.execPath, [join(root, "tests/perf/task-history-calls.mjs")], root],
+  ["Una respuesta larga no cuesta más que su techo por delta", process.execPath, [join(root, "tests/perf/delta-cost.mjs")], root],
   ["Toda clase escrita pinta algo", process.execPath, [join(root, "scripts/guards/missing-classes.mjs")], root],
   ["Todo color se invierte con el tema", process.execPath, [join(root, "scripts/guards/theme-inversion.mjs")], root],
   ...(SKIP_RUST ? [] : rustSteps.slice(1)),

@@ -30,9 +30,41 @@ export function conservar<T>(previous: T[], incoming: T[], key: (row: T) => stri
   return kept.length === previous.length && kept.every((row, i) => row === previous[i]) ? previous : kept;
 }
 
+/**
+ * `incoming` con lo que no cambió tomado de `previous`, a cualquier
+ * profundidad: el `reconcile` de los stores de Solid para datos inmutables.
+ * Un mensaje que cambió en un campo conserva sus pasos, destinatarios e
+ * imágenes, y los `For` de dentro no remontan sus filas.
+ */
+export function reutilizar<T>(previous: T, incoming: T): T {
+  if (previous === incoming) return previous;
+  if (typeof previous !== "object" || typeof incoming !== "object" || previous === null || incoming === null) return incoming;
+  if (Array.isArray(previous) !== Array.isArray(incoming)) return incoming;
+  if (Array.isArray(incoming)) {
+    const antes = previous as unknown[];
+    let igual = antes.length === incoming.length;
+    const out = incoming.map((v, i) => {
+      const r = i < antes.length ? reutilizar(antes[i], v) : v;
+      if (r !== antes[i]) igual = false;
+      return r;
+    });
+    return (igual ? previous : out) as T;
+  }
+  const antes = previous as Record<string, unknown>;
+  const ahora = incoming as Record<string, unknown>;
+  const claves = Object.keys(ahora);
+  let igual = claves.length === Object.keys(antes).length;
+  const out: Record<string, unknown> = {};
+  for (const c of claves) {
+    out[c] = reutilizar(antes[c], ahora[c]);
+    if (out[c] !== antes[c] || !(c in antes)) igual = false;
+  }
+  return (igual ? previous : out) as T;
+}
+
 /** Como `conservar`, por posición: para listas que solo crecen por el final y no tienen clave única. */
 export function conservarEnOrden<T>(previous: T[], incoming: T[]): T[] {
-  const kept = incoming.map((row, i) => (i < previous.length && mismoValor(previous[i], row) ? previous[i] : row));
+  const kept = incoming.map((row, i) => (i < previous.length ? reutilizar(previous[i], row) : row));
   return kept.length === previous.length && kept.every((row, i) => row === previous[i]) ? previous : kept;
 }
 

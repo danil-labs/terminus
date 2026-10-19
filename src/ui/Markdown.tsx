@@ -25,7 +25,7 @@ import { prosaDe } from "./Failure";
 import { FilePreview } from "./FilePreview";
 import { BordeDeColumna, MarkdownTable } from "./MarkdownTable";
 import { MermaidDiagram } from "./Mermaid";
-import { bloquesDeMarkdown } from "./markdown-blocks";
+import { partidorDeBloques } from "./markdown-blocks";
 import { textoDelBloque } from "./markdown-code";
 import { ITEM_DE_MENU, Popover, PopoverContent, PopoverTrigger } from "./Popover";
 
@@ -374,8 +374,9 @@ export function Markdown(props: {
   /** Se compone con el envoltorio. Deja a quien lo usa cambiar la escala. */
   class?: string;
 }) {
-  /** Sin el memo, el texto entero se volvería a partir en cada lectura. */
-  const bloques = createMemo(() => bloquesDeMarkdown(props.children));
+  /** Sin el memo, el texto entero se volvería a partir en cada lectura; el partidor solo lee lo que llegó. */
+  const partir = partidorDeBloques();
+  const bloques = createMemo(() => partir(props.children));
 
   return (
     <ErrorBoundary
