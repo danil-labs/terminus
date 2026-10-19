@@ -70,116 +70,144 @@ falta un enlace que guarde la ventana.
 
 ## Diseño
 
-La ventana conserva **una** máquina activa, la que da los workspaces y los
-proyectos (la de siempre). Las demás corren las tareas que se crearon en ellas.
+La ventana conserva **una** máquina, la suya (la primera de la lista, `HOME` en
+`proxy.rs`): da los workspaces y los proyectos y no cambia nunca. Las demás
+corren las tareas que se crearon en ellas.
 
-1. **Enlace de workspaces y proyectos** (`src-tauri/src/extracted/fleet.rs`,
-   `Fleet::workspace_on` y `project_on`). Por máquina: workspace de la ventana →
-   el suyo, y `<workspace>/<proyecto>` → proyecto suyo. Si no hay enlace se
-   busca, en este orden: el único workspace con el mismo `provider` + `remote`
-   no vacíos, o el único con el mismo nombre; el proyecto, el único con el mismo
-   nombre. Lo encontrado se guarda en `<window_data>/machines.json`, y ese
-   archivo se puede editar a mano para fijar un enlace.
-2. **Dueño de cada tarea.** `(workspace, tarea)` → máquina, en memoria, y
-   reconstruido al arrancar desde la última lista guardada de cada máquina.
-   La máquina activa no se apunta: lo que no tiene dueño va a ella.
-3. **Encaminar por contrato** (`named_session`, `Fleet::target`). La tarea que
-   nombra una orden se saca de sus parámetros en `commands.json` (`session`, o
-   `id` + `project`), sin lista hecha a mano. Si su dueña es otra máquina,
-   `Fleet::forward` traduce el workspace del sobre, `project` y `workspace` de
-   los argumentos, y manda la orden a ese motor. Las órdenes con canal
-   (`watch_task_tree`) abren el stream contra ese motor, y su corte
-   (`unwatch_task_tree`) vuelve al mismo.
-4. **Crear en otra máquina.** El selector «Ejecutar en» ya no cambia de motor:
-   fija dónde nace la próxima tarea. `send_message` y `run_shell_command` de una
-   tarea nueva llevan la cabecera `x-terminus-machine`, como ya se hacía con
-   `x-terminus-workspace`. El proxy la crea allí y apunta la tarea nueva a esa
-   máquina. Sin recarga y sin salir del workspace.
-5. **Lista unida.** `list_live_sessions` de la máquina activa se completa con el
-   de cada otra máquina que contesta, en el proyecto enlazado. Cada fila lleva
-   `machine` y `machine_on`, y se intercala por `created_at` sin reordenar
-   ninguna de las dos listas. `list_active_turns` y `list_live_turns` se unen
-   igual, para que `reconcileActiveTurns` vea las tareas vivas remotas.
-6. **Eventos de varias máquinas.** El sondeo principal sigue igual: un cursor
-   y un `runtime`, los de la máquina activa. Cada otra máquina con este
-   workspace enlazado tiene su propia suscripción en Rust (`side_feeds`), con
-   `Feed` si anuncia `push_stream_v1` y con `service events` si no. Sus eventos
-   `chat`, `session` y `question` se traducen a los ids de la ventana
-   (`Fleet::localize`) y se emiten como eventos de Tauri, que llegan a los
-   mismos oyentes (`lib/serviceEvents.ts`). Los de cuentas, agentes o atención
-   no se reenvían: hablan de esa máquina, no de este workspace.
-7. **Encender por intención.** Listar no enciende nada. Una máquina que no
-   contesta aporta su última lista guardada con `machine_on: false`, y no se le
-   vuelve a preguntar en 15 s. Una orden de `WAKES` sobre una tarea suya
-   (enviar, responder un permiso, contestar una pregunta…) la enciende con su
-   programa `wake` (`reach_waking`) y después la manda. Una lectura sobre una
-   máquina apagada contesta `machine_off`.
+1. **Enlace de workspaces.** Todo pasa por una sola función,
+   `Fleet::counterpart_workspace(machine, workspace)` en
+   `src-tauri/src/extracted/fleet.rs`. Devuelve el workspace de esa máquina que
+   corresponde al de la ventana:
+   - el enlace guardado a mano en `<window_data>/machines.json`
+     (`workspaces.<máquina>.<workspace de la ventana>`), sin interfaz;
+   - si no hay, el único workspace con el mismo `provider` y `remote`, ambos no
+     vacíos.
+
+   Un nombre igual **no** enlaza: dos workspaces «Notas» de dos personas no son
+   el mismo. Lo encontrado se guarda en el mismo archivo. Dentro de un
+   workspace ya enlazado, el proyecto se empareja por nombre único.
+2. **Diseño de destino: el workspace de la cuenta.** El enlace dependerá de la
+   cuenta del usuario, que Terminus aún no tiene. Funcionará como en Slack: uno
+   inicia sesión, sus workspaces son de su cuenta y cada máquina materializa el
+   mismo workspace con el id que la cuenta le da en el plano de control. Cuando
+   exista, `counterpart_workspace` dejará de buscar y devolverá el workspace
+   local cuyo id de cuenta coincide. Nada más del enrutado cambia. Por eso no
+   hay interfaz para enlazar a mano.
+3. **Dueño de cada tarea.** `(workspace, tarea)` → máquina. Vive en memoria y se
+   reconstruye al arrancar desde la última lista guardada de cada máquina. Lo
+   que no tiene dueño va a la máquina de la ventana.
+4. **Encaminar por contrato** (`named_session`, `Fleet::target`). La tarea que
+   nombra una orden se saca de sus parámetros en `commands.json`: `session`, o
+   `id` + `project`. Si su dueña es otra máquina, `Fleet::forward` traduce el
+   workspace del sobre y los `project`/`workspace` de los argumentos. Las
+   órdenes con canal (`watch_task_tree`) abren el stream contra ese motor, y su
+   corte vuelve al mismo.
+5. **Crear en otra máquina.** «Ejecutar en» fija dónde nace la próxima tarea,
+   **recordado por workspace** (preferencia `machines.run_on` de la ventana, en
+   su `localStorage`, dentro de su carpeta de datos). `send_message` y
+   `run_shell_command` de una tarea nueva llevan la cabecera
+   `x-terminus-machine`. Una elección guardada cuya máquina ya no está o no
+   tiene el workspace se ignora.
+6. **Lista unida.** El `list_live_sessions` de cada otra máquina que contesta
+   se intercala por `created_at`, con `machine` y `machine_on` por fila.
+   `list_active_turns` y `list_live_turns` se unen igual. La fila y la cabecera
+   del chat llevan `MachineChip`, atenuado si la máquina está apagada.
+7. **Eventos.** El sondeo principal sigue con un cursor y un `runtime`, los de
+   la máquina de la ventana. Cada otra máquina enlazada tiene su suscripción en
+   Rust (`side_feeds`). Sus eventos `chat`, `session` y `question` se traducen a
+   los ids de la ventana (`Fleet::localize`) y se emiten como eventos de Tauri,
+   que llegan a los mismos oyentes.
+8. **Abrir una tarea de una máquina apagada no falla.** `load_history` (y
+   `load_session` con motores sin push) contestan, sin encender nada, lo último
+   que se leyó de esa tarea con `offline: {machine}` (`Fleet::offline_task`).
+   - **La copia** está en `<window_data>/machine-tasks/`: un archivo por tarea,
+     como mucho 40 tareas y 2 MiB cada una; se borran las más viejas.
+   - **Sin copia**, se contesta solo la fila: agente, modelo y ningún turno.
+   - **En la ventana**, el chat avisa «<máquina> está apagada: se enciende
+     cuando envíes un mensaje» (`shell.machines.asleep_notice`). Cuando la fila
+     dice que la máquina ya contesta, la tarea se vuelve a leer de su motor.
+9. **Encender por intención y entregar una vez** (`Fleet::deliver`,
+   `State::wake_now`). Una orden de `WAKES` sobre una tarea remota prueba el
+   motor que la ventana tenía. Si no contesta (`app_unavailable`, es decir, no
+   llegó), lo enciende con su programa `wake`, espera a que conteste y manda la
+   orden una sola vez. Si encender falla, no sale nada y se contesta
+   `machine_off`.
+
+   Mientras tanto el chat dice «Encendiendo <máquina>…»
+   (`shell.machines.waking`). Al volver, la tarea se relee y la lista se
+   refresca.
+10. **Sin cambio de ventana.** `machine_select`, `State::select`, la recarga y el
+    índice de máquina activa mutable se quitaron. La máquina de la ventana es la
+    constante `HOME`.
 
 ## Lo implementado
 
-- `src-tauri/src/extracted/fleet.rs`: enlaces, dueños, `target`, `forward`,
-  `list`, `turns`, `merge` y `localize`, y la memoria en `machines.json`.
+- `src-tauri/src/extracted/fleet.rs`:
+  - enlaces: `counterpart_workspace` y proyectos;
+  - dueños de tareas;
+  - enrutado: `target`, `forward`, `deliver`;
+  - listas: `list`, `turns`, `merge`;
+  - eventos: `localize`;
+  - copia de tareas: `remember_task`, `offline_task`.
 - `src-tauri/src/extracted/proxy.rs`:
-  - `handle` lee `x-terminus-machine` y encamina con `routed`;
+  - enrutado en `handle` / `routed`, con entrega tras encender;
   - `gathered` une las listas;
-  - `stream` recibe el motor de destino, y los vigilantes y streams recuerdan
-    su motor;
-  - `load_history` lee del motor dueño;
-  - `service_filter` filtra también las suscripciones de las otras máquinas;
-  - `side_feeds` / `side_feed` llevan sus eventos;
-  - `reach` / `reach_waking` dan el motor de una máquina;
+  - streams y vigilantes recuerdan su motor;
+  - `load_history` / `read_history` leen del motor dueño o dan la copia;
+  - suscripciones laterales (`side_feeds` / `side_feed`);
+  - `service_filter` también las filtra;
+  - `reach` / `wake_now` dan el motor de una máquina;
   - `machine_list` añade `linked`.
-  - Se quitó `machine_select`: ya nada cambia el motor de la ventana.
-- `src/features/machines/store.ts`: la lista de máquinas, `runOn` y la cabecera.
-- `src/features/machines/MachinePicker.tsx`: elegir fija `runOn`, sin recarga;
-  una máquina sin este workspace sale deshabilitada.
-- `src/features/projects/Sessions.tsx`: chip con el nombre de la máquina en la
-  fila de una tarea remota, atenuado si está apagada.
-- `src/app/App.tsx`: las dos llamadas que crean tarea pasan `runOnOptions()`.
-- Catálogos `shell.machines.unlinked`, `task_on` y `task_off` en `es` y `en`;
-  `starting`, `active` y `failed` se borraron porque nadie los usa ya.
-- Pruebas en `fleet.rs`, contra dos motores de laboratorio con ids distintos:
-  - `two_engines_one_workspace`: lista unida, enlace por proveedor aunque el
-    nombre se repita, `stop_turn` de una tarea remota con los ids de la VM,
-    una tarea local que no se desvía, y crear en la máquina no activa sin que
-    la activa reciba el `send_message`.
-  - `asleep_machine_keeps_its_tasks_and_events_come_home`: con la máquina
-    apagada y la ventana reabierta, la tarea sigue listada y encaminada; un
-    evento remoto llega con los ids de la ventana; los eventos que no son de
-    tarea, o de un workspace sin enlace, no pasan.
+- Front:
+  - `src/features/machines/store.ts`: lista, elección por workspace y cabecera;
+  - `src/features/machines/MachinePicker.tsx`;
+  - `src/features/machines/MachineChip.tsx`: el chip de la fila y la cabecera;
+  - `src/app/App.tsx`: aviso de apagada o encendiéndose, relectura, cabecera;
+  - `src/features/projects/Sessions.tsx`;
+  - `Session.offline` en `src/features/chat/transcript.ts`.
+- Catálogos `shell.machines.*` en `es` y `en`.
+- Pruebas en Rust (`fleet.rs`), con motores de laboratorio de ids distintos:
+  - `two_engines_one_workspace`: lista unida, orden remota con sus ids, crear
+    en la máquina no activa;
+  - `a_name_alone_does_not_link_a_saved_link_does`: un nombre igual no enlaza;
+    un enlace guardado sí, aun con la máquina apagada;
+  - `asleep_machine_keeps_its_tasks_and_events_come_home`: lista conservada
+    entre sesiones y eventos traducidos;
+  - `an_asleep_task_opens_from_its_last_copy`: copia o fila, copia acotada,
+    nombres de archivo seguros;
+  - `acting_on_an_asleep_task_wakes_it_and_sends_once`: se enciende una vez, se
+    entrega una vez y no sale nada si no enciende.
+- Prueba del front en `tests/unit/machine-task.test.mjs`: `dist/` en jsdom.
+  Chip en fila y cabecera, la copia y el aviso al abrir, «Encendiendo vm…» al
+  mandar, un solo `send_message`, relectura y ningún fallo.
 
 ## Lo que queda
 
-- **Radiant como identidad.** Enlazar por el id de Radiant necesita preguntar
-  `radiant_governance_status` por cada workspace de cada máquina. Hoy se enlaza
-  por `provider` + `remote` o por nombre único; si los nombres no coinciden, hay
-  que fijarlo en `machines.json`. Falta una interfaz para enlazar a mano y para
-  crear el workspace en la otra máquina si no existe.
-- **Proyectos sin pareja.** Una tarea remota de un proyecto que la máquina
-  activa no tiene no aparece, porque la lista va por los proyectos de la
-  ventana. `move_session` hacia otro proyecto no traduce `to`.
-- **Eventos.** La suscripción lateral empieza en el presente (`cursor: null`):
-  lo emitido entre crear la tarea y suscribirse no llega en vivo; se recupera
-  al releer la tarea con el evento `session` o al terminar el turno. Los lotes
-  `catchup` y `resync` laterales se descartan.
-- **Lecturas sobre una máquina apagada.** Abrir una tarea suya no la enciende:
-  contesta `machine_off`. Hay que decidir si abrirla cuenta como intención.
-- **Vista Typst en vivo** (`typst_live.rs`) y otras órdenes que el proxy llama
-  por su cuenta con `proxy::invoke` siguen yendo a la máquina activa.
-- **Cabecera de la tarea abierta.** El chip va en la fila; falta en la cabecera
-  del chat.
-- **Prueba en la ventana real.** jsdom no transporta cabeceras de `invoke`. Las
-  pruebas cubren la lógica en Rust; falta un recorrido con dos motores de
+- **El workspace de la cuenta**: reemplazar `counterpart_workspace` cuando haya
+  cuentas y plano de control.
+- **Proyectos sin pareja.** Una tarea remota de un proyecto que la ventana no
+  tiene no aparece. `move_session` hacia otro proyecto no traduce `to`.
+- **Eventos.** La suscripción lateral empieza en el presente: lo emitido entre
+  encender y suscribirse llega al releer la tarea. Los lotes `catchup` y
+  `resync` laterales se descartan.
+- **Otras lecturas** de una tarea apagada, como árbol, git o consumo, contestan
+  `machine_off` como antes. No está comprobado cómo pinta ese error cada
+  columna; la prueba del front las simula contestando.
+- **Solo el envío avisa.** El aviso «Encendiendo…» sale al mandar un mensaje.
+  Las demás órdenes de `WAKES` (permisos, preguntas) también encienden en el
+  proxy, pero sin ese aviso.
+- **Vista Typst en vivo** (`typst_live.rs`) sigue yendo a la máquina de la
+  ventana.
+- **Prueba con motores reales.** Falta un recorrido con dos motores de
   laboratorio y la ventana construida.
-- **Transporte web.** El selector depende de que `invoke` pase `options.headers`
-  tal cual. La rama del transporte web debe conservar eso o llevar la máquina
-  de otra manera.
+- **Transporte web.** El selector depende de que `invoke` pase
+  `options.headers`.
 
-## Decisiones abiertas
+## Decisiones tomadas
 
-1. ¿Abrir una tarea de una máquina apagada debe encenderla?
-2. ¿Hace falta volver a poder cambiar el motor de toda la ventana (lo que hacía
-   `machine_select`), o basta la máquina por tarea?
-3. ¿Fallback por nombre, o exigir un enlace explícito o Radiant?
-4. ¿«Ejecutar en» debe recordarse por workspace (hoy vale para toda la sesión
-   de la ventana)?
+1. Abrir una tarea de una máquina apagada no la enciende. Se ve lo último leído
+   con un aviso, y mandarle un mensaje la enciende.
+2. Se quita para siempre el cambio de motor de toda la ventana.
+3. El enlace es por `provider` + `remote` o por un enlace guardado. El destino
+   es el id de workspace de la cuenta, y no hay interfaz para enlazar.
+4. «Ejecutar en» se recuerda por workspace.
