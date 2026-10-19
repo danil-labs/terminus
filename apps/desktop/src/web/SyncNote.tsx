@@ -5,11 +5,11 @@ import type { MachineStatus } from "./fleet";
 
 export type MachineRow = { id: string; name: string; status: MachineStatus; at: number | null };
 
-const LABELS: Record<MachineStatus, string> = {
-  online: "web.computers.state.online",
-  starting: "web.computers.state.starting",
-  offline: "web.computers.state.offline",
-  outdated: "web.computers.state.outdated",
+const LABELS: Record<MachineStatus, () => string> = {
+  online: () => t("web.computers.state.online"),
+  starting: () => t("web.computers.state.starting"),
+  offline: () => t("web.computers.state.offline"),
+  outdated: () => t("web.computers.state.outdated"),
 };
 
 /**
@@ -35,7 +35,7 @@ export function SyncNote(props: { machines: Accessor<MachineRow[]> }) {
               class={`size-1.5 shrink-0 rounded-full ${m.status === "online" ? "bg-success" : m.status === "starting" ? "animate-danil-pulse bg-neutral-500" : "bg-neutral-500"}`}
             />
             <span class="truncate">{m.name}</span>
-            <span class="shrink-0">· {t(LABELS[m.status])}</span>
+            <span class="shrink-0">· {LABELS[m.status]()}</span>
           </li>
         )}
       </For>

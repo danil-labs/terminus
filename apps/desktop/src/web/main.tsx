@@ -24,7 +24,7 @@ declare const __TERMINUS_WEB__: WebSettings;
 
 type WebSettings = { endpoint: string; supabaseUrl: string; supabaseKey: string; login: string };
 
-export type TerminusWebConfig = Partial<WebSettings> & Partial<RelayConfig> & { computers?: Computer[] };
+export type TerminusWebConfig = Partial<WebSettings & RelayConfig & { computers: Computer[] }>;
 type Base = Omit<RelayConfig, "computerId" | "beforeReconnect">;
 
 const Picker = lazy(() => import("../features/machines/MachinePicker").then((m) => ({ default: m.MachinePicker })));

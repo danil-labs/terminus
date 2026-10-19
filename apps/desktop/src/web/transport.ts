@@ -299,15 +299,15 @@ export function createWebTransport(machines: MachineLink[], version: string, hos
     (id) => links.get(id)?.relay.state() === "online",
   );
   for (const m of machines) {
-    const outdated = () => {
+    const mark = () => {
       if (fleet.isOutdated(m.info.id)) return;
       fleet.markOutdated(m.info.id);
       onStatus();
     };
     m.relay.onState((state) => {
-      if (state === "version_mismatch" || state === "outdated") outdated();
+      if (state === "version_mismatch" || state === "outdated") mark();
     });
-    links.set(m.info.id, createLink(m.relay, m.info.id, m.onSync ?? (() => {}), outdated));
+    links.set(m.info.id, createLink(m.relay, m.info.id, m.onSync ?? (() => {}), mark));
   }
   const link = (id: string) => links.get(id) as Link;
   const on = (id: string) => link(id).relay.state() === "online";
@@ -332,20 +332,21 @@ export function createWebTransport(machines: MachineLink[], version: string, hos
     return id && fleet.membersOf(workspace).includes(id) ? id : null;
   };
 
-  const refusal = (machine: string, key: string, detail: string): Failure => ({ what: t(key, { name: fleet.name(machine) }), detail });
+  const off = (machine: string): Failure => ({ what: t("web.machines.off_action", { name: fleet.name(machine) }), detail: "machine_off" });
+  const outdated = (machine: string): Failure => ({ what: t("web.machines.outdated_action", { name: fleet.name(machine) }), detail: "version_mismatch" });
 
   /** One machine: an outdated one refuses, and one that cannot be woken says it is off instead of waiting. */
   async function one(machine: string, command: string, workspace: string | null, args: Args): Promise<unknown> {
-    if (fleet.isOutdated(machine)) throw refusal(machine, "web.machines.outdated_action", "version_mismatch");
+    if (fleet.isOutdated(machine)) throw outdated(machine);
     const l = link(machine);
     const asleep = !fleet.info(machine)?.wakes && OFF.includes(l.relay.state());
-    if (asleep && !READ.test(command)) throw refusal(machine, "web.machines.off_action", "machine_off");
+    if (asleep && !READ.test(command)) throw off(machine);
     try {
       const value = await l.send(command, workspace, args, !asleep);
-      if (value === NONE) throw refusal(machine, "web.machines.off_action", "machine_off");
+      if (value === NONE) throw off(machine);
       return value;
     } catch (error) {
-      if (fleet.isOutdated(machine)) throw refusal(machine, "web.machines.outdated_action", "version_mismatch");
+      if (fleet.isOutdated(machine)) throw outdated(machine);
       throw error;
     }
   }
