@@ -1,22 +1,10 @@
-import { type IconShape, LUCIDE, STATUS_ICONS, STATUS_LABELS, type StatusLabel, type TaskState, taskPriority, topState } from "@terminus/design";
+import { type IconShape, LUCIDE, STATUS_ICONS, STATUS_LABELS, type StatusLabel, type TaskState, topState } from "@terminus/design";
 import { View } from "react-native";
 import Svg, { Circle, Line, Path } from "react-native-svg";
-import type { AttentionState, TaskRow } from "../lib/bridge";
 import { lang } from "../lib/i18n";
 import { type Theme, useTheme } from "./theme";
 
 export { type TaskState, topState };
-
-/** The sidebar's state of a task, from what the bridge reports: attention and the running turns. */
-export function taskState(task: Pick<TaskRow, "id" | "outcome">, attention: AttentionState | undefined, live: Set<string>): TaskState | null {
-  return taskPriority({
-    aprobando: attention === "approving",
-    esperando: attention === "asked",
-    viva: live.has(task.id),
-    outcome: task.outcome === "failed" || attention === "failed" ? "failed" : null,
-    sinVer: attention === "unseen",
-  });
-}
 
 export function stateColor(state: TaskState, theme: Theme) {
   switch (state) {

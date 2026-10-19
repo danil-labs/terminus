@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "The contract between a Terminus host bridge and its remote clients.",
+  "description": "The commands a Terminus remote client may send to a machine's engine, and what they answer.",
   "exports": {
     ".": "./src/index.ts"
   }

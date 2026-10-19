@@ -1,35 +1,47 @@
+import type { Project, Space, Workspace } from "@terminus/protocol";
+import { DEFAULT_SIDEBAR_VIEW, type SidebarView, sanitizeSidebarView } from "@terminus/tasks";
 import * as SecureStore from "expo-secure-store";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { type Folder, type Handler, type Space, type TaskRow, type Workspace, call } from "./bridge";
-import { type TaskState, taskState } from "../ui/TaskStatus";
-import { useConnection } from "./connection";
+import { type Agent, type Task, mergeSnapshots, snapshotOf, taskKey, workspacesOf } from "./engine";
+import type { Host } from "./hosts";
+import { useMachines } from "./machines";
 
-/** What the phone shows of one workspace: its channels (spaces), people (handlers) and tasks. */
+/** Un workspace, quizá abierto en varias máquinas. */
+export type WorkspaceEntry = Workspace & { hosts: string[] };
+
+/** Lo que el teléfono enseña de un workspace, juntando todas sus máquinas. */
 export type Snapshot = {
+  folders: (Project & { hosts: string[] })[];
   spaces: Space[];
-  folders: Folder[];
-  tasks: TaskRow[];
-  handlers: Handler[];
-  /** Tasks with a turn running now: the sidebar's "working" mark. */
+  tasks: Task[];
+  agents: Agent[];
+  /** `host/id` de las tareas con un turno en marcha. */
   live: Set<string>;
+  /** La copia más nueva del relay que se usó, si alguna máquina estaba apagada. */
+  cachedAt: number | null;
 };
 
 type Workspaces = {
-  list: Workspace[];
-  current: Workspace | null;
+  list: WorkspaceEntry[];
+  current: WorkspaceEntry | null;
   snapshot: Snapshot | null;
   loading: boolean;
   select: (id: string) => void;
-  /** The active space, a filter like the desktop's SpaceBar; the oldest space when none was chosen. */
+  /** El space activo, como la SpaceBar del escritorio; el primero si no se eligió ninguno. */
   space: Space | null;
   selectSpace: (id: string) => void;
+  /** El filtro de la lista (`@terminus/tasks`), por workspace y space como en el escritorio. */
+  view: SidebarView;
+  setView: (view: SidebarView) => void;
+  /** Las máquinas que tienen el workspace actual. */
+  hostsOfCurrent: Host[];
   reload: () => Promise<void>;
 };
 
 const Context = createContext<Workspaces | null>(null);
 const KEY = "terminus.workspace";
 const SPACES_KEY = "terminus.spaces";
-const REFRESH_ON = new Set(["cli-changed", "session", "resync", "providers"]);
+const REFRESH_ON = new Set(["cli-changed", "session", "providers"]);
 
 export function useWorkspaces() {
   const value = useContext(Context);
@@ -37,47 +49,12 @@ export function useWorkspaces() {
   return value;
 }
 
-async function load(pairing: NonNullable<ReturnType<typeof useConnection>["pairing"]>, workspace: string): Promise<Snapshot> {
-  const scope = { workspace };
-  const [folders, spaces, live] = await Promise.all([
-    call<Folder[]>(pairing, "folder list", {}, scope),
-    call<{ spaces: Space[] }>(pairing, "space list", {}, scope),
-    call<string[]>(pairing, "list_active_turns", { workspace }, scope).catch(() => []),
-  ]);
-  const perFolder = await Promise.all(
-    folders.map(async (folder) => {
-      const inFolder = { workspace, folder: folder.id };
-      const [tasks, handlers] = await Promise.all([
-        call<TaskRow[]>(pairing, "task list", {}, inFolder),
-        call<{ handlers: Omit<Handler, "folders">[] }>(pairing, "handler list", {}, inFolder).catch(() => ({ handlers: [] })),
-      ]);
-      return { folder, tasks, handlers: handlers.handlers };
-    }),
-  );
-  // A handler can serve several folders; the phone shows it once.
-  const handlers = new Map<string, Handler>();
-  for (const { folder, handlers: list } of perFolder) {
-    for (const h of list) {
-      const known = handlers.get(h.name);
-      if (known) {
-        known.folders.push(folder.id);
-        known.live_tasks += h.live_tasks;
-        if (h.status !== "asleep") known.status = h.status;
-      } else handlers.set(h.name, { ...h, folders: [folder.id] });
-    }
-  }
-  return {
-    folders,
-    spaces: spaces.spaces,
-    tasks: perFolder.flatMap((f) => f.tasks).sort((a, b) => b.updated_at - a.updated_at),
-    handlers: [...handlers.values()].sort((a, b) => a.name.localeCompare(b.name)),
-    live: new Set(live),
-  };
-}
+/** Misma clave que `sidebarViewKey` del escritorio, con caracteres que acepta el llavero. */
+const viewKey = (workspace: string, space: string | null) => `terminus.view.${workspace}${space ? `.${space}` : ""}`.replace(/[^\w.-]/g, "_");
 
 export function WorkspacesProvider({ children }: { children: ReactNode }) {
-  const { pairing, online, subscribe, rememberTasks } = useConnection();
-  const [list, setList] = useState<Workspace[]>([]);
+  const { hosts, subscribe, rememberTitles, tick } = useMachines();
+  const [perHost, setPerHost] = useState<Record<string, Workspace[]>>({});
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(false);
@@ -88,40 +65,65 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     void SecureStore.getItemAsync(KEY).then((saved) => saved && setCurrentId((id) => id ?? saved));
   }, []);
 
+  const list = useMemo<WorkspaceEntry[]>(() => {
+    const merged = new Map<string, WorkspaceEntry>();
+    for (const host of hosts) {
+      for (const w of perHost[host.id] ?? []) {
+        const known = merged.get(w.id);
+        if (known) known.hosts.push(host.id);
+        else merged.set(w.id, { ...w, hosts: [host.id] });
+      }
+    }
+    return [...merged.values()];
+  }, [hosts, perHost]);
+
+  const machineCount = hosts.length;
   const reload = useCallback(async () => {
-    if (!pairing) return;
     const mine = ++asked.current;
     setLoading(true);
     try {
-      const workspaces = await call<Workspace[]>(pairing, "workspace list");
+      const answers = await Promise.all(hosts.map(async (host) => [host.id, (await workspacesOf(host).catch(() => ({ list: [] }))).list] as const));
       if (mine !== asked.current) return;
-      setList(workspaces);
-      const id = workspaces.some((w) => w.id === currentId) ? currentId : (workspaces[0]?.id ?? null);
+      const byHost = Object.fromEntries(answers);
+      setPerHost(byHost);
+      const all = answers.flatMap(([, ws]) => ws);
+      const id = all.some((w) => w.id === currentId) ? currentId : (all[0]?.id ?? null);
       if (id !== currentId) setCurrentId(id);
       if (!id) return setSnapshot(null);
-      const next = await load(pairing, id);
+      const having = hosts.filter((h) => byHost[h.id]?.some((w: Workspace) => w.id === id));
+      const parts = await Promise.all(having.map((host) => snapshotOf(host, id).catch(() => null)));
       if (mine !== asked.current) return;
-      rememberTasks(next.tasks);
-      setSnapshot(next);
-    } catch {
-      // The connection banner already says it is offline.
+      // La máquina de cada tarea solo se dice con más de una máquina.
+      const tag = (hostId: string) => {
+        if (machineCount < 2) return null;
+        const host = hosts.find((h) => h.id === hostId);
+        return host ? { machine: host.label, on: host.power() === "on" } : null;
+      };
+      const merged = mergeSnapshots(parts.filter((p) => p !== null), tag);
+      rememberTitles(merged.tasks.map((task) => [taskKey(task), task.title]));
+      setSnapshot(merged);
     } finally {
       if (mine === asked.current) setLoading(false);
     }
-  }, [pairing, currentId, rememberTasks]);
+  }, [hosts, currentId, rememberTitles, machineCount]);
 
+  // Al cambiar las máquinas, su estado o el workspace.
   useEffect(() => {
-    if (online) void reload();
-  }, [online, reload]);
+    void reload();
+  }, [reload, tick]);
 
   useEffect(
     () =>
-      subscribe((event) => {
-        const payload = event.payload as { workspace?: string | null; kind?: string } | null;
-        const turn = event.name === "chat" && (payload?.kind === "started" || payload?.kind === "done");
-        if (!REFRESH_ON.has(event.name) && !turn) return;
-        const workspace = payload?.workspace;
-        if (workspace && workspace !== currentId) return;
+      subscribe((_host, events, gap) => {
+        const relevant =
+          gap ||
+          events.some((event) => {
+            const payload = event.payload as { workspace?: string | null; kind?: string } | null;
+            const turn = event.name === "chat" && (payload?.kind === "started" || payload?.kind === "done");
+            if (!REFRESH_ON.has(event.name) && !turn) return false;
+            return !payload?.workspace || payload.workspace === currentId;
+          });
+        if (!relevant) return;
         if (pending.current) clearTimeout(pending.current);
         pending.current = setTimeout(() => void reload(), 600);
       }),
@@ -152,32 +154,33 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   const spaces = snapshot?.spaces ?? [];
   const space = spaces.find((s) => s.id === (currentId ? spaceIds[currentId] : undefined)) ?? spaces[0] ?? null;
 
+  const [view, setViewState] = useState<SidebarView>(DEFAULT_SIDEBAR_VIEW);
+  const currentViewKey = currentId ? viewKey(currentId, space?.id ?? null) : null;
+  useEffect(() => {
+    setViewState(DEFAULT_SIDEBAR_VIEW);
+    if (!currentViewKey) return;
+    void SecureStore.getItemAsync(currentViewKey).then((saved) => saved && setViewState(sanitizeSidebarView(JSON.parse(saved))));
+  }, [currentViewKey]);
+  const setView = useCallback(
+    (next: SidebarView) => {
+      const clean = sanitizeSidebarView(next);
+      setViewState(clean);
+      if (currentViewKey) void SecureStore.setItemAsync(currentViewKey, JSON.stringify(clean));
+    },
+    [currentViewKey],
+  );
+
+  const current = list.find((w) => w.id === currentId) ?? null;
+  const hostsOfCurrent = useMemo(() => hosts.filter((h) => current?.hosts.includes(h.id)), [hosts, current]);
+
   const value = useMemo<Workspaces>(
-    () => ({ list, current: list.find((w) => w.id === currentId) ?? null, snapshot, loading, select, space, selectSpace, reload }),
-    [list, currentId, snapshot, loading, select, space, selectSpace, reload],
+    () => ({ list, current, snapshot, loading, select, space, selectSpace, view, setView, hostsOfCurrent, reload }),
+    [list, current, snapshot, loading, select, space, selectSpace, view, setView, hostsOfCurrent, reload],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 
-/** The space's name, or the default space's label. */
-export function spaceName(space: Space | undefined, fallback: string) {
+/** El nombre del space, o el del space por defecto. */
+export function spaceName(space: Space | undefined | null, fallback: string) {
   return space?.name?.trim() || fallback;
-}
-
-/** Agent and model of the newest task, the defaults for one started from the phone. */
-export function lastAgent(tasks: TaskRow[]) {
-  const newest = tasks.find((task) => task.provider);
-  // `agent` is the `task create` CLI option, whose name does not change.
-  return newest ? { agent: newest.provider, model: newest.model ?? undefined } : null;
-}
-
-/** The sidebar state of each task of a workspace, from attention and the running turns. */
-export function useTaskStates(workspace: string | undefined) {
-  const { attention } = useConnection();
-  const { snapshot, current } = useWorkspaces();
-  const marks = new Map(
-    attention.filter((w) => w.workspace === workspace).flatMap((w) => w.tasks.map((task) => [task.session, task.state] as const)),
-  );
-  const live = workspace === current?.id ? (snapshot?.live ?? new Set<string>()) : new Set<string>();
-  return (task: Pick<TaskRow, "id" | "outcome">): TaskState | null => taskState(task, marks.get(task.id), live);
 }

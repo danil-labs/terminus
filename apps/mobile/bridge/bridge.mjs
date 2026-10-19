@@ -5,14 +5,14 @@
  *   node apps/mobile/bridge/bridge.mjs [--data <engine data dir>] [--port 6780] [--allow-lan]
  *
  * It speaks RPC1 to the engine over loopback, like the window, and serves the
- * phone a small HTTP API with a bearer token. Only commands in ALLOWED reach the
- * engine. Without `--allow-lan` it answers loopback and Tailscale (100.64.0.0/10)
+ * phone a small HTTP API with a bearer token. Only `APP_COMMANDS` of
+ * `@terminus/protocol` reach the engine, through `service invoke`: the same
+ * closed list the app's relay client enforces for Danil Computers. Without `--allow-lan` it answers loopback and Tailscale (100.64.0.0/10)
  * addresses only: plain HTTP is acceptable inside the tailnet, not on a LAN.
  *
- * It also turns what the desktop announces into `notice` events: a task that
- * starts needing the person (`attention`) or a turn that ends well (`done`;
- * the engine marks a task `unseen` as soon as its turn starts). The phone shows
- * them as local notifications today; a push gateway will deliver them later.
+ * It forwards the engine's events as they come (`chat`, `attention`, `session`,
+ * `question`…) plus `resync` after a gap; the app turns them into notices, the
+ * same way for a machine reached through the relay.
  *
  * `--data` defaults to the engine lab (`apps/desktop/.engine/lab/data`). Never point it at
  * the data of an installed Terminus.
@@ -24,7 +24,7 @@ import { createConnection } from "node:net";
 import { networkInterfaces } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { CLI_COMMANDS, INVOKE_COMMANDS, NEEDS_YOU as NEEDS_YOU_STATES } from "../../../packages/protocol/src/commands.ts";
+import { APP_COMMANDS } from "../../../packages/protocol/src/commands.ts";
 
 // The engine lab lives with the desktop app, which downloads and runs it (`scripts/engine.mjs`).
 const DESKTOP = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "desktop");
@@ -41,9 +41,7 @@ const LONG_POLL_MS = 25_000;
 const MAX_FRAME = 16 * 1024 * 1024;
 
 // The allowlist is the contract with the app; Node strips the types on import.
-const CLI = new Set(CLI_COMMANDS);
-const INVOKE = new Set(INVOKE_COMMANDS);
-const NEEDS_YOU = new Set(NEEDS_YOU_STATES);
+const ALLOWED = new Set(APP_COMMANDS);
 
 function bridgeToken() {
   if (existsSync(STATE)) {
@@ -114,9 +112,6 @@ const feed = {
   seq: 0,
   events: [],
   waiters: new Set(),
-  attention: new Map(),
-  /** The folder of each task seen in `session` events; `done` does not carry it. */
-  folders: new Map(),
   push(event) {
     this.seq += 1;
     this.events.push({ ...event, seq: this.seq });
@@ -126,29 +121,12 @@ const feed = {
   },
 };
 
-function noticesFrom(list) {
-  const next = new Map();
-  for (const entry of Array.isArray(list) ? list : []) {
-    for (const task of entry.tasks ?? []) {
-      if (NEEDS_YOU.has(task.state)) next.set(`${entry.workspace}/${task.session}`, { ...task, workspace: entry.workspace });
-    }
-  }
-  const notices = [];
-  for (const [key, task] of next) {
-    if (NEEDS_YOU.has(task.state) && feed.attention.get(key)?.state !== task.state) notices.push(task);
-  }
-  feed.attention = next;
-  return notices;
-}
-
 async function follow() {
   for (;;) {
     try {
       if (feed.cursor === null) {
         const first = await rpc("service events", { cursor: null, replay: false }, { timeout: 5_000 });
         feed.cursor = first.result?.latest ?? 0;
-        const attention = await invoke("list_workspace_attention", {}, null);
-        noticesFrom(attention.result?.value ?? attention.result);
         continue;
       }
       const page = await rpc("service events", { cursor: feed.cursor, replay: false }, { timeout: 5_000 });
@@ -156,17 +134,7 @@ async function follow() {
       if (!result) throw new Error(page.error?.code ?? "engine_down");
       if (result.gap) feed.push({ name: "resync", payload: null });
       feed.cursor = result.cursor;
-      for (const event of result.events) {
-        feed.push({ name: event.name, payload: event.payload });
-        if (event.name === "attention") {
-          for (const notice of noticesFrom(event.payload)) feed.push({ name: "notice", payload: notice });
-        }
-        if (event.name === "session" && event.payload?.session) feed.folders.set(event.payload.session, event.payload.project);
-        const chat = event.payload;
-        if (event.name === "chat" && chat?.kind === "done" && chat.ok === true) {
-          feed.push({ name: "notice", payload: { workspace: chat.workspace, session: chat.session, project: feed.folders.get(chat.session) ?? null, state: "finished" } });
-        }
-      }
+      for (const event of result.events) feed.push({ name: event.name, payload: event.payload });
       await sleep(result.events.length ? 50 : 400);
     } catch {
       feed.cursor = null;
@@ -208,10 +176,9 @@ async function readJson(request) {
 }
 
 async function call(body) {
-  const { command, workspace = null, folder = null, args = {} } = body;
+  const { command, workspace = null, args = {} } = body;
   if (typeof command !== "string") return [400, { error: { code: "invalid_request" } }];
-  if (CLI.has(command)) return [200, await rpc(command, args, { workspace, folder })];
-  if (INVOKE.has(command)) return [200, await invoke(command, args, workspace)];
+  if (ALLOWED.has(command)) return [200, await invoke(command, args, workspace)];
   return [403, { error: { code: "command_not_allowed", detail: command } }];
 }
 

@@ -1,30 +1,39 @@
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { status } from "../lib/bridge";
-import type { AttentionState } from "../lib/bridge";
-import { useConnection } from "../lib/connection";
+import type { AttentionState } from "@terminus/protocol";
+import { useAccount } from "../lib/account";
+import { BRIDGE_ENABLED } from "../lib/bridge";
+import type { Host } from "../lib/hosts";
+import { t, w } from "../lib/i18n";
+import { useMachines } from "../lib/machines";
 import { useWorkspaces } from "../lib/workspaces";
-import { t } from "../lib/i18n";
-import { Avatar, Badge, Row, SectionTitle } from "../ui/components";
+import { Avatar, Badge, Dot, Row, SectionTitle } from "../ui/components";
 import { TaskMark, type TaskState, topState } from "../ui/TaskStatus";
 import { useTheme } from "../ui/theme";
 
 const NEEDS_YOU = new Set<AttentionState>(["approving", "asked", "failed"]);
 
-/** The desktop's workspace column, as a sheet: every workspace with what waits in it, and the connection. */
+/**
+ * La columna de workspaces del escritorio, como hoja: cada workspace con lo que
+ * espera en él, las máquinas de la persona con su estado (encendida, apagada,
+ * encendiéndose: nunca un error), la cuenta y la conexión de desarrollo.
+ * Abrir esta hoja no enciende nada.
+ */
 export default function WorkspaceSwitcher() {
   const theme = useTheme();
-  const { attention, pairing, online, pair } = useConnection();
+  const { email, signOut, session } = useAccount();
+  const { attention, hosts, pairing, pair } = useMachines();
   const { list, current, select } = useWorkspaces();
-  const [version, setVersion] = useState<string | null>(null);
-  useEffect(() => {
-    if (pairing && online) void status(pairing).then((s) => setVersion(s.engine.version)).catch(() => {});
-  }, [pairing, online]);
+  const several = hosts.length > 1;
+  const labelOf = (id: string) => hosts.find((h) => h.id === id)?.label ?? id;
+  const power = (host: Host) =>
+    host.power() === "on" ? w("web.computers.state.online") : host.power() === "starting" ? w("web.computers.state.starting") : w("web.computers.state.offline");
+  const dot = (host: Host) => (host.power() === "on" ? theme.success : host.power() === "starting" ? theme.info : theme.border);
+
   return (
     <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ paddingVertical: 8 }}>
       {list.map((workspace) => {
-        const tasks = attention.find((w) => w.workspace === workspace.id)?.tasks ?? [];
+        const tasks = Object.entries(attention).flatMap(([, ws]) => ws.filter((x) => x.workspace === workspace.id).flatMap((x) => x.tasks));
         const pending = tasks.filter((task) => NEEDS_YOU.has(task.state)).length;
         const folded = topState(tasks.map((task) => task.state as TaskState));
         return (
@@ -35,7 +44,7 @@ export default function WorkspaceSwitcher() {
             title={workspace.name}
             bold={workspace.id === current?.id}
             right={pending ? <Badge count={pending} /> : <TaskMark state={folded} />}
-            subtitle={workspace.id === current?.id ? <Text style={{ color: theme.primary, fontSize: 13 }}>●</Text> : undefined}
+            subtitle={several ? workspace.hosts.map(labelOf).join(" · ") : undefined}
             onPress={() => {
               select(workspace.id);
               router.back();
@@ -43,21 +52,63 @@ export default function WorkspaceSwitcher() {
           />
         );
       })}
-      <SectionTitle>{t("you.connection")}</SectionTitle>
-      <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <Text style={{ color: theme.text, fontWeight: "600" }}>{pairing?.url}</Text>
-        <Text style={{ color: theme.textMuted }}>{online ? t("you.engine", { version: version ?? "…" }) : t("home.offline")}</Text>
-      </View>
-      <Pressable
-        testID="disconnect"
-        style={[styles.button, { borderColor: theme.failedMark }]}
-        onPress={() => {
-          router.back();
-          void pair(null);
-        }}
-      >
-        <Text style={{ color: theme.failedMark, fontWeight: "600" }}>{t("home.disconnect")}</Text>
-      </Pressable>
+
+      <SectionTitle>{t("machines.title")}</SectionTitle>
+      {hosts.map((host) => (
+        <Row
+          key={host.id}
+          testID={`machine-${host.id}`}
+          left={<Dot color={dot(host)} />}
+          title={host.label}
+          subtitle={`${power(host)} · ${host.kind === "bridge" ? t("signin.dev_bridge") : host.managed ? t("machines.managed") : t("machines.own")}`}
+        />
+      ))}
+
+      {session ? (
+        <>
+          <SectionTitle>{t("account.title")}</SectionTitle>
+          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <Text style={{ color: theme.text, fontWeight: "600" }}>{email}</Text>
+          </View>
+          <Pressable
+            testID="sign-out"
+            style={[styles.button, { borderColor: theme.failedMark }]}
+            onPress={() => {
+              router.back();
+              void signOut();
+            }}
+          >
+            <Text style={{ color: theme.failedMark, fontWeight: "600" }}>{t("account.sign_out")}</Text>
+          </Pressable>
+        </>
+      ) : null}
+
+      {BRIDGE_ENABLED ? (
+        <>
+          <SectionTitle>{t("you.connection")}</SectionTitle>
+          {pairing ? (
+            <>
+              <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                <Text style={{ color: theme.text, fontWeight: "600" }}>{pairing.url}</Text>
+              </View>
+              <Pressable
+                testID="disconnect"
+                style={[styles.button, { borderColor: theme.border }]}
+                onPress={() => {
+                  router.back();
+                  void pair(null);
+                }}
+              >
+                <Text style={{ color: theme.text, fontWeight: "600" }}>{t("home.disconnect")}</Text>
+              </Pressable>
+            </>
+          ) : (
+            <Pressable testID="connect-bridge" style={[styles.button, { borderColor: theme.border }]} onPress={() => router.push("/pair")}>
+              <Text style={{ color: theme.text }}>{t("signin.dev_bridge")}</Text>
+            </Pressable>
+          )}
+        </>
+      ) : null}
     </ScrollView>
   );
 }

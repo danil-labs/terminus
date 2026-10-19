@@ -32,7 +32,9 @@
         {
           "color": "#6539F5"
         }
-      ]
+      ],
+      "expo-web-browser",
+      "expo-font"
     ],
     "scheme": "terminus-mobile",
     "experiments": {
