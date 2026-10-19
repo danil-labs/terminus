@@ -14,8 +14,8 @@ import {
   claseDeFondo,
   type FondoDeChat,
 } from "../../lib/chat-background";
-import { elegirFondoDeChat, elegirFondoPropio, elegirVeloDeFondo, elegirVeloDePestanas, fondoDeChat, fondoPropio, quitarFondoPropio, veloDeFondo, veloDePestanas } from "../../lib/chat-background-store";
-import { VELO_DE_PESTANAS_MAX, VELO_DE_PESTANAS_MIN } from "../../lib/chat-background";
+import { elegirFondoDeChat, elegirFondoPropio, elegirVeloDeFondo, elegirVeloDePaneles, elegirVeloDePestanas, fondoDeChat, fondoPropio, quitarFondoPropio, veloDeFondo, veloDePaneles, veloDePestanas } from "../../lib/chat-background-store";
+import { VELO_DE_PANELES_MAX, VELO_DE_PANELES_MIN, VELO_DE_PESTANAS_MAX, VELO_DE_PESTANAS_MIN } from "../../lib/chat-background";
 import type { Preview } from "../artifacts/Preview";
 import {
   apariencia,
@@ -40,6 +40,7 @@ import { createWorkspaces } from "./workspaces-store";
 const IMAGES = ["png", "jpg", "jpeg", "webp"];
 const VISIBILITY_ID = "settings-appearance-background-visibility";
 const TABS_VEIL_ID = "settings-appearance-tabs-veil";
+const PANELS_VEIL_ID = "settings-appearance-panels-veil";
 
 const temas = (): { id: Apariencia; Icono: Component<{ size?: number }>; label: string }[] => [
   { id: "sistema", Icono: Monitor, label: t("settings.appearance.theme.system") },
@@ -91,6 +92,7 @@ export default function Appearance(props: { proyecto: string }) {
   const [velo, setVelo] = createSignal(veloDeFondo());
   const visibilidad = () => Math.round((1 - velo()) * 100);
   const [veloPestanas, setVeloPestanas] = createSignal(veloDePestanas());
+  const [veloPaneles, setVeloPaneles] = createSignal(veloDePaneles());
   const espacios = createWorkspaces();
   const [filas, setFilas] = createSignal<Fila[]>([]);
   const [cargado, setCargado] = createSignal(false);
@@ -376,6 +378,25 @@ export default function Appearance(props: { proyecto: string }) {
             class="w-40 accent-primary"
             value={Math.round(veloPestanas() * 100)}
             onInput={(e) => setVeloPestanas(elegirVeloDePestanas(Number(e.currentTarget.value) / 100))}
+          />
+        </SettingsRow>
+        <SettingsRow
+          label={
+            <label for={PANELS_VEIL_ID}>
+              {t("settings.appearance.panels_veil", { percent: Math.round(veloPaneles() * 100) })}
+            </label>
+          }
+          description={t("settings.appearance.panels_veil.description")}
+        >
+          <input
+            id={PANELS_VEIL_ID}
+            type="range"
+            min={VELO_DE_PANELES_MIN * 100}
+            max={VELO_DE_PANELES_MAX * 100}
+            step="5"
+            class="w-40 accent-primary"
+            value={Math.round(veloPaneles() * 100)}
+            onInput={(e) => setVeloPaneles(elegirVeloDePaneles(Number(e.currentTarget.value) / 100))}
           />
         </SettingsRow>
         <Show when={backgroundFailure()}>
