@@ -8,7 +8,8 @@ repository. The window reaches it over RPC1 through a frozen contract; see
 
 This file is for people and coding agents contributing from outside. Read the
 area guide before editing an area: [front](src/AGENTS.md),
-[scripts and guards](scripts/AGENTS.md), [tests](tests/AGENTS.md).
+[scripts and guards](scripts/AGENTS.md), [tests](tests/AGENTS.md),
+[mobile app](mobile/AGENTS.md).
 
 ## Commands
 
