@@ -15,7 +15,9 @@ overrides:
 
 importers:
 
-  .:
+  .: {}
+
+  apps/desktop:
     dependencies:
       '@codemirror/autocomplete':
         specifier: ^6.20.3
@@ -73,7 +75,7 @@ importers:
         version: 2.10.1
       '@terminus/design':
         specifier: workspace:*
-        version: link:packages/design
+        version: link:../../packages/design
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -2899,7 +2901,6 @@ packages:
       jiti: '>=1.21.0'
       less: '*'
       lightningcss: ^1.21.0
-      sass: '*'
       sass-embedded: '*'
       stylus: '*'
       sugarss: '*'
@@ -2914,8 +2915,6 @@ packages:
       less:
         optional: true
       lightningcss:
-        optional: true
-      sass:
         optional: true
       sass-embedded:
         optional: true

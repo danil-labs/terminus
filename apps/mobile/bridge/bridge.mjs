@@ -2,7 +2,7 @@
 /**
  * Development bridge between the Terminus mobile app and a Seldon engine.
  *
- *   node mobile/bridge/bridge.mjs [--data <engine data dir>] [--port 6780] [--allow-lan]
+ *   node apps/mobile/bridge/bridge.mjs [--data <engine data dir>] [--port 6780] [--allow-lan]
  *
  * It speaks RPC1 to the engine over loopback, like the window, and serves the
  * phone a small HTTP API with a bearer token. Only commands in ALLOWED reach the
@@ -14,7 +14,7 @@
  * the engine marks a task `unseen` as soon as its turn starts). The phone shows
  * them as local notifications today; a push gateway will deliver them later.
  *
- * `--data` defaults to the engine lab (`.engine/lab/data`). Never point it at
+ * `--data` defaults to the engine lab (`apps/desktop/.engine/lab/data`). Never point it at
  * the data of an installed Terminus.
  */
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
@@ -24,17 +24,18 @@ import { createConnection } from "node:net";
 import { networkInterfaces } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { CLI_COMMANDS, INVOKE_COMMANDS, NEEDS_YOU as NEEDS_YOU_STATES } from "../../packages/protocol/src/commands.ts";
+import { CLI_COMMANDS, INVOKE_COMMANDS, NEEDS_YOU as NEEDS_YOU_STATES } from "../../../packages/protocol/src/commands.ts";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+// The engine lab lives with the desktop app, which downloads and runs it (`scripts/engine.mjs`).
+const DESKTOP = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "desktop");
 const option = (name, fallback) => {
   const i = process.argv.indexOf(`--${name}`);
   return i > 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
 };
-const DATA = resolve(option("data", join(ROOT, ".engine", "lab", "data")));
+const DATA = resolve(option("data", join(DESKTOP, ".engine", "lab", "data")));
 const PORT = Number(option("port", "6780"));
 const ALLOW_LAN = process.argv.includes("--allow-lan");
-const STATE = join(ROOT, ".engine", "mobile-bridge.json");
+const STATE = join(DESKTOP, ".engine", "mobile-bridge.json");
 const MAX_BODY = 1 << 20;
 const LONG_POLL_MS = 25_000;
 const MAX_FRAME = 16 * 1024 * 1024;

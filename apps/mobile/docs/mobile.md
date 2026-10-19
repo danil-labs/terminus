@@ -27,7 +27,7 @@ el dueño de todo; el teléfono es otro cliente más.
   un agente o un workspace muestran la marca más urgente de sus tareas, como
   una fila plegada. Si cambian en el escritorio, se cambia el paquete.
 - **Tema claro y oscuro** según el sistema, con los tokens por omisión del
-  escritorio en `src/styles/global.css`: Violeta en claro y Grafito en oscuro
+  escritorio en `apps/desktop/src/styles/global.css`: Violeta en claro y Grafito en oscuro
   (`[data-dark-style="graphite"]`), no el navy.
 - **El teléfono no ve la pantalla de la máquina.** Habla el mismo contrato que
   la CLI de Terminus a través de un bridge.
@@ -38,14 +38,14 @@ el dueño de todo; el teléfono es otro cliente más.
 [App Expo] ──HTTP + token──▶ [bridge] ──RPC1 (loopback)──▶ [motor seldon-runtime]
 ```
 
-`mobile/bridge/bridge.mjs` es un programa de Node sin dependencias que corre en
+`apps/mobile/bridge/bridge.mjs` es un programa de Node sin dependencias que corre en
 la máquina del motor:
 
 - Habla RPC1 con el motor por loopback, como la ventana, leyendo
   `seldon-endpoint.json` y su token.
 - Sirve al teléfono `GET /v1/status`, `POST /v1/call` y `GET /v1/events`
   (long-poll). Pide `Authorization: Bearer <token>`; el token se genera una vez
-  y se guarda en `.engine/mobile-bridge.json` con permisos `0600`.
+  y se guarda en `apps/desktop/.engine/mobile-bridge.json` con permisos `0600`.
 - Solo deja pasar una lista cerrada de comandos: los de la CLI (`workspace list`,
   `folder list`, `space list`, `handler list`, `task list|show|read|create|send|stop`,
   `agent list|models`, `operation show`) y los que contesta una persona
@@ -59,7 +59,7 @@ la máquina del motor:
   `done`). El motor marca `unseen` en cuanto arranca el turno, así que "terminó"
   sale de `done` y no de `attention`.
 
-La app (`mobile/src`) usa expo-router:
+La app (`apps/mobile/src`) usa expo-router:
 
 | Ruta | Qué es |
 |---|---|
@@ -78,10 +78,14 @@ Terminus.
 ## Probarla
 
 ```bash
-node scripts/engine.mjs download && node scripts/engine.mjs engine   # motor del lab
-node mobile/bridge/bridge.mjs                                        # imprime dirección y token
-cd mobile && npm install && npm start                                # Metro
+pnpm engine:download && node apps/desktop/scripts/engine.mjs engine   # motor del lab
+node apps/mobile/bridge/bridge.mjs                                      # imprime dirección y token
+cd apps/mobile && npm install && npm start                              # Metro
 ```
+
+El lab queda atado a la ruta absoluta de sus datos: si el checkout cambia de
+lugar, el motor sale con `cli.error.authority_incompatible`. Es desechable: se
+borra `apps/desktop/.engine/lab` y se arranca de nuevo.
 
 En el teléfono abre Expo Go, escanea el QR de Metro y pega la dirección de
 Tailscale (`http://100.x.y.z:6780`) y el token que imprimió el bridge.

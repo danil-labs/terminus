@@ -1,26 +1,27 @@
 # Terminus móvil: guía del área
 
-Aplica [AGENTS.md](../AGENTS.md). App de Expo (React Native, TypeScript) para
+Aplica [AGENTS.md](../../AGENTS.md). App de Expo (React Native, TypeScript) para
 iOS y Android: un control remoto de Terminus, no un Terminus completo. La
-arquitectura y el estado están en [docs/mobile.md](../docs/mobile.md).
+arquitectura y el estado están en [docs/mobile.md](docs/mobile.md).
 
 Es un proyecto aparte de la raíz: tiene su `package.json` y su
-`package-lock.json` con npm, y las comprobaciones de la raíz (`pnpm verify`) no
+`package-lock.json` con npm, y las comprobaciones del escritorio (`pnpm verify`) no
 lo cubren.
 
 ## Comandos
 
-Desde `mobile/`:
+Desde `apps/mobile/`:
 
 ```bash
 npm install
-npm run bridge        # bridge contra el motor del lab (.engine/lab/data)
+npm run bridge        # bridge contra el motor del lab (apps/desktop/.engine/lab/data)
 npm start             # Metro; Expo Go en el teléfono o el simulador
 npm run typecheck     # tsc --noEmit
 npm run doctor        # expo-doctor
 ```
 
-El motor del lab se arranca desde la raíz con `node scripts/engine.mjs engine`.
+El motor del lab se arranca desde la raíz con `pnpm engine:download` y
+`node apps/desktop/scripts/engine.mjs engine`.
 
 ## Expo cambia en cada SDK
 
@@ -38,7 +39,7 @@ se agregan con `npx expo install <paquete>`, que elige la versión compatible.
 - Los nombres de comandos y campos son los del motor (`task list`,
   `respond_permission`, `encargado`); no se traducen en la app.
 - Todo texto que se lee viene de `src/lib/i18n.ts`, en `es` y `en`.
-- Lo que comparte con el escritorio viene de `packages/`: colores, estado de
+- Lo que comparte con el escritorio viene de `packages/` en la raíz: colores, estado de
   tarea, íconos y frases de `@terminus/design`, y tipos y comandos del bridge de
   `@terminus/protocol`. No se copian aquí: el guard `shared-design` compara
   `@terminus/design` con el escritorio.

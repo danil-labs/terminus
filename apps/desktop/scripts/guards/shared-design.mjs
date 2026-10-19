@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const { CSS_SOURCE, CSS_THEME_BLOCKS, STATUS_ICONS, STATUS_LABELS, THEMES } = await import(
-  join(ROOT, "packages/design/src/index.ts")
+  join(ROOT, "..", "..", "packages/design/src/index.ts")
 );
 
 const failures = [];

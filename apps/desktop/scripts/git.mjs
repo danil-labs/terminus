@@ -132,16 +132,19 @@ function controlDeTerminus(arbol) {
 export function locateGit(arbol = ROOT) {
   // 1. El árbol trae su git, o quien invoca ya puso `GIT_DIR` a mano. Es el
   //    caso del clon normal y el del runner de Actions, y no cuesta nada.
+  //    La app vive en `apps/desktop`: el git que le toca es el del monorepo.
+  const repo = resolve(arbol, "..", "..");
   const suyo = arbolDeGit(arbol, {});
-  if (suyo && mismaRuta(suyo, arbol)) {
+  if (suyo && (mismaRuta(suyo, arbol) || mismaRuta(suyo, repo))) {
     return { ok: true, entorno: { ...SIN_CANDADO }, origen: "el árbol tiene su propio git" };
   }
 
   // 2. Una copia de trabajo de Terminus: la metadata está fuera del árbol.
-  const control = controlDeTerminus(arbol);
+  const control = controlDeTerminus(repo) ?? controlDeTerminus(arbol);
   if (control) {
-    const entorno = { ...SIN_CANDADO, GIT_DIR: control, GIT_WORK_TREE: arbol };
-    if (mismaRuta(arbolDeGit(arbol, entorno) ?? "", arbol)) {
+    const raiz = controlDeTerminus(repo) ? repo : arbol;
+    const entorno = { ...SIN_CANDADO, GIT_DIR: control, GIT_WORK_TREE: raiz };
+    if (mismaRuta(arbolDeGit(arbol, entorno) ?? "", raiz)) {
       return { ok: true, entorno, origen: `la carpeta de control de la tarea (${control})` };
     }
   }

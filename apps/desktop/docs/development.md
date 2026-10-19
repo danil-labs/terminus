@@ -63,7 +63,7 @@ Maintainers publish with a version tag:
    `release-notes/en.md` and `release-notes/es.md`.
 2. Merge to `main`, tag `v<version>` and push the tag.
 
-[`publish.yml`](../.github/workflows/publish.yml) builds, signs and publishes.
+[`publish.yml`](../../../.github/workflows/publish.yml) builds, signs and publishes.
 It refuses to publish while `seldon-runtime.lock` is not pinned for every
 platform or the engine is not bundled (`bundle.externalBin`): an installed copy
 updated to a window without its engine would not open. To test a change to the
