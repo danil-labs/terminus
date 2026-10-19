@@ -5,7 +5,15 @@ import { dirname, join, relative } from "node:path";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { isMain, ROOT, walkFiles } from "../git.mjs";
 
-const roots = ["AGENTS.md", "README.md", "CONTRIBUTING.md", "SECURITY.md", "CREDITS.md", "NOTICE", "src/AGENTS.md", "scripts/AGENTS.md", "tests/AGENTS.md"];
+/** The repository root, two levels above this app: its own docs and the mobile app's are checked too. */
+const REPO = join("..", "..");
+const roots = [
+  "AGENTS.md",
+  "src/AGENTS.md",
+  "scripts/AGENTS.md",
+  "tests/AGENTS.md",
+  ...["AGENTS.md", "README.md", "CONTRIBUTING.md", "SECURITY.md", "CREDITS.md", "NOTICE", "apps/mobile/AGENTS.md", "apps/mobile/docs/mobile.md"].map((path) => join(REPO, path)),
+];
 const directories = ["docs", "plugins", "tests", "src-tauri/icons", "src-tauri/crates", "npx"];
 const documents = [
   ...roots,
@@ -13,7 +21,7 @@ const documents = [
     [...walkFiles(join(ROOT, directory), [".md"])].map((path) => relative(ROOT, path)),
   ),
 ].filter((path) => path !== "docs/PHRASES.md");
-const sourcePath = /`((?:src|src-tauri|scripts|tests|plugins|docs|npx|\.github)\/[A-Za-z0-9_.@-]+(?:\/[A-Za-z0-9_.@-]+)*\/?)`/g;
+const sourcePath = /`((?:apps|packages|src|src-tauri|scripts|tests|plugins|docs|npx|\.github)\/[A-Za-z0-9_.@-]+(?:\/[A-Za-z0-9_.@-]+)*\/?)`/g;
 const frontendPath = /`((?:features|lib|ui|app|locales|styles)\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*\/?)`/g;
 
 function references() {
@@ -26,7 +34,7 @@ function references() {
         for (const [, path] of line.matchAll(pattern)) {
           if (seen.has(path)) continue;
           seen.add(path);
-          found.push({ document, line: index + 1, path, candidates: [path, `${prefix}${path}`, join(dirname(document), path)] });
+          found.push({ document, line: index + 1, path, candidates: [path, `${prefix}${path}`, join(dirname(document), path), join(REPO, path)] });
         }
       }
     }

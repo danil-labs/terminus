@@ -10,7 +10,8 @@ import { join, basename, dirname, resolve } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const workflow = JSON.parse(execFileSync('ruby', ['-ryaml', '-rjson', '-e', 'puts JSON.generate(YAML.load_file(ARGV[0]))', '.github/workflows/publish.yml'], { cwd: repo, encoding: 'utf8' }));
+const monorepo = resolve(repo, '..', '..');
+const workflow = JSON.parse(execFileSync('ruby', ['-ryaml', '-rjson', '-e', 'puts JSON.generate(YAML.load_file(ARGV[0]))', '.github/workflows/publish.yml'], { cwd: monorepo, encoding: 'utf8' }));
 const { verifyFile } = await import(pathToFileURL(join(repo, 'npx/lib/minisign.mjs')));
 const { detectLocale, t } = await import(pathToFileURL(join(repo, 'npx/lib/i18n.mjs')));
 const scratch = mkdtempSync(join(tmpdir(), 'terminus-release-test-'));
@@ -130,7 +131,7 @@ try {
   // `dist/` es la salida de Vite en harness-app: si el workflow junta ahí los
   // instaladores, el frontend compilado (`index.html`, `assets/`) se cuela en la
   // release y `gh release create` falla al topar con una carpeta. Pasó en v0.2.7.
-  const publishYml = readFileSync(join(repo, '.github/workflows/publish.yml'), 'utf8');
+  const publishYml = readFileSync(join(monorepo, '.github/workflows/publish.yml'), 'utf8');
   assert(!/(?<![\w-])dist\//.test(publishYml), 'publish.yml usa la carpeta dist/, que es la de Vite');
   console.log('PASS installers are collected outside Vite\'s dist/');
 

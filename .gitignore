@@ -6,8 +6,8 @@ dist/
 *.local
 
 # Rust / Tauri
-src-tauri/target/
-src-tauri/gen/
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
 
 
 
@@ -17,11 +17,11 @@ src-tauri/gen/
 tsconfig.tsbuildinfo
 dist-min
 dist-solid
-docs/PHRASES.md
+apps/desktop/docs/PHRASES.md
 
-src-tauri/crates/*/target/
+apps/desktop/src-tauri/crates/*/target/
 
 # Downloaded engine and local engine labs
 .engine/
 # Engine copied for bundle.externalBin (`pnpm engine:sidecar`)
-src-tauri/binaries/
+apps/desktop/src-tauri/binaries/

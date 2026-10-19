@@ -57,19 +57,19 @@ To sign off commits you already made: `git rebase --signoff main`.
 
 - Follow the existing code: naming, structure and comment density of the file
   you edit. Biome (`pnpm lint`) and `cargo fmt`/`clippy` are part of the chain.
-- User-facing text goes through the catalogs in `src/locales/` (`t()`); add the
-  key in both `es` and `en`. See [docs/localization.md](docs/localization.md).
-- Colors and controls come from the theme tokens and `src/ui/`; see
-  [docs/visual-system.md](docs/visual-system.md).
+- User-facing text goes through the catalogs in `apps/desktop/src/locales/` (`t()`); add the
+  key in both `es` and `en`. See [docs/localization.md](apps/desktop/docs/localization.md).
+- Colors and controls come from the theme tokens and `apps/desktop/src/ui/`; see
+  [docs/visual-system.md](apps/desktop/docs/visual-system.md).
 - Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)
   (`feat:`, `fix:`, `docs:`, `chore:`…).
 
 ## What not to change in a pull request
 
-- The app identity in `src-tauri/tauri.conf.json` (`identifier`, `productName`,
+- The app identity in `apps/desktop/src-tauri/tauri.conf.json` (`identifier`, `productName`,
   updater `pubkey` and endpoint) and in `.github/workflows/publish.yml`.
   Installed copies depend on them.
-- `src-tauri/crates/engine-protocol/commands.json`: it is the frozen contract
+- `apps/desktop/src-tauri/crates/engine-protocol/commands.json`: it is the frozen contract
   with the engine and must stay byte-exact.
 - Signing and publishing steps in `publish.yml`, unless the pull request is
   about them and a maintainer asked for it.
