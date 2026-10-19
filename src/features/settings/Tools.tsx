@@ -883,49 +883,63 @@ export function ConexionesMenu(props: {
   };
   const total = () => conectados().length + manuales().length + sueltos().length;
 
-  /** Punto verde si está conectado; rojo y clicable si pide sesión. */
-  const Senal = (p: { name: string; muerto?: boolean }) => (
-    <Show
-      when={pendientes().has(p.name)}
-      fallback={
-        <span
-          class={cn(
-            "size-1.5 shrink-0 rounded-full",
-            p.muerto ? "bg-warning-strong" : "bg-success-strong",
-          )}
-          title={p.muerto ? t("settings.tools.dead_now") : undefined}
-        />
-      }
-    >
-      <Show
-        when={mcpSignInState(p.name) !== "waiting"}
-        fallback={
-          <Show
-            when={mcpLoginUrl()}
-            fallback={<span class="text-[0.6875rem] text-neutral-500">{t("settings.tools.opening")}</span>}
-          >
-            {(u) => (
-              <button
-                class="text-[0.6875rem] text-neutral-500 underline"
-                onClick={() => void invoke("open_external", { target: u() })}
-              >
-                {t("settings.tools.open_login")}
-              </button>
-            )}
-          </Show>
-        }
-      >
-        <button
-          class="grid size-4 shrink-0 place-items-center rounded-full"
-          title={mcpSignInState(p.name) === "retry" ? t("mcp.task.sign_in_again") : t("mcp.task.sign_in")}
-          aria-label={t("mcp.task.sign_in")}
-          onClick={() => void mcpSignIn(p.name)}
+  /**
+   * Un renglón del menú. La dirección no se pinta: va en el `title`, a la
+   * vista solo con el puntero encima. Si el servidor pide sesión, el renglón
+   * entero es el botón que la inicia; el punto rojo solo lo señala.
+   */
+  const Renglon = (p: { name: string; label: string; marca?: string; detalle?: string; muerto?: boolean }) => {
+    const pide = () => pendientes().has(p.name);
+    const estado = () => mcpSignInState(p.name);
+    const aviso = () => (estado() === "retry" ? t("mcp.task.sign_in_again") : t("mcp.task.sign_in"));
+    const contenido = () => (
+      <>
+        <Show when={p.marca}>{(g) => <MarcaProveedor id={g()} size={14} />}</Show>
+        <span class="min-w-0 flex-1 truncate">{p.label}</span>
+      </>
+    );
+    return (
+      <li>
+        <Show
+          when={pide()}
+          fallback={
+            <div class="flex min-h-8 items-center gap-2 px-2 py-1 text-[0.8125rem]" title={p.detalle || undefined}>
+              {contenido()}
+              {/* Ámbar si está muerto, verde si está puesto y sano. */}
+              <span
+                class={cn("size-1.5 shrink-0 rounded-full", p.muerto ? "bg-warning-strong" : "bg-success-strong")}
+                title={p.muerto ? t("settings.tools.dead_now") : undefined}
+              />
+            </div>
+          }
         >
-          <span class="size-1.5 rounded-full bg-error-strong" />
-        </button>
-      </Show>
-    </Show>
-  );
+          <button
+            role="menuitem"
+            class={cn(ITEM_DE_MENU, "flex min-h-8 items-center gap-2 py-1")}
+            title={p.detalle ? `${aviso()} · ${p.detalle}` : aviso()}
+            aria-label={`${aviso()}: ${p.label}`}
+            onClick={() => {
+              // Esperando al navegador: el clic vuelve a abrir la página, no
+              // lanza otro login.
+              if (estado() !== "waiting") return void mcpSignIn(p.name);
+              const u = mcpLoginUrl();
+              if (u) void invoke("open_external", { target: u });
+            }}
+          >
+            {contenido()}
+            <Show
+              when={estado() === "waiting"}
+              fallback={<span class="size-1.5 shrink-0 rounded-full bg-error-strong" />}
+            >
+              <span class="shrink-0 text-[0.6875rem] text-neutral-500">
+                {mcpLoginUrl() ? t("settings.tools.open_login") : t("settings.tools.opening")}
+              </span>
+            </Show>
+          </button>
+        </Show>
+      </li>
+    );
+  };
 
   return (
     <Popover
@@ -963,7 +977,7 @@ export function ConexionesMenu(props: {
 
       <PopoverContent
         role="menu"
-        class="grid w-[260px] gap-0.5 p-1"
+        class="grid w-[260px] grid-cols-[minmax(0,1fr)] gap-0.5 p-1"
         // Mismo motivo que en `WorkspaceMenu`: con una lista variable el
         // primer renglón no es fiable como «el que importa»; nada se enfoca
         // solo al abrir.
@@ -977,39 +991,22 @@ export function ConexionesMenu(props: {
             </p>
           }
         >
-          <ul class="m-0 grid list-none gap-0.5 p-0">
+          <ul class="m-0 grid min-w-0 list-none gap-0.5 p-0">
             <For each={conectados()}>
               {(c) => (
-                <li class="flex min-h-8 items-center gap-2 px-2 py-1 text-[0.8125rem]">
-                  <MarcaProveedor id={c.grupo} size={14} />
-                  <span class="min-w-0 flex-1 truncate">{c.name}</span>
-                  {/* Ámbar solo si está muerto: ver la cabecera del
-                      componente. Puesto y sano no lleva marca — es el estado
-                      tranquilo, igual que `.tag.puesto` en la pantalla
-                      completa. */}
-                  <Senal name={c.clave} muerto={c.escuchando === false} />
-                </li>
+                <Renglon
+                  name={c.clave}
+                  label={c.name}
+                  marca={c.grupo}
+                  detalle={puestos().find((p) => p.name === c.clave)?.detalle}
+                  muerto={c.escuchando === false}
+                />
               )}
             </For>
             <For each={manuales()}>
-              {(p) => (
-                <li class="flex min-h-8 items-center gap-2 px-2 py-1 text-[0.8125rem]">
-                  <span class="min-w-0 flex-1 truncate">{p.name}</span>
-                  <span class="max-w-[40%] shrink-0 truncate font-mono text-[0.6875rem] text-neutral-500">
-                    {p.detalle || t("settings.tools.no_source")}
-                  </span>
-                  <Senal name={p.name} />
-                </li>
-              )}
+              {(p) => <Renglon name={p.name} label={p.name} detalle={p.detalle || t("settings.tools.no_source")} />}
             </For>
-            <For each={sueltos()}>
-              {(p) => (
-                <li class="flex min-h-8 items-center gap-2 px-2 py-1 text-[0.8125rem]">
-                  <span class="min-w-0 flex-1 truncate">{p.name}</span>
-                  <Senal name={p.name} />
-                </li>
-              )}
-            </For>
+            <For each={sueltos()}>{(p) => <Renglon name={p.name} label={p.name} />}</For>
           </ul>
         </Show>
         <Show when={mcpSignInFailure()}>{(f) => <FailureNote f={f()} />}</Show>
