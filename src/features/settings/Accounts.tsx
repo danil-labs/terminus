@@ -1410,7 +1410,7 @@ export default function Accounts(props: {
                 {t("settings.accounts.close")}
               </Button>
             </div>
-            <span class="font-mono text-xs">{f().texto}</span>
+            <span class="break-all font-mono text-xs">{f().texto}</span>
             <div class="flex flex-wrap items-center gap-2 text-xs text-neutral-500">
               <Button size="sm" onClick={() => void conectar(f().id)}>
                 {t("settings.accounts.retry")}

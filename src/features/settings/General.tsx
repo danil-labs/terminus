@@ -72,8 +72,9 @@ function SourceRow(props: {
           <span class="min-w-0 truncate text-sm font-medium">{props.f.name}</span>
           <Show when={branch()}>
             {(r) => (
-              <Badge forma="dato" class="shrink-0 font-mono">
-                {r()}
+              // Con tope y cortada: una rama larga sacaba de la fila los botones.
+              <Badge forma="dato" class="min-w-0 max-w-48 font-mono" title={r()}>
+                <span class="truncate">{r()}</span>
               </Badge>
             )}
           </Show>
