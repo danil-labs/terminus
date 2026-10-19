@@ -1124,10 +1124,10 @@ export default function App() {
     setConAntiguos((all) => (!!all[id] === loaded.start > 0 ? all : { ...all, [id]: loaded.start > 0 }));
   // Con el stream empujado el motor sabe paginar: abrir trae los últimos turnos y no la transcripción entera.
   let historialPaginado = false;
-  const leerTarea = (project: string, id: string, before: number | null = null) =>
-    historialPaginado
-      ? invoke<Session>("load_history", { project, id, before })
-      : invoke<Session>("load_session", { project, id });
+  const leerTarea = (project: string, id: string, before: number | null = null) => {
+    if (historialPaginado) return invoke<Session>("load_history", { project, id, before });
+    return invoke<Session>("load_session", { project, id });
+  };
   /**
    * La página anterior a lo cargado de `id`, lista para anteponerse: devuelve con qué
    * ponerla, para que el hilo la monte sin mover lo que se lee. `null` si no hay o ya no encaja.

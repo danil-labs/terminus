@@ -185,7 +185,8 @@ Reusing an engine leaves `selection.json` untouched when its content is the same
 ## Stream empujado
 
 Con un motor que anuncia `push_stream_v1` en `status.service_features`
-(seldon-host#52, contrato en `docs/push-stream-contract.md` de seldon-host), el
+(seldon-host#52, contrato en
+[push-stream-contract.md](https://github.com/danil-labs/seldon-host/blob/dev/docs/push-stream-contract.md)), el
 cliente deja de abrir una conexión TCP por petición:
 
 - Hasta cuatro conexiones persistentes para peticiones, con varias en vuelo por

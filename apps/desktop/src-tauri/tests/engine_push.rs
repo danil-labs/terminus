@@ -2,6 +2,8 @@
 //! petición con un motor viejo, conexión persistente y suscripción con uno que
 //! anuncia `push_stream_v1`.
 #![cfg(unix)]
+// `allow-unwrap-in-tests` solo cubre los `#[test]`; aquí también los ayudantes del laboratorio.
+#![allow(clippy::unwrap_used)]
 use serde_json::{json, Value};
 use std::{
     io::{BufRead, BufReader, Write},
