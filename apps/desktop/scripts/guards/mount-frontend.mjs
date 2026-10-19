@@ -3284,7 +3284,8 @@ if (!roto) {
   assert.ok(filasDeProyectos.every((f) => f.textContent.includes("Archivos") && f.textContent.includes("sin tareas")), "cada fila dice su tipo en palabras y que no tiene tareas");
   assert.doesNotMatch(panelDeAjustes().textContent, /\bgit\b/i, "la página no le habla de git a la persona");
   agDoc.querySelector("#cfg-tab-agentes").click();
-  await sleep(120);
+  // Agentes llega en su propio trozo: se espera a que pinte sus filas.
+  for (let i = 0; i < 120 && !propia("giskard-po"); i++) await sleep(25);
 
   assert.ok(propia("giskard-po"), "la sección lista los agentes propios");
   assert.deepEqual(chips("giskard-po"), ["Terminus App"]);

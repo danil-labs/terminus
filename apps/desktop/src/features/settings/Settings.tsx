@@ -25,7 +25,6 @@ import {
   SidebarMenuItem,
 } from "../../ui/sidebar";
 import type { ModelChoices } from "../projects/NewAgent";
-import Agents from "./Agents";
 import Appearance from "./Appearance";
 import AIProviders from "./AIProviders";
 import Environment from "./Environment";
@@ -102,6 +101,8 @@ type ContextoDeAgentes = {
 
 // Fuera de la carga inicial: solo pesa cuando se abre la página.
 const ManageProjects = lazy(() => import("./ManageProjects"));
+// Como Proyectos: Agentes llega en su propio trozo, fuera de la carga inicial.
+const Agents = lazy(() => import("./Agents"));
 
 const destinosDe = (
   superficies: () => Superficie[],
@@ -150,11 +151,13 @@ const destinosDe = (
     },
     icono: () => <Bot size={15} />,
     panel: () => (
-      <Agents
-        modelos={agentes.modelos}
-        proyecto={agentes.proyecto}
-        onAgentProfile={agentes.onAgentProfile}
-      />
+      <Suspense fallback={null}>
+        <Agents
+          modelos={agentes.modelos}
+          proyecto={agentes.proyecto}
+          onAgentProfile={agentes.onAgentProfile}
+        />
+      </Suspense>
     ),
   },
   {
