@@ -2,23 +2,23 @@
  * A Danil Computers relay simulated in Node for the browser build: one session
  * socket per connection, answering `call` from a table of engine replies.
  */
-const row = (id) => ({ id, title: `Tarea ${id}`, last_message: "", agent: "codex", model: "gpt-5.6", refs: [], updated_at: 0, turns: 0, parent: null, esperando: false });
+const row = (id) => ({ id, title: `Tarea ${id}`, last_message: "", provider: "codex", model: "gpt-5.6", refs: [], updated_at: 0, turns: 0, parent: null, esperando: false });
 
 export const engine = {
   setup_required: false,
   check_environment: { ready: true, blocked: false, reason: null, items: [] },
-  list_agents: [{ id: "codex", label: "Codex", available: true, driver: true }],
+  list_providers: [{ id: "codex", label: "Codex", available: true, driver: true }],
   list_workspaces: { workspaces: [{ id: "w", name: "W", context_root: null }], active: "w" },
   workspaces_startup: { workspaces: [{ id: "w", name: "W", context_root: null }], active: "w" },
   list_projects: [{ id: "p1", name: "P1", working_directory: "/lab/p1", kind: "git", portfolio: null, sources: [] }],
   list_portfolios: [],
   list_sources: [],
   list_live_sessions: ({ project }) => (project === "" || project === "p1" ? ["t1"].map(row) : []),
-  list_encargados: { encargados: [], rechazados: [] },
-  list_encargado_status: [],
+  list_agents: { agents: [], rechazados: [] },
+  list_agent_status: [],
   list_mentions: { fuentes: [], archivos: [] },
-  list_models: { agent: "codex", models: [{ id: "gpt-5.6", label: "GPT-5.6", gratis: null, note: null, efforts: [], default_effort: null }], fallback: false },
-  list_surfaces: [{ id: "codex", agent: "codex", label: "Codex", catalogo: "todo", usable: true, marca: null, porque: null }],
+  list_models: { provider: "codex", models: [{ id: "gpt-5.6", label: "GPT-5.6", gratis: null, note: null, efforts: [], default_effort: null }], fallback: false },
+  list_surfaces: [{ id: "codex", provider: "codex", label: "Codex", catalogo: "todo", usable: true, marca: null, porque: null }],
   session_folder: "/tmp",
   list_task_trees: [],
   task_history: { history: { archived: false, events: [], recovery: null }, branch: null, path: "/lab", available: true, owned: false, restorable: false, recreatable: false, incomplete: false },
@@ -28,12 +28,12 @@ export const engine = {
   save_queue: null,
   session_usage: null,
   list_session_git: {},
-  load_session: ({ id }) => ({ id, agent: "codex", sources: [], model: "gpt-5.6", effort: null, permission_mode: null, turns: [] }),
+  load_session: ({ id }) => ({ id, provider: "codex", sources: [], model: "gpt-5.6", effort: null, permission_mode: null, turns: [] }),
 };
 
 /** One relay session socket per connection, speaking protocol v1 to the page. */
 /** The relay's wake list (protocol v1): only these start an off computer. */
-const INTENT = new Set(["send_message", "inject_message", "create_project", "create_encargado", "respond_permission", "answer_question", "answer_shell_output", "run_shell_command", "queue_ready", "resume_awaiting_quota", "recreate_task_work"]);
+const INTENT = new Set(["send_message", "inject_message", "create_project", "create_agent", "respond_permission", "answer_question", "answer_shell_output", "run_shell_command", "queue_ready", "resume_awaiting_quota", "recreate_task_work"]);
 
 /** `cachedAt`: with the computer off, the relay answers every known read from its copy of that time. */
 export function relay({ state: initial = "online", wakeAfter = 300, cachedAt = null } = {}) {
