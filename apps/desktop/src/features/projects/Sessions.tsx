@@ -529,6 +529,12 @@ export default function Sessions(props: {
     // La rama de quien comparte el árbol de su padre se dice en la fila del padre.
     const propioDeOtra = () => !!gitDe(r.s).shared_with || sharesTaskGit(r.s, gitRows(), props.relatedSessions ?? props.sessions);
     /** El PR, o el estado de una carpeta de conocimiento; la rama sola va a la tarjeta. */
+    // Va después de la carpeta: dice qué le falta a esa tarea, no la encabeza.
+    const WorktreeFaltante = () => (
+      <Show when={worktreeDe(r.s.id)?.owned && !worktreeDe(r.s.id)?.available}>
+        <span class="flex shrink-0 text-error-strong" title={t("projects.sessions.worktree_missing")} aria-label={t("projects.sessions.worktree_missing")}><WorktreeRoto size={13} /></span>
+      </Show>
+    );
     const ChipDeGit = () => (
       <Show when={(pull() || gitDe(r.s).kind === "kn") && !propioDeOtra()}>
         <span data-session-pr class="inline-flex shrink-0 items-center gap-0.5" title={sessionGitDescription(gitDe(r.s))}>
@@ -553,9 +559,6 @@ export default function Sessions(props: {
         <div class="min-w-0">{r.titulo}</div>
         <Show when={!compacta()}>
           <div data-session-preview class="col-start-2 mt-0.5 flex h-4 min-w-0 items-center gap-1.5 text-[0.6875rem] font-normal leading-tight text-neutral-500">
-            <Show when={worktreeDe(r.s.id)?.owned && !worktreeDe(r.s.id)?.available}>
-              <span class="flex shrink-0 text-error-strong" title={t("projects.sessions.worktree_missing")} aria-label={t("projects.sessions.worktree_missing")}><WorktreeRoto size={13} /></span>
-            </Show>
             <Show
               when={teNecesita()}
               fallback={
@@ -563,6 +566,7 @@ export default function Sessions(props: {
                   <Show when={!props.hideFolder && props.carpetaDe?.(r.s)}>
                     {(nombre) => <FolderChip id={projectOf(r.s)} name={nombre()} class="max-w-[108px] shrink-0" />}
                   </Show>
+                  <WorktreeFaltante />
                   <Show when={r.s.agent && !r.s.chat_de_agente ? r.s.agent : null}>
                     {(agente) => (
                       <span data-session-agent class="flex shrink-0" title={nombreDelAgente()} aria-label={nombreDelAgente()}>
@@ -589,6 +593,7 @@ export default function Sessions(props: {
               <Show when={!props.hideFolder}>
                 <span title={props.carpetaDe?.(r.s)} class="flex shrink-0"><FolderSquare id={projectOf(r.s)} /></span>
               </Show>
+              <WorktreeFaltante />
             </Show>
           </div>
         </Show>
