@@ -94,6 +94,14 @@ async function copySettings(row: Row, workspace: string, from: ReturnType<typeof
     });
   }
 
+  // El fondo de los chats es de la máquina, no del workspace: viaja en bytes si la otra no tiene uno.
+  const fondo = await invoke<{ data_url: string } | null>("chat_background", {}, from).catch(() => null);
+  if (fondo?.data_url) {
+    const suyo = await invoke<{ data_url: string } | null>("chat_background", {}, to).catch(() => null);
+    if (suyo && suyo.data_url !== fondo.data_url) skipped.push(t("shell.machines.here.skip_background"));
+    else if (!suyo) await step(t("shell.machines.here.background"), () => invoke("import_chat_background_data", { dataUrl: fondo.data_url }, to));
+  }
+
   // Conectores del catálogo: conectar declara el servidor; la sesión la pide el agente en esa máquina.
   const known = await invoke<Known[]>("list_known_mcp", {}, from).catch(() => [] as Known[]);
   const there = await invoke<Known[]>("list_known_mcp", {}, to).catch(() => [] as Known[]);

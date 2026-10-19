@@ -20,11 +20,15 @@ repositories, and `GitHostInfo`. Files on disk keep their keys; the types that
 are stored and also travel cross the contract wrapped in `Wire`, which renames
 their keys. There are no aliases. This copy is byte-identical to the engine's.
 SHA-256:
-`b64b514f9dfcda0f027dc60b2eb604e29526a8c19b2d77f7aaec3bc3991796bc`.
+`65c9f8d06ad09fb63e40b90e4bf093830ac533555cc53dec57f327fd69bd09fc`.
 
 seldon-host `4e21caf` (#66) added the Danil account (321 commands, 28 events):
 `danil_connect_start`, `danil_connect_status`, `danil_connect_options`,
 `danil_disconnect` and the `danil-connect` event.
+
+seldon-host `45a28d4` (#71) added the chat background the engine remembers
+(324 commands, 28 events): `chat_background`, `choose_chat_background` and
+`import_chat_background_data`, plus the `settings.appearance.background.not_imported` key.
 
 The source is `crates/engine-protocol/commands.json` in `danil-labs/seldon-host`
 (here, seldon-host `4e21caf`). The engine pinned in `seldon-runtime.lock` must

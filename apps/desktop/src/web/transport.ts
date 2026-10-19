@@ -118,7 +118,7 @@ const INTENT = new Set([
   "add_workspace",
   "radiant_login",
 ]);
-const READ = /^(list_|load_|read_|get_|preview_)|_status$|^(workspaces_startup|session_usage|task_history|session_folder|setup_required|check_environment|account_limits)$/;
+const READ = /^(list_|load_|read_|get_|preview_)|_status$|^(workspaces_startup|session_usage|task_history|session_folder|setup_required|check_environment|account_limits|chat_background)$/;
 /** With the computer off and nothing read before: a managed computer is prepared at install. */
 const OFF_ANSWERS: Record<string, unknown> = { setup_required: false };
 const RETRY_OFF = 5_000;

@@ -72,9 +72,35 @@ export function fondoDeChat(): FondoDeChat {
   return fondo === "propia" && !rutaPropia() ? "dusk" : fondo;
 }
 
+/**
+ * El motor recuerda el fondo elegido para que lo vea la web, que no tiene este
+ * `localStorage`. Un motor anterior no conoce la orden: el fondo sigue igual aquí.
+ */
+function avisarAlMotor() {
+  const ruta = fondoDeChat() === "propia" ? rutaPropia() : null;
+  void invoke("choose_chat_background", { path: ruta }).catch(() => {});
+}
+
+/** Al arrancar: lo elegido antes de que el motor lo recordara también llega a la web. */
+export function sincronizarFondoConElMotor() {
+  if (rutaPropia()) avisarAlMotor();
+}
+
+/** El fondo que recuerda el motor, como `data:` URI, para un cliente sin imagen propia guardada (la web). */
+export async function fondoDelMotor(): Promise<string | null> {
+  if (rutaPropia()) return null;
+  try {
+    const fondo = await invoke<{ data_url: string } | null>("chat_background");
+    return fondo?.data_url ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function elegirFondoDeChat(id: string): FondoDeChat {
   const siguiente = fondoDe(id);
   setGuardado(siguiente === "propia" && !rutaPropia() ? "dusk" : siguiente);
+  avisarAlMotor();
   return fondoDeChat();
 }
 
@@ -87,11 +113,13 @@ export async function elegirFondoPropio(ruta: string): Promise<FondoDeChat> {
   const copia = await invoke<string>("import_chat_background", { source: ruta });
   setRutaPropia(copia);
   setGuardado("propia");
+  avisarAlMotor();
   return "propia";
 }
 
 export function quitarFondoPropio(): FondoDeChat {
   setRutaPropia(null);
   setGuardado("dusk");
+  avisarAlMotor();
   return "dusk";
 }
