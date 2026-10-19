@@ -41,6 +41,11 @@ import { prosaDe } from "../../ui/Failure";
  * recordando lo que leyó (`context::update_source`). Decide la persona, con el
  * botón de esta tarjeta.
  *
+ * **Se trae aunque una tarea lo esté leyendo.** El agente lee archivo por
+ * archivo y nota lo que cambió en los diffs, igual que cuando el equipo empuja
+ * a un repositorio que alguien tiene abierto; hacer esperar a la persona a que
+ * acabe el turno no protegía nada y la dejaba sin poder traer lo nuevo.
+ *
  * **Descartar es descartar de verdad** hasta que ese material vuelva a moverse:
  * se recuerda por fuente y por el commit que tenía en disco, así que el aviso
  * vuelve solo si el remoto avanza otra vez o si traes lo nuevo. Un aviso que
@@ -65,24 +70,10 @@ export default function AvisoDeMaterial() {
   const [nombres, setNombres] = createSignal<Record<string, string>>({});
   const [trayendo, setTrayendo] = createSignal(false);
   const [fallo, setFallo] = createSignal<string | null>(null);
-  /** Las fuentes que un turno tiene delante ahora mismo: no se pueden traer. */
-  const [enUso, setEnUso] = createSignal<string[]>([]);
-  /**
-   * Quedó pedido y se hará en cuanto se libere.
-   *
-   * **Sin esto, el botón fallaba y dejaba un error que nadie podía resolver.**
-   * Traer una fuente que un turno está leyendo se niega —reemplazar archivos
-   * mientras el agente los lee le da uno truncado— y eso no es un fallo de la
-   * persona ni algo que pueda arreglar: solo esperar. Así que el botón promete y
-   * la promesa se cumple al cerrarse el turno.
-   */
-  const [pendiente, setPendiente] = createSignal(false);
   /** Lo que esta persona ya descartó, como `<fuente>:<commit que tenía>`. */
   const [descartadas, setDescartadas] = createSignal<string[]>([]);
   const clave = (f: Frescura) => `${f.id}:${f.local ?? ""}`;
   const visibles = () => atrasadas().filter((f) => !descartadas().includes(clave(f)));
-  /** Las visibles que un turno tiene delante: esas no se pueden traer todavía. */
-  const bloqueadas = () => visibles().filter((f) => enUso().includes(f.id));
   // Las fuentes son del workspace activo: al cambiar de cliente, lo comprobado
   // en el anterior deja de valer y una respuesta en vuelo llega tarde.
   let vuelta = 0;
@@ -93,9 +84,7 @@ export default function AvisoDeMaterial() {
     try {
       const rs = await invoke<Frescura[]>("source_freshness");
       const nuevas = rs.filter((f) => f.estado === "atrasada");
-      const ocupadas = await invoke<string[]>("sources_in_use").catch(() => []);
       if (mia !== vuelta) return;
-      setEnUso(ocupadas);
       if (nuevas.length === 0) {
         setAtrasadas([]);
         return;
@@ -126,20 +115,9 @@ export default function AvisoDeMaterial() {
     // a leer?» se hace sola. Lo emite `nuevaSesion`.
     const alEmpezar = () => void mirar();
     window.addEventListener("harness:tarea-nueva", alEmpezar);
-    // Un turno que acaba libera lo que tenía delante. Si quedó prometido, se
-    // cumple ahora; si no, solo se pone al día quién está en uso, porque de eso
-    // depende lo que el botón promete.
-    const alCerrarse = () => {
-      void invoke<string[]>("sources_in_use")
-        .then(setEnUso)
-        .catch(() => {});
-      if (pendiente()) void traer();
-    };
-    window.addEventListener("harness:turno-cerrado", alCerrarse);
     const alMudar = () => {
       vuelta++;
       setAtrasadas([]);
-      setPendiente(false);
       setFallo(null);
     };
     window.addEventListener("harness:workspace", alMudar);
@@ -148,7 +126,6 @@ export default function AvisoDeMaterial() {
       clearInterval(cada);
       document.removeEventListener("visibilitychange", alVolver);
       window.removeEventListener("harness:tarea-nueva", alEmpezar);
-      window.removeEventListener("harness:turno-cerrado", alCerrarse);
       window.removeEventListener("harness:workspace", alMudar);
     });
   });
@@ -156,36 +133,25 @@ export default function AvisoDeMaterial() {
   /**
    * Trae lo nuevo de las fuentes que lo tienen.
    *
-   * Una por una y no en paralelo: cada una mueve un árbol de git, y el backend
-   * puede negarse a mitad —hay un turno corriendo— con un motivo que hay que
-   * poder enseñar sin ambigüedad sobre cuál falló.
+   * Una por una y no en paralelo: cada una mueve un árbol de git, y si una
+   * falla su motivo tiene que poder enseñarse sin ambigüedad sobre cuál fue.
    */
   async function traer() {
     const mia = vuelta;
     setTrayendo(true);
     setFallo(null);
     const quedan: Frescura[] = [];
-    let bloqueada = false;
     for (const f of visibles()) {
       try {
         await invoke("update_source", { id: f.id });
       } catch (e) {
         quedan.push(f);
-        // **Estar en uso no es un fallo: es un «todavía no».** Se distingue del
-        // resto porque el remedio es distinto — aquí no hay nada que hacer salvo
-        // esperar, y esperar lo hace la app. Cualquier otro error sí se enseña:
-        // ahí la persona tiene algo que decidir.
-        if (enUso().includes(f.id)) bloqueada = true;
-        else
-          setFallo(
-            typeof e === "string" ? e : prosaDe(e),
-          );
+        setFallo(typeof e === "string" ? e : prosaDe(e));
       }
     }
     setTrayendo(false);
     if (mia !== vuelta) return;
     setAtrasadas(quedan);
-    setPendiente(bloqueada);
     // El material del workspace cambió: lo que lo lee tiene que releerlo. NO es
     // `harness:workspace`, que significa «cambiaste de cliente» y cierra la
     // conversación abierta.
@@ -209,23 +175,6 @@ export default function AvisoDeMaterial() {
           </Show>
         </ul>
 
-        {/* **Lo que impide traer se dice antes, no al fallar.** Es el mismo dato
-            que el backend usa para negarse (`chat::sources_in_use`), así que la
-            tarjeta puede prometer en vez de dejar un error que quien lo lee no
-            puede resolver: no hay nada que arreglar, solo esperar. */}
-        <Show when={pendiente()}>
-          <p class="m-0 text-xs text-neutral-500">
-            {t("shell.material.pending")}
-          </p>
-        </Show>
-        <Show when={!pendiente() && bloqueadas().length > 0}>
-          <p class="m-0 text-xs text-neutral-500">
-            {bloqueadas().length === visibles().length
-              ? t("shell.material.blocked_all")
-              : t("shell.material.blocked_some")}
-          </p>
-        </Show>
-
         <Show when={fallo()}>
           {(f) => <p class="m-0 text-xs text-error-strong">{f()}</p>}
         </Show>
@@ -233,21 +182,11 @@ export default function AvisoDeMaterial() {
         <div class="flex gap-1.5">
           <Button
             size="sm"
-            disabled={trayendo() || pendiente()}
+            disabled={trayendo()}
             onClick={() => void traer()}
-            title={
-              bloqueadas().length > 0
-                ? t("shell.material.fetch_blocked_title")
-                : t("shell.material.fetch_title")
-            }
+            title={t("shell.material.fetch_title")}
           >
-            {trayendo()
-              ? t("shell.material.fetching")
-              : pendiente()
-                ? t("shell.material.waiting")
-                : bloqueadas().length > 0
-                  ? t("shell.material.fetch_later")
-                  : t("shell.material.fetch")}
+            {trayendo() ? t("shell.material.fetching") : t("shell.material.fetch")}
           </Button>
           <Button
             variant="ghost"
