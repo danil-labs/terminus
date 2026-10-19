@@ -21,7 +21,9 @@ import {
   onCleanup,
   onMount,
   Show,
+  Suspense,
   Switch,
+  lazy,
   untrack,
 } from "solid-js";
 import VisorDeArtefacto from "../features/artifacts/ArtifactViewer";
@@ -85,7 +87,10 @@ import ArchivedTasks from "../features/projects/ArchivedTasks";
 import BaseBranchPicker from "../features/projects/BaseBranchPicker";
 import { watchHandlerStatus, watchHandlerStatuses } from "../features/projects/handlerPresence";
 import { EmptyContext, ProjectPicker } from "../features/projects/Projects";
-import { MachinePicker } from "../features/machines/MachinePicker";
+// Chunk aparte: solo lo carga quien crea una tarea, no la carga inicial.
+const MachinePicker = lazy(() =>
+  import("../features/machines/MachinePicker").then((m) => ({ default: m.MachinePicker })),
+);
 import VistaDeProyecto from "../features/projects/ProjectView";
 import { DEFAULT_PROFILE, displayName, notifyProfiles, watchProfiles } from "../features/projects/profiles";
 import RecentAgentChats from "../features/projects/RecentAgentChats";
@@ -5707,7 +5712,14 @@ export default function App() {
           onPick={elegirProyecto}
           onNuevoProyecto={() => setAnadiendoCarpeta(true)}
           // Solo al crear: una tarea abierta ya vive en la máquina que la corre.
-          machine={<Show when={props.nueva && !props.locked}><MachinePicker /></Show>}
+          machine={
+            <Show when={props.nueva && !props.locked}>
+              {/* Su propio límite: mientras carga, el resto de la vista sigue. */}
+              <Suspense fallback={null}>
+                <MachinePicker />
+              </Suspense>
+            </Show>
+          }
         />
       {/* A General, no a GitHub: la fuente principal del workspace se elige
           en Configuración → General; mandar a GitHub lleva a conectar un
