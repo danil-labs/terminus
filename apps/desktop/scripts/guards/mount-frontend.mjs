@@ -573,7 +573,8 @@ if (!roto) {
   filaDelAgente.querySelector('[aria-label="Opciones de Holmes"]').click();
   await sleep(80);
   itemDeMenu("Configuración del agente").click();
-  await sleep(150);
+  // El perfil llega en su propio trozo: se espera a que pinte.
+  for (let i = 0; i < 120 && !bubbleDocument.querySelector('button[aria-label="Volver a la conversación"]'); i++) await sleep(25);
   assert.equal(bubbleApp.comandos.filter((c) => c === "send_message").length, 0, "Configuración abre el perfil sin crear chat");
   assert.equal(bubbleDocument.querySelector('[role="menu"]'), null);
   const volverDelPerfil = bubbleDocument.querySelector('button[aria-label="Volver a la conversación"]');
@@ -3326,7 +3327,7 @@ if (!roto) {
   assert.deepEqual(pestanas.slice(skills, skills + 4), ["cfg-tab-skills", "cfg-tab-agentes", "cfg-tab-proyectos", "cfg-tab-plugins"]);
   agDoc.querySelector("#cfg-tab-proyectos").click();
   // La página llega en su propio trozo: se espera a que pinte sus filas.
-  for (let i = 0; i < 40 && !agDoc.querySelector("#cfg-panel [data-settings-project]"); i++) await sleep(25);
+  for (let i = 0; i < 120 && !agDoc.querySelector("#cfg-panel [data-settings-project]"); i++) await sleep(25);
   const filasDeProyectos = [...agDoc.querySelectorAll("#cfg-panel [data-settings-project]")];
   assert.deepEqual(filasDeProyectos.map((f) => f.getAttribute("data-settings-project")), idsDelCatalogo, "Ajustes › Proyectos lista las carpetas del espacio");
   assert.ok(filasDeProyectos.every((f) => f.textContent.includes("Archivos") && f.textContent.includes("sin tareas")), "cada fila dice su tipo en palabras y que no tiene tareas");
