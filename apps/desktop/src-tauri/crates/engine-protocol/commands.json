@@ -536,6 +536,15 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "chat_background",
+      "output": "-> Result < Option < ChatBackground > , crate :: util :: Failure >",
+      "parameters": [],
+      "path": "handlers::chat_background"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "check_environment",
       "output": "-> EnvReport",
       "parameters": [
@@ -590,6 +599,21 @@
       "output": "-> Result < Vec < (String , Salud) > , Failure >",
       "parameters": [],
       "path": "mcp::check_mcp"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "choose_chat_background",
+      "output": "-> Result < () , crate :: util :: Failure >",
+      "parameters": [
+        {
+          "key": "path",
+          "name": "path",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "handlers::choose_chat_background"
     },
     {
       "async": false,
@@ -1476,6 +1500,21 @@
         }
       ],
       "path": "handlers::import_chat_background"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "import_chat_background_data",
+      "output": "-> Result < String , crate :: util :: Failure >",
+      "parameters": [
+        {
+          "key": "dataUrl",
+          "name": "data_url",
+          "type": "String"
+        }
+      ],
+      "path": "handlers::import_chat_background_data"
     },
     {
       "async": false,

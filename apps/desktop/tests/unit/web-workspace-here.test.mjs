@@ -4,7 +4,8 @@
  * creates the workspace with the same name so the panel joins them, copies
  * what carries no credentials, signs in to Radiant there for an organization
  * workspace, and leaves the machine picked. Logos are read on their own
- * machine. Mounts `dist-web/`.
+ * machine, and the chat background is the one the engine remembers. Mounts
+ * `dist-web/`.
  */
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -12,6 +13,7 @@ import { engine, fleet } from "../helpers/fake-relay.mjs";
 import { boot, sleep } from "../helpers/jsdom-app.mjs";
 
 const PNG = "data:image/png;base64,iVBORw0KGgo=";
+const BG = "data:image/jpeg;base64,/9j/4AAQSkZJRg==";
 const DANIL = { id: "d", name: "Danil", context_root: "c1", logo: "/Users/ana/ws/d/logo.png", lengua: "es", terminal_theme: "nord", worktrees_root: "/Users/ana/trees" };
 const VM = { computer_id: "cmp_vm", name: "vm-alberto", state: "offline", provider: "aws-ec2" };
 const MAC = { computer_id: "cmp_mac", name: "MacBook Air", state: "online", provider: "self", kind: "physical" };
@@ -25,6 +27,7 @@ function mac(extra = {}) {
     workspaces_startup: { workspaces: [DANIL], active: "d" },
     preview_file: ({ path }) => (path === DANIL.logo ? { data_url: PNG } : { data_url: null }),
     radiant_status: signedOut,
+    chat_background: { data_url: BG },
     list_known_mcp: [{ id: "figma", clave: "figma", name: "Figma", conectado: true }],
     list_mcp_servers: [{ name: "figma", detalle: "https://mcp.figma.com" }, { name: "interno", detalle: "node server.js" }],
     list_skill_sources: { fuentes: [{ id: "s1", rotulo: "organizacion", nombre: "danil-skills", location: "https://github.com/danil/skills", branch: "main", path: "/x", missing: false, managed: false, enabled: true }], rotas: [] },
@@ -53,6 +56,8 @@ function vm(extra = {}) {
     connect_known_mcp: null,
     list_skill_sources: { fuentes: [], rotas: [] },
     add_skill_source: () => ({ id: "s9" }),
+    chat_background: null,
+    import_chat_background_data: () => "/home/vm/appearance/backgrounds/x/background.jpg",
     radiant_status: signedOut,
     ...extra,
   };
@@ -101,6 +106,9 @@ test("a personal workspace is created on the machine that lacks it, joined and p
   assert.equal(logo.data_url, PNG, "the logo is read on the Mac, whatever leads");
   assert.equal(calls("cmp_vm", "preview_file").length, 0);
 
+  const painted = [...doc.querySelectorAll("[style]")].some((e) => (e.getAttribute("style") ?? "").includes(BG));
+  assert.ok(painted, "the chat background the Mac's engine remembers is painted in the web");
+
   await openPicker(doc);
   const row = doc.querySelector('[data-machine-unlinked="cmp_vm"]');
   assert.ok(row.querySelector("[title]")?.getAttribute("title").includes("no tiene este workspace"), "«sin este workspace» explains itself on hover");
@@ -117,6 +125,7 @@ test("a personal workspace is created on the machine that lacks it, joined and p
   assert.deepEqual(calls("cmp_vm", "set_workspace_language").map((c) => [c.args.id, c.args.lengua, c.workspace]), [["v1", "es", "v1"]]);
   assert.deepEqual(calls("cmp_vm", "set_workspace_terminal_theme").map((c) => c.args.theme), ["nord"]);
   assert.deepEqual(calls("cmp_vm", "set_workspace_logo_png").map((c) => c.args.pngBase64), ["iVBORw0KGgo="], "the logo travels as bytes");
+  assert.deepEqual(calls("cmp_vm", "import_chat_background_data").map((c) => c.args.dataUrl), [BG], "the chat background travels as bytes");
   assert.deepEqual(calls("cmp_vm", "connect_known_mcp").map((c) => c.args.id), ["figma"]);
   assert.deepEqual(calls("cmp_vm", "add_skill_source").map((c) => c.args.url), ["https://github.com/danil/skills"]);
   assert.equal(calls("cmp_vm", "radiant_login").length, 0, "a personal workspace does not sign in to Radiant");

@@ -181,6 +181,7 @@
   "settings.appearance.background.save_failed": "Could not save a copy of the background. The previous background is preserved.",
   "settings.appearance.background.bad_type": "Choose a PNG, JPG, WEBP or GIF background image.",
   "settings.appearance.background.too_big": "The background image must be no larger than 4 MB.",
+  "settings.appearance.background.not_imported": "That file is not a background imported on this computer.",
   "settings.appearance.background.dusk": "Default",
   "settings.appearance.background.propia": "Custom background",
   "settings.appearance.background.pick": "Upload image",

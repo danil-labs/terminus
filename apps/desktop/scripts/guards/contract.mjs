@@ -21,7 +21,10 @@ const PROVENANCE = fileURLToPath(new URL("../../src-tauri/crates/engine-protocol
 const LOCK = fileURLToPath(new URL("../../seldon-runtime.lock", import.meta.url));
 
 /** El contrato copiado cuyo motor aún no tiene release publicada, y qué falta. */
-const MOTOR_PENDIENTE = null;
+const MOTOR_PENDIENTE = {
+  contract: "65c9f8d06ad09fb63e40b90e4bf093830ac533555cc53dec57f327fd69bd09fc",
+  why: "chat_background, choose_chat_background e import_chat_background_data (danil-labs/seldon-host#71): falta fusionarlo, publicar seldon-runtime desde seldon-host dev y fijarlo en seldon-runtime.lock",
+};
 
 const vendored = createHash("sha256").update(readFileSync(CONTRACT)).digest("hex");
 const declared = /SHA-256:\s*`([0-9a-f]{64})`/.exec(readFileSync(PROVENANCE, "utf8"))?.[1];
