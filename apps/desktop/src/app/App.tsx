@@ -6417,35 +6417,38 @@ export default function App() {
     }
   });
 
+  /* El fondo de Estilo cubre la ventana entera, detrás de las columnas de
+     vidrio (`.glass-panel`): así se ve también tras el historial, el árbol y
+     las barras. Cada chat solo pinta encima el fondo propio de su agente. */
+  const FondoDeVentana = () => (
+    <Show
+      when={fondoDeChat() === "propia" ? fondoPropioUrl() : null}
+      fallback={
+        <div class={cn("pointer-events-none absolute inset-0", claseDeFondo("dusk"))} aria-hidden="true">
+          <div
+            class="absolute inset-0 bg-surface"
+            style={{ opacity: String(veloDeFondo()) }}
+          />
+        </div>
+      }
+    >
+      {(url) => (
+        <div
+          class="pointer-events-none absolute inset-0 bg-cover bg-center"
+          style={{ "background-image": `url("${url()}")` }}
+          aria-hidden="true"
+        >
+          <div
+            class="absolute inset-0 bg-surface"
+            style={{ opacity: String(veloDeFondo()) }}
+          />
+        </div>
+      )}
+    </Show>
+  );
+
   const Conversacion = () => (
     <section class="relative flex h-full min-h-0 flex-col overflow-hidden">
-      {/* El fondo vive aquí y no dentro de cada chat: así cubre también la
-          tira de pestañas de la cabecera, que está fuera del hilo. Cada chat
-          solo pinta encima el fondo propio de su agente, si lo tiene. */}
-      <Show
-        when={fondoDeChat() === "propia" ? fondoPropioUrl() : null}
-        fallback={
-          <div class={cn("pointer-events-none absolute inset-0", claseDeFondo("dusk"))} aria-hidden="true">
-            <div
-              class="absolute inset-0 bg-surface"
-              style={{ opacity: String(veloDeFondo()) }}
-            />
-          </div>
-        }
-      >
-        {(url) => (
-          <div
-            class="pointer-events-none absolute inset-0 bg-cover bg-center"
-            style={{ "background-image": `url("${url()}")` }}
-            aria-hidden="true"
-          >
-            <div
-              class="absolute inset-0 bg-surface"
-              style={{ opacity: String(veloDeFondo()) }}
-            />
-          </div>
-        )}
-      </Show>
       {/* Sin línea divisora y sin rótulo de sección: arriba va DE QUÉ es esta
           conversación y el único control que abre algo. El selector de agente no
           vive aquí: con qué agente corre un mensaje se decide al escribirlo. */}
@@ -7133,7 +7136,10 @@ export default function App() {
 
     // Sin cabecera y sin título de app, como Claude: la ventana ya se
     // llama Terminus.
-    <div class="relative flex h-full flex-col overflow-hidden bg-surface">
+    <div class="relative isolate flex h-full flex-col overflow-hidden bg-surface">
+      {/* Detrás de todo y sin posicionar nada encima: `-z-10` dentro del
+          `isolate` queda sobre el `bg-surface` de la raíz y bajo cada columna. */}
+      <div class="pointer-events-none absolute inset-0 -z-10" aria-hidden="true"><FondoDeVentana /></div>
       <CloseGuard title={(id) => filaDe(id)?.title} />
       <ToastStack>
         {/* Aquí y no en Configuración: ahí no entra nadie a buscar

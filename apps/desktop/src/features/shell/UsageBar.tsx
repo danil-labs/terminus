@@ -345,7 +345,7 @@ export default function UsageBar(props: {
 
   return (
     // La versión identifica el build incluso sin cuentas conectadas.
-    <footer class="flex h-7 min-w-0 shrink-0 items-center gap-2 border-t border-border bg-surface px-2 text-xs">
+    <footer class="flex h-7 min-w-0 shrink-0 items-center gap-2 glass-panel border-t border-border px-2 text-xs">
       <Show when={activeAccounts().length > 0}>
         <div
           ref={mountArea}

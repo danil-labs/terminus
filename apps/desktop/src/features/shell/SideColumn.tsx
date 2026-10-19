@@ -138,7 +138,7 @@ export default function ColumnaLateral(props: {
           // usa aquí es tono, que es lo que distingue un plano de otro sin
           // despegarlo. Sigue siendo una superficie continua: los rieles pegan
           // con el chat y lo único que hay entre ellos es la hairline de abajo.
-          "bg-bg",
+          "glass-panel",
           // **El borde va aquí y desaparece con la columna.** Sigue haciendo
           // falta con el tono puesto: 1,22:1 entre `bg` y `surface` separa las
           // regiones a la vista, y WCAG 1.4.11 pide 3:1 para lo que delimita algo
