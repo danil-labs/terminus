@@ -37,12 +37,22 @@ La cuenta de Danil (Configuración → Cuenta de Danil) usa `danil_connect_start
 esta computadora en la cuenta: con un workspace de Radiant entra sin navegador;
 sin él, la ventana abre `verification_uri_complete` y la persona aprueba en
 `app.danil.ai/terminus/connect`. Un motor sin estos comandos recibe `command` del
-proxy y la sección lo dice. La web no muestra la sección (`danilAccount`).
+proxy y la sección lo dice. El campo editable del alta y de la página de
+aprobación es el nombre de **esta computadora**, no el de la cuenta.
+
+La persona de la cuenta (nombre, correo, foto) sale del motor:
+`danil_connect_status` trae `account_name`, `avatar` (ruta de la foto guardada
+en la máquina, pintada con `preview_file`) y `avatar_source`;
+`danil_account_refresh`, `danil_account_set_photo` y `danil_account_remove_photo`
+la vuelven a pedir o cambian la foto **en la cuenta** (seldon-host#70). El pie
+de la barra lateral y la sección la muestran. La web no tiene la sesión de
+máquina (`danilAccount`); con `accountProfile` (`src/web/account.ts`) lee y
+cambia la misma persona en el plano de control con la sesión de Supabase.
 
 ## Contract
 
-`src-tauri/crates/engine-protocol/commands.json` is the frozen contract: 321
-commands (296 domain invocations, three channels and 22 window/bridge
+`src-tauri/crates/engine-protocol/commands.json` is the frozen contract: 328
+commands (303 domain invocations, three channels and 22 window/bridge
 functions) and the events the engine emits. Its SHA-256 is recorded in
 [PROVENANCE](../src-tauri/crates/engine-protocol/PROVENANCE.md); the engine
 announces the same hash and the window refuses to connect to a different one

@@ -22,8 +22,8 @@ const LOCK = fileURLToPath(new URL("../../seldon-runtime.lock", import.meta.url)
 
 /** El contrato copiado cuyo motor aún no tiene release publicada, y qué falta. */
 const MOTOR_PENDIENTE = {
-  contract: "65c9f8d06ad09fb63e40b90e4bf093830ac533555cc53dec57f327fd69bd09fc",
-  why: "chat_background, choose_chat_background e import_chat_background_data (danil-labs/seldon-host#71): falta fusionarlo, publicar seldon-runtime desde seldon-host dev y fijarlo en seldon-runtime.lock",
+  contract: "ef7e08807e1ed51c3f291b375abb6a803e866f510432c5a61ebb3aae8cae018e",
+  why: "danil_client_token, danil_account_* y el fondo del chat (danil-labs/seldon-host#69, #70 y #71, ya en dev cb4ae57): falta publicar seldon-runtime desde seldon-host dev y fijarlo en seldon-runtime.lock",
 };
 
 const vendored = createHash("sha256").update(readFileSync(CONTRACT)).digest("hex");

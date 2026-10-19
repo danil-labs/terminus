@@ -142,3 +142,30 @@ test("sin el flujo en el motor el pie no muestra la entrada", async () => {
   assert.equal(w.document.querySelector("[data-danil-foot]"), null);
   assert.ok(w.document.querySelector('[aria-label="Configuración"]'), "the footer's other items stay");
 });
+
+test("el pie muestra el nombre y la foto de la cuenta de Danil", async () => {
+  const engine = danil({ state: "disconnected", name: "alberto-mbp" });
+  const app = await boot("listo", "danil-footer-person", {
+    ...WITH_SPACE,
+    ...engine.table,
+    preview_file: ({ path }) => ({ data_url: path.endsWith("avatar-v1.png") ? "data:image/png;base64,UFJPVg==" : null }),
+  });
+  const { w } = app;
+  await sleep(800);
+  const foot = () => w.document.querySelector("[data-danil-foot]");
+  const person = { state: "connected", computer_id: "cmp_1", name: "Mac", email: "alberto@danil.ai", account_name: "Alberto Ceballos", online: true };
+
+  engine.become(app, { ...person, avatar: "/data/danil-computers/avatar-v1.png", avatar_source: "provider" });
+  await sleep(300);
+  assert.ok(foot().textContent.includes("Alberto Ceballos"), foot().textContent);
+  assert.equal(foot().getAttribute("title"), "Alberto Ceballos · en línea con Danil");
+  assert.equal(foot().querySelector("img")?.getAttribute("src"), "data:image/png;base64,UFJPVg==");
+  assert.ok(foot().querySelector(".bg-success"), "the online dot stays over the photo");
+  assert.ok(!engine.calls.some((c) => c.command === "danil_account_refresh"), "the footer does not ask the control plane on every start");
+
+  engine.become(app, person);
+  await sleep(300);
+  assert.equal(foot().querySelector("img"), null);
+  assert.equal(foot().querySelector("[data-account-avatar]")?.textContent, "AC", "without a photo, the initials");
+  assert.deepEqual(app.fallos, []);
+});

@@ -4,6 +4,7 @@
  * importar la app y no cambia después.
  */
 import type { JSX } from "solid-js";
+import type { AccountProfileSource } from "../features/settings/account-profile";
 import type { Account } from "../features/settings/accounts-store";
 
 /** Una cuenta agrupada en la web: las máquinas donde tiene sesión (`web/fleet.ts`). */
@@ -26,6 +27,8 @@ export type Capabilities = {
   computerStatus: boolean;
   /** Iniciar sesión en Danil desde Configuración: la web ya entra con esa cuenta. */
   danilAccount?: boolean;
+  /** La persona de la cuenta de Danil leída sin el motor (la web, con su sesión): pie y Configuración. */
+  accountProfile?: AccountProfileSource;
   /** Botón extra al lado de la búsqueda de la barra lateral (en la web, volver a Danil Agents). */
   sidebarExtra?: () => JSX.Element;
   /** El nombre de una máquina por su id. */

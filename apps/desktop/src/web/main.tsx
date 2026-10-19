@@ -15,6 +15,7 @@ import { machineCompatibility } from "./compatibility";
 import { wakes } from "./fleet";
 import { HomeLink } from "./HomeLink";
 import { installIpc } from "./ipc";
+import { webAccountProfile } from "./account";
 import { type RelayConfig, RelaySession } from "./relay";
 import type { MachineRow } from "./SyncNote";
 import { type BrowserHost, createWebTransport } from "./transport";
@@ -64,6 +65,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
     localSetup: false,
     computerStatus: true,
     sidebarExtra: () => <HomeLink />,
+    accountProfile: webAccountProfile(base.endpoint, base.getToken, base.onUnauthorized),
     machineName: (id) => transport.fleet.name(id),
     workspaceOnMachine: multi,
     machineOnCreate: multi

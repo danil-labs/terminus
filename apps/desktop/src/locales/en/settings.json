@@ -219,6 +219,7 @@
   "settings.general.extra.search": "Search",
   "settings.general.name": "Name",
   "settings.general.name_hint": "How you want to be called.",
+  "settings.general.name_from_account": "Left empty, the one in your Danil account is used: {name}.",
   "settings.general.root.empty": "No material. The agent answers with what it knows and with what you give it in the message.",
   "settings.general.root.pick": "Choose material",
   "settings.general.root.title": "Main context",
