@@ -1,7 +1,7 @@
 /**
  * The browser build served by the Danil app: it reads the Supabase session that
- * app stored on the same origin, lists the computers, opens the chosen one and,
- * when the relay refuses it, refreshes the session or explains the refusal.
+ * app stored on the same origin, lists the computers, opens all of them without
+ * starting any and, when the relay refuses, refreshes the session or explains it.
  * Mounts `dist-web/`.
  */
 import assert from "node:assert/strict";
@@ -20,7 +20,7 @@ const session = (token) => JSON.stringify({
   user: { id: "u1", aud: "authenticated", role: "authenticated", email: "persona@example.com", app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z" },
 });
 
-test("the web build uses the stored session, picks the computer and explains refusals", async () => {
+test("the web build uses the stored session, opens every computer and explains refusals", async () => {
   const fake = relay();
   const requests = [];
   let licensed = true;
@@ -55,30 +55,26 @@ test("the web build uses the stored session, picks the computer and explains ref
   });
   const text = () => w.document.body.textContent ?? "";
   try {
-    await sleep(300);
+    await sleep(1500);
     assert.equal(requests[0]?.token, "Bearer stored", "the API gets the session the app stored");
-    assert.equal(w.document.querySelectorAll("[data-computer]").length, 2, "several computers show the picker");
-    assert.ok(text().includes("Apagada") && text().includes("Encendida"));
-
-    const casa = w.document.querySelector('[data-computer="cmp_a"]');
-    [...casa.querySelectorAll("button")].find((b) => b.textContent.includes("Encender")).click();
-    await sleep(200);
-    assert.ok(requests.some((r) => r.method === "POST" && r.url === `${API}/cmp_a/start`), "start goes to the control plane");
-
-    const trabajo = w.document.querySelector('[data-computer="cmp_b"]');
-    [...trabajo.querySelectorAll("button")].find((b) => b.textContent.includes("Abrir")).click();
-    await sleep(1200);
-    assert.equal(w.localStorage.getItem("terminus-web:computer"), "cmp_b");
-    assert.equal(fake.sockets[0]?.url, "wss://computers.danil.ai/v1/computers/cmp_b/session");
+    assert.equal(w.document.querySelector("[data-web-gate]"), null, "several computers open without a picker");
+    assert.deepEqual(
+      fake.sockets.map((s) => s.url).sort(),
+      ["wss://computers.danil.ai/v1/computers/cmp_a/session", "wss://computers.danil.ai/v1/computers/cmp_b/session"],
+      "one relay session per computer",
+    );
     assert.deepEqual(fake.sockets[0]?.protocols, ["danil.computers.v1", "bearer.stored"]);
+    assert.ok(!requests.some((r) => r.method === "POST"), "opening starts no computer");
     assert.ok(fake.calls.some((c) => c.command === "list_projects"), "the app mounted over the relay");
+    assert.equal(w.document.querySelectorAll("[data-machine-row]").length, 2, "each computer has its row");
 
     licensed = false;
     fake.drop(4003);
     await sleep(1500);
-    assert.equal(refreshes, 1, "4003 refreshes the session");
+    assert.ok(refreshes >= 1, "4003 refreshes the session");
     assert.ok(text().includes("no tiene licencia"), "a refused reconnection shows the license notice");
-    assert.equal(fake.sockets.length, 1, "it does not retry the socket blindly");
+    assert.equal(fake.sockets.length, 2, "it does not retry the sockets blindly");
+    assert.equal(w.document.querySelectorAll("[data-web-gate]").length, 1, "one notice for every refused session");
     assert.deepEqual(app.fallos, []);
   } finally {
     globalThis.fetch = own;

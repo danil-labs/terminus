@@ -1,7 +1,6 @@
 /**
- * The control plane's HTTP side: the person's computers and their power. It
- * also explains what a failed WebSocket upgrade cannot say (no license, not
- * your computer).
+ * The control plane's HTTP side: the person's computers. It also explains
+ * what a failed WebSocket upgrade cannot say (no license, not your computer).
  */
 
 export type Computer = {
@@ -10,6 +9,11 @@ export type Computer = {
   plan?: string | null;
   state: string;
   last_seen?: string | null;
+  /** `aws-ec2` is a managed VM the relay can start; see `wakes()` in `fleet.ts`. */
+  provider?: string | null;
+  kind?: string | null;
+  wakeable?: boolean | null;
+  host_version?: string | null;
 };
 
 export type Answer<T> =
@@ -48,8 +52,4 @@ export function listComputers(endpoint: string, token: string, f: Fetch = fetch)
     const list = Array.isArray(body) ? body : (body as { computers?: unknown } | null)?.computers;
     return Array.isArray(list) ? (list.filter((c) => typeof c?.computer_id === "string") as Computer[]) : [];
   }, f);
-}
-
-export function startComputer(endpoint: string, token: string, id: string, f: Fetch = fetch): Promise<Answer<null>> {
-  return request(apiUrl(endpoint, `/v1/computers/${encodeURIComponent(id)}/start`), token, "POST", () => null, f);
 }

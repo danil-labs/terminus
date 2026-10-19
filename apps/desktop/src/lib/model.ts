@@ -22,6 +22,9 @@ export type Project = {
   // Se calcula al leer; crear o quitar .git puede cambiarlo sin modificar el proyecto guardado.
   kind: "git" | "folder";
   cloud?: "google_drive" | "one_drive" | "icloud" | "dropbox" | "box" | "other" | null;
+  // La máquina que lo tiene, cuando el panel junta varias (`web/fleet.ts`).
+  machine?: string;
+  machine_on?: boolean;
 };
 
 export function carpetaDeTrabajo(p: Pick<Project, "working_directory" | "work_tree">) {

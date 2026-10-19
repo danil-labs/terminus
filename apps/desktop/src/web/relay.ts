@@ -16,7 +16,8 @@ export type RelayConfig = {
   beforeReconnect?: () => Promise<boolean>;
 };
 
-export type MachineState = "unknown" | "starting" | "online" | "offline" | "stopped" | "provisioning";
+/** `version_mismatch`: the relay may say the engine's contract is not the web's. */
+export type MachineState = "unknown" | "starting" | "online" | "offline" | "stopped" | "provisioning" | "version_mismatch" | "outdated";
 
 export type RelayFailure = { code?: string; message_key?: string; detail?: unknown; what?: unknown };
 

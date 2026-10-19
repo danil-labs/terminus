@@ -4,6 +4,16 @@
  * importar la app y no cambia después.
  */
 import type { JSX } from "solid-js";
+import type { Account } from "../features/settings/accounts-store";
+
+/** Una cuenta agrupada en la web: las máquinas donde tiene sesión (`web/fleet.ts`). */
+export type AccountMachinesProps = {
+  account: Account;
+  agent: string;
+  /** Agrega y conecta una cuenta en otra máquina con el flujo de siempre. */
+  add: (options: { headers: Record<string, string> }) => Promise<void>;
+  refresh: () => void;
+};
 
 export type Capabilities = {
   /** Controles de ventana propios, semáforo de macOS y bandeja. */
@@ -16,6 +26,12 @@ export type Capabilities = {
   computerStatus: boolean;
   /** Botón extra al lado de la búsqueda de la barra lateral (en la web, volver a Danil Agents). */
   sidebarExtra?: () => JSX.Element;
+  /** El nombre de una máquina por su id. */
+  machineName?: (id: string) => string;
+  /** Dónde se crea un proyecto nuevo, en el diálogo de añadirlo. */
+  machineOnCreate?: (workspace: string | null) => JSX.Element;
+  /** Bajo la tarjeta de una cuenta: sus máquinas. */
+  accountMachines?: (props: AccountMachinesProps) => JSX.Element;
 };
 
 const DESKTOP: Capabilities = { nativeWindow: true, updater: true, localSetup: true, computerStatus: false };
