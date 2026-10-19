@@ -85,3 +85,95 @@ export function bloquesDeMarkdown(texto: string): string[] {
   }
   return bloques;
 }
+
+type Corte = {
+  /** El texto ya leído hasta `desde`; lo que sigue tiene que extenderlo. */
+  texto: string;
+  /** Dónde empieza la primera línea sin leer. */
+  desde: number;
+  /** El trozo en curso, como tramo de `texto`; `-1` si no hay. */
+  actualDesde: number;
+  actualHasta: number;
+  dentroDeFence: boolean;
+  cierre: string;
+  /** Los bloques que ningún trozo futuro puede alargar. */
+  cerrados: string[];
+  /** El último bloque: el siguiente trozo puede unírsele. */
+  abierto: { texto: string; lista: boolean; cita: boolean } | null;
+};
+
+const cortePara = (texto: string): Corte => ({
+  texto,
+  desde: 0,
+  actualDesde: -1,
+  actualHasta: -1,
+  dentroDeFence: false,
+  cierre: "",
+  cerrados: [],
+  abierto: null,
+});
+
+/** Une un trozo terminado al último bloque o lo empieza nuevo, como `bloquesDeMarkdown`. */
+function cerrarTrozo(c: Corte, trozo: string) {
+  const salto = trozo.indexOf("\n");
+  const primera = salto === -1 ? trozo : trozo.slice(0, salto);
+  const previo = c.abierto;
+  const sigue =
+    previo !== null &&
+    (SANGRADO.test(primera) || (LISTA.test(primera) && previo.lista) || (CITA.test(primera) && previo.cita));
+  if (sigue) {
+    c.abierto = {
+      texto: `${previo.texto}\n\n${trozo}`,
+      lista: previo.lista || esLista(trozo),
+      cita: previo.cita || esCita(trozo),
+    };
+    return;
+  }
+  if (previo) c.cerrados.push(previo.texto);
+  c.abierto = { texto: trozo, lista: esLista(trozo), cita: esCita(trozo) };
+}
+
+/** Lee la línea `[inicio, fin)` de `c.texto` con las mismas reglas que `bloquesDeMarkdown`. */
+function leerLinea(c: Corte, inicio: number, fin: number) {
+  const linea = c.texto.slice(inicio, fin);
+  const fence = FENCE.exec(linea);
+  if (fence) {
+    if (!c.dentroDeFence) {
+      c.dentroDeFence = true;
+      c.cierre = fence[1][0];
+    } else if (linea.trimStart().startsWith(c.cierre)) {
+      c.dentroDeFence = false;
+    }
+  } else if (linea.trim() === "" && !c.dentroDeFence) {
+    if (c.actualDesde >= 0) cerrarTrozo(c, c.texto.slice(c.actualDesde, c.actualHasta));
+    c.actualDesde = -1;
+    return;
+  }
+  if (c.actualDesde < 0) c.actualDesde = inicio;
+  c.actualHasta = fin;
+}
+
+/**
+ * `bloquesDeMarkdown` para un texto que crece por el final, como una respuesta
+ * en streaming: recuerda hasta la última línea completa y solo lee lo que
+ * llegó después. Da exactamente lo mismo que `bloquesDeMarkdown`; un texto que
+ * no extiende al anterior se lee desde el principio.
+ */
+export function partidorDeBloques(): (texto: string) => string[] {
+  let c = cortePara("");
+  return (texto) => {
+    if (texto === "") return [];
+    if (!texto.startsWith(c.texto)) c = cortePara(texto);
+    c.texto = texto;
+    // Solo las líneas que ya tienen su salto: la última todavía puede cambiar.
+    for (let fin = texto.indexOf("\n", c.desde); fin !== -1; fin = texto.indexOf("\n", c.desde)) {
+      leerLinea(c, c.desde, fin);
+      c.desde = fin + 1;
+    }
+    c.texto = texto.slice(0, c.desde);
+    const resto: Corte = { ...c, texto, cerrados: [], abierto: c.abierto };
+    leerLinea(resto, c.desde, texto.length);
+    if (resto.actualDesde >= 0) cerrarTrozo(resto, texto.slice(resto.actualDesde, resto.actualHasta));
+    return resto.abierto ? [...c.cerrados, ...resto.cerrados, resto.abierto.texto] : [...c.cerrados, ...resto.cerrados];
+  };
+}

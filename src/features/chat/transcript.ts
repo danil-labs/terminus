@@ -187,6 +187,33 @@ export function anexarDelta(
   return nuevo(d.text);
 }
 
+/** Un fragmento de respuesta tal como lo recibe `anexarDelta`. */
+export type Delta = Parameters<typeof anexarDelta>[1];
+
+/**
+ * Varios fragmentos seguidos de un hilo en una sola pasada, con el mismo
+ * resultado que aplicarlos uno a uno. Los que caen en el mismo globo se pegan
+ * antes: el hilo se copia una vez por tanda y no una por token.
+ */
+export function anexarDeltas(msgs: Msg[], deltas: readonly Delta[]): Msg[] {
+  const juntos: Delta[] = [];
+  for (const d of deltas) {
+    const previo = juntos.at(-1);
+    if (
+      previo &&
+      !d.startsMessage &&
+      // Un globo que abre solo con saltos se los quita: pegarle más texto cambiaría qué se quita.
+      !(previo.startsMessage && /^\n*$/.test(previo.text)) &&
+      d.messageId === previo.messageId &&
+      d.author === previo.author &&
+      d.model === previo.model
+    )
+      juntos[juntos.length - 1] = { ...previo, text: previo.text + d.text };
+    else juntos.push(d);
+  }
+  return juntos.reduce((m, d) => anexarDelta(m, d), msgs);
+}
+
 /**
  * Pega imágenes a la respuesta que se está escribiendo.
  *

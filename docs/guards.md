@@ -30,10 +30,12 @@ sends).
 | `triggers` | `tests/unit/triggers.test.mjs` | A trigger keeps the handler that opens its panel. |
 | `mount-frontend` | `scripts/guards/mount-frontend.mjs` | Runs `dist/` in jsdom with a simulated IPC and checks that it mounts. It does not open a native window. |
 | `storage-refresh` | `tests/unit/storage-refresh.test.ts` | Refresh batching, stale responses and workspace switches. |
-| `open-task-cost` | `tests/perf/open-task-cost.mjs` | Nodes, mutations and IPC when opening a 480-turn thread. The ceiling only goes down. |
+| `open-task-cost` | `tests/perf/open-task-cost.mjs` | Nodes, mutations, IPC calls and IPC bytes when opening a 480-turn thread. The ceiling only goes down. |
 | `reread-thread` | `tests/perf/reread-thread.mjs` | Unmounts when re-reading an unchanged thread, with a new turn and during refreshes. The ceiling only goes down. |
 | `long-session` | `tests/perf/long-session.mjs` | Retained nodes, computations, listeners, intervals and observers after usage cycles. The ceiling only goes down; heap is informative. |
 | `task-history-calls` | `tests/perf/task-history-calls.mjs` | History and status calls during mutations and deltas. The ceiling only goes down. |
+| `delta-cost` | `tests/perf/delta-cost.mjs` | DOM updates and mutations for a 400-delta answer arriving eight per frame. The ceiling only goes down; CPU is informative. |
+| `bundle-size` | `tests/perf/bundle-size.mjs` | Gzip KiB of the script, preloads and CSS that `dist/index.html` loads before painting. Lazy chunks don't count. The ceiling only goes down. |
 | `drop` | `scripts/guards/drop.mjs` | Coordinate conversion per platform for file drops. |
 | `animations` | `scripts/guards/animations.mjs` | Restricts continuous infinite animations and their per-file quota. |
 | `csp` | `scripts/guards/csp.mjs` | The content policy is the same in the window, the lab and the Markdown filters. |
