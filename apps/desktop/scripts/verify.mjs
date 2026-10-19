@@ -255,6 +255,12 @@ const steps = [
     root,
   ],
   [
+    "La tarjeta de una tarea colorea su carpeta y afirma solo el PR confirmado",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/task-hover-card.test.ts")],
+    root,
+  ],
+  [
     "La fila enseña el comando, no cómo se lanzó",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/step-command.test.ts")],
