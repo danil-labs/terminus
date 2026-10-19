@@ -712,6 +712,47 @@ if (!roto) {
   assert.deepEqual(draftApp.fallos, []);
   draftApp.w.close();
 
+  // El menú de `@` separa los del repositorio de los tuyos, no enseña a los
+  // ocultos y marca al tuyo que el repositorio tapa sin dejar elegirlo.
+  const holmes = bubbleResponses.list_agents.agents[0];
+  const mentionAgentsApp = await boot("listo", "agent-mentions", {
+    ...bubbleResponses,
+    list_projects: [{ id: "p", name: "Proyecto", kind: "folder", working_directory: "/lab", sources: [] }],
+    list_agents: { ...bubbleResponses.list_agents, agents: [
+      holmes,
+      { ...holmes, name: "Hudson", origin: ".danil/agents/hudson.md" },
+      { ...holmes, name: "Watson", own: true, own_scope: { kind: "workspace" } },
+    ] },
+    list_agent_profiles: { Hudson: { display_name: null, body: null, background: null, avatar: null, veil: 0.82, provider: null, model: null, effort: null, hidden: true } },
+    list_machine_agents: { own: [{
+      agent: { ...holmes, own: true, own_scope: { kind: "workspace" } }, profile: {}, folders: [], all_folders: true,
+      blocked: [{ folder: "p", origin: holmes.origin, repository: true }], catalog_taken: null,
+    }], repository: [] },
+  });
+  const mentionAgentsDoc = mentionAgentsApp.w.document;
+  await sleep(80);
+  [...mentionAgentsDoc.querySelectorAll('[data-sidebar-agents] button')].find(button => button.textContent.trim() === "Holmes").click();
+  await sleep(100);
+  const agentsField = mentionAgentsDoc.querySelector("textarea");
+  agentsField.value = "@";
+  agentsField.selectionStart = agentsField.selectionEnd = 1;
+  agentsField.dispatchEvent(new mentionAgentsApp.w.InputEvent("input", { bubbles: true, inputType: "insertText" }));
+  agentsField.dispatchEvent(new mentionAgentsApp.w.KeyboardEvent("keyup", { bubbles: true, key: "@" }));
+  await sleep(120);
+  const agentsMenu = mentionAgentsDoc.querySelector("button[aria-selected]")?.closest("ul");
+  const menuLines = [...agentsMenu.querySelectorAll("li")].map(li => li.textContent.replace(/\s+/g, " ").trim());
+  assert.match(menuLines[0], /^Del repositorio Proyecto ?vía PR ?Holmes/, menuLines.join(" | "));
+  assert.match(menuLines[1], /^Tuyos ?Holmes.*Tapado/, menuLines.join(" | "));
+  assert.match(menuLines[2], /^Watson/, menuLines.join(" | "));
+  assert.equal(menuLines.some(line => line.includes("Hudson")), false, "un agente oculto no sale en el menú, como en el riel");
+  const agentButtons = [...agentsMenu.querySelectorAll("button")];
+  assert.equal(agentButtons[1].disabled, true, "el tuyo tapado informa y no se elige");
+  agentsField.dispatchEvent(new mentionAgentsApp.w.KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "ArrowDown" }));
+  await sleep(30);
+  assert.equal(agentButtons[2].getAttribute("aria-selected"), "true", "el teclado salta la fila tapada");
+  assert.deepEqual(mentionAgentsApp.fallos, []);
+  mentionAgentsApp.w.close();
+
   let threadRows = [
     { ...filaDeAgente, id: "dm", title: "Holmes", chat_de_agente: true, agent_thread: false },
     { ...filaDeAgente, id: "topic", title: "Release planning", chat_de_agente: true, agent_thread: true, pinned: false, updated_at: 100 },

@@ -143,6 +143,7 @@ import type {
   HandlerDefinition,
   HandlerList,
   HandlerStatusRow,
+  CatalogoDeAgentes,
   ModoDePermiso,
   Project,
   Source,
@@ -166,7 +167,7 @@ import {
 } from "../lib/panels";
 import { createPref, escribirPref, leerPref } from "../lib/prefs";
 import type { Frase } from "../lib/prose";
-import { editDraft, insertMention, insertRecipient, type Recipient, type RecipientCandidate, type SenderTask, trimDraft } from "../lib/recipients";
+import { editDraft, insertMention, insertRecipient, type Recipient, type RecipientCandidate, recipientCandidatesOf, type SenderTask, trimDraft } from "../lib/recipients";
 import { conservar, conservarEnOrden, conservarPorElFinal, sessionRefresh } from "../lib/sessionRefresh";
 import { readShellCache, shellCacheWriter } from "../lib/shellCache";
 import {
@@ -1481,14 +1482,33 @@ export default function App() {
     const filas = watchHandlerStatuses(id);
     createEffect(() => setPresenciaDeEncargados(filas()));
   });
+  // Los ocultos salen del menú como salen del riel; sin carpeta no hay perfiles que leer.
+  const perfilesDeLaCarpeta = createMemo(() => {
+    const id = project();
+    return id ? watchProfiles(id) : () => ({});
+  });
+  // Quién está tapado solo lo dice el catálogo. Se lee al abrir el menú de `@`
+  // y no al cambiar de carpeta: lo pide quien va a llamar a alguien.
+  const [catalogoDeAgentes, setCatalogoDeAgentes] = createSignal<CatalogoDeAgentes | null>(null);
+  let catalogoRequest = 0;
+  const refreshCatalogoDeAgentes = async () => {
+    const request = ++catalogoRequest;
+    if (!project()) return;
+    try {
+      const catalogo = await invoke<CatalogoDeAgentes>("list_machine_agents");
+      if (request === catalogoRequest) setCatalogoDeAgentes(catalogo);
+    } catch {
+      // Sin catálogo el menú sigue, solo que sin marcar a los tapados.
+    }
+  };
   const recipientCandidates = createMemo<RecipientCandidate[]>(() =>
-    (rosterDelProyecto() ?? lastRoster(project()) ?? []).map((e) => ({
-      name: e.name,
-      description: e.description,
+    recipientCandidatesOf(project(), rosterDelProyecto() ?? lastRoster(project()) ?? [], {
+      profiles: perfilesDeLaCarpeta()(),
       // `undefined` no es un estado: es que todavía no se sabe, y el menú
       // pinta la cara despierta en vez de inventar que duerme.
-      status: presenciaDeEncargados().find((r) => r.name === e.name)?.status,
-    })),
+      statuses: presenciaDeEncargados(),
+      catalog: catalogoDeAgentes(),
+    }),
   );
   const placeCandidates = createMemo<PlaceCandidate[]>(() => {
     return projectList().map(f => ({ target: { kind: "folder" as const, projectId: f.id }, name: f.name, detail: "", updatedAt: f.updated_at }));
@@ -6323,13 +6343,14 @@ export default function App() {
         mentionSources={mentionSources()}
         input={input()}
         taskCandidates={taskCandidates()}
-        onTaskMenuOpen={() => void refreshTaskCandidates()}
+        onTaskMenuOpen={() => { void refreshTaskCandidates(); void refreshCatalogoDeAgentes(); }}
         taskMentions={borrador().task_mentions}
         mentionProject={project()}
         mentionSession={sessionId()}
         onMentionHistory={navigateMentionHistory}
         placeCandidates={placeCandidates()}
         recipientCandidates={recipientCandidates()}
+        recipientFolder={projectList().find((p) => p.id === project())?.name}
         recipients={borrador().recipients}
         /* Llamar a alguien y adjuntar material entran por caminos distintos y
            acaban en listas distintas; lo que comparten es que insertar en el
