@@ -53,6 +53,7 @@
   "chat.attachments.paste_empty": "La imagen del portapapeles está vacía.",
   "chat.attachments.paste_too_large": "La imagen pesa {size} MB y el tope es {tope} MB. Guárdala en un archivo y adjúntala.",
   "chat.attachments.paste_save_failed": "No se pudo guardar la imagen pegada.",
+  "chat.attachments.web_images_only": "Desde la web por ahora solo se adjuntan imágenes PNG, JPG, WebP o GIF. No se adjuntó: {names}.",
   "chat.composer.placeholder.answer": "Contesta lo que te preguntó para seguir",
   "chat.composer.placeholder.deliver": "Se entrega a quien nombraste; aquí no se lanza turno",
   "chat.composer.placeholder.ask": "Pregunta algo · @ encargados, tareas, proyectos, archivos · / comandos",

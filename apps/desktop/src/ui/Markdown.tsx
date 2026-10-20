@@ -1,4 +1,4 @@
-import { convertFileSrc } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import Check from "lucide-solid/icons/check";
 import Copy from "lucide-solid/icons/copy";
 import TriangleAlert from "lucide-solid/icons/triangle-alert";
@@ -6,6 +6,7 @@ import remarkGfm from "remark-gfm";
 import {
   type ComponentProps,
   createMemo,
+  createResource,
   createSignal,
   ErrorBoundary,
   Index,
@@ -49,7 +50,30 @@ import { ITEM_DE_MENU, Popover, PopoverContent, PopoverTrigger } from "./Popover
  */
 function fuenteLocal(src: unknown): string | null {
   const ruta = imagenLocal(src);
-  return ruta ? convertFileSrc(ruta, "terminus-image") : null;
+  return ruta ? convertFileSrc(ruta, "terminus-image") || null : null;
+}
+
+/** En la web el disco es el de la computadora remota: el motor manda la imagen como `data:`. */
+function ImagenRemota(props: { path: string; alt?: string }) {
+  const [fuente] = createResource(
+    () => props.path,
+    (ruta) =>
+      invoke<{ data_url?: string | null }>("preview_file", { path: ruta, rel: ruta })
+        .then((p) => imagenInerte(p.data_url))
+        .catch(() => null),
+  );
+  return (
+    <Show
+      when={fuente()}
+      fallback={
+        <Show when={!fuente.loading} fallback={<span class="text-neutral-500">{props.alt}</span>}>
+          <FilePreview path={props.path} alt={props.alt} />
+        </Show>
+      }
+    >
+      {(src) => <EnlargeableImage src={src()} alt={props.alt} />}
+    </Show>
+  );
 }
 
 /**
@@ -200,7 +224,11 @@ const COMPONENTES = {
       when={imagenInerte(p.src) ?? fuenteLocal(p.src)}
       fallback={
         <Show when={localFilePath(p.src)} fallback={<span class="text-neutral-500">{p.alt}</span>}>
-          {(ruta) => <FilePreview path={ruta()} alt={p.alt} />}
+          {(ruta) => (
+            <Show when={imagenLocal(p.src)} fallback={<FilePreview path={ruta()} alt={p.alt} />}>
+              {(imagen) => <ImagenRemota path={imagen()} alt={p.alt} />}
+            </Show>
+          )}
         </Show>
       }
     >

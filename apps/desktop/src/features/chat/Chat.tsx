@@ -50,6 +50,7 @@ import {
   type SenderTask,
 } from "../../lib/recipients";
 import { base64De, copyText, imagenPegada } from "../../lib/clipboard";
+import { capabilities } from "../../lib/platform";
 import { atenderElCampo, enfocar, enfocarSiNadieEscribe } from "../../lib/focus";
 import { df } from "../../lib/format";
 import { t } from "../../lib/i18n";
@@ -365,6 +366,8 @@ const METRICA_DEL_CAMPO =
   "border border-transparent px-2 py-1.5 text-[0.8125rem] leading-[1.4] [font-family:inherit] [scrollbar-gutter:stable]";
 // Del mismo tipo que el `inherit` de arriba, para que `cn` lo reemplace.
 const FUENTE_DE_TERMINAL = "[font-family:var(--font-mono)] [tab-size:4]";
+/** Lo que `guardar_imagen_pegada` sabe guardar. */
+const IMAGENES_SUBIBLES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 
 const mensajeDe = (bloque: Bloque): BloqueDeMensaje | null =>
   bloque.tipo === "msg" ? bloque : null;
@@ -1360,6 +1363,37 @@ export default function Chat(props: ChatProps) {
     });
   });
 
+  // En el navegador no hay rutas: el `drop` de HTML5 trae el `File` y se sube.
+  onMount(() => {
+    const zona = ancla?.parentElement;
+    if (!capabilities().browserFiles || !zona) return;
+    const conArchivos = (e: DragEvent) => !!e.dataTransfer?.types.includes("Files");
+    const encima = (e: DragEvent) => {
+      if (!conArchivos(e)) return;
+      e.preventDefault();
+      setSoltando(props.soloLectura || !puedeAdjuntar() ? null : zona.getBoundingClientRect());
+    };
+    const fuera = (e: DragEvent) => {
+      if (!zona.contains(e.relatedTarget as Node | null)) setSoltando(null);
+    };
+    const soltar = (e: DragEvent) => {
+      if (!conArchivos(e)) return;
+      e.preventDefault();
+      setSoltando(null);
+      void subirArchivos([...(e.dataTransfer?.files ?? [])]);
+    };
+    zona.addEventListener("dragenter", encima);
+    zona.addEventListener("dragover", encima);
+    zona.addEventListener("dragleave", fuera);
+    zona.addEventListener("drop", soltar);
+    onCleanup(() => {
+      zona.removeEventListener("dragenter", encima);
+      zona.removeEventListener("dragover", encima);
+      zona.removeEventListener("dragleave", fuera);
+      zona.removeEventListener("drop", soltar);
+    });
+  });
+
   async function agregar(rutas: string[]) {
     setPreparingAttachments((n) => n + 1);
     setAttachmentFailure(null);
@@ -1385,6 +1419,29 @@ export default function Chat(props: ChatProps) {
       const datos = await base64De(img);
       const ruta = await props.onPegarImagen(img.type, datos);
       await agregar([ruta]);
+    } catch (err) {
+      if (conversation === props.conversacion) setAttachmentFailure(asFailure(err));
+    } finally {
+      setPreparingAttachments((n) => n - 1);
+    }
+  }
+
+  /** En la web: el archivo viaja como bytes y el motor lo guarda en su máquina. */
+  async function subirArchivos(files: File[]) {
+    if (props.soloLectura || !puedeAdjuntar() || files.length === 0) return;
+    const conversation = props.conversacion;
+    const imagenes = files.filter((f) => IMAGENES_SUBIBLES.includes(f.type));
+    const fuera = files.filter((f) => !IMAGENES_SUBIBLES.includes(f.type));
+    setAttachmentFailure(null);
+    setPreparingAttachments((n) => n + 1);
+    try {
+      const rutas: string[] = [];
+      for (const f of imagenes) rutas.push(await props.onPegarImagen(f.type, await base64De(f)));
+      if (rutas.length) await agregar(rutas);
+      if (fuera.length && conversation === props.conversacion) {
+        const names = fuera.map((f) => f.name).join(", ");
+        setAttachmentFailure({ what: t("chat.attachments.web_images_only", { names }), detail: "web_images_only" });
+      }
     } catch (err) {
       if (conversation === props.conversacion) setAttachmentFailure(asFailure(err));
     } finally {
@@ -1435,6 +1492,15 @@ export default function Chat(props: ChatProps) {
   }
 
   async function elegirArchivos() {
+    if (capabilities().browserFiles) {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.multiple = true;
+      input.accept = IMAGENES_SUBIBLES.join(",");
+      input.onchange = () => void subirArchivos([...(input.files ?? [])]);
+      input.click();
+      return;
+    }
     const elegidos = await open({
       multiple: true,
       title: t("chat.attachments.dialog_title"),
