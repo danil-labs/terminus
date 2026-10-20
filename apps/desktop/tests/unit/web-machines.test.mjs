@@ -81,6 +81,12 @@ test("two machines show together and each command goes to the machine it names",
   assert.equal((await invoke("create_project", { name: "Tercero" })).id, "cmp_mac~p9", "then the last machine used is the default");
   const machines = await invoke("machine_list");
   assert.deepEqual(machines.map((m) => [m.id, m.active]), [["cmp_vm", false], ["cmp_mac", true]]);
+
+  doc.querySelector('[data-sesion="cmp_vm~t1"]').click();
+  await sleep(600);
+  const where = doc.querySelector("[data-task-location]");
+  assert.equal(where?.querySelector("[data-task-location-machine]")?.textContent, "Danil VM", "the task window names the machine that runs it");
+  assert.equal(where?.querySelector("[data-task-location-project]")?.textContent, "Panel");
   assert.deepEqual(app.fallos, []);
 });
 

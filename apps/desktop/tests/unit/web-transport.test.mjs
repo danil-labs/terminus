@@ -35,6 +35,8 @@ test("the web build talks to the relay: calls, events and machine state", async 
 
   app.w.document.querySelector('[data-sesion="t1"]').click();
   await sleep(400);
+  const where = app.w.document.querySelector("[data-task-location]");
+  assert.equal(where?.querySelector("[data-task-location-machine]")?.textContent, "cmp_test", "in the browser the task runs on the computer, not on this one");
   fake.push({
     type: "events",
     cursor: 2,

@@ -85,12 +85,12 @@ import AnadirCarpeta, { type ClonEnCurso } from "../features/projects/AddWorkdir
 import AgentPageTasks from "../features/projects/AgentPageTasks";
 // Chunk aparte: el perfil completo de un agente solo se carga al abrirlo.
 const AgentProfile = lazy(() => import("../features/projects/AgentProfile"));
+const TaskLocation = lazy(() => import("../features/chat/TaskLocation"));
 import AgentTasks, { createdTasks } from "../features/projects/AgentTasks";
 import ArchivedTasks from "../features/projects/ArchivedTasks";
 import BaseBranchPicker from "../features/projects/BaseBranchPicker";
 import { watchHandlerStatus, watchHandlerStatuses } from "../features/projects/handlerPresence";
 import { EmptyContext, ProjectPicker } from "../features/projects/Projects";
-import { MachineChip } from "../features/machines/MachineChip";
 import { machineName, runOnOptions } from "../features/machines/store";
 // Chunk aparte: solo lo carga quien crea una tarea, no la carga inicial.
 const MachinePicker = lazy(() =>
@@ -103,6 +103,7 @@ import { type SessionRow, threadTitle } from "../features/projects/Sessions";
 import TabStrip, { NewTabButton } from "../features/projects/Tabs";
 import { veilTabs } from "../features/projects/tabVeil";
 import { createTaskWork, ResumeTask } from "../features/projects/TaskHistory";
+import { workLabel } from "../features/projects/branchLabel";
 import type { Etapa } from "../features/projects/TaskStage";
 import { esChatDeAgente } from "../features/projects/taskTree";
 import {
@@ -6228,6 +6229,14 @@ export default function App() {
             <span class="truncate">{t("chat.delegation.back", { title: coordinatingTask()!.title })}</span>
           </Button>
         </div> : undefined}
+        location={<Show when={pp.sesion}>{(id) => {
+          return <Suspense fallback={null}><TaskLocation
+            machine={filaDe(id())?.machine}
+            on={!apagadas()[id()] && filaDe(id())?.machine_on !== false}
+            project={proyectoDeLaCelda()?.name}
+            path={estadoDelTrabajo()?.path || undefined}
+            branch={workLabel(estadoDelTrabajo()?.branch, estadoDelTrabajo()?.alias) || undefined} /></Suspense>;
+        }}</Show>}
         msgs={mensajes()}
         /* Identidad de lo que tiene delante, no ids de proyecto/tarea: es lo
            único con lo que distingue «entró un mensaje» de «otra
@@ -6708,15 +6717,6 @@ export default function App() {
         {/* Solo con la columna cerrada: abierta, su conmutador vive en la
             cabecera del panel derecho (`features/shell/RightPanelHeader.tsx`). */}
         <div ref={controlesDerechos} class="relative z-40 ml-auto flex shrink-0 items-center gap-3">
-        <Show when={filaDe(sessionId() ?? "")?.machine}>
-          {(machine) => (
-            <MachineChip
-              machine={machine()}
-              on={!apagadas()[sessionId() ?? ""] && filaDe(sessionId() ?? "")?.machine_on !== false}
-              class="max-w-[140px] text-xs text-neutral-500"
-            />
-          )}
-        </Show>
         <Show when={!artOpen() && !paginaDeAgente()}>
           <BotonConAtajo
             variant="ghost"

@@ -96,7 +96,8 @@ test("una tarea de una máquina apagada abre sin fallo y mandarle algo la encien
   await openTask(app, "r1");
   assert.ok(text(app).includes("Respuesta guardada"), "no enseña la copia guardada");
   assert.equal(doc.querySelector("[data-machine-notice]")?.textContent, "vm está apagada: se enciende cuando envíes un mensaje.");
-  assert.ok(doc.querySelector('[data-conversacion] [data-machine="vm"]'), "la cabecera no lleva el chip");
+  const location = doc.querySelector('[data-conversacion] [data-task-location][data-task-location-on="false"]');
+  assert.equal(location?.querySelector("[data-task-location-machine]")?.textContent, "vm", "la ventana no dice en qué máquina corre");
 
   await send(app, "sigue");
   assert.equal(doc.querySelector("[data-machine-notice]")?.textContent, "Encendiendo vm…");
@@ -104,7 +105,25 @@ test("una tarea de una máquina apagada abre sin fallo y mandarle algo la encien
   assert.equal(sends.length, 1, "el mensaje salió más de una vez");
   assert.equal(sends[0].session, "r1");
   assert.equal(doc.querySelector("[data-machine-notice]"), null, "el aviso sigue tras encenderla");
+  assert.ok(doc.querySelector('[data-task-location][data-task-location-on="true"]'), "la ventana sigue diciendo que está apagada");
   assert.ok(reads.some((r) => r.id === "r1" && r.awake), "no se volvió a leer la tarea");
   assert.ok(text(app).includes("Respuesta despierta"));
+  assert.deepEqual(app.fallos, []);
+});
+
+test("la ventana de una tarea local dice su máquina, su proyecto y su rama", async () => {
+  const app = await boot("listo", "machine-task-location", responses({
+    list_live_sessions: ({ project }) => (project === "p1" ? [row("t1")] : []),
+    load_session: ({ id }) => session(id, [turn(0, "Hola local"), turn(1, "Respuesta local")]),
+    task_history: { history: { archived: false, events: [], recovery: null }, branch: "feat/task-location", path: "/lab/wt/t1", available: true, owned: true, restorable: false, recreatable: false, incomplete: false },
+  }));
+  await sleep(600);
+  await openTask(app, "t1");
+  const doc = app.w.document;
+  const location = doc.querySelector('[data-conversacion] [data-task-location][data-task-location-on="true"]');
+  assert.ok(location, "la ventana no dice dónde corre");
+  assert.match(location.querySelector("[data-task-location-machine]")?.textContent ?? "", /^Esta (Mac|computadora)$/);
+  assert.equal(location.querySelector("[data-task-location-project]")?.textContent, "P1");
+  assert.equal(location.querySelector("[data-task-location-branch]")?.textContent, "feat/task-location");
   assert.deepEqual(app.fallos, []);
 });

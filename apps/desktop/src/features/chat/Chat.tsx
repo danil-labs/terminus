@@ -411,6 +411,8 @@ export type ChatProps = {
   agentTasks?: JSX.Element;
   delegatedTask?: (reference: SenderTask) => JSX.Element;
   coordinator?: JSX.Element;
+  /** Máquina / proyecto / rama, arriba a la izquierda (`TaskLocation`). */
+  location?: JSX.Element;
   chatEstado?: HandlerStatus;
   /** Cómo se le llama y con qué cara, si eligió otras en su perfil. */
   chatName?: string | null;
@@ -2717,6 +2719,7 @@ export default function Chat(props: ChatProps) {
           scrollea, el de dentro es lo único medible —tiene el alto de su
           hueco y no cambia—. `lib/paste.ts`. */}
       <div class="relative flex min-h-0 flex-1 flex-col">
+      {props.location}
       {props.coordinator}
       <Show when={!props.agentDraft ? props.chatEncargado : null}>
         {(name) => (
