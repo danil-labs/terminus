@@ -1966,12 +1966,17 @@ function ModelosGratuitos(props: {
       description={
       <>
       {/* Omitir el proveedor o alejar el aviso oculta el destino de los datos al activar. */}
-      <p class="m-0">
-        {t("settings.accounts.free.provider", { provider: props.proveedor })}
-      </p>
-      <p class="m-0">
-        <strong>{AVISO_DE_USO()}</strong>
-      </p>
+      <Show
+        when={!aceptado() || props.falta}
+        fallback={<p class="m-0">{t("settings.accounts.free.warning_short")}</p>}
+      >
+        <p class="m-0">
+          {t("settings.accounts.free.provider", { provider: props.proveedor })}
+        </p>
+        <p class="m-0">
+          <strong>{AVISO_DE_USO()}</strong>
+        </p>
+      </Show>
       <Show when={fallo()}>
         {(f) => (
           <div class="mt-2">
