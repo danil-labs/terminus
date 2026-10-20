@@ -53,7 +53,7 @@ async function open(name, computers, relays) {
 test("two machines show together and each command goes to the machine it names", async () => {
   const { app, invoke, calls, doc, text } = await open("web-machines", [VM, MAC], {
     cmp_vm: { table: table("Panel", "Tarea de la VM") },
-    cmp_mac: { table: table("Notas", "Tarea del Mac") },
+    cmp_mac: { table: table("Notas", "Tarea del Mac", { list_session_git: ({ project: p }) => (p === "p1" ? { t1: { kind: "branch", branch: "feat/notas", repository: "/lab/p1" } } : {}) }) },
   });
 
   assert.ok(text().includes("Panel") && text().includes("Notas"), "the projects of both machines are in the sidebar");
@@ -64,6 +64,11 @@ test("two machines show together and each command goes to the machine it names",
   assert.ok(calls("cmp_vm", "list_projects").some((c) => c.workspace === "w"), "the VM gets its own workspace id");
   assert.ok(calls("cmp_mac", "list_projects").some((c) => c.workspace === "w"), "the Mac gets its own workspace id");
   assert.deepEqual([...doc.querySelectorAll("[data-machine-row]")].map((r) => r.dataset.state), ["online", "online"]);
+
+  const git = await invoke("list_session_git", { project: "cmp_mac~p1", remote: false, priority: ["cmp_mac~t1"] });
+  assert.deepEqual(Object.keys(git), ["cmp_mac~t1"], "a task's git status is keyed by the id the panel knows");
+  assert.equal(git["cmp_mac~t1"].branch, "feat/notas");
+  assert.deepEqual(calls("cmp_mac", "list_session_git").at(-1).args.priority, ["t1"], "the Mac is asked with its own ids");
 
   const task = await invoke("load_session", { project: "cmp_mac~p1", id: "cmp_mac~t1" });
   assert.equal(task.id, "cmp_mac~t1");
