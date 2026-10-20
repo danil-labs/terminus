@@ -3,7 +3,7 @@
  * «Ejecutar en» picker offers it on the other; the action wakes that machine,
  * creates the workspace with the same name so the panel joins them, copies
  * what carries no credentials, signs in to Radiant there for an organization
- * workspace, and leaves the machine picked. Logos are read on their own
+ * workspace, and leaves the machine picked with no note left behind. Logos are read on their own
  * machine, and the chat background is the one the engine remembers. Mounts
  * `dist-web/`.
  */
@@ -113,7 +113,8 @@ test("a personal workspace is created on the machine that lacks it, joined and p
   const row = doc.querySelector('[data-machine-unlinked="cmp_vm"]');
   assert.ok(row.querySelector("[title]")?.getAttribute("title").includes("no tiene este workspace"), "«sin este workspace» explains itself on hover");
   doc.querySelector('[data-workspace-here="cmp_vm"]').click();
-  assert.ok(await until(() => doc.querySelector('[data-workspace-here-state="done"]'), 15000), "the action finishes");
+  const picked = () => (doc.querySelector('[aria-label="Ejecutar en"]')?.textContent ?? "").includes("vm-alberto");
+  assert.ok(await until(() => picked() && !doc.querySelector("[data-workspace-here-state]"), 15000), "the action finishes and its panel closes");
 
   assert.deepEqual(calls("cmp_vm", "add_workspace").map((c) => c.args.name), ["Danil"], "the VM, woken by the action, creates it with the same name");
   const merged = await invoke("list_workspaces");
@@ -130,15 +131,10 @@ test("a personal workspace is created on the machine that lacks it, joined and p
   assert.deepEqual(calls("cmp_vm", "add_skill_source").map((c) => c.args.url), ["https://github.com/danil/skills"]);
   assert.equal(calls("cmp_vm", "radiant_login").length, 0, "a personal workspace does not sign in to Radiant");
 
-  const skipped = doc.querySelector("[data-workspace-here-skipped]")?.textContent ?? "";
-  assert.ok(skipped.includes("Inicia sesión en tus cuentas de IA y GitHub en vm-alberto"));
-  assert.ok(skipped.includes("«interno»"), "a hand-written MCP server is listed, not copied");
-  assert.ok(skipped.includes("árboles de tareas"));
+  assert.ok(!doc.body.textContent.includes("interno"), "a hand-written MCP server is neither copied nor listed");
 
   const after = await invoke("machine_list");
   assert.equal(after.find((m) => m.id === "cmp_vm").linked, true, "the VM is available for this workspace");
-  const label = doc.querySelector('[aria-label="Ejecutar en"]')?.textContent ?? "";
-  assert.ok(label.includes("vm-alberto"), "and picked");
   assert.deepEqual(app.fallos, []);
 });
 
@@ -163,7 +159,7 @@ test("an organization workspace signs in to Radiant on the other machine with th
   doc.querySelector('[data-workspace-here="cmp_vm"]').click();
   assert.ok(await until(() => doc.querySelector("[data-radiant-code]")?.textContent.includes("WXYZ-1234")), "the code and link show as in onboarding");
   assert.ok(doc.querySelector('[data-radiant-code] a[href="https://radiant.test/device?code=WXYZ-1234"]'));
-  assert.ok(await until(() => doc.querySelector('[data-workspace-here-state="done"]'), 15000), "it finishes once signed in");
+  assert.ok(await until(() => !doc.querySelector("[data-workspace-here-state]"), 15000), "it finishes once signed in");
 
   assert.equal(calls("cmp_vm", "radiant_login").length, 1, "Radiant sign-in starts on the VM");
   assert.equal(calls("cmp_mac", "radiant_login").length, 0);
