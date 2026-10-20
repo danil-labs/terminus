@@ -5,8 +5,10 @@
  */
 export type EngineError = { code: string; message_key?: string; detail?: unknown };
 
+/** La cuenta de Danil vinculada a un workspace (`danil` de `list_workspaces`). */
+export type WorkspaceDanil = { user_id: string; email?: string | null; name?: string | null };
 /** `provider` y `remote` dicen si dos workspaces de máquinas distintas son el mismo (`groupWorkspaces`). */
-export type Workspace = { id: string; name: string; provider?: string | null; remote?: string | null };
+export type Workspace = { id: string; name: string; provider?: string | null; remote?: string | null; danil?: WorkspaceDanil | null };
 /** `list_workspaces`. */
 export type Startup = { workspaces: Workspace[]; active: string | null };
 /** `list_projects`: una carpeta del workspace. */
@@ -91,7 +93,7 @@ export type ChatEvent = {
   starts_message?: boolean;
 };
 /** Un evento del motor tal como llega (`service events`). */
-export type EngineEvent = { name: string; payload: unknown };
+export type EngineEvent = { name: string; payload: unknown; workspace?: string | null };
 
 // --- El cuadro de escribir ---------------------------------------------------
 

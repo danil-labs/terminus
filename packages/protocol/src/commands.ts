@@ -33,6 +33,8 @@ export const APP_READS = [
   "list_accounts",
   "account_status",
   "account_limits",
+  // El fondo de los chats del workspace, detrás de la conversación.
+  "chat_background",
 ] as const;
 
 export const APP_ACTIONS = [
