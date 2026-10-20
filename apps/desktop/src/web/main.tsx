@@ -5,6 +5,7 @@
  * that sets `window.terminusWeb` before this module loads can replace any
  * setting, or give `getToken` with `computerId` or `computers` and skip the session.
  */
+import { linkedWorkspaces } from "@terminus/computers";
 import { createSignal, lazy, Suspense } from "solid-js";
 import { t } from "../lib/i18n";
 import { setCapabilities } from "../lib/platform";
@@ -45,9 +46,17 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
   const [changed, bump] = createSignal(0);
   const links = computers.map((c) => {
     const [at, setAt] = createSignal<number | null>(null);
-    const relay = new RelaySession({ ...base, computerId: c.computer_id, beforeReconnect: before?.(c.computer_id) });
+    // No longer shared with this account: the page lists the computers again.
+    const relay = new RelaySession({ ...base, computerId: c.computer_id, beforeReconnect: before?.(c.computer_id), onUnlinked: () => window.location.reload() });
     relay.onState(() => bump((n) => n + 1));
-    const info = { id: c.computer_id, name: c.name || c.computer_id, wakes: wakes(c), outdated: machineCompatibility(c.contract) === "outdated" };
+    const info = {
+      id: c.computer_id,
+      name: c.name || c.computer_id,
+      wakes: wakes(c),
+      outdated: machineCompatibility(c.contract) === "outdated",
+      linked: linkedWorkspaces(c),
+      member: c.role === "member",
+    };
     return { info, relay, onSync: setAt, at };
   });
   const transport = createWebTransport(links, __TERMINUS_VERSION__, browser, () => bump((n) => n + 1));

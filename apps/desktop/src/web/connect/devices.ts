@@ -1,7 +1,19 @@
-/** The device flow on the control plane: what a code is asking for, and approving it. */
+/**
+ * The device flow on the control plane: what a code is asking for, and approving it.
+ * A `workspace` code links one workspace of a registered computer to the approver; it creates no computer.
+ */
 import { apiUrl } from "../computers.ts";
 
-export type DeviceRequest = { hostname: string; platform: string; name: string | null; expires_at: string | number | null };
+export type DeviceRequest = {
+  kind: "computer" | "workspace";
+  hostname: string;
+  platform: string;
+  name: string | null;
+  expires_at: string | number | null;
+  /** `workspace` codes: what is being linked and on which computer. */
+  workspace_name?: string | null;
+  computer_name?: string | null;
+};
 
 export type DeviceAnswer<T> =
   | { kind: "ok"; value: T }
@@ -43,22 +55,39 @@ export const normalizeCode = (code: string | null | undefined): string => (code 
 export function lookupDevice(endpoint: string, token: string, code: string, f: Fetch = fetch): Promise<DeviceAnswer<DeviceRequest>> {
   const url = `${apiUrl(endpoint, "/v1/devices/lookup")}?user_code=${encodeURIComponent(code)}`;
   return send(url, token, { method: "GET" }, (body) => {
-    const b = body as { hostname?: unknown; platform?: unknown; name?: unknown; expires_at?: unknown } | null;
+    const b = body as Record<string, unknown> | null;
+    const text = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+    const expires_at = typeof b?.expires_at === "string" || typeof b?.expires_at === "number" ? b.expires_at : null;
+    if (b?.kind === "workspace") {
+      const computer = text(b.computer_name) ?? text(b.name) ?? text(b.hostname);
+      if (!text(b.workspace_name) && !computer) return undefined;
+      return {
+        kind: "workspace",
+        hostname: text(b.hostname) ?? computer ?? "",
+        platform: text(b.platform) ?? "",
+        name: text(b.name),
+        expires_at,
+        workspace_name: text(b.workspace_name),
+        computer_name: computer,
+      };
+    }
     if (typeof b?.hostname !== "string") return undefined;
     return {
+      kind: "computer",
       hostname: b.hostname,
       platform: typeof b.platform === "string" ? b.platform : "",
       name: typeof b.name === "string" ? b.name : null,
-      expires_at: typeof b.expires_at === "string" || typeof b.expires_at === "number" ? b.expires_at : null,
+      expires_at,
     };
   }, f);
 }
 
-export function approveDevice(endpoint: string, token: string, code: string, name: string, f: Fetch = fetch): Promise<DeviceAnswer<null>> {
+/** `name` is the computer's; a workspace code is approved without one. */
+export function approveDevice(endpoint: string, token: string, code: string, name: string | null, f: Fetch = fetch): Promise<DeviceAnswer<null>> {
   return send(apiUrl(endpoint, "/v1/devices/approve"), token, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ user_code: code, name }),
+    body: JSON.stringify(name === null ? { user_code: code } : { user_code: code, name }),
   }, () => null, f);
 }
 

@@ -6,6 +6,7 @@
   "web.accounts.sign_out_yes": "Cerrar sesión",
   "web.computers.error": "No se pudo hablar con Danil Computers.",
   "web.computers.license": "Tu cuenta no tiene licencia de Terminus. Pide acceso a quien administra tu cuenta de Danil.",
+  "web.computers.no_workspaces": "Conecta un workspace a tu cuenta desde Terminus en tu computadora.",
   "web.computers.none": "Todavía no tienes ninguna computadora en Danil.",
   "web.computers.not_yours": "Esta computadora no es tuya o ya no existe.",
   "web.computers.retry": "Reintentar",
@@ -53,5 +54,6 @@
   "web.setup.preparing": "Preparando tu computadora…",
   "web.setup.preparing_percent": "Preparando tu computadora… {percent} %",
   "web.start_failed": "La computadora no pudo encenderse. Vuelve a intentarlo en un momento.",
-  "web.sync.last": "Última sincronización: {time}"
+  "web.sync.last": "Última sincronización: {time}",
+  "web.workspace_not_linked": "Este workspace no está conectado a tu cuenta de Danil. Conéctalo desde Terminus en esa computadora."
 }

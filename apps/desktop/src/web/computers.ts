@@ -16,6 +16,10 @@ export type Computer = {
   host_version?: string | null;
   /** The engine contract of its last hello (`compatibility.ts`). */
   contract?: string | null;
+  /** `member`: not the person's computer, only workspaces linked to their account. */
+  role?: "owner" | "member" | null;
+  /** The workspaces of this computer linked to the account; absent from a control plane before links. */
+  workspaces?: string[] | null;
 };
 
 export type Answer<T> =

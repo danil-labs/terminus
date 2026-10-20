@@ -70,6 +70,7 @@ export function failureOf(error: unknown): Failure {
   if (code === "app_unavailable") return { what: { clave: "shell.service.engine_down" }, detail: "engine_down" };
   if (code === "start_failed" || code === "start_timeout") return { what: t("web.start_failed"), detail: code };
   if (code === "revoked") return { what: t("web.revoked"), detail: code };
+  if (code === "workspace_not_linked") return { what: t("web.workspace_not_linked"), detail: code };
   if (code === "engine_missing") return { what: { clave: "shell.service.engine_missing" }, detail: e.detail ?? code };
   return { what: { clave: KEYS[code] ?? "shell.service.failed" }, detail: code };
 }
@@ -188,11 +189,14 @@ function rememberMachine(id: string) {
 }
 
 const OUTDATED = new Set(["version_mismatch", "service_version"]);
+/** Reads of the machine itself, not of a workspace: only the computers the person owns answer them. */
+const MACHINE_LEVEL = new Set(["list_accounts"]);
+type Event = NonNullable<EventsPage["events"]>[number];
 const NONE = Symbol("none");
 type Link = ReturnType<typeof createLink>;
 
 /** One computer: its calls with the off rules, its read copies and its own feed. */
-function createLink(relay: RelayLike, computerId: string, onSync: SyncListener, onOutdated: () => void) {
+function createLink(relay: RelayLike, computerId: string, onSync: SyncListener, onOutdated: () => void, visible: (events: Event[]) => Event[]) {
   let subscribedAt: number | null | undefined;
   const queue: EventsPage[] = [];
   const { wake, changeOr } = changes();
@@ -302,7 +306,7 @@ function createLink(relay: RelayLike, computerId: string, onSync: SyncListener, 
       return { cursor: null, gap: false, replay: true, runtime: changed.runtime, reset: true };
     }
     const last = pages[pages.length - 1];
-    deliver(pages.flatMap((p) => p.events ?? []));
+    deliver(visible(pages.flatMap((p) => p.events ?? [])));
     subscribedAt = last.cursor;
     return {
       cursor: last.cursor,
@@ -339,7 +343,7 @@ export function createWebTransport(
     m.relay.onState((state) => {
       if (state === "version_mismatch" || state === "outdated") mark();
     });
-    links.set(m.info.id, createLink(m.relay, m.info.id, m.onSync ?? (() => {}), mark));
+    links.set(m.info.id, createLink(m.relay, m.info.id, m.onSync ?? (() => {}), mark, (events) => fleet.linkedEvents(m.info.id, events)));
   }
   const link = (id: string) => links.get(id) as Link;
   const on = (id: string) => id === homeId || link(id).relay.state() === "online";
@@ -379,7 +383,7 @@ export function createWebTransport(
     try {
       const value = await l.send(command, workspace, args, !asleep);
       if (value === NONE) throw off(machine);
-      return value;
+      return fleet.linkedOnly(machine, command, value);
     } catch (error) {
       if (fleet.isOutdated(machine)) throw outdated(machine);
       // The relay cannot start the person's own computer: off, said plainly.
@@ -407,7 +411,7 @@ export function createWebTransport(
               home && machine === homeId
                 ? await home.call(command, fleet.argsFor(machine, args), undefined)
                 : await late(link(machine).send(command, fleet.workspaceOn(machine, workspace), fleet.argsFor(machine, args), false));
-            return value === NONE ? null : { machine, value };
+            return value === NONE ? null : { machine, value: fleet.linkedOnly(machine, command, value) };
           } catch (error) {
             return fleet.isOutdated(machine) ? null : { machine, error };
           }
@@ -425,6 +429,15 @@ export function createWebTransport(
   }
 
   async function send(command: string, workspace: string | null, args: Args, options: Options): Promise<unknown> {
+    if (MACHINE_LEVEL.has(command)) {
+      // A computer shared only by a workspace keeps its AI accounts to its owner: the relay would refuse them.
+      const own = fleet.usable().filter((m) => !fleet.info(m)?.member);
+      if (!own.length) return { provider: args.provider ?? null, active: null, accounts: [] };
+      if (fleet.multi && own.length < fleet.usable().length && !headerOf(options, "x-terminus-machine")) {
+        const route = fleet.route(command, args, workspace, null, own[0]);
+        if ("fan" in route) return fan(command, route.fan.filter((m) => own.includes(m)), route.args, workspace);
+      }
+    }
     const chosen = headerOf(options, "x-terminus-machine") ?? (CREATE.has(command) ? picked(workspace) : null);
     let route: ReturnType<Fleet["route"]>;
     try {
@@ -514,7 +527,11 @@ export function createWebTransport(
       if (page.runtime && known && known !== page.runtime) gap = true;
       if (page.runtime) runtimes.set(machine, page.runtime);
     }
-    deliver(taken.flatMap(({ machine, page }) => (page.events ?? []).map((e) => ({ name: e.name, payload: fleet.encodeEvent(machine, e.name, e.payload) }))));
+    deliver(
+      taken.flatMap(({ machine, page }) =>
+        fleet.linkedEvents(machine, page.events ?? []).map((e) => ({ name: e.name, payload: fleet.encodeEvent(machine, e.name, e.payload) })),
+      ),
+    );
     const streams = cameOn;
     cameOn = false;
     tick += 1;
@@ -543,7 +560,7 @@ export function createWebTransport(
         const known = runtimes.get(m.info.id);
         if (page.gap === true || (page.runtime && known && known !== page.runtime)) remoteGap = true;
         if (page.runtime) runtimes.set(m.info.id, page.runtime);
-        deliver((page.events ?? []).map((e) => ({ name: e.name, payload: fleet.encodeEvent(m.info.id, e.name, e.payload) })));
+        deliver(fleet.linkedEvents(m.info.id, page.events ?? []).map((e) => ({ name: e.name, payload: fleet.encodeEvent(m.info.id, e.name, e.payload) })));
       });
       m.relay.onState((state) => {
         if (state === "online" && was !== "online" && homeSubscribed) remoteGap = true;

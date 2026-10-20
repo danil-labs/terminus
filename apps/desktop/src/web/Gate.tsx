@@ -1,11 +1,12 @@
+import { hasLinkedWorkspaces } from "@terminus/computers";
 import { type JSX, Match, onMount, Show, Switch, createSignal } from "solid-js";
 import { t } from "../lib/i18n";
 import { Button } from "../ui/Button";
 import { type Answer, type Computer, listComputers } from "./computers";
 import type { Session } from "./session";
 
-/** What stands between the page and the app: the session, the license and having a computer. */
-export type GateView = { t: "waiting" } | { t: "license" } | { t: "not_yours" } | { t: "none" } | { t: "error" };
+/** What stands between the page and the app: the session, the license, having a computer and a workspace linked to the account. */
+export type GateView = { t: "waiting" } | { t: "license" } | { t: "not_yours" } | { t: "none" } | { t: "no_workspaces" } | { t: "error" };
 
 /** The list with a token the API accepts: a refused token is refreshed once. */
 export async function computersOf(endpoint: string, session: Session): Promise<Answer<Computer[]>> {
@@ -31,9 +32,12 @@ export function Gate(props: { session: Session; endpoint: string; initial?: Gate
     const asked = new URLSearchParams(window.location.search).get("computer");
     if (asked) {
       const one = computers.find((c) => c.computer_id === asked);
-      return one ? props.onOpen?.([one]) : setView({ t: "not_yours" });
+      if (!one) return setView({ t: "not_yours" });
+      return hasLinkedWorkspaces([one]) ? props.onOpen?.([one]) : setView({ t: "no_workspaces" });
     }
     if (computers.length === 0) return setView({ t: "none" });
+    // Each computer shows only the workspaces linked to the account: with none, the app would be empty.
+    if (!hasLinkedWorkspaces(computers)) return setView({ t: "no_workspaces" });
     props.onOpen?.(computers);
   }
 
@@ -65,6 +69,7 @@ export function Gate(props: { session: Session; endpoint: string; initial?: Gate
         <Match when={view().t === "license"}>{message(t("web.computers.license"))}</Match>
         <Match when={view().t === "not_yours"}>{message(t("web.computers.not_yours"))}</Match>
         <Match when={view().t === "none"}>{message(t("web.computers.none"), retry())}</Match>
+        <Match when={view().t === "no_workspaces"}>{message(t("web.computers.no_workspaces"), retry())}</Match>
         <Match when={view().t === "error"}>{message(t("web.computers.error"), retry())}</Match>
       </Switch>
     </main>
