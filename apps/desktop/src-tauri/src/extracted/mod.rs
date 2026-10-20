@@ -37,11 +37,13 @@ pub fn launch() -> Result<()> {
 
 fn open() -> Result<()> {
     let mut args: Vec<_> = std::env::args_os().collect();
-    if let Some(key) = args.get(1).and_then(|arg| tray::notice_key(arg)) {
-        if instance::open_notice(&engine::paths()?.window, &key) {
-            return Ok(());
+    if args.len() == 2 && tray::is_notice(&args[1]) {
+        if let Some(key) = tray::notice_key(&args[1]) {
+            if instance::open_notice(&engine::paths()?.window, &key) {
+                return Ok(());
+            }
         }
-        // Sin ventana abierta, el enlace arranca Terminus como siempre.
+        // Sin ventana abierta o sin clave legible, el enlace arranca Terminus como siempre.
         args.truncate(1);
     }
     let selection = match args.as_slice() {
