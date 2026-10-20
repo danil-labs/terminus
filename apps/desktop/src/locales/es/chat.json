@@ -129,7 +129,7 @@
   "chat.model.empty": "No hay modelos",
   "chat.model.favorite": "Marcar {model} como favorito",
   "chat.model.favorites": "Favoritos",
-  "chat.model.free": "Free",
+  "chat.model.free": "Gratis",
   "chat.model.go_remaining": "mín. {left}%",
   "chat.model.listbox": "Modelos",
   "chat.model.locked": "No se puede cambiar mientras contesta",

@@ -100,7 +100,13 @@ export default function SelectorDeModelo(props: SelectorDeModeloProps) {
     );
   });
 
-  const corto = (label: string) => label.split(" ").at(-1) ?? label;
+  // Los gratuitos se nombran por catálogo: `proveedorDe` corre también en node, sin `t()`.
+  const rotulo = (grupo: GrupoDeModelos) =>
+    grupo.id === "opencode-free" ? t("surfaces.label.free") : grupo.label;
+  const corto = (grupo: GrupoDeModelos) =>
+    grupo.id === "opencode-free"
+      ? t("surfaces.label.free_short")
+      : (grupo.label.split(" ").at(-1) ?? grupo.label);
 
   const niveles = createMemo(() =>
     props.onEffort && props.efforts?.length
@@ -273,8 +279,8 @@ export default function SelectorDeModelo(props: SelectorDeModeloProps) {
                 <button
                   type="button"
                   class={cn("flex size-9 shrink-0 flex-col items-center justify-center gap-px rounded-sm text-neutral-500 outline-none hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary", seccion() === grupo.id && "bg-surface-muted text-neutral-950")}
-                  aria-label={grupo.label}
-                  title={grupo.label}
+                  aria-label={rotulo(grupo)}
+                  title={rotulo(grupo)}
                   onClick={() => setSeccion(grupo.id)}
                 >
                   <MarcaAgente
@@ -283,7 +289,7 @@ export default function SelectorDeModelo(props: SelectorDeModeloProps) {
                   />
                   <Show when={repetidos().has(grupo.logo)}>
                     <span class="text-[0.5625rem] font-medium leading-none">
-                      {corto(grupo.label)}
+                      {corto(grupo)}
                     </span>
                   </Show>
                 </button>
@@ -301,12 +307,12 @@ export default function SelectorDeModelo(props: SelectorDeModeloProps) {
           >
             <For each={grupos()}>
               {(grupo) => (
-                <section role="group" aria-label={grupo.label}>
+                <section role="group" aria-label={rotulo(grupo)}>
                   <div class="flex items-center gap-1.5 px-2 pb-1 pt-2 text-xs font-medium text-neutral-500">
                     <span class="flex size-4 shrink-0 items-center justify-center text-neutral-950">
                       <MarcaAgente id={grupo.logo} size={14} />
                     </span>
-                    <span>{grupo.label}</span>
+                    <span>{rotulo(grupo)}</span>
                     <Show when={grupo.id === "opencode-go" && cupoGo()?.mode === "read"}>
                       <span class="ml-auto truncate font-normal">
                         {t("chat.model.go_remaining", {
