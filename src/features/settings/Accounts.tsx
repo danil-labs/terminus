@@ -81,6 +81,8 @@ export default function Accounts(props: {
   soloGratuitos?: boolean;
   /** Con título, las filas van en su propia sección y «Agregar cuenta» a su derecha. */
   titulo?: string;
+  /** La línea debajo del título. */
+  subtitulo?: string;
   /** El nombre de la fila cuando no hay cuentas, o el de la activación. */
   nombre?: string;
   /** Lo que le falta a la superficie, junto al título o al nombre. */
@@ -773,10 +775,15 @@ export default function Accounts(props: {
             <span class="flex size-4 shrink-0 items-center justify-center">
               <MarcaAgente id={agente()} size={16} />
             </span>
-            <span class="min-w-0 flex-1 truncate">{props.titulo}</span>
+            <span class="grid min-w-0 flex-1">
+              <span class="truncate">{props.titulo}</span>
+              <Show when={props.subtitulo}>
+                <span class="truncate text-xs font-normal text-neutral-500">{props.subtitulo}</span>
+              </Show>
+            </span>
             <span class="flex shrink-0 items-center font-normal">{props.marca}</span>
             {/* Plegada, la cabecera dice con qué cuenta trabaja el proveedor. */}
-            <Show when={!abierto() ? cuentaActiva() : undefined}>
+            <Show when={!abierto() && !props.soloGratuitos ? cuentaActiva() : undefined}>
               {(activa) => (
                 <span class="flex min-w-0 items-center gap-1.5 text-xs font-normal text-neutral-500">
                   <span class="truncate font-medium text-neutral-700">
@@ -1945,10 +1952,12 @@ function ModelosGratuitos(props: {
     </Show>
     <SettingsRow
       label={
-        <span class="flex flex-wrap items-center gap-2">
-          {props.nombre}
-          {props.marca}
-        </span>
+        props.nombre || props.marca ? (
+          <span class="flex flex-wrap items-center gap-2">
+            {props.nombre}
+            {props.marca}
+          </span>
+        ) : ""
       }
       description={
       <>

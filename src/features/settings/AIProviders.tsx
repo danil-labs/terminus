@@ -11,24 +11,28 @@ import { SettingsPanel } from "./layout";
 
 /**
  * Las superficies del mismo agente comparten sección. Cada una conserva su
- * cuenta o consentimiento y su estado dentro de esa sección.
+ * cuenta o consentimiento y su estado dentro de esa sección. Los gratuitos
+ * van aparte: no piden cuenta y su decisión es a dónde sale el material.
  */
 export default function AIProviders(props: { superficies: Superficie[]; agentesEnUso: string[] }) {
   const grupos = createMemo(() => {
     const vistos = new Map<string, Superficie[]>();
     for (const superficie of props.superficies) {
-      const grupo = vistos.get(superficie.agent);
+      const clave = superficie.catalogo === "gratuitos" ? superficie.id : superficie.agent;
+      const grupo = vistos.get(clave);
       if (grupo) grupo.push(superficie);
-      else vistos.set(superficie.agent, [superficie]);
+      else vistos.set(clave, [superficie]);
     }
     return [...vistos.values()];
   });
 
   const nombreDe = (superficie: Superficie, enGrupo: boolean) => {
-    if (!enGrupo) return undefined;
-    return superficie.agent === "opencode-zen" && superficie.catalogo === "de_pago"
-      ? t("settings.ai_providers.zen_go")
-      : rotuloDeSuperficie(superficie);
+    if (superficie.agent === "opencode-zen" && superficie.catalogo === "de_pago") {
+      return t("settings.ai_providers.zen_go");
+    }
+    // El título de la sección ya lo nombra; la fila deja solo el aviso.
+    if (superficie.catalogo === "gratuitos") return enGrupo ? rotuloDeSuperficie(superficie) : "";
+    return enGrupo ? rotuloDeSuperficie(superficie) : undefined;
   };
 
   return (
@@ -43,6 +47,7 @@ export default function AIProviders(props: { superficies: Superficie[]; agentesE
             agente={grupo()[0].agent}
             soloGratuitos={grupo()[0].catalogo === "gratuitos"}
             titulo={grupo().length > 1 ? grupo()[0].label : rotuloDeSuperficie(grupo()[0])}
+            subtitulo={grupo()[0].catalogo === "gratuitos" ? t("settings.ai_providers.free_detail") : undefined}
             nombre={nombreDe(grupo()[0], grupo().length > 1)}
             marca={<Marca superficie={grupo()[0]} />}
             desplegado={props.agentesEnUso.includes(grupo()[0].agent)}

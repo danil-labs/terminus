@@ -47,7 +47,7 @@ export function SettingsSection(props: SettingsSectionProps) {
 export type SettingsRowProps = Omit<JSX.HTMLAttributes<HTMLDivElement>, "children"> & {
   /** Lo que va antes del nombre: un avatar, una marca, un icono. */
   lead?: JSX.Element;
-  /** El nombre del ajuste. Ya traducido. */
+  /** El nombre del ajuste. Ya traducido; vacío, la fila va sin nombre. */
   label: JSX.Element;
   /** Qué hace o en qué estado está. Ya traducido. */
   description?: JSX.Element;
@@ -77,7 +77,9 @@ export function SettingsRow(props: SettingsRowProps) {
       <div class="flex min-w-0 flex-1 items-center gap-3">
         {own.lead}
         <div class="grid min-w-0 flex-1 gap-[3px]">
-          <div class="min-w-0 text-sm">{own.label}</div>
+          <Show when={own.label !== ""}>
+            <div class="min-w-0 text-sm">{own.label}</div>
+          </Show>
           <Show when={description()}>
             <div class="min-w-0 text-[0.8125rem] leading-[19px] text-neutral-500">
               {description()}

@@ -3384,7 +3384,7 @@ export default function App() {
   // de un agente que manda material fuera sin pedir credencial sale vacío
   // hasta que este workspace lo consiente (`runtime/models.rs`). Sin esto, la caja de
   // chat se quedaba con la lista vacía hasta cambiar de agente y volver.
-  // Aceptar es además lo que hace aparecer «Modelos Free»: la misma consulta
+  // Aceptar es además lo que hace aparecer «Modelos gratuitos»: la misma consulta
   // que decide si se puede usar es la que hay que rehacer.
   onMount(() => {
     const refrescar = () => {
