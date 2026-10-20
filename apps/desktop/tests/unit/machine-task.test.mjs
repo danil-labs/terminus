@@ -90,8 +90,8 @@ test("una tarea de una máquina apagada abre sin fallo y mandarle algo la encien
   }));
   await sleep(600);
   const doc = app.w.document;
-  assert.ok(doc.querySelector('[data-sesion="r1"] [data-machine="vm"][data-machine-on="false"]'), "la fila no lleva el chip apagado");
-  assert.equal(doc.querySelector('[data-sesion="t1"] [data-machine]'), null, "una tarea local no lleva chip");
+  assert.ok(doc.querySelector('[data-sesion="r1"]'), "la tarea de la máquina apagada no sale en el sidebar");
+  assert.equal(doc.querySelector("[data-sesion] [data-machine]"), null, "la fila del sidebar lleva el chip de la máquina; lo dice su tarjeta");
 
   await openTask(app, "r1");
   assert.ok(text(app).includes("Respuesta guardada"), "no enseña la copia guardada");
