@@ -366,8 +366,7 @@ const METRICA_DEL_CAMPO =
   "border border-transparent px-2 py-1.5 text-[0.8125rem] leading-[1.4] [font-family:inherit] [scrollbar-gutter:stable]";
 // Del mismo tipo que el `inherit` de arriba, para que `cn` lo reemplace.
 const FUENTE_DE_TERMINAL = "[font-family:var(--font-mono)] [tab-size:4]";
-/** Lo que `guardar_imagen_pegada` sabe guardar. */
-const IMAGENES_SUBIBLES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+const archivosDelNavegador = () => import("./browserFiles");
 
 const mensajeDe = (bloque: Bloque): BloqueDeMensaje | null =>
   bloque.tipo === "msg" ? bloque : null;
@@ -1367,31 +1366,8 @@ export default function Chat(props: ChatProps) {
   onMount(() => {
     const zona = ancla?.parentElement;
     if (!capabilities().browserFiles || !zona) return;
-    const conArchivos = (e: DragEvent) => !!e.dataTransfer?.types.includes("Files");
-    const encima = (e: DragEvent) => {
-      if (!conArchivos(e)) return;
-      e.preventDefault();
-      setSoltando(props.soloLectura || !puedeAdjuntar() ? null : zona.getBoundingClientRect());
-    };
-    const fuera = (e: DragEvent) => {
-      if (!zona.contains(e.relatedTarget as Node | null)) setSoltando(null);
-    };
-    const soltar = (e: DragEvent) => {
-      if (!conArchivos(e)) return;
-      e.preventDefault();
-      setSoltando(null);
-      void subirArchivos([...(e.dataTransfer?.files ?? [])]);
-    };
-    zona.addEventListener("dragenter", encima);
-    zona.addEventListener("dragover", encima);
-    zona.addEventListener("dragleave", fuera);
-    zona.addEventListener("drop", soltar);
-    onCleanup(() => {
-      zona.removeEventListener("dragenter", encima);
-      zona.removeEventListener("dragover", encima);
-      zona.removeEventListener("dragleave", fuera);
-      zona.removeEventListener("drop", soltar);
-    });
+    const quitar = archivosDelNavegador().then((m) => enNavegador(m).escuchar(zona));
+    onCleanup(() => void quitar.then((f) => f()));
   });
 
   async function agregar(rutas: string[]) {
@@ -1426,28 +1402,17 @@ export default function Chat(props: ChatProps) {
     }
   }
 
-  /** En la web: el archivo viaja como bytes y el motor lo guarda en su máquina. */
-  async function subirArchivos(files: File[]) {
-    if (props.soloLectura || !puedeAdjuntar() || files.length === 0) return;
-    const conversation = props.conversacion;
-    const imagenes = files.filter((f) => IMAGENES_SUBIBLES.includes(f.type));
-    const fuera = files.filter((f) => !IMAGENES_SUBIBLES.includes(f.type));
-    setAttachmentFailure(null);
-    setPreparingAttachments((n) => n + 1);
-    try {
-      const rutas: string[] = [];
-      for (const f of imagenes) rutas.push(await props.onPegarImagen(f.type, await base64De(f)));
-      if (rutas.length) await agregar(rutas);
-      if (fuera.length && conversation === props.conversacion) {
-        const names = fuera.map((f) => f.name).join(", ");
-        setAttachmentFailure({ what: t("chat.attachments.web_images_only", { names }), detail: "web_images_only" });
-      }
-    } catch (err) {
-      if (conversation === props.conversacion) setAttachmentFailure(asFailure(err));
-    } finally {
-      setPreparingAttachments((n) => n - 1);
-    }
-  }
+  /** En la web: el archivo viaja como bytes y el motor lo guarda en su máquina (`browserFiles.ts`). */
+  const enNavegador = (m: typeof import("./browserFiles")) => m.adjuntador({
+    puede: () => !props.soloLectura && puedeAdjuntar(),
+    marcar: setSoltando,
+    conversacion: () => props.conversacion,
+    pegar: props.onPegarImagen,
+    agregar,
+    fallo: setAttachmentFailure,
+    ocupado: (d) => setPreparingAttachments((n) => n + d),
+  });
+
 
   async function copiarMensaje(clave: string, texto: string) {
     if (copiando()) return;
@@ -1493,12 +1458,7 @@ export default function Chat(props: ChatProps) {
 
   async function elegirArchivos() {
     if (capabilities().browserFiles) {
-      const input = document.createElement("input");
-      input.type = "file";
-      input.multiple = true;
-      input.accept = IMAGENES_SUBIBLES.join(",");
-      input.onchange = () => void subirArchivos([...(input.files ?? [])]);
-      input.click();
+      enNavegador(await archivosDelNavegador()).elegir();
       return;
     }
     const elegidos = await open({

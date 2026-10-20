@@ -1,4 +1,4 @@
-import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import Check from "lucide-solid/icons/check";
 import Copy from "lucide-solid/icons/copy";
 import TriangleAlert from "lucide-solid/icons/triangle-alert";
@@ -6,13 +6,14 @@ import remarkGfm from "remark-gfm";
 import {
   type ComponentProps,
   createMemo,
-  createResource,
   createSignal,
   ErrorBoundary,
   Index,
   type JSX,
+  lazy,
   onCleanup,
   Show,
+  Suspense,
 } from "solid-js";
 import { SolidMarkdown } from "solid-markdown";
 import { copyText } from "../lib/clipboard";
@@ -53,28 +54,8 @@ function fuenteLocal(src: unknown): string | null {
   return ruta ? convertFileSrc(ruta, "terminus-image") || null : null;
 }
 
-/** En la web el disco es el de la computadora remota: el motor manda la imagen como `data:`. */
-function ImagenRemota(props: { path: string; alt?: string }) {
-  const [fuente] = createResource(
-    () => props.path,
-    (ruta) =>
-      invoke<{ data_url?: string | null }>("preview_file", { path: ruta, rel: ruta })
-        .then((p) => imagenInerte(p.data_url))
-        .catch(() => null),
-  );
-  return (
-    <Show
-      when={fuente()}
-      fallback={
-        <Show when={!fuente.loading} fallback={<span class="text-neutral-500">{props.alt}</span>}>
-          <FilePreview path={props.path} alt={props.alt} />
-        </Show>
-      }
-    >
-      {(src) => <EnlargeableImage src={src()} alt={props.alt} />}
-    </Show>
-  );
-}
+// Solo la web lo usa: el escritorio pinta la imagen desde su disco.
+const ImagenRemota = lazy(() => import("./RemoteImage"));
 
 /**
  * Cómo se pinta cada etiqueta. **Es una constante del módulo y no un literal
@@ -226,7 +207,11 @@ const COMPONENTES = {
         <Show when={localFilePath(p.src)} fallback={<span class="text-neutral-500">{p.alt}</span>}>
           {(ruta) => (
             <Show when={imagenLocal(p.src)} fallback={<FilePreview path={ruta()} alt={p.alt} />}>
-              {(imagen) => <ImagenRemota path={imagen()} alt={p.alt} />}
+              {(imagen) => (
+                <Suspense fallback={<span class="text-neutral-500">{p.alt}</span>}>
+                  <ImagenRemota path={imagen()} alt={p.alt} />
+                </Suspense>
+              )}
             </Show>
           )}
         </Show>
