@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams } from "expo-router";
+import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import type { ChatEvent, Question, Turn } from "@terminus/protocol";
@@ -25,6 +25,7 @@ import { Attachments, MessageBody, toolImages } from "../../../../../ui/chat/Mes
 import { ChatScopeContext } from "../../../../../ui/chat/scope";
 import { Composer, type Submission } from "../../../../../ui/Composer";
 import { type Theme, useTheme } from "../../../../../ui/theme";
+import { Icon } from "../../../../../ui/Icon";
 import { KeyboardScreen } from "../../../../../ui/KeyboardScreen";
 
 /** Kinds that change what the task reports: pending requests or whether it runs. */
@@ -174,7 +175,19 @@ export default function TaskScreen() {
   return (
     <KeyboardScreen>
       <ChatScopeContext.Provider value={scope}>
-      <Stack.Screen options={{ title: titleOf(key) ?? title }} />
+      <Stack.Screen
+        options={{
+          title: titleOf(key) ?? title,
+          // Abierta desde un enlace (en el navegador o un aviso) no hay a dónde volver: la flecha lleva a Tareas.
+          headerLeft: router.canGoBack()
+            ? undefined
+            : () => (
+                <Pressable hitSlop={10} onPress={() => router.replace("/")} accessibilityLabel={t("task.back")} style={{ paddingRight: 12 }}>
+                  <Icon name="arrow-left" size={22} color={theme.text} />
+                </Pressable>
+              ),
+        }}
+      />
       <FlatList
         ref={list}
         data={lines}

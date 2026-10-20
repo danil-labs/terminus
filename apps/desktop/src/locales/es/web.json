@@ -15,6 +15,7 @@
   "web.computers.state.starting": "Encendiéndose",
   "web.computers.waiting": "Conectando con tu cuenta de Danil…",
   "web.desktop_only": "Esto solo está disponible en la app de escritorio de Terminus.",
+  "web.phone_layout": "Ver la versión del teléfono",
   "web.home": "Volver a Danil Agents",
   "web.local_files": "Desde el navegador no se eligen archivos ni carpetas de este equipo. Para eso usa la app de escritorio de Terminus.",
   "web.machines.create_on": "Se crea en",

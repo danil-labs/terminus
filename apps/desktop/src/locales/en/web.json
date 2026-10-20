@@ -15,6 +15,7 @@
   "web.computers.state.starting": "Starting",
   "web.computers.waiting": "Connecting to your Danil account…",
   "web.desktop_only": "This is only available in the Terminus desktop app.",
+  "web.phone_layout": "Open the phone version",
   "web.home": "Back to Danil Agents",
   "web.local_files": "The browser cannot pick files or folders on this device. Use the Terminus desktop app for that.",
   "web.machines.create_on": "Created on",

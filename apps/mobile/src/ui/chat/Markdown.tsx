@@ -8,7 +8,8 @@ import { t } from "../../lib/i18n";
 import { openTask } from "../components";
 import { Icon } from "../Icon";
 import { type Theme, useTheme } from "../theme";
-import { ChatImage, ChatVisual, LocalFile, MermaidDiagram } from "./Embeds";
+import { ChatImage, ChatVisual, LocalFile } from "./Embeds";
+import { MermaidDiagram } from "./Mermaid";
 import { type ChatScope, useChatScope } from "./scope";
 
 const MONO = Platform.select({ ios: "Menlo", default: "monospace" });

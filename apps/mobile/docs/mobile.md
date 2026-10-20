@@ -53,6 +53,25 @@ como la web.
 - **El teléfono no ve la pantalla de la máquina.** Habla los comandos de la
   ventana a través del relay (o del bridge en desarrollo).
 
+## En el navegador
+
+La misma app se compila para web y vive dentro de Terminus web, en
+`/terminus/m/` (`apps/desktop/scripts/web-mobile.mjs`, último paso de
+`pnpm web:build`). La web de escritorio manda ahí a los teléfonos y cada una
+tiene un enlace a la otra («Ver la versión de escritorio» en la hoja de
+workspaces). Lo que cambia en el navegador va en archivos `.web.ts(x)`:
+
+- **Sesión:** la de la app de Danil en el mismo origen (`supabase.web.ts`),
+  como la web de escritorio; sin sesión se va a su inicio (`signin.web.tsx`).
+  No hay bridge.
+- **Lo que se recuerda:** `localStorage` en lugar del llavero (`store.web.ts`).
+- **Visualizaciones y archivos HTML:** el `iframe` de la ventana (`srcdoc`,
+  `allow-scripts` sin `allow-same-origin`) en lugar del WebView. Un PDF no se
+  abre dentro (`frame-src 'self'`).
+- **Mermaid:** el paquete, cargado al primer diagrama; la política de la página
+  no deja traerlo de afuera.
+- **Avisos del sistema:** todavía no; la campana sigue contando.
+
 ## Patrones del teléfono
 
 | Escritorio (#151) | Teléfono | Por qué |

@@ -15,6 +15,7 @@ export type LucideShape =
 
 export const ICONS = {
   "archive": [{"kind": "rect", "width": 20.0, "height": 5.0, "x": 2.0, "y": 3.0, "rx": 1.0}, {"kind": "path", "d": "M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"}, {"kind": "path", "d": "M10 12h4"}],
+  "arrow-left": [{"kind": "path", "d": "m12 19-7-7 7-7"}, {"kind": "path", "d": "M19 12H5"}],
   "arrow-up": [{"kind": "path", "d": "m5 12 7-7 7 7"}, {"kind": "path", "d": "M12 19V5"}],
   "at-sign": [{"kind": "circle", "cx": 12.0, "cy": 12.0, "r": 4.0}, {"kind": "path", "d": "M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"}],
   "bell": [{"kind": "path", "d": "M10.268 21a2 2 0 0 0 3.464 0"}, {"kind": "path", "d": "M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"}],

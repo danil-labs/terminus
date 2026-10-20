@@ -2,12 +2,12 @@ import { envolver } from "@terminus/chat/sandbox";
 import type { FilePreview } from "@terminus/protocol";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Image, Modal, Platform, Pressable, StyleSheet, Text, useColorScheme, View } from "react-native";
-import { WebView } from "react-native-webview";
 import { previewFile, readVisual } from "../../lib/engine";
 import { t } from "../../lib/i18n";
 import { Icon } from "../Icon";
 import { useTheme } from "../theme";
 import { useChatScope } from "./scope";
+import { PDF_INLINE, PdfPage, SandboxedPage } from "./Page";
 import { visualThemeOf } from "./visualTheme";
 import { WebFrame } from "./WebFrame";
 
@@ -51,36 +51,6 @@ export function ChatVisual({ file, title }: { file: string; title: string }) {
         <ActivityIndicator style={styles.loading} />
       )}
     </View>
-  );
-}
-
-/** Un bloque ```mermaid: el diagrama con mermaid, en su propia página, del color del tema. */
-export function MermaidDiagram({ definition }: { definition: string }) {
-  const theme = useTheme();
-  const dark = useColorScheme() === "dark";
-  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<style>html,body{margin:0;background:transparent;color:${theme.text}}#d{padding:8px;overflow-x:auto}#d svg{max-width:100%;height:auto}</style></head>
-<body><div id="d"></div><script src="https://cdn.jsdelivr.net/npm/mermaid@12/dist/mermaid.min.js"></script><script>
-function size(){parent.postMessage({type:"terminus:visual-height",height:Math.ceil(document.body.scrollHeight)},"*")}
-try{mermaid.initialize({startOnLoad:false,securityLevel:"strict",theme:${JSON.stringify(dark ? "dark" : "default")}});
-mermaid.render("m",${JSON.stringify(definition)}).then(function(r){document.getElementById("d").innerHTML=r.svg;size()}).catch(function(){parent.postMessage({type:"terminus:visual-error"},"*")});}
-catch(e){parent.postMessage({type:"terminus:visual-error"},"*")}
-</script></body></html>`;
-  const [failed, setFailed] = useState(false);
-  if (failed) return <CodeFallback text={definition} />;
-  return (
-    <View style={styles.block}>
-      <WebFrame html={html} minHeight={80} onError={() => setFailed(true)} />
-    </View>
-  );
-}
-
-function CodeFallback({ text }: { text: string }) {
-  const theme = useTheme();
-  return (
-    <Text selectable style={[styles.mono, { color: theme.text, backgroundColor: theme.muted }]}>
-      {text}
-    </Text>
   );
 }
 
@@ -163,7 +133,7 @@ function FileBody({ preview, failed }: { preview: FilePreview | null; failed: bo
   if (!preview) return <ActivityIndicator style={styles.loading} />;
   if (preview.kind === "image" && preview.data_url) return <Image source={{ uri: preview.data_url }} style={{ flex: 1 }} resizeMode="contain" />;
   if (preview.kind === "html" && preview.text) return <SandboxedPage html={envolver(preview.text)} />;
-  if (preview.kind === "pdf" && preview.pdf && Platform.OS === "ios") return <WebView source={{ uri: `data:application/pdf;base64,${preview.pdf}` }} originWhitelist={["data:*"]} style={{ flex: 1 }} />;
+  if (preview.kind === "pdf" && preview.pdf && PDF_INLINE) return <PdfPage base64={preview.pdf} />;
   if (preview.kind === "text" && preview.text)
     return (
       <Text selectable style={[styles.mono, { color: theme.text, backgroundColor: theme.muted }]}>
@@ -171,21 +141,6 @@ function FileBody({ preview, failed }: { preview: FilePreview | null; failed: bo
       </Text>
     );
   return <Muted>{t("chat.file.no_preview")}</Muted>;
-}
-
-/** Una página HTML de la máquina a pantalla completa, con el mismo aislamiento que las visualizaciones. */
-function SandboxedPage({ html }: { html: string }) {
-  return (
-    <WebView
-      source={{ html }}
-      originWhitelist={["about:*"]}
-      onShouldStartLoadWithRequest={(request) => request.url.startsWith("about:")}
-      javaScriptCanOpenWindowsAutomatically={false}
-      setSupportMultipleWindows={false}
-      allowFileAccess={false}
-      style={{ flex: 1, backgroundColor: "transparent" }}
-    />
-  );
 }
 
 const styles = StyleSheet.create({

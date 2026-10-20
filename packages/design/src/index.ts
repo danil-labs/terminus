@@ -4,3 +4,4 @@ export { type IconShape, type LucideName, LUCIDE, STATUS_ICONS } from "./icons.t
 export { type ThemeTokens, CSS_SOURCE, CSS_THEME_BLOCKS, THEMES } from "./tokens.ts";
 export { FOLDER_PALETTE, folderColor } from "./folderColor.ts";
 export { type Plural, type Word, type WordKey, WORDS, word } from "./words.ts";
+export { type WebLayout, MOBILE_WEB_DIR, PHONE_QUERY, WEB_LAYOUT_KEY, chosenWebLayout } from "./webLayout.ts";

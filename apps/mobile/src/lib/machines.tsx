@@ -1,6 +1,6 @@
 import { type Answer, type Computer, listComputers, orderComputers, startComputer } from "@terminus/computers";
 import type { EngineEvent, WorkspaceAttention } from "@terminus/protocol";
-import * as SecureStore from "expo-secure-store";
+import { store } from "./store";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AppState, Platform } from "react-native";
 import { useAccount } from "./account";
@@ -91,7 +91,7 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
       setPairing(BRIDGE_ENABLED ? saved : null);
       setPairingLoaded(true);
     });
-    void SecureStore.getItemAsync(LAST).then(setLast);
+    void store.get(LAST).then(setLast);
     if (Platform.OS === "android" && Notifications) {
       void Notifications.setNotificationChannelAsync(CHANNEL, { name: t("notify.channel"), importance: Notifications.AndroidImportance.HIGH });
     }
@@ -184,7 +184,7 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
 
   const rememberMachine = useCallback((id: string) => {
     setLast(id);
-    void SecureStore.setItemAsync(LAST, id);
+    void store.set(LAST, id);
   }, []);
 
   const preferred = useCallback(

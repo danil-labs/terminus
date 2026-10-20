@@ -52,6 +52,16 @@ pnpm web:build      # dist-web/<base>/ plus dist-web/index.html and dist-web/_he
 pnpm web:dev        # Vite on <base>web.html with the same settings
 ```
 
+`pnpm web:build` ends with `scripts/web-mobile.mjs`: the phone app
+(`apps/mobile`, Expo for web) built into `dist-web/<base>m/` with the same
+public settings, so it needs `npm ci` in `apps/mobile` first. A phone (small,
+touch screen: `PHONE_QUERY` in `@terminus/design`) that opens `<base>` goes to
+`<base>m/`; each version links to the other and the choice is kept in
+`localStorage` (`terminus.web.layout`). Both share the origin, the Danil app's
+Supabase session and `_headers`. A deep link under `<base>m/` that falls back to
+`index.html` is passed to the phone app as `?to=`. `web:dev` serves only the
+desktop version.
+
 Build-time settings (environment variables; all are public values):
 
 | Variable | Default | Effect |

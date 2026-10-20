@@ -5,6 +5,7 @@
  * that sets `window.terminusWeb` before this module loads can replace any
  * setting, or give `getToken` with `computerId` or `computers` and skip the session.
  */
+import { chosenWebLayout, MOBILE_WEB_DIR } from "@terminus/design";
 import { createSignal, lazy, Suspense } from "solid-js";
 import { t } from "../lib/i18n";
 import { setCapabilities } from "../lib/platform";
@@ -159,6 +160,28 @@ async function start(settings: WebSettings) {
 const given = (window as Window & { terminusWeb?: TerminusWebConfig }).terminusWeb ?? {};
 const preset = given.computers ?? (given.computerId ? [{ computer_id: given.computerId, state: "unknown" }] : null);
 const connecting = window.location.pathname.replace(/\/+$/, "") === `${import.meta.env.BASE_URL}connect`;
-if (connecting) void import("./connect/main").then((m) => m.startConnect({ ...__TERMINUS_WEB__, ...given } as WebSettings, document.getElementById("root") as HTMLElement));
+
+/**
+ * Un teléfono abre el Terminus del teléfono (`<base>m/`, la app de Expo para
+ * web) salvo que la persona haya elegido este. Una ruta del teléfono que cae
+ * aquí (el respaldo de página única sirve esta copia) se pasa a su raíz con
+ * `?to=`; su raíz misma solo llega aquí si no está publicada (`web:dev`), y
+ * entonces sigue esta.
+ */
+function toPhone(): boolean {
+  const phone = `${import.meta.env.BASE_URL}${MOBILE_WEB_DIR}/`;
+  const path = window.location.pathname;
+  if (path.startsWith(phone) && path !== phone) {
+    window.location.replace(`${phone}?to=${encodeURIComponent(path.slice(phone.length - 1) + window.location.search)}`);
+    return true;
+  }
+  if (path.startsWith(phone) || connecting || preset || chosenWebLayout(window) !== "mobile") return false;
+  window.location.replace(phone);
+  return true;
+}
+
+if (toPhone()) {
+  // Se va al del teléfono: no se monta nada aquí.
+} else if (connecting) void import("./connect/main").then((m) => m.startConnect({ ...__TERMINUS_WEB__, ...given } as WebSettings, document.getElementById("root") as HTMLElement));
 else if (preset && given.getToken) mountApp(preset, { ...__TERMINUS_WEB__, ...given } as Base);
 else void start({ ...__TERMINUS_WEB__, ...given } as WebSettings);
