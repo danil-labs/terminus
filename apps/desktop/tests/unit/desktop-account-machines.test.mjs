@@ -144,10 +144,10 @@ test("signed in, the tasks of every machine show together, each with its machine
   assert.deepEqual(listed, ["Bearer client-tok"], "the computers are listed with the engine's client token");
   assert.equal(doc.querySelectorAll("[data-machine-toast]").length, 0, "a machine found on says nothing");
   assert.ok(text().includes("Tarea local") && text().includes("Tarea de la VM") && text().includes("Tarea del Mac"));
-  assert.ok(doc.querySelector('[data-sesion="t1"] [data-machine="cmp_home"]'), "the local task keeps its id and has its badge");
-  assert.ok(doc.querySelector('[data-sesion="cmp_vm~t1"] [data-machine="cmp_vm"]'), "the VM task has its namespaced id and badge");
-  assert.ok(doc.querySelector('[data-sesion="cmp_mac~t1"] [data-machine="cmp_mac"]'));
-  assert.ok(doc.querySelector('[data-machine="cmp_vm"]')?.textContent.includes("Danil VM"));
+  assert.ok(doc.querySelector('[data-sesion="t1"]'), "the local task keeps its id");
+  assert.ok(doc.querySelector('[data-sesion="cmp_vm~t1"]'), "the VM task has its namespaced id");
+  assert.ok(doc.querySelector('[data-sesion="cmp_mac~t1"]'));
+  assert.equal(doc.querySelector("[data-sesion] [data-machine]"), null, "a sidebar row leaves its machine to the task card");
   assert.ok(relayCalls("cmp_vm", "list_projects").some((c) => c.workspace === "w"), "the VM reads its own workspace");
   assert.equal(native("list_projects").length > 0, true, "the local engine still answers through the window");
 
@@ -178,7 +178,6 @@ test("the task card says its machine, and the folder chip adds no native tooltip
   const fila = doc.querySelector('[data-sesion="cmp_mac~t1"]');
   assert.ok(fila);
   assert.equal(fila.querySelector("[data-folder-chip]")?.getAttribute("title") ?? null, null, "no native title over the card");
-  assert.equal(fila.querySelector("[data-machine]")?.getAttribute("title") ?? null, null);
   fila.closest("[data-sesion]").parentElement.dispatchEvent(new app.w.PointerEvent("pointerenter", { pointerType: "mouse" }));
   await sleep(900);
   const machine = doc.querySelector('[data-hover-machine="cmp_mac"]');
@@ -196,7 +195,7 @@ test("an action wakes the VM; a physical machine that is off says so, neutral", 
       cmp_mac: { table: remote("Notas", "Tarea del Mac"), state: "offline", cachedAt: "2026-10-18T21:30:00Z", notStartable: true },
     },
   });
-  assert.ok(doc.querySelector('[data-sesion="cmp_vm~t1"] [data-machine="cmp_vm"][data-machine-on="false"]'), "the VM's copy shows, marked off");
+  assert.ok(doc.querySelector('[data-sesion="cmp_vm~t1"]'), "the VM's copy shows");
   assert.equal(relayCalls("cmp_vm", "send_message").length, 0, "opening the app never starts it");
 
   await assert.rejects(invoke("send_message", { session: "cmp_mac~t1", text: "hola" }), (e) => {
