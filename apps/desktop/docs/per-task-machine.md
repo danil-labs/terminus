@@ -184,7 +184,7 @@ corren las tareas que se crearon en ellas.
 ## Lo que queda
 
 - **El workspace de la cuenta**: reemplazar `counterpart_workspace` cuando haya
-  cuentas y plano de control.
+  cuentas y plano de control. Plan en [`account-workspace.md`](account-workspace.md).
 - **Proyectos sin pareja.** Una tarea remota de un proyecto que la ventana no
   tiene no aparece. `move_session` hacia otro proyecto no traduce `to`.
 - **Eventos.** La suscripción lateral empieza en el presente: lo emitido entre
