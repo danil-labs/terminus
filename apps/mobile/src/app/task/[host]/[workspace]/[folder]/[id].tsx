@@ -1,12 +1,13 @@
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FlatList, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import type { ChatEvent, Question, Turn } from "@terminus/protocol";
+import { FlatList, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { type ChatBackgroundView, type ChatEvent, type Question, type Turn, DEFAULT_CHAT_VEIL } from "@terminus/protocol";
 import {
   type PendingQuestion,
   type Permission,
   type TaskView,
   answerQuestion,
+  chatBackgroundOf,
   injectIntoTask,
   loadTask,
   markSeen,
@@ -49,6 +50,7 @@ export default function TaskScreen() {
   const [streaming, setStreaming] = useState("");
   const [note, setNote] = useState<string | null>(null);
   const [waking, setWaking] = useState(false);
+  const [background, setBackground] = useState<ChatBackgroundView | null>(null);
   const list = useRef<FlatList<Line>>(null);
   const key = `${params.host}/${id}`;
 
@@ -79,6 +81,17 @@ export default function TaskScreen() {
       .catch(fail);
     return () => setOpenTask(null);
   }, [key, refresh, setOpenTask, fail, host, workspace, id]);
+
+  // El fondo del workspace en la máquina de la tarea; leerlo nunca la enciende.
+  useEffect(() => {
+    setBackground(null);
+    if (!host) return;
+    let current = true;
+    void chatBackgroundOf(host, workspace).then((next) => current && setBackground(next));
+    return () => {
+      current = false;
+    };
+  }, [host, workspace]);
 
   // La máquina se encendió (o volvió): la copia deja paso a lo vivo.
   useEffect(() => {
@@ -159,6 +172,7 @@ export default function TaskScreen() {
   return (
     <KeyboardScreen>
       <Stack.Screen options={{ title: titleOf(key) ?? title }} />
+      <ChatBackdrop background={background} theme={theme} />
       <FlatList
         ref={list}
         data={lines}
@@ -208,6 +222,17 @@ export default function TaskScreen() {
         onStop={stop}
       />
     </KeyboardScreen>
+  );
+}
+
+/** La imagen del workspace con su velo; un patrón del escritorio queda en el fondo liso del tema. */
+function ChatBackdrop({ background, theme }: { background: ChatBackgroundView | null; theme: Theme }) {
+  if (!background?.image) return null;
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Image source={{ uri: background.image }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.surface, opacity: background.veil.chat ?? DEFAULT_CHAT_VEIL }]} />
+    </View>
   );
 }
 

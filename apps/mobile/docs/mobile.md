@@ -49,6 +49,17 @@ como la web.
   aparte con `role="search"`, como en t3code. No se dibuja una barra propia.
 - **Tema claro y oscuro** según el sistema, con los tokens por omisión del
   escritorio en `apps/desktop/src/styles/global.css`: Violeta en claro y Grafito en oscuro.
+- **Solo los workspaces vinculados a la cuenta.** Cada fila de `/v1/computers`
+  trae `workspaces`, los ids que esa máquina vinculó a la cuenta que entró; el
+  relay ya rechaza el resto (`workspace_not_linked`) y el teléfono filtra otra
+  vez la lista, la atención y los eventos (`linkedWorkspaces`, `onlyLinked` en
+  `@terminus/computers`). Una fila sin el campo es de un plano de control
+  anterior y no se filtra.
+- **El fondo de los chats es del workspace** (`chat_background`): la imagen
+  propia se pinta detrás de la conversación con el velo del workspace
+  (`chatBackgroundView` en `@terminus/protocol`). Los patrones del escritorio
+  (`dusk`) salen de CSS con tokens que `@terminus/design` no repite, así que en
+  el teléfono un patrón es el fondo liso del tema.
 - **El teléfono no ve la pantalla de la máquina.** Habla los comandos de la
   ventana a través del relay (o del bridge en desarrollo).
 
@@ -97,7 +108,7 @@ Los avisos salen en la app, igual para los dos caminos: una tarea que entra en
 
 | Ruta | Qué es |
 |---|---|
-| `signin` | Entrar con la cuenta de Danil; en desarrollo, el enlace al bridge. Siempre va primero: un bridge emparejado no la salta, salvo en Android con `EXPO_PUBLIC_TERMINUS_BRIDGE_ONLY=1` (lab sin cuenta). En iOS siempre se inicia sesión |
+| `signin` | Entrar con la cuenta de Danil; en desarrollo, el enlace al bridge. Siempre va primero: sin sesión no se sincroniza nada, tampoco por un bridge emparejado. El bridge solo existe en desarrollo (`__DEV__`); el lab sin cuenta es en desarrollo, en Android y con `EXPO_PUBLIC_TERMINUS_BRIDGE_ONLY=1` (`BRIDGE_WITHOUT_ACCOUNT`). En iOS siempre se inicia sesión |
 | `(tabs)/index` | Tareas: workspace, spaces, alcance y filtro, dock de agentes y la lista plana |
 | `(tabs)/notifications` | «Ahora» de todas las máquinas y «Antes», lo que llegó con la app abierta |
 | `(tabs)/new` | Nueva tarea: el cuadro de escribir con «Ejecutar en» (la última usada, si no la VM), carpeta, rama base y agente; `!` la crea con un comando |
@@ -126,6 +137,7 @@ lleva su comentario allí:
 | Vista previa | `task_blockers` | `set_session_pinned`, `set_task_archived` |
 | Cuadro de escribir | `list_models`, `list_permission_modes`, `list_slash_menu`, `list_mentions`, `project_base_branches` | `run_shell_command`, `stop_shell_command`, `guardar_imagen_pegada`, `prepare_attachments` |
 | Cuentas de IA | `list_accounts`, `account_status`, `account_limits` | `add_account`, `login_account`, `submit_login_code`, `cancel_login`, `discard_account`, `remove_account` |
+| Fondo del chat | `chat_background` | — |
 
 **Qué enciende la VM.** El relay solo enciende con su lista de intención
 (`INTENT_COMMANDS`: escribir, crear, aprobar, `!`, iniciar sesión…). Fijar,

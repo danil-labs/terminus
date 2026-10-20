@@ -1,4 +1,5 @@
 import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
 import type { Pairing } from "./hosts";
 
 /**
@@ -17,5 +18,12 @@ export async function savePairing(pairing: Pairing | null) {
   else await SecureStore.deleteItemAsync(KEY);
 }
 
-/** El camino del bridge se ofrece en desarrollo, o con `EXPO_PUBLIC_TERMINUS_BRIDGE=1`. */
-export const BRIDGE_ENABLED = __DEV__ || process.env.EXPO_PUBLIC_TERMINUS_BRIDGE === "1";
+/** El camino del bridge solo existe en desarrollo: una build de verdad sincroniza con la cuenta de Danil. */
+export const BRIDGE_ENABLED = __DEV__;
+
+/**
+ * El lab sin cuenta: en desarrollo, en Android y con
+ * `EXPO_PUBLIC_TERMINUS_BRIDGE_ONLY=1`, el bridge sincroniza sin sesión de Danil.
+ * En cualquier otro caso, sin sesión no se sincroniza nada.
+ */
+export const BRIDGE_WITHOUT_ACCOUNT = BRIDGE_ENABLED && Platform.OS !== "ios" && process.env.EXPO_PUBLIC_TERMINUS_BRIDGE_ONLY === "1";

@@ -31,6 +31,8 @@ import type {
   Workspace,
   WorkspaceAttention,
 } from "@terminus/protocol";
+import { linkedAttention, onlyLinked } from "@terminus/computers";
+import { type ChatBackgroundView, chatBackgroundView } from "@terminus/protocol";
 import { type FlatRow, flattenTasks } from "@terminus/tasks";
 import { type Host, HostError } from "./hosts.ts";
 
@@ -94,7 +96,13 @@ async function read<T>(host: Host, command: Parameters<Host["call"]>[0], workspa
 export async function workspacesOf(host: Host): Promise<{ list: Workspace[]; cachedAt: number | null }> {
   const at = { cachedAt: null as number | null };
   const startup = await read<Startup | null>(host, "list_workspaces", null, {}, null, at);
-  return { list: startup?.workspaces ?? [], cachedAt: at.cachedAt };
+  return { list: onlyLinked(startup?.workspaces ?? [], host.linked), cachedAt: at.cachedAt };
+}
+
+/** El fondo de los chats del workspace en esa máquina; sin respuesta, ninguno. */
+export async function chatBackgroundOf(host: Host, workspace: string): Promise<ChatBackgroundView> {
+  const at = { cachedAt: null as number | null };
+  return chatBackgroundView(await read<unknown>(host, "chat_background", workspace, {}, null, at).catch(() => null));
 }
 
 /**
@@ -354,7 +362,8 @@ export function markSeen(host: Host, workspace: string, id: string) {
 
 export async function attentionOf(host: Host): Promise<WorkspaceAttention[]> {
   const at = { cachedAt: null as number | null };
-  return read<WorkspaceAttention[]>(host, "list_workspace_attention", null, {}, [], at).catch(() => []);
+  const list = await read<WorkspaceAttention[]>(host, "list_workspace_attention", null, {}, [], at).catch(() => []);
+  return linkedAttention(list, host.linked);
 }
 
 // --- Fijar y archivar (la vista previa) -----------------------------------------
@@ -544,7 +553,9 @@ export function noticer(host: string, initial: WorkspaceAttention[] = []) {
     take(event: EngineEvent): Notice[] {
       if (event.name === "attention" && Array.isArray(event.payload)) {
         const list = event.payload as WorkspaceAttention[];
-        const next = index(list);
+        // Solo cambian los workspaces que trae: lo que se sabía de los demás sigue.
+        const next = new Map([...known].filter(([key]) => !list.some((w) => key.startsWith(`${w.workspace}/`))));
+        for (const [key, state] of index(list)) next.set(key, state);
         const notices: Notice[] = [];
         for (const w of list) for (const task of w.tasks) {
           const key = `${w.workspace}/${task.session}`;

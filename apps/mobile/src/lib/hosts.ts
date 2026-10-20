@@ -17,6 +17,8 @@ import {
   cachedAt,
   canAct,
   isManaged,
+  linkedEvent,
+  linkedWorkspaces,
   powerOf,
   requestId,
 } from "@terminus/computers";
@@ -42,6 +44,10 @@ export type Host = {
   readonly kind: "computer" | "bridge";
   /** La VM que Danil administra: una acción la enciende. */
   readonly managed: boolean;
+  /** Los workspaces vinculados a la cuenta en esta máquina; `null` es que no se filtra (el bridge, un plano de control anterior). */
+  readonly linked: ReadonlySet<string> | null;
+  /** Una computadora de otra persona con workspaces vinculados a esta cuenta: lo de la máquina (cuentas de IA) no es suyo. */
+  readonly member: boolean;
   power(): Power;
   /** Si una acción se puede mandar ya, enciende la máquina, no tiene cómo o su motor está desactualizado. */
   canAct(): "now" | "wakes" | "asleep" | "outdated";
@@ -91,11 +97,14 @@ export function relayHost(computer: Computer, config: Omit<RelayConfig, "compute
   relay.onLink(changed);
   // Hasta que el relay diga su estado, vale el de la fila de `/v1/computers`.
   const state = () => (relay.state() === "unknown" ? computer.state : relay.state());
+  const linked = linkedWorkspaces(computer);
   const host: Host = {
     id: computer.computer_id,
     label: computer.name?.trim() || computer.computer_id,
     kind: "computer",
     managed: isManaged(computer),
+    linked,
+    member: computer.role === "member",
     power: () => powerOf(state()),
     canAct: () => canAct(computer, state()),
     onChange(listener) {
@@ -103,7 +112,8 @@ export function relayHost(computer: Computer, config: Omit<RelayConfig, "compute
       return () => void listeners.delete(listener);
     },
     onEvents(listener) {
-      return relay.onEvents((page: EventsPage) => listener(page.events ?? [], page.gap === true));
+      // El relay ya no manda eventos de un workspace sin vincular; esto es la segunda red.
+      return relay.onEvents((page: EventsPage) => listener((page.events ?? []).filter((e) => linkedEvent(e, linked)), page.gap === true));
     },
     async call<T>(command: AppCommand, workspace: string | null, args: object = {}) {
       allowed(command);
@@ -217,6 +227,8 @@ export function bridgeHost(pairing: Pairing, label: string): Host {
     label,
     kind: "bridge",
     managed: false,
+    linked: null,
+    member: false,
     power: () => (online ? "on" : "off"),
     canAct: () => (online ? "now" : "asleep"),
     onChange(listener) {

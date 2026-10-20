@@ -1,10 +1,10 @@
 import { type Answer, type Computer, listComputers, orderComputers, startComputer } from "@terminus/computers";
-import type { EngineEvent, WorkspaceAttention } from "@terminus/protocol";
+import { type EngineEvent, type WorkspaceAttention, mergeAttention } from "@terminus/protocol";
 import * as SecureStore from "expo-secure-store";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AppState, Platform } from "react-native";
 import { useAccount } from "./account";
-import { BRIDGE_ENABLED, loadPairing, savePairing } from "./bridge";
+import { BRIDGE_ENABLED, BRIDGE_WITHOUT_ACCOUNT, loadPairing, savePairing } from "./bridge";
 import { type Notice, attentionOf, noticer } from "./engine";
 import { type Host, type Pairing, bridgeHost, relayHost } from "./hosts";
 import { t } from "./i18n";
@@ -106,9 +106,12 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
     const answer = await computersOf(account.getToken, account.unauthorized).catch((): Answer<Computer[]> => ({ kind: "error", status: null }));
     if (answer.kind === "ok") {
       setFleet("ok");
-      // Solo cambia la lista si cambian las máquinas: cada cambio vuelve a abrir sus sesiones.
+      // Solo cambia la lista si cambian las máquinas o sus workspaces vinculados: cada cambio vuelve a abrir sus sesiones.
       setComputers((old) => {
-        const same = old.length === answer.value.length && old.every((c, i) => c.computer_id === answer.value[i].computer_id && c.provider === answer.value[i].provider && c.name === answer.value[i].name);
+        const linked = (c: Computer) => JSON.stringify(c.workspaces ?? null);
+        const same =
+          old.length === answer.value.length &&
+          old.every((c, i) => c.computer_id === answer.value[i].computer_id && c.provider === answer.value[i].provider && c.name === answer.value[i].name && linked(c) === linked(answer.value[i]));
         return same ? old : answer.value;
       });
     } else if (answer.kind === "license") setFleet("license");
@@ -130,6 +133,8 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
         endpoint: COMPUTERS,
         getToken: account.getToken,
         onUnauthorized: () => void account.unauthorized(),
+        // Ya no se comparte con esta cuenta: se vuelve a listar, sin reintentar la sesión.
+        onUnlinked: () => void reloadComputers(),
         // Fijar, archivar o cerrar una sesión no son intenciones del relay: la VM se enciende por aquí.
         wake: async () => (await startComputer(COMPUTERS, await account.getToken(), computer.computer_id)).kind === "ok",
         beforeReconnect: async () => {
@@ -140,7 +145,8 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
         },
       }),
     );
-    if (pairing) next.push(bridgeHost(pairing, t("machines.network")));
+    // Sin la sesión de Danil no se sincroniza: el bridge también la pide, salvo el lab sin cuenta.
+    if (pairing && (signedIn || BRIDGE_WITHOUT_ACCOUNT)) next.push(bridgeHost(pairing, t("machines.network")));
     setHosts(next);
     const unsubscribe = next.flatMap((host) => {
       const notices = noticer(host.id);
@@ -159,7 +165,8 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
           if (gap) refreshAttention();
           for (const event of events) {
             if (event.name === "attention" && Array.isArray(event.payload)) {
-              setAttention((old) => ({ ...old, [host.id]: event.payload as WorkspaceAttention[] }));
+              // Una entrada por workspace: las de los demás siguen como estaban.
+              setAttention((old) => ({ ...old, [host.id]: mergeAttention(old[host.id] ?? [], event.payload as WorkspaceAttention[]) }));
             }
             for (const notice of notices.take(event)) {
               setActivity((old) => [{ notice, at: Date.now() }, ...old].slice(0, 100));
@@ -175,7 +182,7 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
       for (const off of unsubscribe) off();
       for (const host of next) host.close();
     };
-  }, [computers, pairing, account.getToken, account.unauthorized]);
+  }, [computers, pairing, signedIn, account.getToken, account.unauthorized, reloadComputers]);
 
   const pair = useCallback(async (next: Pairing | null) => {
     await savePairing(next);

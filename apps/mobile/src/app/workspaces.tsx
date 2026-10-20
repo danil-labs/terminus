@@ -65,7 +65,7 @@ export default function WorkspaceSwitcher() {
           subtitle={`${power(host)} · ${host.kind === "bridge" ? t("signin.dev_bridge") : host.managed ? t("machines.managed") : t("machines.own")}`}
         />
       ))}
-      {hosts.length ? (
+      {hosts.some((h) => !h.member) ? (
         <Row
           testID="open-accounts"
           left={<Icon name="key-round" size={20} color={theme.textMuted} />}

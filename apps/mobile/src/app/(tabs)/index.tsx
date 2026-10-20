@@ -155,7 +155,9 @@ export default function Tasks() {
             {!group.tasks.length ? <Text style={[styles.empty, { color: theme.textMuted }]}>{t("folder.empty")}</Text> : null}
           </View>
         ))}
-        {list.length === 0 && !loading && fleet === "ok" ? <Text style={[styles.empty, { color: theme.textMuted }]}>{t("home.no_workspaces")}</Text> : null}
+        {list.length === 0 && !loading && fleet === "ok" ? (
+          <Text style={[styles.empty, { color: theme.textMuted }]}>{t(hosts.some((h) => h.linked) ? "home.no_linked_workspaces" : "home.no_workspaces")}</Text>
+        ) : null}
       </ScrollView>
     </View>
   );
