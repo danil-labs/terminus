@@ -1,21 +1,28 @@
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Platform, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { createTask, defaultsFor } from "../../lib/engine";
+import type { BaseBranches } from "@terminus/protocol";
+import { baseBranchesOf, createTask, runShell, suggestedDefaults } from "../../lib/engine";
 import { HostError } from "../../lib/hosts";
 import { t, w } from "../../lib/i18n";
 import { useMachines } from "../../lib/machines";
 import { spaceName, useWorkspaces } from "../../lib/workspaces";
-import { openTask } from "../../ui/components";
+import { Avatar, openTask } from "../../ui/components";
+import { Composer, SelectorChip, type Submission } from "../../ui/Composer";
+import { Icon } from "../../ui/Icon";
+import { KeyboardScreen } from "../../ui/KeyboardScreen";
+import { Sheet, SheetOption } from "../../ui/Sheet";
 import { FolderSquare } from "../../ui/TaskCard";
 import { useTheme } from "../../ui/theme";
-import { KeyboardScreen } from "../../ui/KeyboardScreen";
 
 /**
- * «Nueva» de la barra: en qué máquina, en qué carpeta, con quién y qué. La
- * máquina por omisión es la última usada o la VM de Danil; una VM apagada se
- * enciende al empezar, una máquina propia apagada no.
+ * «Nueva» de la barra: la tarea nueva del escritorio. Arriba el workspace; abajo
+ * el cuadro de escribir con sus selectores encima: en qué máquina («Ejecutar
+ * en», solo con más de una), en qué carpeta, desde qué rama base (si la
+ * carpeta tiene git) y con qué agente. La máquina por omisión es la última
+ * usada o la VM de Danil; una VM apagada se enciende al empezar, una máquina
+ * propia apagada no.
  */
 export default function NewTask() {
   const theme = useTheme();
@@ -26,9 +33,11 @@ export default function NewTask() {
   const [hostId, setHostId] = useState<string | null>(null);
   const [folder, setFolder] = useState<string | null>(null);
   const [agent, setAgent] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [branch, setBranch] = useState<string | null>(null);
+  const [branches, setBranches] = useState<BaseBranches | null>(null);
+  const [picker, setPicker] = useState<"machine" | "folder" | "branch" | "agent" | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [waking, setWaking] = useState(false);
 
   useEffect(() => {
     if (params.folder) setFolder(params.folder);
@@ -38,130 +47,186 @@ export default function NewTask() {
 
   const host = hostsOfCurrent.find((h) => h.id === hostId) ?? preferred(hostsOfCurrent);
   const folders = (snapshot?.folders ?? []).filter((f) => (!space || space.folders.includes(f.key)) && f.host === host?.id);
-  const target = folders.some((f) => f.id === folder) ? folder : (folders[0]?.id ?? null);
+  const target = folders.find((f) => f.id === folder) ?? folders[0] ?? null;
   // El id del workspace en esa máquina: cada motor tiene el suyo.
   const workspace = host ? (current?.members.get(host.id) ?? null) : null;
-  const agents = (snapshot?.agents ?? []).filter((a) => a.places.some((p) => p.host === host?.id && p.folder === target));
+  const agents = (snapshot?.agents ?? []).filter((a) => a.places.some((p) => p.host === host?.id && p.folder === target?.id));
   const chosenAgent = agents.some((a) => a.name === agent) ? agent : null;
   const act = host?.canAct();
-  const ready = Boolean(host && workspace && target && message.trim()) && act !== "asleep" && act !== "outdated" && !busy;
+  const power = host?.power();
+  const defaults = host && workspace ? suggestedDefaults(snapshot?.tasks ?? [], host.id, workspace, chosenAgent) : { provider: null, model: null };
   void tick;
 
-  async function start() {
-    if (!host || !workspace || !target) return;
-    setBusy(true);
-    setNote(act === "wakes" ? w("shell.machines.waking", { name: host.label }) : null);
+  // Las ramas base de la carpeta, si tiene git y la máquina contesta. Leer no enciende nada.
+  useEffect(() => {
+    setBranches(null);
+    setBranch(null);
+    if (!host || !workspace || !target || power !== "on") return;
+    let alive = true;
+    void baseBranchesOf(host, workspace, target.id).then((b) => alive && setBranches(b));
+    return () => {
+      alive = false;
+    };
+  }, [host, workspace, target?.id, power]);
+  const selectedBranch = branch ?? branches?.selected ?? null;
+  const branchLabel = branches?.branches.find((b) => b.reference === selectedBranch)?.name ?? selectedBranch;
+
+  async function start(s: Submission) {
+    if (!host || !workspace || !target) return false;
+    setNote(null);
+    setWaking(act === "wakes" && power !== "on");
     try {
-      const defaults = await defaultsFor(host, workspace, snapshot?.tasks ?? [], chosenAgent);
-      const id = await createTask(host, workspace, {
-        folder: target,
-        prompt: message.trim(),
-        provider: defaults.provider,
-        model: defaults.model,
-        agent: chosenAgent,
-        // Los spaces son de la primera máquina: en otra, el id no significaría nada.
-        space: host.id === hostsOfCurrent[0]?.id ? (space?.id ?? null) : null,
-      });
+      // Los spaces son de la primera máquina: en otra, el id no significaría nada.
+      const spaceId = host.id === hostsOfCurrent[0]?.id ? (space?.id ?? null) : null;
+      const baseRef = branch;
+      const id = s.shell
+        ? (await runShell(host, workspace, { folder: target.id, session: null, command: s.command, provider: s.provider, model: s.model, effort: s.effort, permissionMode: s.permissionMode, space: spaceId, agent: chosenAgent, baseRef })).session
+        : await createTask(host, workspace, { folder: target.id, prompt: s.prompt, provider: s.provider, model: s.model, effort: s.effort, permissionMode: s.permissionMode, attachments: s.attachments, agent: chosenAgent, space: spaceId, baseRef });
       rememberMachine(host.id);
-      setMessage("");
-      setNote(null);
-      openTask(host.id, workspace, target, id);
+      openTask(host.id, workspace, target.id, id);
+      return true;
     } catch (error) {
-      if (error instanceof HostError && error.code === "no_provider") setNote(t("new.no_provider"));
-      else if (error instanceof HostError && error.code === "machine_asleep") setNote(w("web.machines.off_action", { name: host.label }));
+      if (error instanceof HostError && error.code === "machine_asleep") setNote(w("web.machines.off_action", { name: host.label }));
       else if (error instanceof HostError && error.code === "machine_outdated") setNote(w("web.machines.outdated_action", { name: host.label }));
       else if (error instanceof HostError && (error.code === "start_failed" || error.code === "start_timeout")) setNote(t("machines.start_failed", { name: host.label }));
       else setNote(t("task.error", { detail: error instanceof Error ? error.message : String(error) }));
+      return false;
     } finally {
-      setBusy(false);
+      setWaking(false);
     }
   }
 
-  const chip = (active: boolean) => [styles.chip, { borderColor: theme.border, backgroundColor: active ? theme.primary : theme.surface }];
-  const chipText = (active: boolean) => ({ color: active ? theme.onPrimary : theme.text, fontWeight: active ? ("700" as const) : ("500" as const) });
-  const power = (h: typeof host) =>
+  const stateOf = (h: typeof host) =>
     !h ? "" : h.power() === "on" ? w("web.computers.state.online") : h.power() === "starting" ? w("web.computers.state.starting") : h.power() === "outdated" ? w("web.computers.state.outdated") : w("web.computers.state.offline");
+
+  const notice = !host
+    ? current
+      ? t("new.no_workspace")
+      : null
+    : waking
+      ? w("shell.machines.waking", { name: host.label })
+      : act === "asleep"
+        ? w("web.machines.off_action", { name: host.label })
+        : act === "outdated"
+          ? w("web.machines.outdated_action", { name: host.label })
+          : act === "wakes" && power === "off"
+            ? w("shell.machines.asleep_notice", { name: host.label })
+            : null;
+
+  const header = (
+    <View style={styles.selectors}>
+      {hostsOfCurrent.length > 1 && host ? (
+        <SelectorChip testID="pick-machine" icon="server" label={w("shell.machines.label")} value={host.label} onPress={() => setPicker("machine")} />
+      ) : null}
+      <SelectorChip
+        testID="pick-folder"
+        left={target ? <FolderSquare id={target.key} /> : <Icon name="folder" size={13} color={theme.textMuted} />}
+        value={target?.name ?? t("new.folder")}
+        muted={!target}
+        onPress={folders.length ? () => setPicker("folder") : undefined}
+      />
+      {branches?.branches.length ? (
+        <SelectorChip testID="pick-branch" icon="git-branch" value={branchLabel ?? w("worktrees.base.choose")} onPress={() => setPicker("branch")} />
+      ) : null}
+      {agents.length ? (
+        <SelectorChip
+          testID="pick-agent"
+          left={chosenAgent ? <Avatar name={chosenAgent} size={15} round /> : <Icon name="user-round" size={13} color={theme.textMuted} />}
+          value={chosenAgent ?? t("new.agent")}
+          muted={!chosenAgent}
+          onPress={() => setPicker("agent")}
+        />
+      ) : null}
+    </View>
+  );
 
   return (
     <KeyboardScreen style={{ backgroundColor: theme.bg }}>
-      <ScrollView contentContainerStyle={[styles.body, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 96 }]} keyboardShouldPersistTaps="handled">
+      <View style={[styles.top, { paddingTop: insets.top + 12 }]}>
         <Text style={[styles.title, { color: theme.text }]}>{t("new.title")}</Text>
         <Text style={{ color: theme.textMuted }}>
           {current?.name}
           {space ? ` · ${spaceName(space, t("space.general"))}` : ""}
         </Text>
-
-        {hostsOfCurrent.length > 1 ? (
-          <>
-            <Text style={[styles.label, { color: theme.textMuted }]}>{w("web.machines.create_on")}</Text>
-            <View style={styles.chips}>
-              {hostsOfCurrent.map((h) => (
-                <Pressable key={h.id} testID={`machine-${h.id}`} style={chip(h.id === host?.id)} onPress={() => setHostId(h.id)}>
-                  <Text style={chipText(h.id === host?.id)}>{h.label}</Text>
-                  <Text style={[chipText(h.id === host?.id), { fontSize: 11, fontWeight: "400" }]}>{power(h)}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </>
-        ) : null}
-        {!host && current ? <Text style={{ color: theme.textMuted }}>{t("new.no_workspace")}</Text> : null}
-
-        <Text style={[styles.label, { color: theme.textMuted }]}>{t("new.folder")}</Text>
-        <View style={styles.chips}>
-          {folders.map((f) => (
-            <Pressable key={f.id} testID={`folder-${f.id}`} style={[chip(f.id === target), styles.folderChip]} onPress={() => setFolder(f.id)}>
-              <FolderSquare id={f.id} />
-              <Text style={chipText(f.id === target)}>{f.name}</Text>
-            </Pressable>
-          ))}
+      </View>
+      <View style={{ flex: 1 }} />
+      {notice || note ? (
+        <View style={styles.notes}>
+          {notice ? <Text style={{ color: theme.textMuted }}>{notice}</Text> : null}
+          {note ? <Text style={{ color: theme.textMuted }}>{note}</Text> : null}
         </View>
-
-        {agents.length ? (
-          <>
-            <Text style={[styles.label, { color: theme.textMuted }]}>{t("new.agent")}</Text>
-            <View style={styles.chips}>
-              <Pressable style={chip(!chosenAgent)} onPress={() => setAgent(null)}>
-                <Text style={chipText(!chosenAgent)}>{t("new.no_agent")}</Text>
-              </Pressable>
-              {agents.map((a) => (
-                <Pressable key={a.name} testID={`agent-${a.name}`} style={chip(chosenAgent === a.name)} onPress={() => setAgent(a.name)}>
-                  <Text style={chipText(chosenAgent === a.name)}>{a.name}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </>
-        ) : null}
-
-        <TextInput
+      ) : null}
+      {/* En iOS 26 la barra de pestañas flota sobre el contenido; en Android el contenido termina encima de ella. */}
+      <View style={{ paddingBottom: Platform.OS === "ios" ? insets.bottom + 56 : 0 }}>
+        <Composer
           testID="new-message"
-          style={[styles.input, { color: theme.text, backgroundColor: theme.surface, borderColor: theme.border }]}
-          value={message}
-          onChangeText={setMessage}
+          host={host ?? undefined}
+          workspace={workspace}
+          folder={target?.id ?? null}
+          session={null}
+          providers={host ? (snapshot?.providers[host.id] ?? []) : []}
+          provider={defaults.provider}
+          model={defaults.model}
+          disabled={!host || !target || act === "asleep" || act === "outdated" || waking}
           placeholder={t("new.placeholder")}
-          placeholderTextColor={theme.textMuted}
-          multiline
+          header={header}
+          onSubmit={start}
+          bottomInset={false}
         />
-        {host && act === "asleep" ? <Text style={{ color: theme.textMuted }}>{w("web.machines.off_action", { name: host.label })}</Text> : null}
-        {host && act === "outdated" ? <Text style={{ color: theme.textMuted }}>{w("web.machines.outdated_action", { name: host.label })}</Text> : null}
-        {host && act === "wakes" && host.power() === "off" && !busy ? (
-          <Text style={{ color: theme.textMuted }}>{w("shell.machines.asleep_notice", { name: host.label })}</Text>
-        ) : null}
-        {note ? <Text style={{ color: theme.textMuted }}>{note}</Text> : null}
-        <Pressable testID="new-start" disabled={!ready} onPress={start} style={[styles.start, { backgroundColor: theme.primary, opacity: ready ? 1 : 0.5 }]}>
-          <Text style={{ color: theme.onPrimary, fontWeight: "700", fontSize: 16 }}>{t("new.start")}</Text>
-        </Pressable>
-      </ScrollView>
+      </View>
+
+      <Sheet visible={picker === "machine"} title={w("shell.machines.label")} onClose={() => setPicker(null)}>
+        {hostsOfCurrent.map((h) => (
+          <SheetOption
+            key={h.id}
+            testID={`machine-${h.id}`}
+            icon="server"
+            label={h.label}
+            detail={`${stateOf(h)} · ${h.managed ? t("machines.managed") : t("machines.own")}`}
+            selected={h.id === host?.id}
+            onPress={() => {
+              setHostId(h.id);
+              setFolder(null);
+              setPicker(null);
+            }}
+          />
+        ))}
+      </Sheet>
+      <Sheet visible={picker === "folder"} title={t("new.folder")} onClose={() => setPicker(null)}>
+        {folders.map((f) => (
+          <SheetOption key={f.key} testID={`folder-${f.id}`} left={<FolderSquare id={f.key} size={10} />} label={f.name} detail={f.working_directory ?? null} selected={f.id === target?.id} onPress={() => {
+            setFolder(f.id);
+            setPicker(null);
+          }} />
+        ))}
+      </Sheet>
+      <Sheet visible={picker === "branch"} title={w("worktrees.base.from")} onClose={() => setPicker(null)}>
+        {branches?.branches.map((b) => (
+          <SheetOption key={b.reference} icon="git-branch" label={b.name} detail={b.remote ?? null} selected={b.reference === selectedBranch} onPress={() => {
+            setBranch(b.reference === branches.selected ? null : b.reference);
+            setPicker(null);
+          }} />
+        ))}
+      </Sheet>
+      <Sheet visible={picker === "agent"} title={t("new.agent")} onClose={() => setPicker(null)}>
+        <SheetOption icon="user-round" label={t("new.no_agent")} selected={!chosenAgent} onPress={() => {
+          setAgent(null);
+          setPicker(null);
+        }} />
+        {agents.map((a) => (
+          <SheetOption key={a.name} testID={`agent-${a.name}`} left={<Avatar name={a.name} size={22} round />} label={a.name} detail={a.description} selected={chosenAgent === a.name} onPress={() => {
+            setAgent(a.name);
+            setPicker(null);
+          }} />
+        ))}
+      </Sheet>
     </KeyboardScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  body: { paddingHorizontal: 16, gap: 8 },
+  top: { paddingHorizontal: 16, gap: 4 },
   title: { fontSize: 28, fontWeight: "800" },
-  label: { fontSize: 13, fontWeight: "700", textTransform: "uppercase", marginTop: 14 },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7 },
-  folderChip: { flexDirection: "row", alignItems: "center", gap: 6 },
-  input: { marginTop: 16, minHeight: 140, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, padding: 12, fontSize: 16, textAlignVertical: "top" },
-  start: { marginTop: 8, borderRadius: 12, paddingVertical: 13, alignItems: "center" },
+  notes: { paddingHorizontal: 16, paddingBottom: 6, gap: 4 },
+  selectors: { flexDirection: "row", flexWrap: "wrap", gap: 6, paddingHorizontal: 2 },
 });

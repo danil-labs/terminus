@@ -10,7 +10,11 @@
  * Dos máquinas comparten el workspace «Producto» (cada motor con sus ids): la VM
  * de Danil (`aws-ec2`, apagada, con copia en el espejo) y una Mac propia
  * (`kind: physical`, encendida; apagada con `--mac-off`). Cada una tiene su motor en memoria: tareas, un
- * agente, permisos y eventos. Para la app:
+ * agente, permisos y eventos; y lo que pide la app además de la lista: fijar y
+ * archivar, el cuadro de escribir (modelos, permisos, `/`, `@`, ramas, `!` e
+ * imágenes adjuntas con las reglas del motor) y las cuentas de IA con su
+ * consumo y el inicio de sesión sin pantalla (enlace y código, por eventos
+ * `account`). Para la app:
  *
  *   EXPO_PUBLIC_SUPABASE_URL=http://<ip>:8787 EXPO_PUBLIC_COMPUTERS_ENDPOINT=http://<ip>:8787 npm start
  *
@@ -32,11 +36,13 @@ const MIRROR = new Set(["workspaces_startup", "list_workspaces", "list_projects"
 
 // --- Motores --------------------------------------------------------------------
 
-function engine(name, ws, projects, tasks) {
+function engine(name, ws, projects, tasks, accounts) {
   const now = Date.now();
   const sessions = new Map(tasks.map((t, i) => [t.id, { ...t, created_at: now - (i + 1) * 60_000, updated_at: now - i * 60_000, turns: [{ id: `${t.id}-u`, role: "user", text: t.title }, { id: `${t.id}-a`, role: "agent", text: `Hecho en ${name}.` }], pending: null }]));
-  return { name, ws, projects, sessions, live: new Set(), cursor: 0, events: [] };
+  return { name, ws, projects, sessions, live: new Set(), cursor: 0, events: [], accounts, files: new Set(), logins: new Map() };
 }
+
+const HOUR = 3_600_000;
 
 const machines = {
   cmp_vm: {
@@ -45,7 +51,10 @@ const machines = {
     engine: engine("la VM", "w-vm", [{ id: "p-vm-web", name: "web" }], [
       { id: "t-vm-1", project: "p-vm-web", title: "Revisar el checkout", agent: "Ada", provider: "codex", model: "gpt-5.6" },
       { id: "t-vm-2", project: "p-vm-web", title: "Arreglar el login", agent: null, provider: "codex", model: "gpt-5.6", esperando: true },
-    ]),
+    ], {
+      claude: [{ id: "a-vm-1", label: "Trabajo", created_at: Date.now(), identity: "ana@example.com", authenticated_at: Date.now() }],
+      codex: [],
+    }),
     mirror: new Map(),
   },
   cmp_mac: {
@@ -53,7 +62,11 @@ const machines = {
     state: process.argv.includes("--mac-off") ? "offline" : "online",
     engine: engine("la Mac", "w-mac", [{ id: "p-mac-web", name: "web" }, { id: "p-mac-api", name: "api" }], [
       { id: "t-mac-1", project: "p-mac-api", title: "Subir la API a v2", agent: null, provider: "claude", model: null },
-    ]),
+      { id: "t-mac-2", project: "p-mac-web", title: "Rediseñar el inicio", agent: null, provider: "claude", model: "claude-opus-5-5", unsaved: ["src/home.tsx"] },
+    ], {
+      claude: [{ id: "a-mac-1", label: "Cuenta 1", created_at: Date.now(), identity: "Ana@Example.com", authenticated_at: Date.now() }],
+      codex: [],
+    }),
     mirror: new Map(),
   },
 };
@@ -61,7 +74,41 @@ const machines = {
 const row = (s) => ({
   id: s.id, title: s.title, provider: s.provider, model: s.model, last_message: s.turns.at(-1)?.text ?? null,
   created_at: s.created_at, updated_at: s.updated_at, esperando: Boolean(s.esperando), outcome: null, agent: s.agent, space: null,
+  pinned: s.pinned ?? null, archived: s.archived ?? false,
 });
+
+const MODELS = {
+  codex: [{ id: "gpt-5.6", label: "GPT-5.6", note: null, efforts: ["low", "medium", "high"], default_effort: "medium", gratis: null }],
+  claude: [
+    { id: "claude-opus-5-5", label: "Opus 5.5", note: { clave: "chat.model.note.opus" }, efforts: ["low", "medium", "high", "max"], default_effort: "high", gratis: null },
+    { id: "claude-sonnet-5", label: "Sonnet 5", note: null, efforts: [], default_effort: null, gratis: null },
+  ],
+};
+const IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
+const IMAGE_CAP = 25 * 1024 * 1024;
+
+/** El inicio de sesión por tubería: Codex da enlace y código a comparar y termina solo; Claude pide pegar el código. */
+function login(m, provider, id) {
+  const e = m.engine;
+  const account = e.accounts[provider]?.find((a) => a.id === id);
+  if (!account) throw { code: "command_failed", detail: "no such account" };
+  const say = (kind, text = "") => emit(m, "account", { account: id, kind, text });
+  const timer = setTimeout(() => {
+    say("url", `https://auth.example.com/${provider}/device?account=${id}`);
+    if (provider === "codex") {
+      say("confirm", "WXYZ-1234");
+      e.logins.set(id, setTimeout(() => {
+        Object.assign(account, { identity: "ana@example.com", authenticated_at: Date.now() });
+        e.logins.delete(id);
+        say("done");
+      }, 200));
+    } else {
+      say("code");
+      e.logins.set(id, { provider, waiting: true });
+    }
+  }, 50);
+  e.logins.set(id, timer);
+}
 
 function attentionOf(e) {
   const tasks = [...e.sessions.values()].flatMap((s) => (s.pending ? [{ session: s.id, project: s.project, state: "approving" }] : s.esperando ? [{ session: s.id, project: s.project, state: "asked" }] : []));
@@ -75,9 +122,9 @@ function emit(m, name, payload) {
 }
 
 /** Un turno: arranca, escribe, y termina o pide permiso si el mensaje lo dice. */
-function turn(m, s, prompt) {
+function turn(m, s, prompt, extra = {}) {
   const e = m.engine;
-  s.turns.push({ id: randomUUID(), role: "user", text: prompt });
+  s.turns.push({ id: randomUUID(), role: "user", text: prompt, ...extra });
   e.live.add(s.id);
   emit(m, "chat", { workspace: m.engine.ws, session: s.id, kind: "started", text: "", meta: null, ok: null, request_id: null });
   setTimeout(() => {
@@ -106,10 +153,10 @@ function invoke(m, command, args) {
     case "list_workspaces": return { workspaces: [{ id: e.ws, name: "Producto" }], active: e.ws };
     case "list_projects": return e.projects.map((p) => ({ ...p, working_directory: `/lab/${p.name}` }));
     case "list_spaces": return [{ id: "s1", name: null, folders: e.projects.map((p) => p.id) }];
-    case "list_live_sessions": return [...e.sessions.values()].filter((s) => s.project === args.project).map(row);
+    case "list_live_sessions": return [...e.sessions.values()].filter((s) => s.project === args.project && !s.archived).map(row);
     case "list_agents": return { agents: args.project === "p-vm-web" ? [{ name: "Ada", description: "Revisa PRs" }] : [] };
     case "list_agent_status": return args.project === "p-vm-web" ? [{ name: "Ada", status: "awake", minutes_since_last_turn: 3, live_tasks: 0 }] : [];
-    case "list_providers": return [{ id: "codex", label: "Codex", available: true, driver: true }];
+    case "list_providers": return [{ id: "codex", label: "Codex", available: true, driver: true }, { id: "claude", label: "Claude", available: true, driver: true }];
     case "list_active_turns": return [...e.live];
     case "list_workspace_attention": return attentionOf(e);
     case "load_session": {
@@ -129,7 +176,8 @@ function invoke(m, command, args) {
         e.sessions.set(id, s);
         emit(m, "session", { workspace: e.ws, project: args.project, session: id });
       }
-      turn(m, s, String(args.prompt));
+      // Lo que eligió el cuadro queda en el turno, para que la prueba lo lea de vuelta.
+      turn(m, s, String(args.prompt), { model: args.model ?? null, attachments: args.attachments ?? [], effort: args.effort ?? null, permissionMode: args.permissionMode ?? null, baseRef: args.baseRef ?? null });
       return s.id;
     }
     case "inject_message": return null;
@@ -143,6 +191,115 @@ function invoke(m, command, args) {
     }
     case "answer_question": return null;
     case "mark_task_seen": return null;
+    case "set_session_pinned": {
+      const s = e.sessions.get(args.id);
+      if (!s) throw { code: "command_failed", detail: "no such task" };
+      s.pinned = Boolean(args.pinned);
+      emit(m, "session", { workspace: e.ws, project: s.project, session: s.id });
+      return null;
+    }
+    case "task_blockers": {
+      const s = e.sessions.get(args.id);
+      return { unsaved: s?.unsaved ? [{ session: s.id, title: s.title, files: s.unsaved }] : [], not_finished: false };
+    }
+    case "set_task_archived": {
+      const s = e.sessions.get(args.id);
+      if (!s) throw { code: "command_failed", detail: "no such task" };
+      s.archived = Boolean(args.archived);
+      emit(m, "session", { workspace: e.ws, project: s.project, session: s.id });
+      return null;
+    }
+    case "list_models": return { provider: args.provider, models: MODELS[args.provider] ?? [], fallback: false };
+    case "list_permission_modes":
+      return ["manual", "edits", "auto"].map((id) => ({ id, label: { clave: `agents.mode.${id}` }, falta: args.provider === "codex" && id !== "auto" ? { clave: "agents.mode.missing.codex" } : null, por_omision: id === "auto" }));
+    case "list_slash_menu":
+      return { commands: [{ name: "review", description: "Revisa los cambios" }, { name: "compact", description: null }], skills: [{ name: "pdf", description: "Lee y escribe PDF" }], side_question: "btw" };
+    case "list_mentions": return { fuentes: [{ ruta: "src", tipo: "carpeta" }, { ruta: "src/app.ts", tipo: "archivo" }, { ruta: "docs/guía de estilo.md", tipo: "archivo" }], truncado: false };
+    case "project_base_branches": return { branches: [{ reference: "refs/heads/main", name: "main", remote: null }, { reference: "refs/remotes/origin/dev", name: "origin/dev", remote: "origin" }], selected: "refs/heads/main", fetched_at: null };
+    case "run_shell_command": {
+      let s = args.session ? e.sessions.get(args.session) : null;
+      if (!s) {
+        const id = `t-${randomUUID().slice(0, 8)}`;
+        s = { id, project: args.project, title: `!${args.command}`, agent: args.agent ?? null, provider: args.provider ?? "codex", model: args.model ?? null, created_at: Date.now(), updated_at: Date.now(), turns: [], pending: null };
+        e.sessions.set(id, s);
+        emit(m, "session", { workspace: e.ws, project: args.project, session: id });
+      }
+      const turn = randomUUID();
+      s.turns.push({ id: turn, role: "shell", text: `$ ${args.command}\nok` });
+      emit(m, "chat", { workspace: e.ws, session: s.id, kind: "done", text: "", meta: null, ok: true, request_id: null });
+      return { session: s.id, turn };
+    }
+    case "stop_shell_command": return false;
+    case "guardar_imagen_pegada": {
+      if (!IMAGE_MIMES.has(args.mime)) throw { code: "command_failed", detail: "chat.attachments.paste_unsupported_format" };
+      const bytes = Buffer.from(String(args.datos ?? ""), "base64");
+      if (!bytes.length) throw { code: "command_failed", detail: "chat.attachments.paste_empty" };
+      if (bytes.length > IMAGE_CAP) throw { code: "command_failed", detail: "chat.attachments.paste_too_large" };
+      const path = `/tmp/captura-${randomUUID().slice(0, 6)}.${args.mime.split("/")[1]}`;
+      e.files.add(path);
+      return path;
+    }
+    case "prepare_attachments":
+      return args.paths.map((path) => {
+        if (!e.files.has(path)) throw { code: "command_failed", detail: "preview.attachments.failed" };
+        return `/lab/attachments/${randomUUID().slice(0, 8)}/${path.split("/").pop()}`;
+      });
+    case "list_accounts": {
+      const accounts = e.accounts[args.provider] ?? [];
+      return { provider: args.provider, env_var: null, shared_credential: null, secret_note: null, active: accounts[0]?.id ?? null, accounts };
+    }
+    case "account_status": {
+      const a = (e.accounts[args.provider] ?? []).find((x) => x.id === args.id);
+      return { id: args.id, authenticated: Boolean(a?.authenticated_at), detail: "" };
+    }
+    case "account_limits": {
+      const a = (e.accounts[args.provider] ?? []).find((x) => x.id === args.id);
+      if (!a) return { mode: "no_account", what: null };
+      return { mode: "read", windows: [{ label: "últimas 5 horas", used_pct: 38, resets_at: Date.now() + 3 * HOUR }, { label: "esta semana", used_pct: 91, resets_at: Date.now() + 72 * HOUR }], plan: "Max", fetched_at: Date.now() };
+    }
+    case "add_account": {
+      const list = (e.accounts[args.provider] ??= []);
+      const account = { id: `a-${randomUUID().slice(0, 6)}`, label: args.label || `Cuenta ${list.length + 1}`, created_at: Date.now(), identity: null, authenticated_at: null };
+      list.push(account);
+      return account;
+    }
+    case "login_account":
+      if (args.mode !== "tuberia") throw { code: "command_failed", detail: "solo tubería en una máquina sin pantalla" };
+      login(m, args.provider, args.id);
+      return null;
+    case "submit_login_code": {
+      const waiting = e.logins.get(args.id);
+      if (!waiting?.waiting) throw { code: "command_failed", detail: "Esa conexión ya no está esperando nada" };
+      e.logins.delete(args.id);
+      const account = (e.accounts[waiting.provider] ?? []).find((a) => a.id === args.id);
+      setTimeout(() => {
+        if (String(args.code).trim() === "good-code") {
+          Object.assign(account, { identity: "ana@example.com", authenticated_at: Date.now() });
+          emit(m, "account", { account: args.id, kind: "done", text: "" });
+        } else emit(m, "account", { account: args.id, kind: "done", text: "El código no es válido." });
+      }, 50);
+      return null;
+    }
+    case "cancel_login": {
+      const pending = e.logins.get(args.id);
+      if (pending && typeof pending !== "object") clearTimeout(pending);
+      e.logins.delete(args.id);
+      return null;
+    }
+    case "discard_account": {
+      const list = e.accounts[args.provider] ?? [];
+      const i = list.findIndex((a) => a.id === args.id && !a.authenticated_at);
+      if (i < 0) return false;
+      list.splice(i, 1);
+      return true;
+    }
+    case "remove_account": {
+      const list = e.accounts[args.provider] ?? [];
+      const i = list.findIndex((a) => a.id === args.id);
+      if (i < 0) throw { code: "command_failed", detail: "no such account" };
+      list.splice(i, 1);
+      return null;
+    }
   }
   throw { code: "command", detail: command };
 }

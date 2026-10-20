@@ -1,4 +1,4 @@
-import { type Answer, type Computer, listComputers, orderComputers } from "@terminus/computers";
+import { type Answer, type Computer, listComputers, orderComputers, startComputer } from "@terminus/computers";
 import type { EngineEvent, WorkspaceAttention } from "@terminus/protocol";
 import * as SecureStore from "expo-secure-store";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -130,6 +130,8 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
         endpoint: COMPUTERS,
         getToken: account.getToken,
         onUnauthorized: () => void account.unauthorized(),
+        // Fijar, archivar o cerrar una sesión no son intenciones del relay: la VM se enciende por aquí.
+        wake: async () => (await startComputer(COMPUTERS, await account.getToken(), computer.computer_id)).kind === "ok",
         beforeReconnect: async () => {
           const answer = await computersOf(account.getToken, account.unauthorized);
           if (answer.kind === "license") setFleet("license");

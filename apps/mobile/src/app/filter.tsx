@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { lang, w } from "../lib/i18n";
 import { useMachines } from "../lib/machines";
 import { useWorkspaces } from "../lib/workspaces";
-import { Avatar } from "../ui/components";
+import { Avatar, SheetTitle } from "../ui/components";
 import { FolderSquare } from "../ui/TaskCard";
 import { useTheme } from "../ui/theme";
 
@@ -48,6 +48,7 @@ export default function Filter() {
 
   return (
     <ScrollView contentContainerStyle={styles.page} contentInsetAdjustmentBehavior="automatic">
+      <SheetTitle>{w("shell.sidebar.view.trigger")}</SheetTitle>
       <Title
         action={
           view.folders.length ? (

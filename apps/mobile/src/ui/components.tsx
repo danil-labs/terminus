@@ -1,8 +1,6 @@
 import { router } from "expo-router";
-import { useState, type ReactNode } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { t } from "../lib/i18n";
+import type { ReactNode } from "react";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "./theme";
 
 /** A square with the first letter, like a workspace or a person in Slack. */
@@ -13,6 +11,17 @@ export function Avatar({ name, size = 32, round = false }: { name: string; size?
       <Text style={{ color: theme.onPrimary, fontWeight: "700", fontSize: size * 0.45 }}>{name.trim().charAt(0).toUpperCase() || "?"}</Text>
     </View>
   );
+}
+
+/**
+ * El título de una hoja (`formSheet`). En Android la hoja es la del sistema y
+ * no pinta la cabecera de la pila: el título va en el contenido. En iOS ya lo
+ * pone la cabecera.
+ */
+export function SheetTitle({ children }: { children: string }) {
+  const theme = useTheme();
+  if (Platform.OS !== "android") return null;
+  return <Text style={[styles.sheetTitle, { color: theme.text }]}>{children}</Text>;
 }
 
 export function SectionTitle({ children }: { children: ReactNode }) {
@@ -77,44 +86,14 @@ export function openTask(host: string, workspace: string, folder: string, id: st
   router.push({ pathname: "/task/[host]/[workspace]/[folder]/[id]", params: { host, workspace, folder: folder || "_", id } });
 }
 
-/** The box at the bottom of a channel or a conversation. */
-export function Composer({ placeholder, onSend, testID }: { placeholder: string; onSend: (text: string) => Promise<boolean>; testID?: string }) {
-  const theme = useTheme();
-  const insets = useSafeAreaInsets();
-  const [draft, setDraft] = useState("");
-  const [busy, setBusy] = useState(false);
-  async function send() {
-    const text = draft.trim();
-    if (!text) return;
-    setBusy(true);
-    setDraft("");
-    if (!(await onSend(text))) setDraft(text);
-    setBusy(false);
-  }
-  return (
-    <View style={[styles.composer, { borderColor: theme.border, backgroundColor: theme.surface, paddingBottom: 8 + insets.bottom }]}>
-      <TextInput
-        testID={testID}
-        style={[styles.input, { color: theme.text, backgroundColor: theme.muted }]}
-        value={draft}
-        onChangeText={setDraft}
-        placeholder={placeholder}
-        placeholderTextColor={theme.textMuted}
-        multiline
-      />
-      <Pressable
-        style={[styles.send, { backgroundColor: theme.primary, opacity: draft.trim() && !busy ? 1 : 0.5 }]}
-        disabled={!draft.trim() || busy}
-        onPress={send}
-      >
-        <Text style={{ color: theme.onPrimary, fontWeight: "600" }}>{t("task.send")}</Text>
-      </Pressable>
-    </View>
-  );
+/** La vista previa de una tarea (mantener pulsada su tarjeta). */
+export function openPreview(host: string, id: string) {
+  router.push({ pathname: "/preview", params: { host, id } });
 }
 
 const styles = StyleSheet.create({
   avatar: { alignItems: "center", justifyContent: "center" },
+  sheetTitle: { fontSize: 20, fontWeight: "700", paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4 },
   section: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 6, fontSize: 13, fontWeight: "700" },
   row: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 9 },
   rowBody: { flex: 1, gap: 2 },
@@ -122,7 +101,4 @@ const styles = StyleSheet.create({
   badge: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, alignItems: "center", justifyContent: "center" },
   badgeText: { color: "#fff", fontSize: 12, fontWeight: "700" },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  composer: { flexDirection: "row", alignItems: "flex-end", gap: 8, padding: 8, borderTopWidth: StyleSheet.hairlineWidth },
-  input: { flex: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 15, maxHeight: 140 },
-  send: { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10 },
 });

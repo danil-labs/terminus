@@ -1,22 +1,27 @@
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ChatEvent, Question, Turn } from "@terminus/protocol";
 import {
   type PendingQuestion,
   type Permission,
   type TaskView,
   answerQuestion,
+  injectIntoTask,
   loadTask,
   markSeen,
   respondPermission,
+  runShell,
   sendToTask,
+  stopShell,
   stopTask,
+  taskDefaults,
 } from "../../../../../lib/engine";
 import { HostError } from "../../../../../lib/hosts";
 import { t, w } from "../../../../../lib/i18n";
 import { useMachines } from "../../../../../lib/machines";
+import { useWorkspaces } from "../../../../../lib/workspaces";
+import { Composer, type Submission } from "../../../../../ui/Composer";
 import { type Theme, useTheme } from "../../../../../ui/theme";
 import { KeyboardScreen } from "../../../../../ui/KeyboardScreen";
 
@@ -34,15 +39,14 @@ const linesOf = (turns: Turn[]): Line[] => turns.map((turn, i) => ({ key: turn.i
  */
 export default function TaskScreen() {
   const theme = useTheme();
-  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ host: string; workspace: string; folder: string; id: string }>();
   const { workspace, id } = params;
   const folder = params.folder === "_" ? "" : params.folder;
   const { hostOf, subscribe, setOpenTask, tick, titleOf } = useMachines();
   const host = hostOf(params.host);
+  const { snapshot } = useWorkspaces();
   const [view, setView] = useState<TaskView | null>(null);
   const [streaming, setStreaming] = useState("");
-  const [draft, setDraft] = useState("");
   const [note, setNote] = useState<string | null>(null);
   const [waking, setWaking] = useState(false);
   const list = useRef<FlatList<Line>>(null);
@@ -123,17 +127,25 @@ export default function TaskScreen() {
     }
   }
 
-  async function send() {
-    if (!host || !view || !draft.trim()) return;
-    const message = draft.trim();
-    setDraft("");
-    if (!(await act(() => sendToTask(host, workspace, folder, view, message)))) setDraft(message);
-  }
+  /** Enviar desde el cuadro: un mensaje abre otro turno; `!` corre el comando en la carpeta. */
+  const submit = (s: Submission) =>
+    act(() =>
+      s.shell
+        ? runShell(host!, workspace, { folder, session: id, command: s.command, provider: s.provider, model: s.model, effort: s.effort, permissionMode: s.permissionMode })
+        : sendToTask(host!, workspace, folder, id, s),
+    );
+  const inject = (text: string, attachments: string[]) => act(() => injectIntoTask(host!, workspace, folder, id, text, attachments));
 
   const decide = (permission: Permission, allow: boolean) => host && void act(() => respondPermission(host, workspace, id, permission.request_id, allow));
   const answer = (pending: PendingQuestion, chosen: Record<string, string[]>, free: Record<string, string>) =>
     host && void act(() => answerQuestion(host, workspace, id, pending, chosen, free));
-  const stop = () => host && void stopTask(host, workspace, folder, id).catch(fail);
+  // Un `!` en marcha se detiene con su comando; si no había, se detiene el turno.
+  const stop = () =>
+    host &&
+    void stopShell(host, workspace, id)
+      .then((r) => (r.value === true ? undefined : stopTask(host, workspace, folder, id)))
+      .catch(() => stopTask(host, workspace, folder, id))
+      .catch(fail);
 
   const running = view?.running ?? false;
   const permissions = view?.permissions ?? [];
@@ -179,31 +191,22 @@ export default function TaskScreen() {
           ))}
         </ScrollView>
       ) : null}
-      <View style={[styles.composer, { borderColor: theme.border, backgroundColor: theme.surface, paddingBottom: 8 + insets.bottom }]}>
-        <TextInput
-          style={[styles.input, { color: theme.text, backgroundColor: theme.muted }]}
-          value={draft}
-          onChangeText={setDraft}
-          placeholder={t("task.composer")}
-          placeholderTextColor={theme.textMuted}
-          editable={!asleep}
-          multiline
-          testID="composer"
-        />
-        {running ? (
-          <Pressable style={[styles.send, { backgroundColor: theme.muted }]} onPress={stop} testID="stop">
-            <Text style={{ color: theme.text, fontWeight: "600" }}>{t("task.stop")}</Text>
-          </Pressable>
-        ) : null}
-        <Pressable
-          style={[styles.send, { backgroundColor: theme.primary, opacity: draft.trim() && !asleep && !waking ? 1 : 0.5 }]}
-          disabled={!draft.trim() || asleep || waking}
-          onPress={send}
-          testID="send"
-        >
-          <Text style={{ color: theme.onPrimary, fontWeight: "600" }}>{t("task.send")}</Text>
-        </Pressable>
-      </View>
+      <Composer
+        host={host}
+        workspace={workspace}
+        folder={folder}
+        session={id}
+        providers={snapshot?.providers[params.host] ?? []}
+        provider={view?.session.provider ?? null}
+        model={view ? taskDefaults(view).model : null}
+        providerLocked={Boolean(view?.session.turns.length)}
+        running={running}
+        disabled={asleep || waking || !view}
+        placeholder={w("chat.composer.placeholder.next")}
+        onSubmit={submit}
+        onInject={inject}
+        onStop={stop}
+      />
     </KeyboardScreen>
   );
 }
@@ -223,7 +226,10 @@ function Bubble({ line, theme }: { line: Line; theme: Theme }) {
       ]}
     >
       {line.text ? (
-        <Text selectable style={{ color: system ? theme.textMuted : theme.text, fontSize: 15, lineHeight: 21 }}>
+        <Text
+          selectable
+          style={{ color: system ? theme.textMuted : theme.text, fontSize: line.role === "shell" ? 13 : 15, lineHeight: 21, fontFamily: line.role === "shell" ? Platform.select({ ios: "Menlo", default: "monospace" }) : undefined }}
+        >
           {line.text}
         </Text>
       ) : null}
@@ -320,7 +326,5 @@ const styles = StyleSheet.create({
   actions: { flexDirection: "row", justifyContent: "flex-end", gap: 8 },
   action: { borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
   option: { borderWidth: 1, borderRadius: 10, padding: 10 },
-  composer: { flexDirection: "row", alignItems: "flex-end", gap: 8, padding: 8, borderTopWidth: StyleSheet.hairlineWidth },
   input: { flex: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 15, maxHeight: 140 },
-  send: { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10 },
 });

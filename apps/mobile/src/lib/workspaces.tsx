@@ -1,5 +1,5 @@
 import { groupWorkspaces } from "@terminus/computers";
-import type { Space, Workspace } from "@terminus/protocol";
+import type { ProviderInfo, Space, Workspace } from "@terminus/protocol";
 import { DEFAULT_SIDEBAR_VIEW, type SidebarView, sanitizeSidebarView } from "@terminus/tasks";
 import * as SecureStore from "expo-secure-store";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -23,6 +23,8 @@ export type Snapshot = {
   agents: Agent[];
   /** `host/id` de las tareas con un turno en marcha. */
   live: Set<string>;
+  /** Los proveedores (Codex, Claude…) de cada máquina, por su id. */
+  providers: Record<string, ProviderInfo[]>;
   /** La copia más nueva del relay que se usó, si alguna máquina estaba apagada. */
   cachedAt: number | null;
 };

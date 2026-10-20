@@ -20,7 +20,7 @@ import {
   powerOf,
   requestId,
 } from "@terminus/computers";
-import { type AppCommand, type EngineError, type EngineEvent, APP_ACTIONS, isAppCommand } from "@terminus/protocol";
+import { type AppCommand, type EngineError, type EngineEvent, isAppAction, isAppCommand } from "@terminus/protocol";
 
 export class HostError extends Error {
   code: string;
@@ -49,6 +49,12 @@ export type Host = {
   /** Eventos del motor; `gap` dice que se perdieron algunos y hay que releer. */
   onEvents(listener: (events: EngineEvent[], gap: boolean) => void): () => void;
   call<T>(command: AppCommand, workspace: string | null, args?: object): Promise<CallAnswer<T>>;
+  /**
+   * Antes de una acción que el relay no toma por intención (fijar, archivar,
+   * cerrar una sesión): enciende la VM administrada apagada y espera a que
+   * conteste. Una máquina propia apagada no se puede despertar (`machine_asleep`).
+   */
+  wake(): Promise<void>;
   close(): void;
 };
 
@@ -56,8 +62,26 @@ function allowed(command: string) {
   if (!isAppCommand(command)) throw new HostError("command_not_allowed", command);
 }
 
+/**
+ * Acciones de la persona que el relay no toma por intención (no encienden la
+ * VM por sí solas): antes de mandarlas se enciende la VM administrada por el
+ * plano de control. Marcar vista, detener o cancelar no están: no tienen
+ * sentido con la máquina apagada y abrir una tarea nunca la enciende.
+ */
+export const WAKES_FIRST: ReadonlySet<string> = new Set([
+  "set_session_pinned",
+  "set_task_archived",
+  "guardar_imagen_pegada",
+  "prepare_attachments",
+  "add_account",
+  "remove_account",
+]);
+
+/** Pide al plano de control que encienda la computadora (`POST /v1/computers/:id/start`). */
+export type Waker = () => Promise<boolean>;
+
 /** Una computadora a través del relay. Abrirla no la enciende: solo una acción lo hace. */
-export function relayHost(computer: Computer, config: Omit<RelayConfig, "computerId">, factory?: SocketFactory): Host {
+export function relayHost(computer: Computer, config: Omit<RelayConfig, "computerId"> & { wake?: Waker }, factory?: SocketFactory): Host {
   const relay = new RelaySession({ ...config, computerId: computer.computer_id }, factory);
   const listeners = new Set<() => void>();
   const changed = () => {
@@ -84,10 +108,13 @@ export function relayHost(computer: Computer, config: Omit<RelayConfig, "compute
     async call<T>(command: AppCommand, workspace: string | null, args: object = {}) {
       allowed(command);
       const intent = INTENT_COMMANDS.has(command);
+      const action = isAppAction(command);
       // Una máquina propia apagada no se puede despertar: ni se intenta, el relay contestaría `start_failed`.
-      if (intent && host.canAct() === "asleep") throw new HostError("machine_asleep", host.label);
+      if ((intent || WAKES_FIRST.has(command)) && host.canAct() === "asleep") throw new HostError("machine_asleep", host.label);
       // Un motor que no habla este contrato no recibe acciones, como en la web.
-      if ((APP_ACTIONS as readonly string[]).includes(command) && host.canAct() === "outdated") throw new HostError("machine_outdated", host.label);
+      if (action && host.canAct() === "outdated") throw new HostError("machine_outdated", host.label);
+      // Una acción que el relay no enciende por su cuenta: la VM se enciende antes por el plano de control.
+      if (WAKES_FIRST.has(command)) await host.wake();
       try {
         const { value, cached } = await relay.call(requestId(), command, workspace, null, args, intent ? WAKE_TIMEOUT : CALL_TIMEOUT);
         return { value: value as T, cachedAt: cachedAt(cached) };
@@ -96,6 +123,30 @@ export function relayHost(computer: Computer, config: Omit<RelayConfig, "compute
         const failure = (error ?? {}) as { code?: string; detail?: unknown; what?: unknown };
         throw new HostError(failure.code ?? "io", failure.detail ?? failure.what);
       }
+    },
+    async wake() {
+      if (host.power() === "on") return;
+      const act = host.canAct();
+      if (act === "asleep") throw new HostError("machine_asleep", host.label);
+      if (act === "outdated") throw new HostError("machine_outdated", host.label);
+      if (host.power() !== "starting" && config.wake && !(await config.wake().catch(() => false))) throw new HostError("start_failed", host.label);
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          off();
+          reject(new HostError("start_timeout", host.label));
+        }, WAKE_TIMEOUT);
+        const off = relay.onState(() => {
+          if (host.power() !== "on") return;
+          clearTimeout(timer);
+          off();
+          resolve();
+        });
+        if (host.power() === "on") {
+          clearTimeout(timer);
+          off();
+          resolve();
+        }
+      });
     },
     close: () => relay.close(),
   };
@@ -187,6 +238,9 @@ export function bridgeHost(pairing: Pairing, label: string): Host {
       // `service invoke` envuelve la respuesta del comando en `value`.
       const value = (result && typeof result === "object" && "value" in result ? result.value : result) as T;
       return { value, cachedAt: null };
+    },
+    async wake() {
+      if (!online) throw new HostError("machine_asleep", label);
     },
     close: () => {
       stopped = true;
