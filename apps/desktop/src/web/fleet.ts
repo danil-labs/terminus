@@ -31,6 +31,8 @@ export const EVERYWHERE = new Set(["list_workspaces", "workspaces_startup", "lis
 export const CREATE = new Set(["send_message", "run_shell_command", "create_project", "clone_project"]);
 /** Answers whose rows carry the id of what they list. */
 const ROW_IDS = new Set(["list_projects", "list_portfolios", "list_live_sessions"]);
+/** Answers keyed by the id of the task each value is about. */
+const KEYED = new Set(["list_session_git"]);
 /** Answers that are one object with its own id. */
 const OWN_ID = new Set(["load_session", "create_project", "clone_project", "add_account"]);
 /** Keys whose value is an image file on the machine that sent it: `preview_file` must read it there. */
@@ -213,6 +215,7 @@ export class Fleet {
     const tag = (row: Row) => (TAGGED.has(command) ? { ...row, machine, machine_on: this.on(machine) } : row);
     if (ROW_IDS.has(command) && Array.isArray(out)) return out.map((r) => (isRow(r) ? tag(ownId(r)) : r));
     if (OWN_ID.has(command) && isRow(out)) return ownId(out);
+    if (KEYED.has(command) && isRow(out)) return Object.fromEntries(Object.entries(out).map(([id, v]) => [this.wrap(machine, id), v]));
     return out;
   }
 
