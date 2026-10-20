@@ -1,3 +1,4 @@
+import type { ChatBackground } from "@terminus/protocol";
 import { createRoot, createSignal } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
 import { t } from "../../lib/i18n";
@@ -94,12 +95,15 @@ async function copySettings(row: Row, workspace: string, from: ReturnType<typeof
     });
   }
 
-  // El fondo de los chats es de la máquina, no del workspace: viaja en bytes si la otra no tiene uno.
-  const fondo = await invoke<{ data_url: string } | null>("chat_background", {}, from).catch(() => null);
-  if (fondo?.data_url) {
-    const suyo = await invoke<{ data_url: string } | null>("chat_background", {}, to).catch(() => null);
-    if (suyo && suyo.data_url !== fondo.data_url) skipped.push(t("shell.machines.here.skip_background"));
-    else if (!suyo) await step(t("shell.machines.here.background"), () => invoke("import_chat_background_data", { dataUrl: fondo.data_url }, to));
+  // El fondo de los chats es del workspace: la imagen viaja en bytes, y el patrón y el velo con ella.
+  const fondo = await invoke<ChatBackground | null>("chat_background", {}, from).catch(() => null);
+  const imagen = fondo && !fondo.preset ? fondo.data_url : null;
+  const resto = fondo && (fondo.preset || fondo.veil != null) ? { preset: fondo.preset ?? null, veil: fondo.veil ?? null } : null;
+  if (imagen || resto) {
+    await step(t("shell.machines.here.background"), async () => {
+      if (imagen) await invoke("import_chat_background_data", { dataUrl: imagen }, to);
+      if (resto) await invoke("set_chat_background", resto, to);
+    });
   }
 
   // Conectores del catálogo: conectar declara el servidor; la sesión la pide el agente en esa máquina.

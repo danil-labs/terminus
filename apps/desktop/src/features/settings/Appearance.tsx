@@ -14,7 +14,10 @@ import {
   claseDeFondo,
   type FondoDeChat,
 } from "../../lib/chat-background";
-import { elegirFondoDeChat, elegirFondoPropio, elegirVeloDeFondo, elegirVeloDePaneles, elegirVeloDePestanas, fondoDeChat, fondoPropio, quitarFondoPropio, veloDeFondo, veloDePaneles, veloDePestanas } from "../../lib/chat-background-store";
+import { elegirFondoDeChat, elegirVeloDeFondo, elegirVeloDePaneles, elegirVeloDePestanas, fondoDeChat, fondoPropio, ponerFondoPropio, veloDeFondo, veloDePaneles, veloDePestanas } from "../../lib/chat-background-store";
+
+/** Guardar en el workspace va en su propio trozo: la carga inicial solo pinta. */
+const motor = () => import("../../lib/chat-background-engine");
 import { VELO_DE_PANELES_MAX, VELO_DE_PANELES_MIN, VELO_DE_PESTANAS_MAX, VELO_DE_PESTANAS_MIN } from "../../lib/chat-background";
 import type { Preview } from "../artifacts/Preview";
 import {
@@ -197,7 +200,7 @@ export default function Appearance(props: { proyecto: string }) {
     if (typeof chosen !== "string") return;
     setBackgroundFailure(null);
     try {
-      setFondo(await elegirFondoPropio(chosen));
+      setFondo(await (await motor()).elegirFondoPropio(chosen));
       setPropia(fondoPropio());
     } catch (error) {
       setBackgroundFailure(prosaDe(error));
@@ -210,6 +213,7 @@ export default function Appearance(props: { proyecto: string }) {
       return;
     }
     setFondo(elegirFondoDeChat(id));
+    void motor().then((m) => m.guardarFondo());
   }
 
   return (
@@ -276,7 +280,8 @@ export default function Appearance(props: { proyecto: string }) {
               size="sm"
               variant="ghost"
               onClick={() => {
-                setFondo(quitarFondoPropio());
+                setFondo(ponerFondoPropio(null));
+                void motor().then((m) => m.quitarFondoPropio());
                 setPropia(null);
               }}
             >
@@ -358,7 +363,10 @@ export default function Appearance(props: { proyecto: string }) {
             step="5"
             class="w-40 accent-primary"
             value={visibilidad()}
-            onInput={(e) => setVelo(elegirVeloDeFondo(1 - Number(e.currentTarget.value) / 100))}
+            onInput={(e) => {
+              setVelo(elegirVeloDeFondo(1 - Number(e.currentTarget.value) / 100));
+              void motor().then((m) => m.guardarVelos());
+            }}
           />
         </SettingsRow>
         <SettingsRow
@@ -377,7 +385,10 @@ export default function Appearance(props: { proyecto: string }) {
             step="5"
             class="w-40 accent-primary"
             value={Math.round(veloPestanas() * 100)}
-            onInput={(e) => setVeloPestanas(elegirVeloDePestanas(Number(e.currentTarget.value) / 100))}
+            onInput={(e) => {
+              setVeloPestanas(elegirVeloDePestanas(Number(e.currentTarget.value) / 100));
+              void motor().then((m) => m.guardarVelos());
+            }}
           />
         </SettingsRow>
         <SettingsRow
@@ -396,7 +407,10 @@ export default function Appearance(props: { proyecto: string }) {
             step="5"
             class="w-40 accent-primary"
             value={Math.round(veloPaneles() * 100)}
-            onInput={(e) => setVeloPaneles(elegirVeloDePaneles(Number(e.currentTarget.value) / 100))}
+            onInput={(e) => {
+              setVeloPaneles(elegirVeloDePaneles(Number(e.currentTarget.value) / 100));
+              void motor().then((m) => m.guardarVelos());
+            }}
           />
         </SettingsRow>
         <Show when={backgroundFailure()}>

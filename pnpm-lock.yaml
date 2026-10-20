@@ -82,6 +82,9 @@ importers:
       '@terminus/design':
         specifier: workspace:*
         version: link:../../packages/design
+      '@terminus/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
       '@terminus/tasks':
         specifier: workspace:*
         version: link:../../packages/tasks

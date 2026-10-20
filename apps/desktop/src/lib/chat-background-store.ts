@@ -1,3 +1,4 @@
+import { createSignal } from "solid-js";
 import { createPref } from "./prefs.ts";
 import { invoke } from "./invoke.ts";
 import {
@@ -12,11 +13,20 @@ import {
   type FondoDeChat,
 } from "./chat-background.ts";
 
+/**
+ * Lo que pinta la ventana: el fondo y los velos elegidos, y la imagen del
+ * workspace abierto. Guardarlos en el motor y leerlos al cambiar de workspace
+ * es de `chat-background-engine.ts`, fuera de la carga inicial.
+ */
 const [guardado, setGuardado] = createPref<string>("chat-background", "dusk");
 const [rutaPropia, setRutaPropia] = createPref<string | null>("chat-background-custom", null);
 const [veloGuardado, setVeloGuardado] = createPref<number>("chat-background-veil", VELO_DE_FONDO);
 const [veloDePestanasGuardado, setVeloDePestanasGuardado] = createPref<number>("tabs-veil", VELO_DE_PESTANAS);
 const [veloDePanelesGuardado, setVeloDePanelesGuardado] = createPref<number>("panels-veil", VELO_DE_PANELES);
+/** La imagen propia del workspace abierto, como `data:` URI, tal como la devuelve su motor. */
+const [imagenDelWorkspace, setImagenDelWorkspace] = createSignal<string | null>(null);
+
+export { imagenDelWorkspace, setImagenDelWorkspace };
 
 function acotarVeloDePestanas(valor: unknown): number {
   return typeof valor === "number" && Number.isFinite(valor)
@@ -69,38 +79,18 @@ export function elegirVeloDeFondo(valor: number): number {
 
 export function fondoDeChat(): FondoDeChat {
   const fondo = fondoDe(guardado());
-  return fondo === "propia" && !rutaPropia() ? "dusk" : fondo;
+  return fondo === "propia" && !rutaPropia() && !imagenDelWorkspace() ? "dusk" : fondo;
 }
 
-/**
- * El motor recuerda el fondo elegido para que lo vea la web, que no tiene este
- * `localStorage`. Un motor anterior no conoce la orden: el fondo sigue igual aquí.
- */
-function avisarAlMotor() {
-  const ruta = fondoDeChat() === "propia" ? rutaPropia() : null;
-  void invoke("choose_chat_background", { path: ruta }).catch(() => {});
-}
-
-/** Al arrancar: lo elegido antes de que el motor lo recordara también llega a la web. */
+/** Al arrancar: la imagen elegida antes de que el motor la recordara llega a la máquina, y de ahí a cada workspace sin fondo propio. */
 export function sincronizarFondoConElMotor() {
-  if (rutaPropia()) avisarAlMotor();
-}
-
-/** El fondo que recuerda el motor, como `data:` URI, para un cliente sin imagen propia guardada (la web). */
-export async function fondoDelMotor(): Promise<string | null> {
-  if (rutaPropia()) return null;
-  try {
-    const fondo = await invoke<{ data_url: string } | null>("chat_background");
-    return fondo?.data_url ?? null;
-  } catch {
-    return null;
-  }
+  const ruta = rutaPropia();
+  if (ruta && fondoDeChat() === "propia") void invoke("choose_chat_background", { path: ruta }).catch(() => {});
 }
 
 export function elegirFondoDeChat(id: string): FondoDeChat {
   const siguiente = fondoDe(id);
-  setGuardado(siguiente === "propia" && !rutaPropia() ? "dusk" : siguiente);
-  avisarAlMotor();
+  setGuardado(siguiente === "propia" && !rutaPropia() && !imagenDelWorkspace() ? "dusk" : siguiente);
   return fondoDeChat();
 }
 
@@ -109,17 +99,10 @@ export function fondoPropio(): string | null {
   return rutaPropia();
 }
 
-export async function elegirFondoPropio(ruta: string): Promise<FondoDeChat> {
-  const copia = await invoke<string>("import_chat_background", { source: ruta });
+/** La copia que hizo el motor de la imagen elegida, o `null` para quitarla. */
+export function ponerFondoPropio(copia: string | null): FondoDeChat {
   setRutaPropia(copia);
-  setGuardado("propia");
-  avisarAlMotor();
-  return "propia";
-}
-
-export function quitarFondoPropio(): FondoDeChat {
-  setRutaPropia(null);
-  setGuardado("dusk");
-  avisarAlMotor();
-  return "dusk";
+  setImagenDelWorkspace(null);
+  setGuardado(copia ? "propia" : "dusk");
+  return fondoDeChat();
 }

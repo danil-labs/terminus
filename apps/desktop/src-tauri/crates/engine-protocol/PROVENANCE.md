@@ -20,7 +20,7 @@ repositories, and `GitHostInfo`. Files on disk keep their keys; the types that
 are stored and also travel cross the contract wrapped in `Wire`, which renames
 their keys. There are no aliases. This copy is byte-identical to the engine's.
 SHA-256:
-`ef7e08807e1ed51c3f291b375abb6a803e866f510432c5a61ebb3aae8cae018e`.
+`9ba81ec3097200f67e3d046b6fed1b28d6a0e863b1d6f5370495a694f1a56bc3`.
 
 seldon-host `4e21caf` (#66) added the Danil account (321 commands, 28 events):
 `danil_connect_start`, `danil_connect_status`, `danil_connect_options`,
@@ -39,8 +39,18 @@ background the engine remembers: `chat_background`, `choose_chat_background`
 and `import_chat_background_data`, plus the
 `settings.appearance.background.not_imported` key.
 
+seldon-host `feat/workspace-danil-link` adds workspaces linked to a Danil
+account and the chat background per workspace (334 commands, 29 events):
+`danil_workspace_link_status`, `danil_workspace_link` (`{mode}`, `owner` or
+`radiant`), `danil_workspace_link_start`, `danil_workspace_link_cancel`,
+`danil_workspace_unlink` (each with an optional `workspace`), the
+`danil-workspace-link` event, and `set_chat_background` (`{preset, path,
+dataUrl, veil}`); `chat_background`, `import_chat_background` and
+`import_chat_background_data` act on the workspace of the envelope. This copy is the
+engine's manifest byte for byte (seldon-host `696773f`).
+
 The source is `crates/engine-protocol/commands.json` in `danil-labs/seldon-host`
-(here, seldon-host `cb4ae57`). The engine pinned in `seldon-runtime.lock` must
+(here, seldon-host `696773f` on `feat/workspace-danil-link`). The engine pinned in `seldon-runtime.lock` must
 announce this same hash as its `contract`; the `contract` guard
 (`scripts/guards/contract.mjs`) compares the three.
 

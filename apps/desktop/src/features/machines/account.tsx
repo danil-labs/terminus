@@ -8,6 +8,7 @@
 import "../../web/phrases";
 import {
   type Computer,
+  linkedWorkspaces,
   listComputers,
   machineCompatibility,
   orderComputers,
@@ -138,6 +139,7 @@ export function startAccountMachines(target: Target = window) {
           token = null;
           void sync();
         },
+        onUnlinked: () => void sync(),
       });
       relays.push(relay);
       relay.onState(() => bump((n) => n + 1));
@@ -146,6 +148,8 @@ export function startAccountMachines(target: Target = window) {
         name: c.name?.trim() || c.computer_id,
         wakes: wakes(c),
         outdated: machineCompatibility(c.contract, __TERMINUS_CONTRACT__) === "outdated",
+        linked: linkedWorkspaces(c),
+        member: c.role === "member",
       };
       return { info, relay };
     });
@@ -221,7 +225,7 @@ export function startAccountMachines(target: Target = window) {
     }
     if (answer.kind !== "ok") return;
     const others = orderComputers(answer.value.filter((c) => c.computer_id !== self));
-    const key = JSON.stringify([self, client.endpoint, others.map((c) => [c.computer_id, c.name, c.contract, wakes(c)])]);
+    const key = JSON.stringify([self, client.endpoint, others.map((c) => [c.computer_id, c.name, c.contract, wakes(c), c.role ?? null, c.workspaces ?? null])]);
     if (installed?.key === key) return;
     uninstall();
     if (others.length) install(self, client.endpoint, others, key);
@@ -238,6 +242,8 @@ export function startAccountMachines(target: Target = window) {
 
   void whenConnected().then(() => {
     void listen("danil-connect", () => void sync());
+    // A workspace linked or unlinked here may change what this account sees on the other computers.
+    void listen("danil-workspace-link", () => void sync());
     setInterval(() => void sync(), RELIST);
     return sync();
   });

@@ -130,7 +130,7 @@ import CloseGuard from "../features/shell/CloseGuard";
 import WorkspaceColumn from "../features/shell/WorkspaceColumn";
 import Sitio from "../features/sites/Site";
 import { claseDeFondo, VELO_DE_FONDO } from "../lib/chat-background";
-import { fondoDeChat, fondoDelMotor, fondoPropio, veloDeFondo } from "../lib/chat-background-store";
+import { fondoDeChat, fondoPropio, imagenDelWorkspace, veloDeFondo } from "../lib/chat-background-store";
 import { copyText } from "../lib/clipboard";
 import { capabilities } from "../lib/platform";
 import { pedirElCampo } from "../lib/focus";
@@ -6507,19 +6507,16 @@ export default function App() {
     }
   });
 
-  /* Sin imagen propia en este cliente (la web), el fondo que recuerda el motor
-     del workspace abierto: el que eligió la persona en su escritorio. */
-  const [fondoDelMotorUrl] = createResource(
-    () => (fondoPropio() ? null : (workspaceActivo() ?? "")),
-    () => fondoDelMotor(),
-  );
+  /* El fondo, la imagen y los velos son del workspace: su motor los recuerda
+     y se leen al abrirlo, aquí y en la web. */
+  createEffect(on(workspaceActivo, () => void import("../lib/chat-background-engine").then((m) => m.cargarFondoDelWorkspace())));
 
   /* El fondo de Estilo cubre la ventana entera, detrás de las columnas de
      vidrio (`.glass-panel`): así se ve también tras el historial, el árbol y
      las barras. Cada chat solo pinta encima el fondo propio de su agente. */
   const FondoDeVentana = () => (
     <Show
-      when={fondoDelAgente()?.url ?? (fondoDeChat() === "propia" ? fondoPropioUrl() : null) ?? fondoDelMotorUrl() ?? null}
+      when={fondoDelAgente()?.url ?? (fondoDeChat() === "propia" ? (imagenDelWorkspace() ?? fondoPropioUrl()) : null) ?? null}
       fallback={
         <div class={cn("pointer-events-none absolute inset-0", claseDeFondo("dusk"))} aria-hidden="true">
           <div

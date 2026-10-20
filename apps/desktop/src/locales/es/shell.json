@@ -289,7 +289,6 @@
   "shell.machines.here.dismiss": "Cerrar",
   "shell.machines.here.logo": "logo",
   "shell.machines.here.background": "fondo de los chats",
-  "shell.machines.here.skip_background": "El fondo de los chats: la otra máquina ya tiene el suyo y no se reemplaza.",
   "shell.machines.now_on": "{name} se encendió",
   "shell.machines.now_off": "{name} se apagó",
   "shell.machines.local_only": "Esto se abre en la máquina de la tarea, no en esta."

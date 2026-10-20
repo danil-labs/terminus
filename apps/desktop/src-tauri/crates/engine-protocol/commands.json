@@ -537,7 +537,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "chat_background",
-      "output": "-> Result < Option < ChatBackground > , crate :: util :: Failure >",
+      "output": "-> Result < ChatBackground , crate :: util :: Failure >",
       "parameters": [],
       "path": "handlers::chat_background"
     },
@@ -1011,6 +1011,86 @@
       "output": "-> Result < Status , Failure >",
       "parameters": [],
       "path": "danil::danil_disconnect"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "danil_workspace_link",
+      "output": "-> Result < WorkspaceLinkStatus , Failure >",
+      "parameters": [
+        {
+          "key": "mode",
+          "name": "mode",
+          "type": "String"
+        },
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "danil::danil_workspace_link"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "danil_workspace_link_cancel",
+      "output": "-> Result < WorkspaceLinkStatus , Failure >",
+      "parameters": [
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "danil::danil_workspace_link_cancel"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "danil_workspace_link_start",
+      "output": "-> Result < LinkStart , Failure >",
+      "parameters": [
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "danil::danil_workspace_link_start"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "danil_workspace_link_status",
+      "output": "-> Result < WorkspaceLinkStatus , Failure >",
+      "parameters": [
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "danil::danil_workspace_link_status"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "danil_workspace_unlink",
+      "output": "-> Result < WorkspaceLinkStatus , Failure >",
+      "parameters": [
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "danil::danil_workspace_unlink"
     },
     {
       "async": false,
@@ -4243,6 +4323,36 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "set_chat_background",
+      "output": "-> Result < ChatBackground , crate :: util :: Failure >",
+      "parameters": [
+        {
+          "key": "preset",
+          "name": "preset",
+          "type": "Option < String >"
+        },
+        {
+          "key": "path",
+          "name": "path",
+          "type": "Option < String >"
+        },
+        {
+          "key": "dataUrl",
+          "name": "data_url",
+          "type": "Option < String >"
+        },
+        {
+          "key": "veil",
+          "name": "veil",
+          "type": "Option < serde_json :: Value >"
+        }
+      ],
+      "path": "handlers::set_chat_background"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "set_effort",
       "output": "-> Result < () , String >",
       "parameters": [
@@ -6335,6 +6445,7 @@
     "cli-open-task",
     "close-tab",
     "danil-connect",
+    "danil-workspace-link",
     "integrations-changed",
     "keep-awake-changed",
     "kn-cloud",

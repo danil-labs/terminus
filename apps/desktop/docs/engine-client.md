@@ -49,11 +49,27 @@ de la barra lateral y la sección la muestran. La web no tiene la sesión de
 máquina (`danilAccount`); con `accountProfile` (`src/web/account.ts`) lee y
 cambia la misma persona en el plano de control con la sesión de Supabase.
 
+Cada workspace se vincula por su cuenta a una cuenta de Danil (seldon-host
+`feat/workspace-danil-link`): la sección «Cuenta de Danil» tiene, debajo de la
+de la computadora, la del workspace abierto (`features/settings/DanilWorkspace.tsx`)
+con `danil_workspace_link_status`, `danil_workspace_link` (`owner` o `radiant`),
+`danil_workspace_link_start` y `danil_workspace_link_cancel` (código y página de
+aprobación para otra cuenta; el evento `danil-workspace-link` dice cómo va) y
+`danil_workspace_unlink`. La web, el teléfono y las otras computadoras vistas
+desde aquí solo muestran los workspaces de `workspaces` en cada fila de
+`GET /v1/computers` (`@terminus/computers`, `linkedWorkspaces`); el relay ya
+rechaza el resto con `workspace_not_linked`. En una computadora de otra persona
+(`role: "member"`) no se piden sus cuentas de IA.
+
+El fondo de los chats también es del workspace: `chat_background` se lee al
+abrirlo (`lib/chat-background-engine.ts`) y Estilo lo guarda con
+`set_chat_background` (patrón y velos siempre; la imagen por su copia importada,
+y se quita con `choose_chat_background` sin ruta).
+
 ## Contract
 
-`src-tauri/crates/engine-protocol/commands.json` is the frozen contract: 328
-commands (303 domain invocations, three channels and 22 window/bridge
-functions) and the events the engine emits. Its SHA-256 is recorded in
+`src-tauri/crates/engine-protocol/commands.json` is the frozen contract: 334
+commands and the events the engine emits. Its SHA-256 is recorded in
 [PROVENANCE](../src-tauri/crates/engine-protocol/PROVENANCE.md); the engine
 announces the same hash and the window refuses to connect to a different one
 (`version_mismatch`). `phrase-keys.json` lists the catalog keys the engine sends
