@@ -101,7 +101,6 @@ import { DEFAULT_PROFILE, displayName, notifyProfiles, watchProfiles } from "../
 import RecentAgentChats from "../features/projects/RecentAgentChats";
 import { type SessionRow, threadTitle } from "../features/projects/Sessions";
 import TabStrip, { NewTabButton } from "../features/projects/Tabs";
-import { veilTabs } from "../features/projects/tabVeil";
 import { createTaskWork, ResumeTask } from "../features/projects/TaskHistory";
 import type { Etapa } from "../features/projects/TaskStage";
 import { esChatDeAgente } from "../features/projects/taskTree";
@@ -6517,14 +6516,17 @@ export default function App() {
   /* El fondo de Estilo cubre la ventana entera, detrás de las columnas de
      vidrio (`.glass-panel`): así se ve también tras el historial, el árbol y
      las barras. Cada chat solo pinta encima el fondo propio de su agente. */
+  const imagenDeVentana = () =>
+    fondoDelAgente()?.url ?? (fondoDeChat() === "propia" ? fondoPropioUrl() : null) ?? fondoDelMotorUrl() ?? null;
+  const veloDeVentana = () => (fondoDelAgente() ? (fondoDelAgente()?.veil ?? VELO_DE_FONDO) : veloDeFondo());
   const FondoDeVentana = () => (
     <Show
-      when={fondoDelAgente()?.url ?? (fondoDeChat() === "propia" ? fondoPropioUrl() : null) ?? fondoDelMotorUrl() ?? null}
+      when={imagenDeVentana()}
       fallback={
         <div class={cn("pointer-events-none absolute inset-0", claseDeFondo("dusk"))} aria-hidden="true">
           <div
             class="absolute inset-0 bg-surface"
-            style={{ opacity: String(veloDeFondo()) }}
+            style={{ opacity: String(veloDeVentana()) }}
           />
         </div>
       }
@@ -6537,7 +6539,7 @@ export default function App() {
         >
           <div
             class="absolute inset-0 bg-surface"
-            style={{ opacity: String(fondoDelAgente() ? (fondoDelAgente()?.veil ?? VELO_DE_FONDO) : veloDeFondo()) }}
+            style={{ opacity: String(veloDeVentana()) }}
           />
         </div>
       )}
@@ -6556,10 +6558,7 @@ export default function App() {
           fila lleva el conmutador para traerlo de vuelta. Antes flotaba
           con `position: absolute`, sin compartir eje con nada. */}
       <div
-        ref={(el) => {
-          cabeceraDeConversacion = el;
-          veilTabs(el);
-        }}
+        ref={cabeceraDeConversacion}
         class={cn("tab-veil flex shrink-0 items-center gap-3 pr-4",
           HEADER_HEIGHT,
           "pl-4",
@@ -6832,7 +6831,6 @@ export default function App() {
         <For each={ventanas().filter((sitio) => sitio.fila > 0)}>
           {(sitio) => (
             <div
-              ref={veilTabs}
               class="tab-veil z-30 flex h-8 min-w-0 items-center self-start px-2"
               style={estiloDeLaCelda(sitio)}
               // Cómo la encuentra el arrastre: `ventanaBajo` pregunta al
@@ -7249,7 +7247,14 @@ export default function App() {
 
     // Sin cabecera y sin título de app, como Claude: la ventana ya se
     // llama Terminus.
-    <div class="relative isolate flex h-full flex-col overflow-hidden bg-surface">
+    <div
+      class="relative isolate flex h-full flex-col overflow-hidden bg-surface"
+      // `.tab-active` repite este fondo dentro de la pestaña para fundirse con su panel.
+      style={{
+        "--window-image": imagenDeVentana() ? `url("${imagenDeVentana()}")` : undefined,
+        "--window-veil": String(veloDeVentana()),
+      }}
+    >
       {/* Detrás de todo y sin posicionar nada encima: `-z-10` dentro del
           `isolate` queda sobre el `bg-surface` de la raíz y bajo cada columna. */}
       <div class="pointer-events-none absolute inset-0 -z-10" aria-hidden="true"><FondoDeVentana /></div>
