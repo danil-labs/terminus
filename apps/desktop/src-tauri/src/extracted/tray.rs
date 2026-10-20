@@ -338,9 +338,18 @@ mod tests {
     fn notice_link_keeps_its_key_after_windows_normalizes_it() {
         let key = |link: &str| notice_key(OsStr::new(link));
         let expected = Some("x647g4vc/880mmwzk".to_owned());
-        assert_eq!(key("terminus-notice://open?key=x647g4vc/880mmwzk"), expected);
-        assert_eq!(key("terminus-notice://open/?key=x647g4vc/880mmwzk"), expected);
-        assert_eq!(key("terminus-notice://open/?key=x647g4vc/880mmwzk/"), expected);
+        assert_eq!(
+            key("terminus-notice://open?key=x647g4vc/880mmwzk"),
+            expected
+        );
+        assert_eq!(
+            key("terminus-notice://open/?key=x647g4vc/880mmwzk"),
+            expected
+        );
+        assert_eq!(
+            key("terminus-notice://open/?key=x647g4vc/880mmwzk/"),
+            expected
+        );
         assert_eq!(key("terminus-notice://open/?key=a%20b"), None);
         assert!(is_notice(OsStr::new("terminus-notice://otra")));
         assert!(!is_notice(OsStr::new("--external-host")));
