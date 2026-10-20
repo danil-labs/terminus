@@ -380,5 +380,6 @@
   "chat.visual.collapse": "Collapse visualization",
   "chat.visual.budget": "This thread reached its limit of 16 loaded visualizations. Close a visualization to load another.",
   "chat.visual.unload": "Close visualization",
-  "chat.visual.load": "Open visualization"
+  "chat.visual.card": "Interactive visualization · Open",
+  "chat.visual.open": "Open"
 }

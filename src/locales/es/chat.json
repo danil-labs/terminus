@@ -380,5 +380,6 @@
   "chat.visual.collapse": "Reducir visualización",
   "chat.visual.budget": "Este hilo alcanzó el límite de 16 visualizaciones cargadas. Cierra una visualización para cargar otra.",
   "chat.visual.unload": "Cerrar visualización",
-  "chat.visual.load": "Abrir visualización"
+  "chat.visual.card": "Visualización interactiva · Abrir",
+  "chat.visual.open": "Abrir"
 }

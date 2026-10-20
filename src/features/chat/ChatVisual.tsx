@@ -1,4 +1,6 @@
 import { createEffect, createMemo, createResource, createSignal, on, onCleanup, onMount, Show } from "solid-js";
+import ChartNoAxesCombined from "lucide-solid/icons/chart-no-axes-combined";
+import ChevronRight from "lucide-solid/icons/chevron-right";
 import Maximize2 from "lucide-solid/icons/maximize-2";
 import Minimize2 from "lucide-solid/icons/minimize-2";
 import X from "lucide-solid/icons/x";
@@ -153,7 +155,17 @@ export default function ChatVisual(props: {
           <Button variant="ghost" size="iconCompact" onClick={close} aria-label={t("chat.visual.unload")} title={t("chat.visual.unload")}><X class="size-3.5" /></Button>
         </div>
       </Show>
-      <Show when={opened()} fallback={<Button variant="ghost" size="compact" onClick={() => setOpened(true)}>{t("chat.visual.load")} · {title()}</Button>}>
+      <Show when={opened()} fallback={
+        <button type="button" onClick={() => setOpened(true)}
+          class="group/card flex w-full max-w-md items-center gap-3 rounded-lg border border-border bg-surface-raised py-2.5 pr-3 pl-2.5 text-left transition-colors duration-150 outline-none hover:border-border-strong focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+          <span class="flex size-9 shrink-0 items-center justify-center rounded-md bg-surface-muted text-neutral-700"><ChartNoAxesCombined class="size-4" aria-hidden="true" /></span>
+          <span class="min-w-0 flex-1">
+            <span class="block truncate text-sm font-semibold text-neutral-950">{title()}</span>
+            <span class="block truncate text-xs text-neutral-500">{props.visual.title ? t("chat.visual.card") : t("chat.visual.open")}</span>
+          </span>
+          <ChevronRight class="size-4 shrink-0 text-neutral-500 transition-colors group-hover/card:text-neutral-800" aria-hidden="true" />
+        </button>
+      }>
         <Show when={html.error}>
           <div>
             <p class="text-sm font-semibold text-neutral-900">{title()}</p>
