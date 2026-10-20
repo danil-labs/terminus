@@ -33,6 +33,8 @@ export type Capabilities = {
   sidebarExtra?: () => JSX.Element;
   /** El nombre de una máquina por su id. */
   machineName?: (id: string) => string;
+  /** La que corre las tareas que llegan sin `machine`; sin esto, la de la ventana. */
+  windowMachine?: () => { id: string; name: string; local: boolean } | undefined;
   /** Dónde se crea un proyecto nuevo, en el diálogo de añadirlo. */
   machineOnCreate?: (workspace: string | null) => JSX.Element;
   /** «Usar este workspace aquí» en una máquina que no lo tiene (`features/machines/workspace-here.ts`). */

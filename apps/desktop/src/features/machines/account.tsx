@@ -155,7 +155,11 @@ export function startAccountMachines(target: Target = window) {
     });
 
     const previous: Capabilities = capabilities();
-    setCapabilities({ ...previous, machineName: (id) => (id === self ? homeName() : transport.fleet.name(id)) });
+    setCapabilities({
+      ...previous,
+      machineName: (id) => (id === self ? homeName() : transport.fleet.name(id)),
+      windowMachine: () => ({ id: self, name: homeName(), local: true }),
+    });
     const route: Invoke = (command, args = {}, options) => {
       if (command.startsWith("plugin:") || WINDOW.has(command)) return native(command, args, options);
       if (FILES.test(command)) {
