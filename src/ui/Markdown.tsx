@@ -1,10 +1,12 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import Check from "lucide-solid/icons/check";
 import Copy from "lucide-solid/icons/copy";
+import "katex/dist/katex.min.css";
 import TriangleAlert from "lucide-solid/icons/triangle-alert";
 import remarkGfm from "remark-gfm";
 import {
   type ComponentProps,
+  createEffect,
   createMemo,
   createSignal,
   ErrorBoundary,
@@ -27,6 +29,7 @@ import { BordeDeColumna, MarkdownTable } from "./MarkdownTable";
 import { MermaidDiagram } from "./Mermaid";
 import { bloquesDeMarkdown } from "./markdown-blocks";
 import { textoDelBloque } from "./markdown-code";
+import { pintarFormula, remarkMatematicas } from "./markdown-math";
 import { ITEM_DE_MENU, Popover, PopoverContent, PopoverTrigger } from "./Popover";
 
 /**
@@ -43,6 +46,9 @@ import { ITEM_DE_MENU, Popover, PopoverContent, PopoverTrigger } from "./Popover
  * URL que escribió el agente, sin pasar por `publications.jsonl`.
  *
  * `ErrorBoundary` cae a texto plano si el pipeline revienta al pintar.
+ *
+ * Las fórmulas las pinta KaTeX sin `trust` y directo al DOM, sin `innerHTML`;
+ * las reglas de sus delimitadores están en `markdown-math.ts`.
  *
  * `solid-markdown` 2.1.1 sigue la API de la versión 8 de su upstream: los
  * problemas se contrastan con esa documentación, no con la última.
@@ -207,16 +213,23 @@ const COMPONENTES = {
       {(fuente) => <EnlargeableImage src={fuente()} alt={p.alt} />}
     </Show>
   ),
-  code: (p) => (
-    <code class="rounded-sm bg-neutral-950/[0.06] px-1 py-0.5 font-mono text-[0.86em] text-neutral-950">
-      {p.children}
-    </code>
-  ),
+  code: (p) => {
+    const nodo = p.node as unknown as MarkdownNode;
+    return tieneClase(nodo, "math-inline") ? (
+      <Formula tex={textoDe(nodo)} bloque={false} />
+    ) : (
+      <code class="rounded-sm bg-neutral-950/[0.06] px-1 py-0.5 font-mono text-[0.86em] text-neutral-950">
+        {p.children}
+      </code>
+    );
+  },
   /* `surface-muted` y no `neutral-950`: la rampa se invierte con el tema, y un
      fondo `neutral-950` acaba casi blanco en oscuro — lo más brillante de la
      pantalla sería el bloque de código. Contraste interno: 17,45:1 en claro y
      15,11:1 en oscuro. Un fondo que no se invirtiera deja el texto a 1,07:1. */
   pre: (p) => {
+    const codigo = (p.node as unknown as MarkdownNode).children?.[0];
+    if (codigo && tieneClase(codigo, "math-display")) return <Formula tex={textoDe(codigo)} bloque />;
     const definition = diagramaMermaid(p.node as unknown as MarkdownNode);
     return definition ? (
       <MermaidDiagram definition={definition} />
@@ -347,14 +360,46 @@ type MarkdownNode = {
   children?: MarkdownNode[];
 };
 
+function tieneClase(nodo: MarkdownNode, clase: string) {
+  const clases = nodo.properties?.className;
+  return Array.isArray(clases) ? clases.includes(clase) : clases === clase;
+}
+
+const textoDe = (nodo: MarkdownNode) => nodo.children?.map((hijo) => hijo.value ?? "").join("") ?? "";
+
 function diagramaMermaid(pre: MarkdownNode): string | null {
   const code = pre.children?.[0];
-  const clases = code?.properties?.className;
-  const esMermaid = Array.isArray(clases)
-    ? clases.includes("language-mermaid")
-    : clases === "language-mermaid";
-  if (code?.tagName !== "code" || !esMermaid) return null;
-  return code.children?.map((hijo) => hijo.value ?? "").join("") ?? "";
+  if (code?.tagName !== "code" || !tieneClase(code, "language-mermaid")) return null;
+  return textoDe(code);
+}
+
+// Mientras la fórmula está a medio escribir, o si no es LaTeX válido, se ve su texto.
+function Formula(props: { tex: string; bloque: boolean }) {
+  const [fallo, setFallo] = createSignal<string | null>(null);
+  let caja!: HTMLSpanElement;
+  createEffect(() => setFallo(pintarFormula(props.tex, props.bloque, caja)));
+  const crudo = (
+    <code
+      title={fallo() ?? undefined}
+      class={cn(
+        "rounded-sm bg-neutral-950/[0.06] px-1 py-0.5 font-mono text-[0.86em] text-neutral-700",
+        props.bloque && "block whitespace-pre-wrap p-3",
+      )}
+    >
+      {props.tex}
+    </code>
+  );
+  return props.bloque ? (
+    <div class="my-3 max-w-full overflow-x-auto overflow-y-hidden [&_.katex-display]:m-0">
+      <span ref={caja} class={cn(fallo() !== null && "hidden")} />
+      <Show when={fallo() !== null}>{crudo}</Show>
+    </div>
+  ) : (
+    <>
+      <span ref={caja} class={cn(fallo() !== null && "hidden")} />
+      <Show when={fallo() !== null}>{crudo}</Show>
+    </>
+  );
 }
 
 // solid-markdown descarta los nodos de texto que valen exactamente un salto.
@@ -404,7 +449,7 @@ export function Markdown(props: {
                vecinos. Con `contents` ese `div` no genera caja. */
             <SolidMarkdown
               class="contents"
-              remarkPlugins={[remarkGfm]}
+              remarkPlugins={[remarkGfm, remarkMatematicas]}
               rehypePlugins={[preserveSoftBreaks]}
               components={COMPONENTES}
             >
