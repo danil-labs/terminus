@@ -57,7 +57,7 @@ export default function RootLayout() {
             headerBackButtonDisplayMode: "minimal",
           }}
         >
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="(home)" options={{ headerShown: false }} />
           <Stack.Screen
             name="workspaces"
             options={{ presentation: "formSheet", sheetAllowedDetents: [0.6, 0.95], sheetGrabberVisible: true, title: t("workspaces.title") }}

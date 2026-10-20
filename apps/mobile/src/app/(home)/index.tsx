@@ -41,6 +41,10 @@ export default function Tasks() {
     .flat()
     .filter((w) => !Object.values(Object.fromEntries(current?.members ?? [])).includes(w.workspace))
     .reduce((sum, w) => sum + w.tasks.filter((task) => NEEDS_YOU.has(task.state)).length, 0);
+  const pending = Object.values(attention)
+    .flat()
+    .flatMap((w) => w.tasks)
+    .filter((task) => NEEDS_YOU.has(task.state)).length;
 
   const spaces = snapshot?.spaces ?? [];
   // Las carpetas se nombran `host/id`: cada máquina tiene sus ids.
@@ -63,6 +67,7 @@ export default function Tasks() {
   return (
     <View style={[styles.page, { backgroundColor: theme.bg }]}>
       <View style={[styles.header, { paddingTop: insets.top + 6, backgroundColor: theme.bg, borderColor: theme.border }]}>
+        <View style={styles.topRow}>
         <Pressable testID="workspace-switcher" onPress={() => router.push("/workspaces")} style={styles.workspace} accessibilityLabel={t("home.switch")}>
           <Avatar name={current?.name ?? "T"} size={32} />
           <Text style={[styles.workspaceName, { color: theme.text }]} numberOfLines={1}>
@@ -71,6 +76,20 @@ export default function Tasks() {
           <Icon name="chevron-down" size={16} color={theme.textMuted} />
           <Badge count={otherPending} />
         </Pressable>
+        <View style={styles.actions}>
+          <Pressable testID="new-task" hitSlop={8} onPress={() => router.push("/new")} accessibilityLabel={t("new.title")} style={styles.action}>
+            <Icon name="square-pen" size={22} color={theme.text} />
+          </Pressable>
+          <Pressable testID="notifications" hitSlop={8} onPress={() => router.push("/notifications")} accessibilityLabel={t("tabs.notifications")} style={styles.action}>
+            <Icon name="bell" size={22} color={theme.text} />
+            {pending ? (
+              <View style={styles.actionBadge}>
+                <Badge count={pending} />
+              </View>
+            ) : null}
+          </Pressable>
+        </View>
+        </View>
         {spaces.length > 1 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.spaces}>
             {spaces.map((s) => {
@@ -113,7 +132,7 @@ export default function Tasks() {
 
       <ScrollView
         refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} />}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 96 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         contentInsetAdjustmentBehavior="automatic"
       >
         <MachineNote hosts={hosts} fleet={fleet} cachedAt={snapshot?.cachedAt ?? null} />
@@ -164,7 +183,11 @@ export default function Tasks() {
 const styles = StyleSheet.create({
   page: { flex: 1 },
   header: { paddingHorizontal: 16, paddingBottom: 8, gap: 10, borderBottomWidth: StyleSheet.hairlineWidth },
-  workspace: { flexDirection: "row", alignItems: "center", gap: 10 },
+  topRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  workspace: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
+  actions: { flexDirection: "row", alignItems: "center", gap: 14 },
+  action: { padding: 4 },
+  actionBadge: { position: "absolute", top: -4, right: -8 },
   workspaceName: { fontSize: 20, fontWeight: "800", flexShrink: 1 },
   spaces: { gap: 8 },
   pill: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 },
