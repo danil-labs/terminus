@@ -21,7 +21,10 @@ const PROVENANCE = fileURLToPath(new URL("../../src-tauri/crates/engine-protocol
 const LOCK = fileURLToPath(new URL("../../seldon-runtime.lock", import.meta.url));
 
 /** El contrato copiado cuyo motor aún no tiene release publicada, y qué falta. */
-const MOTOR_PENDIENTE = null;
+const MOTOR_PENDIENTE = {
+  contract: "49aa8a5f516665238325495ec861c33a66374c3c4ec4d1141d9e5e43e947b9fa",
+  why: "una sesión de Danil por cuenta y cada workspace de una cuenta (danil_sessions, danil_set_default_account, danil_workspace_account, danil_workspace_set_account, el evento danil-sessions y `account` en los comandos de cuenta; seldon-host feat/danil-session-per-account 658cad2): falta fusionarlo, publicar seldon-runtime con él y fijarlo en seldon-runtime.lock",
+};
 
 const vendored = createHash("sha256").update(readFileSync(CONTRACT)).digest("hex");
 const declared = /SHA-256:\s*`([0-9a-f]{64})`/.exec(readFileSync(PROVENANCE, "utf8"))?.[1];
