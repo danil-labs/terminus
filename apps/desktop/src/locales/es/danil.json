@@ -68,5 +68,13 @@
   "danil.footer.sign_in": "Iniciar sesión",
   "danil.footer.sign_in_title": "Iniciar sesión con Danil",
   "danil.footer.online": "{who} · en línea con Danil",
-  "danil.footer.offline": "{who} · sin conexión con Danil por ahora"
+  "danil.footer.offline": "{who} · sin conexión con Danil por ahora",
+  "danil.workspace.title": "Cuenta de Danil de {workspace}",
+  "danil.workspace.title_plain": "Cuenta de Danil de este workspace",
+  "danil.workspace.description": "Elige si este workspace se ve en la web y el teléfono con la cuenta de Danil de esta computadora, como una carpeta que se sincroniza.",
+  "danil.workspace.unavailable": "El motor de esta versión de Terminus todavía no conecta workspaces a una cuenta. Actualiza Terminus.",
+  "danil.workspace.sign_in_first": "Inicia sesión arriba con tu cuenta de Danil para conectar este workspace.",
+  "danil.workspace.sync": "Ver este workspace en la web y el teléfono",
+  "danil.workspace.sync_hint": "Con la cuenta {email}.",
+  "danil.error.workspace_not_linked": "Este workspace no está conectado a tu cuenta de Danil."
 }

@@ -20,7 +20,7 @@ repositories, and `GitHostInfo`. Files on disk keep their keys; the types that
 are stored and also travel cross the contract wrapped in `Wire`, which renames
 their keys. There are no aliases. This copy is byte-identical to the engine's.
 SHA-256:
-`ef7e08807e1ed51c3f291b375abb6a803e866f510432c5a61ebb3aae8cae018e`.
+`90d10591c73b2c57ac64e5f5be11e9c7bbdef99e7644a2f4f353e70f0ff62f22`.
 
 seldon-host `4e21caf` (#66) added the Danil account (321 commands, 28 events):
 `danil_connect_start`, `danil_connect_status`, `danil_connect_options`,
@@ -39,8 +39,19 @@ background the engine remembers: `chat_background`, `choose_chat_background`
 and `import_chat_background_data`, plus the
 `settings.appearance.background.not_imported` key.
 
+seldon-host `feat/workspace-danil-link` adds workspaces synced with the
+computer's own Danil account and the chat background per workspace (332
+commands, 28 events): `danil_workspace_link_status`, `danil_workspace_link`
+(`{mode?: "owner"}`: always the machine's account) and
+`danil_workspace_unlink` (each with an optional `workspace`), and
+`set_chat_background` (`{preset, path, dataUrl, veil}`); `chat_background`,
+`import_chat_background` and `import_chat_background_data` act on the
+workspace of the envelope. There are no other accounts: no device code per
+workspace and no `danil-workspace-link` event. This copy is the engine's
+manifest byte for byte (seldon-host `1687dbf`).
+
 The source is `crates/engine-protocol/commands.json` in `danil-labs/seldon-host`
-(here, seldon-host `cb4ae57`). The engine pinned in `seldon-runtime.lock` must
+(here, seldon-host `1687dbf` on `feat/workspace-danil-link`). The engine pinned in `seldon-runtime.lock` must
 announce this same hash as its `contract`; the `contract` guard
 (`scripts/guards/contract.mjs`) compares the three.
 
@@ -51,6 +62,8 @@ from the engine source at `fdf4dd9863a80363a0dd7b15ea21fd6b69e1f4bd`. The 24
 (`feat/gitlab-git-host`). The eleven `danil.error.*` keys come from seldon-host
 `4e21caf`; `danil.error.not_connected`, `image_too_large`,
 `unsupported_image`, `unauthorized` and `unsupported` from `cb4ae57` ([connector.md](https://github.com/danil-labs/seldon-host/blob/dev/docs/connector.md)).
+`settings.appearance.background.workspace_missing` comes from `1687dbf`, where
+`settings.appearance.background.too_big` also became 700 KB.
 
 Endpoint, selection and StreamPage extend the transport; they do not convert
 domain data. The token travels in RPC1 only between authenticated local

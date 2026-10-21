@@ -1,3 +1,4 @@
+import { mergeAttention } from "@terminus/protocol";
 import { listen } from "../../lib/serviceEvents";
 import { createSignal, onCleanup, onMount } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
@@ -37,7 +38,8 @@ export function createAttention() {
     reload();
     const unlisten = listen<WorkspaceAttention[]>("attention", (e) => {
       asked++;
-      setList(known(e.payload));
+      // Una entrada por workspace: las de los demás siguen como estaban.
+      setList((now) => mergeAttention(now, known(e.payload)));
     });
     onCleanup(() => void unlisten.then((stop) => stop()));
     window.addEventListener("harness:workspace", reload);

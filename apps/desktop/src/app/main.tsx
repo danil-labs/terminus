@@ -10,7 +10,7 @@ import { seguirElTema } from "../lib/theme";
 import { aplicarEscala, atajoDeEscala } from "../lib/zoom";
 import { trimNativeMenu } from "../lib/contextMenu";
 import { activarBarrasAlDesplazar } from "../lib/scrollbars";
-import { aplicarVeloDePestanas, sincronizarFondoConElMotor } from "../lib/chat-background-store";
+import { aplicarVeloDePestanas } from "../lib/chat-background-store";
 import { aplicarLengua, elegirLengua, lenguasDisponibles, semillaDelAlta } from "../lib/i18n";
 import { cargarPaquetes } from "../locales/packs";
 import { capabilities } from "../lib/platform";
@@ -34,7 +34,6 @@ new MutationObserver(reportarFondo).observe(document.documentElement, {
 });
 aplicarEscala();
 aplicarVeloDePestanas();
-sincronizarFondoConElMotor();
 window.addEventListener("keydown", atajoDeEscala);
 trimNativeMenu(window, import.meta.env.DEV);
 activarBarrasAlDesplazar();

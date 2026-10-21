@@ -6,6 +6,7 @@
   "web.accounts.sign_out_yes": "Sign out",
   "web.computers.error": "Could not reach Danil Computers.",
   "web.computers.license": "Your account has no Terminus license. Ask whoever manages your Danil account for access.",
+  "web.computers.no_workspaces": "Connect a workspace to your account from Terminus on your computer.",
   "web.computers.none": "You do not have any computer in Danil yet.",
   "web.computers.not_yours": "This computer is not yours or no longer exists.",
   "web.computers.retry": "Retry",
@@ -15,6 +16,7 @@
   "web.computers.state.starting": "Starting",
   "web.computers.waiting": "Connecting to your Danil account…",
   "web.desktop_only": "This is only available in the Terminus desktop app.",
+  "web.phone_layout": "Open the phone version",
   "web.home": "Back to Danil Agents",
   "web.local_files": "The browser cannot pick files or folders on this device. Use the Terminus desktop app for that.",
   "web.machines.create_on": "Created on",
@@ -53,5 +55,6 @@
   "web.setup.preparing": "Preparing your computer…",
   "web.setup.preparing_percent": "Preparing your computer… {percent}%",
   "web.start_failed": "The computer could not start. Try again in a moment.",
-  "web.sync.last": "Last synced: {time}"
+  "web.sync.last": "Last synced: {time}",
+  "web.workspace_not_linked": "This workspace is not connected to your Danil account. Connect it from Terminus on that computer."
 }

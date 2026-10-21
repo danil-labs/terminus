@@ -8,13 +8,17 @@ import X from "lucide-solid/icons/x";
 import { For, Show, createResource, createSignal, onCleanup, onMount, type Component } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
 import { t } from "../../lib/i18n";
+import { capabilities } from "../../lib/platform";
 import type { AgentProfile, AgenteDeMaquina, CatalogoDeAgentes } from "../../lib/model";
 import {
   FONDOS,
   claseDeFondo,
   type FondoDeChat,
 } from "../../lib/chat-background";
-import { elegirFondoDeChat, elegirFondoPropio, elegirVeloDeFondo, elegirVeloDePaneles, elegirVeloDePestanas, fondoDeChat, fondoPropio, quitarFondoPropio, veloDeFondo, veloDePaneles, veloDePestanas } from "../../lib/chat-background-store";
+import { elegirFondoDeChat, elegirVeloDeFondo, elegirVeloDePaneles, elegirVeloDePestanas, fondoDeChat, fondoPropio, imagenDelWorkspace, ponerFondoPropio, veloDeFondo, veloDePaneles, veloDePestanas } from "../../lib/chat-background-store";
+
+/** Guardar en el workspace va en su propio trozo: la carga inicial solo pinta. */
+const motor = () => import("../../lib/chat-background-engine");
 import { VELO_DE_PANELES_MAX, VELO_DE_PANELES_MIN, VELO_DE_PESTANAS_MAX, VELO_DE_PESTANAS_MIN } from "../../lib/chat-background";
 import type { Preview } from "../artifacts/Preview";
 import {
@@ -38,6 +42,29 @@ import { LogoDelWorkspace } from "./Workspaces";
 import { createWorkspaces } from "./workspaces-store";
 
 const IMAGES = ["png", "jpg", "jpeg", "webp"];
+/** El tope del motor para un fondo (`settings.appearance.background.too_big`): cabe en la copia del relay. */
+const FONDO_MAX = 700 * 1024;
+
+/** En el navegador no hay rutas: la imagen se elige con el selector de archivos y viaja como `data:`. */
+function imagenDelNavegador(): Promise<File | null> {
+  return new Promise((done) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = IMAGES.map((ext) => `.${ext}`).join(",");
+    input.onchange = () => done(input.files?.[0] ?? null);
+    input.oncancel = () => done(null);
+    input.click();
+  });
+}
+
+function comoDataUrl(file: File): Promise<string> {
+  return new Promise((ok, mal) => {
+    const lector = new FileReader();
+    lector.onload = () => ok(String(lector.result));
+    lector.onerror = () => mal(lector.error);
+    lector.readAsDataURL(file);
+  });
+}
 const VISIBILITY_ID = "settings-appearance-background-visibility";
 const TABS_VEIL_ID = "settings-appearance-tabs-veil";
 const PANELS_VEIL_ID = "settings-appearance-panels-veil";
@@ -89,6 +116,8 @@ export default function Appearance(props: { proyecto: string }) {
   const [estiloClaro, setEstiloClaro] = createSignal<LightStyle>(lightStyle());
   const [fondo, setFondo] = createSignal<FondoDeChat>(fondoDeChat());
   const [propia, setPropia] = createSignal<string | null>(fondoPropio());
+  /** El workspace tiene imagen propia: la copia subida aquí o la que devolvió su motor. */
+  const hayPropia = () => !!propia() || !!imagenDelWorkspace();
   const [velo, setVelo] = createSignal(veloDeFondo());
   const visibilidad = () => Math.round((1 - velo()) * 100);
   const [veloPestanas, setVeloPestanas] = createSignal(veloDePestanas());
@@ -189,6 +218,18 @@ export default function Appearance(props: { proyecto: string }) {
   });
 
   async function elegirImagenPropia() {
+    if (capabilities().browserFiles) {
+      const file = await imagenDelNavegador();
+      if (!file) return;
+      setBackgroundFailure(null);
+      if (file.size > FONDO_MAX) return setBackgroundFailure(t("settings.appearance.background.too_big"));
+      try {
+        setFondo(await (await motor()).elegirFondoDelNavegador(await comoDataUrl(file)));
+      } catch (error) {
+        setBackgroundFailure(prosaDe(error));
+      }
+      return;
+    }
     const chosen = await open({
       multiple: false,
       directory: false,
@@ -197,7 +238,7 @@ export default function Appearance(props: { proyecto: string }) {
     if (typeof chosen !== "string") return;
     setBackgroundFailure(null);
     try {
-      setFondo(await elegirFondoPropio(chosen));
+      setFondo(await (await motor()).elegirFondoPropio(chosen));
       setPropia(fondoPropio());
     } catch (error) {
       setBackgroundFailure(prosaDe(error));
@@ -205,11 +246,12 @@ export default function Appearance(props: { proyecto: string }) {
   }
 
   function pulsarFondo(id: FondoDeChat) {
-    if (id === "propia" && !propia()) {
+    if (id === "propia" && !hayPropia()) {
       void elegirImagenPropia();
       return;
     }
     setFondo(elegirFondoDeChat(id));
+    void motor().then((m) => m.guardarFondo());
   }
 
   return (
@@ -267,7 +309,7 @@ export default function Appearance(props: { proyecto: string }) {
           label={t("settings.appearance.background.title")}
           description={t("settings.appearance.background.description")}
         >
-          <Show when={propia()}>
+          <Show when={hayPropia()}>
             <Button size="sm" variant="ghost" onClick={() => void elegirImagenPropia()}>
               <ImagePlus size={14} />
               {t("settings.appearance.background.change")}
@@ -276,7 +318,8 @@ export default function Appearance(props: { proyecto: string }) {
               size="sm"
               variant="ghost"
               onClick={() => {
-                setFondo(quitarFondoPropio());
+                setFondo(ponerFondoPropio(null));
+                void motor().then((m) => m.quitarFondoPropio());
                 setPropia(null);
               }}
             >
@@ -297,14 +340,14 @@ export default function Appearance(props: { proyecto: string }) {
                       "relative block h-11 w-[72px] overflow-hidden rounded-md bg-surface outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
                       fondo() === id
                         ? "border-2 border-primary"
-                        : id === "propia" && !propia()
+                        : id === "propia" && !hayPropia()
                           ? "border border-dashed border-border-strong"
                           : "border border-border",
                     )}
                     onClick={() => pulsarFondo(id)}
                   >
                     <Show
-                      when={id === "propia" ? vistaPropia() : undefined}
+                      when={id === "propia" ? (imagenDelWorkspace() ?? vistaPropia()) : undefined}
                       fallback={
                         <span
                           class={cn(
@@ -358,7 +401,10 @@ export default function Appearance(props: { proyecto: string }) {
             step="5"
             class="w-40 accent-primary"
             value={visibilidad()}
-            onInput={(e) => setVelo(elegirVeloDeFondo(1 - Number(e.currentTarget.value) / 100))}
+            onInput={(e) => {
+              setVelo(elegirVeloDeFondo(1 - Number(e.currentTarget.value) / 100));
+              void motor().then((m) => m.guardarVelos());
+            }}
           />
         </SettingsRow>
         <SettingsRow
@@ -377,7 +423,10 @@ export default function Appearance(props: { proyecto: string }) {
             step="5"
             class="w-40 accent-primary"
             value={Math.round(veloPestanas() * 100)}
-            onInput={(e) => setVeloPestanas(elegirVeloDePestanas(Number(e.currentTarget.value) / 100))}
+            onInput={(e) => {
+              setVeloPestanas(elegirVeloDePestanas(Number(e.currentTarget.value) / 100));
+              void motor().then((m) => m.guardarVelos());
+            }}
           />
         </SettingsRow>
         <SettingsRow
@@ -396,7 +445,10 @@ export default function Appearance(props: { proyecto: string }) {
             step="5"
             class="w-40 accent-primary"
             value={Math.round(veloPaneles() * 100)}
-            onInput={(e) => setVeloPaneles(elegirVeloDePaneles(Number(e.currentTarget.value) / 100))}
+            onInput={(e) => {
+              setVeloPaneles(elegirVeloDePaneles(Number(e.currentTarget.value) / 100));
+              void motor().then((m) => m.guardarVelos());
+            }}
           />
         </SettingsRow>
         <Show when={backgroundFailure()}>

@@ -40,6 +40,12 @@ test("an expired, unknown or unlicensed code is told apart", async () => {
     [401, null, "unauthorized"],
     [500, null, "error"],
     [200, { nothing: true }, "error"],
+    [400, { error: { code: "expired_token" } }, "expired"],
+    [404, { error: { code: "invalid_user_code" } }, "invalid"],
+    [403, { error: { code: "unknown_user" } }, "no_account"],
+    [403, { error: { code: "license_required" } }, "license"],
+    [409, { error: { code: "ambiguous_danil_account" } }, "ambiguous"],
+    [409, { error: { code: "code_already_used" } }, "used"],
   ];
   for (const [status, body, kind] of cases) {
     const { f } = fake(() => ({ status, body }));

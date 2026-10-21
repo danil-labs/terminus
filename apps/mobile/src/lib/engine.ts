@@ -13,6 +13,7 @@ import type {
   BaseBranches,
   ChatEvent,
   EngineEvent,
+  FilePreview,
   MentionList,
   OpenedSession,
   PendingRequests,
@@ -27,10 +28,14 @@ import type {
   Space,
   TaskBlockers,
   Startup,
+  TreeContent,
   Turn,
   Workspace,
   WorkspaceAttention,
 } from "@terminus/protocol";
+import { MAX_VISUAL_BYTES, VISUAL_FILE, VISUAL_TREE } from "@terminus/chat/visual";
+import { linkedAttention, onlyLinked } from "@terminus/computers";
+import { type ChatBackgroundView, chatBackgroundView } from "@terminus/protocol";
 import { type FlatRow, flattenTasks } from "@terminus/tasks";
 import { type Host, HostError } from "./hosts.ts";
 
@@ -94,7 +99,13 @@ async function read<T>(host: Host, command: Parameters<Host["call"]>[0], workspa
 export async function workspacesOf(host: Host): Promise<{ list: Workspace[]; cachedAt: number | null }> {
   const at = { cachedAt: null as number | null };
   const startup = await read<Startup | null>(host, "list_workspaces", null, {}, null, at);
-  return { list: startup?.workspaces ?? [], cachedAt: at.cachedAt };
+  return { list: onlyLinked(startup?.workspaces ?? [], host.linked), cachedAt: at.cachedAt };
+}
+
+/** El fondo de los chats del workspace en esa máquina; sin respuesta, ninguno. */
+export async function chatBackgroundOf(host: Host, workspace: string): Promise<ChatBackgroundView> {
+  const at = { cachedAt: null as number | null };
+  return chatBackgroundView(await read<unknown>(host, "chat_background", workspace, {}, null, at).catch(() => null));
 }
 
 /**
@@ -354,7 +365,8 @@ export function markSeen(host: Host, workspace: string, id: string) {
 
 export async function attentionOf(host: Host): Promise<WorkspaceAttention[]> {
   const at = { cachedAt: null as number | null };
-  return read<WorkspaceAttention[]>(host, "list_workspace_attention", null, {}, [], at).catch(() => []);
+  const list = await read<WorkspaceAttention[]>(host, "list_workspace_attention", null, {}, [], at).catch(() => []);
+  return linkedAttention(list, host.linked);
 }
 
 // --- Fijar y archivar (la vista previa) -----------------------------------------
@@ -469,6 +481,30 @@ export async function uploadAttachment(host: Host, workspace: string, folder: st
   return path;
 }
 
+// --- Lo enriquecido del chat ----------------------------------------------------
+
+/**
+ * Un archivo que el mensaje nombra por su ruta en la máquina: imagen (con
+ * `data_url`), PDF (`pdf` en base64), HTML o texto. Los adjuntos viejos,
+ * `entradas/…`, los resuelve `attachment_preview` dentro de la tarea.
+ */
+export async function previewFile(host: Host, workspace: string, path: string, task?: { folder: string; session: string }): Promise<FilePreview> {
+  const answer = path.startsWith("entradas/") && task
+    ? await host.call<FilePreview>("attachment_preview", workspace, { project: task.folder, id: task.session, rel: path })
+    : await host.call<FilePreview>("preview_file", workspace, { path, rel: path });
+  if (!answer.value) throw new HostError("operation_failed");
+  return answer.value;
+}
+
+/** El HTML de una visualización del chat, del árbol de la tarea; las mismas comprobaciones que la ventana. */
+export async function readVisual(host: Host, workspace: string, folder: string, session: string, file: string): Promise<string> {
+  if (file.length > 128 || !VISUAL_FILE.test(file)) throw new HostError("invalid_visual_file");
+  const { value } = await host.call<TreeContent>("tree_show", workspace, { project: folder, session, tree: VISUAL_TREE, path: file });
+  if (!value || value.truncated || value.bytes > MAX_VISUAL_BYTES) throw new HostError("visual_too_large");
+  if (value.kind !== "text" || typeof value.text !== "string") throw new HostError("invalid_visual_file");
+  return value.text;
+}
+
 // --- Cuentas de IA ---------------------------------------------------------------
 
 export async function accountsOf(host: Host, provider: string): Promise<AccountList | null> {
@@ -544,7 +580,9 @@ export function noticer(host: string, initial: WorkspaceAttention[] = []) {
     take(event: EngineEvent): Notice[] {
       if (event.name === "attention" && Array.isArray(event.payload)) {
         const list = event.payload as WorkspaceAttention[];
-        const next = index(list);
+        // Solo cambian los workspaces que trae: lo que se sabía de los demás sigue.
+        const next = new Map([...known].filter(([key]) => !list.some((w) => key.startsWith(`${w.workspace}/`))));
+        for (const [key, state] of index(list)) next.set(key, state);
         const notices: Notice[] = [];
         for (const w of list) for (const task of w.tasks) {
           const key = `${w.workspace}/${task.session}`;

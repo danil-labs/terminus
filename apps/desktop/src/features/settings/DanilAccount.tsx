@@ -8,6 +8,7 @@ import type { AccountProfileSource } from "./account-profile";
 import { AccountIdentityBlock, createAccountIdentity } from "./AccountIdentity";
 import type { DanilConnectStatus } from "./danil-account";
 import { createDanilSession, DanilSignInChoices } from "./danil-session";
+import { DanilWorkspace } from "./DanilWorkspace";
 import { SettingsBlock, SettingsPanel, SettingsRow, SettingsSection } from "./layout";
 
 /** Configuración → Cuenta de Danil. Chunk aparte: solo lo carga quien abre esta sección. */
@@ -88,7 +89,9 @@ function MachineAccount() {
           {(text) => <p class="m-0 pt-2 text-[0.8125rem] text-error-strong" role="alert">{text()}</p>}
         </Show>
       </SettingsSection>
-      {/* Aquí va la sección de workspaces vinculados cuando el motor los sincronice. */}
+      <Show when={view().t !== "unavailable"}>
+        <DanilWorkspace />
+      </Show>
     </SettingsPanel>
   );
 }

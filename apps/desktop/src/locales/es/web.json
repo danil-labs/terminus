@@ -6,6 +6,7 @@
   "web.accounts.sign_out_yes": "Cerrar sesión",
   "web.computers.error": "No se pudo hablar con Danil Computers.",
   "web.computers.license": "Tu cuenta no tiene licencia de Terminus. Pide acceso a quien administra tu cuenta de Danil.",
+  "web.computers.no_workspaces": "Conecta un workspace a tu cuenta desde Terminus en tu computadora.",
   "web.computers.none": "Todavía no tienes ninguna computadora en Danil.",
   "web.computers.not_yours": "Esta computadora no es tuya o ya no existe.",
   "web.computers.retry": "Reintentar",
@@ -15,6 +16,7 @@
   "web.computers.state.starting": "Encendiéndose",
   "web.computers.waiting": "Conectando con tu cuenta de Danil…",
   "web.desktop_only": "Esto solo está disponible en la app de escritorio de Terminus.",
+  "web.phone_layout": "Ver la versión del teléfono",
   "web.home": "Volver a Danil Agents",
   "web.local_files": "Desde el navegador no se eligen archivos ni carpetas de este equipo. Para eso usa la app de escritorio de Terminus.",
   "web.machines.create_on": "Se crea en",
@@ -53,5 +55,6 @@
   "web.setup.preparing": "Preparando tu computadora…",
   "web.setup.preparing_percent": "Preparando tu computadora… {percent} %",
   "web.start_failed": "La computadora no pudo encenderse. Vuelve a intentarlo en un momento.",
-  "web.sync.last": "Última sincronización: {time}"
+  "web.sync.last": "Última sincronización: {time}",
+  "web.workspace_not_linked": "Este workspace no está conectado a tu cuenta de Danil. Conéctalo desde Terminus en esa computadora."
 }

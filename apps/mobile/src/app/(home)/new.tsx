@@ -1,7 +1,6 @@
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { Platform, StyleSheet, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StyleSheet, Text, View } from "react-native";
 import type { BaseBranches } from "@terminus/protocol";
 import { baseBranchesOf, createTask, runShell, suggestedDefaults } from "../../lib/engine";
 import { HostError } from "../../lib/hosts";
@@ -17,7 +16,7 @@ import { FolderSquare } from "../../ui/TaskCard";
 import { useTheme } from "../../ui/theme";
 
 /**
- * «Nueva» de la barra: la tarea nueva del escritorio. Arriba el workspace; abajo
+ * «Nueva tarea» (el lápiz de arriba en Tareas): la tarea nueva del escritorio. Arriba el workspace; abajo
  * el cuadro de escribir con sus selectores encima: en qué máquina («Ejecutar
  * en», solo con más de una), en qué carpeta, desde qué rama base (si la
  * carpeta tiene git) y con qué agente. La máquina por omisión es la última
@@ -26,7 +25,6 @@ import { useTheme } from "../../ui/theme";
  */
 export default function NewTask() {
   const theme = useTheme();
-  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ folder?: string; agent?: string; host?: string }>();
   const { preferred, rememberMachine, tick } = useMachines();
   const { current, snapshot, space, hostsOfCurrent } = useWorkspaces();
@@ -142,8 +140,7 @@ export default function NewTask() {
 
   return (
     <KeyboardScreen style={{ backgroundColor: theme.bg }}>
-      <View style={[styles.top, { paddingTop: insets.top + 12 }]}>
-        <Text style={[styles.title, { color: theme.text }]}>{t("new.title")}</Text>
+      <View style={styles.top}>
         <Text style={{ color: theme.textMuted }}>
           {current?.name}
           {space ? ` · ${spaceName(space, t("space.general"))}` : ""}
@@ -156,24 +153,20 @@ export default function NewTask() {
           {note ? <Text style={{ color: theme.textMuted }}>{note}</Text> : null}
         </View>
       ) : null}
-      {/* En iOS 26 la barra de pestañas flota sobre el contenido; en Android el contenido termina encima de ella. */}
-      <View style={{ paddingBottom: Platform.OS === "ios" ? insets.bottom + 56 : 0 }}>
-        <Composer
-          testID="new-message"
-          host={host ?? undefined}
-          workspace={workspace}
-          folder={target?.id ?? null}
-          session={null}
-          providers={host ? (snapshot?.providers[host.id] ?? []) : []}
-          provider={defaults.provider}
-          model={defaults.model}
-          disabled={!host || !target || act === "asleep" || act === "outdated" || waking}
-          placeholder={t("new.placeholder")}
-          header={header}
-          onSubmit={start}
-          bottomInset={false}
-        />
-      </View>
+      <Composer
+        testID="new-message"
+        host={host ?? undefined}
+        workspace={workspace}
+        folder={target?.id ?? null}
+        session={null}
+        providers={host ? (snapshot?.providers[host.id] ?? []) : []}
+        provider={defaults.provider}
+        model={defaults.model}
+        disabled={!host || !target || act === "asleep" || act === "outdated" || waking}
+        placeholder={t("new.placeholder")}
+        header={header}
+        onSubmit={start}
+      />
 
       <Sheet visible={picker === "machine"} title={w("shell.machines.label")} onClose={() => setPicker(null)}>
         {hostsOfCurrent.map((h) => (
@@ -225,8 +218,7 @@ export default function NewTask() {
 }
 
 const styles = StyleSheet.create({
-  top: { paddingHorizontal: 16, gap: 4 },
-  title: { fontSize: 28, fontWeight: "800" },
+  top: { paddingHorizontal: 16, paddingTop: 12, gap: 4 },
   notes: { paddingHorizontal: 16, paddingBottom: 6, gap: 4 },
   selectors: { flexDirection: "row", flexWrap: "wrap", gap: 6, paddingHorizontal: 2 },
 });

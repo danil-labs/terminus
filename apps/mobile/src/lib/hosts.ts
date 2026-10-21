@@ -15,8 +15,11 @@ import {
   INTENT_COMMANDS,
   WAKE_TIMEOUT,
   cachedAt,
+  callWorkspace,
   canAct,
   isManaged,
+  linkedEvent,
+  linkedWorkspaces,
   powerOf,
   requestId,
 } from "@terminus/computers";
@@ -42,6 +45,8 @@ export type Host = {
   readonly kind: "computer" | "bridge";
   /** La VM que Danil administra: una acción la enciende. */
   readonly managed: boolean;
+  /** Los workspaces vinculados a la cuenta en esta máquina; `null` es que no se filtra (el bridge, un plano de control anterior). */
+  readonly linked: ReadonlySet<string> | null;
   power(): Power;
   /** Si una acción se puede mandar ya, enciende la máquina, no tiene cómo o su motor está desactualizado. */
   canAct(): "now" | "wakes" | "asleep" | "outdated";
@@ -91,11 +96,13 @@ export function relayHost(computer: Computer, config: Omit<RelayConfig, "compute
   relay.onLink(changed);
   // Hasta que el relay diga su estado, vale el de la fila de `/v1/computers`.
   const state = () => (relay.state() === "unknown" ? computer.state : relay.state());
+  const linked = linkedWorkspaces(computer);
   const host: Host = {
     id: computer.computer_id,
     label: computer.name?.trim() || computer.computer_id,
     kind: "computer",
     managed: isManaged(computer),
+    linked,
     power: () => powerOf(state()),
     canAct: () => canAct(computer, state()),
     onChange(listener) {
@@ -103,7 +110,8 @@ export function relayHost(computer: Computer, config: Omit<RelayConfig, "compute
       return () => void listeners.delete(listener);
     },
     onEvents(listener) {
-      return relay.onEvents((page: EventsPage) => listener(page.events ?? [], page.gap === true));
+      // El relay ya no manda eventos de un workspace sin vincular; esto es la segunda red.
+      return relay.onEvents((page: EventsPage) => listener((page.events ?? []).filter((e) => linkedEvent(e, linked)), page.gap === true));
     },
     async call<T>(command: AppCommand, workspace: string | null, args: object = {}) {
       allowed(command);
@@ -116,7 +124,8 @@ export function relayHost(computer: Computer, config: Omit<RelayConfig, "compute
       // Una acción que el relay no enciende por su cuenta: la VM se enciende antes por el plano de control.
       if (WAKES_FIRST.has(command)) await host.wake();
       try {
-        const { value, cached } = await relay.call(requestId(), command, workspace, null, args, intent ? WAKE_TIMEOUT : CALL_TIMEOUT);
+        // Con el workspace que nombran los argumentos: el relay rechaza (`workspace_mismatch`) uno distinto.
+        const { value, cached } = await relay.call(requestId(), command, callWorkspace(workspace, args as Record<string, unknown>), null, args, intent ? WAKE_TIMEOUT : CALL_TIMEOUT);
         return { value: value as T, cachedAt: cachedAt(cached) };
       } catch (error) {
         if (error instanceof HostError) throw error;
@@ -217,6 +226,7 @@ export function bridgeHost(pairing: Pairing, label: string): Host {
     label,
     kind: "bridge",
     managed: false,
+    linked: null,
     power: () => (online ? "on" : "off"),
     canAct: () => (online ? "now" : "asleep"),
     onChange(listener) {

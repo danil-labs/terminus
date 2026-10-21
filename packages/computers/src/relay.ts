@@ -31,7 +31,8 @@ export type EventsPage = {
   gap?: boolean;
   replay?: boolean;
   runtime?: string;
-  events?: { name: string; payload: unknown }[];
+  /** `workspace`: el del evento, para que el relay lo filtre por los vínculos de cada cuenta; `null` si no es de uno. */
+  events?: { name: string; payload: unknown; workspace?: string | null }[];
 };
 
 export type SocketLike = {

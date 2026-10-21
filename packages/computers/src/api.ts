@@ -24,6 +24,8 @@ export type Computer = {
   host_version?: string | null;
   /** El contrato del motor en su último `hello` (hash de `commands.json`), si lo dijo. */
   contract?: string | null;
+  /** Los workspaces de esta computadora vinculados a la cuenta. Sin el campo, un plano de control de antes. */
+  workspaces?: string[] | null;
 };
 
 export type Answer<T> =

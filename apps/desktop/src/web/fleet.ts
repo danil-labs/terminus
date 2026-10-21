@@ -10,10 +10,15 @@
  *
  * `home` (the desktop's own engine) keeps its raw ids and leads every
  * workspace it has: what its window already shows never changes name.
+ *
+ * Of each other computer the panel shows only the workspaces linked to the
+ * account (`linked`); the relay already refuses the rest.
  */
+import { linkedAttention, linkedEvent, linkedListing } from "@terminus/computers";
 
-/** `outdated`: its engine speaks another contract, known before asking it anything. */
-export type MachineInfo = { id: string; name: string; wakes: boolean; outdated?: boolean };
+
+/** `outdated`: its engine speaks another contract, known before asking it anything. `linked`: `null` shows every workspace. */
+export type MachineInfo = { id: string; name: string; wakes: boolean; outdated?: boolean; linked?: ReadonlySet<string> | null };
 export type MachineStatus = "online" | "offline" | "starting" | "outdated";
 
 type Row = Record<string, unknown>;
@@ -148,6 +153,38 @@ export class Fleet {
   workspaceId(machine: string, raw: string): string {
     if (!this.multi || !raw) return raw;
     return this.groups.find((g) => g.members.get(machine) === raw)?.id ?? this.wrap(machine, raw);
+  }
+
+  /**
+   * The workspaces linked to the account on `machine` as a later `GET /v1/computers` says: what it answers next is
+   * filtered by them. True if they changed.
+   */
+  relink(machine: string, linked: ReadonlySet<string> | null): boolean {
+    const m = this.info(machine);
+    if (!m) return false;
+    const before = m.linked ?? null;
+    const same = before === linked || (before !== null && linked !== null && before.size === linked.size && [...linked].every((id) => before.has(id)));
+    if (same) return false;
+    m.linked = linked;
+    return true;
+  }
+
+  /** What `machine` answered, without the workspaces not linked to the account there. */
+  linkedOnly(machine: string, command: string, value: unknown): unknown {
+    const linked = this.info(machine)?.linked ?? null;
+    if (!linked) return value;
+    if (command === "list_workspaces" || command === "workspaces_startup") return linkedListing(value, linked);
+    if (command === "list_workspace_attention") return linkedAttention(value, linked);
+    return value;
+  }
+
+  /** The events of `machine` the account may see: none of a workspace not linked there. */
+  linkedEvents<E extends { name: string; payload: unknown; workspace?: string | null }>(machine: string, events: E[]): E[] {
+    const linked = this.info(machine)?.linked ?? null;
+    if (!linked) return events;
+    return events
+      .filter((e) => linkedEvent(e, linked) && linkedEvent((isRow(e.payload) ? e.payload : {}) as { workspace?: unknown }, linked))
+      .map((e) => (e.name === "attention" ? { ...e, payload: linkedAttention(e.payload, linked) } : e));
   }
 
   /** The args as `machine` understands them; `machines` collects every machine an id in them names. */

@@ -49,11 +49,44 @@ de la barra lateral y la sección la muestran. La web no tiene la sesión de
 máquina (`danilAccount`); con `accountProfile` (`src/web/account.ts`) lee y
 cambia la misma persona en el plano de control con la sesión de Supabase.
 
+Cada workspace se sincroniza o no con la cuenta de Danil de esta computadora,
+como una carpeta que se elige para el Drive (seldon-host
+`feat/workspace-danil-link`): no hay otras cuentas ni miembros. La sección
+«Cuenta de Danil» tiene, debajo de la de la computadora, la del workspace
+abierto (`features/settings/DanilWorkspace.tsx`): un interruptor «Ver este
+workspace en la web y el teléfono» con el correo de la cuenta, que llama a
+`danil_workspace_link` (sin modo: siempre la cuenta de la máquina) y
+`danil_workspace_unlink`; `danil_workspace_link_status` dice si está
+vinculado y si la máquina tiene sesión. Los workspaces que ya existían los
+vincula el motor una vez, al reconciliar por primera vez. La web, el teléfono y
+las otras computadoras vistas desde aquí solo muestran los workspaces de
+`workspaces` en cada fila de `GET /v1/computers` (`@terminus/computers`,
+`linkedWorkspaces`); sin el campo (un plano de control anterior) no se filtra.
+El relay ya rechaza el resto con `workspace_not_linked`. La web vuelve a listar
+las computadoras cada diez minutos y al volver a la pestaña, así que un
+vínculo nuevo aparece sin recargar.
+
+El fondo de los chats también es del workspace: `chat_background` se lee al
+abrirlo (`lib/chat-background-engine.ts`) y Estilo lo guarda con
+`set_chat_background` (patrón y velos siempre; la imagen por su copia importada,
+y se quita con `choose_chat_background` sin ruta). Solo viaja la ruta de la
+copia recién importada en el workspace abierto; la de otro workspace se olvida
+al cambiar, y un workspace sin nada elegido vuelve al patrón por defecto. Un
+motor que no conoce `set_chat_background` (`command`) recibe
+`choose_chat_background` solo con esa copia, o sin ruta si la persona quitó la
+imagen. La web no tiene rutas: la imagen va como `dataUrl` en
+`set_chat_background` (el relay no deja pasar `import_chat_background`), con el
+tope del motor, 700 KB.
+
+Cada llamada por el relay va con el workspace que nombran sus argumentos
+(`workspace`, o un `scope` de texto distinto de `pending`; `callWorkspace` en
+`@terminus/computers`): el relay rechaza con `workspace_mismatch` una llamada
+cuyos argumentos nombran otro workspace que el suyo.
+
 ## Contract
 
-`src-tauri/crates/engine-protocol/commands.json` is the frozen contract: 328
-commands (303 domain invocations, three channels and 22 window/bridge
-functions) and the events the engine emits. Its SHA-256 is recorded in
+`src-tauri/crates/engine-protocol/commands.json` is the frozen contract: 334
+commands and the events the engine emits. Its SHA-256 is recorded in
 [PROVENANCE](../src-tauri/crates/engine-protocol/PROVENANCE.md); the engine
 announces the same hash and the window refuses to connect to a different one
 (`version_mismatch`). `phrase-keys.json` lists the catalog keys the engine sends

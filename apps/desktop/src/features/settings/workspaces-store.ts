@@ -44,6 +44,8 @@ export type Workspace = {
   sessions: number;
   /** Ruta de la copia dentro del workspace. `null` pinta las iniciales. */
   logo: string | null;
+  /** La cuenta de Danil con que se ve desde la web y el teléfono; un motor anterior no la manda. */
+  danil?: { user_id: string; email?: string | null; name?: string | null } | null;
 };
 
 /**

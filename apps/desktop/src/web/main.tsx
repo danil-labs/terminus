@@ -5,6 +5,8 @@
  * that sets `window.terminusWeb` before this module loads can replace any
  * setting, or give `getToken` with `computerId` or `computers` and skip the session.
  */
+import { linkedWorkspaces } from "@terminus/computers";
+import { chosenWebLayout, MOBILE_WEB_DIR } from "@terminus/design";
 import { createSignal, lazy, Suspense } from "solid-js";
 import { t } from "../lib/i18n";
 import { setCapabilities } from "../lib/platform";
@@ -29,6 +31,9 @@ type WebSettings = { endpoint: string; supabaseUrl: string; supabaseKey: string;
 export type TerminusWebConfig = Partial<WebSettings & RelayConfig & { computers: Computer[] }>;
 type Base = Omit<RelayConfig, "computerId" | "beforeReconnect">;
 
+/** How often the page lists the computers again to pick up workspaces linked or unlinked since it loaded; the desktop's cadence. */
+const RELIST = 10 * 60_000;
+
 const Picker = lazy(() => import("../features/machines/MachinePicker").then((m) => ({ default: m.MachinePicker })));
 const AccountMachines = lazy(() => import("./AccountMachines"));
 
@@ -41,13 +46,20 @@ const browser: BrowserHost = {
   readText: () => navigator.clipboard.readText(),
 };
 
-function mountApp(computers: Computer[], base: Base, before?: (id: string) => () => Promise<boolean>) {
+/** Mounts the app; what it returns applies a newer computer list's linked workspaces without remounting. */
+function mountApp(computers: Computer[], base: Base, before?: (id: string) => () => Promise<boolean>): (computers: Computer[]) => void {
   const [changed, bump] = createSignal(0);
   const links = computers.map((c) => {
     const [at, setAt] = createSignal<number | null>(null);
     const relay = new RelaySession({ ...base, computerId: c.computer_id, beforeReconnect: before?.(c.computer_id) });
     relay.onState(() => bump((n) => n + 1));
-    const info = { id: c.computer_id, name: c.name || c.computer_id, wakes: wakes(c), outdated: machineCompatibility(c.contract) === "outdated" };
+    const info = {
+      id: c.computer_id,
+      name: c.name || c.computer_id,
+      wakes: wakes(c),
+      outdated: machineCompatibility(c.contract) === "outdated",
+      linked: linkedWorkspaces(c),
+    };
     return { info, relay, onSync: setAt, at };
   });
   const transport = createWebTransport(links, __TERMINUS_VERSION__, browser, () => bump((n) => n + 1));
@@ -101,6 +113,12 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
     document.body.append(layer);
     render(() => <SyncNote machines={machines} />, layer);
   });
+  return (fresh) => {
+    let relinked = false;
+    for (const c of fresh) if (transport.fleet.relink(c.computer_id, linkedWorkspaces(c))) relinked = true;
+    // Every list of the window reads again, now filtered by the new links.
+    if (relinked) for (const name of ["harness:workspace-name", "harness:service-resync"]) window.dispatchEvent(new CustomEvent(name));
+  };
 }
 
 async function start(settings: WebSettings) {
@@ -139,7 +157,7 @@ async function start(settings: WebSettings) {
         onOpen={(computers) => {
           dispose();
           const several = computers.length > 1;
-          mountApp(
+          const relink = mountApp(
             computers,
             { endpoint, getToken: () => session.getToken(), onUnauthorized: () => void session.unauthorized() },
             (computerId) => async () => {
@@ -152,6 +170,15 @@ async function start(settings: WebSettings) {
               return false;
             },
           );
+          // Linking a workspace in Terminus shows (or hides) it here without reloading the page.
+          const relist = async () => {
+            const answer = await computersOf(endpoint, session).catch(() => null);
+            if (answer?.kind === "ok") relink(answer.value);
+          };
+          setInterval(() => void relist(), RELIST);
+          document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible") void relist();
+          });
         }}
       />
     ),
@@ -162,6 +189,28 @@ async function start(settings: WebSettings) {
 const given = (window as Window & { terminusWeb?: TerminusWebConfig }).terminusWeb ?? {};
 const preset = given.computers ?? (given.computerId ? [{ computer_id: given.computerId, state: "unknown" }] : null);
 const connecting = window.location.pathname.replace(/\/+$/, "") === `${import.meta.env.BASE_URL}connect`;
-if (connecting) void import("./connect/main").then((m) => m.startConnect({ ...__TERMINUS_WEB__, ...given } as WebSettings, document.getElementById("root") as HTMLElement));
+
+/**
+ * Un teléfono abre el Terminus del teléfono (`<base>m/`, la app de Expo para
+ * web) salvo que la persona haya elegido este. Una ruta del teléfono que cae
+ * aquí (el respaldo de página única sirve esta copia) se pasa a su raíz con
+ * `?to=`; su raíz misma solo llega aquí si no está publicada (`web:dev`), y
+ * entonces sigue esta.
+ */
+function toPhone(): boolean {
+  const phone = `${import.meta.env.BASE_URL}${MOBILE_WEB_DIR}/`;
+  const path = window.location.pathname;
+  if (path.startsWith(phone) && path !== phone) {
+    window.location.replace(`${phone}?to=${encodeURIComponent(path.slice(phone.length - 1) + window.location.search)}`);
+    return true;
+  }
+  if (path.startsWith(phone) || connecting || preset || chosenWebLayout(window) !== "mobile") return false;
+  window.location.replace(phone);
+  return true;
+}
+
+if (toPhone()) {
+  // Se va al del teléfono: no se monta nada aquí.
+} else if (connecting) void import("./connect/main").then((m) => m.startConnect({ ...__TERMINUS_WEB__, ...given } as WebSettings, document.getElementById("root") as HTMLElement));
 else if (preset && given.getToken) mountApp(preset, { ...__TERMINUS_WEB__, ...given } as Base);
 else void start({ ...__TERMINUS_WEB__, ...given } as WebSettings);

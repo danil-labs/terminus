@@ -1,12 +1,13 @@
-import { Stack, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { FlatList, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import type { ChatEvent, Question, Turn } from "@terminus/protocol";
+import { Stack, router, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FlatList, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { type ChatBackgroundView, type ChatEvent, type Question, type Turn, DEFAULT_CHAT_VEIL } from "@terminus/protocol";
 import {
   type PendingQuestion,
   type Permission,
   type TaskView,
   answerQuestion,
+  chatBackgroundOf,
   injectIntoTask,
   loadTask,
   markSeen,
@@ -21,16 +22,41 @@ import { HostError } from "../../../../../lib/hosts";
 import { t, w } from "../../../../../lib/i18n";
 import { useMachines } from "../../../../../lib/machines";
 import { useWorkspaces } from "../../../../../lib/workspaces";
+import { Attachments, MessageBody, toolImages } from "../../../../../ui/chat/Message";
+import { ChatScopeContext } from "../../../../../ui/chat/scope";
 import { Composer, type Submission } from "../../../../../ui/Composer";
 import { type Theme, useTheme } from "../../../../../ui/theme";
+import { Icon } from "../../../../../ui/Icon";
 import { KeyboardScreen } from "../../../../../ui/KeyboardScreen";
 
 /** Kinds that change what the task reports: pending requests or whether it runs. */
 const REFRESH = new Set(["permission", "started", "done", "presence"]);
 
-type Line = { key: string; role: string; text: string; tools: number };
+type Line = { key: string; role: string; text: string; tools: number; images: string[]; attachments: string[] };
 
-const linesOf = (turns: Turn[]): Line[] => turns.map((turn, i) => ({ key: turn.id ?? String(i), role: turn.role, text: turn.text ?? "", tools: turn.tools?.length ?? 0 }));
+const sameList = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
+const sameLine = (a: Line, b: Line) =>
+  a.key === b.key && a.role === b.role && a.text === b.text && a.tools === b.tools && sameList(a.images, b.images) && sameList(a.attachments, b.attachments);
+
+/**
+ * Las líneas de la conversación. Cada lectura trae turnos nuevos aunque no
+ * cambien: una línea igual a la anterior se reutiliza, con sus mismos arreglos
+ * de imágenes, para que `MessageBody` (memo) no vuelva a pintarse.
+ */
+function linesOf(turns: Turn[], previous: ReadonlyMap<string, Line>): Line[] {
+  return turns.map((turn, i) => {
+    const line: Line = {
+      key: turn.id ?? String(i),
+      role: turn.role,
+      text: turn.text ?? "",
+      tools: turn.tools?.length ?? 0,
+      images: toolImages(turn.tools),
+      attachments: turn.attachments ?? [],
+    };
+    const old = previous.get(line.key);
+    return old && sameLine(old, line) ? old : line;
+  });
+}
 
 /**
  * Una tarea en vivo, en la máquina que la corre: conversación, aprobaciones,
@@ -49,6 +75,7 @@ export default function TaskScreen() {
   const [streaming, setStreaming] = useState("");
   const [note, setNote] = useState<string | null>(null);
   const [waking, setWaking] = useState(false);
+  const [background, setBackground] = useState<ChatBackgroundView | null>(null);
   const list = useRef<FlatList<Line>>(null);
   const key = `${params.host}/${id}`;
 
@@ -79,6 +106,17 @@ export default function TaskScreen() {
       .catch(fail);
     return () => setOpenTask(null);
   }, [key, refresh, setOpenTask, fail, host, workspace, id]);
+
+  // El fondo del workspace en la máquina de la tarea; leerlo nunca la enciende.
+  useEffect(() => {
+    setBackground(null);
+    if (!host) return;
+    let current = true;
+    void chatBackgroundOf(host, workspace).then((next) => current && setBackground(next));
+    return () => {
+      current = false;
+    };
+  }, [host, workspace]);
 
   // La máquina se encendió (o volvió): la copia deja paso a lo vivo.
   useEffect(() => {
@@ -151,25 +189,55 @@ export default function TaskScreen() {
   const permissions = view?.permissions ?? [];
   const questions = view?.questions ?? [];
   const asleep = host?.canAct() === "asleep" || host?.canAct() === "outdated";
-  const lines = linesOf(view?.session.turns ?? []);
+  const turns = view?.session.turns;
+  const shown = useRef<ReadonlyMap<string, Line>>(new Map());
+  const lines = useMemo(() => {
+    const next = linesOf(turns ?? [], shown.current);
+    shown.current = new Map(next.map((line) => [line.key, line]));
+    return next;
+  }, [turns]);
   const cachedNote =
     view?.cachedAt && host ? t("machines.cached", { name: host.label, time: new Date(view.cachedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }) : null;
   const title = (view?.session.turns.find((turn) => turn.role === "user")?.text ?? "").split("\n")[0];
+  const lastAgent = [...lines].reverse().find((line) => line.role !== "user" && line.role !== "system" && line.role !== "shell")?.key;
+  const scope = useMemo(() => (host ? { host, hostId: params.host, workspace, folder, session: id } : null), [host, params.host, workspace, folder, id]);
+  // Una respuesta rápida se manda como un mensaje, con el proveedor y el modelo con que sigue la tarea.
+  // Estable entre lecturas (lee la vista y `submit` del último render), para que el memo de `MessageBody` se sostenga.
+  const latest = useRef({ view, submit });
+  latest.current = { view, submit };
+  const quickReply = useCallback((prompt: string) => {
+    const { view: now, submit: send } = latest.current;
+    return now ? send({ shell: false, prompt, ...taskDefaults(now), effort: null, permissionMode: null, attachments: [] }) : Promise.resolve(false);
+  }, []);
 
   return (
     <KeyboardScreen>
-      <Stack.Screen options={{ title: titleOf(key) ?? title }} />
+      <ChatScopeContext.Provider value={scope}>
+      <Stack.Screen
+        options={{
+          title: titleOf(key) ?? title,
+          // Abierta desde un enlace (en el navegador o un aviso) no hay a dónde volver: la flecha lleva a Tareas.
+          headerLeft: router.canGoBack()
+            ? undefined
+            : () => (
+                <Pressable hitSlop={10} onPress={() => router.replace("/")} accessibilityLabel={t("task.back")} style={{ paddingRight: 12 }}>
+                  <Icon name="arrow-left" size={22} color={theme.text} />
+                </Pressable>
+              ),
+        }}
+      />
+      <ChatBackdrop background={background} theme={theme} />
       <FlatList
         ref={list}
         data={lines}
         keyExtractor={(line) => line.key}
         contentContainerStyle={styles.list}
         onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
-        renderItem={({ item }) => <Bubble line={item} theme={theme} />}
+        renderItem={({ item }) => <Bubble line={item} theme={theme} onQuickReply={item.key === lastAgent && !running && !asleep ? quickReply : undefined} />}
         ListHeaderComponent={cachedNote ? <Text style={[styles.banner, { color: theme.textMuted, backgroundColor: theme.muted }]}>{cachedNote}</Text> : undefined}
         ListFooterComponent={
           <View style={styles.footer}>
-            {streaming ? <Bubble line={{ key: "live", role: "agent", text: streaming, tools: 0 }} theme={theme} /> : null}
+            {streaming ? <Bubble line={{ key: "live", role: "agent", text: streaming, tools: 0, images: [], attachments: [] }} theme={theme} streaming /> : null}
             {running && !streaming ? <Text style={{ color: theme.textMuted }}>{t("state.working")}…</Text> : null}
             {waking && host ? <Text style={{ color: theme.textMuted }}>{w("shell.machines.waking", { name: host.label })}</Text> : null}
             {asleep && host ? (
@@ -207,31 +275,54 @@ export default function TaskScreen() {
         onInject={inject}
         onStop={stop}
       />
+      </ChatScopeContext.Provider>
     </KeyboardScreen>
   );
 }
 
-function Bubble({ line, theme }: { line: Line; theme: Theme }) {
+/** La imagen del workspace con su velo; un patrón del escritorio queda en el fondo liso del tema. */
+function ChatBackdrop({ background, theme }: { background: ChatBackgroundView | null; theme: Theme }) {
+  if (!background?.image) return null;
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Image source={{ uri: background.image }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.surface, opacity: background.veil.chat ?? DEFAULT_CHAT_VEIL }]} />
+    </View>
+  );
+}
+
+function Bubble({ line, theme, streaming, onQuickReply }: { line: Line; theme: Theme; streaming?: boolean; onQuickReply?: (prompt: string) => Promise<boolean> }) {
   const mine = line.role === "user";
   const system = line.role === "system";
+  const shell = line.role === "shell";
   const steps = line.tools;
-  if (!line.text && !steps) return null;
+  if (!line.text && !steps && !line.images.length && !line.attachments.length) return null;
+  // Como en la ventana: lo de la persona va en globo; la respuesta del agente, sin globo y a todo el ancho.
+  const agent = !mine && !system && !shell;
   return (
     <View
-      style={[
-        styles.bubble,
-        mine ? { alignSelf: "flex-end", backgroundColor: theme.userBubble } : { alignSelf: "stretch", backgroundColor: theme.surface },
-        system ? { backgroundColor: theme.muted } : null,
-        { borderColor: theme.border },
-      ]}
+      style={
+        agent
+          ? styles.reply
+          : [
+              styles.bubble,
+              mine ? { alignSelf: "flex-end", backgroundColor: theme.userBubble } : { alignSelf: "stretch", backgroundColor: theme.surface },
+              system ? { backgroundColor: theme.muted } : null,
+              { borderColor: theme.border },
+            ]
+      }
     >
-      {line.text ? (
+      {line.attachments.length ? <Attachments paths={line.attachments} /> : null}
+      {/* Lo que escribe la persona y la salida de un `!` van tal cual; lo del agente, con su markdown. */}
+      {line.text && (mine || system || shell) ? (
         <Text
           selectable
-          style={{ color: system ? theme.textMuted : theme.text, fontSize: line.role === "shell" ? 13 : 15, lineHeight: 21, fontFamily: line.role === "shell" ? Platform.select({ ios: "Menlo", default: "monospace" }) : undefined }}
+          style={{ color: system ? theme.textMuted : theme.text, fontSize: shell ? 13 : 15, lineHeight: 21, fontFamily: shell ? Platform.select({ ios: "Menlo", default: "monospace" }) : undefined }}
         >
           {line.text}
         </Text>
+      ) : line.text || line.images.length ? (
+        <MessageBody text={line.text} streaming={streaming} images={line.images} onQuickReply={onQuickReply} />
       ) : null}
       {steps ? <Text style={{ color: theme.textMuted, fontSize: 12, marginTop: 4 }}>{t("task.tools", { count: steps })}</Text> : null}
     </View>
@@ -321,6 +412,7 @@ const styles = StyleSheet.create({
   footer: { gap: 8 },
   pending: { flexGrow: 0, maxHeight: "55%", paddingHorizontal: 12, paddingBottom: 8 },
   bubble: { maxWidth: "92%", borderRadius: 14, padding: 10, borderWidth: StyleSheet.hairlineWidth },
+  reply: { alignSelf: "stretch", paddingHorizontal: 4, paddingVertical: 2 },
   card: { borderWidth: 1, borderRadius: 14, padding: 12, gap: 10 },
   code: { fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }), fontSize: 13, padding: 8, borderRadius: 8 },
   actions: { flexDirection: "row", justifyContent: "flex-end", gap: 8 },

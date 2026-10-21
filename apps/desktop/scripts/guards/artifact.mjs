@@ -4,7 +4,7 @@
  *
  * El motor que corre dentro del marco —diapositivas, orden de tablas, edición y
  * el puente con la app— tiene que inyectarse dentro del documento del agente, y
- * por eso es una cadena en `src/features/artifacts/sandbox.ts`. Su CSS igual. Nada de lo que
+ * por eso es una cadena en `packages/chat/src/sandbox.ts` (la comparten la ventana y el teléfono). Su CSS igual. Nada de lo que
  * hay ahí dentro lo mira `tsc`: para el compilador son dos literales.
  *
  * Escribirlo así tiene dos trampas, y la que duele no es la ruidosa:
@@ -40,7 +40,7 @@ import { readFileSync } from "node:fs";
 // Ver la nota de `paths.mjs`: `.pathname` en Windows da `/C:/…` y revienta.
 import { fileURLToPath } from "node:url";
 
-const RUTA = fileURLToPath(new URL("../../src/features/artifacts/sandbox.ts", import.meta.url));
+const RUTA = fileURLToPath(new URL("../../../../packages/chat/src/sandbox.ts", import.meta.url));
 const fuente = readFileSync(RUTA, "utf8");
 
 const fallos = [];
@@ -66,7 +66,7 @@ function literal(nombre, texto = fuente) {
 
 const CSS = literal("CSS_BASE");
 const JS = literal("JS_RUNTIME");
-const inline = readFileSync(fileURLToPath(new URL("../../src/features/artifacts/inlineVisual.ts", import.meta.url)), "utf8");
+const inline = readFileSync(fileURLToPath(new URL("../../../../packages/chat/src/inlineVisual.ts", import.meta.url)), "utf8");
 const inlineCss = literal("CSS_INLINE", inline);
 const inlineJs = literal("JS_INLINE", inline);
 
@@ -78,7 +78,7 @@ for (const [nombre, l] of [
 ]) {
   if (!l) {
     fallos.push(
-      `No encuentro \`const ${nombre} = String.raw\`…\`\` en src/features/artifacts/.\n` +
+      `No encuentro \`const ${nombre} = String.raw\`…\`\` en packages/chat/src/.\n` +
         `  Ahí vive lo que corre dentro del contenedor; sin ello este chequeo no mira nada.`,
     );
     continue;

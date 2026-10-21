@@ -1,7 +1,7 @@
 import { groupWorkspaces } from "@terminus/computers";
 import type { ProviderInfo, Space, Workspace } from "@terminus/protocol";
 import { DEFAULT_SIDEBAR_VIEW, type SidebarView, sanitizeSidebarView } from "@terminus/tasks";
-import * as SecureStore from "expo-secure-store";
+import { store } from "./store";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { type Agent, type Folder, type Task, mergeSnapshots, snapshotOf, taskKey, workspacesOf } from "./engine";
 import type { Host } from "./hosts";
@@ -70,7 +70,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   const asked = useRef(0);
 
   useEffect(() => {
-    void SecureStore.getItemAsync(KEY).then((saved) => saved && setCurrentId((id) => id ?? saved));
+    void store.get(KEY).then((saved) => saved && setCurrentId((id) => id ?? saved));
   }, []);
 
   const list = useMemo<WorkspaceEntry[]>(() => grouped(hosts, perHost), [hosts, perHost]);
@@ -133,19 +133,19 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   const select = useCallback((id: string) => {
     setSnapshot(null);
     setCurrentId(id);
-    void SecureStore.setItemAsync(KEY, id);
+    void store.set(KEY, id);
   }, []);
 
   const [spaceIds, setSpaceIds] = useState<Record<string, string>>({});
   useEffect(() => {
-    void SecureStore.getItemAsync(SPACES_KEY).then((saved) => saved && setSpaceIds(JSON.parse(saved)));
+    void store.get(SPACES_KEY).then((saved) => saved && setSpaceIds(JSON.parse(saved)));
   }, []);
   const selectSpace = useCallback(
     (id: string) => {
       if (!currentId) return;
       setSpaceIds((old) => {
         const next = { ...old, [currentId]: id };
-        void SecureStore.setItemAsync(SPACES_KEY, JSON.stringify(next));
+        void store.set(SPACES_KEY, JSON.stringify(next));
         return next;
       });
     },
@@ -159,13 +159,13 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setViewState(DEFAULT_SIDEBAR_VIEW);
     if (!currentViewKey) return;
-    void SecureStore.getItemAsync(currentViewKey).then((saved) => saved && setViewState(sanitizeSidebarView(JSON.parse(saved))));
+    void store.get(currentViewKey).then((saved) => saved && setViewState(sanitizeSidebarView(JSON.parse(saved))));
   }, [currentViewKey]);
   const setView = useCallback(
     (next: SidebarView) => {
       const clean = sanitizeSidebarView(next);
       setViewState(clean);
-      if (currentViewKey) void SecureStore.setItemAsync(currentViewKey, JSON.stringify(clean));
+      if (currentViewKey) void store.set(currentViewKey, JSON.stringify(clean));
     },
     [currentViewKey],
   );

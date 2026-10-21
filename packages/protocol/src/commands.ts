@@ -33,6 +33,14 @@ export const APP_READS = [
   "list_accounts",
   "account_status",
   "account_limits",
+  // El fondo de los chats del workspace, detrás de la conversación.
+  "chat_background",
+  // Lo enriquecido del chat, como en la ventana: las visualizaciones del agente
+  // (su árbol `terminus-chat-visuals`), y las imágenes, archivos y adjuntos que
+  // el mensaje nombra por su ruta en la máquina.
+  "tree_show",
+  "preview_file",
+  "attachment_preview",
 ] as const;
 
 export const APP_ACTIONS = [

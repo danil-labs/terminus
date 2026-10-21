@@ -18,6 +18,14 @@ type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
 const EXPIRED = /expired/i;
 
+/** Danil Computers answers `{ error: { code, detail? } }`; a bare string is still read. */
+function errorCode(body: { error?: unknown } | null): string {
+  const e = body?.error;
+  if (typeof e === "string") return e;
+  const code = e && typeof e === "object" ? (e as { code?: unknown }).code : null;
+  return typeof code === "string" ? code : "";
+}
+
 async function send<T>(url: string, token: string, init: RequestInit, read: (body: unknown) => T | undefined, f: Fetch): Promise<DeviceAnswer<T>> {
   let response: Response;
   try {
@@ -26,7 +34,7 @@ async function send<T>(url: string, token: string, init: RequestInit, read: (bod
     return { kind: "error", status: null };
   }
   const body = (await response.json().catch(() => null)) as { error?: unknown } | null;
-  const error = typeof body?.error === "string" ? body.error : "";
+  const error = errorCode(body);
   if (response.status === 401) return { kind: "unauthorized" };
   if (response.status === 403) return { kind: error === "unknown_user" ? "no_account" : "license" };
   if (response.status === 409) return { kind: error === "ambiguous_danil_account" ? "ambiguous" : "used" };

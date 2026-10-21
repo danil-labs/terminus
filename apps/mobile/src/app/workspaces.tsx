@@ -1,5 +1,6 @@
 import { router } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { MOBILE_WEB_DIR, WEB_LAYOUT_KEY } from "@terminus/design";
 import type { AttentionState } from "@terminus/protocol";
 import { useAccount } from "../lib/account";
 import { BRIDGE_ENABLED } from "../lib/bridge";
@@ -13,6 +14,19 @@ import { Icon } from "../ui/Icon";
 import { useTheme } from "../ui/theme";
 
 const NEEDS_YOU = new Set<AttentionState>(["approving", "asked", "failed"]);
+
+/**
+ * La raíz de la web de escritorio: la que fijó la compilación
+ * (`EXPO_PUBLIC_TERMINUS_WEB_BASE`, `web-mobile.mjs`); sin ella, lo que hay
+ * antes de `/m` en la ruta, con o sin barra final.
+ */
+function desktopBase(): string {
+  const built = process.env.EXPO_PUBLIC_TERMINUS_WEB_BASE?.trim();
+  if (built) return built.endsWith("/") ? built : `${built}/`;
+  const path = window.location.pathname;
+  const at = path.search(new RegExp(`/${MOBILE_WEB_DIR}(/|$)`));
+  return at >= 0 ? `${path.slice(0, at)}/` : "/";
+}
 
 /**
  * La columna de workspaces del escritorio, como hoja: cada workspace con lo que
@@ -101,6 +115,19 @@ export default function WorkspaceSwitcher() {
           <Text style={{ color: theme.primary, fontWeight: "600" }}>{t("signin.title")}</Text>
         </Pressable>
       )}
+
+      {Platform.OS === "web" ? (
+        <Pressable
+          testID="desktop-layout"
+          style={[styles.button, { borderColor: theme.border }]}
+          onPress={() => {
+            localStorage.setItem(WEB_LAYOUT_KEY, "desktop");
+            window.location.assign(desktopBase());
+          }}
+        >
+          <Text style={{ color: theme.text }}>{t("web.desktop_layout")}</Text>
+        </Pressable>
+      ) : null}
 
       {BRIDGE_ENABLED ? (
         <>

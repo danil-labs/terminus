@@ -1,19 +1,19 @@
 import { invoke } from "../../lib/invoke";
 import { t } from "../../lib/i18n";
+import { MAX_VISUAL_BYTES, VISUAL_FILE, VISUAL_TREE } from "@terminus/chat/visual";
 
 type Scope = { workspace: string; project: string; session: string };
 type Content = { kind: string; text: string; bytes: number; truncated: boolean };
-const MAX_BYTES = 512 * 1024;
 
 export async function readChatVisual(scope: Scope, file: string): Promise<string> {
-  if (!scope.workspace || !scope.session || file.length > 128 || !/^[a-z0-9][a-z0-9._-]*\.html$/i.test(file)) {
+  if (!scope.workspace || !scope.session || file.length > 128 || !VISUAL_FILE.test(file)) {
     throw { what: t("chat.visual.invalid"), detail: "invalid_visual_file" };
   }
   try {
     const content = await invoke<Content>("tree_show", {
-      project: scope.project, session: scope.session, tree: "terminus-chat-visuals", path: file,
+      project: scope.project, session: scope.session, tree: VISUAL_TREE, path: file,
     }, { headers: { "x-terminus-workspace": scope.workspace } });
-    if (content.truncated || content.bytes > MAX_BYTES) {
+    if (content.truncated || content.bytes > MAX_VISUAL_BYTES) {
       throw { what: t("chat.visual.too_large"), detail: "visual_too_large" };
     }
     if (content.kind !== "text" || typeof content.text !== "string" ||
