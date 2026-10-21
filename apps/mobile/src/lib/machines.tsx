@@ -165,7 +165,7 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
           if (gap) refreshAttention();
           for (const event of events) {
             if (event.name === "attention" && Array.isArray(event.payload)) {
-              // Una entrada por workspace: las de los demás siguen como estaban.
+              // Lista entera o una entrada suelta (`mergeAttention`).
               setAttention((old) => ({ ...old, [host.id]: mergeAttention(old[host.id] ?? [], event.payload as WorkspaceAttention[]) }));
             }
             for (const notice of notices.take(event)) {

@@ -38,7 +38,7 @@ export function createAttention() {
     reload();
     const unlisten = listen<WorkspaceAttention[]>("attention", (e) => {
       asked++;
-      // Una entrada por workspace: las de los demás siguen como estaban.
+      // La lista entera reemplaza; una entrada suelta solo cambia su workspace.
       setList((now) => mergeAttention(now, known(e.payload)));
     });
     onCleanup(() => void unlisten.then((stop) => stop()));
