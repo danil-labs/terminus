@@ -48,7 +48,7 @@ const machines = {
   cmp_vm: {
     row: { computer_id: "cmp_vm", name: "VM de Danil", plan: "standard", provider: "aws-ec2", host_version: "0.3.0" },
     state: "offline",
-    engine: engine("la VM", "w-vm", [{ id: "p-vm-web", name: "web" }], [
+    engine: engine("la VM", "w-prod", [{ id: "p-vm-web", name: "web" }], [
       { id: "t-vm-1", project: "p-vm-web", title: "Revisar el checkout", agent: "Ada", provider: "codex", model: "gpt-5.6" },
       { id: "t-vm-2", project: "p-vm-web", title: "Arreglar el login", agent: null, provider: "codex", model: "gpt-5.6", esperando: true },
     ], {
@@ -60,7 +60,7 @@ const machines = {
   cmp_mac: {
     row: { computer_id: "cmp_mac", name: "Mac de Alberto", plan: null, provider: null, kind: "physical", host_version: "0.3.0" },
     state: process.argv.includes("--mac-off") ? "offline" : "online",
-    engine: engine("la Mac", "w-mac", [{ id: "p-mac-web", name: "web" }, { id: "p-mac-api", name: "api" }], [
+    engine: engine("la Mac", "w-prod", [{ id: "p-mac-web", name: "web" }, { id: "p-mac-api", name: "api" }], [
       { id: "t-mac-1", project: "p-mac-api", title: "Subir la API a v2", agent: null, provider: "claude", model: null },
       { id: "t-mac-2", project: "p-mac-web", title: "Rediseñar el inicio", agent: null, provider: "claude", model: "claude-opus-5-5", unsaved: ["src/home.tsx"] },
     ], {
