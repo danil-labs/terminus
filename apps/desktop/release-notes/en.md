@@ -1,5 +1,8 @@
-Terminus 0.2.83 lets you sign in with your Danil account to see and run this computer's tasks from the web and your phone.
+Terminus 0.2.84 syncs all your workspaces with your Danil account and lets you pick the machine each task runs on.
 
-- **Sign in with Danil.** On first launch, or from the sidebar footer, "Sign in with Danil" opens the browser; confirm there and this computer joins your account. See it or sign out in Settings → Connections → Danil account.
-- **Your computer on app.danil.ai/terminus.** Once signed in, its projects and tasks show up on the web next to your other machines, and you can send messages and create tasks on it from there.
-- **Engine aligned with the app.** The app and its engine speak the same contract again, and a new check prevents publishing a version where they don't match.
+- **Your workspaces on all your machines.** While you are signed in to Danil, every workspace on this computer shows up on the web, on your phone and on your other machines, including the ones you create later. Signing out stops the sync. You no longer link each workspace by hand.
+- **"Run on" decides where the task runs.** Pick your VM and the task starts there: the workspace is the same on all your machines, and the project is cloned on the VM the first time it is needed.
+- **Clone and create folders on another machine** from the web, the desktop and your phone, with progress and a cancel option.
+- **New first launch.** Connect your AI and personalize Terminus from the start, with a clearer setup.
+- **Formulas in chat.** LaTeX formulas render with KaTeX.
+- **Fixes.** The chat background no longer gets erased or carried over to another workspace, you can see why another account can't be added, and on Windows you can remove an Antigravity account again.
