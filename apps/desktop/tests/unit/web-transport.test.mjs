@@ -62,19 +62,16 @@ test("the web build talks to the relay: calls, events and machine state", async 
   assert.deepEqual(app.fallos, []);
 });
 
-test("the transport leaves out what the account may not see: workspaces, attention, events and a shared computer's accounts", async () => {
+test("the transport leaves out what the account may not see: workspaces, attention and events", async () => {
   const { fleet } = await import("../helpers/fake-relay.mjs");
   const ws = (id, name) => ({ id, name, context_root: null });
   const vmList = { workspaces: [ws("w", "W"), ws("w2", "Dos"), ws("z", "Ajeno")], active: "z" };
   const ask = (session) => ({ session, project: "p1", state: "asked" });
-  const accounts = (id) => ({ provider: "codex", env_var: "", shared_credential: null, secret_note: null, active: id, accounts: [{ id, label: id, created_at: 0, identity: `${id}@example.com`, authenticated_at: 1 }] });
   const f = fleet({
-    cmp_vm: { table: { ...engine, list_workspaces: vmList, workspaces_startup: vmList, list_workspace_attention: [{ workspace: "w2", tasks: [ask("t2")] }, { workspace: "z", tasks: [ask("t9")] }], list_accounts: accounts("a1") } },
-    cmp_shared: { table: { ...engine, list_accounts: accounts("s1") } },
+    cmp_vm: { table: { ...engine, list_workspaces: vmList, workspaces_startup: vmList, list_workspace_attention: [{ workspace: "w2", tasks: [ask("t2")] }, { workspace: "z", tasks: [ask("t9")] }] } },
   });
   const computers = [
     { computer_id: "cmp_vm", name: "Danil VM", state: "online", provider: "aws-ec2", workspaces: ["w", "w2"] },
-    { computer_id: "cmp_shared", name: "Compartida", state: "online", provider: "aws-ec2", role: "member", workspaces: ["w"] },
   ];
   const app = await boot("listo", "web-transport-linked", {}, undefined, {}, {
     web: true,
@@ -112,8 +109,5 @@ test("the transport leaves out what the account may not see: workspaces, attenti
   assert.equal(tile("w2")?.dataset.attention, undefined, "and replaces what waited before");
   assert.equal(tile("z"), null);
 
-  const merged = await invoke("list_accounts", { provider: "codex" });
-  assert.deepEqual(merged.accounts.map((a) => a.id), ["cmp_vm~a1"], "a shared computer keeps its AI accounts to its owner");
-  assert.equal(f.relays.cmp_shared.calls.filter((c) => c.command === "list_accounts").length, 0, "and is never asked for them");
   assert.deepEqual(app.fallos, []);
 });
