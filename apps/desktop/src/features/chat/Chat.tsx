@@ -106,6 +106,7 @@ import { Button } from "../../ui/Button";
 import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
 import { asFailure, type Failure, FailureNote, prosaDe } from "../../ui/Failure";
 import { MarcaAgente } from "../../ui/icons";
+import { FileMachine } from "../../ui/fileMachine";
 import { Markdown } from "../../ui/Markdown";
 import { createVisualBudget, type VisualBudget } from "./visualBudget";
 import ChatVisual from "./ChatVisual";
@@ -415,6 +416,8 @@ export type ChatProps = {
   coordinator?: JSX.Element;
   /** Máquina / proyecto / rama, arriba a la izquierda (`TaskLocation`). */
   location?: JSX.Element;
+  /** La máquina de la tarea si no es la de la ventana: los archivos del chat se leen allí. */
+  machine?: string;
   chatEstado?: HandlerStatus;
   /** Cómo se le llama y con qué cara, si eligió otras en su perfil. */
   chatName?: string | null;
@@ -2659,7 +2662,7 @@ export default function Chat(props: ChatProps) {
   );
 
   return (
-    <>
+    <FileMachine.Provider value={() => props.machine}>
       <Dialog open={forkTurn() !== null} onOpenChange={(open) => { if (!open && !forkeando()) setForkTurn(null); }}>
         <DialogContent>
           <DialogTitle class="text-base font-semibold">{t("chat.continuation.title")}</DialogTitle>
@@ -3323,7 +3326,7 @@ export default function Chat(props: ChatProps) {
       </Show>
       </div>
     </Show>
-    </>
+    </FileMachine.Provider>
   );
 }
 

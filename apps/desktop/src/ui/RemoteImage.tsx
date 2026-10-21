@@ -3,13 +3,15 @@ import { createResource, Show } from "solid-js";
 import { imagenInerte } from "../lib/links";
 import { EnlargeableImage } from "./EnlargeableImage";
 import { FilePreview } from "./FilePreview";
+import { useFileMachine } from "./fileMachine";
 
-/** En la web el disco es el de la computadora remota: el motor manda la imagen como `data:`. */
+/** El disco es el de otra computadora (la web, o una tarea remota): su motor manda la imagen como `data:`. */
 export default function RemoteImage(props: { path: string; alt?: string }) {
+  const enSuMaquina = useFileMachine();
   const [fuente] = createResource(
     () => props.path,
     (ruta) =>
-      invoke<{ data_url?: string | null }>("preview_file", { path: ruta, rel: ruta })
+      invoke<{ data_url?: string | null }>("preview_file", { path: ruta, rel: ruta }, enSuMaquina())
         .then((p) => imagenInerte(p.data_url))
         .catch(() => null),
   );

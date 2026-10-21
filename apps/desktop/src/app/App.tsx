@@ -6272,6 +6272,7 @@ export default function App() {
             path={estadoDelTrabajo()?.path || undefined}
             branch={workLabel(estadoDelTrabajo()?.branch, estadoDelTrabajo()?.alias) || undefined} /></Suspense>;
         }}</Show>}
+        machine={pp.sesion ? filaDe(pp.sesion)?.machine : undefined}
         msgs={mensajes()}
         /* Identidad de lo que tiene delante, no ids de proyecto/tarea: es lo
            único con lo que distingue «entró un mensaje» de «otra
