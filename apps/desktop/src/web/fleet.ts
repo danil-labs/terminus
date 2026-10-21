@@ -34,7 +34,7 @@ export const FAN = new Set(["list_projects", "list_portfolios", "list_live_sessi
 /** Reads that list every machine, whatever the workspace. */
 export const EVERYWHERE = new Set(["list_workspaces", "workspaces_startup", "list_accounts", "list_workspace_attention"]);
 /** What makes something new where the person chose, when no id says where. */
-export const CREATE = new Set(["send_message", "run_shell_command", "create_project", "clone_project"]);
+export const CREATE = new Set(["send_message", "run_shell_command", "create_project", "clone_project", "start_project_clone"]);
 /** Answers whose rows carry the id of what they list. */
 const ROW_IDS = new Set(["list_portfolios", "list_live_sessions"]);
 /** Answers keyed by the id of the task each value is about. */

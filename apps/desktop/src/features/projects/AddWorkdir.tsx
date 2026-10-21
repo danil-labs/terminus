@@ -1,7 +1,7 @@
 import { Channel } from "@tauri-apps/api/core";
 import { invoke } from "../../lib/invoke.ts";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Show, createEffect, createSignal, on } from "solid-js";
+import { Show, createEffect, createMemo, createSignal, on } from "solid-js";
 import RepositoryPicker from "./RepositoryPicker";
 import { type ProjectRepository } from "../../lib/projectRepositories";
 import { Button } from "../../ui/Button";
@@ -12,7 +12,9 @@ import { ProgressBar } from "../../ui/ProgressBar";
 import { enfocar } from "../../lib/focus";
 import { t } from "../../lib/i18n";
 import { capabilities } from "../../lib/platform";
+import { leerPref } from "../../lib/prefs";
 import type { Project } from "../../lib/model";
+import { machineName, machines, runOn } from "../machines/store";
 
 /**
  * El clon que corre ahora mismo, tal y como lo pinta el riel.
@@ -31,6 +33,10 @@ export type ClonEnCurso = {
   percent: number | null;
   failed: boolean;
 };
+
+/** Un clon en otra máquina que puede seguir tras recargar (`remoteClone.ts`). */
+export type RemoteClone = { operation: string; machine: string; workspace: string; name: string };
+export const REMOTE_CLONES = "projects.remote_clones";
 
 /** Cómo se lee la fase que git reporta. La comparten el diálogo y el riel. */
 export function faseDeClon(phase: string | null | undefined) {
@@ -82,6 +88,18 @@ export default function AnadirCarpeta(props: {
   const [operation, setOperation] = createSignal<string | null>(null);
   const [progress, setProgress] = createSignal<{ phase: string; percent: number | null } | null>(null);
   const [cancelling, setCancelling] = createSignal(false);
+  const [clonEnOtra, setClonEnOtra] = createSignal<RemoteClone | null>(null);
+  const [nombreClon, setNombreClon] = createSignal("");
+  // En otra máquina no hay diálogo de carpetas: la ruta sería de esta.
+  // Se relee al abrir: el escritorio instala sus máquinas después de montar esto.
+  const remota = createMemo(() => {
+    void props.abierto;
+    runOn(props.workspace);
+    machines();
+    return capabilities().remoteCreate?.(props.workspace) ?? null;
+  });
+  const enRemota = () => (remota() ? { headers: { "x-terminus-machine": remota()?.machine as string } } : undefined);
+  const spaceAlli = () => (remota() && !remota()?.lead ? undefined : (props.space ?? undefined));
   // Un fallo del formulario —la dirección vacía— no es un clon fallido. Sin
   // esto el riel pintaría una fila por cada intento que no llegó a git.
   const [intentado, setIntentado] = createSignal(false);
@@ -103,7 +121,7 @@ export default function AnadirCarpeta(props: {
       op || fallado
         ? {
             operation: op,
-            name: etiqueta(),
+            name: nombreClon() || etiqueta(),
             phase: progress()?.phase ?? null,
             percent: progress()?.percent ?? null,
             failed: !op && fallado,
@@ -113,12 +131,38 @@ export default function AnadirCarpeta(props: {
   });
 
   createEffect(on(() => props.workspace, () => {
-    if (!operation()) { limpiar(); setTrabajando(false); }
+    if (operation()) return;
+    limpiar();
+    setTrabajando(false);
+    const pendiente = leerPref<RemoteClone[]>(REMOTE_CLONES, []).find((c) => c.workspace === props.workspace);
+    if (pendiente) void seguirEnOtra(pendiente, null);
   }));
+
+  async function seguirEnOtra(clon: RemoteClone, start: Record<string, unknown> | null) {
+    setOperation(clon.operation);
+    setClonEnOtra(clon);
+    setNombreClon(clon.name);
+    setProgress(null);
+    setCancelling(false);
+    setIntentado(true);
+    const { followClone } = await import("./remoteClone");
+    await terminar(followClone(clon, start, (value) => { if (operation() === clon.operation) setProgress(value); }));
+    setOperation(null);
+    setClonEnOtra(null);
+    setNombreClon("");
+  }
 
   async function clone() {
     if (trabajando() || !props.workspace) return;
     const id = crypto.randomUUID();
+    const otra = remota();
+    if (otra) {
+      const workspace = props.workspace;
+      await seguirEnOtra({ operation: id, machine: otra.machine, workspace, name: etiqueta() }, {
+        url: url(), name: nombre(), operation: id, workspace, gitHost: provider(), space: spaceAlli(),
+      });
+      return;
+    }
     setOperation(id);
     setProgress(null);
     setCancelling(false);
@@ -137,8 +181,10 @@ export default function AnadirCarpeta(props: {
     const id = operation();
     if (!id || cancelling()) return;
     setCancelling(true);
+    const otra = clonEnOtra();
     try {
-      await invoke("cancel_project_clone", { operation: id });
+      if (otra) await (await import("./remoteClone")).cancelClone(otra);
+      else await invoke("cancel_project_clone", { operation: id });
     } catch (error) {
       setFallo(asFailure(error));
       setCancelling(false);
@@ -206,7 +252,7 @@ export default function AnadirCarpeta(props: {
     setTrabajando(true);
     setFallo(null);
     try {
-      const directory = await invoke<string>("get_project_directory");
+      const directory = await invoke<string>("get_project_directory", {}, enRemota());
       if (workspace !== props.workspace) return;
       setDirectorio(directory);
       setCamino(value);
@@ -263,7 +309,7 @@ export default function AnadirCarpeta(props: {
             <Show when={props.abierto ? props.workspace : null} keyed>{workspace =>
               <RepositoryPicker workspace={workspace} disabled={trabajando()}
                 onUrl={() => { setProvider(null); setRepositoryName(""); void elegirCamino("clonar"); }}
-                onFolder={() => void explorar()} onEmpty={() => void elegirCamino("vacia")}
+                onFolder={remota() ? undefined : () => void explorar()} onEmpty={() => void elegirCamino("vacia")}
                 onRepository={repo => void chooseRepository(repo)} />
             }</Show>
           </Show>
@@ -293,7 +339,8 @@ export default function AnadirCarpeta(props: {
               <div class="grid gap-1">
                 <span class="text-[0.8125rem] text-neutral-500">{t("projects.add.clone_directory")}</span>
                 <p class="m-0 break-all font-mono text-xs">{destino() ?? directorio()}</p>
-                <Button
+                <Show when={remota()}>{(m) => <p class="m-0 text-xs text-neutral-500">{t("projects.add.remote_directory", { name: machineName(m().machine) })}</p>}</Show>
+                <Show when={!remota()}><Button
                   type="button"
                   variant="outline"
                   size="sm"
@@ -302,9 +349,12 @@ export default function AnadirCarpeta(props: {
                   onClick={() => void elegirDestino()}
                 >
                   {t("projects.add.change_directory")}
-                </Button>
+                </Button></Show>
               </div>
               <Show when={fallo()}>{(f) => <FailureNote f={f()} />}</Show>
+              <Show when={fallo() && remota() && provider()}>
+                <p class="m-0 text-xs text-neutral-500" data-git-host-hint="">{t("projects.add.remote_git_host", { name: machineName(remota()?.machine as string) })}</p>
+              </Show>
               <Show when={operation()}>
                 <div class="grid gap-2">
                   <p class="text-xs text-neutral-500" role="status">{phase()}</p>
@@ -349,7 +399,7 @@ export default function AnadirCarpeta(props: {
               onSubmit={(e) => {
                 e.preventDefault();
                 void terminar(
-                  invoke<Project>("create_project", { name: nombre(), space: props.space ?? undefined }),
+                  invoke<Project>("create_project", { name: nombre(), space: spaceAlli() }, enRemota()),
                 );
               }}
             >

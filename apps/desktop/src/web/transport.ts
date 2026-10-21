@@ -5,7 +5,7 @@
  * `service_poll` reads the `subscribe` feeds; window-only commands and plugins
  * answer from the browser or refuse with a sentence the interface already knows.
  */
-import { callWorkspace } from "@terminus/computers";
+import { INTENT_COMMANDS, callWorkspace } from "@terminus/computers";
 import { t } from "../lib/i18n";
 import { leerPref } from "../lib/prefs";
 import { deliver } from "../lib/serviceEvents.ts";
@@ -33,6 +33,8 @@ export type WebTransport = {
   handle(command: string, args?: Args, options?: Options): Promise<unknown>;
   fleet: Fleet;
   status(machine: string): MachineStatus;
+  /** Where something new of `workspace` is made now, and whether that machine leads it (its spaces are the panel's). */
+  createsOn(workspace: string | null): { machine: string; lead: boolean } | null;
 };
 
 export type MachineLink = { info: MachineInfo; relay: RelayLike; onSync?: SyncListener };
@@ -101,27 +103,8 @@ const QUIET = new Set([
   "update_pending",
 ]);
 const OFF: MachineState[] = ["offline", "stopped", "provisioning"];
-/** What wakes an off computer at the relay (protocol v1); anything else waits for it to be on. */
-const INTENT = new Set([
-  "send_message",
-  "inject_message",
-  "create_project",
-  "create_agent",
-  "add_account",
-  "login_account",
-  "submit_login_code",
-  "respond_permission",
-  "answer_question",
-  "answer_shell_output",
-  "run_shell_command",
-  "queue_ready",
-  "resume_awaiting_quota",
-  "recreate_task_work",
-  "add_workspace",
-  "radiant_login",
-  "materialize_workspace",
-  "ensure_project",
-]);
+/** What wakes an off computer at the relay: its list (`INTENT_COMMANDS` of computers' `src/protocol.ts`), shared with the phone. */
+const INTENT = INTENT_COMMANDS;
 const READ = /^(list_|load_|read_|get_|preview_)|_status$|^(workspaces_startup|session_usage|task_history|session_folder|setup_required|check_environment|account_limits|chat_background)$/;
 /** With the computer off and nothing read before: a managed computer is prepared at install. */
 const OFF_ANSWERS: Record<string, unknown> = { setup_required: false };
@@ -661,9 +644,20 @@ export function createWebTransport(
     throw desktopOnly(command);
   }
 
+  function createsOn(workspace: string | null) {
+    const ws = workspace ?? active;
+    try {
+      const route = fleet.route("create_project", {}, ws, picked(ws, null), fallback(ws));
+      return "machine" in route ? { machine: route.machine, lead: !fleet.multi || fleet.membersOf(ws)[0] === route.machine } : null;
+    } catch {
+      return null;
+    }
+  }
+
   return {
     fleet,
     status,
+    createsOn,
     async handle(command, args = {}, options) {
       if (command.startsWith("plugin:")) return plugin(command, args);
       if (command === "service_poll") return home ? pollHome(args, options) : fleet.multi ? pollAll() : link(fleet.machines[0].id).poll(args);

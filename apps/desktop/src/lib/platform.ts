@@ -37,6 +37,8 @@ export type Capabilities = {
   windowMachine?: () => { id: string; name: string; local: boolean } | undefined;
   /** Dónde se crea un proyecto nuevo, en el diálogo de añadirlo. */
   machineOnCreate?: (workspace: string | null) => JSX.Element;
+  /** La máquina donde se crea ahora un proyecto nuevo, si no es la de la ventana; `lead`, si sus spaces son los del panel. */
+  remoteCreate?: (workspace: string | null) => { machine: string; lead: boolean } | null;
   /** Los adjuntos salen del navegador como bytes: el motor solo guarda imágenes (`guardar_imagen_pegada`). */
   browserFiles?: boolean;
   /** Bajo la tarjeta de una cuenta: sus máquinas. */

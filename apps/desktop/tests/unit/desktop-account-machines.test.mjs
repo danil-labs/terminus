@@ -232,3 +232,56 @@ test("an action wakes the VM; a physical machine that is off says so, neutral", 
   assert.ok(!doc.body.textContent.includes("Algo se rompió"), "no generic failure");
   assert.deepEqual(app.fallos, []);
 });
+
+test("with another machine in «Ejecutar en», a clone runs there with start_project_clone", async () => {
+  const status = new Map();
+  const panel = { id: "p7", name: "panel", working_directory: "/home/danil/code/panel", kind: "git", portfolio: null, sources: [] };
+  const { app, f, doc, text, relayCalls, native } = await open("desktop-account-clone", {
+    computers: [HOME, { ...VM, state: "online" }],
+    relays: {
+      cmp_vm: {
+        table: remote("Panel", "Tarea de la VM", {
+          get_project_directory: "/home/danil/code",
+          start_project_clone: ({ operation }) => {
+            status.set(operation, { workspace: "w", operation, phase: "waiting", percent: null, done: false });
+            return { operation };
+          },
+          project_clone_status: ({ operation }) => status.get(operation) ?? null,
+        }),
+      },
+    },
+    extra: { list_project_repositories: [], list_git_hosts: [], get_project_directory: "/Users/ana/Documents" },
+  });
+  app.w.localStorage.setItem("harness.layout.machines.run_on", JSON.stringify({ w: "cmp_vm" }));
+  const button = (label) => [...doc.querySelectorAll("button")].find((b) => b.textContent?.trim().startsWith(label));
+  doc.querySelector('button[aria-label="Proyecto"]').click();
+  await sleep(300);
+  button("Añadir un proyecto").click();
+  await sleep(400);
+  assert.ok(!text().includes("Explorar carpeta"), "no native folder dialog for another machine");
+  button("Git URL").click();
+  await sleep(400);
+  assert.ok(text().includes("/home/danil/code") && !text().includes("/Users/ana/Documents"), "the destination is the VM's projects folder");
+  const input = doc.querySelector('input[placeholder="https://github.com/organizacion/repo"]');
+  Object.getOwnPropertyDescriptor(app.w.HTMLInputElement.prototype, "value").set.call(input, "https://github.com/danil/panel.git");
+  input.dispatchEvent(new app.w.Event("input", { bubbles: true }));
+  await sleep(50);
+  button("Clonar").click();
+  await sleep(500);
+  const started = relayCalls("cmp_vm", "start_project_clone").at(-1);
+  assert.ok(started, "the clone goes to the VM");
+  assert.equal(native("clone_project").length + native("start_project_clone").length, 0, "this Mac does not clone it");
+  const operation = started.args.operation;
+  const report = (event) => {
+    status.set(operation, { workspace: "w", operation, percent: null, done: false, ...event });
+    f.relays.cmp_vm.push({ type: "events", cursor: Date.now(), gap: false, replay: false, runtime: "rt1", events: [{ name: "project_clone", payload: status.get(operation) }] });
+  };
+  report({ phase: "receiving", percent: 55 });
+  await sleep(400);
+  assert.ok(text().includes("Recibiendo objetos") && text().includes("55 %"), "the VM's progress shows in the window");
+  report({ phase: "done", done: true, project: panel });
+  await sleep(600);
+  assert.ok(!text().includes("Recibiendo objetos"), "the clone ended");
+  assert.equal(app.w.localStorage.getItem("harness.layout.projects.remote_clones"), null);
+  assert.deepEqual(app.fallos, []);
+});

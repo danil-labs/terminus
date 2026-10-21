@@ -86,6 +86,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
       const first = transport.fleet.machines[0];
       return first && { id: first.id, name: first.name, local: false };
     },
+    remoteCreate: (workspace) => transport.createsOn(workspace),
     machineOnCreate: multi
       ? (workspace) => (
           <Suspense fallback={null}>

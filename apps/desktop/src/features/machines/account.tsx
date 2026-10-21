@@ -25,6 +25,7 @@ import { isMac } from "../../lib/window";
 import { Toast, ToastPortal } from "../../ui/Toast";
 import type { MachineStatus } from "../../web/fleet";
 import { type BrowserHost, createWebTransport, type WebTransport } from "../../web/transport";
+import { MachinePicker } from "./MachinePicker";
 import { refetchMachines } from "./store";
 
 declare const __TERMINUS_CONTRACT__: string;
@@ -161,6 +162,16 @@ export function startAccountMachines(target: Target = window) {
       ...previous,
       machineName: (id) => (id === self ? homeName() : transport.fleet.name(id)),
       windowMachine: () => ({ id: self, name: homeName(), local: true }),
+      remoteCreate: (workspace) => {
+        const target = transport.createsOn(workspace);
+        return target && target.machine !== self ? target : null;
+      },
+      machineOnCreate: (workspace) => (
+        <div class="flex items-center gap-1 pt-2 text-xs text-neutral-500" data-create-on="">
+          <span>{t("web.machines.create_on")}</span>
+          <MachinePicker workspace={workspace} />
+        </div>
+      ),
     });
     const route: Invoke = (command, args = {}, options) => {
       if (command.startsWith("plugin:") || WINDOW.has(command)) return native(command, args, options);
