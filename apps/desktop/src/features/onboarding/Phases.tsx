@@ -2,14 +2,19 @@ import { For, Show } from "solid-js";
 import Check from "lucide-solid/icons/check";
 import { t } from "../../lib/i18n";
 import { cn } from "../../lib/utils";
+import {
+  createFullscreen,
+  HEADER_HEIGHT,
+  isWindows,
+  needsTrafficLightPadding,
+  TRAFFIC_LIGHT_PADDING,
+  toggleMaximizeFromHeader,
+} from "../../lib/window";
+import ControlesDeVentana from "../shell/WindowControls";
 
-/** Las tres fases del alta: la preparación pinta la primera y el alta las otras dos. */
+/** Las dos fases del alta: preparar incluye conectar la IA; personalizar es la última pantalla. */
 export function Fases(props: { actual: number }) {
-  const fases = () => [
-    t("onboarding.phases.prepare"),
-    t("onboarding.phases.install"),
-    t("onboarding.phases.space"),
-  ];
+  const fases = () => [t("onboarding.phases.prepare"), t("onboarding.phases.personalize")];
   return (
     <nav class="flex gap-5" aria-label={t("onboarding.phases.label")}>
       <For each={fases()}>
@@ -21,7 +26,7 @@ export function Fases(props: { actual: number }) {
             )}
             aria-current={i() === props.actual ? "step" : undefined}
           >
-            <Show when={i() < props.actual} fallback={i() + 1}>
+            <Show when={i() < props.actual} fallback={<strong class="font-semibold">{i() + 1}</strong>}>
               <Check size={12} aria-hidden="true" />
             </Show>{" "}
             {fase}
@@ -29,5 +34,29 @@ export function Fases(props: { actual: number }) {
         )}
       </For>
     </nav>
+  );
+}
+
+/** La cabecera de las pantallas del alta: ocupan la ventana entera y siempre apartan el semáforo. */
+export function CabeceraDelAlta(props: { fase?: number }) {
+  const apartarSemaforo = needsTrafficLightPadding(() => true, createFullscreen());
+  return (
+    <header
+      class={cn(
+        "flex shrink-0 items-center gap-5 border-b border-border px-7 text-xs",
+        HEADER_HEIGHT,
+        apartarSemaforo() && TRAFFIC_LIGHT_PADDING,
+      )}
+      data-tauri-drag-region=""
+      onDblClick={toggleMaximizeFromHeader}
+    >
+      <Show when={props.fase !== undefined}>
+        <Fases actual={props.fase ?? 0} />
+      </Show>
+      <span class="flex-1 self-stretch" data-tauri-drag-region="" />
+      <Show when={isWindows()}>
+        <ControlesDeVentana />
+      </Show>
+    </header>
   );
 }

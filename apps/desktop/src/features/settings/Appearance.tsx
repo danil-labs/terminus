@@ -43,7 +43,7 @@ import { createWorkspaces } from "./workspaces-store";
 
 const IMAGES = ["png", "jpg", "jpeg", "webp"];
 /** El tope del motor para un fondo (`settings.appearance.background.too_big`): cabe en la copia del relay. */
-const FONDO_MAX = 700 * 1024;
+const FONDO_MAX = 700_000;
 
 /** En el navegador no hay rutas: la imagen se elige con el selector de archivos y viaja como `data:`. */
 function imagenDelNavegador(): Promise<File | null> {

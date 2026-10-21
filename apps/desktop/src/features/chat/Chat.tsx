@@ -2577,7 +2577,7 @@ export default function Chat(props: ChatProps) {
               {/* Una opción decide agente, superficie y modelo. Separarlos hacía
                   imposible buscar Claude, Codex y OpenCode en el mismo menú.
                   La marca sale del agente que sirve la superficie: «OpenCode»
-                  y «Modelos Free» son dos entradas del mismo proveedor. */}
+                  y «Modelos gratuitos» son dos entradas del mismo proveedor. */}
               <SelectorDeModelo
                 pildora
                 marca={actual()?.provider ?? props.agent}

@@ -60,7 +60,7 @@ export function paraElMenu(
  *    esto, cargar el catálogo movería el selector debajo de quien acaba de
  *    elegir.
  * 2. La del agente cuyo catálogo contiene el modelo guardado — una tarea de un
- *    modelo gratuito abre en «Modelos Free».
+ *    modelo gratuito abre en «Modelos gratuitos».
  * 3. La primera usable de ese agente — la tarea sin modelo todavía.
  * 4. La primera de ese agente aunque no sea usable: la tarea viva con un agente
  *    desconectado se enseña en vez de cambiarla de agente sin decirlo.
@@ -92,7 +92,7 @@ export function superficieDe(
 /**
  * El rótulo de una superficie, traducido cuando el nombre es nuestro: «Claude
  * Code» o «Codex» son nombres propios y van igual en toda lengua; «Modelos
- * Free» y «Locales» son nuestros y sin esto salen en la lengua de Rust.
+ * gratuitos» y «Locales» son nuestros y sin esto salen en la lengua de Rust.
  *
  * Se distingue por identificador y no por el rótulo: `catalogo` y `agent`
  * cruzan la frontera entre procesos y no cambian con la lengua; comparar contra
