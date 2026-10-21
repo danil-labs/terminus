@@ -47,6 +47,7 @@ pub enum Phase {
     /// La versión anterior sigue con turnos; el motor nuevo entra en cuanto los termine.
     Previous {
         tasks: Option<u64>,
+        stopping: bool,
     },
 }
 
@@ -78,7 +79,14 @@ impl Launcher {
     }
     /// Tras actualizar, el motor de la versión anterior sigue trabajando: la ventana espera a que termine.
     pub fn previous(paths: engine::Paths, tasks: Option<u64>) -> Self {
-        Self::new(Some(paths), Some("previous"), Phase::Previous { tasks })
+        Self::new(
+            Some(paths),
+            Some("previous"),
+            Phase::Previous {
+                tasks,
+                stopping: false,
+            },
+        )
     }
     fn new(paths: Option<engine::Paths>, reason: Option<&'static str>, phase: Phase) -> Self {
         Self {
@@ -175,8 +183,25 @@ fn wait_previous(app: &tauri::AppHandle, launcher: &Launcher, paths: &engine::Pa
         match engine::ensure(paths, false) {
             Err(error) if error.code == "previous_engine_busy" => {
                 let tasks = error.detail["turns"].as_u64().filter(|n| *n > 0);
-                launcher.set(Phase::Previous { tasks });
-                std::thread::sleep(Duration::from_secs(2));
+                let waiting = Phase::Previous {
+                    tasks,
+                    stopping: false,
+                };
+                // «Actualizar ya» solo vale para esta pantalla: al entrar se olvida un clic anterior.
+                if matches!(launcher.phase(), Phase::Previous { .. }) {
+                    launcher.set(waiting);
+                } else {
+                    launcher.ask(waiting);
+                }
+                if launcher.consented(Duration::from_secs(2)) {
+                    launcher.set(Phase::Previous {
+                        tasks,
+                        stopping: true,
+                    });
+                    if let Err(error) = engine::force_previous(paths) {
+                        log::error!("[launcher] previous engine did not stop: {}", error.code);
+                    }
+                }
             }
             Err(error) if error.code == "adoption_required" => {
                 drive(app, launcher, paths, "readopt");

@@ -36,7 +36,7 @@ type Fase =
   | { phase: "ready"; blank_0274?: boolean }
   | Traspaso
   | { phase: "failed"; code: string; log: string; data: string }
-  | { phase: "previous"; tasks: number | null };
+  | { phase: "previous"; tasks: number | null; stopping: boolean };
 
 const RELEASE_0274 = "https://github.com/danil-labs/terminus/releases/tag/v0.2.74";
 const TEXTOS = {
@@ -71,6 +71,8 @@ export default function Lanzador(props: { children: JSX.Element }) {
     const f = fase();
     return f?.phase === "handoff" ? f : null;
   };
+  // «Actualizar ya» corta turnos: se confirma diciendo cuántos.
+  const [confirmando, setConfirmando] = createSignal(false);
   const anterior = () => {
     const f = fase();
     return f?.phase === "previous" ? f : null;
@@ -186,6 +188,41 @@ export default function Lanzador(props: { children: JSX.Element }) {
                     {a().tasks ? t("launcher.step.work.tasks", { count: a().tasks ?? 0 }) : t("launcher.step.work.pending")}
                   </p>
                   <p class="m-0 mt-3 max-w-[60ch] text-sm text-neutral-500">{t("launcher.previous.body")}</p>
+                  <Switch>
+                    <Match when={a().stopping}>
+                      <p class="m-0 mt-8 text-sm text-neutral-950" aria-live="polite">
+                        {t("launcher.previous.stopping")}
+                      </p>
+                    </Match>
+                    <Match when={confirmando()}>
+                      <p class="m-0 mt-8 max-w-[60ch] text-sm text-neutral-950">
+                        {a().tasks
+                          ? t("launcher.previous.confirm", { count: a().tasks ?? 0 })
+                          : t("launcher.previous.confirm_unknown")}
+                      </p>
+                      <div class="mt-4 flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setConfirmando(false);
+                            seguir();
+                          }}
+                        >
+                          {t("launcher.previous.cut")}
+                        </Button>
+                        <Button size="sm" variant="secondary" onClick={() => setConfirmando(false)}>
+                          {t("launcher.previous.keep_waiting")}
+                        </Button>
+                      </div>
+                    </Match>
+                    <Match when={true}>
+                      <div class="mt-8">
+                        <Button size="sm" variant="secondary" onClick={() => setConfirmando(true)}>
+                          {t("launcher.previous.update_now")}
+                        </Button>
+                      </div>
+                    </Match>
+                  </Switch>
                 </>
               )}
             </Show>

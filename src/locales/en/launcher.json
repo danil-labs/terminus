@@ -34,5 +34,14 @@
   "launcher.failed.reason.adoption_required": "The engine asks to adopt the data again and could not.",
   "launcher.failed.reason.engine_start_failed": "The engine closed while starting or did not answer in time.",
   "launcher.previous.title": "Terminus was updated",
-  "launcher.previous.body": "The previous version finishes what it is doing before it lets go of your data; nothing is cut off. Terminus opens on its own as soon as it is done."
+  "launcher.previous.body": "The previous version finishes what it is doing before it lets go of your data. Terminus opens on its own when it is done, or you can update now.",
+  "launcher.previous.update_now": "Update now",
+  "launcher.previous.confirm": {
+    "one": "{count} task that is working will be stopped. What it was doing right now may be lost; once Terminus opens, send it a message to pick it up again.",
+    "other": "{count} tasks that are working will be stopped. What they were doing right now may be lost; once Terminus opens, send each one a message to pick it up again."
+  },
+  "launcher.previous.confirm_unknown": "What the previous version is doing will be stopped. What it was doing right now may be lost; once Terminus opens, send each task a message to pick it up again.",
+  "launcher.previous.cut": "Stop and update",
+  "launcher.previous.keep_waiting": "Keep waiting",
+  "launcher.previous.stopping": "Stopping the previous version…"
 }
