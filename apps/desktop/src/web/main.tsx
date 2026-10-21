@@ -5,7 +5,7 @@
  * that sets `window.terminusWeb` before this module loads can replace any
  * setting, or give `getToken` with `computerId` or `computers` and skip the session.
  */
-import { linkedWorkspaces } from "@terminus/computers";
+import { linkedWorkspaces, listWorkspaces } from "@terminus/computers";
 import { chosenWebLayout, MOBILE_WEB_DIR } from "@terminus/design";
 import { createSignal, lazy, Suspense } from "solid-js";
 import { t } from "../lib/i18n";
@@ -62,7 +62,12 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
     };
     return { info, relay, onSync: setAt, at };
   });
-  const transport = createWebTransport(links, __TERMINUS_VERSION__, browser, () => bump((n) => n + 1));
+  // The account's workspaces list even with every machine of theirs asleep; an older control plane answers none.
+  const registry = async () => {
+    const answer = await listWorkspaces(base.endpoint, await base.getToken());
+    return answer.kind === "ok" ? answer.value : null;
+  };
+  const transport = createWebTransport(links, __TERMINUS_VERSION__, browser, () => bump((n) => n + 1), null, registry);
   const machines = (): MachineRow[] => {
     changed();
     return transport.fleet.machines.map((m) => {

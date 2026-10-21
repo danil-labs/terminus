@@ -55,6 +55,9 @@ const HTML = indice
   .replace(/<script\b[^>]*><\/script>/g, "")
   .replace(/<link\b[^>]*>/g, "");
 
+/** Los workspaces de la cuenta que contesta el plano de control simulado en esta pasada. */
+let registro;
+
 /** Lo que se copió a `globalThis` en la pasada anterior, para poder pisarlo. */
 let copiadas = [];
 
@@ -77,7 +80,9 @@ export const cause = new AsyncLocalStorage();
  *   normal sube por el `setEnv` de `Setup.revisar` y **la traga su propio
  *   `try`**, que es exactamente por qué este fallo no dejó ni un mensaje.
  */
-export async function boot(entorno, version, respuestas, userAgent, storage = {}, { web = false, antes } = {}) {
+export async function boot(entorno, version, respuestas, userAgent, storage = {}, { web = false, antes, workspaces } = {}) {
+  // El registro de workspaces de la cuenta (`GET /v1/workspaces`): sin `workspaces`, un plano de control que no lo tiene.
+  registro = workspaces;
   const dir = web ? distWeb : dist;
   const pagina = web ? readFileSync(join(distWeb, "index.html"), "utf8") : indice;
   const entrada = web ? /<script\b[^>]*\bsrc="\/?([^"?]*assets\/[^"?]+\.js)"/.exec(pagina)?.[1] : `assets/${bundle}`;
@@ -288,7 +293,9 @@ export async function boot(entorno, version, respuestas, userAgent, storage = {}
     const local = (url, opts) =>
       /^(http:\/\/localhost\/|file:)/.test(String(url?.url ?? url))
         ? Promise.resolve(new Response(""))
-        : deNode(url, opts);
+        : /\/v1\/workspaces$/.test(String(url?.url ?? url))
+          ? Promise.resolve(registro === undefined ? new Response("{}", { status: 404 }) : Response.json({ workspaces: registro }))
+          : deNode(url, opts);
     local.__jsdomApp = true;
     globalThis.fetch = local;
   }

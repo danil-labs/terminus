@@ -404,6 +404,31 @@ Agrega:
 - El campo `linked` de `features/machines/store.ts` se renombra a `hosts`
   (tiene el workspace), para no confundirlo con el vínculo de la cuenta.
 
+Lista desde el registro de la cuenta (2026-10-21, tras el reporte de la web
+que pedía «crea tu workspace» con las VMs dormidas y la Mac encendida sin
+workspaces ligados):
+
+- La web, el escritorio con cuenta de Danil (`features/machines/account.tsx`,
+  con el token de cliente) y el móvil leen `GET /v1/workspaces`
+  (`listWorkspaces` en `packages/computers`) y lo juntan con lo que listan las
+  máquinas encendidas (`Fleet.setRegistry` en `src/web/fleet.ts`,
+  `withRegistry` en el paquete). La fila de una máquina que contesta manda; el
+  registro suma los workspaces cuyas máquinas duermen y, como miembros, las
+  computadoras ligadas que no contestaron. El activo es el abierto si sigue en
+  la lista; si no, el de la primera máquina; si no, el primero.
+- Proyectos: las filas de `list_projects` se juntan por id con los proyectos
+  del registro; uno que ninguna máquina listó sale del registro con
+  `materialized: false` y, como máquina, `home_computer_id`.
+- Las tareas siguen siendo de cada máquina: la copia del relay o la del
+  navegador, marcadas apagadas. Con todas sus máquinas dormidas y sin copia,
+  un workspace del registro abre sin esperar: proyectos del registro, tareas,
+  fuentes y spaces vacíos. Crear una tarea va a la máquina elegida o a la
+  última (con `materialize_workspace` antes si no lo tiene) y la enciende.
+- El alta de «crea tu workspace» y `no_workspaces` (`src/web/Gate.tsx`) solo
+  salen con el registro vacío y ninguna máquina con un workspace ligado.
+- Detección: si `/v1/workspaces` falla (un Worker anterior, 404, o la red), todo
+  queda como antes. Prueba: `tests/unit/web-account-workspaces.test.mjs`.
+
 ### Fase 2 (fuera de esta entrega)
 
 Logo, fondo, MCP y skills desde la cuenta; adoptar las copias viejas de «Usar

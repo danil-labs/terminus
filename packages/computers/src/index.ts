@@ -1,4 +1,15 @@
-export { type Answer, type Computer, type Fetch, COMPUTERS_ENDPOINT, apiUrl, listComputers, startComputer } from "./api.ts";
+export {
+  type AccountProject,
+  type AccountWorkspace,
+  type Answer,
+  type Computer,
+  type Fetch,
+  COMPUTERS_ENDPOINT,
+  apiUrl,
+  listComputers,
+  listWorkspaces,
+  startComputer,
+} from "./api.ts";
 export {
   type MachineState,
   type Power,
@@ -13,7 +24,7 @@ export {
   powerOf,
   wakes,
 } from "./machine.ts";
-export { type WorkspaceGroup, type WorkspaceRow, groupWorkspaces } from "./fleet.ts";
+export { type WorkspaceGroup, type WorkspaceRow, groupWorkspaces, hasAccountWorkspaces, registryProjects, withRegistry } from "./fleet.ts";
 export { callWorkspace, hasLinkedWorkspaces, linkedAttention, linkedEvent, linkedEvents, linkedListing, linkedWorkspaces, onlyLinked } from "./links.ts";
 export { type Compatibility, machineCompatibility } from "./compatibility.ts";
 export {

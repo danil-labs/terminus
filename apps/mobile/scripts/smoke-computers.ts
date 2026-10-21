@@ -18,7 +18,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { groupAccounts, groupWorkspaces, listComputers, orderComputers, startComputer, windowLabel } from "@terminus/computers";
+import { groupAccounts, groupWorkspaces, listComputers, listWorkspaces, orderComputers, startComputer, windowLabel } from "@terminus/computers";
 import type { AiAccount, EngineEvent, LoginEvent } from "@terminus/protocol";
 import {
   type Notice,
@@ -51,6 +51,8 @@ import {
   snapshotOf,
   submitLoginCode,
   uploadAttachment,
+  withAccountFolders,
+  workspaceEntries,
   workspacesOf,
 } from "../src/lib/engine.ts";
 import { type Host, HostError, relayHost } from "../src/lib/hosts.ts";
@@ -114,7 +116,7 @@ const ok = (step: string) => {
     const [vmWs, macWs] = await Promise.all([workspacesOf(vm), workspacesOf(mac)]);
     assert.ok(vmWs.cachedAt !== null, "la VM contesta desde el espejo");
     assert.equal(macWs.cachedAt, null);
-    const groups = groupWorkspaces([{ machine: "cmp_vm", rows: vmWs.list }, { machine: "cmp_mac", rows: macWs.list }]);
+    const groups = groupWorkspaces([{ machine: "cmp_vm", rows: vmWs.list ?? [] }, { machine: "cmp_mac", rows: macWs.list ?? [] }]);
     assert.equal(groups.length, 1, "el mismo workspace, con el mismo id en cada motor, se ve una vez");
     const members = groups[0].members;
     assert.deepEqual([...members], [["cmp_vm", "w-prod"], ["cmp_mac", "w-prod"]]);
@@ -183,7 +185,7 @@ const ok = (step: string) => {
     assert.equal(mac.power(), "off");
     assert.equal(mac.canAct(), "asleep");
     const ws = await workspacesOf(mac);
-    assert.deepEqual(ws.list, [], "sin copia, una lectura apagada es vacía, no un error");
+    assert.equal(ws.list, null, "sin copia, una lectura apagada no dice nada, y no es un error");
     await assert.rejects(
       createTask(mac, "w-prod", { folder: "p-mac-api", prompt: "hola", provider: "claude", model: null, agent: null, space: null }),
       (e: HostError) => e.code === "machine_asleep",
@@ -194,6 +196,16 @@ const ok = (step: string) => {
     await assert.rejects(addAccount(mac, "claude"), (e: HostError) => e.code === "machine_asleep");
     assert.equal(mac.power(), "off");
     ok("fijar o iniciar sesión en una máquina propia apagada tampoco se intenta");
+
+    const registry = await listWorkspaces(endpoint, "fake-jwt");
+    assert.equal(registry.kind, "ok");
+    const accountList = registry.kind === "ok" ? registry.value : null;
+    const vmWs = await workspacesOf(byId("cmp_vm"));
+    const entries = workspaceEntries(hosts, { cmp_vm: vmWs.list, cmp_mac: ws.list }, accountList);
+    assert.deepEqual(entries.map((e) => [e.id, e.hosts.includes("cmp_mac")]), [["w-prod", true]], "el workspace de la cuenta sigue en la Mac apagada");
+    const folders = withAccountFolders({ folders: [], spaces: [] }, accountList, "w-prod", ["cmp_mac"]).folders;
+    assert.deepEqual(folders.map((f) => f.key), ["cmp_mac/p-mac-api"], "con sus carpetas del registro");
+    ok("el registro de la cuenta (GET /v1/workspaces) trae el workspace y sus carpetas con la máquina apagada");
     for (const h of hosts) h.close();
   } finally {
     child.kill();

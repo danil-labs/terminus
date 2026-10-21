@@ -1,4 +1,4 @@
-import { type Answer, type Computer, listComputers, orderComputers, startComputer } from "@terminus/computers";
+import { type AccountWorkspace, type Answer, type Computer, listComputers, listWorkspaces, orderComputers, startComputer } from "@terminus/computers";
 import { type EngineEvent, type WorkspaceAttention, mergeAttention } from "@terminus/protocol";
 import { store } from "./store";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -22,6 +22,8 @@ type Machines = {
   /** Las máquinas de la persona y, si está emparejado, el Terminus de la red. */
   hosts: Host[];
   hostOf: (id: string) => Host | undefined;
+  /** Los workspaces de la cuenta (`GET /v1/workspaces`), con sus máquinas apagadas o no; `null` si el plano de control no los dice. */
+  registry: AccountWorkspace[] | null;
   /** La máquina por omisión para tareas nuevas: la última usada, la VM administrada o la primera. */
   preferred: (eligible: Host[]) => Host | null;
   rememberMachine: (id: string) => void;
@@ -74,6 +76,7 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
   const account = useAccount();
   const signedIn = Boolean(account.session);
   const [computers, setComputers] = useState<Computer[]>([]);
+  const [registry, setRegistry] = useState<AccountWorkspace[] | null>(null);
   const [fleet, setFleet] = useState<Fleet>("loading");
   const [pairing, setPairing] = useState<Pairing | null>(null);
   const [pairingLoaded, setPairingLoaded] = useState(false);
@@ -100,10 +103,16 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
   const reloadComputers = useCallback(async () => {
     if (!signedIn) {
       setComputers([]);
+      setRegistry(null);
       setFleet("signed_out");
       return;
     }
-    const answer = await computersOf(account.getToken, account.unauthorized).catch((): Answer<Computer[]> => ({ kind: "error", status: null }));
+    const [answer, workspaces] = await Promise.all([
+      computersOf(account.getToken, account.unauthorized).catch((): Answer<Computer[]> => ({ kind: "error", status: null })),
+      account.getToken().then((token) => listWorkspaces(COMPUTERS, token)).catch(() => null),
+    ]);
+    // Un plano de control sin el registro, o un fallo de red, deja la lista de antes.
+    if (workspaces?.kind === "ok") setRegistry((old) => (JSON.stringify(old) === JSON.stringify(workspaces.value) ? old : workspaces.value));
     if (answer.kind === "ok") {
       setFleet("ok");
       // Solo cambia la lista si cambian las máquinas o sus workspaces vinculados: cada cambio vuelve a abrir sus sesiones.
@@ -221,6 +230,7 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
       fleet,
       hosts,
       hostOf,
+      registry,
       preferred,
       rememberMachine,
       pairing,
@@ -234,7 +244,7 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
       subscribe,
       tick,
     }),
-    [account.ready, pairingLoaded, fleet, hosts, hostOf, preferred, rememberMachine, pairing, pair, reloadComputers, attention, activity, titleOf, rememberTitles, setOpenTask, subscribe, tick],
+    [account.ready, pairingLoaded, fleet, hosts, hostOf, registry, preferred, rememberMachine, pairing, pair, reloadComputers, attention, activity, titleOf, rememberTitles, setOpenTask, subscribe, tick],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

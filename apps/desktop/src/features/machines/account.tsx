@@ -10,6 +10,7 @@ import {
   type Computer,
   linkedWorkspaces,
   listComputers,
+  listWorkspaces,
   machineCompatibility,
   orderComputers,
   RelaySession,
@@ -152,10 +153,19 @@ export function startAccountMachines(target: Target = window) {
       };
       return { info, relay };
     });
-    const transport = createWebTransport(links, "", HOST, () => bump((n) => n + 1), {
-      info: { id: self, name: homeName(), wakes: false },
-      call: (command, args, options) => native(command, args, options),
-    });
+    const registry = async () => {
+      const answer = await listWorkspaces(endpoint, (await getToken()).token);
+      if (answer.kind === "unauthorized") token = null;
+      return answer.kind === "ok" ? answer.value : null;
+    };
+    const transport = createWebTransport(
+      links,
+      "",
+      HOST,
+      () => bump((n) => n + 1),
+      { info: { id: self, name: homeName(), wakes: false }, call: (command, args, options) => native(command, args, options) },
+      registry,
+    );
 
     const previous: Capabilities = capabilities();
     setCapabilities({
