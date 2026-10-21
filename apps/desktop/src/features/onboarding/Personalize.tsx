@@ -151,7 +151,7 @@ export default function Personalizar(props: {
               filas={[
                 { hecho: true, texto: t("onboarding.check.environment") },
                 { hecho: props.ia.length > 0, texto: props.ia.length ? props.ia.join(", ") : t("onboarding.summary.no_ai") },
-                { hecho: integraciones() > 0, texto: t("onboarding.summary.integrations", { count: integraciones() }) },
+                { hecho: true, texto: t("onboarding.summary.integrations", { count: integraciones() }) },
                 { hecho: plugins().instalados > 0, enCurso: plugins().instalando > 0, texto: resumenPlugins() },
               ]}
             />
