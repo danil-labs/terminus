@@ -5,7 +5,7 @@ import { capabilities } from "../../lib/platform";
 import { Button } from "../../ui/Button";
 import { FailureNote, asFailure, prosaDe } from "../../ui/Failure";
 import { crearConexiones } from "./connect-store";
-import { Comprobacion, MapaDeConexiones, nombreDeFila, PanelDeIA } from "./ConnectAI";
+import { Comprobacion, MapaDeConexiones, PanelDeIA } from "./ConnectAI";
 import { crearWorkspace } from "./onboarding-store";
 import Personalizar from "./Personalize";
 import { CabeceraDelAlta } from "./Phases";
@@ -91,7 +91,7 @@ export default function Onboarding(props: {
                             texto: conectadas().length
                               ? t("onboarding.check.ai_connected", {
                                   count: conectadas().length,
-                                  names: conectadas().map(nombreDeFila).join(", "),
+                                  names: conectadas().map(conexiones.nombre).join(", "),
                                 })
                               : t("onboarding.check.ai_pending"),
                           },
@@ -121,7 +121,7 @@ export default function Onboarding(props: {
       >
         <Personalizar
           workspace={workspace()}
-          ia={conectadas().map(nombreDeFila)}
+          ia={conectadas().map(conexiones.nombre)}
           onAtras={() => setPaso("ia")}
           onListo={props.onListo}
         />

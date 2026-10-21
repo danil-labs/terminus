@@ -13,10 +13,11 @@ import { Badge } from "../../ui/Badge";
 import { Button } from "../../ui/Button";
 import { RemoveButton } from "../../ui/IconAction";
 import { Input } from "../../ui/Input";
-import { MarcaAgente, TerminusMark } from "../../ui/icons";
+import { MarcaAgente } from "../../ui/icons";
+import { TerminusMark } from "../../ui/toolMarks";
 import { Spinner } from "../../ui/Spinner";
 import { Consentir } from "../settings/Accounts";
-import type { Conexiones, Fila, Paso } from "./connect-store";
+import { type Conexiones, type Fila, nombreDeFila, type Paso } from "./connect-store";
 
 type Nodo = "off" | "det" | "vivo" | "on";
 
@@ -24,14 +25,6 @@ function nodo(p: Paso | undefined): Nodo {
   if (p?.k === "conectada") return "on";
   if (p && ["descargando", "entrando", "clave", "comprobando", "saliendo"].includes(p.k)) return "vivo";
   return p?.k === "instalada" ? "det" : "off";
-}
-
-/** El nombre de la fila; la de OpenCode con clave es la de Zen y Go, y la local nombra lo que da. */
-export function nombreDeFila(f: Fila) {
-  if (f.modo === "local") return t("onboarding.ai.local.name");
-  if (f.agente === "antigravity" && f.modo === "sesion") return t("onboarding.ai.antigravity");
-  if (f.agente.startsWith("opencode") && (f.modo === "clave" || f.modo === "sesion")) return "OpenCode";
-  return f.label;
 }
 
 function nombreCorto(f: Fila) {

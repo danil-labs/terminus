@@ -1,5 +1,20 @@
 import { listen } from "../../lib/serviceEvents";
-import { createEffect, createSignal, For, type JSX, lazy, Match, on, onCleanup, onMount, Show, Switch } from "solid-js";
+import {
+  createEffect,
+  createSignal,
+  For,
+  getOwner,
+  type JSX,
+  lazy,
+  Match,
+  on,
+  onCleanup,
+  onMount,
+  runWithOwner,
+  Show,
+  Suspense,
+  Switch,
+} from "solid-js";
 import { connected } from "../../lib/engineConnection";
 import { elapsed, mb, peso } from "../../lib/format";
 import { t } from "../../lib/i18n";
@@ -10,21 +25,10 @@ import { cn } from "../../lib/utils";
 import { Button } from "../../ui/Button";
 import { asFailure, FailureNote, prosaDe } from "../../ui/Failure";
 import { Toast, ToastPortal } from "../../ui/Toast";
-import { crearConexiones } from "../onboarding/connect-store";
-import { Comprobacion, MapaDeConexiones, nombreDeFila, PanelDeIA } from "../onboarding/ConnectAI";
+import type { Conexiones } from "../onboarding/connect-store";
 import { crearWorkspace } from "../onboarding/onboarding-store";
-import Personalizar from "../onboarding/Personalize";
 import { CabeceraDelAlta } from "../onboarding/Phases";
-import {
-  type EstadoDeEtapa,
-  type FilaDeEtapa,
-  type Instalacion,
-  type Linea,
-  SelectorDeVista,
-  type Vista,
-  VistaSencilla,
-  VistaTerminal,
-} from "../onboarding/Prepare";
+import type { EstadoDeEtapa, FilaDeEtapa, Instalacion, Linea, Vista } from "../onboarding/Prepare";
 import { Escenario, QUIETO, TituloCambiante } from "../onboarding/Stage";
 import { type EnvReport, ORIGEN_APP, ORIGEN_BUNDLE, ORIGEN_SISTEMA } from "./environment-store";
 
@@ -57,6 +61,14 @@ const CON_DESCRIPCION = new Set(["pnpm", "bun", "agent-browser", "uv", "python"]
 
 // Una computadora gestionada llega preparada: en el navegador solo se ve su estado.
 const PreparacionGestionada = lazy(() => import("../../web/ManagedSetup"));
+// Conectar la IA y personalizar solo se cargan en el primer arranque: la carga inicial está en su techo.
+const MapaDeConexiones = lazy(() => import("../onboarding/ConnectAI").then((m) => ({ default: m.MapaDeConexiones })));
+const PanelDeIA = lazy(() => import("../onboarding/ConnectAI").then((m) => ({ default: m.PanelDeIA })));
+const Comprobacion = lazy(() => import("../onboarding/ConnectAI").then((m) => ({ default: m.Comprobacion })));
+const Personalizar = lazy(() => import("../onboarding/Personalize"));
+const SelectorDeVista = lazy(() => import("../onboarding/Prepare").then((m) => ({ default: m.SelectorDeVista })));
+const VistaSencilla = lazy(() => import("../onboarding/Prepare").then((m) => ({ default: m.VistaSencilla })));
+const VistaTerminal = lazy(() => import("../onboarding/Prepare").then((m) => ({ default: m.VistaTerminal })));
 
 export default function Setup(props: { children: JSX.Element }) {
   if (!capabilities().localSetup) return <PreparacionGestionada>{props.children}</PreparacionGestionada>;
@@ -86,7 +98,8 @@ export default function Setup(props: { children: JSX.Element }) {
   let log: HTMLPreElement | undefined;
   let tope = { total: 0, valor: 0 };
 
-  const conexiones = crearConexiones();
+  const [conexiones, setConexiones] = createSignal<Conexiones | null>(null);
+  const dueño = getOwner();
 
   const consejos = () => [
     [t("setup.tips.agents.title"), t("setup.tips.agents.body")],
@@ -524,8 +537,12 @@ export default function Setup(props: { children: JSX.Element }) {
         const w = await crearWorkspace(t("onboarding.workspace.default"));
         setWorkspace({ id: w.id, nombre: t("onboarding.workspace.default") });
       }
+      if (!conexiones()) {
+        const { crearConexiones } = await import("../onboarding/connect-store");
+        runWithOwner(dueño, () => setConexiones(crearConexiones()));
+      }
       setPaso("ia");
-      void conexiones.cargar();
+      void conexiones()?.cargar();
     } catch (e) {
       setFallo(prosaDe(e));
     } finally {
@@ -535,7 +552,8 @@ export default function Setup(props: { children: JSX.Element }) {
 
   const alta = () => hayEspacio() === false;
   const ia = () => paso() === "ia";
-  const conectadas = () => conexiones.conectadas();
+  const conectadas = () => conexiones()?.conectadas() ?? [];
+  const nombres = () => conectadas().map((f) => conexiones()?.nombre(f) ?? f.label);
 
   const titulo = () => {
     if (ia()) return t("onboarding.ai.title");
@@ -593,7 +611,8 @@ export default function Setup(props: { children: JSX.Element }) {
             </div>
           }
         >
-          <MapaDeConexiones c={conexiones} />
+          <Suspense>
+          <Show when={conexiones()}>{(c) => <MapaDeConexiones c={c()} />}</Show>
           <div class="mt-4 border-t border-border pt-4">
             <Comprobacion
               filas={[
@@ -603,7 +622,7 @@ export default function Setup(props: { children: JSX.Element }) {
                   texto: conectadas().length
                     ? t("onboarding.check.ai_connected", {
                         count: conectadas().length,
-                        names: conectadas().map(nombreDeFila).join(", "),
+                        names: nombres().join(", "),
                       })
                     : t("onboarding.check.ai_pending"),
                 },
@@ -611,6 +630,7 @@ export default function Setup(props: { children: JSX.Element }) {
               ]}
             />
           </div>
+          </Suspense>
         </Show>
       </div>
     </>
@@ -622,6 +642,7 @@ export default function Setup(props: { children: JSX.Element }) {
   const derecha = () => (
     <div class="relative min-h-0 flex-1">
       <div class={cn(CAPA, ia() && "pointer-events-none -translate-x-[90px] opacity-0")} inert={ia() || undefined}>
+        <Suspense>
         <SelectorDeVista class="self-end" vista={vista()} onCambiar={setVista} />
         {/* Las dos vistas siguen montadas: cambiar de una a otra no pierde el desplazamiento ni la corrida. */}
         <div class={cn("min-h-0 flex-1 flex-col", vista() === "sencilla" ? "flex" : "hidden")}>
@@ -630,10 +651,13 @@ export default function Setup(props: { children: JSX.Element }) {
         <div class={cn("min-h-0 flex-1 flex-col", vista() === "terminal" ? "flex" : "hidden")}>
           <VistaTerminal i={instalacion()} onInstalar={(n) => void instalarOpcional(n)} ref={(el) => (log = el)} />
         </div>
+        </Suspense>
       </div>
       <Show when={alta()}>
         <div class={cn(CAPA, !ia() && "pointer-events-none translate-x-[70px] opacity-0")} inert={!ia() || undefined}>
-          <PanelDeIA c={conexiones} />
+          <Suspense>
+            <Show when={conexiones()}>{(c) => <PanelDeIA c={c()} />}</Show>
+          </Suspense>
         </div>
       </Show>
     </div>
@@ -738,12 +762,14 @@ export default function Setup(props: { children: JSX.Element }) {
               </>
             }
           >
-            <Personalizar
-              workspace={workspace()}
-              ia={conectadas().map(nombreDeFila)}
-              onAtras={() => setPaso("ia")}
-              onListo={() => setSeguir(true)}
-            />
+            <Suspense>
+              <Personalizar
+                workspace={workspace()}
+                ia={nombres()}
+                onAtras={() => setPaso("ia")}
+                onListo={() => setSeguir(true)}
+              />
+            </Suspense>
           </Show>
         </main>
       </Match>

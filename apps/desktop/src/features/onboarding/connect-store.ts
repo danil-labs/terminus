@@ -52,6 +52,14 @@ const posicion = (id: string) => {
   return i < 0 ? ORDEN.length : i;
 };
 
+/** El nombre de la fila; la de OpenCode con clave es la de Zen y Go, y la local nombra lo que da. */
+export function nombreDeFila(f: Fila) {
+  if (f.modo === "local") return t("onboarding.ai.local.name");
+  if (f.agente === "antigravity" && f.modo === "sesion") return t("onboarding.ai.antigravity");
+  if (f.agente.startsWith("opencode") && (f.modo === "clave" || f.modo === "sesion")) return "OpenCode";
+  return f.label;
+}
+
 export function crearConexiones() {
   const [filas, setFilas] = createSignal<Fila[]>([]);
   const [pasos, setPasos] = createStore<Record<string, Paso>>({});
@@ -414,6 +422,7 @@ export function crearConexiones() {
     guardando,
     cargada,
     conectadas,
+    nombre: nombreDeFila,
     cargar,
     conectar,
     cancelar,

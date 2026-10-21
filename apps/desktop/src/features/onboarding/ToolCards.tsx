@@ -11,7 +11,8 @@ import { Button } from "../../ui/Button";
 import { prosaDe } from "../../ui/Failure";
 import { CancelButton, RemoveButton } from "../../ui/IconAction";
 import { Input } from "../../ui/Input";
-import { BitbucketMark, MarcaPlugin, MarcaProveedor } from "../../ui/icons";
+import { BitbucketMark, MarcaProveedor } from "../../ui/icons";
+import { GoogleDriveMark, MarcaPlugin } from "../../ui/toolMarks";
 import { Spinner } from "../../ui/Spinner";
 
 type Wait = { code: string; url: string };
@@ -55,6 +56,11 @@ const RECOMENDADOS = ["drawio", "typst"];
 const ORDEN_PLUGINS = ["drawio", "typst", "libreoffice", "agentsview", "computer-use"];
 const CON_PESO = new Set(["drawio", "typst", "libreoffice", "computer-use"]);
 const descripcion = (id: string) => t(`onboarding.tools.about.${id}`);
+
+/** Drive no es un servicio de código ni un MCP conocido: su marca vive con las de los plugins. */
+function MarcaIntegracion(props: { id: string; size?: number }) {
+  return props.id === "drive" ? <GoogleDriveMark size={props.size} /> : <MarcaProveedor id={props.id} size={props.size} />;
+}
 
 /** «Ver más»: texto al aire, los íconos de lo escondido encimados en diagonal y la flecha. */
 export function VerMas(props: { abierto: boolean; resto: { id: string; nombre: string; icono: JSX.Element }[]; onClick: () => void }) {
@@ -292,7 +298,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
         )}
       >
         <span class="grid size-[26px] shrink-0 place-items-center rounded-md bg-surface-muted text-neutral-950">
-          <MarcaProveedor id={p.i.id} size={15} />
+          <MarcaIntegracion id={p.i.id} size={15} />
         </span>
         <span class="grid min-w-0 flex-1 gap-px">
           <strong class="truncate text-[13px] font-semibold text-neutral-950">{p.i.nombre}</strong>
@@ -413,7 +419,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
       </Show>
       <VerMas
         abierto={verMas()}
-        resto={escondidas().map((i) => ({ id: i.id, nombre: i.nombre, icono: <MarcaProveedor id={i.id} size={12} /> }))}
+        resto={escondidas().map((i) => ({ id: i.id, nombre: i.nombre, icono: <MarcaIntegracion id={i.id} size={12} /> }))}
         onClick={() => setVerMas((v) => !v)}
       />
     </>
