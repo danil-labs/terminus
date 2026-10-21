@@ -11,7 +11,7 @@
  * si la persona quitó la imagen, sin ruta.
  */
 import { type ChatBackgroundChange, chatBackgroundView } from "@terminus/protocol";
-import { VELO_DE_FONDO, fondoDe, type FondoDeChat } from "./chat-background.ts";
+import { VELO_DE_FONDO, VELO_DE_PANELES, VELO_DE_PESTANAS, fondoDe, type FondoDeChat } from "./chat-background.ts";
 import * as store from "./chat-background-store.ts";
 import { invoke } from "./invoke.ts";
 
@@ -45,8 +45,9 @@ let lectura = 0;
 
 /**
  * Al abrir un workspace: su fondo y sus velos, de su motor. Sin nada elegido
- * ni en el workspace ni en la máquina vuelve el patrón de la app, sin imagen.
- * Un motor que no conoce la orden deja lo de esta ventana.
+ * ni en el workspace ni en la máquina vuelve el patrón de la app, sin imagen y
+ * con los velos de la app: nada se hereda del workspace anterior. Un motor que
+ * no conoce la orden deja lo de esta ventana.
  */
 export async function cargarFondoDelWorkspace(workspace: string | null): Promise<void> {
   const esta = ++lectura;
@@ -68,6 +69,9 @@ export async function cargarFondoDelWorkspace(workspace: string | null): Promise
   const nada = !r.data_url && !vista.preset && r.veil == null;
   if (nada) {
     store.elegirFondoDeChat("dusk");
+    store.elegirVeloDeFondo(VELO_DE_FONDO);
+    store.elegirVeloDePestanas(VELO_DE_PESTANAS);
+    store.elegirVeloDePaneles(VELO_DE_PANELES);
     return;
   }
   store.setImagenDelWorkspace(vista.image);

@@ -21,7 +21,8 @@ test("las filas y el activo que no están vinculados se quitan", () => {
   assert.deepEqual(onlyLinked([{ id: "w1" }, { id: "w2" }], linked), [{ id: "w1" }]);
   assert.deepEqual(onlyLinked([{ id: "w1" }, { id: "w2" }], null), [{ id: "w1" }, { id: "w2" }]);
   const listing = { workspaces: [{ id: "w1", name: "Uno" }, { id: "w2", name: "Dos" }], active: "w2", extra: 1 };
-  assert.deepEqual(linkedListing(listing, linked), { workspaces: [{ id: "w1", name: "Uno" }], active: null, extra: 1 });
+  assert.deepEqual(linkedListing(listing, linked), { workspaces: [{ id: "w1", name: "Uno" }], active: "w1", extra: 1 }, "un activo sin vincular pasa al primero que queda, como en el relay");
+  assert.equal(linkedListing({ ...listing, workspaces: [{ id: "w2", name: "Dos" }] }, linked).active, null, "sin ninguno vinculado no hay activo");
   assert.deepEqual(linkedListing({ ...listing, active: "w1" }, linked).active, "w1");
   assert.equal(linkedListing(listing, null), listing);
   assert.equal(linkedListing(null, linked), null);
