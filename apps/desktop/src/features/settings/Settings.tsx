@@ -222,8 +222,9 @@ const destinosDe = (
     ? [
         {
           id: "cuenta-danil",
+          // En el escritorio, una sesión por cuenta; la web entra con una sola.
           get name() {
-            return t("settings.nav.danil_account");
+            return capabilities().accountProfile ? t("settings.nav.danil_account") : t("settings.nav.danil_accounts");
           },
           icono: () => <CircleUserRound size={15} />,
           panel: () => (

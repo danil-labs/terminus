@@ -74,5 +74,18 @@
   "danil.error.invalid_workspace_id": "Ese id de workspace no es válido.",
   "danil.error.workspace_not_found": "Ese workspace no está en tu cuenta de Danil.",
   "danil.error.account_not_found": "Esa cuenta ya no tiene sesión en esta computadora. Vuelve a iniciar sesión con ella.",
-  "danil.error.workspace_id_taken": "Este workspace sigue siendo de la otra cuenta. Inicia sesión con esa cuenta en esta computadora para moverlo."
+  "danil.error.workspace_id_taken": "Este workspace sigue siendo de la otra cuenta. Inicia sesión con esa cuenta en esta computadora para moverlo.",
+  "danil.accounts.title": "Cuentas de Danil",
+  "danil.accounts.description": "Cada workspace es de una cuenta de Danil y se sincroniza solo con ella: se ve en la web y el teléfono de esa cuenta, nunca en otra. Los workspaces nuevos son de la cuenta principal.",
+  "danil.accounts.default": "Principal",
+  "danil.accounts.make_default": "Usar como principal",
+  "danil.accounts.add": "Agregar otra cuenta",
+  "danil.accounts.adding_hint": "Se abrió la página de Danil. Inicia sesión ahí con la otra cuenta y confirma.",
+  "danil.accounts.online": "En línea",
+  "danil.accounts.offline": "Sin conexión por ahora",
+  "danil.accounts.row": "{status} · {workspaces}",
+  "danil.accounts.workspaces": {
+    "one": "{count} workspace",
+    "other": "{count} workspaces"
+  }
 }
