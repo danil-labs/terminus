@@ -19,6 +19,7 @@ import type {
   PendingRequests,
   PermissionModeOption,
   Project,
+  ProjectCloneEvent,
   ProviderInfo,
   ProviderModels,
   Question,
@@ -604,4 +605,74 @@ export function noticer(host: string, initial: WorkspaceAttention[] = []) {
       return [];
     },
   };
+}
+
+// --- Carpetas nuevas -----------------------------------------------------------
+
+/** Dónde crea y clona carpetas esa máquina (`SELDON_PROJECTS_DIR` en una VM administrada). */
+export async function projectDirectoryOf(host: Host, workspace: string): Promise<string | null> {
+  const at = { cachedAt: null as number | null };
+  return read<string | null>(host, "get_project_directory", workspace, {}, null, at).catch(() => null);
+}
+
+/** «Nueva carpeta»: una carpeta vacía en la carpeta de proyectos de la máquina. */
+export async function createFolder(host: Host, workspace: string, name: string, space: string | null): Promise<Project> {
+  const { value } = await host.call<Project>("create_project", workspace, { name, space });
+  return value;
+}
+
+/** Cada cuánto se pregunta por el clon, por si se perdió un evento con la conexión caída. */
+export const CLONE_STATUS_EVERY = 5_000;
+
+/**
+ * «Clonar repo»: `start_project_clone` contesta enseguida y el clon sigue en la
+ * máquina; el avance llega en el evento `project_clone` y, si se pierde,
+ * `project_clone_status` lo recupera. Resuelve con la carpeta o rechaza con el
+ * error del motor (`clone_cancelled` si se canceló). `operation` es un UUID:
+ * repetirlo no clona dos veces.
+ */
+export async function cloneRepo(
+  host: Host,
+  workspace: string,
+  args: { operation: string; url: string; name: string; space: string | null },
+  onProgress: (event: ProjectCloneEvent) => void,
+  every = CLONE_STATUS_EVERY,
+): Promise<Project> {
+  let ended = false;
+  let finish: (event: ProjectCloneEvent) => void = () => {};
+  const finished = new Promise<ProjectCloneEvent>((done) => {
+    finish = (event) => {
+      ended = true;
+      done(event);
+    };
+  });
+  const seen = (event: ProjectCloneEvent | null | undefined) => {
+    if (ended || !event || event.operation !== args.operation) return;
+    if (event.done) finish(event);
+    else onProgress(event);
+  };
+  const off = host.onEvents((events) => {
+    for (const event of events) if (event.name === "project_clone") seen(event.payload as ProjectCloneEvent);
+  });
+  let timer: ReturnType<typeof setInterval> | undefined;
+  try {
+    await host.call("start_project_clone", workspace, { ...args, workspace, directory: null, portfolio: null, gitHost: null, id: null });
+    const ask = async () => {
+      const answer = await host.call<ProjectCloneEvent | null>("project_clone_status", workspace, { operation: args.operation, workspace }).catch(() => null);
+      if (answer && answer.value === null && !ended) finish({ operation: args.operation, phase: "done", percent: null, done: true, error: "clone_lost" });
+      else seen(answer?.value);
+    };
+    void ask();
+    timer = setInterval(() => void ask(), every);
+    const last = await finished;
+    if (last.error || !last.project) throw new HostError("clone_failed", last.error ?? "clone_lost");
+    return last.project;
+  } finally {
+    clearInterval(timer);
+    off();
+  }
+}
+
+export function cancelClone(host: Host, workspace: string, operation: string) {
+  return host.call("cancel_project_clone", workspace, { operation, workspace });
 }

@@ -31,7 +31,7 @@ const PORT = Number(option("port", "8787"));
 const LICENSE = !process.argv.includes("--license");
 const WAKE_MS = Number(option("wake-ms", "800"));
 const TOKEN = "fake-jwt";
-const INTENT = new Set(["send_message", "inject_message", "create_project", "create_agent", "create_agent_thread", "login_account", "submit_login_code", "respond_permission", "answer_question", "answer_shell_output", "run_shell_command", "queue_ready", "resume_awaiting_quota", "recreate_task_work"]);
+const INTENT = new Set(["send_message", "inject_message", "create_project", "start_project_clone", "create_agent", "create_agent_thread", "login_account", "submit_login_code", "respond_permission", "answer_question", "answer_shell_output", "run_shell_command", "queue_ready", "resume_awaiting_quota", "recreate_task_work"]);
 const MIRROR = new Set(["workspaces_startup", "list_workspaces", "list_projects", "list_spaces", "list_live_sessions", "list_agent_status", "list_providers", "load_session", "pending_requests", "list_active_turns", "list_workspace_attention", "list_agents"]);
 
 // --- Motores --------------------------------------------------------------------
@@ -147,9 +147,52 @@ function finish(m, s) {
   emit(m, "attention", attentionOf(m.engine));
 }
 
+/** Un clon en segundo plano, como `start_project_clone`: avanza por eventos y queda en `clones`. */
+function startClone(m, args) {
+  const e = m.engine;
+  e.clones ??= new Map();
+  if (e.clones.has(args.operation)) return { operation: args.operation };
+  if (!/^(https:\/\/|git@)/.test(String(args.url))) throw { code: "operation_failed", detail: { what: { clave: "projects.error.clone_failed" }, detail: "bad url" } };
+  const report = (event) => {
+    const full = { workspace: e.ws, operation: args.operation, percent: null, done: false, ...event };
+    e.clones.set(args.operation, full);
+    emit(m, "project_clone", full);
+  };
+  report({ phase: "waiting" });
+  const steps = [{ phase: "receiving", percent: 40 }, { phase: "resolving", percent: 90 }];
+  let i = 0;
+  const timer = setInterval(() => {
+    const clone = e.clones.get(args.operation);
+    if (clone.cancelled) {
+      clearInterval(timer);
+      return report({ phase: "done", done: true, error: { what: { clave: "projects.error.clone_cancelled" }, detail: "" } });
+    }
+    if (i < steps.length) return report(steps[i++]);
+    clearInterval(timer);
+    const name = args.name || String(args.url).replace(/\.git$/, "").split("/").pop();
+    const project = { id: `p-${randomUUID().slice(0, 8)}`, name };
+    e.projects.push(project);
+    report({ phase: "done", done: true, project: { ...project, working_directory: `/home/danil/code/${name}` } });
+  }, String(args.url).includes("slow") ? 1500 : 150);
+  return { operation: args.operation };
+}
+
 function invoke(m, command, args) {
   const e = m.engine;
   switch (command) {
+    case "get_project_directory": return "/home/danil/code";
+    case "create_project": {
+      const project = { id: `p-${randomUUID().slice(0, 8)}`, name: args.name };
+      e.projects.push(project);
+      return { ...project, working_directory: `/home/danil/code/${args.name}` };
+    }
+    case "start_project_clone": return startClone(m, args);
+    case "project_clone_status": return e.clones?.get(args.operation) ?? null;
+    case "cancel_project_clone": {
+      const clone = e.clones?.get(args.operation);
+      if (clone && !clone.done) clone.cancelled = true;
+      return null;
+    }
     case "list_workspaces": return { workspaces: [{ id: e.ws, name: "Producto" }], active: e.ws };
     case "list_projects": return e.projects.map((p) => ({ ...p, working_directory: `/lab/${p.name}` }));
     case "list_spaces": return [{ id: "s1", name: null, folders: e.projects.map((p) => p.id) }];

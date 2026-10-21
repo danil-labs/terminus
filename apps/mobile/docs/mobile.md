@@ -147,7 +147,7 @@ Los avisos salen en la app, igual para los dos caminos: una tarea que entra en
 | `signin` | Entrar con la cuenta de Danil; en desarrollo, el enlace al bridge. Siempre va primero: sin sesión no se sincroniza nada, tampoco por un bridge emparejado. El bridge solo existe en desarrollo (`__DEV__`); el lab sin cuenta es en desarrollo, en Android y con `EXPO_PUBLIC_TERMINUS_BRIDGE_ONLY=1` (`BRIDGE_WITHOUT_ACCOUNT`). En iOS siempre se inicia sesión |
 | `(home)/index` | Tareas: workspace, spaces, alcance y filtro, dock de agentes y la lista plana |
 | `(home)/notifications` | «Ahora» de todas las máquinas y «Antes», lo que llegó con la app abierta |
-| `(home)/new` | Nueva tarea: el cuadro de escribir con «Ejecutar en» (la última usada, si no la VM), carpeta, rama base y agente; `!` la crea con un comando |
+| `(home)/new` | Nueva tarea: el cuadro de escribir con «Ejecutar en» (la última usada, si no la VM), carpeta, rama base y agente; `!` la crea con un comando. La hoja de Carpeta termina en «Nueva carpeta» y «Clonar repo» (ver «Carpetas nuevas») |
 | `preview` | Vista previa de una tarea (mantener pulsada su tarjeta): Abrir, Fijar, Archivar |
 | `accounts` | Proveedores de IA: cuentas por proveedor y correo, consumo, máquinas, iniciar y cerrar sesión |
 | `filter` | Hoja «Filtrar y agrupar» |
@@ -175,6 +175,7 @@ lleva su comentario allí:
 | Cuentas de IA | `list_accounts`, `account_status`, `account_limits` | `add_account`, `login_account`, `submit_login_code`, `cancel_login`, `discard_account`, `remove_account` |
 | Fondo del chat | `chat_background` | — |
 | Chat enriquecido | `tree_show` (solo el árbol `terminus-chat-visuals`), `preview_file`, `attachment_preview` | — |
+| Carpetas nuevas | `get_project_directory`, `project_clone_status` | `create_project`, `start_project_clone`, `cancel_project_clone` |
 
 **Qué enciende la VM.** El relay solo enciende con su lista de intención
 (`INTENT_COMMANDS`: escribir, crear, aprobar, `!`, iniciar sesión…). Fijar,
@@ -183,6 +184,20 @@ esas (`WAKES_FIRST` en `apps/mobile/src/lib/hosts.ts`) el teléfono pide encende
 control (`POST /v1/computers/:id/start`) y espera a que conteste antes de
 mandarlas. Marcar vista, detener o cancelar nunca encienden; abrir la app, una
 tarea, la vista previa o las cuentas tampoco.
+
+**Carpetas nuevas.** En la hoja de Carpeta de la tarea nueva, «Nueva carpeta»
+(`create_project` con nombre, sin ruta) y «Clonar repo» (dirección y nombre
+opcional) crean la carpeta en la máquina elegida en «Ejecutar en», dentro de su
+carpeta de proyectos (`get_project_directory`; en una VM administrada,
+`SELDON_PROJECTS_DIR`, `~/code`). El relay solo llama `service invoke`, que no
+abre el canal de `clone_project`: el clon se pide con `start_project_clone`
+(contesta enseguida) y sigue en la máquina; su avance llega en el evento
+`project_clone` (`waiting`, `receiving`… y al final `done` con el proyecto o el
+error) y el teléfono pregunta además `project_clone_status` cada cinco segundos
+por si se perdió un evento (`cloneRepo` en `apps/mobile/src/lib/engine.ts`).
+Cerrar la hoja no detiene el clon; «Cancelar clon» manda `cancel_project_clone`.
+Las dos son intenciones del relay: encienden la VM apagada. El space solo se
+manda a la primera máquina del workspace, como al crear una tarea.
 
 **Adjuntos.** El único camino del motor para un archivo que viene de otro
 cliente es el de pegar una imagen (`guardar_imagen_pegada`, en base64): solo
@@ -249,6 +264,12 @@ permisos (un PDF no pasa), «Mandar ahora», `!` creando una tarea, las cuentas
 juntadas por correo con su consumo, el inicio de sesión sin pantalla de Codex
 y de Claude en otra máquina y cerrar la sesión en una; marcar vista y abrir
 siguen sin encender la VM.
+
+Carpetas nuevas (2026-10-20, sin teléfono ni simulador): `npm run typecheck` y
+`npm run computers:smoke` con «Nueva carpeta» y «Clonar repo» contra el falso
+(avance por eventos, la carpeta clonada en la lista, una URL rechazada antes de
+clonar y cancelar a mitad). No se tocaron las hojas en un teléfono ni se clonó
+en una VM real.
 
 **No está comprobado:**
 

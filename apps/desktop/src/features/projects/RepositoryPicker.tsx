@@ -24,7 +24,8 @@ export default function RepositoryPicker(props: {
   workspace: string;
   disabled: boolean;
   onUrl: () => void;
-  onFolder: () => void;
+  /** Sin él no se ofrece una carpeta del disco: en otra máquina el diálogo nativo daría una ruta de esta. */
+  onFolder?: () => void;
   /** Sin él no se ofrece empezar vacía: la fuente de contexto del alta no crea carpetas. */
   onEmpty?: () => void;
   onRepository: (repo: ProjectRepository) => void;
@@ -74,7 +75,7 @@ export default function RepositoryPicker(props: {
       detail: p.connected?.identity.user ?? "",
       run: () => { setProvider(p.id); setArea(""); setQuery(""); },
     })),
-    { id: "folder", name: t("projects.add.browse"), detail: t("projects.add.browse_help"), run: props.onFolder },
+    ...(props.onFolder ? [{ id: "folder", name: t("projects.add.browse"), detail: t("projects.add.browse_help"), run: props.onFolder }] : []),
     ...(props.onEmpty ? [{ id: "empty", name: t("projects.add.empty"), detail: t("projects.add.empty_help"), run: props.onEmpty }] : []),
   ];
   const visibleChoices = () => choices().filter(c => c.name.toLowerCase().includes(query().trim().toLowerCase()));

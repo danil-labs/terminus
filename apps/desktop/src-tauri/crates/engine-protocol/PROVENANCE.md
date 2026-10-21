@@ -20,7 +20,7 @@ repositories, and `GitHostInfo`. Files on disk keep their keys; the types that
 are stored and also travel cross the contract wrapped in `Wire`, which renames
 their keys. There are no aliases. This copy is byte-identical to the engine's.
 SHA-256:
-`f36921bac810d77a0debe7dcfaf061fa33f6bb68e1f3596796db022dd3e66856`.
+`593c6503e70dac461d733dd1f1affc12df33ddd98bb8d1eb37e1d35629f51b69`.
 
 seldon-host `4e21caf` (#66) added the Danil account (321 commands, 28 events):
 `danil_connect_start`, `danil_connect_status`, `danil_connect_options`,
@@ -57,8 +57,17 @@ same id on every machine (335 commands, 28 events): `materialize_workspace`,
 when the workspace has no background of its own. This copy is the engine's
 manifest byte for byte (seldon-host dev `09b5dfd`).
 
+seldon-host dev `7569120` (#75) clones from the relay (337 commands, 29
+events): `start_project_clone` (the parameters of `clone_project` without its
+channel) answers `{operation}` and clones in the background,
+`project_clone_status` (`{operation}`) gives the last event of that clone or
+`null`, and the `project_clone` event carries `{workspace, operation, phase,
+percent, done}` plus `project` or `error` at the end. This copy is the
+engine's manifest byte for byte (seldon-host dev `7569120`), pinned in
+`seldon-runtime.lock` as `seldon-runtime-v0.2.73-7569120`.
+
 The source is `crates/engine-protocol/commands.json` in `danil-labs/seldon-host`
-(here, seldon-host dev `09b5dfd`). The engine pinned in `seldon-runtime.lock` must
+(here, seldon-host dev `7569120`). The engine pinned in `seldon-runtime.lock` must
 announce this same hash as its `contract`; the `contract` guard
 (`scripts/guards/contract.mjs`) compares the three.
 

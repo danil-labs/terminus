@@ -65,8 +65,11 @@ export const INTENT_COMMANDS: ReadonlySet<string> = new Set([
   "send_message",
   "inject_message",
   "create_project",
+  // `create_encargado` es el nombre de los motores anteriores al contrato con `agent`.
+  "create_encargado",
   "create_agent",
   "create_agent_thread",
+  "add_account",
   "login_account",
   "submit_login_code",
   "respond_permission",
@@ -76,6 +79,19 @@ export const INTENT_COMMANDS: ReadonlySet<string> = new Set([
   "queue_ready",
   "resume_awaiting_quota",
   "recreate_task_work",
+  // Clonar y crear carpetas en otra computadora, y darle acceso a un proveedor o a un host de git.
+  "start_project_clone",
+  "add_repo_url",
+  "attach_repo",
+  "start_browser_login",
+  "finish_browser_login",
+  "connect_git_host",
+  "set_api_key",
+  "add_workspace",
+  "radiant_login",
+  // Workspaces de la cuenta: crear aquí uno de la cuenta con su id y clonar un proyecto suyo.
+  "materialize_workspace",
+  "ensure_project",
 ]);
 
 /** Lecturas que el relay guarda y contesta desde su copia (`MIRROR_COMMANDS` de `computers/src/mirror.ts`). */

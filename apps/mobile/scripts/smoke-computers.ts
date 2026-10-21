@@ -27,6 +27,9 @@ import {
   archiveTask,
   baseBranchesOf,
   beginLogin,
+  cancelClone,
+  cloneRepo,
+  createFolder,
   createTask,
   defaultsFor,
   injectIntoTask,
@@ -38,6 +41,7 @@ import {
   modelsOf,
   noticer,
   permissionModesOf,
+  projectDirectoryOf,
   respondPermission,
   runShell,
   sendToTask,
@@ -279,6 +283,25 @@ const ok = (step: string) => {
     assert.ok(!(await accountsOf(mac, "claude"))?.accounts.some((a) => a.id === "a-mac-1"));
     assert.ok((await accountsOf(vm, "claude"))?.accounts.some((a) => a.id === "a-vm-1"), "en la otra máquina sigue");
     ok("cerrar la sesión en una máquina (remove_account) deja la de las demás");
+
+    // Carpetas nuevas en la máquina elegida: vacía y clonada, con su avance por eventos.
+    assert.equal(await projectDirectoryOf(vm, "w-vm"), "/home/danil/code");
+    const folder = await createFolder(vm, "w-vm", "notas", null);
+    assert.equal(folder.working_directory, "/home/danil/code/notas");
+    const phases: string[] = [];
+    const cloned = await cloneRepo(vm, "w-vm", { operation: "00000000-0000-4000-8000-000000000001", url: "https://github.com/danil/panel.git", name: "", space: null }, (e) => phases.push(e.phase), 200);
+    assert.equal(cloned.name, "panel");
+    assert.deepEqual([...new Set(phases)], ["waiting", "receiving", "resolving"], "el estado repite el último evento, no inventa otro");
+    assert.ok((await snapshotOf(vm, "w-vm")).folders.some((f) => f.id === cloned.id), "la carpeta clonada se lista");
+    await assert.rejects(
+      cloneRepo(vm, "w-vm", { operation: "00000000-0000-4000-8000-000000000002", url: "ftp://nope", name: "", space: null }, () => {}),
+      (e: HostError) => (e.detail as { what?: { clave?: string } })?.what?.clave === "projects.error.clone_failed",
+    );
+    const slow = cloneRepo(vm, "w-vm", { operation: "00000000-0000-4000-8000-000000000003", url: "https://github.com/danil/slow.git", name: "", space: null }, () => {}, 200);
+    await sleep(300);
+    await cancelClone(vm, "w-vm", "00000000-0000-4000-8000-000000000003");
+    await assert.rejects(slow, (e: HostError) => (e.detail as { what?: { clave?: string } })?.what?.clave === "projects.error.clone_cancelled");
+    ok("«Nueva carpeta» (create_project) y «Clonar repo» (start_project_clone + project_clone): avance, carpeta listada, URL rechazada y cancelar");
 
     for (const h of hosts) h.close();
   } finally {
