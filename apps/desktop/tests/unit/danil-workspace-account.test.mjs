@@ -170,6 +170,7 @@ test("a workspace whose account signed out says it is not synced", async () => {
   const signedOut = [...select(w).options].find((o) => o.value === "u_ytw");
   assert.equal(signedOut?.textContent, "alberto@yucatantechweek.mx · sin sesión");
   assert.ok(signedOut.disabled, "it cannot be chosen until it signs in again");
+  assert.equal(select(w).value, "u_ytw", "the picker still says whose it is");
   assert.deepEqual(app.fallos, []);
 });
 

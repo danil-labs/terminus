@@ -84,7 +84,12 @@ export default function WorkspaceAccount(props: { workspace: string; name: strin
           }
         >
           <Select
-            ref={picker}
+            ref={(el: HTMLSelectElement) => {
+              picker = el;
+              queueMicrotask(() => {
+                el.value = current();
+              });
+            }}
             class="max-w-xs"
             aria-label={t("danil.workspace.label", { name: props.name })}
             disabled={saving() || accounts.busy()}
