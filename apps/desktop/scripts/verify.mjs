@@ -107,6 +107,12 @@ const steps = [
     root,
   ],
   [
+    "El fondo del chat no se borra con un motor anterior ni pasa de un workspace a otro",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/chat-background-engine.test.ts")],
+    root,
+  ],
+  [
     "El nombre de un agente da un identificador que el backend acepta",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/agent-id.test.ts")],

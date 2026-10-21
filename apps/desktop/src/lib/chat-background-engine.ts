@@ -3,8 +3,8 @@
  * (`set_chat_background`) y lo devuelve al abrirlo (`chat_background`), aquí,
  * en la web y en el teléfono. `set_chat_background` reemplaza siempre el
  * patrón y el velo y deja la imagen salvo que llegue otra; la imagen se quita
- * con `choose_chat_background` sin ruta, que es también lo único que entiende
- * un motor anterior.
+ * con `choose_chat_background` sin ruta. Un motor anterior solo entiende esa
+ * orden: a él solo le llega una imagen nueva, nunca un borrado por cambiar el velo.
  */
 import { type ChatBackgroundChange, chatBackgroundView } from "@terminus/protocol";
 import { VELO_DE_FONDO, fondoDe, type FondoDeChat } from "./chat-background.ts";
@@ -17,8 +17,21 @@ async function guardarEnElMotor(cambio: ChatBackgroundChange): Promise<void> {
   try {
     await invoke("set_chat_background", { ...cambio });
   } catch {
-    await invoke("choose_chat_background", { path: cambio.path ?? null }).catch(() => {});
+    if (cambio.path) await invoke("choose_chat_background", { path: cambio.path }).catch(() => {});
   }
+}
+
+type DeLaVentana = { fondo: FondoDeChat; chat: number; tabs: number; panels: number };
+/** Lo que la ventana tenía elegido antes de pintar el fondo de un workspace: vuelve con el primero que no tiene. */
+let deLaVentana: DeLaVentana | null = null;
+
+const actual = (): DeLaVentana => ({ fondo: store.fondoDeChat(), chat: store.veloDeFondo(), tabs: store.veloDePestanas(), panels: store.veloDePaneles() });
+
+function aplicar(fondo: FondoDeChat, chat: number, tabs: number | null, panels: number | null) {
+  store.elegirFondoDeChat(fondo);
+  store.elegirVeloDeFondo(chat);
+  if (tabs !== null) store.elegirVeloDePestanas(tabs);
+  if (panels !== null) store.elegirVeloDePaneles(panels);
 }
 
 /** Lo elegido, entero: un patrón tapa la imagen guardada; la propia viaja por su ruta si es nueva. */
@@ -34,8 +47,8 @@ let lectura = 0;
 
 /**
  * Al abrir un workspace: su fondo y sus velos, de su motor. Sin nada elegido
- * ni en el workspace ni en la máquina queda lo de esta ventana; un motor que
- * no conoce la orden también lo deja como estaba.
+ * ni en el workspace ni en la máquina vuelve lo de esta ventana, no lo del
+ * workspace anterior; un motor que no conoce la orden lo deja como estaba.
  */
 export async function cargarFondoDelWorkspace(): Promise<void> {
   const esta = ++lectura;
@@ -50,12 +63,14 @@ export async function cargarFondoDelWorkspace(): Promise<void> {
   store.setImagenDelWorkspace(null);
   const vista = chatBackgroundView(respuesta);
   const nada = respuesta === null || respuesta === undefined || (!(respuesta as { data_url?: unknown }).data_url && !vista.preset && (respuesta as { veil?: unknown }).veil == null);
-  if (nada) return;
+  if (nada) {
+    if (deLaVentana) aplicar(deLaVentana.fondo, deLaVentana.chat, deLaVentana.tabs, deLaVentana.panels);
+    else deLaVentana = actual();
+    return;
+  }
+  deLaVentana ??= actual();
   store.setImagenDelWorkspace(vista.image);
-  store.elegirFondoDeChat(vista.image ? "propia" : fondoDe(vista.preset));
-  store.elegirVeloDeFondo(vista.veil.chat ?? VELO_DE_FONDO);
-  if (vista.veil.tabs !== null) store.elegirVeloDePestanas(vista.veil.tabs);
-  if (vista.veil.panels !== null) store.elegirVeloDePaneles(vista.veil.panels);
+  aplicar(vista.image ? "propia" : fondoDe(vista.preset), vista.veil.chat ?? VELO_DE_FONDO, vista.veil.tabs, vista.veil.panels);
 }
 
 /** Lo elegido en Estilo, al workspace abierto. */
