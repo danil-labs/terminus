@@ -317,7 +317,14 @@ contract, and the window cannot use an engine of another contract: it asks it
 for `status` and `service stop` anyway (`request_any_contract`), stops it as
 soon as it has no turns, downloads or operations, and until then shows how many
 tasks the previous version is finishing instead of failing with
-`service_busy`. This holds on every platform. Then the window deletes the
+`service_busy`. This holds on every platform. The screen also offers «Actualizar ya», which
+says how many tasks will be cut off and, once confirmed, asks the previous
+engine for `service stop` with `{"force": true}`: an engine that knows it
+writes those tasks to `update-resume.json`, stops their turns like Stop, and
+exits; the new engine resumes each one in its own provider session with an
+`engine_updated` line. An engine older than that ignores `force` and refuses
+with `task_busy`; the window then terminates its process, as the uninstaller
+does, and those tasks do not resume on their own. Then the window deletes the
 `old_*` files no one holds, retrying for a few seconds while the window it
 replaces exits.
 

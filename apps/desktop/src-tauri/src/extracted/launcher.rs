@@ -44,6 +44,7 @@ pub enum Phase {
     /// La versión anterior sigue con turnos; el motor nuevo entra en cuanto los termine.
     Previous {
         tasks: Option<u64>,
+        stopping: bool,
     },
     Failed {
         code: String,
@@ -195,8 +196,25 @@ fn connect(app: &tauri::AppHandle, launcher: &Launcher, paths: &engine::Paths) {
         if let Err(error) = &selected {
             if error.code == "previous_engine_busy" {
                 let tasks = error.detail["turns"].as_u64().filter(|n| *n > 0);
-                launcher.set(Phase::Previous { tasks });
-                std::thread::sleep(Duration::from_secs(2));
+                let waiting = Phase::Previous {
+                    tasks,
+                    stopping: false,
+                };
+                // «Actualizar ya» solo vale para esta pantalla: al entrar se olvida un clic anterior.
+                if matches!(launcher.phase(), Phase::Previous { .. }) {
+                    launcher.set(waiting);
+                } else {
+                    launcher.ask(waiting);
+                }
+                if launcher.consented(Duration::from_secs(2)) {
+                    launcher.set(Phase::Previous {
+                        tasks,
+                        stopping: true,
+                    });
+                    if let Err(error) = engine::force_previous(paths) {
+                        log::error!("[launcher] previous engine did not stop: {}", error.code);
+                    }
+                }
                 continue;
             }
         }

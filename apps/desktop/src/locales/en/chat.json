@@ -116,6 +116,7 @@
   "chat.next_steps.sent": "Already sent: {text}",
   "chat.command.terminal_only": "{agent} only runs {command} in its own terminal.",
   "chat.interrupted": "Interrupted",
+  "chat.engine_updated": "Continued after Terminus was updated mid-turn",
   "chat.mentions.no_match": "No matching tasks, projects or files.",
   "chat.mode.aria": "Permissions: {mode}",
   "chat.mode.listbox": "Permissions",

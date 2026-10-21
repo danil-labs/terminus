@@ -237,7 +237,7 @@ pub fn request_endpoint(
     command: &str,
     timeout: Duration,
 ) -> Result<(Endpoint, Value)> {
-    request(endpoint_path, command, timeout, true)
+    request(endpoint_path, command, json!({}), timeout, true)
 }
 
 /// Lo mismo a un motor de otro contrato, el de la versión anterior tras actualizar:
@@ -247,12 +247,25 @@ pub fn request_any_contract(
     command: &str,
     timeout: Duration,
 ) -> Result<(Endpoint, Value)> {
-    request(endpoint_path, command, timeout, false)
+    request(endpoint_path, command, json!({}), timeout, false)
+}
+
+/// «Actualizar ya»: `service stop` con `force` corta los turnos del motor anterior.
+/// Uno anterior a la orden ignora el argumento y se niega con `task_busy`.
+pub fn force_stop_any_contract(endpoint_path: &Path, timeout: Duration) -> Result<(Endpoint, Value)> {
+    request(
+        endpoint_path,
+        "service stop",
+        json!({"force": true}),
+        timeout,
+        false,
+    )
 }
 
 fn request(
     endpoint_path: &Path,
     command: &str,
+    args: Value,
     timeout: Duration,
     same_contract: bool,
 ) -> Result<(Endpoint, Value)> {
@@ -276,7 +289,7 @@ fn request(
         workspace: None,
         folder: None,
         command: command.into(),
-        args: json!({}),
+        args,
         request_id: uuid::Uuid::new_v4().to_string(),
     };
     let value = reply(exchange(&endpoint.address, &request, timeout)?)?;

@@ -34,5 +34,14 @@
   "launcher.failed.reason.adoption_required": "El motor pide adoptar los datos otra vez y no se pudo.",
   "launcher.failed.reason.engine_start_failed": "El motor se cerró al arrancar o no contestó a tiempo.",
   "launcher.previous.title": "Terminus se actualizó",
-  "launcher.previous.body": "La versión anterior termina lo que tiene en curso antes de soltar tus datos; no se corta nada. Terminus abre solo en cuanto termine."
+  "launcher.previous.body": "La versión anterior termina lo que tiene en curso antes de soltar tus datos. Terminus abre solo en cuanto termine, o puedes actualizar ya.",
+  "launcher.previous.update_now": "Actualizar ya",
+  "launcher.previous.confirm": {
+    "one": "Se va a cortar {count} tarea que está trabajando. Con el motor nuevo sigue sola donde se quedó; lo que hacía en este instante se puede perder.",
+    "other": "Se van a cortar {count} tareas que están trabajando. Con el motor nuevo siguen solas donde se quedaron; lo que hacían en este instante se puede perder."
+  },
+  "launcher.previous.confirm_unknown": "Se va a cortar lo que la versión anterior está haciendo. Las tareas siguen solas con el motor nuevo donde se quedaron; lo que hacían en este instante se puede perder.",
+  "launcher.previous.cut": "Cortar y actualizar",
+  "launcher.previous.keep_waiting": "Seguir esperando",
+  "launcher.previous.stopping": "Deteniendo la versión anterior…"
 }
