@@ -74,6 +74,7 @@ const SIN_INTERFAZ = {
   // El renombre lo hace hoy el agente con `git branch -m`; la app lo reconcilia.
   worktree_rename_branch: "el renombre al entregar aún no tiene gesto en pantalla",
   install_tool: "pnpm y Bun los instala bootstrap::prepare_runtime desde Rust; ninguna pantalla lo invoca",
+  remove_google_drive: "quitar el binario de Drive es de Configuración; el onboarding solo desconecta",
   tree_typst_target: "lo pide typst_live::typst_live_open desde el Rust de la ventana: el webview nunca da la ruta de arranque",
   danil_client_token: "lo pide proxy::account_relay_token desde el Rust de la ventana: la credencial de máquina no sale del motor",
   import_chat_background_data: "lo usaba «Usar este workspace aquí», ya borrado; el fondo llegará desde la cuenta de Danil en la fase 2 (docs/account-workspace.md)",

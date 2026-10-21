@@ -656,5 +656,16 @@
     "other": "También se borrarán sus {count} tareas, chats y artefactos."
   },
   "settings.projects.delete_no_undo": "No hay deshacer.",
-  "settings.projects.keep": "Conservarlo"
+  "settings.projects.keep": "Conservarlo",
+  "settings.google_drive.error_workspace": "Ese espacio de trabajo ya no existe.",
+  "settings.google_drive.error_save": "No se pudo guardar la conexión con Google Drive.",
+  "settings.google_drive.error_network": "No se pudo contactar a Google Drive. La conexión se conserva.",
+  "settings.google_drive.error_rejected": "Google ya no acepta esta conexión. Vuelve a conectar Google Drive.",
+  "settings.google_drive.unsupported": "Google Drive no está disponible en esta plataforma.",
+  "settings.google_drive.error_busy": "Google Drive ya se está instalando.",
+  "settings.google_drive.error_install": "No se pudo instalar la herramienta de Google Drive.",
+  "settings.google_drive.error_not_installed": "Primero instala Google Drive.",
+  "settings.google_drive.error_login": "No se pudo iniciar sesión en Google Drive.",
+  "settings.google_drive.login_cancelled": "Se canceló el inicio de sesión en Google Drive.",
+  "settings.google_drive.login_timeout": "El inicio de sesión en Google Drive tardó demasiado. Vuelve a intentarlo."
 }

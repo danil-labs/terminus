@@ -284,6 +284,12 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
     try {
       if (!d?.installed) {
         setEstados(i.id, { k: "descargando", hecho: 0, total: null });
+        void invoke<number>("install_size", { operation: "google-drive" })
+          .then((b) => {
+            const e = estados[i.id];
+            if (e?.k === "descargando" && !e.total) setEstados(i.id, { ...e, total: b });
+          })
+          .catch(() => {});
         const terminado = new Promise<AvanceDeDrive>((resolve) => (finDeDescarga = resolve));
         await invoke("install_google_drive");
         const a = await terminado;
