@@ -92,7 +92,7 @@ import ArchivedTasks from "../features/projects/ArchivedTasks";
 import BaseBranchPicker from "../features/projects/BaseBranchPicker";
 import { watchHandlerStatus, watchHandlerStatuses } from "../features/projects/handlerPresence";
 import { EmptyContext, ProjectPicker } from "../features/projects/Projects";
-import { machineName, runOnOptions } from "../features/machines/store";
+import { machineName, machines, refetchMachines, runOn, runOnOptions } from "../features/machines/store";
 // Chunk aparte: solo lo carga quien crea una tarea, no la carga inicial.
 const MachinePicker = lazy(() =>
   import("../features/machines/MachinePicker").then((m) => ({ default: m.MachinePicker })),
@@ -1184,7 +1184,8 @@ export default function App() {
   }
   /** Lo que se dice de la máquina de la tarea abierta mientras está apagada o encendiéndose. */
   const avisoDeMaquina = () => {
-    const id = sessionId();
+    // Una tarea que nace aún no tiene id: su pestaña provisional es la que se mira.
+    const id = sessionId() ?? pestanas.active();
     const waking = id ? encendiendo()[id] : undefined;
     if (waking) return t("shell.machines.waking", { name: machineName(waking) });
     const off = id ? apagadas()[id] : undefined;
@@ -5255,6 +5256,11 @@ export default function App() {
     // conteste y entrega una sola vez.
     const dormida = abierta ? apagadas()[abierta] ?? null : null;
     if (abierta && dormida) anotar(setEncendiendo, abierta, dormida);
+    // Y crear en la elegida en «Ejecutar en» si está apagada: el aviso cuelga de la pestaña que nace.
+    const lugar = projectList().find((p) => p.id === proyecto);
+    const destino = abierta ? null : runOn(workspaceActivo(), lugar);
+    const naceDormida = destino && machines().find((x) => x.id === destino)?.on === false ? destino : null;
+    if (provisional && naceDormida) anotar(setEncendiendo, provisional, naceDormida);
     try {
       // La respuesta de una persona no existe en la interfaz hasta que Rust la
       // validó y la escribió: primero persistir, y solo entonces pintarla.
@@ -5300,7 +5306,11 @@ export default function App() {
         // El escritorio que la persona tenía delante al escribirlo, sellado en el
         // mensaje; lo que llega de otro canal no trae ninguno.
         space: m.space ?? null,
-      }, abierta ? undefined : runOnOptions(workspaceActivo(), projectList().find((p) => p.id === proyecto)));
+      }, abierta ? undefined : runOnOptions(workspaceActivo(), lugar));
+      if (provisional && naceDormida) {
+        anotar(setEncendiendo, provisional, null);
+        void refetchMachines();
+      }
       if (abierta && dormida) {
         anotar(setEncendiendo, abierta, null);
         anotar(setApagadas, abierta, null);
@@ -5365,6 +5375,7 @@ export default function App() {
       return true;
     } catch (e) {
       if (abierta && dormida) anotar(setEncendiendo, abierta, null);
+      if (provisional && naceDormida) anotar(setEncendiendo, provisional, null);
       // Sin esto queda una tarea que nadie creó: la fila y la pestaña se
       // pintaron contando con que Rust aceptara el turno.
       if (provisional) {
