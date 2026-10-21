@@ -1,97 +1,131 @@
-import { lazy, Match, Show, Suspense, Switch } from "solid-js";
+import { createSignal, lazy, onMount, Show } from "solid-js";
 import { t } from "../../lib/i18n";
+import { invoke } from "../../lib/invoke.ts";
 import { capabilities } from "../../lib/platform";
-import { cn } from "../../lib/utils";
-import {
-  createFullscreen,
-  HEADER_HEIGHT,
-  isWindows,
-  needsTrafficLightPadding,
-  TRAFFIC_LIGHT_PADDING,
-  toggleMaximizeFromHeader,
-} from "../../lib/window";
-import ControlesDeVentana from "../shell/WindowControls";
-import { crearAlta, crearWorkspace } from "./onboarding-store";
-import { Fases } from "./Phases";
-import { SaltarAlta } from "./Screen";
-import Cuentas from "./steps/Accounts";
-import Proveedores from "./steps/Agents";
-import Contexto from "./steps/Context";
-import Repositorios from "./steps/Sources";
-import CarpetaDeTrabajo from "./steps/WorkFolder";
-import Espacio from "./steps/Workspace";
-
-// Una computadora gestionada llega preparada y con sus asistentes: en el navegador el alta es otra.
-const AltaGestionada = lazy(() => import("../../web/Onboarding"));
-// Chunk aparte con las frases de Danil: la carga inicial está en su techo.
-const IniciarSesionDanil = lazy(() => import("./steps/DanilSignIn"));
+import { Button } from "../../ui/Button";
+import { FailureNote, asFailure, prosaDe } from "../../ui/Failure";
+import { crearConexiones } from "./connect-store";
+import { Comprobacion, MapaDeConexiones, PanelDeIA } from "./ConnectAI";
+import { crearWorkspace } from "./onboarding-store";
+import Personalizar from "./Personalize";
+import { CabeceraDelAlta } from "./Phases";
+import { Escenario, TituloCambiante } from "./Stage";
 
 /**
- * El alta, en el orden de la propuesta de `design/onboarding-review`: proveedores
- * (globales), workspace, sus cuentas, sus repositorios, el contexto principal y la
- * primera carpeta de trabajo. La preparación la hace `Setup.tsx` antes de montar
- * la app. Agregar otro workspace empieza en el paso 3.
+ * El alta sin preparación pendiente: conectar la IA y personalizar. La primera
+ * vez la pinta `Setup.tsx` tras preparar; aquí llegan la app sin workspace y
+ * «Agregar un workspace», que necesita lo mismo: sus cuentas cuelgan de él.
  */
+// Una computadora gestionada llega preparada y con sus asistentes: en el navegador el alta es otra.
+const AltaGestionada = lazy(() => import("../../web/Onboarding"));
+
 export default function Onboarding(props: {
   nuevo?: boolean;
   onListo: () => void;
   onCancelar?: () => void;
 }) {
   if (!capabilities().localSetup) return <AltaGestionada {...props} />;
-  const alta = crearAlta(Boolean(props.nuevo));
-  const apartarSemaforo = needsTrafficLightPadding(() => true, createFullscreen());
+  const [paso, setPaso] = createSignal<"ia" | "personalizar">("ia");
+  const [workspace, setWorkspace] = createSignal<{ id: string; nombre: string } | null>(null);
+  const [fallo, setFallo] = createSignal<string | null>(null);
+  const [cancelando, setCancelando] = createSignal(false);
+  const conexiones = crearConexiones();
+  let anterior: string | null = null;
 
-  // Sin workspace la app no tiene dónde guardar nada: saltar antes del paso 3 crea uno por omisión.
-  async function configurarAMano() {
-    if (!alta.estado.workspace) await crearWorkspace(t("onboarding.manual.default_name"));
-    props.onListo();
+  async function crear() {
+    setFallo(null);
+    try {
+      anterior = (await invoke<{ active: string | null }>("list_workspaces")).active;
+      const nombre = props.nuevo ? t("onboarding.workspace.default_new") : t("onboarding.workspace.default");
+      const w = await crearWorkspace(nombre);
+      setWorkspace({ id: w.id, nombre });
+      await conexiones.cargar();
+    } catch (e) {
+      setFallo(prosaDe(e));
+    }
   }
+  onMount(() => void crear());
+
+  /** Cancelar el alta de otro workspace lo borra y deja activo el de antes. */
+  async function cancelar() {
+    setCancelando(true);
+    try {
+      const w = workspace();
+      if (anterior) await invoke("set_active_workspace", { id: anterior });
+      if (w) await invoke("remove_workspace", { id: w.id });
+      window.dispatchEvent(new CustomEvent("harness:workspace"));
+      props.onCancelar?.();
+    } catch (e) {
+      setFallo(prosaDe(e));
+      setCancelando(false);
+    }
+  }
+
+  const conectadas = () => conexiones.conectadas();
 
   return (
     <div class="flex min-h-0 flex-1 flex-col overflow-hidden bg-bg">
-      <header
-        class={cn(
-          "flex shrink-0 items-center gap-5 border-b border-border px-7 text-xs",
-          HEADER_HEIGHT,
-          apartarSemaforo() && TRAFFIC_LIGHT_PADDING,
-        )}
-        data-tauri-drag-region=""
-        onDblClick={toggleMaximizeFromHeader}
+      <CabeceraDelAlta fase={paso() === "ia" ? 0 : 1} />
+      <Show
+        when={paso() === "personalizar"}
+        fallback={
+          <>
+            <Escenario
+              izquierda={
+                <>
+                  <TituloCambiante titulo={t("onboarding.ai.title")} lede={t("onboarding.ai.lede")} />
+                  <Show when={fallo()}>
+                    {(f) => (
+                      <div class="mt-6">
+                        <FailureNote f={asFailure(f())} />
+                      </div>
+                    )}
+                  </Show>
+                  <div class="mt-auto">
+                    <MapaDeConexiones c={conexiones} />
+                    <div class="mt-4 border-t border-border pt-4">
+                      <Comprobacion
+                        filas={[
+                          {
+                            hecho: conectadas().length > 0,
+                            texto: conectadas().length
+                              ? t("onboarding.check.ai_connected", {
+                                  count: conectadas().length,
+                                  names: conectadas().map(conexiones.nombre).join(", "),
+                                })
+                              : t("onboarding.check.ai_pending"),
+                          },
+                          { hecho: false, texto: t("onboarding.check.personalize") },
+                        ]}
+                      />
+                    </div>
+                  </div>
+                </>
+              }
+              derecha={<PanelDeIA c={conexiones} />}
+            />
+            <footer class="flex flex-wrap items-center gap-2.5 border-t border-border px-5 py-3.5">
+              <Show when={props.nuevo}>
+                <Button size="sm" variant="ghost" disabled={cancelando()} onClick={() => void cancelar()}>
+                  {t("onboarding.cancel")}
+                </Button>
+              </Show>
+              <p class="m-0 text-xs text-neutral-500">{t("onboarding.ai.footer")}</p>
+              <span class="flex-1" />
+              <Button size="sm" disabled={conectadas().length === 0 || !workspace()} onClick={() => setPaso("personalizar")}>
+                {t("onboarding.continue")}
+              </Button>
+            </footer>
+          </>
+        }
       >
-        <Fases actual={alta.estado.paso === "agents" || alta.estado.paso === "danil" ? 1 : 2} />
-        <span class="flex-1 self-stretch" data-tauri-drag-region="" />
-        <Show when={isWindows()}>
-          <ControlesDeVentana />
-        </Show>
-      </header>
-
-      <SaltarAlta.Provider value={props.nuevo ? undefined : configurarAMano}>
-      <Switch>
-        <Match when={alta.estado.paso === "danil"}>
-          <Suspense fallback={<div class="flex-1" />}>
-            <IniciarSesionDanil alta={alta} />
-          </Suspense>
-        </Match>
-        <Match when={alta.estado.paso === "agents"}>
-          <Proveedores alta={alta} />
-        </Match>
-        <Match when={alta.estado.paso === "workspace"}>
-          <Espacio alta={alta} nueva={Boolean(props.nuevo)} onCancelar={props.onCancelar} />
-        </Match>
-        <Match when={alta.estado.paso === "accounts"}>
-          <Cuentas alta={alta} nueva={Boolean(props.nuevo)} />
-        </Match>
-        <Match when={alta.estado.paso === "sources"}>
-          <Repositorios alta={alta} />
-        </Match>
-        <Match when={alta.estado.paso === "context"}>
-          <Contexto alta={alta} />
-        </Match>
-        <Match when={alta.estado.paso === "workdir"}>
-          <CarpetaDeTrabajo alta={alta} onListo={props.onListo} />
-        </Match>
-      </Switch>
-      </SaltarAlta.Provider>
+        <Personalizar
+          workspace={workspace()}
+          ia={conectadas().map(conexiones.nombre)}
+          onAtras={() => setPaso("ia")}
+          onListo={props.onListo}
+        />
+      </Show>
     </div>
   );
 }

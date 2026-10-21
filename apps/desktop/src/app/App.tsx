@@ -80,11 +80,12 @@ import { arbolesDe, contiene, ubicar } from "../features/code/treeKind";
 import ColumnaDeTrabajo from "../features/code/WorkTreeColumn";
 import { esDeCodigo } from "../features/code/workdirKind";
 import Observability from "../features/observability/Observability";
-import Onboarding from "../features/onboarding/Onboarding";
 import AnadirCarpeta, { type ClonEnCurso } from "../features/projects/AddWorkdir";
 import AgentPageTasks from "../features/projects/AgentPageTasks";
 // Chunk aparte: el perfil completo de un agente solo se carga al abrirlo.
 const AgentProfile = lazy(() => import("../features/projects/AgentProfile"));
+// El alta solo se abre sin workspace o al agregar otro: no entra en la carga inicial.
+const Onboarding = lazy(() => import("../features/onboarding/Onboarding"));
 const TaskLocation = lazy(() => import("../features/chat/TaskLocation"));
 import AgentTasks, { createdTasks } from "../features/projects/AgentTasks";
 import ArchivedTasks from "../features/projects/ArchivedTasks";
@@ -3670,7 +3671,7 @@ export default function App() {
   // de un agente que manda material fuera sin pedir credencial sale vacío
   // hasta que este workspace lo consiente (`runtime/models.rs`). Sin esto, la caja de
   // chat se quedaba con la lista vacía hasta cambiar de agente y volver.
-  // Aceptar es además lo que hace aparecer «Modelos Free»: la misma consulta
+  // Aceptar es además lo que hace aparecer «Modelos gratuitos»: la misma consulta
   // que decide si se puede usar es la que hay que rehacer.
   onMount(() => {
     const refrescar = () => {
@@ -7397,7 +7398,7 @@ export default function App() {
       <Show
         when={!alta()}
         fallback={
-          <>
+          <Suspense fallback={null}>
             <Onboarding
               /* Agregar un workspace es la misma alta, no un formulario aparte: el
                  segundo cliente necesita lo mismo que el primero —sus cuentas y su
@@ -7413,7 +7414,7 @@ export default function App() {
                 window.dispatchEvent(new CustomEvent("harness:workspace"));
               }}
             />
-          </>
+          </Suspense>
         }
       >
         {/* El chasis se monta SIEMPRE, tenga o no fuente de contexto:

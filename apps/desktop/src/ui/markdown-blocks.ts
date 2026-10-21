@@ -14,6 +14,10 @@
 
 /** Abre o cierra un bloque de código: ``` o ~~~, con lo que sea detrás. */
 const FENCE = /^\s{0,3}(`{3,}|~{3,})/;
+/** Abre o cierra un bloque de fórmula: `$$` sin otro `$` en la línea. */
+const FORMULA = /^\s{0,3}(\${2,})[^$]*$/;
+/** Lo único que cierra una fórmula: los `$` y espacios. */
+const CIERRE_DE_FORMULA = /^\s{0,3}\${2,}\s*$/;
 /** Empieza un elemento de lista: `-`, `*`, `+`, `1.`, `1)`. */
 const LISTA = /^\s{0,3}([-*+]|\d{1,9}[.)])\s/;
 /** Empieza una cita. */
@@ -43,12 +47,12 @@ export function bloquesDeMarkdown(texto: string): string[] {
   let cierre = "";
 
   for (const linea of lineas) {
-    const fence = FENCE.exec(linea);
+    const fence = FENCE.exec(linea) ?? FORMULA.exec(linea);
     if (fence) {
       if (!dentroDeFence) {
         dentroDeFence = true;
         cierre = fence[1][0];
-      } else if (linea.trimStart().startsWith(cierre)) {
+      } else if (linea.trimStart().startsWith(cierre) && (cierre !== "$" || CIERRE_DE_FORMULA.test(linea))) {
         // **El cierre se compara por el carácter y no por el largo.** Markdown
         // deja cerrar con al menos tantas marcas como abrió, y un ``` dentro de
         // un ~~~~ es contenido y no un cierre.

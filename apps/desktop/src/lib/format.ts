@@ -88,3 +88,7 @@ export function peso(bytes: number) {
   // GB porque una tarea que compiló mide gigas y `4400.0 MB` no se lee.
   return `${(bytes / 1_073_741_824).toFixed(1)} GB`;
 }
+
+/** Una enumeración con la conjunción de la lengua que se pinta: «Claude Code y Codex». */
+export const lista = (items: string[]) =>
+  new Intl.ListFormat(manifiesto().formato, { type: "conjunction" }).format(items);

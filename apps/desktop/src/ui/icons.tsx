@@ -83,7 +83,7 @@ export function WorktreeRoto(props: { size?: number }) {
  * (CC0: sin atribución obligatoria ni licencia que importar); se copian los que
  * hacen falta en vez de traer el paquete entero.
  */
-function Marca(props: { size?: number; d: string; color?: string }) {
+export function Marca(props: { size?: number; d: string; color?: string }) {
   return (
     <svg
       class="block shrink-0"
