@@ -134,7 +134,7 @@ export async function boot(entorno, version, respuestas, userAgent, storage = {}
       currentWindow: { label: "main" },
       currentWebview: { windowLabel: "main", label: "main" },
     },
-    invoke: (cmd, args) => {
+    invoke: (cmd, args, options) => {
       comandos.push(cmd);
       if (cmd === "list_storage") {
         storageQueries.push(args.refrescar);
@@ -169,7 +169,8 @@ export async function boot(entorno, version, respuestas, userAgent, storage = {}
       if (cmd in respuestas) {
         const response = respuestas[cmd];
         if (response instanceof Error) return Promise.reject(response);
-        return Promise.resolve(typeof response === "function" ? response(args) : response);
+        // Con sus opciones: la cabecera `x-terminus-machine` dice a qué máquina va.
+        return Promise.resolve(typeof response === "function" ? response(args, options) : response);
       }
       return Promise.reject(new Error(`sin stub: ${cmd}`));
     },

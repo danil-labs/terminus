@@ -11,6 +11,7 @@ which is not here.
 | `packages/design` | Task states, marks, status and list words, folder colors and theme colors both apps use. | — |
 | `packages/tasks` | The task list both apps derive: flat list, filter and grouping, two-line card, agents dock. | — |
 | `packages/computers` | Danil Computers from any client: control-plane API, relay session (WebSocket injected) and wake rules. | — |
+| `packages/carry` | Carrying work between machines: what travels, the copy in parts and the base the new task starts on. | — |
 | `packages/protocol` | The closed list of commands the mobile app sends to a machine (relay or bridge) and their answers. | — |
 
 Read the guide of the area before editing it.

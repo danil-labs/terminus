@@ -79,6 +79,9 @@ importers:
       '@tauri-apps/plugin-updater':
         specifier: ^2.10.1
         version: 2.10.1
+      '@terminus/carry':
+        specifier: workspace:*
+        version: link:../../packages/carry
       '@terminus/chat':
         specifier: workspace:*
         version: link:../../packages/chat
@@ -191,6 +194,8 @@ importers:
       vite-plugin-solid:
         specifier: ^2.11.14
         version: 2.11.14(solid-js@1.9.17)(vite@6.4.4(@types/node@26.4.0)(jiti@2.7.0)(lightningcss@1.32.0))
+
+  packages/carry: {}
 
   packages/chat: {}
 

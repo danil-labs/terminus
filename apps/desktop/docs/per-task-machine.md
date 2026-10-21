@@ -186,6 +186,27 @@ corren las tareas que se crearon en ellas.
   Chip en fila y cabecera, la copia y el aviso al abrir, «Encendiendo vm…» al
   mandar, un solo `send_message`, relectura y ningún fallo.
 
+## Llevar el trabajo
+
+Elegir otra máquina en «Ejecutar en» para una carpeta de esta ventana lleva
+también lo que no está en el remoto: commits sin push, cambios sin commit y,
+si se eligen, archivos que git ignora. La ventana hace de puente entre los dos
+motores con los comandos `work_*`; la orquestación es de `packages/carry`,
+la comparten la web y el teléfono.
+
+- Al enviar el primer mensaje, `features/machines/carry.ts` pregunta
+  `work_status` al origen y si el destino tiene el proyecto. Sin nada que
+  llevar y con el proyecto allá, se manda como siempre.
+- Si no, `CarrySheet.tsx` deja elegir qué viaja; mientras tanto el origen ya
+  exporta para decir el tamaño. El mensaje espera en la caja.
+- Al enviar: `work_import {probe: true}` despierta el destino (está en `WAKES`
+  de `proxy.rs`), se clona con `start_project_clone` si falta, se copian partes
+  de 4 MiB y `send_message` crea la tarea con `baseRef` y `unwrapSnapshot`.
+  `CarryProgress.tsx` pinta los pasos y, si se detiene, el arreglo; el mensaje
+  vuelve a la caja y reintentar sigue desde la parte que faltaba.
+- Pruebas: `tests/unit/carry-work.test.ts` (orquestación contra dos motores
+  falsos) y `tests/unit/carry-window.test.mjs` (`dist/` en jsdom).
+
 ## Lo que queda
 
 - **El workspace de la cuenta**: `counterpart_workspace` y `project_on` ya

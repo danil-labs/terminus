@@ -93,11 +93,22 @@ import ArchivedTasks from "../features/projects/ArchivedTasks";
 import BaseBranchPicker from "../features/projects/BaseBranchPicker";
 import { watchHandlerStatus, watchHandlerStatuses } from "../features/projects/handlerPresence";
 import { EmptyContext, ProjectPicker } from "../features/projects/Projects";
-import { machineName, machines, refetchMachines, runOn, runOnOptions } from "../features/machines/store";
+import { carryOrigin, machineName, machines, refetchMachines, runOn, runOnOptions } from "../features/machines/store";
+import type { CarryCheck } from "../features/machines/carry";
+import type { CarryResult } from "@terminus/carry";
 // Chunk aparte: solo lo carga quien crea una tarea, no la carga inicial.
 const MachinePicker = lazy(() =>
   import("../features/machines/MachinePicker").then((m) => ({ default: m.MachinePicker })),
 );
+// Llevar el trabajo a otra máquina: solo al enviar a una que no es la de la carpeta.
+const CarrySheet = lazy(() => import("../features/machines/CarrySheet"));
+const CarryProgress = lazy(() => import("../features/machines/CarryProgress"));
+const CarryOriginLabel = lazy(() =>
+  import("../features/machines/CarryProgress").then((m) => ({ default: m.CarryOriginLabel })),
+);
+type CarryModule = typeof import("../features/machines/carry");
+/** Lo que corta un envío cuya copia se detuvo: el fallo y su arreglo quedan en el encabezado. */
+const CARRY_STOPPED = Symbol("carry-stopped");
 import VistaDeProyecto from "../features/projects/ProjectView";
 import { DEFAULT_PROFILE, displayName, notifyProfiles, watchProfiles } from "../features/projects/profiles";
 import RecentAgentChats from "../features/projects/RecentAgentChats";
@@ -5192,6 +5203,8 @@ export default function App() {
      */
     respuestas?: { manda: RespuestaEnviada[]; pinta: Respuesta[] },
     destination?: { project: string; session: string },
+    /** La copia del trabajo a la otra máquina, antes de crear la tarea allá. */
+    llevar?: (claveBorrador: string) => Promise<CarryResult | null>,
   ): Promise<boolean> {
     // Antes de cualquier `await`: es lo que impide que el despacho de
     // la cola saque dos mensajes en el mismo respiro.
@@ -5276,6 +5289,8 @@ export default function App() {
     const naceDormida = destino && machines().find((x) => x.id === destino)?.on === false ? destino : null;
     if (provisional && naceDormida) anotar(setEncendiendo, provisional, naceDormida);
     try {
+      const llevado = llevar ? await llevar(claveBorrador) : null;
+      if (llevar && !llevado) throw CARRY_STOPPED;
       // La respuesta de una persona no existe en la interfaz hasta que Rust la
       // validó y la escribió: primero persistir, y solo entonces pintarla.
       const id = await invoke<string>("send_message", {
@@ -5297,7 +5312,9 @@ export default function App() {
         sources: pendientes,
         excludedSources: excluidas,
         respuestas: respuestas?.manda ?? null,
-        baseRef: abierta ? null : selectedBase,
+        baseRef: abierta ? null : (llevado?.baseRef ?? selectedBase),
+        // La tarea nace en la foto del trabajo llevado y la deshace en cambios sin commit.
+        ...(llevado?.unwrapSnapshot ? { unwrapSnapshot: true } : {}),
         // Solo al crear: el encargado sale de haber pulsado su fila en el
         // riel, no de un selector. Una tarea ya abierta lleva el suyo
         // sellado y volver a mandarlo lo reescribiría.
@@ -5346,6 +5363,8 @@ export default function App() {
       // El turno ya tiene a qué colgarse: deja de ser «la ventana sin id».
       firmas[id] = firmas[id] ?? firmas[""] ?? null;
       modelosEnVivo[id] = modelosEnVivo[id] ?? modelosEnVivo[""] ?? null;
+      // Antes de adoptarla: su encabezado lee de dónde vino al pintarse.
+      if (llevado) carryModule()?.adoptOrigin(claveBorrador, id);
       if (!abierta) adoptarNacida(id, { provisional, proyecto, titulo: tituloProvisional(m.text), claveBorrador });
       if (!finishedTurns.has(id)) marcarViva(id);
       void signatureReady.then((signature) => {
@@ -5398,6 +5417,12 @@ export default function App() {
         olvidarPestana(provisional);
       }
       if (generation !== sessionGeneration) return false;
+      if (e === CARRY_STOPPED) {
+        // El texto vuelve a la caja: el globo se iría duplicado.
+        asentar(clave, (ms) => ms.filter((message) => message !== turnoPropio && !entrando.includes(message)));
+        setArrancando(false);
+        return false;
+      }
       if (destination && claveDe(e) === "history.error.busy") {
         asentar(clave, (ms) => ms.filter((message) => message !== turnoPropio && !entrando.includes(message)));
         marcarQuieta(destination.session);
@@ -5607,6 +5632,37 @@ export default function App() {
     return salio;
   }
 
+  const [carryModule, setCarryModule] = createSignal<CarryModule | null>(null);
+  const [hojaDeLlevar, setHojaDeLlevar] = createSignal<{ key: string; check: CarryCheck } | null>(null);
+  let decidiendoLlevar = false;
+
+  /**
+   * Antes del primer mensaje de una tarea en otra máquina: si hay trabajo sin
+   * subir o el proyecto falta allá, se abre la hoja y el mensaje espera en la
+   * caja. `plan` es que ya se eligió qué llevar y la copia corre al enviar.
+   */
+  async function decidirLlevar(draftKey: string): Promise<"none" | "sheet" | "plan" | "busy"> {
+    if (carryModule()?.carries()[draftKey]) return "plan";
+    const workspace = workspaceActivo();
+    const proyecto = projectList().find((p) => p.id === project());
+    const target = runOn(workspace, proyecto);
+    if (!workspace || !proyecto || !target || proyecto.kind !== "git") return "none";
+    if (decidiendoLlevar) return "busy";
+    decidiendoLlevar = true;
+    try {
+      const mod = carryModule() ?? (await import("../features/machines/carry"));
+      setCarryModule(() => mod);
+      const here = capabilities().windowMachine?.()?.id ?? machines().find((m) => m.active)?.id ?? "local";
+      const source = mod.sourceOf(proyecto, here);
+      const check = source ? await mod.checkCarry({ workspace, project: proyecto, source, target }) : null;
+      if (!check) return "none";
+      setHojaDeLlevar({ key: draftKey, check });
+      return "sheet";
+    } finally {
+      decidiendoLlevar = false;
+    }
+  }
+
   /** Manda si no hay turno corriendo; encola si lo hay. */
   async function mandar(attachments: string[]): Promise<boolean> {
     // Las dos listas se recortan con el mismo gesto: recortar solo las
@@ -5653,6 +5709,8 @@ export default function App() {
     }
     const draftKey = claveAbierta();
     const generation = sessionGeneration;
+    const llevar = sessionId() ? "none" : await decidirLlevar(draftKey);
+    if (llevar === "sheet" || llevar === "busy") return false;
     setInput("");
     // Salen con el texto: el globo los pinta antes de que `send_message` vuelva.
     editarBorrador(draftKey, (b) => ({ ...b, archivos: adjuntosSinMandar(b.archivos, attachments) }));
@@ -5666,7 +5724,7 @@ export default function App() {
       permission_mode: modo() || null,
       attachments,
       space: escritorio(),
-    });
+    }, undefined, undefined, llevar === "plan" ? (clave) => (carryModule() as CarryModule).runCarry(clave) : undefined);
     if (!sent && generation === sessionGeneration) {
       editarBorrador(draftKey, b => ({
         ...(b.input ? b : { ...b, input: message.text, task_mentions: message.task_mentions, recipients: message.recipients }),
@@ -6256,13 +6314,25 @@ export default function App() {
         </> : undefined}
         delegatedTask={reference => <DelegatedLaunch reference={reference} rows={delegatedRows()}
           list={delegatedList} loading={delegation.loading} error={delegationData()?.error} />}
-        coordinator={coordinatingTask() ? <div class="shrink-0 px-4 py-1">
-          <Button variant="ghost" size="sm" class="max-w-full min-w-0 shrink text-xs" data-task-coordinator
-            onClick={() => void abrirSesion(coordinatingTask()!.folder, coordinatingTask()!.task)}>
-            <ArrowLeft size={14} class="shrink-0" aria-hidden="true" />
-            <span class="truncate">{t("chat.delegation.back", { title: coordinatingTask()!.title })}</span>
-          </Button>
-        </div> : undefined}
+        coordinator={<>
+          <Show when={coordinatingTask()}>
+            <div class="shrink-0 px-4 py-1">
+              <Button variant="ghost" size="sm" class="max-w-full min-w-0 shrink text-xs" data-task-coordinator
+                onClick={() => void abrirSesion(coordinatingTask()!.folder, coordinatingTask()!.task)}>
+                <ArrowLeft size={14} class="shrink-0" aria-hidden="true" />
+                <span class="truncate">{t("chat.delegation.back", { title: coordinatingTask()!.title })}</span>
+              </Button>
+            </div>
+          </Show>
+          <Show when={!pp.sesion && carryModule()?.carries()[claveAbierta()]}>
+            <Suspense fallback={null}>
+              <CarryProgress draft={claveAbierta()} onRetry={() => void mandar(archivos())} onOpenSettings={(panel) => setSettings(panel)} />
+            </Suspense>
+          </Show>
+          <Show when={pp.sesion && carryOrigin(pp.sesion)}>
+            <Suspense fallback={null}><CarryOriginLabel session={pp.sesion ?? ""} /></Suspense>
+          </Show>
+        </>}
         location={<Show when={pp.sesion}>{(id) => {
           return <Suspense fallback={null}><TaskLocation
             machine={filaDe(id())?.machine}
@@ -7707,6 +7777,23 @@ export default function App() {
           if (activate) elegirProyecto(p.id);
         }}
       />
+
+      <Show when={hojaDeLlevar()}>
+        {(hoja) => (
+          <Suspense fallback={null}>
+            <CarrySheet
+              check={hoja().check}
+              onCancel={() => setHojaDeLlevar(null)}
+              onConfirm={(job, state) => {
+                const { key, check } = hoja();
+                carryModule()?.planCarry(key, check, { source: check.source, target: check.target, project: check.project.id, task: null, ...job }, state);
+                setHojaDeLlevar(null);
+                if (claveAbierta() === key) void mandar(archivos());
+              }}
+            />
+          </Suspense>
+        )}
+      </Show>
 
       {/* El nombre del workspace ya no se deduce de la ruta: lo lee el propio
           menú de la cabecera, que es quien sabe cuál está activo. */}

@@ -1,7 +1,7 @@
 import { createRoot, createSignal } from "solid-js";
 import { invoke } from "../../lib/invoke";
 import { t } from "../../lib/i18n";
-import { createPref } from "../../lib/prefs";
+import { createPref, escribirPref, leerPref } from "../../lib/prefs";
 import { isMac } from "../../lib/window";
 import { capabilities } from "../../lib/platform";
 
@@ -61,3 +61,16 @@ export function runOnOptions(workspace: string | null, project?: ProjectPlace) {
 
 export const machineName = (id: string, local = id === "local") =>
   local ? (isMac() ? t("shell.machines.this_mac") : t("shell.machines.this_computer")) : (capabilities().machineName?.(id) ?? id);
+
+const ORIGINS = "machines.carry_origins";
+
+/** De dónde se llevó el trabajo con el que nació una tarea (`carry.ts`). */
+export type CarryOrigin = { machine: string; branch: string | null; at: number };
+
+export const carryOrigin = (session: string): CarryOrigin | null => leerPref<Record<string, CarryOrigin>>(ORIGINS, {})[session] ?? null;
+
+export function rememberOrigin(session: string, origin: CarryOrigin) {
+  // Solo las últimas: la etiqueta es de la tarea recién llevada, no un historial.
+  const kept = Object.entries({ ...leerPref<Record<string, CarryOrigin>>(ORIGINS, {}), [session]: origin }).slice(-50);
+  escribirPref(ORIGINS, Object.fromEntries(kept));
+}
