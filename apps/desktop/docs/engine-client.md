@@ -49,16 +49,15 @@ de la barra lateral y la sección la muestran. La web no tiene la sesión de
 máquina (`danilAccount`); con `accountProfile` (`src/web/account.ts`) lee y
 cambia la misma persona en el plano de control con la sesión de Supabase.
 
-Cada workspace se sincroniza o no con la cuenta de Danil de esta computadora,
-como una carpeta que se elige para el Drive (seldon-host
-`feat/workspace-danil-link`): no hay otras cuentas ni miembros. La sección
-«Cuenta de Danil» tiene, debajo de la de la computadora, la del workspace
-abierto (`features/settings/DanilWorkspace.tsx`): un interruptor «Ver este
-workspace en la web y el teléfono» con el correo de la cuenta, que llama a
-`danil_workspace_link` (sin modo: siempre la cuenta de la máquina) y
-`danil_workspace_unlink`; `danil_workspace_link_status` dice si está
-vinculado y si la máquina tiene sesión. Los workspaces que ya existían los
-vincula el motor una vez, al reconciliar por primera vez. La web, el teléfono y
+La sincronización sigue a la sesión de Danil de esta computadora, como una
+carpeta de Drive (seldon-host `feat/workspace-danil-link`): no hay otras
+cuentas ni miembros. Con la sesión iniciada, todos los workspaces de esta
+computadora se ven en la web y el teléfono; con la sesión cerrada, ninguno. El
+motor los liga solo, los que ya existen y los nuevos. No hay interruptor por
+workspace: la sección «Cuenta de Danil» tiene solo la tarjeta de la cuenta
+(foto, esta computadora, «Cerrar sesión»), y `danil_workspace_link`,
+`danil_workspace_unlink` y `danil_workspace_link_status` quedan en el contrato
+sin interfaz (`SIN_INTERFAZ` en `scripts/guards/commands.mjs`). La web, el teléfono y
 las otras computadoras vistas desde aquí solo muestran los workspaces de
 `workspaces` en cada fila de `GET /v1/computers` (`@terminus/computers`,
 `linkedWorkspaces`); sin el campo (un plano de control anterior) no se filtra.
