@@ -307,3 +307,42 @@ test("signed in, a workspace of the account whose machine is asleep lists with t
   assert.equal(relayCalls("cmp_vm", "send_message").length, 0, "reading wakes nothing");
   assert.deepEqual(app.fallos, []);
 });
+
+const SESSION_A = { account: "u_alberto", email: "alberto@danil.ai", name: "Alberto", photo: null, computer_id: "cmp_home", computer_name: "Mi Mac", default: true, workspaces: [], status: "connected", online: true };
+const SESSION_B = { ...SESSION_A, account: "u_fdb", email: "alberto@dondebanco.org", computer_id: "cmp_home_fdb", default: false, workspaces: ["w"] };
+
+test("with one session per account, the open workspace talks as its own account", async () => {
+  const asked = [];
+  const { app, native, listed, relayCalls } = await open("desktop-account-per-workspace", {
+    computers: [{ ...HOME, computer_id: "cmp_home_fdb" }, { ...VM, state: "online" }],
+    relays: { cmp_vm: { table: remote("Panel", "Tarea de la VM"), state: "online" } },
+    token: null,
+    extra: {
+      danil_sessions: [SESSION_A, SESSION_B],
+      danil_workspace_account: { account: "u_fdb", email: "alberto@dondebanco.org", signed_in: true, linked: true },
+      account_relay_token: (args) => {
+        asked.push(args?.account ?? null);
+        return { ...TOKEN(), token: `tok-${args?.account ?? "default"}`, computer_id: "cmp_home_fdb" };
+      },
+    },
+  });
+  assert.ok(asked.length > 0 && asked.every((a) => a === "u_fdb"), `the client token is the workspace's account: ${asked}`);
+  assert.deepEqual(listed, ["Bearer tok-u_fdb"], "its computers, not the default account's");
+  assert.equal(native("danil_connect_status").length, 0, "the sessions say who this computer is");
+  assert.ok(relayCalls("cmp_vm", "list_projects").length > 0, "the account's VM is in the window");
+  assert.deepEqual(app.fallos, []);
+});
+
+test("a workspace whose account is signed out here keeps the window local", async () => {
+  const { app, f, listed } = await open("desktop-account-signed-out-workspace", {
+    relays: { cmp_vm: { table: remote("Panel", "Tarea de la VM"), state: "online" } },
+    extra: {
+      danil_sessions: [SESSION_A],
+      danil_workspace_account: { account: "u_ytw", email: "alberto@yucatantechweek.mx", signed_in: false, linked: false },
+    },
+  });
+  assert.equal(listed.length, 0, "no other account's computers");
+  assert.equal(f.relays.cmp_vm.sockets.length, 0);
+  assert.ok(!app.comandos.includes("account_relay_token"), "no token of another account is asked for");
+  assert.deepEqual(app.fallos, []);
+});

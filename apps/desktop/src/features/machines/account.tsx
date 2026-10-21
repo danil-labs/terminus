@@ -2,8 +2,11 @@
  * With the Danil account signed in, this window shows the tasks of every
  * computer of the person, as the web does (`web/transport.ts`): its own engine
  * keeps the native IPC and its ids; each other computer is one relay session.
- * Without an account, or with no other computer, nothing is installed and the
- * window is exactly the local one. Loaded lazily from `app/main.tsx`.
+ * With one session per account, it is the account of the open workspace: its
+ * client token, its computers and its registry; switching to a workspace of
+ * another account installs that one. Without an account, or with no other
+ * computer, nothing is installed and the window is exactly the local one.
+ * Loaded lazily from `app/main.tsx`.
  */
 import "../../web/phrases";
 import {
@@ -26,6 +29,7 @@ import { isMac } from "../../lib/window";
 import { Toast, ToastPortal } from "../../ui/Toast";
 import type { MachineStatus } from "../../web/fleet";
 import { type BrowserHost, createWebTransport, type WebTransport } from "../../web/transport";
+import { type DanilSessionInfo, sessionForWorkspace, type WorkspaceAccount } from "../settings/danil-sessions";
 import { MachinePicker } from "./MachinePicker";
 import { refetchMachines } from "./store";
 
@@ -113,11 +117,15 @@ export function startAccountMachines(target: Target = window) {
   // The window's own IPC under its usual name: the command guards read these two literally.
   const invoke = native;
   let token: ClientToken | null = null;
+  /** The session the fan-out talks as: the open workspace's account; `null` is the default one. */
+  let account: string | null = null;
 
   const getToken = async (): Promise<ClientToken> => {
     if (token && token.expires_at - Date.now() > TOKEN_MARGIN) return token;
-    token = (await invoke("account_relay_token", {})) as ClientToken;
-    return token;
+    const asked = account;
+    const next = (await invoke("account_relay_token", asked ? { account: asked } : {})) as ClientToken;
+    if (asked === account) token = next;
+    return next;
   };
 
   const uninstall = () => {
@@ -226,10 +234,29 @@ export function startAccountMachines(target: Target = window) {
       });
   }
 
+  /**
+   * The computer and account the open workspace talks as. An engine without
+   * `danil_sessions` has one session, the one of `danil_connect_status`.
+   */
+  async function whoAmI(): Promise<{ self: string | null; account: string | null }> {
+    const sessions = (await invoke("danil_sessions", {}).catch(() => null)) as DanilSessionInfo[] | null;
+    if (Array.isArray(sessions)) {
+      const of = (await invoke("danil_workspace_account", {}).catch(() => null)) as WorkspaceAccount | null;
+      const session = sessionForWorkspace(sessions, of);
+      return { self: session?.computer_id ?? null, account: session?.account ?? session?.computer_id ?? null };
+    }
+    const status = (await invoke("danil_connect_status", {}).catch(() => null)) as DanilStatus | null;
+    return { self: status?.state === "connected" ? (status.computer_id ?? null) : null, account: null };
+  }
+
   /** Reads the account and its computers; installs, replaces or removes the fan-out to match. */
   async function check() {
-    const status = (await invoke("danil_connect_status", {}).catch(() => null)) as DanilStatus | null;
-    const self = status?.state === "connected" ? status.computer_id : null;
+    const who = await whoAmI();
+    const self = who.self;
+    if (who.account !== account) {
+      account = who.account;
+      token = null;
+    }
     if (!self) {
       token = null;
       return uninstall();
@@ -248,23 +275,36 @@ export function startAccountMachines(target: Target = window) {
     }
     if (answer.kind !== "ok") return;
     const others = orderComputers(answer.value.filter((c) => c.computer_id !== self));
-    const key = JSON.stringify([self, client.endpoint, others.map((c) => [c.computer_id, c.name, c.contract, wakes(c), c.workspaces ?? null])]);
+    const key = JSON.stringify([self, account, client.endpoint, others.map((c) => [c.computer_id, c.name, c.contract, wakes(c), c.workspaces ?? null])]);
     if (installed?.key === key) return;
     uninstall();
     if (others.length) install(self, client.endpoint, others, key);
   }
 
-  const sync = () => {
-    syncing ??= check()
+  let again = false;
+  /** One check at a time; a request during one runs again after it, so a workspace switch is never read stale. */
+  const sync = (): Promise<void> => {
+    if (syncing) {
+      again = true;
+      return syncing;
+    }
+    syncing = check()
       .catch(() => {})
       .finally(() => {
         syncing = null;
+        if (again) {
+          again = false;
+          void sync();
+        }
       });
     return syncing;
   };
 
   void whenConnected().then(() => {
     void listen("danil-connect", () => void sync());
+    void listen("danil-sessions", () => void sync());
+    // Another workspace may belong to another account: its computers are others.
+    window.addEventListener("harness:workspace", () => void sync());
     setInterval(() => void sync(), RELIST);
     return sync();
   });
