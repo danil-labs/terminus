@@ -175,16 +175,22 @@ async function start(settings: WebSettings) {
             const answer = await computersOf(endpoint, session).catch(() => null);
             if (answer?.kind === "ok") relink(answer.value);
           };
-          setInterval(() => void relist(), RELIST);
-          document.addEventListener("visibilitychange", () => {
-            if (document.visibilityState === "visible") void relist();
-          });
+          if (!relisting) {
+            relisting = true;
+            setInterval(() => void relist(), RELIST);
+            document.addEventListener("visibilitychange", () => {
+              if (document.visibilityState === "visible") void relist();
+            });
+          }
         }}
       />
     ),
     document.getElementById("root") as HTMLElement,
   );
 }
+
+/** The re-list timer and listener are installed once per page, however many times the gate opens. */
+let relisting = false;
 
 const given = (window as Window & { terminusWeb?: TerminusWebConfig }).terminusWeb ?? {};
 const preset = given.computers ?? (given.computerId ? [{ computer_id: given.computerId, state: "unknown" }] : null);
