@@ -61,6 +61,17 @@ como la web.
   entera de la máquina, que reemplaza, o como una entrada suelta, que cambia solo
   su workspace (`mergeAttention`). Una fila sin el campo es de un plano de control
   anterior y no se filtra.
+- **La lista de workspaces es de la cuenta.** Además de lo que listan las
+  máquinas, el teléfono lee el registro de la cuenta (`GET /v1/workspaces`,
+  `listWorkspaces`) al listar las computadoras: un workspace cuyas máquinas
+  duermen y no tienen copia en el relay sigue en la lista, con sus carpetas del
+  registro en la máquina donde nacieron (`workspaceEntries`,
+  `withAccountFolders` en `engine.ts`). Lo que una máquina contesta manda; el
+  registro solo llena lo que falta. Las tareas siguen siendo de cada máquina:
+  las de una dormida salen de la copia del relay o no salen, y crear una ahí la
+  enciende. «Sin workspaces» solo se dice con el registro vacío y ninguna
+  máquina con un workspace ligado. Sin la ruta (un plano de control anterior o
+  sin red), lo de antes.
 - **El fondo de los chats es del workspace** (`chat_background`): la imagen
   propia se pinta detrás de la conversación con el velo del workspace
   (`chatBackgroundView` en `@terminus/protocol`). Los patrones del escritorio

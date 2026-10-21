@@ -1,18 +1,12 @@
-import { groupWorkspaces } from "@terminus/computers";
 import type { ProviderInfo, Space, Workspace } from "@terminus/protocol";
 import { DEFAULT_SIDEBAR_VIEW, type SidebarView, sanitizeSidebarView } from "@terminus/tasks";
 import { store } from "./store";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { type Agent, type Folder, type Task, mergeSnapshots, snapshotOf, taskKey, workspacesOf } from "./engine";
+import { type Agent, type Folder, type Task, type WorkspaceEntry, mergeSnapshots, snapshotOf, taskKey, withAccountFolders, workspaceEntries, workspacesOf } from "./engine";
 import type { Host } from "./hosts";
 import { useMachines } from "./machines";
 
-/**
- * Un workspace, quizá abierto en varias máquinas: el mismo si su id es igual
- * (`groupWorkspaces`, la regla de la web). `id` es ese id; `members`, el id en
- * cada máquina, que es el mismo.
- */
-export type WorkspaceEntry = { id: string; name: string; members: Map<string, string>; hosts: string[] };
+export type { WorkspaceEntry };
 
 /** Lo que el teléfono enseña de un workspace, juntando todas sus máquinas. */
 export type Snapshot = {
@@ -61,8 +55,8 @@ export function useWorkspaces() {
 const viewKey = (workspace: string, space: string | null) => `terminus.view.${workspace}${space ? `.${space}` : ""}`.replace(/[^\w.-]/g, "_");
 
 export function WorkspacesProvider({ children }: { children: ReactNode }) {
-  const { hosts, subscribe, rememberTitles, tick } = useMachines();
-  const [perHost, setPerHost] = useState<Record<string, Workspace[]>>({});
+  const { hosts, registry, subscribe, rememberTitles, tick } = useMachines();
+  const [perHost, setPerHost] = useState<Record<string, Workspace[] | null>>({});
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(false);
@@ -73,18 +67,18 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     void store.get(KEY).then((saved) => saved && setCurrentId((id) => id ?? saved));
   }, []);
 
-  const list = useMemo<WorkspaceEntry[]>(() => grouped(hosts, perHost), [hosts, perHost]);
+  const list = useMemo<WorkspaceEntry[]>(() => workspaceEntries(hosts, perHost, registry), [hosts, perHost, registry]);
 
   const machineCount = hosts.length;
   const reload = useCallback(async () => {
     const mine = ++asked.current;
     setLoading(true);
     try {
-      const answers = await Promise.all(hosts.map(async (host) => [host.id, (await workspacesOf(host).catch(() => ({ list: [] }))).list] as const));
+      const answers = await Promise.all(hosts.map(async (host) => [host.id, (await workspacesOf(host).catch(() => ({ list: null }))).list] as const));
       if (mine !== asked.current) return;
       const byHost = Object.fromEntries(answers);
       setPerHost(byHost);
-      const groups = grouped(hosts, byHost);
+      const groups = workspaceEntries(hosts, byHost, registry);
       const entry = groups.find((g) => g.id === currentId) ?? groups[0] ?? null;
       if ((entry?.id ?? null) !== currentId) setCurrentId(entry?.id ?? null);
       if (!entry) return setSnapshot(null);
@@ -98,13 +92,14 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         const host = hosts.find((h) => h.id === hostId);
         return host ? { machine: host.label, on: host.power() === "on" } : null;
       };
-      const merged = mergeSnapshots(parts.filter((p) => p !== null), tag);
+      // Lo que ninguna máquina contestó lo pone el registro de la cuenta: un workspace dormido abre con sus carpetas.
+      const merged = withAccountFolders(mergeSnapshots(parts.filter((p) => p !== null), tag), registry, entry.id, having.map((h) => h.id));
       rememberTitles(merged.tasks.map((task) => [taskKey(task), task.title]));
       setSnapshot(merged);
     } finally {
       if (mine === asked.current) setLoading(false);
     }
-  }, [hosts, currentId, rememberTitles, machineCount]);
+  }, [hosts, registry, currentId, rememberTitles, machineCount]);
 
   // Al cambiar las máquinas, su estado o el workspace.
   useEffect(() => {
@@ -185,11 +180,3 @@ export function spaceName(space: Space | undefined | null, fallback: string) {
   return space?.name?.trim() || fallback;
 }
 
-function grouped(hosts: { id: string }[], perHost: Record<string, Workspace[]>): WorkspaceEntry[] {
-  return groupWorkspaces(hosts.map((h) => ({ machine: h.id, rows: perHost[h.id] ?? [] }))).map((g) => ({
-    id: g.key,
-    name: g.row.name ?? g.key,
-    members: g.members,
-    hosts: [...g.members.keys()],
-  }));
-}
