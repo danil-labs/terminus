@@ -6,6 +6,8 @@ import {
   type Selection,
   CarryError,
   cancelCarry,
+  bringBranch,
+  bringSelection,
   carriesNothing,
   choosable,
   etaSeconds,
@@ -29,18 +31,28 @@ type Preview = { state: CarryState; bytes: number | null; tooLarge: boolean };
 
 const SETTLE_MS = 400;
 
+/** Lo elegido en la hoja; al traer, también la rama que lo recibe y qué hacer después. */
+export type SheetChoice = { selection: Selection; partSize: number; task: string | null; branchAs: string | null; next: "continue" | "branch" };
+
 /**
  * La hoja «Llevar a…»: qué viaja de la carpeta a la máquina donde nace la
  * tarea. Mientras se decide, el origen ya exporta la selección para decir
  * cuánto pesa; cancelar la borra. El mensaje sigue en la caja hasta enviar.
+ * Con `check.task` es la hoja «Traer…»: el worktree de una tarea de otra
+ * máquina llega aquí como una rama, sin tocar la carpeta.
  */
 export default function CarrySheet(props: {
   check: CarryCheck;
+  /** Al traer: la tarea sigue en un turno. */
+  busy?: boolean;
   onCancel: () => void;
-  onConfirm: (job: { selection: Selection; partSize: number }, state: CarryState) => void;
+  onConfirm: (choice: SheetChoice, state: CarryState) => void;
 }) {
   const s = () => props.check.status;
-  const [selection, setSelection] = createSignal<Selection>(initialSelection(props.check.status));
+  const bring = () => !!props.check.task;
+  const [selection, setSelection] = createSignal<Selection>(props.check.task ? bringSelection(props.check.status) : initialSelection(props.check.status));
+  const [next, setNext] = createSignal<"continue" | "branch">("continue");
+  const branchAs = () => (bring() ? bringBranch(s(), machineName(props.check.source)) : null);
   const [preview, setPreview] = createSignal<Preview | null>(null);
   const [copied, setCopied] = createSignal<string | null>(null);
   const source = () => machineName(props.check.source);
@@ -49,7 +61,7 @@ export default function CarrySheet(props: {
   let timer: ReturnType<typeof setTimeout> | undefined;
 
   const job = (sel: Selection) => ({
-    source: props.check.source, target: props.check.target, project: props.check.project.id, task: null, selection: sel, partSize: partSize(),
+    source: props.check.source, target: props.check.target, project: props.check.project.id, task: props.check.task?.id ?? null, selection: sel, partSize: partSize(),
   });
 
   // Cada selección es otra exportación: la anterior se borra en el origen.
@@ -97,7 +109,10 @@ export default function CarrySheet(props: {
   function confirm() {
     const p = preview();
     confirmed = true;
-    props.onConfirm({ selection: selection(), partSize: partSize() }, p?.state ?? newState(crypto.randomUUID()));
+    props.onConfirm(
+      { selection: selection(), partSize: partSize(), task: props.check.task?.id ?? null, branchAs: branchAs(), next: next() },
+      p?.state ?? newState(crypto.randomUUID()),
+    );
   }
 
   const workLine = () => {
@@ -115,38 +130,47 @@ export default function CarrySheet(props: {
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) props.onCancel(); }}>
-      <DialogContent class="max-w-[560px]" data-carry-sheet="carry">
+      <DialogContent class="max-w-[560px]" data-carry-sheet={bring() ? "bring" : "carry"}>
         <DialogTitle class="m-0 text-[0.9375rem] font-semibold">
-          {t("work.carry.title", { project: props.check.project.name, machine: target() })}
+          {bring()
+            ? t("work.bring.title", { task: props.check.task?.title ?? "", machine: source(), here: target() })
+            : t("work.carry.title", { project: props.check.project.name, machine: target() })}
         </DialogTitle>
 
         <div class="mt-3 grid grid-cols-[1fr_auto_1fr] items-start gap-3 text-xs text-neutral-500">
           <div class="min-w-0">
             <p class="m-0 font-medium text-neutral-950">{source()}</p>
-            <p class="m-0 truncate">{props.check.project.working_directory ?? props.check.project.name}</p>
+            <p class="m-0 truncate">
+              {bring() ? t("work.bring.task", { task: props.check.task?.title ?? "" }) : (props.check.project.working_directory ?? props.check.project.name)}
+            </p>
             <Show when={s().branch}>{(b) => <p class="m-0 truncate font-mono">{b()}</p>}</Show>
           </div>
           <ArrowRight size={14} class="mt-0.5" aria-hidden="true" />
           <div class="min-w-0">
             <p class="m-0 font-medium text-neutral-950">{target()}</p>
-            <p class="m-0" data-carry-target-project={props.check.hasProject === false ? "clone" : "present"}>
-              {props.check.hasProject === false ? t("work.carry.clones") : t("work.carry.present")}
-            </p>
+            <Show when={bring()} fallback={
+              <p class="m-0" data-carry-target-project={props.check.hasProject === false ? "clone" : "present"}>
+                {props.check.hasProject === false ? t("work.carry.clones") : t("work.carry.present")}
+              </p>
+            }>
+              <p class="m-0 truncate">{props.check.project.working_directory ?? props.check.project.name}</p>
+              <p class="m-0 truncate font-mono" data-carry-branch-as>{t("work.bring.branch", { branch: branchAs() ?? "" })}</p>
+            </Show>
           </div>
         </div>
 
         <section class="mt-4">
           <div class="flex items-center justify-between gap-2">
-            <h3 class="m-0 text-[13px] font-semibold">{t("work.carry.work_title")}</h3>
+            <h3 class="m-0 text-[13px] font-semibold">{bring() ? t("work.bring.work_title") : t("work.carry.work_title")}</h3>
             <Show when={workLine().length}>
               <label class={row}>
                 <Toggle
                   checked={selection().includeWork}
-                  label={t("work.carry.work_toggle")}
+                  label={bring() ? t("work.bring.toggle") : t("work.carry.work_toggle")}
                   data-carry-include-work
                   onChange={(v) => setSelection((sel) => ({ ...sel, includeWork: v }))}
                 />
-                {t("work.carry.work_toggle")}
+                {bring() ? t("work.bring.toggle") : t("work.carry.work_toggle")}
               </label>
             </Show>
           </div>
@@ -186,7 +210,31 @@ export default function CarrySheet(props: {
             <Show when={s().ignoredSkipped.length}>
               <p class="m-0 mt-1 text-xs text-neutral-500">{t("work.carry.skipped", { dirs: s().ignoredSkipped.join(", ") })}</p>
             </Show>
+            <Show when={bring() && s().ignored.length}>
+              <p class="m-0 mt-1 text-xs text-neutral-500">{t("work.bring.ignored_hint", { machine: source() })}</p>
+            </Show>
           </section>
+        </Show>
+
+        <Show when={bring()}>
+          <p class="m-0 mt-3 text-xs text-neutral-500">{t("work.bring.branch_hint", { branch: branchAs() ?? "", machine: source() })}</p>
+          <Show when={props.check.hasProject === false}>
+            <p class="m-0 mt-1 text-xs text-neutral-500">{t("work.bring.missing_project", { here: target(), project: props.check.project.name })}</p>
+          </Show>
+          <Show when={props.busy}>
+            <p class="m-0 mt-1 text-xs text-warning-strong" data-carry-busy>{t("work.bring.busy")}</p>
+          </Show>
+          <fieldset class="m-0 mt-3 flex flex-col gap-1 border-0 p-0">
+            <legend class="mb-1 p-0 text-[13px] font-semibold">{t("work.bring.then")}</legend>
+            <label class={row}>
+              <input type="radio" name="carry-next" data-carry-next="continue" checked={next() === "continue"} onChange={() => setNext("continue")} />
+              {t("work.bring.continue")}
+            </label>
+            <label class={row}>
+              <input type="radio" name="carry-next" data-carry-next="branch" checked={next() === "branch"} onChange={() => setNext("branch")} />
+              {t("work.bring.branch_only")}
+            </label>
+          </fieldset>
         </Show>
 
         <Show when={s().lfs}><p class="m-0 mt-3 text-xs text-neutral-500" data-carry-notice="lfs">{t("work.carry.lfs", { machine: target() })}</p></Show>
@@ -213,7 +261,7 @@ export default function CarrySheet(props: {
           <Show when={verdict() === "block"}>
             <Button variant="secondary" size="sm" onClick={push}>{t("work.carry.push")}</Button>
           </Show>
-          <Button size="sm" data-carry-confirm disabled={!ready()} onClick={confirm}>{t("work.carry.confirm")}</Button>
+          <Button size="sm" data-carry-confirm disabled={!ready()} onClick={confirm}>{bring() ? t("work.bring.confirm") : t("work.carry.confirm")}</Button>
         </div>
       </DialogContent>
     </Dialog>

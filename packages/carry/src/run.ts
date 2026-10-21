@@ -52,6 +52,8 @@ export type CarryJob = {
   task: string | null;
   selection: Selection;
   partSize: number;
+  /** Al traer, la rama local que recibe el trabajo. */
+  branchAs?: string | null;
 };
 
 export type CarryState = {
@@ -184,7 +186,7 @@ export async function carryWork(engine: CarryEngine, job: CarryJob, state: Carry
     }
     progress({ step: "copy" });
 
-    const args = { transfer: exported.transfer, project: job.project, sha256: exported.sha256, bytes: exported.bytes };
+    const args = { transfer: exported.transfer, project: job.project, sha256: exported.sha256, bytes: exported.bytes, ...(job.branchAs ? { branchAs: job.branchAs } : {}) };
     for (;;) {
       stop();
       try {

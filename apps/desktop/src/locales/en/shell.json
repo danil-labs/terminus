@@ -268,5 +268,7 @@
   "shell.machines.no_project_hint": "“{project}” is a folder without a remote on another machine: its tasks only run there.",
   "shell.machines.now_on": "{name} turned on",
   "shell.machines.now_off": "{name} turned off",
+  "shell.machines.bring_here_mac": "Bring to this Mac",
+  "shell.machines.bring_here_pc": "Bring to this PC",
   "shell.machines.local_only": "This opens on the task's machine, not this one."
 }

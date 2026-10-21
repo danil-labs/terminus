@@ -76,3 +76,13 @@ export const etaSeconds = (bytes: number, bytesPerSecond: number) =>
 
 /** `takenAt` en milisegundos, venga en segundos o en milisegundos. */
 export const takenAtMs = (s: Pick<WorkStatus, "takenAt">) => (s.takenAt < 1e12 ? s.takenAt * 1000 : s.takenAt);
+
+/** Al traer no se marca ningún ignorado: en la otra máquina suelen ser generados. */
+export const bringSelection = (s: WorkStatus): Selection => ({ ...initialSelection(s), files: [] });
+
+/** La rama local que recibe lo traído: la de la tarea o, sin rama, una con el nombre de la máquina. */
+export function bringBranch(s: Pick<WorkStatus, "branch" | "head">, machine: string): string {
+  if (s.branch) return s.branch;
+  const slug = machine.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "machine";
+  return `terminus/${slug}-${s.head.slice(0, 7)}`;
+}

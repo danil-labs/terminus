@@ -69,6 +69,8 @@ export type ImportArgs = {
   sha256: string;
   bytes: number;
   probe?: boolean;
+  /** Al traer: crea o adelanta esa rama; si divergió, `<rama>-<máquina>`. Nunca cambia de rama. */
+  branchAs?: string | null;
 };
 
 /**

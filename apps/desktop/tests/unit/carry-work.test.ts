@@ -19,6 +19,8 @@ import {
   newState,
   sizeVerdict,
   type WorkStatus,
+  bringBranch,
+  bringSelection,
 } from "../../../../packages/carry/src/index.ts";
 
 const status = (extra: Partial<WorkStatus> = {}): WorkStatus => ({
@@ -53,6 +55,7 @@ function fakeEngines(payload: Buffer, opts: { failWriteAt?: number[]; tooLarge?:
   };
   const failWriteAt = [...(opts.failWriteAt ?? [])];
   const exports: { full: boolean; files: string[]; exclude: string[] }[] = [];
+  const imports: Parameters<CarryEngine["importWork"]>[1][] = [];
   const engine: CarryEngine = {
     async status(machine) {
       machines[machine].calls.push("work_status");
@@ -89,6 +92,7 @@ function fakeEngines(payload: Buffer, opts: { failWriteAt?: number[]; tooLarge?:
     },
     async importWork(machine, args) {
       const m = machines[machine];
+      imports.push(args);
       if (args.probe) {
         m.calls.push("probe");
         return { head: "", base: "", branch: null, files: [], snapshot: false };
@@ -105,7 +109,7 @@ function fakeEngines(payload: Buffer, opts: { failWriteAt?: number[]; tooLarge?:
       machines[machine].transfers.delete(transfer);
     },
   };
-  return { engine, machines, exports };
+  return { engine, machines, exports, imports };
 }
 
 const PART = 256 * 1024;
@@ -215,4 +219,16 @@ test("cancelar a media copia se detiene entre partes y borra en las dos máquina
   await cancelCarry(engine, job(), state);
   assert.ok(!machines.mac.transfers.has("t-op8"));
   assert.ok(!machines.vm.transfers.has("t-op8"));
+});
+
+test("traer: sin ignorados marcados y la rama local que recibe el trabajo viaja en el import", async () => {
+  assert.deepEqual(bringSelection(status()).files, [], "al traer se marcó un ignorado");
+  assert.equal(bringBranch(status(), "vm-alberto"), "feat/run-on-bundle");
+  assert.equal(bringBranch(status({ branch: null, head: "0123456789" }), "VM Alberto"), "terminus/vm-alberto-0123456");
+  const { engine, imports } = fakeEngines(payload);
+  const back = { source: "vm", target: "mac", project: "p1", task: "t1", selection: bringSelection(status()), partSize: PART, branchAs: "feat/run-on-bundle" };
+  // El falso guarda la transferencia en la máquina que exporta: aquí, la VM.
+  await carryWork(engine, back, newState("op9"));
+  assert.equal(imports.at(-1)?.branchAs, "feat/run-on-bundle");
+  assert.equal(imports.find((a) => a.probe)?.branchAs, undefined, "despertar no lleva rama");
 });

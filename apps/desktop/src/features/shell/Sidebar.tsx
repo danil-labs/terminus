@@ -143,6 +143,8 @@ export default function Sidebar(props: {
   onArchivadas?: () => void;
   spaces?: { id: string; name: string }[];
   onMoveToSpace?: (project: string, id: string, space: string) => void;
+  /** «Traer a esta Mac» en el menú de una tarea de otra máquina; solo en el escritorio. */
+  onBringHere?: (project: string, id: string) => void;
 }) {
   const [creatingAgentIn, setCreatingAgentIn] = createSignal<{ id: string; name: string } | null>(null);
   let listViewport: HTMLDivElement | undefined;
@@ -366,6 +368,7 @@ export default function Sidebar(props: {
       onPin={props.onPin ? (s, pinned) => props.onPin?.(carpetaDe(s), s, pinned) : undefined}
       spaces={props.spaces}
       onMoveToSpace={(s, space) => props.onMoveToSpace?.(carpetaDe(s), s, space)}
+      onBringHere={props.onBringHere ? (s) => props.onBringHere?.(carpetaDe(s), s) : undefined}
       onMove={(s, to) => {
         // El grupo de destino se abre: una tarea que se mueve a una carpeta
         // plegada desaparece de la pantalla, y eso se lee como que se borró.

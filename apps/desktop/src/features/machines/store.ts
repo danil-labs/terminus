@@ -59,13 +59,23 @@ export function runOnOptions(workspace: string | null, project?: ProjectPlace) {
   return id ? { headers: { "x-terminus-machine": id } } : undefined;
 }
 
+/** «Traer a esta Mac» o «a esta PC»: solo donde hay motor local, el escritorio. */
+export const bringHereLabel = () => (isMac() ? t("shell.machines.bring_here_mac") : t("shell.machines.bring_here_pc"));
+export const canBringHere = () => !!capabilities().nativeWindow;
+
 export const machineName = (id: string, local = id === "local") =>
   local ? (isMac() ? t("shell.machines.this_mac") : t("shell.machines.this_computer")) : (capabilities().machineName?.(id) ?? id);
 
 const ORIGINS = "machines.carry_origins";
 
 /** De dónde se llevó el trabajo con el que nació una tarea (`carry.ts`). */
-export type CarryOrigin = { machine: string; branch: string | null; at: number };
+export type CarryOrigin = {
+  machine: string;
+  branch: string | null;
+  at: number;
+  /** Al traer: la tarea de la otra máquina de la que viene, para abrirla. */
+  from?: { session: string; project: string; title: string };
+};
 
 export const carryOrigin = (session: string): CarryOrigin | null => leerPref<Record<string, CarryOrigin>>(ORIGINS, {})[session] ?? null;
 

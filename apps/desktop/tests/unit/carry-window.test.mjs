@@ -180,3 +180,50 @@ test("sin nada sin subir y con el proyecto en la VM se manda como siempre, sin h
   assert.equal(log.filter((c) => c.name.startsWith("work_") && c.name !== "work_status").length, 0, "copió algo sin hoja");
   assert.deepEqual(app.fallos, []);
 });
+
+test("traer a esta Mac una tarea de la VM: la rama llega aquí y la tarea nueva sigue sobre ella con un resumen corto", async () => {
+  const log = [];
+  const row = { id: "r1", title: "Arreglar login", last_message: "", provider: "codex", model: "gpt-5.6", refs: [], created_at: 0, updated_at: 0, turns: 2, parent: null, esperando: false, machine: "vm", machine_on: true };
+  const app = await boot("listo", "carry-window-bring", responses(log, {
+    list_live_sessions: ({ project }) => (project === "p1" ? [row] : []),
+    load_session: ({ id }) => ({ id, provider: "codex", sources: [], model: "gpt-5.6", effort: null, permission_mode: null, turns: id === "r1" ? [{ role: "user", id: "u0", at: 0, text: "arregla el login" }, { role: "agent", id: "a1", at: 1, text: "Listo: el redirect vuelve a /home." }] : [] }),
+    work_import: (args, options) => {
+      log.push({ name: "work_import", machine: machineOf(options), args });
+      return args.probe ? { head: "", base: "", branch: null, files: [], snapshot: false } : { head: "a1", base: "w1", branch: "feat/run-on-bundle-vm", files: [], snapshot: true };
+    },
+    send_message: (args, options) => {
+      log.push({ name: "send_message", machine: machineOf(options), args });
+      return "l1";
+    },
+  }));
+  await sleep(600);
+  const doc = app.w.document;
+  doc.querySelector('[data-sesion="r1"]').click();
+  assert.ok(await until(() => doc.querySelector("[data-bring-here]")), "la tarea de la VM no ofrece traerla");
+  assert.match(doc.querySelector("[data-bring-here]").textContent, /^Traer a esta (Mac|PC)$/);
+  doc.querySelector("[data-bring-here]").click();
+  assert.ok(await until(() => doc.querySelector('[data-carry-sheet="bring"]')), "no se abrió la hoja de traer");
+  assert.deepEqual(log.slice(0, 2).map((c) => `${c.name}@${c.machine}${c.args.probe ? ":probe" : ""}`), ["work_import@vm:probe", "work_status@vm"], "no despertó la VM antes de preguntar");
+  assert.deepEqual(log.find((c) => c.name === "work_status").args, { project: "p1", task: "r1" });
+  assert.equal(doc.querySelector("[data-carry-branch-as]").textContent, "rama feat/run-on-bundle");
+  assert.equal(doc.querySelector('[data-carry-ignored=".env.local"]').checked, false, "al traer se marcó un ignorado");
+  assert.equal(doc.querySelector('[data-carry-next="continue"]').checked, true);
+
+  assert.ok(await until(() => doc.querySelector("[data-carry-confirm]")?.disabled === false));
+  doc.querySelector("[data-carry-confirm]").click();
+  assert.ok(await until(() => doc.querySelector("textarea")?.value.includes("Viene de «Arreglar login» en vm")), "no se abrió la tarea nueva con el resumen");
+  const summary = doc.querySelector("textarea").value;
+  assert.ok(summary.includes("Listo: el redirect vuelve a /home.") && summary.includes("3 commits en feat/run-on-bundle-vm (hasta a1)"), summary);
+  const order = log.filter((c) => c.name !== "work_status").map((c) => `${c.name}@${c.machine}${c.args.probe ? ":probe" : ""}`);
+  assert.deepEqual(order.slice(order.lastIndexOf("work_import@local:probe")), ["work_import@local:probe", "work_read_part@vm", "work_write_part@local", "work_import@local"]);
+  assert.equal(log.filter((c) => c.name === "work_export").at(-1).args.task, "r1");
+  assert.equal(log.filter((c) => c.name === "work_import").at(-1).args.branchAs, "feat/run-on-bundle");
+
+  doc.querySelector("textarea").closest("form").dispatchEvent(new app.w.Event("submit", { bubbles: true, cancelable: true }));
+  assert.ok(await until(() => log.some((c) => c.name === "send_message")), "la tarea de aquí no se creó");
+  const sent = log.find((c) => c.name === "send_message");
+  assert.deepEqual([sent.machine, sent.args.baseRef, sent.args.unwrapSnapshot], ["local", "w1", true]);
+  assert.ok(await until(() => doc.querySelector("[data-carry-origin]")?.textContent.includes("Viene de «Arreglar login» en vm")), "la tarea nueva no dice de dónde viene");
+  assert.ok(doc.querySelector("[data-carry-open-original]"), "sin enlace a la original");
+  assert.deepEqual(app.fallos, []);
+});

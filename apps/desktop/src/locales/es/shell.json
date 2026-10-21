@@ -268,5 +268,7 @@
   "shell.machines.no_project_hint": "«{project}» es una carpeta sin remoto de otra máquina: sus tareas solo corren ahí.",
   "shell.machines.now_on": "{name} se encendió",
   "shell.machines.now_off": "{name} se apagó",
+  "shell.machines.bring_here_mac": "Traer a esta Mac",
+  "shell.machines.bring_here_pc": "Traer a esta PC",
   "shell.machines.local_only": "Esto se abre en la máquina de la tarea, no en esta."
 }

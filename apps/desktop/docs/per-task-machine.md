@@ -204,6 +204,13 @@ la comparten la web y el teléfono.
   de 4 MiB y `send_message` crea la tarea con `baseRef` y `unwrapSnapshot`.
   `CarryProgress.tsx` pinta los pasos y, si se detiene, el arreglo; el mensaje
   vuelve a la caja y reintentar sigue desde la parte que faltaba.
+- «Traer a esta Mac» (solo en el escritorio, que tiene motor local), en el
+  encabezado de una tarea de otra máquina y en su menú: la misma hoja en modo
+  traer. El origen es el worktree de la tarea (`work_status {task}`), nada
+  ignorado sale marcado y `work_import {branchAs}` deja el trabajo en una rama
+  de aquí sin tocar la carpeta. «Seguir en una tarea nueva aquí» abre un
+  borrador sobre esa base con un resumen corto (título, último mensaje del
+  agente y commits) y la tarea que nace enlaza a la original.
 - Pruebas: `tests/unit/carry-work.test.ts` (orquestación contra dos motores
   falsos) y `tests/unit/carry-window.test.mjs` (`dist/` en jsdom).
 

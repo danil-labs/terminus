@@ -72,5 +72,29 @@
   "work.failure.export": "No se pudo preparar la copia en {machine}.",
   "work.failure.import": "{machine} no pudo recibir la copia.",
   "work.origin": "Copia de {machine} · {branch} · {date}",
-  "work.origin_detached": "Copia de {machine} · {date}"
+  "work.origin_detached": "Copia de {machine} · {date}",
+  "work.bring.title": "Traer «{task}» de {machine} a {here}",
+  "work.bring.task": "tarea «{task}»",
+  "work.bring.branch": "rama {branch}",
+  "work.bring.branch_hint": "Si {branch} ya existe aquí con otros commits, o está abierta en la carpeta o en un worktree, llega como {branch}-{machine}. La carpeta de aquí no se toca.",
+  "work.bring.missing_project": "{here} no tiene «{project}»: se clona primero.",
+  "work.bring.work_title": "Trabajo",
+  "work.bring.toggle": "Traer",
+  "work.bring.ignored_hint": "Ninguno sale marcado: en {machine} suelen ser generados.",
+  "work.bring.then": "Y luego",
+  "work.bring.continue": "Seguir en una tarea nueva aquí",
+  "work.bring.branch_only": "Solo dejar la rama",
+  "work.bring.busy": "El agente sigue en un turno: lo que traigas es la foto de ahora.",
+  "work.bring.confirm": "Traer",
+  "work.bring.full": "Traer completa",
+  "work.bring.done": "Traído a {here} en la rama {branch}.",
+  "work.bring.from": "Viene de «{task}» en {machine}",
+  "work.bring.open_original": "Abrir la original",
+  "work.bring.summary": "Viene de «{task}» en {machine}.",
+  "work.bring.summary_last": "Último mensaje del agente:",
+  "work.bring.summary_commits": {
+    "one": "{count} commit en {branch} (hasta {head}).",
+    "other": "{count} commits en {branch} (hasta {head})."
+  },
+  "work.progress.label_bring": "Traer a {machine}"
 }

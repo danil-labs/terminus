@@ -546,7 +546,7 @@ const steps = [
   ["En el navegador se ve la persona de la cuenta de Danil y cambia su foto", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-account.test.mjs")], root],
   ["La página de aprobación y la compatibilidad de contrato hablan con el plano de control", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/danil-connect-web.test.ts")], root],
   ["Con el stream empujado los lotes llegan a los oyentes y el historial se pagina", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/push-stream.test.mjs")], root],
-  ["Al enviar a otra máquina la hoja lleva el trabajo sin subir y la tarea nace sobre él", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/carry-window.test.mjs")], root],
+  ["Al enviar a otra máquina la hoja lleva el trabajo sin subir, y traerlo de vuelta lo deja en una rama de aquí", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/carry-window.test.mjs")], root],
   ["Una tarea de una máquina apagada abre y se enciende al mandarle algo", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/machine-task.test.mjs")], root],
   ["Con la cuenta de Danil el escritorio junta las tareas de todas sus computadoras", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/desktop-account-machines.test.mjs")], root],
   ["Sin el stream empujado la ventana sondea como siempre", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/push-fallback.test.mjs")], root],
