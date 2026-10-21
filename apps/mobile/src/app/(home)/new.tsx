@@ -1,8 +1,11 @@
+import * as Crypto from "expo-crypto";
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import type { BaseBranches } from "@terminus/protocol";
+import { carryForNewTask } from "../../lib/carry";
 import { baseBranchesOf, createTask, runShell, suggestedDefaults } from "../../lib/engine";
+import { store } from "../../lib/store";
 import { HostError } from "../../lib/hosts";
 import { t, w } from "../../lib/i18n";
 import { useMachines } from "../../lib/machines";
@@ -45,7 +48,11 @@ export default function NewTask() {
   }, [params.folder, params.agent, params.host]);
 
   const host = hostsOfCurrent.find((h) => h.id === hostId) ?? preferred(hostsOfCurrent);
-  const folders = (snapshot?.folders ?? []).filter((f) => (!space || space.folders.includes(f.key)) && f.host === host?.id);
+  const visible = (snapshot?.folders ?? []).filter((f) => !space || space.folders.includes(f.key));
+  const here = visible.filter((f) => f.host === host?.id);
+  // Una carpeta de git de otra máquina del workspace también vale: su trabajo se lleva al crear la tarea.
+  const elsewhere = visible.filter((f) => f.host !== host?.id && f.kind !== "folder" && !here.some((h) => h.id === f.id));
+  const folders = [...here, ...elsewhere.filter((f, i) => elsewhere.findIndex((x) => x.id === f.id) === i)];
   const target = folders.find((f) => f.id === folder) ?? folders[0] ?? null;
   // El id del workspace en esa máquina: cada motor tiene el suyo.
   const workspace = host ? (current?.members.get(host.id) ?? null) : null;
@@ -79,15 +86,35 @@ export default function NewTask() {
     setWaking(act === "wakes" && power !== "on");
     try {
       const spaceId = spaceOn(host.id);
-      const baseRef = branch;
+      let baseRef = branch;
+      let unwrapSnapshot = false;
+      const from = target.host !== host.id ? hostsOfCurrent.find((h) => h.id === target.host) : undefined;
+      const fromWorkspace = from ? (current?.members.get(from.id) ?? null) : null;
+      if (from && fromWorkspace && from.power() === "on" && !s.shell) {
+        setNote(t("new.carrying", { from: from.label, to: host.label }));
+        const carried = await carryForNewTask({
+          source: { host: from, workspace: fromWorkspace },
+          target: { host, workspace },
+          folder: target,
+          targetHasFolder: false,
+          pins: { get: (m) => store.get(`carry.key.${m}`), set: (m, key) => store.set(`carry.key.${m}`, key) },
+          newId: () => Crypto.randomUUID(),
+        });
+        if (carried) {
+          baseRef = carried.baseRef;
+          unwrapSnapshot = carried.unwrapSnapshot;
+        }
+        setNote(null);
+      }
       const id = s.shell
         ? (await runShell(host, workspace, { folder: target.id, session: null, command: s.command, provider: s.provider, model: s.model, effort: s.effort, permissionMode: s.permissionMode, space: spaceId, agent: chosenAgent, baseRef })).session
-        : await createTask(host, workspace, { folder: target.id, prompt: s.prompt, provider: s.provider, model: s.model, effort: s.effort, permissionMode: s.permissionMode, attachments: s.attachments, agent: chosenAgent, space: spaceId, baseRef });
+        : await createTask(host, workspace, { folder: target.id, prompt: s.prompt, provider: s.provider, model: s.model, effort: s.effort, permissionMode: s.permissionMode, attachments: s.attachments, agent: chosenAgent, space: spaceId, baseRef, unwrapSnapshot });
       rememberMachine(host.id);
       openTask(host.id, workspace, target.id, id);
       return true;
     } catch (error) {
-      if (error instanceof HostError && error.code === "machine_asleep") setNote(w("web.machines.off_action", { name: host.label }));
+      if (error instanceof HostError && error.code === "key_changed") setNote(t("new.carry_key_changed", { name: host.label }));
+      else if (error instanceof HostError && error.code === "machine_asleep") setNote(w("web.machines.off_action", { name: host.label }));
       else if (error instanceof HostError && error.code === "machine_outdated") setNote(w("web.machines.outdated_action", { name: host.label }));
       else if (error instanceof HostError && (error.code === "start_failed" || error.code === "start_timeout")) setNote(t("machines.start_failed", { name: host.label }));
       else setNote(t("task.error", { detail: error instanceof Error ? error.message : String(error) }));
@@ -190,7 +217,8 @@ export default function NewTask() {
       </Sheet>
       <Sheet visible={picker === "folder"} title={t("new.folder")} onClose={() => setPicker(null)}>
         {folders.map((f) => (
-          <SheetOption key={f.key} testID={`folder-${f.id}`} left={<FolderSquare id={f.key} size={10} />} label={f.name} detail={f.working_directory ?? null} selected={f.id === target?.id} onPress={() => {
+          <SheetOption key={f.key} testID={`folder-${f.id}`} left={<FolderSquare id={f.key} size={10} />} label={f.name}
+            detail={f.host === host?.id ? (f.working_directory ?? null) : t("new.carry_from", { name: hostsOfCurrent.find((h) => h.id === f.host)?.label ?? f.host })} selected={f.id === target?.id} onPress={() => {
             setFolder(f.id);
             setPicker(null);
           }} />

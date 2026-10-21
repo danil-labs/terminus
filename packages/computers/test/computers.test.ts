@@ -173,3 +173,15 @@ test("el contrato: igual es ok, distinto es desactualizado, sin dato no se sabe"
   assert.equal(machineCompatibility("abc", "def"), "outdated");
   assert.equal(machineCompatibility(null, "abc"), "unknown");
 });
+
+test("llevar trabajo: importar y cancelar despiertan; las partes, la llave y el export ni esperan en pending ni se copian al espejo", async () => {
+  const { INTENT_COMMANDS, MIRROR_COMMANDS } = await import("../src/index.ts");
+  assert.ok(INTENT_COMMANDS.has("work_import"));
+  assert.ok(INTENT_COMMANDS.has("work_cancel"));
+  for (const command of ["work_read_part", "work_write_part", "work_export", "work_key", "work_status"]) {
+    assert.ok(!INTENT_COMMANDS.has(command), `${command} no puede guardarse en pending:`);
+  }
+  for (const command of ["work_read_part", "work_write_part", "work_export", "work_key"]) {
+    assert.ok(!MIRROR_COMMANDS.has(command), `${command} no puede quedar en el espejo`);
+  }
+});

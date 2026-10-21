@@ -189,6 +189,7 @@ lleva su comentario allí:
 | Fondo del chat | `chat_background` | — |
 | Chat enriquecido | `tree_show` (solo el árbol `terminus-chat-visuals`), `preview_file`, `attachment_preview` | — |
 | Carpetas nuevas | `get_project_directory`, `project_clone_status` | `create_project`, `start_project_clone`, `cancel_project_clone` |
+| Llevar trabajo | `work_status`, `work_key` | `work_export`, `work_read_part`, `work_write_part`, `work_import`, `work_cancel` |
 
 **Qué enciende la VM.** El relay solo enciende con su lista de intención
 (`INTENT_COMMANDS`: escribir, crear, aprobar, `!`, iniciar sesión…). Fijar,
@@ -211,6 +212,15 @@ por si se perdió un evento (`cloneRepo` en `apps/mobile/src/lib/engine.ts`).
 Cerrar la hoja no detiene el clon; «Cancelar clon» manda `cancel_project_clone`.
 Las dos son intenciones del relay: encienden la VM apagada. El space solo se
 manda a la primera máquina del workspace, como al crear una tarea.
+
+**Llevar trabajo.** En la tarea nueva, la hoja de Carpeta lista también las
+carpetas de git de otras máquinas del workspace. Elegir una para crear la tarea
+en otra máquina lleva su trabajo sin subir con `@terminus/carry`
+(`apps/mobile/src/lib/carry.ts`): siempre sellado con la llave del destino
+(`work_key`, fijada la primera vez en el llavero), partes de 512 KiB y los
+`.env` sugeridos; si la llave cambió no lleva nada. El teléfono nunca trae
+trabajo de vuelta. `work_import` y `work_cancel` son intenciones del relay; las
+partes no. Sin comprobar en el simulador.
 
 **Adjuntos.** El único camino del motor para un archivo que viene de otro
 cliente es el de pegar una imagen (`guardar_imagen_pegada`, en base64): solo

@@ -531,6 +531,7 @@ const steps = [
   ["En el navegador los workspaces de la cuenta se ven con sus máquinas dormidas", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-account-workspaces.test.mjs")], root],
   ["En el navegador los spaces salen de la máquina que los guarda aunque otra duerma", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-spaces.test.mjs")], root],
   ["En el navegador las imágenes y los visuales del chat se leen de la computadora remota", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-chat-media.test.mjs")], root],
+  ["En el navegador llevar trabajo entre computadoras va sellado y en partes de 512 KiB", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-carry.test.mjs")], root],
   ["En el navegador clonar en la computadora sigue su avance, se cancela y se recupera al recargar", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-project-clone.test.mjs")], root],
   ["En el navegador el alta de una computadora gestionada no instala y conecta las cuentas de nube", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-onboarding.test.mjs")], root],
   ["La preparación en curso deja seguir a quien llega tarde", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/setup-in-flight.test.mjs")], root],

@@ -5634,6 +5634,8 @@ export default function App() {
   const [carryModule, setCarryModule] = createSignal<CarryModule | null>(null);
   const [hojaDeLlevar, setHojaDeLlevar] = createSignal<{ key: string; check: CarryCheck; busy?: boolean } | null>(null);
   let decidiendoLlevar = false;
+  /** Borradores que se mandan sin el trabajo sin subir: su máquina de origen está apagada. */
+  const sinTrabajo = new Set<string>();
   const maquinaDeLaVentana = () => capabilities().windowMachine?.()?.id ?? machines().find((m) => m.active)?.id ?? "local";
   async function moduloDeLlevar(): Promise<CarryModule> {
     const mod = carryModule() ?? (await import("../features/machines/carry"));
@@ -5719,15 +5721,29 @@ export default function App() {
    */
   async function decidirLlevar(draftKey: string): Promise<"none" | "sheet" | "plan" | "busy"> {
     if (carryModule()?.carries()[draftKey]) return "plan";
+    if (sinTrabajo.delete(draftKey)) return "none";
     const workspace = workspaceActivo();
     const proyecto = projectList().find((p) => p.id === project());
-    const target = runOn(workspace, proyecto);
+    // En la web la máquina de la tarea nueva puede ser la que lleva el workspace, sin elegir ninguna.
+    const target = runOn(workspace, proyecto) ?? capabilities().remoteCreate?.(workspace)?.machine ?? null;
     if (!workspace || !proyecto || !target || proyecto.kind !== "git") return "none";
     if (decidiendoLlevar) return "busy";
     decidiendoLlevar = true;
     try {
       const mod = await moduloDeLlevar();
       const source = mod.sourceOf(proyecto, maquinaDeLaVentana());
+      // Con la máquina de la carpeta apagada (web o teléfono) solo se lleva lo que hay en el remoto.
+      if (source && source !== target && machines().find((m) => m.id === source)?.on === false) {
+        setAviso({
+          texto: t("work.failure.source_off", { machine: machineName(source) }),
+          boton: t("work.failure.without_work"),
+          ir: () => {
+            sinTrabajo.add(draftKey);
+            if (claveAbierta() === draftKey) void mandar(archivos());
+          },
+        });
+        return "sheet";
+      }
       const check = source ? await mod.checkCarry({ workspace, project: proyecto, source, target }) : null;
       if (!check) return "none";
       setHojaDeLlevar({ key: draftKey, check });

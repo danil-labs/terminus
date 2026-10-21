@@ -12,7 +12,7 @@ export type Workspace = { id: string; name: string; provider?: string | null; re
 /** `list_workspaces`. */
 export type Startup = { workspaces: Workspace[]; active: string | null };
 /** `list_projects`: una carpeta del workspace. */
-export type Project = { id: string; name: string; working_directory?: string | null };
+export type Project = { id: string; name: string; working_directory?: string | null; kind?: "git" | "folder"; remote_url?: string | null };
 /**
  * Evento `project_clone` y respuesta de `project_clone_status`: el clon que pidió
  * `start_project_clone`. Termina con `done` y `project`, o con `error` (un

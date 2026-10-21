@@ -44,6 +44,9 @@ export const APP_READS = [
   // Carpeta nueva y clonar en la máquina: dónde quedan y cómo va un clon.
   "get_project_directory",
   "project_clone_status",
+  // Llevar el trabajo de una carpeta a la máquina donde nace la tarea: qué hay sin subir y la llave para sellar.
+  "work_status",
+  "work_key",
 ] as const;
 
 export const APP_ACTIONS = [
@@ -74,6 +77,12 @@ export const APP_ACTIONS = [
   "create_project",
   "start_project_clone",
   "cancel_project_clone",
+  // Llevar trabajo (`@terminus/carry`): exportar en el origen, copiar por partes, importar y cancelar.
+  "work_export",
+  "work_read_part",
+  "work_write_part",
+  "work_import",
+  "work_cancel",
 ] as const;
 
 export const APP_COMMANDS: readonly AppCommand[] = [...APP_READS, ...APP_ACTIONS];

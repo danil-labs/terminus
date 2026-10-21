@@ -92,6 +92,10 @@ export const INTENT_COMMANDS: ReadonlySet<string> = new Set([
   // Workspaces de la cuenta: crear aquí uno de la cuenta con su id y clonar un proyecto suyo.
   "materialize_workspace",
   "ensure_project",
+  // Llevar trabajo: importar despierta el destino (`{probe: true}`) y cancelar borra allá.
+  // Las partes nunca: su contenido no puede quedar guardado en `pending:`.
+  "work_import",
+  "work_cancel",
 ]);
 
 /** Lecturas que el relay guarda y contesta desde su copia (`MIRROR_COMMANDS` de `computers/src/mirror.ts`). */
