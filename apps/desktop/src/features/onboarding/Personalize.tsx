@@ -148,6 +148,7 @@ export default function Personalizar(props: {
           </div>
           <div class="border-t border-border pt-4">
             <Comprobacion
+              compacta
               filas={[
                 { hecho: true, texto: t("onboarding.check.environment") },
                 { hecho: props.ia.length > 0, texto: props.ia.length ? props.ia.join(", ") : t("onboarding.summary.no_ai") },

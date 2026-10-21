@@ -11,7 +11,7 @@ import { prosa, type Frase } from "../../lib/prose";
 import { cn } from "../../lib/utils";
 import { Badge } from "../../ui/Badge";
 import { Button } from "../../ui/Button";
-import { prosaDe } from "../../ui/Failure";
+import { detalleDe, prosaDe } from "../../ui/Failure";
 import { CancelButton, RemoveButton } from "../../ui/IconAction";
 import { Input } from "../../ui/Input";
 import { MarcaProveedor } from "../../ui/icons";
@@ -82,6 +82,18 @@ const CON_PESO = new Set(["drawio", "typst", "libreoffice", "computer-use"]);
 const descripcion = (id: string) => t(`onboarding.tools.about.${id}`);
 const SIN_BORRADOR: Borrador = { data: {}, token: "" };
 
+/** «Lo ves en la dirección: bitbucket.org/espacio/…», con el espacio en negrita como el diseño. */
+function EspacioEnNegrita() {
+  const [antes, despues] = t("onboarding.tools.bitbucket.space_hint", { space: "@@" }).split("@@");
+  return (
+    <>
+      {antes}
+      <b class="font-semibold">{t("onboarding.tools.bitbucket.space_word")}</b>
+      {despues}
+    </>
+  );
+}
+
 /** Drive no es un servicio de código ni un MCP conocido: su marca vive con las de los plugins. */
 function MarcaIntegracion(props: { id: string; size?: number }) {
   return props.id === "drive" ? <GoogleDriveMark size={props.size} /> : <MarcaProveedor id={props.id} size={props.size} />;
@@ -101,7 +113,7 @@ export function VerMas(props: { abierto: boolean; resto: { id: string; nombre: s
         <span class="inline-flex items-center">
           <span>{props.abierto ? t("onboarding.tools.less") : t("onboarding.tools.more")}</span>
           <Show when={!props.abierto}>
-            <span class="relative z-[1] mr-[-3px] ml-1 inline-flex translate-y-[5px] items-center transition-[transform,margin] duration-300 ease-[cubic-bezier(.3,1.4,.5,1)] group-hover:mx-1.5 group-hover:translate-y-[7px] motion-reduce:transition-none">
+            <span class="relative z-[1] mr-[-3px] ml-[-2px] inline-flex translate-y-[5px] items-center transition-[transform,margin] duration-300 ease-[cubic-bezier(.3,1.4,.5,1)] group-hover:mx-[5px] group-hover:translate-y-[7px] motion-reduce:transition-none">
               <For each={props.resto.slice(0, 4)}>
                 {(r, i) => (
                   <span
@@ -362,7 +374,8 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
       setEstados(i.id, { k: "libre" });
       await cargar();
     } catch (e) {
-      setErrores(i.id, explicar(e));
+      const texto = explicar(e);
+      setErrores(i.id, i.id === "bitbucket" && texto !== t("onboarding.ai.error.keyring") ? t("onboarding.tools.bitbucket.invalid") : texto);
       setEstados(i.id, { k: "formulario" });
     }
   }
@@ -403,14 +416,15 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
 
   const detalle = (i: Integracion) => {
     const e = estados[i.id];
+    if (i.via === "incluido") return descripcion(i.id);
     switch (e?.k) {
       case "conectada":
-        return i.via === "incluido" ? descripcion(i.id) : e.detalle;
+        return e.detalle;
       case "formulario":
         return t("onboarding.tools.fill_below");
       case "descargando":
         return e.total
-          ? t("onboarding.tools.downloading_cli", { done: mb(e.hecho), total: mb(e.total) })
+          ? t("onboarding.tools.downloading_cli", { done: Math.round(e.hecho / 1_048_576), total: mb(e.total) })
           : t("onboarding.tools.downloading_cli_start");
       case "conectando":
         if (formularioAbierto(i)) return t("onboarding.tools.checking_token");
@@ -433,9 +447,9 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
       <div
         class={cn(
           "flex h-[58px] items-center gap-3 rounded-lg border px-3 py-2",
-          e()?.k === "conectada" && "border-success-strong/40 bg-success/5",
+          e()?.k === "conectada" && p.i.via !== "incluido" && "border-success-strong/40 bg-success/5",
           ["conectando", "formulario", "descargando"].includes(e()?.k ?? "") && "border-primary bg-primary/5",
-          (!e() || e()?.k === "libre" || e()?.k === "saliendo") && "border-border bg-surface-raised",
+          (!e() || e()?.k === "libre" || e()?.k === "saliendo" || p.i.via === "incluido") && "border-border bg-surface-raised",
         )}
       >
         <span class="grid size-[26px] shrink-0 place-items-center rounded-md bg-surface-muted text-neutral-950">
@@ -455,7 +469,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
               </Button>
             }
           >
-            <Match when={p.i.via === "incluido" && e()?.k === "conectada"}>
+            <Match when={p.i.via === "incluido"}>
               <Badge tone="success" class="gap-1">
                 <Check size={11} stroke-width={3} aria-hidden="true" />
                 {t("onboarding.tools.included")}
@@ -539,6 +553,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
                     </span>
                     <Input
                       spellcheck={false}
+                      placeholder={bitbucket ? t("onboarding.tools.bitbucket.space_placeholder") : undefined}
                       value={borrador(q.i.id).data[c.id] ?? ""}
                       disabled={ocupado()}
                       ref={(el) => n() === 0 && queueMicrotask(() => el.focus())}
@@ -546,7 +561,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
                       onKeyDown={alEnter}
                     />
                     <span class="text-xs text-neutral-500">
-                      {bitbucket ? t("onboarding.tools.bitbucket.space_hint") : prosa(c.help)}
+                      {bitbucket ? <EspacioEnNegrita /> : prosa(c.help)}
                     </span>
                   </label>
                 )}
@@ -560,6 +575,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
                   class={cn("font-mono tracking-[0.02em]", error() && "border-error-strong")}
                   autocomplete="off"
                   spellcheck={false}
+                  placeholder={bitbucket ? t("onboarding.tools.bitbucket.token_placeholder") : undefined}
                   value={borrador(q.i.id).token}
                   disabled={ocupado()}
                   aria-invalid={error() ? true : undefined}
@@ -612,7 +628,8 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
 
   const visibles = () =>
     INTEGRACIONES().filter(
-      (i) => i.comun || verMas() || ["formulario", "descargando", "conectando", "conectada"].includes(estados[i.id]?.k ?? ""),
+      (i) =>
+        i.comun || verMas() || i.via === "incluido" || ["formulario", "descargando", "conectando", "conectada"].includes(estados[i.id]?.k ?? ""),
     );
   // Como el diseño: la pila de «Ver más» enseña todo lo que no es común, aunque ya esté a la vista.
   const escondidas = () => INTEGRACIONES().filter((i) => !i.comun);
@@ -643,6 +660,8 @@ export function Plugins(props: { onCambio: (estado: { instalados: number; instal
   const [falloDeCarga, setFalloDeCarga] = createSignal<string | null>(null);
   const [ocupados, setOcupados] = createStore<Record<string, "instalando" | "desinstalando" | undefined>>({});
   const [errores, setErrores] = createStore<Record<string, string | null>>({});
+  const [avances, setAvances] = createStore<Record<string, { hecho: number; total: number }>>({});
+  const [pesos, setPesos] = createStore<Record<string, number | null>>({});
   const [verMas, setVerMas] = createSignal(false);
   let cerrada = false;
 
@@ -651,6 +670,11 @@ export function Plugins(props: { onCambio: (estado: { instalados: number; instal
       .filter((p) => ORDEN_PLUGINS.includes(p.id))
       .sort((a, b) => ORDEN_PLUGINS.indexOf(a.id) - ORDEN_PLUGINS.indexOf(b.id));
   const instalando = (p: Plugin) => ocupados[p.id] === "instalando" || (p.installing && !ocupados[p.id]);
+  const peso = (p: Plugin) => {
+    const b = pesos[p.id];
+    if (b) return mb(b);
+    return CON_PESO.has(p.id) ? t(`onboarding.tools.size.${p.id}`) : "";
+  };
 
   function avisar() {
     props.onCambio({
@@ -665,32 +689,49 @@ export function Plugins(props: { onCambio: (estado: { instalados: number; instal
       if (cerrada) return;
       setCatalogo(c);
       avisar();
+      for (const p of c.plugins.filter((x) => ORDEN_PLUGINS.includes(x.id) && pesos[x.id] === undefined)) {
+        setPesos(p.id, null);
+        invoke<number>("install_size", { operation: `plugin:${p.id}` })
+          .then((b) => setPesos(p.id, b))
+          .catch(() => {});
+      }
     } catch (e) {
-      setFalloDeCarga(prosaDe(e));
+      setFalloDeCarga(explicar(e));
     }
   }
   onMount(() => void cargar());
   const cambios = listen("integrations-changed", () => void cargar());
+  const avance = listen<{ operation: string; kind: string; done: number; bytes: number }>("install", (e) => {
+    const id = e.payload.operation.startsWith("plugin:") ? e.payload.operation.slice(7) : null;
+    if (!id || e.payload.bytes <= 0) return;
+    setAvances(id, { hecho: e.payload.done, total: e.payload.bytes });
+  });
   onCleanup(() => {
     cerrada = true;
     void cambios.then((f) => f());
+    void avance.then((f) => f());
   });
 
   async function instalar(p: Plugin) {
     const workspace = catalogo()?.workspace;
     if (!workspace) return;
     setErrores(p.id, null);
+    setAvances(p.id, { hecho: 0, total: pesos[p.id] ?? 0 });
     setOcupados(p.id, "instalando");
     avisar();
     try {
       await invoke("install_integration", { id: p.id });
       await invoke("set_integration_enabled", { id: p.id, workspace, enabled: true });
     } catch (e) {
-      if (!cerrada) setErrores(p.id, prosaDe(e));
+      if (!cerrada && !`${prosaDe(e)} ${detalleDe(e)}`.includes("install.cancelled")) setErrores(p.id, explicar(e));
     }
     if (cerrada) return;
     setOcupados(p.id, undefined);
     await cargar();
+  }
+
+  function cancelar(p: Plugin) {
+    void invoke("cancel_install", { operation: `plugin:${p.id}` }).catch(() => {});
   }
 
   async function desinstalar(p: Plugin) {
@@ -702,7 +743,7 @@ export function Plugins(props: { onCambio: (estado: { instalados: number; instal
       if (p.id === "typst") await invoke("typst_live_stop", { key: null, session: null }).catch(() => {});
       await invoke("uninstall_integration", { id: p.id });
     } catch (e) {
-      setErrores(p.id, prosaDe(e));
+      setErrores(p.id, explicar(e));
     }
     setOcupados(p.id, undefined);
     await cargar();
@@ -711,10 +752,15 @@ export function Plugins(props: { onCambio: (estado: { instalados: number; instal
   function Tarjeta(q: { p: Plugin }) {
     const nombre = () => t(`onboarding.tools.plugin.${q.p.id}`);
     const sub = () => errores[q.p.id] ?? (!q.p.supported && !q.p.installed ? t("onboarding.tools.unsupported") : descripcion(q.p.id));
+    const av = () => avances[q.p.id];
+    const lleva = () => {
+      const a = av();
+      return a && a.total > 0 ? Math.min(100, (a.hecho / a.total) * 100) : 0;
+    };
     return (
       <div
         class={cn(
-          "relative flex h-16 items-center gap-3 overflow-hidden rounded-lg border px-3.5",
+          "relative flex h-16 items-center gap-3 overflow-hidden rounded-lg border px-3.5 py-2.5",
           instalando(q.p)
             ? "border-primary bg-primary/5"
             : q.p.installed && !ocupados[q.p.id]
@@ -726,10 +772,10 @@ export function Plugins(props: { onCambio: (estado: { instalados: number; instal
           <MarcaPlugin id={q.p.id} size={15} />
         </span>
         <span class="grid min-w-0 flex-1 gap-1">
-          <strong class="flex min-w-0 items-center gap-1 text-[13px] leading-tight font-semibold text-neutral-950">
+          <strong class="flex min-w-0 items-center text-[13px] leading-[1.2] font-semibold text-neutral-950">
             <span class="truncate">{nombre()}</span>
             <Show when={RECOMENDADOS.includes(q.p.id)}>
-              <span class="shrink-0 rounded-full bg-primary/10 px-1.5 py-px text-[10px] font-medium text-primary">
+              <span class="ml-1 shrink-0 rounded-full bg-primary/10 px-1.5 py-px text-[10px] font-medium text-primary">
                 {t("onboarding.tools.recommended")}
               </span>
             </Show>
@@ -742,9 +788,7 @@ export function Plugins(props: { onCambio: (estado: { instalados: number; instal
           <Switch
             fallback={
               <>
-                <Show when={CON_PESO.has(q.p.id)}>
-                  <span class="text-[11px] whitespace-nowrap text-neutral-500">{t(`onboarding.tools.size.${q.p.id}`)}</span>
-                </Show>
+                <span class="text-[11px] whitespace-nowrap text-neutral-500">{peso(q.p)}</span>
                 <Button
                   size="compact"
                   variant="secondary"
@@ -758,14 +802,20 @@ export function Plugins(props: { onCambio: (estado: { instalados: number; instal
             }
           >
             <Match when={instalando(q.p)}>
-              <span class="text-[11px] whitespace-nowrap text-neutral-500">{t("onboarding.tools.installing")}</span>
+              <span class="text-[11px] whitespace-nowrap text-neutral-500">
+                {av()?.total
+                  ? t("onboarding.tools.plugin_progress", { done: Math.round(av()!.hecho / 1_048_576), total: mb(av()!.total) })
+                  : t("onboarding.tools.installing")}
+              </span>
               <Spinner class="text-primary" />
+              <CancelButton label={t("onboarding.ai.cancel_download", { name: nombre() })} onClick={() => cancelar(q.p)} />
             </Match>
             <Match when={ocupados[q.p.id] === "desinstalando"}>
               <span class="text-[11px] whitespace-nowrap text-neutral-500">{t("onboarding.tools.uninstalling")}</span>
               <Spinner class="text-neutral-500" />
             </Match>
             <Match when={q.p.installed}>
+              <span class="text-[11px] whitespace-nowrap text-neutral-500">{peso(q.p)}</span>
               <Badge tone="success" class="gap-1">
                 <Check size={11} stroke-width={3} aria-hidden="true" />
                 {t("onboarding.tools.installed")}
@@ -779,9 +829,8 @@ export function Plugins(props: { onCambio: (estado: { instalados: number; instal
           </Switch>
         </span>
         <Show when={instalando(q.p)}>
-          {/* El motor no informa cuánto lleva: la línea barre en vez de llenarse. */}
-          <span class="absolute inset-x-0 bottom-0 h-[3px] overflow-hidden bg-primary/15" aria-hidden="true">
-            <span class="block h-full w-1/4 animate-barrido bg-primary motion-reduce:animate-none" />
+          <span class="absolute inset-x-0 bottom-0 h-[3px] bg-primary/15" aria-hidden="true">
+            <span class="block h-full bg-primary transition-[width] duration-150" style={{ width: `${lleva()}%` }} />
           </span>
         </Show>
       </div>
@@ -796,7 +845,7 @@ export function Plugins(props: { onCambio: (estado: { instalados: number; instal
       <div class="grid gap-2">
         <For each={visibles()}>{(p) => <Tarjeta p={p} />}</For>
       </div>
-      <Show when={falloDeCarga()}>{(e) => <p class="m-0 text-xs text-error-strong">{e()}</p>}</Show>
+      <Show when={falloDeCarga()}>{(e) => <ErrorDeTarjeta class="rounded-md border-t" texto={e()} />}</Show>
       <VerMas
         abierto={verMas()}
         resto={escondidos().map((p) => ({ id: p.id, nombre: t(`onboarding.tools.plugin.${p.id}`), icono: <MarcaPlugin id={p.id} size={12} /> }))}

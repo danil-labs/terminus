@@ -142,12 +142,12 @@ export function MapaDeConexiones(props: { c: Conexiones }) {
 }
 
 /** Lo hecho y lo que falta del alta, debajo del mapa y en el resumen de «Personaliza». */
-export function Comprobacion(props: { filas: { hecho: boolean; texto: string; enCurso?: boolean }[] }) {
+export function Comprobacion(props: { filas: { hecho: boolean; texto: string; enCurso?: boolean }[]; compacta?: boolean }) {
   return (
-    <ul class="m-0 grid list-none gap-2.5 p-0 text-sm">
+    <ul class={cn("m-0 grid list-none p-0", props.compacta ? "gap-2 text-[13px]" : "gap-2.5 text-sm")}>
       <For each={props.filas}>
         {(f) => (
-          <li class={cn("flex items-center gap-2.5", f.hecho ? "text-success-strong" : "text-neutral-500")}>
+          <li class={cn("flex items-center", props.compacta ? "gap-2" : "gap-2.5", f.hecho ? "text-success-strong" : "text-neutral-500")}>
             <Switch fallback={<Circle size={16} aria-hidden="true" />}>
               <Match when={f.hecho}>
                 <CircleCheck size={16} aria-hidden="true" />
