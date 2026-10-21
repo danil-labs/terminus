@@ -233,17 +233,17 @@ relay que lo hace cumplir, eventos con `workspace` y el fondo del chat por
 workspace. La revisión encontró errores graves en los tres y un modelo que
 permite varias personas por computadora. Este plan se construye **encima** de
 esos PRs: se queda con lo que sirve, corrige sus errores y agrega el workspace
-compartido. Las ramas nuevas salen de sus cabezas (fab9bd4, 696773f, 6d93c68).
+compartido. #10 y #72 se fusionaron con la enmienda del 2026-10-21 (abajo);
+las ramas de este plan salen de `main`/`dev` ya con ellos, y la de terminus de
+la cabeza de #185.
 
 Se conserva de esos PRs:
 
 - `computer_workspace_links`: en qué computadoras vive cada workspace y de quién
   es. Hace el papel de `workspace_computers`.
-- El error `workspace_not_linked` (reemplaza a `workspace_forbidden`) y el
-  cierre 4003 `unlinked`.
-- Computadoras compartidas: una persona que no es dueña de la computadora
-  (miembro) puede tener ahí sus workspaces. Hay VMs compartidas
-  (`vm-linux-shared`, `vm-windows-shared`).
+- El error `workspace_not_linked` (reemplaza a `workspace_forbidden`).
+- La lista de vínculos por computadora con versión (`links_version`) guardada
+  en el Durable Object.
 - Las órdenes `danil_workspace_link{mode}` / `danil_workspace_unlink`, el campo
   `danil: {user_id, email, name}` de las filas (hace el papel de `account`) y
   `danil.json` en la carpeta del workspace.
@@ -257,31 +257,29 @@ cambiarla, se cambia aquí primero.
 
 ### Ids
 
-- Formato del motor: 8 caracteres de `0123456789abcdefghjkmnpqrstvwxyz`
-  (`util.rs` `short_id`). Expresión: `^[0-9a-hjkmnp-tv-z]{8}$`. Se valida en
-  las tablas nuevas, en `computer_workspace_links` y en el Worker.
+- El motor genera 8 caracteres de `0123456789abcdefghjkmnpqrstvwxyz`
+  (`util.rs` `short_id`); `add_workspace` con `id` exige ese formato. El plano
+  de control acepta de 1 a 128 caracteres (#10).
 - Workspace y proyecto conservan su id en todas las máquinas. Las tareas
   siguen con id por máquina.
 
-### Quién es dueño de qué
+### Quién es dueño de qué (enmienda del 2026-10-21)
 
-- **Un workspace tiene una sola dueña**: `workspaces.owner_id`. Toda fila de
-  `computer_workspace_links` de ese workspace lleva `user_id = owner_id`; un
-  intento de atarlo a otra persona responde `409 workspace_id_taken`.
-- **La dueña de una computadora es la dueña por omisión de sus workspaces.** Al
-  conectar, el motor ata a ella todo workspace local que no esté atado
-  (`mode: owner`). Así una VM sin ventana nunca queda con workspaces invisibles
-  y el despliegue no deja a nadie sin acceso.
-- **Atar al conectar no toca** un workspace con un código de «Otra cuenta» en
-  curso: ese workspace espera a que el miembro apruebe.
-- El cuerpo de atar conserva `as: "owner"` de #10 y manda `name`. Un miembro
-  que pide `/start` o `/stop` recibe `403 owner_only`. `PATCH` mezcla
-  `settings` con los vigentes; su conflicto es
-  `409 {error:"settings_conflict", workspace}`.
-- **Un miembro** (persona con workspaces en una computadora ajena) entra por el
-  código de dispositivo de «Otra cuenta» de #10, que la dueña de la computadora
-  inicia desde su máquina. Un miembro no materializa workspaces en esa
-  computadora en la fase 1.
+Decidido por la persona el 2026-10-21, ya fusionado en computers#10 y
+seldon-host#72: **solo la dueña, como sincronizar una carpeta de Drive.**
+
+- Un workspace se liga solo a la cuenta de Danil dueña de la computadora. No hay
+  miembros, «Otra cuenta», códigos de dispositivo por workspace ni modo
+  Radiant. Ligar solo elige cuáles de los workspaces de la dueña aparecen en la
+  web, el teléfono y sus otras máquinas.
+- Los workspaces que ya existen se ligan solos **una vez**, en la primera
+  reconciliación con el motor nuevo (`workspaces-backfill.json`). Los nuevos se
+  ligan a mano; desligar después se respeta.
+- Un workspace ligado entra al registro de la cuenta (`workspaces`), con una sola
+  dueña. Solo así puede materializarse en otra máquina de ella: un workspace no
+  ligado se queda en su máquina.
+- Ids: el plano de control acepta de 1 a 128 caracteres (#10); el motor siempre
+  genera 8 de base32.
 
 ### Plano de control (`computers`)
 
@@ -323,19 +321,12 @@ el motor) y respeta la regla de una sola dueña.
 
 Relay — conjunto permitido `L(persona, computadora)`:
 
-- **Dueña de la computadora:** todos los workspaces de su cuenta
+- **La dueña** (única persona con sesión en su computadora): todos los workspaces ligados de su cuenta
   (`workspaces.owner_id`), estén o no en esta computadora. Por eso
   `materialize_workspace` y `ensure_project` pasan en una VM que aún no tiene
   el workspace.
-- **Miembro:** sus workspaces atados en esta computadora.
 - Toda llamada con workspace en el sobre **o en los argumentos** (`args.id` de
   las órdenes de workspace, `args.workspace`) se revisa contra `L`.
-- Las órdenes de toda la máquina (cuentas de agentes, `add_workspace`,
-  `materialize_workspace`, `set_project_directory`, `danil_*`,
-  `remove_workspace`) son solo para la dueña de la computadora. Un miembro usa
-  una lista cerrada de órdenes de su workspace.
-- `/start` y `/stop` son solo de la dueña; un miembro enciende la máquina con
-  una intención (mandar un mensaje).
 - Tras cambiar un workspace o proyecto, el Worker avisa a los Durable Objects
   de las computadoras de la dueña: al conector
   `{ type: "workspace.changed", workspace, settings_version }` y a las sesiones
@@ -358,8 +349,8 @@ Corrige de #72:
 
 Agrega:
 
-- Atar al conectar: todo workspace local sin `danil.json` se ata a la dueña de
-  la computadora (`mode: owner`).
+- La unión inicial (una vez por computadora) de #72 se conserva; no se ata nada
+  más al conectar.
 - `add_workspace(name, folder?, git_host?, remote?, id?)`: con `id`, lo valida
   y falla con `workspace_exists` si la carpeta ya existe.
 - `materialize_workspace(id)`: lee `GET /v1/workspaces`, crea aquí el workspace
@@ -407,5 +398,4 @@ Agrega:
 ### Fase 2 (fuera de esta entrega)
 
 Logo, fondo, MCP y skills desde la cuenta; adoptar las copias viejas de «Usar
-este workspace aquí»; workspaces de organización con varias personas; que un
-miembro materialice workspaces en una computadora compartida.
+este workspace aquí»; workspaces de organización con varias personas.
