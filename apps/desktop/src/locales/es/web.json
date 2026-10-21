@@ -23,6 +23,7 @@
   "web.machines.cross_machine": "Esto junta cosas de dos máquinas distintas y no se puede hacer.",
   "web.machines.off_action": "{name} está apagada. Enciéndela para seguir.",
   "web.machines.outdated_action": "{name} necesita actualizarse antes de usarla desde aquí.",
+  "web.machines.missing_workspace": "{name} no tiene este workspace y su motor todavía no sabe crearlo. Actualízalo para crear tareas ahí.",
   "web.onboarding.accounts.another": "Conectar otra",
   "web.onboarding.accounts.api_key": "Pega tu API key",
   "web.onboarding.accounts.failed": "No se pudo conectar {agent}.",

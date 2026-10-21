@@ -44,8 +44,8 @@ function responses(overrides) {
     service_filter: null,
     service_poll: () => sleep(40).then(() => ({ cursor: 1, gap: false, replay: false, runtime: "lab", reset: false })),
     machine_list: [
-      { id: "local", local: true, active: true, on: true, linked: true },
-      { id: "vm", local: false, active: false, on: false, linked: true },
+      { id: "local", local: true, active: true, on: true, hosts: true },
+      { id: "vm", local: false, active: false, on: false, hosts: true },
     ],
     ...overrides,
   };

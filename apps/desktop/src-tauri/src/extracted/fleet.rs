@@ -1,6 +1,6 @@
-//! Varias máquinas en un mismo workspace. Cada motor guarda sus workspaces,
-//! proyectos y tareas con ids al azar; la ventana enlaza los suyos con los de
-//! cada máquina y recuerda en cuál vive cada tarea para mandarle lo que la nombra.
+//! Varias máquinas en un mismo workspace. Un workspace y sus proyectos de la cuenta
+//! tienen el mismo id en cada máquina; los de antes, ids propios que la ventana enlaza.
+//! Las tareas son de su máquina: la ventana recuerda en cuál vive cada una.
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
@@ -162,9 +162,9 @@ impl Fleet {
             .is_some_and(|m| m.contains_key(workspace))
     }
 
-    /// El workspace de `there` que es `local` en la ventana: el enlazado a mano en
-    /// `machines.json`, o el único con el mismo `git_host` y `remote`. Un nombre igual no
-    /// basta. Lo reemplazará el id de workspace de la cuenta, el mismo en cada máquina.
+    /// El workspace de `there` que es `local` en la ventana: el mismo id (el de la cuenta,
+    /// igual en cada máquina), si no el enlazado en `machines.json`, si no el único con el
+    /// mismo `git_host` y `remote`. Un nombre igual no basta.
     pub fn counterpart_workspace(
         &self,
         machine: &str,
@@ -172,13 +172,25 @@ impl Fleet {
         home: &dyn Engine,
         there: &dyn Engine,
     ) -> Option<String> {
-        if let Some(found) = self
+        let saved = self
             .memory()
             .workspaces
             .get(machine)
             .and_then(|m| m.get(local))
-        {
-            return Some(found.clone());
+            .cloned();
+        if saved.as_deref() == Some(local) {
+            return saved;
+        }
+        // Un enlace viejo a otro id cede ante el mismo id; con la máquina sin contestar, vale.
+        let Some(theirs) = value(there, "list_workspaces", None, json!({})) else {
+            return saved;
+        };
+        let theirs = theirs["workspaces"].as_array()?;
+        if theirs.iter().any(|w| w["id"] == local) {
+            return Some(self.remember_workspace(machine, local, local));
+        }
+        if saved.is_some() {
+            return saved;
         }
         let mine = value(home, "list_workspaces", None, json!({}))?;
         let mine = mine["workspaces"]
@@ -186,28 +198,31 @@ impl Fleet {
             .iter()
             .find(|w| w["id"] == local)?
             .clone();
-        let theirs = value(there, "list_workspaces", None, json!({}))?;
-        let theirs = theirs["workspaces"].as_array()?;
         let same_remote = |w: &&Value| {
             mine["git_host"].as_str().is_some_and(|p| !p.is_empty())
                 && mine["remote"].as_str().is_some_and(|r| !r.is_empty())
                 && w["git_host"] == mine["git_host"]
                 && w["remote"] == mine["remote"]
         };
-        let found = unique(theirs.iter().filter(same_remote))?["id"]
-            .as_str()?
-            .to_owned();
+        let found = unique(theirs.iter().filter(same_remote))?["id"].as_str()?;
+        Some(self.remember_workspace(machine, local, found))
+    }
+
+    /// Apunta en `machines.json` qué workspace de `machine` es `local`, para no volver a
+    /// preguntar y para traducir sus eventos.
+    fn remember_workspace(&self, machine: &str, local: &str, found: &str) -> String {
         let mut memory = self.memory();
         memory
             .workspaces
             .entry(machine.to_owned())
             .or_default()
-            .insert(local.to_owned(), found.clone());
+            .insert(local.to_owned(), found.to_owned());
         self.save(&memory);
-        Some(found)
+        found.to_owned()
     }
 
-    /// El proyecto de `there` que es `project` en la ventana; el vacío es «sin proyecto».
+    /// El proyecto de `there` que es `project` en la ventana: el mismo id, si no el único
+    /// con el mismo nombre; el vacío es «sin proyecto».
     fn project_on(
         &self,
         machine: &str,
@@ -228,17 +243,22 @@ impl Fleet {
         {
             return Some(found.clone());
         }
-        let mine = value(home, "list_projects", Some(local.to_owned()), json!({}))?;
-        let name = mine
-            .as_array()?
-            .iter()
-            .find(|p| p["id"] == project)?
-            .get("name")?
-            .clone();
         let theirs = value(there, "list_projects", Some(remote.to_owned()), json!({}))?;
-        let found = unique(theirs.as_array()?.iter().filter(|p| p["name"] == name))?["id"]
-            .as_str()?
-            .to_owned();
+        let theirs = theirs.as_array()?;
+        let found = if theirs.iter().any(|p| p["id"] == project) {
+            project.to_owned()
+        } else {
+            let mine = value(home, "list_projects", Some(local.to_owned()), json!({}))?;
+            let name = mine
+                .as_array()?
+                .iter()
+                .find(|p| p["id"] == project)?
+                .get("name")?
+                .clone();
+            unique(theirs.iter().filter(|p| p["name"] == name))?["id"]
+                .as_str()?
+                .to_owned()
+        };
         let mut memory = self.memory();
         memory
             .projects
@@ -729,6 +749,50 @@ mod tests {
             Some("vm")
         );
         assert!(mac.sent("send_message").is_empty());
+    }
+
+    #[test]
+    fn the_same_ids_are_the_same_workspace_and_project() {
+        let mac = mac();
+        // La VM ya tiene el workspace y el proyecto de la cuenta, con sus ids; también una
+        // copia vieja con el mismo remoto, que ya no gana.
+        let vm = Fake {
+            workspaces: json!({"workspaces":[{"id":"wvm","name":"Danil","git_host":"github","remote":"danil-labs"},{"id":"wmac","name":"Danil"}],"active":"wvm"}),
+            projects: json!([{"id":"pvm","name":"terminus"},{"id":"pmac","name":"terminus"}]),
+            created: "r2",
+            ..Fake::default()
+        };
+        let fleet = Fleet::load(None);
+        let send = spec("send_message");
+        let args = json!({"project":"pmac","session":null,"prompt":"hola"});
+        assert_eq!(
+            fleet
+                .target(&send, &args, Some("wmac"), Some("vm"))
+                .as_deref(),
+            Some("vm")
+        );
+        let created = fleet
+            .forward("vm", "wmac", &send, &args, &mac, &vm)
+            .expect("linked")
+            .expect("sent");
+        assert_eq!(created["value"], "r2");
+        assert_eq!(
+            vm.sent("send_message"),
+            vec![(Some("wmac".into()), args.clone())],
+            "la VM recibe los mismos ids"
+        );
+        assert!(mac.sent("send_message").is_empty());
+        assert!(fleet.linked("vm", "wmac"));
+        // Sus eventos llegan con el mismo id.
+        let event = fleet
+            .localize(
+                "vm",
+                "session",
+                &json!({"workspace":"wmac","project":"pmac","session":"r2"}),
+            )
+            .expect("task event");
+        assert_eq!(event["workspace"], "wmac");
+        assert_eq!(event["project"], "pmac");
     }
 
     #[test]

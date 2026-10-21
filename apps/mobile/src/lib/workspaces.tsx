@@ -8,9 +8,9 @@ import type { Host } from "./hosts";
 import { useMachines } from "./machines";
 
 /**
- * Un workspace, quizá abierto en varias máquinas: el mismo si tiene el mismo
- * remoto o, si no, el mismo nombre (`groupWorkspaces`, la regla de la web).
- * `id` es la clave del grupo; `members`, su id local en cada máquina.
+ * Un workspace, quizá abierto en varias máquinas: el mismo si su id es igual
+ * (`groupWorkspaces`, la regla de la web). `id` es ese id; `members`, el id en
+ * cada máquina, que es el mismo.
  */
 export type WorkspaceEntry = { id: string; name: string; members: Map<string, string>; hosts: string[] };
 

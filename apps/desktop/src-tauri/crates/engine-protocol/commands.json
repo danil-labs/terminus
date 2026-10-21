@@ -171,6 +171,11 @@
           "key": "remote",
           "name": "remote",
           "type": "Option < String >"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "Option < String >"
         }
       ],
       "path": "workspaces::add_workspace"
@@ -537,7 +542,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "chat_background",
-      "output": "-> Result < ChatBackground , crate :: util :: Failure >",
+      "output": "-> Result < Option < ChatBackground > , crate :: util :: Failure >",
       "parameters": [],
       "path": "handlers::chat_background"
     },
@@ -680,6 +685,11 @@
         {
           "key": "space",
           "name": "space",
+          "type": "Option < String >"
+        },
+        {
+          "key": "id",
+          "name": "id",
           "type": "Option < String >"
         },
         {
@@ -898,6 +908,11 @@
         {
           "key": "space",
           "name": "space",
+          "type": "Option < String >"
+        },
+        {
+          "key": "id",
+          "name": "id",
           "type": "Option < String >"
         }
       ],
@@ -1325,6 +1340,21 @@
       "output": "-> Result < Liberado , String >",
       "parameters": [],
       "path": "storage::empty_build_cache"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "ensure_project",
+      "output": "-> Result < Project , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        }
+      ],
+      "path": "projects::ensure_project"
     },
     {
       "async": false,
@@ -2559,6 +2589,21 @@
         }
       ],
       "path": "attention::mark_task_seen"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "materialize_workspace",
+      "output": "-> Result < crate :: wire :: Wire < crate :: workspaces :: Workspace > , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "danil::materialize_workspace"
     },
     {
       "async": false,
@@ -5342,6 +5387,21 @@
         }
       ],
       "path": "accounts::submit_login_code"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "sync_workspace",
+      "output": "-> Result < crate :: wire :: Wire < crate :: workspaces :: Workspace > , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "danil::sync_workspace"
     },
     {
       "async": false,

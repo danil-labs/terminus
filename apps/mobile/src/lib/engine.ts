@@ -35,7 +35,7 @@ import type {
 } from "@terminus/protocol";
 import { MAX_VISUAL_BYTES, VISUAL_FILE, VISUAL_TREE } from "@terminus/chat/visual";
 import { linkedAttention, onlyLinked } from "@terminus/computers";
-import { type ChatBackgroundView, chatBackgroundView } from "@terminus/protocol";
+import { type ChatBackgroundView, chatBackgroundView, isSingleAttention } from "@terminus/protocol";
 import { type FlatRow, flattenTasks } from "@terminus/tasks";
 import { type Host, HostError } from "./hosts.ts";
 
@@ -580,8 +580,8 @@ export function noticer(host: string, initial: WorkspaceAttention[] = []) {
     take(event: EngineEvent): Notice[] {
       if (event.name === "attention" && Array.isArray(event.payload)) {
         const list = event.payload as WorkspaceAttention[];
-        // Solo cambian los workspaces que trae: lo que se sabía de los demás sigue.
-        const next = new Map([...known].filter(([key]) => !list.some((w) => key.startsWith(`${w.workspace}/`))));
+        // Una entrada suelta cambia solo su workspace; la lista entera reemplaza lo que se sabía.
+        const next = isSingleAttention(list) ? new Map([...known].filter(([key]) => !list.some((w) => key.startsWith(`${w.workspace}/`)))) : new Map<string, AttentionState>();
         for (const [key, state] of index(list)) next.set(key, state);
         const notices: Notice[] = [];
         for (const w of list) for (const task of w.tasks) {

@@ -157,14 +157,14 @@ test("la API dice licencia, no tuya y error sin confundirlos", async () => {
   assert.equal(seen?.authorization, "Bearer tok");
 });
 
-test("un workspace es el mismo en dos máquinas por remoto o, si no, por nombre único", () => {
+test("los workspaces se juntan por id igual, nunca por nombre ni remoto", () => {
   const groups = groupWorkspaces([
     { machine: "vm", rows: [{ id: "a", name: "Producto", provider: "github", remote: "org/app" }, { id: "b", name: "Notas" }] },
-    { machine: "mac", rows: [{ id: "x", name: "Otro nombre", provider: "github", remote: "org/app" }, { id: "y", name: "notas" }, { id: "z", name: "Solo Mac" }] },
+    { machine: "mac", rows: [{ id: "a", name: "Otro nombre" }, { id: "x", name: "Producto", provider: "github", remote: "org/app" }, { id: "y", name: "notas" }] },
   ]);
   assert.deepEqual(
-    groups.map((g) => [g.key, [...g.members]]),
-    [["vm~a", [["vm", "a"], ["mac", "x"]]], ["vm~b", [["vm", "b"], ["mac", "y"]]], ["mac~z", [["mac", "z"]]]],
+    groups.map((g) => [g.key, g.row.name, [...g.members]]),
+    [["a", "Producto", [["vm", "a"], ["mac", "a"]]], ["b", "Notas", [["vm", "b"]]], ["x", "Producto", [["mac", "x"]]], ["y", "notas", [["mac", "y"]]]],
   );
 });
 

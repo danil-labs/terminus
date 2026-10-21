@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { relay } from "../helpers/fake-relay.mjs";
+import { engine, relay } from "../helpers/fake-relay.mjs";
 import { boot, sleep } from "../helpers/jsdom-app.mjs";
 
 test("the web build talks to the relay: calls, events and machine state", async () => {
@@ -59,5 +59,57 @@ test("the web build talks to the relay: calls, events and machine state", async 
   fake.push({ type: "events", cursor: 3, gap: false, replay: false, runtime: "rt1", events: [] });
   await sleep(1200);
   assert.equal(app.w.document.querySelector("[data-web-sync]")?.dataset.state, "online", "the indicator stayed off after the machine came back");
+  assert.deepEqual(app.fallos, []);
+});
+
+test("the transport leaves out what the account may not see: workspaces, attention and events", async () => {
+  const { fleet } = await import("../helpers/fake-relay.mjs");
+  const ws = (id, name) => ({ id, name, context_root: null });
+  const vmList = { workspaces: [ws("w", "W"), ws("w2", "Dos"), ws("z", "Ajeno")], active: "z" };
+  const ask = (session) => ({ session, project: "p1", state: "asked" });
+  const f = fleet({
+    cmp_vm: { table: { ...engine, list_workspaces: vmList, workspaces_startup: vmList, list_workspace_attention: [{ workspace: "w2", tasks: [ask("t2")] }, { workspace: "z", tasks: [ask("t9")] }] } },
+    cmp_other: { table: { ...engine } },
+  });
+  const computers = [
+    { computer_id: "cmp_vm", name: "Danil VM", state: "online", provider: "aws-ec2", workspaces: ["w", "w2"] },
+    { computer_id: "cmp_other", name: "Otra", state: "online", provider: "aws-ec2", workspaces: ["w"] },
+  ];
+  const app = await boot("listo", "web-transport-linked", {}, undefined, {}, {
+    web: true,
+    antes: (w) => {
+      globalThis.WebSocket = f.Socket;
+      w.terminusWeb = { endpoint: "https://relay.test", computers, getToken: async () => "tok" };
+    },
+  });
+  await sleep(2500);
+  const doc = app.w.document;
+  const invoke = (command, args, options) => app.w.__TAURI_INTERNALS__.invoke(command, args, options);
+  const tile = (id) => doc.querySelector(`[data-workspace-tile="${id}"]`);
+
+  const list = await invoke("list_workspaces");
+  assert.deepEqual(list.workspaces.map((w) => w.id), ["w", "w2"], "a workspace not linked on that computer is not listed");
+  assert.notEqual(list.active, "z", "nor opened");
+  assert.equal(tile("z"), null);
+  assert.equal(tile("w2")?.dataset.attention, "asked", "the attention of a linked workspace shows");
+  const attention = await invoke("list_workspace_attention");
+  assert.ok(!attention.some((e) => e.workspace === "z"), "the attention of one that is not, does not");
+
+  f.relays.cmp_vm.push({
+    type: "events",
+    cursor: 5,
+    gap: false,
+    replay: false,
+    runtime: "rt",
+    events: [
+      { name: "attention", workspace: "z", payload: [{ workspace: "z", tasks: [ask("t9")] }] },
+      { name: "attention", payload: [{ workspace: "w", tasks: [ask("t1")] }, { workspace: "w2", tasks: [] }, { workspace: "z", tasks: [ask("t8")] }] },
+    ],
+  });
+  await sleep(800);
+  assert.equal(tile("w")?.dataset.attention, "asked", "the whole list of the machine arrives, filtered");
+  assert.equal(tile("w2")?.dataset.attention, undefined, "and replaces what waited before");
+  assert.equal(tile("z"), null);
+
   assert.deepEqual(app.fallos, []);
 });

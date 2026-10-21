@@ -53,8 +53,11 @@ como la web.
 - **Solo los workspaces vinculados a la cuenta.** Cada fila de `/v1/computers`
   trae `workspaces`, los ids que esa máquina vinculó a la cuenta que entró; el
   relay ya rechaza el resto (`workspace_not_linked`) y el teléfono filtra otra
-  vez la lista, la atención y los eventos (`linkedWorkspaces`, `onlyLinked` en
-  `@terminus/computers`). Una fila sin el campo es de un plano de control
+  vez la lista, la atención y los eventos, por el workspace del sobre y por el
+  de `payload.workspace` (`linkedWorkspaces`, `onlyLinked`, `linkedEvents` en
+  `@terminus/computers`; prueba en `npm test`). `attention` llega como la lista
+  entera de la máquina, que reemplaza, o como una entrada suelta, que cambia solo
+  su workspace (`mergeAttention`). Una fila sin el campo es de un plano de control
   anterior y no se filtra.
 - **El fondo de los chats es del workspace** (`chat_background`): la imagen
   propia se pinta detrás de la conversación con el velo del workspace
@@ -128,8 +131,9 @@ workspaces, que va a la raíz que fijó la compilación,
   tarea nueva es `send_message` sin sesión; la conversación, `load_session`;
   aprobaciones y preguntas, `pending_requests` y el turno de la pregunta.
 - `apps/mobile/src/lib/workspaces.tsx`: el reparto entre máquinas, con la regla de la web
-  (`groupWorkspaces`): cada motor tiene sus ids, así que dos workspaces son el
-  mismo si tienen el mismo proveedor y remoto o, si no, el mismo nombre. Se ven
+  (`groupWorkspaces`): un workspace de la cuenta tiene el mismo id en cada
+  máquina (`apps/desktop/docs/account-workspace.md`), así que dos filas son el
+  mismo workspace solo si su id es igual, nunca por nombre ni remoto. Se ven
   una vez; sus carpetas y tareas vienen de cada máquina, marcadas con ella
   (`host/id`), y cada acción va a la máquina de la tarea con el id que ella le
   da al workspace. Los spaces son los de la primera máquina (la VM administrada).

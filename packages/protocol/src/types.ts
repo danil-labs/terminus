@@ -7,7 +7,7 @@ export type EngineError = { code: string; message_key?: string; detail?: unknown
 
 /** La cuenta de Danil vinculada a un workspace (`danil` de `list_workspaces`). */
 export type WorkspaceDanil = { user_id: string; email?: string | null; name?: string | null };
-/** `provider` y `remote` dicen si dos workspaces de máquinas distintas son el mismo (`groupWorkspaces`). */
+/** Un workspace tiene el mismo id en cada máquina que lo tiene (`groupWorkspaces`). */
 export type Workspace = { id: string; name: string; provider?: string | null; remote?: string | null; danil?: WorkspaceDanil | null };
 /** `list_workspaces`. */
 export type Startup = { workspaces: Workspace[]; active: string | null };

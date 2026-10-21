@@ -63,3 +63,16 @@ export function callWorkspace(workspace: string | null, args: Readonly<Record<st
 export function linkedEvent(event: { workspace?: unknown }, linked: ReadonlySet<string> | null): boolean {
   return !linked || typeof event.workspace !== "string" || linked.has(event.workspace);
 }
+
+/**
+ * Los eventos de una página del relay que la persona puede ver: ninguno de un
+ * workspace sin vincular, diga su workspace el sobre o el `payload`, y el de
+ * `attention` sin las entradas de esos workspaces.
+ */
+export function linkedEvents<E extends { name: string; payload?: unknown; workspace?: unknown }>(events: readonly E[], linked: ReadonlySet<string> | null): E[] {
+  if (!linked) return [...events];
+  const inner = (e: E) => (e.payload && typeof e.payload === "object" && !Array.isArray(e.payload) ? (e.payload as { workspace?: unknown }) : {});
+  return events
+    .filter((e) => linkedEvent(e, linked) && linkedEvent(inner(e), linked))
+    .map((e) => (e.name === "attention" ? { ...e, payload: linkedAttention(e.payload, linked) } : e));
+}

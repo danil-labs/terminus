@@ -119,6 +119,8 @@ const INTENT = new Set([
   "recreate_task_work",
   "add_workspace",
   "radiant_login",
+  "materialize_workspace",
+  "ensure_project",
 ]);
 const READ = /^(list_|load_|read_|get_|preview_)|_status$|^(workspaces_startup|session_usage|task_history|session_folder|setup_required|check_environment|account_limits|chat_background)$/;
 /** With the computer off and nothing read before: a managed computer is prepared at install. */
@@ -190,6 +192,10 @@ function rememberMachine(id: string) {
 }
 
 const OUTDATED = new Set(["version_mismatch", "service_version"]);
+/** Commands about the machine, not a workspace: a machine without the open workspace takes them without one. */
+const OF_THE_MACHINE = /(^|_)accounts?($|_)|login|^radiant_|^danil_/;
+/** How an engine says it does not know a command. */
+const UNKNOWN = new Set(["command", "unsupported", "command_not_allowed"]);
 type Event = NonNullable<EventsPage["events"]>[number];
 const NONE = Symbol("none");
 type Link = ReturnType<typeof createLink>;
@@ -356,19 +362,27 @@ export function createWebTransport(
   let ordered: Promise<unknown> = Promise.resolve();
   const { wake, changeOr } = changes();
 
-  /** Where something new goes: the last machine used if it has this workspace, else the first that has it. */
-  const fallback = (workspace: string | null) => {
+  /**
+   * Where something new goes without a choice: the last machine used, else the
+   * window's (the first of the workspace), as long as it has the workspace and
+   * can run the project.
+   */
+  const fallback = (workspace: string | null, project: unknown = null) => {
     const members = fleet.multi ? fleet.membersOf(workspace) : fleet.usable();
+    const able = members.filter((m) => fleet.canRun(m, workspace, project));
     const last = lastMachine();
-    return last && members.includes(last) ? last : (members[0] ?? fleet.usable()[0] ?? fleet.machines[0].id);
+    return last && able.includes(last) ? last : (able[0] ?? members[0] ?? fleet.usable()[0] ?? fleet.machines[0].id);
   };
-  /** The machine picked in «Ejecutar en» for this workspace (`features/machines/store.ts`). */
-  const picked = (workspace: string | null) => {
+  /** Whether `machine` can take a new task of `workspace`: it has it or can make it its own. */
+  const takes = (machine: string, workspace: string | null) => fleet.has(machine, workspace) !== false || fleet.materializes(machine);
+  /** The machine picked in «Ejecutar en» for this workspace (`features/machines/store.ts`), if it can run the project. */
+  const picked = (workspace: string | null, project: unknown) => {
     const id = workspace ? leerPref<Record<string, string>>("machines.run_on", {})[workspace] : undefined;
-    return id && fleet.membersOf(workspace).includes(id) ? id : null;
+    return id && fleet.usable().includes(id) && takes(id, workspace) && fleet.canRun(id, workspace, project) ? id : null;
   };
 
   const off = (machine: string): Failure => ({ what: t("web.machines.off_action", { name: fleet.name(machine) }), detail: "machine_off" });
+  const missing = (machine: string): Failure => ({ what: t("web.machines.missing_workspace", { name: fleet.name(machine) }), detail: "workspace_missing" });
   const outdated = (machine: string): Failure => ({ what: t("web.machines.outdated_action", { name: fleet.name(machine) }), detail: "version_mismatch" });
 
   /** One machine: an outdated one refuses, and one that cannot be woken says it is off instead of waiting. */
@@ -420,7 +434,7 @@ export function createWebTransport(
       const answers = results.filter((r): r is { machine: string; value: unknown } => !!r && "value" in r);
       if (answers.length || usable.length === 0) {
         if (!answers.length && FAN.has(command)) return [];
-        return fleet.merge(command, answers);
+        return fleet.merge(command, answers, workspace);
       }
       const failed = results.find((r) => r && "error" in r) as { error: unknown } | undefined;
       if (failed && results.every((r) => r && "error" in r)) throw failed.error;
@@ -429,17 +443,44 @@ export function createWebTransport(
   }
 
   async function send(command: string, workspace: string | null, args: Args, options: Options): Promise<unknown> {
-    const chosen = headerOf(options, "x-terminus-machine") ?? (CREATE.has(command) ? picked(workspace) : null);
+    const chosen = headerOf(options, "x-terminus-machine") ?? (CREATE.has(command) ? picked(workspace, args.project) : null);
     let route: ReturnType<Fleet["route"]>;
     try {
-      route = fleet.route(command, args, workspace, chosen && fleet.info(chosen) ? chosen : null, fallback(workspace));
+      route = fleet.route(command, args, workspace, chosen && fleet.info(chosen) ? chosen : null, fallback(workspace, args.project));
     } catch {
       throw { what: t("web.machines.cross_machine"), detail: "cross_machine" };
     }
     if ("fan" in route) return fan(command, route.fan, route.args, workspace);
-    const value = await one(route.machine, command, route.workspace, route.args, options);
+    let target = route.workspace;
+    if (route.missing && workspace) {
+      if (CREATE.has(command)) target = await materialize(route.machine, workspace);
+      else if (!OF_THE_MACHINE.test(command)) throw missing(route.machine);
+    }
+    const value = await one(route.machine, command, target, route.args, options);
+    // A workspace just made on a machine is that machine's before it lists its workspaces again.
+    const made = (value as { id?: unknown } | null)?.id;
+    if (command === "add_workspace" && typeof made === "string") fleet.materialized(route.machine, made);
     if (fleet.multi && CREATE.has(command) && !route.named) rememberMachine(route.machine);
     return fleet.encode(route.machine, value, command);
+  }
+
+  /**
+   * A machine that lacks the workspace of something new makes it its own first,
+   * with the same id. An engine that does not know how yet says so once, and the
+   * machine is left out of «Ejecutar en» for workspaces it lacks.
+   */
+  async function materialize(machine: string, workspace: string): Promise<string> {
+    if (!fleet.materializes(machine)) throw missing(machine);
+    try {
+      await one(machine, "materialize_workspace", null, { id: workspace });
+    } catch (error) {
+      const detail = (error as Failure | undefined)?.detail;
+      if (typeof detail !== "string" || !UNKNOWN.has(detail)) throw error;
+      fleet.cannotMaterialize(machine);
+      throw missing(machine);
+    }
+    fleet.materialized(machine, workspace);
+    return workspace;
   }
 
   /** The active workspace on each of its machines that is on; nothing waits for one that is off. */
@@ -566,6 +607,12 @@ export function createWebTransport(
       for (const id of fleet.usable()) if (id !== homeId) link(id).relay.subscribe(null);
     }
     const page = (await (home as HomeLink).call("service_poll", args, options)) as Record<string, unknown> | null;
+    // The home's `attention` speaks only of its machine: the window gets the list of every machine.
+    if (fleet.multi && page && Array.isArray(page.batches)) {
+      page.batches = (page.batches as { events?: { name: string; payload: unknown }[] }[]).map((b) =>
+        Array.isArray(b?.events) ? { ...b, events: b.events.map((e) => (e.name === "attention" ? { ...e, payload: fleet.encodeEvent(homeId as string, e.name, e.payload) } : e)) } : b,
+      );
+    }
     if (!remoteGap || !page || typeof page !== "object") return page;
     remoteGap = false;
     return { ...page, streams: true };
@@ -626,8 +673,7 @@ export function createWebTransport(
       if (QUIET.has(command)) return null;
       if (command === "machine_list") {
         const lead = fallback(active);
-        const members = fleet.membersOf(active);
-        return fleet.usable().map((id) => ({ id, local: id === homeId, active: id === lead, on: on(id), linked: !fleet.multi || members.includes(id) }));
+        return fleet.usable().map((id) => ({ id, local: id === homeId, active: id === lead, on: on(id), hosts: fleet.has(id, active), materializes: fleet.materializes(id) }));
       }
       if (command === "machine_select") {
         if (typeof args.id !== "string" || !fleet.info(args.id)) throw failureOf({ code: "command" });

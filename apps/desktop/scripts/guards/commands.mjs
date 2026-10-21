@@ -75,6 +75,7 @@ const SIN_INTERFAZ = {
   install_tool: "pnpm y Bun los instala bootstrap::prepare_runtime desde Rust; ninguna pantalla lo invoca",
   tree_typst_target: "lo pide typst_live::typst_live_open desde el Rust de la ventana: el webview nunca da la ruta de arranque",
   danil_client_token: "lo pide proxy::account_relay_token desde el Rust de la ventana: la credencial de máquina no sale del motor",
+  import_chat_background_data: "lo usaba «Usar este workspace aquí», ya borrado; el fondo llegará desde la cuenta de Danil en la fase 2 (docs/account-workspace.md)",
   remove_provider: "sin forma confiable de saber qué instaló Terminus, se quitó el botón",
   remove_gh: "sin forma confiable de saber qué instaló Terminus, se quitó el botón",
   remove_tool: "sin forma confiable de saber qué instaló Terminus, se quitó el botón",
@@ -85,6 +86,9 @@ const SIN_INTERFAZ = {
   restore_task_work: "restaurar vivía en el Historial de tareas, que salió de la ventana",
   create_agent_thread: "los temas antiguos se conservan para lectura; las conversaciones nuevas nacen como tareas",
   sources_in_use: "traer material ya no espera a que acabe el turno que lo lee; el motor lo usa para no cambiar de rama bajo un turno",
+  materialize_workspace: "lo pide la web por el relay a la máquina elegida (web/transport.ts); la ventana local abre sus propios workspaces",
+  ensure_project: "lo pide la web por el relay antes de crear una tarea en otra máquina; el motor lo llama solo en send_message y run_shell_command",
+  sync_workspace: "lo llama el conector del motor al recibir workspace.changed del relay",
   // `docs/agents.md` § Estado observable: el comando de agregación existe
   // para que el riel deje de sondear; el riel mismo no está construido.
 };
