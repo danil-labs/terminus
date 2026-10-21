@@ -134,7 +134,7 @@ export default function Tasks() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         contentInsetAdjustmentBehavior="automatic"
       >
-        <MachineNote hosts={hosts} fleet={fleet} cachedAt={snapshot?.cachedAt ?? null} />
+        <MachineNote hosts={hosts} fleet={fleet} />
         {askNotifications ? (
           <View style={[styles.optIn, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <Text style={{ color: theme.text, flex: 1 }}>{t("notify.enable")}</Text>

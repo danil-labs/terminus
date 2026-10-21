@@ -1,17 +1,15 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { Host } from "../lib/hosts";
-import { t, w } from "../lib/i18n";
+import { w } from "../lib/i18n";
 import { type Fleet, useMachines } from "../lib/machines";
 import { useTheme } from "./theme";
 
-const time = (at: number) => new Date(at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
 /**
  * Lo que la persona tiene que saber de sus máquinas, siempre en tono neutro:
- * una máquina apagada no es un error. Encendiéndose, se dice; apagada con
- * copia, de cuándo es lo que se ve.
+ * una máquina apagada no es un error. Encendiéndose, se dice; apagada, no se
+ * dice nada: la lista de tareas ya enseña lo que guardó.
  */
-export function MachineNote({ hosts, fleet, cachedAt }: { hosts: Host[]; fleet: Fleet; cachedAt: number | null }) {
+export function MachineNote({ hosts, fleet }: { hosts: Host[]; fleet: Fleet }) {
   const theme = useTheme();
   const { reloadComputers } = useMachines();
   const lines: string[] = [];
@@ -21,15 +19,6 @@ export function MachineNote({ hosts, fleet, cachedAt }: { hosts: Host[]; fleet: 
   for (const host of hosts) {
     if (host.power() === "starting") lines.push(w("shell.machines.waking", { name: host.label }));
     else if (host.power() === "outdated") lines.push(w("web.machines.outdated_action", { name: host.label }));
-    else if (host.power() === "off" && host.kind === "computer") {
-      lines.push(
-        cachedAt !== null
-          ? t("machines.cached", { name: host.label, time: time(cachedAt) })
-          : host.managed
-            ? w("shell.machines.asleep_notice", { name: host.label })
-            : w("web.machines.off_action", { name: host.label }),
-      );
-    }
   }
   if (!lines.length) return null;
   return (
