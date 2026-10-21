@@ -1,5 +1,8 @@
-Terminus 0.2.83 te deja iniciar sesión con tu cuenta de Danil para ver y operar las tareas de esta computadora desde la web y el celular.
+Terminus 0.2.84 sincroniza todos tus workspaces con tu cuenta de Danil y te deja elegir en qué máquina corre cada tarea.
 
-- **Inicia sesión con Danil.** En el primer arranque, o desde el pie de la barra lateral, «Iniciar sesión con Danil» abre el navegador; confirmas y esta computadora queda en tu cuenta. Se ve y se cierra en Configuración → Conexiones → Cuenta de Danil.
-- **Tu computadora en app.danil.ai/terminus.** Con la sesión iniciada, sus proyectos y tareas aparecen en la web junto a tus otras máquinas, y desde ahí puedes enviar mensajes y crear tareas en ella.
-- **Motor alineado con la app.** La app y su motor vuelven a hablar el mismo contrato, y una comprobación nueva impide publicar una versión que no coincida.
+- **Tus workspaces en todas tus máquinas.** Con la sesión de Danil iniciada, todos los workspaces de esta computadora se ven en la web, en el teléfono y en tus otras máquinas, también los que crees después. Al cerrar sesión deja de sincronizarse. Ya no hay que vincular cada workspace a mano.
+- **«Ejecutar en» decide dónde corre la tarea.** Si eliges tu VM, la tarea nace ahí: el workspace es el mismo en todas tus máquinas y el proyecto se clona en la VM la primera vez que hace falta.
+- **Clonar y crear carpetas en otra máquina** desde la web, el escritorio y el teléfono, con su avance y la opción de cancelar.
+- **Nuevo arranque.** Conecta tu IA y personaliza Terminus desde el primer inicio, con una preparación más clara.
+- **Fórmulas en el chat.** Las fórmulas LaTeX se pintan con KaTeX.
+- **Arreglos.** El fondo del chat ya no se borra ni pasa de un workspace a otro, se ve por qué no se puede agregar otra cuenta, y en Windows ya se puede quitar una cuenta de Antigravity.

@@ -63,11 +63,16 @@ channel) answers `{operation}` and clones in the background,
 `project_clone_status` (`{operation}`) gives the last event of that clone or
 `null`, and the `project_clone` event carries `{workspace, operation, phase,
 percent, done}` plus `project` or `error` at the end. This copy is the
-engine's manifest byte for byte (seldon-host dev `7569120`), pinned in
-`seldon-runtime.lock` as `seldon-runtime-v0.2.73-7569120`.
+engine's manifest byte for byte (seldon-host dev `7569120`).
+
+seldon-host dev `9bd80c1` (#76, #77, #79) keeps the same manifest: the engine of
+a VM uses the connector's credential, removing an account waits for the CLI that
+holds its home, and while the computer is signed in to Danil every workspace is
+linked to the account. Pinned in `seldon-runtime.lock` as
+`seldon-runtime-v0.2.73-9bd80c1`.
 
 The source is `crates/engine-protocol/commands.json` in `danil-labs/seldon-host`
-(here, seldon-host dev `7569120`). The engine pinned in `seldon-runtime.lock` must
+(here, seldon-host dev `9bd80c1`). The engine pinned in `seldon-runtime.lock` must
 announce this same hash as its `contract`; the `contract` guard
 (`scripts/guards/contract.mjs`) compares the three.
 
