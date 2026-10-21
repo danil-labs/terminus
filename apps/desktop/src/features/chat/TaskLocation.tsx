@@ -1,6 +1,7 @@
 import Folder from "lucide-solid/icons/folder";
 import GitBranch from "lucide-solid/icons/git-branch";
 import Laptop from "lucide-solid/icons/laptop";
+import Monitor from "lucide-solid/icons/monitor";
 import Server from "lucide-solid/icons/server";
 import { createSignal, type JSX, onCleanup, Show } from "solid-js";
 import { copyText } from "../../lib/clipboard";
@@ -18,6 +19,8 @@ export type TaskLocationProps = {
   /** La carpeta de trabajo de la tarea (su worktree). */
   path?: string;
   branch?: string;
+  /** Abre la pantalla de esa máquina; el botón solo sale en una VM administrada encendida. */
+  onScreen?: (machine: string) => void;
 };
 
 const PARTE = "flex h-5.5 min-w-0 items-center gap-1.25 rounded-sm px-1.25 whitespace-nowrap";
@@ -54,6 +57,10 @@ export default function TaskLocation(props: TaskLocationProps) {
       clearTimeout(espera);
       espera = setTimeout(() => setCopiada(false), 1500);
     }).catch(() => {});
+  };
+  const pantalla = () => {
+    const m = props.machine;
+    return m && props.on && !local() && props.onScreen && capabilities().machineScreen?.(m) ? m : null;
   };
   const Sep = () => <span aria-hidden="true" class="shrink-0 px-px text-neutral-500/60">/</span>;
 
@@ -103,6 +110,19 @@ export default function TaskLocation(props: TaskLocationProps) {
               <span data-task-location-branch="" class="min-w-0 truncate font-mono text-[0.71875rem]">{rama()}</span>
             </Pista>
           </>
+        )}
+      </Show>
+      <Show when={pantalla()}>
+        {(m) => (
+          <Pista
+            class="ml-1 shrink-0 text-neutral-500"
+            label={t("screen.open_tip", { name: nombre() })}
+            tip={t("screen.open_tip", { name: nombre() })}
+            onClick={() => props.onScreen?.(m())}
+          >
+            <Monitor size={13} aria-hidden="true" class="shrink-0" />
+            <span data-task-location-screen="">{t("screen.open")}</span>
+          </Pista>
         )}
       </Show>
     </nav>

@@ -87,6 +87,7 @@ const AgentProfile = lazy(() => import("../features/projects/AgentProfile"));
 // El alta solo se abre sin workspace o al agregar otro: no entra en la carga inicial.
 const Onboarding = lazy(() => import("../features/onboarding/Onboarding"));
 const TaskLocation = lazy(() => import("../features/chat/TaskLocation"));
+const Screen = lazy(() => import("../features/screen/Screen"));
 import AgentTasks, { createdTasks } from "../features/projects/AgentTasks";
 import ArchivedTasks from "../features/projects/ArchivedTasks";
 import BaseBranchPicker from "../features/projects/BaseBranchPicker";
@@ -213,6 +214,8 @@ import {
   isTaskTab,
   migrateLegacyStrip,
   OBSERVABILITY_TAB_ID,
+  type ScreenTab,
+  screenTabId,
   type SiteTab,
   siteTabId,
   spacesWithStoredStrip,
@@ -4263,7 +4266,7 @@ export default function App() {
     setProyectoAbierto(null);
     // El navegador del «+» tampoco cuelga de ninguna tarea: detrás no se
     // abre nada.
-    if (p.clase === "observabilidad" || (p.clase === "sitio" && p.navegador)) {
+    if (p.clase === "observabilidad" || p.clase === "pantalla" || (p.clase === "sitio" && p.navegador)) {
       pestanas.activate(p.id);
       return;
     }
@@ -4310,6 +4313,17 @@ export default function App() {
   function abrirObservabilidad() {
     setProyectoAbierto(null);
     pestanas.openObservability(t("observability.tab"));
+  }
+
+  /** La pantalla de una VM, en una ventana al lado de la conversación: se mira mientras se trabaja. */
+  function abrirPantalla(machine: string) {
+    const id = screenTabId(machine);
+    const nueva = !pestanas.open().some((p) => p.id === id);
+    setProyectoAbierto(null);
+    pestanas.openScreen(machine, t("screen.tab", { name: machineName(machine) }));
+    paneles.sync(pestanas.open().map((x) => x.id));
+    paneles.activate(id);
+    if (nueva && !paneles.isSplit()) paneles.split(id);
   }
 
   /**
@@ -4462,7 +4476,7 @@ export default function App() {
     const p = pestanasEnPantalla().find((x) => x.id === id);
     if (!p) return "";
     if (isTaskTab(p)) return p.titulo;
-    if (p.clase === "observabilidad") return p.titulo;
+    if (p.clase === "observabilidad" || p.clase === "pantalla") return p.titulo;
     if (p.clase === "sitio" && !p.url) return t("sites.new_tab");
     const r = p.clase === "archivo" ? p.ruta : p.clase === "artefacto" ? p.rel : p.url;
     return r.slice(r.lastIndexOf("/") + 1);
@@ -6242,6 +6256,7 @@ export default function App() {
           return <Suspense fallback={null}><TaskLocation
             machine={filaDe(id())?.machine}
             on={!apagadas()[id()] && filaDe(id())?.machine_on !== false}
+            onScreen={abrirPantalla}
             project={proyectoDeLaCelda()?.name}
             path={estadoDelTrabajo()?.path || undefined}
             branch={workLabel(estadoDelTrabajo()?.branch, estadoDelTrabajo()?.alias) || undefined} /></Suspense>;
@@ -7216,6 +7231,21 @@ export default function App() {
           <Observability onManage={() => setSettings("plugins")} />
         </div>
       </Show>
+
+      <For each={pestanas.open().filter((p): p is ScreenTab => p.clase === "pantalla")}>
+        {(p) => {
+          const open = capabilities().machineScreen?.(p.machine);
+          return (
+            <div
+              class="min-h-0 min-w-0"
+              classList={{ hidden: celdaDe(p.id) === undefined || tapadoPorElProyecto(paneles.siteOf(p.id)), "pt-8": llevaTiraInterior(paneles.siteOf(p.id)) }}
+              style={celdaDe(p.id)}
+            >
+              <Show when={open}>{(abrir) => <Suspense fallback={null}><Screen open={abrir()} /></Suspense>}</Show>
+            </div>
+          );
+        }}
+      </For>
 
       </Paneles>
 

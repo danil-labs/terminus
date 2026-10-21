@@ -43,6 +43,8 @@ export type Capabilities = {
   remoteCreate?: (workspace: string | null) => { machine: string; lead: boolean } | null;
   /** Los adjuntos salen del navegador como bytes: el motor solo guarda imágenes (`guardar_imagen_pegada`). */
   browserFiles?: boolean;
+  /** El visor de la pantalla de una VM administrada (solo ver); `null` si esa máquina no tiene. */
+  machineScreen?: (machine: string) => (() => Promise<WebSocket>) | null;
   /** Bajo la tarjeta de una cuenta: sus máquinas. */
   accountMachines?: (props: AccountMachinesProps) => JSX.Element;
 };

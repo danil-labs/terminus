@@ -843,3 +843,26 @@ test("una tarea que aún nace no se recuerda al cerrarla", () => {
   t.closeMany(t.open().map((p) => p.id), { remember: true });
   assert.equal(t.canReopen(), false);
 });
+
+/**
+ * La pantalla es de la máquina, no de una tarea: una por máquina, y ni
+ * sincronizar con el historial ni reiniciar la tratan como tarea.
+ */
+test("la pantalla de una máquina es una sola pestaña que no se guarda", () => {
+  const t = tira("pantalla");
+  t.ensure(tarea("s1"));
+  t.openScreen("vm-1", "Pantalla de vm-1");
+  t.openScreen("vm-1", "Pantalla de vm-1");
+  t.openScreen("vm-2", "Pantalla de vm-2");
+  assert.deepEqual(
+    t.open().map((p) => p.id),
+    ["s1", "pantalla\u0000vm-1", "pantalla\u0000vm-2"],
+  );
+  assert.equal(t.active(), "pantalla\u0000vm-2");
+  t.sync((id) => (id === "s1" ? { project: "p", titulo: "uno" } : null));
+  assert.equal(t.open().length, 3);
+  assert.deepEqual(
+    tira("pantalla").open().map((p) => p.id),
+    ["s1"],
+  );
+});

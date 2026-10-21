@@ -1,0 +1,13 @@
+{
+  "screen.open": "Pantalla",
+  "screen.open_tip": "Ver la pantalla de {name}",
+  "screen.tab": "Pantalla de {name}",
+  "screen.connecting": "Conectando con la pantalla…",
+  "screen.view_only": "Solo ver",
+  "screen.offline": "La computadora está apagada. Su pantalla se ve cuando está encendida.",
+  "screen.unavailable": "Esta computadora no tiene pantalla todavía. Llega con la próxima actualización de su motor.",
+  "screen.busy": "Ya hay dos pantallas abiertas de esta computadora. Cierra una para ver esta.",
+  "screen.ended": "Se cerró la pantalla.",
+  "screen.failed": "No se pudo conectar con la pantalla.",
+  "screen.retry": "Reconectar"
+}

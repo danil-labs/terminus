@@ -5,7 +5,7 @@
  * that sets `window.terminusWeb` before this module loads can replace any
  * setting, or give `getToken` with `computerId` or `computers` and skip the session.
  */
-import { linkedWorkspaces, listWorkspaces } from "@terminus/computers";
+import { linkedWorkspaces, listWorkspaces, screenProtocols, screenUrl } from "@terminus/computers";
 import { chosenWebLayout, MOBILE_WEB_DIR } from "@terminus/design";
 import { createSignal, lazy, Suspense } from "solid-js";
 import { t } from "../lib/i18n";
@@ -92,6 +92,10 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
       return first && { id: first.id, name: first.name, local: false };
     },
     remoteCreate: (workspace) => transport.createsOn(workspace),
+    machineScreen: (id) =>
+      links.some(({ info }) => info.id === id && info.wakes)
+        ? async () => new WebSocket(screenUrl(base.endpoint, id), screenProtocols(await base.getToken()))
+        : null,
     machineOnCreate: multi
       ? (workspace) => (
           <Suspense fallback={null}>
