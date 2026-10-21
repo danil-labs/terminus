@@ -202,6 +202,32 @@ pub fn retire_if_replaced(paths: &Paths) {
     }
 }
 
+/// «Actualizar ya» con el motor anterior trabajando: corta sus turnos y apunta sus
+/// tareas para que el nuevo las retome. Uno sin esa orden se niega y se termina su proceso.
+pub fn force_previous(paths: &Paths) -> Result<()> {
+    let endpoint = paths.data.join("seldon-endpoint.json");
+    let (found, _) = previous(&endpoint)?;
+    let asked = terminus_engine_client::force_stop_any_contract(&endpoint, Duration::from_secs(5));
+    log::info!(
+        "[engine] update now: previous pid={} force_stop={}",
+        found.pid,
+        asked.is_ok()
+    );
+    if asked.is_err() {
+        super::legacy::terminate(found.pid);
+    }
+    // El motor corta los turnos con hasta 10 s para guardar cada transcripción.
+    let deadline = Instant::now() + Duration::from_secs(60);
+    while Instant::now() < deadline {
+        if !super::legacy::alive(found.pid) {
+            return Ok(());
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    super::legacy::terminate(found.pid);
+    Err(Error::new("service_busy"))
+}
+
 /// El motor vivo sobre la raíz aunque sea de otro contrato, con su `status`.
 fn previous(endpoint: &Path) -> Result<(terminus_engine_protocol::Endpoint, serde_json::Value)> {
     let (found, status) =
