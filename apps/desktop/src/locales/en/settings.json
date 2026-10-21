@@ -114,6 +114,7 @@
   "settings.accounts.save": "Save",
   "settings.accounts.saving": "Saving…",
   "settings.accounts.send_code": "Send the code",
+  "settings.accounts.shared_remove_first": "To connect another account, remove this one first.",
   "settings.accounts.step_browser": "Sign in in your browser",
   "settings.accounts.step_browser_hint": "A tab opened with the {agent} page. If you don't see it, open it again or copy the link to paste it in another browser.",
   "settings.accounts.step_code": "Paste the code the page shows you",

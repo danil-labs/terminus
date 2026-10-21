@@ -114,6 +114,7 @@
   "settings.accounts.save": "Guardar",
   "settings.accounts.saving": "Guardando…",
   "settings.accounts.send_code": "Enviar el código",
+  "settings.accounts.shared_remove_first": "Para conectar otra cuenta, quita primero la que está.",
   "settings.accounts.step_browser": "Inicia sesión en el navegador",
   "settings.accounts.step_browser_hint": "Se abrió una pestaña con la página de {agent}. Si no la ves, vuelve a abrirla o copia el enlace para pegarlo en otro navegador.",
   "settings.accounts.step_code": "Pega el código que te muestra la página",
