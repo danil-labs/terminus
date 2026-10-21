@@ -1,0 +1,88 @@
+/**
+ * The desktop's default themes, Violeta (light) and Grafito (dark), for clients
+ * that cannot read `src/styles/global.css`. `CSS_SOURCE` names the variable each
+ * value comes from; `scripts/guards/shared-design.mjs` fails when one drifts.
+ * Keys without a source exist only outside the desktop.
+ */
+export type ThemeTokens = {
+  bg: string;
+  surface: string;
+  muted: string;
+  border: string;
+  text: string;
+  textMuted: string;
+  primary: string;
+  onPrimary: string;
+  userBubble: string;
+  success: string;
+  error: string;
+  info: string;
+  approving: string;
+  asked: string;
+  failedMark: string;
+  unseenMark: string;
+  delivered: string;
+};
+
+export const CSS_SOURCE: Partial<Record<keyof ThemeTokens, string>> = {
+  bg: "--color-bg",
+  surface: "--color-surface",
+  muted: "--color-surface-muted",
+  border: "--color-border",
+  text: "--color-neutral-950",
+  textMuted: "--color-neutral-500",
+  primary: "--color-primary",
+  approving: "--color-warning",
+  asked: "--color-brand-yellow",
+  failedMark: "--color-error-strong",
+  unseenMark: "--color-success-strong",
+  delivered: "--color-neutral-500",
+};
+
+export const THEMES: { light: ThemeTokens; dark: ThemeTokens } = {
+  light: {
+    bg: "#f9f9f9",
+    surface: "#ffffff",
+    muted: "#f3f4f8",
+    border: "rgba(10,13,35,0.1)",
+    text: "#0a0d23",
+    textMuted: "#62647a",
+    primary: "#6539f5",
+    onPrimary: "#ffffff",
+    userBubble: "#efeafe",
+    success: "#15803d",
+    error: "#dc2626",
+    info: "#2563eb",
+    approving: "#f59e0b",
+    asked: "#f4eb7b",
+    failedMark: "#dc2626",
+    unseenMark: "#166534",
+    delivered: "#62647a",
+  },
+  dark: {
+    bg: "#111113",
+    surface: "#212124",
+    muted: "#19191c",
+    border: "rgba(255,255,255,0.08)",
+    text: "#ececef",
+    textMuted: "#9a9aa3",
+    primary: "#ececef",
+    onPrimary: "#111113",
+    // `--color-chat-user`: brand yellow at 8% over `surface-raised`.
+    userBubble: "#3c3b36",
+    success: "#4ade80",
+    error: "#f87171",
+    info: "#60a5fa",
+    approving: "#f59e0b",
+    asked: "#f4eb7b",
+    failedMark: "#f87171",
+    unseenMark: "#4ade80",
+    delivered: "#9a9aa3",
+  },
+};
+
+/** The selectors whose declarations make each theme, in cascade order. */
+export const CSS_THEME_BLOCKS = {
+  light: ["@theme static", '[data-theme="light"][data-light-style="violet"]'],
+  dark: ["@theme static", '[data-theme="dark"]', '[data-theme="dark"][data-dark-style="graphite"]'],
+} as const;

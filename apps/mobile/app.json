@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "Terminus",
+    "slug": "terminus-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "ai.danil.terminus.mobile"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#111113",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "ai.danil.terminus.mobile"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-localization",
+      [
+        "expo-notifications",
+        {
+          "color": "#6539F5"
+        }
+      ],
+      "expo-web-browser",
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Terminus abre tus fotos solo para adjuntar las que elijas a un mensaje.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ]
+    ],
+    "scheme": "terminus-mobile",
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
