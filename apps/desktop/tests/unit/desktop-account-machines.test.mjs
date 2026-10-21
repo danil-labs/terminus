@@ -339,6 +339,26 @@ test("a tab of another machine's task never takes every folder's tasks to that m
   assert.deepEqual(app.fallos, []);
 });
 
+test("while the fleet does not know the open workspace yet, the window's lists still answer with this computer's tasks", async () => {
+  // A VM that is slow to say its workspaces keeps the fleet's first `list_workspaces` waiting.
+  const slow = remote("Panel", "Tarea de la VM", { list_workspaces: () => sleep(4000).then(() => ({ workspaces: [SAME], active: "w" })) });
+  const { app, invoke, doc } = await open("desktop-account-first-listing", {
+    computers: [HOME, { ...VM, state: "online" }],
+    relays: { cmp_vm: { table: slow, state: "online" } },
+  });
+  const rows = await invoke("list_live_sessions", { project: "p1", open: [] });
+  assert.ok(rows.some((r) => r.id === "t1"), `a read before the fleet knows the workspace keeps this computer's tasks: ${JSON.stringify(rows.map((r) => r.id))}`);
+  const projects = await invoke("list_projects");
+  assert.deepEqual(projects.map((p) => p.id), ["p1"], "and its folders");
+  app.w.dispatchEvent(new app.w.CustomEvent("harness:tasks-changed"));
+  await sleep(500);
+  assert.ok(doc.querySelector('[data-sesion="t1"]'), "the sidebar keeps the local task meanwhile");
+  await sleep(4000);
+  assert.ok(doc.querySelector('[data-sesion="cmp_vm~t1"]'), "once the fleet knows it, the VM's tasks join");
+  assert.ok(doc.querySelector('[data-sesion="t1"]'));
+  assert.deepEqual(app.fallos, []);
+});
+
 const SESSION_A = { account: "u_alberto", email: "alberto@danil.ai", name: "Alberto", photo: null, computer_id: "cmp_home", computer_name: "Mi Mac", default: true, workspaces: [], status: "connected", online: true };
 const SESSION_B = { ...SESSION_A, account: "u_fdb", email: "alberto@dondebanco.org", computer_id: "cmp_home_fdb", default: false, workspaces: ["w"] };
 

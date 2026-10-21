@@ -63,13 +63,14 @@ export function relay({ state: initial = "online", wakeAfter = 300, cachedAt = n
       if (m.type === "subscribe") subscriptions.push(m.after);
       if (m.type !== "call") return;
       calls.push(m);
-      const respond = () => {
+      // An answer that is a promise arrives when it settles: an engine that takes its time.
+      const respond = async () => {
         const answer = table[m.command];
         const reply = outdated
           ? { type: "result", id: m.id, error: { code: "version_mismatch" } }
           : answer === undefined
           ? { type: "result", id: m.id, error: { code: "command" } }
-          : { type: "result", id: m.id, value: typeof answer === "function" ? answer(m.args) : answer };
+          : { type: "result", id: m.id, value: await (typeof answer === "function" ? answer(m.args) : answer) };
         if (this.readyState === 1) this.onmessage?.({ data: JSON.stringify(reply) });
       };
       if (state === "online") return void setTimeout(respond, 0);

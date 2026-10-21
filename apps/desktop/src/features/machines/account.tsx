@@ -205,7 +205,6 @@ export function startAccountMachines(target: Target = window) {
       }
       return transport.handle(command, args, options) as Promise<unknown>;
     };
-    internals.invoke = route;
     const layer = document.createElement("div");
     document.body.append(layer);
     const unmount = render(
@@ -231,12 +230,15 @@ export function startAccountMachines(target: Target = window) {
       },
     };
     for (const r of relays) r.start();
-    // The groups of workspaces and the open one come from this read; the lists read after it.
+    // The groups of workspaces and the open one come from this read. Until it answers the window's lists stay
+    // native: the fleet would read them with no open workspace and give back every folder empty.
     void transport
       .handle("list_workspaces", {})
       .catch(() => null)
       .then(() => {
-        if (installed?.transport === transport) refresh();
+        if (installed?.transport !== transport) return;
+        internals.invoke = route;
+        refresh();
       });
   }
 

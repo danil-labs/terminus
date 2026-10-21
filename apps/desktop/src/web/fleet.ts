@@ -179,10 +179,13 @@ export class Fleet {
     return this.listed.has(machine) ? false : null;
   }
 
-  /** The machines that hold a workspace of the panel, in order; before they list theirs, every one that may. */
+  /**
+   * The machines that hold a workspace of the panel, in order; before they list theirs, every one that may. Without a
+   * workspace, the desktop's own engine: it knows which one its window has open.
+   */
   membersOf(workspace: string | null): string[] {
     if (!this.multi) return this.usable();
-    if (!workspace) return [];
+    if (!workspace) return this.home ? [this.home] : [];
     return this.usable().filter((m) => this.has(m, workspace) !== false);
   }
 
