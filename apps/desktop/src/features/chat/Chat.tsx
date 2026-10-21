@@ -50,6 +50,7 @@ import {
   type SenderTask,
 } from "../../lib/recipients";
 import { base64De, copyText, imagenPegada } from "../../lib/clipboard";
+import { capabilities } from "../../lib/platform";
 import { atenderElCampo, enfocar, enfocarSiNadieEscribe } from "../../lib/focus";
 import { df } from "../../lib/format";
 import { t } from "../../lib/i18n";
@@ -365,6 +366,7 @@ const METRICA_DEL_CAMPO =
   "border border-transparent px-2 py-1.5 text-[0.8125rem] leading-[1.4] [font-family:inherit] [scrollbar-gutter:stable]";
 // Del mismo tipo que el `inherit` de arriba, para que `cn` lo reemplace.
 const FUENTE_DE_TERMINAL = "[font-family:var(--font-mono)] [tab-size:4]";
+const archivosDelNavegador = () => import("./browserFiles");
 
 const mensajeDe = (bloque: Bloque): BloqueDeMensaje | null =>
   bloque.tipo === "msg" ? bloque : null;
@@ -1360,6 +1362,14 @@ export default function Chat(props: ChatProps) {
     });
   });
 
+  // En el navegador no hay rutas: el `drop` de HTML5 trae el `File` y se sube.
+  onMount(() => {
+    const zona = ancla?.parentElement;
+    if (!capabilities().browserFiles || !zona) return;
+    const quitar = archivosDelNavegador().then((m) => enNavegador(m).escuchar(zona));
+    onCleanup(() => void quitar.then((f) => f()));
+  });
+
   async function agregar(rutas: string[]) {
     setPreparingAttachments((n) => n + 1);
     setAttachmentFailure(null);
@@ -1391,6 +1401,18 @@ export default function Chat(props: ChatProps) {
       setPreparingAttachments((n) => n - 1);
     }
   }
+
+  /** En la web: el archivo viaja como bytes y el motor lo guarda en su máquina (`browserFiles.ts`). */
+  const enNavegador = (m: typeof import("./browserFiles")) => m.adjuntador({
+    puede: () => !props.soloLectura && puedeAdjuntar(),
+    marcar: setSoltando,
+    conversacion: () => props.conversacion,
+    pegar: props.onPegarImagen,
+    agregar,
+    fallo: setAttachmentFailure,
+    ocupado: (d) => setPreparingAttachments((n) => n + d),
+  });
+
 
   async function copiarMensaje(clave: string, texto: string) {
     if (copiando()) return;
@@ -1435,6 +1457,10 @@ export default function Chat(props: ChatProps) {
   }
 
   async function elegirArchivos() {
+    if (capabilities().browserFiles) {
+      enNavegador(await archivosDelNavegador()).elegir();
+      return;
+    }
     const elegidos = await open({
       multiple: true,
       title: t("chat.attachments.dialog_title"),
