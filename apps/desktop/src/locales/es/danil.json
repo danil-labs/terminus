@@ -87,5 +87,15 @@
   "danil.accounts.workspaces": {
     "one": "{count} workspace",
     "other": "{count} workspaces"
-  }
+  },
+  "danil.workspace.title": "Cuenta de este workspace",
+  "danil.workspace.label": "Cuenta de Danil de {name}",
+  "danil.workspace.connect_other": "Conectar otra cuenta…",
+  "danil.workspace.signed_out_option": "{email} · sin sesión",
+  "danil.workspace.synced": "Se sincroniza con {email}",
+  "danil.workspace.unlinked": "Todavía no se sincroniza con {email}.",
+  "danil.workspace.unsynced": "Sin sincronizar",
+  "danil.workspace.unsynced_account": "Sin sincronizar: {email} no tiene sesión en esta computadora.",
+  "danil.workspace.failed": "No se pudo cambiar la cuenta de este workspace.",
+  "danil.footer.signed_out": "{who} · sin sesión en esta computadora"
 }

@@ -1,4 +1,4 @@
-import { For, Show, createSignal, onMount, splitProps, type JSX } from "solid-js";
+import { For, Show, Suspense, createSignal, lazy, onMount, splitProps, type JSX } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
 import { open } from "@tauri-apps/plugin-dialog";
 import Check from "lucide-solid/icons/check";
@@ -31,6 +31,10 @@ import {
   createWorkspaces,
   type Workspace,
 } from "./workspaces-store";
+import { capabilities } from "../../lib/platform";
+
+// Chunk aparte: la cuenta de Danil del workspace solo pesa al abrir esta pantalla.
+const WorkspaceAccount = lazy(() => import("./WorkspaceAccount"));
 
 // ------------------------------------------------ la fila de la lista
 
@@ -628,6 +632,12 @@ export default function Workspaces() {
                     <LogoDelWorkspace workspace={w} onCambio={() => void ws.cargar()} />
 
                     <CarpetaDeCopias workspace={w} onCambio={() => void ws.cargar()} />
+
+                    <Show when={capabilities().danilAccount}>
+                      <Suspense fallback={null}>
+                        <WorkspaceAccount workspace={w.id} name={w.name} />
+                      </Suspense>
+                    </Show>
 
                     {/* Sus proyectos. Aquí y no en el selector de la caja porque
                         son dos actos distintos: elegir con cuál trabajar es de

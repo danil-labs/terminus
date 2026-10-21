@@ -110,13 +110,20 @@ export function sessionForWorkspace(list: DanilSessionInfo[] | null | undefined,
   return sessionOf(list, of.account);
 }
 
-/** La línea de solo lectura del workspace: con quién se sincroniza, o que no. */
-export type SyncLine = { kind: "synced"; email: string } | { kind: "unsynced"; email: string | null };
+/**
+ * La línea de solo lectura del workspace: con quién se sincroniza; `unlinked`
+ * si su cuenta tiene sesión pero el plano de control todavía no lo unió (o no
+ * lo deja, `workspace_id_taken`); `unsynced` si su cuenta no tiene sesión aquí.
+ */
+export type SyncLine =
+  | { kind: "synced"; email: string }
+  | { kind: "unlinked"; email: string }
+  | { kind: "unsynced"; email: string | null };
 
 export function syncLine(of: WorkspaceAccount | null, list: DanilSessionInfo[] | null | undefined): SyncLine {
   const session = of?.signed_in ? sessionOf(list, of.account) : null;
   const email = of?.email?.trim() || (session ? accountLabel(session) : "");
-  if (of?.signed_in && email) return { kind: "synced", email };
+  if (of?.signed_in && email) return { kind: of.linked ? "synced" : "unlinked", email };
   return { kind: "unsynced", email: email || null };
 }
 

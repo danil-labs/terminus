@@ -111,6 +111,10 @@ test("a workspace talks as its account; signed out, as nobody", async () => {
     kind: "synced",
     email: "alberto@dondebanco.org",
   }, "the email comes from the session when the map has none");
+  assert.deepEqual(syncLine({ account: "u_fdb", email: "alberto@dondebanco.org", signed_in: true, linked: false }, list), {
+    kind: "unlinked",
+    email: "alberto@dondebanco.org",
+  }, "signed in but not joined (workspace_id_taken) is not called synced");
   assert.deepEqual(syncLine({ account: "u_ytw", email: "a@ytw.mx", signed_in: false, linked: false }, list), { kind: "unsynced", email: "a@ytw.mx" });
   assert.deepEqual(syncLine(null, list), { kind: "unsynced", email: null });
 });

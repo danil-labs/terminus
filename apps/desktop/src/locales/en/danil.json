@@ -87,5 +87,15 @@
   "danil.accounts.workspaces": {
     "one": "{count} workspace",
     "other": "{count} workspaces"
-  }
+  },
+  "danil.workspace.title": "This workspace's account",
+  "danil.workspace.label": "Danil account of {name}",
+  "danil.workspace.connect_other": "Connect another account…",
+  "danil.workspace.signed_out_option": "{email} · signed out",
+  "danil.workspace.synced": "Syncs with {email}",
+  "danil.workspace.unlinked": "Not syncing with {email} yet.",
+  "danil.workspace.unsynced": "Not synced",
+  "danil.workspace.unsynced_account": "Not synced: {email} is not signed in on this computer.",
+  "danil.workspace.failed": "Could not change this workspace's account.",
+  "danil.footer.signed_out": "{who} · not signed in on this computer"
 }
