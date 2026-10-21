@@ -88,6 +88,7 @@
   "shell.sidebar.view.group_status": "By status",
   "shell.sidebar.view.group_agent": "By agent",
   "shell.sidebar.view.default": "default",
+  "shell.sidebar.view.agent_uninstalled": "uninstalled",
   "shell.sidebar.view.density": "Density",
   "shell.sidebar.view.density_comfortable": "Comfortable",
   "shell.sidebar.view.density_compact": "Compact",

@@ -1,4 +1,5 @@
 export {
+  type AgentOption,
   type SidebarContext,
   type SidebarDensity,
   type SidebarGroup,
@@ -11,10 +12,12 @@ export {
   DENSITIES,
   GROUPINGS,
   activityOf,
+  agentOptions,
   applySidebarView,
   isPinned,
   needsYou,
   nonDefaultCount,
+  sameAgent,
   sanitizeSidebarView,
   statusKeyOf,
 } from "./view.ts";

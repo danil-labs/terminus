@@ -62,6 +62,38 @@ export type SidebarGroup<T> = {
 
 export type SidebarStatusKey = TaskState | "idle" | "finished";
 
+/**
+ * Un agente con otra mayúscula es el mismo agente: en Windows y macOS su
+ * carpeta es una sola, y una tarea guarda el nombre como se escribió.
+ */
+export function sameAgent(a: string | null | undefined, b: string | null | undefined): boolean {
+  return !!a && !!b && a.toLowerCase() === b.toLowerCase();
+}
+
+/** Una opción de «Agente» del filtro; `installed` falso es un agente que ya no está pero tiene tareas. */
+export type AgentOption = { name: string; installed: boolean };
+
+/**
+ * Las opciones de «Agente»: los instalados y, de los desinstalados, solo los
+ * que aún tienen tareas sin archivar. Sin repetir un agente por mayúsculas;
+ * manda como se escribe el instalado. Primero los instalados, por nombre.
+ */
+export function agentOptions(installed: Iterable<string>, tasks: Iterable<SidebarTask>): AgentOption[] {
+  const options = new Map<string, AgentOption>();
+  for (const name of installed) {
+    if (name && !options.has(name.toLowerCase())) options.set(name.toLowerCase(), { name, installed: true });
+  }
+  for (const task of tasks) {
+    const name = task.agent;
+    if (name && !task.archived && !options.has(name.toLowerCase())) options.set(name.toLowerCase(), { name, installed: false });
+  }
+  const byName = (a: AgentOption, b: AgentOption) => {
+    const x = a.name.toLowerCase(), y = b.name.toLowerCase();
+    return x < y ? -1 : x > y ? 1 : 0;
+  };
+  return [...options.values()].sort((a, b) => Number(b.installed) - Number(a.installed) || byName(a, b));
+}
+
 /** Una vista guardada, tal cual o reparada: lo que no se entiende vuelve al valor por defecto. */
 export function sanitizeSidebarView(raw: unknown): SidebarView {
   if (!raw || typeof raw !== "object") return { ...DEFAULT_SIDEBAR_VIEW };
@@ -139,7 +171,7 @@ export function applySidebarView<T extends SidebarTask>(
   const folderOf = (task: T) => (ctx.folderOf ? ctx.folderOf(task) : task.folder) ?? "";
   const visible = tasks.filter((task) => !task.archived
     && (view.folders.length === 0 || view.folders.includes(folderOf(task)))
-    && (view.agent === null || task.agent === view.agent));
+    && (view.agent === null || sameAgent(task.agent, view.agent)));
 
   if (view.group === "none") return [{ kind: "section", key: "active", tasks: pinnedFirst(visible) }];
 
@@ -149,7 +181,11 @@ export function applySidebarView<T extends SidebarTask>(
     groups = groupBy(visible, (task) => statusKeyOf(task, ctx));
     order = [...TASK_STATES, "idle", "finished"];
   } else {
-    groups = groupBy(visible, view.group === "folder" ? folderOf : (task) => task.agent ?? "");
+    // Un agente con otra mayúscula cae en el mismo grupo, con el nombre de su tarea más nueva.
+    const spelling = new Map<string, string>();
+    for (const task of visible) if (task.agent && !spelling.has(task.agent.toLowerCase())) spelling.set(task.agent.toLowerCase(), task.agent);
+    const agentOf = (task: T) => (task.agent ? spelling.get(task.agent.toLowerCase())! : "");
+    groups = groupBy(visible, view.group === "folder" ? folderOf : agentOf);
     order = [...[...groups.keys()].filter((key) => key !== ""), ""];
   }
   const kind = view.group;

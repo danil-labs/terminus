@@ -41,6 +41,7 @@ import Sessions, { type SessionRow } from "../projects/Sessions";
 import type { Etapa } from "../projects/TaskStage";
 import { ConexionesMenu } from "../settings/Tools";
 import {
+  agentOptions,
   applySidebarView,
   groupLabel,
   loadSidebarView,
@@ -313,10 +314,9 @@ export default function Sidebar(props: {
       .map((c) => ({ id: c.project, name: nombreDe(c.project) ?? c.project }))
       .sort((a, b) => orden(a.id) - orden(b.id));
   };
-  const agentesDelFiltro = createMemo(() => {
-    const nombres = new Set([...agentesDelDock().map((a) => a.name), ...todas().flatMap((x) => x.row.agent ? [x.row.agent] : [])]);
-    return [...nombres].sort().map((name) => ({ name, body: perfilDe(name)?.body, avatar: perfilDe(name)?.avatar }));
-  });
+  const agentesDelFiltro = createMemo(() =>
+    agentOptions(agentesDelDock().map((a) => a.name), todas().map((x) => x.row))
+      .map((a) => ({ ...a, body: perfilDe(a.name)?.body, avatar: perfilDe(a.name)?.avatar })));
   const alcance = () => scopeLabel(vistaEfectiva(), (id) => nombreDe(id) ?? id);
   const conResultados = (clave: string) => (searchCounts()[clave] ?? 0) > 0;
 

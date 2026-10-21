@@ -168,7 +168,8 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
         await sleep(80);
         const grupo = doc.querySelector('[role="menu"] [role="group"][aria-label="Agente"]');
         assert.ok(grupo, "el menú de filtro ofrece agentes");
-        [...grupo.querySelectorAll('[role="menuitemradio"]')].find((b) => b.textContent.trim() === (nombre ?? "Todos")).click();
+        // El nombre y no la nota de al lado («desinstalado»).
+        [...grupo.querySelectorAll('[role="menuitemradio"]')].find((b) => b.children[1].textContent.trim() === (nombre ?? "Todos")).click();
         await sleep(80);
         tecla(doc.activeElement ?? doc.body, "Escape");
         await sleep(80);
