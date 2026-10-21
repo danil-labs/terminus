@@ -31,20 +31,23 @@ type ProjectPlace = { machines: Set<string>; remote: boolean };
 export type Answer = { machine: string; value: unknown };
 
 const SEP = "~";
-/** Keys whose string value names a task, portfolio or account of the machine that sent it. */
-const KEYS = new Set(["session", "parent", "portfolio", "account"]);
+/** Keys whose string value names a task, portfolio, account or space of the machine that sent it. */
+const KEYS = new Set(["session", "parent", "portfolio", "account", "space"]);
 /** Reads of workspace content: each machine of the workspace answers its part. */
-export const FAN = new Set(["list_projects", "list_portfolios", "list_live_sessions", "list_active_turns", "list_live_turns"]);
+export const FAN = new Set(["list_projects", "list_portfolios", "list_live_sessions", "list_active_turns", "list_live_turns", "list_spaces"]);
 /** Reads that list every machine, whatever the workspace. */
 export const EVERYWHERE = new Set(["list_workspaces", "workspaces_startup", "list_accounts", "list_workspace_attention"]);
 /** What makes something new where the person chose, when no id says where. */
 export const CREATE = new Set(["send_message", "run_shell_command", "create_project", "clone_project", "start_project_clone"]);
-/** Answers whose rows carry the id of what they list. */
-const ROW_IDS = new Set(["list_portfolios", "list_live_sessions"]);
+/**
+ * Answers whose rows carry the id of what they list. A space is of the machine
+ * that keeps it: with its id prefixed, renaming or deleting it goes only there.
+ */
+const ROW_IDS = new Set(["list_portfolios", "list_live_sessions", "list_spaces"]);
 /** Answers keyed by the id of the task each value is about. */
 const KEYED = new Set(["list_session_git"]);
 /** Answers that are one object with its own id. */
-const OWN_ID = new Set(["load_session", "add_account"]);
+const OWN_ID = new Set(["load_session", "add_account", "create_space", "rename_space", "set_space_folders", "move_task_to_space"]);
 /** Keys whose value is an image file on the machine that sent it: `preview_file` must read it there. */
 const FILES = new Set(["logo", "background", "avatar"]);
 const isPath = (v: string) => /^(\/|~\/|[a-z]:[\\/])/i.test(v);
@@ -114,6 +117,8 @@ export class Fleet {
   private stale = new Set<string>();
   /** What each machine says waits for the person, for `attention`. */
   private attention = new Map<string, Entry[]>();
+  /** Workspace → the machine that keeps its spaces, as the last `list_spaces` said. */
+  private spaceHomes = new Map<string, string>();
   private outdated = new Set<string>();
   /** The account's workspaces, or `null` when the control plane does not say them. */
   private registry: AccountWorkspace[] | null = null;
@@ -174,6 +179,12 @@ export class Fleet {
     if (!this.multi) return this.usable();
     if (!workspace) return [];
     return this.usable().filter((m) => this.has(m, workspace) !== false);
+  }
+
+  /** The machine that keeps the spaces of `workspace`, where a new one goes; `null` until one lists some. */
+  spaceHome(workspace: string | null): string | null {
+    const machine = workspace ? this.spaceHomes.get(workspace) : undefined;
+    return machine && this.usable().includes(machine) ? machine : null;
   }
 
   /** The workspace `machine` is asked with: the same id, or none if it lacks that one. */
@@ -347,6 +358,10 @@ export class Fleet {
     if (command === "list_workspace_attention" && this.multi) {
       for (const { machine, value } of answers) if (Array.isArray(value)) this.attention.set(machine, (this.encode(machine, value) as unknown[]).filter(isEntry));
       return this.attentionList();
+    }
+    if (command === "list_spaces" && workspace) {
+      const keeper = [...answers].sort((a, b) => this.order(a.machine) - this.order(b.machine)).find((a) => Array.isArray(a.value) && a.value.length);
+      if (keeper) this.spaceHomes.set(workspace, keeper.machine);
     }
     const parts = answers.map(({ machine, value }) => this.encode(machine, value, command));
     if (parts.length === 0) return Array.isArray(answers[0]?.value) ? [] : null;
