@@ -4251,7 +4251,7 @@ dependencies = [
 
 [[package]]
 name = "terminus"
-version = "0.2.82"
+version = "0.2.85"
 dependencies = [
  "core-foundation",
  "dirs",
