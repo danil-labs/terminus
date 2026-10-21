@@ -15,8 +15,10 @@ export type LucideShape =
 
 export const ICONS = {
   "archive": [{"kind": "rect", "width": 20.0, "height": 5.0, "x": 2.0, "y": 3.0, "rx": 1.0}, {"kind": "path", "d": "M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"}, {"kind": "path", "d": "M10 12h4"}],
+  "arrow-left": [{"kind": "path", "d": "m12 19-7-7 7-7"}, {"kind": "path", "d": "M19 12H5"}],
   "arrow-up": [{"kind": "path", "d": "m5 12 7-7 7 7"}, {"kind": "path", "d": "M12 19V5"}],
   "at-sign": [{"kind": "circle", "cx": 12.0, "cy": 12.0, "r": 4.0}, {"kind": "path", "d": "M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"}],
+  "bell": [{"kind": "path", "d": "M10.268 21a2 2 0 0 0 3.464 0"}, {"kind": "path", "d": "M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"}],
   "brain": [{"kind": "path", "d": "M12 18V5"}, {"kind": "path", "d": "M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4"}, {"kind": "path", "d": "M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5"}, {"kind": "path", "d": "M17.997 5.125a4 4 0 0 1 2.526 5.77"}, {"kind": "path", "d": "M18 18a4 4 0 0 0 2-7.464"}, {"kind": "path", "d": "M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517"}, {"kind": "path", "d": "M6 18a4 4 0 0 1-2-7.464"}, {"kind": "path", "d": "M6.003 5.125a4 4 0 0 0-2.526 5.77"}],
   "check": [{"kind": "path", "d": "M20 6 9 17l-5-5"}],
   "chevron-down": [{"kind": "path", "d": "m6 9 6 6 6-6"}],
@@ -42,6 +44,7 @@ export const ICONS = {
   "slash": [{"kind": "path", "d": "M22 2 2 22"}],
   "sliders-horizontal": [{"kind": "path", "d": "M10 5H3"}, {"kind": "path", "d": "M12 19H3"}, {"kind": "path", "d": "M14 3v4"}, {"kind": "path", "d": "M16 17v4"}, {"kind": "path", "d": "M21 12h-9"}, {"kind": "path", "d": "M21 19h-5"}, {"kind": "path", "d": "M21 5h-7"}, {"kind": "path", "d": "M8 10v4"}, {"kind": "path", "d": "M8 12H3"}],
   "sparkles": [{"kind": "path", "d": "M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"}, {"kind": "path", "d": "M20 2v4"}, {"kind": "path", "d": "M22 4h-4"}, {"kind": "circle", "cx": 4.0, "cy": 20.0, "r": 2.0}],
+  "square-pen": [{"kind": "path", "d": "M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"}, {"kind": "path", "d": "M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"}],
   "square": [{"kind": "rect", "width": 18.0, "height": 18.0, "x": 3.0, "y": 3.0, "rx": 2.0}],
   "terminal": [{"kind": "path", "d": "M12 19h8"}, {"kind": "path", "d": "m4 17 6-6-6-6"}],
   "user-round": [{"kind": "circle", "cx": 12.0, "cy": 8.0, "r": 5.0}, {"kind": "path", "d": "M20 21a8 8 0 0 0-16 0"}],

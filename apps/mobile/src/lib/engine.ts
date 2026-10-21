@@ -13,6 +13,7 @@ import type {
   BaseBranches,
   ChatEvent,
   EngineEvent,
+  FilePreview,
   MentionList,
   OpenedSession,
   PendingRequests,
@@ -27,10 +28,12 @@ import type {
   Space,
   TaskBlockers,
   Startup,
+  TreeContent,
   Turn,
   Workspace,
   WorkspaceAttention,
 } from "@terminus/protocol";
+import { MAX_VISUAL_BYTES, VISUAL_FILE, VISUAL_TREE } from "@terminus/chat/visual";
 import { linkedAttention, onlyLinked } from "@terminus/computers";
 import { type ChatBackgroundView, chatBackgroundView } from "@terminus/protocol";
 import { type FlatRow, flattenTasks } from "@terminus/tasks";
@@ -476,6 +479,30 @@ export async function uploadAttachment(host: Host, workspace: string, folder: st
   const path = Array.isArray(prepared.value) ? prepared.value[0] : null;
   if (!path) throw new HostError("operation_failed");
   return path;
+}
+
+// --- Lo enriquecido del chat ----------------------------------------------------
+
+/**
+ * Un archivo que el mensaje nombra por su ruta en la máquina: imagen (con
+ * `data_url`), PDF (`pdf` en base64), HTML o texto. Los adjuntos viejos,
+ * `entradas/…`, los resuelve `attachment_preview` dentro de la tarea.
+ */
+export async function previewFile(host: Host, workspace: string, path: string, task?: { folder: string; session: string }): Promise<FilePreview> {
+  const answer = path.startsWith("entradas/") && task
+    ? await host.call<FilePreview>("attachment_preview", workspace, { project: task.folder, id: task.session, rel: path })
+    : await host.call<FilePreview>("preview_file", workspace, { path, rel: path });
+  if (!answer.value) throw new HostError("operation_failed");
+  return answer.value;
+}
+
+/** El HTML de una visualización del chat, del árbol de la tarea; las mismas comprobaciones que la ventana. */
+export async function readVisual(host: Host, workspace: string, folder: string, session: string, file: string): Promise<string> {
+  if (file.length > 128 || !VISUAL_FILE.test(file)) throw new HostError("invalid_visual_file");
+  const { value } = await host.call<TreeContent>("tree_show", workspace, { project: folder, session, tree: VISUAL_TREE, path: file });
+  if (!value || value.truncated || value.bytes > MAX_VISUAL_BYTES) throw new HostError("visual_too_large");
+  if (value.kind !== "text" || typeof value.text !== "string") throw new HostError("invalid_visual_file");
+  return value.text;
 }
 
 // --- Cuentas de IA ---------------------------------------------------------------

@@ -86,8 +86,7 @@ export default function Notifications() {
   };
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: theme.bg }} contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: insets.bottom + 96 }}>
-      <Text style={[styles.title, { color: theme.text }]}>{t("tabs.notifications")}</Text>
+    <ScrollView style={{ flex: 1, backgroundColor: theme.bg }} contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
       {now.length ? <SectionTitle>{t("notifications.now")}</SectionTitle> : null}
       {now.map((entry) => row(entry, `n-${entry.host}-${entry.session}`))}
       {earlier.length ? <SectionTitle>{t("notifications.earlier")}</SectionTitle> : null}
@@ -100,5 +99,4 @@ export default function Notifications() {
 const styles = StyleSheet.create({
   mark: { position: "absolute", right: -6, bottom: -6, borderRadius: 10, padding: 2 },
   empty: { padding: 32, textAlign: "center" },
-  title: { fontSize: 28, fontWeight: "800", paddingHorizontal: 16, paddingBottom: 4 },
 });

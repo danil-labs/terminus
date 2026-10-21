@@ -64,9 +64,26 @@ export type Turn = {
   at?: number;
   meta?: string | null;
   model?: string | null;
-  tools?: unknown[];
+  tools?: TurnTool[];
   questions?: Question[] | null;
+  /** Rutas en la máquina de lo que la persona adjuntó (las viejas, `entradas/…`). */
+  attachments?: string[] | null;
 };
+/** Un paso del turno; `images` son data URLs que produjo la herramienta. */
+export type TurnTool = { name?: string; target?: string | null; images?: string[] };
+/** `preview_file` y `attachment_preview`. */
+export type FilePreview = {
+  rel: string;
+  kind: "html" | "image" | "text" | "pdf" | "binary";
+  text?: string | null;
+  data_url?: string | null;
+  /** El PDF en base64. */
+  pdf?: string | null;
+  bytes: number;
+  truncated: boolean;
+};
+/** `tree_show`: un archivo de un árbol de la tarea. */
+export type TreeContent = { kind: string; text: string; bytes: number; truncated: boolean };
 /** `load_session`. */
 export type OpenedSession = { id: string; provider: string; model: string | null; agent?: string | null; turns: Turn[] };
 

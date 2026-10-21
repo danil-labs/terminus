@@ -44,9 +44,10 @@ como la web.
   dock de agentes (ver «Patrones del teléfono»). Las palabras salen de las
   mismas claves que los catálogos del escritorio (`WORDS` en
   `@terminus/design`, vigiladas por el guard `shared-design`).
-- **Barra de pestañas del sistema** (`expo-router/native-tabs`): Liquid Glass en
-  iOS 26 y Material 3 en Android. Tiene Tareas y Notificaciones, más "Nueva"
-  aparte con `role="search"`, como en t3code. No se dibuja una barra propia.
+- **Sin barra de pestañas.** Tareas es la pantalla de entrada; arriba a la
+  derecha, junto al workspace, el lápiz abre «Nueva tarea» y la campana,
+  Notificaciones (con el número de lo que te necesita). Las dos se abren encima,
+  con su botón de volver.
 - **Tema claro y oscuro** según el sistema, con los tokens por omisión del
   escritorio en `apps/desktop/src/styles/global.css`: Violeta en claro y Grafito en oscuro.
 - **Solo los workspaces vinculados a la cuenta.** Cada fila de `/v1/computers`
@@ -63,6 +64,25 @@ como la web.
 - **El teléfono no ve la pantalla de la máquina.** Habla los comandos de la
   ventana a través del relay (o del bridge en desarrollo).
 
+## En el navegador
+
+La misma app se compila para web y vive dentro de Terminus web, en
+`/terminus/m/` (`apps/desktop/scripts/web-mobile.mjs`, último paso de
+`pnpm web:build`). La web de escritorio manda ahí a los teléfonos y cada una
+tiene un enlace a la otra («Ver la versión de escritorio» en la hoja de
+workspaces). Lo que cambia en el navegador va en archivos `.web.ts(x)`:
+
+- **Sesión:** la de la app de Danil en el mismo origen (`supabase.web.ts`),
+  como la web de escritorio; sin sesión se va a su inicio (`signin.web.tsx`).
+  No hay bridge.
+- **Lo que se recuerda:** `localStorage` en lugar del llavero (`store.web.ts`).
+- **Visualizaciones y archivos HTML:** el `iframe` de la ventana (`srcdoc`,
+  `allow-scripts` sin `allow-same-origin`) en lugar del WebView. Un PDF no se
+  abre dentro (`frame-src 'self'`).
+- **Mermaid:** el paquete, cargado al primer diagrama; la política de la página
+  no deja traerlo de afuera.
+- **Avisos del sistema:** todavía no; la campana sigue contando.
+
 ## Patrones del teléfono
 
 | Escritorio (#151) | Teléfono | Por qué |
@@ -70,7 +90,7 @@ como la web.
 | Lista plana con secciones «Te necesitan» y «Tareas» | Igual, en una sola columna; «Te necesitan» solo aparece si tiene algo | En una pantalla chica una sección vacía empuja la lista sin decir nada |
 | Botón «Filtrar y agrupar» con popover (carpetas, agente, agrupar, densidad) | El mismo botón al lado de la línea de alcance; abre una hoja del sistema (`formSheet`) con las mismas opciones y palabras | Un popover no cabe ni se toca bien con el dedo; la hoja es el popover del teléfono y se cierra con el gesto |
 | Tarjeta de dos líneas: estado + título + chincheta; debajo, lo que pide o carpeta, agente, máquina y PR | Igual, sacado de `taskCard`; sin PR ni worktree (el teléfono no lee git); la máquina solo con más de una | Misma información en el mismo orden; lo que el teléfono no puede saber no se inventa |
-| Dock de agentes: una fila de caras al pie del sidebar; clic abre el chat, clic derecho «Ver sus tareas» | Una fila de caras **arriba de la lista**, del mismo orden y reparto (`planDock`, «+k»); tocar abre su chat, mantener pulsado filtra por sus tareas; «Ver todos» abre una hoja | Abajo choca con la barra de pestañas y «Nueva»; arriba se ve al entrar y se va al hacer scroll, sin robar alto a la lista. Mantener pulsado es el clic derecho del teléfono |
+| Dock de agentes: una fila de caras al pie del sidebar; clic abre el chat, clic derecho «Ver sus tareas» | Una fila de caras **arriba de la lista**, del mismo orden y reparto (`planDock`, «+k»); tocar abre su chat, mantener pulsado filtra por sus tareas; «Ver todos» abre una hoja | Abajo le quita alto a la lista; arriba se ve al entrar y se va al hacer scroll, sin robar alto a la lista. Mantener pulsado es el clic derecho del teléfono |
 | SpaceBar | Las píldoras de space bajo el workspace, como antes | El escritorio la conserva; es el alcance de la lista |
 | Tarjeta flotante al pasar el mouse (`TaskHoverCard`): título, último mensaje, Carpeta, Agente, Proveedor; Abrir, Fijar, Archivar | **Mantener pulsada** la tarjeta abre una hoja del sistema (`preview`, `fitToContents`) con lo mismo, de `taskPreview` (`@terminus/tasks`), más Máquina si hay más de una; Abrir, Fijar/Desfijar y Archivar con los comandos de la ventana | El teléfono no tiene hover; mantener pulsado es su gesto de vista previa, y la hoja se cierra con el gesto |
 | Cuadro de escribir (`Chat.tsx`): adjuntar y permisos a la izquierda; modelo y razonamiento, y enviar/detener a la derecha; `/`, `@`, `!`; cola con «Mandar ahora» | El mismo cuadro y la misma fila (`apps/mobile/src/ui/Composer.tsx`), con el texto que crece hasta seis líneas; los selectores son hojas desde abajo; `/` y `@` abren la lista sobre el cuadro; `!` lo vuelve terminal («Ejecutar»). En una tarea nueva, encima del cuadro: «Ejecutar en» (más de una máquina), Carpeta, Rama base (con git) y Agente | Popovers y menús no se tocan con el dedo; una fila compacta y hojas sí |
@@ -109,9 +129,9 @@ Los avisos salen en la app, igual para los dos caminos: una tarea que entra en
 | Ruta | Qué es |
 |---|---|
 | `signin` | Entrar con la cuenta de Danil; en desarrollo, el enlace al bridge. Siempre va primero: sin sesión no se sincroniza nada, tampoco por un bridge emparejado. El bridge solo existe en desarrollo (`__DEV__`); el lab sin cuenta es en desarrollo, en Android y con `EXPO_PUBLIC_TERMINUS_BRIDGE_ONLY=1` (`BRIDGE_WITHOUT_ACCOUNT`). En iOS siempre se inicia sesión |
-| `(tabs)/index` | Tareas: workspace, spaces, alcance y filtro, dock de agentes y la lista plana |
-| `(tabs)/notifications` | «Ahora» de todas las máquinas y «Antes», lo que llegó con la app abierta |
-| `(tabs)/new` | Nueva tarea: el cuadro de escribir con «Ejecutar en» (la última usada, si no la VM), carpeta, rama base y agente; `!` la crea con un comando |
+| `(home)/index` | Tareas: workspace, spaces, alcance y filtro, dock de agentes y la lista plana |
+| `(home)/notifications` | «Ahora» de todas las máquinas y «Antes», lo que llegó con la app abierta |
+| `(home)/new` | Nueva tarea: el cuadro de escribir con «Ejecutar en» (la última usada, si no la VM), carpeta, rama base y agente; `!` la crea con un comando |
 | `preview` | Vista previa de una tarea (mantener pulsada su tarjeta): Abrir, Fijar, Archivar |
 | `accounts` | Proveedores de IA: cuentas por proveedor y correo, consumo, máquinas, iniciar y cerrar sesión |
 | `filter` | Hoja «Filtrar y agrupar» |
@@ -138,6 +158,7 @@ lleva su comentario allí:
 | Cuadro de escribir | `list_models`, `list_permission_modes`, `list_slash_menu`, `list_mentions`, `project_base_branches` | `run_shell_command`, `stop_shell_command`, `guardar_imagen_pegada`, `prepare_attachments` |
 | Cuentas de IA | `list_accounts`, `account_status`, `account_limits` | `add_account`, `login_account`, `submit_login_code`, `cancel_login`, `discard_account`, `remove_account` |
 | Fondo del chat | `chat_background` | — |
+| Chat enriquecido | `tree_show` (solo el árbol `terminus-chat-visuals`), `preview_file`, `attachment_preview` | — |
 
 **Qué enciende la VM.** El relay solo enciende con su lista de intención
 (`INTENT_COMMANDS`: escribir, crear, aprobar, `!`, iniciar sesión…). Fijar,

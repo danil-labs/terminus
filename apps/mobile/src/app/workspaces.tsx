@@ -1,5 +1,6 @@
 import { router } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { MOBILE_WEB_DIR, WEB_LAYOUT_KEY } from "@terminus/design";
 import type { AttentionState } from "@terminus/protocol";
 import { useAccount } from "../lib/account";
 import { BRIDGE_ENABLED } from "../lib/bridge";
@@ -101,6 +102,19 @@ export default function WorkspaceSwitcher() {
           <Text style={{ color: theme.primary, fontWeight: "600" }}>{t("signin.title")}</Text>
         </Pressable>
       )}
+
+      {Platform.OS === "web" ? (
+        <Pressable
+          testID="desktop-layout"
+          style={[styles.button, { borderColor: theme.border }]}
+          onPress={() => {
+            localStorage.setItem(WEB_LAYOUT_KEY, "desktop");
+            window.location.assign(`${window.location.pathname.split(`/${MOBILE_WEB_DIR}/`)[0]}/`);
+          }}
+        >
+          <Text style={{ color: theme.text }}>{t("web.desktop_layout")}</Text>
+        </Pressable>
+      ) : null}
 
       {BRIDGE_ENABLED ? (
         <>

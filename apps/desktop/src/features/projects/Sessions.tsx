@@ -587,9 +587,9 @@ export default function Sessions(props: {
                       </TooltipRoot>
                     )}
                   </Show>
-                  {/* En qué máquina corre, si no es esta. */}
-                  <Show when={tarjeta().machine}>
-                    {(machine) => <MachineChip machine={machine().id} on={machine().on} untitled={props.sidebar} class="max-w-[96px]" />}
+                  {/* En qué máquina corre, si no es esta. En el sidebar lo dice su tarjeta flotante. */}
+                  <Show when={!props.sidebar && tarjeta().machine}>
+                    {(machine) => <MachineChip machine={machine().id} on={machine().on} class="max-w-[96px]" />}
                   </Show>
                   <ChipDeGit />
                 </>
@@ -852,8 +852,9 @@ export default function Sessions(props: {
                   <span class="flex shrink-0 text-error-strong" title={t("projects.sessions.worktree_missing")} aria-label={t("projects.sessions.worktree_missing")}><WorktreeRoto size={13} /></span>
                 </Show>
                 <span class="flex shrink-0" title={f.s.provider} aria-label={f.s.provider}><MarcaAgente id={f.s.provider} size={13} /></span>
-                <Show when={f.s.machine}>
-                  {(machine) => <MachineChip machine={machine()} on={f.s.machine_on !== false} untitled={props.sidebar} class="max-w-[96px]" />}
+                {/* En el sidebar la máquina la dice su tarjeta flotante. */}
+                <Show when={!props.sidebar && f.s.machine}>
+                  {(machine) => <MachineChip machine={machine()} on={f.s.machine_on !== false} class="max-w-[96px]" />}
                 </Show>
                 {/* El botón del cohete es translúcido: sin desvanecer, el mensaje se lee a
                     través. Máscara y no velo: el fondo del riel cambia con el tema y el wallpaper. */}

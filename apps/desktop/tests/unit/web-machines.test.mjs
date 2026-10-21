@@ -53,17 +53,21 @@ async function open(name, computers, relays) {
 test("two machines show together and each command goes to the machine it names", async () => {
   const { app, invoke, calls, doc, text } = await open("web-machines", [VM, MAC], {
     cmp_vm: { table: table("Panel", "Tarea de la VM") },
-    cmp_mac: { table: table("Notas", "Tarea del Mac") },
+    cmp_mac: { table: table("Notas", "Tarea del Mac", { list_session_git: ({ project: p }) => (p === "p1" ? { t1: { kind: "branch", branch: "feat/notas", repository: "/lab/p1" } } : {}) }) },
   });
 
   assert.ok(text().includes("Panel") && text().includes("Notas"), "the projects of both machines are in the sidebar");
   assert.ok(doc.querySelector('[data-sesion="cmp_vm~t1"]'), "the VM task has its namespaced id");
   assert.ok(doc.querySelector('[data-sesion="cmp_mac~t1"]'), "the Mac task with the same raw id does not collide");
-  const label = doc.querySelector('[data-machine="cmp_mac"]');
-  assert.ok(label?.textContent.includes("Mac de Ana"), "rows carry the machine's name");
+  assert.equal(doc.querySelector("[data-sesion] [data-machine]"), null, "a sidebar row leaves its machine to the task card");
   assert.ok(calls("cmp_vm", "list_projects").some((c) => c.workspace === "w"), "the VM gets its own workspace id");
   assert.ok(calls("cmp_mac", "list_projects").some((c) => c.workspace === "w"), "the Mac gets its own workspace id");
   assert.deepEqual([...doc.querySelectorAll("[data-machine-row]")].map((r) => r.dataset.state), ["online", "online"]);
+
+  const git = await invoke("list_session_git", { project: "cmp_mac~p1", remote: false, priority: ["cmp_mac~t1"] });
+  assert.deepEqual(Object.keys(git), ["cmp_mac~t1"], "a task's git status is keyed by the id the panel knows");
+  assert.equal(git["cmp_mac~t1"].branch, "feat/notas");
+  assert.deepEqual(calls("cmp_mac", "list_session_git").at(-1).args.priority, ["t1"], "the Mac is asked with its own ids");
 
   const task = await invoke("load_session", { project: "cmp_mac~p1", id: "cmp_mac~t1" });
   assert.equal(task.id, "cmp_mac~t1");
@@ -81,6 +85,12 @@ test("two machines show together and each command goes to the machine it names",
   assert.equal((await invoke("create_project", { name: "Tercero" })).id, "cmp_mac~p9", "then the last machine used is the default");
   const machines = await invoke("machine_list");
   assert.deepEqual(machines.map((m) => [m.id, m.active]), [["cmp_vm", false], ["cmp_mac", true]]);
+
+  doc.querySelector('[data-sesion="cmp_vm~t1"]').click();
+  await sleep(600);
+  const where = doc.querySelector("[data-task-location]");
+  assert.equal(where?.querySelector("[data-task-location-machine]")?.textContent, "Danil VM", "the task window names the machine that runs it");
+  assert.equal(where?.querySelector("[data-task-location-project]")?.textContent, "Panel");
   assert.deepEqual(app.fallos, []);
 });
 
@@ -90,7 +100,7 @@ test("an action on a computer that is off and cannot be woken fails short and ne
     cmp_mac: { table: table("Notas", "Tarea del Mac"), state: "offline", cachedAt: "2026-10-18T21:30:00Z" },
   });
 
-  assert.ok(doc.querySelector('[data-sesion="cmp_mac~t1"] [data-machine="cmp_mac"][data-machine-on="false"]'), "the Mac's copy shows, marked off");
+  assert.ok(doc.querySelector('[data-sesion="cmp_mac~t1"]'), "the Mac's copy shows");
   assert.equal(doc.querySelector('[data-machine-row="cmp_mac"]')?.dataset.state, "offline");
   const fila = doc.querySelector('[data-sesion="cmp_mac~t1"]');
   assert.equal(fila.querySelector("[data-folder-chip]")?.getAttribute("title") ?? null, null, "no native tooltip over the task card");
