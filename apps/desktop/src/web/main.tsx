@@ -170,7 +170,7 @@ async function start(settings: WebSettings) {
               return false;
             },
           );
-          // Linking a workspace in Terminus shows (or hides) it here without reloading the page.
+          // A workspace the engine links (signing in to Danil links them all) shows up here without reloading the page.
           const relist = async () => {
             const answer = await computersOf(endpoint, session).catch(() => null);
             if (answer?.kind === "ok") relink(answer.value);

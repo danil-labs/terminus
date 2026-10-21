@@ -89,6 +89,12 @@ const SIN_INTERFAZ = {
   materialize_workspace: "lo pide la web por el relay a la máquina elegida (web/transport.ts); la ventana local abre sus propios workspaces",
   ensure_project: "lo pide la web por el relay antes de crear una tarea en otra máquina; el motor lo llama solo en send_message y run_shell_command",
   sync_workspace: "lo llama el conector del motor al recibir workspace.changed del relay",
+  danil_workspace_link:
+    "la sincronización sigue a la sesión de Danil: el motor vincula todos los workspaces; sin interruptor por workspace",
+  danil_workspace_unlink:
+    "la sincronización sigue a la sesión de Danil: el motor vincula todos los workspaces; sin interruptor por workspace",
+  danil_workspace_link_status:
+    "la sincronización sigue a la sesión de Danil: el motor vincula todos los workspaces; sin interruptor por workspace",
   // `docs/agents.md` § Estado observable: el comando de agregación existe
   // para que el riel deje de sondear; el riel mismo no está construido.
 };

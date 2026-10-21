@@ -50,7 +50,9 @@ como la web.
   con su botón de volver.
 - **Tema claro y oscuro** según el sistema, con los tokens por omisión del
   escritorio en `apps/desktop/src/styles/global.css`: Violeta en claro y Grafito en oscuro.
-- **Solo los workspaces vinculados a la cuenta.** Cada fila de `/v1/computers`
+- **Solo los workspaces vinculados a la cuenta.** Con la sesión de Danil
+  iniciada en una computadora, su motor vincula todos sus workspaces; no hay
+  vínculo a mano. Cada fila de `/v1/computers`
   trae `workspaces`, los ids que esa máquina vinculó a la cuenta que entró; el
   relay ya rechaza el resto (`workspace_not_linked`) y el teléfono filtra otra
   vez la lista, la atención y los eventos, por el workspace del sobre y por el

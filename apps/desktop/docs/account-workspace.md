@@ -51,8 +51,9 @@ selector: el modelo está mal.
      tema de terminal, fondo del chat, catálogo de MCP y fuentes de skills.
    - Se quedan en cada máquina: la bóveda, los tokens de git host y las cuentas
      de agentes. Así lo pide la decisión de computadoras personales (§5).
-5. **Sin cuenta de Danil, nada cambia.** Un workspace sin ligar sigue siendo local,
-   como hoy.
+5. **Sin sesión de Danil, nada cambia.** Los workspaces de una computadora sin
+   sesión siguen siendo locales, como hoy. Con la sesión iniciada, todos los
+   workspaces de esta computadora se ven en la web y el teléfono.
 
 Ya está decidido (2026-10-20) que cada workspace se liga a la cuenta y que el
 relay rechaza los workspaces que no son de quien llama. Este modelo usa esa
@@ -180,9 +181,9 @@ Sobre seldon-host#72 (`feat/workspace-danil-link`); ver «Conciliación».
    - Con un proyecto que es carpeta local de otra máquina, la opción se muestra
      desactivada con la razón.
    - Se borran `workspace-here.ts`, `HerePanel` y sus textos.
-5. **Ligar.** En Configuración del workspace: «Ligar a mi cuenta de Danil» llama
-   a `link_workspace`. Con sesión de Danil, el alta de un workspace nuevo lo liga
-   desde el principio.
+5. **Ligar.** No hay gesto por workspace: con la sesión de Danil iniciada, el
+   motor liga todos los workspaces de la computadora, también los nuevos desde
+   el alta (ver «Quién es dueño de qué»).
 6. **Pruebas.**
    - Se reescriben `web-machines`, `machine-task`, `desktop-account-machines` y
      las de `fleet.rs`.
@@ -244,7 +245,8 @@ Se conserva de esos PRs:
 - El error `workspace_not_linked` (reemplaza a `workspace_forbidden`).
 - La lista de vínculos por computadora con versión (`links_version`) guardada
   en el Durable Object.
-- Las órdenes `danil_workspace_link{mode}` / `danil_workspace_unlink`, el campo
+- Las órdenes `danil_workspace_link{mode}` / `danil_workspace_unlink` (siguen en
+  el contrato, sin interfaz desde que la sincronización sigue a la sesión), el campo
   `danil: {user_id, email, name}` de las filas (hace el papel de `account`) y
   `danil.json` en la carpeta del workspace.
 - Eventos con `workspace` arriba, el filtro de la web por máquina remota
@@ -270,11 +272,17 @@ seldon-host#72: **solo la dueña, como sincronizar una carpeta de Drive.**
 
 - Un workspace se liga solo a la cuenta de Danil dueña de la computadora. No hay
   miembros, «Otra cuenta», códigos de dispositivo por workspace ni modo
-  Radiant. Ligar solo elige cuáles de los workspaces de la dueña aparecen en la
-  web, el teléfono y sus otras máquinas.
-- Los workspaces que ya existen se ligan solos **una vez**, en la primera
-  reconciliación con el motor nuevo (`workspaces-backfill.json`). Los nuevos se
-  ligan a mano; desligar después se respeta.
+  Radiant.
+- **La sincronización sigue a la sesión de Danil** (decidido por la persona el
+  2026-10-21, después de ver Configuración): con la sesión iniciada, todos los
+  workspaces de esta computadora se ven en la web, el teléfono y sus otras
+  máquinas; con la sesión cerrada, ninguno. El motor liga solo todos los
+  workspaces, los que ya existen y los nuevos. No hay interruptor por workspace:
+  la sección «Cuenta de Danil de <workspace>» se quitó, y
+  `danil_workspace_link`, `danil_workspace_unlink` y
+  `danil_workspace_link_status` siguen en el contrato sin interfaz
+  (`SIN_INTERFAZ` en `scripts/guards/commands.mjs`). Lo único que la persona
+  elige es iniciar o cerrar sesión en la tarjeta «Cuenta de Danil».
 - Un workspace ligado entra al registro de la cuenta (`workspaces`), con una sola
   dueña. Solo así puede materializarse en otra máquina de ella: un workspace no
   ligado se queda en su máquina.
@@ -349,8 +357,9 @@ Corrige de #72:
 
 Agrega:
 
-- La unión inicial (una vez por computadora) de #72 se conserva; no se ata nada
-  más al conectar.
+- Con sesión de Danil, el motor ata todos los workspaces de la computadora, los
+  que ya existen y los nuevos (la unión inicial de #72 queda dentro de esta
+  regla). El contrato no cambia.
 - `add_workspace(name, folder?, git_host?, remote?, id?)`: con `id`, lo valida
   y falla con `workspace_exists` si la carpeta ya existe.
 - `materialize_workspace(id)`: lee `GET /v1/workspaces`, crea aquí el workspace
