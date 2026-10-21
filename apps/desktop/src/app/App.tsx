@@ -123,6 +123,7 @@ import AvisoDeMaterial from "../features/shell/MaterialNotice";
 import Paneles from "../features/shell/Panels";
 import Sidebar, { createSidebar } from "../features/shell/Sidebar";
 import { sidebarViewKey } from "../lib/sidebarView";
+import { recordarCarpetas } from "../lib/folderKinds";
 import ColumnaLateral from "../features/shell/SideColumn";
 import SpaceBar from "../features/shell/SpaceBar";
 import TitleBar from "../features/shell/TitleBar";
@@ -334,6 +335,7 @@ export default function App() {
   const [projectList, setProjectRows] = createSignal<Project[]>([]);
   // El riel pinta carpetas con `For`: una nueva en cada relectura remonta sus tareas, y cada una vuelve a pedir su `task_history`.
   const setProjectList = (next: Project[]) => setProjectRows((previous) => conservar(previous, next, (p) => p.id));
+  createEffect(() => recordarCarpetas(projectList()));
   const [sources, setSources] = createSignal<Source[]>([]);
   const [error, setError] = createSignal<string | null>(null);
   // Por qué esta ventana no puede abrir estos datos, si es que no puede: una

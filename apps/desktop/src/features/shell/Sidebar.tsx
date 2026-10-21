@@ -11,6 +11,7 @@ import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createResource, createSignal, type JSX, lazy, mapArray, on, onCleanup, Show, Suspense } from "solid-js";
 import { destinoEnVuelo, puntoDelArrastre, tareaEnVuelo } from "../../lib/drag";
 import { enfocarYSeleccionar } from "../../lib/focus";
+import { recordarCarpetas } from "../../lib/folderKinds";
 import { t } from "../../lib/i18n";
 import { lastRoster, rememberRoster } from "../../lib/handlerRoster";
 import { invoke } from "../../lib/invoke.ts";
@@ -205,6 +206,7 @@ export default function Sidebar(props: {
   const reportResults = (key: string, count: number) => setSearchCounts(previous => previous[key] === count ? previous : { ...previous, [key]: count });
   const closeSearch = () => { setSearchText(""); setSearchOpen(false); };
   createEffect(() => { if (props.collapsed) closeSearch(); });
+  createEffect(() => recordarCarpetas(props.projects));
 
   /** De qué carpeta es cada tarea, por id: las acciones de la fila llegan con el id. */
   const carpetaDeTarea = createMemo(() => {

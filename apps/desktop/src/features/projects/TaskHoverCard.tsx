@@ -8,7 +8,7 @@ import GitPullRequestClosed from "lucide-solid/icons/git-pull-request-closed";
 import GitPullRequestDraft from "lucide-solid/icons/git-pull-request-draft";
 import { type JSX, Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
-import { folderColor } from "../../lib/folderColor";
+import { FolderSquare } from "./FolderChip";
 import { t } from "../../lib/i18n";
 import type { AgentModels, AgentProfile, HandlerStatus } from "../../lib/model";
 import { nombreDeModelo } from "../../lib/models";
@@ -99,11 +99,7 @@ export function TaskHoverCard(props: TaskHoverCardProps) {
       <Show when={props.folderName}>
         {(nombre) => (
           <Fila label={t("projects.hover_card.folder")}>
-            <span
-              class="size-2 shrink-0 rounded-[2px]"
-              style={{ background: folderColor(props.folderId ?? props.task.folder ?? nombre()) }}
-              aria-hidden="true"
-            />
+            <FolderSquare id={props.folderId ?? props.task.folder ?? nombre()} size={12} />
             <span class="truncate">{nombre()}</span>
           </Fila>
         )}
