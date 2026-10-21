@@ -41,6 +41,8 @@ export default function FolderGroupHeader(pp: {
   onQuitarDelEspacio?: () => void;
   onNuevaTarea: () => void;
   onNuevoAgente: () => void;
+  /** «Llevar a otra máquina…»: con más de una máquina y una carpeta de git. */
+  onLlevar?: () => void;
 }) {
   const p = () => pp.p;
   const recibiendo = () => destinoEnVuelo() === p().id;
@@ -170,6 +172,14 @@ export default function FolderGroupHeader(pp: {
                   setMenu(false);
                   pp.onNuevoAgente();
                 }}>{t("projects.agents.new_open")}</button>
+                <Show when={pp.onLlevar}>
+                  {(llevar) => (
+                    <button role="menuitem" class={ITEM_DE_MENU} data-carry-folder onClick={() => {
+                      setMenu(false);
+                      llevar()();
+                    }}>{t("shell.machines.carry_to")}</button>
+                  )}
+                </Show>
                 <button
                   role="menuitem"
                   class={ITEM_DE_MENU}

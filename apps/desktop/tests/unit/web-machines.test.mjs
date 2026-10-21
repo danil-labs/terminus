@@ -172,7 +172,7 @@ test("a new task is born on the machine chosen, with the same project id, and ma
   assert.deepEqual(app.fallos, []);
 });
 
-test("«Ejecutar en» disables, with the reason, a machine that cannot make the workspace its own or lacks a folder without remote", async () => {
+test("«Ejecutar en» disables, with the reason, a machine that cannot make the workspace its own, and offers a folder without remote while its machine is on", async () => {
   const VM2 = { computer_id: "cmp_old", name: "VM vieja", state: "online", provider: "aws-ec2" };
   const empty = { workspaces: [], active: null };
   const { app, invoke, calls, doc } = await open("web-machines-picker", [VM, MAC, VM2], {
@@ -199,9 +199,8 @@ test("«Ejecutar en» disables, with the reason, a machine that cannot make the 
   const option = (id) => doc.querySelector(`[data-machine-option="${id}"]`);
   assert.ok(await until(() => option("cmp_old")?.getAttribute("title")?.includes("no tiene este workspace")), "it reads the machines again when it opens");
   assert.equal(option("cmp_mac").disabled, false, "the machine with the folder is offered");
-  assert.equal(option("cmp_vm").disabled, true, "a folder without remote of another machine runs only there");
-  assert.equal(option("cmp_vm").getAttribute("title"), "«Notas» es una carpeta sin remoto de otra máquina: sus tareas solo corren ahí.");
-  assert.ok(option("cmp_vm").textContent.includes("sin este proyecto"));
+  assert.equal(option("cmp_vm").disabled, false, "a folder without remote is carried from its machine while that one is on");
+  assert.ok(!option("cmp_vm").textContent.includes("sin este proyecto"));
   assert.equal(option("cmp_old").disabled, true);
   assert.deepEqual(app.fallos, []);
 });

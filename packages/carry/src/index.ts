@@ -19,6 +19,7 @@ export {
   partsOf,
   sizeVerdict,
   takenAtMs,
+  withoutRemote,
 } from "./plan.ts";
 export {
   type CarryFailure,

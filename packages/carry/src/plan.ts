@@ -86,3 +86,6 @@ export function bringBranch(s: Pick<WorkStatus, "branch" | "head">, machine: str
   const slug = machine.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "machine";
   return `terminus/${slug}-${s.head.slice(0, 7)}`;
 }
+
+/** Sin remoto el destino no puede clonar: el trabajo viaja entero y el import crea el proyecto. */
+export const withoutRemote = (s: Pick<WorkStatus, "remoteUrl">, projectRemote?: string | null) => !s.remoteUrl && !projectRemote;

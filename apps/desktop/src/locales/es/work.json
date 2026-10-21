@@ -96,5 +96,6 @@
     "one": "{count} commit en {branch} (hasta {head}).",
     "other": "{count} commits en {branch} (hasta {head})."
   },
-  "work.progress.label_bring": "Traer a {machine}"
+  "work.progress.label_bring": "Traer a {machine}",
+  "work.carry.creates": "se crea desde la copia, sin remoto"
 }
