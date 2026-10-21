@@ -9,9 +9,8 @@ import { createStore } from "solid-js/store";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
 import type { Superficie } from "../../lib/surfaces.ts";
-import { prosaDe } from "../../ui/Failure";
+import { detalleDe, prosaDe } from "../../ui/Failure";
 import { accountPresentation } from "../settings/AccountCard";
-import type { Consentimiento } from "../settings/Accounts";
 import type { AccountList, AccountStatus, AgentOpt, LoginEvent } from "../settings/accounts-store";
 import { ORIGEN_SISTEMA } from "../settings/environment-store";
 import type { Frase } from "../../lib/prose";
@@ -37,6 +36,7 @@ export type Fila = {
 
 export type Paso =
   | { k: "falta" }
+  | { k: "externa" }
   | { k: "instalada" }
   | { k: "descargando"; hecho: number; total: number }
   | { k: "entrando"; cuenta: string; codigo?: string; pideCodigo?: boolean }
@@ -46,11 +46,24 @@ export type Paso =
   | { k: "saliendo" };
 
 const EN_CURSO = new Set<Paso["k"]>(["descargando", "entrando", "clave", "comprobando", "saliendo"]);
-const ORDEN = ["claude", "codex", "antigravity", "grok", "opencode-zen", "opencode-local"];
+const ORDEN = ["claude", "codex", "antigravity", "grok", "opencode-zen", "opencode-local", "zcode"];
 const posicion = (id: string) => {
   const i = ORDEN.indexOf(id);
   return i < 0 ? ORDEN.length : i;
 };
+
+/** El mapa pone los gratuitos entre Grok y OpenCode; el panel los deja debajo de OpenCode. */
+export const ordenDelMapa = (filas: Fila[]) =>
+  [...filas].sort((a, b) => rangoEnMapa(a) - rangoEnMapa(b));
+const rangoEnMapa = (f: Fila) => (f.modo === "consentimiento" ? posicion("opencode-zen") - 0.5 : posicion(f.agente));
+
+const SIN_LLAVERO = /secret service|org\.freedesktop\.secrets|secret-service|no keyring|keyring/i;
+
+/** El error en palabras de quien usa la app: la falta de llavero se explica en vez de copiarse en crudo. */
+export function explicar(e: unknown) {
+  const texto = prosaDe(e);
+  return SIN_LLAVERO.test(`${texto} ${detalleDe(e)}`) ? t("onboarding.ai.error.keyring") : texto;
+}
 
 /** El nombre de la fila; la de OpenCode con clave es la de Zen y Go, y la local nombra lo que da. */
 export function nombreDeFila(f: Fila) {
@@ -65,8 +78,6 @@ export function crearConexiones() {
   const [pasos, setPasos] = createStore<Record<string, Paso>>({});
   const [errores, setErrores] = createStore<Record<string, string | null>>({});
   const [falloDeCarga, setFalloDeCarga] = createSignal<string | null>(null);
-  const [pregunta, setPregunta] = createSignal<{ fila: string; texto: Consentimiento } | null>(null);
-  const [guardando, setGuardando] = createSignal(false);
   const [cargada, setCargada] = createSignal(false);
   let agentes: Agente[] = [];
   let detectadas: Set<string> | null = null;
@@ -178,7 +189,9 @@ export function crearConexiones() {
     const estados = await Promise.all(nuevas.map((f) => pasoGuardado(f, superficies)));
     batch(() => {
       nuevas.forEach((f, i) => {
-        if (!enCurso(f.id)) poner(f.id, estados[i]);
+        // Quien fue a instalarlo a su página sigue viendo esa indicación hasta que el binario aparece.
+        const esperaExterna = pasos[f.id]?.k === "externa" && estados[i].k === "falta";
+        if (!enCurso(f.id) && !esperaExterna) poner(f.id, estados[i]);
       });
       setCargada(true);
     });
@@ -210,7 +223,7 @@ export function crearConexiones() {
       }
       return true;
     } catch (e) {
-      setErrores(f.id, prosaDe(e));
+      setErrores(f.id, explicar(e));
       for (const x of filas().filter((x) => x.agente === f.agente && pasos[x.id]?.k === "descargando")) {
         poner(x.id, { k: "falta" });
       }
@@ -223,10 +236,10 @@ export function crearConexiones() {
     const a = f && agente(f.agente);
     if (!f || !a || enCurso(id)) return;
     setErrores(id, null);
-    if (f.modo === "consentimiento") return void preguntar(id);
+    if (f.modo === "consentimiento") return void activar(id);
     if (!a.available) {
       if (a.external_install_url) {
-        setErrores(id, t("onboarding.ai.external", { agent: a.label }));
+        poner(id, { k: "externa" });
         invoke("open_external", { target: a.external_install_url }).catch(() => {});
         return;
       }
@@ -249,7 +262,7 @@ export function crearConexiones() {
     } catch (e) {
       entrada = null;
       if (cuenta) await invoke("discard_account", { provider: f.agente, id: cuenta }).catch(() => {});
-      setErrores(id, prosaDe(e));
+      setErrores(id, explicar(e));
       poner(id, { k: "instalada" });
     }
   }
@@ -270,7 +283,7 @@ export function crearConexiones() {
       // Sin estado legible se trata como un intento que no llegó: la cuenta vacía se descarta.
     }
     await invoke("discard_account", { provider: e.agente, id: e.cuenta }).catch(() => {});
-    setErrores(e.fila, motivo || t("onboarding.ai.login_failed"));
+    setErrores(e.fila, motivo ? explicar(motivo) : t("onboarding.ai.login_failed"));
     poner(e.fila, { k: "instalada" });
   }
 
@@ -282,7 +295,7 @@ export function crearConexiones() {
     try {
       await invoke("submit_login_code", { id: p.cuenta, code: codigo.trim() });
     } catch (e) {
-      setErrores(id, prosaDe(e));
+      setErrores(id, explicar(e));
       poner(id, { ...p, pideCodigo: true });
     }
   }
@@ -303,7 +316,7 @@ export function crearConexiones() {
       poner(id, { k: "conectada", cuenta: conectada?.cuenta ?? t("onboarding.ai.key_saved"), id: cuenta });
     } catch (e) {
       if (cuenta) await invoke("discard_account", { provider: f.agente, id: cuenta }).catch(() => {});
-      setErrores(id, prosaDe(e));
+      setErrores(id, explicar(e));
       poner(id, { k: "clave" });
     }
   }
@@ -320,31 +333,19 @@ export function crearConexiones() {
     poner(id, agente(fila(id)?.agente ?? "")?.available ? { k: "instalada" } : { k: "falta" });
   }
 
-  async function preguntar(id: string) {
-    try {
-      const [lineas, version] = await invoke<[Frase[], number]>("consent_text");
-      setPregunta({ fila: id, texto: { lineas, version } });
-    } catch (e) {
-      setErrores(id, prosaDe(e));
-    }
-  }
-
-  async function responder(acepta: boolean) {
-    const q = pregunta();
-    const f = q && fila(q.fila);
-    if (!q || !f) return;
-    if (!acepta) return void setPregunta(null);
-    setGuardando(true);
+  /** Activar los gratuitos: el aviso de la tarjeta ya se leyó; se descarga OpenCode si falta y se guarda el consentimiento. */
+  async function activar(id: string) {
+    const f = fila(id);
+    if (!f) return;
+    if (!agente(f.agente)?.available && !(await descargar(f))) return;
+    poner(id, { k: "comprobando" });
     try {
       await invoke("set_provider_consent", { provider: f.agente, accepted: true });
-      setPregunta(null);
-      if (!agente(f.agente)?.available && !(await descargar(f))) return;
       window.dispatchEvent(new CustomEvent("harness:consentimiento"));
-      poner(f.id, { k: "conectada", cuenta: t("settings.accounts.free.warning_short"), id: null });
+      poner(id, { k: "conectada", cuenta: t("settings.accounts.free.warning_short"), id: null });
     } catch (e) {
-      setErrores(f.id, prosaDe(e));
-    } finally {
-      setGuardando(false);
+      setErrores(id, explicar(e));
+      poner(id, agente(f.agente)?.available ? { k: "instalada" } : { k: "falta" });
     }
   }
 
@@ -354,7 +355,7 @@ export function crearConexiones() {
       await invoke("install_local_runtime");
       poner(id, { k: "conectada", cuenta: t("onboarding.ai.local.ready"), id: null });
     } catch (e) {
-      setErrores(id, prosaDe(e));
+      setErrores(id, explicar(e));
       poner(id, { k: "instalada" });
     }
   }
@@ -379,7 +380,7 @@ export function crearConexiones() {
       }
       poner(id, agente(f.agente)?.available ? { k: "instalada" } : { k: "falta" });
     } catch (e) {
-      setErrores(id, prosaDe(e));
+      setErrores(id, explicar(e));
       poner(id, p);
     }
   }
@@ -401,8 +402,14 @@ export function crearConexiones() {
     }
   });
   const alAgentes = listen("providers", () => void cargar());
+  // Lo que se instala desde su página no avisa al motor: se vuelve a mirar al regresar a la ventana.
+  const alVolver = () => {
+    if (filas().some((f) => pasos[f.id]?.k === "externa")) void cargar();
+  };
+  window.addEventListener("focus", alVolver);
   onCleanup(() => {
     cerrada = true;
+    window.removeEventListener("focus", alVolver);
     for (const l of [alCuenta, alAvance, alAgentes]) void l.then((f) => f());
     const e = entrada;
     if (e) {
@@ -418,18 +425,18 @@ export function crearConexiones() {
     pasos,
     errores,
     falloDeCarga,
-    pregunta,
-    guardando,
     cargada,
     conectadas,
     nombre: nombreDeFila,
+    /** Su CLI se instala desde la página del fabricante, no lo baja Terminus. */
+    externa: (f: Fila) => Boolean(agente(f.agente)?.external_install_url && !agente(f.agente)?.available),
     cargar,
     conectar,
     cancelar,
     enviarCodigo,
     guardarClave,
-    responder,
     desconectar,
+    limpiarError: (id: string) => setErrores(id, null),
   };
 }
 
