@@ -150,6 +150,9 @@ jobs:
   check:
     if: github.repository == 'danil-labs/terminus'
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/desktop
     outputs:
       should_build: ${{ steps.compare.outputs.should_build }}
       version: ${{ steps.compare.outputs.version }}
@@ -220,6 +223,13 @@ jobs:
           missing=$(jq -r '.platforms | to_entries[] | select(.value.url == "" or .value.sha256 == "") | .key' seldon-runtime.lock)
           if [ -n "$missing" ]; then
             echo "::error title=Motor sin fijar::seldon-runtime.lock no fija: $(echo $missing). Una release sin motor deja la app instalada sin abrir."
+            exit 1
+          fi
+          # La ventana deriva su contrato de commands.json y rechaza un motor que hable otro.
+          vendored=$(sha256sum src-tauri/crates/engine-protocol/commands.json | cut -d' ' -f1)
+          pinned=$(jq -r .contract seldon-runtime.lock)
+          if [ "$vendored" != "$pinned" ]; then
+            echo "::error title=Motor con otro contrato::seldon-runtime.lock fija el contrato $pinned y la ventana habla $vendored: la app instalada no abriría su motor."
             exit 1
           fi
           # Tauri suma a la base el archivo de cada plataforma; macOS no tiene archivo propio.
@@ -325,6 +335,9 @@ jobs:
           - so: ubuntu-22.04
             name: linux
     runs-on: ${{ matrix.so }}
+    defaults:
+      run:
+        working-directory: apps/desktop
     steps:
       - name: Traer la fuente
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -348,7 +361,7 @@ jobs:
 
       - uses: swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
         with:
-          workspaces: src-tauri
+          workspaces: apps/desktop/src-tauri
           key: ${{ matrix.name }}
 
       # Lo que Tauri necesita para compilar en Linux (WebKitGTK, la bandeja del
@@ -855,7 +868,7 @@ jobs:
         with:
           name: dist-${{ matrix.name }}
           if-no-files-found: error
-          path: release-assets/*
+          path: apps/desktop/release-assets/*
 
   # ─────────────────────────────────────────────────────────────────────────────
   # Una sola release con Windows, macOS universal y Linux dentro, y el
@@ -924,7 +937,7 @@ jobs:
           APP="Terminus_${V}_amd64.AppImage"
           export APP PUBLIC_KEY
           node --input-type=module <<'JS'
-          import { verifyFile } from './npx/lib/minisign.mjs';
+          import { verifyFile } from './apps/desktop/npx/lib/minisign.mjs';
           import { readFileSync } from 'node:fs';
           await verifyFile({
             filePath: `release-assets/${process.env.APP}`,
