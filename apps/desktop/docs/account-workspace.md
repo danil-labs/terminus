@@ -289,6 +289,31 @@ seldon-host#72: **solo la dueña, como sincronizar una carpeta de Drive.**
 - Ids: el plano de control acepta de 1 a 128 caracteres (#10); el motor siempre
   genera 8 de base32.
 
+### Una sesión por cuenta (enmienda del 2026-10-21, más tarde)
+
+Decidido por la persona el mismo día, y enmienda lo de arriba: **una sesión de
+Danil por cuenta** en la computadora, y **cada workspace es de una sola
+cuenta**. Caso real: en una Mac, los workspaces de `alberto@danil.ai`, dos de
+la Fundación Donde Banco con el correo de esa empresa y uno de Yucatán Tech
+Week con otro. Cada uno se sincroniza solo con su cuenta: se ve en la web y el
+teléfono de esa cuenta, nunca en otra. Sigue sin haber interruptor de
+sincronizar.
+
+- **Motor** (seldon-host `feat/danil-session-per-account`, ver «Una sesión
+  por cuenta» en [connector.md](https://github.com/danil-labs/seldon-host/blob/dev/docs/connector.md)): una credencial y un relay por cuenta,
+  y el mapa workspace → cuenta. La primera sesión es la principal: los
+  workspaces nuevos y los que no tienen cuenta anotada son suyos.
+- **Escritorio:** Configuración → Cuentas de Danil lista las sesiones y agrega
+  otra con el mismo código del navegador; en Workspaces, cada workspace elige
+  su cuenta («Cuenta de este workspace»); el pie de la barra lateral muestra la
+  del workspace abierto; y el escritorio con cuenta ve las computadoras y el
+  registro de la cuenta del workspace abierto, con su token de cliente.
+- **Cerrar una sesión** deja sus workspaces sin sincronizar, no los pasa a otra
+  cuenta. Si el plano de control no deja moverlo (`workspace_id_taken`), el
+  workspace sigue siendo de la otra cuenta hasta que se inicie sesión con ella
+  aquí.
+- **Web y móvil:** sin cambios; cada uno entra con una sola cuenta.
+
 ### Plano de control (`computers`)
 
 Tablas en `public`, RLS sin políticas (solo rol de servicio):
