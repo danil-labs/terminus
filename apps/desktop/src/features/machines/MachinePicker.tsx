@@ -37,7 +37,7 @@ export function MachinePicker(props: { workspace: string | null }) {
 
   const ocupado = () => {
     const w = workspaceHere();
-    return !!w && w.phase !== "done" && w.phase !== "failed";
+    return !!w && w.phase !== "failed";
   };
 
   const punto = (m: Machine) =>
@@ -112,7 +112,7 @@ export function MachinePicker(props: { workspace: string | null }) {
   );
 }
 
-/** Cómo va «Usar este workspace aquí»: el código de Radiant si hace falta, y al final qué se copió y qué no. */
+/** Cómo va «Usar este workspace aquí»: el código de Radiant si hace falta, y el error si falla. */
 function HerePanel(props: { state: NonNullable<ReturnType<typeof workspaceHere>> }) {
   const s = () => props.state;
   const nombre = () => machineName(s().machine);
@@ -143,21 +143,7 @@ function HerePanel(props: { state: NonNullable<ReturnType<typeof workspaceHere>>
           </button>
         </div>
       </Show>
-      <Show when={s().phase === "done"}>
-        <p class="m-0 text-neutral-950">{t("shell.machines.here.done", { workspace: s().name, name: nombre() })}</p>
-      </Show>
-      <Show when={s().phase === "done" || s().phase === "failed"}>
-        <Show when={s().copied.length}>
-          <p class="m-0" data-workspace-here-copied="">{t("shell.machines.here.copied", { list: s().copied.join(", ") })}</p>
-        </Show>
-        <Show when={s().skipped.length}>
-          <div data-workspace-here-skipped="">
-            <p class="m-0">{t("shell.machines.here.not_copied")}</p>
-            <ul class="m-0 list-disc pl-4">
-              <For each={s().skipped}>{(item) => <li>{item}</li>}</For>
-            </ul>
-          </div>
-        </Show>
+      <Show when={s().phase === "failed"}>
         <Show when={s().failure}>{(f) => <FailureNote f={f()} />}</Show>
         <div>
           <button class="rounded-sm px-1 hover:underline" onClick={dismissWorkspaceHere}>

@@ -8,7 +8,7 @@ import { machineName, machines, refetchMachines, setRunOn } from "./store";
 /**
  * «Usar este workspace aquí»: crea en otra máquina el workspace que solo tiene
  * una, con el mismo nombre, para que la web los junte (`web/fleet.ts`). Copia
- * lo que no lleva credenciales y, si el workspace es de una organización,
+ * en silencio lo que no lleva credenciales y, si el workspace es de una organización,
  * inicia sesión en Radiant en esa máquina con la misma organización.
  */
 
@@ -20,7 +20,6 @@ type Row = {
   lengua_de_salida?: string | null;
   default_permission_mode?: string | null;
   terminal_theme?: string | null;
-  worktrees_root?: string | null;
   logo?: string | null;
 };
 type Listing = { workspaces: Row[] };
@@ -33,10 +32,9 @@ type RadiantStatus = {
 };
 type Identity = { status: string; organization: string | null; organizations: { id: string; name: string }[] };
 type Known = { id: string; clave: string; name: string; conectado: boolean };
-type Server = { name: string; managed?: boolean };
 type SkillSource = { id: string; rotulo: string; nombre: string; location: string; branch: string; managed: boolean; missing: boolean; enabled: boolean };
 
-export type Phase = "creating" | "copying" | "signing_in" | "done" | "failed";
+export type Phase = "creating" | "copying" | "signing_in" | "failed";
 export type WorkspaceHere = {
   workspace: string;
   machine: string;
@@ -44,8 +42,6 @@ export type WorkspaceHere = {
   phase: Phase;
   organization: string | null;
   prompt: Prompt | null;
-  copied: string[];
-  skipped: string[];
   failure: Failure | null;
 };
 
@@ -60,34 +56,21 @@ let cancelled = false;
 
 const update = (patch: Partial<WorkspaceHere>) => setCurrent((c) => (c ? { ...c, ...patch } : c));
 
-/** Lo que tiene sesión o vale solo en la otra máquina: se dice, no se copia. */
-function notCopyable(row: Row, target: string): string[] {
-  const out = [t("shell.machines.here.sign_in", { name: machineName(target) })];
-  if (row.worktrees_root) out.push(t("shell.machines.here.skip_worktrees"));
-  return out;
-}
-
-async function copySettings(row: Row, workspace: string, from: ReturnType<typeof on>, to: ReturnType<typeof on>, copied: string[], skipped: string[]) {
-  const step = async (label: string, run: () => Promise<unknown>) => {
-    try {
-      await run();
-      copied.push(label);
-    } catch {
-      skipped.push(t("shell.machines.here.skip_failed", { what: label }));
-    }
-  };
-  if (row.lengua) await step(t("shell.machines.here.language"), () => invoke("set_workspace_language", { id: workspace, lengua: row.lengua }, to));
+/** Lo que falle al copiar se queda sin copiar: el workspace ya existe allá y se ajusta a mano. */
+async function copySettings(row: Row, workspace: string, from: ReturnType<typeof on>, to: ReturnType<typeof on>) {
+  const step = (run: () => Promise<unknown>) => run().catch(() => {});
+  if (row.lengua) await step(() => invoke("set_workspace_language", { id: workspace, lengua: row.lengua }, to));
   if (row.lengua_de_salida)
-    await step(t("shell.machines.here.output_language"), () => invoke("set_workspace_output_language", { id: workspace, lengua: row.lengua_de_salida }, to));
+    await step(() => invoke("set_workspace_output_language", { id: workspace, lengua: row.lengua_de_salida }, to));
   if (row.default_permission_mode)
-    await step(t("shell.machines.here.permission_mode"), () => invoke("set_workspace_permission_mode", { id: workspace, mode: row.default_permission_mode }, to));
+    await step(() => invoke("set_workspace_permission_mode", { id: workspace, mode: row.default_permission_mode }, to));
   if (row.terminal_theme)
-    await step(t("shell.machines.here.terminal_theme"), () => invoke("set_workspace_terminal_theme", { id: workspace, theme: row.terminal_theme }, to));
+    await step(() => invoke("set_workspace_terminal_theme", { id: workspace, theme: row.terminal_theme }, to));
 
   // El logo viaja en bytes: su ruta es de la otra máquina, y `preview_file` la lee allí por el id que lleva.
   if (row.logo) {
     const logo = row.logo;
-    await step(t("shell.machines.here.logo"), async () => {
+    await step(async () => {
       const { data_url } = await invoke<{ data_url: string | null }>("preview_file", { path: logo, rel: logo });
       const png = /^data:image\/png;base64,(.+)$/i.exec(data_url ?? "")?.[1];
       if (!png) throw new Error("not_png");
@@ -100,7 +83,7 @@ async function copySettings(row: Row, workspace: string, from: ReturnType<typeof
   const imagen = fondo && !fondo.preset ? fondo.data_url : null;
   const resto = fondo && (fondo.preset || fondo.veil != null) ? { preset: fondo.preset ?? null, veil: fondo.veil ?? null } : null;
   if (imagen || resto) {
-    await step(t("shell.machines.here.background"), async () => {
+    await step(async () => {
       if (imagen) await invoke("import_chat_background_data", { dataUrl: imagen }, to);
       if (resto) await invoke("set_chat_background", resto, to);
     });
@@ -111,18 +94,15 @@ async function copySettings(row: Row, workspace: string, from: ReturnType<typeof
   const there = await invoke<Known[]>("list_known_mcp", {}, to).catch(() => [] as Known[]);
   for (const k of known.filter((k) => k.conectado)) {
     if (there.some((x) => x.id === k.id && x.conectado)) continue;
-    await step(t("shell.machines.here.connector", { name: k.name }), () => invoke("connect_known_mcp", { id: k.id }, to));
+    await step(() => invoke("connect_known_mcp", { id: k.id }, to));
   }
-  // Un servidor pegado a mano puede llevar claves en su bloque, y el motor no lo devuelve entero.
-  const servers = await invoke<Server[]>("list_mcp_servers", {}, from).catch(() => [] as Server[]);
-  for (const s of servers.filter((s) => !s.managed && !known.some((k) => k.clave === s.name)))
-    skipped.push(t("shell.machines.here.skip_mcp", { name: s.name }));
+  // Un servidor pegado a mano puede llevar claves en su bloque, y el motor no lo devuelve entero: no viaja.
 
   const sources = await invoke<{ fuentes: SkillSource[] }>("list_skill_sources", {}, from).catch(() => ({ fuentes: [] as SkillSource[] }));
   const present = await invoke<{ fuentes: SkillSource[] }>("list_skill_sources", {}, to).catch(() => ({ fuentes: [] as SkillSource[] }));
   for (const f of sources.fuentes.filter((f) => !f.managed && !f.missing && f.location)) {
     if (present.fuentes.some((x) => x.location === f.location)) continue;
-    await step(t("shell.machines.here.skills", { name: f.nombre }), async () => {
+    await step(async () => {
       const added = await invoke<{ id: string }>("add_skill_source", { url: f.location, branch: f.branch || null, rotulo: f.rotulo }, to);
       if (!f.enabled) await invoke("set_skill_source_enabled", { id: added.id, enabled: false }, to);
     });
@@ -155,9 +135,9 @@ async function signIn(org: RadiantStatus, who: Identity | null, to: ReturnType<t
 }
 
 export async function startWorkspaceHere(workspace: string, machine: string) {
-  if (current() && !["done", "failed"].includes(current()?.phase ?? "")) return;
+  if (current() && current()?.phase !== "failed") return;
   cancelled = false;
-  setCurrent({ workspace, machine, name: "", phase: "creating", organization: null, prompt: null, copied: [], skipped: [], failure: null });
+  setCurrent({ workspace, machine, name: "", phase: "creating", organization: null, prompt: null, failure: null });
   try {
     const listing = await invoke<Listing>("list_workspaces");
     const row = listing.workspaces.find((w) => w.id === workspace);
@@ -179,11 +159,7 @@ export async function startWorkspaceHere(workspace: string, machine: string) {
     await invoke("set_active_workspace", { id: workspace });
 
     update({ phase: "copying" });
-    const copied: string[] = [];
-    const skipped: string[] = [];
-    await copySettings(row, workspace, from, to, copied, skipped);
-    skipped.push(...notCopyable(row, machine));
-    update({ copied, skipped });
+    await copySettings(row, workspace, from, to);
 
     if (org) {
       update({ phase: "signing_in" });
@@ -193,7 +169,8 @@ export async function startWorkspaceHere(workspace: string, machine: string) {
     await refetchMachines();
     const now = machines().find((m) => m.id === machine);
     setRunOn(workspace, now?.active ? null : machine);
-    update({ phase: "done" });
+    // Al terminar no queda nota: la máquina ya sale elegida en «Ejecutar en».
+    setCurrent(null);
   } catch (error) {
     update({ phase: "failed", prompt: null, failure: asFailure(error) });
   }

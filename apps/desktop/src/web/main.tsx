@@ -69,11 +69,14 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
     });
   };
   const multi = transport.fleet.multi;
+  // A file dropped outside the chat would replace the page with it.
+  for (const type of ["dragover", "drop"]) window.addEventListener(type, (e) => e.preventDefault());
   setCapabilities({
     nativeWindow: false,
     updater: false,
     localSetup: false,
     computerStatus: true,
+    browserFiles: true,
     sidebarExtra: () => <HomeLink />,
     accountProfile: webAccountProfile(base.endpoint, base.getToken, base.onUnauthorized),
     machineName: (id) => transport.fleet.name(id),

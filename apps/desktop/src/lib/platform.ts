@@ -39,6 +39,8 @@ export type Capabilities = {
   machineOnCreate?: (workspace: string | null) => JSX.Element;
   /** «Usar este workspace aquí» en una máquina que no lo tiene (`features/machines/workspace-here.ts`). */
   workspaceOnMachine?: boolean;
+  /** Los adjuntos salen del navegador como bytes: el motor solo guarda imágenes (`guardar_imagen_pegada`). */
+  browserFiles?: boolean;
   /** Bajo la tarjeta de una cuenta: sus máquinas. */
   accountMachines?: (props: AccountMachinesProps) => JSX.Element;
 };

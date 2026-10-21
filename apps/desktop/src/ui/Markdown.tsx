@@ -10,8 +10,10 @@ import {
   ErrorBoundary,
   Index,
   type JSX,
+  lazy,
   onCleanup,
   Show,
+  Suspense,
 } from "solid-js";
 import { SolidMarkdown } from "solid-markdown";
 import { copyText } from "../lib/clipboard";
@@ -49,8 +51,11 @@ import { ITEM_DE_MENU, Popover, PopoverContent, PopoverTrigger } from "./Popover
  */
 function fuenteLocal(src: unknown): string | null {
   const ruta = imagenLocal(src);
-  return ruta ? convertFileSrc(ruta, "terminus-image") : null;
+  return ruta ? convertFileSrc(ruta, "terminus-image") || null : null;
 }
+
+// Solo la web lo usa: el escritorio pinta la imagen desde su disco.
+const ImagenRemota = lazy(() => import("./RemoteImage"));
 
 /**
  * Cómo se pinta cada etiqueta. **Es una constante del módulo y no un literal
@@ -200,7 +205,15 @@ const COMPONENTES = {
       when={imagenInerte(p.src) ?? fuenteLocal(p.src)}
       fallback={
         <Show when={localFilePath(p.src)} fallback={<span class="text-neutral-500">{p.alt}</span>}>
-          {(ruta) => <FilePreview path={ruta()} alt={p.alt} />}
+          {(ruta) => (
+            <Show when={imagenLocal(p.src)} fallback={<FilePreview path={ruta()} alt={p.alt} />}>
+              {(imagen) => (
+                <Suspense fallback={<span class="text-neutral-500">{p.alt}</span>}>
+                  <ImagenRemota path={imagen()} alt={p.alt} />
+                </Suspense>
+              )}
+            </Show>
+          )}
         </Show>
       }
     >
