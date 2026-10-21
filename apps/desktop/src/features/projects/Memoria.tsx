@@ -29,8 +29,8 @@ const fecha = (iso: string) =>
 /**
  * El mismo formulario para escribir y para editar. `file` es la identidad:
  * al editar se manda fija, y escribir con el mismo nombre reescribe el
- * cuerpo en el sitio en vez de dejar una segunda versión. No existe para
- * `workspace`: ese alcance sigue en el formato anterior y lo rechaza.
+ * cuerpo en el sitio en vez de dejar una segunda versión. Igual en los tres
+ * alcances: el motor ya guarda `workspace` en el mismo formato que `project`.
  */
 function FormularioDeEntrada(props: {
   abierto: boolean;
@@ -167,10 +167,9 @@ function FormularioDeEntrada(props: {
 }
 
 /**
- * La memoria del proyecto. Espeja `workspace/memoria/comandos.rs`. `workspace`
- * sigue en el formato anterior: se lee, se retira y se borra, pero no se
- * escribe ni se edita desde aquí — `write_memory_entry` lo rechaza. Retirar
- * solo existe ahí; `project` y `agent` reescriben o borran el archivo.
+ * La memoria del proyecto. Espeja `workspace/memory/commands.rs`. Los tres
+ * alcances viven en el mismo formato: se escriben, se editan y se borran
+ * igual. No hay «retirar»: consolidar es reescribir o borrar el archivo.
  */
 export default function Memoria(props: { project: string; agents: Agent[]; encargados?: string[] }) {
   const [scope, setScope] = createSignal<MemoriaScope>({ kind: "project" });
@@ -181,7 +180,6 @@ export default function Memoria(props: { project: string; agents: Agent[]; encar
   const [formulario, setFormulario] = createSignal<"nueva" | MemoriaEntrada | null>(null);
 
   const encargados = () => props.encargados ?? [];
-  const esWorkspace = () => scope().kind === "workspace";
 
   async function refrescar() {
     setFallo(null);
@@ -218,19 +216,6 @@ export default function Memoria(props: { project: string; agents: Agent[]; encar
     return e.origin.provider ? nombreDeAgente(e.origin.provider) : t("projects.memory.person");
   }
 
-  async function retirar(file: string) {
-    setOcupada(file);
-    setFallo(null);
-    try {
-      await invoke("retire_memory_entry", { project: props.project, scope: scope(), file });
-      await refrescar();
-    } catch (e) {
-      setFallo({ ...asFailure(e), what: t("projects.memory.error_retire") });
-    } finally {
-      setOcupada(null);
-    }
-  }
-
   // El único borrado físico del módulo: pide confirmación antes de mandarlo.
   async function borrar(file: string) {
     if (!(await confirm(t("projects.memory.delete_confirm"), { kind: "warning" }))) return;
@@ -252,12 +237,10 @@ export default function Memoria(props: { project: string; agents: Agent[]; encar
         <h2 class="m-0 text-[0.6875rem] font-medium tracking-wide text-neutral-500 uppercase">
           {t("projects.memory.title")}
         </h2>
-        <Show when={!esWorkspace()}>
-          <Button variant="ghost" size="sm" onClick={() => setFormulario("nueva")}>
-            <Plus size={14} />
-            {t("projects.memory.write")}
-          </Button>
-        </Show>
+        <Button variant="ghost" size="sm" onClick={() => setFormulario("nueva")}>
+          <Plus size={14} />
+          {t("projects.memory.write")}
+        </Button>
       </div>
 
       <div class="flex flex-wrap items-center gap-3">
@@ -291,7 +274,7 @@ export default function Memoria(props: { project: string; agents: Agent[]; encar
             )}
           </For>
         </div>
-        <Show when={!esWorkspace() && indice()}>
+        <Show when={indice()}>
           {(idx) => (
             <span
               class="text-[0.6875rem] text-neutral-500"
@@ -330,27 +313,15 @@ export default function Memoria(props: { project: string; agents: Agent[]; encar
                   <Show when={e.origin.commit}>{(commit) => <span class="font-mono">{commit()}</span>}</Show>
                 </div>
                 <div class="flex items-center gap-1">
-                  <Show when={!esWorkspace()}>
-                    <Button
-                      variant="ghost"
-                      size="compact"
-                      disabled={ocupada() !== null}
-                      onClick={() => setFormulario(e)}
-                    >
-                      <Pencil size={12} />
-                      {t("projects.memory.edit")}
-                    </Button>
-                  </Show>
-                  <Show when={esWorkspace()}>
-                    <Button
-                      variant="ghost"
-                      size="compact"
-                      disabled={ocupada() !== null}
-                      onClick={() => void retirar(e.file)}
-                    >
-                      {t("projects.memory.retire")}
-                    </Button>
-                  </Show>
+                  <Button
+                    variant="ghost"
+                    size="compact"
+                    disabled={ocupada() !== null}
+                    onClick={() => setFormulario(e)}
+                  >
+                    <Pencil size={12} />
+                    {t("projects.memory.edit")}
+                  </Button>
                   <Button
                     variant="ghost"
                     size="compact"
