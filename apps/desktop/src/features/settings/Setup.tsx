@@ -333,7 +333,7 @@ export default function Setup(props: { children: JSX.Element }) {
       const skip = Object.entries(quiere())
         .filter(([, si]) => !si)
         .map(([name]) => name);
-      corrida = await invoke<Preparacion | null>("prepare_runtime", { joinOnly, skip });
+      corrida = await invoke<Preparacion | null>("prepare_runtime", skip.length ? { joinOnly, skip } : { joinOnly });
     } catch (e) {
       // Sin parar de preguntar: un servicio que vuelve retoma la corrida y borra el aviso.
       setFalloDelServicio(prosaDe(e));
