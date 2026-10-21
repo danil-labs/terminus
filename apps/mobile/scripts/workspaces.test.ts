@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { AccountWorkspace } from "@terminus/computers";
-import { type Folder, withAccountFolders, workspaceEntries } from "../src/lib/engine.ts";
+import { type Folder, mergeSnapshots, taskInSpace, withAccountFolders, workspaceEntries } from "../src/lib/engine.ts";
 
 const REGISTRY: AccountWorkspace[] = [
   {
@@ -51,4 +51,30 @@ test("las carpetas del registro se ven en la máquina donde nacieron, o en la pr
   assert.deepEqual(withAccountFolders(live, REGISTRY, "w1", ["cmp_vm", "cmp_mac"]).folders.map((f) => f.key), ["cmp_mac/p1", "cmp_vm/p2"], "lo que una máquina lista manda");
   assert.equal(withAccountFolders(empty, REGISTRY, "w1", []), empty, "sin máquinas del workspace, nada");
   assert.equal(withAccountFolders(empty, null, "w1", ["cmp_vm"]), empty, "sin registro, nada");
+});
+
+test("los spaces son de todas las máquinas: uno por id o por nombre, y cada tarea va en el de su fila", () => {
+  const part = (host: string, spaces: { id: string; name: string | null; folders: string[] }[], tasks: { id: string; space: string | null }[]) => ({
+    host,
+    folders: [],
+    spaces,
+    tasks: tasks.map((t) => ({ ...t, title: t.id, provider: "codex", model: null, created_at: 0, updated_at: 0, esperando: false, agent: null, host, workspace: "w1", folder: "p1", folderKey: `${host}/p1` })),
+    agents: [],
+    live: [],
+    providers: [],
+    cachedAt: null,
+  });
+  // La VM (primera) dormida no tiene spaces; la Mac sí.
+  const vm = part("cmp_vm", [], [{ id: "t-vm", space: null }]);
+  const mac = part("cmp_mac", [{ id: "s-gen", name: null, folders: ["p1"] }, { id: "s-web", name: "Web", folders: [] }], [{ id: "t-gen", space: "s-gen" }, { id: "t-web", space: "s-web" }]);
+  const merged = mergeSnapshots([vm, mac], () => null);
+  assert.deepEqual(merged.spaces.map((s) => [s.id, s.on]), [["s-gen", { cmp_mac: "s-gen" }], ["s-web", { cmp_mac: "s-web" }]]);
+  assert.deepEqual(merged.spaces[0].folders, ["cmp_vm/p1", "cmp_mac/p1"], "la carpeta tiene el mismo id en cada máquina");
+  const web = merged.spaces[1];
+  assert.deepEqual(merged.tasks.filter((t) => taskInSpace(t, web)).map((t) => t.id), ["t-vm", "t-web"], "una sin space resuelto va en todos");
+  // Con las dos despiertas, el space por defecto de cada una es uno.
+  const both = mergeSnapshots([part("cmp_vm", [{ id: "s-vm", name: null, folders: [] }], [{ id: "t-vm", space: "s-vm" }]), mac], () => null);
+  assert.deepEqual(both.spaces.map((s) => s.on), [{ cmp_vm: "s-vm", cmp_mac: "s-gen" }, { cmp_mac: "s-web" }]);
+  assert.ok(taskInSpace(both.tasks.find((t) => t.id === "t-vm")!, both.spaces[0]));
+  assert.ok(!taskInSpace(both.tasks.find((t) => t.id === "t-vm")!, both.spaces[1]));
 });
