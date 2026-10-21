@@ -78,6 +78,8 @@ corren las tareas que se crearon en ellas.
    `Fleet::counterpart_workspace(machine, workspace)` en
    `src-tauri/src/extracted/fleet.rs`. Devuelve el workspace de esa máquina que
    corresponde al de la ventana:
+   - el mismo id, si esa máquina lo lista: un workspace de la cuenta tiene el
+     mismo id en todas ([`account-workspace.md`](account-workspace.md));
    - el enlace guardado a mano en `<window_data>/machines.json`
      (`workspaces.<máquina>.<workspace de la ventana>`), sin interfaz;
    - si no hay, el único workspace con el mismo `git_host` y `remote`, ambos no
@@ -85,7 +87,8 @@ corren las tareas que se crearon en ellas.
 
    Un nombre igual **no** enlaza: dos workspaces «Notas» de dos personas no son
    el mismo. Lo encontrado se guarda en el mismo archivo. Dentro de un
-   workspace ya enlazado, el proyecto se empareja por nombre único.
+   workspace ya enlazado, el proyecto es el del mismo id o, si no, el de nombre
+   único.
 2. **Diseño de destino: el workspace de la cuenta.** El enlace dependerá de la
    cuenta del usuario, que Terminus aún no tiene. Funcionará como en Slack: uno
    inicia sesión, sus workspaces son de su cuenta y cada máquina materializa el
@@ -157,7 +160,7 @@ corren las tareas que se crearon en ellas.
   - suscripciones laterales (`side_feeds` / `side_feed`);
   - `service_filter` también las filtra;
   - `reach` / `wake_now` dan el motor de una máquina;
-  - `machine_list` añade `linked`.
+  - `machine_list` añade `hosts` (si tiene el workspace abierto).
 - Front:
   - `src/features/machines/store.ts`: lista, elección por workspace y cabecera;
   - `src/features/machines/MachinePicker.tsx`;
@@ -169,6 +172,8 @@ corren las tareas que se crearon en ellas.
 - Pruebas en Rust (`fleet.rs`), con motores de laboratorio de ids distintos:
   - `two_engines_one_workspace`: lista unida, orden remota con sus ids, crear
     en la máquina no activa;
+  - `the_same_ids_are_the_same_workspace_and_project`: el mismo id gana a un
+    enlace por remoto o por nombre;
   - `a_name_alone_does_not_link_a_saved_link_does`: un nombre igual no enlaza;
     un enlace guardado sí, aun con la máquina apagada;
   - `asleep_machine_keeps_its_tasks_and_events_come_home`: lista conservada
@@ -183,8 +188,9 @@ corren las tareas que se crearon en ellas.
 
 ## Lo que queda
 
-- **El workspace de la cuenta**: reemplazar `counterpart_workspace` cuando haya
-  cuentas y plano de control. Plan en [`account-workspace.md`](account-workspace.md).
+- **El workspace de la cuenta**: `counterpart_workspace` y `project_on` ya
+  prefieren el mismo id; falta dejar de guardar enlaces en `machines.json` cuando
+  no queden workspaces de antes. Plan en [`account-workspace.md`](account-workspace.md).
 - **Proyectos sin pareja.** Una tarea remota de un proyecto que la ventana no
   tiene no aparece. `move_session` hacia otro proyecto no traduce `to`.
 - **Eventos.** La suscripción lateral empieza en el presente: lo emitido entre
@@ -208,8 +214,8 @@ corren las tareas que se crearon en ellas.
 1. Abrir una tarea de una máquina apagada no la enciende. Se ve lo último leído
    con un aviso, y mandarle un mensaje la enciende.
 2. Se quita para siempre el cambio de motor de toda la ventana.
-3. El enlace es por `git_host` + `remote` o por un enlace guardado. El destino
-   es el id de workspace de la cuenta, y no hay interfaz para enlazar.
+3. El enlace es el mismo id de workspace (el de la cuenta); para los de antes,
+   `git_host` + `remote` o un enlace guardado. No hay interfaz para enlazar.
 4. «Ejecutar en» se recuerda por workspace.
 
 ## Con la cuenta de Danil
@@ -222,8 +228,11 @@ de la web (`src/web/fleet.ts` y `src/web/transport.ts`), en un trozo perezoso
 - El motor local sigue por el IPC nativo, con sus ids tal cual: eventos de
   Tauri, canales, lotes empujados y `load_history` paginado no cambian. Es la
   máquina `home` del `Fleet`: encabeza los workspaces que tiene.
-- Cada otra computadora es una sesión del relay (`@terminus/computers`); sus
-  ids llevan el prefijo `cmp_x~`. Sus eventos llegan a los oyentes en cuanto
+- Cada otra computadora es una sesión del relay (`@terminus/computers`). Los
+  workspaces y proyectos tienen el mismo id en todas y no llevan prefijo: un
+  workspace es uno donde se liste su id y un proyecto es una fila con
+  `machines`. Solo tareas, portafolios y cuentas de IA de las demás llevan el
+  prefijo `cmp_x~`. Sus eventos llegan a los oyentes en cuanto
   llegan y sus huecos viajan en la siguiente página de `service_poll`.
 - La credencial es un token de cliente de diez minutos que el motor pide al
   plano de control con su token de máquina (`account_relay_token` →
@@ -234,3 +243,10 @@ de la web (`src/web/fleet.ts` y `src/web/transport.ts`), en un trozo perezoso
   sin tokens de cliente o sin otra computadora, no se instala nada.
 - En una lectura de todas las máquinas, una remota que no contesta en seis
   segundos no aporta: las listas locales no esperan a la red.
+- Al crear, «Ejecutar en» gana: la máquina elegida, si no la última usada, si no
+  la de la ventana. Una máquina sin el workspace lo hace suyo con
+  `materialize_workspace` antes de recibir la tarea; si su motor no conoce la
+  orden, la máquina queda desactivada en «Ejecutar en» con la razón, igual que
+  una carpeta sin remoto (`remote_url`) que vive en otra máquina.
+- `attention` junta por workspace lo que dice cada máquina y llega a la ventana
+  como una sola lista.

@@ -1,6 +1,6 @@
 # El workspace es de la cuenta; la máquina es de la tarea
 
-**Estado:** PROPUESTA · 2026-10-20
+**Estado:** PROPUESTA · 2026-10-20 · clientes de la fase 1 en `feat/account-workspace`
 
 **Reemplaza:** el enlace de workspaces de [`per-task-machine.md`](per-task-machine.md)
 («El workspace de la cuenta», en «Lo que queda») y «Usar este workspace aquí».
@@ -18,7 +18,8 @@ selector: el modelo está mal.
   `create()` usa `free_id` → `short_id()` (`existing-runtime/src/workspace/workspaces.rs:328-365`,
   `util.rs:283`). Ese id es también el nombre de la carpeta (`scope_dir`, `:244-249`).
 - **«Usar este workspace aquí» crea otro workspace.** Hace `add_workspace({ name })`
-  en la otra máquina y le copia los ajustes (`src/features/machines/workspace-here.ts:69,171`).
+  en la otra máquina y le copia los ajustes (`workspace-here.ts`,
+  ya borrado).
 - **La ventana los junta por apariencia.** `Fleet.mergeWorkspaces` los agrupa por
   `provider` + `remote` o, si no hay, por nombre (`src/web/fleet.ts:247-294`). El
   móvil hace lo mismo (`packages/computers` `groupWorkspaces`).
