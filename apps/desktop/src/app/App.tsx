@@ -3169,7 +3169,7 @@ export default function App() {
         agent: encargado,
         baseRef: draftBases()[claveBorrador] ?? null,
         runId,
-      }, runOnOptions(workspaceActivo()));
+      }, runOnOptions(workspaceActivo(), projectList().find((p) => p.id === proyecto)));
       // Sin su `shell_started` no hay nada pintado: se adopta aquí y se lee del disco.
       if (adoptarComando(runId, corrida.session) && nace.generation === sessionGeneration) void settleTurn(corrida.session, true);
       return true;
@@ -5291,7 +5291,7 @@ export default function App() {
         // El escritorio que la persona tenía delante al escribirlo, sellado en el
         // mensaje; lo que llega de otro canal no trae ninguno.
         space: m.space ?? null,
-      }, abierta ? undefined : runOnOptions(workspaceActivo()));
+      }, abierta ? undefined : runOnOptions(workspaceActivo(), projectList().find((p) => p.id === proyecto)));
       if (abierta && dormida) {
         anotar(setEncendiendo, abierta, null);
         anotar(setApagadas, abierta, null);
@@ -5915,7 +5915,7 @@ export default function App() {
             <Show when={props.nueva && !props.locked}>
               {/* Su propio límite: mientras carga, el resto de la vista sigue. */}
               <Suspense fallback={null}>
-                <MachinePicker workspace={workspaceActivo()} />
+                <MachinePicker workspace={workspaceActivo()} project={projectList().find((p) => p.id === project())} />
               </Suspense>
             </Show>
           }

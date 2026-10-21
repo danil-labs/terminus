@@ -1,7 +1,8 @@
 /**
  * The desktop signed in to the Danil account shows the tasks of every computer
  * of the person, as the web does: its own engine stays on the native IPC with
- * its ids, each other computer is a relay session. Signed out, nothing changes.
+ * its ids, each other computer is a relay session, and workspaces and projects
+ * have the same id on all of them. Signed out, nothing changes.
  * Mounts `dist/` with a simulated IPC (the local engine) and a fake relay.
  */
 import assert from "node:assert/strict";
@@ -13,7 +14,7 @@ const SAME = { id: "w", name: "W", context_root: null, provider: "github", remot
 const row = (id, title) => ({ id, title, last_message: "", provider: "codex", model: "gpt-5.6", refs: [], created_at: 0, updated_at: 0, turns: 0, parent: null, esperando: false });
 const project = (name) => ({ id: "p1", name, working_directory: "/lab/p1", kind: "git", portfolio: null, sources: [] });
 
-/** The same raw ids on every machine: only the namespace of the others keeps them apart. */
+/** The same workspace and project on every machine; task ids collide and only the namespace of the others keeps them apart. */
 function remote(name, task, extra = {}) {
   return {
     ...engine,
@@ -62,7 +63,7 @@ function local(calls, extra = {}) {
     turn_authors: { person: null, agent: null },
     service_filter: null,
     service_poll: () => sleep(40).then(() => ({ cursor: 1, gap: false, replay: false, runtime: "lab", reset: false })),
-    machine_list: [{ id: "local", local: true, active: true, on: true, linked: true }],
+    machine_list: [{ id: "local", local: true, active: true, on: true, hosts: true }],
     set_active_workspace: null,
     send_message: () => "t1",
     create_project: ({ name }) => ({ id: "p8", name, working_directory: "/lab/p8", kind: "folder", sources: [] }),
@@ -118,7 +119,7 @@ test("signed out, the desktop is the local window as before", async () => {
   assert.equal(listed.length, 0, "the computers are never listed");
   assert.equal(f.relays.cmp_vm.sockets.length, 0, "no relay session opens");
   assert.ok(!app.comandos.includes("account_relay_token"), "no token is asked for");
-  assert.deepEqual(await invoke("machine_list"), [{ id: "local", local: true, active: true, on: true, linked: true }], "the window's own machine list");
+  assert.deepEqual(await invoke("machine_list"), [{ id: "local", local: true, active: true, on: true, hosts: true }], "the window's own machine list");
   assert.deepEqual(app.fallos, []);
 });
 
@@ -163,8 +164,27 @@ test("signed in, the tasks of every machine show together, each with its machine
   assert.equal(relayCalls("cmp_mac", "send_message").length, 0);
 
   const made = await invoke("create_project", { name: "Nuevo" }, { headers: { "x-terminus-machine": "cmp_vm" } });
-  assert.equal(made.id, "cmp_vm~p9", "the picked machine makes it");
+  assert.equal(made.id, "p9", "the picked machine makes it, and its id is the same everywhere");
+  assert.equal(relayCalls("cmp_vm", "create_project").length, 1);
+  assert.equal(native("create_project").length, 0);
   assert.equal((await invoke("machine_list")).find((m) => m.active)?.id, "cmp_vm", "then the last machine used is the default");
+  assert.deepEqual(app.fallos, []);
+});
+
+test("a task of a project of this computer, with the VM chosen in «Ejecutar en», is born on the VM", async () => {
+  const { app, invoke, relayCalls, native } = await open("desktop-account-run-on", {
+    relays: {
+      cmp_vm: { table: remote("Panel", "Tarea de la VM", { send_message: () => "r7" }), state: "online" },
+      cmp_mac: { table: remote("Notas", "Tarea del Mac"), state: "online" },
+    },
+  });
+  const projects = await invoke("list_projects");
+  assert.deepEqual(projects.map((p) => [p.id, p.machines]), [["p1", ["cmp_home", "cmp_vm", "cmp_mac"]]], "one project, the same id on every machine");
+  const sent = native("send_message").length;
+  const id = await invoke("send_message", { project: "p1", session: null, prompt: "hola" }, { headers: { "x-terminus-machine": "cmp_vm" } });
+  assert.equal(id, "cmp_vm~r7", "the task is the VM's");
+  assert.deepEqual(relayCalls("cmp_vm", "send_message").map((c) => [c.args.project, c.workspace]), [["p1", "w"]], "with the same project and workspace ids");
+  assert.equal(native("send_message").length, sent, "nothing is born on this computer");
   assert.deepEqual(app.fallos, []);
 });
 

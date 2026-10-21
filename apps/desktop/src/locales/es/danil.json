@@ -85,5 +85,9 @@
   "danil.workspace.use_radiant": "Usar mi sesión de Radiant ({email})",
   "danil.workspace.other": "Otra cuenta",
   "danil.workspace.pending_hint": "Se abrió la página de Danil. Quien entre ahí con su cuenta conecta este workspace.",
-  "danil.error.workspace_not_linked": "Este workspace no está conectado a tu cuenta de Danil."
+  "danil.error.workspace_not_linked": "Este workspace no está conectado a tu cuenta de Danil.",
+  "danil.error.project_not_here": "Ese proyecto es una carpeta de otra máquina y no tiene remoto: sus tareas solo corren ahí.",
+  "danil.error.workspace_exists": "Esta máquina ya tiene un workspace con ese id.",
+  "danil.error.invalid_workspace_id": "Ese id de workspace no es válido.",
+  "danil.error.workspace_not_found": "Ese workspace no está en tu cuenta de Danil."
 }

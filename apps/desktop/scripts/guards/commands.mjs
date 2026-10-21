@@ -75,6 +75,7 @@ const SIN_INTERFAZ = {
   install_tool: "pnpm y Bun los instala bootstrap::prepare_runtime desde Rust; ninguna pantalla lo invoca",
   tree_typst_target: "lo pide typst_live::typst_live_open desde el Rust de la ventana: el webview nunca da la ruta de arranque",
   danil_client_token: "lo pide proxy::account_relay_token desde el Rust de la ventana: la credencial de máquina no sale del motor",
+  import_chat_background_data: "lo usaba «Usar este workspace aquí», ya borrado; el fondo llegará desde la cuenta de Danil en la fase 2 (docs/account-workspace.md)",
   remove_provider: "sin forma confiable de saber qué instaló Terminus, se quitó el botón",
   remove_gh: "sin forma confiable de saber qué instaló Terminus, se quitó el botón",
   remove_tool: "sin forma confiable de saber qué instaló Terminus, se quitó el botón",

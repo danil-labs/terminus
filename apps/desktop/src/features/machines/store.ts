@@ -5,8 +5,21 @@ import { createPref } from "../../lib/prefs";
 import { isMac } from "../../lib/window";
 import { capabilities } from "../../lib/platform";
 
-/** `machine_list`: `linked` es si tiene el workspace abierto; `null`, que no se sabe sin encenderla. */
-export type Machine = { id: string; local: boolean; active: boolean; on: boolean; linked: boolean | null };
+/**
+ * `machine_list`: `hosts` es si tiene el workspace abierto (`null`, que no se sabe
+ * sin encenderla); `materializes`, si puede hacerlo suyo con el mismo id al crear ahí.
+ */
+export type Machine = { id: string; local: boolean; active: boolean; on: boolean; hosts: boolean | null; materializes?: boolean };
+
+/** Lo que el picker sabe del proyecto de la tarea nueva: las máquinas con su carpeta y su remoto. */
+export type ProjectPlace = { name: string; machines?: string[]; remote_url?: string | null } | null | undefined;
+
+/** Por qué una máquina no puede correr la tarea nueva, o `null` si puede. */
+export function unavailable(m: Machine, project: ProjectPlace): "workspace" | "project" | null {
+  if (m.hosts === false && !m.materializes) return "workspace";
+  if (project?.machines && !project.remote_url && !project.machines.includes(m.id)) return "project";
+  return null;
+}
 
 // Una sola lista para toda la ventana. Señal y no `createResource`, que
 // suspendería la vista entera mientras contestan.
@@ -26,11 +39,11 @@ const [elegidas, guardarElegidas] = createRoot(() =>
   createPref<Record<string, string>>("machines.run_on", {}),
 );
 
-/** La máquina elegida para `workspace`, si sigue en la lista y tiene ese workspace. */
-export function runOn(workspace: string | null): string | null {
+/** La máquina elegida para `workspace`, si sigue en la lista y puede correr una tarea de `project`. */
+export function runOn(workspace: string | null, project?: ProjectPlace): string | null {
   const id = workspace ? elegidas()[workspace] : undefined;
   const machine = id ? machines().find((m) => m.id === id) : undefined;
-  if (!id || machine?.active || machine?.linked === false) return null;
+  if (!id || machine?.active || (machine && unavailable(machine, project))) return null;
   return machines().length === 0 || machine ? id : null;
 }
 
@@ -41,8 +54,8 @@ export function setRunOn(workspace: string | null, id: string | null) {
 }
 
 /** Con esta cabecera el proxy crea la tarea en esa máquina sin salir del workspace (`fleet.rs`). */
-export function runOnOptions(workspace: string | null) {
-  const id = runOn(workspace);
+export function runOnOptions(workspace: string | null, project?: ProjectPlace) {
+  const id = runOn(workspace, project);
   return id ? { headers: { "x-terminus-machine": id } } : undefined;
 }
 

@@ -1354,7 +1354,7 @@ pub(super) fn machine_list(app: tauri::AppHandle) -> Result<Value, Value> {
                 true
             };
             // Si tiene este workspace: solo se sabe preguntándole, y apagada no se pregunta.
-            let linked = match &workspace {
+            let hosts = match &workspace {
                 _ if i == active => Some(true),
                 Some(local) if state.fleet.linked(&m.id, local) => Some(true),
                 Some(local) if on => state.reach(i).map(|there| {
@@ -1363,7 +1363,7 @@ pub(super) fn machine_list(app: tauri::AppHandle) -> Result<Value, Value> {
                 }),
                 _ => None,
             };
-            json!({"id": m.id, "local": m.wake.is_none(), "active": i == active, "on": on, "linked": linked})
+            json!({"id": m.id, "local": m.wake.is_none(), "active": i == active, "on": on, "hosts": hosts})
         })
         .collect();
     Ok(json!(list))

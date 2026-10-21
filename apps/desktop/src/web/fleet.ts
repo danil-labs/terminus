@@ -1,12 +1,11 @@
 /**
- * Every computer of the person behind one panel. Each engine keeps its own
- * random ids: with more than one computer the panel sees them prefixed with the
- * computer's id, so two machines never collide and a command finds its machine
- * from the ids it carries. With one computer nothing is renamed.
- *
- * Workspaces of different computers that are the same (same provider and
- * remote, or else the same name) show as one; its projects and tasks come
- * from each machine, each row marked with its machine.
+ * Every computer of the person behind one panel. A workspace and its projects
+ * keep the same id on every machine (`docs/account-workspace.md`): the panel
+ * never renames them, a workspace is one wherever its id is listed, and a
+ * project is one row that says which machines have it. Tasks, portfolios and
+ * AI accounts keep an id per machine: with more than one computer the panel
+ * sees them prefixed with the computer's id, so two machines never collide and
+ * a command finds its machine from the ids it carries.
  *
  * `home` (the desktop's own engine) keeps its raw ids and leads every
  * workspace it has: what its window already shows never changes name.
@@ -15,7 +14,7 @@
  * account (`linked`); the relay already refuses the rest.
  */
 import { linkedAttention, linkedEvents, linkedListing } from "@terminus/computers";
-
+import { mergeAttention } from "@terminus/protocol";
 
 /**
  * `outdated`: its engine speaks another contract, known before asking it anything. `linked`: `null` shows every workspace.
@@ -25,29 +24,31 @@ export type MachineInfo = { id: string; name: string; wakes: boolean; outdated?:
 export type MachineStatus = "online" | "offline" | "starting" | "outdated";
 
 type Row = Record<string, unknown>;
-type Group = { id: string; members: Map<string, string> };
+type Entry = { workspace: string; tasks: unknown[] };
+/** Where a project lives: the machines that have its folder, and whether another can clone it. */
+type ProjectPlace = { machines: Set<string>; remote: boolean };
 export type Answer = { machine: string; value: unknown };
 
 const SEP = "~";
-/** Keys whose string value names a workspace, project, task or account of the machine that sent it. */
-const KEYS = new Set(["workspace", "project", "session", "parent", "portfolio", "account"]);
+/** Keys whose string value names a task, portfolio or account of the machine that sent it. */
+const KEYS = new Set(["session", "parent", "portfolio", "account"]);
 /** Reads of workspace content: each machine of the workspace answers its part. */
 export const FAN = new Set(["list_projects", "list_portfolios", "list_live_sessions", "list_active_turns", "list_live_turns"]);
 /** Reads that list every machine, whatever the workspace. */
-export const EVERYWHERE = new Set(["list_workspaces", "workspaces_startup", "list_accounts"]);
+export const EVERYWHERE = new Set(["list_workspaces", "workspaces_startup", "list_accounts", "list_workspace_attention"]);
 /** What makes something new where the person chose, when no id says where. */
 export const CREATE = new Set(["send_message", "run_shell_command", "create_project", "clone_project"]);
 /** Answers whose rows carry the id of what they list. */
-const ROW_IDS = new Set(["list_projects", "list_portfolios", "list_live_sessions"]);
+const ROW_IDS = new Set(["list_portfolios", "list_live_sessions"]);
 /** Answers keyed by the id of the task each value is about. */
 const KEYED = new Set(["list_session_git"]);
 /** Answers that are one object with its own id. */
-const OWN_ID = new Set(["load_session", "create_project", "clone_project", "add_account"]);
+const OWN_ID = new Set(["load_session", "add_account"]);
 /** Keys whose value is an image file on the machine that sent it: `preview_file` must read it there. */
 const FILES = new Set(["logo", "background", "avatar"]);
 const isPath = (v: string) => /^(\/|~\/|[a-z]:[\\/])/i.test(v);
 /** Rows the sidebar marks with their machine. */
-const TAGGED = new Set(["list_projects", "list_live_sessions"]);
+const TAGGED = new Set(["list_live_sessions"]);
 
 // `self` is the person's own machine: the relay cannot start it.
 const MANAGED_PROVIDERS = new Set(["aws-ec2"]);
@@ -67,16 +68,29 @@ export function ordered(machines: MachineInfo[]): MachineInfo[] {
 
 const isRow = (v: unknown): v is Row => !!v && typeof v === "object" && !Array.isArray(v);
 const text = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+const isEntry = (v: unknown): v is Entry => isRow(v) && typeof v.workspace === "string";
 
-/** `named`: the machine came from an id in the command, not from a choice. */
-export type Route = { machine: string; args: Row; workspace: string | null; named: boolean } | { fan: string[]; args: Row; workspace: string | null };
+/**
+ * `named`: the machine came from an id in the command, not from a choice.
+ * `missing`: that machine listed its workspaces and this one is not among them.
+ */
+export type Route =
+  | { machine: string; args: Row; workspace: string | null; named: boolean; missing: boolean }
+  | { fan: string[]; args: Row; workspace: string | null };
 
 export class Fleet {
   readonly machines: MachineInfo[];
   readonly multi: boolean;
-  private groups: Group[] = [];
-  /** The workspaces each machine listed last, to name a workspace for a machine outside the active one. */
-  private seen = new Map<string, string[]>();
+  /** Workspace → the machines that listed it. */
+  private hosts = new Map<string, Set<string>>();
+  /** The machines whose workspaces were read: what one of them does not list, it does not have. */
+  private listed = new Set<string>();
+  /** Workspace → project → where it lives. */
+  private projects = new Map<string, Map<string, ProjectPlace>>();
+  /** Machines whose engine does not know `materialize_workspace` yet. */
+  private stale = new Set<string>();
+  /** What each machine says waits for the person, for `attention`. */
+  private attention = new Map<string, Entry[]>();
   private outdated = new Set<string>();
 
   /** `on`: whether a machine answers now; rows from one that does not are marked off. */
@@ -123,39 +137,50 @@ export class Fleet {
     return m ? { machine: m.id, id: value.slice(m.id.length + SEP.length) } : null;
   }
 
-  /** The machine a workspace id outside every group belongs to: the one in its prefix, else `home`. */
-  private ownerOf(workspace: string): { machine: string; id: string } | null {
-    return this.unwrap(workspace) ?? (this.home ? { machine: this.home, id: workspace } : null);
+  /** Whether `machine` has `workspace`: `null` until it says which ones it has. */
+  has(machine: string, workspace: string | null): boolean | null {
+    if (!workspace || !this.multi) return workspace ? true : null;
+    if (this.hosts.get(workspace)?.has(machine)) return true;
+    return this.listed.has(machine) ? false : null;
   }
 
-  private group(id: string | null | undefined): Group | undefined {
-    return id ? this.groups.find((g) => g.id === id) : undefined;
-  }
-
-  /** The machines that hold a workspace of the panel, in order. */
+  /** The machines that hold a workspace of the panel, in order; before they list theirs, every one that may. */
   membersOf(workspace: string | null): string[] {
-    const g = this.group(workspace);
-    if (!g) {
-      const own = workspace ? this.ownerOf(workspace) : null;
-      return own ? [own.machine] : this.multi ? [] : this.usable();
-    }
-    return this.usable().filter((m) => g.members.has(m));
+    if (!this.multi) return this.usable();
+    if (!workspace) return [];
+    return this.usable().filter((m) => this.has(m, workspace) !== false);
   }
 
-  /** The workspace of `machine` behind the panel's `workspace`, or another of its own if it lacks that one. */
+  /** The workspace `machine` is asked with: the same id, or none if it lacks that one. */
   workspaceOn(machine: string, workspace: string | null): string | null {
-    if (!this.multi) return workspace;
-    const g = this.group(workspace);
-    if (g?.members.has(machine)) return g.members.get(machine) ?? null;
-    const own = workspace ? this.ownerOf(workspace) : null;
-    if (own?.machine === machine) return own.id;
-    return this.seen.get(machine)?.[0] ?? null;
+    return this.has(machine, workspace) === false ? null : workspace;
   }
 
-  /** The panel's id for a workspace of `machine`. */
-  workspaceId(machine: string, raw: string): string {
-    if (!this.multi || !raw) return raw;
-    return this.groups.find((g) => g.members.get(machine) === raw)?.id ?? this.wrap(machine, raw);
+  /** Whether `machine` may still be asked to make a workspace of the account its own. */
+  materializes(machine: string): boolean {
+    return !this.stale.has(machine);
+  }
+
+  /** `machine` answered that it does not know `materialize_workspace`. */
+  cannotMaterialize(machine: string) {
+    this.stale.add(machine);
+  }
+
+  /** `machine` made `workspace` its own: it hosts it from now on. */
+  materialized(machine: string, workspace: string) {
+    const set = this.hosts.get(workspace) ?? new Set<string>();
+    this.hosts.set(workspace, set.add(machine));
+  }
+
+  /** Where a project of `workspace` lives, once some machine listed it. */
+  projectOf(workspace: string | null, project: unknown): ProjectPlace | undefined {
+    return workspace && typeof project === "string" && project ? this.projects.get(workspace)?.get(project) : undefined;
+  }
+
+  /** Whether a new task of `project` can run on `machine`: it has its folder, or can clone it from its remote. */
+  canRun(machine: string, workspace: string | null, project: unknown): boolean {
+    const place = this.projectOf(workspace, project);
+    return !place || place.remote || place.machines.has(machine);
   }
 
   /** What `machine` answered, without the workspaces not linked to the account there. */
@@ -175,11 +200,9 @@ export class Fleet {
   /** The args as `machine` understands them; `machines` collects every machine an id in them names. */
   private decode(value: unknown, target: string | null, machines: Set<string>, key: string | null = null): unknown {
     if (typeof value === "string") {
-      const g = this.group(value);
-      if (g) return target ? (g.members.get(target) ?? value) : value;
       const own = this.unwrap(value);
       if (!own) {
-        // A bare id of a workspace, folder or task is the home machine's: only its ids go unprefixed.
+        // A bare id of a task, portfolio or account is the home machine's: only its ids go unprefixed.
         if (this.home && this.multi && value && key && KEYS.has(key)) machines.add(this.home);
         return value;
       }
@@ -191,25 +214,38 @@ export class Fleet {
     return value;
   }
 
+  /** The machines that answer a read of `workspace`: of one project, only those that have its folder. */
+  private fanOf(workspace: string | null, project: unknown): string[] {
+    const members = this.membersOf(workspace);
+    const place = this.projectOf(workspace, project);
+    const having = place ? members.filter((m) => place.machines.has(m)) : [];
+    return having.length ? having : members;
+  }
+
   /**
    * Where a command goes: the machine its ids name, the one chosen for something
    * new, every machine of the workspace for its content, or the machine that
-   * leads the workspace for anything else.
+   * leads the workspace (or the project it names) for anything else.
    */
   route(command: string, args: Row, workspace: string | null, chosen: string | null, fallback: string): Route {
-    if (!this.multi) return { machine: this.machines[0].id, args, workspace, named: false };
+    if (!this.multi) return { machine: this.machines[0].id, args, workspace, named: false, missing: false };
     const named = new Set<string>();
     this.decode(args, null, named);
-    const g = this.group(workspace);
-    const own = !g && workspace ? this.ownerOf(workspace) : null;
-    if (own) named.add(own.machine);
     if (named.size > 1) throw new Error("cross_machine");
-    let machine = [...named][0] ?? null;
-    const byId = machine !== null;
-    if (!machine && EVERYWHERE.has(command) && !chosen) return { fan: this.usable(), args, workspace };
-    if (!machine && FAN.has(command) && !chosen) return { fan: this.membersOf(workspace), args, workspace };
-    machine ??= chosen ?? (CREATE.has(command) ? fallback : (this.membersOf(workspace)[0] ?? fallback));
-    return { machine, args: this.decode(args, machine, new Set()) as Row, workspace: this.workspaceOn(machine, workspace), named: byId };
+    const byName = [...named][0] ?? null;
+    const byId = byName !== null;
+    if (!byName && EVERYWHERE.has(command) && !chosen) return { fan: this.usable(), args, workspace };
+    if (!byName && FAN.has(command) && !chosen) return { fan: this.fanOf(workspace, args.project), args, workspace };
+    const place = this.projectOf(workspace, args.project);
+    const lead = CREATE.has(command) ? null : this.membersOf(workspace).find((m) => !place || place.machines.has(m));
+    const machine: string = byName ?? chosen ?? lead ?? fallback;
+    return {
+      machine,
+      args: this.decode(args, machine, new Set()) as Row,
+      workspace: this.workspaceOn(machine, workspace),
+      named: byId,
+      missing: this.has(machine, workspace) === false,
+    };
   }
 
   /** `args` decoded for one machine of a fan-out. */
@@ -225,7 +261,6 @@ export class Fleet {
     const walk = (v: unknown, key: string | null): unknown => {
       if (typeof v === "string") {
         if (!key || !v) return v;
-        if (key === "workspace") return this.workspaceId(machine, v);
         return KEYS.has(key) || (FILES.has(key) && isPath(v)) ? this.wrap(machine, v) : v;
       }
       if (Array.isArray(v)) return v.map((x) => walk(x, key));
@@ -241,16 +276,24 @@ export class Fleet {
     return out;
   }
 
-  /** An event of `machine` for the panel: the bare id of `account-rejected` included. */
+  /** An event of `machine` for the panel: the bare id of `account-rejected` included, and `attention` for every machine. */
   encodeEvent(machine: string, name: string, payload: unknown): unknown {
     if (name === "account-rejected" && typeof payload === "string") return this.wrap(machine, payload);
-    return this.encode(machine, payload);
+    const encoded = this.encode(machine, payload);
+    if (name !== "attention" || !this.multi || !Array.isArray(encoded)) return encoded;
+    this.attention.set(machine, mergeAttention(this.attention.get(machine) ?? [], encoded.filter(isEntry)));
+    return this.attentionList();
   }
 
   /** The answers of a fan-out joined: lists one after another, each row with its machine. */
-  merge(command: string, answers: Answer[]): unknown {
+  merge(command: string, answers: Answer[], workspace: string | null = null): unknown {
     if (command === "list_workspaces" || command === "workspaces_startup") return this.mergeWorkspaces(answers);
     if (command === "list_accounts") return this.mergeAccounts(answers);
+    if (command === "list_projects" && this.multi) return this.mergeProjects(answers, workspace);
+    if (command === "list_workspace_attention" && this.multi) {
+      for (const { machine, value } of answers) if (Array.isArray(value)) this.attention.set(machine, (this.encode(machine, value) as unknown[]).filter(isEntry));
+      return this.attentionList();
+    }
     const parts = answers.map(({ machine, value }) => this.encode(machine, value, command));
     if (parts.length === 0) return Array.isArray(answers[0]?.value) ? [] : null;
     if (parts.every(Array.isArray)) {
@@ -268,54 +311,78 @@ export class Fleet {
     return parts.find((p) => p !== null && p !== undefined) ?? null;
   }
 
-  /** One workspace for the ones that are the same on several machines; the first machine leads. */
+  private order(machine: string): number {
+    return this.machines.findIndex((x) => x.id === machine);
+  }
+
+  /** One row per workspace id, from the first machine that lists it, with every machine that has it. */
   private mergeWorkspaces(answers: Answer[]): unknown {
     if (!this.multi) return answers[0]?.value ?? null;
     const lists = answers
       .filter((a) => isRow(a.value) && Array.isArray((a.value as Row).workspaces))
-      .map((a) => ({ machine: a.machine, value: a.value as Row, rows: ((a.value as Row).workspaces as Row[]).filter((w) => typeof w?.id === "string") }));
-    const order = (m: string) => this.machines.findIndex((x) => x.id === m);
-    lists.sort((a, b) => order(a.machine) - order(b.machine));
-    const groups: (Group & { row: Row; rows: Map<string, Row> })[] = [];
-    for (const { machine, rows } of lists) {
-      this.seen.set(machine, rows.map((w) => w.id as string));
-      const free = groups.filter((g) => !g.members.has(machine));
-      const pick = (same: (a: Row, b: Row) => boolean, w: Row) => {
-        const theirs = free.filter((g) => same(g.row, w));
-        const mine = rows.filter((x) => same(x, w));
-        return theirs.length === 1 && mine.length === 1 ? theirs[0] : undefined;
-      };
-      const remote = (a: Row, b: Row) => !!text(a.provider) && !!text(a.remote) && a.provider === b.provider && a.remote === b.remote;
-      const named = (a: Row, b: Row) => !!text(a.name) && text(a.name).toLowerCase() === text(b.name).toLowerCase();
-      for (const w of rows) {
-        const g = pick(remote, w) ?? pick(named, w);
-        if (g) {
-          g.members.set(machine, w.id as string);
-          g.rows.set(machine, w);
-          free.splice(free.indexOf(g), 1);
-        } else groups.push({ id: this.wrap(machine, w.id as string), members: new Map([[machine, w.id as string]]), row: w, rows: new Map([[machine, w]]) });
+      .map((a) => ({ machine: a.machine, value: a.value as Row, rows: ((a.value as Row).workspaces as Row[]).filter((w) => typeof w?.id === "string") }))
+      .sort((a, b) => this.order(a.machine) - this.order(b.machine));
+    const rows = new Map<string, { row: Row; owner: string }>();
+    for (const { machine, rows: listed } of lists) {
+      // What a machine that did not answer listed before still counts: a machine that turns off keeps its workspaces.
+      this.listed.add(machine);
+      for (const set of this.hosts.values()) set.delete(machine);
+      for (const w of listed) {
+        const id = w.id as string;
+        this.materialized(machine, id);
+        if (!rows.has(id)) rows.set(id, { row: w, owner: machine });
       }
     }
-    // A machine that joins a workspace later keeps its panel id and row: the open workspace does not change under the person.
-    const kept = new Set<string>();
-    for (const g of groups) {
-      const before = this.groups.find((b) => !kept.has(b.id) && [...g.members].some(([m, raw]) => b.members.get(m) === raw));
-      if (!before) continue;
-      kept.add(before.id);
-      g.id = before.id;
-      const owner = this.unwrap(before.id)?.machine;
-      if (owner && g.rows.has(owner)) g.row = g.rows.get(owner) as Row;
-    }
-    this.groups = groups.map(({ id, members }) => ({ id, members }));
     const lead = lists[0];
     if (!lead) return answers[0]?.value ?? null;
-    const fileOf = (g: (typeof groups)[number]) => {
-      const owner = [...g.rows].find(([, r]) => r === g.row)?.[0];
-      return typeof g.row.logo === "string" && owner && isPath(g.row.logo) ? { logo: this.wrap(owner, g.row.logo) } : {};
-    };
-    const workspaces = groups.map((g) => ({ ...g.row, ...fileOf(g), id: g.id, machines: [...g.members.keys()] }));
-    const active = lists.map((l) => (typeof l.value.active === "string" ? this.workspaceId(l.machine, l.value.active) : null)).find(Boolean) ?? null;
+    const fileOf = (row: Row, owner: string) => (typeof row.logo === "string" && isPath(row.logo) ? { logo: this.wrap(owner, row.logo) } : {});
+    const workspaces = [...rows].map(([id, { row, owner }]) => ({ ...row, ...fileOf(row, owner), id, machines: this.usable().filter((m) => this.hosts.get(id)?.has(m)) }));
+    const active = lists.map((l) => (typeof l.value.active === "string" ? l.value.active : null)).find(Boolean) ?? null;
     return { ...(this.encode(lead.machine, lead.value) as Row), workspaces, active };
+  }
+
+  /**
+   * One row per project id, with the machines that have its folder (`machines`).
+   * A row of a machine that only knows it from the account (`materialized: false`)
+   * adds no machine; its remote says whether another machine can clone it.
+   */
+  private mergeProjects(answers: Answer[], workspace: string | null): unknown[] {
+    const joined = new Map<string, { row: Row; machines: string[]; remote: string | null; here: boolean }>();
+    for (const { machine, value } of [...answers].sort((a, b) => this.order(a.machine) - this.order(b.machine))) {
+      if (!Array.isArray(value)) continue;
+      for (const raw of value) {
+        if (!isRow(raw) || typeof raw.id !== "string") continue;
+        const row = this.encode(machine, raw) as Row;
+        const here = raw.materialized !== false;
+        const seen = joined.get(raw.id);
+        const entry = seen ?? { row, machines: [], remote: null, here };
+        if (seen && here && !seen.here) Object.assign(entry, { row, here });
+        if (here) entry.machines.push(machine);
+        entry.remote ??= text(raw.remote_url) || null;
+        joined.set(raw.id, entry);
+      }
+    }
+    if (workspace) this.projects.set(workspace, new Map([...joined].map(([id, e]) => [id, { machines: new Set(e.machines), remote: !!e.remote }])));
+    return [...joined.values()].map((e) => ({ ...e.row, ...(e.remote ? { remote_url: e.remote } : {}), machines: e.machines }));
+  }
+
+  /**
+   * What waits for the person in every workspace, from every machine: one entry
+   * per workspace with the tasks of all of them. A workspace that had something
+   * and no longer does stays with no tasks, so the window reads it as the whole list.
+   */
+  private attentionList(): Entry[] {
+    const known = this.listed.size ? (id: string) => this.hosts.get(id)?.size : () => true;
+    const joined = new Map<string, Entry>();
+    for (const m of this.machines)
+      for (const e of this.attention.get(m.id) ?? []) {
+        if (!known(e.workspace)) continue;
+        const before = joined.get(e.workspace);
+        const tasks = Array.isArray(e.tasks) ? e.tasks : [];
+        joined.set(e.workspace, before ? { ...before, tasks: [...before.tasks, ...tasks] } : { ...e, tasks });
+      }
+    for (const id of this.hosts.keys()) if (!joined.has(id) && this.hosts.get(id)?.size) joined.set(id, { workspace: id, tasks: [] });
+    return [...joined.values()];
   }
 
   /**
