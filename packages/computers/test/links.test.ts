@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { hasLinkedWorkspaces, linkedAttention, linkedEvent, linkedListing, linkedWorkspaces, onlyLinked } from "../src/index.ts";
+import { callWorkspace, hasLinkedWorkspaces, linkedAttention, linkedEvent, linkedListing, linkedWorkspaces, onlyLinked } from "../src/index.ts";
 
 test("los vínculos salen de `workspaces`; sin el campo no se filtra", () => {
   assert.deepEqual([...(linkedWorkspaces({ workspaces: ["w1", "w2"] }) ?? [])], ["w1", "w2"]);
@@ -36,4 +36,12 @@ test("la atención y los eventos de un workspace no vinculado no llegan", () => 
   assert.equal(linkedEvent({ workspace: "w1" }, linked), true);
   assert.equal(linkedEvent({ workspace: null }, linked), true);
   assert.equal(linkedEvent({ workspace: "w2" }, null), true);
+});
+
+test("una llamada va con el workspace que nombran sus argumentos", () => {
+  assert.equal(callWorkspace("w1", {}), "w1");
+  assert.equal(callWorkspace("w1", { workspace: "w2" }), "w2");
+  assert.equal(callWorkspace(null, { scope: "w2" }), "w2");
+  assert.equal(callWorkspace("w1", { scope: "pending" }), "w1");
+  assert.equal(callWorkspace("w1", { scope: { kind: "project" } }), "w1");
 });

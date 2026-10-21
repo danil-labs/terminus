@@ -1022,7 +1022,7 @@
         {
           "key": "mode",
           "name": "mode",
-          "type": "String"
+          "type": "Option < String >"
         },
         {
           "key": "workspace",
@@ -1031,36 +1031,6 @@
         }
       ],
       "path": "danil::danil_workspace_link"
-    },
-    {
-      "async": false,
-      "channel": null,
-      "kind": "invoke",
-      "name": "danil_workspace_link_cancel",
-      "output": "-> Result < WorkspaceLinkStatus , Failure >",
-      "parameters": [
-        {
-          "key": "workspace",
-          "name": "workspace",
-          "type": "Option < String >"
-        }
-      ],
-      "path": "danil::danil_workspace_link_cancel"
-    },
-    {
-      "async": false,
-      "channel": null,
-      "kind": "invoke",
-      "name": "danil_workspace_link_start",
-      "output": "-> Result < LinkStart , Failure >",
-      "parameters": [
-        {
-          "key": "workspace",
-          "name": "workspace",
-          "type": "Option < String >"
-        }
-      ],
-      "path": "danil::danil_workspace_link_start"
     },
     {
       "async": false,
@@ -6445,7 +6415,6 @@
     "cli-open-task",
     "close-tab",
     "danil-connect",
-    "danil-workspace-link",
     "integrations-changed",
     "keep-awake-changed",
     "kn-cloud",

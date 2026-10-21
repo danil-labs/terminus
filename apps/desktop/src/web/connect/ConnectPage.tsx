@@ -1,4 +1,4 @@
-import { createSignal, Match, onMount, Show, Switch } from "solid-js";
+import { createSignal, Match, onMount, Switch } from "solid-js";
 import { t } from "../../lib/i18n";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
@@ -16,7 +16,7 @@ export type ConnectView =
   | { t: "error" }
   | { t: "ask"; device: DeviceRequest }
   | { t: "approving"; device: DeviceRequest }
-  | { t: "done"; kind: DeviceRequest["kind"] }
+  | { t: "done" }
   | { t: "denied" };
 
 /** `app.danil.ai/terminus/connect?code=…`: approves a Terminus that asked to join this account. */
@@ -43,17 +43,17 @@ export function ConnectPage(props: { session: Session; endpoint: string; code: s
     const answer = await withToken((token) => lookupDevice(props.endpoint, token, props.code)).catch(() => null);
     if (!answer) return;
     if (answer.kind !== "ok") return refused(answer);
-    setName(answer.value.kind === "workspace" ? "" : answer.value.name || answer.value.hostname);
+    setName(answer.value.name || answer.value.hostname);
     setView({ t: "ask", device: answer.value });
   }
 
   async function approve(device: DeviceRequest) {
     setView({ t: "approving", device });
-    const chosen = device.kind === "workspace" ? null : name().trim() || device.hostname;
+    const chosen = name().trim() || device.hostname;
     const answer = await withToken((token) => approveDevice(props.endpoint, token, props.code, chosen)).catch(() => null);
     if (!answer) return;
     if (answer.kind !== "ok") return refused(answer);
-    setView({ t: "done", kind: device.kind });
+    setView({ t: "done" });
   }
 
   async function deny(device: DeviceRequest) {
@@ -87,9 +87,7 @@ export function ConnectPage(props: { session: Session; endpoint: string; code: s
         <Match when={view().t === "no_account"}>{note(t("danil.connect.no_account"))}</Match>
         <Match when={view().t === "used"}>{note(t("danil.connect.used"))}</Match>
         <Match when={view().t === "ambiguous"}>{note(t("danil.connect.ambiguous"))}</Match>
-        <Match when={view().t === "done"}>
-          {note((view() as { kind?: string }).kind === "workspace" ? t("danil.connect.workspace_done") : t("danil.connect.done"))}
-        </Match>
+        <Match when={view().t === "done"}>{note(t("danil.connect.done"))}</Match>
         <Match when={view().t === "denied"}>{note(t("danil.connect.denied"))}</Match>
         <Match when={view().t === "error"}>
           {note(t("danil.connect.error"))}
@@ -108,25 +106,13 @@ export function ConnectPage(props: { session: Session; endpoint: string; code: s
                 void approve(d());
               }}
             >
-              <Show
-                when={d().kind === "workspace"}
-                fallback={
-                  <p class="m-0 text-base text-neutral-950">{t("danil.connect.ask", { hostname: d().hostname, platform: d().platform })}</p>
-                }
-              >
-                <p class="m-0 text-base text-neutral-950" data-connect-workspace="">
-                  {t("danil.connect.workspace_ask", { workspace: d().workspace_name || "", computer: d().computer_name || d().hostname })}
-                </p>
-                <p class="m-0 text-sm text-neutral-500">{t("danil.connect.workspace_hint")}</p>
-              </Show>
+              <p class="m-0 text-base text-neutral-950">{t("danil.connect.ask", { hostname: d().hostname, platform: d().platform })}</p>
               <p class="m-0 text-xs text-neutral-500">{t("danil.connect.code", { code: props.code })}</p>
-              <Show when={d().kind === "computer"}>
-                <label class="grid gap-1.5 text-[0.8125rem] text-neutral-500">
-                  {t("danil.connect.name_label")}
-                  <Input value={name()} onInput={(e) => setName(e.currentTarget.value)} disabled={view().t === "approving"} data-machine-name="" />
-                  <span class="text-xs">{t("danil.connect.name_hint")}</span>
-                </label>
-              </Show>
+              <label class="grid gap-1.5 text-[0.8125rem] text-neutral-500">
+                {t("danil.connect.name_label")}
+                <Input value={name()} onInput={(e) => setName(e.currentTarget.value)} disabled={view().t === "approving"} data-machine-name="" />
+                <span class="text-xs">{t("danil.connect.name_hint")}</span>
+              </label>
               <div class="flex flex-wrap gap-2">
                 <Button type="submit" size="sm" disabled={view().t === "approving"}>
                   {view().t === "approving" ? t("danil.connect.approving") : t("danil.connect.approve")}

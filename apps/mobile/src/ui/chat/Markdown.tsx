@@ -3,7 +3,7 @@ import { MAX_CHAT_VISUALS, parseVisualDirective } from "@terminus/chat/visual";
 import * as Clipboard from "expo-clipboard";
 import { type Token, type Tokens, marked } from "marked";
 import { type ReactNode, memo, useMemo, useState } from "react";
-import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { t } from "../../lib/i18n";
 import { openTask } from "../components";
 import { Icon } from "../Icon";
@@ -202,10 +202,18 @@ function inline(tokens: Token[] | undefined, ctx: Ctx, key: string): ReactNode[]
   });
 }
 
-/** Como la ventana: una tarea abre la tarea; http(s) y mailto, el navegador; lo demás no navega. */
+/**
+ * Como la ventana: una tarea del mismo workspace abre la tarea (la de otro lo
+ * dice, como `markdown.link.other_workspace`); http(s) y mailto, el navegador;
+ * lo demás no navega.
+ */
 function linkAction(href: string, ctx: Ctx): (() => void) | undefined {
   const task = internalTaskLink(href);
-  if (task && ctx.scope) return () => openTask(ctx.scope!.hostId, task.workspace, task.folder, task.task);
+  const scope = ctx.scope;
+  if (task && scope) {
+    if (task.workspace !== scope.workspace) return () => Alert.alert(t("chat.link.other_workspace"));
+    return () => openTask(scope.hostId, task.workspace, task.folder, task.task);
+  }
   const target = destinoAbrible(href);
   if (target) return () => void Linking.openURL(target);
   return undefined;

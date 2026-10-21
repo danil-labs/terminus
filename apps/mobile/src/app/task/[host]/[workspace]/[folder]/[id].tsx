@@ -34,15 +34,29 @@ const REFRESH = new Set(["permission", "started", "done", "presence"]);
 
 type Line = { key: string; role: string; text: string; tools: number; images: string[]; attachments: string[] };
 
-const linesOf = (turns: Turn[]): Line[] =>
-  turns.map((turn, i) => ({
-    key: turn.id ?? String(i),
-    role: turn.role,
-    text: turn.text ?? "",
-    tools: turn.tools?.length ?? 0,
-    images: toolImages(turn.tools),
-    attachments: turn.attachments ?? [],
-  }));
+const sameList = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
+const sameLine = (a: Line, b: Line) =>
+  a.key === b.key && a.role === b.role && a.text === b.text && a.tools === b.tools && sameList(a.images, b.images) && sameList(a.attachments, b.attachments);
+
+/**
+ * Las líneas de la conversación. Cada lectura trae turnos nuevos aunque no
+ * cambien: una línea igual a la anterior se reutiliza, con sus mismos arreglos
+ * de imágenes, para que `MessageBody` (memo) no vuelva a pintarse.
+ */
+function linesOf(turns: Turn[], previous: ReadonlyMap<string, Line>): Line[] {
+  return turns.map((turn, i) => {
+    const line: Line = {
+      key: turn.id ?? String(i),
+      role: turn.role,
+      text: turn.text ?? "",
+      tools: turn.tools?.length ?? 0,
+      images: toolImages(turn.tools),
+      attachments: turn.attachments ?? [],
+    };
+    const old = previous.get(line.key);
+    return old && sameLine(old, line) ? old : line;
+  });
+}
 
 /**
  * Una tarea en vivo, en la máquina que la corre: conversación, aprobaciones,
@@ -175,15 +189,26 @@ export default function TaskScreen() {
   const permissions = view?.permissions ?? [];
   const questions = view?.questions ?? [];
   const asleep = host?.canAct() === "asleep" || host?.canAct() === "outdated";
-  const lines = linesOf(view?.session.turns ?? []);
+  const turns = view?.session.turns;
+  const shown = useRef<ReadonlyMap<string, Line>>(new Map());
+  const lines = useMemo(() => {
+    const next = linesOf(turns ?? [], shown.current);
+    shown.current = new Map(next.map((line) => [line.key, line]));
+    return next;
+  }, [turns]);
   const cachedNote =
     view?.cachedAt && host ? t("machines.cached", { name: host.label, time: new Date(view.cachedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }) : null;
   const title = (view?.session.turns.find((turn) => turn.role === "user")?.text ?? "").split("\n")[0];
   const lastAgent = [...lines].reverse().find((line) => line.role !== "user" && line.role !== "system" && line.role !== "shell")?.key;
   const scope = useMemo(() => (host ? { host, hostId: params.host, workspace, folder, session: id } : null), [host, params.host, workspace, folder, id]);
   // Una respuesta rápida se manda como un mensaje, con el proveedor y el modelo con que sigue la tarea.
-  const quickReply = (prompt: string) =>
-    view ? submit({ shell: false, prompt, ...taskDefaults(view), effort: null, permissionMode: null, attachments: [] }) : Promise.resolve(false);
+  // Estable entre lecturas (lee la vista y `submit` del último render), para que el memo de `MessageBody` se sostenga.
+  const latest = useRef({ view, submit });
+  latest.current = { view, submit };
+  const quickReply = useCallback((prompt: string) => {
+    const { view: now, submit: send } = latest.current;
+    return now ? send({ shell: false, prompt, ...taskDefaults(now), effort: null, permissionMode: null, attachments: [] }) : Promise.resolve(false);
+  }, []);
 
   return (
     <KeyboardScreen>

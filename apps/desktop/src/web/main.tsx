@@ -31,6 +31,9 @@ type WebSettings = { endpoint: string; supabaseUrl: string; supabaseKey: string;
 export type TerminusWebConfig = Partial<WebSettings & RelayConfig & { computers: Computer[] }>;
 type Base = Omit<RelayConfig, "computerId" | "beforeReconnect">;
 
+/** How often the page lists the computers again to pick up workspaces linked or unlinked since it loaded; the desktop's cadence. */
+const RELIST = 10 * 60_000;
+
 const Picker = lazy(() => import("../features/machines/MachinePicker").then((m) => ({ default: m.MachinePicker })));
 const AccountMachines = lazy(() => import("./AccountMachines"));
 
@@ -43,12 +46,12 @@ const browser: BrowserHost = {
   readText: () => navigator.clipboard.readText(),
 };
 
-function mountApp(computers: Computer[], base: Base, before?: (id: string) => () => Promise<boolean>) {
+/** Mounts the app; what it returns applies a newer computer list's linked workspaces without remounting. */
+function mountApp(computers: Computer[], base: Base, before?: (id: string) => () => Promise<boolean>): (computers: Computer[]) => void {
   const [changed, bump] = createSignal(0);
   const links = computers.map((c) => {
     const [at, setAt] = createSignal<number | null>(null);
-    // No longer shared with this account: the page lists the computers again.
-    const relay = new RelaySession({ ...base, computerId: c.computer_id, beforeReconnect: before?.(c.computer_id), onUnlinked: () => window.location.reload() });
+    const relay = new RelaySession({ ...base, computerId: c.computer_id, beforeReconnect: before?.(c.computer_id) });
     relay.onState(() => bump((n) => n + 1));
     const info = {
       id: c.computer_id,
@@ -56,7 +59,6 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
       wakes: wakes(c),
       outdated: machineCompatibility(c.contract) === "outdated",
       linked: linkedWorkspaces(c),
-      member: c.role === "member",
     };
     return { info, relay, onSync: setAt, at };
   });
@@ -111,6 +113,12 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
     document.body.append(layer);
     render(() => <SyncNote machines={machines} />, layer);
   });
+  return (fresh) => {
+    let relinked = false;
+    for (const c of fresh) if (transport.fleet.relink(c.computer_id, linkedWorkspaces(c))) relinked = true;
+    // Every list of the window reads again, now filtered by the new links.
+    if (relinked) for (const name of ["harness:workspace-name", "harness:service-resync"]) window.dispatchEvent(new CustomEvent(name));
+  };
 }
 
 async function start(settings: WebSettings) {
@@ -149,7 +157,7 @@ async function start(settings: WebSettings) {
         onOpen={(computers) => {
           dispose();
           const several = computers.length > 1;
-          mountApp(
+          const relink = mountApp(
             computers,
             { endpoint, getToken: () => session.getToken(), onUnauthorized: () => void session.unauthorized() },
             (computerId) => async () => {
@@ -162,6 +170,15 @@ async function start(settings: WebSettings) {
               return false;
             },
           );
+          // Linking a workspace in Terminus shows (or hides) it here without reloading the page.
+          const relist = async () => {
+            const answer = await computersOf(endpoint, session).catch(() => null);
+            if (answer?.kind === "ok") relink(answer.value);
+          };
+          setInterval(() => void relist(), RELIST);
+          document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible") void relist();
+          });
         }}
       />
     ),

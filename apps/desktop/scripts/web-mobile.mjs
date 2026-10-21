@@ -34,6 +34,8 @@ const origin = (value) => (value ? new URL(value).origin : "");
 const expoEnv = {
   ...env,
   TERMINUS_MOBILE_WEB_BASE: `${base}m`,
+  // La raíz de la web de escritorio, para «Ver la versión de escritorio» sin adivinarla de la ruta.
+  EXPO_PUBLIC_TERMINUS_WEB_BASE: base,
   EXPO_PUBLIC_COMPUTERS_ENDPOINT: origin(env.TERMINUS_WEB_ENDPOINT || "https://computers.danil.ai"),
   EXPO_PUBLIC_TERMINUS_WEB_LOGIN: env.TERMINUS_WEB_LOGIN || "/",
   ...(env.TERMINUS_WEB_SUPABASE_URL ? { EXPO_PUBLIC_SUPABASE_URL: origin(env.TERMINUS_WEB_SUPABASE_URL) } : {}),

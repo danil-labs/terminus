@@ -1,29 +1,18 @@
 import { createSignal, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { t } from "../../lib/i18n";
-import { invoke } from "../../lib/invoke";
-import { listen } from "../../lib/serviceEvents";
-import { Button } from "../../ui/Button";
+import { Toggle } from "../../ui/Toggle";
 import { failureCode } from "./danil-account";
 import { said } from "./danil-session";
-import {
-  cancelWorkspaceLink,
-  type DanilWorkspaceLinkEvent,
-  type DanilWorkspaceLinkStatus,
-  linkedLabel,
-  linkWorkspace,
-  linkWorkspaceWithBrowser,
-  readWorkspaceLink,
-  unlinkWorkspace,
-} from "./danil-workspace";
+import { accountEmail, type DanilWorkspaceLinkStatus, linkWorkspace, readWorkspaceLink, unlinkWorkspace } from "./danil-workspace";
 import { SettingsBlock, SettingsRow, SettingsSection } from "./layout";
 import { createWorkspaces } from "./workspaces-store";
 
 type View = { t: "loading" } | { t: "unavailable" } | { t: "ready"; status: DanilWorkspaceLinkStatus };
 
 /**
- * Configuración → Cuenta de Danil → el workspace abierto: con qué cuenta se ve
- * desde la web y el teléfono. Puede ser la de esta computadora, la de su sesión
- * de Radiant u otra que aprueba en el navegador.
+ * Configuración → Cuenta de Danil → el workspace abierto: si se ve en la web y
+ * el teléfono con la cuenta de esta computadora. Un interruptor, como elegir
+ * qué carpeta se sincroniza.
  */
 export function DanilWorkspace() {
   const espacios = createWorkspaces();
@@ -43,11 +32,11 @@ export function DanilWorkspace() {
     }
   }
 
-  async function run(action: () => Promise<unknown>) {
+  async function choose(on: boolean) {
     setBusy(true);
     setProblem(null);
     try {
-      await action();
+      await (on ? linkWorkspace() : unlinkWorkspace());
     } catch (e) {
       setProblem(said(failureCode(e)));
     } finally {
@@ -58,11 +47,6 @@ export function DanilWorkspace() {
 
   onMount(() => {
     void load();
-    const changes = listen<DanilWorkspaceLinkEvent>("danil-workspace-link", (e) => {
-      if (e.payload.state === "error") setProblem(said(e.payload.error));
-      void load();
-      void espacios.cargar();
-    });
     const switched = () => {
       setProblem(null);
       void load();
@@ -71,7 +55,6 @@ export function DanilWorkspace() {
     onCleanup(() => {
       lectura++;
       window.removeEventListener("harness:workspace", switched);
-      void changes.then((off) => off());
     });
   });
 
@@ -80,16 +63,12 @@ export function DanilWorkspace() {
     return v.t === "ready" ? v.status : null;
   };
   const workspace = () => espacios.actual()?.name ?? "";
-  const reopen = () => {
-    const url = status()?.pending?.verification_uri_complete;
-    if (url) void invoke("open_external", { target: url }).catch(() => {});
-  };
 
   return (
     <SettingsSection
       title={workspace() ? t("danil.workspace.title", { workspace: workspace() }) : t("danil.workspace.title_plain")}
       description={t("danil.workspace.description")}
-      data-danil-workspace={view().t === "ready" ? (status()?.linked ? "linked" : status()?.pending ? "pending" : "unlinked") : view().t}
+      data-danil-workspace={view().t === "ready" ? (status()?.linked ? "linked" : "unlinked") : view().t}
     >
       <Switch>
         <Match when={view().t === "loading"}>
@@ -107,53 +86,21 @@ export function DanilWorkspace() {
             <p class="m-0 text-sm text-neutral-500">{t("danil.workspace.sign_in_first")}</p>
           </SettingsBlock>
         </Match>
-        <Match when={status()?.linked}>
-          <SettingsRow
-            label={t("danil.workspace.linked", { account: linkedLabel(status() as DanilWorkspaceLinkStatus) })}
-            description={t("danil.workspace.linked_hint")}
-          >
-            <Button size="sm" variant="secondary" disabled={busy()} onClick={() => void run(unlinkWorkspace)} data-danil-workspace-unlink="">
-              {t("danil.workspace.unlink")}
-            </Button>
-          </SettingsRow>
-        </Match>
-        <Match when={status()?.pending}>
-          {(pending) => (
-            <SettingsRow label={t("danil.account.pending", { code: pending().user_code })} description={t("danil.workspace.pending_hint")}>
-              <Show when={pending().verification_uri_complete}>
-                <Button size="sm" variant="secondary" onClick={reopen}>
-                  {t("danil.account.open_again")}
-                </Button>
-              </Show>
-              <Button size="sm" variant="ghost" disabled={busy()} onClick={() => void run(cancelWorkspaceLink)}>
-                {t("danil.account.cancel")}
-              </Button>
+        <Match when={status()}>
+          {(s) => (
+            <SettingsRow
+              label={t("danil.workspace.sync")}
+              description={accountEmail(s()) ? t("danil.workspace.sync_hint", { email: accountEmail(s()) }) : undefined}
+            >
+              <Toggle
+                checked={s().linked}
+                label={t("danil.workspace.sync")}
+                disabled={busy()}
+                onChange={(on) => void choose(on)}
+                data-danil-workspace-sync=""
+              />
             </SettingsRow>
           )}
-        </Match>
-        <Match when={status()}>
-          <SettingsBlock>
-            <p class="m-0 text-sm text-neutral-500">{t("danil.workspace.unlinked")}</p>
-            <div class="flex flex-wrap items-center gap-2">
-              <Show when={status()?.machine_email}>
-                {(email) => (
-                  <Button size="sm" disabled={busy()} onClick={() => void run(() => linkWorkspace("owner"))} data-danil-workspace-link="owner">
-                    {t("danil.workspace.use_machine", { email: email() })}
-                  </Button>
-                )}
-              </Show>
-              <Show when={status()?.radiant_email}>
-                {(email) => (
-                  <Button size="sm" variant="secondary" disabled={busy()} onClick={() => void run(() => linkWorkspace("radiant"))} data-danil-workspace-link="radiant">
-                    {t("danil.workspace.use_radiant", { email: email() })}
-                  </Button>
-                )}
-              </Show>
-              <Button size="sm" variant="secondary" disabled={busy()} onClick={() => void run(linkWorkspaceWithBrowser)} data-danil-workspace-link="other">
-                {t("danil.workspace.other")}
-              </Button>
-            </div>
-          </SettingsBlock>
         </Match>
       </Switch>
       <Show when={problem()}>{(text) => <p class="m-0 pt-2 text-[0.8125rem] text-error-strong" role="alert">{text()}</p>}</Show>

@@ -5,6 +5,7 @@
  * `service_poll` reads the `subscribe` feeds; window-only commands and plugins
  * answer from the browser or refuse with a sentence the interface already knows.
  */
+import { callWorkspace } from "@terminus/computers";
 import { t } from "../lib/i18n";
 import { leerPref } from "../lib/prefs";
 import { deliver } from "../lib/serviceEvents.ts";
@@ -189,8 +190,6 @@ function rememberMachine(id: string) {
 }
 
 const OUTDATED = new Set(["version_mismatch", "service_version"]);
-/** Reads of the machine itself, not of a workspace: only the computers the person owns answer them. */
-const MACHINE_LEVEL = new Set(["list_accounts"]);
 type Event = NonNullable<EventsPage["events"]>[number];
 const NONE = Symbol("none");
 type Link = ReturnType<typeof createLink>;
@@ -381,7 +380,7 @@ export function createWebTransport(
     const asleep = !fleet.info(machine)?.wakes && OFF.includes(l.relay.state());
     if (asleep && !READ.test(command)) throw off(machine);
     try {
-      const value = await l.send(command, workspace, args, !asleep);
+      const value = await l.send(command, callWorkspace(workspace, args), args, !asleep);
       if (value === NONE) throw off(machine);
       return fleet.linkedOnly(machine, command, value);
     } catch (error) {
@@ -407,10 +406,11 @@ export function createWebTransport(
       const results = await Promise.all(
         usable.map(async (machine) => {
           try {
+            const raw = fleet.argsFor(machine, args);
             const value =
               home && machine === homeId
-                ? await home.call(command, fleet.argsFor(machine, args), undefined)
-                : await late(link(machine).send(command, fleet.workspaceOn(machine, workspace), fleet.argsFor(machine, args), false));
+                ? await home.call(command, raw, undefined)
+                : await late(link(machine).send(command, callWorkspace(fleet.workspaceOn(machine, workspace), raw), raw, false));
             return value === NONE ? null : { machine, value: fleet.linkedOnly(machine, command, value) };
           } catch (error) {
             return fleet.isOutdated(machine) ? null : { machine, error };
@@ -429,15 +429,6 @@ export function createWebTransport(
   }
 
   async function send(command: string, workspace: string | null, args: Args, options: Options): Promise<unknown> {
-    if (MACHINE_LEVEL.has(command)) {
-      // A computer shared only by a workspace keeps its AI accounts to its owner: the relay would refuse them.
-      const own = fleet.usable().filter((m) => !fleet.info(m)?.member);
-      if (!own.length) return { provider: args.provider ?? null, active: null, accounts: [] };
-      if (fleet.multi && own.length < fleet.usable().length && !headerOf(options, "x-terminus-machine")) {
-        const route = fleet.route(command, args, workspace, null, own[0]);
-        if ("fan" in route) return fan(command, route.fan.filter((m) => own.includes(m)), route.args, workspace);
-      }
-    }
     const chosen = headerOf(options, "x-terminus-machine") ?? (CREATE.has(command) ? picked(workspace) : null);
     let route: ReturnType<Fleet["route"]>;
     try {

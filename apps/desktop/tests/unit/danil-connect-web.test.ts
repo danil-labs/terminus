@@ -23,25 +23,9 @@ function fake(handler: (url: string, init: RequestInit) => { status: number; bod
 test("lookup sends the code and the session and reads the machine", async () => {
   const { f, seen } = fake(() => ({ status: 200, body: { hostname: "alberto-mbp", platform: "macos", expires_at: "2026-10-19T12:15:00Z" } }));
   const answer = await lookupDevice(API, "tok", "WDJB-MJHT", f);
-  assert.deepEqual(answer, { kind: "ok", value: { kind: "computer", hostname: "alberto-mbp", platform: "macos", name: null, expires_at: "2026-10-19T12:15:00Z" } });
+  assert.deepEqual(answer, { kind: "ok", value: { hostname: "alberto-mbp", platform: "macos", name: null, expires_at: "2026-10-19T12:15:00Z" } });
   assert.equal(seen[0].url, `${API}/v1/devices/lookup?user_code=WDJB-MJHT`);
   assert.equal(new Headers(seen[0].init.headers).get("authorization"), "Bearer tok");
-});
-
-test("a workspace code says which workspace of which computer, and is approved without a name", async () => {
-  const { f } = fake(() => ({
-    status: 200,
-    body: { kind: "workspace", workspace_name: "Cliente", computer_name: "Mac de Alberto", hostname: "alberto-mbp", expires_at: 1760000000000 },
-  }));
-  const answer = await lookupDevice(API, "tok", "WDJB-MJHT", f);
-  assert.equal(answer.kind, "ok");
-  if (answer.kind !== "ok") return;
-  assert.equal(answer.value.kind, "workspace");
-  assert.equal(answer.value.workspace_name, "Cliente");
-  assert.equal(answer.value.computer_name, "Mac de Alberto");
-  const { f: approve, seen } = fake(() => ({ status: 200, body: { linked: true } }));
-  assert.deepEqual(await approveDevice(API, "tok", "WDJB-MJHT", null, approve), { kind: "ok", value: null });
-  assert.deepEqual(JSON.parse(String(seen[0].init.body)), { user_code: "WDJB-MJHT" });
 });
 
 test("an expired, unknown or unlicensed code is told apart", async () => {
@@ -56,6 +40,12 @@ test("an expired, unknown or unlicensed code is told apart", async () => {
     [401, null, "unauthorized"],
     [500, null, "error"],
     [200, { nothing: true }, "error"],
+    [400, { error: { code: "expired_token" } }, "expired"],
+    [404, { error: { code: "invalid_user_code" } }, "invalid"],
+    [403, { error: { code: "unknown_user" } }, "no_account"],
+    [403, { error: { code: "license_required" } }, "license"],
+    [409, { error: { code: "ambiguous_danil_account" } }, "ambiguous"],
+    [409, { error: { code: "code_already_used" } }, "used"],
   ];
   for (const [status, body, kind] of cases) {
     const { f } = fake(() => ({ status, body }));

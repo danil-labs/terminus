@@ -16,8 +16,6 @@ export type RelayConfig = {
   getToken: () => string | Promise<string>;
   /** El relay revocó la sesión (4003): el cliente vuelve a iniciar sesión. */
   onUnauthorized?: () => void;
-  /** La computadora dejó de compartirse con la cuenta (4003 `unlinked`): la sesión se cierra y el cliente vuelve a listar. */
-  onUnlinked?: () => void;
   /** Antes de cada reconexión: un upgrade fallido no trae cuerpo, así que el cliente pregunta a la API por qué. False para. */
   beforeReconnect?: () => Promise<boolean>;
 };
@@ -43,7 +41,7 @@ export type SocketLike = {
   close(code?: number, reason?: string): void;
   onopen: ((ev: unknown) => void) | null;
   onmessage: ((ev: { data: unknown }) => void) | null;
-  onclose: ((ev: { code: number; reason?: string }) => void) | null;
+  onclose: ((ev: { code: number }) => void) | null;
   onerror: ((ev: unknown) => void) | null;
 };
 
@@ -60,7 +58,6 @@ export const CALL_TIMEOUT = 180_000;
 export const WAKE_TIMEOUT = 330_000;
 const REPLACED = 4001;
 const REVOKED = 4003;
-const UNLINKED = "unlinked";
 
 export function sessionUrl(endpoint: string, computerId: string): string {
   const base = /^[a-z]+:\/\//i.test(endpoint) ? endpoint : `wss://${endpoint}`;
@@ -225,10 +222,6 @@ export class RelaySession {
       this.socket = null;
       clearInterval(this.pinger);
       for (const listener of this.linkListeners) listener(false);
-      if (event.code === REVOKED && event.reason === UNLINKED) {
-        this.close();
-        return this.config.onUnlinked?.();
-      }
       if (event.code === REVOKED) this.config.onUnauthorized?.();
       // Otra sesión ocupó el lugar de esta computadora: reconectar la echaría a su vez.
       if (event.code === REPLACED) return this.close();

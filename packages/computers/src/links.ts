@@ -47,6 +47,18 @@ export function linkedAttention<T>(value: T, linked: ReadonlySet<string> | null)
   }) as T;
 }
 
+/**
+ * El workspace con que va una llamada: el que nombran sus argumentos, si lo
+ * hacen (`workspace`, o un `scope` de texto que no sea `pending`). El relay
+ * rechaza (`workspace_mismatch`) la llamada cuyos argumentos nombran otro
+ * workspace que el suyo.
+ */
+export function callWorkspace(workspace: string | null, args: Readonly<Record<string, unknown>>): string | null {
+  if (typeof args.workspace === "string" && args.workspace) return args.workspace;
+  if (typeof args.scope === "string" && args.scope && args.scope !== "pending") return args.scope;
+  return workspace;
+}
+
 /** Un evento con `workspace` que no está vinculado no llega; uno sin workspace, sí. */
 export function linkedEvent(event: { workspace?: unknown }, linked: ReadonlySet<string> | null): boolean {
   return !linked || typeof event.workspace !== "string" || linked.has(event.workspace);

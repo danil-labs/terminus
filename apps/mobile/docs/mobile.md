@@ -63,6 +63,17 @@ como la web.
   el teléfono un patrón es el fondo liso del tema.
 - **El teléfono no ve la pantalla de la máquina.** Habla los comandos de la
   ventana a través del relay (o del bridge en desarrollo).
+- **Enlaces del chat.** Un enlace a una tarea abre la tarea solo si es del
+  mismo workspace; si no, lo dice (`chat.link.other_workspace`, como la
+  ventana). Dentro de una visualización (`WebFrame`) no se navega: un http(s)
+  se abre en el navegador del sistema solo si lo tocó la persona (en iOS,
+  `navigationType` `click`; en Android, que no lo distingue, se pregunta
+  antes). Lo que la página navegue sola se bloquea.
+- **Mermaid en el WebView:** `mermaid@12.2.0` exacto de jsDelivr con SRI
+  (`sha384`, el mismo archivo que el paquete de npm), una CSP que solo deja ese
+  origen para scripts y nada de red, y la definición escapada dentro del
+  `<script>` (`<`, U+2028 y U+2029). Al cambiar de versión se recalcula el hash
+  (ver `apps/mobile/src/ui/chat/Mermaid.tsx`).
 
 ## En el navegador
 
@@ -70,7 +81,8 @@ La misma app se compila para web y vive dentro de Terminus web, en
 `/terminus/m/` (`apps/desktop/scripts/web-mobile.mjs`, último paso de
 `pnpm web:build`). La web de escritorio manda ahí a los teléfonos y cada una
 tiene un enlace a la otra («Ver la versión de escritorio» en la hoja de
-workspaces). Lo que cambia en el navegador va en archivos `.web.ts(x)`:
+workspaces, que va a la raíz que fijó la compilación,
+`EXPO_PUBLIC_TERMINUS_WEB_BASE`). Lo que cambia en el navegador va en archivos `.web.ts(x)`:
 
 - **Sesión:** la de la app de Danil en el mismo origen (`supabase.web.ts`),
   como la web de escritorio; sin sesión se va a su inicio (`signin.web.tsx`).
