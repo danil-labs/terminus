@@ -69,9 +69,11 @@ test("the transport leaves out what the account may not see: workspaces, attenti
   const ask = (session) => ({ session, project: "p1", state: "asked" });
   const f = fleet({
     cmp_vm: { table: { ...engine, list_workspaces: vmList, workspaces_startup: vmList, list_workspace_attention: [{ workspace: "w2", tasks: [ask("t2")] }, { workspace: "z", tasks: [ask("t9")] }] } },
+    cmp_other: { table: { ...engine } },
   });
   const computers = [
     { computer_id: "cmp_vm", name: "Danil VM", state: "online", provider: "aws-ec2", workspaces: ["w", "w2"] },
+    { computer_id: "cmp_other", name: "Otra", state: "online", provider: "aws-ec2", workspaces: ["w"] },
   ];
   const app = await boot("listo", "web-transport-linked", {}, undefined, {}, {
     web: true,
