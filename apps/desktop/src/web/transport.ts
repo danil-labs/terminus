@@ -466,6 +466,9 @@ export function createWebTransport(
       else if (!OF_THE_MACHINE.test(command)) throw missing(route.machine);
     }
     const value = await one(route.machine, command, target, route.args, options);
+    // A workspace just made on a machine is that machine's before it lists its workspaces again.
+    const made = (value as { id?: unknown } | null)?.id;
+    if (command === "add_workspace" && typeof made === "string") fleet.materialized(route.machine, made);
     if (fleet.multi && CREATE.has(command) && !route.named) rememberMachine(route.machine);
     return fleet.encode(route.machine, value, command);
   }
