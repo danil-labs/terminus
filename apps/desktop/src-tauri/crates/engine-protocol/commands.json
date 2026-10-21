@@ -2947,6 +2947,21 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "project_clone_status",
+      "output": "-> Option < CloneStatus >",
+      "parameters": [
+        {
+          "key": "operation",
+          "name": "operation",
+          "type": "String"
+        }
+      ],
+      "path": "projects::cloning::project_clone_status"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "project_setup_command",
       "output": "-> Result < Option < String > , String >",
       "parameters": [
@@ -5328,6 +5343,61 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "start_project_clone",
+      "output": "-> Result < cloning :: Started , crate :: util :: Failure >",
+      "parameters": [
+        {
+          "key": "url",
+          "name": "url",
+          "type": "String"
+        },
+        {
+          "key": "name",
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "key": "directory",
+          "name": "directory",
+          "type": "Option < String >"
+        },
+        {
+          "key": "operation",
+          "name": "operation",
+          "type": "String"
+        },
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "String"
+        },
+        {
+          "key": "portfolio",
+          "name": "portfolio",
+          "type": "Option < String >"
+        },
+        {
+          "key": "gitHost",
+          "name": "git_host",
+          "type": "Option < String >"
+        },
+        {
+          "key": "space",
+          "name": "space",
+          "type": "Option < String >"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "projects::start_project_clone"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "stop_local_model",
       "output": "-> Result < () , Failure >",
       "parameters": [],
@@ -6482,6 +6552,7 @@
     "local-model",
     "mcp",
     "mcp-login",
+    "project_clone",
     "providers",
     "question",
     "radiant",
