@@ -189,7 +189,7 @@ export function lenguasDisponibles(): Manifiesto[] {
  * Lo elegido en el alta, antes de que exista un workspace. No entra en la
  * cadena de resolución: si entrara, el maya probado en el alta iría a todos
  * los clientes creados después. La lengua es del workspace
- * (ARCHITECTURE.md § 9); `Onboarding.tsx` pasa esta en `add_workspace`.
+ * (ARCHITECTURE.md § 9); `crearWorkspace` la fija al crear el workspace.
  */
 export function semillaDelAlta(): string {
   return almacen()?.getItem(CLAVE) ?? "sistema";

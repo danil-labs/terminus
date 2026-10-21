@@ -1780,7 +1780,7 @@ function ModelosLocales(props: { onReady: () => void }) {
  * frase tiene el número al lado, y un guarda en Rust falla si el texto se
  * mueve sin que la versión suba.
  */
-type Consentimiento = { lineas: Frase[]; version: number };
+export type Consentimiento = { lineas: Frase[]; version: number };
 
 /**
  * El sí explícito, antes de activar.
@@ -1799,7 +1799,7 @@ type Consentimiento = { lineas: Frase[]; version: number };
  * respuesta legítima a una pregunta legítima; tratarla como error empujaría
  * a aceptar, lo que un consentimiento no puede hacer.
  */
-function Consentir(props: {
+export function Consentir(props: {
   texto: Consentimiento;
   guardando: boolean;
   onAceptar: () => void;
