@@ -271,6 +271,12 @@ cambiarla, se cambia aquí primero.
   conectar, el motor ata a ella todo workspace local que no esté atado
   (`mode: owner`). Así una VM sin ventana nunca queda con workspaces invisibles
   y el despliegue no deja a nadie sin acceso.
+- **Atar al conectar no toca** un workspace con un código de «Otra cuenta» en
+  curso: ese workspace espera a que el miembro apruebe.
+- El cuerpo de atar conserva `as: "owner"` de #10 y manda `name`. Un miembro
+  que pide `/start` o `/stop` recibe `403 owner_only`. `PATCH` mezcla
+  `settings` con los vigentes; su conflicto es
+  `409 {error:"settings_conflict", workspace}`.
 - **Un miembro** (persona con workspaces en una computadora ajena) entra por el
   código de dispositivo de «Otra cuenta» de #10, que la dueña de la computadora
   inicia desde su máquina. Un miembro no materializa workspaces en esa
