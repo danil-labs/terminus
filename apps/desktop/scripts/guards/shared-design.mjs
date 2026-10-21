@@ -15,11 +15,11 @@
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const { CSS_SOURCE, CSS_THEME_BLOCKS, STATUS_ICONS, STATUS_LABELS, THEMES, WORDS } = await import(
-  join(ROOT, "..", "..", "packages/design/src/index.ts")
+  pathToFileURL(join(ROOT, "..", "..", "packages/design/src/index.ts")).href
 );
 
 const failures = [];

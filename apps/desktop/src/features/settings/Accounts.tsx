@@ -1159,6 +1159,17 @@ export default function Accounts(props: {
         )}
       </Show>
 
+      {/* `Button` deshabilitado no recibe el puntero: su `title` nunca se ve. */}
+      <Show when={segunda()}>
+        {(porque) => (
+          <SettingsBlock>
+            <p class="m-0 max-w-[62ch] text-[0.8125rem] leading-[19px] text-neutral-500" data-shared-credential="">
+              {porque()} {t("settings.accounts.shared_remove_first")}
+            </p>
+          </SettingsBlock>
+        )}
+      </Show>
+
       <Show when={props.titulo === undefined && hayCuentas()}>
         <SettingsBlock class="justify-items-start">{botonAgregar("bloque")}</SettingsBlock>
       </Show>
