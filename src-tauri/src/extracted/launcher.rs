@@ -44,6 +44,10 @@ pub enum Phase {
         log: PathBuf,
         data: PathBuf,
     },
+    /// La versión anterior sigue con turnos; el motor nuevo entra en cuanto los termine.
+    Previous {
+        tasks: Option<u64>,
+    },
 }
 
 pub struct Launcher {
@@ -71,6 +75,10 @@ impl Launcher {
             done: false,
         };
         Self::new(Some(paths), Some(reason), Phase::Handoff(steps))
+    }
+    /// Tras actualizar, el motor de la versión anterior sigue trabajando: la ventana espera a que termine.
+    pub fn previous(paths: engine::Paths, tasks: Option<u64>) -> Self {
+        Self::new(Some(paths), Some("previous"), Phase::Previous { tasks })
     }
     fn new(paths: Option<engine::Paths>, reason: Option<&'static str>, phase: Phase) -> Self {
         Self {
@@ -124,8 +132,10 @@ pub fn start(app: tauri::AppHandle, launcher: Arc<Launcher>) {
     let _ = std::thread::Builder::new()
         .name("launcher".into())
         .spawn(move || {
-            if let Some(reason) = launcher.reason {
-                drive(&app, &launcher, &paths, reason);
+            match launcher.reason {
+                Some("previous") => wait_previous(&app, &launcher, &paths),
+                Some(reason) => drive(&app, &launcher, &paths, reason),
+                None => {}
             }
             watch(&launcher, &paths);
         });
@@ -157,6 +167,43 @@ pub fn reason(paths: &engine::Paths) -> Option<&'static str> {
     } else {
         "first"
     })
+}
+
+/// Espera al motor de la versión anterior y, en cuanto lo para, arranca el de esta ventana.
+fn wait_previous(app: &tauri::AppHandle, launcher: &Launcher, paths: &engine::Paths) {
+    loop {
+        match engine::ensure(paths, false) {
+            Err(error) if error.code == "previous_engine_busy" => {
+                let tasks = error.detail["turns"].as_u64().filter(|n| *n > 0);
+                launcher.set(Phase::Previous { tasks });
+                std::thread::sleep(Duration::from_secs(2));
+            }
+            Err(error) if error.code == "adoption_required" => {
+                drive(app, launcher, paths, "readopt");
+                return;
+            }
+            selected => match selected.and_then(|selection| Client::select(&selection)) {
+                Ok(client) => {
+                    let state = Arc::new(proxy::State::new(Arc::new(client), true));
+                    if let Some(window) = app.get_window("main") {
+                        let _ = window.set_title(&super::title(app));
+                    }
+                    app.manage(state);
+                    launcher.set(Phase::Ready { blank_0274: false });
+                    return;
+                }
+                Err(error) => {
+                    log::error!("[launcher] engine did not start: {}", error.code);
+                    launcher.ask(Phase::Failed {
+                        code: error.code,
+                        log: paths.launch_log.clone(),
+                        data: paths.data.clone(),
+                    });
+                    launcher.wait_consent();
+                }
+            },
+        }
+    }
 }
 
 fn drive(app: &tauri::AppHandle, launcher: &Launcher, paths: &engine::Paths, reason: &'static str) {

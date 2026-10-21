@@ -46,10 +46,15 @@ fn open() -> Result<()> {
     let selection = match args.as_slice() {
         [_] => {
             let found = engine::paths()?;
+            let mut previous = None;
             let ensured = match launcher::reason(&found) {
                 Some(reason) => Err(reason),
                 None => match engine::ensure(&found, false) {
                     Err(error) if error.code == "adoption_required" => Err("readopt"),
+                    Err(error) if error.code == "previous_engine_busy" => {
+                        previous = Some(error.detail["turns"].as_u64().filter(|n| *n > 0));
+                        Err("previous")
+                    }
                     other => Ok(other?),
                 },
             };
@@ -60,7 +65,11 @@ fn open() -> Result<()> {
                 }
                 Err(reason) => {
                     engine::prepare(&found)?;
-                    start(None, true, launcher::Launcher::handoff(found, reason));
+                    let launcher = match previous {
+                        Some(tasks) => launcher::Launcher::previous(found, tasks),
+                        None => launcher::Launcher::handoff(found, reason),
+                    };
+                    start(None, true, launcher);
                     return Ok(());
                 }
             }

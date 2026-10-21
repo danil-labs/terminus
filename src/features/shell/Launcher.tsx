@@ -35,7 +35,8 @@ type Traspaso = {
 type Fase =
   | { phase: "ready"; blank_0274?: boolean }
   | Traspaso
-  | { phase: "failed"; code: string; log: string; data: string };
+  | { phase: "failed"; code: string; log: string; data: string }
+  | { phase: "previous"; tasks: number | null };
 
 const RELEASE_0274 = "https://github.com/danil-labs/terminus/releases/tag/v0.2.74";
 const TEXTOS = {
@@ -69,6 +70,10 @@ export default function Lanzador(props: { children: JSX.Element }) {
   const traspaso = () => {
     const f = fase();
     return f?.phase === "handoff" ? f : null;
+  };
+  const anterior = () => {
+    const f = fase();
+    return f?.phase === "previous" ? f : null;
   };
   const fallo = () => {
     const f = fase();
@@ -168,6 +173,19 @@ export default function Lanzador(props: { children: JSX.Element }) {
                       </Button>
                     </Show>
                   </div>
+                </>
+              )}
+            </Show>
+            <Show when={anterior()}>
+              {(a) => (
+                <>
+                  <h1 class="m-0 mb-5 max-w-[22ch] text-3xl leading-tight font-display font-bold tracking-[-0.03em] text-neutral-950">
+                    {t("launcher.previous.title")}
+                  </h1>
+                  <p class="m-0 max-w-[60ch] text-sm text-neutral-950" aria-live="polite">
+                    {a().tasks ? t("launcher.step.work.tasks", { count: a().tasks ?? 0 }) : t("launcher.step.work.pending")}
+                  </p>
+                  <p class="m-0 mt-3 max-w-[60ch] text-sm text-neutral-500">{t("launcher.previous.body")}</p>
                 </>
               )}
             </Show>
