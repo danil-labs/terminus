@@ -34,7 +34,9 @@ export function linkedListing<T>(value: T, linked: ReadonlySet<string> | null): 
   const listing = value as { workspaces?: unknown; active?: unknown };
   if (!Array.isArray(listing.workspaces)) return value;
   const workspaces = listing.workspaces.filter((w) => typeof w?.id === "string" && linked.has(w.id));
-  const active = typeof listing.active === "string" && !linked.has(listing.active) ? null : listing.active;
+  // Como el relay: un activo sin vincular pasa al primero que queda; con null la app abriría el alta.
+  const first = (workspaces[0] as { id?: string } | undefined)?.id ?? null;
+  const active = typeof listing.active === "string" && !linked.has(listing.active) ? first : listing.active;
   return { ...value, workspaces, ...("active" in listing ? { active } : {}) };
 }
 
