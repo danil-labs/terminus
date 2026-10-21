@@ -1,0 +1,10 @@
+{
+  "name": "@terminus/protocol",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The commands a Terminus remote client may send to a machine's engine, and what they answer.",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

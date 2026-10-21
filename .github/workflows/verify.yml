@@ -1,4 +1,4 @@
-# Runs the deterministic part of `pnpm verificar` on every pull request,
+# Runs the deterministic part of `pnpm verify` on every pull request,
 # including pull requests from forks.
 #
 # Safe for forks by construction:
@@ -8,7 +8,7 @@
 #   - every action is pinned to a commit SHA.
 #
 # Rust (fmt, check, clippy, test) runs in the `rust` job on Linux. Windows and
-# macOS are verified by maintainers with `pnpm verificar` on those machines.
+# macOS are verified by maintainers with `pnpm verify` on those machines.
 
 name: verify
 
@@ -45,12 +45,15 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm verificar --sin-cargo
+      - run: pnpm verify --no-cargo
 
   rust:
     name: verify (rust)
     runs-on: ubuntu-22.04
     timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/desktop
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
@@ -65,7 +68,7 @@ jobs:
 
       - uses: swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
         with:
-          workspaces: src-tauri
+          workspaces: apps/desktop/src-tauri
           # A fork's pull request may read the cache but never writes it.
           save-if: ${{ github.event_name == 'push' }}
 
@@ -74,21 +77,21 @@ jobs:
       - run: mkdir -p dist
 
       # `bundle.externalBin` declares the engine: `tauri-build` refuses to compile
-      # without the pinned binary for this platform in `src-tauri/binaries/`.
+      # without the pinned binary for this platform in `apps/desktop/src-tauri/binaries/`.
       - name: Engine sidecar
         run: node scripts/engine.mjs sidecar
 
       - name: CLI forwarding and pinned command catalog
-        run: node --test scripts/cli-forward.test.mjs
+        run: node --test tests/unit/cli-forward.test.mjs
 
       - name: cargo fmt
-        working-directory: src-tauri
+        working-directory: apps/desktop/src-tauri
         run: cargo fmt --check -- --config-path rustfmt.toml
 
       - name: cargo clippy
-        working-directory: src-tauri
+        working-directory: apps/desktop/src-tauri
         run: cargo clippy --locked --all-targets
 
       - name: cargo test
-        working-directory: src-tauri
+        working-directory: apps/desktop/src-tauri
         run: cargo test --locked

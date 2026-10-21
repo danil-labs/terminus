@@ -1,0 +1,90 @@
+import {
+  type SidebarGrouping,
+  type SidebarGroup,
+  type SidebarSection,
+  type SidebarStatusKey,
+  type SidebarView,
+  sanitizeSidebarView,
+} from "@terminus/tasks";
+import { t } from "./i18n.ts";
+import { escribirPref, leerPref } from "./prefs.ts";
+
+// La vista (filtrar, agrupar, secciones) es la misma en el teléfono: vive en `@terminus/tasks`.
+export {
+  type SidebarContext,
+  type SidebarDensity,
+  type SidebarGroup,
+  type SidebarGrouping,
+  type SidebarSection,
+  type SidebarStatusKey,
+  type SidebarTask,
+  type SidebarView,
+  DEFAULT_SIDEBAR_VIEW,
+  activityOf,
+  applySidebarView,
+  isPinned,
+  nonDefaultCount,
+  sectionOf,
+} from "@terminus/tasks";
+
+/** La vista se guarda por workspace y espacio, como la tira de pestañas. */
+export function sidebarViewKey(workspace: string | null, space: string | null): string {
+  return space ? `sidebar.view.${workspace ?? ""}.${space}` : `sidebar.view.${workspace ?? ""}`;
+}
+
+export function loadSidebarView(key: string): SidebarView {
+  return sanitizeSidebarView(leerPref<unknown>(key, null));
+}
+
+export function saveSidebarView(key: string, view: SidebarView) {
+  escribirPref(key, sanitizeSidebarView(view));
+}
+
+export function groupingLabel(group: SidebarGrouping): string {
+  switch (group) {
+    case "folder": return t("shell.sidebar.view.group_folder");
+    case "status": return t("shell.sidebar.view.group_status");
+    case "agent": return t("shell.sidebar.view.group_agent");
+    default: return t("shell.sidebar.view.group_none");
+  }
+}
+
+/** La línea bajo «Nueva tarea» que dice qué se enseña. */
+export function scopeLabel(view: SidebarView, folderName: (id: string) => string): string {
+  const parts = [view.folders.length ? view.folders.map(folderName).join(", ") : t("shell.sidebar.view.all_folders")];
+  if (view.agent) parts.push(view.agent);
+  switch (view.group) {
+    case "folder": parts.push(t("shell.sidebar.view.scope_by_folder")); break;
+    case "status": parts.push(t("shell.sidebar.view.scope_by_status")); break;
+    case "agent": parts.push(t("shell.sidebar.view.scope_by_agent")); break;
+  }
+  return parts.join(" · ");
+}
+
+export function sectionLabel(section: SidebarSection): string {
+  switch (section) {
+    case "needs_you": return t("shell.sidebar.view.section_needs_you");
+    default: return t("shell.sidebar.view.section_active");
+  }
+}
+
+export function statusGroupLabel(key: SidebarStatusKey): string {
+  switch (key) {
+    case "approving": return t("shell.sidebar.view.status_approving");
+    case "asked": return t("shell.sidebar.view.status_asked");
+    case "working": return t("shell.sidebar.view.status_working");
+    case "failed": return t("shell.sidebar.view.status_failed");
+    case "unseen": return t("shell.sidebar.view.status_unseen");
+    case "finished": return t("shell.sidebar.view.status_finished");
+    default: return t("shell.sidebar.view.status_idle");
+  }
+}
+
+export function groupLabel(group: SidebarGroup<unknown>, folderName: (id: string) => string): string {
+  switch (group.kind) {
+    case "section": return sectionLabel(group.key as SidebarSection);
+    case "status": return statusGroupLabel(group.key as SidebarStatusKey);
+    case "folder": return group.key ? folderName(group.key) : t("shell.sidebar.view.no_folder");
+    default: return group.key || t("shell.sidebar.view.no_agent");
+  }
+}

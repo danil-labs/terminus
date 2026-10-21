@@ -1,0 +1,72 @@
+import { type JSX, Match, onMount, Show, Switch, createSignal } from "solid-js";
+import { t } from "../lib/i18n";
+import { Button } from "../ui/Button";
+import { type Answer, type Computer, listComputers } from "./computers";
+import type { Session } from "./session";
+
+/** What stands between the page and the app: the session, the license and having a computer. */
+export type GateView = { t: "waiting" } | { t: "license" } | { t: "not_yours" } | { t: "none" } | { t: "error" };
+
+/** The list with a token the API accepts: a refused token is refreshed once. */
+export async function computersOf(endpoint: string, session: Session): Promise<Answer<Computer[]>> {
+  const answer = await listComputers(endpoint, await session.getToken());
+  if (answer.kind !== "unauthorized" || !(await session.unauthorized())) return answer;
+  return listComputers(endpoint, await session.getToken());
+}
+
+/**
+ * Opening is not intent to work: every computer of the person mounts as it is,
+ * on or off, and wakes with the first action. `?computer=` opens only that one.
+ */
+export function Gate(props: { session: Session; endpoint: string; initial?: GateView; onOpen?: (computers: Computer[]) => void }) {
+  const [view, setView] = createSignal<GateView>(props.initial ?? { t: "waiting" });
+
+  async function load() {
+    setView({ t: "waiting" });
+    const answer = await computersOf(props.endpoint, props.session).catch((): Answer<Computer[]> => ({ kind: "unauthorized" }));
+    if (answer.kind === "unauthorized") return;
+    if (answer.kind === "license") return setView({ t: "license" });
+    if (answer.kind !== "ok") return setView({ t: "error" });
+    const computers = answer.value;
+    const asked = new URLSearchParams(window.location.search).get("computer");
+    if (asked) {
+      const one = computers.find((c) => c.computer_id === asked);
+      return one ? props.onOpen?.([one]) : setView({ t: "not_yours" });
+    }
+    if (computers.length === 0) return setView({ t: "none" });
+    props.onOpen?.(computers);
+  }
+
+  onMount(() => {
+    if (!props.initial) void load();
+  });
+
+  const message = (text: string, action?: JSX.Element) => (
+    <>
+      <p class="m-0 max-w-[60ch] text-sm text-neutral-950">{text}</p>
+      <Show when={action}>
+        <div class="mt-6">{action}</div>
+      </Show>
+    </>
+  );
+  const retry = () => (
+    <Button size="sm" variant="secondary" onClick={() => void load()}>
+      {t("web.computers.retry")}
+    </Button>
+  );
+
+  return (
+    <main class="flex h-full flex-col overflow-y-auto bg-bg px-10 py-10" data-web-gate={view().t}>
+      <h1 class="m-0 mb-5 text-3xl leading-tight font-display font-bold tracking-[-0.03em] text-neutral-950">Terminus</h1>
+      <Switch>
+        <Match when={view().t === "waiting"}>
+          <p class="m-0 text-sm text-neutral-500">{t("web.computers.waiting")}</p>
+        </Match>
+        <Match when={view().t === "license"}>{message(t("web.computers.license"))}</Match>
+        <Match when={view().t === "not_yours"}>{message(t("web.computers.not_yours"))}</Match>
+        <Match when={view().t === "none"}>{message(t("web.computers.none"), retry())}</Match>
+        <Match when={view().t === "error"}>{message(t("web.computers.error"), retry())}</Match>
+      </Switch>
+    </main>
+  );
+}

@@ -45,7 +45,7 @@ The Windows installer is signed by Software y Servicios Danil, S.A.P.I. de C.V.
 While the certificate builds reputation, SmartScreen may warn the first time:
 **More info → Run anyway**. The macOS app is signed and notarized with the same
 company's Developer ID. The `npx` path also verifies the minisign signature the
-app uses to update itself. Its code is in [`npx/`](npx).
+app uses to update itself. Its code is in [`apps/desktop/npx/`](apps/desktop/npx).
 
 ## Build from source
 
@@ -62,52 +62,64 @@ app uses to update itself. Its code is in [`npx/`](npx).
 ```sh
 pnpm install
 pnpm window:build            # debug build of the window, frontend embedded
-pnpm engine:download         # seldon-runtime pinned in seldon-runtime.lock
+pnpm engine:download         # seldon-runtime pinned in apps/desktop/seldon-runtime.lock
 pnpm engine:start            # starts the engine with throwaway data and opens the window
 ```
 
-`pnpm engine:start` keeps everything under `.engine/lab/`: its own data
+`pnpm engine:start` keeps everything under `apps/desktop/.engine/lab/`: its own data
 directory, HOME and temp folder, and the engine identity `ai.danil.seldon.dev`.
 It never touches the data, keychain or accounts of an installed Terminus. Stop
 the engine with `pnpm engine:stop` (it also stops by itself five minutes after
 the last window closes). `node scripts/engine.mjs help` lists every command.
 
 The engine is published as a prerelease of this repository
-([`seldon-runtime-v0.2.73-d6ab489`](https://github.com/danil-labs/terminus/releases/tag/seldon-runtime-v0.2.73-d6ab489)).
-By downloading it you accept its [terms](https://github.com/danil-labs/terminus/releases/download/seldon-runtime-v0.2.73-d6ab489/TERMS.md). Today it is published
-for **Windows x86_64 only**; on macOS and Linux `pnpm engine:download` stops
-with "No seldon-runtime has been published for <platform> yet". If you have an
-engine binary, use it with `node scripts/engine.mjs download --from <path>`.
+([`seldon-runtime-v0.2.73-4b8714c`](https://github.com/danil-labs/terminus/releases/tag/seldon-runtime-v0.2.73-4b8714c)).
+By downloading it you accept its [terms](https://github.com/danil-labs/terminus/releases/download/seldon-runtime-v0.2.73-4b8714c/TERMS.md).
+The lock pins builds for Windows x86_64, macOS arm64/x86_64 and Linux x86_64.
+To use a local engine build instead, run
+`node scripts/engine.mjs download --from <path>`.
 
 The window build uses the Cargo feature `extracted-client`, which is the
 default. Release installers are built by
 [`publish.yml`](.github/workflows/publish.yml); see
-[docs/development.md](docs/development.md) for the details.
+[docs/development.md](apps/desktop/docs/development.md) for the details.
 
 ### Verify
 
 ```sh
-pnpm verificar              # every guard, the front build and Rust
-pnpm verificar --sin-cargo  # the same chain without Rust
+pnpm verify              # every guard, the front build and Rust
+pnpm verify --no-cargo  # the same chain without Rust
 ```
 
-What each guard checks is in [docs/guards.md](docs/guards.md).
+What each guard checks is in [docs/guards.md](apps/desktop/docs/guards.md).
+
+La [conexión de GitHub por workspace](apps/desktop/docs/github.md) distingue la selección
+local de las instalaciones de la App en GitHub y describe la coordinación con
+el motor.
 
 ## How it fits together
 
 The window talks to the engine over a local authenticated socket using a
-frozen contract (`src-tauri/crates/engine-protocol/commands.json`). See
-[docs/engine-client.md](docs/engine-client.md).
+frozen contract (`apps/desktop/src-tauri/crates/engine-protocol/commands.json`). See
+[docs/engine-client.md](apps/desktop/docs/engine-client.md).
 
 ```
-src/                    SolidJS front (features/, ui/, lib/, locales/)
-src-tauri/              Tauri window (Rust)
-  crates/engine-client  RPC client for the engine, no Tauri dependency
-  crates/engine-protocol  contract: commands, events, phrase keys
-plugins/lenguas/        bundled language packs
-scripts/                guards, tests and dev tooling (pnpm verificar)
-npx/                    the npx installer
+apps/desktop/             the window (this is what the installers ship)
+  src/                    SolidJS front (features/, ui/, lib/, locales/)
+  src-tauri/              Tauri window (Rust)
+    crates/engine-client    RPC client for the engine, no Tauri dependency
+    crates/engine-protocol  contract: commands, events, phrase keys
+  plugins/languages/      bundled language packs
+  scripts/                guards, tests and dev tooling (pnpm verify)
+  npx/                    the npx installer
+apps/mobile/              the iOS and Android app (Expo) and its dev bridge
+packages/design           task states, marks, words, folder colors and theme colors both apps share
+packages/tasks            the task list both apps derive: flat list, filter, two-line card, agents dock
+packages/computers        Danil Computers client: control-plane API, relay session, wake rules
+packages/protocol         the commands the mobile app may send to a machine, and their answers
 ```
+
+`pnpm <script>` at the root runs the desktop's script (`apps/desktop/package.json`).
 
 ## Contributing
 
@@ -123,9 +135,9 @@ and generated dependency notices.
 
 The `seldon-runtime` engine is proprietary software by Danil and is not covered
 by this license. Its terms and third-party notices are published with each
-engine release: [TERMS.md](https://github.com/danil-labs/terminus/releases/download/seldon-runtime-v0.2.73-d6ab489/TERMS.md) and
-[THIRD-PARTY-NOTICES (Windows x86_64)](https://github.com/danil-labs/terminus/releases/download/seldon-runtime-v0.2.73-d6ab489/THIRD-PARTY-NOTICES-x86_64-pc-windows-msvc.txt)
-for the version pinned in `seldon-runtime.lock`.
+engine release: [TERMS.md](https://github.com/danil-labs/terminus/releases/download/seldon-runtime-v0.2.73-4b8714c/TERMS.md) and
+[third-party notices by platform](https://github.com/danil-labs/terminus/releases/tag/seldon-runtime-v0.2.73-4b8714c)
+for the version pinned in `apps/desktop/seldon-runtime.lock`.
 
 "Terminus", "Danil" and their logos are trademarks of Danil;
 the license does not grant permission to use them. Forks must use their own

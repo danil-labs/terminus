@@ -25,7 +25,7 @@ In scope:
 - the Terminus window and its front (this repository);
 - the release pipeline and the `npx` installer;
 - how the window handles content produced by agents (artifacts, Markdown,
-  links, embedded sites) — see [attacks/](attacks/README.md) for the existing
+  links, embedded sites) — see [tests/security/](apps/desktop/tests/security/README.md) for the existing
   containment tests;
 - the engine `seldon-runtime` as shipped with Terminus. Its source is not
   public, but reports about its behavior are welcome through the same channel.

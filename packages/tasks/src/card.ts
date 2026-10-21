@@ -1,0 +1,58 @@
+/**
+ * La tarjeta de dos líneas de una tarea (sidebar del escritorio, #151).
+ *
+ * Línea 1: la marca de estado en su columna fija, el título y la chincheta.
+ * Línea 2: lo que te piden si te necesita (el último mensaje); si no, la
+ * carpeta, la cara del agente y la máquina. En «Compacta» no hay línea 2.
+ *
+ * Cada cliente pinta esto a su manera; qué entra y en qué orden sale de aquí.
+ * Lo que solo el escritorio sabe (git, PR, worktree) lo añade él.
+ */
+import { type TaskActivity, type TaskState, taskPriority } from "../../design/src/index.ts";
+import { type SidebarContext, type SidebarTask, activityOf, isPinned, needsYou } from "./view.ts";
+
+export type CardTask = SidebarTask & {
+  title: string;
+  last_message?: string | null;
+  /** La máquina que la corre, si se enseña; `machine_on: false` es apagada. */
+  machine?: string | null;
+  machine_on?: boolean;
+};
+
+export type TaskCard = {
+  activity: TaskActivity;
+  state: TaskState | null;
+  /** Sin estado y entregada: la marca de entregada en vez del círculo vacío. */
+  delivered: boolean;
+  pinned: boolean;
+  needsYou: boolean;
+  /** Línea 2 si te necesita: lo que pide. */
+  request: string | null;
+  /** La carpeta de la fila, si se enseña (`""` es sin carpeta y no se enseña). */
+  folder: string | null;
+  /** La cara del agente; no en su propio chat, que ya es suyo. */
+  agent: string | null;
+  machine: { id: string; on: boolean } | null;
+};
+
+export type CardOptions<T extends CardTask> = Pick<SidebarContext<T>, "live" | "approving" | "folderOf"> & {
+  /** Bajo la cabecera de su carpeta, la fila no repite la carpeta. */
+  hideFolder?: boolean;
+};
+
+export function taskCard<T extends CardTask>(task: T, options: CardOptions<T>): TaskCard {
+  const activity = activityOf(task, options);
+  const state = taskPriority(activity);
+  const folder = options.hideFolder ? null : ((options.folderOf ? options.folderOf(task) : task.folder) || null);
+  return {
+    activity,
+    state,
+    delivered: !state && activity.outcome === "delivered",
+    pinned: isPinned(task),
+    needsYou: needsYou(state),
+    request: needsYou(state) ? (task.last_message ?? null) : null,
+    folder,
+    agent: task.agent && !task.chat_de_agente ? task.agent : null,
+    machine: task.machine ? { id: task.machine, on: task.machine_on !== false } : null,
+  };
+}
