@@ -206,14 +206,18 @@ const destinosDe = (
     icono: () => <GitBranch size={15} />,
     panel: () => <Providers />,
   },
-  {
-    id: "radiant",
-    get name() {
-      return t("settings.nav.radiant");
-    },
-    icono: () => <Radar size={15} />,
-    panel: () => <Radiant />,
-  },
+  ...(capabilities().radiant
+    ? [
+        {
+          id: "radiant",
+          get name() {
+            return t("settings.nav.radiant");
+          },
+          icono: () => <Radar size={15} />,
+          panel: () => <Radiant />,
+        },
+      ]
+    : []),
   ...(capabilities().danilAccount || capabilities().accountProfile
     ? [
         {

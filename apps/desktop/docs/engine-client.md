@@ -40,6 +40,12 @@ sin él, la ventana abre `verification_uri_complete` y la persona aprueba en
 proxy y la sección lo dice. El campo editable del alta y de la página de
 aprobación es el nombre de **esta computadora**, no el de la cuenta.
 
+La web (`app.danil.ai/terminus`) no ofrece Radiant: ni la sección de
+Configuración, ni su gobierno en las pantallas, ni la elección «De mi
+organización» al crear el espacio (`capabilities().radiant`, solo en el
+escritorio). Radiant se conectará con Terminus Computers, no con cada ventana;
+el escritorio lo conserva por ahora (2026-10-21).
+
 La persona de la cuenta (nombre, correo, foto) sale del motor:
 `danil_connect_status` trae `account_name`, `avatar` (ruta de la foto guardada
 en la máquina, pintada con `preview_file`) y `avatar_source`;
