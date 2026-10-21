@@ -727,6 +727,10 @@ enum Routed {
 fn machine_off() -> Value {
     json!({"what":{"clave":"shell.service.machine_off"},"detail":"machine_off"})
 }
+fn wake_failed() -> Value {
+    let clave = super::util::Frase::new("shell.service.machine_wake_failed").0;
+    json!({"what":{"clave":clave},"detail":"machine_wake_failed"})
+}
 fn unlinked() -> Value {
     json!({"what":{"clave":"shell.machines.unlinked"},"detail":"machine_unlinked"})
 }
@@ -752,7 +756,8 @@ fn routed(
             .deliver(id, local, spec, args, &*home, state.reach(i), || {
                 state.wake_now(i)
             })
-            .map_err(|_| machine_off())?
+            // Solo `wake` falla aquí: su programa no la encendió.
+            .map_err(|_| wake_failed())?
             .ok_or_else(unlinked)?;
         return Ok(Routed::Done(sent.map_err(|e| failure(&e)).and_then(reply)));
     }
@@ -1356,8 +1361,9 @@ pub(super) fn machine_list(app: tauri::AppHandle) -> Result<Value, Value> {
             } else if let Some(client) = m.parked.lock().unwrap_or_else(|p| p.into_inner()).as_ref()
             {
                 answers(client)
-            } else if let Some((_, selection)) = &m.wake {
-                Client::select(selection).is_ok()
+            } else if m.wake.is_some() {
+                // Leer su selección no dice si contesta: apagada, el túnel ya no llega.
+                state.reach(i).is_some_and(|client| answers(&client))
             } else {
                 true
             };
