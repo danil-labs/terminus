@@ -68,7 +68,11 @@ async function request<T>(url: string, token: string, method: string, read: (bod
   if (response.status === 404) return { kind: "missing" };
   if (!response.ok) return { kind: "error", status: response.status };
   const body = await response.json().catch(() => null);
-  return { kind: "ok", value: read(body) };
+  try {
+    return { kind: "ok", value: read(body) };
+  } catch {
+    return { kind: "error", status: response.status };
+  }
 }
 
 export function listComputers(endpoint: string, token: string, f: Fetch = globalFetch): Promise<Answer<Computer[]>> {
@@ -79,6 +83,62 @@ export function listComputers(endpoint: string, token: string, f: Fetch = global
     (body) => {
       const list = Array.isArray(body) ? body : (body as { computers?: unknown } | null)?.computers;
       return Array.isArray(list) ? (list.filter((c) => typeof c?.computer_id === "string") as Computer[]) : [];
+    },
+    f,
+  );
+}
+
+/** Un proyecto del registro de la cuenta (`Project` de `GET /v1/workspaces`): el mismo id en cada máquina. */
+export type AccountProject = {
+  id: string;
+  name: string;
+  remote_url?: string | null;
+  default_branch?: string | null;
+  /** La computadora donde nació, si el plano de control la sabe. */
+  home_computer_id?: string | null;
+};
+
+/**
+ * Un workspace del registro de la cuenta de Danil (`GET /v1/workspaces`): existe
+ * aunque sus computadoras estén apagadas. `computers`, en cuáles está ligado.
+ */
+export type AccountWorkspace = {
+  id: string;
+  name: string;
+  radiant_workspace_id?: string | null;
+  settings?: Partial<Record<"lengua" | "lengua_de_salida" | "default_permission_mode" | "terminal_theme", string | null>> | null;
+  settings_version?: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+  projects: AccountProject[];
+  computers: string[];
+};
+
+const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x !== "") : []);
+
+function accountWorkspace(raw: unknown): AccountWorkspace | null {
+  const w = raw as Record<string, unknown> | null;
+  if (!w || typeof w !== "object" || typeof w.id !== "string" || !w.id) return null;
+  const projects = (Array.isArray(w.projects) ? w.projects : []).filter(
+    (p): p is AccountProject => !!p && typeof (p as AccountProject).id === "string" && typeof (p as AccountProject).name === "string",
+  );
+  return { ...(w as AccountWorkspace), name: typeof w.name === "string" && w.name.trim() ? w.name : w.id, projects, computers: strings(w.computers) };
+}
+
+/**
+ * Los workspaces de la cuenta, con sus proyectos y computadoras. Acepta el JWT de
+ * la persona o el token de cliente del escritorio. Un plano de control anterior
+ * al registro contesta `missing` (404): quien llama sigue sin él.
+ */
+export function listWorkspaces(endpoint: string, token: string, f: Fetch = globalFetch): Promise<Answer<AccountWorkspace[]>> {
+  return request(
+    apiUrl(endpoint, "/v1/workspaces"),
+    token,
+    "GET",
+    (body) => {
+      const list = (body as { workspaces?: unknown } | null)?.workspaces;
+      if (!Array.isArray(list)) throw new Error("bad_registry");
+      return list.map(accountWorkspace).filter((w): w is AccountWorkspace => w !== null);
     },
     f,
   );
