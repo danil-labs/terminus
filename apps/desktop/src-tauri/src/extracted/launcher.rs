@@ -41,6 +41,10 @@ pub enum Phase {
         blank_0274: bool,
     },
     Handoff(Handoff),
+    /// La versión anterior sigue con turnos; el motor nuevo entra en cuanto los termine.
+    Previous {
+        tasks: Option<u64>,
+    },
     Failed {
         code: String,
         log: PathBuf,
@@ -187,6 +191,14 @@ fn connect(app: &tauri::AppHandle, launcher: &Launcher, paths: &engine::Paths) {
         if matches!(&selected, Err(error) if error.code == "adoption_required") {
             drive(app, launcher, paths, "readopt");
             return;
+        }
+        if let Err(error) = &selected {
+            if error.code == "previous_engine_busy" {
+                let tasks = error.detail["turns"].as_u64().filter(|n| *n > 0);
+                launcher.set(Phase::Previous { tasks });
+                std::thread::sleep(Duration::from_secs(2));
+                continue;
+            }
         }
         match selected.and_then(|selection| super::connect(&selection)) {
             Ok(client) => {

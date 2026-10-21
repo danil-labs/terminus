@@ -293,7 +293,12 @@ did it, and the front asks for a restart. A manual installer that finds
 Terminus open shows the same notice and ends there, instead of running a second
 window from its finish page. On the next start, an engine running from
 `old_seldon-runtime.exe` gets `service stop`; one that refuses keeps working
-and the new engine waits for the next start. Then the window deletes the
+and the new engine waits for the next start. An update usually changes the
+contract, and the window cannot use an engine of another contract: it asks it
+for `status` and `service stop` anyway (`request_any_contract`), stops it as
+soon as it has no turns, downloads or operations, and until then shows how many
+tasks the previous version is finishing instead of failing with
+`service_busy`. This holds on every platform. Then the window deletes the
 `old_*` files no one holds, retrying for a few seconds while the window it
 replaces exits.
 
