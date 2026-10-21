@@ -36,21 +36,32 @@ type Proveedor = {
 type Conocido = { id: string; grupo: string; pide_sesion: boolean; conectado: boolean; sesiones?: string[] };
 type AgenteMcp = { id: string; label: string; recibe: boolean; instalado: boolean; login?: boolean };
 type Plugin = { id: string; installed: boolean; installing: boolean; supported: boolean };
-type Avance = { id: string; done: number; bytes: number };
+type FalloDelMotor = { what: Frase; detail?: string };
+type AvanceDeDrive = {
+  kind: "progress" | "verifying" | "done" | "cancelled" | "error" | "connection";
+  received?: number;
+  total?: number | null;
+  failure?: FalloDelMotor | null;
+};
+type EstadoDeDrive = {
+  supported: boolean;
+  installed: boolean;
+  install: AvanceDeDrive | null;
+  connected: { email: string; name: string } | null;
+  unverified: FalloDelMotor | null;
+};
 
-/** Cómo se conecta cada integración: el motor de servicios de código o un servicio MCP conocido. */
+/** Cómo se conecta cada integración: servicios de código, un servicio MCP conocido o Drive con su CLI. */
 type Integracion = {
   id: string;
   nombre: string;
   comun: boolean;
-  via: "proveedor" | "mcp" | "incluido";
-  /** Su id en `list_known_mcp`, cuando no es el mismo de la tarjeta. */
-  mcp?: string;
+  via: "proveedor" | "mcp" | "incluido" | "drive";
 };
 type EstadoDeIntegracion =
   | { k: "libre" }
   | { k: "formulario" }
-  | { k: "descargando"; hecho: number; total: number }
+  | { k: "descargando"; hecho: number; total: number | null }
   | { k: "conectando"; codigo?: string }
   | { k: "conectada"; detalle: string }
   | { k: "saliendo" };
@@ -58,7 +69,7 @@ type Borrador = { data: Record<string, string>; token: string };
 
 const INTEGRACIONES = (): Integracion[] => [
   { id: "github", nombre: "GitHub", comun: true, via: "proveedor" },
-  { id: "drive", nombre: t("onboarding.tools.drive"), comun: true, via: "mcp", mcp: "google-drive" },
+  { id: "drive", nombre: t("onboarding.tools.drive"), comun: true, via: "drive" },
   { id: "figma", nombre: "Figma", comun: true, via: "mcp" },
   { id: "atlassian", nombre: t("onboarding.tools.atlassian"), comun: true, via: "mcp" },
   { id: "gitlab", nombre: "GitLab", comun: false, via: "proveedor" },
@@ -69,7 +80,6 @@ const RECOMENDADOS = ["drawio", "typst"];
 const ORDEN_PLUGINS = ["drawio", "typst", "libreoffice", "agentsview", "computer-use"];
 const CON_PESO = new Set(["drawio", "typst", "libreoffice", "computer-use"]);
 const descripcion = (id: string) => t(`onboarding.tools.about.${id}`);
-const idMcp = (i: Integracion) => i.mcp ?? i.id;
 const SIN_BORRADOR: Borrador = { data: {}, token: "" };
 
 /** Drive no es un servicio de código ni un MCP conocido: su marca vive con las de los plugins. */
@@ -131,6 +141,8 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
   const [motivos, setMotivos] = createStore<Record<string, string | null>>({});
   const [verMas, setVerMas] = createSignal(false);
   const [falloDeCarga, setFalloDeCarga] = createSignal<string | null>(null);
+  const [drive, setDrive] = createSignal<EstadoDeDrive | null>(null);
+  let finDeDescarga: ((a: AvanceDeDrive) => void) | null = null;
   const scope = invoke<{ active: string | null }>("list_workspaces").then((s) => s.active ?? "pending");
   let esperandoMcp: string | null = null;
   let incluidas = false;
@@ -138,11 +150,20 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
 
   const agenteDeSesion = () => agentesMcp().find((a) => a.instalado && a.recibe && a.login);
   const proveedor = (id: string) => proveedores().find((p) => p.id === id);
-  const conocido = (i: Integracion) => conocidos().find((c) => c.id === idMcp(i));
+  const conocido = (i: Integracion) => conocidos().find((c) => c.id === i.id);
+  const descargaDeDrive = (a: AvanceDeDrive | null | undefined): EstadoDeIntegracion | null =>
+    a && (a.kind === "progress" || a.kind === "verifying")
+      ? { k: "descargando", hecho: a.received ?? 0, total: a.total ?? null }
+      : null;
   const viva = (id: string) => ["formulario", "descargando", "conectando", "saliendo"].includes(estados[id]?.k ?? "libre");
   const borrador = (id: string) => borradores[id] ?? SIN_BORRADOR;
 
   function guardado(i: Integracion): EstadoDeIntegracion {
+    if (i.via === "drive") {
+      const d = drive();
+      if (d?.connected) return { k: "conectada", detalle: d.connected.email || d.connected.name };
+      return descargaDeDrive(d?.install) ?? { k: "libre" };
+    }
     if (i.via === "proveedor") {
       const c = proveedor(i.id)?.connected;
       if (!c) return { k: "libre" };
@@ -161,12 +182,14 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
 
   async function cargar() {
     try {
-      const [p, c, a] = await Promise.all([
+      const [p, c, a, d] = await Promise.all([
         invoke<Proveedor[]>("list_git_hosts", { scope: await scope }),
         invoke<Conocido[]>("list_known_mcp"),
         invoke<AgenteMcp[]>("list_mcp_providers"),
+        invoke<EstadoDeDrive>("google_drive_status").catch(() => null),
       ]);
       if (cerrada) return;
+      setDrive(d);
       setProveedores(p);
       setConocidos(c);
       setAgentesMcp(a);
@@ -187,7 +210,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
       const c = conocido(i);
       if (!c || c.conectado) continue;
       try {
-        await invoke("connect_known_mcp", { id: idMcp(i) });
+        await invoke("connect_known_mcp", { id: i.id });
       } catch (e) {
         setErrores(i.id, explicar(e));
       }
@@ -204,18 +227,35 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
   const url = listen<string>("mcp-login", (e) => {
     if (esperandoMcp) invoke("open_external", { target: e.payload }).catch(() => {});
   });
-  // La CLI de un servicio que se descarga avisa su avance con el id del servicio.
-  const avance = listen<Avance>("toolchain", (e) => {
-    const i = INTEGRACIONES().find((x) => idMcp(x) === e.payload.id);
-    if (!i || e.payload.bytes <= 0 || !["descargando", "conectando"].includes(estados[i.id]?.k ?? "")) return;
-    if (e.payload.done >= e.payload.bytes) return void setEstados(i.id, { k: "conectando" });
-    setEstados(i.id, { k: "descargando", hecho: e.payload.done, total: e.payload.bytes });
+  const alDrive = listen<AvanceDeDrive>("google-drive", (e) => {
+    const a = e.payload;
+    if (a.kind === "connection") return void cargar();
+    const bajando = descargaDeDrive(a);
+    if (bajando) {
+      if (estados.drive?.k === "descargando" || finDeDescarga) setEstados("drive", bajando);
+      return;
+    }
+    finDeDescarga?.(a);
+  });
+  // Al abrir se pregunta a Google si la conexión sigue viva; sin red queda conectada y sin comprobar.
+  onMount(() => {
+    void invoke<EstadoDeDrive>("google_drive_status")
+      .then((d) => (d.connected ? invoke<EstadoDeDrive>("check_google_drive") : d))
+      .then((d) => {
+        if (cerrada) return;
+        setDrive(d);
+        if (!viva("drive")) setEstados("drive", guardado(INTEGRACIONES().find((i) => i.id === "drive")!));
+      })
+      .catch((e) => {
+        setErrores("drive", explicar(e));
+        void cargar();
+      });
   });
   onCleanup(() => {
     cerrada = true;
-    for (const l of [fin, url, avance]) void l.then((f) => f());
+    for (const l of [fin, url, alDrive]) void l.then((f) => f());
     for (const i of INTEGRACIONES()) {
-      if (i.via === "proveedor" && estados[i.id]?.k === "conectando") void cancelar(i);
+      if ((i.via === "proveedor" || i.via === "drive") && estados[i.id]?.k === "conectando") void cancelar(i);
     }
   });
 
@@ -225,9 +265,42 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
     setEstados(i.id, { k: "formulario" });
   }
 
+  /** Drive: su CLI (rclone) se descarga si falta y luego se aprueba en el navegador. */
+  async function conectarDrive(i: Integracion) {
+    const d = drive();
+    if (d && !d.supported) return void setErrores(i.id, t("onboarding.tools.unsupported"));
+    try {
+      if (!d?.installed) {
+        setEstados(i.id, { k: "descargando", hecho: 0, total: null });
+        const terminado = new Promise<AvanceDeDrive>((resolve) => (finDeDescarga = resolve));
+        await invoke("install_google_drive");
+        const a = await terminado;
+        finDeDescarga = null;
+        if (a.kind === "cancelled") return void setEstados(i.id, { k: "libre" });
+        if (a.kind === "error") throw a.failure ?? new Error(t("onboarding.tools.drive_install_failed"));
+      }
+      if (cerrada || estados[i.id]?.k === "libre") return;
+      setEstados(i.id, { k: "conectando" });
+      const { url } = await invoke<{ url: string }>("start_google_drive_login");
+      invoke("open_external", { target: url }).catch(() => {});
+      const fresco = await invoke<EstadoDeDrive>("finish_google_drive_login");
+      if (cerrada) return;
+      setDrive(fresco);
+      setEstados(i.id, guardado(i));
+    } catch (e) {
+      finDeDescarga = null;
+      if (cerrada || estados[i.id]?.k === "libre") return;
+      setErrores(i.id, explicar(e));
+      setEstados(i.id, { k: "libre" });
+      void cargar();
+    }
+    props.onCambio(INTEGRACIONES().filter((x) => estados[x.id]?.k === "conectada").length);
+  }
+
   async function conectar(i: Integracion) {
     setErrores(i.id, null);
     setMotivos(i.id, null);
+    if (i.via === "drive") return conectarDrive(i);
     if (i.via === "proveedor") {
       const p = proveedor(i.id);
       if (!p) return void setErrores(i.id, t("onboarding.tools.unavailable"));
@@ -253,14 +326,14 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
       return void cargar();
     }
     const c = conocido(i);
-    if (!c) return void setErrores(i.id, i.id === "drive" ? t("onboarding.tools.drive_engine") : t("onboarding.tools.unavailable"));
+    if (!c) return void setErrores(i.id, t("onboarding.tools.unavailable"));
     esperandoMcp = i.id;
     setEstados(i.id, { k: "conectando" });
     try {
-      await invoke("connect_known_mcp", { id: idMcp(i) });
+      await invoke("connect_known_mcp", { id: i.id });
       const agente = agenteDeSesion();
       if (c.pide_sesion && agente) {
-        await invoke("mcp_login", { provider: agente.id, id: idMcp(i) });
+        await invoke("mcp_login", { provider: agente.id, id: i.id });
         return;
       }
     } catch (e) {
@@ -297,11 +370,14 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
   async function cancelar(i: Integracion) {
     setErrores(i.id, null);
     const e = estados[i.id]?.k;
-    if (i.via === "proveedor" && e === "conectando" && !borradores[i.id]?.token) {
+    if (i.via === "drive") {
+      if (e === "descargando") await invoke("cancel_install", { operation: "google-drive" }).catch(() => {});
+      if (e === "conectando") await invoke("cancel_google_drive_login").catch(() => {});
+    } else if (i.via === "proveedor" && e === "conectando" && !borradores[i.id]?.token) {
       invoke("cancel_browser_login", { id: i.id, scope: await scope }).catch(() => {});
     } else if (i.via !== "proveedor" && esperandoMcp === i.id) {
       esperandoMcp = null;
-      await invoke("disconnect_known_mcp", { id: idMcp(i) }).catch(() => {});
+      await invoke("disconnect_known_mcp", { id: i.id }).catch(() => {});
     }
     setBorradores(i.id, SIN_BORRADOR);
     setMotivos(i.id, null);
@@ -312,8 +388,9 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
     setErrores(i.id, null);
     setEstados(i.id, { k: "saliendo" });
     try {
-      if (i.via === "proveedor") await invoke("disconnect_git_host", { id: i.id, scope: await scope });
-      else await invoke("disconnect_known_mcp", { id: idMcp(i) });
+      if (i.via === "drive") await invoke("disconnect_google_drive");
+      else if (i.via === "proveedor") await invoke("disconnect_git_host", { id: i.id, scope: await scope });
+      else await invoke("disconnect_known_mcp", { id: i.id });
     } catch (e) {
       setErrores(i.id, explicar(e));
     }
@@ -332,7 +409,9 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
       case "formulario":
         return t("onboarding.tools.fill_below");
       case "descargando":
-        return t("onboarding.tools.downloading_cli", { done: mb(e.hecho), total: mb(e.total) });
+        return e.total
+          ? t("onboarding.tools.downloading_cli", { done: mb(e.hecho), total: mb(e.total) })
+          : t("onboarding.tools.downloading_cli_start");
       case "conectando":
         if (formularioAbierto(i)) return t("onboarding.tools.checking_token");
         if (e.codigo) return t("onboarding.ai.confirm_code", { code: e.codigo });
@@ -396,8 +475,8 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
             <Match when={e()?.k === "descargando" && e()}>
               {(d) => {
                 const v = () => {
-                  const x = d() as { hecho: number; total: number };
-                  return x.total > 0 ? Math.min(100, (x.hecho / x.total) * 100) : 0;
+                  const x = d() as { hecho: number; total: number | null };
+                  return x.total ? Math.min(100, (x.hecho / x.total) * 100) : 0;
                 };
                 return (
                   <>

@@ -17,8 +17,8 @@ sends).
 |---|---|---|
 | `engine` | `scripts/engine.mjs` | Before the Rust steps, places the engine pinned in `seldon-runtime.lock` (SHA-256 checked) as the `externalBin` sidecar of this platform (on macOS both architectures and their `lipo`); `tauri-build` refuses to compile without it. |
 | `reviewable` | `scripts/guards/reviewable.mjs` | Rejects control bytes that turn a diff binary. Needs git metadata. |
-| `bridge` | `scripts/guards/bridge.mjs` | Every event the front listens to is emitted by the window or declared in the engine contract. |
-| `commands` | `scripts/guards/commands.mjs` | Every `invoke` name exists in the window registry or the engine contract, and every contract command has a caller or a written reason. |
+| `bridge` | `scripts/guards/bridge.mjs` | Every event the front listens to is emitted by the window or declared in the engine contract, or listed in `scripts/engine-pending.mjs` until the contract brings it. |
+| `commands` | `scripts/guards/commands.mjs` | Every `invoke` name exists in the window registry or the engine contract, and every contract command has a caller or a written reason. Names in `scripts/engine-pending.mjs` pass until the contract has them, then the entry must go. |
 | `contract` | `scripts/guards/contract.mjs` | `commands.json` hashes to the SHA-256 in PROVENANCE, and `seldon-runtime.lock` pins an engine with that `contract`. A lock behind the contract passes only while `MOTOR_PENDIENTE` in the guard names it with what is missing; `publish.yml` refuses to publish in that state. |
 | `service-errors` | `scripts/guards/service-errors.mjs` | Errors rejected by `invoke` are not flattened with `String()`. The per-file quota only goes down. |
 | `artifact` | `scripts/guards/artifact.mjs`, `tests/unit/artifact-viewer.test.ts` | Validates the artifact container and inline chat scripts, and the CSS classes shared with the viewer. |

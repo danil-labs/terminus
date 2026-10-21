@@ -42,6 +42,7 @@ import { relative } from "node:path";
 // Ver la nota de `paths.mjs`: `.pathname` en Windows da `/C:/…` y revienta.
 import { fileURLToPath } from "node:url";
 import { walkFiles } from "../git.mjs";
+import { COMANDOS_PENDIENTES } from "../engine-pending.mjs";
 
 const LIB = fileURLToPath(new URL("../../src-tauri/src/extracted/mod.rs", import.meta.url));
 const CONTRACT = fileURLToPath(new URL("../../src-tauri/crates/engine-protocol/commands.json", import.meta.url));
@@ -170,7 +171,8 @@ for (const { dir, f } of ARBOLES.flatMap((dir) =>
 
 // ------------------------------------------------------------------ el fallo
 
-const fantasmas = [...invocados].filter(([n]) => !registrados.has(n));
+const fantasmas = [...invocados].filter(([n]) => !registrados.has(n) && !(n in COMANDOS_PENDIENTES));
+const llegados = Object.keys(COMANDOS_PENDIENTES).filter((n) => registrados.has(n));
 const muertos = [...registrados.keys()]
   .filter((n) => !invocados.has(n) && !(n in SIN_INTERFAZ))
   .sort();
@@ -186,11 +188,14 @@ if (dinamicos.length) {
 for (const [n, donde] of fantasmas) {
   console.error(`Nadie registra «${n}» — lo invoca ${donde.join(", ")}`);
 }
+for (const n of llegados) {
+  console.error(`«${n}» ya está en el contrato: quítalo de scripts/engine-pending.mjs.`);
+}
 for (const n of muertos) {
   console.error(`Nadie invoca «${n}» — lo registra ${registrados.get(n)}`);
 }
 
-if (!fantasmas.length && !muertos.length && !dinamicos.length) {
+if (!fantasmas.length && !muertos.length && !dinamicos.length && !llegados.length) {
   console.log(
     `Los ${registrados.size} comandos registrados los invoca alguien` +
       (Object.keys(SIN_INTERFAZ).length
