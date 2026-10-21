@@ -461,7 +461,15 @@ export function createWebTransport(
     if (LISTING.has(command)) await readRegistry();
     // One machine asleep: the account's lists answer now instead of waiting for it.
     if (!fleet.multi && fromRegistry(command, workspace)) return fan(command, fleet.usable(), args, workspace);
-    const chosen = headerOf(options, "x-terminus-machine") ?? (CREATE.has(command) ? picked(workspace, args.project) : null);
+    const chosen =
+      headerOf(options, "x-terminus-machine") ??
+      (CREATE.has(command) ? picked(workspace, args.project) : command === "create_space" ? fleet.spaceHome(workspace) : null);
+    // A space is of one machine: something new made on another one goes there without it.
+    const spaceOf = typeof args.space === "string" ? fleet.unwrap(args.space)?.machine : undefined;
+    if (CREATE.has(command) && chosen && spaceOf && spaceOf !== chosen) {
+      const { space: _elsewhere, ...rest } = args;
+      args = rest;
+    }
     let route: ReturnType<Fleet["route"]>;
     try {
       route = fleet.route(command, args, workspace, chosen && fleet.info(chosen) ? chosen : null, fallback(workspace, args.project));
