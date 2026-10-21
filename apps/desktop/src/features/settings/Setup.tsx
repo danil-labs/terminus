@@ -1,66 +1,74 @@
 import { listen } from "../../lib/serviceEvents";
-import { createEffect, createSignal, For, type JSX, lazy, Match, on, onCleanup, onMount, Show, Switch } from "solid-js";
+import {
+  createEffect,
+  createSignal,
+  For,
+  getOwner,
+  type JSX,
+  lazy,
+  Match,
+  on,
+  onCleanup,
+  onMount,
+  runWithOwner,
+  Show,
+  Suspense,
+  Switch,
+} from "solid-js";
 import { connected } from "../../lib/engineConnection";
-import { peso } from "../../lib/format";
+import { elapsed, mb, peso } from "../../lib/format";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
 import { capabilities } from "../../lib/platform";
 import { hasShellCache } from "../../lib/shellCache";
 import { cn } from "../../lib/utils";
-import {
-  createFullscreen,
-  HEADER_HEIGHT,
-  isWindows,
-  needsTrafficLightPadding,
-  TRAFFIC_LIGHT_PADDING,
-  toggleMaximizeFromHeader,
-} from "../../lib/window";
 import { Button } from "../../ui/Button";
 import { asFailure, FailureNote, prosaDe } from "../../ui/Failure";
-import { BARRA_DE_TERMINAL, CUERPO_DE_TERMINAL, NOMBRE_DE_TERMINAL, TerminalCursor } from "../../ui/Terminal";
 import { Toast, ToastPortal } from "../../ui/Toast";
+import type { Conexiones } from "../onboarding/connect-store";
 import { crearWorkspace } from "../onboarding/onboarding-store";
-import { Fases } from "../onboarding/Phases";
-import ControlesDeVentana from "../shell/WindowControls";
+import { CabeceraDelAlta } from "../onboarding/Phases";
+import type { EstadoDeEtapa, FilaDeEtapa, Instalacion, Linea, Vista } from "../onboarding/Prepare";
+import { Escenario, QUIETO, TituloCambiante } from "../onboarding/Stage";
 import { type EnvReport, ORIGEN_APP, ORIGEN_BUNDLE, ORIGEN_SISTEMA } from "./environment-store";
 
 /**
- * La preparación del runtime, por etapas y a la vista: la terminal enseña lo
- * que `bootstrap::prepare_runtime` narra por `bootstrap-run`. Se enseña solo la
- * primera vez; lo que falte con la app abierta se repara detrás con un aviso.
+ * La preparación del runtime, por etapas y a la vista, y en la primera vez el
+ * alta entera: preparar, conectar la IA en la misma pantalla y personalizar.
+ * Lo que falte con la app abierta se repara detrás con un aviso.
  */
 
-type Estado = "waiting" | "running" | "succeeded" | "failed";
-type Etapa = { name: string; essential: boolean; state: Estado; failure?: string };
+type Etapa = { name: string; essential: boolean; state: EstadoDeEtapa; failure?: string };
 /** Lo que contesta `prepare_runtime`: el estado de la corrida, la suya o la que ya estaba en curso. */
 type Preparacion = { stages: Etapa[]; running: boolean };
 type Nota = { type: "note"; stage: string; kind: string; value?: string; extra?: string };
 type Evento =
   | { type: "manifest"; stages: { name: string; essential: boolean }[] }
-  | { type: "stage"; name: string; state: Exclude<Estado, "waiting"> }
+  | { type: "stage"; name: string; state: Exclude<EstadoDeEtapa, "waiting">; durationMs?: number }
   | Nota
   | { type: "output"; stage: string; line: string; stream: "stdout" | "stderr" }
   | { type: "download"; stage: string; done: number; total?: number };
-type Tono = "ok" | "info" | "warn" | "error" | "out" | "err";
-type Linea = { tono: Tono; texto: string };
 type Avance = { id: string; done: number; bytes: number };
+/** Lo que las notas dicen de cada etapa, para el detalle de su fila. */
+type Dato = { version?: string; origen?: string; libre?: string; plataforma?: string; instala?: boolean };
+type Paso = "preparar" | "ia" | "personalizar";
 
 const LINEAS_MAX = 400;
-const RANGO: Record<Estado, number> = { waiting: 0, running: 1, succeeded: 2, failed: 2 };
+const RANGO: Record<EstadoDeEtapa, number> = { waiting: 0, running: 1, succeeded: 2, failed: 2 };
 const RITMO_CONSEJOS = 9000;
 const RITMO_FOTO = 5000;
-const MARCA: Record<Tono, string> = { ok: "✓", info: "→", warn: "⚠", error: "✗", out: " ", err: " " };
-const COLOR: Record<Tono, string> = {
-  ok: "text-terminal-ok",
-  info: "text-terminal-text",
-  warn: "text-terminal-warn",
-  error: "text-terminal-error",
-  out: "text-terminal-muted",
-  err: "text-terminal-muted/70",
-};
+const CON_DESCRIPCION = new Set(["pnpm", "bun", "agent-browser", "uv", "python"]);
 
 // Una computadora gestionada llega preparada: en el navegador solo se ve su estado.
 const PreparacionGestionada = lazy(() => import("../../web/ManagedSetup"));
+// Conectar la IA y personalizar solo se cargan en el primer arranque: la carga inicial está en su techo.
+const MapaDeConexiones = lazy(() => import("../onboarding/ConnectAI").then((m) => ({ default: m.MapaDeConexiones })));
+const PanelDeIA = lazy(() => import("../onboarding/ConnectAI").then((m) => ({ default: m.PanelDeIA })));
+const Comprobacion = lazy(() => import("../onboarding/ConnectAI").then((m) => ({ default: m.Comprobacion })));
+const Personalizar = lazy(() => import("../onboarding/Personalize"));
+const SelectorDeVista = lazy(() => import("../onboarding/Prepare").then((m) => ({ default: m.SelectorDeVista })));
+const VistaSencilla = lazy(() => import("../onboarding/Prepare").then((m) => ({ default: m.VistaSencilla })));
+const VistaTerminal = lazy(() => import("../onboarding/Prepare").then((m) => ({ default: m.VistaTerminal })));
 
 export default function Setup(props: { children: JSX.Element }) {
   if (!capabilities().localSetup) return <PreparacionGestionada>{props.children}</PreparacionGestionada>;
@@ -76,17 +84,22 @@ export default function Setup(props: { children: JSX.Element }) {
   const [lineas, setLineas] = createSignal<Linea[]>([]);
   const [activa, setActiva] = createSignal<string | null>(null);
   const [parcial, setParcial] = createSignal(0);
+  const [datos, setDatos] = createSignal<Record<string, Dato>>({});
+  const [descarga, setDescarga] = createSignal<{ stage: string; file: string; done: number; total: number } | null>(null);
+  const [reintentos, setReintentos] = createSignal<Record<string, { enCurso: boolean; error?: string }>>({});
   const [consejo, setConsejo] = createSignal(0);
   const [pausa, setPausa] = createSignal(false);
-  const [saltando, setSaltando] = createSignal(false);
   const [sinSoporte, setSinSoporte] = createSignal(false);
   const [bloqueado, setBloqueado] = createSignal(false);
+  const [vista, setVista] = createSignal<Vista>("sencilla");
+  const [paso, setPaso] = createSignal<Paso>("preparar");
+  const [entrando, setEntrando] = createSignal(false);
+  const [workspace, setWorkspace] = createSignal<{ id: string; nombre: string } | null>(null);
   let log: HTMLPreElement | undefined;
-  const pantallaCompleta = createFullscreen();
-  // Esta pantalla ocupa la ventana entera: su cabecera siempre tiene la esquina del semáforo.
-  const apartarSemaforo = needsTrafficLightPadding(() => true, pantallaCompleta);
+  let tope = { total: 0, valor: 0 };
 
-  const quieto = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+  const [conexiones, setConexiones] = createSignal<Conexiones | null>(null);
+  const dueño = getOwner();
 
   const consejos = () => [
     [t("setup.tips.agents.title"), t("setup.tips.agents.body")],
@@ -108,11 +121,14 @@ export default function Setup(props: { children: JSX.Element }) {
     return t("settings.environment.origin.missing");
   }
 
+  const anotar = (stage: string, d: Dato) => setDatos((x) => ({ ...x, [stage]: { ...x[stage], ...d } }));
+
   function traducir(e: Nota): Linea[] {
     const name = nombre(e.stage);
     const valor = e.value ?? "";
     switch (e.kind) {
       case "platform":
+        anotar(e.stage, { plataforma: valor, libre: e.extra ? peso(Number(e.extra)) : undefined });
         return [
           {
             tono: "ok",
@@ -122,10 +138,14 @@ export default function Setup(props: { children: JSX.Element }) {
           },
         ];
       case "found":
+        anotar(e.stage, { version: valor, origen: e.extra });
         return [{ tono: "ok", texto: t("setup.log.found", { name, version: valor, source: origen(e.extra) }) }];
       case "installing":
+        anotar(e.stage, { version: valor, instala: true });
         return [{ tono: "info", texto: t("setup.log.installing", { name, version: valor }) }];
       case "download":
+        anotar(e.stage, { instala: true });
+        setDescarga({ stage: e.stage, file: valor, done: 0, total: Number(e.extra ?? 0) });
         return [
           {
             tono: "info",
@@ -135,6 +155,7 @@ export default function Setup(props: { children: JSX.Element }) {
           },
         ];
       case "installed":
+        anotar(e.stage, { version: valor, origen: ORIGEN_APP });
         return [{ tono: "ok", texto: t("setup.log.installed", { name, version: valor }) }];
       case "timed_out":
         return [{ tono: "warn", texto: t("setup.log.timed_out", { name }) }];
@@ -161,8 +182,8 @@ export default function Setup(props: { children: JSX.Element }) {
   }
 
   // Una etapa puede llegar por evento antes que la respuesta que trae el manifiesto.
-  const vistas = new Map<string, Estado>();
-  const masAvanzado = (a: Estado, b?: Estado) => (b && RANGO[b] > RANGO[a] ? b : a);
+  const vistas = new Map<string, EstadoDeEtapa>();
+  const masAvanzado = (a: EstadoDeEtapa, b?: EstadoDeEtapa) => (b && RANGO[b] > RANGO[a] ? b : a);
 
   // La foto manda; un evento que ya llegó más lejos no retrocede.
   function adoptar(p: Preparacion) {
@@ -175,16 +196,35 @@ export default function Setup(props: { children: JSX.Element }) {
         // Un manifiesto abre una corrida: la de un servicio anterior ya no cuenta.
         vistas.clear();
         setLineas([]);
+        setDatos({});
+        setDescarga(null);
         setEtapas(e.stages.map((s) => ({ ...s, state: "waiting" })));
         return;
-      case "stage":
+      case "stage": {
         vistas.set(e.name, masAvanzado(e.state, vistas.get(e.name)));
+        const etapa = etapas().find((s) => s.name === e.name);
         setEtapas((antes) => antes.map((s) => (s.name === e.name ? { ...s, state: e.state } : s)));
         if (e.state === "running") {
           setActiva(e.name);
           setParcial(0);
+          agregar([
+            {
+              tono: "etapa",
+              texto: t("setup.log.stage_start", {
+                name: nombre(e.name),
+                kind: etapa?.essential === false ? t("setup.log.optional") : t("setup.log.essential"),
+              }),
+            },
+          ]);
+        } else {
+          if (descarga()?.stage === e.name) setDescarga(null);
+          if (e.state === "succeeded" && e.durationMs !== undefined) {
+            const s = Math.max(1, Math.round(e.durationMs / 1000));
+            agregar([{ tono: "ok", texto: t("setup.log.stage_done", { name: nombre(e.name), duration: elapsed(s) }) }]);
+          }
         }
         return;
+      }
       case "note":
         agregar(traducir(e));
         return;
@@ -192,7 +232,10 @@ export default function Setup(props: { children: JSX.Element }) {
         agregar([{ tono: e.stream === "stderr" ? "err" : "out", texto: e.line }]);
         return;
       case "download":
-        if (e.total) setParcial(e.done / e.total);
+        if (e.total) {
+          setParcial(e.done / e.total);
+          setDescarga((d) => (d && d.stage === e.stage ? { ...d, done: e.done, total: e.total ?? d.total } : d));
+        }
         return;
     }
   }
@@ -200,7 +243,9 @@ export default function Setup(props: { children: JSX.Element }) {
   const escuchaEtapas = listen<Evento>("bootstrap-run", (e) => recibir(e.payload));
   // pnpm y Bun bajan por `toolchain::install_tool`, que ya reporta su avance por aquí.
   const escuchaHerramientas = listen<Avance>("toolchain", (e) => {
-    if (e.payload.id === activa() && e.payload.bytes > 0) setParcial(e.payload.done / e.payload.bytes);
+    if (e.payload.id !== activa() || e.payload.bytes <= 0) return;
+    setParcial(e.payload.done / e.payload.bytes);
+    setDescarga((d) => (d && d.stage === e.payload.id ? { ...d, done: e.payload.done, total: e.payload.bytes } : d));
   });
   let streamCursor: number | null = null;
   let streamRuntime: string | null = null;
@@ -278,8 +323,12 @@ export default function Setup(props: { children: JSX.Element }) {
   );
 
   function contarEspacios() {
-    invoke<{ workspaces: unknown[] }>("list_workspaces")
-      .then((s) => setHayEspacio(s.workspaces.length > 0))
+    invoke<{ workspaces: { id: string; name: string }[]; active: string | null }>("list_workspaces")
+      .then((s) => {
+        setHayEspacio(s.workspaces.length > 0);
+        const activo = s.workspaces.find((w) => w.id === s.active);
+        if (activo) setWorkspace({ id: activo.id, nombre: activo.name });
+      })
       .catch(() => setHayEspacio(null));
   }
 
@@ -288,8 +337,7 @@ export default function Setup(props: { children: JSX.Element }) {
    *
    * Este componente es la compuerta de la app entera: mientras `mostrar()` es
    * `null` la ventana pinta un div vacío. Todo lo que se espere aquí es tiempo
-   * en blanco, y el sondeo del entorno crece solo cada vez que alguien le añade
-   * una herramienta.
+   * en blanco.
    */
   async function empezar() {
     setFallo(null);
@@ -328,13 +376,13 @@ export default function Setup(props: { children: JSX.Element }) {
   onMount(() => void empezar());
 
   const temporizador = setInterval(() => {
-    if (!pausa() && !quieto && !seguir()) setConsejo((c) => (c + 1) % consejos().length);
+    if (!pausa() && !QUIETO() && !seguir() && paso() === "preparar") setConsejo((c) => (c + 1) % consejos().length);
   }, RITMO_CONSEJOS);
   onCleanup(() => clearInterval(temporizador));
 
   createEffect(
     on(
-      () => lineas().length,
+      () => [lineas().length, vista()],
       () => {
         if (log) log.scrollTop = log.scrollHeight;
       },
@@ -348,24 +396,19 @@ export default function Setup(props: { children: JSX.Element }) {
   createEffect(() => {
     if (cerrada()) setCorriendo(false);
   });
-  const falloOpcional = () => etapas().some((s) => !s.essential && s.state === "failed");
+  const falloOpcional = () =>
+    etapas().some((s) => !s.essential && s.state === "failed" && !reintentos()[s.name]?.enCurso);
+  // Un solo avance para toda la instalación, y nunca hacia atrás dentro de la misma corrida.
   const porcentaje = () => {
     const total = etapas().length;
     if (!total) return 0;
-    const enCurso = corriendo() && !terminado() ? Math.min(parcial(), 0.99) : 0;
-    return Math.round(((hechas() + enCurso) / total) * 100);
+    if (terminado()) return 100;
+    const enCurso = corriendo() ? Math.min(parcial(), 0.99) : 0;
+    const valor = Math.round(((hechas() + enCurso) / total) * 100);
+    if (tope.total !== total) tope = { total, valor };
+    tope.valor = Math.max(tope.valor, valor);
+    return tope.valor;
   };
-  // Saltar el alta necesita un workspace: sin él la app no tiene dónde guardar nada.
-  async function configurarAMano() {
-    setSaltando(true);
-    try {
-      await crearWorkspace(t("onboarding.manual.default_name"));
-      setSeguir(true);
-    } catch (e) {
-      setFallo(prosaDe(e));
-      setSaltando(false);
-    }
-  }
 
   const reparando = () => {
     const fallida = etapas().find((s) => s.essential && s.state === "failed");
@@ -391,6 +434,284 @@ export default function Setup(props: { children: JSX.Element }) {
     if (terminado()) return falloOpcional() ? t("setup.status.partial") : t("setup.status.done");
     return t("setup.status.running", { percent: porcentaje() });
   };
+
+  function detalle(s: Etapa): string {
+    const d = datos()[s.name] ?? {};
+    if (s.state === "running") return d.instala ? t("setup.row.installing") : t("setup.row.checking");
+    if (s.state === "failed") return t("setup.row.failed");
+    if (s.state !== "succeeded") return "";
+    if (s.name === "platform") return d.libre ? t("setup.row.free", { free: d.libre }) : (d.plataforma ?? "");
+    if (!d.version) return t("setup.row.ready");
+    return d.origen === ORIGEN_SISTEMA
+      ? t("setup.row.system", { version: d.version })
+      : t("setup.row.installed", { version: d.version });
+  }
+
+  const fila = (s: Etapa): FilaDeEtapa => {
+    const r = reintentos()[s.name];
+    return {
+      name: s.name,
+      label: nombre(s.name),
+      essential: s.essential,
+      estado: r && !r.enCurso && !r.error ? "succeeded" : s.state,
+      detalle: detalle(s),
+      descripcion: CON_DESCRIPCION.has(s.name) ? t(`setup.optional.about.${s.name}`) : "",
+      reintento: r,
+    };
+  };
+
+  const instalacion = (): Instalacion => {
+    const corre = etapas().find((s) => s.state === "running");
+    const omitidas = etapas().filter((s) => !s.essential && s.state === "failed" && !reintentos()[s.name]).length;
+    const listas = hechas() - omitidas;
+    const titulo = () => {
+      if (!etapas().length) return t("setup.status.checking");
+      if (sinSoporte()) return t("setup.status.unsupported");
+      if (falloEsencial()) return t("setup.status.failed");
+      if (terminado()) return falloOpcional() ? t("setup.simple.essentials_ready") : t("setup.simple.done");
+      if (!corre) return t("setup.status.checking");
+      return datos()[corre.name]?.instala
+        ? t("setup.simple.installing", { name: nombre(corre.name) })
+        : t("setup.simple.checking", { name: nombre(corre.name) });
+    };
+    const subtitulo = () => {
+      if (!etapas().length) return "";
+      if (terminado()) {
+        return omitidas
+          ? t("setup.simple.summary_skipped", { count: listas, skipped: omitidas })
+          : t("setup.simple.summary", { count: listas });
+      }
+      return t("setup.simple.step", { step: Math.min(hechas() + 1, etapas().length), total: etapas().length });
+    };
+    const d = descarga();
+    return {
+      titulo: titulo(),
+      subtitulo: subtitulo(),
+      estado: estado(),
+      porcentaje: porcentaje(),
+      terminado: terminado() && !falloEsencial(),
+      cerrada: cerrada(),
+      corriendo: corriendo(),
+      hechas: hechas(),
+      total: etapas().length,
+      esenciales: etapas().filter((s) => s.essential).map(fila),
+      opcionales: etapas().filter((s) => !s.essential).map(fila),
+      lineas: lineas(),
+      descarga:
+        d && d.total > 0
+          ? t("setup.log.download_live", {
+              file: d.file,
+              done: mb(d.done),
+              total: mb(d.total),
+              percent: Math.round((d.done / d.total) * 100),
+            })
+          : null,
+    };
+  };
+
+  /** Lo opcional que no quedó se instala solo, ya con la corrida terminada. */
+  async function instalarOpcional(name: string) {
+    if (reintentos()[name]?.enCurso) return;
+    setReintentos((r) => ({ ...r, [name]: { enCurso: true } }));
+    agregar([{ tono: "info", texto: t("setup.log.installing_tool", { name: nombre(name) }) }]);
+    try {
+      await invoke<string>("install_base_tool", { tool: name });
+      setReintentos((r) => ({ ...r, [name]: { enCurso: false } }));
+      agregar([{ tono: "ok", texto: t("setup.log.installed_tool", { name: nombre(name) }) }]);
+      const r = await invoke<EnvReport>("check_environment", { force: false }).catch(() => null);
+      if (r) setReporte(r);
+    } catch (e) {
+      const error = prosaDe(e);
+      setReintentos((r) => ({ ...r, [name]: { enCurso: false, error } }));
+      agregar([{ tono: "warn", texto: t("setup.log.optional_failed", { name: nombre(name) }) }]);
+    }
+  }
+
+  /** «Siguiente»: el workspace «Personal» nace aquí, que es de quien cuelgan las cuentas de la IA. */
+  async function aConectar() {
+    if (entrando()) return;
+    setEntrando(true);
+    setFallo(null);
+    try {
+      if (!workspace()) {
+        const w = await crearWorkspace(t("onboarding.workspace.default"));
+        setWorkspace({ id: w.id, nombre: t("onboarding.workspace.default") });
+      }
+      if (!conexiones()) {
+        const { crearConexiones } = await import("../onboarding/connect-store");
+        runWithOwner(dueño, () => setConexiones(crearConexiones()));
+      }
+      setPaso("ia");
+      void conexiones()?.cargar();
+    } catch (e) {
+      setFallo(prosaDe(e));
+    } finally {
+      setEntrando(false);
+    }
+  }
+
+  const alta = () => hayEspacio() === false;
+  const ia = () => paso() === "ia";
+  const conectadas = () => conexiones()?.conectadas() ?? [];
+  const nombres = () => conectadas().map((f) => conexiones()?.nombre(f) ?? f.label);
+
+  const titulo = () => {
+    if (ia()) return t("onboarding.ai.title");
+    if (terminado() && !falloEsencial()) return t("setup.done_title");
+    return t("setup.title");
+  };
+  const lede = () => {
+    if (ia()) return t("onboarding.ai.lede");
+    if (terminado() && !falloEsencial()) return alta() ? t("setup.done_lede") : t("setup.done_lede_app");
+    return t("setup.description");
+  };
+
+  const izquierda = () => (
+    <>
+      <TituloCambiante titulo={titulo()} lede={lede()} />
+      <Show when={fallo() ?? falloDelServicio()}>
+        {(f) => (
+          <div class="mt-6 w-full">
+            <FailureNote f={asFailure(f())} />
+          </div>
+        )}
+      </Show>
+      <div class="mt-auto w-full">
+        <Show
+          when={ia()}
+          fallback={
+            <div
+              class="border-t border-border pt-5"
+              onPointerEnter={() => setPausa(true)}
+              onPointerLeave={() => setPausa(false)}
+              onFocusIn={() => setPausa(true)}
+              onFocusOut={() => setPausa(false)}
+            >
+              <p class="m-0 text-xs text-neutral-500">{t("setup.tips.eyebrow")}</p>
+              <h2 class="m-0 mt-2 mb-1.5 text-base font-display font-bold tracking-[-0.01em] text-neutral-950">
+                {consejos()[consejo()][0]}
+              </h2>
+              <p class="m-0 min-h-[58px] max-w-[42ch] text-[13px] text-neutral-500">{consejos()[consejo()][1]}</p>
+              <div class="mt-2.5 flex gap-1.5">
+                <For each={consejos()}>
+                  {(_, i) => (
+                    <button
+                      type="button"
+                      class={cn(
+                        "size-[9px] cursor-pointer rounded-full outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+                        i() === consejo() ? "bg-primary" : "bg-border-strong",
+                      )}
+                      aria-label={t("setup.tips.go", { number: i() + 1 })}
+                      aria-pressed={i() === consejo()}
+                      onClick={() => setConsejo(i())}
+                    />
+                  )}
+                </For>
+              </div>
+            </div>
+          }
+        >
+          <Suspense>
+          <Show when={conexiones()}>{(c) => <MapaDeConexiones c={c()} />}</Show>
+          <div class="mt-4 border-t border-border pt-4">
+            <Comprobacion
+              filas={[
+                { hecho: true, texto: t("onboarding.check.environment") },
+                {
+                  hecho: conectadas().length > 0,
+                  texto: conectadas().length
+                    ? t("onboarding.check.ai_connected", {
+                        count: conectadas().length,
+                        names: nombres().join(", "),
+                      })
+                    : t("onboarding.check.ai_pending"),
+                },
+                { hecho: false, texto: t("onboarding.check.personalize") },
+              ]}
+            />
+          </div>
+          </Suspense>
+        </Show>
+      </div>
+    </>
+  );
+
+  const CAPA =
+    "absolute inset-0 flex flex-col gap-2.5 transition-[transform,opacity] duration-[420ms] ease-[cubic-bezier(.2,.7,.2,1)] motion-reduce:transition-none";
+
+  const derecha = () => (
+    <div class="relative min-h-0 flex-1">
+      <div class={cn(CAPA, ia() && "pointer-events-none -translate-x-[90px] opacity-0")} inert={ia() || undefined}>
+        <Suspense>
+        <SelectorDeVista class="self-end" vista={vista()} onCambiar={setVista} />
+        {/* Las dos vistas siguen montadas: cambiar de una a otra no pierde el desplazamiento ni la corrida. */}
+        <div class={cn("min-h-0 flex-1 flex-col", vista() === "sencilla" ? "flex" : "hidden")}>
+          <VistaSencilla i={instalacion()} onInstalar={(n) => void instalarOpcional(n)} />
+        </div>
+        <div class={cn("min-h-0 flex-1 flex-col", vista() === "terminal" ? "flex" : "hidden")}>
+          <VistaTerminal i={instalacion()} onInstalar={(n) => void instalarOpcional(n)} ref={(el) => (log = el)} />
+        </div>
+        </Suspense>
+      </div>
+      <Show when={alta()}>
+        <div class={cn(CAPA, !ia() && "pointer-events-none translate-x-[70px] opacity-0")} inert={!ia() || undefined}>
+          <Suspense>
+            <Show when={conexiones()}>{(c) => <PanelDeIA c={c()} />}</Show>
+          </Suspense>
+        </div>
+      </Show>
+    </div>
+  );
+
+  const pie = () => (
+    <footer class="flex flex-wrap items-center gap-2.5 border-t border-border px-5 py-3.5">
+      <Show
+        when={ia()}
+        fallback={
+          <>
+            <p class="m-0 text-xs text-neutral-500">{t("setup.footer")}</p>
+            <span class="flex-1" />
+            {/* Solo lo esencial se reintenta aquí: lo opcional se marca en su fila. */}
+            <Show when={!sinSoporte() && (falloDelServicio() || (!corriendo() && (fallo() || falloEsencial())))}>
+              <Button size="sm" variant="secondary" onClick={() => void empezar()}>
+                {t("setup.retry")}
+              </Button>
+            </Show>
+            <Show when={!falloEsencial() && !sinSoporte()}>
+              <Show when={terminado() && alta() && workspace()}>
+                <Button size="sm" variant="ghost" onClick={() => setPaso("ia")}>
+                  {t("setup.back_to_ai")}
+                </Button>
+              </Show>
+              <Button
+                size="sm"
+                disabled={!terminado() || entrando()}
+                onClick={() => (alta() ? void aConectar() : setSeguir(true))}
+              >
+                {alta() ? t("setup.next.ai") : t("setup.next.app")}
+              </Button>
+            </Show>
+          </>
+        }
+      >
+        <button
+          type="button"
+          class="cursor-pointer border-0 bg-transparent p-0 text-xs text-neutral-500 underline underline-offset-2 hover:text-neutral-950"
+          onClick={() => {
+            setVista("terminal");
+            setPaso("preparar");
+          }}
+        >
+          {t("setup.see_log")}
+        </button>
+        <p class="m-0 text-xs text-neutral-500">{t("onboarding.ai.footer")}</p>
+        <span class="flex-1" />
+        <Button size="sm" disabled={conectadas().length === 0} onClick={() => setPaso("personalizar")}>
+          {t("onboarding.continue")}
+        </Button>
+      </Show>
+    </footer>
+  );
 
   return (
     <Switch
@@ -431,144 +752,25 @@ export default function Setup(props: { children: JSX.Element }) {
       </Match>
       <Match when={mostrar() && !seguir()}>
         <main class="flex h-full flex-col overflow-hidden bg-bg">
-          <header
-            class={cn(
-              "flex shrink-0 items-center gap-5 border-b border-border px-7 text-xs",
-              HEADER_HEIGHT,
-              apartarSemaforo() && TRAFFIC_LIGHT_PADDING,
-            )}
-            data-tauri-drag-region=""
-            onDblClick={toggleMaximizeFromHeader}
+          <CabeceraDelAlta fase={alta() ? (paso() === "personalizar" ? 1 : 0) : undefined} />
+          <Show
+            when={paso() === "personalizar"}
+            fallback={
+              <>
+                <Escenario izquierda={izquierda()} derecha={derecha()} />
+                {pie()}
+              </>
+            }
           >
-            <Show when={hayEspacio() === false}>
-              <Fases actual={0} />
-            </Show>
-            <span class="flex-1 self-stretch" data-tauri-drag-region="" />
-            <Show when={isWindows()}>
-              <ControlesDeVentana />
-            </Show>
-          </header>
-
-          <div class="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] md:grid-cols-[45%_55%] md:grid-rows-[minmax(0,1fr)]">
-            <section class="flex min-h-0 flex-col items-start overflow-y-auto px-10 py-10">
-              <h1 class="m-0 mb-5 max-w-[13ch] text-4xl leading-tight font-display font-bold tracking-[-0.03em] text-neutral-950">
-                {t("setup.title")}
-              </h1>
-              <p class="m-0 max-w-[38ch] text-sm text-neutral-500">{t("setup.description")}</p>
-              <Show when={fallo() ?? falloDelServicio()}>
-                {(f) => (
-                  <div class="mt-6 w-full">
-                    <FailureNote f={asFailure(f())} />
-                  </div>
-                )}
-              </Show>
-
-              <div class="mt-auto w-full border-t border-border pt-6">
-                <p class="m-0 text-xs text-neutral-500">{t("setup.tips.eyebrow")}</p>
-                <h2 class="m-0 mt-3 text-lg font-display font-bold tracking-[-0.01em] text-neutral-950">
-                  {consejos()[consejo()][0]}
-                </h2>
-                <p class="m-0 mt-3 min-h-28 max-w-[40ch] text-sm text-neutral-500">{consejos()[consejo()][1]}</p>
-                <div class="mt-4 flex items-center gap-2">
-                  <div class="flex gap-1.5">
-                    <For each={consejos()}>
-                      {(_, i) => (
-                        <button
-                          type="button"
-                          class={cn(
-                            "size-2.5 rounded-full outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
-                            i() === consejo() ? "bg-primary" : "bg-border-strong",
-                          )}
-                          aria-label={t("setup.tips.go", { number: i() + 1 })}
-                          aria-pressed={i() === consejo()}
-                          onClick={() => setConsejo(i())}
-                        />
-                      )}
-                    </For>
-                  </div>
-                  <span class="flex-1" />
-                  <Button
-                    size="compact"
-                    variant="ghost"
-                    onClick={() => setConsejo((c) => (c + consejos().length - 1) % consejos().length)}
-                  >
-                    {t("setup.tips.previous")}
-                  </Button>
-                  <Button size="compact" variant="ghost" onClick={() => setConsejo((c) => (c + 1) % consejos().length)}>
-                    {t("setup.tips.next")}
-                  </Button>
-                  <Button size="compact" variant="ghost" onClick={() => setPausa((p) => !p)}>
-                    {pausa() ? t("setup.tips.resume") : t("setup.tips.pause")}
-                  </Button>
-                </div>
-              </div>
-            </section>
-
-            <section
-              class="mx-6 mb-6 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg bg-terminal text-terminal-text md:mt-6 md:ml-0"
-              aria-label={t("setup.terminal.title")}
-            >
-              <header class={cn(BARRA_DE_TERMINAL, "px-5 py-3.5")}>
-                <strong class={NOMBRE_DE_TERMINAL}>{t("setup.terminal.title")}</strong>
-                <span class="flex-1" />
-                <Show when={etapas().length > 0}>
-                  <span class="tabular-nums">
-                    {hechas()}/{etapas().length}
-                  </span>
-                </Show>
-              </header>
-              <pre
-                ref={log}
-                role="log"
-                tabindex="0"
-                class={cn(CUERPO_DE_TERMINAL, "flex-1 p-6 leading-6")}
-              >
-                <For each={lineas()}>
-                  {(linea) => (
-                    <div class={COLOR[linea.tono]}>
-                      <span aria-hidden="true">{MARCA[linea.tono]} </span>
-                      {linea.texto}
-                    </div>
-                  )}
-                </For>
-                <Show when={corriendo()}>
-                  <TerminalCursor />
-                </Show>
-              </pre>
-              <footer class="border-t border-terminal-line px-5 py-4 text-xs text-terminal-muted">
-                <span role="status">{estado()}</span>
-                <div class="my-3 h-1.5 overflow-hidden rounded-full bg-terminal-line">
-                  <div
-                    class="h-full bg-terminal-accent transition-[width] duration-300"
-                    style={{ width: `${porcentaje()}%` }}
-                  />
-                </div>
-                {t("setup.terminal.reuse")}
-              </footer>
-            </section>
-          </div>
-
-          <footer class="flex flex-wrap items-center gap-3 border-t border-border px-7 py-5">
-            <p class="m-0 text-xs text-neutral-500">{t("setup.footer")}</p>
-            <span class="flex-1" />
-            {/* Solo lo esencial se reintenta aquí: lo opcional se reintenta solo en el
-                siguiente arranque y a mano en Estado del entorno. */}
-            <Show when={!sinSoporte() && (falloDelServicio() || (!corriendo() && (fallo() || falloEsencial())))}>
-              <Button size="sm" variant="secondary" onClick={() => void empezar()}>
-                {t("setup.retry")}
-              </Button>
-            </Show>
-            <Show when={terminado() && !falloEsencial()}>
-              <Show when={hayEspacio() === false}>
-                <Button size="sm" variant="ghost" disabled={saltando()} onClick={() => void configurarAMano()}>
-                  {t("onboarding.manual.skip")}
-                </Button>
-              </Show>
-              <Button size="sm" disabled={saltando()} onClick={() => setSeguir(true)}>
-                {hayEspacio() === false ? t("setup.next.workspace") : t("setup.next.app")}
-              </Button>
-            </Show>
-          </footer>
+            <Suspense>
+              <Personalizar
+                workspace={workspace()}
+                ia={nombres()}
+                onAtras={() => setPaso("ia")}
+                onListo={() => setSeguir(true)}
+              />
+            </Suspense>
+          </Show>
         </main>
       </Match>
     </Switch>

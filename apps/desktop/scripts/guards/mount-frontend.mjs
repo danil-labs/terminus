@@ -4014,15 +4014,17 @@ if (!roto) {
   assert.deepEqual(codeLinks.fallos, []);
 
   /**
-   * El primer arranque sin workspace: el alta pinta sus pasos en orden, Atrás
-   * conserva lo escrito y volver sin cambiar el nombre no crea otro workspace.
+   * El primer arranque sin workspace: nace «Personal», se conecta una IA por los
+   * eventos de su login, una de clave abre su panel y «Personaliza» renombra en
+   * su sitio antes de entrar a la app.
    */
   let altaActiva = null;
   const altaCreados = [];
-  const altaProyectos = [];
-  const altaUbicaciones = [];
+  const altaRenombres = [];
+  const altaClaves = [];
+  let altaSesion = false;
   const altaEspacios = () => ({
-    workspaces: altaActiva ? [{ id: "n", name: "Norte", context_root: null }] : [],
+    workspaces: altaActiva ? [{ id: "n", name: "Personal", context_root: null }] : [],
     active: altaActiva,
     migrations: [],
   });
@@ -4032,121 +4034,71 @@ if (!roto) {
     workspaces_startup: altaEspacios,
     list_language_packs: [], list_bundled_language_packs: [],
     list_providers: [
-      { id: "codex", label: "Codex", available: true, driver: true, sin_cuenta: false, source: null },
-      { id: "opencode-local", label: "Locales", available: true, driver: true, sin_cuenta: true, source: null },
+      { id: "codex", label: "Codex", available: true, sin_cuenta: false, source: "del sistema", system_broken: false, api_key: null, inferencia: "con_cuenta" },
+      { id: "grok", label: "Grok", available: true, sin_cuenta: false, source: null, system_broken: false, api_key: "https://console.x.ai", inferencia: "con_cuenta" },
     ],
+    list_surfaces: [],
     add_workspace: ({ name }) => { altaCreados.push(name); return { id: "n", name }; },
     set_active_workspace: ({ id }) => { altaActiva = id; },
     set_workspace_language: null,
-    rename_workspace: ({ id, name }) => ({ id, name }),
-    list_accounts: { provider: "codex", env_var: "", shared_credential: null, secret_note: null, active: null, accounts: [] },
-    list_git_hosts: [["github", "GitHub", "#"], ["bitbucket", "Bitbucket", "#"], ["gitlab", "GitLab", "!"]].map(([id, name, prefix]) => ({
-      id, name, fields: [], browser_login: false, select_area: false, setup_url: null, token_label: "Token", token_help: "", token_url: "",
-      login_help: "", area_label: "área", areas_label: "áreas", area_help: "", connected: null, unverified: null,
-      summary: { clave: `providers.${id}.summary` },
-      vocabulary: { change: { clave: `providers.${id}.change` }, change_short: { clave: `providers.${id}.change_short` }, change_prefix: prefix, checks: { clave: `providers.${id}.checks` } },
-    })),
-    "plugin:dialog|open": "/tmp/contexto",
-    set_workspace_source: ({ locator }) => ({ id: "ctx", kind: "folder", name: "contexto", identity: locator, locator }),
-    get_project_directory: "/tmp/terminus",
-    set_project_directory: ({ directory }) => { altaUbicaciones.push(directory); return directory; },
-    list_project_repositories: [],
-    create_project: ({ name }) => { altaProyectos.push(name); return { id: "p1", name, working_directory: "/tmp/terminus/p1" }; },
+    rename_workspace: ({ id, name }) => { altaRenombres.push(name); return { id, name }; },
+    list_accounts: ({ provider: agent }) => ({
+      provider: agent, env_var: "", shared_credential: null, secret_note: null, active: null,
+      accounts: agent === "codex" && altaSesion
+        ? [{ id: "a1", label: "", created_at: 1, identity: "yo@norte.mx", authenticated_at: 2 }]
+        : [],
+    }),
+    add_account: ({ provider: agent }) => ({ id: agent === "codex" ? "a1" : "k1", label: "", created_at: 1, identity: null, authenticated_at: null }),
+    login_account: null,
+    set_api_key: ({ key }) => { altaClaves.push(key); },
+    account_status: ({ id }) => ({ id, authenticated: id === "a1", detail: "" }),
+    set_active_account: () => { altaSesion = true; },
+    discard_account: true,
+    list_git_hosts: [],
+    list_known_mcp: [],
+    list_mcp_providers: [],
+    list_integrations: { workspace: "n", plugins: [] },
   });
   const altaDoc = alta.w.document;
   const altaTitulo = () => altaDoc.querySelector("h1")?.textContent?.trim();
   const altaBoton = (texto) => [...altaDoc.querySelectorAll("button")].find((b) => b.textContent?.trim() === texto);
-  await sleep(150);
-  assert.equal(altaTitulo(), "Elige tus proveedores de IA.", "sin workspace el alta empieza en los proveedores");
-  assert.ok(altaDoc.body.textContent.includes("Modelos locales (OpenCode · llama.cpp)"));
-  assert.ok(altaBoton("Instalar y continuar")?.disabled, "sin proveedores elegidos no se avanza");
-  altaDoc.querySelector('input[type="checkbox"]').click();
-  await sleep(30);
-  altaBoton("Instalar y continuar").click();
+  await sleep(500);
+  assert.equal(altaTitulo(), "Conecta tu IA.", "sin workspace el alta empieza conectando la IA");
+  assert.deepEqual(altaCreados, ["Personal"], "el workspace por omisión se llama Personal");
+  assert.ok(altaDoc.body.textContent.includes("Encontramos en tu computadora"), "lo instalado en el sistema va arriba");
+  assert.ok(altaBoton("Continuar")?.disabled, "sin una IA conectada no se avanza");
+  altaBoton("Conectar").click();
   await sleep(80);
-  assert.equal(altaTitulo(), "Crea tu primer workspace.");
-  const altaNombre = altaDoc.querySelector('input[type="text"]');
+  alta.emit("account", { account: "a1", kind: "done", text: "" });
+  await sleep(150);
+  assert.ok(altaDoc.body.textContent.includes("yo@norte.mx"), altaDoc.body.textContent.slice(0, 800));
+  assert.ok(!altaBoton("Continuar")?.disabled, "con Codex conectado se puede seguir");
+  altaBoton("Conectar").click();
+  await sleep(80);
+  const altaClave = altaDoc.querySelector('input[type="password"]');
+  assert.ok(altaClave, "una IA de clave abre su panel en la tarjeta");
+  altaClave.value = "xai-123456789012";
+  altaClave.dispatchEvent(new alta.w.InputEvent("input", { bubbles: true }));
+  await sleep(20);
+  [...altaDoc.querySelectorAll("button")].filter((b) => b.textContent?.trim() === "Conectar").at(-1).click();
+  await sleep(150);
+  assert.deepEqual(altaClaves, ["xai-123456789012"]);
+  altaBoton("Continuar").click();
+  await sleep(150);
+  assert.equal(altaTitulo(), "Personaliza Terminus.");
+  altaDoc.querySelector('button[aria-label="Renombrar el workspace"]').click();
+  await sleep(30);
+  const altaNombre = altaDoc.querySelector('input[aria-label="Workspace"]');
   altaNombre.value = "Norte";
   altaNombre.dispatchEvent(new alta.w.InputEvent("input", { bubbles: true }));
-  await sleep(20);
-  altaBoton("Crear workspace").click();
+  altaNombre.dispatchEvent(new alta.w.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  await sleep(80);
+  assert.deepEqual(altaRenombres, ["Norte"], "el nombre se cambia en su sitio");
+  altaBoton("Empezar").click();
   await sleep(200);
-  assert.equal(altaTitulo(), "Conecta tus cuentas.", altaDoc.body.textContent.slice(0, 600));
-  altaBoton("Atrás").click();
-  await sleep(80);
-  assert.equal(altaDoc.querySelector('input[type="text"]')?.value, "Norte", "Atrás conserva el nombre");
-  altaBoton("Continuar").click();
-  await sleep(120);
-  assert.deepEqual(altaCreados, ["Norte"], "volver sin cambiar el nombre no crea otro workspace");
-  altaBoton("Continuar").click();
-  await sleep(120);
-  assert.equal(altaTitulo(), "Conecta tus repositorios.");
-  assert.deepEqual(
-    [...altaDoc.querySelectorAll("button[aria-expanded] strong")].map((el) => el.textContent),
-    ["GitHub", "Bitbucket", "GitLab"],
-    "las tarjetas son las que declara el motor",
-  );
-  assert.ok(altaDoc.body.textContent.includes("en gitlab.com o en el GitLab de tu empresa"), "cada tarjeta dice cómo se conecta con la frase del motor");
-  altaDoc.querySelector("button[aria-expanded]")?.click();
-  await sleep(80);
-  assert.ok(
-    altaDoc.querySelector('button[aria-expanded="true"]')?.textContent?.includes("GitHub"),
-    "la tarjeta de GitHub despliega su conexión",
-  );
-  altaBoton("Continuar").click();
-  await sleep(80);
-  assert.equal(altaTitulo(), "Elige tu fuente de contexto principal.");
-  assert.ok(altaBoton("Agregar después"), "sin contexto elegido el botón deja seguir");
-  const altaOpcion = (texto) => [...altaDoc.querySelectorAll("button")].find((b) => b.textContent?.trim().startsWith(texto));
-  assert.ok(!altaOpcion("GitHub") && !altaOpcion("Bitbucket"), "un servicio sin conectar no se ofrece como contexto");
-  assert.ok(!altaOpcion("Empezar vacía"), "la fuente de contexto no crea carpetas");
-  altaOpcion("Explorar carpeta").click();
-  await sleep(80);
-  altaBoton("Usar como contexto principal").click();
-  await sleep(150);
-  assert.equal(altaTitulo(), "Agrega tu primer proyecto.");
-  assert.ok(altaOpcion("Explorar carpeta") && altaOpcion("Empezar vacía"), "el proyecto se elige como en «Añadir un proyecto»");
-  altaOpcion("Empezar vacía").click();
-  await sleep(80);
-  assert.ok(altaDoc.body.textContent.includes("/tmp/terminus"), "enseña la ubicación del workspace");
-  altaBoton("Cambiar…").click();
-  await sleep(80);
-  assert.deepEqual(altaUbicaciones, ["/tmp/contexto"], "la ubicación se cambia desde el alta");
-  const altaProyecto = altaDoc.querySelector('input[type="text"]');
-  altaProyecto.value = "Mi proyecto";
-  altaProyecto.dispatchEvent(new alta.w.InputEvent("input", { bubbles: true }));
-  await sleep(20);
-  altaBoton("Terminar").click();
-  await sleep(200);
-  assert.deepEqual(altaProyectos, ["Mi proyecto"]);
-  assert.ok(!altaDoc.body.textContent.includes("Agrega tu primer proyecto."), "terminar entra a la app");
+  assert.ok(!altaDoc.body.textContent.includes("Personaliza Terminus."), "empezar entra a la app");
+  assert.deepEqual(altaCreados, ["Personal"], "el alta no crea otro workspace");
   assert.deepEqual(alta.fallos, []);
-
-  /** Saltar el alta desde los proveedores crea el workspace por omisión y entra a la app. */
-  let saltoActiva = null;
-  const saltoCreados = [];
-  const saltoEspacios = () => ({
-    workspaces: saltoActiva ? [{ id: "m", name: "Mi workspace", context_root: null }] : [],
-    active: saltoActiva,
-    migrations: [],
-  });
-  const salto = await boot("listo", "alta-manual", {
-    ...RESPUESTAS,
-    list_workspaces: saltoEspacios,
-    workspaces_startup: saltoEspacios,
-    list_language_packs: [], list_bundled_language_packs: [],
-    add_workspace: ({ name }) => { saltoCreados.push(name); return { id: "m", name }; },
-    set_active_workspace: ({ id }) => { saltoActiva = id; },
-    set_workspace_language: null,
-  });
-  await sleep(150);
-  [...salto.w.document.querySelectorAll("button")]
-    .find((b) => b.textContent?.trim() === "Configurar manualmente")
-    ?.click();
-  await sleep(200);
-  assert.deepEqual(saltoCreados, ["Mi workspace"], "configurar a mano crea el workspace por omisión");
-  assert.ok(!salto.w.document.body.textContent.includes("Elige tus proveedores de IA."), "configurar a mano entra a la app");
-  assert.deepEqual(salto.fallos, []);
 
   // Contestar una pregunta viva después de ir a otra tarea y volver.
   //

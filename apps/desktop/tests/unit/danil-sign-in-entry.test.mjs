@@ -1,6 +1,6 @@
 /**
  * Las entradas a la cuenta de Danil fuera de Configuración, contra un motor
- * simulado: el paso del alta en el primer arranque y el pie de la barra
+ * simulado: la sección de «Personaliza» en el primer arranque y el pie de la barra
  * lateral. Monta `dist/`.
  */
 import assert from "node:assert/strict";
@@ -65,49 +65,77 @@ const heading = (w) => w.document.querySelector("h1")?.textContent ?? "";
 const buttons = (w, root = w.document) => [...root.querySelectorAll("button")];
 const button = (w, label, root) => buttons(w, root).find((b) => b.textContent.trim() === label);
 
-test("el alta ofrece iniciar sesión con Danil por el navegador, y «Ahora no» sigue sin bloquear", async () => {
-  const engine = danil({ state: "disconnected", name: "alberto-mbp" });
-  const { w, fallos } = await boot("listo", "danil-onboarding", { ...FIRST_RUN, ...engine.table });
+/** Primer arranque con Codex ya conectado: «Conecta tu IA» deja seguir a «Personaliza». */
+const TO_PERSONALIZE = {
+  ...FIRST_RUN,
+  list_providers: [
+    { id: "codex", label: "Codex", available: true, sin_cuenta: false, source: null, system_broken: false, api_key: null, inferencia: "con_cuenta" },
+  ],
+  list_accounts: {
+    provider: "codex", env_var: "", shared_credential: null, secret_note: null, active: "a1",
+    accounts: [{ id: "a1", label: "", created_at: 1, identity: "yo@norte.mx", authenticated_at: 2 }],
+  },
+  add_workspace: ({ name }) => ({ id: "n", name }),
+  set_active_workspace: null,
+  set_workspace_language: null,
+  list_git_hosts: [],
+  list_known_mcp: [],
+  list_mcp_providers: [],
+  list_integrations: { workspace: "n", plugins: [] },
+};
+
+async function personalize(name, table) {
+  const app = await boot("listo", name, { ...TO_PERSONALIZE, ...table });
   await sleep(800);
-  assert.equal(heading(w), "Inicia sesión con Danil.", w.document.body.textContent);
+  button(app.w, "Continuar").click();
+  await sleep(500);
+  return app;
+}
+
+const step = (w) => w.document.querySelector("[data-danil-onboarding]");
+
+test("«Personaliza» ofrece iniciar sesión con Danil por el navegador, y se puede empezar sin ella", async () => {
+  const engine = danil({ state: "disconnected", name: "alberto-mbp" });
+  const { w, fallos } = await personalize("danil-onboarding", engine.table);
+  assert.equal(heading(w), "Personaliza Terminus.", w.document.body.textContent.slice(0, 600));
+  assert.equal(step(w)?.dataset.danilOnboarding, "disconnected");
+  assert.ok(step(w).textContent.includes("Inicia sesión con Danil."));
   assert.ok(!w.document.body.textContent.includes("Continuar como"), "one-click sign-in stays off");
   assert.ok(!engine.calls.some((c) => c.command === "danil_connect_options"));
-  assert.ok(button(w, "Ahora no"), "the step can be skipped");
 
   button(w, "Iniciar sesión con Danil").click();
   await sleep(300);
   assert.equal(engine.calls.find((c) => c.command === "open_external")?.args?.target, PENDING.verification_uri_complete);
-  const step = () => w.document.querySelector("[data-danil-onboarding]");
-  assert.equal(step()?.dataset.danilOnboarding, "pending");
-  assert.ok(step().textContent.includes("Confirma en el navegador · código WDJB-MJHT"), step().textContent);
-  assert.ok(button(w, "Abrir de nuevo", step()) && button(w, "Cancelar", step()));
+  assert.equal(step(w)?.dataset.danilOnboarding, "pending");
+  assert.ok(step(w).textContent.includes("Confirma en el navegador · código WDJB-MJHT"), step(w).textContent);
+  assert.ok(button(w, "Abrir de nuevo", step(w)) && button(w, "Cancelar", step(w)));
 
-  button(w, "Ahora no").click();
+  button(w, "Empezar").click();
   await sleep(300);
-  assert.equal(heading(w), "Elige tus proveedores de IA.", "skipping goes on to the providers");
+  assert.ok(!w.document.body.textContent.includes("Personaliza Terminus."), "starting does not wait for Danil");
   assert.deepEqual(fallos, []);
 });
 
-test("el alta sigue sola cuando la persona confirma en el navegador", async () => {
+test("la sección de Danil se va sola cuando la persona confirma en el navegador", async () => {
   const engine = danil({ state: "disconnected", name: "alberto-mbp" });
-  const app = await boot("listo", "danil-onboarding-approved", { ...FIRST_RUN, ...engine.table });
-  await sleep(800);
+  const app = await personalize("danil-onboarding-approved", engine.table);
   button(app.w, "Iniciar sesión con Danil").click();
   await sleep(300);
   app.emit("danil-connect", { state: "connected", computer_id: "cmp_1", name: "alberto-mbp", email: "alberto@danil.ai", online: true });
   await sleep(300);
-  assert.equal(heading(app.w), "Elige tus proveedores de IA.");
+  assert.equal(step(app.w), null);
+  assert.equal(heading(app.w), "Personaliza Terminus.");
 });
 
-test("el alta no muestra el paso con la sesión ya iniciada ni con un motor sin el flujo", async () => {
+test("«Personaliza» no ofrece Danil con la sesión ya iniciada ni con un motor sin el flujo", async () => {
   const connected = danil({ state: "connected", computer_id: "cmp_1", name: "Mac", email: "alberto@danil.ai", online: true });
-  const a = await boot("listo", "danil-onboarding-connected", { ...FIRST_RUN, ...connected.table });
-  await sleep(800);
-  assert.equal(heading(a.w), "Elige tus proveedores de IA.");
+  const a = await personalize("danil-onboarding-connected", connected.table);
+  assert.equal(heading(a.w), "Personaliza Terminus.");
+  assert.equal(step(a.w), null);
 
-  const b = await boot("listo", "danil-onboarding-old-engine", { ...FIRST_RUN, danil_connect_status: unknown() });
-  await sleep(800);
-  assert.equal(heading(b.w), "Elige tus proveedores de IA.");
+  const b = await personalize("danil-onboarding-old-engine", { danil_connect_status: unknown() });
+  assert.equal(heading(b.w), "Personaliza Terminus.");
+  assert.equal(step(b.w), null);
 });
 
 test("el pie de la barra lateral dice si hay sesión de Danil y abre su sección", async () => {
