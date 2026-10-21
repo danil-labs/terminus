@@ -27,7 +27,6 @@ import {
   SidebarMenuItem,
 } from "../../ui/sidebar";
 import type { ModelChoices } from "../projects/NewAgent";
-import Appearance from "./Appearance";
 import AIProviders from "./AIProviders";
 import Environment from "./Environment";
 import General from "./General";
@@ -37,8 +36,9 @@ import Providers from "./Providers";
 import Radiant from "./Radiant";
 import Skills from "./Skills";
 import Workspaces from "./Workspaces";
-// Chunk aparte: solo lo carga quien abre la sección.
+// Chunks aparte: solo los carga quien abre la sección.
 const DanilAccount = lazy(() => import("./DanilAccount"));
+const Appearance = lazy(() => import("./Appearance"));
 
 /**
  * Configuración: el contenedor y su navegación.
@@ -127,7 +127,11 @@ const destinosDe = (
       return t("settings.nav.appearance");
     },
     icono: () => <Palette size={15} />,
-    panel: () => <Appearance proyecto={agentes.proyecto} />,
+    panel: () => (
+      <Suspense fallback={null}>
+        <Appearance proyecto={agentes.proyecto} />
+      </Suspense>
+    ),
   },
   {
     id: "entorno",
