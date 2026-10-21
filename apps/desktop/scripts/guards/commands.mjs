@@ -86,6 +86,9 @@ const SIN_INTERFAZ = {
   restore_task_work: "restaurar vivía en el Historial de tareas, que salió de la ventana",
   create_agent_thread: "los temas antiguos se conservan para lectura; las conversaciones nuevas nacen como tareas",
   sources_in_use: "traer material ya no espera a que acabe el turno que lo lee; el motor lo usa para no cambiar de rama bajo un turno",
+  materialize_workspace: "lo pide la web por el relay a la máquina elegida (web/transport.ts); la ventana local abre sus propios workspaces",
+  ensure_project: "lo pide la web por el relay antes de crear una tarea en otra máquina; el motor lo llama solo en send_message y run_shell_command",
+  sync_workspace: "lo llama el conector del motor al recibir workspace.changed del relay",
   // `docs/agents.md` § Estado observable: el comando de agregación existe
   // para que el riel deje de sondear; el riel mismo no está construido.
 };
