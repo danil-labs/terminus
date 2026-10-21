@@ -16,7 +16,7 @@ export type SidebarView = {
 
 export type SidebarGrouping = "none" | "folder" | "status" | "agent";
 export type SidebarDensity = "comfortable" | "compact";
-export type SidebarSection = "needs_you" | "active";
+export type SidebarSection = "active";
 
 export const DEFAULT_SIDEBAR_VIEW: SidebarView = {
   folders: [],
@@ -105,10 +105,6 @@ export function needsYou(state: TaskState | null): boolean {
   return state === "approving" || state === "asked" || state === "failed";
 }
 
-export function sectionOf(task: SidebarTask, ctx: Pick<SidebarContext, "live" | "approving">): SidebarSection {
-  return needsYou(taskPriority(activityOf(task, ctx))) ? "needs_you" : "active";
-}
-
 export function statusKeyOf(task: SidebarTask, ctx: Pick<SidebarContext, "live" | "approving">): SidebarStatusKey {
   return taskPriority(activityOf(task, ctx)) ?? (task.stage === "done" || task.outcome === "delivered" ? "finished" : "idle");
 }
@@ -131,8 +127,9 @@ function groupBy<T extends SidebarTask>(tasks: T[], keyOf: (task: T) => string):
 
 /**
  * Filtra por carpetas y agente y reparte en grupos, conservando el orden de
- * entrada (la más nueva primero). Sin agrupar devuelve siempre las dos
- * secciones; agrupando, solo los grupos con tareas.
+ * entrada (la más nueva primero). Sin agrupar devuelve siempre una sola
+ * sección, con cada tarea en su sitio (la que te necesita lo dice su marca);
+ * agrupando, solo los grupos con tareas.
  */
 export function applySidebarView<T extends SidebarTask>(
   tasks: readonly T[],
@@ -144,13 +141,7 @@ export function applySidebarView<T extends SidebarTask>(
     && (view.folders.length === 0 || view.folders.includes(folderOf(task)))
     && (view.agent === null || task.agent === view.agent));
 
-  const sections = groupBy(visible, (task) => sectionOf(task, ctx));
-  const section = (key: SidebarSection): SidebarGroup<T> => ({
-    kind: "section",
-    key,
-    tasks: pinnedFirst(sections.get(key) ?? []),
-  });
-  if (view.group === "none") return [section("needs_you"), section("active")];
+  if (view.group === "none") return [{ kind: "section", key: "active", tasks: pinnedFirst(visible) }];
 
   let groups: Map<string, T[]>;
   let order: string[];

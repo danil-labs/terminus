@@ -93,7 +93,6 @@
   "shell.sidebar.view.scope_by_folder": "por carpeta",
   "shell.sidebar.view.scope_by_status": "por estado",
   "shell.sidebar.view.scope_by_agent": "por agente",
-  "shell.sidebar.view.section_needs_you": "Te necesitan",
   "shell.sidebar.view.section_active": "Tareas",
   "shell.sidebar.view.status_approving": "Esperan tu aprobación",
   "shell.sidebar.view.status_asked": "Te preguntaron",

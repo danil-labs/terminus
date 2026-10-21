@@ -23,7 +23,7 @@ const NEEDS_YOU = new Set(["approving", "asked", "failed"]);
  * Tareas: el sidebar del escritorio (#151) en el teléfono. Arriba el workspace y
  * sus spaces; debajo, qué se enseña y el único filtro; el dock de agentes; y la
  * lista plana de todas las carpetas (y todas las máquinas), en tarjetas de dos
- * líneas, repartida en «Te necesitan» y «Tareas» o en los grupos del filtro.
+ * líneas, en una sola lista «Tareas» o en los grupos del filtro.
  */
 export default function Tasks() {
   const theme = useTheme();
@@ -60,7 +60,6 @@ export default function Tasks() {
     approving: [...marks.attention].filter(([, s]) => s === "approving").map(([k]) => k),
     folderOf: (row) => row.task.folderKey,
   });
-  const visibleGroups = groups.filter((g) => g.kind !== "section" || g.tasks.length || g.key === "active");
   const agents = (snapshot?.agents ?? []).filter((a) => a.places.some((p) => inSpace(`${p.host}/${p.folder}`)));
   const changed = nonDefaultCount(view);
 
@@ -157,7 +156,7 @@ export default function Tasks() {
           onSeeAll={() => router.push("/agents")}
         />
 
-        {visibleGroups.map((group) => (
+        {groups.map((group) => (
           <View key={`${group.kind}-${group.key}`} style={styles.group}>
             <Text style={[styles.groupTitle, { color: theme.textMuted }]}>{groupLabel(lang, group, (id) => folderName(id) ?? id)}</Text>
             {group.tasks.map(({ task }) => (

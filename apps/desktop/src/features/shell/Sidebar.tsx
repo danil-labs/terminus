@@ -441,8 +441,7 @@ export default function Sidebar(props: {
     const titulo = () => groupLabel(g(), (id) => nombreDe(id) ?? id);
     const proyecto = () => g().kind === "folder" ? props.projects.find((x) => x.id === g().key) : undefined;
     const abierto = () => !!query() || g().kind !== "folder" || !cerrados().includes(g().key);
-    const necesita = () => (g().kind === "section" && g().key === "needs_you")
-      || (g().kind === "status" && ["approving", "asked", "failed"].includes(g().key));
+    const necesita = () => g().kind === "status" && ["approving", "asked", "failed"].includes(g().key);
     return (
       <Show when={g().tasks.length > 0}>
         <section

@@ -11,7 +11,6 @@ import {
   saveSidebarView,
   sidebarViewKey,
   scopeLabel,
-  sectionOf,
   type SidebarTask,
   type SidebarView,
 } from "../../src/lib/sidebarView.ts";
@@ -39,27 +38,7 @@ const idle = { live: [] as string[], approving: [] as string[] };
 const ids = (tasks: SidebarTask[]) => tasks.map((x) => x.id);
 const view = (extra: Partial<SidebarView>): SidebarView => ({ ...DEFAULT_SIDEBAR_VIEW, ...extra });
 
-test("a task needs you when it waits for approval, asked something or failed", () => {
-  assert.equal(sectionOf(task("a"), { live: [], approving: ["a"] }), "needs_you");
-  assert.equal(sectionOf(task("a", { esperando: true }), idle), "needs_you");
-  assert.equal(sectionOf(task("a", { outcome: "failed" }), idle), "needs_you");
-  assert.equal(sectionOf(task("a", { outcome: "failed" }), { live: new Set(["a"]), approving: [] }), "active", "a live turn hides the old failure");
-});
-
-test("finished tasks stay among the tasks; only what needs you moves up", () => {
-  assert.equal(sectionOf(task("a", { outcome: "delivered" }), idle), "active");
-  assert.equal(sectionOf(task("a", { stage: "done" }), idle), "active");
-  assert.equal(sectionOf(task("a", { outcome: "delivered", sin_ver: true }), idle), "active");
-  assert.equal(sectionOf(task("a", { stage: "done" }), { live: ["a"], approving: [] }), "active");
-  assert.equal(sectionOf(task("a"), idle), "active");
-  assert.equal(
-    sectionOf(task("a", { delegated_activity: { aprobando: true, esperando: false, viva: false } }), idle),
-    "needs_you",
-    "delegated activity wins over the row",
-  );
-});
-
-test("without grouping there are always two sections, finished in place, pinned first", () => {
+test("without grouping there is one list: tasks that need you stay in place, pinned first", () => {
   const tasks = [
     task("new"),
     task("asks", { esperando: true }),
@@ -69,9 +48,8 @@ test("without grouping there are always two sections, finished in place, pinned 
     task("chat", { chat_de_agente: true }),
   ];
   const groups = applySidebarView(tasks, DEFAULT_SIDEBAR_VIEW, idle);
-  assert.deepEqual(groups.map((g) => g.key), ["needs_you", "active"]);
-  assert.deepEqual(ids(groups[0].tasks), ["asks"]);
-  assert.deepEqual(ids(groups[1].tasks), ["pinned", "chat", "new", "done"]);
+  assert.deepEqual(groups.map((g) => g.key), ["active"]);
+  assert.deepEqual(ids(groups[0].tasks), ["pinned", "chat", "new", "asks", "done"]);
   assert.deepEqual(ids(applySidebarView([], DEFAULT_SIDEBAR_VIEW, idle)[0].tasks), []);
 });
 
@@ -154,7 +132,7 @@ test("the scope line says what is shown, in the app language", () => {
   assert.equal(scopeLabel(view({ folders: ["f1"], group: "status" }), name), "terminus · por estado");
   assert.equal(scopeLabel(view({ folders: ["f1", "f2"], agent: "ada" }), name), "terminus, web · ada");
   assert.equal(groupLabel({ kind: "folder", key: "", tasks: [] }, name), "Sin carpeta");
-  assert.equal(groupLabel({ kind: "section", key: "needs_you", tasks: [] }, name), "Te necesitan");
+  assert.equal(groupLabel({ kind: "section", key: "active", tasks: [] }, name), "Tareas");
   elegirLengua("en");
   assert.equal(scopeLabel(view({ group: "agent" }), name), "All folders · by agent");
   elegirLengua("es");

@@ -9,7 +9,7 @@ import {
 import { t } from "./i18n.ts";
 import { escribirPref, leerPref } from "./prefs.ts";
 
-// La vista (filtrar, agrupar, secciones) es la misma en el teléfono: vive en `@terminus/tasks`.
+// La vista (filtrar, agrupar) es la misma en el teléfono: vive en `@terminus/tasks`.
 export {
   type SidebarContext,
   type SidebarDensity,
@@ -24,7 +24,6 @@ export {
   applySidebarView,
   isPinned,
   nonDefaultCount,
-  sectionOf,
 } from "@terminus/tasks";
 
 /** La vista se guarda por workspace y espacio, como la tira de pestañas. */
@@ -61,11 +60,8 @@ export function scopeLabel(view: SidebarView, folderName: (id: string) => string
   return parts.join(" · ");
 }
 
-export function sectionLabel(section: SidebarSection): string {
-  switch (section) {
-    case "needs_you": return t("shell.sidebar.view.section_needs_you");
-    default: return t("shell.sidebar.view.section_active");
-  }
+export function sectionLabel(_section: SidebarSection): string {
+  return t("shell.sidebar.view.section_active");
 }
 
 export function statusGroupLabel(key: SidebarStatusKey): string {
