@@ -17,7 +17,7 @@ import {
   cachedAt,
   canAct,
   isManaged,
-  linkedEvent,
+  linkedEvents,
   linkedWorkspaces,
   powerOf,
   requestId,
@@ -112,8 +112,8 @@ export function relayHost(computer: Computer, config: Omit<RelayConfig, "compute
       return () => void listeners.delete(listener);
     },
     onEvents(listener) {
-      // El relay ya no manda eventos de un workspace sin vincular; esto es la segunda red.
-      return relay.onEvents((page: EventsPage) => listener((page.events ?? []).filter((e) => linkedEvent(e, linked)), page.gap === true));
+      // El relay ya no manda eventos de un workspace sin vincular; esto es la segunda red, también por `payload.workspace`.
+      return relay.onEvents((page: EventsPage) => listener(linkedEvents(page.events ?? [], linked), page.gap === true));
     },
     async call<T>(command: AppCommand, workspace: string | null, args: object = {}) {
       allowed(command);

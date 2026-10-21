@@ -50,6 +50,7 @@
     "android": "expo start --android",
     "bridge": "node bridge/bridge.mjs",
     "typecheck": "tsc --noEmit",
+    "test": "node --test scripts/*.test.ts",
     "doctor": "npx -y expo-doctor",
     "computers:fake": "node scripts/fake-computers.mjs",
     "computers:smoke": "node --no-warnings scripts/smoke-computers.ts"

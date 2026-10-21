@@ -17,6 +17,7 @@ Desde `apps/mobile/`:
 npm install
 npm start               # Metro; Expo Go en el teléfono o el simulador
 npm run typecheck       # tsc --noEmit
+npm test                # pruebas en Node de la capa de datos (scripts/*.test.ts)
 npm run doctor          # expo-doctor
 npm run computers:fake  # Danil Computers falso en :8787 (login, plano de control y relay)
 npm run computers:smoke # la capa de datos contra el falso, por HTTP y WebSocket reales

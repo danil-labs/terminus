@@ -14,7 +14,7 @@
  * Of each other computer the panel shows only the workspaces linked to the
  * account (`linked`); the relay already refuses the rest.
  */
-import { linkedAttention, linkedEvent, linkedListing } from "@terminus/computers";
+import { linkedAttention, linkedEvents, linkedListing } from "@terminus/computers";
 
 
 /**
@@ -169,11 +169,7 @@ export class Fleet {
 
   /** The events of `machine` the account may see: none of a workspace not linked there. */
   linkedEvents<E extends { name: string; payload: unknown; workspace?: string | null }>(machine: string, events: E[]): E[] {
-    const linked = this.info(machine)?.linked ?? null;
-    if (!linked) return events;
-    return events
-      .filter((e) => linkedEvent(e, linked) && linkedEvent((isRow(e.payload) ? e.payload : {}) as { workspace?: unknown }, linked))
-      .map((e) => (e.name === "attention" ? { ...e, payload: linkedAttention(e.payload, linked) } : e));
+    return linkedEvents(events, this.info(machine)?.linked ?? null);
   }
 
   /** The args as `machine` understands them; `machines` collects every machine an id in them names. */
