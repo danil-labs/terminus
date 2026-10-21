@@ -17,6 +17,8 @@ import {
   machineCompatibility,
   orderComputers,
   RelaySession,
+  screenProtocols,
+  screenUrl,
   wakes,
 } from "@terminus/computers";
 import { createSignal, For } from "solid-js";
@@ -180,6 +182,10 @@ export function startAccountMachines(target: Target = window) {
       ...previous,
       machineName: (id) => (id === self ? homeName() : transport.fleet.name(id)),
       windowMachine: () => ({ id: self, name: homeName(), local: true }),
+      machineScreen: (id) =>
+        links.some(({ info }) => info.id === id && info.wakes)
+          ? async () => new WebSocket(screenUrl(endpoint, id), screenProtocols((await getToken()).token))
+          : null,
       remoteCreate: (workspace) => {
         const target = transport.createsOn(workspace);
         return target && target.machine !== self ? target : null;

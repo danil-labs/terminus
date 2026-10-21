@@ -43,6 +43,7 @@ export {
   requestId,
   sessionUrl,
 } from "./relay.ts";
+export { type ScreenEnd, SCREEN_SUBPROTOCOL, screenEnd, screenProtocols, screenUrl } from "./screen.ts";
 export {
   type AccountGroup,
   type AccountMember,
