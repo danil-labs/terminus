@@ -219,14 +219,24 @@ const rank = (s: Agent["status"]) => (s === "working" ? 0 : s === "awake" ? 1 : 
 
 /**
  * Junta lo que cada máquina sabe de un mismo workspace, como el panel de la
- * web: las carpetas y tareas de cada una, marcadas con su máquina (sus ids no
- * se parecen entre motores). Los spaces son los de la primera máquina; las
- * carpetas de las demás se ven en todos.
+ * web: las carpetas y tareas de cada una, marcadas con su máquina. Los spaces
+ * son los de todas las máquinas (una VM dormida no tiene por qué tenerlos), uno
+ * por id o, si los ids difieren, por nombre; una carpeta lleva el mismo id en
+ * cada máquina, así que el space la nombra en todas.
  */
 export function mergeSnapshots(parts: HostSnapshot[], tagMachines: (host: string) => { machine: string; on: boolean } | null) {
-  const lead = parts[0];
-  const others = parts.slice(1).flatMap((p) => p.folders.map((f) => f.key));
-  const spaces: Space[] = (lead?.spaces ?? []).map((s) => ({ ...s, folders: [...s.folders.map((f) => `${lead.host}/${f}`), ...others] }));
+  const spaces: MergedSpace[] = [];
+  for (const part of parts) {
+    for (const s of part.spaces) {
+      const folders = s.folders.flatMap((f) => parts.map((p) => `${p.host}/${f}`));
+      const same = spaces.find((m) => Object.values(m.on).includes(s.id) || (!(part.host in m.on) && (m.name ?? "") === (s.name ?? "")));
+      if (!same) spaces.push({ ...s, folders, on: { [part.host]: s.id } });
+      else {
+        same.on[part.host] ??= s.id;
+        same.folders = [...new Set([...same.folders, ...folders])];
+      }
+    }
+  }
   const agents = new Map<string, Agent>();
   const tasks: Task[] = [];
   const live = new Set<string>();
@@ -249,6 +259,15 @@ export function mergeSnapshots(parts: HostSnapshot[], tagMachines: (host: string
   const providers = Object.fromEntries(parts.map((p) => [p.host, p.providers]));
   return { folders: parts.flatMap((p) => p.folders), spaces, agents: [...agents.values()], tasks, live, providers, cachedAt: cached };
 }
+
+/**
+ * Un space del workspace en todas sus máquinas: `id` es el de la primera que lo
+ * tiene y `on`, su id en cada una (el que se le manda a esa máquina).
+ */
+export type MergedSpace = Space & { on: Record<string, string> };
+
+/** Si la tarea va en el space, como `enEscritorio` del escritorio: una sin space resuelto va en todos. */
+export const taskInSpace = (task: { space?: string | null }, space: MergedSpace | null) => !space || !task.space || Object.values(space.on).includes(task.space);
 
 /** La clave de una tarea entre máquinas: el mismo id puede repetirse en dos. */
 export const taskKey = (task: { host: string; id: string }) => `${task.host}/${task.id}`;

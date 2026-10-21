@@ -82,9 +82,15 @@ export type Turn = {
   questions?: Question[] | null;
   /** Rutas en la máquina de lo que la persona adjuntó (las viejas, `entradas/…`). */
   attachments?: string[] | null;
+  /** El turno en su orden: lo que el agente dijo, con las herramientas (`tool` indexa `tools`) donde las usó. */
+  pieces?: TurnPiece[] | null;
+  /** Un `!`: el comando va en `text`. */
+  shell?: { cwd: string; output: string; exit_code: number | null; duration_ms: number; truncated: boolean } | null;
 };
-/** Un paso del turno; `images` son data URLs que produjo la herramienta. */
-export type TurnTool = { name?: string; target?: string | null; images?: string[] };
+/** Un paso del turno; `images` son data URLs que produjo la herramienta. `ok: false` si falló. */
+export type TurnTool = { name?: string; target?: string | null; images?: string[]; ok?: boolean | null };
+/** Un trozo de `Turn.pieces`. */
+export type TurnPiece = { text: string } | { tool: number };
 /** `preview_file` y `attachment_preview`. */
 export type FilePreview = {
   rel: string;

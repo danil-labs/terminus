@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cardOf, cardTask, marksOf } from "../../lib/cards";
-import { taskKey } from "../../lib/engine";
+import { taskInSpace, taskKey } from "../../lib/engine";
 import { lang, t, w } from "../../lib/i18n";
 import { useMachines } from "../../lib/machines";
 import { Notifications } from "../../lib/notifications";
@@ -47,9 +47,9 @@ export default function Tasks() {
     .filter((task) => NEEDS_YOU.has(task.state)).length;
 
   const spaces = snapshot?.spaces ?? [];
-  // Las carpetas se nombran `host/id`: cada máquina tiene sus ids.
+  // Las carpetas se nombran `host/id`; una tarea va en el space que dice su fila, como en el escritorio.
   const inSpace = (key: string) => !space || key.endsWith("/") || space.folders.includes(key);
-  const tasks = (snapshot?.tasks ?? []).filter((task) => inSpace(task.folderKey));
+  const tasks = (snapshot?.tasks ?? []).filter((task) => taskInSpace(task, space));
   const folderName = (key: string) => snapshot?.folders.find((f) => f.key === key)?.name;
   const counts = folderCounts(tasks.map((task) => ({ project: task.folderKey, row: task })));
   // Como el escritorio: de las carpetas elegidas, las que siguen teniendo tareas.
@@ -93,7 +93,7 @@ export default function Tasks() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.spaces}>
             {spaces.map((s) => {
               const active = s.id === space?.id;
-              const folded = active ? null : topState((snapshot?.tasks ?? []).filter((task) => s.folders.includes(task.folderKey)).map((task) => cardOf(task, marks).state));
+              const folded = active ? null : topState((snapshot?.tasks ?? []).filter((task) => task.space && taskInSpace(task, s)).map((task) => cardOf(task, marks).state));
               return (
                 <Pressable
                   key={s.id}
