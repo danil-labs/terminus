@@ -308,6 +308,37 @@ test("signed in, a workspace of the account whose machine is asleep lists with t
   assert.deepEqual(app.fallos, []);
 });
 
+test("a tab of another machine's task never takes every folder's tasks to that machine", async () => {
+  // The inherited session (`connection.json`, no default account): one session, the workspace's account.
+  const inherited = { account: "4", email: "ana@danil.ai", name: "Ana", photo: null, computer_id: "cmp_home", default: true, workspaces: ["w"], status: "connected", online: true };
+  const VM2 = { computer_id: "cmp_vm2", name: "VM 2", state: "offline", provider: "aws-ec2" };
+  const { app, invoke, relayCalls, native } = await open("desktop-account-open-tabs", {
+    computers: [HOME, { ...VM, state: "online" }, VM2],
+    relays: {
+      cmp_vm: { table: remote("Panel", "Tarea de la VM"), state: "online" },
+      // Off and never read: neither the relay nor the window has a copy of it.
+      cmp_vm2: { table: remote("Panel", "Tarea de la VM 2"), state: "offline" },
+    },
+    extra: {
+      danil_sessions: [inherited],
+      danil_workspace_account: { account: "4", email: "ana@danil.ai", signed_in: true, linked: true },
+    },
+  });
+  const ids = (rows) => rows.map((r) => r.id).sort();
+  const before = native("list_live_sessions").length;
+  const rows = await invoke("list_live_sessions", { project: "p1", open: ["t1", "cmp_vm~t1"] });
+  assert.deepEqual(ids(rows), ["cmp_vm~t1", "t1"], "the tab of the VM's task leaves this computer's tasks in the list");
+  assert.deepEqual(native("list_live_sessions").slice(before).map((c) => c.args.open), [["t1"]], "this computer gets its own open tasks");
+  assert.deepEqual(relayCalls("cmp_vm", "list_live_sessions").at(-1)?.args.open, ["t1"], "the VM gets its own, with its ids");
+
+  const late = Symbol("late");
+  const read = await Promise.race([invoke("list_live_sessions", { project: "p1", open: ["cmp_vm2~t9"] }), sleep(4000).then(() => late)]);
+  assert.notEqual(read, late, "a tab of an off machine's task does not wait for it to wake");
+  assert.ok(ids(read).includes("t1"), "and this computer's tasks are still there");
+  assert.deepEqual(relayCalls("cmp_vm2", "send_message"), [], "reading wakes nothing");
+  assert.deepEqual(app.fallos, []);
+});
+
 const SESSION_A = { account: "u_alberto", email: "alberto@danil.ai", name: "Alberto", photo: null, computer_id: "cmp_home", computer_name: "Mi Mac", default: true, workspaces: [], status: "connected", online: true };
 const SESSION_B = { ...SESSION_A, account: "u_fdb", email: "alberto@dondebanco.org", computer_id: "cmp_home_fdb", default: false, workspaces: ["w"] };
 

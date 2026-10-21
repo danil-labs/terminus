@@ -110,6 +110,18 @@ test("two machines show together and each command goes to the machine it names",
   assert.deepEqual(app.fallos, []);
 });
 
+test("a tab of one machine's task leaves the other machines' tasks in every folder", async () => {
+  const { app, invoke, calls } = await open("web-machines-open-tabs", [VM, MAC], {
+    cmp_vm: { table: table("Panel", "Tarea de la VM") },
+    cmp_mac: { table: table("Panel", "Tarea del Mac") },
+  });
+  const rows = await invoke("list_live_sessions", { project: "p1", open: ["cmp_vm~t1"] });
+  assert.deepEqual(rows.map((r) => r.id).sort(), ["cmp_mac~t1", "cmp_vm~t1"], "the open tab does not send the folder's read to its machine alone");
+  assert.deepEqual(calls("cmp_vm", "list_live_sessions").at(-1)?.args.open, ["t1"], "the VM gets its open task with its own id");
+  assert.deepEqual(calls("cmp_mac", "list_live_sessions").at(-1)?.args.open, [], "the Mac gets none of another machine's");
+  assert.deepEqual(app.fallos, []);
+});
+
 test("workspaces join by id alone, never by name, and a project is one row with its machines", async () => {
   const LOGO = "/Users/ana/ws/y/logo.png";
   const PNG = "data:image/png;base64,iVBORw0KGgo=";
