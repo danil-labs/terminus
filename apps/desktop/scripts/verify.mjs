@@ -335,6 +335,12 @@ const steps = [
     root,
   ],
   [
+    "Las fórmulas se pintan y el dinero queda como texto",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/markdown-math.test.ts")],
+    root,
+  ],
+  [
     "El diff numera las líneas donde están",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/diff.test.ts")],
