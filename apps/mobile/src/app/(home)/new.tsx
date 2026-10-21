@@ -7,6 +7,7 @@ import { HostError } from "../../lib/hosts";
 import { t, w } from "../../lib/i18n";
 import { useMachines } from "../../lib/machines";
 import { spaceName, useWorkspaces } from "../../lib/workspaces";
+import { AddFolderSheets, type AddFolderMode } from "../../ui/AddFolder";
 import { Avatar, openTask } from "../../ui/components";
 import { Composer, SelectorChip, type Submission } from "../../ui/Composer";
 import { Icon } from "../../ui/Icon";
@@ -27,13 +28,13 @@ export default function NewTask() {
   const theme = useTheme();
   const params = useLocalSearchParams<{ folder?: string; agent?: string; host?: string }>();
   const { preferred, rememberMachine, tick } = useMachines();
-  const { current, snapshot, space, hostsOfCurrent } = useWorkspaces();
+  const { current, snapshot, space, hostsOfCurrent, reload } = useWorkspaces();
   const [hostId, setHostId] = useState<string | null>(null);
   const [folder, setFolder] = useState<string | null>(null);
   const [agent, setAgent] = useState<string | null>(null);
   const [branch, setBranch] = useState<string | null>(null);
   const [branches, setBranches] = useState<BaseBranches | null>(null);
-  const [picker, setPicker] = useState<"machine" | "folder" | "branch" | "agent" | null>(null);
+  const [picker, setPicker] = useState<"machine" | "folder" | "branch" | "agent" | AddFolderMode | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [waking, setWaking] = useState(false);
 
@@ -69,13 +70,15 @@ export default function NewTask() {
   const selectedBranch = branch ?? branches?.selected ?? null;
   const branchLabel = branches?.branches.find((b) => b.reference === selectedBranch)?.name ?? selectedBranch;
 
+  // Los spaces son de la primera máquina: en otra, el id no significaría nada.
+  const spaceOn = (id: string | undefined) => (id && id === hostsOfCurrent[0]?.id ? (space?.id ?? null) : null);
+
   async function start(s: Submission) {
     if (!host || !workspace || !target) return false;
     setNote(null);
     setWaking(act === "wakes" && power !== "on");
     try {
-      // Los spaces son de la primera máquina: en otra, el id no significaría nada.
-      const spaceId = host.id === hostsOfCurrent[0]?.id ? (space?.id ?? null) : null;
+      const spaceId = spaceOn(host.id);
       const baseRef = branch;
       const id = s.shell
         ? (await runShell(host, workspace, { folder: target.id, session: null, command: s.command, provider: s.provider, model: s.model, effort: s.effort, permissionMode: s.permissionMode, space: spaceId, agent: chosenAgent, baseRef })).session
@@ -121,7 +124,7 @@ export default function NewTask() {
         left={target ? <FolderSquare id={target.key} /> : <Icon name="folder" size={13} color={theme.textMuted} />}
         value={target?.name ?? t("new.folder")}
         muted={!target}
-        onPress={folders.length ? () => setPicker("folder") : undefined}
+        onPress={host && workspace ? () => setPicker("folder") : undefined}
       />
       {branches?.branches.length ? (
         <SelectorChip testID="pick-branch" icon="git-branch" value={branchLabel ?? w("worktrees.base.choose")} onPress={() => setPicker("branch")} />
@@ -192,7 +195,21 @@ export default function NewTask() {
             setPicker(null);
           }} />
         ))}
+        <SheetOption testID="add-folder" icon="plus" label={t("folder.new")} disabled={act === "asleep" || act === "outdated"} onPress={() => setPicker("new-folder")} />
+        <SheetOption testID="add-clone" icon="git-branch" label={t("clone.title")} disabled={act === "asleep" || act === "outdated"} onPress={() => setPicker("clone")} />
       </Sheet>
+      <AddFolderSheets
+        mode={picker === "clone" || picker === "new-folder" ? picker : null}
+        host={host ?? undefined}
+        workspace={workspace}
+        space={spaceOn(host?.id)}
+        onClose={() => setPicker(null)}
+        onDone={(project) => {
+          setFolder(project.id);
+          setPicker(null);
+          void reload();
+        }}
+      />
       <Sheet visible={picker === "branch"} title={w("worktrees.base.from")} onClose={() => setPicker(null)}>
         {branches?.branches.map((b) => (
           <SheetOption key={b.reference} icon="git-branch" label={b.name} detail={b.remote ?? null} selected={b.reference === selectedBranch} onPress={() => {

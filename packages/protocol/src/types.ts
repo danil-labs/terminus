@@ -13,6 +13,20 @@ export type Workspace = { id: string; name: string; provider?: string | null; re
 export type Startup = { workspaces: Workspace[]; active: string | null };
 /** `list_projects`: una carpeta del workspace. */
 export type Project = { id: string; name: string; working_directory?: string | null };
+/**
+ * Evento `project_clone` y respuesta de `project_clone_status`: el clon que pidió
+ * `start_project_clone`. Termina con `done` y `project`, o con `error` (un
+ * `Failure` del motor; `projects.error.clone_cancelled` si se canceló).
+ */
+export type ProjectCloneEvent = {
+  workspace?: string;
+  operation: string;
+  phase: string;
+  percent: number | null;
+  done: boolean;
+  project?: Project;
+  error?: { what?: Frase; detail?: string } | string;
+};
 /** `list_spaces`. */
 export type Space = { id: string; name: string | null; folders: string[] };
 

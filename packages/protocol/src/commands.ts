@@ -41,6 +41,9 @@ export const APP_READS = [
   "tree_show",
   "preview_file",
   "attachment_preview",
+  // Carpeta nueva y clonar en la máquina: dónde quedan y cómo va un clon.
+  "get_project_directory",
+  "project_clone_status",
 ] as const;
 
 export const APP_ACTIONS = [
@@ -66,6 +69,11 @@ export const APP_ACTIONS = [
   "cancel_login",
   "discard_account",
   "remove_account",
+  // «Nueva carpeta» y «Clonar repo» desde la tarea nueva: el clon corre en segundo
+  // plano y avisa con el evento `project_clone`.
+  "create_project",
+  "start_project_clone",
+  "cancel_project_clone",
 ] as const;
 
 export const APP_COMMANDS: readonly AppCommand[] = [...APP_READS, ...APP_ACTIONS];
