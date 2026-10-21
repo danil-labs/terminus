@@ -273,6 +273,31 @@
   --animate-spin-steps: spin 1s steps(8) infinite;
   /* Un giro que se lee continuo con 20 repintados por segundo: el de compilar de Typst. */
   --animate-spin-fluido: spin 1s steps(20) infinite;
+  /* El trazo que corre hacia el centro del mapa mientras se conecta una IA. */
+  --animate-flujo: flujo 0.8s steps(8) infinite;
+  /* La línea de una descarga que no reporta cuánto lleva. */
+  --animate-barrido: barrido 1.6s steps(16) infinite;
+  /* Lo que aparece en su sitio: sube poco y se enciende. */
+  --animate-entrar: entrar 0.35s ease both;
+  @keyframes entrar {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
+  @keyframes flujo {
+    to {
+      stroke-dashoffset: -12;
+    }
+  }
+  @keyframes barrido {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(300%);
+    }
+  }
   @keyframes danil-pulse {
     0%,
     100% {
