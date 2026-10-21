@@ -237,11 +237,30 @@ pub fn request_endpoint(
     command: &str,
     timeout: Duration,
 ) -> Result<(Endpoint, Value)> {
+    request(endpoint_path, command, timeout, true)
+}
+
+/// Lo mismo a un motor de otro contrato, el de la versión anterior tras actualizar:
+/// solo para `status` y `service stop`, que no cambian entre contratos.
+pub fn request_any_contract(
+    endpoint_path: &Path,
+    command: &str,
+    timeout: Duration,
+) -> Result<(Endpoint, Value)> {
+    request(endpoint_path, command, timeout, false)
+}
+
+fn request(
+    endpoint_path: &Path,
+    command: &str,
+    timeout: Duration,
+    same_contract: bool,
+) -> Result<(Endpoint, Value)> {
     let descriptor = private_file(endpoint_path)?;
     let endpoint: Endpoint = serde_json::from_slice(&descriptor.bytes)?;
     if endpoint.version != VERSION
         || endpoint.product != PRODUCT
-        || endpoint.contract != contract()
+        || (same_contract && endpoint.contract != contract())
         || !endpoint.address.ip().is_loopback()
     {
         return Err(Error::new("version_mismatch"));

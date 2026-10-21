@@ -17,8 +17,8 @@ import { Toast, ToastPortal } from "../../ui/Toast";
 import ControlesDeVentana from "./WindowControls";
 
 /**
- * Lo que la ventana enseña antes de tener motor: el traspaso desde 0.2.74 y la
- * salida si el motor no arranca. Rust decide la fase (`launcher.rs`). Mientras
+ * Lo que la ventana enseña antes de tener motor: el traspaso desde 0.2.74, la
+ * espera a que la versión anterior termine sus turnos y la salida si el motor no arranca. Rust decide la fase (`launcher.rs`). Mientras
  * conecta se monta la app: lo que pide al motor espera (`lib/invoke.ts`).
  */
 
@@ -38,6 +38,7 @@ type Fase =
   | { phase: "connecting" }
   | { phase: "ready"; blank_0274?: boolean }
   | Traspaso
+  | { phase: "previous"; tasks: number | null }
   | { phase: "failed"; code: string; log: string; data: string };
 
 const RELEASE_0274 = "https://github.com/danil-labs/terminus/releases/tag/v0.2.74";
@@ -76,6 +77,10 @@ export default function Lanzador(props: { children: JSX.Element }) {
   const traspaso = () => {
     const f = fase();
     return f?.phase === "handoff" ? f : null;
+  };
+  const anterior = () => {
+    const f = fase();
+    return f?.phase === "previous" ? f : null;
   };
   const fallo = () => {
     const f = fase();
@@ -175,6 +180,19 @@ export default function Lanzador(props: { children: JSX.Element }) {
                       </Button>
                     </Show>
                   </div>
+                </>
+              )}
+            </Show>
+            <Show when={anterior()}>
+              {(a) => (
+                <>
+                  <h1 class="m-0 mb-5 max-w-[22ch] text-3xl leading-tight font-display font-bold tracking-[-0.03em] text-neutral-950">
+                    {t("launcher.previous.title")}
+                  </h1>
+                  <p class="m-0 max-w-[60ch] text-sm text-neutral-950" aria-live="polite">
+                    {a().tasks ? t("launcher.step.work.tasks", { count: a().tasks ?? 0 }) : t("launcher.step.work.pending")}
+                  </p>
+                  <p class="m-0 mt-3 max-w-[60ch] text-sm text-neutral-500">{t("launcher.previous.body")}</p>
                 </>
               )}
             </Show>

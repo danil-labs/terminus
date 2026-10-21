@@ -32,5 +32,7 @@
   "launcher.failed.retry": "Retry",
   "launcher.blank_0274": "Terminus 0.2.74 is open on this data and stays blank while this engine works: close it. To go back to 0.2.74, close this window and wait for the engine to finish its tasks and stop (5 minutes without clients).",
   "launcher.failed.reason.adoption_required": "The engine asks to adopt the data again and could not.",
-  "launcher.failed.reason.engine_start_failed": "The engine closed while starting or did not answer in time."
+  "launcher.failed.reason.engine_start_failed": "The engine closed while starting or did not answer in time.",
+  "launcher.previous.title": "Terminus was updated",
+  "launcher.previous.body": "The previous version finishes what it is doing before it lets go of your data; nothing is cut off. Terminus opens on its own as soon as it is done."
 }
