@@ -80,6 +80,7 @@
     "connectors.telegram.file_failed",
     "connectors.telegram.file_too_big",
     "connectors.telegram.unsupported",
+    "danil.error.account_not_found",
     "danil.error.already_connected",
     "danil.error.ambiguous_danil_account",
     "danil.error.email_not_verified",

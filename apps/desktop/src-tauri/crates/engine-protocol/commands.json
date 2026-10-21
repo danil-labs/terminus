@@ -944,7 +944,13 @@
       "kind": "invoke",
       "name": "danil_account_refresh",
       "output": "-> Result < Status , Failure >",
-      "parameters": [],
+      "parameters": [
+        {
+          "key": "account",
+          "name": "account",
+          "type": "Option < String >"
+        }
+      ],
       "path": "danil::danil_account_refresh"
     },
     {
@@ -953,7 +959,13 @@
       "kind": "invoke",
       "name": "danil_account_remove_photo",
       "output": "-> Result < Status , Failure >",
-      "parameters": [],
+      "parameters": [
+        {
+          "key": "account",
+          "name": "account",
+          "type": "Option < String >"
+        }
+      ],
       "path": "danil::danil_account_remove_photo"
     },
     {
@@ -967,6 +979,11 @@
           "key": "image",
           "name": "image",
           "type": "String"
+        },
+        {
+          "key": "account",
+          "name": "account",
+          "type": "Option < String >"
         }
       ],
       "path": "danil::danil_account_set_photo"
@@ -977,7 +994,13 @@
       "kind": "invoke",
       "name": "danil_client_token",
       "output": "-> Result < ClientToken , Failure >",
-      "parameters": [],
+      "parameters": [
+        {
+          "key": "account",
+          "name": "account",
+          "type": "Option < String >"
+        }
+      ],
       "path": "danil::danil_client_token"
     },
     {
@@ -1005,6 +1028,16 @@
           "key": "workspace",
           "name": "workspace",
           "type": "Option < String >"
+        },
+        {
+          "key": "accountHint",
+          "name": "account_hint",
+          "type": "Option < String >"
+        },
+        {
+          "key": "add",
+          "name": "add",
+          "type": "Option < bool >"
         }
       ],
       "path": "danil::danil_connect_start"
@@ -1024,8 +1057,53 @@
       "kind": "invoke",
       "name": "danil_disconnect",
       "output": "-> Result < Status , Failure >",
-      "parameters": [],
+      "parameters": [
+        {
+          "key": "account",
+          "name": "account",
+          "type": "Option < String >"
+        }
+      ],
       "path": "danil::danil_disconnect"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "danil_sessions",
+      "output": "-> Result < Vec < SessionInfo > , Failure >",
+      "parameters": [],
+      "path": "danil::danil_sessions"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "danil_set_default_account",
+      "output": "-> Result < Vec < SessionInfo > , Failure >",
+      "parameters": [
+        {
+          "key": "account",
+          "name": "account",
+          "type": "String"
+        }
+      ],
+      "path": "danil::danil_set_default_account"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "danil_workspace_account",
+      "output": "-> Result < WorkspaceAccountOf , Failure >",
+      "parameters": [
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "danil::danil_workspace_account"
     },
     {
       "async": false,
@@ -1061,6 +1139,26 @@
         }
       ],
       "path": "danil::danil_workspace_link_status"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "danil_workspace_set_account",
+      "output": "-> Result < WorkspaceAccountOf , Failure >",
+      "parameters": [
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "Option < String >"
+        },
+        {
+          "key": "account",
+          "name": "account",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "danil::danil_workspace_set_account"
     },
     {
       "async": false,
@@ -6545,6 +6643,7 @@
     "cli-open-task",
     "close-tab",
     "danil-connect",
+    "danil-sessions",
     "integrations-changed",
     "keep-awake-changed",
     "kn-cloud",

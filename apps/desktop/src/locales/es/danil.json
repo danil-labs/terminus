@@ -36,7 +36,7 @@
   "danil.account.your_account": "Tu cuenta de Danil",
   "danil.account.online": "En línea con Danil.",
   "danil.account.offline": "Sin conexión con Danil por ahora.",
-  "danil.error.already_connected": "Esta computadora ya tiene una sesión de Danil. Cierra sesión antes de entrar con otra cuenta.",
+  "danil.error.already_connected": "Ya hay una sesión de Danil con esa cuenta en esta computadora.",
   "danil.error.workspace_missing": "Ese workspace ya no existe.",
   "danil.error.radiant_session_required": "Ese workspace ya no tiene sesión de Radiant. Inicia sesión con el navegador.",
   "danil.error.no_danil_account": "Ese correo no tiene cuenta de Danil. Inicia sesión con otra cuenta en el navegador.",
@@ -72,5 +72,7 @@
   "danil.error.project_not_here": "Ese proyecto es una carpeta de otra máquina y no tiene remoto: sus tareas solo corren ahí.",
   "danil.error.workspace_exists": "Esta máquina ya tiene un workspace con ese id.",
   "danil.error.invalid_workspace_id": "Ese id de workspace no es válido.",
-  "danil.error.workspace_not_found": "Ese workspace no está en tu cuenta de Danil."
+  "danil.error.workspace_not_found": "Ese workspace no está en tu cuenta de Danil.",
+  "danil.error.account_not_found": "Esa cuenta ya no tiene sesión en esta computadora. Vuelve a iniciar sesión con ella.",
+  "danil.error.workspace_id_taken": "Este workspace sigue siendo de la otra cuenta. Inicia sesión con esa cuenta en esta computadora para moverlo."
 }
