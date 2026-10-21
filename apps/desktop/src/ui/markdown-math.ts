@@ -7,7 +7,6 @@
  * lo sigue un dígito, y si no cierra no hay fórmula. «cuesta $5 y luego $10»
  * queda como texto. `\[` solo abre al principio de una línea.
  */
-import katex, { type KatexOptions } from "katex";
 import type { Extension as ExtensionMdast } from "mdast-util-from-markdown";
 import { mathFromMarkdown } from "mdast-util-math";
 import { math } from "micromark-extension-math";
@@ -279,24 +278,4 @@ export function remarkMatematicas(this: { data(): unknown }) {
   (datos.micromarkExtensions ??= []).push(EXTENSION_MICROMARK);
   (datos.fromMarkdownExtensions ??= []).push(mathFromMarkdown(), EXTENSION_MDAST);
   return (arbol: unknown) => formulasEnSuLinea(arbol as Nodo);
-}
-
-/** Sin `trust` no hay `\href`, `\url` ni `\html…`; los topes frenan una fórmula que crece sin fin. */
-export const OPCIONES_KATEX = {
-  throwOnError: true,
-  trust: false,
-  strict: "ignore",
-  maxSize: 20,
-  maxExpand: 1000,
-} as const satisfies KatexOptions;
-
-/** Pinta `tex` dentro de `destino` y devuelve el error de KaTeX, o `null` si se pudo. */
-export function pintarFormula(tex: string, bloque: boolean, destino: HTMLElement): string | null {
-  try {
-    katex.render(tex, destino, { ...OPCIONES_KATEX, displayMode: bloque });
-    return null;
-  } catch (e) {
-    destino.textContent = "";
-    return (e as Error).message;
-  }
 }

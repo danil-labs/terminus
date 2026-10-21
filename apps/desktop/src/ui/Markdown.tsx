@@ -1,7 +1,6 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import Check from "lucide-solid/icons/check";
 import Copy from "lucide-solid/icons/copy";
-import "katex/dist/katex.min.css";
 import TriangleAlert from "lucide-solid/icons/triangle-alert";
 import remarkGfm from "remark-gfm";
 import {
@@ -31,7 +30,7 @@ import { BordeDeColumna, MarkdownTable } from "./MarkdownTable";
 import { MermaidDiagram } from "./Mermaid";
 import { partidorDeBloques } from "./markdown-blocks";
 import { textoDelBloque } from "./markdown-code";
-import { pintarFormula, remarkMatematicas } from "./markdown-math";
+import { remarkMatematicas } from "./markdown-math";
 import { ITEM_DE_MENU, Popover, PopoverContent, PopoverTrigger } from "./Popover";
 
 /**
@@ -386,14 +385,27 @@ function diagramaMermaid(pre: MarkdownNode): string | null {
   return textoDe(code);
 }
 
-// Mientras la fórmula está a medio escribir, o si no es LaTeX válido, se ve su texto.
+type ModuloKatex = typeof import("./markdown-katex");
+let katexCargado: ModuloKatex | undefined;
+let cargaKatex: Promise<ModuloKatex> | undefined;
+const cargarKatex = () =>
+  (cargaKatex ??= Promise.all([import("./markdown-katex"), import("katex/dist/katex.min.css")]).then(
+    ([modulo]) => (katexCargado = modulo),
+  ));
+
+// Mientras KaTeX carga, la fórmula está a medio escribir o no es LaTeX válido, se ve su texto.
 function Formula(props: { tex: string; bloque: boolean }) {
+  const [katex, setKatex] = createSignal(katexCargado);
   const [fallo, setFallo] = createSignal<string | null>(null);
   let caja!: HTMLSpanElement;
-  createEffect(() => setFallo(pintarFormula(props.tex, props.bloque, caja)));
+  if (!katexCargado) void cargarKatex().then((modulo) => setKatex(() => modulo));
+  createEffect(() => {
+    const modulo = katex();
+    setFallo(modulo ? modulo.pintarFormula(props.tex, props.bloque, caja) : "");
+  });
   const crudo = (
     <code
-      title={fallo() ?? undefined}
+      title={fallo() || undefined}
       class={cn(
         "rounded-sm bg-neutral-950/[0.06] px-1 py-0.5 font-mono text-[0.86em] text-neutral-700",
         props.bloque && "block whitespace-pre-wrap p-3",

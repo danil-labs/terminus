@@ -44,5 +44,6 @@ final del mensaje, como un bloque de código, y se ve crudo mientras no sea
 LaTeX válido.
 
 El CSS y las fuentes de KaTeX salen del paquete `katex` y viajan dentro de
-`dist/`: la ventana no pide nada a la red. El color sigue al texto, así que
+`dist/`: la ventana no pide nada a la red. KaTeX y su CSS van en un trozo
+aparte (`markdown-katex.ts`) que se carga con la primera fórmula. El color sigue al texto, así que
 el tema claro y el oscuro no necesitan reglas propias.

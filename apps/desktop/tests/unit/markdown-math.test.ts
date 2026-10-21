@@ -3,7 +3,8 @@ import test from "node:test";
 import { JSDOM } from "jsdom";
 import { fromMarkdown } from "mdast-util-from-markdown";
 
-const { remarkMatematicas, pintarFormula, OPCIONES_KATEX } = await import("../../src/ui/markdown-math.ts");
+const { remarkMatematicas } = await import("../../src/ui/markdown-math.ts");
+const { pintarFormula, OPCIONES_KATEX } = await import("../../src/ui/markdown-katex.ts");
 const { bloquesDeMarkdown } = await import("../../src/ui/markdown-blocks.ts");
 const katex = (await import("katex")).default;
 
