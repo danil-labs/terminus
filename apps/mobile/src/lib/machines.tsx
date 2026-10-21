@@ -133,8 +133,6 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
         endpoint: COMPUTERS,
         getToken: account.getToken,
         onUnauthorized: () => void account.unauthorized(),
-        // Ya no se comparte con esta cuenta: se vuelve a listar, sin reintentar la sesión.
-        onUnlinked: () => void reloadComputers(),
         // Fijar, archivar o cerrar una sesión no son intenciones del relay: la VM se enciende por aquí.
         wake: async () => (await startComputer(COMPUTERS, await account.getToken(), computer.computer_id)).kind === "ok",
         beforeReconnect: async () => {
@@ -182,7 +180,7 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
       for (const off of unsubscribe) off();
       for (const host of next) host.close();
     };
-  }, [computers, pairing, signedIn, account.getToken, account.unauthorized, reloadComputers]);
+  }, [computers, pairing, signedIn, account.getToken, account.unauthorized]);
 
   const pair = useCallback(async (next: Pairing | null) => {
     await savePairing(next);

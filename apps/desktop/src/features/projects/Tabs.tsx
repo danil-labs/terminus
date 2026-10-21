@@ -242,7 +242,8 @@ export default function TabStrip(props: {
       }}
       // La pestaña activa toca el borde inferior para fundirse con su panel bajo el velo.
       // flex-1 separaría el botón de añadir de la última pestaña.
-      class="group/strip relative flex min-w-0 items-end gap-0.5 self-stretch overflow-x-auto overflow-y-hidden overscroll-x-contain px-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      // Con touchpad en Windows, el rebote elástico al tope desplaza el texto sin el fondo de la pestaña.
+      class="group/strip relative flex min-w-0 items-end gap-0.5 self-stretch overflow-x-auto overflow-y-hidden overscroll-x-none px-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       <For each={props.tabs}>
         {(p, i) => {

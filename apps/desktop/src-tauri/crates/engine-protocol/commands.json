@@ -171,6 +171,11 @@
           "key": "remote",
           "name": "remote",
           "type": "Option < String >"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "Option < String >"
         }
       ],
       "path": "workspaces::add_workspace"
@@ -537,7 +542,7 @@
       "channel": null,
       "kind": "invoke",
       "name": "chat_background",
-      "output": "-> Result < ChatBackground , crate :: util :: Failure >",
+      "output": "-> Result < Option < ChatBackground > , crate :: util :: Failure >",
       "parameters": [],
       "path": "handlers::chat_background"
     },
@@ -680,6 +685,11 @@
         {
           "key": "space",
           "name": "space",
+          "type": "Option < String >"
+        },
+        {
+          "key": "id",
+          "name": "id",
           "type": "Option < String >"
         },
         {
@@ -899,6 +909,11 @@
           "key": "space",
           "name": "space",
           "type": "Option < String >"
+        },
+        {
+          "key": "id",
+          "name": "id",
+          "type": "Option < String >"
         }
       ],
       "path": "projects::create_project"
@@ -1022,7 +1037,7 @@
         {
           "key": "mode",
           "name": "mode",
-          "type": "String"
+          "type": "Option < String >"
         },
         {
           "key": "workspace",
@@ -1031,36 +1046,6 @@
         }
       ],
       "path": "danil::danil_workspace_link"
-    },
-    {
-      "async": false,
-      "channel": null,
-      "kind": "invoke",
-      "name": "danil_workspace_link_cancel",
-      "output": "-> Result < WorkspaceLinkStatus , Failure >",
-      "parameters": [
-        {
-          "key": "workspace",
-          "name": "workspace",
-          "type": "Option < String >"
-        }
-      ],
-      "path": "danil::danil_workspace_link_cancel"
-    },
-    {
-      "async": false,
-      "channel": null,
-      "kind": "invoke",
-      "name": "danil_workspace_link_start",
-      "output": "-> Result < LinkStart , Failure >",
-      "parameters": [
-        {
-          "key": "workspace",
-          "name": "workspace",
-          "type": "Option < String >"
-        }
-      ],
-      "path": "danil::danil_workspace_link_start"
     },
     {
       "async": false,
@@ -1355,6 +1340,21 @@
       "output": "-> Result < Liberado , String >",
       "parameters": [],
       "path": "storage::empty_build_cache"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "ensure_project",
+      "output": "-> Result < Project , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        }
+      ],
+      "path": "projects::ensure_project"
     },
     {
       "async": false,
@@ -2589,6 +2589,21 @@
         }
       ],
       "path": "attention::mark_task_seen"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "materialize_workspace",
+      "output": "-> Result < crate :: wire :: Wire < crate :: workspaces :: Workspace > , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "danil::materialize_workspace"
     },
     {
       "async": false,
@@ -5377,6 +5392,21 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "sync_workspace",
+      "output": "-> Result < crate :: wire :: Wire < crate :: workspaces :: Workspace > , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "danil::sync_workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "task_blockers",
       "output": "-> Result < Blockers , Failure >",
       "parameters": [
@@ -6445,7 +6475,6 @@
     "cli-open-task",
     "close-tab",
     "danil-connect",
-    "danil-workspace-link",
     "integrations-changed",
     "keep-awake-changed",
     "kn-cloud",

@@ -1,6 +1,5 @@
 import { createSignal } from "solid-js";
 import { createPref } from "./prefs.ts";
-import { invoke } from "./invoke.ts";
 import {
   fondoDe,
   VELO_DE_FONDO,
@@ -20,13 +19,17 @@ import {
  */
 const [guardado, setGuardado] = createPref<string>("chat-background", "dusk");
 const [rutaPropia, setRutaPropia] = createPref<string | null>("chat-background-custom", null);
+/** El workspace donde el motor copió `rutaPropia`: la copia de otro no se pinta ni se manda. `null`, de antes de los fondos por workspace. */
+const [rutaDelWorkspace, setRutaDelWorkspace] = createPref<string | null>("chat-background-custom-workspace", null);
 const [veloGuardado, setVeloGuardado] = createPref<number>("chat-background-veil", VELO_DE_FONDO);
 const [veloDePestanasGuardado, setVeloDePestanasGuardado] = createPref<number>("tabs-veil", VELO_DE_PESTANAS);
 const [veloDePanelesGuardado, setVeloDePanelesGuardado] = createPref<number>("panels-veil", VELO_DE_PANELES);
 /** La imagen propia del workspace abierto, como `data:` URI, tal como la devuelve su motor. */
 const [imagenDelWorkspace, setImagenDelWorkspace] = createSignal<string | null>(null);
+/** El workspace abierto, según la última lectura de su fondo; `null` hasta la primera. */
+const [workspaceAbierto, setWorkspaceAbierto] = createSignal<string | null>(null);
 
-export { imagenDelWorkspace, setImagenDelWorkspace };
+export { imagenDelWorkspace, setImagenDelWorkspace, workspaceAbierto, setWorkspaceAbierto };
 
 function acotarVeloDePestanas(valor: unknown): number {
   return typeof valor === "number" && Number.isFinite(valor)
@@ -79,30 +82,31 @@ export function elegirVeloDeFondo(valor: number): number {
 
 export function fondoDeChat(): FondoDeChat {
   const fondo = fondoDe(guardado());
-  return fondo === "propia" && !rutaPropia() && !imagenDelWorkspace() ? "dusk" : fondo;
-}
-
-/** Al arrancar: la imagen elegida antes de que el motor la recordara llega a la máquina, y de ahí a cada workspace sin fondo propio. */
-export function sincronizarFondoConElMotor() {
-  const ruta = rutaPropia();
-  if (ruta && fondoDeChat() === "propia") void invoke("choose_chat_background", { path: ruta }).catch(() => {});
+  return fondo === "propia" && !fondoPropio() && !imagenDelWorkspace() ? "dusk" : fondo;
 }
 
 export function elegirFondoDeChat(id: string): FondoDeChat {
   const siguiente = fondoDe(id);
-  setGuardado(siguiente === "propia" && !rutaPropia() && !imagenDelWorkspace() ? "dusk" : siguiente);
+  setGuardado(siguiente === "propia" && !fondoPropio() && !imagenDelWorkspace() ? "dusk" : siguiente);
   return fondoDeChat();
 }
 
-/** La imagen propia, si se subió alguna. Vive en disco; aquí solo su ruta. */
+/** La copia de la imagen propia del workspace abierto, si se subió ahí. Vive en disco; aquí solo su ruta. */
 export function fondoPropio(): string | null {
-  return rutaPropia();
+  return rutaDelWorkspace() === workspaceAbierto() ? rutaPropia() : null;
 }
 
-/** La copia que hizo el motor de la imagen elegida, o `null` para quitarla. */
+/** La copia que hizo el motor de la imagen elegida, en el workspace abierto, o `null` para quitarla. */
 export function ponerFondoPropio(copia: string | null): FondoDeChat {
   setRutaPropia(copia);
+  setRutaDelWorkspace(copia ? workspaceAbierto() : null);
   setImagenDelWorkspace(null);
   setGuardado(copia ? "propia" : "dusk");
   return fondoDeChat();
+}
+
+/** La copia guardada aquí ya no vale (es de otro workspace, o el motor ya no la tiene). */
+export function olvidarFondoPropio() {
+  setRutaPropia(null);
+  setRutaDelWorkspace(null);
 }

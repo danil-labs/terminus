@@ -15,6 +15,7 @@ import {
   INTENT_COMMANDS,
   WAKE_TIMEOUT,
   cachedAt,
+  callWorkspace,
   canAct,
   isManaged,
   linkedEvents,
@@ -46,8 +47,6 @@ export type Host = {
   readonly managed: boolean;
   /** Los workspaces vinculados a la cuenta en esta máquina; `null` es que no se filtra (el bridge, un plano de control anterior). */
   readonly linked: ReadonlySet<string> | null;
-  /** Una computadora de otra persona con workspaces vinculados a esta cuenta: lo de la máquina (cuentas de IA) no es suyo. */
-  readonly member: boolean;
   power(): Power;
   /** Si una acción se puede mandar ya, enciende la máquina, no tiene cómo o su motor está desactualizado. */
   canAct(): "now" | "wakes" | "asleep" | "outdated";
@@ -104,7 +103,6 @@ export function relayHost(computer: Computer, config: Omit<RelayConfig, "compute
     kind: "computer",
     managed: isManaged(computer),
     linked,
-    member: computer.role === "member",
     power: () => powerOf(state()),
     canAct: () => canAct(computer, state()),
     onChange(listener) {
@@ -126,7 +124,8 @@ export function relayHost(computer: Computer, config: Omit<RelayConfig, "compute
       // Una acción que el relay no enciende por su cuenta: la VM se enciende antes por el plano de control.
       if (WAKES_FIRST.has(command)) await host.wake();
       try {
-        const { value, cached } = await relay.call(requestId(), command, workspace, null, args, intent ? WAKE_TIMEOUT : CALL_TIMEOUT);
+        // Con el workspace que nombran los argumentos: el relay rechaza (`workspace_mismatch`) uno distinto.
+        const { value, cached } = await relay.call(requestId(), command, callWorkspace(workspace, args as Record<string, unknown>), null, args, intent ? WAKE_TIMEOUT : CALL_TIMEOUT);
         return { value: value as T, cachedAt: cachedAt(cached) };
       } catch (error) {
         if (error instanceof HostError) throw error;
@@ -228,7 +227,6 @@ export function bridgeHost(pairing: Pairing, label: string): Host {
     kind: "bridge",
     managed: false,
     linked: null,
-    member: false,
     power: () => (online ? "on" : "off"),
     canAct: () => (online ? "now" : "asleep"),
     onChange(listener) {

@@ -344,6 +344,7 @@
     "settings.appearance.background.not_imported",
     "settings.appearance.background.save_failed",
     "settings.appearance.background.too_big",
+    "settings.appearance.background.workspace_missing",
     "settings.integrations.error_busy",
     "settings.integrations.error_check",
     "settings.integrations.error_install",

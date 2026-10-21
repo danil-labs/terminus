@@ -24,7 +24,7 @@ class FakeSocket implements SocketLike {
   sent: Record<string, unknown>[] = [];
   onopen: ((ev: unknown) => void) | null = null;
   onmessage: ((ev: { data: unknown }) => void) | null = null;
-  onclose: ((ev: { code: number; reason?: string }) => void) | null = null;
+  onclose: ((ev: { code: number }) => void) | null = null;
   onerror: ((ev: unknown) => void) | null = null;
   url: string;
   protocols?: string[];
@@ -43,9 +43,9 @@ class FakeSocket implements SocketLike {
   receive(message: object) {
     this.onmessage?.({ data: JSON.stringify(message) });
   }
-  close(code = 1000, reason = "") {
+  close(code = 1000) {
     this.readyState = 3;
-    this.onclose?.({ code, reason });
+    this.onclose?.({ code });
   }
 }
 
@@ -94,24 +94,6 @@ test("una llamada pendiente se reenvía con el mismo id al reconectar, y `cached
   assert.deepEqual(result.value, [1]);
   assert.equal(cachedAt(result.cached), Date.parse("2026-10-19T10:00:00Z"));
   relay.close();
-});
-
-test("4003 `unlinked` cierra la sesión sin pedir otra vez la cuenta ni reconectar", async () => {
-  FakeSocket.all = [];
-  let unlinked = 0;
-  let unauthorized = 0;
-  const relay = new RelaySession(
-    { endpoint: "https://computers.example", computerId: "cmp_a", getToken: () => "jwt", onUnlinked: () => unlinked++, onUnauthorized: () => unauthorized++ },
-    (url, protocols) => new FakeSocket(url, protocols),
-  );
-  relay.start();
-  await tick();
-  FakeSocket.all[0].open();
-  FakeSocket.all[0].close(4003, "unlinked");
-  await new Promise((r) => setTimeout(r, 700));
-  assert.equal(unlinked, 1);
-  assert.equal(unauthorized, 0);
-  assert.equal(FakeSocket.all.length, 1, "no reconnection");
 });
 
 test("un error del relay rechaza con su código", async () => {

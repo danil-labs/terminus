@@ -2,7 +2,7 @@ import { type AccountGroup, groupAccounts, usageTone, windowLabel, windowLeft } 
 import type { AccountLimits, AiAccount, LoginEvent, ProviderInfo, UsageWindow } from "@terminus/protocol";
 import * as Clipboard from "expo-clipboard";
 import * as WebBrowser from "expo-web-browser";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { accountsOf, addAccount, beginLogin, cancelLogin, limitsOf, signOutAccount, submitLoginCode } from "../lib/engine";
 import { type Host, HostError } from "../lib/hosts";
@@ -28,10 +28,7 @@ type Login = { host: Host; provider: ProviderInfo; id: string | null; url: strin
  */
 export default function Accounts() {
   const theme = useTheme();
-  const machines = useMachines();
-  const { subscribe, tick } = machines;
-  // Las cuentas de IA son de la máquina: en una computadora compartida solo por un workspace no se ven.
-  const hosts = useMemo(() => machines.hosts.filter((h) => !h.member), [machines.hosts]);
+  const { hosts, subscribe, tick } = useMachines();
   const [data, setData] = useState<ProviderAccounts[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [pick, setPick] = useState<{ provider: ProviderInfo; exclude: string[] } | null>(null);

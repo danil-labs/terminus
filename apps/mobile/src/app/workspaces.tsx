@@ -16,6 +16,19 @@ import { useTheme } from "../ui/theme";
 const NEEDS_YOU = new Set<AttentionState>(["approving", "asked", "failed"]);
 
 /**
+ * La raíz de la web de escritorio: la que fijó la compilación
+ * (`EXPO_PUBLIC_TERMINUS_WEB_BASE`, `web-mobile.mjs`); sin ella, lo que hay
+ * antes de `/m` en la ruta, con o sin barra final.
+ */
+function desktopBase(): string {
+  const built = process.env.EXPO_PUBLIC_TERMINUS_WEB_BASE?.trim();
+  if (built) return built.endsWith("/") ? built : `${built}/`;
+  const path = window.location.pathname;
+  const at = path.search(new RegExp(`/${MOBILE_WEB_DIR}(/|$)`));
+  return at >= 0 ? `${path.slice(0, at)}/` : "/";
+}
+
+/**
  * La columna de workspaces del escritorio, como hoja: cada workspace con lo que
  * espera en él, las máquinas de la persona con su estado (encendida, apagada,
  * encendiéndose: nunca un error), la cuenta y la conexión de desarrollo.
@@ -66,7 +79,7 @@ export default function WorkspaceSwitcher() {
           subtitle={`${power(host)} · ${host.kind === "bridge" ? t("signin.dev_bridge") : host.managed ? t("machines.managed") : t("machines.own")}`}
         />
       ))}
-      {hosts.some((h) => !h.member) ? (
+      {hosts.length ? (
         <Row
           testID="open-accounts"
           left={<Icon name="key-round" size={20} color={theme.textMuted} />}
@@ -109,7 +122,7 @@ export default function WorkspaceSwitcher() {
           style={[styles.button, { borderColor: theme.border }]}
           onPress={() => {
             localStorage.setItem(WEB_LAYOUT_KEY, "desktop");
-            window.location.assign(`${window.location.pathname.split(`/${MOBILE_WEB_DIR}/`)[0]}/`);
+            window.location.assign(desktopBase());
           }}
         >
           <Text style={{ color: theme.text }}>{t("web.desktop_layout")}</Text>

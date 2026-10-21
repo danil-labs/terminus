@@ -16,11 +16,8 @@
 import { linkedAttention, linkedEvents, linkedListing } from "@terminus/computers";
 import { mergeAttention } from "@terminus/protocol";
 
-/**
- * `outdated`: its engine speaks another contract, known before asking it anything. `linked`: `null` shows every workspace.
- * `member`: another person's computer that shares only some workspaces; what belongs to the machine (AI accounts) is not shown.
- */
-export type MachineInfo = { id: string; name: string; wakes: boolean; outdated?: boolean; linked?: ReadonlySet<string> | null; member?: boolean };
+/** `outdated`: its engine speaks another contract, known before asking it anything. `linked`: `null` shows every workspace. */
+export type MachineInfo = { id: string; name: string; wakes: boolean; outdated?: boolean; linked?: ReadonlySet<string> | null };
 export type MachineStatus = "online" | "offline" | "starting" | "outdated";
 
 type Row = Record<string, unknown>;
@@ -181,6 +178,20 @@ export class Fleet {
   canRun(machine: string, workspace: string | null, project: unknown): boolean {
     const place = this.projectOf(workspace, project);
     return !place || place.remote || place.machines.has(machine);
+  }
+
+  /**
+   * The workspaces linked to the account on `machine` as a later `GET /v1/computers` says: what it answers next is
+   * filtered by them. True if they changed.
+   */
+  relink(machine: string, linked: ReadonlySet<string> | null): boolean {
+    const m = this.info(machine);
+    if (!m) return false;
+    const before = m.linked ?? null;
+    const same = before === linked || (before !== null && linked !== null && before.size === linked.size && [...linked].every((id) => before.has(id)));
+    if (same) return false;
+    m.linked = linked;
+    return true;
   }
 
   /** What `machine` answered, without the workspaces not linked to the account there. */

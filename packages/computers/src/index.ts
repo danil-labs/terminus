@@ -14,7 +14,7 @@ export {
   wakes,
 } from "./machine.ts";
 export { type WorkspaceGroup, type WorkspaceRow, groupWorkspaces } from "./fleet.ts";
-export { hasLinkedWorkspaces, linkedAttention, linkedEvent, linkedEvents, linkedListing, linkedWorkspaces, onlyLinked } from "./links.ts";
+export { callWorkspace, hasLinkedWorkspaces, linkedAttention, linkedEvent, linkedEvents, linkedListing, linkedWorkspaces, onlyLinked } from "./links.ts";
 export { type Compatibility, machineCompatibility } from "./compatibility.ts";
 export {
   type Cached,
