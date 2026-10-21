@@ -1,4 +1,4 @@
-import { hasLinkedWorkspaces } from "@terminus/computers";
+import { hasAccountWorkspaces, hasLinkedWorkspaces, listWorkspaces } from "@terminus/computers";
 import { type JSX, Match, onMount, Show, Switch, createSignal } from "solid-js";
 import { t } from "../lib/i18n";
 import { Button } from "../ui/Button";
@@ -13,6 +13,13 @@ export async function computersOf(endpoint: string, session: Session): Promise<A
   const answer = await listComputers(endpoint, await session.getToken());
   if (answer.kind !== "unauthorized" || !(await session.unauthorized())) return answer;
   return listComputers(endpoint, await session.getToken());
+}
+
+/** Whether the account registry has a workspace (of `computer`, if given); a control plane without it says no. */
+async function accountHasWorkspaces(endpoint: string, session: Session, computer?: string): Promise<boolean> {
+  const answer = await listWorkspaces(endpoint, await session.getToken()).catch(() => null);
+  if (answer?.kind !== "ok") return false;
+  return hasAccountWorkspaces(computer ? answer.value.filter((w) => w.computers.includes(computer)) : answer.value);
 }
 
 /**
@@ -33,11 +40,12 @@ export function Gate(props: { session: Session; endpoint: string; initial?: Gate
     if (asked) {
       const one = computers.find((c) => c.computer_id === asked);
       if (!one) return setView({ t: "not_yours" });
-      return hasLinkedWorkspaces([one]) ? props.onOpen?.([one]) : setView({ t: "no_workspaces" });
+      const any = hasLinkedWorkspaces([one]) || (await accountHasWorkspaces(props.endpoint, props.session, asked));
+      return any ? props.onOpen?.([one]) : setView({ t: "no_workspaces" });
     }
     if (computers.length === 0) return setView({ t: "none" });
-    // Each computer shows only the workspaces linked to the account: with none, the app would be empty.
-    if (!hasLinkedWorkspaces(computers)) return setView({ t: "no_workspaces" });
+    // Each computer shows only the workspaces linked to the account: with none there nor in the account, the app would be empty.
+    if (!hasLinkedWorkspaces(computers) && !(await accountHasWorkspaces(props.endpoint, props.session))) return setView({ t: "no_workspaces" });
     props.onOpen?.(computers);
   }
 

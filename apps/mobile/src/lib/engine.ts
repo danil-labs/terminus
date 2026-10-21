@@ -35,7 +35,7 @@ import type {
   WorkspaceAttention,
 } from "@terminus/protocol";
 import { MAX_VISUAL_BYTES, VISUAL_FILE, VISUAL_TREE } from "@terminus/chat/visual";
-import { linkedAttention, onlyLinked } from "@terminus/computers";
+import { type AccountWorkspace, groupWorkspaces, linkedAttention, onlyLinked, registryProjects, withRegistry } from "@terminus/computers";
 import { type ChatBackgroundView, chatBackgroundView, isSingleAttention } from "@terminus/protocol";
 import { type FlatRow, flattenTasks } from "@terminus/tasks";
 import { type Host, HostError } from "./hosts.ts";
@@ -96,11 +96,56 @@ async function read<T>(host: Host, command: Parameters<Host["call"]>[0], workspa
   }
 }
 
-/** Los workspaces de una máquina; apagada y sin copia, ninguno. */
-export async function workspacesOf(host: Host): Promise<{ list: Workspace[]; cachedAt: number | null }> {
+/** Los workspaces de una máquina; apagada y sin copia, `null`: no dijo cuáles tiene. */
+export async function workspacesOf(host: Host): Promise<{ list: Workspace[] | null; cachedAt: number | null }> {
   const at = { cachedAt: null as number | null };
   const startup = await read<Startup | null>(host, "list_workspaces", null, {}, null, at);
-  return { list: onlyLinked(startup?.workspaces ?? [], host.linked), cachedAt: at.cachedAt };
+  return { list: startup ? onlyLinked(startup.workspaces ?? [], host.linked) : null, cachedAt: at.cachedAt };
+}
+
+/**
+ * Un workspace, quizá en varias máquinas: el mismo si su id es igual
+ * (`groupWorkspaces`, la regla de la web). `members`, su id en cada máquina,
+ * que es el mismo.
+ */
+export type WorkspaceEntry = { id: string; name: string; members: Map<string, string>; hosts: string[] };
+
+/**
+ * Los workspaces de la persona: lo que listan sus máquinas más el registro de
+ * la cuenta (`GET /v1/workspaces`), que trae los de máquinas dormidas. Una
+ * máquina que contestó manda sobre el registro; sin registro, lo de antes.
+ */
+export function workspaceEntries(hosts: readonly { id: string }[], perHost: Record<string, Workspace[] | null>, registry: readonly AccountWorkspace[] | null): WorkspaceEntry[] {
+  const order = hosts.map((h) => h.id);
+  const answered = new Set(order.filter((id) => perHost[id] != null));
+  const groups = groupWorkspaces(hosts.map((h) => ({ machine: h.id, rows: perHost[h.id] ?? [] })));
+  return withRegistry(groups, registry, order, answered, (w): Workspace => ({ id: w.id, name: w.name })).map((g) => ({
+    id: g.key,
+    name: g.row.name ?? g.key,
+    members: g.members,
+    hosts: [...g.members.keys()],
+  }));
+}
+
+/**
+ * Las carpetas del registro que ninguna máquina listó (sus máquinas duermen y
+ * el relay no tiene copia): en la máquina donde nació, si es del workspace, o
+ * en la primera que lo tiene. Una tarea nueva ahí enciende esa máquina.
+ */
+export function withAccountFolders<S extends { folders: Folder[]; spaces: Space[] }>(
+  snapshot: S,
+  registry: readonly AccountWorkspace[] | null,
+  workspace: string,
+  members: readonly string[],
+): S {
+  const known = new Set(snapshot.folders.map((f) => f.id));
+  const extra = registryProjects(registry, workspace, known).flatMap((p): Folder[] => {
+    const host = p.home_computer_id && members.includes(p.home_computer_id) ? p.home_computer_id : members[0];
+    return host ? [{ id: p.id, name: p.name, working_directory: null, key: `${host}/${p.id}`, host }] : [];
+  });
+  if (!extra.length) return snapshot;
+  const keys = extra.map((f) => f.key);
+  return { ...snapshot, folders: [...snapshot.folders, ...extra], spaces: snapshot.spaces.map((s) => ({ ...s, folders: [...s.folders, ...keys] })) };
 }
 
 /** El fondo de los chats del workspace en esa máquina; sin respuesta, ninguno. */
@@ -174,14 +219,24 @@ const rank = (s: Agent["status"]) => (s === "working" ? 0 : s === "awake" ? 1 : 
 
 /**
  * Junta lo que cada máquina sabe de un mismo workspace, como el panel de la
- * web: las carpetas y tareas de cada una, marcadas con su máquina (sus ids no
- * se parecen entre motores). Los spaces son los de la primera máquina; las
- * carpetas de las demás se ven en todos.
+ * web: las carpetas y tareas de cada una, marcadas con su máquina. Los spaces
+ * son los de todas las máquinas (una VM dormida no tiene por qué tenerlos), uno
+ * por id o, si los ids difieren, por nombre; una carpeta lleva el mismo id en
+ * cada máquina, así que el space la nombra en todas.
  */
 export function mergeSnapshots(parts: HostSnapshot[], tagMachines: (host: string) => { machine: string; on: boolean } | null) {
-  const lead = parts[0];
-  const others = parts.slice(1).flatMap((p) => p.folders.map((f) => f.key));
-  const spaces: Space[] = (lead?.spaces ?? []).map((s) => ({ ...s, folders: [...s.folders.map((f) => `${lead.host}/${f}`), ...others] }));
+  const spaces: MergedSpace[] = [];
+  for (const part of parts) {
+    for (const s of part.spaces) {
+      const folders = s.folders.flatMap((f) => parts.map((p) => `${p.host}/${f}`));
+      const same = spaces.find((m) => Object.values(m.on).includes(s.id) || (!(part.host in m.on) && (m.name ?? "") === (s.name ?? "")));
+      if (!same) spaces.push({ ...s, folders, on: { [part.host]: s.id } });
+      else {
+        same.on[part.host] ??= s.id;
+        same.folders = [...new Set([...same.folders, ...folders])];
+      }
+    }
+  }
   const agents = new Map<string, Agent>();
   const tasks: Task[] = [];
   const live = new Set<string>();
@@ -204,6 +259,15 @@ export function mergeSnapshots(parts: HostSnapshot[], tagMachines: (host: string
   const providers = Object.fromEntries(parts.map((p) => [p.host, p.providers]));
   return { folders: parts.flatMap((p) => p.folders), spaces, agents: [...agents.values()], tasks, live, providers, cachedAt: cached };
 }
+
+/**
+ * Un space del workspace en todas sus máquinas: `id` es el de la primera que lo
+ * tiene y `on`, su id en cada una (el que se le manda a esa máquina).
+ */
+export type MergedSpace = Space & { on: Record<string, string> };
+
+/** Si la tarea va en el space, como `enEscritorio` del escritorio: una sin space resuelto va en todos. */
+export const taskInSpace = (task: { space?: string | null }, space: MergedSpace | null) => !space || !task.space || Object.values(space.on).includes(task.space);
 
 /** La clave de una tarea entre máquinas: el mismo id puede repetirse en dos. */
 export const taskKey = (task: { host: string; id: string }) => `${task.host}/${task.id}`;

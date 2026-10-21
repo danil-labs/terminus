@@ -19,6 +19,7 @@ import {
   taskDefaults,
 } from "../../../../../lib/engine";
 import { HostError } from "../../../../../lib/hosts";
+import { type Line, type LivePiece, type StepRow, applyLive, bareCommand, fileName, linesOfLive, linesOfTurn } from "../../../../../lib/steps";
 import { t, w } from "../../../../../lib/i18n";
 import { useMachines } from "../../../../../lib/machines";
 import { useWorkspaces } from "../../../../../lib/workspaces";
@@ -26,36 +27,27 @@ import { Attachments, MessageBody, toolImages } from "../../../../../ui/chat/Mes
 import { ChatScopeContext } from "../../../../../ui/chat/scope";
 import { Composer, type Submission } from "../../../../../ui/Composer";
 import { type Theme, useTheme } from "../../../../../ui/theme";
-import { Icon } from "../../../../../ui/Icon";
+import { Icon, type IconName } from "../../../../../ui/Icon";
 import { KeyboardScreen } from "../../../../../ui/KeyboardScreen";
 
 /** Kinds that change what the task reports: pending requests or whether it runs. */
 const REFRESH = new Set(["permission", "started", "done", "presence"]);
 
-type Line = { key: string; role: string; text: string; tools: number; images: string[]; attachments: string[] };
-
-const sameList = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
-const sameLine = (a: Line, b: Line) =>
-  a.key === b.key && a.role === b.role && a.text === b.text && a.tools === b.tools && sameList(a.images, b.images) && sameList(a.attachments, b.attachments);
+const sameLine = (a: Line, b: Line) => JSON.stringify(a) === JSON.stringify(b);
 
 /**
- * Las líneas de la conversación. Cada lectura trae turnos nuevos aunque no
+ * Las líneas de la conversación: por turno, sus avances, sus pasos y su
+ * respuesta (`linesOfTurn`). Cada lectura trae turnos nuevos aunque no
  * cambien: una línea igual a la anterior se reutiliza, con sus mismos arreglos
  * de imágenes, para que `MessageBody` (memo) no vuelva a pintarse.
  */
 function linesOf(turns: Turn[], previous: ReadonlyMap<string, Line>): Line[] {
-  return turns.map((turn, i) => {
-    const line: Line = {
-      key: turn.id ?? String(i),
-      role: turn.role,
-      text: turn.text ?? "",
-      tools: turn.tools?.length ?? 0,
-      images: toolImages(turn.tools),
-      attachments: turn.attachments ?? [],
-    };
-    const old = previous.get(line.key);
-    return old && sameLine(old, line) ? old : line;
-  });
+  return turns.flatMap((turn, i) =>
+    linesOfTurn(turn, turn.id ?? String(i), toolImages(turn.tools)).map((line) => {
+      const old = previous.get(line.key);
+      return old && sameLine(old, line) ? old : line;
+    }),
+  );
 }
 
 /**
@@ -72,7 +64,7 @@ export default function TaskScreen() {
   const host = hostOf(params.host);
   const { snapshot } = useWorkspaces();
   const [view, setView] = useState<TaskView | null>(null);
-  const [streaming, setStreaming] = useState("");
+  const [live, setLive] = useState<readonly LivePiece[]>([]);
   const [note, setNote] = useState<string | null>(null);
   const [waking, setWaking] = useState(false);
   const [background, setBackground] = useState<ChatBackgroundView | null>(null);
@@ -95,7 +87,7 @@ export default function TaskScreen() {
     if (!host) return;
     const next = await loadTask(host, workspace, folder, id);
     setView(next);
-    setStreaming("");
+    setLive([]);
   }, [host, workspace, folder, id]);
 
   useEffect(() => {
@@ -136,7 +128,7 @@ export default function TaskScreen() {
             void refresh().catch(fail);
             continue;
           }
-          if (chat.kind === "delta") setStreaming((text) => (chat.starts_message ? chat.text : text + chat.text));
+          if (chat.kind === "delta" || chat.kind === "tool" || chat.kind === "tool_done") setLive((now) => applyLive(now, chat));
           if (chat.kind === "done") {
             void refresh()
               .then(() => host && markSeen(host, workspace, id))
@@ -199,7 +191,9 @@ export default function TaskScreen() {
   const cachedNote =
     view?.cachedAt && host ? t("machines.cached", { name: host.label, time: new Date(view.cachedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }) : null;
   const title = (view?.session.turns.find((turn) => turn.role === "user")?.text ?? "").split("\n")[0];
-  const lastAgent = [...lines].reverse().find((line) => line.role !== "user" && line.role !== "system" && line.role !== "shell")?.key;
+  const lastAgent = [...lines].reverse().find((line) => line.kind === "message" && line.role !== "user" && line.role !== "system" && line.role !== "shell")?.key;
+  const liveLines = useMemo(() => linesOfLive(live), [live]);
+  const streaming = liveLines.some((line) => line.key === "live");
   const scope = useMemo(() => (host ? { host, hostId: params.host, workspace, folder, session: id } : null), [host, params.host, workspace, folder, id]);
   // Una respuesta rápida se manda como un mensaje, con el proveedor y el modelo con que sigue la tarea.
   // Estable entre lecturas (lee la vista y `submit` del último render), para que el memo de `MessageBody` se sostenga.
@@ -233,11 +227,13 @@ export default function TaskScreen() {
         keyExtractor={(line) => line.key}
         contentContainerStyle={styles.list}
         onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
-        renderItem={({ item }) => <Bubble line={item} theme={theme} onQuickReply={item.key === lastAgent && !running && !asleep ? quickReply : undefined} />}
+        renderItem={({ item }) => <Row line={item} theme={theme} onQuickReply={item.key === lastAgent && !running && !asleep ? quickReply : undefined} />}
         ListHeaderComponent={cachedNote ? <Text style={[styles.banner, { color: theme.textMuted, backgroundColor: theme.muted }]}>{cachedNote}</Text> : undefined}
         ListFooterComponent={
           <View style={styles.footer}>
-            {streaming ? <Bubble line={{ key: "live", role: "agent", text: streaming, tools: 0, images: [], attachments: [] }} theme={theme} streaming /> : null}
+            {liveLines.map((line) => (
+              <Row key={line.key} line={line} theme={theme} streaming={line.key === "live"} />
+            ))}
             {running && !streaming ? <Text style={{ color: theme.textMuted }}>{t("state.working")}…</Text> : null}
             {waking && host ? <Text style={{ color: theme.textMuted }}>{w("shell.machines.waking", { name: host.label })}</Text> : null}
             {asleep && host ? (
@@ -291,12 +287,27 @@ function ChatBackdrop({ background, theme }: { background: ChatBackgroundView | 
   );
 }
 
-function Bubble({ line, theme, streaming, onQuickReply }: { line: Line; theme: Theme; streaming?: boolean; onQuickReply?: (prompt: string) => Promise<boolean> }) {
+const MONO = Platform.select({ ios: "Menlo", default: "monospace" });
+
+function Row({ line, theme, streaming, onQuickReply }: { line: Line; theme: Theme; streaming?: boolean; onQuickReply?: (prompt: string) => Promise<boolean> }) {
+  if (line.kind === "steps") return <Steps rows={line.rows} theme={theme} />;
+  if (line.kind === "progress")
+    return (
+      <View style={styles.progress}>
+        <Text selectable style={{ color: theme.textMuted, fontSize: 14, lineHeight: 20 }}>
+          {line.text}
+        </Text>
+      </View>
+    );
+  if (line.kind === "shell") return <ShellRun command={line.command} output={line.output} exitCode={line.exitCode} theme={theme} />;
+  return <Bubble line={line} theme={theme} streaming={streaming} onQuickReply={onQuickReply} />;
+}
+
+function Bubble({ line, theme, streaming, onQuickReply }: { line: Extract<Line, { kind: "message" }>; theme: Theme; streaming?: boolean; onQuickReply?: (prompt: string) => Promise<boolean> }) {
   const mine = line.role === "user";
   const system = line.role === "system";
   const shell = line.role === "shell";
-  const steps = line.tools;
-  if (!line.text && !steps && !line.images.length && !line.attachments.length) return null;
+  if (!line.text && !line.images.length && !line.attachments.length) return null;
   // Como en la ventana: lo de la persona va en globo; la respuesta del agente, sin globo y a todo el ancho.
   const agent = !mine && !system && !shell;
   return (
@@ -315,16 +326,91 @@ function Bubble({ line, theme, streaming, onQuickReply }: { line: Line; theme: T
       {line.attachments.length ? <Attachments paths={line.attachments} /> : null}
       {/* Lo que escribe la persona y la salida de un `!` van tal cual; lo del agente, con su markdown. */}
       {line.text && (mine || system || shell) ? (
-        <Text
-          selectable
-          style={{ color: system ? theme.textMuted : theme.text, fontSize: shell ? 13 : 15, lineHeight: 21, fontFamily: shell ? Platform.select({ ios: "Menlo", default: "monospace" }) : undefined }}
-        >
+        <Text selectable style={{ color: system ? theme.textMuted : theme.text, fontSize: shell ? 13 : 15, lineHeight: 21, fontFamily: shell ? MONO : undefined }}>
           {line.text}
         </Text>
       ) : line.text || line.images.length ? (
         <MessageBody text={line.text} streaming={streaming} images={line.images} onQuickReply={onQuickReply} />
       ) : null}
-      {steps ? <Text style={{ color: theme.textMuted, fontSize: 12, marginTop: 4 }}>{t("task.tools", { count: steps })}</Text> : null}
+    </View>
+  );
+}
+
+const STEP_ICON: Record<StepRow["kind"], IconName> = { read: "file", search: "sparkles", edit: "square-pen", run: "terminal", web: "external-link", plan: "list-checks", other: "sparkles" };
+/** Las filas que se ven de entrada; las de antes se abren con un toque. */
+const SHOWN_ROWS = 4;
+
+/** La cabecera de una fila, como `resumen` del escritorio: el verbo se lee, el sujeto va en mono. */
+function rowLabel(row: StepRow): { verb: string; subject: string | null } {
+  const n = row.steps.length;
+  const target = row.steps[0].target;
+  switch (row.kind) {
+    case "read":
+      return n === 1 ? { verb: w("common.steps.read.one"), subject: target && fileName(target) } : { verb: w("common.steps.read.many", { count: n }), subject: null };
+    case "search":
+      return n === 1 ? { verb: w("common.steps.search.one"), subject: target } : { verb: w("common.steps.search.many", { count: n }), subject: null };
+    case "edit": {
+      const files = new Set(row.steps.map((s, i) => s.target ?? `#${i}`)).size;
+      return n === 1 ? { verb: w("common.steps.edit.one"), subject: target && fileName(target) } : { verb: w("common.steps.edit.many", { count: files }), subject: null };
+    }
+    case "run":
+      return { verb: w("common.steps.run"), subject: target && bareCommand(target).split("\n")[0] };
+    case "web":
+      return n === 1 ? { verb: w("common.steps.web.one"), subject: target } : { verb: w("common.steps.web.many", { count: n }), subject: null };
+    case "plan":
+      return { verb: n === 1 ? w("common.steps.plan.one") : w("common.steps.plan.many", { count: n }), subject: null };
+    default:
+      return n === 1 ? { verb: w("common.steps.other.one", { tool: row.steps[0].name }), subject: target } : { verb: w("common.steps.other.many", { count: n }), subject: null };
+  }
+}
+
+/** Lo que el agente hizo: una fila por acto, con qué y sobre qué; las más viejas, plegadas. */
+function Steps({ rows, theme }: { rows: StepRow[]; theme: Theme }) {
+  const [open, setOpen] = useState(false);
+  const hidden = open ? 0 : Math.max(0, rows.length - SHOWN_ROWS);
+  return (
+    <View style={styles.steps}>
+      {hidden ? (
+        <Pressable onPress={() => setOpen(true)} hitSlop={6} style={styles.stepRow}>
+          <Icon name="chevron-right" size={14} color={theme.textMuted} />
+          <Text style={{ color: theme.textMuted, fontSize: 13 }}>{t("task.more_steps", { count: hidden })}</Text>
+        </Pressable>
+      ) : null}
+      {rows.slice(hidden).map((row, i) => {
+        const { verb, subject } = rowLabel(row);
+        const failed = row.steps.some((s) => s.ok === false);
+        const running = row.steps.some((s) => s.running);
+        const color = failed ? theme.error : theme.textMuted;
+        return (
+          <View key={i} style={styles.stepRow}>
+            <Icon name={STEP_ICON[row.kind]} size={14} color={color} />
+            <Text numberOfLines={1} style={{ flexShrink: 1, color, fontSize: 13 }}>
+              {verb}
+              {subject ? <Text style={{ fontFamily: MONO, fontSize: 12 }}>{` ${subject}`}</Text> : null}
+              {running ? "…" : ""}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Un `!` de la persona: el comando y lo que imprimió, como en la ventana. */
+function ShellRun({ command, output, exitCode, theme }: { command: string; output: string; exitCode: number | null; theme: Theme }) {
+  const failed = exitCode !== null && exitCode !== 0;
+  return (
+    <View style={[styles.bubble, { alignSelf: "stretch", backgroundColor: theme.surface, borderColor: theme.border }]}>
+      <Text selectable style={{ color: theme.text, fontFamily: MONO, fontSize: 13 }}>
+        {`$ ${command}`}
+      </Text>
+      {output ? (
+        <ScrollView horizontal style={{ marginTop: 6 }}>
+          <Text selectable style={{ color: failed ? theme.error : theme.textMuted, fontFamily: MONO, fontSize: 12, lineHeight: 17 }}>
+            {output.trimEnd()}
+          </Text>
+        </ScrollView>
+      ) : null}
     </View>
   );
 }
@@ -413,8 +499,11 @@ const styles = StyleSheet.create({
   pending: { flexGrow: 0, maxHeight: "55%", paddingHorizontal: 12, paddingBottom: 8 },
   bubble: { maxWidth: "92%", borderRadius: 14, padding: 10, borderWidth: StyleSheet.hairlineWidth },
   reply: { alignSelf: "stretch", paddingHorizontal: 4, paddingVertical: 2 },
+  progress: { alignSelf: "stretch", paddingHorizontal: 4 },
+  steps: { alignSelf: "stretch", gap: 4, paddingHorizontal: 4, paddingVertical: 2 },
+  stepRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   card: { borderWidth: 1, borderRadius: 14, padding: 12, gap: 10 },
-  code: { fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }), fontSize: 13, padding: 8, borderRadius: 8 },
+  code: { fontFamily: MONO, fontSize: 13, padding: 8, borderRadius: 8 },
   actions: { flexDirection: "row", justifyContent: "flex-end", gap: 8 },
   action: { borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
   option: { borderWidth: 1, borderRadius: 10, padding: 10 },

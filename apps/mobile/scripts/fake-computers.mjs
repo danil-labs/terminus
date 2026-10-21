@@ -2,7 +2,7 @@
 /**
  * Un Danil Computers falso para probar la app sin la sesión de nadie:
  * el login de Supabase (`/auth/v1/token`), el plano de control
- * (`/v1/computers`, `/start`) y el relay (`/v1/computers/:id/session`, protocolo
+ * (`/v1/computers`, `/start`, `/v1/workspaces`) y el relay (`/v1/computers/:id/session`, protocolo
  * v1 con espejo), sobre HTTP y WebSocket reales en localhost.
  *
  *   node apps/mobile/scripts/fake-computers.mjs [--port 8787] [--mac-off] [--license]
@@ -476,6 +476,23 @@ const server = createServer((request, response) => {
   if (url.pathname === "/auth/v1/logout") return json(response, 204, {});
   if (request.headers.authorization !== `Bearer ${TOKEN}`) return json(response, 401, { error: { code: "invalid_token" } });
   if (url.pathname === "/v1/computers" && request.method === "GET") return json(response, 200, Object.values(machines).map((m) => ({ ...m.row, state: m.state, last_seen: null })));
+  // El registro de la cuenta: el workspace existe aunque sus máquinas estén apagadas.
+  if (url.pathname === "/v1/workspaces" && request.method === "GET")
+    return json(response, 200, {
+      workspaces: [
+        {
+          id: "w-prod",
+          name: "Producto",
+          radiant_workspace_id: null,
+          settings: {},
+          settings_version: 1,
+          created_at: new Date(0).toISOString(),
+          updated_at: new Date(0).toISOString(),
+          projects: [{ id: "p-mac-api", name: "api", remote_url: null, default_branch: null, home_computer_id: "cmp_mac" }],
+          computers: Object.keys(machines),
+        },
+      ],
+    });
   const start = /^\/v1\/computers\/([^/]+)\/start$/.exec(url.pathname);
   if (start && request.method === "POST") {
     const m = machines[start[1]];

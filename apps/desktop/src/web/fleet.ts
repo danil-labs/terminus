@@ -12,8 +12,12 @@
  *
  * Of each other computer the panel shows only the workspaces linked to the
  * account (`linked`); the relay already refuses the rest.
+ *
+ * With the account registry (`GET /v1/workspaces`, `setRegistry`) a workspace
+ * whose machines are all asleep still lists, with its projects: what a machine
+ * answers wins, the registry fills in the rest.
  */
-import { linkedAttention, linkedEvents, linkedListing } from "@terminus/computers";
+import { type AccountWorkspace, linkedAttention, linkedEvents, linkedListing, registryProjects } from "@terminus/computers";
 import { mergeAttention } from "@terminus/protocol";
 
 /** `outdated`: its engine speaks another contract, known before asking it anything. `linked`: `null` shows every workspace. */
@@ -27,20 +31,23 @@ type ProjectPlace = { machines: Set<string>; remote: boolean };
 export type Answer = { machine: string; value: unknown };
 
 const SEP = "~";
-/** Keys whose string value names a task, portfolio or account of the machine that sent it. */
-const KEYS = new Set(["session", "parent", "portfolio", "account"]);
+/** Keys whose string value names a task, portfolio, account or space of the machine that sent it. */
+const KEYS = new Set(["session", "parent", "portfolio", "account", "space"]);
 /** Reads of workspace content: each machine of the workspace answers its part. */
-export const FAN = new Set(["list_projects", "list_portfolios", "list_live_sessions", "list_active_turns", "list_live_turns"]);
+export const FAN = new Set(["list_projects", "list_portfolios", "list_live_sessions", "list_active_turns", "list_live_turns", "list_spaces"]);
 /** Reads that list every machine, whatever the workspace. */
 export const EVERYWHERE = new Set(["list_workspaces", "workspaces_startup", "list_accounts", "list_workspace_attention"]);
 /** What makes something new where the person chose, when no id says where. */
 export const CREATE = new Set(["send_message", "run_shell_command", "create_project", "clone_project", "start_project_clone"]);
-/** Answers whose rows carry the id of what they list. */
-const ROW_IDS = new Set(["list_portfolios", "list_live_sessions"]);
+/**
+ * Answers whose rows carry the id of what they list. A space is of the machine
+ * that keeps it: with its id prefixed, renaming or deleting it goes only there.
+ */
+const ROW_IDS = new Set(["list_portfolios", "list_live_sessions", "list_spaces"]);
 /** Answers keyed by the id of the task each value is about. */
 const KEYED = new Set(["list_session_git"]);
 /** Answers that are one object with its own id. */
-const OWN_ID = new Set(["load_session", "add_account"]);
+const OWN_ID = new Set(["load_session", "add_account", "create_space", "rename_space", "set_space_folders", "move_task_to_space"]);
 /** Keys whose value is an image file on the machine that sent it: `preview_file` must read it there. */
 const FILES = new Set(["logo", "background", "avatar"]);
 const isPath = (v: string) => /^(\/|~\/|[a-z]:[\\/])/i.test(v);
@@ -67,6 +74,28 @@ const isRow = (v: unknown): v is Row => !!v && typeof v === "object" && !Array.i
 const text = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 const isEntry = (v: unknown): v is Entry => isRow(v) && typeof v.workspace === "string";
 
+/** A registry workspace as the window reads a `list_workspaces` row. */
+function registryRow(w: AccountWorkspace): Row {
+  const at = Date.parse(w.created_at ?? "");
+  const setting = (key: "lengua" | "lengua_de_salida" | "default_permission_mode" | "terminal_theme") => w.settings?.[key] ?? null;
+  return {
+    id: w.id,
+    name: w.name,
+    context_root: null,
+    lengua: setting("lengua"),
+    lengua_de_salida: setting("lengua_de_salida"),
+    default_permission_mode: setting("default_permission_mode"),
+    terminal_theme: setting("terminal_theme"),
+    worktrees_root: null,
+    git_host: null,
+    remote: null,
+    memoria: { tipo: "local" },
+    created_at: Number.isFinite(at) ? Math.floor(at / 1000) : 0,
+    sessions: 0,
+    logo: null,
+  };
+}
+
 /**
  * `named`: the machine came from an id in the command, not from a choice.
  * `missing`: that machine listed its workspaces and this one is not among them.
@@ -88,7 +117,11 @@ export class Fleet {
   private stale = new Set<string>();
   /** What each machine says waits for the person, for `attention`. */
   private attention = new Map<string, Entry[]>();
+  /** Workspace → the machine that keeps its spaces, as the last `list_spaces` said. */
+  private spaceHomes = new Map<string, string>();
   private outdated = new Set<string>();
+  /** The account's workspaces, or `null` when the control plane does not say them. */
+  private registry: AccountWorkspace[] | null = null;
 
   /** `on`: whether a machine answers now; rows from one that does not are marked off. */
   constructor(
@@ -148,6 +181,12 @@ export class Fleet {
     return this.usable().filter((m) => this.has(m, workspace) !== false);
   }
 
+  /** The machine that keeps the spaces of `workspace`, where a new one goes; `null` until one lists some. */
+  spaceHome(workspace: string | null): string | null {
+    const machine = workspace ? this.spaceHomes.get(workspace) : undefined;
+    return machine && this.usable().includes(machine) ? machine : null;
+  }
+
   /** The workspace `machine` is asked with: the same id, or none if it lacks that one. */
   workspaceOn(machine: string, workspace: string | null): string | null {
     return this.has(machine, workspace) === false ? null : workspace;
@@ -167,6 +206,21 @@ export class Fleet {
   materialized(machine: string, workspace: string) {
     const set = this.hosts.get(workspace) ?? new Set<string>();
     this.hosts.set(workspace, set.add(machine));
+  }
+
+  /** The account registry as last read; `null` keeps the panel as it was without it. */
+  setRegistry(list: AccountWorkspace[] | null) {
+    this.registry = list;
+  }
+
+  /** Whether the account has a workspace in the registry: the workspace list never waits for a machine to wake. */
+  hasRegistry(): boolean {
+    return !!this.registry?.length;
+  }
+
+  /** Whether the account registry knows `workspace`: its lists never wait for a machine to wake. */
+  inRegistry(workspace: string | null): boolean {
+    return !!workspace && !!this.registry?.some((w) => w.id === workspace);
   }
 
   /** Where a project of `workspace` lives, once some machine listed it. */
@@ -298,12 +352,16 @@ export class Fleet {
 
   /** The answers of a fan-out joined: lists one after another, each row with its machine. */
   merge(command: string, answers: Answer[], workspace: string | null = null): unknown {
-    if (command === "list_workspaces" || command === "workspaces_startup") return this.mergeWorkspaces(answers);
+    if (command === "list_workspaces" || command === "workspaces_startup") return this.mergeWorkspaces(answers, workspace);
     if (command === "list_accounts") return this.mergeAccounts(answers);
-    if (command === "list_projects" && this.multi) return this.mergeProjects(answers, workspace);
+    if (command === "list_projects" && (this.multi || this.inRegistry(workspace))) return this.mergeProjects(answers, workspace);
     if (command === "list_workspace_attention" && this.multi) {
       for (const { machine, value } of answers) if (Array.isArray(value)) this.attention.set(machine, (this.encode(machine, value) as unknown[]).filter(isEntry));
       return this.attentionList();
+    }
+    if (command === "list_spaces" && workspace) {
+      const keeper = [...answers].sort((a, b) => this.order(a.machine) - this.order(b.machine)).find((a) => Array.isArray(a.value) && a.value.length);
+      if (keeper) this.spaceHomes.set(workspace, keeper.machine);
     }
     const parts = answers.map(({ machine, value }) => this.encode(machine, value, command));
     if (parts.length === 0) return Array.isArray(answers[0]?.value) ? [] : null;
@@ -326,14 +384,17 @@ export class Fleet {
     return this.machines.findIndex((x) => x.id === machine);
   }
 
-  /** One row per workspace id, from the first machine that lists it, with every machine that has it. */
-  private mergeWorkspaces(answers: Answer[]): unknown {
-    if (!this.multi) return answers[0]?.value ?? null;
+  /**
+   * One row per workspace id, from the first machine that lists it, with every machine that has it; then the
+   * registry's workspaces no machine listed. The open one stays open while it lists; else the first.
+   */
+  private mergeWorkspaces(answers: Answer[], open: string | null): unknown {
+    if (!this.multi && !this.registry) return answers[0]?.value ?? null;
     const lists = answers
       .filter((a) => isRow(a.value) && Array.isArray((a.value as Row).workspaces))
       .map((a) => ({ machine: a.machine, value: a.value as Row, rows: ((a.value as Row).workspaces as Row[]).filter((w) => typeof w?.id === "string") }))
       .sort((a, b) => this.order(a.machine) - this.order(b.machine));
-    const rows = new Map<string, { row: Row; owner: string }>();
+    const rows = new Map<string, { row: Row; owner: string | null }>();
     for (const { machine, rows: listed } of lists) {
       // What a machine that did not answer listed before still counts: a machine that turns off keeps its workspaces.
       this.listed.add(machine);
@@ -344,12 +405,20 @@ export class Fleet {
         if (!rows.has(id)) rows.set(id, { row: w, owner: machine });
       }
     }
+    const answered = new Set(lists.map((l) => l.machine));
+    for (const w of this.registry ?? []) {
+      // A machine that did not answer has what the account says it has.
+      for (const c of w.computers) if (this.info(c) && !answered.has(c)) this.materialized(c, w.id);
+      if (!rows.has(w.id)) rows.set(w.id, { row: registryRow(w), owner: null });
+    }
     const lead = lists[0];
-    if (!lead) return answers[0]?.value ?? null;
-    const fileOf = (row: Row, owner: string) => (typeof row.logo === "string" && isPath(row.logo) ? { logo: this.wrap(owner, row.logo) } : {});
+    if (!lead && !rows.size) return answers[0]?.value ?? null;
+    const fileOf = (row: Row, owner: string | null) => (owner && typeof row.logo === "string" && isPath(row.logo) ? { logo: this.wrap(owner, row.logo) } : {});
     const workspaces = [...rows].map(([id, { row, owner }]) => ({ ...row, ...fileOf(row, owner), id, machines: this.usable().filter((m) => this.hosts.get(id)?.has(m)) }));
-    const active = lists.map((l) => (typeof l.value.active === "string" ? l.value.active : null)).find(Boolean) ?? null;
-    return { ...(this.encode(lead.machine, lead.value) as Row), workspaces, active };
+    const live = lists.map((l) => (typeof l.value.active === "string" ? l.value.active : null)).find(Boolean) ?? null;
+    const active = [open, live].find((id) => id && rows.has(id)) ?? (this.registry ? (workspaces[0]?.id ?? null) : live);
+    const base = lead ? (this.encode(lead.machine, lead.value) as Row) : { migrations: [] };
+    return { ...base, workspaces, active };
   }
 
   /**
@@ -372,6 +441,12 @@ export class Fleet {
         entry.remote ??= text(raw.remote_url) || null;
         joined.set(raw.id, entry);
       }
+    }
+    // What no machine listed comes from the account, in the machine where it was made.
+    for (const p of registryProjects(this.registry, workspace, new Set(joined.keys()))) {
+      const home = p.home_computer_id && this.info(p.home_computer_id) ? [p.home_computer_id] : [];
+      const row = { id: p.id, name: p.name, node: null, sources: [], portfolio: null, working_directory: null, kind: p.remote_url ? "git" : "folder", created_at: 0, updated_at: 0, sessions: 0, materialized: false };
+      joined.set(p.id, { row, machines: home, remote: text(p.remote_url) || null, here: false });
     }
     if (workspace) this.projects.set(workspace, new Map([...joined].map(([id, e]) => [id, { machines: new Set(e.machines), remote: !!e.remote }])));
     return [...joined.values()].map((e) => ({ ...e.row, ...(e.remote ? { remote_url: e.remote } : {}), machines: e.machines }));

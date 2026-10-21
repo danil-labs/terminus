@@ -5,7 +5,7 @@
  * `service_poll` reads the `subscribe` feeds; window-only commands and plugins
  * answer from the browser or refuse with a sentence the interface already knows.
  */
-import { INTENT_COMMANDS, callWorkspace } from "@terminus/computers";
+import { type AccountWorkspace, INTENT_COMMANDS, callWorkspace } from "@terminus/computers";
 import { t } from "../lib/i18n";
 import { leerPref } from "../lib/prefs";
 import { deliver } from "../lib/serviceEvents.ts";
@@ -38,6 +38,9 @@ export type WebTransport = {
 };
 
 export type MachineLink = { info: MachineInfo; relay: RelayLike; onSync?: SyncListener };
+
+/** The account's workspaces (`GET /v1/workspaces`); `null` when the control plane cannot say them. */
+export type RegistrySource = () => Promise<AccountWorkspace[] | null>;
 
 /** What the transport uses of a relay session (`./relay` or `@terminus/computers`). */
 export type RelayLike = Pick<RelaySession, "state" | "connected" | "onState" | "onEvents" | "onLink" | "call" | "subscribe">;
@@ -113,6 +116,12 @@ const POLL_WAIT = 20_000;
 const LINK_WAIT = 5_000;
 const STATE_WAIT = 2_000;
 const HOME_FAN_WAIT = 6_000;
+/** How long a read of the account registry is reused, and how long a list waits for it. */
+const REGISTRY_FOR = 30_000;
+const REGISTRY_WAIT = 4_000;
+const LISTING = new Set(["list_workspaces", "workspaces_startup"]);
+/** Reads of an account workspace that, with its machine asleep and no copy, answer empty instead of waiting for it to wake. */
+const ASLEEP_EMPTY: Record<string, unknown> = { list_sources: [], list_spaces: [], chat_background: null };
 
 const isWeb = (url: unknown): url is string => typeof url === "string" && /^https?:\/\//i.test(url);
 
@@ -314,6 +323,7 @@ export function createWebTransport(
   host: BrowserHost,
   onStatus: () => void = () => {},
   home: HomeLink | null = null,
+  registry: RegistrySource | null = null,
 ): WebTransport {
   const links = new Map<string, Link>();
   const homeId = home?.info.id ?? null;
@@ -343,6 +353,26 @@ export function createWebTransport(
   };
   let active: string | null = null;
   let ordered: Promise<unknown> = Promise.resolve();
+
+  // The registry read now and then; one that fails keeps the last good one, and without any the panel is as before.
+  let registryAt = 0;
+  let registryRead: Promise<void> | null = null;
+  const readRegistry = (): Promise<void> => {
+    if (!registry || Date.now() - registryAt < REGISTRY_FOR) return Promise.resolve();
+    registryRead ??= registry()
+      .catch(() => null)
+      .then((list) => {
+        registryAt = Date.now();
+        if (list) fleet.setRegistry(list);
+      })
+      .finally(() => {
+        registryRead = null;
+      });
+    return Promise.race([registryRead, new Promise<void>((done) => setTimeout(done, REGISTRY_WAIT))]);
+  };
+  /** Whether a read that no machine answered can settle from the registry instead of waiting for one to wake. */
+  const fromRegistry = (command: string, workspace: string | null) =>
+    LISTING.has(command) ? fleet.hasRegistry() : FAN.has(command) && fleet.inRegistry(workspace);
   const { wake, changeOr } = changes();
 
   /**
@@ -376,8 +406,10 @@ export function createWebTransport(
     const l = link(machine);
     const asleep = !fleet.info(machine)?.wakes && OFF.includes(l.relay.state());
     if (asleep && !READ.test(command)) throw off(machine);
+    const settles = command in ASLEEP_EMPTY && fleet.inRegistry(workspace);
     try {
-      const value = await l.send(command, callWorkspace(workspace, args), args, !asleep);
+      const value = await l.send(command, callWorkspace(workspace, args), args, !asleep && !settles);
+      if (value === NONE && settles) return ASLEEP_EMPTY[command];
       if (value === NONE) throw off(machine);
       return fleet.linkedOnly(machine, command, value);
     } catch (error) {
@@ -415,8 +447,8 @@ export function createWebTransport(
         }),
       );
       const answers = results.filter((r): r is { machine: string; value: unknown } => !!r && "value" in r);
-      if (answers.length || usable.length === 0) {
-        if (!answers.length && FAN.has(command)) return [];
+      if (answers.length || usable.length === 0 || fromRegistry(command, workspace)) {
+        if (!answers.length && FAN.has(command) && !(command === "list_projects" && fleet.inRegistry(workspace))) return [];
         return fleet.merge(command, answers, workspace);
       }
       const failed = results.find((r) => r && "error" in r) as { error: unknown } | undefined;
@@ -426,7 +458,18 @@ export function createWebTransport(
   }
 
   async function send(command: string, workspace: string | null, args: Args, options: Options): Promise<unknown> {
-    const chosen = headerOf(options, "x-terminus-machine") ?? (CREATE.has(command) ? picked(workspace, args.project) : null);
+    if (LISTING.has(command)) await readRegistry();
+    // One machine asleep: the account's lists answer now instead of waiting for it.
+    if (!fleet.multi && fromRegistry(command, workspace)) return fan(command, fleet.usable(), args, workspace);
+    const chosen =
+      headerOf(options, "x-terminus-machine") ??
+      (CREATE.has(command) ? picked(workspace, args.project) : command === "create_space" ? fleet.spaceHome(workspace) : null);
+    // A space is of one machine: something new made on another one goes there without it.
+    const spaceOf = typeof args.space === "string" ? fleet.unwrap(args.space)?.machine : undefined;
+    if (CREATE.has(command) && chosen && spaceOf && spaceOf !== chosen) {
+      const { space: _elsewhere, ...rest } = args;
+      args = rest;
+    }
     let route: ReturnType<Fleet["route"]>;
     try {
       route = fleet.route(command, args, workspace, chosen && fleet.info(chosen) ? chosen : null, fallback(workspace, args.project));
@@ -469,10 +512,11 @@ export function createWebTransport(
   /** The active workspace on each of its machines that is on; nothing waits for one that is off. */
   async function activate(id: string, args: Args): Promise<unknown> {
     const members = fleet.membersOf(id).filter((m) => !fleet.isOutdated(m));
-    const sent = members
-      .filter((m) => on(m) || members.length === 1)
-      .map((m) => one(m, "set_active_workspace", fleet.workspaceOn(m, id), fleet.argsFor(m, args)).catch(() => null));
-    return (await Promise.all(sent))[0] ?? null;
+    const tell = (m: string) => one(m, "set_active_workspace", fleet.workspaceOn(m, id), fleet.argsFor(m, args)).catch(() => null);
+    const awake = members.filter(on);
+    // Its only machine asleep learns it when it wakes; opening the workspace does not wait for that.
+    if (!awake.length && members.length === 1) void tell(members[0]);
+    return (await Promise.all(awake.map(tell)))[0] ?? null;
   }
 
   async function engine(command: string, args: Args, options: Options): Promise<unknown> {

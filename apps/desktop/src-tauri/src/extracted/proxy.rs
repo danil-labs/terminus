@@ -727,6 +727,10 @@ enum Routed {
 fn machine_off() -> Value {
     json!({"what":{"clave":"shell.service.machine_off"},"detail":"machine_off"})
 }
+fn wake_failed() -> Value {
+    let clave = super::util::Frase::new("shell.service.machine_wake_failed").0;
+    json!({"what":{"clave":clave},"detail":"machine_wake_failed"})
+}
 fn unlinked() -> Value {
     json!({"what":{"clave":"shell.machines.unlinked"},"detail":"machine_unlinked"})
 }
@@ -752,7 +756,8 @@ fn routed(
             .deliver(id, local, spec, args, &*home, state.reach(i), || {
                 state.wake_now(i)
             })
-            .map_err(|_| machine_off())?
+            // Solo `wake` falla aquí: su programa no la encendió.
+            .map_err(|_| wake_failed())?
             .ok_or_else(unlinked)?;
         return Ok(Routed::Done(sent.map_err(|e| failure(&e)).and_then(reply)));
     }
@@ -1321,12 +1326,20 @@ pub(super) fn service_cancel_update() -> Result<(), Value> {
 /// El token de cliente de vida corta de la cuenta de Danil, con el que la ventana
 /// lista las otras computadoras de la persona y les abre una sesión del relay. La
 /// credencial de la máquina no sale del motor; uno sin `danil_client_token` lo rechaza.
+/// `account` nombra la sesión de la cuenta del workspace; sin él, la principal.
 #[tauri::command(async)]
-pub(super) fn account_relay_token(app: tauri::AppHandle) -> Result<Value, Value> {
+pub(super) fn account_relay_token(
+    app: tauri::AppHandle,
+    account: Option<String>,
+) -> Result<Value, Value> {
     let state = app
         .try_state::<Arc<State>>()
         .ok_or_else(|| failure(&Error::new("app_unavailable")))?;
-    invoke(&state, "danil_client_token", json!({}))
+    let args = match account.filter(|a| !a.trim().is_empty()) {
+        Some(account) => json!({ "account": account }),
+        None => json!({}),
+    };
+    invoke(&state, "danil_client_token", args)
 }
 
 /// Las máquinas de esta ventana y cuál está activa. Una remota inactiva cuenta
@@ -1348,8 +1361,9 @@ pub(super) fn machine_list(app: tauri::AppHandle) -> Result<Value, Value> {
             } else if let Some(client) = m.parked.lock().unwrap_or_else(|p| p.into_inner()).as_ref()
             {
                 answers(client)
-            } else if let Some((_, selection)) = &m.wake {
-                Client::select(selection).is_ok()
+            } else if m.wake.is_some() {
+                // Leer su selección no dice si contesta: apagada, el túnel ya no llega.
+                state.reach(i).is_some_and(|client| answers(&client))
             } else {
                 true
             };

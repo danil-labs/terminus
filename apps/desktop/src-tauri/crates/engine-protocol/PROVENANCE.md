@@ -20,7 +20,7 @@ repositories, and `GitHostInfo`. Files on disk keep their keys; the types that
 are stored and also travel cross the contract wrapped in `Wire`, which renames
 their keys. There are no aliases. This copy is byte-identical to the engine's.
 SHA-256:
-`593c6503e70dac461d733dd1f1affc12df33ddd98bb8d1eb37e1d35629f51b69`.
+`49aa8a5f516665238325495ec861c33a66374c3c4ec4d1141d9e5e43e947b9fa`.
 
 seldon-host `4e21caf` (#66) added the Danil account (321 commands, 28 events):
 `danil_connect_start`, `danil_connect_status`, `danil_connect_options`,
@@ -71,8 +71,20 @@ holds its home, and while the computer is signed in to Danil every workspace is
 linked to the account. Pinned in `seldon-runtime.lock` as
 `seldon-runtime-v0.2.73-9bd80c1`.
 
+seldon-host `feat/danil-session-per-account` (`658cad2`) keeps one Danil
+session per account on a computer, and each workspace belongs to one account
+(341 commands, 30 events): `danil_sessions` → `[SessionInfo]`,
+`danil_set_default_account` (`{account}`), `danil_workspace_account`
+(`{workspace?}`) → `{account, email, signed_in, linked}` and
+`danil_workspace_set_account` (`{workspace?, account}`, plus `error?`), and the
+`danil-sessions` event. `danil_connect_start` gains `accountHint` and `add`;
+`danil_disconnect`, `danil_client_token`, `danil_account_refresh` and
+`danil_account_remove_photo` take an optional `account`, and
+`danil_account_set_photo` `{image, account?}`. This copy is the engine's
+manifest byte for byte; no `seldon-runtime` with it is published yet.
+
 The source is `crates/engine-protocol/commands.json` in `danil-labs/seldon-host`
-(here, seldon-host dev `9bd80c1`). The engine pinned in `seldon-runtime.lock` must
+(here, seldon-host `658cad2` on `feat/danil-session-per-account`). The engine pinned in `seldon-runtime.lock` must
 announce this same hash as its `contract`; the `contract` guard
 (`scripts/guards/contract.mjs`) compares the three.
 
@@ -85,6 +97,7 @@ from the engine source at `fdf4dd9863a80363a0dd7b15ea21fd6b69e1f4bd`. The 24
 `unsupported_image`, `unauthorized` and `unsupported` from `cb4ae57` ([connector.md](https://github.com/danil-labs/seldon-host/blob/dev/docs/connector.md)).
 `settings.appearance.background.workspace_missing` comes from `1687dbf`, where
 `settings.appearance.background.too_big` also became 700 KB.
+`danil.error.account_not_found` comes from `658cad2`.
 
 Endpoint, selection and StreamPage extend the transport; they do not convert
 domain data. The token travels in RPC1 only between authenticated local

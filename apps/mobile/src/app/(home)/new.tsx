@@ -70,8 +70,8 @@ export default function NewTask() {
   const selectedBranch = branch ?? branches?.selected ?? null;
   const branchLabel = branches?.branches.find((b) => b.reference === selectedBranch)?.name ?? selectedBranch;
 
-  // Los spaces son de la primera máquina: en otra, el id no significaría nada.
-  const spaceOn = (id: string | undefined) => (id && id === hostsOfCurrent[0]?.id ? (space?.id ?? null) : null);
+  // Cada máquina tiene sus ids de space; una que no tiene este, ninguno.
+  const spaceOn = (id: string | undefined) => (id ? (space?.on[id] ?? null) : null);
 
   async function start(s: Submission) {
     if (!host || !workspace || !target) return false;

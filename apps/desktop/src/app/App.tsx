@@ -87,12 +87,13 @@ const AgentProfile = lazy(() => import("../features/projects/AgentProfile"));
 // El alta solo se abre sin workspace o al agregar otro: no entra en la carga inicial.
 const Onboarding = lazy(() => import("../features/onboarding/Onboarding"));
 const TaskLocation = lazy(() => import("../features/chat/TaskLocation"));
+const Screen = lazy(() => import("../features/screen/Screen"));
 import AgentTasks, { createdTasks } from "../features/projects/AgentTasks";
 import ArchivedTasks from "../features/projects/ArchivedTasks";
 import BaseBranchPicker from "../features/projects/BaseBranchPicker";
 import { watchHandlerStatus, watchHandlerStatuses } from "../features/projects/handlerPresence";
 import { EmptyContext, ProjectPicker } from "../features/projects/Projects";
-import { machineName, runOnOptions } from "../features/machines/store";
+import { machineName, machines, refetchMachines, runOn, runOnOptions } from "../features/machines/store";
 // Chunk aparte: solo lo carga quien crea una tarea, no la carga inicial.
 const MachinePicker = lazy(() =>
   import("../features/machines/MachinePicker").then((m) => ({ default: m.MachinePicker })),
@@ -213,6 +214,8 @@ import {
   isTaskTab,
   migrateLegacyStrip,
   OBSERVABILITY_TAB_ID,
+  type ScreenTab,
+  screenTabId,
   type SiteTab,
   siteTabId,
   spacesWithStoredStrip,
@@ -1184,7 +1187,8 @@ export default function App() {
   }
   /** Lo que se dice de la máquina de la tarea abierta mientras está apagada o encendiéndose. */
   const avisoDeMaquina = () => {
-    const id = sessionId();
+    // Una tarea que nace aún no tiene id: su pestaña provisional es la que se mira.
+    const id = sessionId() ?? pestanas.active();
     const waking = id ? encendiendo()[id] : undefined;
     if (waking) return t("shell.machines.waking", { name: machineName(waking) });
     const off = id ? apagadas()[id] : undefined;
@@ -4263,7 +4267,7 @@ export default function App() {
     setProyectoAbierto(null);
     // El navegador del «+» tampoco cuelga de ninguna tarea: detrás no se
     // abre nada.
-    if (p.clase === "observabilidad" || (p.clase === "sitio" && p.navegador)) {
+    if (p.clase === "observabilidad" || p.clase === "pantalla" || (p.clase === "sitio" && p.navegador)) {
       pestanas.activate(p.id);
       return;
     }
@@ -4310,6 +4314,17 @@ export default function App() {
   function abrirObservabilidad() {
     setProyectoAbierto(null);
     pestanas.openObservability(t("observability.tab"));
+  }
+
+  /** La pantalla de una VM, en una ventana al lado de la conversación: se mira mientras se trabaja. */
+  function abrirPantalla(machine: string) {
+    const id = screenTabId(machine);
+    const nueva = !pestanas.open().some((p) => p.id === id);
+    setProyectoAbierto(null);
+    pestanas.openScreen(machine, t("screen.tab", { name: machineName(machine) }));
+    paneles.sync(pestanas.open().map((x) => x.id));
+    paneles.activate(id);
+    if (nueva && !paneles.isSplit()) paneles.split(id);
   }
 
   /**
@@ -4462,7 +4477,7 @@ export default function App() {
     const p = pestanasEnPantalla().find((x) => x.id === id);
     if (!p) return "";
     if (isTaskTab(p)) return p.titulo;
-    if (p.clase === "observabilidad") return p.titulo;
+    if (p.clase === "observabilidad" || p.clase === "pantalla") return p.titulo;
     if (p.clase === "sitio" && !p.url) return t("sites.new_tab");
     const r = p.clase === "archivo" ? p.ruta : p.clase === "artefacto" ? p.rel : p.url;
     return r.slice(r.lastIndexOf("/") + 1);
@@ -5255,6 +5270,11 @@ export default function App() {
     // conteste y entrega una sola vez.
     const dormida = abierta ? apagadas()[abierta] ?? null : null;
     if (abierta && dormida) anotar(setEncendiendo, abierta, dormida);
+    // Y crear en la elegida en «Ejecutar en» si está apagada: el aviso cuelga de la pestaña que nace.
+    const lugar = projectList().find((p) => p.id === proyecto);
+    const destino = abierta ? null : runOn(workspaceActivo(), lugar);
+    const naceDormida = destino && machines().find((x) => x.id === destino)?.on === false ? destino : null;
+    if (provisional && naceDormida) anotar(setEncendiendo, provisional, naceDormida);
     try {
       // La respuesta de una persona no existe en la interfaz hasta que Rust la
       // validó y la escribió: primero persistir, y solo entonces pintarla.
@@ -5300,7 +5320,11 @@ export default function App() {
         // El escritorio que la persona tenía delante al escribirlo, sellado en el
         // mensaje; lo que llega de otro canal no trae ninguno.
         space: m.space ?? null,
-      }, abierta ? undefined : runOnOptions(workspaceActivo(), projectList().find((p) => p.id === proyecto)));
+      }, abierta ? undefined : runOnOptions(workspaceActivo(), lugar));
+      if (provisional && naceDormida) {
+        anotar(setEncendiendo, provisional, null);
+        void refetchMachines();
+      }
       if (abierta && dormida) {
         anotar(setEncendiendo, abierta, null);
         anotar(setApagadas, abierta, null);
@@ -5365,6 +5389,7 @@ export default function App() {
       return true;
     } catch (e) {
       if (abierta && dormida) anotar(setEncendiendo, abierta, null);
+      if (provisional && naceDormida) anotar(setEncendiendo, provisional, null);
       // Sin esto queda una tarea que nadie creó: la fila y la pestaña se
       // pintaron contando con que Rust aceptara el turno.
       if (provisional) {
@@ -6242,6 +6267,7 @@ export default function App() {
           return <Suspense fallback={null}><TaskLocation
             machine={filaDe(id())?.machine}
             on={!apagadas()[id()] && filaDe(id())?.machine_on !== false}
+            onScreen={abrirPantalla}
             project={proyectoDeLaCelda()?.name}
             path={estadoDelTrabajo()?.path || undefined}
             branch={workLabel(estadoDelTrabajo()?.branch, estadoDelTrabajo()?.alias) || undefined} /></Suspense>;
@@ -7216,6 +7242,21 @@ export default function App() {
           <Observability onManage={() => setSettings("plugins")} />
         </div>
       </Show>
+
+      <For each={pestanas.open().filter((p): p is ScreenTab => p.clase === "pantalla")}>
+        {(p) => {
+          const open = capabilities().machineScreen?.(p.machine);
+          return (
+            <div
+              class="min-h-0 min-w-0"
+              classList={{ hidden: celdaDe(p.id) === undefined || tapadoPorElProyecto(paneles.siteOf(p.id)), "pt-8": llevaTiraInterior(paneles.siteOf(p.id)) }}
+              style={celdaDe(p.id)}
+            >
+              <Show when={open}>{(abrir) => <Suspense fallback={null}><Screen open={abrir()} /></Suspense>}</Show>
+            </div>
+          );
+        }}
+      </For>
 
       </Paneles>
 

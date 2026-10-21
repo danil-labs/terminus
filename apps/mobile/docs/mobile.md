@@ -61,6 +61,17 @@ como la web.
   entera de la máquina, que reemplaza, o como una entrada suelta, que cambia solo
   su workspace (`mergeAttention`). Una fila sin el campo es de un plano de control
   anterior y no se filtra.
+- **La lista de workspaces es de la cuenta.** Además de lo que listan las
+  máquinas, el teléfono lee el registro de la cuenta (`GET /v1/workspaces`,
+  `listWorkspaces`) al listar las computadoras: un workspace cuyas máquinas
+  duermen y no tienen copia en el relay sigue en la lista, con sus carpetas del
+  registro en la máquina donde nacieron (`workspaceEntries`,
+  `withAccountFolders` en `engine.ts`). Lo que una máquina contesta manda; el
+  registro solo llena lo que falta. Las tareas siguen siendo de cada máquina:
+  las de una dormida salen de la copia del relay o no salen, y crear una ahí la
+  enciende. «Sin workspaces» solo se dice con el registro vacío y ninguna
+  máquina con un workspace ligado. Sin la ruta (un plano de control anterior o
+  sin red), lo de antes.
 - **El fondo de los chats es del workspace** (`chat_background`): la imagen
   propia se pinta detrás de la conversación con el velo del workspace
   (`chatBackgroundView` en `@terminus/protocol`). Los patrones del escritorio
@@ -104,7 +115,7 @@ workspaces, que va a la raíz que fijó la compilación,
 
 | Escritorio (#151) | Teléfono | Por qué |
 |---|---|---|
-| Lista plana con secciones «Te necesitan» y «Tareas» | Igual, en una sola columna; «Te necesitan» solo aparece si tiene algo | En una pantalla chica una sección vacía empuja la lista sin decir nada |
+| Lista plana «Tareas»: cada tarea en su sitio, la que te necesita lo dice su marca | Igual, en una sola columna | La tarea no salta de lugar cuando cambia de estado |
 | Botón «Filtrar y agrupar» con popover (carpetas, agente, agrupar, densidad) | El mismo botón al lado de la línea de alcance; abre una hoja del sistema (`formSheet`) con las mismas opciones y palabras | Un popover no cabe ni se toca bien con el dedo; la hoja es el popover del teléfono y se cierra con el gesto |
 | Tarjeta de dos líneas: estado + título + chincheta; debajo, lo que pide o carpeta, agente, máquina y PR | Igual, sacado de `taskCard`; sin PR ni worktree (el teléfono no lee git); la máquina solo con más de una | Misma información en el mismo orden; lo que el teléfono no puede saber no se inventa |
 | Dock de agentes: una fila de caras al pie del sidebar; clic abre el chat, clic derecho «Ver sus tareas» | Una fila de caras **arriba de la lista**, del mismo orden y reparto (`planDock`, «+k»); tocar abre su chat, mantener pulsado filtra por sus tareas; «Ver todos» abre una hoja | Abajo le quita alto a la lista; arriba se ve al entrar y se va al hacer scroll, sin robar alto a la lista. Mantener pulsado es el clic derecho del teléfono |

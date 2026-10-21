@@ -1567,6 +1567,7 @@ export default function Chat(props: ChatProps) {
         m.role !== "system" ||
         m.meta === "fallo" ||
         m.meta === "cupo" ||
+        m.meta === "engine_updated" ||
         esFilaDeLaBandeja(m.meta) ||
         esSalidaDeComando(m.meta) ||
         m.contexto ||
@@ -2945,6 +2946,10 @@ export default function Chat(props: ChatProps) {
                   {(m) => <SiguioTrasElCupo cambio={m().quota ?? {}} />}
                 </Match>
 
+                <Match when={mensaje()?.msg.meta === "engine_updated"}>
+                  <LineaDeSistema texto={t("chat.engine_updated")} />
+                </Match>
+
                 <Match when={mensaje() && esFilaDeLaBandeja(mensaje()!.msg.meta) ? mensaje()!.msg : null}>
                   {(m) => <FilaDeLaBandeja msg={m()} onOpenTask={props.onOpenTask} tareaPorId={props.tareaPorId} />}
                 </Match>
@@ -3695,6 +3700,17 @@ function Interrupcion() {
     <div class="col-start-1 flex items-center gap-3 py-2 text-xs text-neutral-500" role="status">
       <span class="h-px flex-1 bg-border" aria-hidden="true" />
       <span>{t("chat.interrupted")}</span>
+      <span class="h-px flex-1 bg-border" aria-hidden="true" />
+    </div>
+  );
+}
+
+/** La tarea siguió con el motor nuevo tras cortar su turno para actualizar (`update_resume.rs`). */
+function LineaDeSistema(props: { texto: string }) {
+  return (
+    <div class="col-start-1 flex items-center gap-3 py-2 text-xs text-neutral-500" role="status">
+      <span class="h-px flex-1 bg-border" aria-hidden="true" />
+      <span>{props.texto}</span>
       <span class="h-px flex-1 bg-border" aria-hidden="true" />
     </div>
   );

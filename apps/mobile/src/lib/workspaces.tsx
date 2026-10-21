@@ -1,24 +1,18 @@
-import { groupWorkspaces } from "@terminus/computers";
-import type { ProviderInfo, Space, Workspace } from "@terminus/protocol";
+import type { ProviderInfo, Workspace } from "@terminus/protocol";
 import { DEFAULT_SIDEBAR_VIEW, type SidebarView, sanitizeSidebarView } from "@terminus/tasks";
 import { store } from "./store";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { type Agent, type Folder, type Task, mergeSnapshots, snapshotOf, taskKey, workspacesOf } from "./engine";
+import { type Agent, type Folder, type HostSnapshot, type MergedSpace, type Task, type WorkspaceEntry, mergeSnapshots, snapshotOf, taskKey, withAccountFolders, workspaceEntries, workspacesOf } from "./engine";
 import type { Host } from "./hosts";
 import { useMachines } from "./machines";
 
-/**
- * Un workspace, quizá abierto en varias máquinas: el mismo si su id es igual
- * (`groupWorkspaces`, la regla de la web). `id` es ese id; `members`, el id en
- * cada máquina, que es el mismo.
- */
-export type WorkspaceEntry = { id: string; name: string; members: Map<string, string>; hosts: string[] };
+export type { MergedSpace, WorkspaceEntry };
 
 /** Lo que el teléfono enseña de un workspace, juntando todas sus máquinas. */
 export type Snapshot = {
   /** Carpetas de cada máquina; `key` es `host/id`. */
   folders: Folder[];
-  spaces: Space[];
+  spaces: MergedSpace[];
   tasks: Task[];
   agents: Agent[];
   /** `host/id` de las tareas con un turno en marcha. */
@@ -36,7 +30,7 @@ type Workspaces = {
   loading: boolean;
   select: (id: string) => void;
   /** El space activo, como la SpaceBar del escritorio; el primero si no se eligió ninguno. */
-  space: Space | null;
+  space: MergedSpace | null;
   selectSpace: (id: string) => void;
   /** El filtro de la lista (`@terminus/tasks`), por workspace y space como en el escritorio. */
   view: SidebarView;
@@ -61,50 +55,84 @@ export function useWorkspaces() {
 const viewKey = (workspace: string, space: string | null) => `terminus.view.${workspace}${space ? `.${space}` : ""}`.replace(/[^\w.-]/g, "_");
 
 export function WorkspacesProvider({ children }: { children: ReactNode }) {
-  const { hosts, subscribe, rememberTitles, tick } = useMachines();
-  const [perHost, setPerHost] = useState<Record<string, Workspace[]>>({});
+  const { hosts, registry, subscribe, rememberTitles, tick } = useMachines();
+  const [perHost, setPerHost] = useState<Record<string, Workspace[] | null>>({});
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
   const asked = useRef(0);
+  // La recarga en vuelo lee lo último, no lo de su render: el workspace abierto, lo que listó cada máquina y qué recarga pintó.
+  const currentNow = useRef(currentId);
+  currentNow.current = currentId;
+  const perHostNow = useRef(perHost);
+  const shown = useRef(0);
 
   useEffect(() => {
-    void store.get(KEY).then((saved) => saved && setCurrentId((id) => id ?? saved));
+    void store.get(KEY).then((saved) => {
+      if (!saved || currentNow.current !== null) return;
+      currentNow.current = saved;
+      setCurrentId(saved);
+    });
   }, []);
 
-  const list = useMemo<WorkspaceEntry[]>(() => grouped(hosts, perHost), [hosts, perHost]);
+  const list = useMemo<WorkspaceEntry[]>(() => workspaceEntries(hosts, perHost, registry), [hosts, perHost, registry]);
 
   const machineCount = hosts.length;
   const reload = useCallback(async () => {
     const mine = ++asked.current;
     setLoading(true);
-    try {
-      const answers = await Promise.all(hosts.map(async (host) => [host.id, (await workspacesOf(host).catch(() => ({ list: [] }))).list] as const));
-      if (mine !== asked.current) return;
-      const byHost = Object.fromEntries(answers);
-      setPerHost(byHost);
-      const groups = grouped(hosts, byHost);
-      const entry = groups.find((g) => g.id === currentId) ?? groups[0] ?? null;
-      if ((entry?.id ?? null) !== currentId) setCurrentId(entry?.id ?? null);
-      if (!entry) return setSnapshot(null);
-      // En el orden de las máquinas: la primera pone los spaces.
+    // La máquina de cada tarea solo se dice con más de una máquina.
+    const tag = (hostId: string) => {
+      if (machineCount < 2) return null;
+      const host = hosts.find((h) => h.id === hostId);
+      return host ? { machine: host.label, on: host.power() === "on" } : null;
+    };
+    // Cada máquina se pinta al contestar: una lenta o sin conexión no detiene la lista. Una recarga más nueva que ya pintó manda.
+    const load = async (entry: WorkspaceEntry) => {
       const having = hosts.filter((h) => entry.members.has(h.id));
-      const parts = await Promise.all(having.map((host) => snapshotOf(host, entry.members.get(host.id) as string).catch(() => null)));
-      if (mine !== asked.current) return;
-      // La máquina de cada tarea solo se dice con más de una máquina.
-      const tag = (hostId: string) => {
-        if (machineCount < 2) return null;
-        const host = hosts.find((h) => h.id === hostId);
-        return host ? { machine: host.label, on: host.power() === "on" } : null;
+      const parts: (HostSnapshot | null)[] = having.map(() => null);
+      const show = () => {
+        if (mine < shown.current || (currentNow.current !== null && currentNow.current !== entry.id)) return;
+        shown.current = mine;
+        // Lo que ninguna máquina contestó lo pone el registro de la cuenta: un workspace dormido abre con sus carpetas.
+        const merged = withAccountFolders(mergeSnapshots(parts.filter((p) => p !== null), tag), registry, entry.id, having.map((h) => h.id));
+        rememberTitles(merged.tasks.map((task) => [taskKey(task), task.title]));
+        setSnapshot(merged);
       };
-      const merged = mergeSnapshots(parts.filter((p) => p !== null), tag);
-      rememberTitles(merged.tasks.map((task) => [taskKey(task), task.title]));
-      setSnapshot(merged);
+      await Promise.all(
+        having.map(async (host, i) => {
+          parts[i] = await snapshotOf(host, entry.members.get(host.id) as string).catch(() => null);
+          show();
+        }),
+      );
+      if (!having.length) show();
+    };
+    const pick = (groups: WorkspaceEntry[]) => groups.find((g) => g.id === currentNow.current) ?? groups[0] ?? null;
+    const sameEntry = (a: WorkspaceEntry | null, b: WorkspaceEntry | null) => a?.id === b?.id && [...(a?.members ?? [])].join() === [...(b?.members ?? [])].join();
+    try {
+      // Con lo que ya se sabe del workspace, sus tareas se piden a la vez que la lista de workspaces.
+      const early = pick(workspaceEntries(hosts, perHostNow.current, registry));
+      const first = early ? load(early) : null;
+      const answers = await Promise.all(hosts.map(async (host) => [host.id, (await workspacesOf(host).catch(() => ({ list: null }))).list] as const));
+      if (mine !== asked.current) return void (await first);
+      const byHost = Object.fromEntries(answers);
+      perHostNow.current = byHost;
+      setPerHost(byHost);
+      const entry = pick(workspaceEntries(hosts, byHost, registry));
+      if ((entry?.id ?? null) !== currentNow.current) {
+        currentNow.current = entry?.id ?? null;
+        setCurrentId(currentNow.current);
+      }
+      if (!entry) {
+        shown.current = mine;
+        return setSnapshot(null);
+      }
+      await (sameEntry(early, entry) && first ? first : load(entry));
     } finally {
       if (mine === asked.current) setLoading(false);
     }
-  }, [hosts, currentId, rememberTitles, machineCount]);
+  }, [hosts, registry, rememberTitles, machineCount]);
 
   // Al cambiar las máquinas, su estado o el workspace.
   useEffect(() => {
@@ -132,9 +160,11 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
 
   const select = useCallback((id: string) => {
     setSnapshot(null);
+    currentNow.current = id;
     setCurrentId(id);
     void store.set(KEY, id);
-  }, []);
+    void reload();
+  }, [reload]);
 
   const [spaceIds, setSpaceIds] = useState<Record<string, string>>({});
   useEffect(() => {
@@ -152,7 +182,8 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     [currentId],
   );
   const spaces = snapshot?.spaces ?? [];
-  const space = spaces.find((s) => s.id === (currentId ? spaceIds[currentId] : undefined)) ?? spaces[0] ?? null;
+  const chosen = currentId ? spaceIds[currentId] : undefined;
+  const space = spaces.find((s) => chosen !== undefined && Object.values(s.on).includes(chosen)) ?? spaces[0] ?? null;
 
   const [view, setViewState] = useState<SidebarView>(DEFAULT_SIDEBAR_VIEW);
   const currentViewKey = currentId ? viewKey(currentId, space?.id ?? null) : null;
@@ -181,15 +212,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
 }
 
 /** El nombre del space, o el del space por defecto. */
-export function spaceName(space: Space | undefined | null, fallback: string) {
+export function spaceName(space: { name: string | null } | undefined | null, fallback: string) {
   return space?.name?.trim() || fallback;
 }
 
-function grouped(hosts: { id: string }[], perHost: Record<string, Workspace[]>): WorkspaceEntry[] {
-  return groupWorkspaces(hosts.map((h) => ({ machine: h.id, rows: perHost[h.id] ?? [] }))).map((g) => ({
-    id: g.key,
-    name: g.row.name ?? g.key,
-    members: g.members,
-    hosts: [...g.members.keys()],
-  }));
-}

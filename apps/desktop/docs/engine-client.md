@@ -40,6 +40,12 @@ sin él, la ventana abre `verification_uri_complete` y la persona aprueba en
 proxy y la sección lo dice. El campo editable del alta y de la página de
 aprobación es el nombre de **esta computadora**, no el de la cuenta.
 
+La web (`app.danil.ai/terminus`) no ofrece Radiant: ni la sección de
+Configuración, ni su gobierno en las pantallas, ni la elección «De mi
+organización» al crear el espacio (`capabilities().radiant`, solo en el
+escritorio). Radiant se conectará con Terminus Computers, no con cada ventana;
+el escritorio lo conserva por ahora (2026-10-21).
+
 La persona de la cuenta (nombre, correo, foto) sale del motor:
 `danil_connect_status` trae `account_name`, `avatar` (ruta de la foto guardada
 en la máquina, pintada con `preview_file`) y `avatar_source`;
@@ -49,21 +55,40 @@ de la barra lateral y la sección la muestran. La web no tiene la sesión de
 máquina (`danilAccount`); con `accountProfile` (`src/web/account.ts`) lee y
 cambia la misma persona en el plano de control con la sesión de Supabase.
 
-La sincronización sigue a la sesión de Danil de esta computadora, como una
-carpeta de Drive (seldon-host `feat/workspace-danil-link`): no hay otras
-cuentas ni miembros. Con la sesión iniciada, todos los workspaces de esta
-computadora se ven en la web y el teléfono; con la sesión cerrada, ninguno. El
-motor los liga solo, los que ya existen y los nuevos. No hay interruptor por
-workspace: la sección «Cuenta de Danil» tiene solo la tarjeta de la cuenta
-(foto, esta computadora, «Cerrar sesión»), y `danil_workspace_link`,
-`danil_workspace_unlink` y `danil_workspace_link_status` quedan en el contrato
-sin interfaz (`SIN_INTERFAZ` en `scripts/guards/commands.mjs`). La web, el teléfono y
+Una sesión de Danil por cuenta (decisión del 2026-10-21, seldon-host
+`feat/danil-session-per-account`): la computadora tiene una sesión por cuenta
+y cada workspace es de una sola cuenta, con la que se sincroniza y en ninguna
+otra. Configuración → Cuentas de Danil (`DanilAccount.tsx`) lista
+`danil_sessions` (foto, nombre, correo, esta computadora en esa cuenta, en
+línea, cuántos workspaces, «Principal») y sigue el evento `danil-sessions`;
+«Agregar otra cuenta» es `danil_connect_start {add: true}` con el mismo código
+del navegador, «Usar como principal» `danil_set_default_account` y «Cerrar
+sesión» `danil_disconnect {account}`. En Workspaces, la tarjeta del abierto
+tiene «Cuenta de este workspace» (`WorkspaceAccount.tsx`, chunk aparte):
+`danil_workspace_account` y `danil_workspace_set_account`, con
+`workspace_id_taken` y `danil.error.account_not_found` en castellano. El pie
+de la barra lateral muestra la cuenta del workspace abierto. El escritorio con
+cuenta (`features/machines/account.tsx`) pide el token de cliente de esa
+cuenta (`account_relay_token {account}` → `danil_client_token {account}`) y
+solo ve sus computadoras y su registro; cambiar a un workspace de otra cuenta
+reinstala el abanico. La lógica sin Solid vive en
+`features/settings/danil-sessions.ts`. Con un motor sin `danil_sessions`
+todo vuelve a la cuenta única: la tarjeta de siempre, sin sección por
+workspace, y el abanico con `danil_connect_status`. `danil_workspace_link`,
+`danil_workspace_unlink` y `danil_workspace_link_status` siguen sin interfaz
+(`SIN_INTERFAZ` en `scripts/guards/commands.mjs`). La web, el teléfono y
 las otras computadoras vistas desde aquí solo muestran los workspaces de
 `workspaces` en cada fila de `GET /v1/computers` (`@terminus/computers`,
 `linkedWorkspaces`); sin el campo (un plano de control anterior) no se filtra.
 El relay ya rechaza el resto con `workspace_not_linked`. La web vuelve a listar
 las computadoras cada diez minutos y al volver a la pestaña, así que un
 vínculo nuevo aparece sin recargar.
+
+Para probarlo contra el motor nuevo antes de su release: compila
+`seldon-runtime` en seldon-host (`cargo build --release -p seldon-runtime`),
+cópialo con `node scripts/engine.mjs download --from <ruta>` y abre el
+laboratorio con `node scripts/engine.mjs start`. Las pruebas de `pnpm verify`
+usan motores simulados y no lo necesitan.
 
 El fondo de los chats también es del workspace: `chat_background` se lee al
 abrirlo (`lib/chat-background-engine.ts`) y Estilo lo guarda con
@@ -84,8 +109,8 @@ cuyos argumentos nombran otro workspace que el suyo.
 
 ## Contract
 
-`src-tauri/crates/engine-protocol/commands.json` is the frozen contract: 334
-commands and the events the engine emits. Its SHA-256 is recorded in
+`src-tauri/crates/engine-protocol/commands.json` is the frozen contract: 341
+commands and the 30 events the engine emits. Its SHA-256 is recorded in
 [PROVENANCE](../src-tauri/crates/engine-protocol/PROVENANCE.md); the engine
 announces the same hash and the window refuses to connect to a different one
 (`version_mismatch`). `phrase-keys.json` lists the catalog keys the engine sends
@@ -287,7 +312,19 @@ did it, and the front asks for a restart. A manual installer that finds
 Terminus open shows the same notice and ends there, instead of running a second
 window from its finish page. On the next start, an engine running from
 `old_seldon-runtime.exe` gets `service stop`; one that refuses keeps working
-and the new engine waits for the next start. Then the window deletes the
+and the new engine waits for the next start. An update usually changes the
+contract, and the window cannot use an engine of another contract: it asks it
+for `status` and `service stop` anyway (`request_any_contract`), stops it as
+soon as it has no turns, downloads or operations, and until then shows how many
+tasks the previous version is finishing instead of failing with
+`service_busy`. This holds on every platform. The screen also offers «Actualizar ya», which
+says how many tasks will be cut off and, once confirmed, asks the previous
+engine for `service stop` with `{"force": true}`: an engine that knows it
+writes those tasks to `update-resume.json`, stops their turns like Stop, and
+exits; the new engine resumes each one in its own provider session with an
+`engine_updated` line. An engine older than that ignores `force` and refuses
+with `task_busy`; the window then terminates its process, as the uninstaller
+does, and those tasks do not resume on their own. Then the window deletes the
 `old_*` files no one holds, retrying for a few seconds while the window it
 replaces exits.
 

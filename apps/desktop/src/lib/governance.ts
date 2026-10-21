@@ -6,6 +6,7 @@
 import { listen } from "./serviceEvents";
 import { createSignal } from "solid-js";
 import { invoke } from "./invoke.ts";
+import { capabilities } from "./platform";
 
 export type GovernedSection = "context_sources" | "mcp_servers" | "skills" | "agents" | "models";
 
@@ -85,6 +86,8 @@ export function adoptGovernance(next: GovernanceStatus) {
 }
 
 export function governance(): GovernanceStatus | null {
+  // La web no ofrece Radiant: ni pide su gobierno ni lo pinta.
+  if (!capabilities().radiant) return null;
   if (!started) {
     started = true;
     void listen("radiant", () => void reloadGovernance());

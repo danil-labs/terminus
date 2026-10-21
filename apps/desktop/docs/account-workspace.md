@@ -289,6 +289,31 @@ seldon-host#72: **solo la dueña, como sincronizar una carpeta de Drive.**
 - Ids: el plano de control acepta de 1 a 128 caracteres (#10); el motor siempre
   genera 8 de base32.
 
+### Una sesión por cuenta (enmienda del 2026-10-21, más tarde)
+
+Decidido por la persona el mismo día, y enmienda lo de arriba: **una sesión de
+Danil por cuenta** en la computadora, y **cada workspace es de una sola
+cuenta**. Caso real: en una Mac, los workspaces de `alberto@danil.ai`, dos de
+la Fundación Donde Banco con el correo de esa empresa y uno de Yucatán Tech
+Week con otro. Cada uno se sincroniza solo con su cuenta: se ve en la web y el
+teléfono de esa cuenta, nunca en otra. Sigue sin haber interruptor de
+sincronizar.
+
+- **Motor** (seldon-host `feat/danil-session-per-account`, ver «Una sesión
+  por cuenta» en [connector.md](https://github.com/danil-labs/seldon-host/blob/dev/docs/connector.md)): una credencial y un relay por cuenta,
+  y el mapa workspace → cuenta. La primera sesión es la principal: los
+  workspaces nuevos y los que no tienen cuenta anotada son suyos.
+- **Escritorio:** Configuración → Cuentas de Danil lista las sesiones y agrega
+  otra con el mismo código del navegador; en Workspaces, cada workspace elige
+  su cuenta («Cuenta de este workspace»); el pie de la barra lateral muestra la
+  del workspace abierto; y el escritorio con cuenta ve las computadoras y el
+  registro de la cuenta del workspace abierto, con su token de cliente.
+- **Cerrar una sesión** deja sus workspaces sin sincronizar, no los pasa a otra
+  cuenta. Si el plano de control no deja moverlo (`workspace_id_taken`), el
+  workspace sigue siendo de la otra cuenta hasta que se inicie sesión con ella
+  aquí.
+- **Web y móvil:** sin cambios; cada uno entra con una sola cuenta.
+
 ### Plano de control (`computers`)
 
 Tablas en `public`, RLS sin políticas (solo rol de servicio):
@@ -403,6 +428,31 @@ Agrega:
 - «Usar este workspace aquí» se borra.
 - El campo `linked` de `features/machines/store.ts` se renombra a `hosts`
   (tiene el workspace), para no confundirlo con el vínculo de la cuenta.
+
+Lista desde el registro de la cuenta (2026-10-21, tras el reporte de la web
+que pedía «crea tu workspace» con las VMs dormidas y la Mac encendida sin
+workspaces ligados):
+
+- La web, el escritorio con cuenta de Danil (`features/machines/account.tsx`,
+  con el token de cliente) y el móvil leen `GET /v1/workspaces`
+  (`listWorkspaces` en `packages/computers`) y lo juntan con lo que listan las
+  máquinas encendidas (`Fleet.setRegistry` en `src/web/fleet.ts`,
+  `withRegistry` en el paquete). La fila de una máquina que contesta manda; el
+  registro suma los workspaces cuyas máquinas duermen y, como miembros, las
+  computadoras ligadas que no contestaron. El activo es el abierto si sigue en
+  la lista; si no, el de la primera máquina; si no, el primero.
+- Proyectos: las filas de `list_projects` se juntan por id con los proyectos
+  del registro; uno que ninguna máquina listó sale del registro con
+  `materialized: false` y, como máquina, `home_computer_id`.
+- Las tareas siguen siendo de cada máquina: la copia del relay o la del
+  navegador, marcadas apagadas. Con todas sus máquinas dormidas y sin copia,
+  un workspace del registro abre sin esperar: proyectos del registro, tareas,
+  fuentes y spaces vacíos. Crear una tarea va a la máquina elegida o a la
+  última (con `materialize_workspace` antes si no lo tiene) y la enciende.
+- El alta de «crea tu workspace» y `no_workspaces` (`src/web/Gate.tsx`) solo
+  salen con el registro vacío y ninguna máquina con un workspace ligado.
+- Detección: si `/v1/workspaces` falla (un Worker anterior, 404, o la red), todo
+  queda como antes. Prueba: `tests/unit/web-account-workspaces.test.mjs`.
 
 ### Fase 2 (fuera de esta entrega)
 

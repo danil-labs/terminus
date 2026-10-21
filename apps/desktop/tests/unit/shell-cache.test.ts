@@ -69,3 +69,12 @@ test("una foto ilegible no rompe el arranque", () => {
   store.set("harness:shell-cache", "{no es json");
   assert.equal(readShellCache(), null);
 });
+
+test("la misma foto no se vuelve a escribir", () => {
+  writeShellCache(snapshot("a"), 1);
+  const before = store.get("harness:shell-cache");
+  writeShellCache(snapshot("a"), 2);
+  assert.equal(store.get("harness:shell-cache"), before);
+  writeShellCache(snapshot("a", 4), 3);
+  assert.notEqual(store.get("harness:shell-cache"), before);
+});

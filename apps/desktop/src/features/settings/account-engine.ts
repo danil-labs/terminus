@@ -18,8 +18,15 @@ export async function profileFromStatus(status: DanilConnectStatus | null): Prom
 }
 
 /** Escritorio: el motor guarda la foto de la cuenta en esta computadora y la cambia en la cuenta. */
-export const engineAccountProfile: AccountProfileSource = {
-  read: () => invoke<DanilConnectStatus>("danil_account_refresh").then(profileFromStatus),
-  setPhoto: (photo) => invoke<DanilConnectStatus>("danil_account_set_photo", { image: photo.dataUrl }).then(profileFromStatus),
-  removePhoto: () => invoke<DanilConnectStatus>("danil_account_remove_photo").then(profileFromStatus),
-};
+export const engineAccountProfile: AccountProfileSource = engineAccountProfileOf();
+
+/** La de una sesión: `account` es el id de la persona o su `computer_id`; sin él, la principal. */
+export function engineAccountProfileOf(account?: string | null): AccountProfileSource {
+  const named = account ? { account } : {};
+  return {
+    read: () => invoke<DanilConnectStatus>("danil_account_refresh", named).then(profileFromStatus),
+    setPhoto: (photo) =>
+      invoke<DanilConnectStatus>("danil_account_set_photo", { image: photo.dataUrl, ...named }).then(profileFromStatus),
+    removePhoto: () => invoke<DanilConnectStatus>("danil_account_remove_photo", named).then(profileFromStatus),
+  };
+}

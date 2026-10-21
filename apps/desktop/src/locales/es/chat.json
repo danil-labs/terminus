@@ -116,6 +116,7 @@
   "chat.next_steps.sent": "Ya enviada: {text}",
   "chat.command.terminal_only": "{agent} solo ejecuta {command} en su propia terminal.",
   "chat.interrupted": "Interrumpido",
+  "chat.engine_updated": "Siguió tras actualizar Terminus a mitad del turno",
   "chat.mentions.no_match": "No hay tareas, proyectos ni archivos que coincidan.",
   "chat.mode.aria": "Permisos: {mode}",
   "chat.mode.listbox": "Permisos",

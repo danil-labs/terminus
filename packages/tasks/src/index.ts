@@ -16,7 +16,6 @@ export {
   needsYou,
   nonDefaultCount,
   sanitizeSidebarView,
-  sectionOf,
   statusKeyOf,
 } from "./view.ts";
 export { type FlatRow, type FlatTask, type LauncherRow, flattenTasks, folderCounts, shownUnderLauncher } from "./flat.ts";

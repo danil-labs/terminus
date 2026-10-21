@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cardOf, cardTask, marksOf } from "../../lib/cards";
-import { taskKey } from "../../lib/engine";
+import { taskInSpace, taskKey } from "../../lib/engine";
 import { lang, t, w } from "../../lib/i18n";
 import { useMachines } from "../../lib/machines";
 import { Notifications } from "../../lib/notifications";
@@ -23,7 +23,7 @@ const NEEDS_YOU = new Set(["approving", "asked", "failed"]);
  * Tareas: el sidebar del escritorio (#151) en el teléfono. Arriba el workspace y
  * sus spaces; debajo, qué se enseña y el único filtro; el dock de agentes; y la
  * lista plana de todas las carpetas (y todas las máquinas), en tarjetas de dos
- * líneas, repartida en «Te necesitan» y «Tareas» o en los grupos del filtro.
+ * líneas, en una sola lista «Tareas» o en los grupos del filtro.
  */
 export default function Tasks() {
   const theme = useTheme();
@@ -47,9 +47,9 @@ export default function Tasks() {
     .filter((task) => NEEDS_YOU.has(task.state)).length;
 
   const spaces = snapshot?.spaces ?? [];
-  // Las carpetas se nombran `host/id`: cada máquina tiene sus ids.
+  // Las carpetas se nombran `host/id`; una tarea va en el space que dice su fila, como en el escritorio.
   const inSpace = (key: string) => !space || key.endsWith("/") || space.folders.includes(key);
-  const tasks = (snapshot?.tasks ?? []).filter((task) => inSpace(task.folderKey));
+  const tasks = (snapshot?.tasks ?? []).filter((task) => taskInSpace(task, space));
   const folderName = (key: string) => snapshot?.folders.find((f) => f.key === key)?.name;
   const counts = folderCounts(tasks.map((task) => ({ project: task.folderKey, row: task })));
   // Como el escritorio: de las carpetas elegidas, las que siguen teniendo tareas.
@@ -60,7 +60,6 @@ export default function Tasks() {
     approving: [...marks.attention].filter(([, s]) => s === "approving").map(([k]) => k),
     folderOf: (row) => row.task.folderKey,
   });
-  const visibleGroups = groups.filter((g) => g.kind !== "section" || g.tasks.length || g.key === "active");
   const agents = (snapshot?.agents ?? []).filter((a) => a.places.some((p) => inSpace(`${p.host}/${p.folder}`)));
   const changed = nonDefaultCount(view);
 
@@ -94,7 +93,7 @@ export default function Tasks() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.spaces}>
             {spaces.map((s) => {
               const active = s.id === space?.id;
-              const folded = active ? null : topState((snapshot?.tasks ?? []).filter((task) => s.folders.includes(task.folderKey)).map((task) => cardOf(task, marks).state));
+              const folded = active ? null : topState((snapshot?.tasks ?? []).filter((task) => task.space && taskInSpace(task, s)).map((task) => cardOf(task, marks).state));
               return (
                 <Pressable
                   key={s.id}
@@ -135,7 +134,7 @@ export default function Tasks() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         contentInsetAdjustmentBehavior="automatic"
       >
-        <MachineNote hosts={hosts} fleet={fleet} cachedAt={snapshot?.cachedAt ?? null} />
+        <MachineNote hosts={hosts} fleet={fleet} />
         {askNotifications ? (
           <View style={[styles.optIn, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <Text style={{ color: theme.text, flex: 1 }}>{t("notify.enable")}</Text>
@@ -157,7 +156,7 @@ export default function Tasks() {
           onSeeAll={() => router.push("/agents")}
         />
 
-        {visibleGroups.map((group) => (
+        {groups.map((group) => (
           <View key={`${group.kind}-${group.key}`} style={styles.group}>
             <Text style={[styles.groupTitle, { color: theme.textMuted }]}>{groupLabel(lang, group, (id) => folderName(id) ?? id)}</Text>
             {group.tasks.map(({ task }) => (

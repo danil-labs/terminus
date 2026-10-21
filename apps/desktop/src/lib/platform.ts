@@ -25,6 +25,8 @@ export type Capabilities = {
   localSetup: boolean;
   /** Una computadora apagada o encendiéndose se ve en su indicador, no como error. */
   computerStatus: boolean;
+  /** Radiant en Configuración y su gobierno en las pantallas; la web no lo ofrece. */
+  radiant?: boolean;
   /** Iniciar sesión en Danil desde Configuración: la web ya entra con esa cuenta. */
   danilAccount?: boolean;
   /** La persona de la cuenta de Danil leída sin el motor (la web, con su sesión): pie y Configuración. */
@@ -41,11 +43,13 @@ export type Capabilities = {
   remoteCreate?: (workspace: string | null) => { machine: string; lead: boolean } | null;
   /** Los adjuntos salen del navegador como bytes: el motor solo guarda imágenes (`guardar_imagen_pegada`). */
   browserFiles?: boolean;
+  /** El visor de la pantalla de una VM administrada (solo ver); `null` si esa máquina no tiene. */
+  machineScreen?: (machine: string) => (() => Promise<WebSocket>) | null;
   /** Bajo la tarjeta de una cuenta: sus máquinas. */
   accountMachines?: (props: AccountMachinesProps) => JSX.Element;
 };
 
-const DESKTOP: Capabilities = { nativeWindow: true, updater: true, localSetup: true, computerStatus: false, danilAccount: true };
+const DESKTOP: Capabilities = { nativeWindow: true, updater: true, localSetup: true, computerStatus: false, danilAccount: true, radiant: true };
 
 let current = DESKTOP;
 

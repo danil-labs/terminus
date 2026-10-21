@@ -206,20 +206,25 @@ const destinosDe = (
     icono: () => <GitBranch size={15} />,
     panel: () => <Providers />,
   },
-  {
-    id: "radiant",
-    get name() {
-      return t("settings.nav.radiant");
-    },
-    icono: () => <Radar size={15} />,
-    panel: () => <Radiant />,
-  },
+  ...(capabilities().radiant
+    ? [
+        {
+          id: "radiant",
+          get name() {
+            return t("settings.nav.radiant");
+          },
+          icono: () => <Radar size={15} />,
+          panel: () => <Radiant />,
+        },
+      ]
+    : []),
   ...(capabilities().danilAccount || capabilities().accountProfile
     ? [
         {
           id: "cuenta-danil",
+          // En el escritorio, una sesión por cuenta; la web entra con una sola.
           get name() {
-            return t("settings.nav.danil_account");
+            return capabilities().accountProfile ? t("settings.nav.danil_account") : t("settings.nav.danil_accounts");
           },
           icono: () => <CircleUserRound size={15} />,
           panel: () => (

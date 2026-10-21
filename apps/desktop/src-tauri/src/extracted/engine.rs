@@ -120,6 +120,14 @@ pub fn ensure(paths: &Paths, adopt: bool) -> Result<PathBuf> {
         if !super::legacy::engine_replaced(found.pid, true) || !retire(&endpoint, found.pid) {
             return write_selection(paths, &endpoint, &found, &status);
         }
+    } else if let Ok((found, status)) = previous(&endpoint) {
+        // Tras actualizar el contrato cambia: esta ventana no puede usarlo, lo para en cuanto quede libre.
+        if working(&status["busy"]) || !retire(&endpoint, found.pid) {
+            return Err(Error {
+                detail: status["busy"].clone(),
+                ..Error::new("previous_engine_busy")
+            });
+        }
     }
     let offset = std::fs::metadata(&paths.launch_log).map_or(0, |m| m.len());
     let mut child = spawn(paths, adopt)?;
@@ -156,7 +164,7 @@ pub fn stop() -> Stopped {
     // Una orden de una ventana que se acaba de cerrar termina sola; un turno o una descarga, no.
     let settle = Instant::now() + Duration::from_secs(20);
     loop {
-        match terminus_engine_client::request_endpoint(
+        match terminus_engine_client::request_any_contract(
             &endpoint,
             "service stop",
             Duration::from_secs(5),
@@ -194,10 +202,49 @@ pub fn retire_if_replaced(paths: &Paths) {
     }
 }
 
+/// «Actualizar ya» con el motor anterior trabajando: corta sus turnos y apunta sus
+/// tareas para que el nuevo las retome. Uno sin esa orden se niega y se termina su proceso.
+pub fn force_previous(paths: &Paths) -> Result<()> {
+    let endpoint = paths.data.join("seldon-endpoint.json");
+    let (found, _) = previous(&endpoint)?;
+    let asked = terminus_engine_client::force_stop_any_contract(&endpoint, Duration::from_secs(5));
+    log::info!(
+        "[engine] update now: previous pid={} force_stop={}",
+        found.pid,
+        asked.is_ok()
+    );
+    if asked.is_err() {
+        super::legacy::terminate(found.pid);
+    }
+    // El motor corta los turnos con hasta 10 s para guardar cada transcripción.
+    let deadline = Instant::now() + Duration::from_secs(60);
+    while Instant::now() < deadline {
+        if !super::legacy::alive(found.pid) {
+            return Ok(());
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    super::legacy::terminate(found.pid);
+    Err(Error::new("service_busy"))
+}
+
+/// El motor vivo sobre la raíz aunque sea de otro contrato, con su `status`.
+fn previous(endpoint: &Path) -> Result<(terminus_engine_protocol::Endpoint, serde_json::Value)> {
+    let (found, status) =
+        terminus_engine_client::request_any_contract(endpoint, "status", Duration::from_secs(3))?;
+    if status["runtime"] != found.runtime.as_str() || status["service"] != true {
+        return Err(Error::new("version_mismatch"));
+    }
+    Ok((found, status))
+}
+
 /// Una sola petición: al abrir la ventana no se espera a que acaben las órdenes.
 fn retire(endpoint: &Path, pid: u32) -> bool {
-    let stopped =
-        terminus_engine_client::request_endpoint(endpoint, "service stop", Duration::from_secs(5));
+    let stopped = terminus_engine_client::request_any_contract(
+        endpoint,
+        "service stop",
+        Duration::from_secs(5),
+    );
     log::info!(
         "[engine] replaced engine pid={pid} stop={}",
         stopped.is_ok()
