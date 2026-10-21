@@ -78,10 +78,11 @@ const HOME = { computer_id: "cmp_home", name: "Mi Mac", state: "online", provide
 const VM = { computer_id: "cmp_vm", name: "Danil VM", state: "stopped", provider: "aws-ec2" };
 const MAC = { computer_id: "cmp_mac", name: "Mac de Ana", state: "offline", provider: "self", kind: "physical" };
 
-async function open(name, { status = SIGNED_IN, token = TOKEN, computers = [HOME, VM, MAC], relays = {}, extra = {} } = {}) {
+async function open(name, { status = SIGNED_IN, token = TOKEN, computers = [HOME, VM, MAC], relays = {}, extra = {}, registry = null } = {}) {
   const f = fleet(relays);
   const calls = [];
   const listed = [];
+  const registered = [];
   const responses = local(calls, {
     danil_connect_status: status,
     ...(token ? { account_relay_token: token } : {}),
@@ -92,6 +93,10 @@ async function open(name, { status = SIGNED_IN, token = TOKEN, computers = [HOME
       globalThis.WebSocket = f.Socket;
       const previous = globalThis.fetch;
       const fake = (url, init) => {
+        if (String(url) === "https://relay.test/v1/workspaces") {
+          registered.push(init?.headers?.authorization);
+          return Promise.resolve(registry ? Response.json({ workspaces: registry }) : new Response("{}", { status: 404 }));
+        }
         if (String(url).startsWith("https://relay.test/v1/computers")) {
           listed.push(init?.headers?.authorization);
           return Promise.resolve(new Response(JSON.stringify({ computers }), { status: 200, headers: { "content-type": "application/json" } }));
@@ -106,7 +111,7 @@ async function open(name, { status = SIGNED_IN, token = TOKEN, computers = [HOME
   const invoke = (command, args, options) => app.w.__TAURI_INTERNALS__.invoke(command, args, options);
   const relayCalls = (id, command) => (f.relays[id]?.calls ?? []).filter((c) => c.command === command);
   const native = (command) => calls.filter((c) => c.command === command);
-  return { app, f, invoke, relayCalls, native, listed, doc: app.w.document, text: () => app.w.document.body.textContent ?? "" };
+  return { app, f, invoke, relayCalls, native, listed, registered, doc: app.w.document, text: () => app.w.document.body.textContent ?? "" };
 }
 
 test("signed out, the desktop is the local window as before", async () => {
@@ -283,5 +288,22 @@ test("with another machine in «Ejecutar en», a clone runs there with start_pro
   await sleep(600);
   assert.ok(!text().includes("Recibiendo objetos"), "the clone ended");
   assert.equal(app.w.localStorage.getItem("harness.layout.projects.remote_clones"), null);
+  assert.deepEqual(app.fallos, []);
+});
+
+test("signed in, a workspace of the account whose machine is asleep lists with the window's own", async () => {
+  const registry = [
+    { id: "w2", name: "Producto", projects: [{ id: "p5", name: "Aplicación", remote_url: "https://github.com/ana/app", home_computer_id: "cmp_vm" }], computers: ["cmp_vm"] },
+  ];
+  const { app, invoke, registered, relayCalls } = await open("desktop-account-registry", {
+    computers: [HOME, VM],
+    registry,
+    relays: { cmp_vm: { table: remote("Panel", "Tarea de la VM"), state: "offline" } },
+  });
+  const startup = await invoke("list_workspaces");
+  assert.deepEqual(startup.workspaces.map((w) => [w.id, w.machines]), [["w", ["cmp_home"]], ["w2", ["cmp_vm"]]], "the account's workspace joins the local ones");
+  assert.equal(startup.active, "w", "the window stays in its own");
+  assert.ok(registered.includes("Bearer client-tok"), "the registry is read with the client token");
+  assert.equal(relayCalls("cmp_vm", "send_message").length, 0, "reading wakes nothing");
   assert.deepEqual(app.fallos, []);
 });
