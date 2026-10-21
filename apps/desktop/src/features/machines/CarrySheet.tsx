@@ -23,7 +23,7 @@ import { Toggle } from "../../ui/Toggle";
 import { copyText } from "../../lib/clipboard";
 import { df, elapsed, peso } from "../../lib/format";
 import { t } from "../../lib/i18n";
-import { type CarryCheck, DESKTOP_BYTES_PER_SECOND, createsProject, engine, jobFor, partSize, viaSsh } from "./carry";
+import { type CarryCheck, DESKTOP_BYTES_PER_SECOND, createsProject, engine, jobFor, partSize, trustKey, viaSsh } from "./carry";
 import { machineName } from "./store";
 
 /** Lo que se pide al exportar mientras la persona decide; se rehace al cambiar la selección. */
@@ -55,6 +55,7 @@ export default function CarrySheet(props: {
   const branchAs = () => (bring() ? bringBranch(s(), machineName(props.check.source)) : null);
   const [preview, setPreview] = createSignal<Preview | null>(null);
   const [copied, setCopied] = createSignal<string | null>(null);
+  const [keyChanged, setKeyChanged] = createSignal(props.check.keyChanged);
   const source = () => machineName(props.check.source);
   const target = () => machineName(props.check.target);
   let confirmed = false;
@@ -96,7 +97,7 @@ export default function CarrySheet(props: {
     if (p?.tooLarge) return "block";
     return p?.bytes == null ? null : sizeVerdict(p.bytes);
   };
-  const ready = () => carriesNothing(selection()) || (preview()?.bytes != null && verdict() !== "block");
+  const ready = () => !keyChanged() && (carriesNothing(selection()) || (preview()?.bytes != null && verdict() !== "block"));
 
   const pushCommand = () => `git push -u origin ${s().branch ?? "HEAD"}`;
   function push() {
@@ -249,8 +250,21 @@ export default function CarrySheet(props: {
             </Show>
             <p class="m-0">{t("work.carry.taken_at", { time: df({ hour: "2-digit", minute: "2-digit" }).format(takenAtMs(s())) })}</p>
           </Show>
-          <Show when={viaSsh() && selection().files.length}>
-            <p class="m-0 flex items-center gap-1"><Lock size={12} aria-hidden="true" />{t("work.carry.ssh")}</p>
+          <Show when={props.check.recipientKey} fallback={
+            <Show when={viaSsh() && selection().files.length}>
+              <p class="m-0 flex items-center gap-1"><Lock size={12} aria-hidden="true" />{t("work.carry.ssh")}</p>
+            </Show>
+          }>
+            <p class="m-0 flex items-center gap-1" data-carry-sealed><Lock size={12} aria-hidden="true" />{t("work.carry.sealed", { machine: target() })}</p>
+          </Show>
+          <Show when={keyChanged()}>
+            <div class="flex flex-col items-start gap-1" data-carry-key-changed>
+              <p class="m-0 text-warning-strong">{t("work.carry.key_changed", { machine: target() })}</p>
+              <Button size="compact" variant="secondary" data-carry-trust-key onClick={() => {
+                trustKey(props.check.target, props.check.recipientKey ?? "");
+                setKeyChanged(false);
+              }}>{t("work.carry.trust_key")}</Button>
+            </div>
           </Show>
           <Show when={copied()}>{(command) => <p class="m-0" role="status">{t("work.carry.push_copied", { command: command() })}</p>}</Show>
         </div>

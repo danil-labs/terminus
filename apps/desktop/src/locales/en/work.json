@@ -1,5 +1,6 @@
 {
   "work.error.bad_branch": "The branch name is not valid.",
+  "work.error.bad_key": "The destination machine's key is not valid: the copy cannot be sealed.",
   "work.error.bad_part": "A part of the copy is not valid: retry.",
   "work.error.bad_path": "One of the chosen files is outside the project or is a link: remove it from the list.",
   "work.error.bad_transfer": "The copy file is not valid: cancel and start again.",
@@ -9,6 +10,7 @@
   "work.error.no_commits": "The repository has no commits yet: make one and try again.",
   "work.error.not_git": "The folder is not a git repository: its work cannot be carried.",
   "work.error.project_missing": "This machine does not have the project: it is cloned before receiving the work.",
+  "work.error.sealed_open_failed": "The destination machine could not open the sealed copy: the key is not its own or the copy arrived damaged. Start again.",
   "work.error.sha_mismatch": "The copy arrived damaged: cancel and start again.",
   "work.error.storage": "The copy could not be saved on the machine's disk: check the free space.",
   "work.error.task_missing": "The task is no longer on that machine: there is no work to bring.",
@@ -97,5 +99,8 @@
     "other": "{count} commits on {branch} (up to {head})."
   },
   "work.progress.label_bring": "Bring to {machine}",
-  "work.carry.creates": "created from the copy, without a remote"
+  "work.carry.creates": "created from the copy, without a remote",
+  "work.carry.sealed": "They travel end-to-end encrypted for {machine}; Danil does not see them.",
+  "work.carry.key_changed": "The key of {machine} is not the one from last time. If you did not reinstall it, someone could be in the middle: do not carry anything until you know.",
+  "work.carry.trust_key": "Trust the new key"
 }

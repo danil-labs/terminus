@@ -21,6 +21,7 @@ import {
   cancelCarry,
   carryWork,
   type Selection,
+  keyVerdict,
   needsSheet,
   newState,
   withoutRemote,
@@ -29,6 +30,7 @@ import "../../locales/workPhrases";
 import { invoke } from "../../lib/invoke";
 import type { Project } from "../../lib/model";
 import { capabilities } from "../../lib/platform";
+import { escribirPref, leerPref } from "../../lib/prefs";
 import { t } from "../../lib/i18n";
 import { type CarryOrigin, machineName, rememberOrigin } from "./store";
 
@@ -42,6 +44,7 @@ export const engine: CarryEngine = {
   writePart: (machine, args) => invoke("work_write_part", args, on(machine)),
   importWork: (machine, args) => invoke<Imported>("work_import", args, on(machine)),
   cancel: (machine, args) => invoke("work_cancel", args, on(machine)),
+  key: (machine) => invoke<{ publicKey: string }>("work_key", {}, on(machine)),
 };
 
 /** Lo que se sabe al enviar: de dónde a dónde, qué hay sin subir y si el destino ya tiene el proyecto. */
@@ -55,7 +58,33 @@ export type CarryCheck = {
   hasProject: boolean | null;
   /** Al traer: la tarea de la otra máquina cuyo worktree se trae. */
   task: { id: string; title: string } | null;
+  /**
+   * La llave del destino con la que se sella, o `null` si viaja sin sellar (el
+   * escritorio por SSH, o un motor sin `work_key`). `keyChanged`: no es la fijada.
+   */
+  recipientKey: string | null;
+  keyChanged: boolean;
 };
+
+const KEYS = "machines.carry_keys";
+const pinned = () => leerPref<Record<string, string>>(KEYS, {});
+
+/** Fija la llave de una máquina: la primera vez sola (TOFU), después al pulsar «Confiar en la nueva llave». */
+export function trustKey(machine: string, key: string) {
+  escribirPref(KEYS, { ...pinned(), [machine]: key });
+}
+
+/** El escritorio llega a sus máquinas por un túnel SSH y no sella; la web y el teléfono sellan siempre. */
+export const seals = () => !viaSsh();
+
+async function keyFor(target: string): Promise<{ recipientKey: string | null; keyChanged: boolean }> {
+  if (!seals()) return { recipientKey: null, keyChanged: false };
+  const key = await engine.key(target).then((k) => k.publicKey).catch(() => null);
+  if (!key) return { recipientKey: null, keyChanged: false };
+  const verdict = keyVerdict(pinned()[target], key);
+  if (verdict === "new") trustKey(target, key);
+  return { recipientKey: key, keyChanged: verdict === "changed" };
+}
 
 /** Si el destino tiene la carpeta del proyecto: por su lista, con el mismo id o, si no, el mismo nombre. */
 async function targetHasProject(target: string, project: Project): Promise<boolean> {
@@ -77,7 +106,7 @@ export async function checkCarry(input: { workspace: string; project: Project; s
     targetHasProject(input.target, input.project).catch(() => null),
   ]);
   if (!status || (!force && !needsSheet(status, hasProject ?? true))) return null;
-  return { ...input, status, hasProject, task: null };
+  return { ...input, status, hasProject, task: null, ...(await keyFor(input.target)) };
 }
 
 /**
@@ -90,7 +119,8 @@ export async function checkBring(input: { workspace: string; project: Project; s
     engine.status(input.source, { project: input.project.id, task: input.task.id }),
     targetHasProject(input.target, input.project).catch(() => null),
   ]);
-  return { ...input, status, hasProject };
+  // Traer es del escritorio: llega por el túnel SSH y no se sella.
+  return { ...input, status, hasProject, recipientKey: null, keyChanged: false };
 }
 
 /** «Seguir en una tarea nueva aquí» (D4): título, último mensaje del agente y los commits; no la transcripción. */
@@ -155,7 +185,7 @@ export const createsProject = (check: CarryCheck) => withoutRemote(check.status,
 export function jobFor(check: CarryCheck, choice: { selection: Selection; partSize: number; task: string | null; branchAs: string | null }): CarryJob {
   const create = createsProject(check) ? { name: check.project.name, id: check.project.id } : null;
   const selection = create ? { ...choice.selection, includeWork: true, full: true } : choice.selection;
-  return { source: check.source, target: check.target, project: check.project.id, task: choice.task, selection, partSize: choice.partSize, branchAs: choice.branchAs, create };
+  return { source: check.source, target: check.target, project: check.project.id, task: choice.task, selection, partSize: choice.partSize, branchAs: choice.branchAs, create, recipientKey: check.recipientKey };
 }
 
 /** Clona en el destino por `start_project_clone`, con su avance, como al añadir una carpeta. */

@@ -56,6 +56,8 @@ export type CarryJob = {
   branchAs?: string | null;
   /** Sin remoto y sin el proyecto en el destino: lo crea el import desde el bundle completo. */
   create?: { name: string; id: string } | null;
+  /** Sellado para el motor de destino (`work_key`); sin llave viaja en claro. */
+  recipientKey?: string | null;
 };
 
 export type CarryState = {
@@ -127,6 +129,7 @@ export async function prepare(engine: CarryEngine, job: CarryJob, state: CarrySt
       exclude: job.selection.exclude,
       files: job.selection.files,
       full: job.selection.full,
+      ...(job.recipientKey ? { recipientKey: job.recipientKey } : {}),
     });
   } catch (cause) {
     fail({ code: errorKey(cause) === "work.error.too_large" ? "too_large" : "export_failed", cause });
