@@ -50,6 +50,8 @@ let lectura = 0;
  */
 export async function cargarFondoDelWorkspace(workspace: string | null): Promise<void> {
   const esta = ++lectura;
+  // Antes de leer: aunque la lectura falle, lo que se importe después es de este workspace.
+  store.setWorkspaceAbierto(workspace);
   let respuesta: unknown;
   try {
     respuesta = await invoke<unknown>("chat_background");
@@ -58,7 +60,6 @@ export async function cargarFondoDelWorkspace(workspace: string | null): Promise
     return;
   }
   if (esta !== lectura) return;
-  store.setWorkspaceAbierto(workspace);
   store.setImagenDelWorkspace(null);
   const vista = chatBackgroundView(respuesta);
   const r = (respuesta ?? {}) as { data_url?: unknown; veil?: unknown };
