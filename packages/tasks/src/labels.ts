@@ -30,8 +30,8 @@ export function scopeLabel(lang: Lang, view: SidebarView, folderName: (id: strin
   return parts.join(" · ");
 }
 
-export function sectionLabel(lang: Lang, section: SidebarSection): string {
-  return section === "needs_you" ? word(lang, "shell.sidebar.view.section_needs_you") : word(lang, "shell.sidebar.view.section_active");
+export function sectionLabel(lang: Lang, _section: SidebarSection): string {
+  return word(lang, "shell.sidebar.view.section_active");
 }
 
 export function statusGroupLabel(lang: Lang, key: SidebarStatusKey): string {
