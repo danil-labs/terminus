@@ -33,6 +33,11 @@ export type Answer = { machine: string; value: unknown };
 const SEP = "~";
 /** Keys whose string value names a task, portfolio, account or space of the machine that sent it. */
 const KEYS = new Set(["session", "parent", "portfolio", "account", "space"]);
+/**
+ * Keys whose list names tasks of any machine (`open`: the ones with a tab). They never pick the machine: a tab of
+ * another machine's task would send every folder's read there alone. Each machine gets only its own ids.
+ */
+const SPREAD = new Set(["open"]);
 /** Reads of workspace content: each machine of the workspace answers its part. */
 export const FAN = new Set(["list_projects", "list_portfolios", "list_live_sessions", "list_active_turns", "list_live_turns", "list_spaces"]);
 /** Reads that list every machine, whatever the workspace. */
@@ -264,6 +269,7 @@ export class Fleet {
 
   /** The args as `machine` understands them; `machines` collects every machine an id in them names. */
   private decode(value: unknown, target: string | null, machines: Set<string>, key: string | null = null): unknown {
+    if (key && SPREAD.has(key) && Array.isArray(value)) return target === null ? value : this.ownOf(target, value);
     if (typeof value === "string") {
       const own = this.unwrap(value);
       if (!own) {
@@ -277,6 +283,16 @@ export class Fleet {
     if (Array.isArray(value)) return value.map((v) => this.decode(v, target, machines, key));
     if (isRow(value)) return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, this.decode(v, target, machines, k)]));
     return value;
+  }
+
+  /** The ids of `list` that are `machine`'s, as it knows them; a bare id is the home machine's, or anyone's without one. */
+  private ownOf(machine: string, list: unknown[]): unknown[] {
+    return list.flatMap((v) => {
+      if (typeof v !== "string") return [v];
+      const own = this.unwrap(v);
+      if (own) return own.machine === machine ? [own.id] : [];
+      return !this.home || machine === this.home ? [v] : [];
+    });
   }
 
   /** The machines that answer a read of `workspace`: of one project, only those that have its folder. */
