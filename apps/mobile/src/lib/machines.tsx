@@ -1,0 +1,235 @@
+import { type Answer, type Computer, listComputers, orderComputers, startComputer } from "@terminus/computers";
+import type { EngineEvent, WorkspaceAttention } from "@terminus/protocol";
+import * as SecureStore from "expo-secure-store";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { AppState, Platform } from "react-native";
+import { useAccount } from "./account";
+import { BRIDGE_ENABLED, loadPairing, savePairing } from "./bridge";
+import { type Notice, attentionOf, noticer } from "./engine";
+import { type Host, type Pairing, bridgeHost, relayHost } from "./hosts";
+import { t } from "./i18n";
+import { Notifications } from "./notifications";
+import { COMPUTERS } from "./supabase";
+
+type Listener = (host: string, events: EngineEvent[], gap: boolean) => void;
+
+/** Lo que dijo `/v1/computers`: la licencia y el error no se confunden con «no tienes máquinas». */
+export type Fleet = "loading" | "ok" | "license" | "error" | "signed_out";
+
+type Machines = {
+  ready: boolean;
+  fleet: Fleet;
+  /** Las máquinas de la persona y, si está emparejado, el Terminus de la red. */
+  hosts: Host[];
+  hostOf: (id: string) => Host | undefined;
+  /** La máquina por omisión para tareas nuevas: la última usada, la VM administrada o la primera. */
+  preferred: (eligible: Host[]) => Host | null;
+  rememberMachine: (id: string) => void;
+  pairing: Pairing | null;
+  pair: (pairing: Pairing | null) => Promise<void>;
+  reloadComputers: () => Promise<void>;
+  /** Atención por máquina: `hostId → workspaces`. */
+  attention: Record<string, WorkspaceAttention[]>;
+  activity: { notice: Notice; at: number }[];
+  titleOf: (key: string) => string | undefined;
+  rememberTitles: (entries: [string, string][]) => void;
+  setOpenTask: (key: string | null) => void;
+  subscribe: (listener: Listener) => () => void;
+  /** Cambia cuando una máquina cambia de estado: para repintar. */
+  tick: number;
+};
+
+const Context = createContext<Machines | null>(null);
+
+export function useMachines() {
+  const value = useContext(Context);
+  if (!value) throw new Error("useMachines outside MachinesProvider");
+  return value;
+}
+
+const CHANNEL = "tasks";
+const LAST = "terminus.machine.last";
+
+async function announce(notice: Notice, title: string | undefined) {
+  if (!Notifications) return;
+  const name = title?.trim() || t("notify.untitled");
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: t(`notify.${notice.state === "unseen" ? "finished" : notice.state}` as const, { title: name }),
+      body: "",
+      data: { host: notice.host, workspace: notice.workspace, folder: notice.folder, task: notice.session },
+    },
+    trigger: Platform.OS === "android" ? { channelId: CHANNEL } : null,
+  });
+}
+
+/** La lista con un token que la API acepta: un token rechazado se refresca una vez. */
+async function computersOf(getToken: () => Promise<string>, unauthorized: () => Promise<boolean>): Promise<Answer<Computer[]>> {
+  const answer = await listComputers(COMPUTERS, await getToken());
+  if (answer.kind !== "unauthorized" || !(await unauthorized())) return answer;
+  return listComputers(COMPUTERS, await getToken());
+}
+
+export function MachinesProvider({ children }: { children: ReactNode }) {
+  const account = useAccount();
+  const signedIn = Boolean(account.session);
+  const [computers, setComputers] = useState<Computer[]>([]);
+  const [fleet, setFleet] = useState<Fleet>("loading");
+  const [pairing, setPairing] = useState<Pairing | null>(null);
+  const [pairingLoaded, setPairingLoaded] = useState(false);
+  const [hosts, setHosts] = useState<Host[]>([]);
+  const [tick, setTick] = useState(0);
+  const [attention, setAttention] = useState<Record<string, WorkspaceAttention[]>>({});
+  const [activity, setActivity] = useState<{ notice: Notice; at: number }[]>([]);
+  const [last, setLast] = useState<string | null>(null);
+  const listeners = useRef(new Set<Listener>());
+  const openTask = useRef<string | null>(null);
+  const titles = useRef(new Map<string, string>());
+
+  useEffect(() => {
+    void loadPairing().then((saved) => {
+      setPairing(BRIDGE_ENABLED ? saved : null);
+      setPairingLoaded(true);
+    });
+    void SecureStore.getItemAsync(LAST).then(setLast);
+    if (Platform.OS === "android" && Notifications) {
+      void Notifications.setNotificationChannelAsync(CHANNEL, { name: t("notify.channel"), importance: Notifications.AndroidImportance.HIGH });
+    }
+  }, []);
+
+  const reloadComputers = useCallback(async () => {
+    if (!signedIn) {
+      setComputers([]);
+      setFleet("signed_out");
+      return;
+    }
+    const answer = await computersOf(account.getToken, account.unauthorized).catch((): Answer<Computer[]> => ({ kind: "error", status: null }));
+    if (answer.kind === "ok") {
+      setFleet("ok");
+      // Solo cambia la lista si cambian las máquinas: cada cambio vuelve a abrir sus sesiones.
+      setComputers((old) => {
+        const same = old.length === answer.value.length && old.every((c, i) => c.computer_id === answer.value[i].computer_id && c.provider === answer.value[i].provider && c.name === answer.value[i].name);
+        return same ? old : answer.value;
+      });
+    } else if (answer.kind === "license") setFleet("license");
+    else if (answer.kind !== "unauthorized") setFleet("error");
+  }, [signedIn, account.getToken, account.unauthorized]);
+
+  useEffect(() => {
+    void reloadComputers();
+    // Al volver al frente, la lista (y su estado) puede haber cambiado. Nunca enciende nada.
+    const sub = AppState.addEventListener("change", (state) => state === "active" && void reloadComputers());
+    return () => sub.remove();
+  }, [reloadComputers]);
+
+  // Una sesión de relay por computadora y el bridge si está emparejado.
+  useEffect(() => {
+    // En el orden de la web: las administradas primero; la primera encabeza un workspace compartido.
+    const next: Host[] = orderComputers(computers).map((computer) =>
+      relayHost(computer, {
+        endpoint: COMPUTERS,
+        getToken: account.getToken,
+        onUnauthorized: () => void account.unauthorized(),
+        // Fijar, archivar o cerrar una sesión no son intenciones del relay: la VM se enciende por aquí.
+        wake: async () => (await startComputer(COMPUTERS, await account.getToken(), computer.computer_id)).kind === "ok",
+        beforeReconnect: async () => {
+          const answer = await computersOf(account.getToken, account.unauthorized);
+          if (answer.kind === "license") setFleet("license");
+          if (answer.kind === "ok" && !answer.value.some((c) => c.computer_id === computer.computer_id)) return false;
+          return answer.kind !== "license" && answer.kind !== "unauthorized";
+        },
+      }),
+    );
+    if (pairing) next.push(bridgeHost(pairing, t("machines.network")));
+    setHosts(next);
+    const unsubscribe = next.flatMap((host) => {
+      const notices = noticer(host.id);
+      const refreshAttention = () =>
+        void attentionOf(host).then((list) => {
+          notices.reset(list);
+          setAttention((old) => ({ ...old, [host.id]: list }));
+        });
+      refreshAttention();
+      return [
+        host.onChange(() => {
+          setTick((n) => n + 1);
+          if (host.power() === "on") refreshAttention();
+        }),
+        host.onEvents((events, gap) => {
+          if (gap) refreshAttention();
+          for (const event of events) {
+            if (event.name === "attention" && Array.isArray(event.payload)) {
+              setAttention((old) => ({ ...old, [host.id]: event.payload as WorkspaceAttention[] }));
+            }
+            for (const notice of notices.take(event)) {
+              setActivity((old) => [{ notice, at: Date.now() }, ...old].slice(0, 100));
+              const key = `${notice.host}/${notice.session}`;
+              if (key !== openTask.current) void announce(notice, titles.current.get(key));
+            }
+          }
+          for (const listener of listeners.current) listener(host.id, events, gap);
+        }),
+      ];
+    });
+    return () => {
+      for (const off of unsubscribe) off();
+      for (const host of next) host.close();
+    };
+  }, [computers, pairing, account.getToken, account.unauthorized]);
+
+  const pair = useCallback(async (next: Pairing | null) => {
+    await savePairing(next);
+    setPairing(next);
+  }, []);
+
+  const rememberMachine = useCallback((id: string) => {
+    setLast(id);
+    void SecureStore.setItemAsync(LAST, id);
+  }, []);
+
+  const preferred = useCallback(
+    (eligible: Host[]) => {
+      const remembered = eligible.find((h) => h.id === last);
+      if (remembered) return remembered;
+      // La regla de `defaultComputer`: la VM administrada, si no la primera.
+      return eligible.find((h) => h.managed) ?? eligible[0] ?? null;
+    },
+    [last],
+  );
+
+  const subscribe = useCallback((listener: Listener) => {
+    listeners.current.add(listener);
+    return () => void listeners.current.delete(listener);
+  }, []);
+  const setOpenTask = useCallback((key: string | null) => {
+    openTask.current = key;
+  }, []);
+  const rememberTitles = useCallback((entries: [string, string][]) => {
+    for (const [key, title] of entries) titles.current.set(key, title);
+  }, []);
+  const titleOf = useCallback((key: string) => titles.current.get(key), []);
+  const hostOf = useCallback((id: string) => hosts.find((h) => h.id === id), [hosts]);
+
+  const value = useMemo<Machines>(
+    () => ({
+      ready: account.ready && pairingLoaded,
+      fleet,
+      hosts,
+      hostOf,
+      preferred,
+      rememberMachine,
+      pairing,
+      pair,
+      reloadComputers,
+      attention,
+      activity,
+      titleOf,
+      rememberTitles,
+      setOpenTask,
+      subscribe,
+      tick,
+    }),
+    [account.ready, pairingLoaded, fleet, hosts, hostOf, preferred, rememberMachine, pairing, pair, reloadComputers, attention, activity, titleOf, rememberTitles, setOpenTask, subscribe, tick],
+  );
+  return <Context.Provider value={value}>{children}</Context.Provider>;
+}
