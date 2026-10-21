@@ -73,6 +73,8 @@ export function encodeSnapshot(snapshot: ShellSnapshot, rows: number): string {
 export function writeShellCache(snapshot: ShellSnapshot, now = Date.now()) {
   const text = ROWS.map((rows) => encodeSnapshot(snapshot, rows)).find((t) => t.length <= BYTES);
   const value = stored() ?? { version: 2 as const, last: snapshot.workspace, workspaces: {} };
+  // La misma foto ya guardada no se reescribe: cada escritura rehace todo el valor.
+  if (value.last === snapshot.workspace && value.workspaces[snapshot.workspace]?.snapshot === text) return;
   if (text === undefined) {
     delete value.workspaces[snapshot.workspace];
   } else {
