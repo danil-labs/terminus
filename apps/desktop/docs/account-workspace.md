@@ -86,7 +86,7 @@ detrás de lo que ya existe, sin romper a quien no lo usa.
 
 ### 1. `danil-labs/computers` — el registro y la regla
 
-Rama `feat/workspace-owners`; ya existe y está vacía.
+Sobre computers#10 (`feat/workspace-owners`); ver «Conciliación».
 
 1. **Migración `005_workspaces.sql`**, aplicada a mano como las demás:
    - `workspaces`: `workspace_id` (el id del motor, llave primaria), `owner_id`,
@@ -119,7 +119,7 @@ Rama `feat/workspace-owners`; ya existe y está vacía.
 
 ### 2. `danil-labs/seldon-host` — materializar con el id de la cuenta
 
-Rama `feat/workspace-danil-link`; ya existe y está vacía.
+Sobre seldon-host#72 (`feat/workspace-danil-link`); ver «Conciliación».
 
 1. **Workspace con id dado.**
    - `add_workspace` recibe `id: Option<String>`. Lo valida con `safe_segment` y
@@ -224,18 +224,57 @@ Rama `feat/workspace-danil-link`; ya existe y está vacía.
   máquina.
 - Un workspace sin cuenta de Danil funciona igual que hoy.
 
-## Contrato entre los tres repositorios (fase 1)
+## Conciliación con los PRs de vínculos (2026-10-21)
 
-Decidido el 2026-10-20: el mismo id de workspace y de proyecto en todas las
-máquinas. Esta sección es la fuente común de las tres implementaciones; si una
-necesita cambiarla, se cambia aquí primero.
+Mientras se escribía este plan, otra tarea abrió computers#10, seldon-host#72 y
+terminus#185: cada `(computadora, workspace)` atado a una cuenta de Danil, el
+relay que lo hace cumplir, eventos con `workspace` y el fondo del chat por
+workspace. La revisión encontró errores graves en los tres y un modelo que
+permite varias personas por computadora. Este plan se construye **encima** de
+esos PRs: se queda con lo que sirve, corrige sus errores y agrega el workspace
+compartido. Las ramas nuevas salen de sus cabezas (fab9bd4, 696773f, 6d93c68).
+
+Se conserva de esos PRs:
+
+- `computer_workspace_links`: en qué computadoras vive cada workspace y de quién
+  es. Hace el papel de `workspace_computers`.
+- El error `workspace_not_linked` (reemplaza a `workspace_forbidden`) y el
+  cierre 4003 `unlinked`.
+- Computadoras compartidas: una persona que no es dueña de la computadora
+  (miembro) puede tener ahí sus workspaces. Hay VMs compartidas
+  (`vm-linux-shared`, `vm-windows-shared`).
+- Las órdenes `danil_workspace_link{mode}` / `danil_workspace_unlink`, el campo
+  `danil: {user_id, email, name}` de las filas (hace el papel de `account`) y
+  `danil.json` en la carpeta del workspace.
+- Eventos con `workspace` arriba, el filtro de la web por máquina remota
+  (`linkedOnly`/`linkedEvents`) y el fondo del chat por workspace.
+
+## Contrato entre los tres repositorios (fase 1, conciliado)
+
+Esta sección es la fuente común de las tres implementaciones; si una necesita
+cambiarla, se cambia aquí primero.
 
 ### Ids
 
 - Formato del motor: 8 caracteres de `0123456789abcdefghjkmnpqrstvwxyz`
-  (`util.rs` `short_id`). Expresión: `^[0-9a-hjkmnp-tv-z]{8}$`.
-- Workspace y proyecto ligados a la cuenta conservan su id en todas las
-  máquinas. Las tareas siguen con id por máquina.
+  (`util.rs` `short_id`). Expresión: `^[0-9a-hjkmnp-tv-z]{8}$`. Se valida en
+  las tablas nuevas, en `computer_workspace_links` y en el Worker.
+- Workspace y proyecto conservan su id en todas las máquinas. Las tareas
+  siguen con id por máquina.
+
+### Quién es dueño de qué
+
+- **Un workspace tiene una sola dueña**: `workspaces.owner_id`. Toda fila de
+  `computer_workspace_links` de ese workspace lleva `user_id = owner_id`; un
+  intento de atarlo a otra persona responde `409 workspace_id_taken`.
+- **La dueña de una computadora es la dueña por omisión de sus workspaces.** Al
+  conectar, el motor ata a ella todo workspace local que no esté atado
+  (`mode: owner`). Así una VM sin ventana nunca queda con workspaces invisibles
+  y el despliegue no deja a nadie sin acceso.
+- **Un miembro** (persona con workspaces en una computadora ajena) entra por el
+  código de dispositivo de «Otra cuenta» de #10, que la dueña de la computadora
+  inicia desde su máquina. Un miembro no materializa workspaces en esa
+  computadora en la fase 1.
 
 ### Plano de control (`computers`)
 
@@ -248,95 +287,118 @@ Tablas en `public`, RLS sin políticas (solo rol de servicio):
 - `workspace_projects(workspace_id, project_id, name, remote_url null,
   default_branch null, home_computer_id null, created_at, updated_at,
   deleted_at null; pk (workspace_id, project_id))`.
-- `workspace_computers(workspace_id, computer_id, seen_at; pk (workspace_id,
-  computer_id))`: qué máquinas materializaron cada workspace.
+- `computer_workspace_links` (de #10) sigue; su `workspace_id` pasa a la
+  expresión de ids.
 
 `settings` (fase 1): `{ lengua, lengua_de_salida, default_permission_mode,
-terminal_theme }`, todas texto o null. Fase 2 suma logo, fondo, MCP y skills.
+terminal_theme }`, todas texto o null.
 
-Rutas (JWT, token de cliente o token de máquina; siempre del `owner_id`):
+Rutas nuevas (JWT, token de cliente o token de máquina; siempre de la persona):
 
 | Ruta | Cuerpo | Respuesta |
 |---|---|---|
-| `GET /v1/workspaces` | — | `{ workspaces: Workspace[] }` |
-| `POST /v1/workspaces` | `{ id, name, radiant_workspace_id?, settings?, projects?: Project[] }` | `201 Workspace`; `200` si ya es de la misma persona (idempotente, no pisa nada); `409 {error:"workspace_id_taken"}` si es de otra o está borrado |
-| `PATCH /v1/workspaces/:id` | `{ name?, settings?, settings_version }` (`settings_version` obligatorio con `settings`; es la versión que el cliente leyó) | `200 Workspace` con versión +1; `409 {error:"settings_conflict", workspace}` |
-| `DELETE /v1/workspaces/:id` | — | `204` (borrado suave) |
+| `GET /v1/workspaces` | — | `{ workspaces: Workspace[] }` de quien llama |
+| `POST /v1/workspaces` | `{ id, name, radiant_workspace_id?, settings?, projects?: Project[] }` | `201`; `200` si ya es suyo (idempotente, no pisa nada); `409 workspace_id_taken` |
+| `PATCH /v1/workspaces/:id` | `{ name?, settings?, settings_version }` | `200` con versión +1; `409 {error:"settings_conflict", workspace}` |
+| `DELETE /v1/workspaces/:id` | — | `204` (borrado suave; borra sus vínculos) |
 | `PUT /v1/workspaces/:id/projects/:project` | `{ name, remote_url?, default_branch?, home_computer_id? }` | `200 Project` |
 | `DELETE /v1/workspaces/:id/projects/:project` | — | `204` |
-| `PUT /v1/computers/self/workspaces` | `{ workspaces: string[] }` (solo token de máquina) | `204`; reemplaza las filas de esa computadora |
-| `GET /v1/me` | — | suma `id` (el `owner_id`) a lo que ya devuelve |
+| `GET /v1/me` | — | suma `id` |
 
 `Workspace = { id, name, radiant_workspace_id, settings, settings_version,
-created_at, updated_at, projects: Project[], computers: string[] }`.
+created_at, updated_at, projects: Project[], computers: string[] }`
+(`computers` sale de `computer_workspace_links`).
 `Project = { id, name, remote_url, default_branch, home_computer_id }`.
 
-Relay:
+Las rutas de vínculo de #10 (`/v1/computers/self/workspaces...`) siguen; atar
+con `mode: owner` crea la fila de `workspaces` si falta (con el nombre que manda
+el motor) y respeta la regla de una sola dueña.
 
-- Una llamada con `workspace` no nulo solo pasa si ese id es un workspace
-  ligado y no borrado del dueño de la sesión; si no, resultado de error
-  `workspace_forbidden`. Se puede cachear por Durable Object con vida corta.
-- Tras `POST`/`PATCH`/`DELETE` de un workspace o proyecto, el Worker avisa a los
-  Durable Objects de las computadoras del dueño. Cada uno manda al conector
-  `{ type: "workspace.changed", workspace, settings_version }` y lo emite como
-  evento `workspace.changed` a sus sesiones.
-- `INTENT_COMMANDS` suma `materialize_workspace`, `link_workspace` y
-  `ensure_project`.
+Relay — conjunto permitido `L(persona, computadora)`:
+
+- **Dueña de la computadora:** todos los workspaces de su cuenta
+  (`workspaces.owner_id`), estén o no en esta computadora. Por eso
+  `materialize_workspace` y `ensure_project` pasan en una VM que aún no tiene
+  el workspace.
+- **Miembro:** sus workspaces atados en esta computadora.
+- Toda llamada con workspace en el sobre **o en los argumentos** (`args.id` de
+  las órdenes de workspace, `args.workspace`) se revisa contra `L`.
+- Las órdenes de toda la máquina (cuentas de agentes, `add_workspace`,
+  `materialize_workspace`, `set_project_directory`, `danil_*`,
+  `remove_workspace`) son solo para la dueña de la computadora. Un miembro usa
+  una lista cerrada de órdenes de su workspace.
+- `/start` y `/stop` son solo de la dueña; un miembro enciende la máquina con
+  una intención (mandar un mensaje).
+- Tras cambiar un workspace o proyecto, el Worker avisa a los Durable Objects
+  de las computadoras de la dueña: al conector
+  `{ type: "workspace.changed", workspace, settings_version }` y a las sesiones
+  el evento `workspace.changed`.
+- `INTENT_COMMANDS` suma `materialize_workspace` y `ensure_project`.
 
 ### Motor (`seldon-host`)
 
+Corrige de #72:
+
+- `attention` conserva su forma de lista en un solo evento; cada entrada lleva
+  su `workspace` y el relay filtra entradas (no parte el evento).
+- `chat_background` contesta `null` cuando el workspace no tiene fondo propio,
+  como antes.
+- `set_chat_background` sin imagen conserva la imagen vigente (propia o de la
+  máquina).
+- `store_link` no escribe si la credencial ya no está (carrera con
+  desconectar).
+- Los avisos de `chat` y demás eventos de un workspace llevan su `workspace`.
+
+Agrega:
+
+- Atar al conectar: todo workspace local sin `danil.json` se ata a la dueña de
+  la computadora (`mode: owner`).
 - `add_workspace(name, folder?, git_host?, remote?, id?)`: con `id`, lo valida
-  (formato y `safe_segment`) y falla con `workspace_exists` si la carpeta ya
-  existe.
-- `Workspace` y su `Wire` suman `account: Option<String>` (el `owner_id` de
-  Danil; `serde(default)`).
-- `link_workspace(id)`: exige sesión de Danil. `POST /v1/workspaces` con nombre,
-  `settings` y sus proyectos (cada uno con `remote_url`/`default_branch`; sin
-  remoto, `home_computer_id` = esta computadora). Guarda `account`. Devuelve el
-  `Wire<Workspace>`.
-- `unlink_workspace(id)`: quita `account` aquí (no borra en la cuenta).
+  y falla con `workspace_exists` si la carpeta ya existe.
 - `materialize_workspace(id)`: lee `GET /v1/workspaces`, crea aquí el workspace
-  con ese id, nombre, ajustes y `account`. Si ya existe, solo sincroniza.
-  Devuelve el `Wire<Workspace>`.
-- `sync_workspace(id)`: relee los ajustes de la cuenta y los escribe.
+  con ese id, nombre, ajustes y vínculo. Si ya existe, solo sincroniza.
+- `sync_workspace(id)`: relee los ajustes de la cuenta y los escribe; corre al
+  recibir `workspace.changed`.
 - Setters de `lengua`, `lengua_de_salida`, `default_permission_mode`,
-  `terminal_theme` y `rename_workspace` en un workspace ligado publican con
-  `PATCH`; ante `settings_conflict` releen y reintentan una vez.
-- `Project` y `ProjectInfo` suman `remote_url`, `default_branch` y
-  `materialized: bool`. `create_project` y `clone_project` aceptan `id?`. En
-  un workspace ligado publican con `PUT .../projects/:id`.
-- `list_projects` de un workspace ligado devuelve los locales más los de la
-  cuenta que no están aquí, con `materialized: false` y sin
-  `working_directory`.
-- `ensure_project(project)`: si está aquí, nada. Si no, lo busca en la cuenta;
-  con `remote_url` lo clona en `default_project_directory` (carpeta libre con
-  su nombre) y escribe `project.json` con el mismo id; sin remoto, error
-  `project_not_here`.
-- `send_message` y `run_shell_command` con `session: null` llaman a
-  `ensure_project` antes de `prepare_cwd`.
-- Conector: tras `hello`, y después de ligar, materializar o quitar, hace
-  `PUT /v1/computers/self/workspaces` con los ids ligados de la máquina. Al
-  recibir `workspace.changed` corre `sync_workspace`.
-- `commands.json` suma las órdenes y campos nuevos.
+  `terminal_theme` y `rename_workspace` en un workspace atado publican con
+  `PATCH` (ante `settings_conflict` releen y reintentan una vez; un fallo de
+  red no rompe el setter local).
+- Proyectos: `remote_url`, `default_branch` y `materialized: bool` en `Project`
+  y `ProjectInfo`; `create_project` y `clone_project` aceptan `id?` y publican
+  con `PUT`; `list_projects` de un workspace atado suma los de la cuenta que no
+  están aquí (`materialized: false`).
+- `ensure_project(project)`: clona con `remote_url` en
+  `default_project_directory`, con el mismo id; sin remoto,
+  `project_not_here`. `send_message` y `run_shell_command` de una tarea nueva lo
+  llaman antes de `prepare_cwd`.
 
 ### Clientes (`terminus`)
 
+Corrige de #185:
+
+- El respaldo de `set_chat_background` no borra la imagen; un workspace sin
+  fondo no hereda el del anterior.
+- El móvil filtra eventos también por `payload.workspace`.
+- `workspaceOn` no cae a «el primer workspace de la máquina»: sin pareja, error.
+- Pruebas del filtro dentro del transporte.
+
+Agrega:
+
 - Con varias máquinas, los ids de workspace y de proyecto **no** llevan
-  prefijo; solo tareas, portafolios y cuentas de agentes lo llevan.
-- De una máquina remota solo se muestran sus workspaces con `account`; la
-  máquina de la ventana muestra todos los suyos. Los workspaces se agrupan por
-  id igual, nunca por nombre ni remoto.
+  prefijo; solo tareas, portafolios y cuentas de agentes.
+- Los workspaces se agrupan por id igual, nunca por nombre ni remoto.
 - Los proyectos de todas las máquinas se juntan por id; la fila dice en qué
   máquinas está (`machines`).
 - Al crear: la máquina elegida, si no la última usada, si no la de la ventana.
   Si esa máquina no tiene el workspace, primero `materialize_workspace` en
   ella. Un proyecto sin remoto que vive en otra máquina deja esa opción
   desactivada en «Ejecutar en», con la razón.
-- «Usar este workspace aquí» se borra. En Configuración del workspace, con
-  sesión de Danil: «Ligar a mi cuenta de Danil» (`link_workspace`). Un
-  workspace nuevo con sesión de Danil se liga al crearse.
+- «Usar este workspace aquí» se borra.
+- El campo `linked` de `features/machines/store.ts` se renombra a `hosts`
+  (tiene el workspace), para no confundirlo con el vínculo de la cuenta.
 
 ### Fase 2 (fuera de esta entrega)
 
-Logo, fondo del chat, MCP y skills desde la cuenta; adoptar las copias viejas
-de «Usar este workspace aquí»; workspaces de organización con varias personas.
+Logo, fondo, MCP y skills desde la cuenta; adoptar las copias viejas de «Usar
+este workspace aquí»; workspaces de organización con varias personas; que un
+miembro materialice workspaces en una computadora compartida.
