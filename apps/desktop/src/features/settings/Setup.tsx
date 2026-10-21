@@ -16,7 +16,7 @@ import {
   Switch,
 } from "solid-js";
 import { connected } from "../../lib/engineConnection";
-import { elapsed, mb, peso } from "../../lib/format";
+import { elapsed, peso } from "../../lib/format";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
 import { capabilities } from "../../lib/platform";
@@ -28,7 +28,7 @@ import { Toast, ToastPortal } from "../../ui/Toast";
 import type { Conexiones } from "../onboarding/connect-store";
 import { crearWorkspace } from "../onboarding/onboarding-store";
 import { CabeceraDelAlta } from "../onboarding/Phases";
-import type { EstadoDeEtapa, FilaDeEtapa, Instalacion, Linea, Vista } from "../onboarding/Prepare";
+import type { EstadoDeEtapa, FilaDeEtapa, Instalacion, Linea, Paso as PasoDeFila, Vista } from "../onboarding/Prepare";
 import { Escenario, QUIETO, TituloCambiante } from "../onboarding/Stage";
 import { type EnvReport, ORIGEN_APP, ORIGEN_BUNDLE, ORIGEN_SISTEMA } from "./environment-store";
 
@@ -49,13 +49,15 @@ type Evento =
   | { type: "output"; stage: string; line: string; stream: "stdout" | "stderr" }
   | { type: "download"; stage: string; done: number; total?: number };
 type Avance = { id: string; done: number; bytes: number };
+/** El evento `install` del motor: el avance de todo lo que se descarga y se puede cancelar. */
+type AvanceDeInstalacion = { operation: string; kind: string; done: number; bytes: number };
 /** Lo que las notas dicen de cada etapa, para el detalle de su fila. */
 type Dato = { version?: string; origen?: string; libre?: string; plataforma?: string; instala?: boolean };
 type Paso = "preparar" | "ia" | "personalizar";
 
 const LINEAS_MAX = 400;
-const RANGO: Record<EstadoDeEtapa, number> = { waiting: 0, running: 1, succeeded: 2, failed: 2 };
-const RITMO_CONSEJOS = 9000;
+const RANGO: Record<EstadoDeEtapa, number> = { waiting: 0, running: 1, succeeded: 2, failed: 2, skipped: 2 };
+const RITMO_CONSEJOS = 5000;
 const RITMO_FOTO = 5000;
 const CON_DESCRIPCION = new Set(["pnpm", "bun", "agent-browser", "uv", "python"]);
 
@@ -86,9 +88,13 @@ export default function Setup(props: { children: JSX.Element }) {
   const [parcial, setParcial] = createSignal(0);
   const [datos, setDatos] = createSignal<Record<string, Dato>>({});
   const [descarga, setDescarga] = createSignal<{ stage: string; file: string; done: number; total: number } | null>(null);
-  const [reintentos, setReintentos] = createSignal<Record<string, { enCurso: boolean; error?: string }>>({});
+  const [quiere, setQuiere] = createSignal<Record<string, boolean>>({});
+  // Lo que se hace con un opcional fuera de la corrida (instalarlo solo, desinstalarlo) manda sobre su etapa.
+  const [sueltos, setSueltos] = createSignal<Record<string, PasoDeFila>>({});
+  const [cancelados, setCancelados] = createSignal<Set<string>>(new Set());
+  // Los que se cortaron con la ×: su línea es «descarga cancelada», no «omitido».
+  const conLaX = new Set<string>();
   const [consejo, setConsejo] = createSignal(0);
-  const [pausa, setPausa] = createSignal(false);
   const [sinSoporte, setSinSoporte] = createSignal(false);
   const [bloqueado, setBloqueado] = createSignal(false);
   const [vista, setVista] = createSignal<Vista>("sencilla");
@@ -96,7 +102,7 @@ export default function Setup(props: { children: JSX.Element }) {
   const [entrando, setEntrando] = createSignal(false);
   const [workspace, setWorkspace] = createSignal<{ id: string; nombre: string } | null>(null);
   let log: HTMLPreElement | undefined;
-  let tope = { total: 0, valor: 0 };
+  let tope = { total: -1, valor: 0 };
 
   const [conexiones, setConexiones] = createSignal<Conexiones | null>(null);
   const dueño = getOwner();
@@ -106,11 +112,19 @@ export default function Setup(props: { children: JSX.Element }) {
     [t("setup.tips.context.title"), t("setup.tips.context.body")],
     [t("setup.tips.workspaces.title"), t("setup.tips.workspaces.body")],
     [t("setup.tips.memory.title"), t("setup.tips.memory.body")],
-    [t("setup.tips.folders.title"), t("setup.tips.folders.body")],
   ];
+  const quiereEsta = (name: string) => quiere()[name] !== false;
+  const ponerSuelto = (name: string, paso: PasoDeFila | null) =>
+    setSueltos((x) => {
+      const y = { ...x };
+      if (paso) y[name] = paso;
+      else delete y[name];
+      return y;
+    });
 
   function nombre(stage: string) {
     if (stage === "platform") return t("setup.stage.platform");
+    if (stage === "python") return "Python";
     return reporte()?.items.find((r) => r.id === stage)?.label ?? stage;
   }
 
@@ -139,7 +153,15 @@ export default function Setup(props: { children: JSX.Element }) {
         ];
       case "found":
         anotar(e.stage, { version: valor, origen: e.extra });
-        return [{ tono: "ok", texto: t("setup.log.found", { name, version: valor, source: origen(e.extra) }) }];
+        return [
+          {
+            tono: "ok",
+            texto:
+              e.extra === ORIGEN_SISTEMA
+                ? t("setup.log.found_system", { name, version: valor })
+                : t("setup.log.found", { name, version: valor, source: origen(e.extra) }),
+          },
+        ];
       case "installing":
         anotar(e.stage, { version: valor, instala: true });
         return [{ tono: "info", texto: t("setup.log.installing", { name, version: valor }) }];
@@ -166,6 +188,7 @@ export default function Setup(props: { children: JSX.Element }) {
         return [{ tono: "error", texto: t("setup.log.unsupported", { version: valor, minimum: e.extra ?? "" }) }];
       case "failed": {
         if (e.stage === "platform" && sinSoporte()) return [];
+        if (cancelados().has(e.stage)) return [];
         const esencial = etapas().find((s) => s.name === e.stage)?.essential ?? true;
         const cabeza: Linea = esencial
           ? { tono: "error", texto: t("setup.log.failed", { name }) }
@@ -204,6 +227,15 @@ export default function Setup(props: { children: JSX.Element }) {
         vistas.set(e.name, masAvanzado(e.state, vistas.get(e.name)));
         const etapa = etapas().find((s) => s.name === e.name);
         setEtapas((antes) => antes.map((s) => (s.name === e.name ? { ...s, state: e.state } : s)));
+        if (e.state === "running" && etapa && !etapa.essential && !quiereEsta(e.name)) {
+          // Se desmarcó mientras esperaba: el motor ya la arrancó, se corta en cuanto empieza.
+          setCancelados((c) => new Set(c).add(e.name));
+          void invoke("cancel_install", { operation: `tool:${e.name}` }).catch(() => {});
+        }
+        const cortada = e.state === "failed" && cancelados().has(e.name);
+        if ((e.state === "skipped" || cortada) && !conLaX.has(e.name)) {
+          agregar([{ tono: "omite", texto: t("setup.log.skipped", { name: nombre(e.name) }) }]);
+        }
         if (e.state === "running") {
           setActiva(e.name);
           setParcial(0);
@@ -241,6 +273,13 @@ export default function Setup(props: { children: JSX.Element }) {
   }
 
   const escuchaEtapas = listen<Evento>("bootstrap-run", (e) => recibir(e.payload));
+  // Un opcional que se instala solo, después de la corrida, cuenta su descarga por aquí.
+  const escuchaInstalaciones = listen<AvanceDeInstalacion>("install", (e) => {
+    const name = e.payload.operation.startsWith("tool:") ? e.payload.operation.slice(5) : null;
+    if (!name || sueltos()[name] !== "run" || e.payload.bytes <= 0) return;
+    setParcial(e.payload.done / e.payload.bytes);
+    setDescarga({ stage: name, file: nombre(name), done: e.payload.done, total: e.payload.bytes });
+  });
   // pnpm y Bun bajan por `toolchain::install_tool`, que ya reporta su avance por aquí.
   const escuchaHerramientas = listen<Avance>("toolchain", (e) => {
     if (e.payload.id !== activa() || e.payload.bytes <= 0) return;
@@ -272,12 +311,13 @@ export default function Setup(props: { children: JSX.Element }) {
     }
     if (!streamClosed) streamTimer = setTimeout(() => void readSetupEvents(), 250);
   }
-  const streamReady = Promise.all([escuchaEtapas, escuchaHerramientas]).then(readSetupEvents);
+  const streamReady = Promise.all([escuchaEtapas, escuchaHerramientas, escuchaInstalaciones]).then(readSetupEvents);
   onCleanup(() => {
     streamClosed = true;
     if (streamTimer) clearTimeout(streamTimer);
     void escuchaEtapas.then((f) => f());
     void escuchaHerramientas.then((f) => f());
+    void escuchaInstalaciones.then((f) => f());
   });
 
   async function preparar() {
@@ -290,7 +330,10 @@ export default function Setup(props: { children: JSX.Element }) {
   async function consultar(joinOnly = true) {
     let corrida: Preparacion | null = null;
     try {
-      corrida = await invoke<Preparacion | null>("prepare_runtime", { joinOnly });
+      const skip = Object.entries(quiere())
+        .filter(([, si]) => !si)
+        .map(([name]) => name);
+      corrida = await invoke<Preparacion | null>("prepare_runtime", { joinOnly, skip });
     } catch (e) {
       // Sin parar de preguntar: un servicio que vuelve retoma la corrida y borra el aviso.
       setFalloDelServicio(prosaDe(e));
@@ -376,7 +419,7 @@ export default function Setup(props: { children: JSX.Element }) {
   onMount(() => void empezar());
 
   const temporizador = setInterval(() => {
-    if (!pausa() && !QUIETO() && !seguir() && paso() === "preparar") setConsejo((c) => (c + 1) % consejos().length);
+    if (!QUIETO() && !seguir() && paso() === "preparar") setConsejo((c) => (c + 1) % consejos().length);
   }, RITMO_CONSEJOS);
   onCleanup(() => clearInterval(temporizador));
 
@@ -389,21 +432,46 @@ export default function Setup(props: { children: JSX.Element }) {
     ),
   );
 
-  const hechas = () => etapas().filter((s) => s.state === "succeeded" || s.state === "failed").length;
-  const terminado = () => etapas().length > 0 && hechas() === etapas().length;
+  /** El estado de cada fila como lo cuenta el diseño. */
+  function pasoDe(s: Etapa): PasoDeFila {
+    const suelto = sueltos()[s.name];
+    if (suelto) return suelto;
+    switch (s.state) {
+      case "running":
+        return "run";
+      case "succeeded":
+        return "ok";
+      case "failed":
+        return cancelados().has(s.name) ? "skip" : "fail";
+      case "skipped":
+        return "skip";
+      default:
+        return "wait";
+    }
+  }
+  const corridaHecha = () =>
+    etapas().length > 0 && etapas().every((s) => s.state === "succeeded" || s.state === "failed" || s.state === "skipped");
   const falloEsencial = () => etapas().some((s) => s.essential && s.state === "failed");
-  const cerrada = () => terminado() || falloEsencial();
+  const cerrada = () => corridaHecha() || falloEsencial();
   createEffect(() => {
     if (cerrada()) setCorriendo(false);
   });
-  const falloOpcional = () =>
-    etapas().some((s) => !s.essential && s.state === "failed" && !reintentos()[s.name]?.enCurso);
-  // Un solo avance para toda la instalación, y nunca hacia atrás dentro de la misma corrida.
+  const terminado = () => corridaHecha();
+  const solo = () => Object.values(sueltos()).includes("run");
+  /** Terminada y sin nada suelto en curso: lo omitido ya se puede marcar para instalarlo. */
+  const fin = () => terminado() && !solo();
+  // Lo que cuenta para el avance: lo esencial, lo opcional que se quiere y lo que ya quedó.
+  const elegidas = () =>
+    etapas().filter((s) => s.essential || pasoDe(s) === "ok" || (quiereEsta(s.name) && pasoDe(s) !== "skip"));
+  const hechas = () => elegidas().filter((s) => ["ok", "fail"].includes(pasoDe(s))).length;
+  const omitidas = () => etapas().filter((s) => ["skip", "bye"].includes(pasoDe(s))).length;
+  const falloOpcional = () => etapas().some((s) => pasoDe(s) === "fail");
+  // Un solo avance para toda la instalación: solo baja si se agrega o se quita un opcional.
   const porcentaje = () => {
-    const total = etapas().length;
-    if (!total) return 0;
-    if (terminado()) return 100;
-    const enCurso = corriendo() ? Math.min(parcial(), 0.99) : 0;
+    if (!etapas().length) return 0;
+    if (fin()) return 100;
+    const total = Math.max(1, elegidas().length);
+    const enCurso = corriendo() || solo() ? Math.min(parcial(), 0.99) : 0;
     const valor = Math.round(((hechas() + enCurso) / total) * 100);
     if (tope.total !== total) tope = { total, valor };
     tope.valor = Math.max(tope.valor, valor);
@@ -431,15 +499,16 @@ export default function Setup(props: { children: JSX.Element }) {
     if (!etapas().length) return t("setup.status.checking");
     if (sinSoporte()) return t("setup.status.unsupported");
     if (falloEsencial()) return t("setup.status.failed");
-    if (terminado()) return falloOpcional() ? t("setup.status.partial") : t("setup.status.done");
+    if (fin()) return falloOpcional() ? t("setup.status.partial") : t("setup.status.done");
     return t("setup.status.running", { percent: porcentaje() });
   };
 
   function detalle(s: Etapa): string {
     const d = datos()[s.name] ?? {};
-    if (s.state === "running") return d.instala ? t("setup.row.installing") : t("setup.row.checking");
-    if (s.state === "failed") return t("setup.row.failed");
-    if (s.state !== "succeeded") return "";
+    const paso = pasoDe(s);
+    if (paso === "run") return t("setup.row.installing");
+    if (paso === "fail") return t("setup.row.failed");
+    if (paso !== "ok") return "";
     if (s.name === "platform") return d.libre ? t("setup.row.free", { free: d.libre }) : (d.plataforma ?? "");
     if (!d.version) return t("setup.row.ready");
     return d.origen === ORIGEN_SISTEMA
@@ -447,41 +516,38 @@ export default function Setup(props: { children: JSX.Element }) {
       : t("setup.row.installed", { version: d.version });
   }
 
-  const fila = (s: Etapa): FilaDeEtapa => {
-    const r = reintentos()[s.name];
-    return {
-      name: s.name,
-      label: nombre(s.name),
-      essential: s.essential,
-      estado: r && !r.enCurso && !r.error ? "succeeded" : s.state,
-      detalle: detalle(s),
-      descripcion: CON_DESCRIPCION.has(s.name) ? t(`setup.optional.about.${s.name}`) : "",
-      reintento: r,
-    };
-  };
+  const version = (name: string) =>
+    datos()[name]?.version ?? reporte()?.items.find((r) => r.id === name)?.detail ?? "";
+
+  const fila = (s: Etapa): FilaDeEtapa => ({
+    name: s.name,
+    label: nombre(s.name),
+    essential: s.essential,
+    paso: pasoDe(s),
+    quiere: quiereEsta(s.name),
+    detalle: detalle(s),
+    version: version(s.name),
+    descripcion: CON_DESCRIPCION.has(s.name) ? t(`setup.optional.about.${s.name}`) : "",
+  });
 
   const instalacion = (): Instalacion => {
-    const corre = etapas().find((s) => s.state === "running");
-    const omitidas = etapas().filter((s) => !s.essential && s.state === "failed" && !reintentos()[s.name]).length;
-    const listas = hechas() - omitidas;
+    const corre = etapas().find((s) => pasoDe(s) === "run");
     const titulo = () => {
       if (!etapas().length) return t("setup.status.checking");
       if (sinSoporte()) return t("setup.status.unsupported");
       if (falloEsencial()) return t("setup.status.failed");
-      if (terminado()) return falloOpcional() ? t("setup.simple.essentials_ready") : t("setup.simple.done");
+      if (fin()) return falloOpcional() ? t("setup.simple.essentials_ready") : t("setup.simple.done");
       if (!corre) return t("setup.status.checking");
-      return datos()[corre.name]?.instala
-        ? t("setup.simple.installing", { name: nombre(corre.name) })
-        : t("setup.simple.checking", { name: nombre(corre.name) });
+      return t("setup.simple.installing", { name: nombre(corre.name) });
     };
     const subtitulo = () => {
       if (!etapas().length) return "";
-      if (terminado()) {
-        return omitidas
-          ? t("setup.simple.summary_skipped", { count: listas, skipped: omitidas })
-          : t("setup.simple.summary", { count: listas });
+      if (fin()) {
+        return omitidas()
+          ? t("setup.simple.summary_skipped", { tools: hechas(), count: omitidas() })
+          : t("setup.simple.summary", { count: hechas() });
       }
-      return t("setup.simple.step", { step: Math.min(hechas() + 1, etapas().length), total: etapas().length });
+      return t("setup.simple.step", { step: Math.min(hechas() + 1, elegidas().length), total: elegidas().length });
     };
     const d = descarga();
     return {
@@ -489,11 +555,10 @@ export default function Setup(props: { children: JSX.Element }) {
       subtitulo: subtitulo(),
       estado: estado(),
       porcentaje: porcentaje(),
-      terminado: terminado() && !falloEsencial(),
-      cerrada: cerrada(),
-      corriendo: corriendo(),
+      terminado: fin() && !falloEsencial(),
+      corriendo: corriendo() || solo(),
       hechas: hechas(),
-      total: etapas().length,
+      total: elegidas().length,
       esenciales: etapas().filter((s) => s.essential).map(fila),
       opcionales: etapas().filter((s) => !s.essential).map(fila),
       lineas: lineas(),
@@ -501,31 +566,85 @@ export default function Setup(props: { children: JSX.Element }) {
         d && d.total > 0
           ? t("setup.log.download_live", {
               file: d.file,
-              done: mb(d.done),
-              total: mb(d.total),
+              done: `${(d.done / 1_048_576).toFixed(1)} MB`,
+              total: `${(d.total / 1_048_576).toFixed(1)} MB`,
               percent: Math.round((d.done / d.total) * 100),
             })
           : null,
     };
   };
 
-  /** Lo opcional que no quedó se instala solo, ya con la corrida terminada. */
-  async function instalarOpcional(name: string) {
-    if (reintentos()[name]?.enCurso) return;
-    setReintentos((r) => ({ ...r, [name]: { enCurso: true } }));
-    agregar([{ tono: "info", texto: t("setup.log.installing_tool", { name: nombre(name) }) }]);
+  async function refrescarReporte() {
+    const r = await invoke<EnvReport>("check_environment", { force: false }).catch(() => null);
+    if (r) setReporte(r);
+  }
+
+  /** Lo omitido o fallido se instala solo, ya con la corrida terminada, por la misma etapa. */
+  async function instalarSuelto(name: string) {
+    if (sueltos()[name] === "run") return;
+    setQuiere((q) => ({ ...q, [name]: true }));
+    ponerSuelto(name, "run");
+    setParcial(0);
+    const inicio = Date.now();
+    agregar([{ tono: "etapa", texto: t("setup.log.stage_start", { name: nombre(name), kind: t("setup.log.optional") }) }]);
     try {
       await invoke<string>("install_base_tool", { tool: name });
-      setReintentos((r) => ({ ...r, [name]: { enCurso: false } }));
-      agregar([{ tono: "ok", texto: t("setup.log.installed_tool", { name: nombre(name) }) }]);
-      const r = await invoke<EnvReport>("check_environment", { force: false }).catch(() => null);
-      if (r) setReporte(r);
+      await refrescarReporte();
+      anotar(name, { version: version(name), origen: ORIGEN_APP });
+      ponerSuelto(name, "ok");
+      agregar([
+        { tono: "ok", texto: t("setup.log.installed", { name: nombre(name), version: version(name) }) },
+        { tono: "ok", texto: t("setup.log.stage_done", { name: nombre(name), duration: elapsed(Math.max(1, Math.round((Date.now() - inicio) / 1000))) }) },
+      ]);
     } catch (e) {
-      const error = prosaDe(e);
-      setReintentos((r) => ({ ...r, [name]: { enCurso: false, error } }));
-      agregar([{ tono: "warn", texto: t("setup.log.optional_failed", { name: nombre(name) }) }]);
+      if (prosaDe(e).includes("install.cancelled") || cancelados().has(name)) {
+        ponerSuelto(name, "skip");
+      } else {
+        ponerSuelto(name, "fail");
+        agregar([
+          { tono: "warn", texto: t("setup.log.optional_failed", { name: nombre(name) }) },
+          { tono: "err", texto: prosaDe(e) },
+        ]);
+      }
+    } finally {
+      setDescarga((d) => (d?.stage === name ? null : d));
     }
   }
+
+  /** La casilla: antes de que corra, decide si se instala; al terminar, marcar lo omitido lo instala solo. */
+  function marcar(name: string, marcado: boolean) {
+    const s = etapas().find((x) => x.name === name);
+    const paso = s ? pasoDe(s) : "wait";
+    if (fin() && (paso === "skip" || paso === "fail") && marcado) return void instalarSuelto(name);
+    setQuiere((q) => ({ ...q, [name]: marcado }));
+  }
+
+  /** La × corta la descarga de un opcional; queda omitido y se puede instalar después. */
+  function cancelarOpcional(name: string) {
+    setQuiere((q) => ({ ...q, [name]: false }));
+    setCancelados((c) => new Set(c).add(name));
+    conLaX.add(name);
+    if (sueltos()[name] === "run") ponerSuelto(name, "skip");
+    agregar([{ tono: "aviso", texto: t("setup.log.cancelled", { name: nombre(name) }) }]);
+    void invoke("cancel_install", { operation: `tool:${name}` }).catch(() => {});
+  }
+
+  /** La basura quita la copia que instaló Terminus; la del sistema no se toca. */
+  async function desinstalar(name: string) {
+    ponerSuelto(name, "bye");
+    try {
+      await invoke("remove_tool", { tool: name });
+      setQuiere((q) => ({ ...q, [name]: false }));
+      ponerSuelto(name, "skip");
+      agregar([{ tono: "omite", texto: t("setup.log.removed", { name: nombre(name) }) }]);
+      await refrescarReporte();
+    } catch (e) {
+      ponerSuelto(name, "ok");
+      agregar([{ tono: "warn", texto: prosaDe(e) }]);
+    }
+  }
+
+  const acciones = { onMarcar: marcar, onCancelar: cancelarOpcional, onDesinstalar: (n: string) => void desinstalar(n) };
 
   /** «Siguiente»: el workspace «Personal» nace aquí, que es de quien cuelgan las cuentas de la IA. */
   async function aConectar() {
@@ -557,12 +676,12 @@ export default function Setup(props: { children: JSX.Element }) {
 
   const titulo = () => {
     if (ia()) return t("onboarding.ai.title");
-    if (terminado() && !falloEsencial()) return t("setup.done_title");
+    if ((terminado() || solo()) && !falloEsencial()) return t("setup.done_title");
     return t("setup.title");
   };
   const lede = () => {
     if (ia()) return t("onboarding.ai.lede");
-    if (terminado() && !falloEsencial()) return alta() ? t("setup.done_lede") : t("setup.done_lede_app");
+    if ((terminado() || solo()) && !falloEsencial()) return alta() ? t("setup.done_lede") : t("setup.done_lede_app");
     return t("setup.description");
   };
 
@@ -580,13 +699,7 @@ export default function Setup(props: { children: JSX.Element }) {
         <Show
           when={ia()}
           fallback={
-            <div
-              class="border-t border-border pt-5"
-              onPointerEnter={() => setPausa(true)}
-              onPointerLeave={() => setPausa(false)}
-              onFocusIn={() => setPausa(true)}
-              onFocusOut={() => setPausa(false)}
-            >
+            <div class="border-t border-border pt-5">
               <p class="m-0 text-xs text-neutral-500">{t("setup.tips.eyebrow")}</p>
               <h2 class="m-0 mt-2 mb-1.5 text-base font-display font-bold tracking-[-0.01em] text-neutral-950">
                 {consejos()[consejo()][0]}
@@ -646,10 +759,10 @@ export default function Setup(props: { children: JSX.Element }) {
         <SelectorDeVista class="self-end" vista={vista()} onCambiar={setVista} />
         {/* Las dos vistas siguen montadas: cambiar de una a otra no pierde el desplazamiento ni la corrida. */}
         <div class={cn("min-h-0 flex-1 flex-col", vista() === "sencilla" ? "flex" : "hidden")}>
-          <VistaSencilla i={instalacion()} onInstalar={(n) => void instalarOpcional(n)} />
+          <VistaSencilla i={instalacion()} {...acciones} />
         </div>
         <div class={cn("min-h-0 flex-1 flex-col", vista() === "terminal" ? "flex" : "hidden")}>
-          <VistaTerminal i={instalacion()} onInstalar={(n) => void instalarOpcional(n)} ref={(el) => (log = el)} />
+          <VistaTerminal i={instalacion()} {...acciones} ref={(el) => (log = el)} />
         </div>
         </Suspense>
       </div>
@@ -678,14 +791,14 @@ export default function Setup(props: { children: JSX.Element }) {
               </Button>
             </Show>
             <Show when={!falloEsencial() && !sinSoporte()}>
-              <Show when={terminado() && alta() && workspace()}>
+              <Show when={terminado() && alta() && workspace() && conectadas().length > 0}>
                 <Button size="sm" variant="ghost" onClick={() => setPaso("ia")}>
                   {t("setup.back_to_ai")}
                 </Button>
               </Show>
               <Button
                 size="sm"
-                disabled={!terminado() || entrando()}
+                disabled={!(terminado() || solo()) || entrando()}
                 onClick={() => (alta() ? void aConectar() : setSeguir(true))}
               >
                 {alta() ? t("setup.next.ai") : t("setup.next.app")}

@@ -17,6 +17,17 @@ import type { Frase } from "../../lib/prose";
 
 type Agente = AgentOpt & { source: string | null; system_broken: boolean };
 type Avance = { id: string; done: number; bytes: number };
+type AvanceDeInstalacion = { operation: string; kind: string; done: number; bytes: number };
+/** Una sesión ya iniciada en esta computadora, fuera de Terminus (`list_system_sessions`). */
+type SesionDelSistema = { provider: string; identity: string | null; plan: string | null };
+
+/** Los que se conectan con una clave pegada en su panel, como en el diseño: dónde se crea y cómo se ve. */
+const CLAVES: Record<string, { url: string; placeholder: string }> = {
+  grok: { url: "https://console.x.ai", placeholder: "xai-…" },
+  "opencode-zen": { url: "https://opencode.ai/auth", placeholder: "sk-…" },
+};
+const CANCELADA = "install.cancelled";
+const fueCancelada = (e: unknown) => `${prosaDe(e)} ${detalleDe(e)} ${String((e as { code?: string })?.code ?? "")}`.includes(CANCELADA);
 
 /** Cómo se conecta: iniciando sesión con su CLI, pegando una clave, aceptando el aviso o en la máquina. */
 export type Modo = "sesion" | "clave" | "consentimiento" | "local";
@@ -32,11 +43,14 @@ export type Fila = {
   bytes: number | null;
   /** Dónde se consigue la clave, para el modo `clave`. */
   urlDeClave: string | null;
+  /** El ejemplo del campo de la clave. */
+  placeholder: string;
 };
 
 export type Paso =
   | { k: "falta" }
   | { k: "externa" }
+  | { k: "sesion"; identidad: string }
   | { k: "instalada" }
   | { k: "descargando"; hecho: number; total: number }
   | { k: "entrando"; cuenta: string; codigo?: string; pideCodigo?: boolean }
@@ -80,6 +94,7 @@ export function crearConexiones() {
   const [falloDeCarga, setFalloDeCarga] = createSignal<string | null>(null);
   const [cargada, setCargada] = createSignal(false);
   let agentes: Agente[] = [];
+  let sesiones: SesionDelSistema[] = [];
   let detectadas: Set<string> | null = null;
   let entrada: { fila: string; agente: string; cuenta: string } | null = null;
   // En serie: las filas de OpenCode comparten carpeta, y la segunda la encuentra ya instalada.
@@ -129,7 +144,9 @@ export function crearConexiones() {
           : base;
       }
       const conectada = await cuentaConectada(f.agente);
-      return conectada ? { k: "conectada", ...conectada } : base;
+      if (conectada) return { k: "conectada", ...conectada };
+      const sesion = sesiones.find((x) => x.provider === f.agente);
+      return sesion ? { k: "sesion", identidad: sesion.identity ?? "" } : base;
     } catch {
       return base;
     }
@@ -138,9 +155,10 @@ export function crearConexiones() {
   async function cargar() {
     let superficies: Superficie[] = [];
     try {
-      [agentes, superficies] = await Promise.all([
+      [agentes, superficies, sesiones] = await Promise.all([
         invoke<Agente[]>("list_providers"),
         invoke<Superficie[]>("list_surfaces").catch(() => [] as Superficie[]),
+        invoke<SesionDelSistema[]>("list_system_sessions").catch(() => [] as SesionDelSistema[]),
       ]);
     } catch (e) {
       setFalloDeCarga(prosaDe(e));
@@ -149,7 +167,10 @@ export function crearConexiones() {
     if (cerrada) return;
     setFalloDeCarga(null);
     detectadas ??= new Set(
-      agentes.filter((a) => a.available && a.source === ORIGEN_SISTEMA && !a.system_broken).map((a) => a.id),
+      [
+        ...agentes.filter((a) => a.available && a.source === ORIGEN_SISTEMA && !a.system_broken).map((a) => a.id),
+        ...sesiones.map((x) => x.provider),
+      ],
     );
     const nuevas: Fila[] = [];
     for (const a of [...agentes].sort((x, y) => posicion(x.id) - posicion(y.id))) {
@@ -160,7 +181,7 @@ export function crearConexiones() {
           ? "local"
           : a.inferencia === "sin_pedir_nada" && gratuitas.length === 0
             ? "consentimiento"
-            : a.api_key
+            : a.api_key || CLAVES[a.id]
               ? "clave"
               : "sesion";
       const previa = filas().find((f) => f.id === a.id);
@@ -171,7 +192,8 @@ export function crearConexiones() {
         modo,
         detectada: detectadas.has(a.id),
         bytes: previa?.bytes ?? null,
-        urlDeClave: a.api_key ?? null,
+        urlDeClave: CLAVES[a.id]?.url ?? a.api_key ?? null,
+        placeholder: CLAVES[a.id]?.placeholder ?? "",
       });
       for (const s of gratuitas) {
         nuevas.push({
@@ -182,6 +204,7 @@ export function crearConexiones() {
           detectada: false,
           bytes: previa?.bytes ?? null,
           urlDeClave: null,
+          placeholder: "",
         });
       }
     }
@@ -223,9 +246,9 @@ export function crearConexiones() {
       }
       return true;
     } catch (e) {
-      setErrores(f.id, explicar(e));
+      if (!fueCancelada(e)) setErrores(f.id, explicar(e));
       for (const x of filas().filter((x) => x.agente === f.agente && pasos[x.id]?.k === "descargando")) {
-        poner(x.id, { k: "falta" });
+        poner(x.id, sesiones.some((y) => y.provider === f.agente) ? { k: "instalada" } : { k: "falta" });
       }
       return false;
     }
@@ -248,6 +271,29 @@ export function crearConexiones() {
     if (f.modo === "local") return void activarLocal(id);
     if (f.modo === "clave") return poner(id, { k: "clave" });
     await entrar(id);
+  }
+
+  /** «Usar esta»: la sesión que ya hay en la computadora pasa a ser una cuenta del workspace, sin volver a entrar. */
+  async function usarSesion(id: string) {
+    const f = fila(id);
+    const p = pasos[id];
+    if (!f || p?.k !== "sesion") return;
+    setErrores(id, null);
+    poner(id, { k: "comprobando" });
+    try {
+      const cuenta = await invoke<{ id: string }>("adopt_system_session", { provider: f.agente });
+      const conectada = await cuentaConectada(f.agente);
+      poner(id, { k: "conectada", cuenta: conectada?.cuenta ?? p.identidad, id: cuenta.id });
+    } catch (e) {
+      setErrores(id, explicar(e));
+      poner(id, p);
+    }
+  }
+
+  /** La × de la descarga: el motor la corta y no deja nada a medias. */
+  function cancelarDescarga(id: string) {
+    const f = fila(id);
+    if (f) void invoke("cancel_install", { operation: `provider:${f.agente}` }).catch(() => {});
   }
 
   async function entrar(id: string) {
@@ -302,21 +348,16 @@ export function crearConexiones() {
 
   async function guardarClave(id: string, clave: string) {
     const f = fila(id);
-    if (!f || !clave.trim()) return;
+    const v = clave.trim();
+    if (!f || !v) return;
     setErrores(id, null);
     poner(id, { k: "comprobando" });
-    let cuenta: string | null = null;
     try {
-      cuenta = (await invoke<{ id: string }>("add_account", { provider: f.agente, label: "" })).id;
-      await invoke("set_api_key", { provider: f.agente, id: cuenta, key: clave.trim() });
-      const estado = await invoke<AccountStatus>("account_status", { provider: f.agente, id: cuenta });
-      if (!estado.authenticated) throw new Error(t("onboarding.ai.key_invalid"));
-      await invoke("set_active_account", { provider: f.agente, id: cuenta }).catch(() => {});
-      const conectada = await cuentaConectada(f.agente);
-      poner(id, { k: "conectada", cuenta: conectada?.cuenta ?? t("onboarding.ai.key_saved"), id: cuenta });
+      const cuenta = await invoke<{ id: string }>("connect_api_key", { provider: f.agente, key: v });
+      poner(id, { k: "conectada", cuenta: t("onboarding.ai.key_saved", { start: v.slice(0, 4), end: v.slice(-4) }), id: cuenta.id });
     } catch (e) {
-      if (cuenta) await invoke("discard_account", { provider: f.agente, id: cuenta }).catch(() => {});
-      setErrores(id, explicar(e));
+      const texto = explicar(e);
+      setErrores(id, texto === t("onboarding.ai.error.keyring") ? texto : t("onboarding.ai.key_invalid"));
       poner(id, { k: "clave" });
     }
   }
@@ -330,7 +371,9 @@ export function crearConexiones() {
       await invoke("cancel_login", { id: p.cuenta }).catch(() => {});
       if (e) await invoke("discard_account", { provider: e.agente, id: e.cuenta }).catch(() => {});
     }
-    poner(id, agente(fila(id)?.agente ?? "")?.available ? { k: "instalada" } : { k: "falta" });
+    const f = fila(id);
+    const sesion = sesiones.find((x) => x.provider === f?.agente);
+    poner(id, sesion ? { k: "sesion", identidad: sesion.identity ?? "" } : agente(f?.agente ?? "")?.available ? { k: "instalada" } : { k: "falta" });
   }
 
   /** Activar los gratuitos: el aviso de la tarjeta ya se leyó; se descarga OpenCode si falta y se guarda el consentimiento. */
@@ -395,6 +438,13 @@ export function crearConexiones() {
     else if (kind === "code") poner(e.fila, { ...p, pideCodigo: true });
     else if (kind === "done") void terminarEntrada(text);
   });
+  const alInstalar = listen<AvanceDeInstalacion>("install", (ev) => {
+    const id = ev.payload.operation.startsWith("provider:") ? ev.payload.operation.slice(9) : null;
+    if (!id || ev.payload.bytes <= 0) return;
+    for (const f of filas().filter((x) => x.agente === id && pasos[x.id]?.k === "descargando")) {
+      poner(f.id, { k: "descargando", hecho: ev.payload.done, total: ev.payload.bytes });
+    }
+  });
   const alAvance = listen<Avance>("toolchain", (ev) => {
     if (ev.payload.bytes <= 0) return;
     for (const f of filas().filter((x) => x.agente === ev.payload.id && pasos[x.id]?.k === "descargando")) {
@@ -410,7 +460,7 @@ export function crearConexiones() {
   onCleanup(() => {
     cerrada = true;
     window.removeEventListener("focus", alVolver);
-    for (const l of [alCuenta, alAvance, alAgentes]) void l.then((f) => f());
+    for (const l of [alCuenta, alAvance, alAgentes, alInstalar]) void l.then((f) => f());
     const e = entrada;
     if (e) {
       void invoke("cancel_login", { id: e.cuenta }).catch(() => {});
@@ -432,6 +482,8 @@ export function crearConexiones() {
     externa: (f: Fila) => Boolean(agente(f.agente)?.external_install_url && !agente(f.agente)?.available),
     cargar,
     conectar,
+    usarSesion,
+    cancelarDescarga,
     cancelar,
     enviarCodigo,
     guardarClave,

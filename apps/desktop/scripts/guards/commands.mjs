@@ -79,7 +79,6 @@ const SIN_INTERFAZ = {
   import_chat_background_data: "lo usaba «Usar este workspace aquí», ya borrado; el fondo llegará desde la cuenta de Danil en la fase 2 (docs/account-workspace.md)",
   remove_provider: "sin forma confiable de saber qué instaló Terminus, se quitó el botón",
   remove_gh: "sin forma confiable de saber qué instaló Terminus, se quitó el botón",
-  remove_tool: "sin forma confiable de saber qué instaló Terminus, se quitó el botón",
   // Sin pantalla hasta el metabuscador del workspace: una archivada no se
   // desarchiva ni tiene historial por carpeta.
   list_archived: "el índice de archivadas por carpeta espera al metabuscador del workspace",

@@ -11,7 +11,7 @@ import { invoke } from "../../lib/invoke.ts";
 import { cn } from "../../lib/utils";
 import { Badge } from "../../ui/Badge";
 import { Button } from "../../ui/Button";
-import { RemoveButton } from "../../ui/IconAction";
+import { CancelButton, RemoveButton } from "../../ui/IconAction";
 import { Input } from "../../ui/Input";
 import { MarcaAgente } from "../../ui/icons";
 import { TerminusMark } from "../../ui/toolMarks";
@@ -23,7 +23,7 @@ type Nodo = "off" | "det" | "vivo" | "on";
 function nodo(p: Paso | undefined): Nodo {
   if (p?.k === "conectada") return "on";
   if (p && ["descargando", "entrando", "clave", "comprobando", "saliendo"].includes(p.k)) return "vivo";
-  return p?.k === "instalada" ? "det" : "off";
+  return p?.k === "instalada" || p?.k === "sesion" ? "det" : "off";
 }
 
 function nombreCorto(f: Fila) {
@@ -123,7 +123,7 @@ export function MapaDeConexiones(props: { c: Conexiones }) {
                 >
                   <MarcaAgente id={f.agente} size={22} />
                   <Show when={estado() === "on"}>
-                    <span class="absolute -top-1.5 -right-1.5 grid size-4 place-items-center rounded-full bg-success-strong text-bg ring-2 ring-bg">
+                    <span class="absolute -top-1 -right-1.5 grid size-4 place-items-center rounded-full bg-success-strong text-bg ring-2 ring-bg">
                       <Check size={10} stroke-width={3} />
                     </span>
                   </Show>
@@ -181,12 +181,14 @@ function detalle(c: Conexiones, f: Fila): string {
   switch (p?.k) {
     case "externa":
       return t("onboarding.ai.external_waiting");
+    case "sesion":
+      return t("onboarding.ai.has_session", { account: p.identidad });
     case "instalada":
-      if (base) return base;
-      return f.detectada ? t("onboarding.ai.system_no_session") : t("onboarding.ai.installed_no_session");
+      if (f.modo === "consentimiento" || f.modo === "local") return base;
+      return t("onboarding.ai.system_no_session");
     case "descargando":
       return p.total > 0
-        ? t("onboarding.ai.downloading_of", { done: mb(p.hecho), total: mb(p.total) })
+        ? t("onboarding.ai.downloading_of", { done: Math.round(p.hecho / 1_048_576), total: mb(p.total) })
         : t("onboarding.ai.downloading");
     case "entrando":
       if (p.codigo) return t("onboarding.ai.confirm_code", { code: p.codigo });
@@ -238,13 +240,21 @@ function Tarjeta(props: { c: Conexiones; f: Fila; abajo?: JSX.Element; resaltada
             }
           >
             <Match when={p()?.k === "descargando"}>
-              <Show when={avance(p())} fallback={<Spinner class="text-primary" />}>
-                {(v) => (
-                  <span class="h-[5px] w-[90px] overflow-hidden rounded-full bg-surface-muted">
-                    <span class="block h-full bg-primary transition-[width] duration-150" style={{ width: `${v()}%` }} />
-                  </span>
-                )}
-              </Show>
+              <span class="h-[5px] w-[90px] overflow-hidden rounded-full bg-surface-muted">
+                <span class="block h-full bg-primary transition-[width] duration-150" style={{ width: `${avance(p())}%` }} />
+              </span>
+              <CancelButton
+                label={t("onboarding.ai.cancel_download", { name: nombre() })}
+                onClick={() => props.c.cancelarDescarga(props.f.id)}
+              />
+            </Match>
+            <Match when={p()?.k === "sesion"}>
+              <Button size="sm" variant="ghost" onClick={() => void props.c.conectar(props.f.id)}>
+                {t("onboarding.ai.connect_other")}
+              </Button>
+              <Button size="sm" onClick={() => void props.c.usarSesion(props.f.id)}>
+                {t("onboarding.ai.use_this")}
+              </Button>
             </Match>
             <Match when={p()?.k === "entrando"}>
               <Spinner class="text-primary" />
@@ -296,7 +306,7 @@ function PanelDeClave(props: { c: Conexiones; f: Fila }) {
   return (
     <div class={PANEL}>
       <label class="text-[13px] font-semibold" for={id}>
-        {t("onboarding.ai.key.label", { name: nombreDeFila(props.f) })}
+        {t(`onboarding.ai.key.label.${props.f.agente}`)}
       </label>
       <Input
         id={id}
@@ -304,6 +314,7 @@ function PanelDeClave(props: { c: Conexiones; f: Fila }) {
         class={cn("font-mono tracking-[0.02em]", error() && "border-error-strong")}
         autocomplete="off"
         spellcheck={false}
+        placeholder={props.f.placeholder}
         value={valor()}
         disabled={ocupado()}
         aria-invalid={error() ? true : undefined}
@@ -322,7 +333,7 @@ function PanelDeClave(props: { c: Conexiones; f: Fila }) {
           <Show when={props.f.urlDeClave}>
             {(url) => (
               <span class="text-xs text-neutral-500">
-                {t("onboarding.ai.key.help")}{" "}
+                {t(`onboarding.ai.key.help.${props.f.agente}`)}{" "}
                 <button
                   type="button"
                   class="inline-flex cursor-pointer items-center gap-0.5 border-0 bg-transparent p-0 text-primary hover:underline"
@@ -428,7 +439,7 @@ function FilaDeIA(props: { c: Conexiones; f: Fila }) {
     if (props.f.modo === "consentimiento" && (paso?.k === "falta" || paso?.k === "instalada")) return <AvisoDeGratuitos />;
     return undefined;
   };
-  const resaltada = () => ["entrando", "clave", "comprobando"].includes(p()?.k ?? "") && props.f.modo !== "consentimiento";
+  const resaltada = () => ["sesion", "entrando", "clave", "comprobando"].includes(p()?.k ?? "") && props.f.modo !== "consentimiento";
   return <Tarjeta c={props.c} f={props.f} abajo={abajo()} resaltada={resaltada()} />;
 }
 
