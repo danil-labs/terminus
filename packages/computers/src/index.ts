@@ -8,6 +8,9 @@ export {
   apiUrl,
   listComputers,
   listWorkspaces,
+  listWorkspacesWithDeleted,
+  purgeWorkspace,
+  restoreWorkspace,
   startComputer,
 } from "./api.ts";
 export {
@@ -30,6 +33,7 @@ export { type Compatibility, machineCompatibility } from "./compatibility.ts";
 export {
   type Cached,
   type CallResult,
+  type EngineInfo,
   type EventsPage,
   type RelayConfig,
   type RelayFailure,
@@ -38,10 +42,12 @@ export {
   CALL_TIMEOUT,
   RelaySession,
   SUBPROTOCOL,
+  TOKEN_EXPIRED,
   WAKE_TIMEOUT,
   cachedAt,
   requestId,
   sessionUrl,
+  tokenExpiry,
 } from "./relay.ts";
 export { type ScreenEnd, SCREEN_SUBPROTOCOL, screenEnd, screenProtocols, screenUrl } from "./screen.ts";
 export {

@@ -35,6 +35,8 @@ export type Capabilities = {
   sidebarExtra?: () => JSX.Element;
   /** El nombre de una máquina por su id. */
   machineName?: (id: string) => string;
+  /** La máquina de la cuenta que guarda una tarea o un space por su id de panel (`<máquina>~<id>`); `null` si es de la ventana. */
+  taskMachine?: (id: string) => string | null;
   /** La que corre las tareas que llegan sin `machine`; sin esto, la de la ventana. */
   windowMachine?: () => { id: string; name: string; local: boolean } | undefined;
   /** Dónde se crea un proyecto nuevo, en el diálogo de añadirlo. */
@@ -45,6 +47,8 @@ export type Capabilities = {
   browserFiles?: boolean;
   /** El visor de la pantalla de una VM administrada (solo ver); `null` si esa máquina no tiene. */
   machineScreen?: (machine: string) => (() => Promise<WebSocket>) | null;
+  /** El estado de la rebanada de cada otra máquina (`@terminus/fleet`): `ok`, `cached`, `no_answer`, `off` u `outdated`, con su hora. */
+  machineSlices?: () => Record<string, { status: "ok" | "cached" | "no_answer" | "off" | "outdated"; at: number | null }>;
   /** Bajo la tarjeta de una cuenta: sus máquinas. */
   accountMachines?: (props: AccountMachinesProps) => JSX.Element;
 };

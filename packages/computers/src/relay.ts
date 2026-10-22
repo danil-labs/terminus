@@ -18,7 +18,15 @@ export type RelayConfig = {
   onUnauthorized?: () => void;
   /** Antes de cada reconexión: un upgrade fallido no trae cuerpo, así que el cliente pregunta a la API por qué. False para. */
   beforeReconnect?: () => Promise<boolean>;
+  /**
+   * Los contratos de motor que este cliente habla (`?contracts=`): con otro, el
+   * relay no reenvía ni contesta del espejo (`version_mismatch`).
+   */
+  contracts?: readonly string[];
 };
+
+/** Lo que el relay sabe del motor por su último `hello` (`{"type":"engine"}`). */
+export type EngineInfo = { contract: string | null; host_version: string | null };
 
 export type RelayFailure = { code?: string; message_key?: string; detail?: unknown; what?: unknown };
 
@@ -58,13 +66,39 @@ export const CALL_TIMEOUT = 180_000;
 export const WAKE_TIMEOUT = 330_000;
 const REPLACED = 4001;
 const REVOKED = 4003;
+/** El token con que se abrió la sesión venció sin renovarse: se reabre con uno nuevo. */
+export const TOKEN_EXPIRED = 4005;
+/** Cuánto antes de vencer se manda el token nuevo (`auth`), y cada cuánto se reintenta si aún no hay otro. */
+const RENEW_BEFORE = 45_000;
+const RENEW_RETRY = 10_000;
+const CONTRACT = /^[A-Za-z0-9._-]{1,64}$/;
 
-export function sessionUrl(endpoint: string, computerId: string): string {
+export function sessionUrl(endpoint: string, computerId: string, contracts: readonly string[] = []): string {
   const base = /^[a-z]+:\/\//i.test(endpoint) ? endpoint : `wss://${endpoint}`;
   const url = new URL(base.replace(/^http/i, "ws"));
+  // Hasta 16 y con la forma que acepta el relay: una lista mal formada la ignoraría entera.
+  const known = [...new Set(contracts.map((c) => c.trim()).filter((c) => CONTRACT.test(c)))].slice(0, 16);
+  const query = known.length ? `?contracts=${known.map(encodeURIComponent).join(",")}` : "";
   // `origin` de whatwg-url no da `ws:`/`wss:` en todos los entornos: se arma a mano.
-  return `${url.protocol}//${url.host}${url.pathname.replace(/\/+$/, "")}/v1/computers/${encodeURIComponent(computerId)}/session`;
+  return `${url.protocol}//${url.host}${url.pathname.replace(/\/+$/, "")}/v1/computers/${encodeURIComponent(computerId)}/session${query}`;
 }
+
+/** El `exp` de un JWT en ms de época, o `null` si no se lee (el relay solo lo usa para cerrar con 4005). */
+export function tokenExpiry(token: string): number | null {
+  const part = token.split(".")[1];
+  if (!part) return null;
+  try {
+    const json = JSON.parse(atob(part.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(part.length / 4) * 4, "=")));
+    return typeof json?.exp === "number" ? json.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+const timeOf = (v: unknown): number | null => {
+  const at = typeof v === "number" ? (v < 1e12 ? v * 1000 : v) : typeof v === "string" ? Date.parse(v) : Number.NaN;
+  return Number.isFinite(at) ? at : null;
+};
 
 /** Un UUID v4 para el `id` de un `call`: reintentar con el mismo no repite la acción. */
 export function requestId(): string {
@@ -103,6 +137,11 @@ export class RelaySession {
   private retry: ReturnType<typeof setTimeout> | undefined;
   private closed = false;
   private machine: MachineState = "unknown";
+  private engineInfo: EngineInfo | null = null;
+  /** El token de la sesión abierta y cuándo vence, para renovarlo con `auth` antes. */
+  private token: string | null = null;
+  private renew: ReturnType<typeof setTimeout> | undefined;
+  private engineListeners = new Set<(engine: EngineInfo) => void>();
   private stateListeners = new Set<(state: MachineState) => void>();
   private eventListeners = new Set<(page: EventsPage) => void>();
   private linkListeners = new Set<(open: boolean) => void>();
@@ -137,6 +176,17 @@ export class RelaySession {
     return () => void this.eventListeners.delete(listener);
   }
 
+  /** El motor de la computadora según su último `hello`; `null` si el relay aún no lo dijo. */
+  engine(): EngineInfo | null {
+    return this.engineInfo;
+  }
+
+  /** Cada `hello` nuevo del motor: el cliente vuelve a comparar su contrato. */
+  onEngine(listener: (engine: EngineInfo) => void): () => void {
+    this.engineListeners.add(listener);
+    return () => void this.engineListeners.delete(listener);
+  }
+
   onLink(listener: (open: boolean) => void): () => void {
     this.linkListeners.add(listener);
     return () => void this.linkListeners.delete(listener);
@@ -167,6 +217,7 @@ export class RelaySession {
   close() {
     this.closed = true;
     clearTimeout(this.retry);
+    clearTimeout(this.renew);
     clearInterval(this.pinger);
     this.socket?.close(1000);
     for (const [id, call] of this.pending) {
@@ -198,7 +249,7 @@ export class RelaySession {
     const protocols = [SUBPROTOCOL, `bearer.${token}`];
     let socket: SocketLike;
     try {
-      socket = this.factory(sessionUrl(this.config.endpoint, this.config.computerId), protocols);
+      socket = this.factory(sessionUrl(this.config.endpoint, this.config.computerId, this.config.contracts), protocols);
     } catch {
       return this.reconnectLater();
     }
@@ -207,6 +258,8 @@ export class RelaySession {
       if (this.socket !== socket) return;
       this.attempt = 0;
       this.missed = 0;
+      this.token = token;
+      this.scheduleRenew(tokenExpiry(token));
       clearInterval(this.pinger);
       this.pinger = setInterval(() => this.ping(), PING_EVERY);
       if (this.subscribed) this.send({ type: "subscribe", after: this.after });
@@ -221,12 +274,45 @@ export class RelaySession {
       if (this.socket !== socket) return;
       this.socket = null;
       clearInterval(this.pinger);
+      clearTimeout(this.renew);
       for (const listener of this.linkListeners) listener(false);
       if (event.code === REVOKED) this.config.onUnauthorized?.();
+      // 4005: el token venció sin renovarse; la reconexión pide uno nuevo.
       // Otra sesión ocupó el lugar de esta computadora: reconectar la echaría a su vez.
       if (event.code === REPLACED) return this.close();
       this.reconnectLater();
     };
+  }
+
+  /**
+   * Antes de que venza el token de la sesión manda uno nuevo por `auth`, sin
+   * reconectar: el token de cliente del escritorio dura 10 min.
+   */
+  private scheduleRenew(expires: number | null) {
+    clearTimeout(this.renew);
+    if (expires === null || this.closed) return;
+    const wait = Math.max(1_000, expires - Date.now() - RENEW_BEFORE);
+    this.renew = setTimeout(() => void this.renewNow(expires), wait);
+  }
+
+  private async renewNow(expires: number) {
+    if (this.closed || !this.connected()) return;
+    let next: string;
+    try {
+      next = await this.config.getToken();
+    } catch {
+      next = this.token ?? "";
+    }
+    if (this.closed || !this.connected()) return;
+    // Quien da el token aún tiene el mismo: se vuelve a pedir en un rato, mientras no venza.
+    if (!next || next === this.token) {
+      if (Date.now() + RENEW_RETRY < expires) this.renew = setTimeout(() => void this.renewNow(expires), RENEW_RETRY);
+      return;
+    }
+    this.token = next;
+    this.send({ type: "auth", token: next });
+    // Hasta que el relay confirme, el plazo es el del token nuevo.
+    this.scheduleRenew(tokenExpiry(next));
   }
 
   private reconnectLater() {
@@ -283,6 +369,15 @@ export class RelaySession {
         for (const listener of this.stateListeners) listener(this.machine);
         return;
       }
+      case "engine": {
+        const text = (v: unknown) => (typeof v === "string" && v ? v : typeof v === "number" ? String(v) : null);
+        this.engineInfo = { contract: text(message.contract), host_version: text(message.host_version) };
+        for (const listener of this.engineListeners) listener(this.engineInfo);
+        return;
+      }
+      case "auth":
+        this.scheduleRenew(timeOf(message.expires_at) ?? (this.token ? tokenExpiry(this.token) : null));
+        return;
       case "ping":
         this.send({ type: "pong", t: message.t });
         return;

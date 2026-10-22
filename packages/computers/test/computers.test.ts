@@ -13,7 +13,10 @@ import {
   isManaged,
   wakes,
   listComputers,
+  listWorkspacesWithDeleted,
   powerOf,
+  purgeWorkspace,
+  restoreWorkspace,
   sessionUrl,
   startComputer,
 } from "../src/index.ts";
@@ -184,4 +187,77 @@ test("llevar trabajo: importar y cancelar despiertan; las partes, la llave y el 
   for (const command of ["work_read_part", "work_write_part", "work_export", "work_key"]) {
     assert.ok(!MIRROR_COMMANDS.has(command), `${command} no puede quedar en el espejo`);
   }
+});
+
+const jwt = (exp: number, n = 1) => `h.${Buffer.from(JSON.stringify({ exp: Math.floor(exp / 1000), n })).toString("base64url")}.s`;
+
+test("la sesión manda los contratos que habla en la URL, y solo los bien formados", () => {
+  assert.equal(sessionUrl("https://c.example", "cmp_x", ["abc123", "mal formado", "abc123", "def.4"]), "wss://c.example/v1/computers/cmp_x/session?contracts=abc123,def.4");
+  assert.equal(sessionUrl("https://c.example", "cmp_x", []), "wss://c.example/v1/computers/cmp_x/session");
+});
+
+test("antes de que venza el token se renueva con `auth` sin reconectar; 4005 reabre con uno nuevo", async () => {
+  FakeSocket.all = [];
+  let n = 0;
+  const tokens: string[] = [];
+  const relay = new RelaySession(
+    {
+      endpoint: "https://c.example",
+      computerId: "cmp_a",
+      contracts: ["abc123"],
+      getToken: () => {
+        const t = jwt(Date.now() + 46_000, ++n);
+        tokens.push(t);
+        return t;
+      },
+    },
+    (url, protocols) => new FakeSocket(url, protocols),
+  );
+  relay.start();
+  await tick();
+  const socket = FakeSocket.all[0];
+  assert.ok(socket.url.endsWith("?contracts=abc123"));
+  socket.open();
+  await new Promise((r) => setTimeout(r, 1_100));
+  const auth = socket.sent.filter((m) => m.type === "auth");
+  assert.equal(auth.length, 1, "a fresh token goes over the open socket");
+  assert.equal(auth[0].token, tokens[1]);
+  assert.equal(FakeSocket.all.length, 1, "without reconnecting");
+  socket.receive({ type: "auth", expires_at: new Date(Date.now() + 600_000).toISOString() });
+  socket.close(4005);
+  await new Promise((r) => setTimeout(r, 600));
+  assert.equal(FakeSocket.all.length, 2, "an expired session opens again");
+  assert.deepEqual(FakeSocket.all[1].protocols, [SUBPROTOCOL, `bearer.${tokens.at(-1)}`], "with a new token");
+  relay.close();
+});
+
+test("cada `hello` del motor llega como `engine` con su contrato", async () => {
+  const relay = session();
+  await tick();
+  const socket = FakeSocket.all[0];
+  const seen: (string | null)[] = [];
+  relay.onEngine((e) => seen.push(e.contract));
+  socket.open();
+  socket.receive({ type: "engine", contract: "old", host_version: "0.2.82" });
+  socket.receive({ type: "engine", contract: "new", host_version: "0.2.86" });
+  assert.deepEqual(seen, ["old", "new"]);
+  assert.deepEqual(relay.engine(), { contract: "new", host_version: "0.2.86" });
+  relay.close();
+});
+
+test("lápidas: la lista con borrados, restaurar, purgar y el 409 con su código", async () => {
+  const asked: [string, string | undefined][] = [];
+  const reply = (status: number, body: unknown) => async (url: string, init?: { method?: string }) => {
+    asked.push([url, init?.method]);
+    return { status, ok: status < 300, json: async () => body };
+  };
+  const both = await listWorkspacesWithDeleted("https://c.example", "t", reply(200, { workspaces: [{ id: "w", name: "W", projects: [], computers: ["c"] }], deleted: [{ id: "w9", name: "Viejo", projects: [], computers: [], deleted_at: "2026-10-22T10:00:00Z" }] }));
+  assert.equal(both.kind, "ok");
+  if (both.kind === "ok") assert.deepEqual([both.value.workspaces.map((w) => w.id), both.value.deleted.map((w) => [w.id, w.deleted_at])], [["w"], [["w9", "2026-10-22T10:00:00Z"]]]);
+  assert.equal(asked[0][0], "https://c.example/v1/workspaces?include_deleted=1");
+  const restored = await restoreWorkspace("https://c.example", "t", "w9", reply(200, { id: "w9", name: "Viejo", projects: [], computers: [] }));
+  assert.equal(restored.kind === "ok" && restored.value?.id, "w9");
+  assert.equal((await purgeWorkspace("https://c.example", "t", "w9", reply(204, null))).kind, "ok");
+  assert.deepEqual(asked.slice(1), [["https://c.example/v1/workspaces/w9/restore", "POST"], ["https://c.example/v1/workspaces/w9/purge", "POST"]]);
+  assert.deepEqual(await purgeWorkspace("https://c.example", "t", "w", reply(409, { error: "workspace_not_deleted" })), { kind: "error", status: 409, code: "workspace_not_deleted" });
 });

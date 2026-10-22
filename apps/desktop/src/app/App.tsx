@@ -432,7 +432,8 @@ export default function App() {
   const guardarCache = shellCacheWriter();
   createEffect(() => {
     const workspace = workspaceActivo();
-    const snapshot = { workspace, projects: projectList(), sessions: sesiones(), spaces: spaces(), desk: escritorio() };
+    const slices = capabilities().machineSlices?.();
+    const snapshot = { workspace, projects: projectList(), sessions: sesiones(), spaces: spaces(), desk: escritorio(), ...(slices ? { slices } : {}) };
     if (enCache() || bloqueo() || !workspace) return;
     // A mitad de un cambio de workspace las filas aún son del anterior: esa foto no se guarda.
     const carpetas = ["", ...snapshot.projects.map((p) => p.id)];
@@ -567,6 +568,21 @@ export default function App() {
       if (fila) return fila;
     }
     return naciendo().find((n) => n.row.id === id)?.row;
+  };
+  /**
+   * Las opciones de una orden sobre la tarea `id`: si corre en otra máquina, con
+   * su cabecera. La máquina sale de su fila (o de la pestaña que aún no la
+   * tiene), nunca de los demás argumentos (`features/machines/router.ts`).
+   */
+  const deLaTarea = (id: string | null | undefined): { headers: Record<string, string> } | undefined => {
+    const machine = id ? (filaDe(id)?.machine ?? capabilities().taskMachine?.(id) ?? null) : null;
+    return machine ? { headers: { "x-terminus-machine": machine } } : undefined;
+  };
+  /** El space con que nace o sigue algo en `machine`: uno de otra máquina no viaja. */
+  const espacioPara = (space: string | null | undefined, machine: string | null | undefined) => {
+    if (!space || !machine) return space ?? null;
+    const own = capabilities().taskMachine?.(space) ?? null;
+    return own === machine ? space : null;
   };
   // Sin la carpeta no se puede abrir: `abrirSesion` la necesita para la pestaña.
   const tareaDelRiel = (id: string): SenderTask | null => {
@@ -1162,8 +1178,8 @@ export default function App() {
   // Con el stream empujado el motor sabe paginar: abrir trae los últimos turnos y no la transcripción entera.
   let historialPaginado = false;
   const leerTarea = (project: string, id: string, before: number | null = null) => {
-    if (historialPaginado) return invoke<Session>("load_history", { project, id, before });
-    return invoke<Session>("load_session", { project, id });
+    if (historialPaginado) return invoke<Session>("load_history", { project, id, before }, deLaTarea(id));
+    return invoke<Session>("load_session", { project, id }, deLaTarea(id));
   };
   /**
    * La página anterior a lo cargado de `id`, lista para anteponerse: devuelve con qué
@@ -1764,7 +1780,7 @@ export default function App() {
             project: project(),
             id,
             rel,
-          })
+          }, deLaTarea(id))
         : await invoke<Preview>("preview_file", { path: rel, rel });
       return p.data_url ?? null;
     } catch {
@@ -1781,7 +1797,7 @@ export default function App() {
   // (`abrirPorRel`).
   async function refreshFolder(p: string, id: string) {
     try {
-      setFolder(await invoke<string>("session_folder", { project: p, id }));
+      setFolder(await invoke<string>("session_folder", { project: p, id }, deLaTarea(id)));
     } catch {
       setFolder(null);
     }
@@ -2858,6 +2874,20 @@ export default function App() {
     };
     window.addEventListener("harness:tasks-changed", tasksChanged);
     onCleanup(() => window.removeEventListener("harness:tasks-changed", tasksChanged));
+    // Otra máquina de la cuenta trajo una rebanada distinta (`features/machines/router.ts`): se relee solo eso.
+    const machineSlices = (event: Event) => {
+      const changes = (event as CustomEvent<{ changes?: string[] } | null>).detail?.changes ?? [];
+      if (changes.includes("sessions")) void refreshSessionsOnEvent(grupos());
+      if (changes.includes("spaces")) void reloadSpaces();
+      if (changes.includes("projects")) {
+        const workspace = workspaceActivo();
+        void invoke<Project[]>("list_projects").then((items) => {
+          if (workspace === workspaceActivo()) setProjectList(items);
+        }).catch(() => {});
+      }
+    };
+    window.addEventListener("harness:machine-slices", machineSlices);
+    onCleanup(() => window.removeEventListener("harness:machine-slices", machineSlices));
     // La otra mitad de la elección del enlace (`ui/Markdown.tsx`): sale al
     // navegador de la persona por una puerta más estrecha que la de dentro.
     // Ver `sites::abrible_fuera`.
@@ -2957,7 +2987,7 @@ export default function App() {
         session: p.session,
         requestId: p.requestId,
         allow,
-      });
+      }, deLaTarea(p.session));
       asentar(p.session, (ms) => [
         ...ms,
         {
@@ -3102,7 +3132,7 @@ export default function App() {
         model: lanzado.model,
         effort: lanzado.effort,
         permissionMode: lanzado.permission_mode,
-      });
+      }, deLaTarea(session));
       if (abrio) {
         asentar(session, (ms) => [...ms, { role: "system", text: "", meta: "shell_reply", agent: lanzado.provider }]);
         return;
@@ -3131,7 +3161,7 @@ export default function App() {
       });
     });
     try {
-      await invoke<Corrida>("run_shell_command", { project: lanzado.project, session, command, queueId });
+      await invoke<Corrida>("run_shell_command", { project: lanzado.project, session, command, queueId }, deLaTarea(session));
       return null;
     } catch (error) {
       if (lanzados.get(session) === lanzado) {
@@ -3190,6 +3220,7 @@ export default function App() {
       ponerTerminal("", { id: "", command: command.trim(), cwd: null, output: "", truncated: false, desde: Date.now() });
     });
     try {
+      const enOtra = runOnOptions(workspaceActivo(), projectList().find((p) => p.id === proyecto));
       const corrida = await invoke<Corrida>("run_shell_command", {
         project: proyecto,
         session: null,
@@ -3199,11 +3230,11 @@ export default function App() {
         model: lanzado.model,
         effort: lanzado.effort,
         permissionMode: lanzado.permission_mode,
-        space: escritorio(),
+        space: espacioPara(escritorio(), enOtra?.headers["x-terminus-machine"]),
         agent: encargado,
         baseRef: draftBases()[claveBorrador] ?? null,
         runId,
-      }, runOnOptions(workspaceActivo(), projectList().find((p) => p.id === proyecto)));
+      }, enOtra);
       // Sin su `shell_started` no hay nada pintado: se adopta aquí y se lee del disco.
       if (adoptarComando(runId, corrida.session) && nace.generation === sessionGeneration) void settleTurn(corrida.session, true);
       return true;
@@ -3254,7 +3285,7 @@ export default function App() {
     const vivo = id ? terminales()[id] : null;
     if (!id || !vivo?.id) return false;
     try {
-      if (!(await invoke<boolean>("write_shell_input", { session: id, input: texto }))) return false;
+      if (!(await invoke<boolean>("write_shell_input", { session: id, input: texto }, deLaTarea(id)))) return false;
     } catch (e) {
       anexar(id, (m) => [...m, { role: "system", text: prosaDe(e), meta: "fallo" }]);
       return false;
@@ -3281,7 +3312,7 @@ export default function App() {
     if (terminales()[id] || lanzados.has(id)) {
       detenidos.add(id);
       try {
-        if (!(await invoke<boolean>("stop_shell_command", { session: id }))) {
+        if (!(await invoke<boolean>("stop_shell_command", { session: id }, deLaTarea(id)))) {
           detenidos.delete(id);
           setDeteniendo(null);
         }
@@ -3293,7 +3324,7 @@ export default function App() {
       return;
     }
     try {
-      await invoke("stop_turn", { project: project(), session: id });
+      await invoke("stop_turn", { project: project(), session: id }, deLaTarea(id));
       await reconcileActiveTurns();
       // Rust ya quitó el gate y cerró su stdin. La hoja desaparece en el mismo
       // gesto, sin esperar a que el proceso termine de emitir su cierre.
@@ -3330,7 +3361,7 @@ export default function App() {
         project: project(),
         session: de,
         queued: items,
-      }).catch((e) =>
+      }, deLaTarea(de)).catch((e) =>
         anexar(de, (m) => [
           ...m,
           {
@@ -3362,7 +3393,7 @@ export default function App() {
       if (checking) return;
       checking = true;
       try {
-        const ready = await invoke<boolean>("queue_ready", { project: proyecto, session: id });
+        const ready = await invoke<boolean>("queue_ready", { project: proyecto, session: id }, deLaTarea(id));
         if (ready && !cancelled && generation === sessionGeneration && id === sessionId()) {
           setRetenida(null);
         }
@@ -3439,7 +3470,7 @@ export default function App() {
     savedQueues.set(session, { ...queued, items: resto, retained: null });
     marcarViva(session);
     try {
-      await invoke("save_queue", { project: queued.project, session, queued: resto });
+      await invoke("save_queue", { project: queued.project, session, queued: resto }, deLaTarea(session));
       if (generation !== sessionGeneration) return;
       if (!await enviar(message, undefined, { project: queued.project, session })) throw new Error("queue-send-failed");
     } catch (error) {
@@ -3458,7 +3489,7 @@ export default function App() {
         setColaDe(session);
       });
       marcarQuieta(session);
-      void invoke("save_queue", { project: queued.project, session, queued: restored.items }).catch((error) => {
+      void invoke("save_queue", { project: queued.project, session, queued: restored.items }, deLaTarea(session)).catch((error) => {
         anexar(session, (messages) => [...messages, { role: "system", text: t("shell.queue.save_failed", { error: prosaDe(error) }), meta: "aviso" }]);
       });
     } finally {
@@ -3766,7 +3797,7 @@ export default function App() {
         setVentana(null);
         return;
       }
-      invoke<SessionUsage>("session_usage", { project: p, session: id })
+      invoke<SessionUsage>("session_usage", { project: p, session: id }, deLaTarea(id))
         .then((s) => setVentana(ventanaDe(s.records)))
         .catch(() => setVentana(null));
     }),
@@ -4002,7 +4033,7 @@ export default function App() {
       const q = cached?.items ?? await invoke<Encolado[]>("load_queue", {
         project: proyecto,
         session: id,
-      });
+      }, deLaTarea(id));
       if (!current()) return;
       const restored = savedQueues.get(id);
       const retentions = workspaceRetentions.get(workspaceActivo() ?? "");
@@ -4556,7 +4587,7 @@ export default function App() {
     try {
       // En Windows un Tinymist vivo bloquea la carpeta de la tarea.
       await apagarVistasDe(id);
-      await invoke("delete_session", { project: proyecto, id, force });
+      await invoke("delete_session", { project: proyecto, id, force }, deLaTarea(id));
       // Borrada, no tiene pestaña ni hilo ni borrador que conservar.
       const vecina = pestanas.close(id);
       // Igual que al cerrar la pestaña: el panel que la enseñaba se cierra.
@@ -4596,7 +4627,7 @@ export default function App() {
    */
   async function moverSesion(de: string, id: string, a: string) {
     try {
-      await invoke("move_session", { project: de, id, to: a });
+      await invoke("move_session", { project: de, id, to: a }, deLaTarea(id));
       if (id === sessionId()) setProject(a);
       pestanas.moveToProject(id, a);
       void refreshSessions(grupos());
@@ -4618,7 +4649,7 @@ export default function App() {
     etapa: Etapa | null,
   ) {
     try {
-      await invoke("set_session_stage", { project: proyecto, id, stage: etapa });
+      await invoke("set_session_stage", { project: proyecto, id, stage: etapa }, deLaTarea(id));
       void refreshSessions(grupos());
     } catch (e) {
       setError(prosaDe(e));
@@ -4626,7 +4657,7 @@ export default function App() {
   }
 
   async function fijarSesion(proyecto: string, id: string, pinned: boolean) {
-    await invoke("set_session_pinned", { project: proyecto, id, pinned });
+    await invoke("set_session_pinned", { project: proyecto, id, pinned }, deLaTarea(id));
     void refreshSessions(grupos());
   }
 
@@ -4638,7 +4669,7 @@ export default function App() {
    */
   async function renombrarSesion(proyecto: string, id: string, title: string) {
     try {
-      await invoke("rename_session", { project: proyecto, id, title });
+      await invoke("rename_session", { project: proyecto, id, title }, deLaTarea(id));
       void refreshSessions(grupos());
       return true;
     } catch (e) {
@@ -4691,7 +4722,7 @@ export default function App() {
         project: project(),
         session: sid,
         source: id,
-      });
+      }, deLaTarea(sid));
     } catch (e) {
       asentar(sid, (ms) => [
         ...ms,
@@ -4824,7 +4855,7 @@ export default function App() {
       const arboles = await invoke<ArbolEnTarea[]>("list_task_trees", {
         project: proyecto,
         session,
-      });
+      }, deLaTarea(session));
       const arbol = arboles[0]?.key;
       if (!arbol) return;
       paneles.renameTabs(pestanas.attachPreviewFiles(proyecto, session, arbol));
@@ -4947,7 +4978,7 @@ export default function App() {
     const salida = await invoke<ChatExportado>("export_chat", {
       project: project(),
       id,
-    });
+    }, deLaTarea(id));
     abrirArtefacto(salida.rel, salida.path);
     window.dispatchEvent(new CustomEvent("harness:copia"));
   }
@@ -5042,7 +5073,7 @@ export default function App() {
         project: project(),
         session: sesion,
         effort: effortDelTurno(),
-      }).catch((e) => {
+      }, deLaTarea(sesion)).catch((e) => {
         anexar(sesion, (m) => [...m, { role: "system", text: prosaDe(e), meta: "aviso" }]);
       });
     }
@@ -5107,7 +5138,7 @@ export default function App() {
       project: project(),
       session: sesion,
       mode: id,
-    })
+    }, deLaTarea(sesion))
       .then(() => {
         if (id === MODO_AUTOMATICO) return aprobarPendientes(sesion);
       })
@@ -5312,6 +5343,7 @@ export default function App() {
       if (llevar && !llevado) throw CARRY_STOPPED;
       // La respuesta de una persona no existe en la interfaz hasta que Rust la
       // validó y la escribió: primero persistir, y solo entonces pintarla.
+      const opciones = abierta ? deLaTarea(abierta) : llevado ? { headers: { "x-terminus-machine": llevado.target } } : runOnOptions(workspaceActivo(), lugar);
       const id = await invoke<string>("send_message", {
         provider: m.provider,
         project: proyecto,
@@ -5355,8 +5387,8 @@ export default function App() {
         fromTask: m.from_task ?? null,
         // El escritorio que la persona tenía delante al escribirlo, sellado en el
         // mensaje; lo que llega de otro canal no trae ninguno.
-        space: m.space ?? null,
-      }, abierta ? undefined : llevado ? { headers: { "x-terminus-machine": llevado.target } } : runOnOptions(workspaceActivo(), lugar));
+        space: espacioPara(m.space, opciones?.headers?.["x-terminus-machine"]),
+      }, opciones);
       if (provisional && naceDormida) {
         anotar(setEncendiendo, provisional, null);
         void refetchMachines();
@@ -5487,7 +5519,7 @@ export default function App() {
   };
   /** Lo que esa tarea tiene esperando. No lanza: sin respuesta, no hay nada. */
   const pendientesDe = (session: string) =>
-    invoke<Pendientes>("pending_requests", { session }).catch(() => null);
+    invoke<Pendientes>("pending_requests", { session }, deLaTarea(session)).catch(() => null);
 
   /**
    * El `request_id` de la pregunta viva de este turno, si alguien espera.
@@ -5536,7 +5568,7 @@ export default function App() {
         project: project(),
         session: sid,
         turn: turno,
-      });
+      }, deLaTarea(sid));
       soltarPreguntas(sid, turno);
       asentar(sid, (ms) => [
         ...ms,
@@ -5589,7 +5621,7 @@ export default function App() {
           session: sid,
           requestId: viva,
           respuestas: manda,
-        });
+        }, deLaTarea(sid));
         soltarPreguntas(sid, turno);
         asentar(sid, (ms) => [
           ...ms,
@@ -5907,7 +5939,7 @@ export default function App() {
         if (!abierta) return;
         setRetenida(null);
         try {
-          await invoke("reintentar_reanudacion_por_entregas", { project: project(), session: abierta });
+          await invoke("reintentar_reanudacion_por_entregas", { project: project(), session: abierta }, deLaTarea(abierta));
         } catch (e) {
           setError(prosaDe(e));
         }
@@ -5997,7 +6029,7 @@ export default function App() {
         taskMentions: m.task_mentions ?? [],
         queueId: id,
         attachments: m.attachments,
-      });
+      }, deLaTarea(abierta));
       if (workspaceActivo() !== sourceWorkspace) return;
       // El turno sigue siendo el mismo, pero lo que contesta cambió: sin esto
       // el rótulo sigue contando desde el arranque hasta el próximo sondeo, y
@@ -6219,7 +6251,7 @@ export default function App() {
     const [delegation, { refetch: refreshDelegation }] = createResource(delegationScope, async key => {
       const [workspace, folder, id] = JSON.parse(key) as [string, string, string];
       try {
-        const rows = await invoke<SessionRow[]>("list_delegated_sessions", { project: folder, id });
+        const rows = await invoke<SessionRow[]>("list_delegated_sessions", { project: folder, id }, deLaTarea(id));
         return { workspace, id, rows, error: undefined as unknown };
       } catch (error) {
         return { workspace, id, rows: [] as SessionRow[], error };
@@ -6275,7 +6307,7 @@ export default function App() {
     const [coordinator] = createResource(coordinatorScope, async key => {
       const [workspace, folder, id] = JSON.parse(key) as [string, string, string];
       try {
-        const reference = await invoke<SenderTask | null>("task_coordinator", { project: folder, id });
+        const reference = await invoke<SenderTask | null>("task_coordinator", { project: folder, id }, deLaTarea(id));
         return { workspace, id, reference };
       } catch { return { workspace, id, reference: null }; }
     });
