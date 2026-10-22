@@ -118,6 +118,8 @@ const WAKES: &[&str] = &[
     "queue_ready",
     "resume_awaiting_quota",
     "recreate_task_work",
+    // Llevar trabajo despierta la máquina de destino con `work_import {probe: true}`.
+    "work_import",
 ];
 /// La suscripción viva y el cursor que la ventana ya recibió de ella.
 struct Fed {

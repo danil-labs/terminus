@@ -20,7 +20,7 @@ repositories, and `GitHostInfo`. Files on disk keep their keys; the types that
 are stored and also travel cross the contract wrapped in `Wire`, which renames
 their keys. There are no aliases. This copy is byte-identical to the engine's.
 SHA-256:
-`49aa8a5f516665238325495ec861c33a66374c3c4ec4d1141d9e5e43e947b9fa`.
+`24a36079ea129f3a31b5bc869a057bd108b0b6088a4e3dc90098b624c8e96775`.
 
 seldon-host `4e21caf` (#66) added the Danil account (321 commands, 28 events):
 `danil_connect_start`, `danil_connect_status`, `danil_connect_options`,
@@ -83,8 +83,18 @@ session per account on a computer, and each workspace belongs to one account
 `danil_account_set_photo` `{image, account?}`. This copy is the engine's
 manifest byte for byte; no `seldon-runtime` with it is published yet.
 
+seldon-host `feat/carry-work-1-export-import` (#84, `4870085`) carries work between
+machines (347 commands, 30 events): `work_status` (`{project, task?}`),
+`work_export` (`{project, task?, operation, includeWork, exclude, files,
+full}`; the transfer id is the client's `operation`), `work_read_part`
+(`{transfer, offset, size}`), `work_write_part` (`{transfer, offset, data}`),
+`work_import` (`{transfer, project, sha256, bytes, probe?, branchAs?}`) and
+`work_cancel` (`{transfer}`); `send_message` and `run_shell_command` take
+`unwrapSnapshot`. The `work.error.*` keys come from the same branch
+(seldon-host docs/carry-work.md).
+
 The source is `crates/engine-protocol/commands.json` in `danil-labs/seldon-host`
-(here, seldon-host `658cad2` on `feat/danil-session-per-account`). The engine pinned in `seldon-runtime.lock` must
+(here, seldon-host `4870085` on `feat/carry-work-1-export-import`). The engine pinned in `seldon-runtime.lock` must
 announce this same hash as its `contract`; the `contract` guard
 (`scripts/guards/contract.mjs`) compares the three.
 
