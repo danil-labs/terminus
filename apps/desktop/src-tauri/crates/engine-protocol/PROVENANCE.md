@@ -172,7 +172,7 @@ turn, to create a file or a folder from the preview before writing to the agent
 (367 commands, 32 events): `create_empty_session` (`{provider, project, title,
 baseRef?, agent?, space?}`) → `{session, folder}` does what the first
 `send_message` does to prepare the task and its working copy (a worktree from
-`baseRef` with git, the folder itself without git), without a turn. `title` is
+`baseRef` with git, the task's kn copy without git), without a turn. `title` is
 provisional: the person's first `send_message` on that task replaces it. This
 copy is `git show 3274de5:crates/engine-protocol/commands.json` byte for byte.
 
