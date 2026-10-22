@@ -64,8 +64,11 @@ export type Paso =
   | { k: "alta"; cuenta: string; url: string | null; revisando?: boolean };
 
 const EN_CURSO = new Set<Paso["k"]>(["descargando", "entrando", "clave", "comprobando", "saliendo", "alta"]);
-const ORDEN = ["claude", "codex", "antigravity", "grok", "opencode-zen", "opencode-local", "zcode"];
+const ORDEN = ["claude", "codex", "antigravity", "grok", "opencode-zen", "opencode-local"];
+/** ZCode va siempre al final, aunque esté en la computadora o el motor traiga proveedores nuevos. */
+export const AL_FINAL = "zcode";
 const posicion = (id: string) => {
+  if (id === AL_FINAL) return ORDEN.length + 1;
   const i = ORDEN.indexOf(id);
   return i < 0 ? ORDEN.length : i;
 };

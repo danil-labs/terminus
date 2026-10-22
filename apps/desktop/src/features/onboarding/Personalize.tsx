@@ -1,49 +1,11 @@
 import { createSignal, onMount, Show } from "solid-js";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
-import { capabilities } from "../../lib/platform";
 import { Button } from "../../ui/Button";
 import { prosaDe } from "../../ui/Failure";
 import { Input } from "../../ui/Input";
-import { createDanilSession, DanilSignInChoices } from "../settings/danil-session";
 import { Comprobacion } from "./ConnectAI";
 import { Integraciones, Plugins } from "./ToolCards";
-
-/** La cuenta de Danil es de la computadora: se ofrece aquí mientras no haya sesión. */
-function CuentaDanil() {
-  const session = createDanilSession();
-  const estado = () => session.status()?.state;
-  return (
-    <Show when={estado() === "disconnected" || estado() === "pending"}>
-      <div class="grid gap-2 border-t border-border pt-4" data-danil-onboarding={estado()}>
-        <span class="text-[13px] font-semibold text-neutral-950">{t("danil.onboarding.title")}</span>
-        <span class="text-xs text-neutral-500">{t("danil.onboarding.lede")}</span>
-        <Show when={estado() === "pending"} fallback={<DanilSignInChoices session={session} />}>
-          <div class="grid gap-2 rounded-md border border-border bg-surface-raised px-3 py-2.5">
-            <strong class="text-[13px] font-semibold text-neutral-950">
-              {t("danil.account.pending", { code: session.status()?.user_code ?? "" })}
-            </strong>
-            <span class="text-xs text-neutral-500">{t("danil.account.pending_hint")}</span>
-            <div class="flex flex-wrap items-center gap-2">
-              <Show when={session.status()?.verification_uri_complete}>
-                <Button size="sm" variant="secondary" onClick={session.reopen}>
-                  {t("danil.account.open_again")}
-                </Button>
-              </Show>
-              <Button size="sm" variant="ghost" disabled={session.busy()} onClick={() => void session.signOut()}>
-                {t("danil.account.cancel")}
-              </Button>
-            </div>
-          </div>
-        </Show>
-        <Show when={session.message()}>
-          {(text) => <p class="m-0 text-[0.8125rem] text-error-strong" role="alert">{text()}</p>}
-        </Show>
-        <span class="text-xs text-neutral-500">{t("danil.onboarding.footer")}</span>
-      </div>
-    </Show>
-  );
-}
 
 /** La última pantalla del alta: el workspace, las herramientas con que ya se trabaja y los plugins. */
 export default function Personalizar(props: {
@@ -133,9 +95,6 @@ export default function Personalizar(props: {
               ]}
             />
           </div>
-          <Show when={capabilities().danilAccount}>
-            <CuentaDanil />
-          </Show>
         </section>
         <section class="flex min-h-0 flex-col gap-3 px-7 pb-5 md:overflow-y-auto md:pt-7 md:pl-2 [&>*]:shrink-0">
           <div class="grid gap-0.5">
