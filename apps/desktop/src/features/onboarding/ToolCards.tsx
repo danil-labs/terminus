@@ -1,6 +1,6 @@
 import TriangleAlert from "lucide-solid/icons/triangle-alert";
 import { listen } from "../../lib/serviceEvents";
-import { AvanceDeDescarga } from "./DownloadProgress";
+import { AvanceDeDescarga, BarraDeCarga, CodigoParaConfirmar } from "./DownloadProgress";
 import ArrowRight from "lucide-solid/icons/arrow-right";
 import Check from "lucide-solid/icons/check";
 import ExternalLink from "lucide-solid/icons/external-link";
@@ -453,7 +453,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
     return (
       <div
         class={cn(
-          "flex h-[58px] items-center gap-3 rounded-lg border px-3 py-2",
+          "relative flex h-[58px] items-center gap-3 overflow-hidden rounded-lg border px-3 py-2",
           fallo() && "animate-sacudir border-neutral-950 bg-surface-raised",
           e()?.k === "conectada" && p.i.via !== "incluido" && "border-success-strong/40 bg-success/5",
           ["conectando", "formulario", "descargando"].includes(e()?.k ?? "") && "border-primary bg-primary/5",
@@ -504,9 +504,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
                 const x = () => d() as { hecho: number; total: number | null };
                 return (
                   <AvanceDeDescarga
-                    hecho={x().hecho}
                     total={x().total}
-                    barra="w-[36px]"
                     cancelar={t("onboarding.tools.cancel_connect", { name: nombre })}
                     onCancelar={() => void cancelar(p.i)}
                   />
@@ -515,7 +513,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
             </Match>
             <Match when={e()?.k === "conectando"}>
               <Show when={(e() as { codigo?: string }).codigo} fallback={<Spinner size={18} class="text-primary" />}>
-                {(c) => <strong class="select-all rounded-sm bg-surface-muted px-2 py-0.5 font-mono text-base font-semibold tracking-[0.08em] text-neutral-950">{c()}</strong>}
+                {(c) => <CodigoParaConfirmar codigo={c()} />}
               </Show>
               <Show when={!formularioAbierto(p.i)}>{cancelarEsta()}</Show>
             </Match>
@@ -525,6 +523,9 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
             </Match>
           </Switch>
         </span>
+        <Show when={e()?.k === "descargando" && (e() as { hecho: number; total: number | null })}>
+          {(d) => <BarraDeCarga hecho={d().hecho} total={d().total} />}
+        </Show>
       </div>
     );
   }
@@ -808,7 +809,6 @@ export function Plugins(props: { onCambio: (estado: { instalados: number; instal
           >
             <Match when={instalando(q.p)}>
               <AvanceDeDescarga
-                hecho={av()?.hecho ?? 0}
                 total={av()?.total ?? null}
                 cancelar={t("onboarding.ai.cancel_download", { name: nombre() })}
                 onCancelar={() => cancelar(q.p)}
@@ -832,6 +832,9 @@ export function Plugins(props: { onCambio: (estado: { instalados: number; instal
             </Match>
           </Switch>
         </span>
+        <Show when={instalando(q.p)}>
+          <BarraDeCarga hecho={av()?.hecho ?? 0} total={av()?.total ?? null} />
+        </Show>
       </div>
     );
   }
