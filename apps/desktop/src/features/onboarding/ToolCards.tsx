@@ -78,7 +78,7 @@ const INTEGRACIONES = (): Integracion[] => [
   { id: "bitbucket", nombre: "Bitbucket", comun: false, via: "proveedor" },
   { id: "excalidraw", nombre: "Excalidraw", comun: false, via: "incluido" },
 ];
-const RECOMENDADOS = ["drawio", "typst"];
+const RECOMENDADOS = ["drawio", "typst", "libreoffice"];
 const ORDEN_PLUGINS = ["drawio", "typst", "libreoffice", "agentsview", "computer-use"];
 const CON_PESO = new Set(["drawio", "typst", "libreoffice", "computer-use"]);
 const descripcion = (id: string) => t(`onboarding.tools.about.${id}`);
@@ -644,7 +644,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
 
   const visibles = () => {
     const base = INTEGRACIONES().filter(
-      (i) => i.comun || i.via === "incluido" || ["formulario", "descargando", "conectando", "conectada"].includes(estados[i.id]?.k ?? ""),
+      (i) => i.comun || (i.via !== "incluido" && ["formulario", "descargando", "conectando", "conectada"].includes(estados[i.id]?.k ?? "")),
     );
     return verMas() ? [...base, ...INTEGRACIONES().filter((i) => !base.includes(i))] : base;
   };
