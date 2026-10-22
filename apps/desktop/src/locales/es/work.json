@@ -47,7 +47,6 @@
   "work.carry.skipped": "{dirs} no se copian",
   "work.carry.lfs": "Usa Git LFS: sus archivos no viajan; {machine} los baja del remoto si están ahí.",
   "work.carry.submodules": "Tiene submódulos: sus commits no viajan; {machine} los baja del remoto si están ahí.",
-  "work.carry.ssh": "Viajan por el túnel SSH de la máquina; Danil no los ve.",
   "work.carry.preparing": "Preparando la copia…",
   "work.carry.size": "{size} · unos {eta}",
   "work.carry.size_warn": "Son {size}: tardará un rato en copiarse.",
