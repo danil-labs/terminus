@@ -115,12 +115,12 @@ export function VerMas(props: { abierto: boolean; resto: { id: string; nombre: s
         <span class="inline-flex items-center">
           <span>{props.abierto ? t("onboarding.tools.less") : t("onboarding.tools.more")}</span>
           <Show when={!props.abierto}>
-            <span class="relative z-[1] mr-[-3px] ml-[-2px] inline-flex translate-y-[5px] items-center transition-[transform,margin] duration-300 ease-[cubic-bezier(.3,1.4,.5,1)] group-hover:mx-[5px] group-hover:translate-y-[7px] motion-reduce:transition-none">
+            <span class="relative z-[1] mr-[-3px] ml-[-2px] inline-flex translate-y-[5px] items-center transition-[translate,margin] duration-300 ease-[cubic-bezier(.3,1.4,.5,1)] group-hover:mx-[5px] group-hover:translate-y-[7px]">
               <For each={props.resto.slice(0, 4)}>
                 {(r, i) => (
                   <span
-                    class="-ml-1.5 grid size-[15px] place-items-center rounded-full border border-border-strong bg-surface-raised shadow-[0_0_0_1.5px_var(--color-bg)] transition-[width,height,margin,transform] duration-300 ease-[cubic-bezier(.3,1.4,.5,1)] first:ml-0 group-hover:ml-1 group-hover:size-[19px] group-hover:translate-y-0 group-hover:first:ml-0 motion-reduce:transition-none [&>svg]:size-[62%]"
-                    style={{ transform: `translateY(${-3 * i()}px)` }}
+                    class="-ml-1.5 grid size-[15px] translate-y-[var(--sube)] place-items-center rounded-full border border-border-strong bg-surface-raised shadow-[0_0_0_1.5px_var(--color-bg)] transition-[width,height,margin,translate,box-shadow] duration-300 ease-[cubic-bezier(.3,1.4,.5,1)] first:ml-0 group-hover:ml-1 group-hover:size-[19px] group-hover:translate-y-0 group-hover:shadow-[0_0_0_2px_var(--color-bg),0_2px_6px_rgba(10,13,35,.12)] group-hover:first:ml-0 [&>svg]:size-[62%]"
+                    style={{ "--sube": `${-3 * Math.min(i(), 3)}px` }}
                     title={r.nombre}
                   >
                     {r.icono}
@@ -133,7 +133,7 @@ export function VerMas(props: { abierto: boolean; resto: { id: string; nombre: s
             size={14}
             aria-hidden="true"
             class={cn(
-              "ml-0.5 transition-transform duration-200 motion-reduce:transition-none",
+              "ml-0.5 transition-[translate,rotate] duration-200",
               props.abierto ? "ml-1.5 -rotate-90" : "group-hover:translate-x-[3px]",
             )}
           />
@@ -642,11 +642,12 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
     );
   }
 
-  const visibles = () =>
-    INTEGRACIONES().filter(
-      (i) =>
-        i.comun || verMas() || i.via === "incluido" || ["formulario", "descargando", "conectando", "conectada"].includes(estados[i.id]?.k ?? ""),
+  const visibles = () => {
+    const base = INTEGRACIONES().filter(
+      (i) => i.comun || i.via === "incluido" || ["formulario", "descargando", "conectando", "conectada"].includes(estados[i.id]?.k ?? ""),
     );
+    return verMas() ? [...base, ...INTEGRACIONES().filter((i) => !base.includes(i))] : base;
+  };
   // Como el diseño: la pila de «Ver más» enseña todo lo que no es común, aunque ya esté a la vista.
   const escondidas = () => INTEGRACIONES().filter((i) => !i.comun);
 
@@ -844,7 +845,10 @@ export function Plugins(props: { onCambio: (estado: { instalados: number; instal
     );
   }
 
-  const visibles = () => plugins().filter((p) => RECOMENDADOS.includes(p.id) || verMas() || p.installed || instalando(p));
+  const visibles = () => {
+    const base = plugins().filter((p) => RECOMENDADOS.includes(p.id) || p.installed || instalando(p));
+    return verMas() ? [...base, ...plugins().filter((p) => !base.includes(p))] : base;
+  };
   const escondidos = () => plugins().filter((p) => !visibles().includes(p));
 
   return (
