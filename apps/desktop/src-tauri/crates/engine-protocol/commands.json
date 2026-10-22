@@ -5140,6 +5140,26 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "set_workspace_host_github",
+      "output": "-> Result < Wire < Workspace > , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "enabled",
+          "name": "enabled",
+          "type": "bool"
+        }
+      ],
+      "path": "workspaces::set_workspace_host_github"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "set_workspace_language",
       "output": "-> Result < Wire < Workspace > , String >",
       "parameters": [

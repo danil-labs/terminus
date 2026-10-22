@@ -1,14 +1,16 @@
 import { For, Match, Show, Switch, createEffect, createSignal, on, onCleanup, onMount } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
-import { FailureNote, asFailure, type Failure } from "../../ui/Failure";
+import { FailureNote, asFailure, detalleDe, type Failure } from "../../ui/Failure";
 import { Skeleton } from "../../ui/Skeleton";
 import { MarcaGitHost } from "../../ui/icons";
 import { listGitHosts, type GitHost } from "../../lib/gitHosts.ts";
+import type { Startup, Workspace } from "./workspaces-store";
 import { manifiesto, t } from "../../lib/i18n";
 import { prosa, type Frase } from "../../lib/prose";
 import { Badge } from "../../ui/Badge";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
+import { Toggle } from "../../ui/Toggle";
 import Ellipsis from "lucide-solid/icons/ellipsis";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -124,7 +126,8 @@ export default function Providers(props: { solo?: string | string[] }) {
 }
 
 function WorkspaceProviders(props: { solo?: string | string[] }) {
-  const scope = invoke<{ active: string | null }>("list_workspaces").then((s) => s.active ?? "pending");
+  const startup = invoke<Startup>("list_workspaces");
+  const scope = startup.then((s) => s.active ?? "pending");
   let disposed = false;
   onCleanup(() => {
     disposed = true;
@@ -153,6 +156,32 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
     } finally { setLoadingCli(false); }
   }
   onMount(() => { void refreshCli().catch((e) => setCliFailure(asFailure(e))); });
+  // «Usar el GitHub de esta computadora»: es de esta máquina y no viaja con la cuenta.
+  const [hostGithub, setHostGithub] = createSignal(false);
+  const [savingHost, setSavingHost] = createSignal(false);
+  const [hostFailure, setHostFailure] = createSignal<Failure | null>(null);
+  onMount(() => {
+    void startup
+      .then((s) => setHostGithub(!!s.workspaces.find((w) => w.id === s.active)?.host_github))
+      .catch(() => {});
+  });
+  async function changeHostGithub(enabled: boolean) {
+    const id = await scope;
+    if (id === "pending") return;
+    const before = hostGithub();
+    setHostGithub(enabled);
+    setSavingHost(true);
+    setHostFailure(null);
+    try {
+      const w = await invoke<Workspace>("set_workspace_host_github", { id, enabled });
+      setHostGithub(!!w.host_github);
+    } catch (e) {
+      setHostGithub(before);
+      setHostFailure({ what: t("providers.github.host_mode.save_failed"), detail: detalleDe(e) });
+    } finally {
+      setSavingHost(false);
+    }
+  }
   const [lista, setLista] = createSignal<Provider[] | null>(null);
   const [cargando, setCargando] = createSignal(true);
   const [fallo, setFallo] = createSignal<Failure | null>(null);
@@ -550,6 +579,27 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                     </Switch>
                   }
                 >
+                  <Show when={p.id === "github"}>
+                    <SettingsRow
+                      label={t("providers.github.host_mode.title")}
+                      description={
+                        <Show when={hostGithub()}>
+                          <span class="text-warning-strong" role="status">{t("providers.github.host_mode.warning")}</span>
+                        </Show>
+                      }
+                    >
+                      <Toggle
+                        checked={hostGithub()}
+                        label={t("providers.github.host_mode.title")}
+                        disabled={savingHost()}
+                        onChange={(on) => void changeHostGithub(on)}
+                      />
+                    </SettingsRow>
+                    <Show when={hostFailure()}>{(f) => <FailureNote f={f()} />}</Show>
+                    <Show when={hostGithub()}>
+                      <p class="m-0 text-xs text-neutral-500">{t("providers.github.host_mode.managed_note")}</p>
+                    </Show>
+                  </Show>
                   <Switch>
                     <Match when={p.connected && !esperaAqui() && !montajes()[p.id] ? p.connected : null}>
                       {(c) => (

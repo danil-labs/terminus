@@ -250,6 +250,7 @@
     "providers.github.error.no_installations",
     "providers.github.error.outside_area",
     "providers.github.error.unfinished",
+    "providers.github.host_mode.save_failed",
     "providers.github.login_help.browser",
     "providers.github.login_help.paste",
     "providers.github.summary",
