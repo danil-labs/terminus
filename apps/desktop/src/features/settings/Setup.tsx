@@ -509,7 +509,8 @@ export default function Setup(props: { children: JSX.Element }) {
     if (paso === "run") return t("setup.row.installing");
     if (paso === "fail") return t("setup.row.failed");
     if (paso !== "ok") return "";
-    if (s.name === "platform") return d.libre ? t("setup.row.free", { free: d.libre }) : (d.plataforma ?? "");
+    // El espacio libre solo importa antes de instalar: la vista terminal lo dice; aquí, el sistema.
+    if (s.name === "platform") return d.plataforma ?? "";
     if (!d.version) return t("setup.row.ready");
     return d.origen === ORIGEN_SISTEMA
       ? t("setup.row.system", { version: d.version })
