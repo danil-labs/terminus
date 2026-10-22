@@ -3694,9 +3694,18 @@ export default function App() {
       void cargarSuperficies(false);
     };
     window.addEventListener("harness:consentimiento", refrescar);
-    onCleanup(() =>
-      window.removeEventListener("harness:consentimiento", refrescar),
-    );
+    // El modelo local activo va primero en su catálogo: una tarea nueva lo adopta al cambiarlo.
+    const motorLocal = listen("local-engine", () => {
+      void cargarSuperficies(false).then(() => {
+        if (sessionId() || agent() !== "opencode-local") return;
+        const activo = catalogos()["opencode-local"]?.models[0]?.id;
+        if (activo) setModel(activo);
+      });
+    });
+    onCleanup(() => {
+      window.removeEventListener("harness:consentimiento", refrescar);
+      void motorLocal.then((f) => f());
+    });
   });
 
   // Lo que el menú de la barra ofrece depende del agente y del workspace, no

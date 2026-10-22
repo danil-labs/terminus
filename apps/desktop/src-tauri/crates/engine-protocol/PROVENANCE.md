@@ -20,7 +20,7 @@ repositories, and `GitHostInfo`. Files on disk keep their keys; the types that
 are stored and also travel cross the contract wrapped in `Wire`, which renames
 their keys. There are no aliases. This copy is byte-identical to the engine's.
 SHA-256:
-`e0f98005f7c551d2e6df91658fa466220362181ca697ada9ca63b97899219aaf`.
+`0768e84fba95667301539e780433f5eb82b1f314df8664fbeac34867bcd27a02`.
 
 seldon-host `4e21caf` (#66) added the Danil account (321 commands, 28 events):
 `danil_connect_start`, `danil_connect_status`, `danil_connect_options`,
@@ -133,6 +133,15 @@ pnpm, bun, agent-browser, uv and python. Accounts: `list_system_sessions`,
 `disconnect_google_drive` and `remove_google_drive`, plus the `google-drive`
 event and the `settings.google_drive.*` keys. This copy is
 `git show b831eeb:crates/engine-protocol/commands.json` byte for byte.
+
+seldon-host `feat/modelos-locales` (on dev `41b51c3`, which adds
+`google_drive_desktop_status`, `install_google_drive_desktop` and
+`open_google_drive_desktop`) adds the local model the tasks use: `set_active_local_model` (`{id}`). The `ModelState` items of
+`list_local_models` gain `kind`, `memory`, `machine_memory`, `fits`,
+`recommended` and `active`; `install_local_runtime` reports through the
+`install` event and is cancelled with `cancel_install`, operation
+`local-runtime`; the manifest keeps only type names, so those do not move the
+hash.
 
 Endpoint, selection and StreamPage extend the transport; they do not convert
 domain data. The token travels in RPC1 only between authenticated local
