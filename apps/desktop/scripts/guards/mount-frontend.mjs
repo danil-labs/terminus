@@ -4051,6 +4051,7 @@ if (!roto) {
     add_account: ({ provider: agent }) => ({ id: agent === "codex" ? "a1" : "k1", label: "", created_at: 1, identity: null, authenticated_at: null }),
     login_account: null,
     set_api_key: ({ key }) => { altaClaves.push(key); },
+    connect_api_key: ({ provider, key }) => { altaClaves.push(key); return { id: `k-${provider}`, label: "", created_at: 1, identity: null, authenticated_at: 1 }; },
     account_status: ({ id }) => ({ id, authenticated: id === "a1", detail: "" }),
     set_active_account: () => { altaSesion = true; },
     discard_account: true,
