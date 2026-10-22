@@ -298,8 +298,8 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
         finDeDescarga = null;
         if (a.kind === "cancelled") return void setEstados(i.id, { k: "libre" });
         if (a.kind === "error") throw a.failure ?? new Error(t("onboarding.tools.drive_install_failed"));
+        if (cerrada || estados[i.id]?.k === "libre") return;
       }
-      if (cerrada || estados[i.id]?.k === "libre") return;
       setEstados(i.id, { k: "conectando" });
       const { url } = await invoke<{ url: string }>("start_google_drive_login");
       invoke("open_external", { target: url }).catch(() => {});

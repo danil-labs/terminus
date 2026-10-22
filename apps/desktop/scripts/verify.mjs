@@ -540,6 +540,7 @@ const steps = [
   ["Con una cuenta que comparte credencial, el motivo de no poder agregar otra se ve", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/shared-credential-note.test.mjs")], root],
   ["Las cuentas de Danil entran con el navegador, se agregan y cierran sesión", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/danil-account-panel.test.mjs")], root],
   ["El alta y el pie de la barra lateral ofrecen la cuenta de Danil", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/danil-sign-in-entry.test.mjs")], root],
+  ["Google Drive del alta vuelve a conectar después de desconectar", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/onboarding-drive-reconnect.test.mjs")], root],
   ["Cada workspace elige su cuenta de Danil y el pie sigue a la del abierto", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/danil-workspace-account.test.mjs")], root],
   ["La memoria del workspace se escribe y se edita como la del proyecto", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/memory-workspace-scope.test.mjs")], root],
   ["La cuenta de Danil habla con el motor por danil_connect_*", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/danil-account.test.ts")], root],
