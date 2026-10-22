@@ -93,7 +93,7 @@ import ArchivedTasks from "../features/projects/ArchivedTasks";
 import BaseBranchPicker from "../features/projects/BaseBranchPicker";
 import { watchHandlerStatus, watchHandlerStatuses } from "../features/projects/handlerPresence";
 import { EmptyContext, ProjectPicker } from "../features/projects/Projects";
-import { bringHereLabel, canBringHere, carryOrigin, machineName, machines, refetchMachines, runOn, runOnOptions } from "../features/machines/store";
+import { bringHereLabel, canBringHere, carryOrigin, machineName, machines, refetchMachines, runOn, runOnOptions, setRunOn } from "../features/machines/store";
 import type { CarriedBase, CarryCheck } from "../features/machines/carry";
 // Chunk aparte: solo lo carga quien crea una tarea, no la carga inicial.
 const MachinePicker = lazy(() =>
@@ -5665,6 +5665,30 @@ export default function App() {
   }
 
   /**
+   * «Llevar a otra máquina…» desde el menú de la carpeta: abre su tarea nueva en
+   * la máquina elegida (o la primera encendida) y la hoja, aunque no haya nada
+   * sin subir. La copia corre al enviar el primer mensaje.
+   */
+  async function abrirLlevarCarpeta(id: string) {
+    const workspace = workspaceActivo();
+    const carpeta = projectList().find((p) => p.id === id);
+    if (!workspace || !carpeta) return;
+    const mod = await moduloDeLlevar();
+    const source = mod.sourceOf(carpeta, maquinaDeLaVentana());
+    const elegida = runOn(workspace, carpeta);
+    const target = elegida && elegida !== source ? elegida : machines().find((m) => m.id !== source && m.on && m.hosts !== false)?.id;
+    if (!source || !target) {
+      setError(t("shell.machines.carry_none"));
+      return;
+    }
+    nuevaSesion(id);
+    setRunOn(workspace, target);
+    const check = await mod.checkCarry({ workspace, project: carpeta, source, target }, true).catch(() => null);
+    if (check) setHojaDeLlevar({ key: claveAbierta(), check });
+    else setError(t("work.failure.export", { machine: machineName(source) }));
+  }
+
+  /**
    * Corre la copia de vuelta. Con «Seguir aquí» abre una tarea nueva en esta
    * máquina sobre lo traído, con un resumen corto como primer contexto (D4).
    */
@@ -7658,6 +7682,7 @@ export default function App() {
               spaces={opcionesDeMover()}
               onMoveToSpace={(p, id, i) => void moveToSpace(p, id, i)}
               onBringHere={(p, id) => void abrirTraer(p, id)}
+              onCarryFolder={machines().length > 1 ? (id) => void abrirLlevarCarpeta(id) : undefined}
               current={sessionId()}
               vivas={vivas()}
         /* Qué tareas esperan que apruebes algo, aparte de `vivas`: pesa
@@ -7852,8 +7877,8 @@ export default function App() {
               onCancel={() => setHojaDeLlevar(null)}
               onConfirm={(choice, state) => {
                 const { key, check } = hoja();
-                const job = { source: check.source, target: check.target, project: check.project.id, task: choice.task, selection: choice.selection, partSize: choice.partSize, branchAs: choice.branchAs };
-                carryModule()?.planCarry(key, check, job, state);
+                const mod = carryModule();
+                mod?.planCarry(key, check, mod.jobFor(check, choice), state);
                 setHojaDeLlevar(null);
                 if (check.task) {
                   despuesDeTraer.set(key, choice.next);

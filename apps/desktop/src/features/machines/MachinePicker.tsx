@@ -13,8 +13,8 @@ let pedida = false;
  * «Ejecutar en»: la máquina donde corre la tarea que se va a crear, recordada por
  * workspace. La ventana sigue en su workspace; elegir una apagada no la enciende,
  * la enciende enviar. Una máquina sin el workspace lo crea con el mismo id al
- * enviar; la que no puede, o no tiene la carpeta de un proyecto sin remoto, se
- * ve desactivada con la razón.
+ * enviar; la que no puede se ve desactivada con la razón. Un proyecto sin
+ * remoto se lleva desde su máquina mientras esté encendida (`carry.ts`).
  */
 export function MachinePicker(props: { workspace: string | null; project?: ProjectPlace }) {
   if (!pedida) {

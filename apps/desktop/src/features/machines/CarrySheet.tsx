@@ -23,7 +23,7 @@ import { Toggle } from "../../ui/Toggle";
 import { copyText } from "../../lib/clipboard";
 import { df, elapsed, peso } from "../../lib/format";
 import { t } from "../../lib/i18n";
-import { type CarryCheck, DESKTOP_BYTES_PER_SECOND, engine, partSize, viaSsh } from "./carry";
+import { type CarryCheck, DESKTOP_BYTES_PER_SECOND, createsProject, engine, jobFor, partSize, viaSsh } from "./carry";
 import { machineName } from "./store";
 
 /** Lo que se pide al exportar mientras la persona decide; se rehace al cambiar la selección. */
@@ -60,9 +60,7 @@ export default function CarrySheet(props: {
   let confirmed = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
 
-  const job = (sel: Selection) => ({
-    source: props.check.source, target: props.check.target, project: props.check.project.id, task: props.check.task?.id ?? null, selection: sel, partSize: partSize(),
-  });
+  const job = (sel: Selection) => jobFor(props.check, { selection: sel, partSize: partSize(), task: props.check.task?.id ?? null, branchAs: branchAs() });
 
   // Cada selección es otra exportación: la anterior se borra en el origen.
   createEffect(on(selection, (sel) => {
@@ -149,8 +147,8 @@ export default function CarrySheet(props: {
           <div class="min-w-0">
             <p class="m-0 font-medium text-neutral-950">{target()}</p>
             <Show when={bring()} fallback={
-              <p class="m-0" data-carry-target-project={props.check.hasProject === false ? "clone" : "present"}>
-                {props.check.hasProject === false ? t("work.carry.clones") : t("work.carry.present")}
+              <p class="m-0" data-carry-target-project={createsProject(props.check) ? "create" : props.check.hasProject === false ? "clone" : "present"}>
+                {createsProject(props.check) ? t("work.carry.creates") : props.check.hasProject === false ? t("work.carry.clones") : t("work.carry.present")}
               </p>
             }>
               <p class="m-0 truncate">{props.check.project.working_directory ?? props.check.project.name}</p>
@@ -166,6 +164,7 @@ export default function CarrySheet(props: {
               <label class={row}>
                 <Toggle
                   checked={selection().includeWork}
+                  disabled={createsProject(props.check)}
                   label={bring() ? t("work.bring.toggle") : t("work.carry.work_toggle")}
                   data-carry-include-work
                   onChange={(v) => setSelection((sel) => ({ ...sel, includeWork: v }))}

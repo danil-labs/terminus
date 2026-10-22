@@ -14,10 +14,17 @@ export type Machine = { id: string; local: boolean; active: boolean; on: boolean
 /** Lo que el picker sabe del proyecto de la tarea nueva: las máquinas con su carpeta y su remoto. */
 export type ProjectPlace = { name: string; machines?: string[]; remote_url?: string | null } | null | undefined;
 
-/** Por qué una máquina no puede correr la tarea nueva, o `null` si puede. */
-export function unavailable(m: Machine, project: ProjectPlace): "workspace" | "project" | null {
+/**
+ * Por qué una máquina no puede correr la tarea nueva, o `null` si puede. Un
+ * proyecto sin remoto se lleva desde la máquina donde vive mientras esté
+ * encendida; apagada, sus tareas solo corren ahí.
+ */
+export function unavailable(m: Machine, project: ProjectPlace, all: Machine[] = machines()): "workspace" | "project" | null {
   if (m.hosts === false && !m.materializes) return "workspace";
-  if (project?.machines && !project.remote_url && !project.machines.includes(m.id)) return "project";
+  if (project?.machines && !project.remote_url && !project.machines.includes(m.id)) {
+    const sourceOn = project.machines.some((id) => all.find((x) => x.id === id)?.on);
+    if (!sourceOn) return "project";
+  }
   return null;
 }
 

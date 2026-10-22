@@ -146,6 +146,8 @@ export default function Sidebar(props: {
   onMoveToSpace?: (project: string, id: string, space: string) => void;
   /** «Traer a esta Mac» en el menú de una tarea de otra máquina; solo en el escritorio. */
   onBringHere?: (project: string, id: string) => void;
+  /** «Llevar a otra máquina…» en el menú de una carpeta de git. */
+  onCarryFolder?: (project: string) => void;
 }) {
   const [creatingAgentIn, setCreatingAgentIn] = createSignal<{ id: string; name: string } | null>(null);
   let listViewport: HTMLDivElement | undefined;
@@ -488,6 +490,7 @@ export default function Sidebar(props: {
                   onQuitarDelEspacio={props.onRemoveFromSpace ? () => props.onRemoveFromSpace?.(proj().id) : undefined}
                   onNuevaTarea={() => props.onNuevaTareaEn(proj().id)}
                   onNuevoAgente={() => setCreatingAgentIn({ id: proj().id, name: proj().name })}
+                  onLlevar={props.onCarryFolder && proj().kind === "git" ? () => props.onCarryFolder?.(proj().id) : undefined}
                 />
               </Suspense>
             )}

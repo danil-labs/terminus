@@ -282,8 +282,12 @@ impl Fleet {
         let remote = self.counterpart_workspace(machine, local, home, there)?;
         let mut args = args.clone();
         if let Some(project) = args["project"].as_str().map(str::to_owned) {
-            args["project"] =
-                json!(self.project_on(machine, (local, &remote), &project, home, there)?);
+            match self.project_on(machine, (local, &remote), &project, home, there) {
+                Some(theirs) => args["project"] = json!(theirs),
+                // `work_import {create}` hace allí el proyecto sin remoto, con el mismo id.
+                None if !args["create"].is_null() => {}
+                None => return None,
+            }
         }
         if args["workspace"] == local {
             args["workspace"] = json!(remote);
@@ -749,6 +753,27 @@ mod tests {
             Some("vm")
         );
         assert!(mac.sent("send_message").is_empty());
+    }
+
+    #[test]
+    fn a_project_the_other_machine_lacks_only_travels_to_be_created() {
+        let (mac, vm) = (mac(), vm());
+        let mac = Fake {
+            projects: json!([{"id":"pmac","name":"terminus"},{"id":"pnotas","name":"notas"}]),
+            ..mac
+        };
+        let fleet = Fleet::load(None);
+        let import = spec("work_import");
+        let plain = json!({"project":"pnotas","transfer":"t","sha256":"","bytes":0});
+        assert!(fleet
+            .forward("vm", "wmac", &import, &plain, &mac, &vm)
+            .is_none());
+        let create = json!({"project":"pnotas","transfer":"t","sha256":"","bytes":0,"create":{"name":"notas","id":"pnotas"}});
+        fleet
+            .forward("vm", "wmac", &import, &create, &mac, &vm)
+            .expect("linked")
+            .expect("sent");
+        assert_eq!(vm.sent("work_import")[0].1["project"], "pnotas");
     }
 
     #[test]

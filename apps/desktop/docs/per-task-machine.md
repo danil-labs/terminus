@@ -211,6 +211,11 @@ la comparten la web y el teléfono.
   de aquí sin tocar la carpeta. «Seguir en una tarea nueva aquí» abre un
   borrador sobre esa base con un resumen corto (título, último mensaje del
   agente y commits) y la tarea que nace enlaza a la original.
+- Una carpeta sin remoto ya no deja fuera a las demás máquinas mientras la
+  suya esté encendida: viaja entera (`full`) y `work_import {create}` crea allá
+  el proyecto con el mismo id; `fleet.rs` deja pasar ese `project` sin
+  traducir. El menú de la carpeta ofrece «Llevar a otra máquina…»: abre su
+  tarea nueva en la máquina elegida y la hoja aunque no haya nada sin subir.
 - Pruebas: `tests/unit/carry-work.test.ts` (orquestación contra dos motores
   falsos) y `tests/unit/carry-window.test.mjs` (`dist/` en jsdom).
 

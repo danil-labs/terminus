@@ -21,6 +21,7 @@ import {
   type WorkStatus,
   bringBranch,
   bringSelection,
+  withoutRemote,
 } from "../../../../packages/carry/src/index.ts";
 
 const status = (extra: Partial<WorkStatus> = {}): WorkStatus => ({
@@ -98,6 +99,7 @@ function fakeEngines(payload: Buffer, opts: { failWriteAt?: number[]; tooLarge?:
         return { head: "", base: "", branch: null, files: [], snapshot: false };
       }
       m.calls.push("work_import");
+      if (!m.projects.has(args.project) && args.create && exports.at(-1)?.full) m.projects.add(args.create.id);
       if (!m.projects.has(args.project)) throw { what: { clave: "work.error.project_missing" }, detail: "" };
       const got = m.transfers.get(args.transfer) ?? Buffer.alloc(0);
       if (createHash("sha256").update(got).digest("hex") !== args.sha256) throw { what: { clave: "work.error.sha_mismatch" }, detail: "" };
@@ -231,4 +233,18 @@ test("traer: sin ignorados marcados y la rama local que recibe el trabajo viaja 
   await carryWork(engine, back, newState("op9"));
   assert.equal(imports.at(-1)?.branchAs, "feat/run-on-bundle");
   assert.equal(imports.find((a) => a.probe)?.branchAs, undefined, "despertar no lleva rama");
+});
+
+test("un proyecto sin remoto viaja entero y el destino lo crea con el mismo id, sin clonar", async () => {
+  const local = status({ remoteBase: null, remoteUrl: null, upstream: null });
+  assert.equal(withoutRemote(local, null), true);
+  assert.equal(withoutRemote(status(), null), false);
+  const { engine, machines, imports, exports } = fakeEngines(payload);
+  machines.vm.projects.clear();
+  const job = { source: "mac", target: "vm", project: "p1", task: null, selection: initialSelection(local), partSize: PART, create: { name: "notas", id: "p1" } };
+  const result = await carryWork(engine, job, newState("op10"), { hasProject: async () => false, clone: undefined });
+  assert.equal(result.baseRef, "w1");
+  assert.equal(exports.at(-1)?.full, true, "sin remoto no viajó la historia completa");
+  assert.deepEqual(imports.at(-1)?.create, { name: "notas", id: "p1" });
+  assert.ok(machines.vm.projects.has("p1"));
 });

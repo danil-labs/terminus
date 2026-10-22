@@ -227,3 +227,33 @@ test("traer a esta Mac una tarea de la VM: la rama llega aquí y la tarea nueva 
   assert.ok(doc.querySelector("[data-carry-open-original]"), "sin enlace a la original");
   assert.deepEqual(app.fallos, []);
 });
+
+test("una carpeta sin remoto se lleva desde su menú: viaja entera y la VM crea el proyecto con el mismo id", async () => {
+  const log = [];
+  const local = { id: "t1", title: "Tarea local", last_message: "", provider: "codex", model: "gpt-5.6", refs: [], created_at: 0, updated_at: 0, turns: 2, parent: null, esperando: false };
+  const app = await boot("listo", "carry-window-no-remote", responses(log, {
+    list_projects: (_args, options) => (machineOf(options) === "vm" ? [] : [{ id: "p1", name: "P1", working_directory: "/lab/p1", kind: "git", portfolio: null, sources: [], remote_url: null }]),
+    list_live_sessions: ({ project }) => (project === "p1" ? [local] : []),
+    work_status: (args, options) => {
+      log.push({ name: "work_status", machine: machineOf(options), args });
+      return { ...STATUS, upstream: null, remoteBase: null, remoteUrl: null, ahead: 12 };
+    },
+  }), undefined, { "harness.layout.sidebar.view.w": JSON.stringify({ folders: [], agent: null, group: "folder", density: "comfortable" }) });
+  await sleep(600);
+  const doc = app.w.document;
+  doc.querySelector('[data-folder-group="p1"] [aria-haspopup="menu"]').click();
+  assert.ok(await until(() => doc.querySelector("[data-carry-folder]")), "el menú de la carpeta no ofrece llevarla");
+  doc.querySelector("[data-carry-folder]").click();
+  assert.ok(await until(() => doc.querySelector('[data-carry-sheet="carry"]')), "no se abrió la hoja");
+  assert.equal(doc.querySelector("[data-carry-target-project]").dataset.carryTargetProject, "create");
+  assert.equal(app.w.localStorage.getItem("harness.layout.machines.run_on"), JSON.stringify({ w: "vm" }), "la tarea nueva no se fue a la VM");
+  assert.ok(await until(() => doc.querySelector("[data-carry-confirm]")?.disabled === false));
+  assert.equal(log.filter((c) => c.name === "work_export").at(-1).args.full, true, "sin remoto no viaja entera");
+  doc.querySelector("[data-carry-confirm]").click();
+  await write(app, "sigue en la VM");
+  assert.ok(await until(() => log.some((c) => c.name === "send_message")), "no se creó la tarea");
+  const imported = log.filter((c) => c.name === "work_import" && !c.args.probe).at(-1);
+  assert.deepEqual([imported.machine, imported.args.create], ["vm", { name: "P1", id: "p1" }]);
+  assert.equal(log.filter((c) => c.name === "start_project_clone").length, 0, "intentó clonar sin remoto");
+  assert.deepEqual(app.fallos, []);
+});

@@ -20,8 +20,10 @@ import {
   PART_DESKTOP,
   cancelCarry,
   carryWork,
+  type Selection,
   needsSheet,
   newState,
+  withoutRemote,
 } from "@terminus/carry";
 import "../../locales/workPhrases";
 import { invoke } from "../../lib/invoke";
@@ -68,13 +70,13 @@ async function targetHasProject(target: string, project: Project): Promise<boole
  * `null` es mandar como siempre (nada que llevar, o un motor que no sabe de
  * `work_status`: entonces `ensure_here` sigue clonando en silencio).
  */
-export async function checkCarry(input: { workspace: string; project: Project; source: string; target: string }): Promise<CarryCheck | null> {
+export async function checkCarry(input: { workspace: string; project: Project; source: string; target: string }, force = false): Promise<CarryCheck | null> {
   if (input.source === input.target) return null;
   const [status, hasProject] = await Promise.all([
     engine.status(input.source, { project: input.project.id, task: null }).catch(() => null),
     targetHasProject(input.target, input.project).catch(() => null),
   ]);
-  if (!status || !needsSheet(status, hasProject ?? true)) return null;
+  if (!status || (!force && !needsSheet(status, hasProject ?? true))) return null;
   return { ...input, status, hasProject, task: null };
 }
 
@@ -146,6 +148,16 @@ export function dropCarry(key: string) {
   setCarries(({ [key]: _, ...rest }) => rest);
 }
 
+/** Sin remoto el destino no puede clonar: el import crea el proyecto desde el bundle completo. */
+export const createsProject = (check: CarryCheck) => withoutRemote(check.status, check.project.remote_url) && check.hasProject !== true;
+
+/** La copia que corre al enviar, con lo elegido en la hoja. */
+export function jobFor(check: CarryCheck, choice: { selection: Selection; partSize: number; task: string | null; branchAs: string | null }): CarryJob {
+  const create = createsProject(check) ? { name: check.project.name, id: check.project.id } : null;
+  const selection = create ? { ...choice.selection, includeWork: true, full: true } : choice.selection;
+  return { source: check.source, target: check.target, project: check.project.id, task: choice.task, selection, partSize: choice.partSize, branchAs: choice.branchAs, create };
+}
+
 /** Clona en el destino por `start_project_clone`, con su avance, como al añadir una carpeta. */
 async function cloneOn(check: CarryCheck, progress: (phase: string, percent: number | null) => void) {
   const url = check.status.remoteUrl ?? check.project.remote_url;
@@ -176,7 +188,7 @@ export async function runCarry(key: string): Promise<CarriedBase | null> {
     const result = await carryWork(engine, carry.job, carry.state, {
       progress: (progress) => update(key, (c) => ({ ...c, progress })),
       hasProject: carry.check.hasProject === null ? undefined : async () => carry.check.hasProject as boolean,
-      clone: (progress) => cloneOn(carry.check, progress),
+      clone: carry.job.create ? undefined : (progress) => cloneOn(carry.check, progress),
       cancelled: () => !!carries()[key]?.cancelled,
     });
     rememberPending(key, carry);

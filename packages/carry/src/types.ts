@@ -71,6 +71,8 @@ export type ImportArgs = {
   probe?: boolean;
   /** Al traer: crea o adelanta esa rama; si divergió, `<rama>-<máquina>`. Nunca cambia de rama. */
   branchAs?: string | null;
+  /** Un proyecto sin remoto que el destino no tiene: se crea desde el bundle completo, con ese id. */
+  create?: { name: string; id: string } | null;
 };
 
 /**

@@ -20,7 +20,7 @@ repositories, and `GitHostInfo`. Files on disk keep their keys; the types that
 are stored and also travel cross the contract wrapped in `Wire`, which renames
 their keys. There are no aliases. This copy is byte-identical to the engine's.
 SHA-256:
-`24a36079ea129f3a31b5bc869a057bd108b0b6088a4e3dc90098b624c8e96775`.
+`b440bb78783ea12834937a095d1bcc0cc13654006d1c05c85391ed80f2396534`.
 
 seldon-host `4e21caf` (#66) added the Danil account (321 commands, 28 events):
 `danil_connect_start`, `danil_connect_status`, `danil_connect_options`,
@@ -93,8 +93,12 @@ full}`; the transfer id is the client's `operation`), `work_read_part`
 `unwrapSnapshot`. The `work.error.*` keys come from the same branch
 (seldon-host docs/carry-work.md).
 
+seldon-host `feat/carry-work-3-no-remote` (#86, `43f9787`) creates a project without
+remote from a full bundle (347 commands, 30 events): `work_import` takes
+`create` (`{name, id}`).
+
 The source is `crates/engine-protocol/commands.json` in `danil-labs/seldon-host`
-(here, seldon-host `4870085` on `feat/carry-work-1-export-import`). The engine pinned in `seldon-runtime.lock` must
+(here, seldon-host `43f9787` on `feat/carry-work-3-no-remote`). The engine pinned in `seldon-runtime.lock` must
 announce this same hash as its `contract`; the `contract` guard
 (`scripts/guards/contract.mjs`) compares the three.
 

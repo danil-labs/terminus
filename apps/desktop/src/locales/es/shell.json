@@ -265,10 +265,12 @@
   "shell.machines.waking": "Encendiendo {name}…",
   "shell.machines.unlinked_hint": "{name} no tiene este workspace y su motor todavía no sabe crearlo: actualízalo para correr ahí sus tareas.",
   "shell.machines.no_project": "sin este proyecto",
-  "shell.machines.no_project_hint": "«{project}» es una carpeta sin remoto de otra máquina: sus tareas solo corren ahí.",
+  "shell.machines.no_project_hint": "«{project}» es una carpeta sin remoto de una máquina apagada: se puede llevar cuando esté encendida.",
   "shell.machines.now_on": "{name} se encendió",
   "shell.machines.now_off": "{name} se apagó",
   "shell.machines.bring_here_mac": "Traer a esta Mac",
   "shell.machines.bring_here_pc": "Traer a esta PC",
+  "shell.machines.carry_to": "Llevar a otra máquina…",
+  "shell.machines.carry_none": "No hay otra máquina encendida con este workspace a la que llevarla.",
   "shell.machines.local_only": "Esto se abre en la máquina de la tarea, no en esta."
 }
