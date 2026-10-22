@@ -86,6 +86,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
     browserFiles: true,
     sidebarExtra: () => <HomeLink />,
     accountProfile: webAccountProfile(base.endpoint, base.getToken, base.onUnauthorized),
+    accountMemory: { endpoint: base.endpoint, getToken: async () => base.getToken() },
     machineName: (id) => transport.fleet.name(id),
     windowMachine: () => {
       const first = transport.fleet.machines[0];

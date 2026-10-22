@@ -7249,6 +7249,7 @@ export default function App() {
           >
             <VistaDeProyecto
               proyecto={p()}
+              workspace={workspaceActivo()}
               modelos={modelosParaAgentes()}
               sources={sources()}
               agents={agents()}
