@@ -7810,6 +7810,7 @@ export default function App() {
               clon={clonEnCurso()}
               onAbrirClon={() => setAnadiendoCarpeta(true)}
               proyectoAbierto={proyectoAbierto()}
+              carpetaDelBorrador={!proyectoAbierto() && pestanaActiva() === null && !sessionId() && !hablandoCon() ? project() || null : null}
               onAbrirProyecto={abrirProyecto}
               /* El proyecto viaja en el mismo gesto que abre el borrador. */
               onNuevaTareaEn={(id) => nuevaSesion(id)}
@@ -7972,7 +7973,8 @@ export default function App() {
           // El backend ya la fijó en el escritorio desde el que se pidió: un
           // clon en segundo plano termina cuando la ventana puede mirar otro.
           await reloadSpaces();
-          if (activate) elegirProyecto(p.id);
+          // Se sigue en «Nueva tarea» dentro de ella; su página queda a un clic en su nombre.
+          if (activate) nuevaSesion(p.id);
         }}
       />
 
