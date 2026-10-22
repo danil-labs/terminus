@@ -1,6 +1,6 @@
 import TriangleAlert from "lucide-solid/icons/triangle-alert";
 import { listen } from "../../lib/serviceEvents";
-import { AvanceDeDescarga, BarraDeCarga, CodigoParaConfirmar } from "./DownloadProgress";
+import { AvanceDeDescarga, BarraDeCarga, CodigoParaConfirmar, Peso } from "./DownloadProgress";
 import ArrowRight from "lucide-solid/icons/arrow-right";
 import Check from "lucide-solid/icons/check";
 import ExternalLink from "lucide-solid/icons/external-link";
@@ -9,8 +9,10 @@ import { createStore } from "solid-js/store";
 import { mb } from "../../lib/format";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
+import { escribirPref, leerPref } from "../../lib/prefs";
 import { prosa, type Frase } from "../../lib/prose";
 import { cn } from "../../lib/utils";
+import { isMac } from "../../lib/window";
 import { Badge } from "../../ui/Badge";
 import { Button } from "../../ui/Button";
 import { detalleDe, prosaDe } from "../../ui/Failure";
@@ -52,6 +54,28 @@ type EstadoDeDrive = {
   connected: { email: string; name: string } | null;
   unverified: FalloDelMotor | null;
 };
+/** La app oficial de Google (Windows y Mac); sin `supported` Drive sigue con rclone. */
+type DriveDeEscritorio = {
+  supported: boolean;
+  installed: boolean;
+  running: boolean;
+  mounts: { email: string | null; path: string }[];
+  installer_bytes: number | null;
+};
+/** El evento `install` de la app oficial; en `error`, `failure` es una clave del catálogo. */
+type InstalacionDeDrive = {
+  operation: string;
+  kind: "sizing" | "downloading" | "installing" | "done" | "cancelled" | "error";
+  done: number;
+  bytes: number;
+  failure?: string | null;
+};
+const falloDeInstalacion = (clave: string | null | undefined) => {
+  const texto = clave ? t(clave) : "";
+  return texto && texto !== clave ? texto : t("onboarding.tools.drive_app.install_failed");
+};
+const SIN_USAR_DRIVE = "onboarding.drive-desktop-unused";
+const CADA_CUANTO_SESION = 2500;
 
 /** Cómo se conecta cada integración: servicios de código, un servicio MCP conocido o Drive con su CLI. */
 type Integracion = {
@@ -64,8 +88,11 @@ type EstadoDeIntegracion =
   | { k: "libre" }
   | { k: "formulario" }
   | { k: "descargando"; hecho: number; total: number | null }
+  | { k: "instalando" }
+  | { k: "sesion" }
   | { k: "conectando"; codigo?: string }
   | { k: "conectada"; detalle: string }
+  | { k: "detectada"; detalle: string }
   | { k: "saliendo" };
 type Borrador = { data: Record<string, string>; token: string };
 
@@ -156,6 +183,12 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
   const [verMas, setVerMas] = createSignal(false);
   const [falloDeCarga, setFalloDeCarga] = createSignal<string | null>(null);
   const [drive, setDrive] = createSignal<EstadoDeDrive | null>(null);
+  const [escritorio, setEscritorio] = createSignal<DriveDeEscritorio | null>(null);
+  const oficial = () => escritorio()?.supported === true;
+  /** Cada «Conectar» de la app oficial: lo que conteste uno ya cancelado no toca la tarjeta. */
+  let intentoDeDrive = 0;
+  let finDeInstalacion: ((a: InstalacionDeDrive) => void) | null = null;
+  let vigiaDeSesion: ReturnType<typeof setTimeout> | undefined;
   let finDeDescarga: ((a: AvanceDeDrive) => void) | null = null;
   const scope = invoke<{ active: string | null }>("list_workspaces").then((s) => s.active ?? "pending");
   let esperandoMcp: string | null = null;
@@ -169,10 +202,18 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
     a && (a.kind === "progress" || a.kind === "verifying")
       ? { k: "descargando", hecho: a.received ?? 0, total: a.total ?? null }
       : null;
-  const viva = (id: string) => ["formulario", "descargando", "conectando", "saliendo"].includes(estados[id]?.k ?? "libre");
+  const viva = (id: string) =>
+    ["formulario", "descargando", "instalando", "sesion", "conectando", "saliendo"].includes(estados[id]?.k ?? "libre");
+  const unidad = (d: DriveDeEscritorio | null) => d?.mounts?.[0];
   const borrador = (id: string) => borradores[id] ?? SIN_BORRADOR;
 
   function guardado(i: Integracion): EstadoDeIntegracion {
+    if (i.via === "drive" && oficial()) {
+      const m = unidad(escritorio());
+      if (!m) return { k: "libre" };
+      const donde = [m.email, m.path].filter(Boolean).join(" · ");
+      return leerPref(SIN_USAR_DRIVE, false) ? { k: "detectada", detalle: donde } : { k: "conectada", detalle: donde };
+    }
     if (i.via === "drive") {
       const d = drive();
       if (d?.connected) return { k: "conectada", detalle: d.connected.email || d.connected.name };
@@ -196,14 +237,16 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
 
   async function cargar() {
     try {
-      const [p, c, a, d] = await Promise.all([
+      const [p, c, a, d, o] = await Promise.all([
         invoke<Proveedor[]>("list_git_hosts", { scope: await scope }),
         invoke<Conocido[]>("list_known_mcp"),
         invoke<AgenteMcp[]>("list_mcp_providers"),
         invoke<EstadoDeDrive>("google_drive_status").catch(() => null),
+        invoke<DriveDeEscritorio>("google_drive_desktop_status").catch(() => null),
       ]);
       if (cerrada) return;
       setDrive(d);
+      setEscritorio(o);
       setProveedores(p);
       setConocidos(c);
       setAgentesMcp(a);
@@ -252,7 +295,9 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
     finDeDescarga?.(a);
   });
   // Al abrir se pregunta a Google si la conexión sigue viva; sin red queda conectada y sin comprobar.
-  onMount(() => {
+  onMount(async () => {
+    const o = await invoke<DriveDeEscritorio>("google_drive_desktop_status").catch(() => null);
+    if (o?.supported) return;
     void invoke<EstadoDeDrive>("google_drive_status")
       .then((d) => (d.connected ? invoke<EstadoDeDrive>("check_google_drive") : d))
       .then((d) => {
@@ -265,9 +310,18 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
         void cargar();
       });
   });
+  const alInstalar = listen<InstalacionDeDrive>("install", (e) => {
+    const a = e.payload;
+    if (a.operation !== "google-drive-desktop") return;
+    if (a.kind === "done" || a.kind === "cancelled" || a.kind === "error") return finDeInstalacion?.(a);
+    if (estados.drive?.k !== "descargando") return;
+    if (a.kind === "installing") setEstados("drive", { k: "instalando" });
+    else if (a.bytes > 0) setEstados("drive", { k: "descargando", hecho: a.done, total: a.bytes });
+  });
   onCleanup(() => {
     cerrada = true;
-    for (const l of [fin, url, alDrive]) void l.then((f) => f());
+    clearTimeout(vigiaDeSesion);
+    for (const l of [fin, url, alDrive, alInstalar]) void l.then((f) => f());
     for (const i of INTEGRACIONES()) {
       if ((i.via === "proveedor" || i.via === "drive") && estados[i.id]?.k === "conectando") void cancelar(i);
     }
@@ -279,8 +333,62 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
     setEstados(i.id, { k: "formulario" });
   }
 
+  const contarConectadas = () => props.onCambio(INTEGRACIONES().filter((x) => estados[x.id]?.k === "conectada").length);
+
+  function usarUnidad(i: Integracion, o: DriveDeEscritorio) {
+    setEscritorio(o);
+    escribirPref(SIN_USAR_DRIVE, false);
+    setEstados(i.id, guardado(i));
+    contarConectadas();
+  }
+
+  /** Mientras la persona inicia sesión en la app de Google, la tarjeta pasa sola a conectada cuando aparece la unidad. */
+  function vigilarSesion(i: Integracion, intento: number) {
+    clearTimeout(vigiaDeSesion);
+    vigiaDeSesion = setTimeout(async () => {
+      const o = await invoke<DriveDeEscritorio>("google_drive_desktop_status").catch(() => null);
+      if (cerrada || intento !== intentoDeDrive || estados[i.id]?.k !== "sesion") return;
+      if (o && unidad(o)) return usarUnidad(i, o);
+      vigilarSesion(i, intento);
+    }, CADA_CUANTO_SESION);
+  }
+
+  /** La app oficial de Google se descarga e instala sola; la persona acepta el permiso del sistema e inicia sesión. */
+  async function conectarDriveDeEscritorio(i: Integracion) {
+    const intento = ++intentoDeDrive;
+    const vigente = () => !cerrada && intento === intentoDeDrive;
+    const antes = escritorio()!;
+    if (unidad(antes)) return usarUnidad(i, antes);
+    try {
+      if (antes.installed) await invoke("open_google_drive_desktop");
+      else {
+        setEstados(i.id, { k: "descargando", hecho: 0, total: antes.installer_bytes });
+        const terminada = new Promise<InstalacionDeDrive>((resolve) => (finDeInstalacion = resolve));
+        await invoke("install_google_drive_desktop");
+        const a = await terminada;
+        finDeInstalacion = null;
+        if (!vigente() || a.kind === "cancelled") return;
+        if (a.kind === "error") throw new Error(falloDeInstalacion(a.failure));
+      }
+      if (!vigente()) return;
+      const o = await invoke<DriveDeEscritorio>("google_drive_desktop_status");
+      if (!vigente()) return;
+      if (unidad(o)) return usarUnidad(i, o);
+      setEscritorio(o);
+      setEstados(i.id, { k: "sesion" });
+      vigilarSesion(i, intento);
+    } catch (e) {
+      finDeInstalacion = null;
+      if (!vigente()) return;
+      setErrores(i.id, explicar(e) || t("onboarding.tools.drive_app.install_failed"));
+      setEstados(i.id, { k: "libre" });
+      void cargar();
+    }
+  }
+
   /** Drive: su CLI (rclone) se descarga si falta y luego se aprueba en el navegador. */
   async function conectarDrive(i: Integracion) {
+    if (oficial()) return conectarDriveDeEscritorio(i);
     const d = drive();
     if (d && !d.supported) return void setErrores(i.id, t("onboarding.tools.unsupported"));
     try {
@@ -396,7 +504,12 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
     setBorradores(i.id, SIN_BORRADOR);
     setMotivos(i.id, null);
     if (!cerrada) setEstados(i.id, { k: "libre" });
-    if (i.via === "drive") {
+    if (i.via === "drive" && oficial()) {
+      intentoDeDrive++;
+      finDeInstalacion = null;
+      clearTimeout(vigiaDeSesion);
+      if (e === "descargando") void invoke("cancel_install", { operation: "google-drive-desktop" }).catch(() => {});
+    } else if (i.via === "drive") {
       if (e === "descargando") void invoke("cancel_install", { operation: "google-drive" }).catch(() => {});
       if (e === "conectando") void invoke("cancel_google_drive_login").catch(() => {});
     } else if (i.via === "proveedor" && e === "conectando" && !conToken) {
@@ -409,6 +522,12 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
 
   async function desconectar(i: Integracion) {
     setErrores(i.id, null);
+    // Solo deja de usarla Terminus: la app de Google sigue instalada y con su sesión.
+    if (i.via === "drive" && oficial()) {
+      escribirPref(SIN_USAR_DRIVE, true);
+      setEstados(i.id, guardado(i));
+      return contarConectadas();
+    }
     setEstados(i.id, { k: "saliendo" });
     try {
       if (i.via === "drive") await invoke("disconnect_google_drive");
@@ -432,8 +551,14 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
         return e.detalle;
       case "formulario":
         return t("onboarding.tools.fill_below");
+      case "detectada":
+        return t("onboarding.tools.drive_app.unused", { where: e.detalle });
       case "descargando":
-        return t("onboarding.tools.downloading_cli_start");
+        return i.via === "drive" && oficial() ? t("onboarding.tools.drive_app.downloading") : t("onboarding.tools.downloading_cli_start");
+      case "instalando":
+        return isMac() ? t("onboarding.tools.drive_app.installing_mac") : t("onboarding.tools.drive_app.installing_windows");
+      case "sesion":
+        return t("onboarding.tools.drive_app.sign_in");
       case "conectando":
         if (formularioAbierto(i)) return t("onboarding.tools.checking_token");
         if (e.codigo) return t("onboarding.login.confirm_in_browser");
@@ -458,8 +583,8 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
           "relative flex h-[58px] items-center gap-3 overflow-hidden rounded-lg border px-3 py-2",
           fallo() && "animate-sacudir border-error-strong bg-surface-raised",
           e()?.k === "conectada" && p.i.via !== "incluido" && "border-success-strong/40 bg-success/5",
-          ["conectando", "formulario", "descargando"].includes(e()?.k ?? "") && "border-primary bg-primary/5",
-          (!e() || e()?.k === "libre" || e()?.k === "saliendo" || p.i.via === "incluido") && "border-border bg-surface-raised",
+          ["conectando", "formulario", "descargando", "instalando", "sesion"].includes(e()?.k ?? "") && "border-primary bg-primary/5",
+          (!e() || ["libre", "saliendo", "detectada"].includes(e()!.k) || p.i.via === "incluido") && "border-border bg-surface-raised",
         )}
       >
         <span class="grid size-[26px] shrink-0 place-items-center rounded-md bg-surface-muted text-neutral-950">
@@ -477,6 +602,9 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
               <>
                 <Show when={fallo()}>
                   <TriangleAlert size={15} class="shrink-0 text-error-strong" aria-hidden="true" />
+                </Show>
+                <Show when={!fallo() && p.i.via === "drive" && oficial() && !escritorio()?.installed}>
+                  <Peso bytes={escritorio()?.installer_bytes} />
                 </Show>
                 <Button size="compact" variant="secondary" onClick={() => void conectar(p.i)}>
                   {fallo() ? t("onboarding.ai.retry") : t("onboarding.ai.connect")}
@@ -497,9 +625,27 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
               </Badge>
               <RemoveButton
                 icon="unlink"
-                label={t("onboarding.ai.disconnect", { name: nombre })}
+                label={p.i.via === "drive" && oficial() ? t("onboarding.tools.drive_app.stop") : t("onboarding.ai.disconnect", { name: nombre })}
                 onClick={() => void desconectar(p.i)}
               />
+            </Match>
+            <Match when={e()?.k === "detectada"}>
+              <Button size="compact" variant="secondary" onClick={() => void conectar(p.i)}>
+                {t("onboarding.ai.use_this")}
+              </Button>
+            </Match>
+            <Match when={e()?.k === "instalando"}>
+              <Spinner size={18} class="text-primary" />
+            </Match>
+            <Match when={e()?.k === "sesion"}>
+              <Button
+                size="compact"
+                variant="secondary"
+                onClick={() => void invoke("open_google_drive_desktop").catch((x) => setErrores(p.i.id, explicar(x)))}
+              >
+                {t("onboarding.tools.drive_app.open")}
+              </Button>
+              {cancelarEsta()}
             </Match>
             <Match when={e()?.k === "descargando" && e()}>
               {(d) => {
@@ -527,6 +673,9 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
         </span>
         <Show when={e()?.k === "descargando" && (e() as { hecho: number; total: number | null })}>
           {(d) => <BarraDeCarga hecho={d().hecho} total={d().total} />}
+        </Show>
+        <Show when={e()?.k === "instalando"}>
+          <BarraDeCarga hecho={0} total={null} />
         </Show>
       </div>
     );
@@ -644,7 +793,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
 
   const visibles = () => {
     const base = INTEGRACIONES().filter(
-      (i) => i.comun || (i.via !== "incluido" && ["formulario", "descargando", "conectando", "conectada"].includes(estados[i.id]?.k ?? "")),
+      (i) => i.comun || (i.via !== "incluido" && ["formulario", "descargando", "instalando", "sesion", "conectando", "conectada"].includes(estados[i.id]?.k ?? "")),
     );
     // Por id: INTEGRACIONES() arma objetos nuevos en cada lectura.
     const vistas = new Set(base.map((i) => i.id));

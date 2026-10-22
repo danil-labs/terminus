@@ -3,13 +3,11 @@ import { enfocar } from "../../lib/focus";
 import { invoke } from "../../lib/invoke.ts";
 import { textoDeFalta } from "../../lib/no-space";
 import { listen } from "../../lib/serviceEvents";
-import { confirm } from "@tauri-apps/plugin-dialog";
 import AccountCard, { accountPresentation } from "./AccountCard";
 import { FailureNote, type Failure, detalleDe, prosaDe } from "../../ui/Failure";
 import { cn } from "../../lib/utils";
 import { capabilities } from "../../lib/platform";
 import { Skeleton } from "../../ui/Skeleton";
-import { ProgressBar } from "../../ui/ProgressBar";
 import { Badge } from "../../ui/Badge";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
@@ -24,8 +22,9 @@ import {
 } from "../../ui/DropdownMenu";
 import { MarcaAgente } from "../../ui/icons";
 import { SettingsBlock, SettingsRow, SettingsSection } from "./layout";
+import ListaDeModelosLocales from "./LocalModels";
+import { crearModelosLocales } from "./local-models-store";
 import { revocada } from "../../lib/limits";
-import { peso } from "../../lib/format";
 import { t } from "../../lib/i18n";
 import { type Frase, prosa } from "../../lib/prose";
 import { Terminal, TerminalBody } from "../../ui/Terminal";
@@ -1519,275 +1518,13 @@ function Paso(props: { numero: number; titulo: string; children: JSX.Element }) 
  * columna que dice por qué hace falta consentimiento). Con el id escrito
  * dentro, este bloque solo serviría a una fila.
  */
-/** Preparación del único runtime que Terminus instala y de sus modelos. */
+/** El runtime que Terminus instala, el catálogo de modelos y cuál usan las tareas. */
 function MotoresLocales() {
-  return <ModelosLocales onReady={() => {}} />;
-}
-
-type ModeloLocal = { id: string; label: string; quant: string; bytes: number; state: "missing" | "partial" | "installed" | "blocked"; on_disk: number; path?: string; verified?: boolean; serving: boolean };
-type ProgresoModelo = { id: string; kind: string; on_disk: number; bytes: number; failure?: Failure };
-
-
-/** Pesos que Terminus posee: se descargan y se retiran aquí, nunca mediante el
- * runtime de otra aplicación. Un `.partial` no se ofrece como modelo. */
-function ModelosLocales(props: { onReady: () => void }) {
-  const [runtime, setRuntime] = createSignal<{ label: string; path?: string; remedy?: string; source?: string } | null>(null);
-  const [modelos, setModelos] = createSignal<ModeloLocal[]>([]);
-  const [progreso, setProgreso] = createSignal<Record<string, ProgresoModelo>>({});
-  const [quitando, setQuitando] = createSignal<string | null>(null);
-  const [cargando, setCargando] = createSignal<string | null>(null);
-  const [error, setError] = createSignal<string | null>(null);
-  const [instalandoMotor, setInstalandoMotor] = createSignal(false);
-  const cargar = () => invoke<ModeloLocal[]>("list_local_models").then(setModelos).catch(() => setModelos([]));
-  /**
-   * Lo que ya estaba pasando cuando esta pantalla se montó. El evento
-   * `local-model` solo llega a quien está escuchando en ese instante: sin
-   * esto, una descarga viva de 1,2 GB volvería a mostrar «Reanudar · 0,4 GB
-   * de 1,28 GB» y, al pulsarla, «ya hay una descarga en curso». El backend
-   * guarda el último aviso de cada una (`local_model::AVANCE`) y aquí se pide
-   * al montar: la barra sigue desde donde iba.
-   */
-  const sembrar = () => invoke<ProgresoModelo[]>("local_downloads")
-    .then((v) => setProgreso(Object.fromEntries(v.map((p) => [p.id, p]))))
-    .catch(() => {});
-  onMount(() => {
-    void invoke<{ label: string; path?: string; remedy?: string; source?: string }>("local_runtime").then(setRuntime).catch(() => setRuntime(null));
-    void cargar();
-    void sembrar();
-    const desuscribir = listen<ProgresoModelo>("local-model", (e) => {
-      setProgreso((prev) => ({ ...prev, [e.payload.id]: e.payload }));
-      if (["done", "cancelled", "error"].includes(e.payload.kind)) void cargar();
-    });
-    onCleanup(() => void desuscribir.then((f) => f()));
-  });
-
-  /**
-   * Deja el modelo cargado en memoria ya, sin esperar al primer mensaje. No
-   * hace falta para usarlo —el turno levanta lo que necesite por su cuenta—:
-   * adelanta la espera a cuando estás mirando la pantalla, en vez de a
-   * cuando mandas un mensaje. Son gigabytes subiendo del disco: la fila lo
-   * dice mientras dura, un botón que no cambia se lee como uno que no
-   * hizo nada.
-   */
-  const cargarEnMemoria = (id: string) => {
-    setError(null);
-    setCargando(id);
-    void invoke("start_local_model", { id })
-      .then(() => { props.onReady(); return cargar(); })
-      .catch((e) => setError(prosaDe(e)))
-      .finally(() => setCargando(null));
-  };
-
-  /** Son once megas en el hilo del comando: el botón dice que sigue, y lo que
-   * falle se ve aquí en vez de volver a «Instalar» como si nada. */
-  const instalarMotor = () => {
-    setError(null);
-    setInstalandoMotor(true);
-    void invoke("install_local_runtime")
-      .then(() => invoke<{ label: string; path?: string; remedy?: string; source?: string }>("local_runtime").then(setRuntime))
-      .catch((e) => setError(prosaDe(e)))
-      .finally(() => setInstalandoMotor(false));
-  };
-  const quitarMotor = (label: string) => {
-    setError(null);
-    void invoke("remove_local_runtime")
-      .then(() => setRuntime({ label, source: "missing" }))
-      .catch((e) => setError(prosaDe(e)));
-  };
-
+  const m = crearModelosLocales();
   return (
-    <>
-      <Show when={runtime()}>
-        {(r) => (
-          <SettingsRow
-            label={t("settings.accounts.local.runtime")}
-            description={
-              r().path
-                ? t("settings.accounts.local.runtime_installed", { label: r().label })
-                : t("settings.accounts.local.runtime_missing", { label: r().label })
-            }
-          >
-            <Show
-              when={r().path}
-              fallback={
-                <Button size="sm" disabled={instalandoMotor()} onClick={instalarMotor}>
-                  {instalandoMotor()
-                    ? t("settings.accounts.local.installing")
-                    : t("settings.accounts.local.install")}
-                </Button>
-              }
-            >
-              <Badge tone="success">
-                {r().source === "system"
-                  ? t("settings.accounts.local.from_system")
-                  : t("settings.accounts.local.from_terminus")}
-              </Badge>
-              <Show when={r().source === "managed"}>
-                <Button
-                  variant="outline"
-                  size="compact"
-                  onClick={() => quitarMotor(r().label)}
-                >
-                  {t("settings.accounts.local.remove")}
-                </Button>
-              </Show>
-            </Show>
-          </SettingsRow>
-        )}
-      </Show>
-    {/* Apagar es del motor, no de un modelo. Solo aparece cuando hay algo
-        cargado: un botón para apagar lo que no está encendido es ruido. Libera
-        los gigabytes de todos los modelos que tenga dentro: se dice cuántos
-        son. */}
-      <Show when={modelos().filter((m) => m.serving)}>
-        {(dentro) => (
-          <Show when={dentro().length > 0}>
-            <SettingsRow label={t("settings.accounts.local.in_memory", { count: dentro().length })}>
-              <Button
-                variant="outline"
-                size="compact"
-                onClick={() => void invoke("stop_local_model").then(cargar)}
-              >
-                {t("settings.accounts.local.stop_engine")}
-              </Button>
-            </SettingsRow>
-          </Show>
-        )}
-      </Show>
-      <Show when={error()}>
-        {(message) => (
-          <SettingsBlock>
-            <p class="m-0 text-xs text-error-strong">{message()}</p>
-          </SettingsBlock>
-        )}
-      </Show>
-      <For each={modelos()}>
-        {(m, i) => {
-      const p = () => progreso()[m.id];
-      const bajando = () => p()?.kind === "progress";
-      const comprobando = () => p()?.kind === "verifying";
-      const activo = () => bajando() || comprobando();
-      /**
-       * Qué está pasando con estos pesos, en una línea debajo del nombre.
-       *
-       * Sin ella, mientras bajan 2,7 GB la fila enseña el tamaño y un botón
-       * «Cancelar»: ni cuánto lleva, ni si sigue viva.
-       */
-      const estado = () => {
-        if (comprobando()) return t("settings.accounts.local.verifying");
-        if (bajando()) return t("settings.accounts.local.downloading", { done: peso(p()!.on_disk), total: peso(m.bytes) });
-        if (m.serving) return t("settings.accounts.local.serving");
-        if (cargando() === m.id) return t("settings.accounts.local.loading");
-        return null;
-      };
-          return (
-            <SettingsRow
-              label={
-                <>
-                  {m.label}
-                  {i() === 0
-                    ? t("settings.accounts.local.recommended")
-                    : t("settings.accounts.local.lightest")}
-                </>
-              }
-              description={
-                <>
-                  {m.quant} · {peso(m.bytes)}
-                  <Show when={estado()}>{(e) => <> · {e()}</>}</Show>
-          {/* Una barra determinada y no un giro: lo que hace tolerable una
-              espera de gigabytes es saber cuánto falta, no que algo se mueva. */}
-                <Show when={activo()}>
-                  <ProgressBar
-                    class="mt-1"
-                    value={comprobando() ? m.bytes : (p()?.on_disk ?? 0)}
-                    max={m.bytes}
-                    label={t("settings.accounts.local.download_of", { label: m.label })}
-                  />
-                </Show>
-                </>
-              }
-            >
-              <Show
-                when={m.state === "blocked"}
-                fallback={
-                  <Show
-                    when={m.state === "installed"}
-                    fallback={
-                      <Show
-                        when={activo()}
-                        fallback={
-                          <Button
-                            size="sm"
-                            onClick={() => void invoke("install_local_model", { id: m.id })}
-                          >
-                            {m.state === "partial"
-                              ? t("settings.accounts.local.resume", {
-                                  done: peso(m.on_disk),
-                                  total: peso(m.bytes),
-                                })
-                              : t("settings.accounts.local.download")}
-                          </Button>
-                        }
-                      >
-                        <Button
-                          variant="outline"
-                          size="compact"
-                          onClick={() => void invoke("cancel_local_model")}
-                        >
-                          {t("settings.accounts.local.cancel")}
-                        </Button>
-                      </Show>
-                    }
-                  >
-                    <div class="flex shrink-0 items-center gap-2">
-            {/* Un modelo cargado no ofrece nada: el motor es uno solo y puede
-                tener varios modelos dentro a la vez, y un «Detener» por fila
-                apagaría también el que estuviera usando la tarea de al lado.
-                Apagar es del motor, y su botón está arriba. */}
-                      <Show when={!m.serving}>
-                        <Button
-                          size="sm"
-                          disabled={cargando() !== null}
-                          onClick={() => cargarEnMemoria(m.id)}
-                        >
-                          {cargando() === m.id
-                            ? t("settings.accounts.local.loading")
-                            : t("settings.accounts.local.load")}
-                        </Button>
-                      </Show>
-                      <Button
-                        variant="outline"
-                        size="compact"
-                        disabled={quitando() === m.id}
-                        onClick={() => {
-                          void confirm(
-                            t("settings.accounts.local.remove_confirm", {
-                              label: m.label,
-                              size: peso(m.bytes),
-                            }),
-                            { kind: "warning" },
-                          ).then((si) => {
-                            if (!si) return;
-                            setQuitando(m.id);
-                            void invoke("remove_local_model", { id: m.id })
-                              .then(cargar)
-                              .finally(() => setQuitando(null));
-                          });
-                        }}
-                      >
-                        {t("settings.accounts.local.remove")}
-                      </Button>
-                    </div>
-                  </Show>
-                }
-              >
-                <Badge>{t("settings.accounts.local.blocked")}</Badge>
-              </Show>
-            </SettingsRow>
-          );
-        }}
-      </For>
-    </>
+    <SettingsBlock>
+      <ListaDeModelosLocales m={m} memoria />
+    </SettingsBlock>
   );
 }
 

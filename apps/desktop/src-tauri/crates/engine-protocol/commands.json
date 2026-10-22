@@ -1780,6 +1780,15 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "google_drive_desktop_status",
+      "output": "-> DesktopStatus",
+      "parameters": [],
+      "path": "google_drive_desktop::google_drive_desktop_status"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "google_drive_status",
       "output": "-> Result < GoogleDriveStatus , Failure >",
       "parameters": [
@@ -1953,6 +1962,15 @@
       "output": "-> Result < () , Failure >",
       "parameters": [],
       "path": "google_drive::install_google_drive"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "install_google_drive_desktop",
+      "output": "-> Result < () , Failure >",
+      "parameters": [],
+      "path": "google_drive_desktop::install_google_drive_desktop"
     },
     {
       "async": false,
@@ -3013,6 +3031,15 @@
         }
       ],
       "path": "env::open_file_external"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "open_google_drive_desktop",
+      "output": "-> Result < () , Failure >",
+      "parameters": [],
+      "path": "google_drive_desktop::open_google_drive_desktop"
     },
     {
       "async": false,
@@ -4478,6 +4505,21 @@
         }
       ],
       "path": "accounts::set_active_account"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "set_active_local_model",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "models::set_active_local_model"
     },
     {
       "async": false,
