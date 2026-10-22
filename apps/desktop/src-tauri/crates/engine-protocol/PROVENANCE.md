@@ -20,7 +20,7 @@ repositories, and `GitHostInfo`. Files on disk keep their keys; the types that
 are stored and also travel cross the contract wrapped in `Wire`, which renames
 their keys. There are no aliases. This copy is byte-identical to the engine's.
 SHA-256:
-`e0f98005f7c551d2e6df91658fa466220362181ca697ada9ca63b97899219aaf`.
+`ed5ba3a574acaf44eadb9dc56d88d169c0e5ace7e4dd9c0fa829ed6395ed65f4`.
 
 seldon-host `4e21caf` (#66) added the Danil account (321 commands, 28 events):
 `danil_connect_start`, `danil_connect_status`, `danil_connect_options`,
@@ -133,6 +133,16 @@ pnpm, bun, agent-browser, uv and python. Accounts: `list_system_sessions`,
 `disconnect_google_drive` and `remove_google_drive`, plus the `google-drive`
 event and the `settings.google_drive.*` keys. This copy is
 `git show b831eeb:crates/engine-protocol/commands.json` byte for byte.
+
+seldon-host `feat/google-drive-desktop` (`0774f28`, #95) adds Google Drive
+through Google's own desktop app on Windows and macOS (357 commands, 32
+events): `google_drive_desktop_status` (no parameters) → `{supported,
+installed, running, mounts: [{email, path}], installer_bytes}`,
+`install_google_drive_desktop` and `open_google_drive_desktop` (no
+parameters), the `google-drive-desktop` operation for `cancel_install`,
+`install_size` and the `install` event, and the
+`settings.google_drive_desktop.*` keys. Linux keeps the rclone commands. This
+copy is `git show 0774f28:crates/engine-protocol/commands.json` byte for byte.
 
 Endpoint, selection and StreamPage extend the transport; they do not convert
 domain data. The token travels in RPC1 only between authenticated local
