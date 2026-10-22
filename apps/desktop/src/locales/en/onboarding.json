@@ -111,6 +111,7 @@
   "onboarding.tools.about.gitlab": "Repositories and merge requests",
   "onboarding.tools.about.bitbucket": "Repositories with a credential",
   "onboarding.tools.about.excalidraw": "Hand-drawn diagrams in the chat",
+  "onboarding.tools.about.notion": "Your Notion pages and databases",
   "onboarding.tools.about.drawio": "Your agents draw diagrams and flows in the chat",
   "onboarding.tools.about.typst": "Your agents write documents and reports as PDF",
   "onboarding.tools.about.libreoffice": "Your agents open and create Word, Excel and PowerPoint",

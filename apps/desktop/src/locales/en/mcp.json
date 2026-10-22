@@ -9,6 +9,8 @@
   "mcp.known.figma_desktop.after": "It doesn't ask you to sign in: it uses the session of the app you already have open.",
   "mcp.known.atlassian.requires": "Jira and Confluence come with the same connection. Bitbucket doesn't: through this path it asks for an API token instead of the browser session.",
   "mcp.known.atlassian.after": "The first time the agent uses it, Atlassian will ask you to sign in. You'll see and be able to do exactly what your account already allows, no more and no less.",
+  "mcp.known.notion.requires": "Being a member of the Notion workspace; guests can't connect it.",
+  "mcp.known.notion.after": "The first time the agent uses it, Notion will ask you to sign in from the browser and pick the workspace. It will see the same things you see in that workspace.",
   "mcp.known.excalidraw.requires": "Your drawings are stored on Excalidraw's server with no account: anyone with a drawing's ID can open it. It needs an internet connection.",
   "mcp.known.excalidraw.after": "Ready as soon as you connect, no sign-in. When the agent draws, the diagram opens in the chat and you can edit it there.",
   "mcp.login.opened_browser": "Your browser opened so you can authorize {service}. Come back here when you're done.",

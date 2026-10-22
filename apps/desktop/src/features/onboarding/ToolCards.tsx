@@ -104,6 +104,7 @@ const INTEGRACIONES = (): Integracion[] => [
   { id: "gitlab", nombre: "GitLab", comun: false, via: "proveedor" },
   { id: "bitbucket", nombre: "Bitbucket", comun: false, via: "proveedor" },
   { id: "excalidraw", nombre: "Excalidraw", comun: false, via: "incluido" },
+  { id: "notion", nombre: "Notion", comun: false, via: "mcp" },
 ];
 const RECOMENDADOS = ["drawio", "typst", "libreoffice"];
 const ORDEN_PLUGINS = ["drawio", "typst", "libreoffice", "agentsview", "computer-use"];
