@@ -134,6 +134,16 @@ pnpm, bun, agent-browser, uv and python. Accounts: `list_system_sessions`,
 event and the `settings.google_drive.*` keys. This copy is
 `git show b831eeb:crates/engine-protocol/commands.json` byte for byte.
 
+seldon-host `feat/google-drive-desktop` (`0774f28`, #95) adds Google Drive
+through Google's own desktop app on Windows and macOS (357 commands, 32
+events): `google_drive_desktop_status` (no parameters) → `{supported,
+installed, running, mounts: [{email, path}], installer_bytes}`,
+`install_google_drive_desktop` and `open_google_drive_desktop` (no
+parameters), the `google-drive-desktop` operation for `cancel_install`,
+`install_size` and the `install` event, and the
+`settings.google_drive_desktop.*` keys. Linux keeps the rclone commands. This
+copy is `git show 0774f28:crates/engine-protocol/commands.json` byte for byte.
+
 seldon-host `feat/modelos-locales` (on dev `41b51c3`, which adds
 `google_drive_desktop_status`, `install_google_drive_desktop` and
 `open_google_drive_desktop`) adds the local model the tasks use: `set_active_local_model` (`{id}`). The `ModelState` items of

@@ -665,5 +665,13 @@
   "settings.google_drive.error_not_installed": "Install Google Drive first.",
   "settings.google_drive.error_login": "Could not sign in to Google Drive.",
   "settings.google_drive.login_cancelled": "Google Drive sign-in was cancelled.",
-  "settings.google_drive.login_timeout": "Google Drive sign-in took too long. Try again."
+  "settings.google_drive.login_timeout": "Google Drive sign-in took too long. Try again.",
+  "settings.google_drive_desktop.unsupported": "Google Drive for desktop is not available on this platform.",
+  "settings.google_drive_desktop.error_busy": "Google Drive is already being installed.",
+  "settings.google_drive_desktop.error_download": "Google Drive could not be downloaded. Check your connection and try again.",
+  "settings.google_drive_desktop.error_signature": "The downloaded installer is not signed by Google, so it was not installed. Try again.",
+  "settings.google_drive_desktop.error_declined": "Google Drive was not installed because administrator permission was not given. Try again and accept the system prompt.",
+  "settings.google_drive_desktop.error_install": "Google Drive could not be installed. Try again.",
+  "settings.google_drive_desktop.error_not_installed": "Install Google Drive first.",
+  "settings.google_drive_desktop.error_open": "Google Drive could not be opened."
 }
