@@ -146,7 +146,7 @@ test("sin licencia, la sección abre la prueba en el navegador y reintenta", asy
   button("Iniciar sesión con Danil").click();
   await sleep(300);
   assert.ok(text().includes("Activa Terminus"), text());
-  assert.ok(text().includes("Prueba 30 días gratis, sin tarjeta. Después, 99 MXN al mes con IVA incluido."), text());
+  assert.ok(text().includes("7 días gratis, sin tarjeta; después, 99 MXN al mes con IVA incluido."), text());
   assert.ok(!text().includes("no tiene licencia"), "the bare refusal is gone");
 
   button("Empezar prueba gratis").click();

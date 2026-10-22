@@ -77,7 +77,7 @@ test("the web build uses the stored session, opens every computer and explains r
     await sleep(1500);
     assert.ok(refreshes >= 1, "4003 refreshes the session");
     assert.ok(text().includes("Activa Terminus"), "a refused reconnection offers the trial");
-    assert.ok(text().includes("Prueba 30 días gratis, sin tarjeta."), text());
+    assert.ok(text().includes("7 días gratis, sin tarjeta;"), text());
     assert.ok(w.document.querySelector("[data-license-start]"), "the trial button is there");
     assert.ok(w.document.querySelector("[data-license-retry]"), "and the retry");
     assert.equal(fake.sockets.length, 2, "it does not retry the sockets blindly");
