@@ -53,7 +53,7 @@ export type Paso =
   | { k: "sesion"; identidad: string }
   | { k: "instalada" }
   | { k: "descargando"; hecho: number; total: number }
-  | { k: "entrando"; cuenta: string; codigo?: string; pideCodigo?: boolean }
+  | { k: "entrando"; cuenta: string; url?: string; codigo?: string; pideCodigo?: boolean }
   | { k: "clave" }
   | { k: "comprobando" }
   | { k: "conectada"; cuenta: string; id: string | null }
@@ -91,6 +91,8 @@ export function crearConexiones() {
   const [filas, setFilas] = createSignal<Fila[]>([]);
   const [pasos, setPasos] = createStore<Record<string, Paso>>({});
   const [errores, setErrores] = createStore<Record<string, string | null>>({});
+  // Lo que el CLI dice mientras se inicia sesión, para «Ver lo que dice…».
+  const [salidas, setSalidas] = createStore<Record<string, string[]>>({});
   const [falloDeCarga, setFalloDeCarga] = createSignal<string | null>(null);
   const [cargada, setCargada] = createSignal(false);
   let agentes: Agente[] = [];
@@ -302,6 +304,7 @@ export function crearConexiones() {
     try {
       cuenta = (await invoke<{ id: string }>("add_account", { provider: f.agente, label: "" })).id;
       entrada = { fila: id, agente: f.agente, cuenta };
+      setSalidas(id, []);
       poner(id, { k: "entrando", cuenta });
       await invoke("login_account", { provider: f.agente, id: cuenta, mode: "tuberia" });
     } catch (e) {
@@ -432,7 +435,10 @@ export function crearConexiones() {
     const p = e ? pasos[e.fila] : undefined;
     if (!e || ev.payload.account !== e.cuenta || p?.k !== "entrando") return;
     const { kind, text } = ev.payload;
-    if (kind === "url") invoke("open_external", { target: text }).catch(() => {});
+    if (kind === "url") {
+      poner(e.fila, { ...p, url: text });
+      invoke("open_external", { target: text }).catch(() => {});
+    } else if (kind === "notice") setSalidas(e.fila, (s) => [...(s ?? []), text]);
     else if (kind === "confirm") poner(e.fila, { ...p, codigo: text });
     else if (kind === "code") poner(e.fila, { ...p, pideCodigo: true });
     else if (kind === "done") void terminarEntrada(text);
@@ -473,6 +479,7 @@ export function crearConexiones() {
     filas,
     pasos,
     errores,
+    salidas,
     falloDeCarga,
     cargada,
     conectadas,
