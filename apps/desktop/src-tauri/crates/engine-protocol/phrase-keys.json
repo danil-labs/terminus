@@ -62,6 +62,7 @@
     "chat.sleep.background_running",
     "chat.sleep.background_running_many",
     "chat.sleep.turn_running",
+    "chat.steer.delivered",
     "chat.steer.not_running",
     "chat.steer.stopping",
     "chat.steer.unconfirmed",
