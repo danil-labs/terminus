@@ -115,6 +115,8 @@
   "code.editor.selection_deleted": "Selección borrada",
   "code.tree.new_file": "Nuevo archivo",
   "code.tree.new_folder": "Nueva carpeta",
+  "code.tree.new_file.empty_task": "Nuevo archivo (abre una tarea sin escribirle al agente)",
+  "code.tree.new_folder.empty_task": "Nueva carpeta (abre una tarea sin escribirle al agente)",
   "code.tree.rename": "Renombrar",
   "code.tree.name.new_file": "Nombre del archivo nuevo",
   "code.tree.name.new_folder": "Nombre de la carpeta nueva",

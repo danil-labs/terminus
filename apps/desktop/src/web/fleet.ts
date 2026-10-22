@@ -43,7 +43,7 @@ export const FAN = new Set(["list_projects", "list_portfolios", "list_live_sessi
 /** Reads that list every machine, whatever the workspace. */
 export const EVERYWHERE = new Set(["list_workspaces", "workspaces_startup", "list_accounts", "list_workspace_attention"]);
 /** What makes something new where the person chose, when no id says where. */
-export const CREATE = new Set(["send_message", "run_shell_command", "create_project", "clone_project", "start_project_clone"]);
+export const CREATE = new Set(["send_message", "create_empty_session", "run_shell_command", "create_project", "clone_project", "start_project_clone"]);
 /**
  * Answers whose rows carry the id of what they list. A space is of the machine
  * that keeps it: with its id prefixed, renaming or deleting it goes only there.

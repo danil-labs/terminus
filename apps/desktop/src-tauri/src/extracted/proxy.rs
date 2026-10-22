@@ -108,6 +108,8 @@ fn machines(autostart: bool) -> Vec<Machine> {
 const HOME: usize = 0;
 const WAKES: &[&str] = &[
     "send_message",
+    // La tarea vacía de la vista previa nace donde nacería la del primer mensaje.
+    "create_empty_session",
     "inject_message",
     "create_project",
     "create_agent",

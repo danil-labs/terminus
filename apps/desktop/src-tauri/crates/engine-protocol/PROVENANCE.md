@@ -20,7 +20,7 @@ repositories, and `GitHostInfo`. Files on disk keep their keys; the types that
 are stored and also travel cross the contract wrapped in `Wire`, which renames
 their keys. There are no aliases. This copy is byte-identical to the engine's.
 SHA-256:
-`9f418b8dcc8a1784ec5cff44e72cdb6cefe8f3c9a96d72d6143541ae58c162e9`.
+`43db399c8227b52e6fc5f240681c55d1dc81cb88a292cbf76d56ed1fc37e4d85`.
 
 seldon-host `4e21caf` (#66) added the Danil account (321 commands, 28 events):
 `danil_connect_start`, `danil_connect_status`, `danil_connect_options`,
@@ -168,6 +168,15 @@ commands, 32 events): `set_workspace_host_github` (`{id, enabled}`) →
 kept on this computer only) and the `providers.github.host_mode.*` keys. Open
 sessions pick up the change on their next turn. This copy is
 `git show ecc364d:crates/engine-protocol/commands.json` byte for byte.
+
+seldon-host `feat/tarea-vacia` (`3274de5`) lets a task be born empty, without a
+turn, to create a file or a folder from the preview before writing to the agent
+(367 commands, 32 events): `create_empty_session` (`{provider, project, title,
+baseRef?, agent?, space?}`) → `{session, folder}` does what the first
+`send_message` does to prepare the task and its working copy (a worktree from
+`baseRef` with git, the task's kn copy without git), without a turn. `title` is
+provisional: the person's first `send_message` on that task replaces it. This
+copy is `git show 3274de5:crates/engine-protocol/commands.json` byte for byte.
 
 Endpoint, selection and StreamPage extend the transport; they do not convert
 domain data. The token travels in RPC1 only between authenticated local

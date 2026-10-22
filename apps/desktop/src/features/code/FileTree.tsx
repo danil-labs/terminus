@@ -50,7 +50,7 @@ const HuecoDeChevron = () => (
   <span class="shrink-0" style={{ width: `${CHEVRON}px` }} aria-hidden="true" />
 );
 
-type Tipo = "archivo" | "carpeta";
+export type Tipo = "archivo" | "carpeta";
 
 const padreDe = (ruta: string) => ruta.slice(0, Math.max(0, ruta.lastIndexOf("/")));
 const nombreDe = (ruta: string) => ruta.slice(ruta.lastIndexOf("/") + 1);
@@ -65,6 +65,11 @@ export default function ArbolDeArchivos(props: {
   visible: boolean;
   /** Sin tarea aún, lee el commit de la rama base en lugar de una copia. */
   preview?: { baseRef?: string };
+  /**
+   * En la vista previa, crear lo nuevo en una tarea que nace vacía para eso.
+   * Sin él, la vista previa no ofrece crear.
+   */
+  crearSinTarea?: (tipo: Tipo, ruta: string) => Promise<void>;
   onAbrir: (ruta: string, cambiado: boolean) => void;
   /** Un archivo o una carpeta cambió de ruta desde aquí: sus pestañas la siguen. */
   onMovido?: (desde: string, hasta: string) => void;
@@ -205,8 +210,10 @@ export default function ArbolDeArchivos(props: {
     setAbiertas(abiertas_);
   }
 
-  // La vista previa lee un commit: ahí no hay árbol que escribir.
+  // La vista previa lee un commit: ahí no hay árbol que escribir. Crear sí,
+  // en la tarea que nace para eso (`crearSinTarea`).
   const editable = () => !props.preview;
+  const creable = () => editable() || Boolean(props.crearSinTarea);
   seguirPluginTypst();
   const conOjo = (ruta: string) => !props.preview && conVistaTypst() && esTypst(ruta);
   const [seleccion, setSeleccion] = createSignal<{ ruta: string; tipo: Tipo } | null>(null);
@@ -281,13 +288,18 @@ export default function ArbolDeArchivos(props: {
     const n = nuevo();
     if (!n || nombreInvalido(nombre)) return false;
     const path = unir(n.padre, nombre);
+    const sinTarea = props.preview ? props.crearSinTarea : undefined;
     const hecho = await operar(() =>
-      n.tipo === "archivo"
-        ? invoke("tree_create_file", { ...ids(), path })
-        : invoke("tree_create_folder", { ...ids(), path }),
+      sinTarea
+        ? sinTarea(n.tipo, path)
+        : n.tipo === "archivo"
+          ? invoke("tree_create_file", { ...ids(), path })
+          : invoke("tree_create_folder", { ...ids(), path }),
     );
     if (!hecho) return false;
     setNuevo(null);
+    // La tarea que nació abre su árbol y el archivo.
+    if (sinTarea) return true;
     setSeleccion({ ruta: path, tipo: n.tipo });
     if (n.tipo === "archivo") props.onAbrir(path, false);
     return true;
@@ -623,13 +635,13 @@ export default function ArbolDeArchivos(props: {
               class="min-h-7 px-0 py-0 text-xs"
             />
           </label>
-          <Show when={editable()}>
+          <Show when={creable()}>
             <Button
               variant="ghost"
               size="iconCompact"
               class="size-6 text-neutral-500"
               aria-label={t("code.tree.new_file")}
-              title={t("code.tree.new_file")}
+              title={editable() ? t("code.tree.new_file") : t("code.tree.new_file.empty_task")}
               onClick={() => empezarNuevo("archivo")}
             >
               <FilePlus size={14} />
@@ -639,7 +651,7 @@ export default function ArbolDeArchivos(props: {
               size="iconCompact"
               class="size-6 text-neutral-500"
               aria-label={t("code.tree.new_folder")}
-              title={t("code.tree.new_folder")}
+              title={editable() ? t("code.tree.new_folder") : t("code.tree.new_folder.empty_task")}
               onClick={() => empezarNuevo("carpeta")}
             >
               <FolderPlus size={14} />
