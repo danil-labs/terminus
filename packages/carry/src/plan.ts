@@ -89,3 +89,12 @@ export function bringBranch(s: Pick<WorkStatus, "branch" | "head">, machine: str
 
 /** Sin remoto el destino no puede clonar: el trabajo viaja entero y el import crea el proyecto. */
 export const withoutRemote = (s: Pick<WorkStatus, "remoteUrl">, projectRemote?: string | null) => !s.remoteUrl && !projectRemote;
+
+/**
+ * TOFU: la primera llave de una máquina se fija; si después cambia, la persona
+ * decide si confía. Un relay que cambiara la llave por la suya se nota aquí.
+ */
+export function keyVerdict(pinned: string | null | undefined, key: string): "new" | "same" | "changed" {
+  if (!pinned) return "new";
+  return pinned === key ? "same" : "changed";
+}

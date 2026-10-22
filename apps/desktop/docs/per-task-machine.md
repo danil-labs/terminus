@@ -216,6 +216,11 @@ la comparten la web y el teléfono.
   el proyecto con el mismo id; `fleet.rs` deja pasar ese `project` sin
   traducir. El menú de la carpeta ofrece «Llevar a otra máquina…»: abre su
   tarea nueva en la máquina elegida y la hoja aunque no haya nada sin subir.
+- Sellado: la web y el teléfono piden `work_key` al destino y mandan
+  `recipientKey` en `work_export`; el archivo viaja cifrado para ese motor.
+  La primera llave de cada máquina se fija en las preferencias
+  (`machines.carry_keys`, TOFU); si cambia, la hoja lo avisa y no deja llevar
+  hasta «Confiar en la nueva llave». El escritorio por el túnel SSH no sella.
 - Pruebas: `tests/unit/carry-work.test.ts` (orquestación contra dos motores
   falsos) y `tests/unit/carry-window.test.mjs` (`dist/` en jsdom).
 

@@ -61,6 +61,8 @@ export type ExportArgs = {
   exclude: string[];
   files: string[];
   full: boolean;
+  /** La llave pública (X25519, base64) del motor de destino: el archivo sale sellado para él. */
+  recipientKey?: string | null;
 };
 
 export type ImportArgs = {
@@ -87,4 +89,6 @@ export type CarryEngine = {
   writePart(machine: string, args: { transfer: string; offset: number; data: string }): Promise<unknown>;
   importWork(machine: string, args: ImportArgs): Promise<Imported>;
   cancel(machine: string, args: { transfer: string }): Promise<unknown>;
+  /** `work_key`: la llave pública de la máquina, para sellar lo que se le manda. */
+  key(machine: string): Promise<{ publicKey: string }>;
 };

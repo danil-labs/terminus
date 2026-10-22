@@ -6607,6 +6607,11 @@
           "key": "full",
           "name": "full",
           "type": "bool"
+        },
+        {
+          "key": "recipientKey",
+          "name": "recipient_key",
+          "type": "Option < String >"
         }
       ],
       "path": "carry::work_export"
@@ -6655,6 +6660,15 @@
         }
       ],
       "path": "carry::work_import"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "work_key",
+      "output": "-> Result < WorkKey , Failure >",
+      "parameters": [],
+      "path": "carry::work_key"
     },
     {
       "async": false,

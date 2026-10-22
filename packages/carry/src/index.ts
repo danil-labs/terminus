@@ -14,6 +14,7 @@ export {
   etaSeconds,
   hasWork,
   initialSelection,
+  keyVerdict,
   needsSheet,
   partAt,
   partsOf,

@@ -21,6 +21,7 @@ import {
   type WorkStatus,
   bringBranch,
   bringSelection,
+  keyVerdict,
   withoutRemote,
 } from "../../../../packages/carry/src/index.ts";
 
@@ -55,7 +56,7 @@ function fakeEngines(payload: Buffer, opts: { failWriteAt?: number[]; tooLarge?:
     vm: { transfers: new Map(), projects: new Set(["p1"]), calls: [] },
   };
   const failWriteAt = [...(opts.failWriteAt ?? [])];
-  const exports: { full: boolean; files: string[]; exclude: string[] }[] = [];
+  const exports: { full: boolean; files: string[]; exclude: string[]; recipientKey?: string | null }[] = [];
   const imports: Parameters<CarryEngine["importWork"]>[1][] = [];
   const engine: CarryEngine = {
     async status(machine) {
@@ -64,7 +65,7 @@ function fakeEngines(payload: Buffer, opts: { failWriteAt?: number[]; tooLarge?:
     },
     async exportWork(machine, args) {
       machines[machine].calls.push("work_export");
-      exports.push({ full: args.full, files: args.files, exclude: args.exclude });
+      exports.push({ full: args.full, files: args.files, exclude: args.exclude, recipientKey: args.recipientKey });
       if (opts.tooLarge) throw { what: { clave: "work.error.too_large" }, detail: "" };
       const transfer = `t-${args.operation}`;
       machines[machine].transfers.set(transfer, payload);
@@ -105,6 +106,9 @@ function fakeEngines(payload: Buffer, opts: { failWriteAt?: number[]; tooLarge?:
       if (createHash("sha256").update(got).digest("hex") !== args.sha256) throw { what: { clave: "work.error.sha_mismatch" }, detail: "" };
       if (m.missingBase && exports.at(-1)?.full !== true) throw { what: { clave: "work.error.missing_base" }, detail: "" };
       return { head: "a1", base: "w1", branch: null, files: [".env.local"], snapshot: true };
+    },
+    async key(machine) {
+      return { publicKey: `key-of-${machine}` };
     },
     async cancel(machine, { transfer }) {
       machines[machine].calls.push("work_cancel");
@@ -247,4 +251,16 @@ test("un proyecto sin remoto viaja entero y el destino lo crea con el mismo id, 
   assert.equal(exports.at(-1)?.full, true, "sin remoto no viajó la historia completa");
   assert.deepEqual(imports.at(-1)?.create, { name: "notas", id: "p1" });
   assert.ok(machines.vm.projects.has("p1"));
+});
+
+test("sellado: la llave del destino se fija la primera vez, un cambio se nota y el export sale sellado con ella", async () => {
+  assert.equal(keyVerdict(undefined, "k1"), "new");
+  assert.equal(keyVerdict("k1", "k1"), "same");
+  assert.equal(keyVerdict("k1", "k2"), "changed");
+  const { engine, exports } = fakeEngines(payload);
+  const { publicKey } = await engine.key("vm");
+  await carryWork(engine, job({ recipientKey: publicKey }), newState("op11"));
+  assert.equal(exports.at(-1)?.recipientKey, "key-of-vm");
+  await carryWork(engine, job(), newState("op12"));
+  assert.equal(exports.at(-1)?.recipientKey, undefined, "sin llave el export no lleva recipientKey");
 });

@@ -1,5 +1,6 @@
 {
   "work.error.bad_branch": "El nombre de la rama no es válido.",
+  "work.error.bad_key": "La llave de la máquina de destino no es válida: no se puede sellar la copia.",
   "work.error.bad_part": "Una parte de la copia no es válida: reintenta.",
   "work.error.bad_path": "Uno de los archivos elegidos está fuera del proyecto o es un enlace: quítalo de la lista.",
   "work.error.bad_transfer": "El archivo de la copia no es válido: cancela y vuelve a empezar.",
@@ -9,6 +10,7 @@
   "work.error.no_commits": "El repositorio todavía no tiene commits: haz uno y vuelve a intentarlo.",
   "work.error.not_git": "La carpeta no es un repositorio de git: no se puede llevar su trabajo.",
   "work.error.project_missing": "Esta máquina no tiene el proyecto: se clona antes de recibir el trabajo.",
+  "work.error.sealed_open_failed": "La máquina de destino no pudo abrir la copia sellada: la llave no es la suya o la copia llegó dañada. Vuelve a empezar.",
   "work.error.sha_mismatch": "La copia llegó dañada: cancela y vuelve a empezar.",
   "work.error.storage": "No se pudo guardar la copia en el disco de la máquina: revisa el espacio libre.",
   "work.error.task_missing": "La tarea ya no está en esa máquina: no hay trabajo que traer.",
@@ -97,5 +99,8 @@
     "other": "{count} commits en {branch} (hasta {head})."
   },
   "work.progress.label_bring": "Traer a {machine}",
-  "work.carry.creates": "se crea desde la copia, sin remoto"
+  "work.carry.creates": "se crea desde la copia, sin remoto",
+  "work.carry.sealed": "Van cifrados de punta a punta para {machine}; Danil no los ve.",
+  "work.carry.key_changed": "La llave de {machine} no es la de la última vez. Si no la reinstalaste, alguien podría estar en medio: no lleves nada hasta saberlo.",
+  "work.carry.trust_key": "Confiar en la nueva llave"
 }
