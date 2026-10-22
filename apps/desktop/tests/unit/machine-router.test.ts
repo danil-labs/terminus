@@ -174,3 +174,34 @@ test("an action on a machine stopped by the license says so by name", async () =
   });
   assert.equal(vm.calls.length, 0);
 });
+
+test("by the relay every call says its workspace: making one its own included; the engine's refusals are named", async () => {
+  const vm = fakeLink({ materialize_workspace: null, send_message: "r1", rename_session: null });
+  const { router, fleet } = setup({ cmp_vm: vm });
+  fleet.setRegistry([{ id: "w", name: "W", projects: [], computers: ["cmp_home"] }]);
+  await router.handle("list_workspaces");
+  assert.equal(await router.handle("send_message", { project: "p1", session: null, prompt: "hola" }, on("cmp_vm")), "cmp_vm~r1");
+  assert.deepEqual(vm.calls.map((c) => [c.command, c.workspace]), [["materialize_workspace", "w"], ["send_message", "w"]], "never without a workspace");
+
+  const refusing = (code: string, detail: unknown) => {
+    const link = fakeLink({});
+    link.call = (id, command, workspace) => {
+      link.calls.push({ id, command, workspace, args: {} });
+      return Promise.reject({ code, detail });
+    };
+    return link;
+  };
+  const mismatch = setup({ cmp_vm: refusing("workspace_mismatch", null) });
+  await mismatch.router.handle("list_workspaces");
+  await assert.rejects(mismatch.router.handle("rename_session", { project: "p1", id: "cmp_vm~t1", title: "x" }, on("cmp_vm")), (e: { what: string; detail: string }) => {
+    assert.equal(e.detail, "workspace_mismatch");
+    assert.equal(e.what, "Danil VM no deja hacer esto desde aquí: es de otro workspace o de otra cuenta.");
+    return true;
+  });
+  const failed = setup({ cmp_vm: refusing("command_failed", "Por el relay, la llamada tiene que decir de qué workspace es.") });
+  await failed.router.handle("list_workspaces");
+  await assert.rejects(failed.router.handle("rename_session", { project: "p1", id: "cmp_vm~t1", title: "x" }, on("cmp_vm")), (e: { what: string }) => e.what === "Por el relay, la llamada tiene que decir de qué workspace es.");
+  const scoped = setup({ cmp_vm: refusing("command_not_allowed", { command: "rename_session", scope: "machine" }) });
+  await scoped.router.handle("list_workspaces");
+  await assert.rejects(scoped.router.handle("rename_session", { project: "p1", id: "cmp_vm~t1", title: "x" }, on("cmp_vm")), (e: { what: { clave: string } }) => e.what.clave === "shell.service.command");
+});

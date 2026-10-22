@@ -26,6 +26,7 @@
   "web.machines.missing_workspace": "{name} doesn't have this workspace and its engine can't create it yet. Update it to create tasks there.",
   "web.machines.timeout": "{name} didn't answer in time. You're seeing the last thing it said.",
   "web.machines.lost": "The connection to {name} was lost. Try again.",
+  "web.machines.workspace_mismatch": "{name} won't allow this from here: it belongs to another workspace or account.",
   "web.machines.license_required": "Using your other computers from here is part of paid Terminus.",
   "web.onboarding.accounts.another": "Connect another",
   "web.onboarding.accounts.api_key": "Paste your API key",

@@ -20,7 +20,7 @@ repositories, and `GitHostInfo`. Files on disk keep their keys; the types that
 are stored and also travel cross the contract wrapped in `Wire`, which renames
 their keys. There are no aliases. This copy is byte-identical to the engine's.
 SHA-256:
-`9f418b8dcc8a1784ec5cff44e72cdb6cefe8f3c9a96d72d6143541ae58c162e9`.
+`ec1ae0754929abcc7aab58d79a34b243265d59266505533f132e331ebadd88a8`.
 
 seldon-host `4e21caf` (#66) added the Danil account (321 commands, 28 events):
 `danil_connect_start`, `danil_connect_status`, `danil_connect_options`,
@@ -168,6 +168,19 @@ commands, 32 events): `set_workspace_host_github` (`{id, enabled}`) →
 kept on this computer only) and the `providers.github.host_mode.*` keys. Open
 sessions pick up the change on their next turn. This copy is
 `git show ecc364d:crates/engine-protocol/commands.json` byte for byte.
+
+seldon-host #106 (`feat/relay-account-isolation`) and #110
+(`feat/relay-machine-commands`, on #106) annotate the commands without changing
+any name or signature (366 commands, 32 events): `ids` says which arguments are
+workspace or account ids, which the engine checks against the relay envelope
+and the session's account (`workspace_mismatch`); `relay: false` refuses a
+command through the relay (`set_active_workspace`: the open workspace belongs to
+each window); and `scope: "machine"` lets 41 commands run through the relay only
+for the default session (else `command_not_allowed` with
+`{command, scope: "machine"}`). A relayed call without a workspace answers
+`command_failed`. This copy is
+`git show origin/feat/relay-machine-commands:crates/engine-protocol/commands.json`
+byte for byte; no `seldon-runtime` with it is published yet.
 
 Endpoint, selection and StreamPage extend the transport; they do not convert
 domain data. The token travels in RPC1 only between authenticated local

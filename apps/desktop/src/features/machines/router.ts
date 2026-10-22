@@ -156,6 +156,15 @@ export function createRouter(config: RouterConfig) {
         return { what: t("web.machines.cross_machine"), detail: "unknown_machine" };
       case "license_required":
         return { what: t("web.machines.license_required"), detail: "license_required" };
+      case "workspace_mismatch":
+        return { what: t("web.machines.workspace_mismatch", { name }), detail: "workspace_mismatch" };
+      case "command_failed": {
+        // El motor de allá explica por qué en `detail`, como frase o como `Failure`.
+        const own = error.detail as { what?: unknown } | string | null;
+        if (typeof own === "string" && own) return { what: own, detail: error.code };
+        if (own && typeof own === "object" && "what" in own) return own as Failure;
+        return { what: { clave: "shell.service.failed" }, detail: error.code };
+      }
       case "workspace_not_linked":
         return { what: t("web.workspace_not_linked"), detail: "workspace_not_linked" };
       case "operation_failed": {
@@ -241,7 +250,8 @@ export function createRouter(config: RouterConfig) {
   async function materialize(machine: string, workspace: string) {
     if (stale.has(machine)) throw missing(machine);
     try {
-      await fleet.call({ machine, workspace: null, command: "materialize_workspace", args: { id: workspace } });
+      // Por el relay toda llamada dice su workspace (seldon-host #106): el que se hace suyo.
+      await fleet.call({ machine, workspace, command: "materialize_workspace", args: { id: workspace } });
     } catch (error) {
       const code = error instanceof FleetError ? error.code : null;
       if (!code || !UNKNOWN.has(code)) throw error;
