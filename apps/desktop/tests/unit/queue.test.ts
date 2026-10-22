@@ -227,7 +227,7 @@ test("una entrega de otra tarea no se inyecta ni se toma por de la persona", () 
     ...written,
     id: "r1",
     text: "Ya subí el arreglo",
-    from_task: { folder: "p", task: "2jcp4typ", title: "Arreglo", agent: "claude" },
+    from_task: { folder: "p", task: "2jcp4typ", title: "Arreglo", provider: "claude" },
     hops: 0,
   };
   assert.equal(isInjectable(reply), false);
