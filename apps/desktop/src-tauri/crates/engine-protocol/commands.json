@@ -184,6 +184,21 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "adopt_system_session",
+      "output": "-> Result < Account , String >",
+      "parameters": [
+        {
+          "key": "provider",
+          "name": "provider",
+          "type": "String"
+        }
+      ],
+      "path": "accounts::adopt_system_session"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "agentsview_status",
       "output": "-> Result < IntegrationStatus , String >",
       "parameters": [],
@@ -452,6 +467,36 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "cancel_google_drive_login",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "google_drive::cancel_google_drive_login"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "cancel_install",
+      "output": "-> bool",
+      "parameters": [
+        {
+          "key": "operation",
+          "name": "operation",
+          "type": "String"
+        }
+      ],
+      "path": "cancel::cancel_install"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "cancel_local_model",
       "output": "",
       "parameters": [],
@@ -580,6 +625,21 @@
         }
       ],
       "path": "git_hosts::check_git_host"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "check_google_drive",
+      "output": "-> Result < GoogleDriveStatus , Failure >",
+      "parameters": [
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "google_drive::check_google_drive"
     },
     {
       "async": false,
@@ -768,6 +828,26 @@
       "output": "-> Result < Liberado , String >",
       "parameters": [],
       "path": "storage::collect_orphans"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "connect_api_key",
+      "output": "-> Result < Account , String >",
+      "parameters": [
+        {
+          "key": "provider",
+          "name": "provider",
+          "type": "String"
+        },
+        {
+          "key": "key",
+          "name": "key",
+          "type": "String"
+        }
+      ],
+      "path": "accounts::connect_api_key"
     },
     {
       "async": false,
@@ -1394,6 +1474,21 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "disconnect_google_drive",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "google_drive::disconnect_google_drive"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "disconnect_known_mcp",
       "output": "-> Result < () , Failure >",
       "parameters": [
@@ -1533,6 +1628,21 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "finish_google_drive_login",
+      "output": "-> Result < GoogleDriveStatus , Failure >",
+      "parameters": [
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "google_drive::finish_google_drive_login"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "finish_task",
       "output": "-> Result < () , Failure >",
       "parameters": [
@@ -1665,6 +1775,21 @@
         }
       ],
       "path": "git_hosts::git_host_projects"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "google_drive_status",
+      "output": "-> Result < GoogleDriveStatus , Failure >",
+      "parameters": [
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "google_drive::google_drive_status"
     },
     {
       "async": false,
@@ -1824,6 +1949,15 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "install_google_drive",
+      "output": "-> Result < () , Failure >",
+      "parameters": [],
+      "path": "google_drive::install_google_drive"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "install_integration",
       "output": "-> Result < () , Failure >",
       "parameters": [
@@ -1888,6 +2022,21 @@
         }
       ],
       "path": "agents::install_provider"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "install_size",
+      "output": "-> Result < u64 , String >",
+      "parameters": [
+        {
+          "key": "operation",
+          "name": "operation",
+          "type": "String"
+        }
+      ],
+      "path": "cancel::install_size"
     },
     {
       "async": false,
@@ -2542,6 +2691,15 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "list_system_sessions",
+      "output": "-> Vec < SystemSession >",
+      "parameters": [],
+      "path": "accounts::list_system_sessions"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "list_task_mentions",
       "output": "-> Result < Vec < Candidate > , String >",
       "parameters": [],
@@ -2922,6 +3080,11 @@
           "key": "joinOnly",
           "name": "join_only",
           "type": "Option < bool >"
+        },
+        {
+          "key": "skip",
+          "name": "skip",
+          "type": "Option < Vec < String > >"
         }
       ],
       "path": "bootstrap::prepare_runtime"
@@ -3475,6 +3638,15 @@
       "output": "-> Result < () , String >",
       "parameters": [],
       "path": "github::remove_gh"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "remove_google_drive",
+      "output": "-> Result < () , Failure >",
+      "parameters": [],
+      "path": "google_drive::remove_google_drive"
     },
     {
       "async": false,
@@ -5436,6 +5608,21 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "start_google_drive_login",
+      "output": "-> Result < Wait , Failure >",
+      "parameters": [
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "google_drive::start_google_drive_login"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "start_local_model",
       "output": "-> Result < String , Failure >",
       "parameters": [
@@ -6843,6 +7030,8 @@
     "close-tab",
     "danil-connect",
     "danil-sessions",
+    "google-drive",
+    "install",
     "integrations-changed",
     "keep-awake-changed",
     "kn-cloud",

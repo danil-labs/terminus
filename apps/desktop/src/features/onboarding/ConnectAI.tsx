@@ -11,20 +11,19 @@ import { invoke } from "../../lib/invoke.ts";
 import { cn } from "../../lib/utils";
 import { Badge } from "../../ui/Badge";
 import { Button } from "../../ui/Button";
-import { RemoveButton } from "../../ui/IconAction";
+import { CancelButton, RemoveButton } from "../../ui/IconAction";
 import { Input } from "../../ui/Input";
 import { MarcaAgente } from "../../ui/icons";
 import { TerminusMark } from "../../ui/toolMarks";
 import { Spinner } from "../../ui/Spinner";
-import { Consentir } from "../settings/Accounts";
-import { type Conexiones, type Fila, nombreDeFila, type Paso } from "./connect-store";
+import { type Conexiones, type Fila, nombreDeFila, ordenDelMapa, type Paso } from "./connect-store";
 
 type Nodo = "off" | "det" | "vivo" | "on";
 
 function nodo(p: Paso | undefined): Nodo {
   if (p?.k === "conectada") return "on";
   if (p && ["descargando", "entrando", "clave", "comprobando", "saliendo"].includes(p.k)) return "vivo";
-  return p?.k === "instalada" ? "det" : "off";
+  return p?.k === "instalada" || p?.k === "sesion" ? "det" : "off";
 }
 
 function nombreCorto(f: Fila) {
@@ -47,25 +46,46 @@ const AZULEJO: Record<Nodo, string> = {
   on: "ring-2 ring-success-strong",
 };
 
+/** El texto con los nombres en negrita, como los escribe el resumen del mapa. */
+function ConNombres(props: { texto: string; nombres: string }) {
+  const i = () => (props.nombres ? props.texto.indexOf(props.nombres) : -1);
+  return (
+    <Show when={i() >= 0} fallback={props.texto}>
+      {props.texto.slice(0, i())}
+      <b class="font-semibold text-neutral-950">{props.nombres}</b>
+      {props.texto.slice(i() + props.nombres.length)}
+    </Show>
+  );
+}
+
 /** Terminus al centro y cada IA alrededor, con su estado en el trazo y en el aro de su logo. */
 export function MapaDeConexiones(props: { c: Conexiones }) {
-  const filas = () => props.c.filas();
+  const filas = () => ordenDelMapa(props.c.filas());
   const lugar = (i: number) => {
     const angulo = -Math.PI / 2 + (i * 2 * Math.PI) / Math.max(1, filas().length);
     return [50 + 37 * Math.cos(angulo), 48 + 40 * Math.sin(angulo)] as const;
   };
   const resumen = () => {
     const vivo = filas().find((f) => nodo(props.c.pasos[f.id]) === "vivo");
-    if (vivo) return t("onboarding.ai.map.connecting", { name: nombreDeFila(vivo) });
+    if (vivo) {
+      const names = nombreDeFila(vivo);
+      return { texto: t("onboarding.ai.map.connecting", { name: names }), names };
+    }
     const on = props.c.conectadas();
-    if (on.length) return t("onboarding.ai.map.ready", { count: on.length, names: lista(on.map(nombreDeFila)) });
+    if (on.length) {
+      const names = lista(on.map(nombreDeFila));
+      return { texto: t("onboarding.ai.map.ready", { count: on.length, names }), names };
+    }
     const det = filas().filter((f) => f.detectada);
-    if (det.length) return t("onboarding.ai.map.found", { names: lista(det.map(nombreDeFila)) });
-    return t("onboarding.ai.map.none");
+    if (det.length) {
+      const names = lista(det.map(nombreDeFila));
+      return { texto: t("onboarding.ai.map.found", { names }), names };
+    }
+    return { texto: t("onboarding.ai.map.none"), names: "" };
   };
   return (
     <div>
-      <div class="relative my-5 h-[250px]" aria-hidden="true">
+      <div class="relative mt-[22px] mb-[18px] h-[250px]" aria-hidden="true">
         <svg class="absolute inset-0 size-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
           <For each={filas()}>
             {(f, i) => (
@@ -89,8 +109,9 @@ export function MapaDeConexiones(props: { c: Conexiones }) {
             return (
               <span
                 class={cn(
-                  "absolute grid w-[92px] -translate-1/2 justify-items-center gap-1.5 text-center text-[11px] transition-opacity",
+                  "absolute grid w-[92px] -translate-1/2 justify-items-center gap-[5px] text-center text-[11px] transition-opacity duration-300",
                   estado() === "on" ? "font-semibold text-neutral-950" : "text-neutral-500",
+                  estado() === "off" && "opacity-80",
                 )}
                 style={{ left: `${lugar(i())[0]}%`, top: `${lugar(i())[1]}%` }}
               >
@@ -102,7 +123,7 @@ export function MapaDeConexiones(props: { c: Conexiones }) {
                 >
                   <MarcaAgente id={f.agente} size={22} />
                   <Show when={estado() === "on"}>
-                    <span class="absolute -top-1.5 -right-1.5 grid size-4 place-items-center rounded-full bg-success-strong text-bg ring-2 ring-bg">
+                    <span class="absolute -top-1 -right-1.5 grid size-4 place-items-center rounded-full bg-success-strong text-bg ring-2 ring-bg">
                       <Check size={10} stroke-width={3} />
                     </span>
                   </Show>
@@ -114,19 +135,19 @@ export function MapaDeConexiones(props: { c: Conexiones }) {
         </For>
       </div>
       <p class="m-0 min-h-[18px] text-center text-[13px] text-neutral-500" role="status">
-        {resumen()}
+        <ConNombres texto={resumen().texto} nombres={resumen().names} />
       </p>
     </div>
   );
 }
 
 /** Lo hecho y lo que falta del alta, debajo del mapa y en el resumen de «Personaliza». */
-export function Comprobacion(props: { filas: { hecho: boolean; texto: string; enCurso?: boolean }[] }) {
+export function Comprobacion(props: { filas: { hecho: boolean; texto: string; enCurso?: boolean }[]; compacta?: boolean }) {
   return (
-    <ul class="m-0 grid list-none gap-2.5 p-0 text-sm">
+    <ul class={cn("m-0 grid list-none p-0", props.compacta ? "gap-2 text-[13px]" : "gap-2.5 text-sm")}>
       <For each={props.filas}>
         {(f) => (
-          <li class={cn("flex items-center gap-2.5", f.hecho ? "text-success-strong" : "text-neutral-500")}>
+          <li class={cn("flex items-center", props.compacta ? "gap-2" : "gap-2.5", f.hecho ? "text-success-strong" : "text-neutral-500")}>
             <Switch fallback={<Circle size={16} aria-hidden="true" />}>
               <Match when={f.hecho}>
                 <CircleCheck size={16} aria-hidden="true" />
@@ -158,12 +179,16 @@ function detalle(c: Conexiones, f: Fila): string {
           : "";
   const peso = f.bytes ? mb(f.bytes) : "";
   switch (p?.k) {
+    case "externa":
+      return t("onboarding.ai.external_waiting");
+    case "sesion":
+      return t("onboarding.ai.has_session", { account: p.identidad });
     case "instalada":
-      if (base) return base;
-      return f.detectada ? t("onboarding.ai.system_no_session") : t("onboarding.ai.installed_no_session");
+      if (f.modo === "consentimiento" || f.modo === "local") return base;
+      return t("onboarding.ai.system_no_session");
     case "descargando":
       return p.total > 0
-        ? t("onboarding.ai.downloading_of", { done: mb(p.hecho), total: mb(p.total) })
+        ? t("onboarding.ai.downloading_of", { done: Math.round(p.hecho / 1_048_576), total: mb(p.total) })
         : t("onboarding.ai.downloading");
     case "entrando":
       if (p.codigo) return t("onboarding.ai.confirm_code", { code: p.codigo });
@@ -178,21 +203,21 @@ function detalle(c: Conexiones, f: Fila): string {
       return t("onboarding.ai.disconnecting");
     default:
       if (base) return peso ? `${base} · ${peso}` : base;
-      return peso ? t("onboarding.ai.download_size", { size: peso }) : "";
+      if (peso) return t("onboarding.ai.download_size", { size: peso });
+      return c.externa(f) ? t("onboarding.ai.external_detail") : "";
   }
 }
 
 /** Una tarjeta de tamaño fijo: logo, nombre en una línea, detalle y una columna de acciones de ancho fijo. */
 function Tarjeta(props: { c: Conexiones; f: Fila; abajo?: JSX.Element; resaltada?: boolean }) {
   const p = () => props.c.pasos[props.f.id];
-  const error = () => props.c.errores[props.f.id];
   const nombre = () => nombreDeFila(props.f);
   const gratuitos = () => props.f.modo === "consentimiento";
   return (
     <div class="grid shrink-0">
       <div
         class={cn(
-          "flex h-[62px] items-center gap-3 rounded-md border px-3.5",
+          "flex h-[62px] items-center gap-3 rounded-md border px-3.5 py-2",
           props.resaltada ? "border-primary bg-primary/5" : "border-border bg-surface-raised",
           props.abajo && "rounded-b-none",
         )}
@@ -202,11 +227,8 @@ function Tarjeta(props: { c: Conexiones; f: Fila; abajo?: JSX.Element; resaltada
         </span>
         <span class="grid min-w-0 flex-1 gap-0.5">
           <strong class="truncate text-sm font-semibold text-neutral-950">{nombre()}</strong>
-          <span
-            class={cn("truncate text-xs", error() ? "text-error-strong" : "text-neutral-500")}
-            title={error() ?? detalle(props.c, props.f)}
-          >
-            {error() ?? detalle(props.c, props.f)}
+          <span class="truncate text-xs text-neutral-500" title={detalle(props.c, props.f)}>
+            {detalle(props.c, props.f)}
           </span>
         </span>
         <span class="flex w-[196px] shrink-0 items-center justify-end gap-1.5">
@@ -218,13 +240,21 @@ function Tarjeta(props: { c: Conexiones; f: Fila; abajo?: JSX.Element; resaltada
             }
           >
             <Match when={p()?.k === "descargando"}>
-              <Show when={avance(p())} fallback={<Spinner class="text-primary" />}>
-                {(v) => (
-                  <span class="h-[5px] w-[90px] overflow-hidden rounded-full bg-surface-muted">
-                    <span class="block h-full bg-primary transition-[width] duration-150" style={{ width: `${v()}%` }} />
-                  </span>
-                )}
-              </Show>
+              <span class="h-[5px] w-[90px] overflow-hidden rounded-full bg-surface-muted">
+                <span class="block h-full bg-primary transition-[width] duration-150" style={{ width: `${avance(p())}%` }} />
+              </span>
+              <CancelButton
+                label={t("onboarding.ai.cancel_download", { name: nombre() })}
+                onClick={() => props.c.cancelarDescarga(props.f.id)}
+              />
+            </Match>
+            <Match when={p()?.k === "sesion"}>
+              <Button size="sm" variant="ghost" onClick={() => void props.c.conectar(props.f.id)}>
+                {t("onboarding.ai.connect_other")}
+              </Button>
+              <Button size="sm" onClick={() => void props.c.usarSesion(props.f.id)}>
+                {t("onboarding.ai.use_this")}
+              </Button>
             </Match>
             <Match when={p()?.k === "entrando"}>
               <Spinner class="text-primary" />
@@ -268,6 +298,7 @@ const PANEL = "grid gap-2 rounded-b-lg border border-t-0 border-primary bg-surfa
 function PanelDeClave(props: { c: Conexiones; f: Fila }) {
   const [valor, setValor] = createSignal("");
   const ocupado = () => props.c.pasos[props.f.id]?.k === "comprobando";
+  const error = () => props.c.errores[props.f.id];
   const id = `clave-${props.f.id}`;
   const enviar = () => {
     if (valor().trim() && !ocupado()) void props.c.guardarClave(props.f.id, valor()).then(() => setValor(""));
@@ -275,38 +306,56 @@ function PanelDeClave(props: { c: Conexiones; f: Fila }) {
   return (
     <div class={PANEL}>
       <label class="text-[13px] font-semibold" for={id}>
-        {t("onboarding.ai.key.label", { name: nombreDeFila(props.f) })}
+        {t(`onboarding.ai.key.label.${props.f.agente}`)}
       </label>
       <Input
         id={id}
         type="password"
-        class="font-mono"
+        class={cn("font-mono tracking-[0.02em]", error() && "border-error-strong")}
         autocomplete="off"
         spellcheck={false}
+        placeholder={props.f.placeholder}
         value={valor()}
         disabled={ocupado()}
+        aria-invalid={error() ? true : undefined}
         ref={(el) => queueMicrotask(() => el.focus())}
-        onInput={(e) => setValor(e.currentTarget.value)}
+        onInput={(e) => {
+          setValor(e.currentTarget.value);
+          props.c.limpiarError(props.f.id);
+        }}
         onKeyDown={(e) => {
           if (e.key === "Enter") enviar();
         }}
       />
-      <Show when={props.f.urlDeClave}>
-        {(url) => (
-          <span class="text-xs text-neutral-500">
-            {t("onboarding.ai.key.help")}{" "}
-            <button
-              type="button"
-              class="inline-flex cursor-pointer items-center gap-0.5 text-primary hover:underline"
-              onClick={() => void invoke("open_external", { target: url() }).catch(() => {})}
-            >
-              {url().replace(/^https?:\/\//, "")}
-              <ExternalLink size={11} aria-hidden="true" />
-            </button>
+      <Show
+        when={error()}
+        fallback={
+          <Show when={props.f.urlDeClave}>
+            {(url) => (
+              <span class="text-xs text-neutral-500">
+                {t(`onboarding.ai.key.help.${props.f.agente}`)}{" "}
+                <button
+                  type="button"
+                  class="inline-flex cursor-pointer items-center gap-0.5 border-0 bg-transparent p-0 text-primary hover:underline"
+                  onClick={() => void invoke("open_external", { target: url() }).catch(() => {})}
+                >
+                  {url().replace(/^https?:\/\//, "")}
+                  <ExternalLink size={11} aria-hidden="true" />
+                </button>
+              </span>
+            )}
+          </Show>
+        }
+      >
+        {(e) => (
+          <span class="text-xs text-error-strong" role="alert">
+            {e()}
           </span>
         )}
       </Show>
-      <div class="mt-0.5 flex flex-wrap items-center justify-end gap-2">
+      <div class="mt-0.5 flex flex-wrap items-center gap-2">
+        <span class="text-xs text-neutral-500">{t("onboarding.ai.key.stored")}</span>
+        <span class="flex-1" />
         <Button size="sm" variant="ghost" disabled={ocupado()} onClick={() => void props.c.cancelar(props.f.id)}>
           {t("onboarding.cancel")}
         </Button>
@@ -350,11 +399,30 @@ function PanelDeCodigo(props: { c: Conexiones; f: Fila }) {
   );
 }
 
+/** El aviso de los gratuitos va pegado a su tarjeta mientras no se han activado. */
 function AvisoDeGratuitos() {
   return (
     <div class="flex items-start gap-2 rounded-b-md border border-t-0 border-border bg-warning/10 px-3.5 py-2 text-[11px] leading-[1.4] text-warning-strong">
       <TriangleAlert size={13} class="mt-px shrink-0" aria-hidden="true" />
-      <span>{t("settings.accounts.free.warning")}</span>
+      <span>
+        <b class="font-semibold">{t("onboarding.ai.free.warning_lead")}</b> {t("onboarding.ai.free.warning_rest")}
+      </span>
+    </div>
+  );
+}
+
+/** Lo que falló, entero y legible debajo de su tarjeta: el detalle de la tarjeta es de una sola línea. */
+export function ErrorDeTarjeta(props: { texto: string; class?: string }) {
+  return (
+    <div
+      class={cn(
+        "flex items-start gap-2 rounded-b-md border border-t-0 border-border bg-error/10 px-3.5 py-2 text-xs leading-[1.4] break-words text-error-strong",
+        props.class,
+      )}
+      role="alert"
+    >
+      <TriangleAlert size={13} class="mt-px shrink-0" aria-hidden="true" />
+      <span class="min-w-0">{props.texto}</span>
     </div>
   );
 }
@@ -363,13 +431,15 @@ function FilaDeIA(props: { c: Conexiones; f: Fila }) {
   const p = () => props.c.pasos[props.f.id];
   const abajo = () => {
     const paso = p();
-    if (paso?.k === "clave" || paso?.k === "comprobando" && props.f.modo === "clave")
+    if (paso?.k === "clave" || (paso?.k === "comprobando" && props.f.modo === "clave"))
       return <PanelDeClave c={props.c} f={props.f} />;
     if (paso?.k === "entrando" && paso.pideCodigo) return <PanelDeCodigo c={props.c} f={props.f} />;
-    if (props.f.modo === "consentimiento" && paso?.k !== "conectada") return <AvisoDeGratuitos />;
+    const error = props.c.errores[props.f.id];
+    if (error) return <ErrorDeTarjeta texto={error} />;
+    if (props.f.modo === "consentimiento" && (paso?.k === "falta" || paso?.k === "instalada")) return <AvisoDeGratuitos />;
     return undefined;
   };
-  const resaltada = () => ["entrando", "clave", "comprobando"].includes(p()?.k ?? "");
+  const resaltada = () => ["sesion", "entrando", "clave", "comprobando"].includes(p()?.k ?? "") && props.f.modo !== "consentimiento";
   return <Tarjeta c={props.c} f={props.f} abajo={abajo()} resaltada={resaltada()} />;
 }
 
@@ -378,7 +448,7 @@ export function PanelDeIA(props: { c: Conexiones }) {
   const detectadas = () => props.c.filas().filter((f) => f.detectada);
   const otras = () => props.c.filas().filter((f) => !f.detectada);
   return (
-    <div class="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto rounded-lg border border-border bg-surface-raised p-5">
+    <div class="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto rounded-lg border border-border bg-surface-raised p-5 [&>*]:shrink-0">
       <Show
         when={detectadas().length > 0}
         fallback={<h2 class="m-0 text-xs font-semibold text-neutral-500">{t("onboarding.ai.choose")}</h2>}
@@ -398,16 +468,6 @@ export function PanelDeIA(props: { c: Conexiones }) {
       </Show>
       <Show when={props.c.falloDeCarga()}>
         {(e) => <p class="m-0 text-xs text-error-strong">{e()}</p>}
-      </Show>
-      <Show when={props.c.pregunta()}>
-        {(q) => (
-          <Consentir
-            texto={q().texto}
-            guardando={props.c.guardando()}
-            onAceptar={() => void props.c.responder(true)}
-            onCancelar={() => void props.c.responder(false)}
-          />
-        )}
       </Show>
     </div>
   );

@@ -36,6 +36,7 @@ import { relative } from "node:path";
 // Ver la nota de `paths.mjs`: `.pathname` en Windows da `/C:/…` y revienta.
 import { fileURLToPath } from "node:url";
 import { walkFiles } from "../git.mjs";
+import { EVENTOS_PENDIENTES } from "../engine-pending.mjs";
 
 const RUST = fileURLToPath(new URL("../../src-tauri/src", import.meta.url));
 
@@ -135,7 +136,10 @@ if (explicadas < escuchasTotales) {
   process.exit(1);
 }
 
-const huerfanos = [...escuchados].filter(([n]) => !emitidos.has(n));
+const llegados = Object.keys(EVENTOS_PENDIENTES).filter((n) => emitidos.has(n));
+for (const n of llegados) console.error(`«${n}» ya lo emite el motor: quítalo de scripts/engine-pending.mjs.`);
+if (llegados.length) process.exit(1);
+const huerfanos = [...escuchados].filter(([n]) => !emitidos.has(n) && !(n in EVENTOS_PENDIENTES));
 
 if (huerfanos.length === 0) {
   console.log(

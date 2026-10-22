@@ -42,6 +42,7 @@ import { relative } from "node:path";
 // Ver la nota de `paths.mjs`: `.pathname` en Windows da `/C:/…` y revienta.
 import { fileURLToPath } from "node:url";
 import { walkFiles } from "../git.mjs";
+import { COMANDOS_PENDIENTES } from "../engine-pending.mjs";
 
 const LIB = fileURLToPath(new URL("../../src-tauri/src/extracted/mod.rs", import.meta.url));
 const CONTRACT = fileURLToPath(new URL("../../src-tauri/crates/engine-protocol/commands.json", import.meta.url));
@@ -75,12 +76,12 @@ const SIN_INTERFAZ = {
   // El renombre lo hace hoy el agente con `git branch -m`; la app lo reconcilia.
   worktree_rename_branch: "el renombre al entregar aún no tiene gesto en pantalla",
   install_tool: "pnpm y Bun los instala bootstrap::prepare_runtime desde Rust; ninguna pantalla lo invoca",
+  remove_google_drive: "quitar el binario de Drive es de Configuración; el onboarding solo desconecta",
   tree_typst_target: "lo pide typst_live::typst_live_open desde el Rust de la ventana: el webview nunca da la ruta de arranque",
   danil_client_token: "lo pide proxy::account_relay_token desde el Rust de la ventana: la credencial de máquina no sale del motor",
   import_chat_background_data: "lo usaba «Usar este workspace aquí», ya borrado; el fondo llegará desde la cuenta de Danil en la fase 2 (docs/account-workspace.md)",
   remove_provider: "sin forma confiable de saber qué instaló Terminus, se quitó el botón",
   remove_gh: "sin forma confiable de saber qué instaló Terminus, se quitó el botón",
-  remove_tool: "sin forma confiable de saber qué instaló Terminus, se quitó el botón",
   // Sin pantalla hasta el metabuscador del workspace: una archivada no se
   // desarchiva ni tiene historial por carpeta.
   list_archived: "el índice de archivadas por carpeta espera al metabuscador del workspace",
@@ -172,7 +173,8 @@ for (const { dir, f } of ARBOLES.flatMap((dir) =>
 
 // ------------------------------------------------------------------ el fallo
 
-const fantasmas = [...invocados].filter(([n]) => !registrados.has(n));
+const fantasmas = [...invocados].filter(([n]) => !registrados.has(n) && !(n in COMANDOS_PENDIENTES));
+const llegados = Object.keys(COMANDOS_PENDIENTES).filter((n) => registrados.has(n));
 const muertos = [...registrados.keys()]
   .filter((n) => !invocados.has(n) && !(n in SIN_INTERFAZ))
   .sort();
@@ -188,11 +190,14 @@ if (dinamicos.length) {
 for (const [n, donde] of fantasmas) {
   console.error(`Nadie registra «${n}» — lo invoca ${donde.join(", ")}`);
 }
+for (const n of llegados) {
+  console.error(`«${n}» ya está en el contrato: quítalo de scripts/engine-pending.mjs.`);
+}
 for (const n of muertos) {
   console.error(`Nadie invoca «${n}» — lo registra ${registrados.get(n)}`);
 }
 
-if (!fantasmas.length && !muertos.length && !dinamicos.length) {
+if (!fantasmas.length && !muertos.length && !dinamicos.length && !llegados.length) {
   console.log(
     `Los ${registrados.size} comandos registrados los invoca alguien` +
       (Object.keys(SIN_INTERFAZ).length

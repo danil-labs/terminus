@@ -656,5 +656,16 @@
     "other": "Its {count} tasks, chats and artifacts will also be deleted."
   },
   "settings.projects.delete_no_undo": "There is no undo.",
-  "settings.projects.keep": "Keep it"
+  "settings.projects.keep": "Keep it",
+  "settings.google_drive.error_workspace": "That workspace does not exist anymore.",
+  "settings.google_drive.error_save": "Could not save the Google Drive connection.",
+  "settings.google_drive.error_network": "Could not reach Google Drive. The connection is kept.",
+  "settings.google_drive.error_rejected": "Google no longer accepts this connection. Connect Google Drive again.",
+  "settings.google_drive.unsupported": "Google Drive is not available on this platform.",
+  "settings.google_drive.error_busy": "Google Drive is already being installed.",
+  "settings.google_drive.error_install": "Could not install the Google Drive tool.",
+  "settings.google_drive.error_not_installed": "Install Google Drive first.",
+  "settings.google_drive.error_login": "Could not sign in to Google Drive.",
+  "settings.google_drive.login_cancelled": "Google Drive sign-in was cancelled.",
+  "settings.google_drive.login_timeout": "Google Drive sign-in took too long. Try again."
 }

@@ -20,7 +20,7 @@ repositories, and `GitHostInfo`. Files on disk keep their keys; the types that
 are stored and also travel cross the contract wrapped in `Wire`, which renames
 their keys. There are no aliases. This copy is byte-identical to the engine's.
 SHA-256:
-`d5fb6a2b43b995776b322e175b61114deec3b7a6f0cdd796e7b6f9828b95bc9c`.
+`e0f98005f7c551d2e6df91658fa466220362181ca697ada9ca63b97899219aaf`.
 
 seldon-host `4e21caf` (#66) added the Danil account (321 commands, 28 events):
 `danil_connect_start`, `danil_connect_status`, `danil_connect_options`,
@@ -117,6 +117,22 @@ from the engine source at `fdf4dd9863a80363a0dd7b15ea21fd6b69e1f4bd`. The 24
 `settings.appearance.background.workspace_missing` comes from `1687dbf`, where
 `settings.appearance.background.too_big` also became 700 KB.
 `danil.error.account_not_found` comes from `658cad2`.
+
+seldon-host `feat/onboarding-engine` (`8f32a29`, `21f5687`) and
+`feat/google-drive-integration` (`b831eeb`, rebased on them) add what the
+onboarding needs (354 commands, 32 events). Installs: `cancel_install`
+(`{operation}`) and `install_size` (`{operation}`), with `operation` one of
+`provider:<id>`, `plugin:<id>`, `tool:<id>` or `google-drive`, and the `install`
+event `{operation, kind, done, bytes, failure}`; `prepare_runtime` takes an
+optional `skip`, uv and Python become optional stages and `remove_tool` accepts
+pnpm, bun, agent-browser, uv and python. Accounts: `list_system_sessions`,
+`adopt_system_session` (`{provider}`) and `connect_api_key`
+(`{provider, key}`). Google Drive through the engine's own rclone:
+`google_drive_status`, `install_google_drive`, `start_google_drive_login`,
+`finish_google_drive_login`, `cancel_google_drive_login`, `check_google_drive`,
+`disconnect_google_drive` and `remove_google_drive`, plus the `google-drive`
+event and the `settings.google_drive.*` keys. This copy is
+`git show b831eeb:crates/engine-protocol/commands.json` byte for byte.
 
 Endpoint, selection and StreamPage extend the transport; they do not convert
 domain data. The token travels in RPC1 only between authenticated local

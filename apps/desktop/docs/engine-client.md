@@ -109,8 +109,8 @@ cuyos argumentos nombran otro workspace que el suyo.
 
 ## Contract
 
-`src-tauri/crates/engine-protocol/commands.json` is the frozen contract: 341
-commands and the 30 events the engine emits. Its SHA-256 is recorded in
+`src-tauri/crates/engine-protocol/commands.json` is the frozen contract: 354
+commands and the 32 events the engine emits. Its SHA-256 is recorded in
 [PROVENANCE](../src-tauri/crates/engine-protocol/PROVENANCE.md); the engine
 announces the same hash and the window refuses to connect to a different one
 (`version_mismatch`). `phrase-keys.json` lists the catalog keys the engine sends
