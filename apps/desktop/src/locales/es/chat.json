@@ -175,6 +175,8 @@
   "chat.queue.edit_aria": "Editar el mensaje {n} de la cola",
   "chat.queue.empty_blocked": "Un mensaje vacío no se puede mandar",
   "chat.queue.label": "en cola",
+  "chat.queue.from_task": "Respuesta de la tarea «{title}»",
+  "chat.queue.from_agent": "Mensaje de @{name}",
   "chat.queue.remove": "Quitar",
   "chat.queue.remove_aria": "Quitar el mensaje {n} de la cola",
   "chat.queue.save": "guardar",
@@ -334,6 +336,8 @@
   "chat.inbox.chain_limit": "Terminó «{title}», pero su cadena ya despertó a la Bandeja {max} veces: Terminus no abre otro turno.",
   "chat.inbox.replied": "Respuesta entregada a «{title}».",
   "chat.inbox.replied_someone": "Respuesta entregada a quien la pidió.",
+  "chat.inbox.delivery_pending": "La respuesta de «{title}» espera: entra cuando termine este turno.",
+  "chat.inbox.delivery_pending_someone": "Una entrega espera: entra cuando termine este turno.",
   "chat.inbox.woke": {
     "one": "Terminó una tarea y Terminus abrió este turno.",
     "other": "Terminaron {count} tareas y Terminus abrió este turno."

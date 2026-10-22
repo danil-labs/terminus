@@ -443,6 +443,7 @@ const LINEAS_SIN_PROSA = new Set([
   "task_chain_limit",
   "woke_by_tasks",
   "respondido",
+  "delivery_pending",
   "shell_reply",
 ]);
 
