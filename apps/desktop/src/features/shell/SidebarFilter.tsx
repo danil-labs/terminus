@@ -9,6 +9,7 @@ import {
   DEFAULT_SIDEBAR_VIEW,
   groupingLabel,
   nonDefaultCount,
+  sameAgent,
   scopeLabel,
 } from "../../lib/sidebarView";
 import { cn } from "../../lib/utils";
@@ -18,7 +19,8 @@ import { AstroAvatar } from "../projects/AstroAvatar";
 import { FolderSquare } from "../projects/FolderChip";
 
 export type SidebarFilterFolder = { id: string; name: string; count: number };
-export type SidebarFilterAgent = { name: string; body?: string | null; avatar?: string | null };
+/** `installed` falso: ya no está instalado, pero tiene tareas. */
+export type SidebarFilterAgent = { name: string; installed: boolean; body?: string | null; avatar?: string | null };
 
 export type SidebarFilterProps = {
   view: SidebarView;
@@ -154,7 +156,12 @@ export function SidebarFilter(props: SidebarFilterProps) {
             </Opcion>
             <For each={props.agents}>
               {(a) => (
-                <Opcion role="menuitemradio" on={props.view.agent === a.name} onSelect={() => set({ agent: a.name })}>
+                <Opcion
+                  role="menuitemradio"
+                  on={sameAgent(props.view.agent, a.name)}
+                  onSelect={() => set({ agent: a.name })}
+                  aside={a.installed ? undefined : t("shell.sidebar.view.agent_uninstalled")}
+                >
                   <AstroAvatar name={a.name} body={a.body} avatar={a.avatar} status="asleep" size={14} />
                   <span class="truncate">{a.name}</span>
                 </Opcion>
