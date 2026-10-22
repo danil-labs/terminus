@@ -87,7 +87,7 @@ export function DialogoDeConexion(props: {
           {(c) => (
             <div class="flex flex-col gap-1.5 text-xs text-neutral-500">
               <span>{t("settings.accounts.confirm_code")}</span>
-              <strong class="self-start select-all rounded-sm bg-surface-muted px-3 py-2 font-mono text-xl font-semibold tracking-[0.08em] text-neutral-950">{c()}</strong>
+              <strong class="self-start select-all rounded-sm bg-surface-muted px-3 py-2 font-mono text-3xl font-semibold tracking-[0.12em] text-neutral-950">{c()}</strong>
             </div>
           )}
         </Show>

@@ -99,6 +99,21 @@ export function crearConexiones() {
   let sesiones: SesionDelSistema[] = [];
   let detectadas: Set<string> | null = null;
   let entrada: { fila: string; agente: string; cuenta: string } | null = null;
+  // Cerrar el navegador no avisa a nadie: sin respuesta en este plazo, el login se da por fallido.
+  const PLAZO_DE_ENTRADA_MS = 3 * 60_000;
+  let plazo: ReturnType<typeof setTimeout> | undefined;
+  function vigilarEntrada(id: string, cuenta: string) {
+    clearTimeout(plazo);
+    plazo = setTimeout(() => {
+      const e = entrada;
+      if (!e || e.cuenta !== cuenta || pasos[id]?.k !== "entrando") return;
+      entrada = null;
+      void invoke("cancel_login", { id: cuenta }).catch(() => {});
+      void invoke("discard_account", { provider: e.agente, id: cuenta }).catch(() => {});
+      setErrores(id, t("onboarding.ai.login_timeout"));
+      poner(id, { k: "instalada" });
+    }, PLAZO_DE_ENTRADA_MS);
+  }
   // En serie: las filas de OpenCode comparten carpeta, y la segunda la encuentra ya instalada.
   let descargas: Promise<unknown> = Promise.resolve();
   let cerrada = false;
@@ -318,6 +333,7 @@ export function crearConexiones() {
   async function terminarEntrada(motivo: string) {
     const e = entrada;
     if (!e) return;
+    clearTimeout(plazo);
     entrada = null;
     try {
       const estado = await invoke<AccountStatus>("account_status", { provider: e.agente, id: e.cuenta });
@@ -367,6 +383,7 @@ export function crearConexiones() {
   async function cancelar(id: string) {
     const p = pasos[id];
     setErrores(id, null);
+    clearTimeout(plazo);
     if (p?.k === "entrando") {
       const e = entrada;
       entrada = null;
@@ -436,6 +453,7 @@ export function crearConexiones() {
     if (!e || ev.payload.account !== e.cuenta || p?.k !== "entrando") return;
     const { kind, text } = ev.payload;
     if (kind === "url") {
+      vigilarEntrada(e.fila, e.cuenta);
       poner(e.fila, { ...p, url: text });
       invoke("open_external", { target: text }).catch(() => {});
     } else if (kind === "notice") setSalidas(e.fila, (s) => [...(s ?? []), text]);
@@ -464,6 +482,7 @@ export function crearConexiones() {
   window.addEventListener("focus", alVolver);
   onCleanup(() => {
     cerrada = true;
+    clearTimeout(plazo);
     window.removeEventListener("focus", alVolver);
     for (const l of [alCuenta, alAvance, alAgentes, alInstalar]) void l.then((f) => f());
     const e = entrada;

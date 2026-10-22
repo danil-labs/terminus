@@ -5,18 +5,19 @@ import ExternalLink from "lucide-solid/icons/external-link";
 import Sparkles from "lucide-solid/icons/sparkles";
 import TriangleAlert from "lucide-solid/icons/triangle-alert";
 import { createSignal, For, Match, Show, Switch, type JSX } from "solid-js";
-import { lista, mb } from "../../lib/format";
+import { lista } from "../../lib/format";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
 import { cn } from "../../lib/utils";
 import { Badge } from "../../ui/Badge";
 import { Button } from "../../ui/Button";
-import { CancelButton, RemoveButton } from "../../ui/IconAction";
+import { RemoveButton } from "../../ui/IconAction";
 import { Input } from "../../ui/Input";
 import { MarcaAgente } from "../../ui/icons";
 import { TerminusMark } from "../../ui/toolMarks";
 import { Spinner } from "../../ui/Spinner";
 import { DialogoDeConexion } from "../settings/LoginDialog";
+import { AvanceDeDescarga, BarraDeCarga, CodigoParaConfirmar, Peso } from "./DownloadProgress";
 import { type Conexiones, type Fila, nombreDeFila, ordenDelMapa, type Paso } from "./connect-store";
 
 type Nodo = "off" | "det" | "vivo" | "on";
@@ -165,8 +166,6 @@ export function Comprobacion(props: { filas: { hecho: boolean; texto: string; en
   );
 }
 
-const avance = (p: Paso | undefined) =>
-  p?.k === "descargando" && p.total > 0 ? Math.min(100, (p.hecho / p.total) * 100) : 0;
 
 function detalle(c: Conexiones, f: Fila): string {
   const p = c.pasos[f.id];
@@ -178,7 +177,6 @@ function detalle(c: Conexiones, f: Fila): string {
         : f.agente.startsWith("opencode")
           ? t("onboarding.ai.zen_detail")
           : "";
-  const peso = f.bytes ? mb(f.bytes) : "";
   switch (p?.k) {
     case "externa":
       return t("onboarding.ai.external_waiting");
@@ -188,9 +186,7 @@ function detalle(c: Conexiones, f: Fila): string {
       if (f.modo === "consentimiento" || f.modo === "local") return base;
       return t("onboarding.ai.system_no_session");
     case "descargando":
-      return p.total > 0
-        ? t("onboarding.ai.downloading_of", { done: Math.round(p.hecho / 1_048_576), total: mb(p.total) })
-        : t("onboarding.ai.downloading");
+      return t("onboarding.ai.downloading");
     case "entrando":
       if (p.codigo) return t("onboarding.ai.confirm_code", { code: p.codigo });
       return p.pideCodigo ? t("onboarding.ai.paste_code") : t("onboarding.ai.finish_in_browser");
@@ -203,9 +199,8 @@ function detalle(c: Conexiones, f: Fila): string {
     case "saliendo":
       return t("onboarding.ai.disconnecting");
     default:
-      if (base) return peso ? `${base} · ${peso}` : base;
-      if (peso) return t("onboarding.ai.download_size", { size: peso });
-      return c.externa(f) ? t("onboarding.ai.external_detail") : "";
+      if (base) return base;
+      return c.externa(f) ? t("onboarding.ai.external_detail") : t("onboarding.ai.installs_and_signs_in");
   }
 }
 
@@ -219,7 +214,7 @@ function Tarjeta(props: { c: Conexiones; f: Fila; abajo?: JSX.Element; resaltada
     <div class={cn("grid shrink-0", fallo() && "animate-sacudir")}>
       <div
         class={cn(
-          "flex h-[62px] items-center gap-3 rounded-md border px-3.5 py-2",
+          "relative flex h-[62px] items-center gap-3 overflow-hidden rounded-md border px-3.5 py-2",
           fallo() ? "border-error-strong bg-error/5" : props.resaltada ? "border-primary bg-primary/5" : "border-border bg-surface-raised",
           props.abajo && "rounded-b-none",
         )}
@@ -240,20 +235,23 @@ function Tarjeta(props: { c: Conexiones; f: Fila; abajo?: JSX.Element; resaltada
                 <Show when={fallo()}>
                   <TriangleAlert size={16} class="shrink-0 text-error-strong" aria-hidden="true" />
                 </Show>
+                <Show when={!fallo() && (!p() || p()?.k === "falta")}>
+                  <Peso bytes={props.f.bytes} />
+                </Show>
                 <Button size="sm" variant="secondary" onClick={() => void props.c.conectar(props.f.id)}>
                   {fallo() ? t("onboarding.ai.retry") : gratuitos() ? t("onboarding.ai.activate") : t("onboarding.ai.connect")}
                 </Button>
               </>
             }
           >
-            <Match when={p()?.k === "descargando"}>
-              <span class="h-[5px] w-[90px] overflow-hidden rounded-full bg-surface-muted">
-                <span class="block h-full bg-primary transition-[width] duration-150" style={{ width: `${avance(p())}%` }} />
-              </span>
-              <CancelButton
-                label={t("onboarding.ai.cancel_download", { name: nombre() })}
-                onClick={() => props.c.cancelarDescarga(props.f.id)}
-              />
+            <Match when={p()?.k === "descargando" && (p() as { hecho: number; total: number })}>
+              {(d) => (
+                <AvanceDeDescarga
+                  total={d().total}
+                  cancelar={t("onboarding.ai.cancel_download", { name: nombre() })}
+                  onCancelar={() => props.c.cancelarDescarga(props.f.id)}
+                />
+              )}
             </Match>
             <Match when={p()?.k === "sesion"}>
               <Button size="sm" variant="ghost" onClick={() => void props.c.conectar(props.f.id)}>
@@ -264,7 +262,9 @@ function Tarjeta(props: { c: Conexiones; f: Fila; abajo?: JSX.Element; resaltada
               </Button>
             </Match>
             <Match when={p()?.k === "entrando"}>
-              <Spinner class="text-primary" />
+              <Show when={(p() as { codigo?: string }).codigo} fallback={<Spinner class="text-primary" />}>
+                {(c) => <CodigoParaConfirmar codigo={c()} />}
+              </Show>
               <Button size="sm" variant="ghost" onClick={() => void props.c.cancelar(props.f.id)}>
                 {t("onboarding.cancel")}
               </Button>
@@ -294,6 +294,9 @@ function Tarjeta(props: { c: Conexiones; f: Fila; abajo?: JSX.Element; resaltada
             </Match>
           </Switch>
         </span>
+        <Show when={p()?.k === "descargando" && (p() as { hecho: number; total: number })}>
+          {(d) => <BarraDeCarga hecho={d().hecho} total={d().total} />}
+        </Show>
       </div>
       {props.abajo}
     </div>
