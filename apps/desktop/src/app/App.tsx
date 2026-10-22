@@ -93,9 +93,8 @@ import ArchivedTasks from "../features/projects/ArchivedTasks";
 import BaseBranchPicker from "../features/projects/BaseBranchPicker";
 import { watchHandlerStatus, watchHandlerStatuses } from "../features/projects/handlerPresence";
 import { EmptyContext, ProjectPicker } from "../features/projects/Projects";
-import { carryOrigin, machineName, machines, refetchMachines, runOn, runOnOptions } from "../features/machines/store";
-import type { CarryCheck } from "../features/machines/carry";
-import type { CarryResult } from "@terminus/carry";
+import { bringHereLabel, canBringHere, carryOrigin, machineName, machines, refetchMachines, runOn, runOnOptions } from "../features/machines/store";
+import type { CarriedBase, CarryCheck } from "../features/machines/carry";
 // Chunk aparte: solo lo carga quien crea una tarea, no la carga inicial.
 const MachinePicker = lazy(() =>
   import("../features/machines/MachinePicker").then((m) => ({ default: m.MachinePicker })),
@@ -5206,7 +5205,7 @@ export default function App() {
     respuestas?: { manda: RespuestaEnviada[]; pinta: Respuesta[] },
     destination?: { project: string; session: string },
     /** La copia del trabajo a la otra máquina, antes de crear la tarea allá. */
-    llevar?: (claveBorrador: string) => Promise<CarryResult | null>,
+    llevar?: (claveBorrador: string) => Promise<CarriedBase | null>,
   ): Promise<boolean> {
     // Antes de cualquier `await`: es lo que impide que el despacho de
     // la cola saque dos mensajes en el mismo respiro.
@@ -5339,7 +5338,7 @@ export default function App() {
         // El escritorio que la persona tenía delante al escribirlo, sellado en el
         // mensaje; lo que llega de otro canal no trae ninguno.
         space: m.space ?? null,
-      }, abierta ? undefined : runOnOptions(workspaceActivo(), lugar));
+      }, abierta ? undefined : llevado ? { headers: { "x-terminus-machine": llevado.target } } : runOnOptions(workspaceActivo(), lugar));
       if (provisional && naceDormida) {
         anotar(setEncendiendo, provisional, null);
         void refetchMachines();
@@ -5635,8 +5634,61 @@ export default function App() {
   }
 
   const [carryModule, setCarryModule] = createSignal<CarryModule | null>(null);
-  const [hojaDeLlevar, setHojaDeLlevar] = createSignal<{ key: string; check: CarryCheck } | null>(null);
+  const [hojaDeLlevar, setHojaDeLlevar] = createSignal<{ key: string; check: CarryCheck; busy?: boolean } | null>(null);
   let decidiendoLlevar = false;
+  const maquinaDeLaVentana = () => capabilities().windowMachine?.()?.id ?? machines().find((m) => m.active)?.id ?? "local";
+  async function moduloDeLlevar(): Promise<CarryModule> {
+    const mod = carryModule() ?? (await import("../features/machines/carry"));
+    setCarryModule(() => mod);
+    return mod;
+  }
+  /** Lo que se eligió hacer después de traer, por la clave de la copia. */
+  const despuesDeTraer = new Map<string, "continue" | "branch">();
+  const esRemota = (id: string) => {
+    const machine = filaDe(id)?.machine;
+    return !!machine && machine !== maquinaDeLaVentana();
+  };
+
+  /** «Traer a esta Mac»: despierta la otra máquina, pregunta qué hay en el worktree de la tarea y abre la hoja. */
+  async function abrirTraer(proyecto: string | undefined, id: string) {
+    const fila = filaDe(id);
+    const workspace = workspaceActivo();
+    const carpeta = projectList().find((p) => p.id === proyecto);
+    if (!fila?.machine || !workspace || !carpeta) return;
+    const mod = await moduloDeLlevar();
+    try {
+      const check = await mod.checkBring({ workspace, project: carpeta, source: fila.machine, target: maquinaDeLaVentana(), task: { id, title: fila.title } });
+      setHojaDeLlevar({ key: `bring:${id}`, check, busy: vivas().includes(id) });
+    } catch (e) {
+      setError(prosaDe(e));
+    }
+  }
+
+  /**
+   * Corre la copia de vuelta. Con «Seguir aquí» abre una tarea nueva en esta
+   * máquina sobre lo traído, con un resumen corto como primer contexto (D4).
+   */
+  async function traer(key: string) {
+    const mod = carryModule();
+    const plan = mod?.carries()[key];
+    const task = plan?.check.task;
+    if (!mod || !plan || !task) return;
+    const result = await mod.runCarry(key);
+    if (!result) return;
+    const branch = result.imported?.branch ?? plan.job.branchAs ?? null;
+    if (despuesDeTraer.get(key) === "branch") {
+      despuesDeTraer.delete(key);
+      setAviso({ texto: t("work.bring.done", { here: machineName(plan.check.target), branch: branch ?? "" }) });
+      return;
+    }
+    despuesDeTraer.delete(key);
+    const leida = await leerTarea(plan.check.project.id, task.id).catch(() => null);
+    const ultimo = leida?.turns.filter((turn) => turn.role === "agent" && turn.text.trim()).at(-1)?.text ?? null;
+    nuevaSesion(plan.check.project.id);
+    const draft = claveAbierta();
+    mod.planCarry(draft, plan.check, plan.job, plan.state, result);
+    setInput(mod.bringSummary(plan.check, ultimo, branch));
+  }
 
   /**
    * Antes del primer mensaje de una tarea en otra máquina: si hay trabajo sin
@@ -5652,10 +5704,8 @@ export default function App() {
     if (decidiendoLlevar) return "busy";
     decidiendoLlevar = true;
     try {
-      const mod = carryModule() ?? (await import("../features/machines/carry"));
-      setCarryModule(() => mod);
-      const here = capabilities().windowMachine?.()?.id ?? machines().find((m) => m.active)?.id ?? "local";
-      const source = mod.sourceOf(proyecto, here);
+      const mod = await moduloDeLlevar();
+      const source = mod.sourceOf(proyecto, maquinaDeLaVentana());
       const check = source ? await mod.checkCarry({ workspace, project: proyecto, source, target }) : null;
       if (!check) return "none";
       setHojaDeLlevar({ key: draftKey, check });
@@ -6332,7 +6382,19 @@ export default function App() {
             </Suspense>
           </Show>
           <Show when={pp.sesion && carryOrigin(pp.sesion)}>
-            <Suspense fallback={null}><CarryOriginLabel session={pp.sesion ?? ""} /></Suspense>
+            <Suspense fallback={null}><CarryOriginLabel session={pp.sesion ?? ""} onOpen={(p, id) => void abrirSesion(p, id)} /></Suspense>
+          </Show>
+          <Show when={pp.sesion && carryModule()?.carries()[`bring:${pp.sesion}`]}>
+            <Suspense fallback={null}>
+              <CarryProgress draft={`bring:${pp.sesion}`} onRetry={() => void traer(`bring:${pp.sesion}`)} onOpenSettings={(panel) => setSettings(panel)} />
+            </Suspense>
+          </Show>
+          <Show when={pp.sesion && canBringHere() && esRemota(pp.sesion) && !carryModule()?.carries()[`bring:${pp.sesion}`]}>
+            <div class="shrink-0 px-4 py-1">
+              <Button variant="outline" size="compact" data-bring-here onClick={() => void abrirTraer(proyectoDeLaCelda()?.id, pp.sesion ?? "")}>
+                {bringHereLabel()}
+              </Button>
+            </div>
           </Show>
         </>}
         location={<Show when={pp.sesion}>{(id) => {
@@ -7595,6 +7657,7 @@ export default function App() {
               onArchivadas={spaces().length > 0 ? alternarArchivadas : undefined}
               spaces={opcionesDeMover()}
               onMoveToSpace={(p, id, i) => void moveToSpace(p, id, i)}
+              onBringHere={(p, id) => void abrirTraer(p, id)}
               current={sessionId()}
               vivas={vivas()}
         /* Qué tareas esperan que apruebes algo, aparte de `vivas`: pesa
@@ -7785,12 +7848,17 @@ export default function App() {
           <Suspense fallback={null}>
             <CarrySheet
               check={hoja().check}
+              busy={hoja().busy}
               onCancel={() => setHojaDeLlevar(null)}
-              onConfirm={(job, state) => {
+              onConfirm={(choice, state) => {
                 const { key, check } = hoja();
-                carryModule()?.planCarry(key, check, { source: check.source, target: check.target, project: check.project.id, task: null, ...job }, state);
+                const job = { source: check.source, target: check.target, project: check.project.id, task: choice.task, selection: choice.selection, partSize: choice.partSize, branchAs: choice.branchAs };
+                carryModule()?.planCarry(key, check, job, state);
                 setHojaDeLlevar(null);
-                if (claveAbierta() === key) void mandar(archivos());
+                if (check.task) {
+                  despuesDeTraer.set(key, choice.next);
+                  void traer(key);
+                } else if (claveAbierta() === key) void mandar(archivos());
               }}
             />
           </Suspense>

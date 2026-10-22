@@ -72,5 +72,29 @@
   "work.failure.export": "Could not prepare the copy on {machine}.",
   "work.failure.import": "{machine} could not receive the copy.",
   "work.origin": "Copy from {machine} · {branch} · {date}",
-  "work.origin_detached": "Copy from {machine} · {date}"
+  "work.origin_detached": "Copy from {machine} · {date}",
+  "work.bring.title": "Bring “{task}” from {machine} to {here}",
+  "work.bring.task": "task “{task}”",
+  "work.bring.branch": "branch {branch}",
+  "work.bring.branch_hint": "If {branch} already exists here with other commits, or is checked out in the folder or a worktree, it arrives as {branch}-{machine}. The folder here is not touched.",
+  "work.bring.missing_project": "{here} does not have “{project}”: it is cloned first.",
+  "work.bring.work_title": "Work",
+  "work.bring.toggle": "Bring",
+  "work.bring.ignored_hint": "None is checked: on {machine} they are usually generated.",
+  "work.bring.then": "And then",
+  "work.bring.continue": "Continue in a new task here",
+  "work.bring.branch_only": "Just leave the branch",
+  "work.bring.busy": "The agent is still in a turn: what you bring is a snapshot of now.",
+  "work.bring.confirm": "Bring",
+  "work.bring.full": "Bring all of it",
+  "work.bring.done": "Brought to {here} on branch {branch}.",
+  "work.bring.from": "Comes from “{task}” on {machine}",
+  "work.bring.open_original": "Open the original",
+  "work.bring.summary": "Comes from “{task}” on {machine}.",
+  "work.bring.summary_last": "Last agent message:",
+  "work.bring.summary_commits": {
+    "one": "{count} commit on {branch} (up to {head}).",
+    "other": "{count} commits on {branch} (up to {head})."
+  },
+  "work.progress.label_bring": "Bring to {machine}"
 }

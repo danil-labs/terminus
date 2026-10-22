@@ -8,6 +8,8 @@ export {
   PART_DESKTOP,
   PART_RELAY,
   WARN_BYTES,
+  bringBranch,
+  bringSelection,
   choosable,
   etaSeconds,
   hasWork,

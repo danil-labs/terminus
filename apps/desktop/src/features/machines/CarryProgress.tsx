@@ -28,6 +28,7 @@ export default function CarryProgress(props: {
 }) {
   const carry = (): Carry | undefined => carries()[props.draft];
   const target = () => machineName(carry()?.check.target ?? "");
+  const bring = () => !!carry()?.check.task;
   const step = () => carry()?.progress?.step ?? "wake";
   const visible = () => STEPS.filter((s) => s !== "clone" || carry()?.check.hasProject !== true);
   const done = (s: CarryStep) => STEPS.indexOf(s) < STEPS.indexOf(step());
@@ -52,7 +53,7 @@ export default function CarryProgress(props: {
       case "missing_base":
         return {
           text: c.fullBytes == null ? t("work.failure.missing_base_unknown", { machine }) : t("work.failure.missing_base", { machine, size: peso(c.fullBytes) }),
-          fix: { label: t("work.failure.send_full"), run: props.onRetry },
+          fix: { label: bring() ? t("work.bring.full") : t("work.failure.send_full"), run: props.onRetry },
         };
       case "too_large": {
         const command = `git push -u origin ${c.check.status.branch ?? "HEAD"}`;
@@ -75,9 +76,17 @@ export default function CarryProgress(props: {
   };
 
   return (
-    <Show when={carry()}>
+    <Show when={carry()} keyed>
+      {(c) => (
+      <Show when={!c.ready} fallback={
+        <p class="m-0 shrink-0 truncate px-4 py-1 text-[0.6875rem] text-neutral-500" data-carry-from>
+          {t("work.bring.from", { task: c.check.task?.title ?? "", machine: machineName(c.check.source) })}
+        </p>
+      }>
       <div class="shrink-0 px-4 py-1.5 text-xs" data-carry-progress={carry()?.failure ? carry()?.failure?.code : step()} role="status">
-        <p class="m-0 mb-1 font-medium text-neutral-950">{t("work.progress.label", { machine: target() })}</p>
+        <p class="m-0 mb-1 font-medium text-neutral-950">
+          {bring() ? t("work.progress.label_bring", { machine: target() }) : t("work.progress.label", { machine: target() })}
+        </p>
         <ol class="m-0 flex flex-wrap items-center gap-x-3 gap-y-1 p-0 text-neutral-500">
           <For each={visible()}>
             {(s) => (
@@ -114,22 +123,38 @@ export default function CarryProgress(props: {
           <Button size="compact" variant="outline" class="mt-1" data-carry-cancel onClick={() => void stopCarry(props.draft)}>{t("work.carry.cancel")}</Button>
         </Show>
       </div>
+      </Show>
+      )}
     </Show>
   );
 }
 
-/** «Copia de MacBook · rama · fecha»: en el encabezado de la tarea que nació de una copia. */
-export function CarryOriginLabel(props: { session: string }) {
+/**
+ * «Copia de MacBook · rama · fecha» en el encabezado de la tarea que nació de
+ * una copia; «Viene de “tarea” en vm», con su enlace, en la que nació al traer.
+ */
+export function CarryOriginLabel(props: { session: string; onOpen: (project: string, session: string) => void }) {
   const origin = () => carryOrigin(props.session);
   const date = () => df({ day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(origin()?.at ?? 0);
   return (
     <Show when={origin()}>
       {(o) => (
-        <p class="m-0 shrink-0 truncate px-4 text-[0.6875rem] text-neutral-500" data-carry-origin>
-          {o().branch
-            ? t("work.origin", { machine: machineName(o().machine), branch: o().branch ?? "", date: date() })
-            : t("work.origin_detached", { machine: machineName(o().machine), date: date() })}
-        </p>
+        <Show when={o().from} fallback={
+          <p class="m-0 shrink-0 truncate px-4 text-[0.6875rem] text-neutral-500" data-carry-origin>
+            {o().branch
+              ? t("work.origin", { machine: machineName(o().machine), branch: o().branch ?? "", date: date() })
+              : t("work.origin_detached", { machine: machineName(o().machine), date: date() })}
+          </p>
+        }>
+          {(from) => (
+            <p class="m-0 flex shrink-0 items-center gap-2 px-4 text-[0.6875rem] text-neutral-500" data-carry-origin>
+              <span class="truncate">{t("work.bring.from", { task: from().title, machine: machineName(o().machine) })}</span>
+              <Button size="compact" variant="ghost" data-carry-open-original onClick={() => props.onOpen(from().project, from().session)}>
+                {t("work.bring.open_original")}
+              </Button>
+            </p>
+          )}
+        </Show>
       )}
     </Show>
   );

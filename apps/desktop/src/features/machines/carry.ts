@@ -27,7 +27,8 @@ import "../../locales/workPhrases";
 import { invoke } from "../../lib/invoke";
 import type { Project } from "../../lib/model";
 import { capabilities } from "../../lib/platform";
-import { type CarryOrigin, rememberOrigin } from "./store";
+import { t } from "../../lib/i18n";
+import { type CarryOrigin, machineName, rememberOrigin } from "./store";
 
 const on = (machine: string) => ({ headers: { "x-terminus-machine": machine } });
 
@@ -50,6 +51,8 @@ export type CarryCheck = {
   status: WorkStatus;
   /** `null`: no se pudo saber (la máquina dormía); se clona si el import lo echa en falta. */
   hasProject: boolean | null;
+  /** Al traer: la tarea de la otra máquina cuyo worktree se trae. */
+  task: { id: string; title: string } | null;
 };
 
 /** Si el destino tiene la carpeta del proyecto: por su lista, con el mismo id o, si no, el mismo nombre. */
@@ -72,8 +75,38 @@ export async function checkCarry(input: { workspace: string; project: Project; s
     targetHasProject(input.target, input.project).catch(() => null),
   ]);
   if (!status || !needsSheet(status, hasProject ?? true)) return null;
+  return { ...input, status, hasProject, task: null };
+}
+
+/**
+ * Traer a la máquina de la ventana el trabajo de una tarea que corre en otra.
+ * Despierta la otra antes de preguntar: traer es una intención. Lanza si no contesta.
+ */
+export async function checkBring(input: { workspace: string; project: Project; source: string; target: string; task: { id: string; title: string } }): Promise<CarryCheck> {
+  await engine.importWork(input.source, { transfer: "", project: "", sha256: "", bytes: 0, probe: true });
+  const [status, hasProject] = await Promise.all([
+    engine.status(input.source, { project: input.project.id, task: input.task.id }),
+    targetHasProject(input.target, input.project).catch(() => null),
+  ]);
   return { ...input, status, hasProject };
 }
+
+/** «Seguir en una tarea nueva aquí» (D4): título, último mensaje del agente y los commits; no la transcripción. */
+export function bringSummary(check: CarryCheck, lastAgentMessage: string | null, branch: string | null): string {
+  const machine = machineName(check.source);
+  const lines = [t("work.bring.summary", { task: check.task?.title ?? "", machine })];
+  if (lastAgentMessage?.trim()) {
+    const last = lastAgentMessage.trim();
+    lines.push("", t("work.bring.summary_last"), last.length > SUMMARY_MAX ? `${last.slice(0, SUMMARY_MAX)}…` : last);
+  }
+  if (check.status.ahead > 0) {
+    lines.push("", t("work.bring.summary_commits", { count: check.status.ahead, branch: branch ?? check.status.branch ?? "", head: check.status.head.slice(0, 7) }));
+  }
+  return `${lines.join("\n")}\n\n`;
+}
+
+/** Del último mensaje del agente basta el final de su respuesta: el resto está en la original. */
+const SUMMARY_MAX = 1200;
 
 /** Una copia en marcha o detenida, por la clave del borrador que la espera. */
 export type Carry = {
@@ -85,7 +118,12 @@ export type Carry = {
   /** El tamaño de la rama completa, cuando falta la base y ya se exportó. */
   fullBytes: number | null;
   cancelled: boolean;
+  /** Ya traído: la base con la que nace la tarea nueva aquí, sin copiar nada más. */
+  ready: CarryResult | null;
 };
+
+/** Con qué nace la tarea: la base y en qué máquina (`x-terminus-machine`). */
+export type CarriedBase = CarryResult & { target: string };
 
 const [carries, setCarries] = createRoot(() => createSignal<Record<string, Carry>>({}));
 export { carries };
@@ -100,8 +138,12 @@ export const DESKTOP_BYTES_PER_SECOND = 4 * 1024 * 1024;
 export const partSize = () => PART_DESKTOP;
 
 /** Lo elegido en la hoja queda esperando el envío del borrador `key`. */
-export function planCarry(key: string, check: CarryCheck, job: CarryJob, state: CarryState) {
-  setCarries((all) => ({ ...all, [key]: { check, job, state, progress: null, failure: null, fullBytes: null, cancelled: false } }));
+export function planCarry(key: string, check: CarryCheck, job: CarryJob, state: CarryState, ready: CarryResult | null = null) {
+  setCarries((all) => ({ ...all, [key]: { check, job, state, progress: null, failure: null, fullBytes: null, cancelled: false, ready } }));
+}
+
+export function dropCarry(key: string) {
+  setCarries(({ [key]: _, ...rest }) => rest);
 }
 
 /** Clona en el destino por `start_project_clone`, con su avance, como al añadir una carpeta. */
@@ -121,9 +163,14 @@ async function cloneOn(check: CarryCheck, progress: (phase: string, percent: num
  * Corre la copia del borrador `key`. Resuelve con la base de la tarea, o con
  * `null` si se detuvo: el fallo queda en `carries()` con su arreglo.
  */
-export async function runCarry(key: string): Promise<CarryResult | null> {
+export async function runCarry(key: string): Promise<CarriedBase | null> {
   const carry = carries()[key];
   if (!carry) return null;
+  if (carry.ready) {
+    rememberPending(key, carry);
+    dropCarry(key);
+    return { ...carry.ready, target: carry.job.target };
+  }
   update(key, (c) => ({ ...c, failure: null, cancelled: false }));
   try {
     const result = await carryWork(engine, carry.job, carry.state, {
@@ -133,8 +180,8 @@ export async function runCarry(key: string): Promise<CarryResult | null> {
       cancelled: () => !!carries()[key]?.cancelled,
     });
     rememberPending(key, carry);
-    setCarries(({ [key]: _, ...rest }) => rest);
-    return result;
+    dropCarry(key);
+    return { ...result, target: carry.job.target };
   } catch (error) {
     const failure: CarryFailure = error instanceof CarryError ? error.failure : { code: "import_failed", cause: error };
     if (failure.code === "cancelled") {
@@ -178,7 +225,10 @@ export async function stopCarry(key: string) {
 const pending = new Map<string, CarryOrigin>();
 
 function rememberPending(key: string, carry: Carry) {
-  pending.set(key, { machine: carry.check.source, branch: carry.check.status.branch, at: Date.now() });
+  // Lo traído no nace en una tarea hasta que se envía el borrador de aquí.
+  if (carry.check.task && !carry.ready) return;
+  const from = carry.check.task ? { session: carry.check.task.id, project: carry.check.project.id, title: carry.check.task.title } : undefined;
+  pending.set(key, { machine: carry.check.source, branch: carry.ready?.imported?.branch ?? carry.check.status.branch, at: Date.now(), ...(from ? { from } : {}) });
 }
 
 /** La tarea `session` nació de la copia del borrador `key`: su encabezado lo dice. */

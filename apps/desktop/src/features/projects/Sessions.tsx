@@ -30,6 +30,7 @@ import SessionGit, { gitAppearance, sessionGitDescription } from "./SessionGit";
 import { WithTaskHoverCard } from "./TaskHoverCardTrigger";
 import { hoverCardPull } from "./hoverCardPull";
 import { MachineChip } from "../machines/MachineChip";
+import { bringHereLabel, canBringHere } from "../machines/store";
 import { createTaskHistories } from "./taskHistories";
 
 // Solo hace falta cuando algo estorba al terminar o archivar: fuera de la carga inicial.
@@ -303,6 +304,8 @@ export default function Sessions(props: {
   /** El nombre de la carpeta, que no cambia al moverla de espacio. */
   carpeta?: string;
   onMoveToSpace?: (id: string, space: string) => void;
+  /** Traer a la máquina de la ventana el trabajo de una tarea que corre en otra. */
+  onBringHere?: (id: string) => void;
   /** Con tareas de varias carpetas en la misma lista, la de cada fila. Sin esto es `de`. */
   projectOf?: (row: SessionRow) => string;
   destinosDe?: (row: SessionRow) => { id: string; name: string }[];
@@ -1107,6 +1110,20 @@ export default function Sessions(props: {
                         }}
                       >
                         {t("projects.sessions.remove_from_project")}
+                      </button>
+                    </Show>
+
+                    <Show when={props.onBringHere && f.s.machine && canBringHere()}>
+                      <button
+                        role="menuitem"
+                        class={ITEM_DE_MENU}
+                        data-bring-here-menu
+                        onClick={() => {
+                          setMenu(null);
+                          props.onBringHere?.(f.s.id);
+                        }}
+                      >
+                        {bringHereLabel()}
                       </button>
                     </Show>
 
