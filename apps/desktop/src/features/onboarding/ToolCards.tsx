@@ -446,11 +446,13 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
       try {
         const fresco = await invoke<Proveedor>("finish_browser_login", { id: i.id, scope: await scope });
         if (fresco.setup_url) invoke("open_external", { target: fresco.setup_url }).catch(() => {});
+        // Pasa directo a «Conectada» con lo que devolvió el login, sin mostrar «Conectar» mientras recarga.
+        setProveedores((ps) => ps.map((x) => (x.id === fresco.id ? fresco : x)));
       } catch (e) {
         if (estados[i.id]?.k !== "conectando") return;
         setErrores(i.id, explicar(e));
       }
-      setEstados(i.id, { k: "libre" });
+      setEstados(i.id, guardado(i));
       return void cargar();
     }
     const c = conocido(i);
@@ -472,8 +474,8 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
       return;
     }
     esperandoMcp = null;
-    setEstados(i.id, { k: "libre" });
     await cargar();
+    setEstados(i.id, guardado(i));
   }
 
   async function conectarConToken(i: Integracion) {
