@@ -20,7 +20,7 @@ repositories, and `GitHostInfo`. Files on disk keep their keys; the types that
 are stored and also travel cross the contract wrapped in `Wire`, which renames
 their keys. There are no aliases. This copy is byte-identical to the engine's.
 SHA-256:
-`0768e84fba95667301539e780433f5eb82b1f314df8664fbeac34867bcd27a02`.
+`9f418b8dcc8a1784ec5cff44e72cdb6cefe8f3c9a96d72d6143541ae58c162e9`.
 
 seldon-host `4e21caf` (#66) added the Danil account (321 commands, 28 events):
 `danil_connect_start`, `danil_connect_status`, `danil_connect_options`,
@@ -157,6 +157,14 @@ seldon-host `feat/install-disk-space-check` refuses an install that does not
 fit on disk without changing `commands.json`: `common.install.no_space` with
 `needed` and `free` in bytes, in the rejection or the `install` event's
 `failure`, and as the `no_space` note of `prepare_runtime`.
+
+seldon-host #100 (`ecc364d`, on dev `666f4ac`, which leaves the contract as
+`55c729b` had it) adds "Use this computer's GitHub" per workspace (366
+commands, 32 events): `set_workspace_host_github` (`{id, enabled}`) →
+`Wire<Workspace>`, the `host_github` field of `Workspace` (off by default and
+kept on this computer only) and the `providers.github.host_mode.*` keys. Open
+sessions pick up the change on their next turn. This copy is
+`git show ecc364d:crates/engine-protocol/commands.json` byte for byte.
 
 Endpoint, selection and StreamPage extend the transport; they do not convert
 domain data. The token travels in RPC1 only between authenticated local
