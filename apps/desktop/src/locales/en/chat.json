@@ -401,5 +401,18 @@
   "chat.visual.open_browser": "Open in browser",
   "chat.visual.open_failed": "Could not open the visualization in the browser.",
   "chat.visual.unload": "Close visualization",
-  "chat.visual.load": "Open visualization"
+  "chat.visual.load": "Open visualization",
+  "chat.greeting.morning": "Good morning. Where do we start?",
+  "chat.greeting.afternoon": "Good afternoon. What's next?",
+  "chat.greeting.evening": "Good evening. How can I help?",
+  "chat.greeting.1": "What are we doing today?",
+  "chat.greeting.2": "What are we working on?",
+  "chat.greeting.3": "What's on your mind?",
+  "chat.greeting.4": "Where do we start?",
+  "chat.greeting.5": "What are we building today?",
+  "chat.greeting.6": "Tell me what you need.",
+  "chat.greeting.7": "What are we solving?",
+  "chat.greeting.8": "What's next on your list?",
+  "chat.greeting.9": "I'm here. What should we do?",
+  "chat.greeting.10": "What do you want to get done?"
 }

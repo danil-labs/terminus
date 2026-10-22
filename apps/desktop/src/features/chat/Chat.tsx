@@ -852,6 +852,17 @@ export default function Chat(props: ChatProps) {
    */
   const centrada = createMemo(() => vacia() && props.conversacion === "");
 
+  /** El saludo de una tarea nueva se elige al abrirla: una de las frases o la de la hora. */
+  const SALUDOS = 10;
+  const saludo = createMemo(() => {
+    if (!centrada()) return "";
+    const n = Math.floor(Math.random() * (SALUDOS + 1));
+    if (n < SALUDOS) return t(`chat.greeting.${n + 1}`);
+    const hora = new Date().getHours();
+    if (hora >= 5 && hora < 12) return t("chat.greeting.morning");
+    return hora >= 12 && hora < 19 ? t("chat.greeting.afternoon") : t("chat.greeting.evening");
+  });
+
   /**
    * Cuánto tiene que tardar la lectura para que el esqueleto ayude. El
    * estado de carga tapa el hueco entero —sin él vuelve la caja centrada,
@@ -3274,6 +3285,13 @@ export default function Chat(props: ChatProps) {
               <h1 class="m-0 font-display text-xl font-bold text-neutral-950">{props.chatName?.trim() || name()}</h1>
               <Show when={props.chatDescription}><p class="m-0 max-w-[36rem] text-sm text-neutral-700">{props.chatDescription}</p></Show>
             </div>}
+          </Show>
+          <Show when={centrada() && !props.chatEncargado && !props.recovery ? saludo() : null}>
+            {(texto) => (
+              <h1 class="m-0 mb-6 max-w-[860px] px-6 text-center font-display text-3xl font-bold tracking-[-0.02em] text-neutral-950">
+                {texto()}
+              </h1>
+            )}
           </Show>
           {/* El puntero vuelve aquí: la capa entera lo deja pasar para que se
               pueda seleccionar el texto que sigue visible detrás. */}

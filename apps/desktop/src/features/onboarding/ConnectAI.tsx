@@ -18,7 +18,7 @@ import { TerminusMark } from "../../ui/toolMarks";
 import { Spinner } from "../../ui/Spinner";
 import { DialogoDeConexion } from "../settings/LoginDialog";
 import { AvanceDeDescarga, BarraDeCarga, CodigoParaConfirmar, Peso } from "./DownloadProgress";
-import { type Conexiones, type Fila, nombreDeFila, ordenDelMapa, type Paso } from "./connect-store";
+import { AL_FINAL, type Conexiones, type Fila, nombreDeFila, ordenDelMapa, type Paso } from "./connect-store";
 
 // El panel de modelos locales solo hace falta al abrirlo.
 const ListaDeModelosLocales = lazy(() => import("../settings/LocalModels"));
@@ -489,10 +489,11 @@ function FilaDeIA(props: { c: Conexiones; f: Fila }) {
   return <Tarjeta c={props.c} f={props.f} abajo={abajo()} resaltada={resaltada()} />;
 }
 
-/** El panel de la derecha: lo encontrado en esta computadora primero, luego los demás proveedores. */
+/** El panel de la derecha: lo encontrado en esta computadora primero, luego los demás proveedores y ZCode al final. */
 export function PanelDeIA(props: { c: Conexiones }) {
-  const detectadas = () => props.c.filas().filter((f) => f.detectada);
-  const otras = () => props.c.filas().filter((f) => !f.detectada);
+  const encontrada = (f: Fila) => f.detectada && f.agente !== AL_FINAL;
+  const detectadas = () => props.c.filas().filter(encontrada);
+  const otras = () => props.c.filas().filter((f) => !encontrada(f));
   return (
     <div class="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto rounded-lg border border-border bg-surface-raised p-5 [&>*]:shrink-0">
       <Show

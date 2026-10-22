@@ -1,4 +1,4 @@
-import { For, Match, Show, Switch, createEffect, createSignal, on, onCleanup, onMount } from "solid-js";
+import { For, Match, Show, Suspense, Switch, createEffect, createSignal, lazy, on, onCleanup, onMount } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
 import { FailureNote, asFailure, detalleDe, type Failure } from "../../ui/Failure";
 import { Skeleton } from "../../ui/Skeleton";
@@ -17,6 +17,9 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "../../ui/DropdownMenu";
 import { SettingsBlock, SettingsPanel, SettingsRow, SettingsSection } from "./layout";
+
+// La tarjeta de Drive es la del alta; su chunk solo lo carga quien abre Fuentes.
+const Integraciones = lazy(() => import("../onboarding/ToolCards").then((m) => ({ default: m.Integraciones })));
 
 /**
  * Proveedores de código: de dónde salen los proyectos de la organización.
@@ -1144,6 +1147,15 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
               );
             }}
           </For>
+          <Show when={!props.solo}>
+            <SettingsSection title={t("onboarding.tools.drive")} description={t("onboarding.tools.about.drive")}>
+              <div class="mt-3">
+                <Suspense fallback={null}>
+                  <Integraciones solo={["drive"]} onCambio={() => {}} />
+                </Suspense>
+              </div>
+            </SettingsSection>
+          </Show>
         </SettingsPanel>
       </Show>
     </Show>

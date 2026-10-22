@@ -104,6 +104,7 @@ const INTEGRACIONES = (): Integracion[] => [
   { id: "gitlab", nombre: "GitLab", comun: false, via: "proveedor" },
   { id: "bitbucket", nombre: "Bitbucket", comun: false, via: "proveedor" },
   { id: "excalidraw", nombre: "Excalidraw", comun: false, via: "incluido" },
+  { id: "notion", nombre: "Notion", comun: false, via: "mcp" },
 ];
 const RECOMENDADOS = ["drawio", "typst", "libreoffice"];
 const ORDEN_PLUGINS = ["drawio", "typst", "libreoffice", "agentsview", "computer-use"];
@@ -171,7 +172,14 @@ export function VerMas(props: { abierto: boolean; resto: { id: string; nombre: s
 }
 
 /** Las integraciones: cada tarjeta mide lo mismo en todos sus estados y se conecta o desconecta en su sitio. */
-export function Integraciones(props: { onCambio: (conectadas: number) => void }) {
+export function Integraciones(props: { onCambio: (conectadas: number) => void; solo?: string[] }) {
+  /** Con `solo`, únicamente esas tarjetas y todas a la vista: Configuración monta así la de Drive. */
+  const integraciones = () =>
+    props.solo
+      ? INTEGRACIONES()
+          .filter((i) => props.solo?.includes(i.id))
+          .map((i) => ({ ...i, comun: true }))
+      : INTEGRACIONES();
   const [proveedores, setProveedores] = createSignal<Proveedor[]>([]);
   const [conocidos, setConocidos] = createSignal<Conocido[]>([]);
   const [agentesMcp, setAgentesMcp] = createSignal<AgenteMcp[]>([]);
@@ -251,8 +259,8 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
       setConocidos(c);
       setAgentesMcp(a);
       setFalloDeCarga(null);
-      for (const i of INTEGRACIONES()) if (!viva(i.id)) setEstados(i.id, guardado(i));
-      props.onCambio(INTEGRACIONES().filter((i) => estados[i.id]?.k === "conectada").length);
+      for (const i of integraciones()) if (!viva(i.id)) setEstados(i.id, guardado(i));
+      props.onCambio(integraciones().filter((i) => estados[i.id]?.k === "conectada").length);
       void incluir();
     } catch (e) {
       setFalloDeCarga(explicar(e));
@@ -263,7 +271,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
   async function incluir() {
     if (incluidas) return;
     incluidas = true;
-    for (const i of INTEGRACIONES().filter((x) => x.via === "incluido")) {
+    for (const i of integraciones().filter((x) => x.via === "incluido")) {
       const c = conocido(i);
       if (!c || c.conectado) continue;
       try {
@@ -322,7 +330,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
     cerrada = true;
     clearTimeout(vigiaDeSesion);
     for (const l of [fin, url, alDrive, alInstalar]) void l.then((f) => f());
-    for (const i of INTEGRACIONES()) {
+    for (const i of integraciones()) {
       if ((i.via === "proveedor" || i.via === "drive") && estados[i.id]?.k === "conectando") void cancelar(i);
     }
   });
@@ -333,7 +341,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
     setEstados(i.id, { k: "formulario" });
   }
 
-  const contarConectadas = () => props.onCambio(INTEGRACIONES().filter((x) => estados[x.id]?.k === "conectada").length);
+  const contarConectadas = () => props.onCambio(integraciones().filter((x) => estados[x.id]?.k === "conectada").length);
 
   function usarUnidad(i: Integracion, o: DriveDeEscritorio) {
     setEscritorio(o);
@@ -422,7 +430,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
       setEstados(i.id, { k: "libre" });
       void cargar();
     }
-    props.onCambio(INTEGRACIONES().filter((x) => estados[x.id]?.k === "conectada").length);
+    props.onCambio(integraciones().filter((x) => estados[x.id]?.k === "conectada").length);
   }
 
   async function conectar(i: Integracion) {
@@ -796,15 +804,15 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
   }
 
   const visibles = () => {
-    const base = INTEGRACIONES().filter(
+    const base = integraciones().filter(
       (i) => i.comun || (i.via !== "incluido" && ["formulario", "descargando", "instalando", "sesion", "conectando", "conectada"].includes(estados[i.id]?.k ?? "")),
     );
-    // Por id: INTEGRACIONES() arma objetos nuevos en cada lectura.
+    // Por id: integraciones() arma objetos nuevos en cada lectura.
     const vistas = new Set(base.map((i) => i.id));
-    return verMas() ? [...base, ...INTEGRACIONES().filter((i) => !vistas.has(i.id))] : base;
+    return verMas() ? [...base, ...integraciones().filter((i) => !vistas.has(i.id))] : base;
   };
   // Como el diseño: la pila de «Ver más» enseña todo lo que no es común, aunque ya esté a la vista.
-  const escondidas = () => INTEGRACIONES().filter((i) => !i.comun);
+  const escondidas = () => integraciones().filter((i) => !i.comun);
 
   return (
     <>
@@ -812,7 +820,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
         <For each={visibles()}>{(i) => <Tarjeta i={i} />}</For>
       </div>
       <Show when={falloDeCarga()}>{(e) => <ErrorDeTarjeta class="rounded-md border-t" texto={e()} />}</Show>
-      <For each={INTEGRACIONES().filter(formularioAbierto)}>{(i) => <Formulario i={i} />}</For>
+      <For each={integraciones().filter(formularioAbierto)}>{(i) => <Formulario i={i} />}</For>
       <VerMas
         abierto={verMas()}
         resto={escondidas().map((i) => ({ id: i.id, nombre: i.nombre, icono: <MarcaIntegracion id={i.id} size={12} /> }))}
