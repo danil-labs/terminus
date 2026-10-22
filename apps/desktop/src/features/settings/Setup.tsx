@@ -19,6 +19,7 @@ import { connected } from "../../lib/engineConnection";
 import { elapsed, peso } from "../../lib/format";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
+import { anotarFalta, SIN_ESPACIO, textoDeFalta, textoSinEspacio } from "../../lib/no-space";
 import { capabilities } from "../../lib/platform";
 import { hasShellCache } from "../../lib/shellCache";
 import { cn } from "../../lib/utils";
@@ -50,7 +51,7 @@ type Evento =
   | { type: "download"; stage: string; done: number; total?: number };
 type Avance = { id: string; done: number; bytes: number };
 /** El evento `install` del motor: el avance de todo lo que se descarga y se puede cancelar. */
-type AvanceDeInstalacion = { operation: string; kind: string; done: number; bytes: number };
+type AvanceDeInstalacion = { operation: string; kind: string; done: number; bytes: number; failure?: unknown };
 /** Lo que las notas dicen de cada etapa, para el detalle de su fila. */
 type Dato = { version?: string; origen?: string; libre?: string; plataforma?: string; instala?: boolean };
 type Paso = "preparar" | "ia" | "personalizar";
@@ -96,6 +97,8 @@ export default function Setup(props: { children: JSX.Element }) {
   const conLaX = new Set<string>();
   const [consejo, setConsejo] = createSignal(0);
   const [sinSoporte, setSinSoporte] = createSignal(false);
+  // Lo esencial no cabe en disco: la corrida se para antes de empezar y se reintenta entera.
+  const [sinEspacio, setSinEspacio] = createSignal<string | null>(null);
   const [bloqueado, setBloqueado] = createSignal(false);
   const [vista, setVista] = createSignal<Vista>("sencilla");
   const [paso, setPaso] = createSignal<Paso>("preparar");
@@ -183,6 +186,11 @@ export default function Setup(props: { children: JSX.Element }) {
         return [{ tono: "warn", texto: t("setup.log.timed_out", { name }) }];
       case "stalled":
         return [{ tono: "warn", texto: t("setup.log.stalled", { name, minutes: valor }) }];
+      case "no_space": {
+        const texto = textoSinEspacio({ needed: valor, free: e.extra });
+        if (e.stage === "platform") setSinEspacio(texto);
+        return [{ tono: e.stage === "platform" ? "error" : "warn", texto }];
+      }
       case "unsupported":
         setSinSoporte(true);
         return [{ tono: "error", texto: t("setup.log.unsupported", { version: valor, minimum: e.extra ?? "" }) }];
@@ -193,7 +201,8 @@ export default function Setup(props: { children: JSX.Element }) {
         const cabeza: Linea = esencial
           ? { tono: "error", texto: t("setup.log.failed", { name }) }
           : { tono: "warn", texto: t("setup.log.optional_failed", { name }) };
-        const detalle = valor.split("\n").filter((l) => l.trim());
+        // La nota `no_space` ya lo dijo con cifras.
+        const detalle = valor === SIN_ESPACIO ? [] : valor.split("\n").filter((l) => l.trim());
         return [cabeza, ...detalle.map((texto): Linea => ({ tono: "err", texto }))];
       }
     }
@@ -220,6 +229,7 @@ export default function Setup(props: { children: JSX.Element }) {
         vistas.clear();
         setLineas([]);
         setDatos({});
+        setSinEspacio(null);
         setDescarga(null);
         setEtapas(e.stages.map((s) => ({ ...s, state: "waiting" })));
         return;
@@ -274,7 +284,9 @@ export default function Setup(props: { children: JSX.Element }) {
 
   const escuchaEtapas = listen<Evento>("bootstrap-run", (e) => recibir(e.payload));
   // Un opcional que se instala solo, después de la corrida, cuenta su descarga por aquí.
+  // Este oyente vive mientras viva la app: anota para todas las pantallas lo que no cupo en disco.
   const escuchaInstalaciones = listen<AvanceDeInstalacion>("install", (e) => {
+    anotarFalta(e.payload);
     const name = e.payload.operation.startsWith("tool:") ? e.payload.operation.slice(5) : null;
     if (!name || sueltos()[name] !== "run" || e.payload.bytes <= 0) return;
     setParcial(e.payload.done / e.payload.bytes);
@@ -451,7 +463,7 @@ export default function Setup(props: { children: JSX.Element }) {
   }
   const corridaHecha = () =>
     etapas().length > 0 && etapas().every((s) => s.state === "succeeded" || s.state === "failed" || s.state === "skipped");
-  const falloEsencial = () => etapas().some((s) => s.essential && s.state === "failed");
+  const falloEsencial = () => sinEspacio() !== null || etapas().some((s) => s.essential && s.state === "failed");
   const cerrada = () => corridaHecha() || falloEsencial();
   createEffect(() => {
     if (cerrada()) setCorriendo(false);
@@ -604,7 +616,7 @@ export default function Setup(props: { children: JSX.Element }) {
         ponerSuelto(name, "fail");
         agregar([
           { tono: "warn", texto: t("setup.log.optional_failed", { name: nombre(name) }) },
-          { tono: "err", texto: prosaDe(e) },
+          { tono: "err", texto: (await textoDeFalta(e, `tool:${name}`)) ?? prosaDe(e) },
         ]);
       }
     } finally {
@@ -711,6 +723,13 @@ export default function Setup(props: { children: JSX.Element }) {
         {(f) => (
           <div class="mt-6 w-full">
             <FailureNote f={asFailure(f())} />
+          </div>
+        )}
+      </Show>
+      <Show when={!ia() && !corriendo() && sinEspacio()}>
+        {(texto) => (
+          <div class="mt-6 w-full">
+            <FailureNote f={{ what: texto(), detail: "" }} />
           </div>
         )}
       </Show>

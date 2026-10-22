@@ -134,6 +134,11 @@ pnpm, bun, agent-browser, uv and python. Accounts: `list_system_sessions`,
 event and the `settings.google_drive.*` keys. This copy is
 `git show b831eeb:crates/engine-protocol/commands.json` byte for byte.
 
+seldon-host `feat/install-disk-space-check` refuses an install that does not
+fit on disk without changing `commands.json`: `common.install.no_space` with
+`needed` and `free` in bytes, in the rejection or the `install` event's
+`failure`, and as the `no_space` note of `prepare_runtime`.
+
 Endpoint, selection and StreamPage extend the transport; they do not convert
 domain data. The token travels in RPC1 only between authenticated local
 processes, read from a protected file; it is never handed to the webview.

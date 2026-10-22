@@ -9,6 +9,7 @@ import { createStore } from "solid-js/store";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
 import type { Superficie } from "../../lib/surfaces.ts";
+import { textoDeFalta } from "../../lib/no-space";
 import { detalleDe, prosaDe } from "../../ui/Failure";
 import { accountPresentation } from "../settings/AccountCard";
 import type { AccountList, AccountStatus, AgentOpt, LoginEvent } from "../settings/accounts-store";
@@ -268,6 +269,8 @@ export function crearConexiones() {
       for (const x of filas().filter((x) => x.agente === f.agente && pasos[x.id]?.k === "descargando")) {
         poner(x.id, sesiones.some((y) => y.provider === f.agente) ? { k: "instalada" } : { k: "falta" });
       }
+      const sinEspacio = await textoDeFalta(e, `provider:${f.agente}`);
+      if (sinEspacio && errores[f.id]) setErrores(f.id, sinEspacio);
       return false;
     }
   }

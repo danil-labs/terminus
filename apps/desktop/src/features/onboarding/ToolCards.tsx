@@ -810,7 +810,7 @@ export function Plugins(props: { onCambio: (estado: { instalados: number; instal
                   disabled={!q.p.supported}
                   onClick={() => void instalar(q.p)}
                 >
-                  {t("onboarding.tools.install")}
+                  {errores[q.p.id] ? t("onboarding.ai.retry") : t("onboarding.tools.install")}
                 </Button>
               </>
             }
