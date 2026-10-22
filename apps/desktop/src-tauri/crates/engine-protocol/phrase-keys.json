@@ -175,6 +175,8 @@
     "mcp.known.figma_desktop.after",
     "mcp.known.figma_desktop.requires",
     "mcp.known.figma_desktop.via",
+    "mcp.known.notion.after",
+    "mcp.known.notion.requires",
     "mcp.login.opened_browser",
     "mcp.session.cli_has_none",
     "preview.attachments.failed",

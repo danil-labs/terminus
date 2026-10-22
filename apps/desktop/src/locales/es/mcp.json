@@ -9,6 +9,8 @@
   "mcp.known.figma_desktop.after": "No pide iniciar sesión: usa la sesión de la aplicación que ya tienes abierta.",
   "mcp.known.atlassian.requires": "Incluye Jira y Confluence con la misma conexión. Bitbucket no: por este camino pide un token de API en vez de la sesión del navegador.",
   "mcp.known.atlassian.after": "La primera vez que el agente lo use, Atlassian te pedirá iniciar sesión. Verás y podrás hacer exactamente lo que tu cuenta ya permite, ni más ni menos.",
+  "mcp.known.notion.requires": "Ser miembro del espacio de Notion; las personas invitadas no pueden conectarlo.",
+  "mcp.known.notion.after": "La primera vez que el agente lo use, Notion te pedirá iniciar sesión en el navegador y elegir el espacio. Verá lo mismo que tú ves en ese espacio.",
   "mcp.known.excalidraw.requires": "Tus dibujos se guardan en el servidor de Excalidraw, sin cuenta: quien tenga el identificador de un dibujo puede abrirlo. Necesita conexión a internet.",
   "mcp.known.excalidraw.after": "Listo al conectar, sin iniciar sesión. Cuando el agente dibuje, el diagrama se abre en el chat y puedes editarlo ahí.",
   "mcp.login.opened_browser": "Se abrió tu navegador para autorizar {service}. Vuelve aquí cuando termines.",
