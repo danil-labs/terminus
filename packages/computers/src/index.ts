@@ -8,6 +8,10 @@ export {
   apiUrl,
   listComputers,
   listWorkspaces,
+  listWorkspacesWithDeleted,
+  purgeWorkspace,
+  restoreWorkspace,
+  sessionProbe,
   startComputer,
 } from "./api.ts";
 export {
@@ -28,8 +32,10 @@ export { type WorkspaceGroup, type WorkspaceRow, groupWorkspaces, hasAccountWork
 export { callWorkspace, hasLinkedWorkspaces, linkedAttention, linkedEvent, linkedEvents, linkedListing, linkedWorkspaces, onlyLinked } from "./links.ts";
 export { type Compatibility, machineCompatibility } from "./compatibility.ts";
 export {
+  type Blocked,
   type Cached,
   type CallResult,
+  type EngineInfo,
   type EventsPage,
   type RelayConfig,
   type RelayFailure,
@@ -38,10 +44,12 @@ export {
   CALL_TIMEOUT,
   RelaySession,
   SUBPROTOCOL,
+  TOKEN_EXPIRED,
   WAKE_TIMEOUT,
   cachedAt,
   requestId,
   sessionUrl,
+  tokenExpiry,
 } from "./relay.ts";
 export { type ScreenEnd, SCREEN_SUBPROTOCOL, screenEnd, screenProtocols, screenUrl } from "./screen.ts";
 export {

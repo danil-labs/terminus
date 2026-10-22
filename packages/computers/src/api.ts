@@ -33,7 +33,7 @@ export type Answer<T> =
   | { kind: "unauthorized" }
   | { kind: "license" }
   | { kind: "missing" }
-  | { kind: "error"; status: number | null };
+  | { kind: "error"; status: number | null; code?: string };
 
 /** Lo mínimo de `fetch` que usa el cliente. */
 export type Fetch = (input: string, init?: { method?: string; headers?: Record<string, string> }) => Promise<{
@@ -66,7 +66,12 @@ async function request<T>(url: string, token: string, method: string, read: (bod
     return { kind: "license" };
   }
   if (response.status === 404) return { kind: "missing" };
-  if (!response.ok) return { kind: "error", status: response.status };
+  if (!response.ok) {
+    // `409 workspace_deleted` y compañía: el código del cuerpo dice qué pasó.
+    const code = ((await response.json().catch(() => null)) as { error?: unknown } | null)?.error;
+    return typeof code === "string" ? { kind: "error", status: response.status, code } : { kind: "error", status: response.status };
+  }
+  if (response.status === 204) return { kind: "ok", value: read(null) };
   const body = await response.json().catch(() => null);
   try {
     return { kind: "ok", value: read(body) };
@@ -112,6 +117,8 @@ export type AccountWorkspace = {
   updated_at?: string | null;
   projects: AccountProject[];
   computers: string[];
+  /** Con lápida (`include_deleted=1`): cuándo se borró. Un borrado no revive al volver a atarlo; solo con `restore`. */
+  deleted_at?: string | null;
 };
 
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x !== "") : []);
@@ -142,6 +149,43 @@ export function listWorkspaces(endpoint: string, token: string, f: Fetch = globa
     },
     f,
   );
+}
+
+const registryList = (list: unknown): AccountWorkspace[] => (Array.isArray(list) ? list.map(accountWorkspace).filter((w): w is AccountWorkspace => w !== null) : []);
+
+/** Los vivos y, aparte, los que tienen lápida (`GET /v1/workspaces?include_deleted=1`), para ofrecer restaurarlos. */
+export function listWorkspacesWithDeleted(endpoint: string, token: string, f: Fetch = globalFetch): Promise<Answer<{ workspaces: AccountWorkspace[]; deleted: AccountWorkspace[] }>> {
+  return request(
+    apiUrl(endpoint, "/v1/workspaces?include_deleted=1"),
+    token,
+    "GET",
+    (body) => {
+      const b = body as { workspaces?: unknown; deleted?: unknown } | null;
+      if (!Array.isArray(b?.workspaces)) throw new Error("bad_registry");
+      return { workspaces: registryList(b.workspaces), deleted: registryList(b.deleted) };
+    },
+    f,
+  );
+}
+
+/** Saca un workspace de la lápida con sus proyectos y su memoria. */
+export function restoreWorkspace(endpoint: string, token: string, id: string, f: Fetch = globalFetch): Promise<Answer<AccountWorkspace | null>> {
+  return request(apiUrl(endpoint, `/v1/workspaces/${encodeURIComponent(id)}/restore`), token, "POST", accountWorkspace, f);
+}
+
+/** Borra para siempre uno con lápida (su repo de memoria y sus respaldos); uno vivo contesta `409 workspace_not_deleted`. */
+export function purgeWorkspace(endpoint: string, token: string, id: string, f: Fetch = globalFetch): Promise<Answer<null>> {
+  return request(apiUrl(endpoint, `/v1/workspaces/${encodeURIComponent(id)}/purge`), token, "POST", () => null, f);
+}
+
+/**
+ * Por qué no abrió la sesión de una computadora: un upgrade fallido no trae
+ * cuerpo en el navegador, así que se pregunta por HTTP. `license_required`
+ * (`403`, computers#22) o `null` si no lo dice.
+ */
+export async function sessionProbe(endpoint: string, token: string, id: string, f: Fetch = globalFetch): Promise<"license_required" | null> {
+  const answer = await request(apiUrl(endpoint, `/v1/computers/${encodeURIComponent(id)}/session`), token, "GET", () => null, f);
+  return answer.kind === "license" ? "license_required" : null;
 }
 
 /** Encendido explícito. La app no lo usa al abrir: una acción enciende la VM por el relay. */

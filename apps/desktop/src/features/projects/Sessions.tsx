@@ -144,6 +144,9 @@ export type SessionRow = {
   /** La máquina que la corre si no es la de la ventana (`fleet.rs`); apagada, `machine_on` es `false`. */
   machine?: string;
   machine_on?: boolean;
+  /** Con la cuenta de Danil, el estado de la rebanada de su máquina (`@terminus/fleet`) y cuándo se leyó. */
+  machine_status?: "ok" | "cached" | "no_answer" | "off" | "outdated" | "license_required";
+  machine_at?: number | null;
 };
 
 type EstadoDelWorktree = { available: boolean; owned: boolean };
