@@ -5,6 +5,7 @@ import Palette from "lucide-solid/icons/palette";
 import Bot from "lucide-solid/icons/bot";
 import Folders from "lucide-solid/icons/folders";
 import Puzzle from "lucide-solid/icons/puzzle";
+import Wrench from "lucide-solid/icons/wrench";
 import Radar from "lucide-solid/icons/radar";
 import GitBranch from "lucide-solid/icons/git-branch";
 import Monitor from "lucide-solid/icons/monitor";
@@ -39,6 +40,7 @@ import Workspaces from "./Workspaces";
 // Chunks aparte: solo los carga quien abre la sección.
 const DanilAccount = lazy(() => import("./DanilAccount"));
 const Appearance = lazy(() => import("./Appearance"));
+const ToolCatalog = lazy(() => import("./ToolCatalog"));
 
 /**
  * Configuración: el contenedor y su navegación.
@@ -199,6 +201,18 @@ const destinosDe = (
     panel: () => <AIProviders superficies={superficies()} agentesEnUso={agentes.agentesEnUso} />,
   },
   {
+    id: "herramientas",
+    get name() {
+      return t("settings.nav.tools");
+    },
+    icono: () => <Wrench size={15} />,
+    panel: () => (
+      <Suspense fallback={null}>
+        <ToolCatalog />
+      </Suspense>
+    ),
+  },
+  {
     id: "fuentes",
     get name() {
       return t("settings.nav.sources");
@@ -242,7 +256,7 @@ const GRUPOS: { nombre: () => string; ids: string[] }[] = [
   { nombre: () => t("settings.nav.group_custom"), ids: ["skills", "agentes", "proyectos", "plugins"] },
   {
     nombre: () => t("settings.nav.group_connections"),
-    ids: ["cuenta-danil", "proveedores-ia", "fuentes", "radiant"],
+    ids: ["cuenta-danil", "proveedores-ia", "herramientas", "fuentes", "radiant"],
   },
 ];
 
