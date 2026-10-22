@@ -28,6 +28,16 @@ export { type WorkspaceGroup, type WorkspaceRow, groupWorkspaces, hasAccountWork
 export { callWorkspace, hasLinkedWorkspaces, linkedAttention, linkedEvent, linkedEvents, linkedListing, linkedWorkspaces, onlyLinked } from "./links.ts";
 export { type Compatibility, machineCompatibility } from "./compatibility.ts";
 export {
+  type ConnectHop,
+  type ConnectProgress,
+  type WatchOptions,
+  APPEAR_WAIT,
+  INSTALL_URL,
+  ONLINE_WAIT,
+  installCommand,
+  watchNewComputer,
+} from "./connect.ts";
+export {
   type Cached,
   type CallResult,
   type EventsPage,

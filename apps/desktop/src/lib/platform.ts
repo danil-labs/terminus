@@ -3,6 +3,7 @@
  * el valor por defecto; la entrada web (`src/web/main.tsx`) lo fija antes de
  * importar la app y no cambia después.
  */
+import type { Answer, Computer } from "@terminus/computers";
 import type { JSX } from "solid-js";
 import type { AccountProfileSource } from "../features/settings/account-profile";
 import type { Account } from "../features/settings/accounts-store";
@@ -47,6 +48,16 @@ export type Capabilities = {
   machineScreen?: (machine: string) => (() => Promise<WebSocket>) | null;
   /** Bajo la tarjeta de una cuenta: sus máquinas. */
   accountMachines?: (props: AccountMachinesProps) => JSX.Element;
+  /**
+   * «Conectar otra máquina» con la sesión de la página (la web): la lista de la
+   * cuenta y qué hacer cuando la nueva está en línea. El escritorio usa su token
+   * de cliente (`features/machines/ConnectMachine.tsx`).
+   */
+  connectMachine?: {
+    list: () => Promise<Answer<Computer[]>>;
+    outdated?: (computer: Computer) => boolean;
+    onReady: (computer: Computer) => void;
+  };
 };
 
 const DESKTOP: Capabilities = { nativeWindow: true, updater: true, localSetup: true, computerStatus: false, danilAccount: true, radiant: true };
