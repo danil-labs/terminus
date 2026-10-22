@@ -695,7 +695,8 @@ export default function Setup(props: { children: JSX.Element }) {
           </div>
         )}
       </Show>
-      <div class="mt-auto w-full">
+      {/* En «Conecta tu IA» el mapa va al centro del alto libre y la comprobación queda abajo. */}
+      <div class={cn("w-full", ia() ? "flex min-h-0 flex-1 flex-col" : "mt-auto")}>
         <Show
           when={ia()}
           fallback={
@@ -725,7 +726,9 @@ export default function Setup(props: { children: JSX.Element }) {
           }
         >
           <Suspense>
-          <Show when={conexiones()}>{(c) => <MapaDeConexiones c={c()} />}</Show>
+          <div class="flex flex-1 flex-col justify-center">
+            <Show when={conexiones()}>{(c) => <MapaDeConexiones c={c()} />}</Show>
+          </div>
           <div class="mt-4 border-t border-border pt-4">
             <Comprobacion
               filas={[

@@ -2,7 +2,7 @@ import Check from "lucide-solid/icons/check";
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import Copy from "lucide-solid/icons/copy";
 import ExternalLink from "lucide-solid/icons/external-link";
-import Loader2 from "lucide-solid/icons/loader-circle";
+import { Spinner } from "../../ui/Spinner";
 import { Show, createSignal, type JSX } from "solid-js";
 import { copyText } from "../../lib/clipboard";
 import { enfocar } from "../../lib/focus";
@@ -73,7 +73,7 @@ export function DialogoDeConexion(props: {
             </DialogTitle>
             <Show when={!props.url && !props.pideCodigo && !props.porConfirmar}>
               <span class="flex items-center gap-1.5 text-xs text-neutral-500">
-                <Loader2 size={12} class="animate-spin" />
+                <Spinner size={12} />
                 {t("settings.accounts.connecting")}
               </span>
             </Show>
