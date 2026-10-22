@@ -448,6 +448,8 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
         if (fresco.setup_url) invoke("open_external", { target: fresco.setup_url }).catch(() => {});
         // Pasa directo a «Conectada» con lo que devolvió el login, sin mostrar «Conectar» mientras recarga.
         setProveedores((ps) => ps.map((x) => (x.id === fresco.id ? fresco : x)));
+        // Los agentes usan gh con esta conexión; en Ajustes se instala a mano, aquí se deja listo.
+        if (i.id === "github") invoke("install_gh").catch(() => {});
       } catch (e) {
         if (estados[i.id]?.k !== "conectando") return;
         setErrores(i.id, explicar(e));
