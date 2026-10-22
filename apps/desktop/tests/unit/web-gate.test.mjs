@@ -9,6 +9,10 @@ import test from "node:test";
 import { relay } from "../helpers/fake-relay.mjs";
 import { boot, sleep } from "../helpers/jsdom-app.mjs";
 
+// Each mount is a tab of its own; in one process their Supabase clients would
+// share Node's BroadcastChannel and hand jsdom a Node MessageEvent.
+globalThis.BroadcastChannel = undefined;
+
 const SUPABASE = "https://supabase.test";
 const API = "https://computers.danil.ai/v1/computers";
 const session = (token) => JSON.stringify({
@@ -72,9 +76,49 @@ test("the web build uses the stored session, opens every computer and explains r
     fake.drop(4003);
     await sleep(1500);
     assert.ok(refreshes >= 1, "4003 refreshes the session");
-    assert.ok(text().includes("no tiene licencia"), "a refused reconnection shows the license notice");
+    assert.ok(text().includes("Activa Terminus"), "a refused reconnection offers the trial");
+    assert.ok(text().includes("7 días gratis, sin tarjeta;"), text());
+    assert.ok(w.document.querySelector("[data-license-start]"), "the trial button is there");
+    assert.ok(w.document.querySelector("[data-license-retry]"), "and the retry");
     assert.equal(fake.sockets.length, 2, "it does not retry the sockets blindly");
     assert.equal(w.document.querySelectorAll("[data-web-gate]").length, 1, "one notice for every refused session");
+    assert.deepEqual(app.fallos, []);
+  } finally {
+    globalThis.fetch = own;
+  }
+});
+
+test("without a license the gate offers the trial and opens the app once it is activated", async () => {
+  const fake = relay();
+  let licensed = false;
+  const own = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const url = String(input?.url ?? input);
+    if (!url.startsWith(API)) return own(input, init);
+    if (!licensed) return new Response(JSON.stringify({ error: { code: "license_required" } }), { status: 403 });
+    return new Response(JSON.stringify([{ computer_id: "cmp_a", name: "Casa", state: "online" }]), { status: 200 });
+  };
+  let w;
+  const app = await boot("listo", "web-gate-license", {}, undefined, { "sb-supabase-auth-token": session("stored") }, {
+    web: true,
+    antes: (win) => {
+      w = win;
+      globalThis.WebSocket = fake.Socket;
+      win.terminusWeb = { supabaseUrl: SUPABASE, supabaseKey: "public-anon-key" };
+    },
+  });
+  try {
+    await sleep(800);
+    const gate = () => w.document.querySelector("[data-web-gate]");
+    assert.equal(gate()?.dataset.webGate, "license");
+    assert.ok(gate().textContent.includes("Activa Terminus"), gate().textContent);
+    assert.equal(gate().querySelector("[data-license-start]")?.textContent.trim(), "Empezar prueba gratis");
+
+    licensed = true;
+    gate().querySelector("[data-license-retry]").click();
+    await sleep(1200);
+    assert.equal(gate(), null, "retrying asks again and opens the app");
+    assert.equal(fake.sockets.length, 1);
     assert.deepEqual(app.fallos, []);
   } finally {
     globalThis.fetch = own;

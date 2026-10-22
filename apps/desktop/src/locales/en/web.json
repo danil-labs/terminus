@@ -5,7 +5,6 @@
   "web.accounts.sign_out_no": "Cancel",
   "web.accounts.sign_out_yes": "Sign out",
   "web.computers.error": "Could not reach Danil Computers.",
-  "web.computers.license": "Your account has no Terminus license. Ask whoever manages your Danil account for access.",
   "web.computers.no_workspaces": "Sign in with your Danil account in Terminus on your computer: while signed in, every workspace on that computer shows up here.",
   "web.computers.none": "You do not have any computer in Danil yet.",
   "web.computers.not_yours": "This computer is not yours or no longer exists.",
