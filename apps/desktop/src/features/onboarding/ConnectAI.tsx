@@ -219,8 +219,14 @@ function Tarjeta(props: { c: Conexiones; f: Fila; abajo?: JSX.Element; resaltada
     <div class={cn("grid shrink-0", fallo() && "animate-sacudir")}>
       <div
         class={cn(
-          "relative flex h-[62px] items-center gap-3 overflow-hidden rounded-md border px-3.5 py-2",
-          fallo() ? "border-error-strong bg-error/5" : props.resaltada ? "border-primary bg-primary/5" : "border-border bg-surface-raised",
+          "relative flex h-[62px] items-center gap-3 overflow-hidden rounded-md border px-3.5 py-2 transition-colors duration-300",
+          fallo()
+            ? "border-error-strong bg-error/5"
+            : p()?.k === "conectada"
+              ? "border-success-strong/40 bg-success/5"
+              : props.resaltada
+                ? "border-primary bg-primary/5"
+                : "border-border bg-surface-raised",
           props.abajo && "rounded-b-none",
         )}
       >
