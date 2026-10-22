@@ -2184,7 +2184,9 @@ export default function App() {
       if (deteniendo() === session) setDeteniendo(null);
       setPermissions((items) => items.filter((permission) => permission.session !== session));
       soltarTerminal(session);
-      if (unsaved) anexar(session, (messages) => [...messages, { role: "system", text: t("chat.turn.unsaved"), meta: "aviso" }]);
+      // `fallo` y no `aviso`: un aviso se pliega dentro del registro del turno,
+      // y éste tiene que verse junto a la respuesta que se perderá.
+      if (unsaved) anexar(session, (messages) => [...messages, { role: "system", text: t("chat.turn.unsaved"), meta: "fallo" }]);
     });
     const tab = pestanas.open().find((item) => item.id === session);
     const projectId = session === sessionId() ? project() : tab?.project ?? savedQueues.get(session)?.project;

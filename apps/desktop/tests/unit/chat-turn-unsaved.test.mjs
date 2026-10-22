@@ -50,6 +50,19 @@ function responses(overrides) {
   };
 }
 
+// El del arnés nunca dispara: sin esto el visual no llega a leerse.
+const visible = {
+  antes: (w) => {
+    globalThis.IntersectionObserver = w.IntersectionObserver = class {
+      constructor(callback) { this.callback = callback; }
+      observe(target) { setTimeout(() => this.callback([{ isIntersecting: true, target }], this), 0); }
+      unobserve() {}
+      disconnect() {}
+      takeRecords() { return []; }
+    };
+  },
+};
+
 const text = (app) => app.w.document.body.textContent ?? "";
 async function openTask(app, id) {
   const el = app.w.document.querySelector(`[data-sesion="${id}"]`);
@@ -64,7 +77,7 @@ test("la respuesta que el motor no pudo guardar sigue en el chat, con su aviso",
     // El disco nunca recibe la respuesta: es lo que dejaba el rename fallido.
     load_session: ({ id }) => session(id, [USER]),
     tree_show: { kind: "text", text: visual, bytes: new TextEncoder().encode(visual).byteLength, truncated: false },
-  }));
+  }), undefined, {}, visible);
   await sleep(600);
   await openTask(app, "t1");
   app.emit("chat", { kind: "started", session: "t1", workspace: "w" });
@@ -88,7 +101,7 @@ test("un visual que no se puede leer deja el texto, el archivo y el botón para 
       opened.push({ args, workspace: options?.headers?.["x-terminus-workspace"] });
       return null;
     },
-  }));
+  }), undefined, {}, visible);
   await sleep(600);
   await openTask(app, "t1");
   await sleep(400);
