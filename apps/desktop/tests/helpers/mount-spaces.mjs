@@ -357,11 +357,11 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     u.doc.querySelector('[data-space="i2"]').click();
     await sleep(400);
     assert.ok(u.doc.querySelector('[data-sesion="t3"]') && u.doc.querySelector('[data-sesion="t4"]'), "otro espacio no hereda el filtro");
-    assert.doesNotMatch(u.doc.querySelector("[data-sidebar-scope]").textContent, /ada/);
+    assert.doesNotMatch(u.doc.querySelector('[data-sidebar-scope] button[aria-haspopup="menu"]').getAttribute("aria-label"), /cambiad/);
     u.doc.querySelector('[data-space="i1"]').click();
     await sleep(400);
     assert.ok(u.doc.querySelector('[data-sesion="t1"]') && !u.doc.querySelector('[data-sesion="t2"]'), "volver al espacio recupera su filtro");
-    assert.match(u.doc.querySelector("[data-sidebar-scope]").textContent, /ada/);
+    assert.match(u.doc.querySelector('[data-sidebar-scope] button[aria-haspopup="menu"]').getAttribute("aria-label"), /1 cambiad/);
     assert.equal(u.pref("sidebar.view.w.i1").agent, "ada");
     assert.equal(u.pref("sidebar.view.w.i2")?.agent ?? null, null);
     await u.filtrarPorAgente(null);

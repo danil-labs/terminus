@@ -487,7 +487,7 @@ export default function Sessions(props: {
   const filteredSessions = createMemo(() => !query() ? enBarra() : enBarra().filter(session => {
     const git = effectiveTaskGit(session, gitRows(), props.relatedSessions ?? props.sessions);
     const agente = session.agent ? displayName(session.agent, profiles()[session.agent]) : null;
-    return matchesTaskQuery([session.title, session.last_message, git?.branch, git?.alias, agente], query());
+    return matchesTaskQuery([session.title, session.last_message, git?.branch, git?.alias, agente, props.carpetaDe?.(session)], query());
   }));
   if (props.onSearchResults) {
     createEffect(() => props.onSearchResults?.(filteredSessions().length));

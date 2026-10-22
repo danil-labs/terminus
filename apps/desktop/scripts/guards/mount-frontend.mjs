@@ -513,10 +513,8 @@ if (!roto) {
   assert.equal(bubbleDocument.querySelector("[data-sidebar-agents]"), null, "el riel no lista agentes");
   const filasDelRiel = () => [...bubbleDocument.querySelectorAll('[data-sidebar-tasks] [data-sesion]')].map((f) => f.dataset.sesion);
   assert.ok(bubbleDocument.querySelector('[data-sidebar-tasks] [data-sesion="s-task"] [data-session-agent]'), "sin agrupar, la tarea lleva la pastilla de su agente");
-  bubbleDocument.querySelector('button[aria-label="Buscar tareas"]').click();
-  await sleep(50);
   const buscadorDelRiel = bubbleDocument.querySelector('[data-sidebar-search] input[role="searchbox"]');
-  assert.ok(buscadorDelRiel, "la lupa abre el buscador bajo los controles del sidebar");
+  assert.ok(buscadorDelRiel, "el buscador del riel está siempre a la vista");
   buscadorDelRiel.value = "REVISAR";
   buscadorDelRiel.dispatchEvent(new bubbleApp.w.Event("input", { bubbles: true }));
   await sleep(80);
@@ -528,8 +526,9 @@ if (!roto) {
   assert.deepEqual(filasDelRiel(), ["s-transfer"], "encuentra la tarea por el nombre de su agente");
   buscadorDelRiel.dispatchEvent(new bubbleApp.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   await sleep(80);
-  assert.equal(bubbleDocument.querySelector('[data-sidebar-search] input[role="searchbox"]'), null, "Escape cierra el buscador");
-  assert.ok(filasDelRiel().includes("s-task") && filasDelRiel().includes("s-plain"), "cerrar la búsqueda devuelve la lista entera");
+  assert.equal(buscadorDelRiel.value, "", "Escape limpia la búsqueda");
+  assert.ok(bubbleDocument.querySelector('[data-sidebar-search] input[role="searchbox"]'), "y el buscador sigue a la vista");
+  assert.ok(filasDelRiel().includes("s-task") && filasDelRiel().includes("s-plain"), "limpiar la búsqueda devuelve la lista entera");
 
   // Los agentes están en el dock del pie: pulsar uno abre su chat, como su fila
   // de antes; el clic derecho ofrece ver sus tareas, que filtra la lista.
@@ -556,7 +555,7 @@ if (!roto) {
   verSusTareas.dispatchEvent(new bubbleApp.w.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
   await sleep(120);
   assert.ok(filasDelRiel().includes("s-task") && !filasDelRiel().includes("s-plain"), "ver sus tareas filtra por el agente");
-  assert.match(bubbleDocument.querySelector("[data-sidebar-scope]").textContent, /Holmes/, "la línea de alcance dice el filtro");
+  assert.match(bubbleDocument.querySelector('[data-sidebar-scope] button[aria-haspopup="menu"]').getAttribute("aria-label"), /1 cambiad/, "el filtro cuenta el cambio");
   bubbleDocument.querySelector('button[aria-haspopup="menu"][aria-label^="Filtrar y agrupar"]').click();
   await sleep(80);
   [...bubbleDocument.querySelectorAll('[role="menu"] [role="group"][aria-label="Agente"] [role="menuitemradio"]')].find((b) => b.textContent.trim() === "Todos").click();
@@ -1474,8 +1473,6 @@ if (!roto) {
   assert.equal(row("own"), null, "la delegación no llena el sidebar");
   assert.equal(row("p").querySelectorAll('[aria-label="Fallo o interrupción"]').length, 1,
     "una subtarea fallida ocupa el único indicador del coordinador");
-  sidebar.w.document.querySelector('button[aria-label="Buscar tareas"]').click();
-  await sleep(50);
   const taskSearch = sidebar.w.document.querySelector('[data-sidebar-search] input[role="searchbox"]');
   const searchTasks = async value => {
     taskSearch.value = value;
@@ -3678,11 +3675,11 @@ if (!roto) {
   const d2 = plegado.w.document;
   const ocultarRiel = d2.querySelector('button[aria-label="Ocultar el historial"]');
   assert.equal(ocultarRiel.parentElement.querySelector('button[aria-label="Proyectos"]'), null, "el encabezado del riel no repite «Proyectos»: ya lo dice la sección de abajo");
-  assert.equal(ocultarRiel.nextElementSibling?.getAttribute("aria-label"), "Buscar tareas", "la lupa comparte la fila con el control del sidebar");
+  assert.ok(d2.querySelector('[data-sidebar-search] input[role="searchbox"]'), "el buscador del riel está a la vista");
   assert.equal(d2.querySelector("[data-title-bar]").classList.contains("pl-[84px]"), false, "en pantalla completa la fila no reserva el semáforo");
   ocultarRiel.click();
   await sleep(100);
-  assert.equal(d2.querySelector('button[aria-label="Buscar tareas"]'), null, "la lupa desaparece cuando el sidebar está cerrado");
+  assert.equal(d2.querySelector('[data-sidebar-search]'), null, "el buscador desaparece cuando el sidebar está cerrado");
   assert.ok(d2.querySelector('[data-conversacion] button[aria-label="Mostrar el historial"]'), "con el riel oculto, la fila de pestañas lo trae de vuelta");
   assert.equal(d2.querySelector("[data-title-bar] [data-workspace-name]")?.textContent.trim(), LARGO, "y la fila del título no cambia");
   assert.equal(d2.querySelector("[data-window-branch]"), null, "sin título de ventana no se nombra ninguna build");
@@ -3849,8 +3846,6 @@ if (!roto) {
   assert.ok(finishButton("merged"));
   assert.equal(finishApp.w.document.querySelector('[role="alertdialog"]'), null);
   rejectFinish = false;
-  finishApp.w.document.querySelector('button[aria-label="Buscar tareas"]').click();
-  await sleep(50);
   const finishSearch = finishApp.w.document.querySelector('[data-sidebar-search] input[role="searchbox"]');
   finishSearch.value = "Tarea";
   finishSearch.dispatchEvent(new finishApp.w.Event("input", { bubbles: true }));
