@@ -1104,9 +1104,9 @@ pub(super) fn service_poll(
             if !known_event(name) {
                 return Err(failure(&Error::new("invalid_request")));
             }
-            if setup != Some(true) || matches!(name, "bootstrap" | "bootstrap-run" | "toolchain") {
-                let _ = app.emit(name, &event["payload"]);
-            }
+            // El alta (Setup) conecta cuentas e integraciones: necesita `account`, `install`, `mcp`…
+            // App no está montada mientras sondea, así que nada llega dos veces.
+            let _ = app.emit(name, &event["payload"]);
         }
     }
     // Un stream de comando cortado no pierde eventos del diario: va aparte de `gap`.

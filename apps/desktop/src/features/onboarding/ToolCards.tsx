@@ -1,4 +1,4 @@
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "../../lib/serviceEvents";
 import ArrowRight from "lucide-solid/icons/arrow-right";
 import Check from "lucide-solid/icons/check";
 import ExternalLink from "lucide-solid/icons/external-link";

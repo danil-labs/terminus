@@ -3,7 +3,7 @@
  * conectado en el workspace activo y en qué paso va cada conexión. El mapa y el
  * panel leen el mismo estado; las cuentas cuelgan del workspace activo.
  */
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "../../lib/serviceEvents";
 import { batch, createSignal, onCleanup } from "solid-js";
 import { createStore } from "solid-js/store";
 import { t } from "../../lib/i18n";
