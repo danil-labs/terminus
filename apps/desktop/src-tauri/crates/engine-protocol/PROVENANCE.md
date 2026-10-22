@@ -118,6 +118,8 @@ from the engine source at `fdf4dd9863a80363a0dd7b15ea21fd6b69e1f4bd`. The 24
 `settings.appearance.background.too_big` also became 700 KB.
 `danil.error.account_not_found` comes from `658cad2`.
 `chat.steer.delivered` comes from `d2266ae` (`fix/mandar-ahora-sin-atoros`).
+`mcp.known.notion.requires` and `mcp.known.notion.after` come from `31774ed`
+(`feat/notion-mcp-conocido`).
 
 seldon-host `feat/onboarding-engine` (`8f32a29`, `21f5687`) and
 `feat/google-drive-integration` (`b831eeb`, rebased on them) add what the
