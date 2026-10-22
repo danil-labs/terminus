@@ -1,6 +1,6 @@
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import MoreVertical from "lucide-solid/icons/more-vertical";
-import SquarePen from "lucide-solid/icons/square-pen";
+import Plus from "lucide-solid/icons/plus";
 import { createSignal, Show } from "solid-js";
 import { destinoEnVuelo } from "../../lib/drag";
 import { enfocarYSeleccionar } from "../../lib/focus";
@@ -264,7 +264,7 @@ export default function FolderGroupHeader(pp: {
           pp.onNuevaTarea();
         }}
       >
-        <SquarePen size={15} />
+        <Plus size={15} />
       </button>
     </div>
   );

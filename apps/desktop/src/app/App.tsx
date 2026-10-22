@@ -80,7 +80,7 @@ import { arbolesDe, contiene, ubicar } from "../features/code/treeKind";
 import ColumnaDeTrabajo from "../features/code/WorkTreeColumn";
 import { esDeCodigo } from "../features/code/workdirKind";
 import Observability from "../features/observability/Observability";
-import AnadirCarpeta, { type ClonEnCurso } from "../features/projects/AddWorkdir";
+import AnadirCarpeta, { type ClonEnCurso, type InicioDeCarpeta } from "../features/projects/AddWorkdir";
 import AgentPageTasks from "../features/projects/AgentPageTasks";
 // Chunk aparte: el perfil completo de un agente solo se carga al abrirlo.
 const AgentProfile = lazy(() => import("../features/projects/AgentProfile"));
@@ -1622,6 +1622,7 @@ export default function App() {
   // `null` = cerrada. Una cadena es además con qué destino abrirla.
   const [settings, setSettings] = createSignal<string | null>(null);
   const [anadiendoCarpeta, setAnadiendoCarpeta] = createSignal(false);
+  const [inicioDeCarpeta, setInicioDeCarpeta] = createSignal<InicioDeCarpeta | null>(null);
   /** El clon en vuelo, que el riel enseña mientras no hay proyecto que listar. */
   const [clonEnCurso, setClonEnCurso] = createSignal<ClonEnCurso | null>(null);
   // Cerrar la configuración es el único momento en que las cuentas pudieron
@@ -7755,7 +7756,10 @@ export default function App() {
               }
               onBorrarProyecto={borrarProyecto}
               onRemoveFromSpace={multipleSpaces() ? removeFromActiveSpace : undefined}
-              onAnadirCarpeta={() => setAnadiendoCarpeta(true)}
+              onAnadirCarpeta={(inicio) => batch(() => {
+                setInicioDeCarpeta(inicio);
+                setAnadiendoCarpeta(true);
+              })}
               clon={clonEnCurso()}
               onAbrirClon={() => setAnadiendoCarpeta(true)}
               proyectoAbierto={proyectoAbierto()}
@@ -7909,8 +7913,12 @@ export default function App() {
         abierto={anadiendoCarpeta()}
         workspace={workspaceActivo()}
         space={escritorio()}
+        inicio={inicioDeCarpeta()}
         onClon={setClonEnCurso}
-        onCerrar={() => setAnadiendoCarpeta(false)}
+        onCerrar={() => batch(() => {
+          setAnadiendoCarpeta(false);
+          setInicioDeCarpeta(null);
+        })}
         onHecho={async (p, activate) => {
           setProjectList(await invoke<Project[]>("list_projects"));
           // El backend ya la fijó en el escritorio desde el que se pidió: un

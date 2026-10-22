@@ -1,4 +1,7 @@
 import Archive from "lucide-solid/icons/archive";
+import Folder from "lucide-solid/icons/folder";
+import FolderPlus from "lucide-solid/icons/folder-plus";
+import GitBranch from "lucide-solid/icons/git-branch";
 import History from "lucide-solid/icons/history";
 import Loader2 from "lucide-solid/icons/loader-2";
 import PanelLeftClose from "lucide-solid/icons/panel-left-close";
@@ -10,7 +13,6 @@ import TriangleAlert from "lucide-solid/icons/triangle-alert";
 import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createResource, createSignal, type JSX, lazy, mapArray, on, onCleanup, Show, Suspense } from "solid-js";
 import { destinoEnVuelo, puntoDelArrastre, tareaEnVuelo } from "../../lib/drag";
-import { enfocarYSeleccionar } from "../../lib/focus";
 import { recordarCarpetas } from "../../lib/folderKinds";
 import { t } from "../../lib/i18n";
 import { lastRoster, rememberRoster } from "../../lib/handlerRoster";
@@ -23,6 +25,7 @@ import { cn } from "../../lib/utils";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
 import { KeyedList } from "../../ui/KeyedList";
+import { ITEM_DE_MENU, Popover, PopoverContent, PopoverTrigger } from "../../ui/Popover";
 import { BotonConAtajo, TeclaDeAtajo } from "../../ui/Shortcut";
 import {
   SidebarContent,
@@ -33,7 +36,7 @@ import {
   SidebarMenuItem,
   Sidebar as SidebarShell,
 } from "../../ui/sidebar";
-import { type ClonEnCurso, faseDeClon } from "../projects/AddWorkdir";
+import { type ClonEnCurso, faseDeClon, type InicioDeCarpeta } from "../projects/AddWorkdir";
 import { AstroAvatar } from "../projects/AstroAvatar";
 import { watchHandlerStatuses } from "../projects/handlerPresence";
 import NewAgent, { type ModelChoices } from "../projects/NewAgent";
@@ -47,7 +50,6 @@ import {
   groupLabel,
   loadSidebarView,
   saveSidebarView,
-  scopeLabel,
   type SidebarGroup,
   type SidebarView,
 } from "../../lib/sidebarView";
@@ -115,7 +117,8 @@ export default function Sidebar(props: {
   onBorrarProyecto: (id: string) => Promise<void> | void;
   /** With more than one space, the folder leaves the active one instead of being deleted. */
   onRemoveFromSpace?: (id: string) => void;
-  onAnadirCarpeta: () => void;
+  /** Abre «Añadir un proyecto»; `inicio` salta a uno de sus caminos. */
+  onAnadirCarpeta: (inicio: InicioDeCarpeta | null) => void;
   /** El clon que corre ahora mismo, si lo hay. Ver `projects/AddWorkdir.tsx`. */
   clon: ClonEnCurso | null;
   /** Devuelve el diálogo del clon, con su progreso y su cancelación. */
@@ -126,7 +129,7 @@ export default function Sidebar(props: {
   onAbrirProyecto: (id: string) => void;
   /** Lo que se ofrece como modelo por defecto al crear un agente. */
   modelos: ModelChoices;
-  /** Empezar una tarea dentro de ese proyecto, sin pasar por su vista. */
+  /** Empezar una tarea dentro de ese proyecto, sin pasar por su vista. `""` es sin carpeta. */
   onNuevaTareaEn: (id: string) => void;
   onDelete: (project: string, id: string) => Promise<boolean | void> | boolean | void;
   onMove: (project: string, id: string, to: string) => void;
@@ -204,13 +207,32 @@ export default function Sidebar(props: {
     saveSidebarView(props.viewKey, siguiente);
   };
 
-  const [searchOpen, setSearchOpen] = createSignal(false);
   const [searchText, setSearchText] = createSignal("");
   const query = () => searchText().trim();
   const [searchCounts, setSearchCounts] = createSignal<Record<string, number>>({});
   const reportResults = (key: string, count: number) => setSearchCounts(previous => previous[key] === count ? previous : { ...previous, [key]: count });
-  const closeSearch = () => { setSearchText(""); setSearchOpen(false); };
-  createEffect(() => { if (props.collapsed) closeSearch(); });
+  const clearSearch = () => setSearchText("");
+  createEffect(() => { if (props.collapsed) clearSearch(); });
+  const [menuCarpeta, setMenuCarpeta] = createSignal(false);
+  const anadirCarpeta = (inicio: InicioDeCarpeta) => {
+    setMenuCarpeta(false);
+    setDesplegado(false);
+    props.onAnadirCarpeta(inicio);
+  };
+  const OpcionDeCarpeta = (p: { inicio: InicioDeCarpeta; titulo: string; detalle: string; children: JSX.Element }) => (
+    <button
+      role="menuitem"
+      class={cn(ITEM_DE_MENU, "grid grid-cols-[16px_minmax(0,1fr)] items-start gap-2 [&_svg]:mt-px [&_svg]:text-neutral-500")}
+      data-folder-menu={p.inicio}
+      onClick={() => anadirCarpeta(p.inicio)}
+    >
+      {p.children}
+      <span class="grid min-w-0">
+        <span>{p.titulo}</span>
+        <span class="text-[0.6875rem] text-neutral-500">{p.detalle}</span>
+      </span>
+    </button>
+  );
   createEffect(() => recordarCarpetas(props.projects));
 
   /** De qué carpeta es cada tarea, por id: las acciones de la fila llegan con el id. */
@@ -323,7 +345,6 @@ export default function Sidebar(props: {
   const agentesDelFiltro = createMemo(() =>
     agentOptions(agentesDelDock().map((a) => a.name), todas().map((x) => x.row))
       .map((a) => ({ ...a, body: perfilDe(a.name)?.body, avatar: perfilDe(a.name)?.avatar })));
-  const alcance = () => scopeLabel(vistaEfectiva(), (id) => nombreDe(id) ?? id);
   const conResultados = (clave: string) => (searchCounts()[clave] ?? 0) > 0;
 
   /**
@@ -383,13 +404,15 @@ export default function Sidebar(props: {
   );
 
   /** El rótulo de un tramo, con su cuenta a la derecha. */
-  const Rotulo = (p: { children: JSX.Element; cuenta: number; tono?: "need" }) => (
+  const Rotulo = (p: { children: JSX.Element; cuenta: number; tono?: "need"; accion?: JSX.Element }) => (
     <div class={cn(
-      "flex h-7 min-w-0 items-center gap-1.5 px-2 pt-1 text-[0.6875rem] font-medium",
+      "group flex h-7 min-w-0 items-center gap-1.5 px-2 pt-1 text-[0.6875rem] font-medium",
+      p.accion && "pr-0",
       p.tono === "need" ? "text-warning" : "text-neutral-500",
     )}>
       {p.children}
       <span class={cn("ml-auto shrink-0 tabular-nums", p.tono !== "need" && "text-neutral-700")}>{p.cuenta}</span>
+      {p.accion}
     </div>
   );
 
@@ -464,7 +487,21 @@ export default function Sidebar(props: {
                 data-destino={g().kind === "folder" ? "" : undefined}
                 class={cn("rounded-[var(--radius-sm)]", g().kind === "folder" && destinoEnVuelo() === "" && RECIBE_LA_TAREA)}
               >
-                <Rotulo cuenta={cuentaDe(clave(), g().tasks)} tono={necesita() ? "need" : undefined}>
+                <Rotulo
+                  cuenta={cuentaDe(clave(), g().tasks)}
+                  tono={necesita() ? "need" : undefined}
+                  accion={g().kind === "folder" && !g().key ? (
+                    <button
+                      class="mr-1 grid size-6 shrink-0 place-items-center rounded-sm text-neutral-500 opacity-0 outline-none hover:bg-surface-muted hover:text-neutral-950 focus-visible:opacity-100 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary group-hover:opacity-100 group-focus-within:opacity-100"
+                      data-loose-task=""
+                      aria-label={t("shell.sidebar.new_loose_task")}
+                      title={t("shell.sidebar.new_loose_task")}
+                      onClick={() => { props.onNuevaTareaEn(""); setDesplegado(false); }}
+                    >
+                      <Plus size={15} aria-hidden="true" />
+                    </button>
+                  ) : undefined}
+                >
                   <Show when={g().kind === "agent" && g().key}>
                     <AstroAvatar name={g().key} status="asleep" size={14} />
                   </Show>
@@ -520,7 +557,6 @@ export default function Sidebar(props: {
               {t("spaces.rail.empty", { name: props.escritorio ?? "" })}
             </p>
           </Show>
-          <Button variant="ghost" size="compact" class="w-full justify-start text-neutral-500" onClick={props.onAnadirCarpeta}><Plus size={14} />{t("shell.sidebar.new_folder")}</Button>
         </Show>
       </Show>
 
@@ -575,19 +611,8 @@ export default function Sidebar(props: {
           >
             <PanelLeftClose size={16} />
           </BotonConAtajo>
-          <Show when={!props.collapsed && !searchOpen()}>
-            <Button variant="chrome" size="iconCompact" class="size-7 shrink-0 text-neutral-500" aria-label={t("shell.sidebar.search")} title={t("shell.sidebar.search")} aria-expanded={searchOpen()} onClick={() => setSearchOpen(true)}>
-              <Search size={16} />
-            </Button>
+          <Show when={!props.collapsed}>
             {capabilities().sidebarExtra?.()}
-          </Show>
-          <Show when={!props.collapsed && searchOpen()}>
-            <div data-sidebar-search class="flex h-7 min-w-0 flex-1 items-center gap-1 rounded-md border border-border-strong bg-surface-raised px-1 focus-within:outline-solid focus-within:outline-2 focus-within:outline-primary">
-              <Input ref={enfocarYSeleccionar} type="text" role="searchbox" variant="ghost" class="h-full min-h-0 min-w-0 flex-1 border-0 px-0 py-0" placeholder={t("shell.sidebar.search")} aria-label={t("shell.sidebar.search")} value={searchText()} onInput={event => setSearchText(event.currentTarget.value)} onKeyDown={event => {
-                if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); closeSearch(); }
-              }} />
-              <Button variant="chrome" size="iconCompact" class="size-6 shrink-0 text-neutral-500" aria-label={t("shell.sidebar.close_search")} title={t("shell.sidebar.close_search")} onClick={closeSearch}><X size={14} /></Button>
-            </div>
           </Show>
           </div>
         </SidebarHeader>
@@ -613,6 +638,38 @@ export default function Sidebar(props: {
                 </Show>
               </SidebarMenuButton>
             </SidebarMenuItem>
+            <SidebarMenuItem>
+              <Popover open={menuCarpeta()} onOpenChange={setMenuCarpeta} placement={props.collapsed ? "right-start" : "bottom-start"} gutter={4}>
+                <PopoverTrigger
+                  as={(disparador: object) => (
+                    <SidebarMenuButton
+                      {...disparador}
+                      class="bg-neutral-950 font-bold text-neutral-50 hover:bg-neutral-950"
+                      data-new-folder=""
+                      aria-haspopup="menu"
+                      aria-label={t("shell.sidebar.new_folder")}
+                      title={props.collapsed ? t("shell.sidebar.new_folder") : undefined}
+                    >
+                      <FolderPlus size={14} aria-hidden="true" />
+                      <Show when={!props.collapsed}>
+                        <span>{t("shell.sidebar.new_folder")}</span>
+                      </Show>
+                    </SidebarMenuButton>
+                  )}
+                />
+                <PopoverContent role="menu" aria-label={t("shell.sidebar.new_folder")} class="grid w-72 gap-0.5 p-1">
+                  <OpcionDeCarpeta inicio="carpeta" titulo={t("shell.sidebar.folder_menu.open")} detalle={t("projects.add.browse_help")}>
+                    <Folder size={15} aria-hidden="true" />
+                  </OpcionDeCarpeta>
+                  <OpcionDeCarpeta inicio="vacia" titulo={t("shell.sidebar.folder_menu.create")} detalle={t("projects.add.empty_help")}>
+                    <Plus size={15} aria-hidden="true" />
+                  </OpcionDeCarpeta>
+                  <OpcionDeCarpeta inicio="clonar" titulo={t("shell.sidebar.folder_menu.clone")} detalle={t("shell.sidebar.folder_menu.clone_help")}>
+                    <GitBranch size={15} aria-hidden="true" />
+                  </OpcionDeCarpeta>
+                </PopoverContent>
+              </Popover>
+            </SidebarMenuItem>
             <Show when={props.collapsed}>
               <SidebarMenuItem>
                 <SidebarMenuButton
@@ -635,9 +692,16 @@ export default function Sidebar(props: {
           </SidebarMenu>
 
           <Show when={!props.collapsed}>
-            {/* Qué se enseña, y el único botón que lo cambia. */}
-            <div data-sidebar-scope class="-mt-1 flex min-w-0 items-center gap-1 pl-2">
-              <span class="min-w-0 flex-1 truncate text-[0.6875rem] text-neutral-500" title={alcance()}>{alcance()}</span>
+            <div data-sidebar-scope class="flex min-w-0 items-center gap-1">
+              <div data-sidebar-search class="flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-md border border-border-strong bg-surface-raised px-2 focus-within:outline-solid focus-within:outline-2 focus-within:outline-primary">
+                <Search size={14} class="shrink-0 text-neutral-500" aria-hidden="true" />
+                <Input type="text" role="searchbox" variant="ghost" class="h-full min-h-0 min-w-0 flex-1 border-0 px-0 py-0" placeholder={t("shell.sidebar.search")} aria-label={t("shell.sidebar.search")} value={searchText()} onInput={event => setSearchText(event.currentTarget.value)} onKeyDown={event => {
+                  if (event.key === "Escape" && searchText()) { event.preventDefault(); event.stopPropagation(); clearSearch(); }
+                }} />
+                <Show when={searchText()}>
+                  <Button variant="chrome" size="iconCompact" class="-mr-1 size-6 shrink-0 text-neutral-500" aria-label={t("shell.sidebar.clear_search")} title={t("shell.sidebar.clear_search")} onClick={clearSearch}><X size={14} /></Button>
+                </Show>
+              </div>
               <Suspense>
                 <SidebarFilter
                   view={vistaEfectiva()}
