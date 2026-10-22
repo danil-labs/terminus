@@ -791,7 +791,7 @@ export default function Setup(props: { children: JSX.Element }) {
   );
 
   const CAPA =
-    "absolute inset-0 flex flex-col gap-2.5 transition-[transform,opacity] duration-[420ms] ease-[cubic-bezier(.2,.7,.2,1)] motion-reduce:transition-none";
+    "absolute inset-0 flex flex-col gap-2.5 transition-[translate,opacity] duration-[420ms] ease-[cubic-bezier(.2,.7,.2,1)] motion-reduce:transition-none";
 
   const derecha = () => (
     <div class="relative min-h-0 flex-1">
