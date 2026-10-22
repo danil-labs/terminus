@@ -115,6 +115,8 @@
   "code.editor.selection_deleted": "Selection deleted",
   "code.tree.new_file": "New file",
   "code.tree.new_folder": "New folder",
+  "code.tree.new_file.empty_task": "New file (opens a task without messaging the agent)",
+  "code.tree.new_folder.empty_task": "New folder (opens a task without messaging the agent)",
   "code.tree.rename": "Rename",
   "code.tree.name.new_file": "Name of the new file",
   "code.tree.name.new_folder": "Name of the new folder",

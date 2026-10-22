@@ -77,6 +77,7 @@ import VisorDeArchivo from "../features/code/FileViewer";
 import { avisarDeLosArboles } from "../features/code/refresh";
 import CambiosDelTurno from "../features/code/TurnChanges";
 import { arbolesDe, contiene, ubicar } from "../features/code/treeKind";
+import type { Tipo } from "../features/code/FileTree";
 import ColumnaDeTrabajo from "../features/code/WorkTreeColumn";
 import { esDeCodigo } from "../features/code/workdirKind";
 import Observability from "../features/observability/Observability";
@@ -4829,6 +4830,43 @@ export default function App() {
   }
 
   /**
+   * Crear un archivo o una carpeta en la vista previa, sin escribirle al
+   * agente: la tarea nace vacía con su copia de trabajo, como la del primer
+   * mensaje (`create_empty_session`), y lo nuevo se crea dentro. Ese primer
+   * mensaje sigue después en esta misma tarea y le pone el título.
+   */
+  async function crearEnTareaVacia(tipo: Tipo, ruta: string) {
+    const proyecto = project();
+    const claveBorrador = claveAbierta();
+    const lugar = projectList().find((p) => p.id === proyecto);
+    const { session } = await invoke<{ session: string; folder: string }>("create_empty_session", {
+      provider: agent(),
+      project: proyecto,
+      title: ruta.slice(ruta.lastIndexOf("/") + 1),
+      baseRef: draftBases()[claveBorrador] ?? null,
+      agent: hablandoCon()?.name ?? null,
+      space: escritorio(),
+    }, runOnOptions(workspaceActivo(), lugar));
+    let arbol = "";
+    try {
+      const arboles = await invoke<ArbolEnTarea[]>("list_task_trees", { project: proyecto, session });
+      arbol = arboles[0]?.key ?? "";
+      const donde = { project: proyecto, session, tree: arbol, path: ruta };
+      await (tipo === "archivo" ? invoke("tree_create_file", donde) : invoke("tree_create_folder", donde));
+    } catch (e) {
+      // Sin lo que se pidió crear, la tarea vacía no tiene por qué estar.
+      await invoke("delete_session", { project: proyecto, id: session, force: false }).catch(() => {});
+      throw e;
+    }
+    void refreshSessions([proyecto]);
+    // La persona ya mira otra cosa: la tarea queda en la lista, sin quitarle la vista.
+    if (claveAbierta() !== claveBorrador) return;
+    adoptarNacida(session, { provisional: null, proyecto, titulo: "", claveBorrador });
+    await abrirSesion(proyecto, session);
+    if (tipo === "archivo" && sessionId() === session) abrirArchivo(arbol, ruta, false);
+  }
+
+  /**
    * El servidor que levantó una tarea, pestaña más del centro. Se abre
    * la tarea primero: `pestanas.abrir` mete la de contenido detrás de
    * las de su tarea, o dejaría un hueco al cerrarla (`lib/tabs.ts`).
@@ -7843,6 +7881,7 @@ export default function App() {
               tabs={pestanas.open()}
               visible={artOpen()}
               onExportarChat={exportarChat}
+              onCrearSinTarea={project() ? crearEnTareaVacia : undefined}
               onAbrirArchivo={abrirArchivo}
               onArchivoMovido={archivoMovido}
               onArchivoBorrado={archivoBorrado}

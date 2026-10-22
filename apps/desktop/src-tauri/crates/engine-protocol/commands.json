@@ -972,6 +972,46 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "create_empty_session",
+      "output": "-> Result < EmptySession , String >",
+      "parameters": [
+        {
+          "key": "provider",
+          "name": "provider",
+          "type": "String"
+        },
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "title",
+          "name": "title",
+          "type": "String"
+        },
+        {
+          "key": "baseRef",
+          "name": "base_ref",
+          "type": "Option < String >"
+        },
+        {
+          "key": "agent",
+          "name": "agent",
+          "type": "Option < String >"
+        },
+        {
+          "key": "space",
+          "name": "space",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "chat::create_empty_session"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "create_project",
       "output": "-> Result < Project , crate :: util :: Failure >",
       "parameters": [
