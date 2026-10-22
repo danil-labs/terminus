@@ -647,22 +647,34 @@ export default function Setup(props: { children: JSX.Element }) {
 
   const acciones = { onMarcar: marcar, onCancelar: cancelarOpcional, onDesinstalar: (n: string) => void desinstalar(n) };
 
-  /** «Siguiente»: el workspace «Personal» nace aquí, que es de quien cuelgan las cuentas de la IA. */
-  async function aConectar() {
-    if (entrando()) return;
-    setEntrando(true);
-    setFallo(null);
-    try {
+  /** El workspace «Personal» nace aquí, que es de quien cuelgan las cuentas de la IA, y los proveedores se cargan. */
+  let preparadas: Promise<void> | null = null;
+  function prepararConexiones() {
+    preparadas ??= (async () => {
       if (!workspace()) {
         const w = await crearWorkspace(t("onboarding.workspace.default"));
         setWorkspace({ id: w.id, nombre: t("onboarding.workspace.default") });
       }
       if (!conexiones()) {
-        const { crearConexiones } = await import("../onboarding/connect-store");
+        const [{ crearConexiones }] = await Promise.all([import("../onboarding/connect-store"), import("../onboarding/ConnectAI")]);
         runWithOwner(dueño, () => setConexiones(crearConexiones()));
       }
+      await conexiones()?.cargar();
+    })().catch((e) => {
+      preparadas = null;
+      throw e;
+    });
+    return preparadas;
+  }
+
+  /** «Siguiente». */
+  async function aConectar() {
+    if (entrando()) return;
+    setEntrando(true);
+    setFallo(null);
+    try {
+      await prepararConexiones();
       setPaso("ia");
-      void conexiones()?.cargar();
     } catch (e) {
       setFallo(prosaDe(e));
     } finally {
@@ -671,6 +683,12 @@ export default function Setup(props: { children: JSX.Element }) {
   }
 
   const alta = () => hayEspacio() === false;
+
+  // Con la preparación terminada, «Conecta tu IA» se deja lista por detrás: al pulsar «Siguiente»
+  // la capa entra completa, sin quedarse vacía mientras carga.
+  createEffect(() => {
+    if (fin() && alta()) void prepararConexiones().catch(() => {});
+  });
   const ia = () => paso() === "ia";
   const conectadas = () => conexiones()?.conectadas() ?? [];
   const nombres = () => conectadas().map((f) => conexiones()?.nombre(f) ?? f.label);
