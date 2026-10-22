@@ -86,6 +86,8 @@ export type AccountStatus = {
    * disco y no del llavero.
    */
   unreadable?: Failure;
+  /** La sesión quedó guardada pero el proveedor todavía no le dio de alta el servicio a la cuenta; `url` es la página que lo completa. */
+  signup?: { url: string | null };
 };
 
 /**

@@ -24,7 +24,7 @@ type Nodo = "off" | "det" | "vivo" | "on";
 
 function nodo(p: Paso | undefined): Nodo {
   if (p?.k === "conectada") return "on";
-  if (p && ["descargando", "entrando", "clave", "comprobando", "saliendo"].includes(p.k)) return "vivo";
+  if (p && ["descargando", "entrando", "clave", "comprobando", "saliendo", "alta"].includes(p.k)) return "vivo";
   return p?.k === "instalada" || p?.k === "sesion" ? "det" : "off";
 }
 
@@ -198,6 +198,8 @@ function detalle(c: Conexiones, f: Fila): string {
       return p.cuenta;
     case "saliendo":
       return t("onboarding.ai.disconnecting");
+    case "alta":
+      return t("onboarding.ai.signup.pending");
     default:
       if (base) return base;
       return c.externa(f) ? t("onboarding.ai.external_detail") : t("onboarding.ai.installs_and_signs_in");
@@ -270,6 +272,14 @@ function Tarjeta(props: { c: Conexiones; f: Fila; abajo?: JSX.Element; resaltada
               </Button>
             </Match>
             <Match when={p()?.k === "clave"}>
+              <Button size="sm" variant="ghost" onClick={() => void props.c.cancelar(props.f.id)}>
+                {t("onboarding.cancel")}
+              </Button>
+            </Match>
+            <Match when={p()?.k === "alta"}>
+              <Show when={(p() as { revisando?: boolean }).revisando}>
+                <Spinner class="text-primary" />
+              </Show>
               <Button size="sm" variant="ghost" onClick={() => void props.c.cancelar(props.f.id)}>
                 {t("onboarding.cancel")}
               </Button>
@@ -377,6 +387,27 @@ function PanelDeClave(props: { c: Conexiones; f: Fila }) {
   );
 }
 
+/** La cuenta ya inició sesión y le falta el alta: la página se abrió sola y se vuelve a revisar al regresar. */
+function PanelDeAlta(props: { c: Conexiones; f: Fila; paso: Extract<Paso, { k: "alta" }> }) {
+  return (
+    <div class={PANEL}>
+      <span class="text-xs leading-[1.4] text-neutral-700">
+        {props.paso.url ? t("onboarding.ai.signup.hint") : t("onboarding.ai.signup.hint_admin")}
+      </span>
+      <div class="mt-0.5 flex flex-wrap items-center justify-end gap-2">
+        <Button size="sm" variant="ghost" disabled={props.paso.revisando} onClick={() => void props.c.revisarAlta(props.f.id)}>
+          {t("onboarding.ai.signup.check")}
+        </Button>
+        <Show when={props.paso.url}>
+          <Button size="sm" onClick={() => props.c.abrirAlta(props.f.id)}>
+            {t("onboarding.ai.signup.open")}
+            <ExternalLink size={12} aria-hidden="true" />
+          </Button>
+        </Show>
+      </div>
+    </div>
+  );
+}
 
 /** El aviso de los gratuitos va pegado a su tarjeta mientras no se han activado. */
 function AvisoDeGratuitos() {
@@ -412,12 +443,13 @@ function FilaDeIA(props: { c: Conexiones; f: Fila }) {
     const paso = p();
     if (paso?.k === "clave" || (paso?.k === "comprobando" && props.f.modo === "clave"))
       return <PanelDeClave c={props.c} f={props.f} />;
+    if (paso?.k === "alta") return <PanelDeAlta c={props.c} f={props.f} paso={paso} />;
     const error = props.c.errores[props.f.id];
     if (error) return <ErrorDeTarjeta texto={error} />;
     if (props.f.modo === "consentimiento" && (paso?.k === "falta" || paso?.k === "instalada")) return <AvisoDeGratuitos />;
     return undefined;
   };
-  const resaltada = () => ["sesion", "entrando", "clave", "comprobando"].includes(p()?.k ?? "") && props.f.modo !== "consentimiento";
+  const resaltada = () => ["sesion", "entrando", "clave", "comprobando", "alta"].includes(p()?.k ?? "") && props.f.modo !== "consentimiento";
   return <Tarjeta c={props.c} f={props.f} abajo={abajo()} resaltada={resaltada()} />;
 }
 
