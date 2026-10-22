@@ -136,6 +136,16 @@ if (explicadas < escuchasTotales) {
   process.exit(1);
 }
 
+// Con el stream empujado los eventos del motor solo llegan a quien escucha con `lib/serviceEvents`.
+const CRUDO = /import\s*\{[^}]*\blisten\b[^}]*\}\s*from\s*"@tauri-apps\/api\/event"/;
+const crudos = WEB.flatMap((dir) =>
+  [...walkFiles(dir, [".ts", ".tsx"])]
+    .filter((f) => !f.replaceAll("\\", "/").endsWith("lib/serviceEvents.ts") && CRUDO.test(readFileSync(f, "utf8")))
+    .map((f) => relative(dir, f)),
+);
+for (const f of crudos) console.error(`${f} importa \`listen\` de @tauri-apps/api/event: usa el de lib/serviceEvents.`);
+if (crudos.length) process.exit(1);
+
 const llegados = Object.keys(EVENTOS_PENDIENTES).filter((n) => emitidos.has(n));
 for (const n of llegados) console.error(`«${n}» ya lo emite el motor: quítalo de scripts/engine-pending.mjs.`);
 if (llegados.length) process.exit(1);
