@@ -129,7 +129,8 @@ export function crearConexiones() {
 
   async function pasoGuardado(f: Fila, superficies: Superficie[]): Promise<Paso> {
     const a = agente(f.agente);
-    const base: Paso = a?.available ? { k: "instalada" } : { k: "falta" };
+    // El binario que Terminus bajó para otra fila del mismo agente no cuenta como instalado en el sistema.
+    const base: Paso = a?.available && (f.detectada || f.modo !== "clave") ? { k: "instalada" } : { k: "falta" };
     try {
       if (f.modo === "consentimiento") {
         return a?.available && (await consentida(f.agente))
@@ -229,9 +230,7 @@ export function crearConexiones() {
 
   async function descargar(f: Fila): Promise<boolean> {
     const total = f.bytes ?? 0;
-    for (const x of filas().filter((x) => x.agente === f.agente && !enCurso(x.id))) {
-      poner(x.id, { k: "descargando", hecho: 0, total });
-    }
+    poner(f.id, { k: "descargando", hecho: 0, total });
     const vuelta = descargas.then(async () => {
       if (agente(f.agente)?.available) return true;
       await invoke("install_provider", { provider: f.agente });
