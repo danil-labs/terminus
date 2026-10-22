@@ -1,3 +1,4 @@
+import TriangleAlert from "lucide-solid/icons/triangle-alert";
 import { listen } from "../../lib/serviceEvents";
 import ArrowRight from "lucide-solid/icons/arrow-right";
 import Check from "lucide-solid/icons/check";
@@ -446,6 +447,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
   function Tarjeta(p: { i: Integracion }) {
     const e = () => estados[p.i.id];
     const nombre = p.i.nombre;
+    const fallo = () => Boolean(errores[p.i.id]) && !formularioAbierto(p.i);
     const cancelarEsta = () => (
       <CancelButton label={t("onboarding.tools.cancel_connect", { name: nombre })} onClick={() => void cancelar(p.i)} />
     );
@@ -453,6 +455,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
       <div
         class={cn(
           "flex h-[58px] items-center gap-3 rounded-lg border px-3 py-2",
+          fallo() && "animate-sacudir border-neutral-950 bg-surface-raised",
           e()?.k === "conectada" && p.i.via !== "incluido" && "border-success-strong/40 bg-success/5",
           ["conectando", "formulario", "descargando"].includes(e()?.k ?? "") && "border-primary bg-primary/5",
           (!e() || e()?.k === "libre" || e()?.k === "saliendo" || p.i.via === "incluido") && "border-border bg-surface-raised",
@@ -463,16 +466,21 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
         </span>
         <span class="grid min-w-0 flex-1 gap-px">
           <strong class="truncate text-[13px] font-semibold text-neutral-950">{nombre}</strong>
-          <span class="truncate text-[11px] text-neutral-500" title={detalle(p.i)}>
-            {detalle(p.i)}
+          <span class={cn("truncate text-[11px]", fallo() ? "text-error-strong" : "text-neutral-500")} title={fallo() ? (errores[p.i.id] ?? "") : detalle(p.i)}>
+            {fallo() ? errores[p.i.id] : detalle(p.i)}
           </span>
         </span>
         <span class="flex w-[124px] shrink-0 items-center justify-end gap-1.5">
           <Switch
             fallback={
-              <Button size="compact" variant="secondary" onClick={() => void conectar(p.i)}>
-                {t("onboarding.ai.connect")}
-              </Button>
+              <>
+                <Show when={fallo()}>
+                  <TriangleAlert size={15} class="shrink-0 text-error-strong" aria-hidden="true" />
+                </Show>
+                <Button size="compact" variant="secondary" onClick={() => void conectar(p.i)}>
+                  {fallo() ? t("onboarding.ai.retry") : t("onboarding.ai.connect")}
+                </Button>
+              </>
             }
           >
             <Match when={p.i.via === "incluido"}>
@@ -509,7 +517,9 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
               }}
             </Match>
             <Match when={e()?.k === "conectando"}>
-              <Spinner size={18} class="text-primary" />
+              <Show when={(e() as { codigo?: string }).codigo} fallback={<Spinner size={18} class="text-primary" />}>
+                {(c) => <strong class="select-all rounded-sm bg-surface-muted px-2 py-0.5 font-mono text-base font-semibold tracking-[0.08em] text-neutral-950">{c()}</strong>}
+              </Show>
               <Show when={!formularioAbierto(p.i)}>{cancelarEsta()}</Show>
             </Match>
             <Match when={e()?.k === "formulario"}>{cancelarEsta()}</Match>
@@ -639,7 +649,6 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
     );
   // Como el diseño: la pila de «Ver más» enseña todo lo que no es común, aunque ya esté a la vista.
   const escondidas = () => INTEGRACIONES().filter((i) => !i.comun);
-  const fallidas = () => INTEGRACIONES().filter((i) => errores[i.id] && !formularioAbierto(i));
 
   return (
     <>
@@ -647,9 +656,6 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
         <For each={visibles()}>{(i) => <Tarjeta i={i} />}</For>
       </div>
       <Show when={falloDeCarga()}>{(e) => <ErrorDeTarjeta class="rounded-md border-t" texto={e()} />}</Show>
-      <For each={fallidas()}>
-        {(i) => <ErrorDeTarjeta class="rounded-md border-t" texto={t("onboarding.tools.failed", { name: i.nombre, reason: errores[i.id] ?? "" })} />}
-      </For>
       <For each={INTEGRACIONES().filter(formularioAbierto)}>{(i) => <Formulario i={i} />}</For>
       <VerMas
         abierto={verMas()}

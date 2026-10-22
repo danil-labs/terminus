@@ -264,7 +264,9 @@ function Tarjeta(props: { c: Conexiones; f: Fila; abajo?: JSX.Element; resaltada
               </Button>
             </Match>
             <Match when={p()?.k === "entrando"}>
-              <Spinner class="text-primary" />
+              <Show when={(p() as { codigo?: string }).codigo} fallback={<Spinner class="text-primary" />}>
+                {(c) => <strong class="select-all rounded-sm bg-surface-muted px-2 py-0.5 font-mono text-base font-semibold tracking-[0.08em] text-neutral-950">{c()}</strong>}
+              </Show>
               <Button size="sm" variant="ghost" onClick={() => void props.c.cancelar(props.f.id)}>
                 {t("onboarding.cancel")}
               </Button>
