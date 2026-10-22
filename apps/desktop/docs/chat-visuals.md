@@ -77,6 +77,19 @@ La ampliación reserva la capa modal en `lib/sites.ts`, ocultando los sitios
 nativos aunque el diálogo siga bajo `#root`. Reducir, cerrar o desmontar libera
 esa reserva; los menús y portales conservan su propia suspensión.
 
+Si la lectura falla, el bloque conserva su lugar entre los párrafos: título,
+nombre del archivo, el error, Reintentar y Abrir en el navegador. Abrir usa
+`tree_open_external` con el mismo selector, header y comprobaciones de ruta,
+sin el tope de tamaño ni UTF-8.
+
+En Windows, la lectura comparte lectura y escritura en las carpetas y también
+el borrado en los archivos, y suelta `session.json` antes de leer el visual.
+La ventana suele pedir el visual cuando el turno que lo publicó está cerrando;
+un handle sin compartir hacía fallar con os error 32 el rename que guarda la
+transcripción. Si el motor no logra guardar un turno, su `done` lleva
+`text="unsaved"`: la ventana conserva lo que pintó en vivo, avisa y no relee
+el disco hasta otra apertura.
+
 El historial conserva la directiva original. Reabrir carga el mismo archivo;
 el estado JavaScript se reinicia tras cerrar o desmontar el iframe.
 El sandbox no limita CPU ni memoria de los scripts del agente.
@@ -92,7 +105,9 @@ El sandbox no limita CPU ni memoria de los scripts del agente.
 | Contenido que crece y se reduce; márgenes; ancho estrecho | Ajusta altura y permite seguir por el chat |
 | Altura no finita o mensaje de otro marco | Rechaza; las alturas válidas se acotan |
 | Ocho directivas y una novena; 17 marcos en el hilo | Respeta límites y permite cerrar para cargar otro |
-| Archivo faltante y reintento | Error localizado; recupera tras crear el archivo |
+| Archivo faltante y reintento | Error localizado con el nombre del archivo; recupera tras crearlo |
+| Lectura fallida y Abrir en el navegador | El texto sigue; abre el HTML con su app |
+| Turno con visual cuyo guardado falla | El mensaje sigue en el chat, con aviso |
 | Tamaño, UTF-8, symlink, reparse, reservado y archivo especial | Rechazo por el motor antes de cargar HTML |
 | Sesión ajena y cambio de workspace durante la lectura | Mantiene el ámbito capturado |
 | Red, DOM padre, API, popups y navegación | Bloqueados por el sandbox y la CSP |

@@ -151,7 +151,7 @@ import { lastRoster, rememberRoster } from "../lib/handlerRoster";
 import { aplicarLenguaDeWorkspace, clavesConocidas, t } from "../lib/i18n";
 import { invoke } from "../lib/invoke.ts";
 import { connected } from "../lib/engineConnection";
-import { readChatVisual } from "../features/chat/readVisual";
+import { openChatVisual, readChatVisual } from "../features/chat/readVisual";
 import { createPointerDrag } from "../lib/pointer-drag";
 import type { InternalTaskLink } from "../lib/links";
 import type { MentionSources } from "../lib/mentions";
@@ -2149,7 +2149,7 @@ export default function App() {
     ),
   );
 
-  async function settleTurn(session: string, ok?: boolean | null) {
+  async function settleTurn(session: string, ok?: boolean | null, unsaved = false) {
     const generation = sessionGeneration;
     const revision = advanceTurn(session);
     finishedTurns.set(session, ok);
@@ -2184,10 +2184,14 @@ export default function App() {
       if (deteniendo() === session) setDeteniendo(null);
       setPermissions((items) => items.filter((permission) => permission.session !== session));
       soltarTerminal(session);
+      if (unsaved) anexar(session, (messages) => [...messages, { role: "system", text: t("chat.turn.unsaved"), meta: "aviso" }]);
     });
     const tab = pestanas.open().find((item) => item.id === session);
     const projectId = session === sessionId() ? project() : tab?.project ?? savedQueues.get(session)?.project;
     try {
+      // El motor no pudo escribir el turno: el disco no lo tiene, y releerlo
+      // borraría del chat la respuesta que la persona acaba de ver llegar.
+      if (unsaved) return;
       if (projectId !== undefined) {
         const result = await leerTarea(projectId, session);
         if (generation === sessionGeneration && revision === turnRevisions.get(session))
@@ -2625,7 +2629,7 @@ export default function App() {
       }
 
       if (kind === "done") {
-        void settleTurn(session, ok);
+        void settleTurn(session, ok, text === "unsaved");
         return;
       }
 
@@ -6671,6 +6675,7 @@ export default function App() {
         onRespuestaRapida={mandarTexto}
         visualScope={JSON.stringify([visualWorkspace, pp.proyecto ?? "", pp.sesion])}
         readVisual={(file) => readChatVisual({ workspace: visualWorkspace, project: pp.proyecto ?? "", session: pp.sesion ?? "" }, file)}
+        openVisual={(file) => openChatVisual({ workspace: visualWorkspace, project: pp.proyecto ?? "", session: pp.sesion ?? "" }, file)}
         onMiniatura={miniaturaDeAdjunto}
         onPegarImagen={pegarImagen}
         onStop={detener}

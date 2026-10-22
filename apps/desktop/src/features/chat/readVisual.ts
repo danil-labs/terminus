@@ -30,3 +30,13 @@ export async function readChatVisual(scope: Scope, file: string): Promise<string
     throw error;
   }
 }
+
+/** Abre el HTML del visual en el navegador, con el mismo ámbito que su lectura. */
+export async function openChatVisual(scope: Scope, file: string): Promise<void> {
+  if (!scope.workspace || !scope.session || file.length > 128 || !VISUAL_FILE.test(file)) {
+    throw { what: t("chat.visual.invalid"), detail: "invalid_visual_file" };
+  }
+  await invoke("tree_open_external", {
+    project: scope.project, session: scope.session, tree: VISUAL_TREE, path: file,
+  }, { headers: { "x-terminus-workspace": scope.workspace } });
+}

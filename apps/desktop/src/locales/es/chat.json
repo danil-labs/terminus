@@ -249,6 +249,7 @@
   "chat.turn.stop": "Detener turno",
   "chat.turn.cancelled": "Turno cancelado",
   "chat.turn.preparation_failed": "El turno no pudo prepararse. Vuelve a intentarlo.",
+  "chat.turn.unsaved": "Este turno terminó, pero no se pudo guardar en disco. Lo ves aquí mientras la tarea siga abierta: copia lo que necesites antes de cerrarla.",
   "chat.turn.stopping": "Deteniendo…",
   "chat.turn.stopping_aria": "Deteniendo turno",
   "chat.turn.verb.connecting_dots": "Atando cabos",
@@ -397,6 +398,8 @@
   "chat.visual.too_large": "La visualización supera el límite de 512 KiB.",
   "chat.visual.collapse": "Reducir visualización",
   "chat.visual.budget": "Este hilo alcanzó el límite de 16 visualizaciones cargadas. Cierra una visualización para cargar otra.",
+  "chat.visual.open_browser": "Abrir en el navegador",
+  "chat.visual.open_failed": "No se pudo abrir la visualización en el navegador.",
   "chat.visual.unload": "Cerrar visualización",
   "chat.visual.load": "Abrir visualización"
 }
