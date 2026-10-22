@@ -16,6 +16,7 @@ import { Input } from "../../ui/Input";
 import { MarcaAgente } from "../../ui/icons";
 import { TerminusMark } from "../../ui/toolMarks";
 import { Spinner } from "../../ui/Spinner";
+import { DialogoDeConexion } from "../settings/LoginDialog";
 import { type Conexiones, type Fila, nombreDeFila, ordenDelMapa, type Paso } from "./connect-store";
 
 type Nodo = "off" | "det" | "vivo" | "on";
@@ -213,12 +214,13 @@ function Tarjeta(props: { c: Conexiones; f: Fila; abajo?: JSX.Element; resaltada
   const p = () => props.c.pasos[props.f.id];
   const nombre = () => nombreDeFila(props.f);
   const gratuitos = () => props.f.modo === "consentimiento";
+  const fallo = () => Boolean(props.c.errores[props.f.id]);
   return (
-    <div class="grid shrink-0">
+    <div class={cn("grid shrink-0", fallo() && "animate-sacudir")}>
       <div
         class={cn(
           "flex h-[62px] items-center gap-3 rounded-md border px-3.5 py-2",
-          props.resaltada ? "border-primary bg-primary/5" : "border-border bg-surface-raised",
+          fallo() ? "border-error-strong bg-error/5" : props.resaltada ? "border-primary bg-primary/5" : "border-border bg-surface-raised",
           props.abajo && "rounded-b-none",
         )}
       >
@@ -234,9 +236,14 @@ function Tarjeta(props: { c: Conexiones; f: Fila; abajo?: JSX.Element; resaltada
         <span class="flex w-[196px] shrink-0 items-center justify-end gap-1.5">
           <Switch
             fallback={
-              <Button size="sm" variant="secondary" onClick={() => void props.c.conectar(props.f.id)}>
-                {gratuitos() ? t("onboarding.ai.activate") : t("onboarding.ai.connect")}
-              </Button>
+              <>
+                <Show when={fallo()}>
+                  <TriangleAlert size={16} class="shrink-0 text-error-strong" aria-hidden="true" />
+                </Show>
+                <Button size="sm" variant="secondary" onClick={() => void props.c.conectar(props.f.id)}>
+                  {fallo() ? t("onboarding.ai.retry") : gratuitos() ? t("onboarding.ai.activate") : t("onboarding.ai.connect")}
+                </Button>
+              </>
             }
           >
             <Match when={p()?.k === "descargando"}>
@@ -367,37 +374,6 @@ function PanelDeClave(props: { c: Conexiones; f: Fila }) {
   );
 }
 
-function PanelDeCodigo(props: { c: Conexiones; f: Fila }) {
-  const [valor, setValor] = createSignal("");
-  const id = `codigo-${props.f.id}`;
-  const enviar = () => {
-    if (valor().trim()) void props.c.enviarCodigo(props.f.id, valor());
-  };
-  return (
-    <div class={PANEL}>
-      <label class="text-[13px] font-semibold" for={id}>
-        {t("onboarding.ai.code.label")}
-      </label>
-      <Input
-        id={id}
-        class="font-mono"
-        autocomplete="off"
-        spellcheck={false}
-        value={valor()}
-        ref={(el) => queueMicrotask(() => el.focus())}
-        onInput={(e) => setValor(e.currentTarget.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") enviar();
-        }}
-      />
-      <div class="mt-0.5 flex justify-end">
-        <Button size="sm" disabled={!valor().trim()} onClick={enviar}>
-          {t("onboarding.ai.code.send")}
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 /** El aviso de los gratuitos va pegado a su tarjeta mientras no se han activado. */
 function AvisoDeGratuitos() {
@@ -433,7 +409,6 @@ function FilaDeIA(props: { c: Conexiones; f: Fila }) {
     const paso = p();
     if (paso?.k === "clave" || (paso?.k === "comprobando" && props.f.modo === "clave"))
       return <PanelDeClave c={props.c} f={props.f} />;
-    if (paso?.k === "entrando" && paso.pideCodigo) return <PanelDeCodigo c={props.c} f={props.f} />;
     const error = props.c.errores[props.f.id];
     if (error) return <ErrorDeTarjeta texto={error} />;
     if (props.f.modo === "consentimiento" && (paso?.k === "falta" || paso?.k === "instalada")) return <AvisoDeGratuitos />;
@@ -468,6 +443,26 @@ export function PanelDeIA(props: { c: Conexiones }) {
       </Show>
       <Show when={props.c.falloDeCarga()}>
         {(e) => <p class="m-0 text-xs text-error-strong">{e()}</p>}
+      </Show>
+      <Show when={props.c.filas().find((f) => props.c.pasos[f.id]?.k === "entrando")}>
+        {(f) => {
+          const p = () => props.c.pasos[f().id];
+          const de = <K extends "url" | "codigo">(k: K) => {
+            const x = p();
+            return x?.k === "entrando" ? (x[k] ?? null) : null;
+          };
+          return (
+            <DialogoDeConexion
+              etiqueta={nombreDeFila(f())}
+              url={de("url")}
+              porConfirmar={de("codigo")}
+              pideCodigo={p()?.k === "entrando" && Boolean((p() as { pideCodigo?: boolean }).pideCodigo)}
+              salida={props.c.salidas[f().id] ?? []}
+              onCancelar={() => void props.c.cancelar(f().id)}
+              onCodigo={(codigo) => void props.c.enviarCodigo(f().id, codigo)}
+            />
+          );
+        }}
       </Show>
     </div>
   );
