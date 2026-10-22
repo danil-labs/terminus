@@ -68,6 +68,8 @@ function responses(log, overrides = {}) {
     work_write_part: at("work_write_part", () => ({ received: 1 })),
     work_import: at("work_import", ({ probe }) => (probe ? { head: "", base: "", branch: null, files: [], snapshot: false } : { head: "a1", base: "w1", branch: null, files: [".env.local"], snapshot: true })),
     work_cancel: at("work_cancel", () => null),
+    // Todo va por el relay de la cuenta: siempre se sella para el motor de destino.
+    work_key: { publicKey: "S0VZLWRFLUxBLVZN" },
     send_message: at("send_message", () => "r1"),
     ...overrides,
   };
@@ -119,6 +121,8 @@ test("enviar a la VM con trabajo sin subir abre la hoja, copia por partes y la t
   const exported = log.filter((c) => c.name === "work_export").at(-1);
   assert.equal(exported.machine, "local");
   assert.deepEqual([exported.args.files, exported.args.exclude, exported.args.includeWork], [[".env.local"], ["data/big.csv"], true]);
+  assert.equal(exported.args.recipientKey, "S0VZLWRFLUxBLVZN", "el escritorio no selló para el destino");
+  assert.ok(doc.querySelector("[data-carry-sealed]"), "no dice que viaja sellado");
   doc.querySelector("[data-carry-confirm]").click();
 
   assert.ok(await until(() => log.some((c) => c.name === "send_message")), "la tarea no se creó");
@@ -134,13 +138,14 @@ test("enviar a la VM con trabajo sin subir abre la hoja, copia por partes y la t
 
 test("si la copia se corta el mensaje vuelve a la caja y reintentar sigue sin volver a exportar", async () => {
   const log = [];
-  let fail = true;
+  // Un corte suelto se repite solo; tres seguidos en la misma parte ya se le dicen a la persona.
+  let fails = 3;
   const { app, doc } = await start("carry-window-retry", log, {
     work_write_part: (args, options) => {
       log.push({ name: "work_write_part", machine: machineOf(options), args });
-      if (fail) {
-        fail = false;
-        return Promise.reject({ what: { clave: "shell.service.unreachable" }, detail: "io" });
+      if (fails > 0) {
+        fails -= 1;
+        return Promise.reject({ what: { clave: "shell.service.unreachable" }, detail: "machine_lost" });
       }
       return { received: 1 };
     },
@@ -157,7 +162,7 @@ test("si la copia se corta el mensaje vuelve a la caja y reintentar sigue sin vo
   doc.querySelector("[data-carry-fix]").click();
   assert.ok(await until(() => log.some((c) => c.name === "send_message")), "reintentar no creó la tarea");
   assert.equal(log.filter((c) => c.name === "work_export").length, exports, "reintentar volvió a exportar");
-  assert.equal(log.filter((c) => c.name === "work_write_part").length, 2);
+  assert.equal(log.filter((c) => c.name === "work_write_part").length, 4);
   assert.equal(doc.querySelector("[data-carry-progress]"), null, "el avance sigue a la vista");
   assert.deepEqual(app.fallos, []);
 });

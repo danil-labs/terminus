@@ -6,8 +6,7 @@ import type { WorkStatus } from "./types.ts";
 
 const MIB = 1024 * 1024;
 
-/** Partes de 4 MiB por el túnel SSH del escritorio y de 512 KiB por el relay. */
-export const PART_DESKTOP = 4 * MIB;
+/** Partes de 512 KiB: todo cliente va por el relay y cada parte es una llamada corta. */
 export const PART_RELAY = 512 * 1024;
 /** Arriba de esto la hoja avisa (D1). */
 export const WARN_BYTES = 100 * MIB;
