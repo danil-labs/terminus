@@ -646,7 +646,9 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
     const base = INTEGRACIONES().filter(
       (i) => i.comun || (i.via !== "incluido" && ["formulario", "descargando", "conectando", "conectada"].includes(estados[i.id]?.k ?? "")),
     );
-    return verMas() ? [...base, ...INTEGRACIONES().filter((i) => !base.includes(i))] : base;
+    // Por id: INTEGRACIONES() arma objetos nuevos en cada lectura.
+    const vistas = new Set(base.map((i) => i.id));
+    return verMas() ? [...base, ...INTEGRACIONES().filter((i) => !vistas.has(i.id))] : base;
   };
   // Como el diseño: la pila de «Ver más» enseña todo lo que no es común, aunque ya esté a la vista.
   const escondidas = () => INTEGRACIONES().filter((i) => !i.comun);
@@ -847,7 +849,8 @@ export function Plugins(props: { onCambio: (estado: { instalados: number; instal
 
   const visibles = () => {
     const base = plugins().filter((p) => RECOMENDADOS.includes(p.id) || p.installed || instalando(p));
-    return verMas() ? [...base, ...plugins().filter((p) => !base.includes(p))] : base;
+    const vistos = new Set(base.map((p) => p.id));
+    return verMas() ? [...base, ...plugins().filter((p) => !vistos.has(p.id))] : base;
   };
   const escondidos = () => plugins().filter((p) => !visibles().includes(p));
 
