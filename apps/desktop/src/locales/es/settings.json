@@ -512,7 +512,7 @@
   "settings.account_card.retry_wait": "El proveedor limitó las consultas de consumo. Podrás consultarlo de nuevo en {count} min.",
   "settings.account_card.retry_ready": "Ya puedes volver a actualizar.",
   "settings.account_card.refresh_in": "se actualiza en {count} min",
-  "settings.update.service_busy": "No se pudo detener el Seldon Plan Host. Termina las tareas activas antes de actualizar.",
+  "settings.update.service_busy": "No se pudo cerrar Terminus para actualizar. Termina las tareas activas antes de actualizar.",
   "settings.update.busy_tasks": "Siguen trabajando:",
   "settings.update.busy_elsewhere": {
     "one": "{count} tarea en «{workspace}»",

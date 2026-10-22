@@ -4087,8 +4087,6 @@ if (!roto) {
   altaBoton("Continuar").click();
   await sleep(150);
   assert.equal(altaTitulo(), "Personaliza Terminus.");
-  altaDoc.querySelector('button[aria-label="Renombrar el workspace"]').click();
-  await sleep(30);
   const altaNombre = altaDoc.querySelector('input[aria-label="Workspace"]');
   altaNombre.value = "Norte";
   altaNombre.dispatchEvent(new alta.w.InputEvent("input", { bubbles: true }));

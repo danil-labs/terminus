@@ -8,7 +8,6 @@
   "onboarding.workspace.default": "Personal",
   "onboarding.workspace.default_new": "New workspace",
   "onboarding.workspace.label": "Workspace",
-  "onboarding.workspace.rename": "Rename the workspace",
   "onboarding.workspace.hint": "Groups your projects, accounts and tools.",
   "onboarding.check.environment": "Environment ready",
   "onboarding.check.ai_connected": {
@@ -52,7 +51,6 @@
   "onboarding.ai.downloading": "Downloading…",
   "onboarding.ai.cancel_download": "Cancel the {name} download",
   "onboarding.ai.finish_in_browser": "Finish signing in in your browser…",
-  "onboarding.ai.confirm_code": "Code {code} · confirm it in your browser",
   "onboarding.ai.paste_code": "Paste the code your browser gave you",
   "onboarding.ai.paste_key": "Paste your key to connect",
   "onboarding.ai.checking_key": "Checking the key…",
@@ -164,5 +162,7 @@
   "onboarding.workspace.create": "Create workspace",
   "onboarding.workspace.creating": "Creating…",
   "onboarding.workspace.footer": "You can create more spaces later.",
-  "onboarding.workspace.name": "Workspace name"
+  "onboarding.workspace.name": "Workspace name",
+  "onboarding.login.waiting_browser": "Waiting for you to finish in the browser…",
+  "onboarding.login.confirm_in_browser": "Confirm it in your browser"
 }

@@ -1,4 +1,3 @@
-import Pencil from "lucide-solid/icons/pencil";
 import { createSignal, onMount, Show } from "solid-js";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
@@ -54,8 +53,7 @@ export default function Personalizar(props: {
   onListo: () => void;
 }) {
   const [nombre, setNombre] = createSignal(props.workspace?.nombre ?? "");
-  const [editando, setEditando] = createSignal(false);
-  const [borrador, setBorrador] = createSignal("");
+  const [borrador, setBorrador] = createSignal(props.workspace?.nombre ?? "");
   const [error, setError] = createSignal<string | null>(null);
   const [integraciones, setIntegraciones] = createSignal(0);
   const [plugins, setPlugins] = createSignal({ instalados: 0, instalando: 0 });
@@ -63,15 +61,10 @@ export default function Personalizar(props: {
 
   onMount(() => titulo?.focus({ preventScroll: true }));
 
-  function editar() {
-    setBorrador(nombre());
-    setEditando(true);
-  }
-
   async function renombrar() {
     const nuevo = borrador().trim();
-    setEditando(false);
     const w = props.workspace;
+    if (!nuevo) setBorrador(nombre());
     if (!w || !nuevo || nuevo === nombre()) return;
     const antes = nombre();
     setNombre(nuevo);
@@ -81,6 +74,7 @@ export default function Personalizar(props: {
       window.dispatchEvent(new CustomEvent("harness:workspace"));
     } catch (e) {
       setNombre(antes);
+      setBorrador(antes);
       setError(prosaDe(e));
     }
   }
@@ -108,42 +102,24 @@ export default function Personalizar(props: {
           </div>
           <div class="grid gap-1.5">
             <span class="text-[13px] font-semibold text-neutral-950">{t("onboarding.workspace.label")}</span>
-            <Show
-              when={editando()}
-              fallback={
-                <div class="flex h-9 items-center gap-2 rounded-md border border-border-strong bg-surface-raised px-3">
-                  <span class="min-w-0 flex-1 truncate text-[13px] text-neutral-950">{nombre()}</span>
-                  <Show when={props.workspace}>
-                    <button
-                      type="button"
-                      class="grid cursor-pointer place-items-center border-0 bg-transparent p-0 text-neutral-500 outline-none hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                      aria-label={t("onboarding.workspace.rename")}
-                      title={t("onboarding.workspace.rename")}
-                      onClick={editar}
-                    >
-                      <Pencil size={14} aria-hidden="true" />
-                    </button>
-                  </Show>
-                </div>
-              }
-            >
-              <Input
-                value={borrador()}
-                aria-label={t("onboarding.workspace.label")}
-                ref={(el) =>
-                  queueMicrotask(() => {
-                    el.focus();
-                    el.select();
-                  })
+            <Input
+              value={borrador()}
+              aria-label={t("onboarding.workspace.label")}
+              disabled={!props.workspace}
+              onFocus={(e) => e.currentTarget.select()}
+              onInput={(e) => setBorrador(e.currentTarget.value)}
+              onBlur={() => void renombrar()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  void renombrar();
+                  e.currentTarget.blur();
                 }
-                onInput={(e) => setBorrador(e.currentTarget.value)}
-                onBlur={() => void renombrar()}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void renombrar();
-                  if (e.key === "Escape") setEditando(false);
-                }}
-              />
-            </Show>
+                if (e.key === "Escape") {
+                  setBorrador(nombre());
+                  e.currentTarget.blur();
+                }
+              }}
+            />
             <span class="text-xs text-neutral-500">{error() ?? t("onboarding.workspace.hint")}</span>
           </div>
           <div class="border-t border-border pt-4">

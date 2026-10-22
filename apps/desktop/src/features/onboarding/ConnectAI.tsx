@@ -188,7 +188,7 @@ function detalle(c: Conexiones, f: Fila): string {
     case "descargando":
       return t("onboarding.ai.downloading");
     case "entrando":
-      if (p.codigo) return t("onboarding.ai.confirm_code", { code: p.codigo });
+      if (p.codigo) return t("onboarding.login.confirm_in_browser");
       return p.pideCodigo ? t("onboarding.ai.paste_code") : t("onboarding.ai.finish_in_browser");
     case "clave":
       return t("onboarding.ai.paste_key");

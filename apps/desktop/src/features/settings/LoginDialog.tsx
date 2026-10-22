@@ -71,10 +71,10 @@ export function DialogoDeConexion(props: {
             <DialogTitle class="text-sm font-semibold">
               {t("settings.accounts.connect_agent", { agent: props.etiqueta })}
             </DialogTitle>
-            <Show when={!props.url && !props.pideCodigo && !props.porConfirmar}>
-              <span class="flex items-center gap-1.5 text-xs text-neutral-500">
+            <Show when={!props.pideCodigo}>
+              <span class="flex items-center gap-1.5 text-xs text-neutral-500" role="status">
                 <Spinner size={12} />
-                {t("settings.accounts.connecting")}
+                {props.url || props.porConfirmar ? t("onboarding.login.waiting_browser") : t("settings.accounts.connecting")}
               </span>
             </Show>
           </div>

@@ -388,21 +388,23 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
     }
   }
 
+  // La tarjeta vuelve al instante; el motor termina de cortar por detrás.
   async function cancelar(i: Integracion) {
     setErrores(i.id, null);
     const e = estados[i.id]?.k;
-    if (i.via === "drive") {
-      if (e === "descargando") await invoke("cancel_install", { operation: "google-drive" }).catch(() => {});
-      if (e === "conectando") await invoke("cancel_google_drive_login").catch(() => {});
-    } else if (i.via === "proveedor" && e === "conectando" && !borradores[i.id]?.token) {
-      invoke("cancel_browser_login", { id: i.id, scope: await scope }).catch(() => {});
-    } else if (i.via !== "proveedor" && esperandoMcp === i.id) {
-      esperandoMcp = null;
-      await invoke("disconnect_known_mcp", { id: i.id }).catch(() => {});
-    }
+    const conToken = Boolean(borradores[i.id]?.token);
     setBorradores(i.id, SIN_BORRADOR);
     setMotivos(i.id, null);
     if (!cerrada) setEstados(i.id, { k: "libre" });
+    if (i.via === "drive") {
+      if (e === "descargando") void invoke("cancel_install", { operation: "google-drive" }).catch(() => {});
+      if (e === "conectando") void invoke("cancel_google_drive_login").catch(() => {});
+    } else if (i.via === "proveedor" && e === "conectando" && !conToken) {
+      void invoke("cancel_browser_login", { id: i.id, scope: await scope }).catch(() => {});
+    } else if (i.via !== "proveedor" && esperandoMcp === i.id) {
+      esperandoMcp = null;
+      void invoke("disconnect_known_mcp", { id: i.id }).catch(() => {});
+    }
   }
 
   async function desconectar(i: Integracion) {
@@ -434,7 +436,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
         return t("onboarding.tools.downloading_cli_start");
       case "conectando":
         if (formularioAbierto(i)) return t("onboarding.tools.checking_token");
-        if (e.codigo) return t("onboarding.ai.confirm_code", { code: e.codigo });
+        if (e.codigo) return t("onboarding.login.confirm_in_browser");
         return t("onboarding.tools.finish_in_browser");
       case "saliendo":
         return t("onboarding.ai.disconnecting");
@@ -454,7 +456,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
       <div
         class={cn(
           "relative flex h-[58px] items-center gap-3 overflow-hidden rounded-lg border px-3 py-2",
-          fallo() && "animate-sacudir border-neutral-950 bg-surface-raised",
+          fallo() && "animate-sacudir border-error-strong bg-surface-raised",
           e()?.k === "conectada" && p.i.via !== "incluido" && "border-success-strong/40 bg-success/5",
           ["conectando", "formulario", "descargando"].includes(e()?.k ?? "") && "border-primary bg-primary/5",
           (!e() || e()?.k === "libre" || e()?.k === "saliendo" || p.i.via === "incluido") && "border-border bg-surface-raised",
@@ -668,7 +670,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
 export function Plugins(props: { onCambio: (estado: { instalados: number; instalando: number }) => void }) {
   const [catalogo, setCatalogo] = createSignal<{ workspace: string; plugins: Plugin[] } | null>(null);
   const [falloDeCarga, setFalloDeCarga] = createSignal<string | null>(null);
-  const [ocupados, setOcupados] = createStore<Record<string, "instalando" | "desinstalando" | undefined>>({});
+  const [ocupados, setOcupados] = createStore<Record<string, "instalando" | "desinstalando" | "cancelado" | undefined>>({});
   const [errores, setErrores] = createStore<Record<string, string | null>>({});
   const [avances, setAvances] = createStore<Record<string, { hecho: number; total: number }>>({});
   const [pesos, setPesos] = createStore<Record<string, number | null>>({});
@@ -733,14 +735,17 @@ export function Plugins(props: { onCambio: (estado: { instalados: number; instal
       await invoke("install_integration", { id: p.id });
       await invoke("set_integration_enabled", { id: p.id, workspace, enabled: true });
     } catch (e) {
-      if (!cerrada && !`${prosaDe(e)} ${detalleDe(e)}`.includes("install.cancelled")) setErrores(p.id, explicar(e));
+      if (!cerrada && ocupados[p.id] !== "cancelado" && !`${prosaDe(e)} ${detalleDe(e)}`.includes("install.cancelled")) setErrores(p.id, explicar(e));
     }
     if (cerrada) return;
     setOcupados(p.id, undefined);
     await cargar();
   }
 
+  // La tarjeta vuelve al instante; el motor termina de cortar por detrás.
   function cancelar(p: Plugin) {
+    setOcupados(p.id, "cancelado");
+    avisar();
     void invoke("cancel_install", { operation: `plugin:${p.id}` }).catch(() => {});
   }
 
