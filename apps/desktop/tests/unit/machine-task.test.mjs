@@ -1,7 +1,8 @@
 /**
  * Una tarea que corre en otra máquina, apagada: abre con lo último que se leyó, dice que
  * la máquina está apagada y lleva su chip; mandarle un mensaje la enciende, sale una vez y
- * la tarea se vuelve a leer. El proxy (`fleet.rs`) se simula con sus respuestas. Monta `dist/`.
+ * la tarea se vuelve a leer. Un archivo que nombra su chat se lee en esa máquina. El proxy
+ * (`fleet.rs`) se simula con sus respuestas. Monta `dist/`.
  */
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -126,4 +127,44 @@ test("la ventana de una tarea local dice su máquina, su proyecto y su rama", as
   assert.equal(location.querySelector("[data-task-location-project]")?.textContent, "P1");
   assert.equal(location.querySelector("[data-task-location-branch]")?.textContent, "feat/task-location");
   assert.deepEqual(app.fallos, []);
+});
+
+test("el PDF que nombra el chat de una tarea de otra máquina se lee en esa máquina", async () => {
+  const PDF = "/Users/alberto/exchange/Propuesta%20Chemara.pdf";
+  const reads = [];
+  // El motor de la ventana no tiene el archivo: solo contesta la máquina de la tarea.
+  const there = (command, value) => (args, options) => {
+    const machine = options?.headers?.["x-terminus-machine"] ?? null;
+    reads.push({ command, path: args.path, machine });
+    if (machine !== "vm") throw new Error("not_found");
+    return value;
+  };
+  const app = await boot("listo", "machine-task-file", responses({
+    list_live_sessions: ({ project }) => (project === "p1" ? [row("r1", { machine: "vm", machine_on: true })] : []),
+    load_session: ({ id }) => session(id, [turn(0, "hazme la propuesta"), turn(1, `Lista:
+
+![Propuesta Danil para Chemara](${PDF})`)]),
+    file_size: there("file_size", 2048),
+    preview_file: there("preview_file", { kind: "pdf", text: null, data_url: null, pdf: null, bytes: 2048, truncated: false }),
+  }), undefined, {}, {
+    antes: (w) => {
+      globalThis.IntersectionObserver = w.IntersectionObserver = class {
+        constructor(callback) { this.callback = callback; }
+        observe(target) { setTimeout(() => this.callback([{ isIntersecting: true, target }], this), 0); }
+        unobserve() {}
+        disconnect() {}
+        takeRecords() { return []; }
+      };
+    },
+  });
+  await sleep(600);
+  await openTask(app, "r1");
+  await sleep(300);
+  const path = decodeURIComponent(PDF);
+  assert.ok(text(app).includes("PDF · 2 KB"), "la tarjeta no tiene el tamaño del archivo");
+  for (const command of ["file_size", "preview_file"]) {
+    const asked = reads.filter((r) => r.command === command && r.path === path);
+    assert.ok(asked.length > 0, `no pidió ${command}`);
+    assert.deepEqual(asked.map((r) => r.machine), asked.map(() => "vm"), `${command} fue al motor de la ventana`);
+  }
 });
