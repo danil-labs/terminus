@@ -19,6 +19,7 @@ import {
   RelaySession,
   screenProtocols,
   screenUrl,
+  sessionProbe,
   startComputer,
   wakes,
 } from "@terminus/computers";
@@ -126,6 +127,8 @@ export function startAccountMachines(target: Target = window) {
           // Con otro contrato el relay ni reenvía ni contesta del espejo: `version_mismatch`.
           contracts: [__TERMINUS_CONTRACT__],
           getToken: async () => (await getToken()).token,
+          // Un upgrade sin licencia no trae cuerpo: se pregunta por HTTP para no reintentar en bucle.
+          probe: async () => sessionProbe(endpoint, (await getToken()).token, info.id),
           onUnauthorized: () => {
             token = null;
             void sync();
@@ -180,6 +183,14 @@ export function startAccountMachines(target: Target = window) {
       machineSlices: () => {
         changed();
         return fleet.sliceStatuses();
+      },
+      machinesLicense: () => {
+        changed();
+        return fleet.license();
+      },
+      retryMachines: () => {
+        fleet.retry();
+        refresh();
       },
     });
     const route = (command: string, args?: unknown, options?: { headers?: HeadersInit }) => router.handle(command, (args ?? {}) as Record<string, unknown>, options);

@@ -19,9 +19,12 @@ function fakeLink(options: FakeOptions = {}) {
   const stateListeners = new Set<(s: MachineState) => void>();
   const eventListeners = new Set<(p: EventsPage) => void>();
   const engineListeners = new Set<(e: { contract: string | null; host_version: string | null }) => void>();
+  const blockedListeners = new Set<(b: "license_required" | null) => void>();
+  let stopped: "license_required" | null = null;
+  let retries = 0;
   let closed = false;
   const subscribed: (number | null)[] = [];
-  const link: Link & { calls: typeof calls; setState(s: MachineState): void; push(p: EventsPage): void; hello(contract: string): void; closed(): boolean; subscribed: typeof subscribed; options: FakeOptions } = {
+  const link: Link & { calls: typeof calls; setState(s: MachineState): void; push(p: EventsPage): void; hello(contract: string): void; block(b: "license_required" | null): void; retries(): number; closed(): boolean; subscribed: typeof subscribed; options: FakeOptions } = {
     calls,
     subscribed,
     options,
@@ -40,6 +43,20 @@ function fakeLink(options: FakeOptions = {}) {
       engineListeners.add(l);
       return () => void engineListeners.delete(l);
     },
+    block(b) {
+      stopped = b;
+      for (const l of blockedListeners) l(b);
+    },
+    blocked: () => stopped,
+    onBlocked(l) {
+      blockedListeners.add(l);
+      return () => void blockedListeners.delete(l);
+    },
+    retry() {
+      retries += 1;
+      link.block(null);
+    },
+    retries: () => retries,
     closed: () => closed,
     call(id, command, workspace, _folder, args, timeout) {
       calls.push({ id, command, workspace, args: args as Record<string, unknown>, timeout });
@@ -328,4 +345,23 @@ test("carry: a bare task id never travels to another machine, work_export wakes 
   assert.equal(fleet.power("cmp_vm"), "on");
   await fleet.wake("cmp_vm");
   assert.deepEqual(woken, ["cmp_vm"], "an awake machine is not started again");
+});
+
+test("without a Terminus license a machine keeps its slice with a named state, asks nothing more, and «Reintentar» reopens it", async () => {
+  const { fleet, link, changes } = setup({ cmp_vm: { answers: { list_live_sessions: [row("t1")] } } }, [VM]);
+  const envelope = { machine: "cmp_vm", workspace: "w", command: "list_live_sessions", args: { project: "p1" } };
+  await fleet.read(envelope);
+  link("cmp_vm").block("license_required");
+  assert.ok(changes.filter((c) => c === "cmp_vm").length >= 2, "the UI hears it");
+  const before = link("cmp_vm").calls.length;
+  const slice = await fleet.read(envelope);
+  assert.deepEqual([slice.status, slice.value], ["license_required", [row("t1")]], "the slice stays, with its name");
+  await assert.rejects(fleet.call({ machine: "cmp_vm", workspace: "w", command: "send_message", args: { project: "p1" } }), (e: FleetError) => e.code === "license_required");
+  assert.equal(link("cmp_vm").calls.length, before, "nothing is sent, nothing loops");
+  assert.equal(fleet.license(), "license_required");
+  assert.equal(fleet.sliceStatuses().cmp_vm.status, "license_required");
+  fleet.retry();
+  assert.equal(link("cmp_vm").retries(), 1);
+  assert.equal(fleet.license(), null);
+  assert.equal((await fleet.read(envelope)).status, "ok");
 });

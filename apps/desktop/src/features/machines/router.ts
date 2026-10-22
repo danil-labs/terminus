@@ -154,6 +154,8 @@ export function createRouter(config: RouterConfig) {
         return { what: t("web.machines.lost", { name }), detail: "machine_lost" };
       case "unknown_machine":
         return { what: t("web.machines.cross_machine"), detail: "unknown_machine" };
+      case "license_required":
+        return { what: t("web.machines.license_required"), detail: "license_required" };
       case "workspace_not_linked":
         return { what: t("web.workspace_not_linked"), detail: "workspace_not_linked" };
       case "operation_failed": {

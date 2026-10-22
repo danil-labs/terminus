@@ -178,6 +178,16 @@ export function purgeWorkspace(endpoint: string, token: string, id: string, f: F
   return request(apiUrl(endpoint, `/v1/workspaces/${encodeURIComponent(id)}/purge`), token, "POST", () => null, f);
 }
 
+/**
+ * Por qué no abrió la sesión de una computadora: un upgrade fallido no trae
+ * cuerpo en el navegador, así que se pregunta por HTTP. `license_required`
+ * (`403`, computers#22) o `null` si no lo dice.
+ */
+export async function sessionProbe(endpoint: string, token: string, id: string, f: Fetch = globalFetch): Promise<"license_required" | null> {
+  const answer = await request(apiUrl(endpoint, `/v1/computers/${encodeURIComponent(id)}/session`), token, "GET", () => null, f);
+  return answer.kind === "license" ? "license_required" : null;
+}
+
 /** Encendido explícito. La app no lo usa al abrir: una acción enciende la VM por el relay. */
 export function startComputer(endpoint: string, token: string, id: string, f: Fetch = globalFetch): Promise<Answer<{ state: string } | null>> {
   return request(

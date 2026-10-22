@@ -7,11 +7,12 @@
  * - `no_answer`: no contestó a tiempo; se queda lo que había.
  * - `off`: apagada y sin copia: no aporta nada, y nada se inventa en su lugar.
  * - `outdated`: su motor habla otro contrato.
+ * - `license_required`: la cuenta no tiene Terminus de pago; se queda lo que había.
  *
  * Una rebanada sin valor (`has: false`) no aporta filas: nunca es una lista vacía.
  */
 
-export type SliceStatus = "ok" | "cached" | "no_answer" | "off" | "outdated";
+export type SliceStatus = "ok" | "cached" | "no_answer" | "off" | "outdated" | "license_required";
 
 export type Slice = {
   machine: string;

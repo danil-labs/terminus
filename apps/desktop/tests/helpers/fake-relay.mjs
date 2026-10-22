@@ -109,17 +109,17 @@ export function relay({ state: initial = "online", wakeAfter = 300, cachedAt = n
         respond();
       }, wakeAfter);
     }
-    close(code = 1000) {
+    close(code = 1000, reason = "") {
       this.readyState = 3;
-      setTimeout(() => this.onclose?.({ code }), 0);
+      setTimeout(() => this.onclose?.({ code, reason }), 0);
     }
   }
   function setState(next) {
     state = next;
     push({ type: "state", state });
   }
-  const drop = (code) => {
-    for (const s of sockets) if (s.readyState === 1) s.close(code);
+  const drop = (code, reason = "") => {
+    for (const s of sockets) if (s.readyState === 1) s.close(code, reason);
   };
   /** `delay`: how long an online computer takes to answer; a long one is a machine that does not answer. */
   const setDelay = (ms) => {

@@ -23,7 +23,15 @@ export type RelayConfig = {
    * relay no reenvía ni contesta del espejo (`version_mismatch`).
    */
   contracts?: readonly string[];
+  /**
+   * Por qué no abrió un upgrade fallido (sin cuerpo en el navegador):
+   * `license_required` para la sesión hasta `retry()`; `null` reintenta como siempre.
+   */
+  probe?: () => Promise<Blocked | null>;
 };
+
+/** Lo que detiene la sesión sin reintentar sola: la persona no tiene Terminus de pago (computers#22). */
+export type Blocked = "license_required";
 
 /** Lo que el relay sabe del motor por su último `hello` (`{"type":"engine"}`). */
 export type EngineInfo = { contract: string | null; host_version: string | null };
@@ -49,7 +57,7 @@ export type SocketLike = {
   close(code?: number, reason?: string): void;
   onopen: ((ev: unknown) => void) | null;
   onmessage: ((ev: { data: unknown }) => void) | null;
-  onclose: ((ev: { code: number }) => void) | null;
+  onclose: ((ev: { code: number; reason?: string }) => void) | null;
   onerror: ((ev: unknown) => void) | null;
 };
 
@@ -134,10 +142,12 @@ export class RelaySession {
   private attempt = 0;
   private missed = 0;
   private pinger: ReturnType<typeof setInterval> | undefined;
-  private retry: ReturnType<typeof setTimeout> | undefined;
+  private retryTimer: ReturnType<typeof setTimeout> | undefined;
   private closed = false;
   private machine: MachineState = "unknown";
   private engineInfo: EngineInfo | null = null;
+  private stopped: Blocked | null = null;
+  private blockedListeners = new Set<(blocked: Blocked | null) => void>();
   /** El token de la sesión abierta y cuándo vence, para renovarlo con `auth` antes. */
   private token: string | null = null;
   private renew: ReturnType<typeof setTimeout> | undefined;
@@ -176,6 +186,24 @@ export class RelaySession {
     return () => void this.eventListeners.delete(listener);
   }
 
+  /** Por qué la sesión está detenida (`license_required`), o `null`. */
+  blocked(): Blocked | null {
+    return this.stopped;
+  }
+
+  onBlocked(listener: (blocked: Blocked | null) => void): () => void {
+    this.blockedListeners.add(listener);
+    return () => void this.blockedListeners.delete(listener);
+  }
+
+  /** «Reintentar»: vuelve a abrir una sesión detenida (por ejemplo, tras activar la licencia). */
+  retry() {
+    if (this.closed || !this.stopped) return;
+    this.setBlocked(null);
+    this.attempt = 0;
+    void this.connect();
+  }
+
   /** El motor de la computadora según su último `hello`; `null` si el relay aún no lo dijo. */
   engine(): EngineInfo | null {
     return this.engineInfo;
@@ -198,6 +226,7 @@ export class RelaySession {
    */
   call(id: string, command: string, workspace: string | null, folder: string | null, args: unknown, timeoutMs = CALL_TIMEOUT): Promise<CallResult> {
     const message = JSON.stringify({ type: "call", id, command, workspace, folder, args: args ?? {} });
+    if (this.stopped) return Promise.reject({ code: this.stopped });
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
@@ -216,7 +245,7 @@ export class RelaySession {
 
   close() {
     this.closed = true;
-    clearTimeout(this.retry);
+    clearTimeout(this.retryTimer);
     clearTimeout(this.renew);
     clearInterval(this.pinger);
     this.socket?.close(1000);
@@ -232,7 +261,7 @@ export class RelaySession {
   }
 
   private async connect() {
-    if (this.closed) return;
+    if (this.closed || this.stopped) return;
     if (this.attempt > 0 && this.config.beforeReconnect) {
       const go = await this.config.beforeReconnect().catch(() => true);
       if (!go) return this.close();
@@ -254,8 +283,10 @@ export class RelaySession {
       return this.reconnectLater();
     }
     this.socket = socket;
+    let opened = false;
     socket.onopen = () => {
       if (this.socket !== socket) return;
+      opened = true;
       this.attempt = 0;
       this.missed = 0;
       this.token = token;
@@ -276,7 +307,10 @@ export class RelaySession {
       clearInterval(this.pinger);
       clearTimeout(this.renew);
       for (const listener of this.linkListeners) listener(false);
+      // Sin licencia no se reintenta en bucle: la sesión espera a `retry()`.
+      if (event.code === REVOKED && event.reason === "license_required") return this.setBlocked("license_required");
       if (event.code === REVOKED) this.config.onUnauthorized?.();
+      if (!opened && this.config.probe) return void this.afterFailedUpgrade();
       // 4005: el token venció sin renovarse; la reconexión pide uno nuevo.
       // Otra sesión ocupó el lugar de esta computadora: reconectar la echaría a su vez.
       if (event.code === REPLACED) return this.close();
@@ -315,12 +349,33 @@ export class RelaySession {
     this.scheduleRenew(tokenExpiry(next));
   }
 
+  private async afterFailedUpgrade() {
+    const why = await this.config.probe?.().catch(() => null);
+    if (this.closed) return;
+    if (why) return this.setBlocked(why);
+    this.reconnectLater();
+  }
+
+  private setBlocked(blocked: Blocked | null) {
+    if (this.stopped === blocked) return;
+    this.stopped = blocked;
+    if (blocked) {
+      clearTimeout(this.retryTimer);
+      for (const [id, call] of this.pending) {
+        clearTimeout(call.timer);
+        call.reject({ code: blocked });
+        this.pending.delete(id);
+      }
+    }
+    for (const listener of this.blockedListeners) listener(blocked);
+  }
+
   private reconnectLater() {
     if (this.closed) return;
     const wait = BACKOFF[Math.min(this.attempt, BACKOFF.length - 1)];
     this.attempt += 1;
-    clearTimeout(this.retry);
-    this.retry = setTimeout(() => void this.connect(), wait);
+    clearTimeout(this.retryTimer);
+    this.retryTimer = setTimeout(() => void this.connect(), wait);
   }
 
   private ping() {

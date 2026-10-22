@@ -145,7 +145,7 @@ export type SessionRow = {
   machine?: string;
   machine_on?: boolean;
   /** Con la cuenta de Danil, el estado de la rebanada de su máquina (`@terminus/fleet`) y cuándo se leyó. */
-  machine_status?: "ok" | "cached" | "no_answer" | "off" | "outdated";
+  machine_status?: "ok" | "cached" | "no_answer" | "off" | "outdated" | "license_required";
   machine_at?: number | null;
 };
 

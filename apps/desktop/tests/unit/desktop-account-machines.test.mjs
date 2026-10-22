@@ -516,3 +516,21 @@ test("the session says which contract this window speaks; a VM on another one is
   assert.equal(f.relays.cmp_vm.sockets.length, 1);
   assert.deepEqual(app.fallos, []);
 });
+
+test("when the relay stops the sessions for lack of a Terminus license, the VM keeps its rows and nothing reconnects in a loop", async () => {
+  const { app, doc, f } = await open("desktop-account-license", {
+    computers: [HOME, { ...VM, state: "online" }],
+    relays: { cmp_vm: { table: remote("Panel", "Tarea de la VM"), state: "online" } },
+  });
+  assert.ok(doc.querySelector('[data-sesion="cmp_vm~t1"]'));
+  const asked = f.relays.cmp_vm.calls.length;
+  f.relays.cmp_vm.drop(4003, "license_required");
+  await sleep(300);
+  await reread(app);
+  await sleep(2_500);
+  assert.equal(f.relays.cmp_vm.sockets.length, 1, "no reconnection loop");
+  assert.equal(f.relays.cmp_vm.calls.length, asked, "nothing more is asked of the VM");
+  assert.ok(doc.querySelector('[data-sesion="cmp_vm~t1"]'), "its rows stay");
+  assert.ok(doc.querySelector('[data-sesion="t1"]'), "this computer is untouched");
+  assert.deepEqual(app.fallos, []);
+});

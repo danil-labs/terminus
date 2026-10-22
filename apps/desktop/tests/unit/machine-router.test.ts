@@ -162,3 +162,15 @@ test("a file of another machine's task does not open on this computer", async ()
   assert.equal(await router.handle("open_file_external", { target: "/x" }), null, "this computer's own opens");
   assert.deepEqual(native.map((c) => c.command), ["open_file_external"]);
 });
+
+test("an action on a machine stopped by the license says so by name", async () => {
+  const vm = fakeLink({ send_message: "x" });
+  Object.assign(vm, { blocked: () => "license_required" as const });
+  const { router } = setup({ cmp_vm: vm });
+  await assert.rejects(router.handle("send_message", { project: "p1", session: "cmp_vm~t1", prompt: "hola" }, on("cmp_vm")), (e: { what: string; detail: string }) => {
+    assert.equal(e.detail, "license_required");
+    assert.equal(e.what, "Usar tus otras computadoras desde aquí es parte de Terminus de pago.");
+    return true;
+  });
+  assert.equal(vm.calls.length, 0);
+});

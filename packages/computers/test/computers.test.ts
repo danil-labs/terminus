@@ -17,6 +17,7 @@ import {
   powerOf,
   purgeWorkspace,
   restoreWorkspace,
+  sessionProbe,
   sessionUrl,
   startComputer,
 } from "../src/index.ts";
@@ -46,9 +47,9 @@ class FakeSocket implements SocketLike {
   receive(message: object) {
     this.onmessage?.({ data: JSON.stringify(message) });
   }
-  close(code = 1000) {
+  close(code = 1000, reason = "") {
     this.readyState = 3;
-    this.onclose?.({ code });
+    this.onclose?.({ code, reason });
   }
 }
 
@@ -262,4 +263,55 @@ test("lápidas: la lista con borrados, restaurar, purgar y el 409 con su código
   assert.equal((await purgeWorkspace("https://c.example", "t", "w9", reply(204, null))).kind, "ok");
   assert.deepEqual(asked.slice(1), [["https://c.example/v1/workspaces/w9/restore", "POST"], ["https://c.example/v1/workspaces/w9/purge", "POST"]]);
   assert.deepEqual(await purgeWorkspace("https://c.example", "t", "w", reply(409, { error: "workspace_not_deleted" })), { kind: "error", status: 409, code: "workspace_not_deleted" });
+});
+
+test("sin licencia la sesión se detiene con nombre, sin reintentar en bucle, hasta «Reintentar»", async () => {
+  const relay = session();
+  await tick();
+  const socket = FakeSocket.all[0];
+  const seen: (string | null)[] = [];
+  relay.onBlocked((b) => seen.push(b));
+  socket.open();
+  const pending = relay.call("id-l", "list_projects", "w", null, {});
+  socket.close(4003, "license_required");
+  await assert.rejects(pending, (e: { code: string }) => e.code === "license_required", "what was in flight says why");
+  await new Promise((r) => setTimeout(r, 700));
+  assert.equal(FakeSocket.all.length, 1, "it does not reconnect on its own");
+  assert.equal(relay.blocked(), "license_required");
+  await assert.rejects(relay.call("id-m", "list_projects", "w", null, {}), (e: { code: string }) => e.code === "license_required", "a new call fails at once");
+  relay.retry();
+  await tick();
+  assert.equal(FakeSocket.all.length, 2, "«Reintentar» opens it again");
+  assert.equal(relay.blocked(), null);
+  assert.deepEqual(seen, ["license_required", null]);
+  relay.close();
+});
+
+test("un upgrade que no abre pregunta por qué: con licencia faltante se detiene; si no lo sabe, reintenta", async () => {
+  FakeSocket.all = [];
+  let answer: "license_required" | null = "license_required";
+  const relay = new RelaySession(
+    { endpoint: "https://c.example", computerId: "cmp_a", getToken: () => "jwt", probe: async () => answer },
+    (url, protocols) => new FakeSocket(url, protocols),
+  );
+  relay.start();
+  await tick();
+  FakeSocket.all[0].close(1006);
+  await new Promise((r) => setTimeout(r, 700));
+  assert.equal(relay.blocked(), "license_required");
+  assert.equal(FakeSocket.all.length, 1);
+  answer = null;
+  relay.retry();
+  await tick();
+  FakeSocket.all[1].close(1006);
+  await new Promise((r) => setTimeout(r, 700));
+  assert.equal(relay.blocked(), null);
+  assert.equal(FakeSocket.all.length, 3, "an unknown failure reconnects as before");
+  relay.close();
+});
+
+test("la sonda de la sesión dice license_required con el 403 del relay", async () => {
+  const reply = (status: number) => async () => ({ status, ok: false, json: async () => ({ error: status === 403 ? "license_required" : "websocket_required" }) });
+  assert.equal(await sessionProbe("https://c.example", "t", "cmp_a", reply(403)), "license_required");
+  assert.equal(await sessionProbe("https://c.example", "t", "cmp_a", reply(426)), null);
 });

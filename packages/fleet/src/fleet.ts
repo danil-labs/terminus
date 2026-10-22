@@ -12,7 +12,7 @@
  * La máquina de la ventana no pasa por aquí: quien la tiene la lee nativa y
  * suma su rebanada con `merge`.
  */
-import { type AccountWorkspace, type CallResult, type EngineInfo, type EventsPage, type MachineState, cachedAt, callWorkspace, linkedAttention, linkedEvents, linkedListing, requestId } from "../../computers/src/index.ts";
+import { type AccountWorkspace, type Blocked, type CallResult, type EngineInfo, type EventsPage, type MachineState, cachedAt, callWorkspace, linkedAttention, linkedEvents, linkedListing, requestId } from "../../computers/src/index.ts";
 import { DEADLINES, type Deadlines, classOf } from "./deadlines.ts";
 import { FleetError, fromRelay } from "./errors.ts";
 import { argsFor } from "./ids.ts";
@@ -38,6 +38,10 @@ export type Link = {
   close(): void;
   /** Cada `hello` del motor (`{"type":"engine"}`); una sesión de antes no lo tiene. */
   onEngine?(listener: (engine: EngineInfo) => void): () => void;
+  /** Detenida sin reintentar sola (`license_required`) hasta `retry()`; una sesión de antes no lo tiene. */
+  blocked?(): Blocked | null;
+  onBlocked?(listener: (blocked: Blocked | null) => void): () => void;
+  retry?(): void;
 };
 
 export type FleetEvent = { name: string; payload: unknown };
@@ -254,6 +258,21 @@ export class Fleet {
     await this.wakeMember(member);
   }
 
+  /** Por qué está detenida la sesión con `machine` (`license_required`), o `null`. */
+  blocked(machine: string): Blocked | null {
+    return this.members.get(machine)?.link.blocked?.() ?? null;
+  }
+
+  /** `license_required` si alguna máquina está detenida por la licencia: la UI enseña el aviso de Terminus de pago. */
+  license(): Blocked | null {
+    return [...this.members.keys()].map((id) => this.blocked(id)).find(Boolean) ?? null;
+  }
+
+  /** «Reintentar»: vuelve a abrir las sesiones detenidas. */
+  retry() {
+    for (const m of this.members.values()) if (m.link.blocked?.()) m.link.retry?.();
+  }
+
   /** Los eventos de todas: cada máquina se suscribe ahora y las que lleguen después, al agregarse. */
   subscribeEvents() {
     if (this.listening) return;
@@ -294,6 +313,7 @@ export class Fleet {
       if (e.code === "cross_machine" || e.code === "unknown_machine") throw e;
       if (e.code === "machine_off") slice = before?.has ? { ...before, status: "cached", error: e.code } : keep("off", e.code);
       else if (e.code === "version_mismatch") slice = keep("outdated", e.code);
+      else if (e.code === "license_required") slice = keep("license_required", e.code);
       else slice = keep("no_answer", e.code);
     }
     this.book.put(slice, key);
@@ -306,6 +326,9 @@ export class Fleet {
     const member = this.members.get(machine);
     if (!member) throw new FleetError("unknown_machine", machine);
     const args = this.argsFor(machine, envelope.args ?? {});
+    // Sin licencia no se pregunta nada: la sesión espera a «Reintentar».
+    const stopped = member.link.blocked?.();
+    if (stopped) throw new FleetError(stopped, machine);
     const kind = classOf(command);
     if (kind !== "read" && this.isOutdated(member)) throw new FleetError("version_mismatch", machine);
     const off = OFF.includes(member.link.state());
@@ -389,6 +412,7 @@ export class Fleet {
         if (verdict) member.outdated = false;
         this.config.onChange?.(info.id);
       }) ?? (() => {}),
+      link.onBlocked?.(() => this.config.onChange?.(info.id)) ?? (() => {}),
       link.onEvents((page) => {
         if (!this.listening || this.isOutdated(member)) return;
         const events = linkedEvents(page.events ?? [], member.info.linked ?? null).map((e) => ({ name: e.name, payload: encodeEvent(this.context(), info.id, e.name, e.payload) }));
