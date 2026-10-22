@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { type CallResult, type EventsPage, INTENT_COMMANDS, type MachineState } from "../../computers/src/index.ts";
-import { Fleet, type FleetError, type Link, type MachineInfo, type Slice, SLICES_KEY } from "../src/index.ts";
+import { Fleet, type FleetError, type Link, type MachineInfo, type Slice, SLICES_KEY, classOf } from "../src/index.ts";
 
 type Answer = unknown | ((args: Record<string, unknown>) => unknown);
 /** `errors`: what the relay answers the next calls, in order, before answering normally. */
@@ -308,4 +308,24 @@ test("projects keep one row per id with the machines that have them, and the reg
   const vm = await fleet.read({ machine: "cmp_vm", workspace: "w", command: "list_projects", args: {} });
   const merged = fleet.merge("list_projects", [local([{ id: "p1", name: "P1" }]), vm], "w") as Record<string, unknown>[];
   assert.deepEqual(merged.map((p) => [p.id, p.machines]), [["p1", ["cmp_home", "cmp_vm"]], ["p2", []], ["p3", ["cmp_vm"]]]);
+});
+
+test("carry: a bare task id never travels to another machine, work_export wakes like an intent, and the fleet can wake a VM on request", async () => {
+  const woken: string[] = [];
+  const { fleet, link } = setup({ cmp_vm: { state: "stopped", answers: { work_status: { ahead: 0 } } }, cmp_mac: { state: "offline" } }, [VM, MAC], {
+    wake: async (machine) => {
+      woken.push(machine);
+      setTimeout(() => link(machine).setState("online"), 20);
+      return true;
+    },
+  });
+  assert.equal(classOf("work_export"), "intent");
+  await assert.rejects(fleet.call({ machine: "cmp_vm", workspace: "w", command: "work_status", args: { project: "p1", task: "t1" } }), (e: FleetError) => e.code === "cross_machine");
+  assert.deepEqual(fleet.argsFor("cmp_vm", { task: "cmp_vm~t1", transfer: "tx-1" }), { task: "t1", transfer: "tx-1" }, "its own task goes bare; the client's transfer id is never touched");
+  await assert.rejects(fleet.wake("cmp_mac"), (e: FleetError) => e.code === "machine_off" && !e.canWake, "the person's own machine is not started");
+  await fleet.wake("cmp_vm");
+  assert.deepEqual(woken, ["cmp_vm"]);
+  assert.equal(fleet.power("cmp_vm"), "on");
+  await fleet.wake("cmp_vm");
+  assert.deepEqual(woken, ["cmp_vm"], "an awake machine is not started again");
 });

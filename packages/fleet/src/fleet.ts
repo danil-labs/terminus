@@ -242,6 +242,18 @@ export class Fleet {
     return run;
   }
 
+  /**
+   * Enciende `machine` y espera a que diga `online`, con el tope de un intent.
+   * Una máquina propia apagada, o sin plano de control para encenderla, es `machine_off`.
+   */
+  async wake(machine: string): Promise<void> {
+    const member = this.members.get(machine);
+    if (!member) throw new FleetError("unknown_machine", machine);
+    if (member.link.state() === "online") return;
+    if (!member.info.wakes) throw new FleetError("machine_off", machine, null, false);
+    await this.wakeMember(member);
+  }
+
   /** Los eventos de todas: cada máquina se suscribe ahora y las que lleguen después, al agregarse. */
   subscribeEvents() {
     if (this.listening) return;
@@ -300,7 +312,7 @@ export class Fleet {
     if (off && kind !== "read") {
       if (!member.info.wakes) throw new FleetError("machine_off", machine, null, false);
       // El relay enciende la VM solo con un intent; otra acción la enciende antes el plano de control.
-      if (kind === "action") await this.wake(member);
+      if (kind === "action") await this.wakeMember(member);
     }
     const workspace = callWorkspace(envelope.workspace, args);
     const timeout = this.deadlines[kind];
@@ -323,7 +335,7 @@ export class Fleet {
   }
 
   /** Enciende la VM y espera a que diga `online`, con el tope de un intent. */
-  private async wake(member: Member) {
+  private async wakeMember(member: Member) {
     const { id } = member.info;
     if (!this.config.wake) throw new FleetError("machine_off", id, null, true);
     if (member.link.state() !== "starting" && !(await this.config.wake(id).catch(() => false))) throw new FleetError("machine_off", id, "start_failed", true);
