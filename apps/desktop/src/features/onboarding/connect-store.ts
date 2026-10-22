@@ -57,9 +57,11 @@ export type Paso =
   | { k: "clave" }
   | { k: "comprobando" }
   | { k: "conectada"; cuenta: string; id: string | null }
-  | { k: "saliendo" };
+  | { k: "saliendo" }
+  /** La sesión se guardó y falta el alta del proveedor; `url` es la página que la completa. */
+  | { k: "alta"; cuenta: string; url: string | null; revisando?: boolean };
 
-const EN_CURSO = new Set<Paso["k"]>(["descargando", "entrando", "clave", "comprobando", "saliendo"]);
+const EN_CURSO = new Set<Paso["k"]>(["descargando", "entrando", "clave", "comprobando", "saliendo", "alta"]);
 const ORDEN = ["claude", "codex", "antigravity", "grok", "opencode-zen", "opencode-local", "zcode"];
 const posicion = (id: string) => {
   const i = ORDEN.indexOf(id);
@@ -340,10 +342,12 @@ export function crearConexiones() {
     entrada = null;
     try {
       const estado = await invoke<AccountStatus>("account_status", { provider: e.agente, id: e.cuenta });
-      if (!motivo && estado.authenticated) {
-        await invoke("set_active_account", { provider: e.agente, id: e.cuenta }).catch(() => {});
-        const conectada = await cuentaConectada(e.agente);
-        poner(e.fila, { k: "conectada", cuenta: conectada?.cuenta ?? "", id: e.cuenta });
+      if (!motivo && estado.authenticated) return void (await quedoConectada(e.fila, e.agente, e.cuenta));
+      // La cuenta se queda: ya tiene la sesión, y en cuanto el alta exista se conecta sin volver a entrar.
+      if (!motivo && estado.signup) {
+        const url = estado.signup.url;
+        poner(e.fila, { k: "alta", cuenta: e.cuenta, url });
+        if (url) invoke("open_external", { target: url }).catch(() => {});
         return;
       }
     } catch {
@@ -352,6 +356,38 @@ export function crearConexiones() {
     await invoke("discard_account", { provider: e.agente, id: e.cuenta }).catch(() => {});
     setErrores(e.fila, motivo ? explicar(motivo) : t("onboarding.ai.login_failed"));
     poner(e.fila, { k: "instalada" });
+  }
+
+  async function quedoConectada(id: string, agent: string, cuenta: string) {
+    await invoke("set_active_account", { provider: agent, id: cuenta }).catch(() => {});
+    const conectada = await cuentaConectada(agent);
+    poner(id, { k: "conectada", cuenta: conectada?.cuenta ?? "", id: cuenta });
+  }
+
+  /** Vuelve a preguntar por una cuenta que esperaba su alta: se conecta si ya quedó, sigue esperando si no. */
+  async function revisarAlta(id: string) {
+    const f = fila(id);
+    const p = pasos[id];
+    if (!f || p?.k !== "alta" || p.revisando) return;
+    setErrores(id, null);
+    poner(id, { ...p, revisando: true });
+    try {
+      const estado = await invoke<AccountStatus>("account_status", { provider: f.agente, id: p.cuenta });
+      if (pasos[id]?.k !== "alta") return;
+      if (estado.authenticated) return void (await quedoConectada(id, f.agente, p.cuenta));
+      if (estado.signup) return poner(id, { ...p, url: estado.signup.url ?? p.url, revisando: false });
+      await invoke("discard_account", { provider: f.agente, id: p.cuenta }).catch(() => {});
+      setErrores(id, t("onboarding.ai.login_failed"));
+      poner(id, { k: "instalada" });
+    } catch {
+      // Sin respuesta no se sabe nada nuevo: se sigue esperando y se vuelve a mirar al regresar.
+      if (pasos[id]?.k === "alta") poner(id, { ...p, revisando: false });
+    }
+  }
+
+  function abrirAlta(id: string) {
+    const p = pasos[id];
+    if (p?.k === "alta" && p.url) invoke("open_external", { target: p.url }).catch(() => {});
   }
 
   async function enviarCodigo(id: string, codigo: string) {
@@ -394,6 +430,7 @@ export function crearConexiones() {
       if (e) await invoke("discard_account", { provider: e.agente, id: e.cuenta }).catch(() => {});
     }
     const f = fila(id);
+    if (p?.k === "alta" && f) await invoke("discard_account", { provider: f.agente, id: p.cuenta }).catch(() => {});
     const sesion = sesiones.find((x) => x.provider === f?.agente);
     poner(id, sesion ? { k: "sesion", identidad: sesion.identity ?? "" } : agente(f?.agente ?? "")?.available ? { k: "instalada" } : { k: "falta" });
   }
@@ -478,9 +515,10 @@ export function crearConexiones() {
     }
   });
   const alAgentes = listen("providers", () => void cargar());
-  // Lo que se instala desde su página no avisa al motor: se vuelve a mirar al regresar a la ventana.
+  // Lo que se instala o se activa en una página no avisa al motor: se vuelve a mirar al regresar a la ventana.
   const alVolver = () => {
     if (filas().some((f) => pasos[f.id]?.k === "externa")) void cargar();
+    for (const f of filas().filter((x) => pasos[x.id]?.k === "alta")) void revisarAlta(f.id);
   };
   window.addEventListener("focus", alVolver);
   onCleanup(() => {
@@ -492,6 +530,10 @@ export function crearConexiones() {
     if (e) {
       void invoke("cancel_login", { id: e.cuenta }).catch(() => {});
       void invoke("discard_account", { provider: e.agente, id: e.cuenta }).catch(() => {});
+    }
+    for (const f of filas()) {
+      const p = pasos[f.id];
+      if (p?.k === "alta") void invoke("discard_account", { provider: f.agente, id: p.cuenta }).catch(() => {});
     }
   });
 
@@ -514,6 +556,8 @@ export function crearConexiones() {
     cancelarDescarga,
     cancelar,
     enviarCodigo,
+    revisarAlta,
+    abrirAlta,
     guardarClave,
     desconectar,
     limpiarError: (id: string) => setErrores(id, null),
