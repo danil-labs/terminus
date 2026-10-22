@@ -75,6 +75,7 @@
     "code.typst.error.export",
     "code.typst.error.live",
     "code.typst.error.no_main",
+    "common.install.no_space",
     "connectors.telegram.audio_refused",
     "connectors.telegram.delivery_failed",
     "connectors.telegram.file_failed",

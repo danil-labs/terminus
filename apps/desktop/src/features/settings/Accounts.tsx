@@ -1,6 +1,7 @@
 import { For, Show, createEffect, createSignal, createUniqueId, on, onCleanup, onMount, untrack, type JSX } from "solid-js";
 import { enfocar } from "../../lib/focus";
 import { invoke } from "../../lib/invoke.ts";
+import { textoDeFalta } from "../../lib/no-space";
 import { listen } from "../../lib/serviceEvents";
 import AccountCard, { accountPresentation } from "./AccountCard";
 import { FailureNote, type Failure, detalleDe, prosaDe } from "../../ui/Failure";
@@ -295,7 +296,8 @@ export default function Accounts(props: {
       setAgentes(await invoke<AgentOpt[]>("list_providers"));
       setFallo(null);
     } catch (e) {
-      setFallo({ what: t("settings.accounts.error.install"), detail: detalleDe(e) });
+      const sinEspacio = await textoDeFalta(e, `provider:${agente()}`);
+      setFallo(sinEspacio ? { what: sinEspacio, detail: "" } : { what: t("settings.accounts.error.install"), detail: detalleDe(e) });
     } finally {
       setInstalando(null);
     }
