@@ -2686,6 +2686,15 @@ export default function App() {
 
       // `tool` no cae aquí: lo atiende la línea de tiempo, que además tiene que
       // casar el `tool_done` con el paso que abrió.
+      // Una entrega de otra tarea espera a que este turno cierre: es la fila que
+      // el motor ya dejó en la transcripción, que no se relee hasta el cierre.
+      // La prosa del evento es para una ventana anterior.
+      if (kind === "notice" && meta === "delivery_pending") {
+        append((m) => id && m.some((x) => x.turno === id) ? m : [
+          ...m, { role: "system", text: "", meta: "delivery_pending", fromTask: task ?? undefined, turno: id },
+        ]);
+        return;
+      }
       if (kind === "notice") {
         const message = clavesConocidas().has(text) ? t(text) : text;
         append((m) => [...m, { role: "system", text: message, meta: "aviso" }]);

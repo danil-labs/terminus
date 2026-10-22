@@ -13,7 +13,7 @@ import { cn } from "../../lib/utils";
 import type { Agent } from "../../lib/model";
 import { Button } from "../../ui/Button";
 import { Textarea } from "../../ui/Textarea";
-import { esDeLaTerminal, inyectable } from "./queue";
+import { deOtraTarea, esDeLaTerminal, inyectable } from "./queue";
 
 // Conserva la configuración al encolar; el lote adopta la del último mensaje.
 export type Encolado = {
@@ -91,6 +91,8 @@ export type ColaDeMensajesProps = {
   /** Editar pausa la cola: un turno que cierra a mitad de la edición no se lleva el texto a medias. */
   onEditando: (activo: boolean) => void;
   onMandar: () => void;
+  /** Abre la tarea que mandó una entrega. */
+  onOpenTask?: (folder: string, task: string) => void;
 };
 
 /**
@@ -209,15 +211,39 @@ export default function ColaDeMensajes(props: ColaDeMensajesProps) {
                         aria-label={t("chat.queue.terminal")}
                       />
                     </Show>
-                    <span
-                      class={cn(
-                        "mt-0.5 min-w-0 flex-1 text-sm break-words text-neutral-700",
-                        props.compact ? "line-clamp-1" : "line-clamp-2",
-                        esDeLaTerminal(it) && "font-mono text-[0.8125rem]",
-                      )}
-                      title={props.compact ? it.text : undefined}
-                    >
-                      {it.text}
+                    <span class="mt-0.5 flex min-w-0 flex-1 flex-col">
+                      <Show when={deOtraTarea(it)}>
+                        <span class="text-xs text-neutral-500" data-queue-from="task">
+                          {it.from_task
+                            ? t("chat.queue.from_task", { title: it.from_task.title })
+                            : t("chat.queue.from_agent", { name: it.agent ?? "" })}
+                          <Show when={props.onOpenTask ? it.from_task : null}>
+                            {(sender) => (
+                              <>
+                                {" — "}
+                                <button
+                                  type="button"
+                                  class="cursor-pointer underline underline-offset-2"
+                                  aria-label={t("chat.recipients.open_task", { title: sender().title })}
+                                  onClick={() => props.onOpenTask?.(sender().folder, sender().task)}
+                                >
+                                  {t("chat.task_completed.open")}
+                                </button>
+                              </>
+                            )}
+                          </Show>
+                        </span>
+                      </Show>
+                      <span
+                        class={cn(
+                          "min-w-0 text-sm break-words text-neutral-700",
+                          props.compact ? "line-clamp-1" : "line-clamp-2",
+                          esDeLaTerminal(it) && "font-mono text-[0.8125rem]",
+                        )}
+                        title={props.compact ? it.text : undefined}
+                      >
+                        {it.text}
+                      </span>
                     </span>
 
                     {/* Solo cuando difiere de lo que hay puesto ahora: eso es lo
@@ -259,6 +285,7 @@ export default function ColaDeMensajes(props: ColaDeMensajesProps) {
                           </Button>
                         )}
                       </Show>
+                      <Show when={!deOtraTarea(it)}>
                       <Button
                         type="button"
                         variant="ghost"
@@ -283,6 +310,7 @@ export default function ColaDeMensajes(props: ColaDeMensajesProps) {
                       >
                         <X size={13} />
                       </Button>
+                      </Show>
                     </span>
                   </li>
                 }

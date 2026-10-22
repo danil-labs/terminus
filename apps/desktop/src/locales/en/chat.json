@@ -175,6 +175,8 @@
   "chat.queue.edit_aria": "Edit message {n} in the queue",
   "chat.queue.empty_blocked": "An empty message cannot be sent",
   "chat.queue.label": "queued",
+  "chat.queue.from_task": "Reply from task “{title}”",
+  "chat.queue.from_agent": "Message from @{name}",
   "chat.queue.remove": "Remove",
   "chat.queue.remove_aria": "Remove message {n} from the queue",
   "chat.queue.save": "save",
@@ -334,6 +336,8 @@
   "chat.inbox.chain_limit": "“{title}” finished, but its chain already woke the inbox {max} times: Terminus does not open another turn.",
   "chat.inbox.replied": "Reply delivered to “{title}”.",
   "chat.inbox.replied_someone": "Reply delivered to whoever asked for it.",
+  "chat.inbox.delivery_pending": "The reply from “{title}” is waiting: it goes in when this turn ends.",
+  "chat.inbox.delivery_pending_someone": "A delivery is waiting: it goes in when this turn ends.",
   "chat.inbox.woke": {
     "one": "A task finished and Terminus opened this turn.",
     "other": "{count} tasks finished and Terminus opened this turn."
