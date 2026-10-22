@@ -71,12 +71,15 @@ export function DialogoDeConexion(props: {
             <DialogTitle class="text-sm font-semibold">
               {t("settings.accounts.connect_agent", { agent: props.etiqueta })}
             </DialogTitle>
-            <Show when={!props.pideCodigo}>
-              <span class="flex items-center gap-1.5 text-xs text-neutral-500" role="status">
-                <Spinner size={12} />
-                {props.url || props.porConfirmar ? t("onboarding.login.waiting_browser") : t("settings.accounts.connecting")}
-              </span>
-            </Show>
+            {/* Siempre dice qué espera: que abra el navegador, que termines ahí o que pegues su código. */}
+            <span class="flex items-center gap-1.5 text-xs text-neutral-500" role="status">
+              <Spinner size={12} />
+              {props.pideCodigo
+                ? t("onboarding.login.waiting_code")
+                : props.url || props.porConfirmar
+                  ? t("onboarding.login.waiting_browser")
+                  : t("onboarding.login.opening_browser")}
+            </span>
           </div>
           <Button variant="outline" size="compact" onClick={() => props.onCancelar()}>
             {t("settings.accounts.cancel")}

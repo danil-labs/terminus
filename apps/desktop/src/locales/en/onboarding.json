@@ -163,6 +163,8 @@
   "onboarding.workspace.creating": "Creating…",
   "onboarding.workspace.footer": "You can create more spaces later.",
   "onboarding.workspace.name": "Workspace name",
+  "onboarding.login.opening_browser": "Opening the browser so you can sign in…",
+  "onboarding.login.waiting_code": "Waiting for the code the browser gives you…",
   "onboarding.login.waiting_browser": "Waiting for you to finish in the browser…",
   "onboarding.login.confirm_in_browser": "Confirm it in your browser"
 }
