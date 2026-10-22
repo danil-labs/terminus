@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../lib/invoke";
 import { createResource, Show } from "solid-js";
 import { imagenInerte } from "../lib/links";
 import { EnlargeableImage } from "./EnlargeableImage";

@@ -8,7 +8,7 @@ const end = source.indexOf("\n  }", start) + 4;
 const original = source.slice(start, end);
 
 function reintento({ invoke, setError = () => {} }) {
-  return new Function("msgs", "sessionId", "project", "setRetenida", "invoke", "setError", "prosaDe", "editarBorrador", "claveAbierta", "mandar", `${original}; return reintentar;`)(
+  return new Function("msgs", "sessionId", "project", "setRetenida", "invoke", "setError", "prosaDe", "editarBorrador", "claveAbierta", "mandar", "deLaTarea", `${original}; return reintentar;`)(
     () => [{ role: "user", text: "delegar" }, { role: "system", text: "falló", meta: "fallo", resume: "deliveries" }],
     () => "padre",
     () => "proyecto",
@@ -19,6 +19,7 @@ function reintento({ invoke, setError = () => {} }) {
     () => { throw new Error("no debe reponer el borrador"); },
     () => "padre",
     async () => { throw new Error("no debe mandar un input"); },
+    () => undefined,
   );
 }
 
@@ -26,7 +27,7 @@ test("reintentar una entrega fallida conserva la reanudacion interna", async () 
   const calls = [];
   const retry = reintento({ invoke: async (...args) => calls.push(args) });
   await retry();
-  assert.deepEqual(calls, [["reintentar_reanudacion_por_entregas", { project: "proyecto", session: "padre" }]]);
+  assert.deepEqual(calls, [["reintentar_reanudacion_por_entregas", { project: "proyecto", session: "padre" }, undefined]]);
 });
 
 test("un rechazo del reintento de entregas se muestra sin escribir al historial", async () => {
