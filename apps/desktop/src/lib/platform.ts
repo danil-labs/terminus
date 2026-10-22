@@ -3,6 +3,7 @@
  * el valor por defecto; la entrada web (`src/web/main.tsx`) lo fija antes de
  * importar la app y no cambia después.
  */
+import type { MemorySource } from "@terminus/computers";
 import type { JSX } from "solid-js";
 import type { AccountProfileSource } from "../features/settings/account-profile";
 import type { Account } from "../features/settings/accounts-store";
@@ -53,6 +54,13 @@ export type Capabilities = {
   machinesLicense?: () => "license_required" | null;
   /** «Reintentar» del aviso de licencia: vuelve a abrir las sesiones de las otras máquinas. */
   retryMachines?: () => void;
+  /**
+   * La memoria versionada de los workspaces en la cuenta (`/v1/workspaces/:id/memory/*`)
+   * con la sesión de la persona: en la web, la pestaña Memoria la lee y la escribe
+   * ahí, aunque todas las máquinas estén apagadas. La ventana usa el token de
+   * cliente de la cuenta de cada workspace (`memory-account.ts`).
+   */
+  accountMemory?: MemorySource;
   /** Bajo la tarjeta de una cuenta: sus máquinas. */
   accountMachines?: (props: AccountMachinesProps) => JSX.Element;
 };
