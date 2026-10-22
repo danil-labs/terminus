@@ -11,6 +11,7 @@ import type { DanilConnectStatus } from "./danil-account";
 import { createDanilAccounts, type DanilAccounts } from "./danil-accounts";
 import { createDanilSession, DanilSignInChoices, said } from "./danil-session";
 import { type DanilSessionInfo, sessionKey, statusOf } from "./danil-sessions";
+import { ConnectMachineSection } from "../machines/ConnectMachine";
 import { LICENSE_REQUIRED, startTrialInBrowser, TerminusLicense } from "./TerminusLicense";
 import { SettingsBlock, SettingsPanel, SettingsRow, SettingsSection } from "./layout";
 
@@ -28,6 +29,7 @@ function WebAccount(props: { source: AccountProfileSource }) {
       <SettingsSection title={t("danil.account.title")} description={t("danil.account.web_description")}>
         <AccountIdentityBlock identity={identity} />
       </SettingsSection>
+      <ConnectMachineSection />
     </SettingsPanel>
   );
 }
@@ -115,6 +117,7 @@ function AccountList(props: { accounts: DanilAccounts }) {
           {(code) => <p class="m-0 pt-2 text-[0.8125rem] text-error-strong" role="alert">{said(code())}</p>}
         </Show>
       </SettingsSection>
+      <ConnectMachineSection />
     </SettingsPanel>
   );
 }
@@ -224,6 +227,9 @@ function SingleAccount() {
           {(text) => <p class="m-0 pt-2 text-[0.8125rem] text-error-strong" role="alert">{text()}</p>}
         </Show>
       </SettingsSection>
+      <Show when={status()?.state === "connected"}>
+        <ConnectMachineSection />
+      </Show>
     </SettingsPanel>
   );
 }
