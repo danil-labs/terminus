@@ -66,7 +66,6 @@
   "setup.row.installing": "Instalando…",
   "setup.row.failed": "No se instaló",
   "setup.row.ready": "Listo",
-  "setup.row.free": "{free} libres",
   "setup.row.system": "{version} · en el sistema",
   "setup.row.installed": "{version} · instalado",
   "setup.optional.title": "Opcionales",
