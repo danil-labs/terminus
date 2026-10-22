@@ -55,7 +55,7 @@ export function CodigoParaConfirmar(props: { codigo: string }) {
       .catch(() => {});
   return (
     <>
-      <strong class="select-all rounded-sm bg-surface-muted px-2 py-0.5 font-mono text-base font-semibold tracking-[0.08em] text-neutral-950">
+      <strong class="select-all rounded-sm bg-surface-muted px-1.5 py-0.5 font-mono text-[13px] font-semibold tracking-[0.04em] whitespace-nowrap text-neutral-950">
         {props.codigo}
       </strong>
       <button

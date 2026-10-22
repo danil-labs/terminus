@@ -309,7 +309,10 @@ export function crearConexiones() {
   /** La × de la descarga: el motor la corta y no deja nada a medias. */
   function cancelarDescarga(id: string) {
     const f = fila(id);
-    if (f) void invoke("cancel_install", { operation: `provider:${f.agente}` }).catch(() => {});
+    if (!f) return;
+    // La tarjeta vuelve al instante; el motor termina de cortar por detrás.
+    poner(id, sesiones.some((y) => y.provider === f.agente) ? { k: "instalada" } : { k: "falta" });
+    void invoke("cancel_install", { operation: `provider:${f.agente}` }).catch(() => {});
   }
 
   async function entrar(id: string) {
