@@ -63,8 +63,6 @@
   "onboarding.ai.key.stored": "Se guarda cifrada en esta computadora y solo la usa este workspace.",
   "onboarding.ai.key_invalid": "Esa clave no parece válida. Revísala y vuelve a pegarla completa.",
   "onboarding.ai.key_saved": "Clave guardada · {start}…{end}",
-  "onboarding.ai.code.label": "Código de autorización",
-  "onboarding.ai.code.send": "Enviar",
   "onboarding.ai.login_failed": "No se completó el inicio de sesión. Vuelve a intentarlo.",
   "onboarding.ai.error.keyring": "Esta computadora no tiene un llavero activo donde guardar la sesión. Abre o desbloquea el llavero del sistema (GNOME Keyring o KWallet) y vuelve a intentarlo.",
   "onboarding.ai.map.connecting": "Conectando {name}…",

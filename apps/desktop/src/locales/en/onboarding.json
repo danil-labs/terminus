@@ -63,8 +63,6 @@
   "onboarding.ai.key.stored": "Stored encrypted on this computer and used only by this workspace.",
   "onboarding.ai.key_invalid": "That key doesn't look valid. Check it and paste it again in full.",
   "onboarding.ai.key_saved": "Key saved · {start}…{end}",
-  "onboarding.ai.code.label": "Authorization code",
-  "onboarding.ai.code.send": "Send",
   "onboarding.ai.login_failed": "Sign-in didn't finish. Try again.",
   "onboarding.ai.error.keyring": "This computer has no active keyring to store the session. Open or unlock the system keyring (GNOME Keyring or KWallet) and try again.",
   "onboarding.ai.map.connecting": "Connecting {name}…",
