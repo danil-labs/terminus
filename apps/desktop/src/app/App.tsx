@@ -88,6 +88,14 @@ const AgentProfile = lazy(() => import("../features/projects/AgentProfile"));
 const Onboarding = lazy(() => import("../features/onboarding/Onboarding"));
 const TaskLocation = lazy(() => import("../features/chat/TaskLocation"));
 const Screen = lazy(() => import("../features/screen/Screen"));
+// El aviso de Terminus de pago solo se baja si la flota lo pide (trae los textos de Danil).
+const MachinesLicense = lazy(() =>
+  import("../features/settings/TerminusLicense").then((m) => ({
+    default: (props: { onRetry: () => void }) => (
+      <m.TerminusLicense compact onStart={m.startTrialInBrowser} onRetry={props.onRetry} />
+    ),
+  })),
+);
 import AgentTasks, { createdTasks } from "../features/projects/AgentTasks";
 import ArchivedTasks from "../features/projects/ArchivedTasks";
 import BaseBranchPicker from "../features/projects/BaseBranchPicker";
@@ -7746,6 +7754,13 @@ export default function App() {
             etiqueta={t("shell.column.sidebar_width")}
           >
             <div class="relative h-full min-h-0 w-full min-w-0">
+            {/* Las otras máquinas se ven por el relay, que es de pago: si la flota lo
+                detuvo por la licencia, el aviso de Terminus (el pago vive en la web). */}
+            <Show when={capabilities().machinesLicense?.() === "license_required" && !sidebar.colapsado()}>
+              <div class="absolute inset-x-2 bottom-2 z-10 rounded-md border border-border bg-surface-raised p-3 shadow-sm" data-machines-license="">
+                <MachinesLicense onRetry={() => capabilities().retryMachines?.()} />
+              </div>
+            </Show>
             <div
               class="h-full min-h-0 w-full min-w-0"
               classList={{ "opacity-60": enCache() }}
