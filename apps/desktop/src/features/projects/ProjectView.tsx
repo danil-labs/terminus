@@ -1,4 +1,6 @@
 import { open } from "@tauri-apps/plugin-dialog";
+import Check from "lucide-solid/icons/check";
+import Copy from "lucide-solid/icons/copy";
 import Eye from "lucide-solid/icons/eye";
 import FolderOpen from "lucide-solid/icons/folder-open";
 import GitBranch from "lucide-solid/icons/git-branch";
@@ -7,6 +9,7 @@ import SquarePen from "lucide-solid/icons/square-pen";
 import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from "solid-js";
 import { rememberRoster } from "../../lib/handlerRoster";
+import { copyText } from "../../lib/clipboard";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
 import {
@@ -286,6 +289,15 @@ export default function VistaDeProyecto(props: {
   }
 
   const carpeta = () => carpetaDeTrabajo(props.proyecto);
+  const [rutaCopiada, setRutaCopiada] = createSignal(false);
+  function copiarRuta(dir: string) {
+    void copyText(dir)
+      .then(() => {
+        setRutaCopiada(true);
+        setTimeout(() => setRutaCopiada(false), 1500);
+      })
+      .catch(() => {});
+  }
 
   const fijo = () =>
     props.proyecto.sources
@@ -371,13 +383,37 @@ export default function VistaDeProyecto(props: {
             }
           >
             {(dir) => (
-              <div class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1 rounded-md border border-border px-3 py-2">
+              <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 rounded-md border border-border px-3 py-2">
                 <WorkdirIcon
                   kind={props.proyecto.kind} cloud={props.proyecto.cloud}
                   class="text-neutral-500"
                 />
-                <span class="min-w-0 truncate font-mono text-[0.6875rem] text-neutral-950">
+                <span class="min-w-0 truncate font-mono text-[0.6875rem] text-neutral-950" title={dir()}>
                   {dir()}
+                </span>
+                <span class="row-span-2 flex items-center gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    class="size-7 text-neutral-500"
+                    onClick={() => void invoke("open_external", { target: dir() }).catch(() => {})}
+                    aria-label={t("shell.folder.open")}
+                    title={t("shell.folder.open")}
+                  >
+                    <FolderOpen size={15} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    class="size-7 text-neutral-500"
+                    onClick={() => copiarRuta(dir())}
+                    aria-label={rutaCopiada() ? t("shell.folder.copied") : t("shell.folder.copy")}
+                    title={rutaCopiada() ? t("shell.folder.copied") : t("shell.folder.copy")}
+                  >
+                    <Show when={rutaCopiada()} fallback={<Copy size={15} />}>
+                      <Check size={15} />
+                    </Show>
+                  </Button>
                 </span>
                 <span class="col-start-2 text-xs text-neutral-500">
                   {props.proyecto.kind === "git"
