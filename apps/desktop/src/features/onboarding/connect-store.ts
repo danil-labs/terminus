@@ -335,6 +335,8 @@ export function crearConexiones() {
     }
   }
 
+  // Un login que el CLI terminó deja la cuenta marcada como autenticada y `discard_account` ya no la tira:
+  // la que este intento creó y no quedó conectada se quita entera.
   async function terminarEntrada(motivo: string) {
     const e = entrada;
     if (!e) return;
@@ -353,7 +355,7 @@ export function crearConexiones() {
     } catch {
       // Sin estado legible se trata como un intento que no llegó: la cuenta vacía se descarta.
     }
-    await invoke("discard_account", { provider: e.agente, id: e.cuenta }).catch(() => {});
+    await invoke("remove_account", { provider: e.agente, id: e.cuenta }).catch(() => {});
     setErrores(e.fila, motivo ? explicar(motivo) : t("onboarding.ai.login_failed"));
     poner(e.fila, { k: "instalada" });
   }
@@ -376,7 +378,7 @@ export function crearConexiones() {
       if (pasos[id]?.k !== "alta") return;
       if (estado.authenticated) return void (await quedoConectada(id, f.agente, p.cuenta));
       if (estado.signup) return poner(id, { ...p, url: estado.signup.url ?? p.url, revisando: false });
-      await invoke("discard_account", { provider: f.agente, id: p.cuenta }).catch(() => {});
+      await invoke("remove_account", { provider: f.agente, id: p.cuenta }).catch(() => {});
       setErrores(id, t("onboarding.ai.login_failed"));
       poner(id, { k: "instalada" });
     } catch {
@@ -430,7 +432,7 @@ export function crearConexiones() {
       if (e) await invoke("discard_account", { provider: e.agente, id: e.cuenta }).catch(() => {});
     }
     const f = fila(id);
-    if (p?.k === "alta" && f) await invoke("discard_account", { provider: f.agente, id: p.cuenta }).catch(() => {});
+    if (p?.k === "alta" && f) await invoke("remove_account", { provider: f.agente, id: p.cuenta }).catch(() => {});
     const sesion = sesiones.find((x) => x.provider === f?.agente);
     poner(id, sesion ? { k: "sesion", identidad: sesion.identity ?? "" } : agente(f?.agente ?? "")?.available ? { k: "instalada" } : { k: "falta" });
   }
@@ -533,7 +535,7 @@ export function crearConexiones() {
     }
     for (const f of filas()) {
       const p = pasos[f.id];
-      if (p?.k === "alta") void invoke("discard_account", { provider: f.agente, id: p.cuenta }).catch(() => {});
+      if (p?.k === "alta") void invoke("remove_account", { provider: f.agente, id: p.cuenta }).catch(() => {});
     }
   });
 
