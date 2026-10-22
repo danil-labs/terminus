@@ -555,6 +555,7 @@ const steps = [
   ["Una tarea de una máquina apagada abre y se enciende al mandarle algo", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/machine-task.test.mjs")], root],
   ["Con la cuenta de Danil el escritorio junta las tareas de todas sus computadoras", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/desktop-account-machines.test.mjs")], root],
   ["Sin el stream empujado la ventana sondea como siempre", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/push-fallback.test.mjs")], root],
+  ["Una respuesta con visual no desaparece del chat aunque el turno no se guarde o el visual no se lea", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/chat-turn-unsaved.test.mjs")], root],
   ["Abrir una tarea larga no cuesta más que su techo", process.execPath, [join(root, "tests/perf/open-task-cost.mjs")], root],
   ["Releer una tarea abierta no remonta su hilo", process.execPath, [join(root, "tests/perf/reread-thread.mjs")], root],
   ["Una sesión larga no deja memoria detrás", process.execPath, ["--expose-gc", join(root, "tests/perf/long-session.mjs")], root],

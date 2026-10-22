@@ -606,6 +606,7 @@ export type ChatProps = {
   onEntradaDeComando?: (texto: string, eco: boolean) => Promise<boolean>;
   visualScope?: string;
   readVisual?: (file: string) => Promise<string>;
+  openVisual?: (file: string) => Promise<void>;
   /**
    * La miniatura de un adjunto ya mandado, de ruta relativa a `data:` URI.
    * Aquí y no dentro de `Adjuntos`: este componente no conoce el proyecto
@@ -2865,6 +2866,7 @@ export default function Chat(props: ChatProps) {
                       visualBudget={visualBudget}
                       visualScope={props.visualScope}
                       readVisual={props.readVisual}
+                      openVisual={props.openVisual}
                       pasos={fromWork(b(), (t) => t.pasos, [])}
                       avance={fromWork(b(), (t) => t.avance ?? SIN_AVANCE, SIN_AVANCE)}
                       msg={fromWork(b(), (t) => t.msg, SIN_MENSAJE)}
@@ -3446,6 +3448,7 @@ function TrabajoDeAgente(props: {
   visualBudget: VisualBudget;
   visualScope?: string;
   readVisual?: (file: string) => Promise<string>;
+  openVisual?: (file: string) => Promise<void>;
   searchBlock?: number;
   pasos: Paso[];
   avance: Avance[];
@@ -3532,7 +3535,7 @@ function TrabajoDeAgente(props: {
       <Show when={texto()}>
         {(md) => (
           <AltoMonotono vivo={props.vivo} searchBlock={props.searchBlock}>
-            <TextoConSiguientes texto={md()} vivo={props.vivo} rapida={props.rapida} readVisual={props.readVisual} owner={props.visualScope ?? ""} visualBudget={props.visualBudget} />
+            <TextoConSiguientes texto={md()} vivo={props.vivo} rapida={props.rapida} readVisual={props.readVisual} openVisual={props.openVisual} owner={props.visualScope ?? ""} visualBudget={props.visualBudget} />
           </AltoMonotono>
         )}
       </Show>
@@ -3613,7 +3616,7 @@ type RespuestaRapida = {
  * `Index` y no `For`: cada token trae partes nuevas y `For` remontaría el
  * markdown entero en cada una.
  */
-function TextoConSiguientes(props: { texto: string; vivo: boolean; rapida: RespuestaRapida | null; owner: string; visualBudget: VisualBudget; readVisual?: (file: string) => Promise<string> }) {
+function TextoConSiguientes(props: { texto: string; vivo: boolean; rapida: RespuestaRapida | null; owner: string; visualBudget: VisualBudget; readVisual?: (file: string) => Promise<string>; openVisual?: (file: string) => Promise<void> }) {
   const partes = createMemo(() => {
     const visuals = props.readVisual ? splitChatVisuals(props.texto, props.vivo) : [{ kind: "markdown" as const, markdown: props.texto }];
     return visuals.flatMap<Visual | NextStepsPart>((part) => part.kind === "visual" ? [part] : splitNextSteps(part.markdown, props.vivo));
@@ -3653,7 +3656,7 @@ function TextoConSiguientes(props: { texto: string; vivo: boolean; rapida: Respu
             />
           </Show>
           }>
-            <ChatVisual visual={parte() as Visual} owner={props.owner} budget={props.visualBudget} read={(file) => props.readVisual!(file)} />
+            <ChatVisual visual={parte() as Visual} owner={props.owner} budget={props.visualBudget} read={(file) => props.readVisual!(file)} open={props.openVisual} />
           </Show>
         );
       }}
