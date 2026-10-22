@@ -398,5 +398,18 @@
   "chat.visual.collapse": "Reducir visualización",
   "chat.visual.budget": "Este hilo alcanzó el límite de 16 visualizaciones cargadas. Cierra una visualización para cargar otra.",
   "chat.visual.unload": "Cerrar visualización",
-  "chat.visual.load": "Abrir visualización"
+  "chat.visual.load": "Abrir visualización",
+  "chat.greeting.morning": "Buenos días. ¿Por dónde empezamos?",
+  "chat.greeting.afternoon": "Buenas tardes. ¿Qué sigue?",
+  "chat.greeting.evening": "Buenas noches. ¿En qué te ayudo?",
+  "chat.greeting.1": "¿Qué hacemos hoy?",
+  "chat.greeting.2": "¿En qué trabajamos?",
+  "chat.greeting.3": "¿Qué tienes en mente?",
+  "chat.greeting.4": "¿Por dónde empezamos?",
+  "chat.greeting.5": "¿Qué construimos hoy?",
+  "chat.greeting.6": "Cuéntame qué necesitas.",
+  "chat.greeting.7": "¿Qué resolvemos?",
+  "chat.greeting.8": "¿Qué sigue en tu lista?",
+  "chat.greeting.9": "Aquí estoy. ¿Qué hacemos?",
+  "chat.greeting.10": "¿Qué quieres sacar adelante?"
 }
