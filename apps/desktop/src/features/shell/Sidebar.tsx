@@ -618,7 +618,7 @@ export default function Sidebar(props: {
         </SidebarHeader>
 
         <SidebarContent class="gap-2 px-2 pb-0">
-          <SidebarMenu>
+          <SidebarMenu class="gap-1.5">
             <SidebarMenuItem>
               {/* Nueva tarea es la acción principal, negra y sólida.
                   `primary` queda reservado para las acciones del agente. */}
