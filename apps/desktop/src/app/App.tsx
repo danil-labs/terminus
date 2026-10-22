@@ -1787,8 +1787,11 @@ export default function App() {
     }
   }
 
+  // Sin tarea abierta, el panel enseña la carpeta de trabajo del proyecto.
+  const rutaDelPanel = () => folder() ?? carpetaDelProyecto() ?? null;
+
   function abrirCarpeta() {
-    const f = folder();
+    const f = rutaDelPanel();
     if (f) void invoke("open_external", { target: f }).catch((e) => setError(prosaDe(e)));
   }
 
@@ -1796,7 +1799,7 @@ export default function App() {
   // gesto de un clic es la glosa que el sistema visual descarta.
   const [rutaCopiada, setRutaCopiada] = createSignal(false);
   async function copiarRuta() {
-    const f = folder();
+    const f = rutaDelPanel();
     if (!f) return;
     try {
       await copyText(f);
@@ -7780,7 +7783,7 @@ export default function App() {
                     variant="ghost"
                     size="icon"
                     class="size-7 shrink-0 text-neutral-500"
-                    disabled={!folder()}
+                    disabled={!rutaDelPanel()}
                     onClick={abrirCarpeta}
                     aria-label={t("shell.folder.open")}
                     title={t("shell.folder.open")}
@@ -7791,7 +7794,7 @@ export default function App() {
                     variant="ghost"
                     size="icon"
                     class="size-7 shrink-0 text-neutral-500"
-                    disabled={!folder()}
+                    disabled={!rutaDelPanel()}
                     onClick={() => void copiarRuta()}
                     aria-label={rutaCopiada() ? t("shell.folder.copied") : t("shell.folder.copy")}
                     title={rutaCopiada() ? t("shell.folder.copied") : t("shell.folder.copy")}
