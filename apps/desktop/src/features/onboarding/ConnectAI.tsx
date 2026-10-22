@@ -4,7 +4,7 @@ import Circle from "lucide-solid/icons/circle";
 import ExternalLink from "lucide-solid/icons/external-link";
 import Sparkles from "lucide-solid/icons/sparkles";
 import TriangleAlert from "lucide-solid/icons/triangle-alert";
-import { createSignal, For, Match, Show, Switch, type JSX } from "solid-js";
+import { createSignal, For, lazy, Match, Show, Suspense, Switch, type JSX } from "solid-js";
 import { lista } from "../../lib/format";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
@@ -19,6 +19,9 @@ import { Spinner } from "../../ui/Spinner";
 import { DialogoDeConexion } from "../settings/LoginDialog";
 import { AvanceDeDescarga, BarraDeCarga, CodigoParaConfirmar, Peso } from "./DownloadProgress";
 import { type Conexiones, type Fila, nombreDeFila, ordenDelMapa, type Paso } from "./connect-store";
+
+// El panel de modelos locales solo hace falta al abrirlo.
+const ListaDeModelosLocales = lazy(() => import("../settings/LocalModels"));
 
 type Nodo = "off" | "det" | "vivo" | "on";
 
@@ -288,6 +291,11 @@ function Tarjeta(props: { c: Conexiones; f: Fila; abajo?: JSX.Element; resaltada
               <Spinner class={p()?.k === "saliendo" ? "text-neutral-500" : "text-primary"} />
             </Match>
             <Match when={p()?.k === "conectada"}>
+              <Show when={props.f.modo === "local"}>
+                <Button size="compact" variant="ghost" onClick={() => props.c.alternarLocal(props.f.id)}>
+                  {t("onboarding.ai.local.models")}
+                </Button>
+              </Show>
               <Badge tone="success" class="gap-1">
                 <Check size={11} stroke-width={3} aria-hidden="true" />
                 {gratuitos() ? t("onboarding.ai.activated") : t("onboarding.ai.connected")}
@@ -409,6 +417,25 @@ function PanelDeAlta(props: { c: Conexiones; f: Fila; paso: Extract<Paso, { k: "
   );
 }
 
+/** El catálogo de modelos locales, abierto debajo de su tarjeta como el panel de la clave. */
+function PanelLocal(props: { c: Conexiones }) {
+  const m = props.c.locales;
+  return (
+    <div class={PANEL}>
+      <strong class="text-[13px] font-semibold">{t("onboarding.ai.local.title")}</strong>
+      <Suspense fallback={<Spinner class="justify-self-center text-neutral-500" />}>
+        <ListaDeModelosLocales m={m} />
+      </Suspense>
+      <div class="mt-0.5 flex flex-wrap items-center gap-2">
+        <span class="min-w-0 flex-1 text-xs text-neutral-500">{t("onboarding.ai.local.hint")}</span>
+        <Button size="sm" variant={m.listo() ? "primary" : "ghost"} onClick={() => props.c.cerrarLocal()}>
+          {m.listo() ? t("onboarding.ai.local.done") : t("onboarding.cancel")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /** El aviso de los gratuitos va pegado a su tarjeta mientras no se han activado. */
 function AvisoDeGratuitos() {
   return (
@@ -446,10 +473,13 @@ function FilaDeIA(props: { c: Conexiones; f: Fila }) {
     if (paso?.k === "alta") return <PanelDeAlta c={props.c} f={props.f} paso={paso} />;
     const error = props.c.errores[props.f.id];
     if (error) return <ErrorDeTarjeta texto={error} />;
+    if (props.f.modo === "local" && props.c.localAbierto() === props.f.id) return <PanelLocal c={props.c} />;
     if (props.f.modo === "consentimiento" && (paso?.k === "falta" || paso?.k === "instalada")) return <AvisoDeGratuitos />;
     return undefined;
   };
-  const resaltada = () => ["sesion", "entrando", "clave", "comprobando", "alta"].includes(p()?.k ?? "") && props.f.modo !== "consentimiento";
+  const resaltada = () =>
+    (["sesion", "entrando", "clave", "comprobando", "alta"].includes(p()?.k ?? "") && props.f.modo !== "consentimiento") ||
+    props.c.localAbierto() === props.f.id;
   return <Tarjeta c={props.c} f={props.f} abajo={abajo()} resaltada={resaltada()} />;
 }
 

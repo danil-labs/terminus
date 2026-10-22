@@ -4,7 +4,7 @@
  * panel leen el mismo estado; las cuentas cuelgan del workspace activo.
  */
 import { listen } from "../../lib/serviceEvents";
-import { batch, createSignal, onCleanup } from "solid-js";
+import { batch, createEffect, createSignal, onCleanup, untrack } from "solid-js";
 import { createStore } from "solid-js/store";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
@@ -13,6 +13,7 @@ import { detalleDe, prosaDe } from "../../ui/Failure";
 import { accountPresentation } from "../settings/AccountCard";
 import type { AccountList, AccountStatus, AgentOpt, LoginEvent } from "../settings/accounts-store";
 import { ORIGEN_SISTEMA } from "../settings/environment-store";
+import { crearModelosLocales } from "../settings/local-models-store";
 import type { Frase } from "../../lib/prose";
 
 type Agente = AgentOpt & { source: string | null; system_broken: boolean };
@@ -97,6 +98,11 @@ export function crearConexiones() {
   const [salidas, setSalidas] = createStore<Record<string, string[]>>({});
   const [falloDeCarga, setFalloDeCarga] = createSignal<string | null>(null);
   const [cargada, setCargada] = createSignal(false);
+  // La fila local cuyo panel de modelos está abierto debajo de su tarjeta.
+  const [localAbierto, setLocalAbierto] = createSignal<string | null>(null);
+  // Vive con la pantalla y no con el panel: una descarga que sigue con el panel cerrado también conecta.
+  const locales = crearModelosLocales();
+  const listoLocal = () => t("onboarding.ai.local.ready", { model: locales.activo()?.label ?? "" });
   let agentes: Agente[] = [];
   let sesiones: SesionDelSistema[] = [];
   let detectadas: Set<string> | null = null;
@@ -146,7 +152,7 @@ export function crearConexiones() {
     return activo?.consents?.some((c) => c.provider === agent && c.version === version) ?? false;
   }
 
-  async function pasoGuardado(f: Fila, superficies: Superficie[]): Promise<Paso> {
+  async function pasoGuardado(f: Fila): Promise<Paso> {
     const a = agente(f.agente);
     // El binario que Terminus bajó para otra fila del mismo agente no cuenta como instalado en el sistema.
     const base: Paso = a?.available && (f.detectada || f.modo !== "clave") ? { k: "instalada" } : { k: "falta" };
@@ -157,11 +163,8 @@ export function crearConexiones() {
           : base;
       }
       if (f.modo === "local") {
-        const lista = superficies.find((s) => s.provider === f.agente);
-        const motor = await invoke<{ source?: string }>("local_runtime");
-        return a?.available && (lista?.usable || (motor.source && motor.source !== "missing"))
-          ? { k: "conectada", cuenta: t("onboarding.ai.local.ready"), id: null }
-          : base;
+        await locales.cargar();
+        return a?.available && locales.listo() ? { k: "conectada", cuenta: listoLocal(), id: null } : base;
       }
       const conectada = await cuentaConectada(f.agente);
       if (conectada) return { k: "conectada", ...conectada };
@@ -171,6 +174,20 @@ export function crearConexiones() {
       return base;
     }
   }
+
+  // La tarjeta local queda conectada cuando hay llama.cpp y un modelo bajado, y dice cuál usan las tareas.
+  createEffect(() => {
+    const listo = locales.listo();
+    const cuenta = listoLocal();
+    for (const f of filas().filter((x) => x.modo === "local")) {
+      const p = untrack(() => pasos[f.id]);
+      if (listo && agente(f.agente)?.available && (p?.k === "instalada" || (p?.k === "conectada" && p.cuenta !== cuenta))) {
+        poner(f.id, { k: "conectada", cuenta, id: null });
+      } else if (!listo && p?.k === "conectada") {
+        poner(f.id, { k: "instalada" });
+      }
+    }
+  });
 
   async function cargar() {
     let superficies: Superficie[] = [];
@@ -229,7 +246,7 @@ export function crearConexiones() {
       }
     }
     setFilas(nuevas);
-    const estados = await Promise.all(nuevas.map((f) => pasoGuardado(f, superficies)));
+    const estados = await Promise.all(nuevas.map((f) => pasoGuardado(f)));
     batch(() => {
       nuevas.forEach((f, i) => {
         // Quien fue a instalarlo a su página sigue viendo esa indicación hasta que el binario aparece.
@@ -286,7 +303,11 @@ export function crearConexiones() {
       }
       if (!(await descargar(f))) return;
     }
-    if (f.modo === "local") return void activarLocal(id);
+    if (f.modo === "local") {
+      setLocalAbierto(id);
+      if (locales.listo()) poner(id, { k: "conectada", cuenta: listoLocal(), id: null });
+      return;
+    }
     if (f.modo === "clave") return poner(id, { k: "clave" });
     await entrar(id);
   }
@@ -453,17 +474,6 @@ export function crearConexiones() {
     }
   }
 
-  async function activarLocal(id: string) {
-    poner(id, { k: "comprobando" });
-    try {
-      await invoke("install_local_runtime");
-      poner(id, { k: "conectada", cuenta: t("onboarding.ai.local.ready"), id: null });
-    } catch (e) {
-      setErrores(id, explicar(e));
-      poner(id, { k: "instalada" });
-    }
-  }
-
   async function desconectar(id: string) {
     const f = fila(id);
     const p = pasos[id];
@@ -476,6 +486,8 @@ export function crearConexiones() {
         window.dispatchEvent(new CustomEvent("harness:consentimiento"));
       } else if (f.modo === "local") {
         await invoke("remove_local_runtime");
+        setLocalAbierto(null);
+        await locales.cargar();
       } else {
         const lista = await invoke<AccountList>("list_accounts", { provider: f.agente });
         for (const c of lista.accounts.filter((c) => c.authenticated_at !== null)) {
@@ -554,6 +566,11 @@ export function crearConexiones() {
     externa: (f: Fila) => Boolean(agente(f.agente)?.external_install_url && !agente(f.agente)?.available),
     cargar,
     conectar,
+    locales,
+    localAbierto,
+    /** Abre o cierra el panel de modelos debajo de la tarjeta local. */
+    alternarLocal: (id: string) => setLocalAbierto((a) => (a === id ? null : id)),
+    cerrarLocal: () => setLocalAbierto(null),
     usarSesion,
     cancelarDescarga,
     cancelar,

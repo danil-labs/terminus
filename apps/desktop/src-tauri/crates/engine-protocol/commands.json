@@ -4510,6 +4510,21 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "set_active_local_model",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "models::set_active_local_model"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "set_active_workspace",
       "output": "-> Result < () , String >",
       "parameters": [
