@@ -20,7 +20,7 @@ repositories, and `GitHostInfo`. Files on disk keep their keys; the types that
 are stored and also travel cross the contract wrapped in `Wire`, which renames
 their keys. There are no aliases. This copy is byte-identical to the engine's.
 SHA-256:
-`43db399c8227b52e6fc5f240681c55d1dc81cb88a292cbf76d56ed1fc37e4d85`.
+`815e064458deae82ac7d2f520dd08fa341350cc4cd11e7c8b7a5c986f6dec343`.
 
 seldon-host `4e21caf` (#66) added the Danil account (321 commands, 28 events):
 `danil_connect_start`, `danil_connect_status`, `danil_connect_options`,
@@ -177,6 +177,21 @@ baseRef?, agent?, space?}`) → `{session, folder}` does what the first
 `baseRef` with git, the task's kn copy without git), without a turn. `title` is
 provisional: the person's first `send_message` on that task replaces it. This
 copy is `git show 3274de5:crates/engine-protocol/commands.json` byte for byte.
+
+seldon-host `integration/plan-multi-machine` (`5b8f29a`: dev with #106, #110,
+#108 and #113) is the contract of the multi-machine plan (367 commands, 32
+events). #106 and #110 annotate every command without changing any name or
+signature: `ids` says which arguments are workspace or account ids, which the
+engine checks against the relay envelope and the session's account
+(`workspace_mismatch`); `relay: false` refuses a command through the relay
+(`set_active_workspace`: the open workspace belongs to each window); and
+`scope: "machine"` lets 41 commands run through the relay only for the default
+session (else `command_not_allowed` with `{command, scope: "machine"}`). A
+relayed call without a workspace answers `command_failed`. #108 adds
+`sync_workspace_memory` and removes `retire_memory_entry`.
+`create_empty_session` is unchanged apart from `scope: "workspace"`. This copy
+is `git show 5b8f29a:crates/engine-protocol/commands.json` byte for byte; no
+`seldon-runtime` with it is published yet.
 
 Endpoint, selection and StreamPage extend the transport; they do not convert
 domain data. The token travels in RPC1 only between authenticated local
