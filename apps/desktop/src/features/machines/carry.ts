@@ -18,6 +18,7 @@ import {
   type WorkStatus,
   CarryError,
   PART_DESKTOP,
+  PART_RELAY,
   cancelCarry,
   carryWork,
   type Selection,
@@ -164,10 +165,16 @@ function update(key: string, change: (c: Carry) => Carry) {
   setCarries((all) => (all[key] ? { ...all, [key]: change(all[key]) } : all));
 }
 
-/** Por el túnel SSH: sin medir, una cifra prudente para el tiempo estimado. */
-export const DESKTOP_BYTES_PER_SECOND = 4 * 1024 * 1024;
+/** Sin medir: cifras prudentes para el tiempo estimado, por el túnel SSH y por el relay. */
+const SSH_BYTES_PER_SECOND = 4 * 1024 * 1024;
+const RELAY_BYTES_PER_SECOND = 1024 * 1024;
+export const bytesPerSecond = () => (viaSsh() ? SSH_BYTES_PER_SECOND : RELAY_BYTES_PER_SECOND);
 
-export const partSize = () => PART_DESKTOP;
+/** Partes de 4 MiB por SSH y de 512 KiB por el relay (`MAX_FRAME` y el espejo del relay). */
+export const partSize = () => (viaSsh() ? PART_DESKTOP : PART_RELAY);
+
+/** Por el relay los archivos ignorados (`.env`) solo viajan sellados (D3). */
+export const ignoredAllowed = (check: Pick<CarryCheck, "recipientKey">) => viaSsh() || !!check.recipientKey;
 
 /** Lo elegido en la hoja queda esperando el envío del borrador `key`. */
 export function planCarry(key: string, check: CarryCheck, job: CarryJob, state: CarryState, ready: CarryResult | null = null) {
@@ -184,7 +191,8 @@ export const createsProject = (check: CarryCheck) => withoutRemote(check.status,
 /** La copia que corre al enviar, con lo elegido en la hoja. */
 export function jobFor(check: CarryCheck, choice: { selection: Selection; partSize: number; task: string | null; branchAs: string | null }): CarryJob {
   const create = createsProject(check) ? { name: check.project.name, id: check.project.id } : null;
-  const selection = create ? { ...choice.selection, includeWork: true, full: true } : choice.selection;
+  const files = ignoredAllowed(check) ? choice.selection.files : [];
+  const selection = create ? { ...choice.selection, files, includeWork: true, full: true } : { ...choice.selection, files };
   return { source: check.source, target: check.target, project: check.project.id, task: choice.task, selection, partSize: choice.partSize, branchAs: choice.branchAs, create, recipientKey: check.recipientKey };
 }
 

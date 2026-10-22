@@ -384,7 +384,7 @@ export function suggestedDefaults(tasks: Task[], host: string, workspace: string
 export async function createTask(
   host: Host,
   workspace: string,
-  args: { folder: string; prompt: string; provider: string; model: string | null; agent: string | null; space: string | null } & Partial<Pick<Draft, "effort" | "permissionMode" | "attachments">> & { baseRef?: string | null },
+  args: { folder: string; prompt: string; provider: string; model: string | null; agent: string | null; space: string | null } & Partial<Pick<Draft, "effort" | "permissionMode" | "attachments">> & { baseRef?: string | null; unwrapSnapshot?: boolean },
 ) {
   const { value } = await host.call<string>("send_message", workspace, {
     ...MESSAGE_DEFAULTS,
@@ -397,6 +397,7 @@ export async function createTask(
     permissionMode: args.permissionMode ?? null,
     attachments: args.attachments ?? [],
     baseRef: args.baseRef ?? null,
+    ...(args.unwrapSnapshot ? { unwrapSnapshot: true } : {}),
     agent: args.agent,
     taskFromAgent: Boolean(args.agent),
     space: args.space,
@@ -698,7 +699,7 @@ export const CLONE_STATUS_EVERY = 5_000;
 export async function cloneRepo(
   host: Host,
   workspace: string,
-  args: { operation: string; url: string; name: string; space: string | null },
+  args: { operation: string; url: string; name: string; space: string | null; id?: string | null },
   onProgress: (event: ProjectCloneEvent) => void,
   every = CLONE_STATUS_EVERY,
 ): Promise<Project> {
@@ -720,7 +721,7 @@ export async function cloneRepo(
   });
   let timer: ReturnType<typeof setInterval> | undefined;
   try {
-    await host.call("start_project_clone", workspace, { ...args, workspace, directory: null, portfolio: null, gitHost: null, id: null });
+    await host.call("start_project_clone", workspace, { ...args, workspace, directory: null, portfolio: null, gitHost: null, id: args.id ?? null });
     const ask = async () => {
       const answer = await host.call<ProjectCloneEvent | null>("project_clone_status", workspace, { operation: args.operation, workspace }).catch(() => null);
       if (answer && answer.value === null && !ended) finish({ operation: args.operation, phase: "done", percent: null, done: true, error: "clone_lost" });

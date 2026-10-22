@@ -23,7 +23,7 @@ import { Toggle } from "../../ui/Toggle";
 import { copyText } from "../../lib/clipboard";
 import { df, elapsed, peso } from "../../lib/format";
 import { t } from "../../lib/i18n";
-import { type CarryCheck, DESKTOP_BYTES_PER_SECOND, createsProject, engine, jobFor, partSize, trustKey, viaSsh } from "./carry";
+import { type CarryCheck, bytesPerSecond, createsProject, engine, ignoredAllowed, jobFor, partSize, trustKey, viaSsh } from "./carry";
 import { machineName } from "./store";
 
 /** Lo que se pide al exportar mientras la persona decide; se rehace al cambiar la selección. */
@@ -50,7 +50,8 @@ export default function CarrySheet(props: {
 }) {
   const s = () => props.check.status;
   const bring = () => !!props.check.task;
-  const [selection, setSelection] = createSignal<Selection>(props.check.task ? bringSelection(props.check.status) : initialSelection(props.check.status));
+  const first = props.check.task ? bringSelection(props.check.status) : initialSelection(props.check.status);
+  const [selection, setSelection] = createSignal<Selection>(ignoredAllowed(props.check) ? first : { ...first, files: [] });
   const [next, setNext] = createSignal<"continue" | "branch">("continue");
   const branchAs = () => (bring() ? bringBranch(s(), machineName(props.check.source)) : null);
   const [preview, setPreview] = createSignal<Preview | null>(null);
@@ -199,7 +200,7 @@ export default function CarrySheet(props: {
             <For each={s().ignored}>
               {(f) => (
                 <label class={row}>
-                  <input type="checkbox" data-carry-ignored={f.path} disabled={!choosable(f)}
+                  <input type="checkbox" data-carry-ignored={f.path} disabled={!choosable(f) || !ignoredAllowed(props.check)}
                     checked={selection().files.includes(f.path)}
                     onChange={(e) => toggle("files", f.path, e.currentTarget.checked)} />
                   <span class="flex-1 truncate font-mono text-xs">{f.path}</span>
@@ -209,6 +210,9 @@ export default function CarrySheet(props: {
             </For>
             <Show when={s().ignoredSkipped.length}>
               <p class="m-0 mt-1 text-xs text-neutral-500">{t("work.carry.skipped", { dirs: s().ignoredSkipped.join(", ") })}</p>
+            </Show>
+            <Show when={!ignoredAllowed(props.check)}>
+              <p class="m-0 mt-1 text-xs text-neutral-500" data-carry-ignored-unsealed>{t("work.carry.ignored_unsealed")}</p>
             </Show>
             <Show when={bring() && s().ignored.length}>
               <p class="m-0 mt-1 text-xs text-neutral-500">{t("work.bring.ignored_hint", { machine: source() })}</p>
@@ -244,7 +248,7 @@ export default function CarrySheet(props: {
           <Show when={!carriesNothing(selection())}>
             <Show when={!preview()?.tooLarge} fallback={<p class="m-0 text-error-strong">{t("work.carry.too_large", { machine: target() })}</p>}>
               <Show when={preview()?.bytes != null} fallback={<p class="m-0">{t("work.carry.preparing")}</p>}>
-                <p class="m-0">{t("work.carry.size", { size: peso(preview()?.bytes ?? 0), eta: elapsed(etaSeconds(preview()?.bytes ?? 0, DESKTOP_BYTES_PER_SECOND)) })}</p>
+                <p class="m-0">{t("work.carry.size", { size: peso(preview()?.bytes ?? 0), eta: elapsed(etaSeconds(preview()?.bytes ?? 0, bytesPerSecond())) })}</p>
                 <Show when={verdict() === "warn"}><p class="m-0 text-warning-strong">{t("work.carry.size_warn", { size: peso(preview()?.bytes ?? 0) })}</p></Show>
               </Show>
             </Show>
