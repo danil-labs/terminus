@@ -1,5 +1,6 @@
 import TriangleAlert from "lucide-solid/icons/triangle-alert";
 import { listen } from "../../lib/serviceEvents";
+import { AvanceDeDescarga } from "./DownloadProgress";
 import ArrowRight from "lucide-solid/icons/arrow-right";
 import Check from "lucide-solid/icons/check";
 import ExternalLink from "lucide-solid/icons/external-link";
@@ -430,9 +431,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
       case "formulario":
         return t("onboarding.tools.fill_below");
       case "descargando":
-        return e.total
-          ? t("onboarding.tools.downloading_cli", { done: Math.round(e.hecho / 1_048_576), total: mb(e.total) })
-          : t("onboarding.tools.downloading_cli_start");
+        return t("onboarding.tools.downloading_cli_start");
       case "conectando":
         if (formularioAbierto(i)) return t("onboarding.tools.checking_token");
         if (e.codigo) return t("onboarding.ai.confirm_code", { code: e.codigo });
@@ -470,7 +469,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
             {fallo() ? errores[p.i.id] : detalle(p.i)}
           </span>
         </span>
-        <span class="flex w-[124px] shrink-0 items-center justify-end gap-1.5">
+        <span class="flex w-[148px] shrink-0 items-center justify-end gap-1.5">
           <Switch
             fallback={
               <>
@@ -502,17 +501,15 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void })
             </Match>
             <Match when={e()?.k === "descargando" && e()}>
               {(d) => {
-                const v = () => {
-                  const x = d() as { hecho: number; total: number | null };
-                  return x.total ? Math.min(100, (x.hecho / x.total) * 100) : 0;
-                };
+                const x = () => d() as { hecho: number; total: number | null };
                 return (
-                  <>
-                    <span class="h-[5px] w-[70px] overflow-hidden rounded-full bg-surface-muted">
-                      <span class="block h-full bg-primary transition-[width] duration-150" style={{ width: `${v()}%` }} />
-                    </span>
-                    {cancelarEsta()}
-                  </>
+                  <AvanceDeDescarga
+                    hecho={x().hecho}
+                    total={x().total}
+                    barra="w-[36px]"
+                    cancelar={t("onboarding.tools.cancel_connect", { name: nombre })}
+                    onCancelar={() => void cancelar(p.i)}
+                  />
                 );
               }}
             </Match>
@@ -765,10 +762,6 @@ export function Plugins(props: { onCambio: (estado: { instalados: number; instal
     const nombre = () => t(`onboarding.tools.plugin.${q.p.id}`);
     const sub = () => errores[q.p.id] ?? (!q.p.supported && !q.p.installed ? t("onboarding.tools.unsupported") : descripcion(q.p.id));
     const av = () => avances[q.p.id];
-    const lleva = () => {
-      const a = av();
-      return a && a.total > 0 ? Math.min(100, (a.hecho / a.total) * 100) : 0;
-    };
     return (
       <div
         class={cn(
@@ -814,13 +807,12 @@ export function Plugins(props: { onCambio: (estado: { instalados: number; instal
             }
           >
             <Match when={instalando(q.p)}>
-              <span class="text-[11px] whitespace-nowrap text-neutral-500">
-                {av()?.total
-                  ? t("onboarding.tools.plugin_progress", { done: Math.round(av()!.hecho / 1_048_576), total: mb(av()!.total) })
-                  : t("onboarding.tools.installing")}
-              </span>
-              <Spinner class="text-primary" />
-              <CancelButton label={t("onboarding.ai.cancel_download", { name: nombre() })} onClick={() => cancelar(q.p)} />
+              <AvanceDeDescarga
+                hecho={av()?.hecho ?? 0}
+                total={av()?.total ?? null}
+                cancelar={t("onboarding.ai.cancel_download", { name: nombre() })}
+                onCancelar={() => cancelar(q.p)}
+              />
             </Match>
             <Match when={ocupados[q.p.id] === "desinstalando"}>
               <span class="text-[11px] whitespace-nowrap text-neutral-500">{t("onboarding.tools.uninstalling")}</span>
@@ -840,11 +832,6 @@ export function Plugins(props: { onCambio: (estado: { instalados: number; instal
             </Match>
           </Switch>
         </span>
-        <Show when={instalando(q.p)}>
-          <span class="absolute inset-x-0 bottom-0 h-[3px] bg-primary/15" aria-hidden="true">
-            <span class="block h-full bg-primary transition-[width] duration-150" style={{ width: `${lleva()}%` }} />
-          </span>
-        </Show>
       </div>
     );
   }

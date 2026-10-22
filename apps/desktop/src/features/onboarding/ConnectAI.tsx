@@ -17,6 +17,7 @@ import { MarcaAgente } from "../../ui/icons";
 import { TerminusMark } from "../../ui/toolMarks";
 import { Spinner } from "../../ui/Spinner";
 import { DialogoDeConexion } from "../settings/LoginDialog";
+import { AvanceDeDescarga } from "./DownloadProgress";
 import { type Conexiones, type Fila, nombreDeFila, ordenDelMapa, type Paso } from "./connect-store";
 
 type Nodo = "off" | "det" | "vivo" | "on";
@@ -165,8 +166,6 @@ export function Comprobacion(props: { filas: { hecho: boolean; texto: string; en
   );
 }
 
-const avance = (p: Paso | undefined) =>
-  p?.k === "descargando" && p.total > 0 ? Math.min(100, (p.hecho / p.total) * 100) : 0;
 
 function detalle(c: Conexiones, f: Fila): string {
   const p = c.pasos[f.id];
@@ -188,9 +187,7 @@ function detalle(c: Conexiones, f: Fila): string {
       if (f.modo === "consentimiento" || f.modo === "local") return base;
       return t("onboarding.ai.system_no_session");
     case "descargando":
-      return p.total > 0
-        ? t("onboarding.ai.downloading_of", { done: Math.round(p.hecho / 1_048_576), total: mb(p.total) })
-        : t("onboarding.ai.downloading");
+      return t("onboarding.ai.downloading");
     case "entrando":
       if (p.codigo) return t("onboarding.ai.confirm_code", { code: p.codigo });
       return p.pideCodigo ? t("onboarding.ai.paste_code") : t("onboarding.ai.finish_in_browser");
@@ -246,14 +243,15 @@ function Tarjeta(props: { c: Conexiones; f: Fila; abajo?: JSX.Element; resaltada
               </>
             }
           >
-            <Match when={p()?.k === "descargando"}>
-              <span class="h-[5px] w-[90px] overflow-hidden rounded-full bg-surface-muted">
-                <span class="block h-full bg-primary transition-[width] duration-150" style={{ width: `${avance(p())}%` }} />
-              </span>
-              <CancelButton
-                label={t("onboarding.ai.cancel_download", { name: nombre() })}
-                onClick={() => props.c.cancelarDescarga(props.f.id)}
-              />
+            <Match when={p()?.k === "descargando" && (p() as { hecho: number; total: number })}>
+              {(d) => (
+                <AvanceDeDescarga
+                  hecho={d().hecho}
+                  total={d().total}
+                  cancelar={t("onboarding.ai.cancel_download", { name: nombre() })}
+                  onCancelar={() => props.c.cancelarDescarga(props.f.id)}
+                />
+              )}
             </Match>
             <Match when={p()?.k === "sesion"}>
               <Button size="sm" variant="ghost" onClick={() => void props.c.conectar(props.f.id)}>
