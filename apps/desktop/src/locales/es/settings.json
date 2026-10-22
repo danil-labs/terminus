@@ -667,5 +667,13 @@
   "settings.google_drive.error_not_installed": "Primero instala Google Drive.",
   "settings.google_drive.error_login": "No se pudo iniciar sesión en Google Drive.",
   "settings.google_drive.login_cancelled": "Se canceló el inicio de sesión en Google Drive.",
-  "settings.google_drive.login_timeout": "El inicio de sesión en Google Drive tardó demasiado. Vuelve a intentarlo."
+  "settings.google_drive.login_timeout": "El inicio de sesión en Google Drive tardó demasiado. Vuelve a intentarlo.",
+  "settings.google_drive_desktop.unsupported": "Google Drive para escritorio no existe en esta plataforma.",
+  "settings.google_drive_desktop.error_busy": "Google Drive ya se está instalando.",
+  "settings.google_drive_desktop.error_download": "No se pudo descargar Google Drive. Revisa tu conexión y vuelve a intentarlo.",
+  "settings.google_drive_desktop.error_signature": "El instalador descargado no está firmado por Google, así que no se instaló. Vuelve a intentarlo.",
+  "settings.google_drive_desktop.error_declined": "Google Drive no se instaló porque no se dio el permiso de administrador. Vuelve a intentarlo y acepta el aviso del sistema.",
+  "settings.google_drive_desktop.error_install": "No se pudo instalar Google Drive. Vuelve a intentarlo.",
+  "settings.google_drive_desktop.error_not_installed": "Primero instala Google Drive.",
+  "settings.google_drive_desktop.error_open": "No se pudo abrir Google Drive."
 }
