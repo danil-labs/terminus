@@ -68,6 +68,8 @@ const SIN_INTERFAZ = {
   git_host_pending_setup: "el CLI del motor lo usa para completar la conexión; permanece en el contrato congelado",
   finish_git_host_setup: "el CLI del motor espera la instalación; la ventana actualiza al regresar",
   set_session_pinned: "el gesto de fijar lo implementa la tarea de frontend en paralelo",
+  // V2 no tiene estados y el motor siempre lo rechaza; sale del contrato en seldon-host.
+  retire_memory_entry: "ya no hay «retirar» en memoria; se borra del motor en el siguiente contrato",
   // El backend prepara los árboles; esta lectura aún no tiene pantalla.
   session_worktree: "el árbol y sus notas aún no se pintan en ninguna pantalla",
   // El renombre lo hace hoy el agente con `git branch -m`; la app lo reconcilia.
