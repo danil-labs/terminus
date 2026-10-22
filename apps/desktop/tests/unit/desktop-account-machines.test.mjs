@@ -534,3 +534,22 @@ test("when the relay stops the sessions for lack of a Terminus license, the VM k
   assert.ok(doc.querySelector('[data-sesion="t1"]'), "this computer is untouched");
   assert.deepEqual(app.fallos, []);
 });
+
+test("a machine just connected to the account adds its slice live, without reconnecting the others", async () => {
+  const computers = [HOME, { ...VM, state: "online" }];
+  const { app, doc, f } = await open("desktop-account-connected", {
+    computers,
+    relays: {
+      cmp_vm: { table: remote("Panel", "Tarea de la VM"), state: "online" },
+      cmp_mac: { table: remote("Notas", "Tarea del Mac"), state: "online" },
+    },
+  });
+  assert.equal(doc.querySelector('[data-sesion="cmp_mac~t1"]'), null);
+  computers.push({ ...MAC, state: "online" });
+  app.w.dispatchEvent(new app.w.CustomEvent("harness:account-computers"));
+  await sleep(1_200);
+  await reread(app);
+  assert.ok(doc.querySelector('[data-sesion="cmp_mac~t1"]'), "the new machine's tasks join");
+  assert.equal(f.relays.cmp_vm.sockets.length, 1, "the VM was not reconnected");
+  assert.deepEqual(app.fallos, []);
+});

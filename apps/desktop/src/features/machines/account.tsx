@@ -315,6 +315,8 @@ export function startAccountMachines(target: Target = window) {
     void listen("danil-sessions", () => void sync());
     // Another workspace may belong to another account: its computers are others.
     window.addEventListener("harness:workspace", () => void sync());
+    // Una máquina recién conectada («Conectar otra máquina») suma su rebanada sin desmontar las demás.
+    window.addEventListener("harness:account-computers", () => void sync());
     setInterval(() => void sync(), RELIST);
     return sync();
   });
