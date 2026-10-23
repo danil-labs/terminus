@@ -20,7 +20,7 @@ repositories, and `GitHostInfo`. Files on disk keep their keys; the types that
 are stored and also travel cross the contract wrapped in `Wire`, which renames
 their keys. There are no aliases. This copy is byte-identical to the engine's.
 SHA-256:
-`815e064458deae82ac7d2f520dd08fa341350cc4cd11e7c8b7a5c986f6dec343`.
+`29b952368255ede3371b3f83e32f29407f2b728c1901e52079e387d50a06c956`.
 
 seldon-host `4e21caf` (#66) added the Danil account (321 commands, 28 events):
 `danil_connect_start`, `danil_connect_status`, `danil_connect_options`,
@@ -192,6 +192,13 @@ relayed call without a workspace answers `command_failed`. #108 adds
 `create_empty_session` is unchanged apart from `scope: "workspace"`. This copy
 is `git show 5b8f29a:crates/engine-protocol/commands.json` byte for byte; no
 `seldon-runtime` with it is published yet.
+
+seldon-host `fix/carpetas-nuevas-en-documentos` (`8cb37ac`) adds an optional
+`directory` to `create_project` (`{name, workingDirectory?, space?, id?,
+directory?}`): where a folder created from scratch is born when the person picks
+a location other than the workspace default. Without it nothing changes. The
+same commit makes that default the person's Documents folder
+(`<Documents>/Terminus`) instead of one inside the engine's data.
 
 Endpoint, selection and StreamPage extend the transport; they do not convert
 domain data. The token travels in RPC1 only between authenticated local
