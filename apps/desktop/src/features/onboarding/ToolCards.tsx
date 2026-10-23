@@ -218,12 +218,15 @@ export function VerMas(props: {
 /** Las integraciones: cada tarjeta mide lo mismo en todos sus estados y se conecta o desconecta en su sitio. */
 export function Integraciones(props: { onCambio: (conectadas: number) => void; solo?: string[] }) {
   /** Con `solo`, únicamente esas tarjetas y todas a la vista: Configuración monta así la de Drive. */
+  const [mendeley, setMendeley] = createSignal<EstadoDeMendeley | null>(null);
+  // Mendeley sólo existe con la app de Terminus registrada en su sitio de desarrolladores.
+  const disponibles = () => INTEGRACIONES().filter((i) => i.id !== "mendeley" || mendeley()?.configured === true);
   const integraciones = () =>
     props.solo
-      ? INTEGRACIONES()
+      ? disponibles()
           .filter((i) => props.solo?.includes(i.id))
           .map((i) => ({ ...i, comun: true }))
-      : INTEGRACIONES();
+      : disponibles();
   const [proveedores, setProveedores] = createSignal<Proveedor[]>([]);
   const [conocidos, setConocidos] = createSignal<Conocido[]>([]);
   const [agentesMcp, setAgentesMcp] = createSignal<AgenteMcp[]>([]);
@@ -237,7 +240,6 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
   const [drive, setDrive] = createSignal<EstadoDeDrive | null>(null);
   const [escritorio, setEscritorio] = createSignal<DriveDeEscritorio | null>(null);
   const [zotero, setZotero] = createSignal<EstadoDeZotero | null>(null);
-  const [mendeley, setMendeley] = createSignal<EstadoDeMendeley | null>(null);
   let intentoDeZotero = 0;
   let finDeZotero: ((a: InstalacionDeDrive) => void) | null = null;
   let vigiaDeZotero: ReturnType<typeof setTimeout> | undefined;
