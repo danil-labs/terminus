@@ -224,6 +224,12 @@ const steps = [
     root,
   ],
   [
+    "Un turno con varias subtareas y un mensaje para una de ellas no se pinta dos veces",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/chat-delegation-thread.test.ts")],
+    root,
+  ],
+  [
     "El servicio que vuelve no se pinta en la pantalla",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/invoke-retry.test.ts")],

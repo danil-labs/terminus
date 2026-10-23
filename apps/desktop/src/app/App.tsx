@@ -64,6 +64,7 @@ import {
   type ChatExportado,
   clave,
   mcpCallFromName,
+  mensajesDelHilo,
   modeloDeSubtarea,
   type PreguntaEvent,
   type Session,
@@ -71,6 +72,7 @@ import {
   type Signatures,
   type TranscriptOrigin,
   type Turn,
+  tramoGuardado,
   transcripcion,
 } from "../features/chat/transcript";
 import VisorDeArchivo from "../features/code/FileViewer";
@@ -1083,7 +1085,8 @@ export default function App() {
   // enseña la pregunta sin la respuesta hasta que el turno cierre. Tienen
   // hilo la abierta, las de una pestaña, y las que siguen contestando;
   // cambiar de workspace los suelta todos (`aplicar`).
-  type Hilo = { base: Msg[]; vivo: Msg[] };
+  // `guardados`: los ids de los turnos que trajo la última lectura (`mensajesDelHilo`).
+  type Hilo = { base: Msg[]; vivo: Msg[]; guardados?: ReadonlySet<string> };
   const SIN_HILO: Hilo = { base: [], vivo: [] };
   const workspaceThreads = new Map<string, Record<string, Hilo>>();
   const [hilos, setHilos] = createSignal<Record<string, Hilo>>({});
@@ -1096,7 +1099,7 @@ export default function App() {
   const hiloAbierto = createMemo(() => hilos()[claveDelHilo()]);
   const msgs = createMemo<Msg[]>(() => {
     const h = hiloAbierto();
-    return h ? [...h.base, ...h.vivo] : [];
+    return h ? mensajesDelHilo(h) : [];
   });
   // De qué tarea se está trayendo la transcripción del disco, si de alguna.
   // `msgs` no distingue «no tiene mensajes» de «todavía no han llegado»:
@@ -1140,7 +1143,7 @@ export default function App() {
   // (`guardar_segmento_pregunta`): ese turno llega por partida doble, de
   // `base` y de `vivo`. Se identifican por `turno`; a `base` se le copia
   // su `questionRequestId`, o la respuesta cae al canal de archivo.
-  const releer = (session: string, leida: Msg[], vaciarVivo: boolean, antepuesta = false) => {
+  const releer = (session: string, leida: Msg[], vaciarVivo: boolean, antepuesta = false, guardados?: ReadonlySet<string>) => {
     deltasPorCuadro.vaciar();
     setHilos((hs) => {
       const previo = hs[session];
@@ -1167,10 +1170,12 @@ export default function App() {
         ? []
         : vivoPrevio.filter((m) => !m.turno || !persistidos.has(m.turno));
       const mismoVivo = vivo.length === vivoPrevio.length;
-      if (previo && base === previo.base && mismoVivo) return hs;
-      return { ...hs, [session]: { base, vivo: mismoVivo ? vivoPrevio : vivo } };
+      const tramos = guardados ?? previo?.guardados;
+      if (previo && base === previo.base && mismoVivo && tramos === previo.guardados) return hs;
+      return { ...hs, [session]: { base, vivo: mismoVivo ? vivoPrevio : vivo, guardados: tramos } };
     });
   };
+  const idsDeTurnos = (turns: readonly Turn[]) => new Set(turns.flatMap((t) => (t.id ? [t.id] : [])));
   // Por tarea: `undefined` es que aún no se abrió, `null` que salió de `session.json`.
   const [origenes, setOrigenes] = createSignal<Readonly<Record<string, TranscriptOrigin | null>>>({});
   // Por tarea, la máquina apagada que la corre (`offline` de la lectura) y la que se está
@@ -1218,7 +1223,7 @@ export default function App() {
         if (generation !== sessionGeneration || historias.get(id) !== loaded) return;
         historias.set(id, merged);
         marcarAntiguos(id, merged);
-        releer(id, transcripcion(merged.turns), false, true);
+        releer(id, transcripcion(merged.turns), false, true, idsDeTurnos(merged.turns));
       };
     } catch {
       return null;
@@ -1250,7 +1255,7 @@ export default function App() {
     const loaded = refreshHistory(historias.get(id), session.turns, session.history);
     historias.set(id, loaded);
     marcarAntiguos(id, loaded);
-    releer(id, transcripcion(loaded.turns), clear);
+    releer(id, transcripcion(loaded.turns), clear, false, idsDeTurnos(loaded.turns));
     const origen = session.transcript ?? null;
     setOrigenes((o) =>
       id in o && o[id]?.file === origen?.file && o[id]?.from_cli === origen?.from_cli ? o : { ...o, [id]: origen },
@@ -2243,7 +2248,7 @@ export default function App() {
   }
 
   // Lo que reconstruye el turno en curso de una tarea que pasa a verse: lo filtrado y lo que lo acompaña.
-  const REPUESTO = new Set(["delta", "tool", "tool_done", "command_output", "command_running", "shell_started", "shell_output", "image", "retry", "notice", "task_launched"]);
+  const REPUESTO = new Set(["delta", "tool", "tool_done", "command_output", "command_running", "shell_started", "shell_output", "image", "retry", "notice", "task_launched", "segment_saved"]);
   type PushedBatch = { events?: JournalEvent[]; catchup?: string; resync?: string };
   function applyPushed(batches: PushedBatch[]) {
     for (const lote of batches) {
@@ -2543,7 +2548,7 @@ export default function App() {
 
       const esGate = kind === "permission";
       const retainedStream = Boolean(workspace && liveThreads.has(liveThreadKey(workspace, session))) &&
-        ["delta", "image", "tool", "tool_done", "notice", "task_launched", "command_output", "command_running"].includes(kind);
+        ["delta", "image", "tool", "tool_done", "notice", "task_launched", "segment_saved", "command_output", "command_running"].includes(kind);
       if (!esGate && !esDelWorkspaceAbierto(workspace) && !retainedStream) return;
 
       if (kind === "started") return;
@@ -2553,6 +2558,11 @@ export default function App() {
           ...messages, { role: "system", text: "", meta: "task_launched", fromTask: task, turno: id },
         ]);
         if (esDelWorkspaceAbierto(workspace)) void refreshSessionsOnEvent(grupos());
+        return;
+      }
+
+      if (kind === "segment_saved") {
+        if (id) append((messages) => tramoGuardado(messages, id));
         return;
       }
 
@@ -5278,6 +5288,7 @@ export default function App() {
         [id]: {
           base: [...(sinId?.base ?? []), ...previo.base],
           vivo: [...(sinId?.vivo ?? []), ...previo.vivo],
+          guardados: previo.guardados,
         },
       };
     });
@@ -6479,7 +6490,7 @@ export default function App() {
     const vistaDeLaCelda = vistaDe(pp.sesion ?? "");
     const mensajes = createMemo<Msg[]>(() => {
       const h = suyo();
-      const todos = h ? [...h.base, ...h.vivo] : [];
+      const todos = h ? mensajesDelHilo(h) : [];
       return esRepositorio()
         ? todos.filter((m) => !m.artefactos?.length)
         : todos;

@@ -224,6 +224,7 @@
   "chat.shell.reply": "{agent} contesta a la salida de la terminal",
   "chat.subagent.failed": "El subagente terminó con un error sin detalle. Revisa su conversación antes de reintentarlo.",
   "chat.subagent.hidden_task": "El CLI no publicó el texto del encargo de este subagente.",
+  "chat.subagent.relayed": "Mensaje para «{title}»",
   "chat.commands.skills": "Skills",
   "chat.commands.no_match": "Nada coincide.",
   "chat.suggestions.truncated": "Lo adjunto tiene más archivos de los que caben en esta lista.",

@@ -39,6 +39,7 @@ import { taskChatPresentation } from "./TaskChatPresentation";
 import { CHUNK, blockOfMessage, chunkAt, chunkIds, chunkOf, chunkStart, headChunk, tailChunk, type Lectura } from "./threadWindow";
 import { workLabel } from "../projects/branchLabel";
 import { sangrarTerminal } from "./terminalIndent";
+import { ponerLanzamiento } from "./launchGroups";
 import { FIN_DE_ARCHIVO, TECLAS_DE_TERMINAL, pideClave } from "./commandInput";
 import { claseDelTramo, finishEdit, highlightSpans, placeLabel, referenceId, searchPlaces, searchTasks, taskLabel, type MentionTarget, type PendingEdit, type PlaceCandidate, type TextEdit, type TaskCandidate, type TaskMention, tramosDelMensaje } from "../../lib/taskMentions";
 import {
@@ -215,6 +216,10 @@ export type Msg = {
    * la pregunta que la provocó sin depender de que estén una debajo de la otra.
    */
   turno?: string;
+  /** El turno guardado en el que el motor ya escribió este mensaje vivo (`segment_saved`). */
+  tramo?: string;
+  /** La subtarea a la que la persona escribió por su padre. Ver `relevoDe`. */
+  relevo?: { titulo: string };
 
   nativeId?: string;
   /**
@@ -1522,7 +1527,11 @@ export default function Chat(props: ChatProps) {
       // Terminus ya no avisa en el chat que una tarea lanzada terminó; las
       // filas que quedaron guardadas de antes tampoco se pintan.
       if (m.meta === "task_completed") return;
-      if (m.shell || m.meta === "task_launched") {
+      if (m.meta === "task_launched") {
+        ponerLanzamiento(out, { tipo: "msg", msg: m, i }, (b) => b.tipo === "msg" && b.msg.meta === "task_launched");
+        return;
+      }
+      if (m.shell) {
         out.push({ tipo: "msg", msg: m, i });
         return;
       }
@@ -3081,6 +3090,13 @@ export default function Chat(props: ChatProps) {
                             )}
                           </Show>
                         </div>
+                      </Show>
+                      <Show when={m().relevo}>
+                        {(relevo) => (
+                          <div class="mb-1 text-right text-[0.72rem] text-neutral-500">
+                            {t("chat.subagent.relayed", { title: relevo().titulo })}
+                          </div>
+                        )}
                       </Show>
                       <Show when={!m().encargado && !m().fromTask ? m().channel : undefined}>
                         {(channel) => (
