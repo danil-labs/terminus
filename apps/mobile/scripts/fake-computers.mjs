@@ -33,7 +33,7 @@ const LICENSE = !process.argv.includes("--license");
 const WAKE_MS = Number(option("wake-ms", "800"));
 const WORKSPACE_MODE = option("workspace-mode", null);
 const TOKEN = "fake-jwt";
-const INTENT = new Set(["send_message", "inject_message", "create_project", "start_project_clone", "create_agent", "create_agent_thread", "login_account", "submit_login_code", "respond_permission", "answer_question", "answer_shell_output", "run_shell_command", "queue_ready", "resume_awaiting_quota", "recreate_task_work"]);
+const INTENT = new Set(["send_message", "inject_message", "create_project", "start_project_clone", "create_agent", "create_agent_thread", "add_account", "login_account", "submit_login_code", "respond_permission", "answer_question", "answer_shell_output", "run_shell_command", "queue_ready", "resume_awaiting_quota", "recreate_task_work"]);
 const MIRROR = new Set(["workspaces_startup", "list_workspaces", "list_projects", "list_spaces", "list_live_sessions", "list_agent_status", "list_providers", "load_session", "pending_requests", "list_active_turns", "list_workspace_attention", "list_agents"]);
 
 // --- Motores --------------------------------------------------------------------
@@ -399,11 +399,25 @@ function wake(m) {
   return true;
 }
 
+/**
+ * Como el motor por el relay (`admit_relayed` + `workspaces::active`): las cuentas
+ * son de un workspace y sin él en el sobre no hay activo. `list_accounts` sale
+ * vacía y lo demás falla con la frase del motor (medido en vm-alberto, 1198b04).
+ */
+const ACCOUNT_COMMANDS = new Set(["list_accounts", "account_status", "account_limits", "add_account", "login_account", "remove_account"]);
+const RELAY_WITHOUT_WORKSPACE = "Por el relay, la llamada tiene que decir de qué workspace es.";
+
+function withoutWorkspace(call) {
+  if (!ACCOUNT_COMMANDS.has(call.command) || call.workspace) return undefined;
+  if (call.command === "list_accounts") return { provider: call.args?.provider, env_var: null, shared_credential: null, secret_note: null, active: null, accounts: [] };
+  throw { code: "command_failed", detail: RELAY_WITHOUT_WORKSPACE };
+}
+
 function onCall(socket, m, call) {
   const reply = (body) => socket.send({ type: "result", id: call.id, ...body });
   const run = () => {
     try {
-      const value = invoke(m, call.command, call.args ?? {});
+      const value = withoutWorkspace(call) ?? invoke(m, call.command, call.args ?? {});
       if (MIRROR.has(call.command)) m.mirror.set(keyOf(call), { value, at: new Date().toISOString() });
       reply({ value });
     } catch (error) {

@@ -6,6 +6,7 @@
 import type {
   AccountLimits,
   AccountList,
+  LoginEvent,
   AgentList,
   AgentStatusRow,
   Answer,
@@ -618,19 +619,33 @@ export async function readVisual(host: Host, workspace: string, folder: string, 
 
 // --- Cuentas de IA ---------------------------------------------------------------
 
-export async function accountsOf(host: Host, provider: string): Promise<AccountList | null> {
-  const at = { cachedAt: null as number | null };
-  return read<AccountList | null>(host, "list_accounts", null, { provider }, null, at);
+/**
+ * El workspace con que van las llamadas de cuentas a una máquina. En el motor
+ * las cuentas son de un workspace, y por el relay toda llamada tiene que decir
+ * el suyo: sin él, `add_account` contesta «Por el relay, la llamada tiene que
+ * decir de qué workspace es.» y `list_accounts` una lista vacía (medido en
+ * vm-alberto, motor 1198b04). Es el abierto en el teléfono si la máquina lo
+ * tiene; si no, el primero suyo vinculado a la cuenta; `null` si no tiene ninguno.
+ */
+export function accountWorkspace(host: Pick<Host, "linked">, current: string | null): string | null {
+  if (!host.linked) return current;
+  if (current && host.linked.has(current)) return current;
+  return [...host.linked][0] ?? null;
 }
 
-export async function limitsOf(host: Host, provider: string, id: string): Promise<AccountLimits | null> {
+export async function accountsOf(host: Host, workspace: string | null, provider: string): Promise<AccountList | null> {
   const at = { cachedAt: null as number | null };
-  return read<AccountLimits | null>(host, "account_limits", null, { provider, id, force: false }, null, at).catch(() => null);
+  return read<AccountList | null>(host, "list_accounts", workspace, { provider }, null, at);
+}
+
+export async function limitsOf(host: Host, workspace: string | null, provider: string, id: string): Promise<AccountLimits | null> {
+  const at = { cachedAt: null as number | null };
+  return read<AccountLimits | null>(host, "account_limits", workspace, { provider, id, force: false }, null, at).catch(() => null);
 }
 
 /** Cerrar la sesión de una cuenta en una máquina (`remove_account`), como la ✕ de la chapa en la web. */
-export async function signOutAccount(host: Host, provider: string, id: string) {
-  await host.call("remove_account", null, { provider, id });
+export async function signOutAccount(host: Host, workspace: string | null, provider: string, id: string) {
+  await host.call("remove_account", workspace, { provider, id });
 }
 
 /**
@@ -640,24 +655,58 @@ export async function signOutAccount(host: Host, provider: string, id: string) {
  * llega en eventos `account` de esa máquina: el enlace (`url`), el código a
  * comparar (`confirm`) o a pegar (`code`) y el final (`done`, con texto si falló).
  */
-export async function addAccount(host: Host, provider: string): Promise<string> {
-  const { value } = await host.call<{ id: string } | null>("add_account", null, { provider, label: "" });
+export async function addAccount(host: Host, workspace: string | null, provider: string): Promise<string> {
+  const { value } = await host.call<{ id: string } | null>("add_account", workspace, { provider, label: "" });
   if (!value?.id) throw new HostError("operation_failed");
   return value.id;
 }
 
-export async function beginLogin(host: Host, provider: string, id: string) {
-  await host.call("login_account", null, { provider, id, mode: "tuberia" });
+export async function beginLogin(host: Host, workspace: string | null, provider: string, id: string) {
+  await host.call("login_account", workspace, { provider, id, mode: "tuberia" });
 }
 
-export async function submitLoginCode(host: Host, id: string, code: string) {
-  await host.call("submit_login_code", null, { id, code });
+export async function submitLoginCode(host: Host, workspace: string | null, id: string, code: string) {
+  await host.call("submit_login_code", workspace, { id, code });
 }
 
 /** Cancelar un inicio de sesión a medias y no dejar la cuenta vacía. */
-export async function cancelLogin(host: Host, provider: string, id: string) {
-  await host.call("cancel_login", null, { id }).catch(() => {});
-  await host.call("discard_account", null, { provider, id }).catch(() => {});
+export async function cancelLogin(host: Host, workspace: string | null, provider: string, id: string) {
+  await host.call("cancel_login", workspace, { id }).catch(() => {});
+  await host.call("discard_account", workspace, { provider, id }).catch(() => {});
+}
+
+/** Lo que el teléfono sabe de un inicio de sesión en curso, de los eventos `account`. */
+export type LoginProgress = { url: string | null; confirm: string | null; askCode: boolean; notice: string | null; error: string | null; done: boolean };
+
+export const LOGIN_START: LoginProgress = { url: null, confirm: null, askCode: false, notice: null, error: null, done: false };
+
+/** Un evento `account` sobre el inicio de sesión: el enlace, el código, un aviso o el final (con texto si falló). */
+export function loginStep<T extends LoginProgress>(login: T, event: LoginEvent): T {
+  if (event.kind === "url") return { ...login, url: event.text };
+  if (event.kind === "confirm") return { ...login, confirm: event.text };
+  if (event.kind === "code") return { ...login, askCode: true };
+  if (event.kind === "notice") return { ...login, notice: event.text };
+  return event.text ? { ...login, error: event.text, done: true } : { ...login, done: true };
+}
+
+/**
+ * Lo que dice un fallo de la máquina, sin el código genérico delante: el motor
+ * contesta frases (`command_failed` con la frase en `detail`) o un `Failure`
+ * (`what`, `detail`). Solo sin frase queda el código.
+ */
+export function failureText(error: unknown): string {
+  if (error instanceof HostError) {
+    const detail = error.detail as Record<string, unknown> | string | null | undefined;
+    if (typeof detail === "string" && detail.trim()) return detail;
+    if (detail && typeof detail === "object") {
+      for (const key of ["what", "message", "detail"]) {
+        const text = detail[key];
+        if (typeof text === "string" && text.trim()) return text;
+      }
+    }
+    return error.code;
+  }
+  return error instanceof Error ? error.message : String(error);
 }
 
 // --- Avisos ------------------------------------------------------------------
