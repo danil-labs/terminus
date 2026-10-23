@@ -89,8 +89,10 @@ async function start(name, log, overrides) {
   const doc = app.w.document;
   const button = (label) => [...doc.querySelectorAll("button")].find((b) => b.textContent?.trim().startsWith(label));
   doc.querySelector('button[aria-label="Proyecto"]').click();
-  assert.ok(await until(() => [...doc.querySelectorAll("button")].some((b) => b.textContent?.includes("P1"))), "no se abre el selector de proyecto");
-  [...doc.querySelectorAll("[role=menu] button, [role=dialog] button, button")].find((b) => b.textContent?.trim().startsWith("P1")).click();
+  // Dentro del selector: la barra lateral también tiene un botón «P1» (el grupo de la carpeta).
+  const opcion = () => [...doc.querySelectorAll("[role=dialog] button")].find((b) => b.textContent?.trim().startsWith("P1"));
+  assert.ok(await until(() => opcion()), "no se abre el selector de proyecto");
+  opcion().click();
   await sleep(300);
   return { app, doc, button };
 }
