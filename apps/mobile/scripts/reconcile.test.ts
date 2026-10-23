@@ -20,6 +20,7 @@ const part = (host: string, tasks: Task[], live: string[] = []): HostSnapshot =>
   folders: [{ id: "p1", name: "Aplicación", key: `${host}/p1`, host } as HostSnapshot["folders"][number]],
   spaces: [{ id: "s1", name: null, folders: ["p1"] } as HostSnapshot["spaces"][number]],
   tasks: tasks.map((t) => ({ ...t })),
+  delegated: [],
   agents: [{ name: "ana", description: null, status: "asleep", liveTasks: 0, minutesSinceLastTurn: null, places: [{ host, folder: "p1" }] }],
   live,
   providers: [],

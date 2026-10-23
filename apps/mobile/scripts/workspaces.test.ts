@@ -9,7 +9,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { AccountWorkspace } from "@terminus/computers";
-import { type Folder, mergeSnapshots, taskInSpace, withAccountFolders, workspaceEntries } from "../src/lib/engine.ts";
+import { delegatedOf } from "@terminus/tasks";
+import { type Folder, mergeSnapshots, taskInSpace, tasksOf, withAccountFolders, workspaceEntries } from "../src/lib/engine.ts";
 
 const REGISTRY: AccountWorkspace[] = [
   {
@@ -59,6 +60,7 @@ test("los spaces son de todas las máquinas: uno por id o por nombre, y cada tar
     folders: [],
     spaces,
     tasks: tasks.map((t) => ({ ...t, title: t.id, provider: "codex", model: null, created_at: 0, updated_at: 0, esperando: false, agent: null, host, workspace: "w1", folder: "p1", folderKey: `${host}/p1` })),
+    delegated: [],
     agents: [],
     live: [],
     providers: [],
@@ -77,4 +79,17 @@ test("los spaces son de todas las máquinas: uno por id o por nombre, y cada tar
   assert.deepEqual(both.spaces.map((s) => s.on), [{ cmp_vm: "s-vm", cmp_mac: "s-gen" }, { cmp_mac: "s-web" }]);
   assert.ok(taskInSpace(both.tasks.find((t) => t.id === "t-vm")!, both.spaces[0]));
   assert.ok(!taskInSpace(both.tasks.find((t) => t.id === "t-vm")!, both.spaces[1]));
+});
+
+test("la lista del teléfono esconde las delegadas bajo su lanzador, como el escritorio, y las guarda para su chat", () => {
+  const row = (id: string, created_at: number, extra: object = {}) => ({ id, title: id, provider: "codex", model: null, created_at, updated_at: 0, esperando: false, agent: null, ...extra });
+  const { tasks, delegated } = tasksOf({
+    p1: [row("lanzador", 3), row("delegada", 2, { launched_by: "lanzador", launcher_available: true }), row("huerfana", 1, { launched_by: "borrado", launcher_available: false })],
+    "": [row("vieja", 0, { launched_by: "lanzador", archived: true })],
+  }, "cmp_mac", "w1");
+  assert.deepEqual(tasks.map((t) => t.id), ["lanzador", "huerfana"], "la de un lanzador que ya no existe sale suelta");
+  assert.deepEqual(delegated.map((t) => [t.id, t.folderKey]), [["delegada", "cmp_mac/p1"]], "la archivada no");
+  const merged = mergeSnapshots([{ host: "cmp_mac", folders: [], spaces: [], tasks, delegated, agents: [], live: [], providers: [], cachedAt: null }], () => ({ machine: "Mac", on: false }));
+  assert.deepEqual(merged.delegated.map((t) => [t.id, t.machine, t.machine_on]), [["delegada", "Mac", false]], "con la máquina apagada siguen en el chat de su lanzador");
+  assert.deepEqual(delegatedOf(merged.delegated, "lanzador").map((t) => t.id), ["delegada"]);
 });

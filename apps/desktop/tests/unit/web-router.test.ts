@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { INTENT_COMMANDS, type MachineState } from "@terminus/computers";
 import { Fleet, type Link, type MachineInfo } from "@terminus/fleet";
+import { delegatedOf, flattenTasks } from "@terminus/tasks";
 import "../helpers/catalog.ts";
 import { createRouter } from "../../src/features/machines/router.ts";
 
@@ -100,6 +101,28 @@ test("with every machine off the page opens at once from the registry and the sa
   assert.deepEqual(rows.map((r) => [r.id, r.title, r.machine_status]).sort(), [["cmp_mac~t1", "de mac", "cached"], ["cmp_vm~t1", "de vm", "cached"]], "the saved tasks of each, marked saved");
   await new Promise((r) => setTimeout(r, 20));
   assert.equal(vm.calls.filter((c) => c.command === "list_live_sessions").length + mac.calls.filter((c) => c.command === "list_live_sessions").length, 0, "an off machine with a copy is not asked");
+});
+
+test("the web hides a delegated task under its launcher like the desktop, also from an off machine's saved copy", async () => {
+  type Row = { id: string; created_at: number; launched_by?: string | null; parent?: string | null; launcher_available?: boolean };
+  const rows = (prefix: string) => [
+    { ...row("lanzador"), created_at: 3 },
+    { ...row("delegada"), created_at: 2, launched_by: "lanzador", launcher_available: true },
+    { ...row("huerfana"), created_at: 1, launched_by: "borrado", launcher_available: false },
+  ].map((r) => ({ ...r, title: `${prefix} ${r.title}` }));
+  const args = { project: "", open: [] };
+  const before = web({ cmp_vm: fakeLink({ list_live_sessions: rows("vm") }), cmp_mac: fakeLink({ list_live_sessions: rows("mac") }) });
+  await before.router.handle("list_workspaces");
+  await before.fleet.read({ machine: "cmp_mac", workspace: "w", command: "list_live_sessions", args });
+  before.fleet.flush();
+
+  // La Mac está apagada: sus filas salen de lo guardado y siguen colgando de su lanzador.
+  const { router } = web({ cmp_vm: fakeLink({ list_live_sessions: rows("vm") }), cmp_mac: fakeLink({ list_live_sessions: rows("mac") }, "offline") }, before.storage);
+  await router.handle("list_workspaces");
+  const listed = (await router.handle("list_live_sessions", args)) as Row[];
+  const shown = flattenTasks({ "": listed }).map((t) => t.row.id).sort();
+  assert.deepEqual(shown, ["cmp_mac~huerfana", "cmp_mac~lanzador", "cmp_vm~huerfana", "cmp_vm~lanzador"], "the delegated ones hang from their launcher; one whose launcher is gone shows loose");
+  assert.deepEqual(delegatedOf(listed, "cmp_mac~lanzador").map((r) => r.id), ["cmp_mac~delegada"], "and the launcher's panel finds its own");
 });
 
 test("a machine of another contract shows outdated in its slice and the page still answers with the others", async () => {

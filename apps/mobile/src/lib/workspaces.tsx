@@ -15,6 +15,8 @@ export type Snapshot = {
   folders: Folder[];
   spaces: MergedSpace[];
   tasks: Task[];
+  /** Las que cuelgan de su lanzador: no salen en la lista, sí en el chat de este. */
+  delegated: Task[];
   agents: Agent[];
   /** `host/id` de las tareas con un turno en marcha. */
   live: Set<string>;

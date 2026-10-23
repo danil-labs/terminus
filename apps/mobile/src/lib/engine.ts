@@ -38,7 +38,7 @@ import type {
 import { MAX_VISUAL_BYTES, VISUAL_FILE, VISUAL_TREE } from "@terminus/chat/visual";
 import { type AccountWorkspace, groupWorkspaces, linkedAttention, onlyLinked, registryProjects, withRegistry } from "@terminus/computers";
 import { type ChatBackgroundView, chatBackgroundImageUrl, chatBackgroundView, isSingleAttention } from "@terminus/protocol";
-import { type FlatRow, flattenTasks } from "@terminus/tasks";
+import { type FlatRow, flattenTasks, launcherOf } from "@terminus/tasks";
 import { type Host, HostError } from "./hosts.ts";
 
 /** Una tarea de la lista, con la máquina y la carpeta de donde viene. */
@@ -74,6 +74,8 @@ export type HostSnapshot = {
   folders: Folder[];
   spaces: Space[];
   tasks: Task[];
+  /** Las que la lista esconde bajo su lanzador: salen en el chat de este («N tareas delegadas»). */
+  delegated: Task[];
   agents: Agent[];
   /** Tareas con un turno en marcha. */
   live: string[];
@@ -189,6 +191,20 @@ export async function chatBackgroundOf(host: Host, workspace: string, accountUrl
 }
 
 /**
+ * Las tareas vivas de una máquina con la regla del riel del escritorio
+ * (`flattenTasks`): las que cuelgan de su lanzador no van en `tasks` sino en
+ * `delegated`, para el chat de este.
+ */
+export function tasksOf(byProject: Record<string, (SessionRow & FlatRow)[]>, host: string, workspace: string): { tasks: Task[]; delegated: Task[] } {
+  const asTask = (project: string, row: SessionRow): Task => ({ ...row, host, workspace, folder: project, folderKey: `${host}/${project}` });
+  const tasks = flattenTasks(byProject).map(({ project, row }) => asTask(project, row));
+  const shown = new Set(tasks.map((task) => task.id));
+  const delegated = Object.entries(byProject).flatMap(([project, rows]) =>
+    rows.filter((row) => !row.archived && !shown.has(row.id) && launcherOf(row)).map((row) => asTask(project, row)));
+  return { tasks, delegated };
+}
+
+/**
  * Carpetas, spaces, tareas abiertas y agentes de un workspace en una máquina.
  * `list_live_sessions` con `project: ""` solo trae las tareas sin carpeta: se
  * pide una vez por carpeta y otra para `""`, como la ventana.
@@ -214,7 +230,7 @@ export async function snapshotOf(host: Host, workspace: string): Promise<HostSna
   );
   const byProject: Record<string, (SessionRow & FlatRow)[]> = {};
   for (const { project, rows } of perFolder) byProject[project] = rows;
-  const tasks: Task[] = flattenTasks(byProject).map(({ project, row }) => ({ ...row, host: host.id, workspace, folder: project, folderKey: `${host.id}/${project}` }));
+  const { tasks, delegated } = tasksOf(byProject, host.id, workspace);
 
   const agents = new Map<string, Agent>();
   for (const { project, agents: list, status } of perFolder) {
@@ -242,6 +258,7 @@ export async function snapshotOf(host: Host, workspace: string): Promise<HostSna
     folders: folders.map((f) => ({ ...f, key: `${host.id}/${f.id}`, host: host.id })),
     spaces,
     tasks,
+    delegated,
     agents: [...agents.values()],
     live,
     providers: Array.isArray(providers) ? providers : [],
@@ -273,6 +290,7 @@ export function mergeSnapshots(parts: HostSnapshot[], tagMachines: (host: string
   }
   const agents = new Map<string, Agent>();
   const tasks: Task[] = [];
+  const delegated: Task[] = [];
   const live = new Set<string>();
   let cached: number | null = null;
   for (const part of parts) {
@@ -286,12 +304,13 @@ export function mergeSnapshots(parts: HostSnapshot[], tagMachines: (host: string
     }
     const tag = tagMachines(part.host);
     for (const task of part.tasks) tasks.push(tag ? { ...task, machine: tag.machine, machine_on: tag.on } : task);
+    for (const task of part.delegated) delegated.push(tag ? { ...task, machine: tag.machine, machine_on: tag.on } : task);
     for (const id of part.live) live.add(`${part.host}/${id}`);
     if (part.cachedAt !== null) cached = Math.max(cached ?? 0, part.cachedAt);
   }
   tasks.sort((a, b) => b.created_at - a.created_at);
   const providers = Object.fromEntries(parts.map((p) => [p.host, p.providers]));
-  return { folders: parts.flatMap((p) => p.folders), spaces, agents: [...agents.values()], tasks, live, providers, cachedAt: cached };
+  return { folders: parts.flatMap((p) => p.folders), spaces, agents: [...agents.values()], tasks, delegated, live, providers, cachedAt: cached };
 }
 
 /**

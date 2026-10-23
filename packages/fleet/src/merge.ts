@@ -31,8 +31,12 @@ export type MergeContext = {
   name?(machine: string): string;
 };
 
-/** Llaves cuyo texto es un id de la máquina que lo mandó. */
-const KEYS = new Set(["session", "parent", "portfolio", "account", "space"]);
+/**
+ * Llaves cuyo texto es un id de la máquina que lo mandó. `launched_by` también:
+ * la tarea que lanzó a otra vive en el mismo motor, y con el mismo prefijo que
+ * los `id` la lista la esconde bajo su lanzador, como en el escritorio.
+ */
+const KEYS = new Set(["session", "parent", "launched_by", "portfolio", "account", "space"]);
 /** Llaves cuyo valor es un archivo de imagen de esa máquina: `preview_file` lo lee allá. */
 const FILES = new Set(["logo", "background", "avatar"]);
 const isPath = (v: string) => /^(\/|~\/|[a-z]:[\\/])/i.test(v);
