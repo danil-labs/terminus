@@ -99,6 +99,10 @@ export default function Accounts(props: {
   const [cargando, setCargando] = createSignal(true);
   const [estados, setEstados] = createSignal<Record<string, AccountStatus>>({});
   const [comprobando, setComprobando] = createSignal<Record<string, boolean>>({});
+  // Las que la última consulta de estado no pudo responder. No es «sin
+  // conectar» —nadie lo dijo— ni «conectada»: una cuenta cuyo `account_status`
+  // se corta por plazo cada vez se veía conectada con un error encima.
+  const [sinComprobar, setSinComprobar] = createSignal<Record<string, boolean>>({});
   const [fallo, setFallo] = createSignal<Failure | null>(null);
   // Quitar borra la credencial y no se puede deshacer: el primer clic pregunta.
   const [porQuitar, setPorQuitar] = createSignal<string | null>(null);
@@ -324,6 +328,7 @@ export default function Accounts(props: {
   createEffect(
     on(agente, () => {
       setEstados({});
+      setSinComprobar({});
       comprobadas.clear();
       setPorQuitar(null);
       void refrescar();
@@ -527,8 +532,10 @@ export default function Accounts(props: {
         id,
       });
       setEstados((e) => ({ ...e, [id]: st }));
+      setSinComprobar((c) => ({ ...c, [id]: false }));
       return st;
     } catch (e) {
+      setSinComprobar((c) => ({ ...c, [id]: true }));
       setFallo({
         what: t("settings.accounts.error.status", { agent: etiqueta() }),
         detail: detalleDe(e),
@@ -1034,6 +1041,7 @@ export default function Accounts(props: {
                 active={activa()}
                 status={estado()}
                 checkingStatus={comprobando()[a.id]}
+                statusUnknown={sinComprobar()[a.id] && a.authenticated_at !== null}
                 onRecheckStatus={() => comprobar(a.id)}
                 supportsLimits={
                   agentes().find((x) => x.id === agente())?.limits ?? false
@@ -1042,6 +1050,9 @@ export default function Accounts(props: {
                 afterStatusChange={conectadaVez()[a.id] ?? 0}
                 actions={(info) => {
                   const caida = () => info.revocada || estado()?.authenticated === false;
+                  // Autenticada alguna vez y sin respuesta ahora: se ofrece
+                  // preguntar de nuevo, y reconectar por si no era el plazo.
+                  const dudosa = () => !caida() && info.sinComprobar;
                   return (
                     <>
                       <Show when={agente() === "opencode-zen"}>
@@ -1049,9 +1060,19 @@ export default function Accounts(props: {
                           {t("settings.accounts.go_key")}
                         </Button>
                       </Show>
-                      {/* Un solo botón visible: reconectar si se cayó, usarla si no es la activa. */}
+                      <Show when={dudosa()}>
+                        <Button
+                          variant="outline"
+                          size="compact"
+                          disabled={comprobando()[a.id]}
+                          onClick={() => void comprobar(a.id)}
+                        >
+                          {t("settings.accounts.retry")}
+                        </Button>
+                      </Show>
+                      {/* Un solo botón visible: reconectar si se cayó o no se pudo comprobar, usarla si no es la activa. */}
                       <Show
-                        when={caida()}
+                        when={caida() || dudosa()}
                         fallback={
                           <Show when={!activa()}>
                             <Button
@@ -1081,7 +1102,7 @@ export default function Accounts(props: {
                             : t("settings.accounts.connect")}
                         </Button>
                       </Show>
-                      <Show when={!caida() || !props.enAlta}>
+                      <Show when={!(caida() || dudosa()) || !props.enAlta}>
                         <DropdownMenu>
                           <DropdownMenuTrigger
                             aria-label={t("settings.accounts.more_actions", {
@@ -1097,7 +1118,7 @@ export default function Accounts(props: {
                           {/* Configuración es un Dialog en z-[80] que cierra con Esc salvo dentro de data-owns-escape. */}
                           <DropdownMenuContent class="z-[90]" data-owns-escape>
                             {/* Reconectar reescribe la credencial en su carpeta; quitar la borra. */}
-                            <Show when={!caida()}>
+                            <Show when={!caida() && !dudosa()}>
                               <DropdownMenuItem
                                 class="flex items-center gap-2"
                                 disabled={enCurso() !== null}
@@ -1107,7 +1128,7 @@ export default function Accounts(props: {
                                 {t("settings.accounts.reconnect")}
                               </DropdownMenuItem>
                             </Show>
-                            <Show when={!caida() && !props.enAlta}>
+                            <Show when={!caida() && !dudosa() && !props.enAlta}>
                               <DropdownMenuSeparator />
                             </Show>
                             <Show when={!props.enAlta && !a.machines}>
@@ -1803,6 +1824,8 @@ function CuentaConfigurada(props: {
   active: boolean;
   status?: AccountStatus;
   checkingStatus?: boolean;
+  /** Autenticada, pero la última consulta de estado falló. */
+  statusUnknown?: boolean;
   onRecheckStatus?: () => void | Promise<unknown>;
   supportsLimits: boolean;
   order: number;
@@ -1819,7 +1842,7 @@ function CuentaConfigurada(props: {
    * colocaría una sola vez y no se recalcularía cuando la fila descubra
    * el 401.
    */
-  actions: (info: { revocada: boolean }) => JSX.Element;
+  actions: (info: { revocada: boolean; sinComprobar: boolean }) => JSX.Element;
   destructiveAction: JSX.Element;
 }) {
   const lectura = createAccountLimit({
@@ -1846,12 +1869,17 @@ function CuentaConfigurada(props: {
     },
   });
 
+  // Si el proveedor sí contestó con límites, la cuenta funciona aunque el CLI
+  // local no haya respondido a tiempo.
+  const sinComprobar = () => !!props.statusUnknown && lectura.limits?.mode !== "read";
+
   return (
     <AccountCard
       account={props.account}
       active={props.active}
       status={props.status}
       checkingStatus={props.checkingStatus}
+      statusUnknown={sinComprobar()}
       onRecheckStatus={props.onRecheckStatus}
       noLimitsLabel={props.agent === "opencode-zen" ? t("settings.accounts.go_key_required") : undefined}
       limits={lectura.limits}
@@ -1859,7 +1887,7 @@ function CuentaConfigurada(props: {
       loadingLimits={lectura.loading}
       refreshingLimits={lectura.refreshing}
       onRefreshLimits={props.supportsLimits ? lectura.refresh : undefined}
-      actions={props.actions({ revocada: revocada(lectura.limits) })}
+      actions={props.actions({ revocada: revocada(lectura.limits), sinComprobar: sinComprobar() })}
       destructiveAction={props.destructiveAction}
       variant="row"
     />
