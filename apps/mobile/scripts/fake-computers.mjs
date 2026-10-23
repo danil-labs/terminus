@@ -112,6 +112,19 @@ function login(m, provider, id) {
   e.logins.set(id, timer);
 }
 
+/** Git por tarea de una carpeta: un PR abierto con el CI fallido en la VM, uno integrado en la Mac. */
+const PULLS = { "t-vm-1": { number: 312, state: "open", checks: "failure" }, "t-mac-1": { number: 302, state: "merged", checks: "success" } };
+function gitOf(e, project) {
+  return Object.fromEntries([...e.sessions.values()].filter((s) => s.project === project).map((s) => {
+    const pull = PULLS[s.id];
+    return [s.id, {
+      kind: "branch", kn: null, branch: `task/${s.id}`, alias: null, head: "h1", repository: `/lab/${project}`, shared_with: null,
+      pull: pull ? { git_host: "github", number: pull.number, state: pull.state, head_sha: "h1", checks: pull.checks } : null,
+      pull_known: true, checked_at: Date.now(), stale: false, has_remote: true, merged_locally: false,
+    }];
+  }));
+}
+
 function attentionOf(e) {
   const tasks = [...e.sessions.values()].flatMap((s) => (s.pending ? [{ session: s.id, project: s.project, state: "approving" }] : s.esperando ? [{ session: s.id, project: s.project, state: "asked" }] : []));
   return [{ workspace: e.ws, tasks }];
@@ -204,6 +217,7 @@ function invoke(m, command, args) {
     case "list_providers": return [{ id: "codex", label: "Codex", available: true, driver: true }, { id: "claude", label: "Claude", available: true, driver: true }];
     case "list_active_turns": return [...e.live];
     case "list_workspace_attention": return attentionOf(e);
+    case "list_session_git": return gitOf(e, args.project);
     case "load_session": {
       const s = e.sessions.get(args.id);
       if (!s) throw { code: "command_failed", detail: "no such task" };

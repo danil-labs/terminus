@@ -22,6 +22,8 @@ export type ThemeTokens = {
   failedMark: string;
   unseenMark: string;
   delivered: string;
+  /** A merged PR, like the desktop's git icon. */
+  merged: string;
 };
 
 export const CSS_SOURCE: Partial<Record<keyof ThemeTokens, string>> = {
@@ -37,6 +39,7 @@ export const CSS_SOURCE: Partial<Record<keyof ThemeTokens, string>> = {
   failedMark: "--color-error-strong",
   unseenMark: "--color-success-strong",
   delivered: "--color-neutral-500",
+  merged: "--color-brand-purple",
 };
 
 export const THEMES: { light: ThemeTokens; dark: ThemeTokens } = {
@@ -58,6 +61,7 @@ export const THEMES: { light: ThemeTokens; dark: ThemeTokens } = {
     failedMark: "#dc2626",
     unseenMark: "#166534",
     delivered: "#62647a",
+    merged: "#6539f5",
   },
   dark: {
     bg: "#111113",
@@ -78,6 +82,7 @@ export const THEMES: { light: ThemeTokens; dark: ThemeTokens } = {
     failedMark: "#f87171",
     unseenMark: "#4ade80",
     delivered: "#9a9aa3",
+    merged: "#6539f5",
   },
 };
 
