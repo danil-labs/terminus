@@ -1,8 +1,11 @@
-Terminus 0.2.84 syncs all your workspaces with your Danil account and lets you pick the machine each task runs on.
+Terminus 0.2.86 brings References with Zotero, fuller Typst documents, local models and a shorter first launch.
 
-- **Your workspaces on all your machines.** While you are signed in to Danil, every workspace on this computer shows up on the web, on your phone and on your other machines, including the ones you create later. Signing out stops the sync. You no longer link each workspace by hand.
-- **"Run on" decides where the task runs.** Pick your VM and the task starts there: the workspace is the same on all your machines, and the project is cloned on the VM the first time it is needed.
-- **Clone and create folders on another machine** from the web, the desktop and your phone, with progress and a cancel option.
-- **New first launch.** Connect your AI and personalize Terminus from the start, with a clearer setup.
-- **Formulas in chat.** LaTeX formulas render with KaTeX.
-- **Fixes.** The chat background no longer gets erased or carried over to another workspace, you can see why another account can't be added, and on Windows you can remove an Antigravity account again.
+- **References with Zotero.** Search and cite from your Zotero library, and a linked `.bib` stays in sync.
+- **Typst.** Live preview beside the editor, PDF export and the "@" panel to cite and link files.
+- **HTML preview.** An `.html` file shows as a page, without going to the network.
+- **Local models.** Use a model running on your computer; if it is not ready, the chat says what to check.
+- **Notion, Google Drive and MCP.** Agents see your connections, and Terminus is the one that signs in to each service.
+- **New sidebar.** "New task" and search always at hand, tasks grouped by folder, and new files or folders from the project view without asking the agent.
+- **Shorter first launch.** Setup ends straight in the app.
+- **Multiple machines.** A folder on several machines is grouped by machine, and a powered-off VM starts when you create a task on it.
+- **Fixes.** Antigravity on Windows, opening folders with spaces, delegated tasks without duplicates and heavy folders folded in the tree.
