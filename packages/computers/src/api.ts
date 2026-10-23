@@ -104,6 +104,13 @@ export type AccountProject = {
 };
 
 /**
+ * Un space compartido del workspace (`Space` de `GET /v1/workspaces`): el mismo id
+ * en todas las máquinas. `name: null` es el nombre por omisión; `changed_at`, los
+ * milisegundos del motor que lo cambió por última vez.
+ */
+export type AccountSpace = { id: string; name: string | null; folders: string[]; position: number; changed_at: number };
+
+/**
  * Un workspace del registro de la cuenta de Danil (`GET /v1/workspaces`): existe
  * aunque sus computadoras estén apagadas. `computers`, en cuáles está ligado.
  */
@@ -120,6 +127,10 @@ export type AccountWorkspace = {
   /** El logo y el fondo de los chats en la cuenta (`GET …/logo|background`, con la sesión); `null` sin imagen. Un plano de control anterior no los manda. */
   logo_url?: string | null;
   background_url?: string | null;
+  /** Sus spaces compartidos, en orden (vacío con un plano de control anterior). */
+  spaces?: AccountSpace[];
+  /** Ids de spaces compartidos con lápida. */
+  deleted_spaces?: string[];
   /** Con lápida (`include_deleted=1`): cuándo se borró. Un borrado no revive al volver a atarlo; solo con `restore`. */
   deleted_at?: string | null;
 };
@@ -132,7 +143,27 @@ function accountWorkspace(raw: unknown): AccountWorkspace | null {
   const projects = (Array.isArray(w.projects) ? w.projects : []).filter(
     (p): p is AccountProject => !!p && typeof (p as AccountProject).id === "string" && typeof (p as AccountProject).name === "string",
   );
-  return { ...(w as AccountWorkspace), name: typeof w.name === "string" && w.name.trim() ? w.name : w.id, projects, computers: strings(w.computers) };
+  const spaces = (Array.isArray(w.spaces) ? w.spaces : []).flatMap((raw): AccountSpace[] => {
+    const s = raw as Record<string, unknown> | null;
+    if (!s || typeof s.id !== "string" || !s.id) return [];
+    return [
+      {
+        id: s.id,
+        name: typeof s.name === "string" && s.name ? s.name : null,
+        folders: strings(s.folders),
+        position: typeof s.position === "number" ? s.position : 0,
+        changed_at: typeof s.changed_at === "number" ? s.changed_at : 0,
+      },
+    ];
+  });
+  return {
+    ...(w as AccountWorkspace),
+    name: typeof w.name === "string" && w.name.trim() ? w.name : w.id,
+    projects,
+    computers: strings(w.computers),
+    spaces,
+    deleted_spaces: strings(w.deleted_spaces),
+  };
 }
 
 /**

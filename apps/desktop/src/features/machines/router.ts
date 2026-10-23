@@ -10,7 +10,7 @@
  * esta computadora no tiene se lee de sus miembros y actúa en el primero.
  */
 import { type AccountWorkspace, callWorkspace } from "@terminus/computers";
-import { AttentionBook, type Envelope, type Fleet, FleetError, type Slice } from "@terminus/fleet";
+import { AttentionBook, type Envelope, type Fleet, FleetError, type Slice, unwrap } from "@terminus/fleet";
 import { t } from "../../lib/i18n.ts";
 
 type Args = Record<string, unknown>;
@@ -26,6 +26,8 @@ const FAN = new Set(["list_projects", "list_portfolios", "list_live_sessions", "
 const LISTING = new Set(["list_workspaces", "workspaces_startup"]);
 /** Lo que crea algo nuevo: en un workspace que esa máquina no tiene, primero lo hace suyo. */
 const CREATE = new Set(["send_message", "run_shell_command", "create_project", "clone_project", "start_project_clone"]);
+/** Lo que pone una tarea de otra máquina en un space de esta ventana: el space se comparte antes. */
+const WITH_SPACE = new Set([...CREATE, "create_empty_session", "move_task_to_space", "set_task_archived"]);
 /** De esta computadora por definición: sus cuentas de IA, su sesión de Danil, Radiant. */
 const OF_THIS_MACHINE = /(^|_)accounts?($|_)|login|^radiant_|^danil_|^account_relay_token$/;
 /** Las órdenes con canal pierden el canal por el relay: vuelve solo la respuesta final. */
@@ -142,8 +144,13 @@ export function createRouter(config: RouterConfig) {
   const named = (error: FleetError): Failure => {
     const name = error.machine ? fleet.name(error.machine) : "";
     switch (error.code) {
+      // La interfaz nunca ofrece mezclar máquinas: llegar al candado de la flota
+      // es un bug. Se registra y la persona ve el fallo genérico, sin explicarle
+      // algo que no hizo.
       case "cross_machine":
-        return { what: t("web.machines.cross_machine"), detail: "cross_machine" };
+      case "unknown_machine":
+        console.error(`[máquinas] bug: ${error.code}`, error.machine, error.detail);
+        return { what: { clave: "shell.service.failed" }, detail: error.code };
       case "machine_off":
         return { what: t("web.machines.off_action", { name }), detail: "machine_off" };
       case "version_mismatch":
@@ -152,8 +159,6 @@ export function createRouter(config: RouterConfig) {
         return { what: t("web.machines.timeout", { name }), detail: "machine_timeout" };
       case "machine_lost":
         return { what: t("web.machines.lost", { name }), detail: "machine_lost" };
-      case "unknown_machine":
-        return { what: t("web.machines.cross_machine"), detail: "unknown_machine" };
       case "license_required":
         return { what: t("web.machines.license_required"), detail: "license_required" };
       case "workspace_mismatch":
@@ -244,6 +249,7 @@ export function createRouter(config: RouterConfig) {
   async function remote(machine: string, command: string, args: Args, workspace: string | null): Promise<unknown> {
     args = withoutChannel(command, args);
     if (CREATE.has(command) && workspace && fleet.inRegistry(workspace) && !fleet.membersOf(workspace).includes(machine)) await materialize(machine, workspace);
+    if (WITH_SPACE.has(command)) args = await withSharedSpace(args);
     if (command === "load_history") {
       // El relay no pagina: la tarea entera, con la forma de la página.
       const session = (await fleet.call({ machine, workspace, command: "load_session", args: { project: args.project, id: args.id } })) as { turns?: unknown[] } | null;
@@ -251,6 +257,24 @@ export function createRouter(config: RouterConfig) {
       return { ...session, history: { total, start: 0, end: total, limit: total, has_more: false } };
     }
     return fleet.call({ machine, workspace, command, args });
+  }
+
+  /**
+   * Lo nuevo en otra máquina nace en el space de la ventana: uno de esta
+   * computadora que aún no es de la cuenta se comparte antes (`share_space`), y
+   * allá se crea con el mismo id. Si no se puede compartir (workspace sin cuenta,
+   * motor anterior), nace sin space, como antes.
+   */
+  async function withSharedSpace(args: Args): Promise<Args> {
+    const space = args.space;
+    if (typeof space !== "string" || !space || fleet.isShared(space) || unwrap(space, fleet.remotes())) return args;
+    try {
+      await native("share_space", { id: space });
+      fleet.markShared(space);
+      return args;
+    } catch {
+      return { ...args, space: null };
+    }
   }
 
   /** Una máquina que no tiene el workspace de algo nuevo lo hace suyo primero, con el mismo id. */

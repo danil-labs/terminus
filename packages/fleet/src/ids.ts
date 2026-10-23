@@ -1,7 +1,8 @@
 /**
  * Lo que cada máquina guarda con su propio id (tareas, portafolios, cuentas de
  * IA, spaces) viaja por el panel como `<máquina>~<id>`, para que dos máquinas
- * no choquen; workspaces y proyectos tienen el mismo id en todas y van tal cual.
+ * no choquen; workspaces, proyectos y los spaces compartidos con la cuenta
+ * tienen el mismo id en todas y van tal cual.
  *
  * Ese prefijo es identidad, no ruta: la máquina de una llamada sale solo del
  * sobre. Un id de otra máquina en los argumentos se rechaza antes de mandar.
@@ -44,7 +45,13 @@ export function unwrap(value: string, machines: Iterable<string>): { machine: st
  * prefijo; `self`, la de la ventana, cuyos ids van sueltos (`null` en la web).
  * Lanza `cross_machine` si nombran algo de otra máquina.
  */
-export function argsFor(args: Row, machine: string, remotes: ReadonlySet<string>, self: string | null): Row {
+export function argsFor(
+  args: Row,
+  machine: string,
+  remotes: ReadonlySet<string>,
+  self: string | null,
+  shared: (space: string) => boolean = () => false,
+): Row {
   const walk = (value: unknown, key: string | null): unknown => {
     if (typeof value === "string") {
       const own = unwrap(value, remotes);
@@ -52,6 +59,8 @@ export function argsFor(args: Row, machine: string, remotes: ReadonlySet<string>
         if (own.machine !== machine) throw new FleetError("cross_machine", own.machine, { key, machine });
         return own.id;
       }
+      // Un space compartido con la cuenta tiene el mismo id en todas.
+      if (key === "space" && shared(value)) return value;
       if (self !== null && machine !== self && key && OWN_KEYS.has(key) && value) throw new FleetError("cross_machine", self, { key, machine });
       return value;
     }

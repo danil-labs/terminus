@@ -78,16 +78,41 @@ test("the machine comes only from the envelope: a VM id in the args of this comp
   const vm = fakeLink({ load_session: ({ id }: Args) => ({ id }) });
   const { router, native } = setup({ cmp_vm: vm });
   await router.handle("list_workspaces");
-  await assert.rejects(router.handle("load_session", { project: "p1", id: "cmp_vm~t1" }), (e: { detail: string; what: string }) => {
-    assert.equal(e.detail, "cross_machine");
-    assert.equal(e.what, "Esto junta cosas de dos máquinas distintas y no se puede hacer.");
-    return true;
-  });
+  // Llegar al candado es un bug: se registra y la persona ve el fallo genérico, sin la frase de «dos máquinas».
+  const logged: unknown[][] = [];
+  const error = console.error;
+  console.error = (...args: unknown[]) => void logged.push(args);
+  try {
+    await assert.rejects(router.handle("load_session", { project: "p1", id: "cmp_vm~t1" }), (e: { detail: string; what: unknown }) => {
+      assert.equal(e.detail, "cross_machine");
+      assert.deepEqual(e.what, { clave: "shell.service.failed" });
+      return true;
+    });
+  } finally {
+    console.error = error;
+  }
+  assert.ok(String(logged[0]?.[0]).includes("cross_machine"), "registered as a failure");
   assert.equal(native.filter((c) => c.command === "load_session").length, 0, "the local engine never got another machine's id");
   assert.equal(vm.calls.length, 0, "and the id did not pick the VM either");
   assert.deepEqual(await router.handle("load_session", { project: "p1", id: "cmp_vm~t1" }, on("cmp_vm")), { id: "cmp_vm~t1" });
   assert.deepEqual(vm.calls.map((c) => [c.command, c.args.id, c.workspace]), [["load_session", "t1", "w"]]);
-  await assert.rejects(router.handle("send_message", { session: "t1", prompt: "x" }, on("cmp_vm")), (e: { detail: string }) => e.detail === "cross_machine", "a bare id is this computer's");
+  console.error = () => {};
+  try {
+    await assert.rejects(router.handle("send_message", { session: "t1", prompt: "x" }, on("cmp_vm")), (e: { detail: string }) => e.detail === "cross_machine", "a bare id is this computer's");
+  } finally {
+    console.error = error;
+  }
+});
+
+test("moving a VM task to this window's space goes to the VM with the same id, after sharing it; no window memory", async () => {
+  const vm = fakeLink({ move_task_to_space: ({ space }: Args) => ({ id: space, name: "Trabajo" }) });
+  const { router, fleet, native } = setup({ cmp_vm: vm }, { share_space: { id: "s1", name: "Trabajo", folders: [], created_at: 1, updated_at: 1, account: true } });
+  fleet.setRegistry([{ id: "w", name: "W", projects: [], computers: ["cmp_vm"] }]);
+  await router.handle("list_workspaces");
+  const moved = await router.handle("move_task_to_space", { project: "p1", id: "cmp_vm~t1", space: "s1" }, on("cmp_vm"));
+  assert.deepEqual(moved, { id: "s1", name: "Trabajo" });
+  assert.deepEqual(native.find((c) => c.command === "share_space")?.args, { id: "s1" });
+  assert.deepEqual(vm.calls.find((c) => c.command === "move_task_to_space")?.args, { project: "p1", id: "t1", space: "s1" });
 });
 
 test("this computer's list answers at once with its own rows; the VM's slice is added when it arrives", async () => {
@@ -224,4 +249,46 @@ test("by the relay every call says its workspace: making one its own included; t
   const scoped = setup({ cmp_vm: refusing("command_not_allowed", { command: "rename_session", scope: "machine" }) });
   await scoped.router.handle("list_workspaces");
   await assert.rejects(scoped.router.handle("rename_session", { project: "p1", id: "cmp_vm~t1", title: "x" }, on("cmp_vm")), (e: { what: { clave: string } }) => e.what.clave === "shell.service.command");
+});
+
+test("CASE 3: a task created on the VM from this window's space lands in THAT space, shared first with the account", async () => {
+  const vm = fakeLink({
+    send_message: "t9",
+    list_live_sessions: [{ ...row("t9", "vm"), space: "s1" }],
+  });
+  const { router, fleet, native } = setup(
+    { cmp_vm: vm },
+    {
+      share_space: { id: "s1", name: "Trabajo", folders: [], created_at: 1, updated_at: 1, account: true },
+      list_live_sessions: [],
+    },
+  );
+  fleet.setRegistry([{ id: "w", name: "W", projects: [], computers: ["cmp_vm"] }]);
+  await router.handle("list_workspaces");
+  const task = await router.handle("send_message", { provider: "claude", project: "p1", session: null, prompt: "hola", space: "s1" }, on("cmp_vm"));
+  assert.equal(task, "cmp_vm~t9");
+  const shared = native.findIndex((c) => c.command === "share_space");
+  assert.ok(shared >= 0, "this computer shares its space with the account before");
+  assert.deepEqual(native[shared].args, { id: "s1" });
+  const sent = vm.calls.find((c) => c.command === "send_message");
+  assert.equal(sent?.args.space, "s1", "the VM gets the same space id");
+
+  // The VM's row names that same space, bare: the window paints it in that space.
+  await router.handle("list_live_sessions", { project: "p1" });
+  await sleep(300);
+  const rows = (await router.handle("list_live_sessions", { project: "p1" })) as { id: string; space: string }[];
+  assert.deepEqual(rows.map((r) => [r.id, r.space]), [["cmp_vm~t9", "s1"]]);
+
+  // Once shared, the next one does not ask again.
+  await router.handle("send_message", { provider: "claude", project: "p1", session: null, prompt: "otra", space: "s1" }, on("cmp_vm"));
+  assert.equal(native.filter((c) => c.command === "share_space").length, 1);
+});
+
+test("a space that cannot be shared (workspace without account, older engine) is not sent: the task is born as before", async () => {
+  const vm = fakeLink({ send_message: "t9" });
+  const { router, fleet } = setup({ cmp_vm: vm });
+  fleet.setRegistry([{ id: "w", name: "W", projects: [], computers: ["cmp_vm"] }]);
+  await router.handle("list_workspaces");
+  await router.handle("send_message", { provider: "claude", project: "p1", session: null, prompt: "hola", space: "s1" }, on("cmp_vm"));
+  assert.equal(vm.calls.find((c) => c.command === "send_message")?.args.space, null);
 });
