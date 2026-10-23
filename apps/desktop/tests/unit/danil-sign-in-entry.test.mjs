@@ -105,15 +105,15 @@ test("«Personaliza» no ofrece Danil: queda en Configuración, y «Empezar» en
   assert.deepEqual(fallos, []);
 });
 
-test("el pie de la barra lateral dice si hay sesión de Danil y abre su sección", async () => {
+test("el pie de la barra lateral solo aparece con sesión de Danil y abre su sección", async () => {
   const engine = danil({ state: "disconnected", name: "alberto-mbp" });
   const app = await boot("listo", "danil-footer", { ...WITH_SPACE, ...engine.table });
   const { w } = app;
   await sleep(800);
   const foot = () => w.document.querySelector("[data-danil-foot]");
-  assert.equal(foot()?.dataset.danilFoot, "disconnected", w.document.body.innerHTML.slice(0, 400));
-  assert.equal(foot().textContent.trim(), "Iniciar sesión");
-  assert.equal(foot().getAttribute("title"), "Iniciar sesión con Danil");
+  assert.equal(foot(), null, "without a session there is nothing: signing in is in Settings");
+  assert.ok(!w.document.body.textContent.includes("Iniciar sesión"), "no sign-in button in the sidebar");
+  assert.ok(w.document.querySelector('[aria-label="Configuración"]'), "the footer's other items stay");
 
   engine.become(app, { state: "connected", computer_id: "cmp_1", name: "Mac", email: "alberto@danil.ai", online: true });
   await sleep(300);
@@ -129,6 +129,10 @@ test("el pie de la barra lateral dice si hay sesión de Danil y abre su sección
   foot().click();
   await sleep(800);
   assert.equal(w.document.querySelector("[data-danil-account]")?.dataset.danilAccount, "connected", "the click opens Settings at the section");
+
+  engine.become(app, { state: "disconnected", name: "alberto-mbp" });
+  await sleep(300);
+  assert.equal(foot(), null, "signing out takes it away");
 });
 
 test("sin el flujo en el motor el pie no muestra la entrada", async () => {

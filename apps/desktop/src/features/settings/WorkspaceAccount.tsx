@@ -16,11 +16,15 @@ import { LICENSE_REQUIRED, startTrialInBrowser, TerminusLicense } from "./Termin
 
 /** El valor del selector que no es una cuenta: abre el inicio de sesión de otra. */
 const OTHER = "+other";
+/** «Sin cuenta»: el workspace no se sincroniza con ninguna. */
+const NONE = "";
 
 export default function WorkspaceAccount(props: { workspace: string; name: string }) {
   const accounts = createDanilAccounts({ workspace: () => props.workspace });
   const [saving, setSaving] = createSignal(false);
   const [problem, setProblem] = createSignal<string | null>(null);
+  /** Quitarlo de su cuenta lo saca de su web y su teléfono: se confirma antes. */
+  const [leaving, setLeaving] = createSignal(false);
 
   const choices = () => accountChoices(accounts.sessions(), accounts.of());
   const current = () => accounts.of()?.account ?? "";
@@ -38,6 +42,7 @@ export default function WorkspaceAccount(props: { workspace: string; name: strin
     const l = line();
     if (l.kind === "synced") return t("danil.workspace.synced", { email: l.email });
     if (l.kind === "unlinked") return t("danil.workspace.unlinked", { email: l.email });
+    if (l.kind === "none") return t("danil.workspace.no_account");
     return l.email ? t("danil.workspace.unsynced_account", { email: l.email }) : t("danil.workspace.unsynced");
   };
   /** Un código que el catálogo no conoce dice que no se pudo cambiar, no que falló iniciar sesión. */
@@ -55,7 +60,18 @@ export default function WorkspaceAccount(props: { workspace: string; name: strin
       select.value = current();
       return;
     }
-    if (!value || value === current()) return;
+    if (value === current()) return;
+    if (value === NONE) {
+      select.value = current();
+      setProblem(null);
+      setLeaving(true);
+      return;
+    }
+    setLeaving(false);
+    await change(value, select);
+  }
+
+  async function change(value: string | null, select?: HTMLSelectElement) {
     setSaving(true);
     setProblem(null);
     try {
@@ -63,7 +79,7 @@ export default function WorkspaceAccount(props: { workspace: string; name: strin
       accounts.setOf(result);
       setProblem(changeProblem(result));
     } catch (e) {
-      select.value = current();
+      if (select) select.value = current();
       setProblem(changeProblem(null, e));
     } finally {
       setSaving(false);
@@ -104,8 +120,29 @@ export default function WorkspaceAccount(props: { workspace: string; name: strin
                 </option>
               )}
             </For>
+            <option value={NONE}>{t("danil.workspace.no_account_option")}</option>
             <option value={OTHER}>{t("danil.workspace.connect_other")}</option>
           </Select>
+        </Show>
+        <Show when={leaving()}>
+          <div class="flex flex-wrap items-center gap-2" data-workspace-leave="">
+            <span class="text-neutral-500">{t("danil.workspace.leave_confirm", { email: accounts.of()?.email || current() })}</span>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={saving()}
+              onClick={() => {
+                setLeaving(false);
+                void change(null, picker);
+              }}
+              data-workspace-leave-yes=""
+            >
+              {t("danil.workspace.leave_yes")}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setLeaving(false)}>
+              {t("danil.workspace.leave_no")}
+            </Button>
+          </div>
         </Show>
         <p class="m-0 text-neutral-500" data-workspace-sync="">
           {lineText()}

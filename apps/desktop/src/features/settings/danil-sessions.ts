@@ -31,7 +31,7 @@ export type DanilSessionInfo = {
 };
 
 export type WorkspaceAccount = {
-  /** La cuenta del workspace; `null` sin ninguna sesión. */
+  /** La cuenta del workspace; `null` si no es de ninguna (nadie la eligió). */
   account: string | null;
   email: string | null;
   /** Si esa cuenta tiene sesión aquí; sin ella no se sincroniza. */
@@ -113,14 +113,17 @@ export function sessionForWorkspace(list: DanilSessionInfo[] | null | undefined,
 /**
  * La línea de solo lectura del workspace: con quién se sincroniza; `unlinked`
  * si su cuenta tiene sesión pero el plano de control todavía no lo unió (o no
- * lo deja, `workspace_id_taken`); `unsynced` si su cuenta no tiene sesión aquí.
+ * lo deja, `workspace_id_taken`); `unsynced` si su cuenta no tiene sesión aquí;
+ * `none` si no es de ninguna cuenta.
  */
 export type SyncLine =
   | { kind: "synced"; email: string }
   | { kind: "unlinked"; email: string }
-  | { kind: "unsynced"; email: string | null };
+  | { kind: "unsynced"; email: string | null }
+  | { kind: "none" };
 
 export function syncLine(of: WorkspaceAccount | null, list: DanilSessionInfo[] | null | undefined): SyncLine {
+  if (of && !of.account) return { kind: "none" };
   const session = of?.signed_in ? sessionOf(list, of.account) : null;
   const email = of?.email?.trim() || (session ? accountLabel(session) : "");
   if (of?.signed_in && email) return { kind: of.linked ? "synced" : "unlinked", email };
@@ -154,7 +157,10 @@ export const setDefaultAccount = (account: string) => invoke<DanilSessionInfo[]>
 
 export const signOutAccount = (account: string) => invoke<DanilConnectStatus>("danil_disconnect", { account });
 
-/** `account: null` vuelve a la principal. La respuesta trae `error` si no se pudo unir en la nueva. */
+/**
+ * `account: null` lo deja sin cuenta: sale de la anterior (de su web y su
+ * teléfono) sin cerrar su sesión. La respuesta trae `error` si no se pudo unir en la nueva.
+ */
 export function setWorkspaceAccount(workspace: string, account: string | null): Promise<WorkspaceAccount> {
   return invoke<WorkspaceAccount>("danil_workspace_set_account", { workspace, account });
 }

@@ -117,6 +117,7 @@ test("a workspace talks as its account; signed out, as nobody", async () => {
   }, "signed in but not joined (workspace_id_taken) is not called synced");
   assert.deepEqual(syncLine({ account: "u_ytw", email: "a@ytw.mx", signed_in: false, linked: false }, list), { kind: "unsynced", email: "a@ytw.mx" });
   assert.deepEqual(syncLine(null, list), { kind: "unsynced", email: null });
+  assert.deepEqual(syncLine({ account: null, email: null, signed_in: false, linked: false }, list), { kind: "none" }, "nobody chose an account");
 });
 
 test("adding an account starts the flow with add and opens the approval page", async () => {

@@ -327,6 +327,20 @@ test("con una sesión por cuenta, la sección lista las cuentas, agrega otra, ca
   app.emit("danil-sessions", sessions);
   button(card("u_alberto"), "Cerrar sesión").click();
   await settle();
+  assert.ok(!calls.some((c) => c.command === "danil_disconnect"), "signing out asks first");
+  assert.ok(
+    card("u_alberto").textContent.includes("Cerrar sesión deja sin sincronizar su workspace en esta computadora."),
+    card("u_alberto").textContent,
+  );
+  assert.ok(card("u_alberto").textContent.includes("elige «Sin cuenta» en Workspaces"), "it says how to remove just one");
+  button(card("u_alberto"), "Cancelar").click();
+  await settle();
+  assert.equal(card("u_alberto").querySelector("[data-danil-sign-out-confirm]"), null, "cancel leaves it signed in");
+  assert.ok(!calls.some((c) => c.command === "danil_disconnect"));
+  button(card("u_alberto"), "Cerrar sesión").click();
+  await settle();
+  card("u_alberto").querySelector("[data-danil-sign-out-yes]").click();
+  await settle();
   assert.deepEqual(calls.find((c) => c.command === "danil_disconnect")?.args, { account: "u_alberto" }, "only that account");
   assert.equal(panel().querySelectorAll("[data-danil-session]").length, 1);
   assert.ok(!panel().textContent.includes("Principal"), "with one account left there is no badge");
