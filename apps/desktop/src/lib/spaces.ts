@@ -1,5 +1,4 @@
 import { t } from "./i18n.ts";
-import { escribirPref, leerPref } from "./prefs.ts";
 
 /**
  * Los espacios de la ventana: espejo de `workspace/spaces.rs`. La
@@ -15,6 +14,8 @@ export type Space = {
   folders: string[];
   created_at: number;
   updated_at: number;
+  /** De la cuenta de Danil: el mismo id en todas las máquinas del workspace. */
+  account?: boolean;
 };
 
 export type SpaceRef = { id: string; name: string | null; deleted?: boolean };
@@ -47,50 +48,29 @@ type Fila = {
   machine?: string | null;
 };
 
-const TASK_SPACES = "machines.task_spaces";
-
-/**
- * El escritorio de esta ventana donde se creó una tarea de otra máquina. Esa
- * máquina no conoce los spaces de aquí y la guarda en el suyo; hasta que los
- * spaces sean de la cuenta, la ventana recuerda dónde nació.
- */
-export function rememberTaskSpace(task: string, space: string) {
-  const kept = Object.entries({ ...leerPref<Record<string, string>>(TASK_SPACES, {}), [task]: space }).slice(-500);
-  escribirPref(TASK_SPACES, Object.fromEntries(kept));
-}
-
-/** Deja de recordarlo: la tarea vuelve al space de su máquina. */
-export function forgetTaskSpace(task: string) {
-  const all = leerPref<Record<string, string>>(TASK_SPACES, {});
-  if (!(task in all)) return;
-  delete all[task];
-  escribirPref(TASK_SPACES, all);
-}
-
-const originSpace = (row: Fila): string | null =>
-  row.machine && row.id ? (leerPref<Record<string, string>>(TASK_SPACES, {})[row.id] ?? null) : null;
-
 export const spaceName = (i: { name: string | null } | null | undefined) =>
   i?.name ?? t("spaces.default_name");
 
 /**
  * Si la fila se pinta en el escritorio `desk`. Sin escritorio se pinta todo.
- * Una tarea de otra máquina creada desde aquí va en el escritorio donde nació;
- * las demás, en el space de su máquina.
+ * Una tarea de otra máquina en un space de la cuenta trae el mismo id que aquí;
+ * en uno que solo tiene esa máquina, el de esa máquina (con su prefijo).
  */
 export function enEscritorio(row: Fila, desk: string | null): boolean {
   if (desk === null) return true;
-  const origin = originSpace(row);
-  if (origin) return origin === desk;
   return !row.space || row.space === desk;
 }
 
-/** De qué escritorio vivo es la fila, o `null` si de ninguno en concreto. */
+/**
+ * De qué escritorio vivo es la fila, o `null` si de ninguno en concreto. Una
+ * tarea de otra máquina en un space que solo tiene esa máquina no lleva a
+ * ninguno: abrirla no saca a la persona del escritorio donde la ve.
+ */
 export function escritorioDeFila(row: Fila | undefined, vivas: readonly Space[]): string | null {
-  const origin = row ? originSpace(row) : null;
-  if (origin) return vivas.some((i) => i.id === origin) ? origin : null;
   if (!row || !row.space) return null;
-  return vivas.some((i) => i.id === row.space) ? row.space : null;
+  const viva = vivas.find((i) => i.id === row.space);
+  if (!viva || (row.machine && !viva.account)) return null;
+  return viva.id;
 }
 
 /**

@@ -5949,6 +5949,22 @@
     {
       "async": false,
       "channel": null,
+      "kind": "invoke",
+      "name": "share_space",
+      "output": "-> Result < Space , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "spaces::share_space",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
       "kind": "desktop",
       "name": "site_close",
       "output": "-> Result < () , String >",

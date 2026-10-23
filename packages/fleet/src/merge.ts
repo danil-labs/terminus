@@ -25,6 +25,8 @@ export type MergeContext = {
   order: readonly string[];
   /** El registro de la cuenta, o `null` si el plano de control no lo dice. */
   registry: readonly AccountWorkspace[] | null;
+  /** Si `space` es un space compartido con la cuenta: el mismo id en todas, sin prefijo. */
+  shared?: (space: string) => boolean;
 };
 
 /** Llaves cuyo texto es un id de la máquina que lo mandó. */
@@ -37,7 +39,9 @@ const ROW_IDS = new Set(["list_portfolios", "list_live_sessions", "list_spaces"]
 /** Respuestas con un objeto por id de tarea. */
 const KEYED = new Set(["list_session_git"]);
 /** Respuestas que son un objeto con su propio id. */
-const OWN_ID = new Set(["load_session", "add_account", "create_space", "rename_space", "set_space_folders", "move_task_to_space"]);
+const OWN_ID = new Set(["load_session", "add_account", "create_space", "rename_space", "set_space_folders", "move_task_to_space", "share_space"]);
+/** Respuestas que son un space o una lista de spaces. */
+const SPACES = new Set(["list_spaces", "create_space", "rename_space", "set_space_folders", "move_task_to_space", "share_space"]);
 /** Filas que la barra marca con su máquina. */
 const TAGGED = new Set(["list_live_sessions"]);
 
@@ -53,6 +57,7 @@ export function encode(ctx: MergeContext, machine: string, value: unknown, comma
   const walk = (v: unknown, key: string | null): unknown => {
     if (typeof v === "string") {
       if (!key || !v) return v;
+      if (key === "space" && ctx.shared?.(v)) return v;
       return KEYS.has(key) || (FILES.has(key) && isPath(v)) ? wrap(machine, v) : v;
     }
     if (Array.isArray(v)) return v.map((x) => walk(x, key));
@@ -60,7 +65,9 @@ export function encode(ctx: MergeContext, machine: string, value: unknown, comma
     return v;
   };
   const out = walk(value, null);
-  const ownId = (row: Row) => (typeof row.id === "string" ? { ...row, id: wrap(machine, row.id) } : row);
+  // Un space compartido (`account`, o uno que el registro conoce) conserva su id.
+  const sharedRow = (row: Row) => SPACES.has(command) && typeof row.id === "string" && (row.account === true || !!ctx.shared?.(row.id));
+  const ownId = (row: Row) => (typeof row.id === "string" && !sharedRow(row) ? { ...row, id: wrap(machine, row.id) } : row);
   if (ROW_IDS.has(command) && Array.isArray(out)) return out.map((r) => (isRow(r) ? ownId(r) : r));
   if (OWN_ID.has(command) && isRow(out)) return ownId(out);
   if (KEYED.has(command) && isRow(out)) return Object.fromEntries(Object.entries(out).map(([id, v]) => [wrap(machine, id), v]));
@@ -95,6 +102,7 @@ export function merge(ctx: MergeContext, command: string, slices: readonly Slice
   const parts = sorted(ctx, slices);
   if (command === "list_workspaces" || command === "workspaces_startup") return mergeWorkspaces(ctx, parts);
   if (command === "list_projects") return parts.length || inRegistry(ctx, workspace) ? mergeProjects(ctx, parts, workspace) : undefined;
+  if (command === "list_spaces") return mergeSpaces(ctx, parts, workspace);
   if (!parts.length) return undefined;
   if (command === "list_workspace_attention") return joinAttention(parts.map((s) => ({ machine: s.machine, entries: entriesOf(encode(ctx, s.machine, s.value)) })));
   const encoded = parts.map((s) => {
@@ -114,6 +122,32 @@ export function merge(ctx: MergeContext, command: string, slices: readonly Slice
     return joined;
   }
   return encoded.find((p) => p !== null && p !== undefined) ?? null;
+}
+
+/**
+ * Un space por id: los compartidos salen una vez aunque los listen todas las
+ * máquinas (gana la copia con el `updated_at` más nuevo); los de una sola
+ * máquina, con su prefijo. Sin ventana (la web), los compartidos que el
+ * registro conoce salen aunque ninguna máquina conteste.
+ */
+function mergeSpaces(ctx: MergeContext, parts: Slice[], workspace: string | null): unknown {
+  const known = (workspace && ctx.registry?.find((w) => w.id === workspace)?.spaces) || [];
+  const fromRegistry = ctx.self === null ? known : [];
+  if (!parts.length && !fromRegistry.length) return undefined;
+  const rows = new Map<string, Row>();
+  const stamp = (r: Row) => (typeof r.updated_at === "number" ? r.updated_at : 0);
+  for (const s of parts) {
+    const value = encode(ctx, s.machine, s.value, "list_spaces");
+    if (!Array.isArray(value)) continue;
+    for (const r of value) {
+      if (!isRow(r) || typeof r.id !== "string") continue;
+      const before = rows.get(r.id);
+      if (!before || stamp(r) > stamp(before)) rows.set(r.id, before ? { ...r } : r);
+    }
+  }
+  for (const s of fromRegistry)
+    if (!rows.has(s.id)) rows.set(s.id, { id: s.id, name: s.name, folders: s.folders, created_at: s.position, updated_at: s.changed_at, account: true });
+  return [...rows.values()];
 }
 
 const inRegistry = (ctx: MergeContext, workspace: string | null) => !!workspace && !!ctx.registry?.some((w) => w.id === workspace);

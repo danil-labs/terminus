@@ -473,8 +473,10 @@ export function createWebTransport(
     let route: ReturnType<Fleet["route"]>;
     try {
       route = fleet.route(command, args, workspace, chosen && fleet.info(chosen) ? chosen : null, fallback(workspace, args.project));
-    } catch {
-      throw { what: t("web.machines.cross_machine"), detail: "cross_machine" };
+    } catch (error) {
+      // La interfaz nunca ofrece mezclar máquinas: llegar aquí es un bug.
+      console.error("[máquinas] bug: cross_machine", command, error);
+      throw { what: { clave: "shell.service.failed" }, detail: "cross_machine" };
     }
     if ("fan" in route) return fan(command, route.fan, route.args, workspace);
     let target = route.workspace;

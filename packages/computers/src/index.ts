@@ -1,5 +1,6 @@
 export {
   type AccountProject,
+  type AccountSpace,
   type AccountWorkspace,
   type Answer,
   type Computer,
