@@ -213,6 +213,8 @@ import {
   carpetasDelEscritorio,
   enEscritorio,
   escritorioDeFila,
+  forgetTaskSpace,
+  rememberTaskSpace,
   type Space,
   spaceName,
 } from "../lib/spaces";
@@ -898,7 +900,18 @@ export default function App() {
 
   async function moveToSpace(project: string, id: string, space: string) {
     try {
+      const machine = filaDe(id)?.machine ?? null;
+      const target = spaces().find((i) => i.id === space);
+      // Una tarea de otra máquina a un space de esta ventana: esa máquina no lo
+      // conoce, así que la ventana recuerda dónde va (`lib/spaces.ts`).
+      if (machine && target && capabilities().taskMachine?.(space) !== machine) {
+        rememberTaskSpace(id, space);
+        setSesiones((prev) => ({ ...prev }));
+        setAviso({ texto: t("spaces.move.toast", { name: spaceName(target) }), boton: t("spaces.toast.go"), ir: () => void abrirSesion(project, id) });
+        return;
+      }
       const destino = await invoke<{ id: string; name: string | null }>("move_task_to_space", { project, id, space });
+      if (machine) forgetTaskSpace(id);
       await refreshSessions(grupos());
       setAviso({
         texto: t("spaces.move.toast", { name: spaceName(destino) }),
@@ -5460,6 +5473,11 @@ export default function App() {
         // mensaje; lo que llega de otro canal no trae ninguno.
         space: espacioPara(m.space, opciones?.headers?.["x-terminus-machine"]),
       }, opciones);
+      // Una tarea nueva en otra máquina nace en el space de esa máquina: la
+      // ventana recuerda el escritorio donde se creó (`lib/spaces.ts`).
+      if (!abierta && m.space && opciones?.headers?.["x-terminus-machine"] && !espacioPara(m.space, opciones.headers["x-terminus-machine"])) {
+        rememberTaskSpace(id, m.space);
+      }
       if (provisional && naceDormida) {
         anotar(setEncendiendo, provisional, null);
         void refetchMachines();

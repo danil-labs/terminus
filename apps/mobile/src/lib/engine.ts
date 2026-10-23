@@ -36,7 +36,7 @@ import type {
 } from "@terminus/protocol";
 import { MAX_VISUAL_BYTES, VISUAL_FILE, VISUAL_TREE } from "@terminus/chat/visual";
 import { type AccountWorkspace, groupWorkspaces, linkedAttention, onlyLinked, registryProjects, withRegistry } from "@terminus/computers";
-import { type ChatBackgroundView, chatBackgroundView, isSingleAttention } from "@terminus/protocol";
+import { type ChatBackgroundView, chatBackgroundImageUrl, chatBackgroundView, isSingleAttention } from "@terminus/protocol";
 import { type FlatRow, flattenTasks } from "@terminus/tasks";
 import { type Host, HostError } from "./hosts.ts";
 
@@ -148,10 +148,34 @@ export function withAccountFolders<S extends { folders: Folder[]; spaces: Space[
   return { ...snapshot, folders: [...snapshot.folders, ...extra], spaces: snapshot.spaces.map((s) => ({ ...s, folders: [...s.folders, ...keys] })) };
 }
 
-/** El fondo de los chats del workspace en esa máquina; sin respuesta, ninguno. */
-export async function chatBackgroundOf(host: Host, workspace: string): Promise<ChatBackgroundView> {
+/** El fondo de los chats con `remote`: la imagen en la cuenta de Danil, que se pide con la sesión de la persona. */
+export type ChatBackdropView = ChatBackgroundView & { remote: string | null };
+
+const sameOrigin = (url: string, endpoint: string) => {
+  try {
+    return new URL(url).origin === new URL(endpoint).origin;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Sin patrón elegido, la imagen de la cuenta (`background_url` del registro o
+ * `image_url` del motor) manda sobre la copia en línea. Solo del plano de
+ * control: la sesión no va a otro origen.
+ */
+export function withAccountBackground(answer: unknown, accountUrl: string | null, endpoint: string): ChatBackdropView {
+  const view = chatBackgroundView(answer);
+  if (view.preset) return { ...view, remote: null };
+  const remote = [accountUrl, chatBackgroundImageUrl(answer)].find((u): u is string => !!u && sameOrigin(u, endpoint)) ?? null;
+  return { ...view, remote };
+}
+
+/** El fondo de los chats del workspace en esa máquina y en la cuenta; sin ninguno, ninguno. */
+export async function chatBackgroundOf(host: Host, workspace: string, accountUrl: string | null = null, endpoint = ""): Promise<ChatBackdropView> {
   const at = { cachedAt: null as number | null };
-  return chatBackgroundView(await read<unknown>(host, "chat_background", workspace, {}, null, at).catch(() => null));
+  const answer = await read<unknown>(host, "chat_background", workspace, {}, null, at).catch(() => null);
+  return withAccountBackground(answer, accountUrl, endpoint);
 }
 
 /**

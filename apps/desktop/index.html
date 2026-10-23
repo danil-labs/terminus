@@ -57,6 +57,9 @@
                                    `sandbox` ni la política del propio documento
                                    alcanzan ese caso: un marco siempre puede
                                    navegarse a sí mismo. Ver `tests/security/README.md`.
+                                   `terminus-page` es la vista previa de un `.html`
+                                   de la tarea (`page_preview.rs`): solo sirve
+                                   archivos de esa carpeta, no lleva a la red.
          · `base-uri` y `form-action` en `'none'`
                                    no heredan de `default-src`, así que quedarían
                                    abiertas. Los cinco formularios de la app llaman
@@ -68,7 +71,7 @@
          sistema. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; script-src-elem 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: terminus-image: http://terminus-image.localhost; font-src 'self' data:; media-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https://computers.danil.ai wss://computers.danil.ai; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
+      content="default-src 'self'; script-src 'self'; script-src-elem 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: terminus-image: http://terminus-image.localhost; font-src 'self' data:; media-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https://computers.danil.ai wss://computers.danil.ai; frame-src 'self' terminus-page: http://terminus-page.localhost; object-src 'none'; base-uri 'none'; form-action 'none'"
     />
     <title>Terminus</title>
   </head>
