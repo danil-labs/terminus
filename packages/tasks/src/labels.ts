@@ -59,7 +59,11 @@ export function groupLabel(
     case "machine": return group.key ? machineName(group.key) : word(lang, "shell.sidebar.view.this_machine");
     case "section": return sectionLabel(lang, group.key as SidebarSection);
     case "status": return statusGroupLabel(lang, group.key as SidebarStatusKey);
-    case "folder": return group.key ? folderName(group.key) : word(lang, "shell.sidebar.view.no_folder");
+    case "folder": {
+      const folder = group.key ? folderName(group.key) : word(lang, "shell.sidebar.view.no_folder");
+      if (group.machine === undefined) return folder;
+      return `${folder} · ${(group.machine && machineName(group.machine)) || word(lang, "shell.sidebar.view.this_machine")}`;
+    }
     default: return group.key || word(lang, "shell.sidebar.view.no_agent");
   }
 }

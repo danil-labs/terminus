@@ -4230,6 +4230,14 @@ export default function App() {
     return hablandoCon();
   });
 
+  /**
+   * Una carpeta con tareas en varias máquinas se parte en un grupo por máquina
+   * en el riel: lo que se empieza desde un grupo corre en la suya (`""` es esta).
+   */
+  function enLaMaquinaDelGrupo(machine: string | undefined) {
+    if (machine !== undefined) setRunOn(workspaceActivo(), machine || null);
+  }
+
   function nuevaSesion(enProyecto?: string) {
     // Empezar una tarea es cuando más barato sale enterarse de que el
     // material se movió: si esta tarea va a leer un repositorio, ¿está al
@@ -7896,9 +7904,9 @@ export default function App() {
               onAbrirClon={() => setAnadiendoCarpeta(true)}
               proyectoAbierto={proyectoAbierto()}
               carpetaDelBorrador={!proyectoAbierto() && pestanaActiva() === null && !sessionId() && !hablandoCon() ? project() || null : null}
-              onAbrirProyecto={abrirProyecto}
+              onAbrirProyecto={(id, machine) => { abrirProyecto(id); enLaMaquinaDelGrupo(machine); }}
               /* El proyecto viaja en el mismo gesto que abre el borrador. */
-              onNuevaTareaEn={(id) => nuevaSesion(id)}
+              onNuevaTareaEn={(id, machine) => { nuevaSesion(id); enLaMaquinaDelGrupo(machine); }}
               onDelete={(p, id) => borrarSesion(p, id)}
               onMove={(p, id, a) => void moverSesion(p, id, a)}
               onEtapa={(p, id, etapa) => void etaparSesion(p, id, etapa)}

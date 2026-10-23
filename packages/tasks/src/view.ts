@@ -53,12 +53,19 @@ export type SidebarContext<T extends SidebarTask = SidebarTask> = {
   approving: Iterable<string>;
   /** De qué carpeta es la tarea; por omisión `task.folder`. */
   folderOf?: (task: T) => string | null | undefined;
+  /** En qué máquina corre; por omisión `task.machine`, y `""` es esta. */
+  machineOf?: (task: T) => string | null | undefined;
 };
 
 export type SidebarGroup<T> = {
   kind: "section" | "folder" | "status" | "agent" | "machine";
   /** Sección, id de carpeta, estado, nombre de agente o máquina; `""` es sin carpeta, sin agente o esta máquina. */
   key: string;
+  /**
+   * Solo en una carpeta con tareas en más de una máquina: cada máquina es su
+   * propio grupo, porque en disco son clones distintos. `""` es esta máquina.
+   */
+  machine?: string;
   tasks: T[];
 };
 
@@ -195,7 +202,21 @@ export function applySidebarView<T extends SidebarTask>(
     order = [...[...groups.keys()].filter((key) => key !== ""), ""];
   }
   const kind = view.group;
-  return order.filter((key) => groups.has(key)).map((key) => ({ kind, key, tasks: pinnedFirst(groups.get(key)!) }));
+  const machineOf = (task: T) => (ctx.machineOf ? ctx.machineOf(task) : task.machine) ?? "";
+  return order.filter((key) => groups.has(key)).flatMap((key): SidebarGroup<T>[] => {
+    const tasks = groups.get(key)!;
+    // Una carpeta en dos máquinas son dos clones: un grupo por máquina, esta primero
+    // y las demás por su tarea más nueva. En una sola máquina, el grupo de siempre.
+    const byMachine = kind === "folder" && key !== "" ? groupBy(tasks, machineOf) : null;
+    if (!byMachine || byMachine.size < 2) return [{ kind, key, tasks: pinnedFirst(tasks) }];
+    const machines = [...byMachine.keys()].sort((a, b) => Number(b === "") - Number(a === ""));
+    return machines.map((machine) => ({ kind, key, machine, tasks: pinnedFirst(byMachine.get(machine)!) }));
+  });
+}
+
+/** La clave de un grupo para listas y plegado: la de la carpeta, más la máquina si se partió. */
+export function groupKey(group: Pick<SidebarGroup<unknown>, "kind" | "key" | "machine">): string {
+  return group.machine === undefined ? `${group.kind}:${group.key}` : `${group.kind}:${group.key}@${group.machine}`;
 }
 
 /** Cuántas opciones del filtro no están en su valor por defecto: el número del botón. */
