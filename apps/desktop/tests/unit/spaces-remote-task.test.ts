@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import "../helpers/catalog.ts";
-import { carpetasDelEscritorio, enEscritorio } from "../../src/lib/spaces.ts";
+import { carpetasDelEscritorio, enEscritorio, escritorioDeFila } from "../../src/lib/spaces.ts";
 
 test("a task of another machine shows in this window's space although its space is the other machine's", () => {
   assert.equal(enEscritorio({ space: "cmp_vm~jpycve7w", machine: "cmp_vm" }, "esc1"), true);
@@ -14,4 +14,10 @@ test("a task of another machine shows in this window's space although its space 
   const desk = { id: "esc1", name: null, folders: [], created_at: 0, updated_at: 0 };
   const folders = carpetasDelEscritorio([{ id: "p1" }], desk, { p1: [{ space: "cmp_vm~s", machine: "cmp_vm" }] });
   assert.deepEqual(folders.map((p) => p.id), ["p1"], "its folder is listed too");
+});
+
+test("opening a task of another machine does not move the window to that machine's space", () => {
+  const vivas = [{ id: "esc1", name: null, folders: [], created_at: 0, updated_at: 0 }, { id: "cmp_vm~jpycve7w", name: null, folders: [], created_at: 0, updated_at: 0 }];
+  assert.equal(escritorioDeFila({ space: "cmp_vm~jpycve7w", machine: "cmp_vm" }, vivas), null);
+  assert.equal(escritorioDeFila({ space: "esc1" }, vivas), "esc1", "a task of this computer still opens in its space");
 });

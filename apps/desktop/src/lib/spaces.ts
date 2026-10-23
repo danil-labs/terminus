@@ -58,9 +58,13 @@ export function enEscritorio(row: Fila, desk: string | null): boolean {
   return !row.space || row.space === desk;
 }
 
-/** De qué escritorio vivo es la fila, o `null` si de ninguno en concreto. */
+/**
+ * De qué escritorio vivo es la fila, o `null` si de ninguno en concreto. Una
+ * tarea de otra máquina no lleva a ninguno: su space es de esa máquina, y
+ * abrirla no debe sacar a la persona del escritorio donde la ve.
+ */
 export function escritorioDeFila(row: Fila | undefined, vivas: readonly Space[]): string | null {
-  if (!row || !row.space) return null;
+  if (!row || !row.space || row.machine) return null;
   return vivas.some((i) => i.id === row.space) ? row.space : null;
 }
 
