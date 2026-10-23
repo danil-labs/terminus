@@ -117,11 +117,11 @@ export default function GithubAccount(props: {
     setBusy("authorize");
     setFailure(null);
     try {
-      const { url } = githubAuthorizeOf(await invoke("github_account_authorize", { scope: props.scope }));
+      const { url, opened } = githubAuthorizeOf(await invoke("github_account_authorize", { scope: props.scope }));
       if (disposed) return;
       setWaiting(url);
-      // En la web abre otra pestaña; si el navegador la bloquea, queda el enlace de la espera.
-      invoke("open_external", { target: url }).catch(() => {});
+      // Si el motor no la abrió (la web, un motor sin pantalla), se abre aquí; si algo la bloquea, queda el enlace.
+      if (!opened) invoke("open_external", { target: url }).catch(() => {});
       const until = Date.now() + POLL_FOR_MS;
       const reauthorizing = credential()?.status === "reauthorize";
       stopPolling();

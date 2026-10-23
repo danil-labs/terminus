@@ -47,7 +47,8 @@ export type GithubInstallation = {
 
 export type GithubInstallations = { installations: GithubInstallation[]; install_url: string | null };
 
-export type GithubAuthorize = { url: string; expires_at: string | null };
+/** `opened`: el motor ya abrió el navegador (escritorio); el Worker nunca lo dice. */
+export type GithubAuthorize = { url: string; expires_at: string | null; opened: boolean };
 
 /** La respuesta de una ruta de GitHub; `failed` conserva el código del Worker (`github_not_connected`, `license_required`…). */
 export type GithubAnswer<T> =
@@ -157,7 +158,7 @@ export function githubInstallationsOf(raw: unknown): GithubInstallations {
 
 export function githubAuthorizeOf(raw: unknown): GithubAuthorize {
   if (!isObj(raw) || !str(raw.url)) throw new Error("bad_github_authorize");
-  return { url: raw.url as string, expires_at: str(raw.expires_at) };
+  return { url: raw.url as string, expires_at: str(raw.expires_at), opened: raw.opened === true };
 }
 
 const routeOf = (workspace: string) => `/v1/workspaces/${encodeURIComponent(workspace)}/github`;

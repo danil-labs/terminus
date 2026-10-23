@@ -185,6 +185,19 @@ test("a local connection with an empty account offers to move it, and connecting
   assert.deepEqual(app.fallos, []);
 });
 
+test("when the engine already opened the browser the card does not open it again, and keeps the link", async () => {
+  const e = engine({ status: { connected: false, credential: null, install_url: null } });
+  e.table.github_account_authorize = () => ({ url: "https://github.com/login/oauth/authorize?state=s", expires_at: null, opened: true });
+  const app = await openSources("github-account-opened", e);
+  const { w } = app;
+  buttonIn(card(w), "Conectar con GitHub").click();
+  await sleep(300);
+  assert.ok(!e.calls.some((c) => c.command === "open_external"), "only one tab");
+  const link = [...card(w).querySelectorAll("a")].find((a) => a.textContent === "Abrir GitHub");
+  assert.equal(link?.getAttribute("href"), "https://github.com/login/oauth/authorize?state=s");
+  assert.deepEqual(app.fallos, []);
+});
+
 test("a connection GitHub stopped accepting asks to reconnect", async () => {
   const e = engine({ status: { connected: true, credential: { ...CREDENTIAL, status: "reauthorize" }, install_url: null } });
   const app = await openSources("github-account-reauthorize", e);

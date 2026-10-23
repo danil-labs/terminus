@@ -75,7 +75,7 @@ test("sin credencial no hay conexión, y reautorizar se distingue", async () => 
 test("autorizar manda return_to solo si lo hay; sin él el Worker usa su página", async () => {
   const seen: Seen[] = [];
   const web = await githubAuthorize(source(200, { url: "https://github.com/login/oauth/authorize?x=1", expires_at: "2026-10-23T01:00:00Z" }, seen), "w", "https://app.danil.ai/terminus/");
-  assert.deepEqual(web, { kind: "ok", value: { url: "https://github.com/login/oauth/authorize?x=1", expires_at: "2026-10-23T01:00:00Z" } });
+  assert.deepEqual(web, { kind: "ok", value: { url: "https://github.com/login/oauth/authorize?x=1", expires_at: "2026-10-23T01:00:00Z", opened: false } });
   assert.equal(seen[0]?.url, "https://computers.example/v1/workspaces/w/github/authorize");
   assert.equal(seen[0]?.method, "POST");
   assert.equal(seen[0]?.headers?.["content-type"], "application/json");
