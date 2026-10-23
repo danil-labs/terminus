@@ -1138,6 +1138,11 @@
           "key": "id",
           "name": "id",
           "type": "Option < String >"
+        },
+        {
+          "key": "directory",
+          "name": "directory",
+          "type": "Option < String >"
         }
       ],
       "path": "projects::create_project",
@@ -3683,6 +3688,32 @@
         }
       ],
       "path": "development::preview_tree_files",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "preview_tree_folder",
+      "output": "-> Result < PaginaDeCarpeta , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        },
+        {
+          "key": "offset",
+          "name": "offset",
+          "type": "u32"
+        }
+      ],
+      "path": "development::preview_tree_folder",
       "scope": "workspace"
     },
     {
@@ -6901,6 +6932,42 @@
         }
       ],
       "path": "development::tree_files",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "tree_folder",
+      "output": "-> Result < PaginaDeCarpeta , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "tree",
+          "name": "tree",
+          "type": "String"
+        },
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        },
+        {
+          "key": "offset",
+          "name": "offset",
+          "type": "u32"
+        }
+      ],
+      "path": "development::tree_folder",
       "scope": "workspace"
     },
     {

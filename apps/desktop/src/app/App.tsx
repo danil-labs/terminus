@@ -565,6 +565,10 @@ export default function App() {
     (proyectoDeLaVista() !== null || viendoArchivadas()) &&
     !!sitio &&
     sameSite(sitio, paneles.activeSite());
+  /** La pestaña que se ve en `sitio`: ninguna cuando Archivadas o la página
+   *  de un proyecto la tapan, aunque siga siendo la activa de su ventana. */
+  const pestanaDelanteEn = (sitio: SitioDePanel) =>
+    tapadoPorElProyecto(sitio) ? null : paneles.activeTabAt(sitio);
   /** Sitios sin pestaña delante, restando el que ocupa la vista de proyecto. */
   const sitiosEnBlanco = () =>
     paneles
@@ -6575,6 +6579,9 @@ export default function App() {
            conversación». La caja es la misma instancia al cambiar de tarea:
            sin esto el fondo del hilo anterior quedaría puesto. */
         conversacion={pp.sesion ?? ""}
+        /* Sin fila todavía es la que acaba de nacer vacía (`crearEnTareaVacia`). */
+        sinEmpezar={!!pp.sesion && (filaDe(pp.sesion)?.turns ?? 0) === 0 && !filaDe(pp.sesion)?.chat_de_agente
+          && !vivas().includes(pp.sesion) && cargandoHilo() !== pp.sesion}
         lectura={lecturaDeLaCelda()}
         onLectura={(lectura) => guardarLectura(pp.sesion, lectura)}
         chatEncargado={identidadVisualDeLaCelda()}
@@ -6958,7 +6965,7 @@ export default function App() {
                 <TabStrip
                   session={filaDe}
                   tabs={pestanasDe(sitio)}
-                  activeId={paneles.activeTabAt(sitio)}
+                  activeId={pestanaDelanteEn(sitio)}
                   liveIds={vivas()}
                   approvingIds={permissions().map((p) => p.session)}
                   waitingIds={preguntadas()}
@@ -7008,7 +7015,7 @@ export default function App() {
                   <TabStrip
                     session={filaDe}
                     tabs={pestanasDe(sitio)}
-                    activeId={paneles.activeTabAt(sitio)}
+                    activeId={pestanaDelanteEn(sitio)}
                     liveIds={vivas()}
                     approvingIds={permissions().map((p) => p.session)}
                     waitingIds={preguntadas()}
@@ -7177,7 +7184,7 @@ export default function App() {
               <TabStrip
                 session={filaDe}
                 tabs={pestanasDe(sitio)}
-                activeId={paneles.activeTabAt(sitio)}
+                activeId={pestanaDelanteEn(sitio)}
                 liveIds={vivas()}
                 approvingIds={permissions().map((p) => p.session)}
                 waitingIds={preguntadas()}
@@ -7858,6 +7865,7 @@ export default function App() {
               clon={clonEnCurso()}
               onAbrirClon={() => setAnadiendoCarpeta(true)}
               proyectoAbierto={proyectoAbierto()}
+              carpetaDelBorrador={!proyectoAbierto() && pestanaActiva() === null && !sessionId() && !hablandoCon() ? project() || null : null}
               onAbrirProyecto={abrirProyecto}
               /* El proyecto viaja en el mismo gesto que abre el borrador. */
               onNuevaTareaEn={(id) => nuevaSesion(id)}
@@ -8020,7 +8028,8 @@ export default function App() {
           // El backend ya la fijó en el escritorio desde el que se pidió: un
           // clon en segundo plano termina cuando la ventana puede mirar otro.
           await reloadSpaces();
-          if (activate) elegirProyecto(p.id);
+          // Se sigue en «Nueva tarea» dentro de ella; su página queda a un clic en su nombre.
+          if (activate) nuevaSesion(p.id);
         }}
       />
 

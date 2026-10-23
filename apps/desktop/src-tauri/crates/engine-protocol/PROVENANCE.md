@@ -20,7 +20,7 @@ repositories, and `GitHostInfo`. Files on disk keep their keys; the types that
 are stored and also travel cross the contract wrapped in `Wire`, which renames
 their keys. There are no aliases. This copy is byte-identical to the engine's.
 SHA-256:
-`1c992c0df178709623fa5c43072f3425eff93d3bc29794d82ed6ae1dc4799150`.
+`f1550c57089e81a9cf0a261db91eed4bd6d9f0be5b3fb507b7251f1ca521fc3d`.
 
 seldon-host `4e21caf` (#66) added the Danil account (321 commands, 28 events):
 `danil_connect_start`, `danil_connect_status`, `danil_connect_options`,
@@ -193,7 +193,22 @@ relayed call without a workspace answers `command_failed`. #108 adds
 is `git show 5b8f29a:crates/engine-protocol/commands.json` byte for byte; no
 `seldon-runtime` with it is published yet.
 
-seldon-host `feat/referencias-zotero-mendeley` (`5fd3b43`) connects the person's reference libraries (374 commands, 33 events). Zotero, on this machine: `zotero_status` → `{installed, running, version, local_api, installer_bytes}` (`local_api`: `ready`, `disabled` when Zotero's local API is off, `unsupported` for Zotero 6, `unavailable` when Zotero does not answer), and `install_zotero` and `open_zotero` with `scope: "machine"`; `install_size` and `cancel_install` take `"zotero"` and progress goes through the `install` event. Mendeley, in the cloud with the workspace's account: `mendeley_status` → `{app_installed, configured, connected, account, signing_in}`, `mendeley_login` → `{url}`, `cancel_mendeley_login` and `disconnect_mendeley`, all with `{workspace?}`. New event `references` (`{workspace, library, ok, failure}`). This copy is `git show 5fd3b43:crates/engine-protocol/commands.json` byte for byte; no `seldon-runtime` with it is published yet.
+seldon-host `fix/carpetas-nuevas-en-documentos` (`8cb37ac`) adds an optional
+`directory` to `create_project` (`{name, workingDirectory?, space?, id?,
+directory?}`): where a folder created from scratch is born when the person picks
+a location other than the workspace default. Without it nothing changes. The
+same commit makes that default the person's Documents folder
+(`<Documents>/Terminus`) instead of one inside the engine's data.
+
+seldon-host dev `340fe91` (#119) folds heavy and ignored folders in the task
+tree (369 commands). `tree_folder` (`{project, session, tree, path, offset}`)
+and `preview_tree_folder` (`{project, path, offset}`) → `PaginaDeCarpeta`
+`{paths, folders, next, total}` give one level of a folded folder, 300 entries
+per page. `CarpetaDelArbol` gains `lazy` and `ignored`; the manifest keeps only
+type names, so those fields do not move the hash. This copy is
+`git show 340fe91:crates/engine-protocol/commands.json` byte for byte.
+
+seldon-host `feat/referencias-zotero-mendeley` (`0416bb3`, merged with dev `340fe91`) connects the person's reference libraries (376 commands, 33 events). Zotero, on this machine: `zotero_status` → `{installed, running, version, local_api, installer_bytes}` (`local_api`: `ready`, `disabled` when Zotero's local API is off, `unsupported` for Zotero 6, `unavailable` when Zotero does not answer), and `install_zotero` and `open_zotero` with `scope: "machine"`; `install_size` and `cancel_install` take `"zotero"` and progress goes through the `install` event. Mendeley, in the cloud with the workspace's account: `mendeley_status` → `{app_installed, configured, connected, account, signing_in}`, `mendeley_login` → `{url}`, `cancel_mendeley_login` and `disconnect_mendeley`, all with `{workspace?}`. New event `references` (`{workspace, library, ok, failure}`). This copy is `git show 0416bb3:crates/engine-protocol/commands.json` byte for byte; no `seldon-runtime` with it is published yet.
 
 Endpoint, selection and StreamPage extend the transport; they do not convert
 domain data. The token travels in RPC1 only between authenticated local

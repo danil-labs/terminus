@@ -228,3 +228,29 @@ test("buscar el nombre de una carpeta deja el subárbol entero", () => {
   if (hallado[0].tipo !== "carpeta") return;
   assert.ok(hallado[0].hijos.some((n) => n.ruta === "src/ui/Badge.tsx" || n.tipo === "carpeta"));
 });
+
+test("una carpeta pesada sale plegada y se llena con sus páginas sin perder la marca de ignorada", () => {
+  const carpetas = [
+    { path: ".venv", repo: false, lazy: true, ignored: true },
+    { path: "node_modules", repo: false, lazy: true, ignored: false },
+  ];
+  const plegado = construir(["main.py"], [], carpetas);
+  const venv = buscar(plegado, ".venv");
+  assert.ok(venv?.tipo === "carpeta" && venv.plegada && venv.ignorada && venv.hijos.length === 0);
+  const deps = buscar(plegado, "node_modules");
+  assert.ok(deps?.tipo === "carpeta" && deps.plegada && !deps.ignorada);
+
+  // Lo que dan las páginas de `tree_folder`: un nivel cada vez, subcarpetas plegadas.
+  const nivel = [{ path: ".venv/lib", repo: false, lazy: true, ignored: false }];
+  const sitio = [{ path: ".venv/lib/site-packages", repo: false, lazy: true, ignored: false }];
+  const paginas = Array.from({ length: 1500 }, (_, i) => `.venv/lib/site-packages/m${String(i).padStart(4, "0")}.py`);
+  const abierto = construir(["main.py", ".venv/pyvenv.cfg", ...paginas], [], [...carpetas, ...nivel, ...sitio]);
+  const lib = buscar(abierto, ".venv/lib");
+  assert.ok(lib?.tipo === "carpeta" && lib.nombre === "lib" && lib.ignorada, "una plegada no se compacta con su hija");
+  const site = buscar(abierto, ".venv/lib/site-packages");
+  assert.ok(site?.tipo === "carpeta" && site.ignorada && site.hijos.length === 1500);
+  assert.equal(site.hijos[0].ruta, ".venv/lib/site-packages/m0000.py");
+  const main = buscar(abierto, "main.py");
+  assert.ok(main?.tipo === "archivo");
+  assert.equal(abierto[abierto.length - 1].ruta, "main.py");
+});

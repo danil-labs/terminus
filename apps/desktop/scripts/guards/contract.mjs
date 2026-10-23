@@ -22,8 +22,8 @@ const LOCK = fileURLToPath(new URL("../../seldon-runtime.lock", import.meta.url)
 
 /** El contrato copiado cuyo motor aún no tiene release publicada, y qué falta. */
 const MOTOR_PENDIENTE = {
-  contract: "1c992c0df178709623fa5c43072f3425eff93d3bc29794d82ed6ae1dc4799150",
-  why: "el aislamiento del relay y la memoria sincronizada (seldon-host integration/plan-multi-machine: #106, #110, #108), llevar y traer trabajo entre máquinas (work_*, seldon-host #84–#87), una sesión de Danil por cuenta (feat/danil-session-per-account), el onboarding (#91), Google Drive (#92), Google Drive para escritorio (#95), el modelo local activo (#98), «Usar el GitHub de esta computadora» (#100), la tarea vacía de la vista previa (create_empty_session, seldon-host feat/tarea-vacia) y las bibliotecas de referencias Zotero y Mendeley (seldon-host feat/referencias-zotero-mendeley): falta publicar seldon-runtime con ellos y fijarlo en seldon-runtime.lock",
+  contract: "f1550c57089e81a9cf0a261db91eed4bd6d9f0be5b3fb507b7251f1ca521fc3d",
+  why: "el aislamiento del relay y la memoria sincronizada (seldon-host integration/plan-multi-machine: #106, #110, #108), llevar y traer trabajo entre máquinas (work_*, seldon-host #84–#87), una sesión de Danil por cuenta (feat/danil-session-per-account), el onboarding (#91), Google Drive (#92), Google Drive para escritorio (#95), el modelo local activo (#98), «Usar el GitHub de esta computadora» (#100), la tarea vacía de la vista previa (create_empty_session, seldon-host feat/tarea-vacia), las carpetas nuevas en Documentos (#118), las carpetas plegadas del árbol (tree_folder, #119) y las bibliotecas de referencias Zotero y Mendeley (seldon-host feat/referencias-zotero-mendeley): falta publicar seldon-runtime con ellos y fijarlo en seldon-runtime.lock",
 };
 
 const vendored = createHash("sha256").update(readFileSync(CONTRACT)).digest("hex");

@@ -57,6 +57,8 @@ import {
   saltarA,
   pedirReapertura,
   vivaDe,
+  mirarEditorTypst,
+  dejarDeMirarEditorTypst,
 } from "./typst";
 
 const EditorDeCodigo = lazy(cargarEditor);
@@ -557,6 +559,24 @@ export default function VisorDeArchivo(props: {
     if (abiertoEn) void invoke("typst_live_close_doc", abiertoEn).catch(() => {});
   });
 
+  // El panel de «@» y las rutas pide a la vista de este árbol; sin ella, el editor no propone nada.
+  const dondeTypst = () => {
+    const viva = vivaDelArbol();
+    return {
+      project: props.project,
+      session: props.session,
+      arbol: props.arbol,
+      ruta: props.ruta,
+      key: viva?.estado === "lista" ? viva.key : null,
+    };
+  };
+  createEffect(() => {
+    if (!props.visible || !typst() || !editable()) return;
+    const editor = { session: props.session, arbol: props.arbol, ruta: props.ruta };
+    mirarEditorTypst(editor);
+    onCleanup(() => dejarDeMirarEditorTypst(editor));
+  });
+
   function mostrarEnLaVista(linea: number, columna: number) {
     const viva = vivaDelArbol();
     if (viva?.estado !== "lista") return;
@@ -773,6 +793,7 @@ export default function VisorDeArchivo(props: {
                         marcas={marcas()}
                         irA={irA()}
                         onIdoA={consumirSalto}
+                        typst={typst() && editable() ? dondeTypst : undefined}
                       />
                     </Suspense>
                   </div>

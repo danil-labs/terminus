@@ -256,7 +256,13 @@ export default function TabStrip(props: {
             return s?.agent ?? null;
           };
           const legacyConversation = () => !!row()?.chat_de_agente;
+          // El título de la tarea que nació vacía es provisional: el primer mensaje lo reemplaza.
+          const sinEmpezar = () => {
+            const s = row();
+            return isTaskTab(p) && s?.turns === 0 && !s.chat_de_agente && !s.subagent && !props.liveIds.includes(p.session);
+          };
           const fullTitle = () => {
+            if (sinEmpezar()) return t("projects.view.new_task");
             const agent = agentProfile();
             if (agent && isTaskTab(p)) {
               if (!legacyConversation()) return row()?.title ?? p.titulo;
@@ -323,7 +329,8 @@ export default function TabStrip(props: {
                 <div
                   role="tab"
                   aria-selected={active()}
-                  tabindex={active() ? 0 : -1}
+                  // Sin activa (la tapa una página) la primera recibe el foco con Tab.
+                  tabindex={active() || (i() === 0 && !props.tabs.some((x) => x.id === props.activeId)) ? 0 : -1}
                   data-pestana={i()}
                   title={statusDecorated(
                     dirty()
