@@ -1,6 +1,6 @@
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { FlatList, Image, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { type ChatEvent, type Question, type Turn, DEFAULT_CHAT_VEIL } from "@terminus/protocol";
 import {
   type ChatBackdropView,
@@ -22,6 +22,7 @@ import {
 import { HostError } from "../../../../../lib/hosts";
 import { type Line, type LivePiece, type StepRow, applyLive, bareCommand, fileName, linesOfLive, linesOfTurn } from "../../../../../lib/steps";
 import { t, w } from "../../../../../lib/i18n";
+import { type Follow, OPENED, jumped, scrolled, shouldStick, showJump, unseen } from "../../../../../lib/follow";
 import { useAccount } from "../../../../../lib/account";
 import { useMachines } from "../../../../../lib/machines";
 import { COMPUTERS } from "../../../../../lib/supabase";
@@ -75,6 +76,13 @@ export default function TaskScreen() {
   const [background, setBackground] = useState<Backdrop | null>(null);
   const list = useRef<FlatList<Line>>(null);
   const key = `${params.host}/${id}`;
+  // Si el chat sigue el final, como el hilo del escritorio (ver `lib/follow.ts`). Ref y no estado:
+  // cambia con cada evento de scroll; solo el botón, que se ve, va en estado.
+  const follow = useRef<Follow>(OPENED);
+  const [jump, setJump] = useState<{ shown: boolean; unseen: number }>({ shown: false, unseen: 0 });
+  // Al final de verdad: el `scrollToEnd` de la `FlatList` calcula el fondo con el alto estimado de sus filas y sin el
+  // pie (lo que llega en vivo), y con eso se queda corto o sube. El de su `ScrollView` usa el alto medido.
+  const toBottom = (animated: boolean) => list.current?.getNativeScrollRef()?.scrollToEnd({ animated });
 
   const fail = useCallback(
     (error: unknown) => {
@@ -98,6 +106,8 @@ export default function TaskScreen() {
   useEffect(() => {
     setOpenTask(key);
     setView(null);
+    follow.current = OPENED;
+    setJump({ shown: false, unseen: 0 });
     void refresh()
       .then(() => host && markSeen(host, workspace, id))
       .catch(fail);
@@ -165,13 +175,23 @@ export default function TaskScreen() {
     }
   }
 
+  /** Baja animado al final y vuelve a seguirlo: el botón y mandar un mensaje. */
+  const toEnd = () => {
+    follow.current = jumped(follow.current);
+    setJump({ shown: false, unseen: 0 });
+    toBottom(true);
+  };
+
   /** Enviar desde el cuadro: un mensaje abre otro turno; `!` corre el comando en la carpeta. */
-  const submit = (s: Submission) =>
-    act(() =>
+  const submit = (s: Submission) => {
+    // Mandar es volver al final: lo que se acaba de escribir va abajo, como en el escritorio.
+    toEnd();
+    return act(() =>
       s.shell
         ? runShell(host!, workspace, { folder, session: id, command: s.command, provider: s.provider, model: s.model, effort: s.effort, permissionMode: s.permissionMode })
         : sendToTask(host!, workspace, folder, id, s),
     );
+  };
   const inject = (text: string, attachments: string[]) => act(() => injectIntoTask(host!, workspace, folder, id, text, attachments));
 
   const decide = (permission: Permission, allow: boolean) => host && void act(() => respondPermission(host, workspace, id, permission.request_id, allow));
@@ -201,6 +221,23 @@ export default function TaskScreen() {
   const title = (view?.session.turns.find((turn) => turn.role === "user")?.text ?? "").split("\n")[0];
   const lastAgent = [...lines].reverse().find((line) => line.kind === "message" && line.role !== "user" && line.role !== "system" && line.role !== "shell")?.key;
   const liveLines = useMemo(() => linesOfLive(live), [live]);
+  // Las respuestas del agente, para contar en el botón las que entraron desde que se subió.
+  const replies = useRef(0);
+  replies.current = lines.filter((line) => line.kind === "message" && line.role !== "user" && line.role !== "system" && line.role !== "shell").length;
+  const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    const next = scrolled(follow.current, { offset: contentOffset.y, content: contentSize.height, viewport: layoutMeasurement.height }, replies.current);
+    follow.current = next;
+    const shown = showJump(next);
+    setJump((now) => (now.shown === shown ? now : { shown, unseen: unseen(next, replies.current) }));
+  }, []);
+  // Siguiendo, todo lo que cambia de alto —el texto que llega, los pasos, una imagen, el teclado— baja de un corte.
+  // Suelto, no se mueve: crecer por abajo no toca el scroll.
+  const stick = useCallback(() => {
+    if (shouldStick(follow.current)) toBottom(false);
+  }, []);
+  const onLayout = useCallback((_: LayoutChangeEvent) => stick(), [stick]);
+  const newReplies = jump.shown ? unseen(follow.current, replies.current) : 0;
   const streaming = liveLines.some((line) => line.key === "live");
   const scope = useMemo(() => (host ? { host, hostId: params.host, workspace, folder, session: id } : null), [host, params.host, workspace, folder, id]);
   // Una respuesta rápida se manda como un mensaje, con el proveedor y el modelo con que sigue la tarea.
@@ -229,12 +266,18 @@ export default function TaskScreen() {
         }}
       />
       <ChatBackdrop background={background} theme={theme} />
+      <View style={styles.thread}>
       <FlatList
         ref={list}
         data={lines}
         keyExtractor={(line) => line.key}
         contentContainerStyle={styles.list}
-        onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
+        onContentSizeChange={stick}
+        onLayout={onLayout}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        // Lo que cambia de alto por encima de lo que se lee (una imagen que carga, pasos que se abren) no lo mueve.
+        maintainVisibleContentPosition={Platform.OS === "web" ? undefined : { minIndexForVisible: 0 }}
         renderItem={({ item }) => <Row line={item} theme={theme} onQuickReply={item.key === lastAgent && !running && !asleep ? quickReply : undefined} />}
         ListHeaderComponent={cachedNote ? <Text style={[styles.banner, { color: theme.textMuted, backgroundColor: theme.muted }]}>{cachedNote}</Text> : undefined}
         ListFooterComponent={
@@ -253,6 +296,20 @@ export default function TaskScreen() {
           </View>
         }
       />
+      {jump.shown ? (
+        <Pressable
+          onPress={toEnd}
+          accessibilityRole="button"
+          testID="to-bottom"
+          style={[styles.toBottom, { backgroundColor: theme.surface, borderColor: theme.border }]}
+        >
+          <Text style={{ color: theme.text, fontSize: 13, fontWeight: "500" }}>
+            {newReplies > 0 ? w("chat.thread.new_messages", { count: newReplies }) : w("chat.thread.to_bottom")}
+          </Text>
+          <Icon name="arrow-down" size={14} color={theme.text} />
+        </Pressable>
+      ) : null}
+      </View>
       {permissions.length || questions.length ? (
         <ScrollView style={styles.pending} contentContainerStyle={styles.footer}>
           {permissions.map((p) => (
@@ -510,7 +567,27 @@ function QuestionCard({
 
 const styles = StyleSheet.create({
   banner: { padding: 8, borderRadius: 8, fontSize: 13 },
+  thread: { flex: 1 },
   list: { padding: 12, gap: 8 },
+  // Como el del escritorio: una píldora centrada por encima del borde de abajo del hilo.
+  toBottom: {
+    position: "absolute",
+    bottom: 12,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingLeft: 12,
+    paddingRight: 10,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
   footer: { gap: 8 },
   pending: { flexGrow: 0, maxHeight: "55%", paddingHorizontal: 12, paddingBottom: 8 },
   bubble: { maxWidth: "92%", borderRadius: 14, padding: 10, borderWidth: StyleSheet.hairlineWidth },

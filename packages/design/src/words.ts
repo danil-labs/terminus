@@ -167,6 +167,8 @@ const es = {
   "agents.mode.auto": "Automático",
   "chat.model.placeholder": "modelo",
   "chat.mode.placeholder": "permisos",
+  "chat.thread.to_bottom": "Ir al final",
+  "chat.thread.new_messages": { one: "{count} mensaje nuevo", other: "{count} mensajes nuevos" },
 } as const satisfies Record<string, Word>;
 
 export type WordKey = keyof typeof es;
@@ -328,6 +330,8 @@ const en: Record<WordKey, Word> = {
   "agents.mode.auto": "Automatic",
   "chat.model.placeholder": "model",
   "chat.mode.placeholder": "permissions",
+  "chat.thread.to_bottom": "Jump to bottom",
+  "chat.thread.new_messages": { one: "{count} new message", other: "{count} new messages" },
 };
 
 export const WORDS: Record<"es" | "en", Record<WordKey, Word>> = { es, en };
