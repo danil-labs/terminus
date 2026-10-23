@@ -5,11 +5,9 @@ export function esTypst(ruta: string) {
 }
 
 /**
- * Si el visor pone la vista de Typst al lado de este archivo: solo un `.typ`,
- * con el ojo puesto en un principal. Cualquier otro archivo usa su propia
- * previa o se queda en código; si no, el PDF del documento anterior se queda
- * pegado al JSON o a la notebook que se abrió después en la misma pestaña.
+ * Todo `.typ` lleva la vista, con o sin ojo: sin él, el motor compila el `main.typ` más cercano.
+ * Otro archivo no: el PDF del documento anterior se quedaría pegado al JSON que se abrió después.
  */
-export function llevaVistaTypst(ruta: string, principal: string | null) {
-  return principal !== null && esTypst(ruta);
+export function llevaVistaTypst(ruta: string) {
+  return esTypst(ruta);
 }

@@ -18,12 +18,15 @@ test("la vista de Typst no se queda pegada al abrir otro archivo en la misma pes
     [principal, true],
   ] as const;
   for (const [ruta, esperada] of recorrido) {
-    assert.equal(llevaVistaTypst(ruta, principal), esperada, ruta);
+    assert.equal(llevaVistaTypst(ruta), esperada, ruta);
   }
 });
 
-test("sin principal elegido ningún archivo lleva la vista de Typst", () => {
-  assert.equal(llevaVistaTypst(principal, null), false);
+test("sin principal elegido un .typ también lleva la vista de Typst", () => {
+  // El motor compila el main.typ más cercano: abrir main.typ o una sección ya enseña el documento.
+  assert.equal(llevaVistaTypst("articulo/main.typ"), true);
+  assert.equal(llevaVistaTypst("articulo/secciones/01-introduccion.typ"), true);
+  assert.equal(llevaVistaTypst("articulo/refs.bib"), false);
 });
 
 test("un .typ se reconoce sin importar mayúsculas", () => {
