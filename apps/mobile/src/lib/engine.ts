@@ -108,7 +108,14 @@ export async function workspacesOf(host: Host): Promise<{ list: Workspace[] | nu
  * (`groupWorkspaces`, la regla de la web). `members`, su id en cada máquina,
  * que es el mismo.
  */
-export type WorkspaceEntry = { id: string; name: string; members: Map<string, string>; hosts: string[] };
+export type WorkspaceEntry = {
+  id: string;
+  name: string;
+  members: Map<string, string>;
+  hosts: string[];
+  /** El modo de permisos que eligió el workspace para las tareas nuevas; `null`, ninguno. */
+  defaultPermissionMode: string | null;
+};
 
 /**
  * Los workspaces de la persona: lo que listan sus máquinas más el registro de
@@ -124,6 +131,8 @@ export function workspaceEntries(hosts: readonly { id: string }[], perHost: Reco
     name: g.row.name ?? g.key,
     members: g.members,
     hosts: [...g.members.keys()],
+    // La máquina que contestó manda; si no lo dice, el ajuste del registro de la cuenta.
+    defaultPermissionMode: g.row.default_permission_mode || registry?.find((w) => w.id === g.key)?.settings?.default_permission_mode || null,
   }));
 }
 

@@ -90,6 +90,7 @@ export default function AgentScreen() {
         providers={host ? (snapshot?.providers[host.id] ?? []) : []}
         provider={defaults.provider}
         model={defaults.model}
+        permissionMode={current?.defaultPermissionMode ?? null}
         placeholder={t("agent.message", { name })}
         onSubmit={message}
       />

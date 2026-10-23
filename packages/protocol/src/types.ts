@@ -7,8 +7,12 @@ export type EngineError = { code: string; message_key?: string; detail?: unknown
 
 /** La cuenta de Danil vinculada a un workspace (`danil` de `list_workspaces`). */
 export type WorkspaceDanil = { user_id: string; email?: string | null; name?: string | null };
-/** Un workspace tiene el mismo id en cada máquina que lo tiene (`groupWorkspaces`). */
-export type Workspace = { id: string; name: string; provider?: string | null; remote?: string | null; danil?: WorkspaceDanil | null };
+/**
+ * Un workspace tiene el mismo id en cada máquina que lo tiene (`groupWorkspaces`).
+ * `default_permission_mode`, el modo con que arranca una tarea nueva si la
+ * persona eligió uno (`workspaces::Workspace::default_permission_mode`).
+ */
+export type Workspace = { id: string; name: string; provider?: string | null; remote?: string | null; danil?: WorkspaceDanil | null; default_permission_mode?: string | null };
 /** `list_workspaces`. */
 export type Startup = { workspaces: Workspace[]; active: string | null };
 /** `list_projects`: una carpeta del workspace. */
@@ -105,7 +109,7 @@ export type FilePreview = {
 /** `tree_show`: un archivo de un árbol de la tarea. */
 export type TreeContent = { kind: string; text: string; bytes: number; truncated: boolean };
 /** `load_session`. */
-export type OpenedSession = { id: string; provider: string; model: string | null; agent?: string | null; turns: Turn[] };
+export type OpenedSession = { id: string; provider: string; model: string | null; agent?: string | null; permission_mode?: string | null; turns: Turn[] };
 
 /** `pending_requests`. */
 export type PendingRequests = {

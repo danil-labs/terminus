@@ -192,6 +192,7 @@ export default function NewTask() {
         providers={host ? (snapshot?.providers[host.id] ?? []) : []}
         provider={defaults.provider}
         model={defaults.model}
+        permissionMode={current?.defaultPermissionMode ?? null}
         disabled={!host || !target || act === "asleep" || act === "outdated" || waking}
         placeholder={t("new.placeholder")}
         header={header}
