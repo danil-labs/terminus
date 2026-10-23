@@ -5,7 +5,6 @@ mod appearance;
 mod desktop;
 mod engine;
 pub mod env;
-mod fleet;
 mod instance;
 mod launcher;
 mod legacy;

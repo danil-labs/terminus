@@ -3,7 +3,7 @@
  * al enviar se abre la hoja con lo que hay sin subir, «Llevar y enviar» copia
  * por partes con la máquina en la cabecera y la tarea nace en la VM sobre la
  * foto. Si la copia se corta, el mensaje vuelve a la caja y «Reintentar» sigue
- * desde la parte que faltaba. El proxy (`fleet.rs`) se simula con sus
+ * desde la parte que faltaba. El proxy (`features/machines/router.ts`) se simula con sus
  * respuestas por máquina. Monta `dist/`.
  */
 import assert from "node:assert/strict";

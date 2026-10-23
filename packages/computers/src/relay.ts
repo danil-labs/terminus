@@ -4,7 +4,7 @@
  * ping/pong sobre un WebSocket que se reconecta con un token fresco.
  *
  * Sin APIs del DOM: el WebSocket se inyecta (el global de React Native o del
- * navegador sirve tal cual). Portado de `apps/desktop/src/web/relay.ts`.
+ * navegador sirve tal cual).
  */
 import type { MachineState } from "./machine.ts";
 

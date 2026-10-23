@@ -63,10 +63,14 @@ export type FleetConfig = {
   deadlines?: Partial<Deadlines>;
   /** Una máquina cambió de estado, o se agregó, quitó o renombró. */
   onChange?(machine: string): void;
+  /** Cambió el estado de la última rebanada de una máquina (`sliceStatuses`): solo para repintarlo. */
+  onSlice?(machine: string): void;
   /** Eventos de otra máquina, ya con los ids del panel. `gap`: se perdieron algunos y hay que releer. */
   onEvents?(machine: string, events: FleetEvent[], gap: boolean): void;
   /** Cambió la cola de acciones aplazadas de `machine` (se encoló o se aplicó una): la lista se relee. */
   onDeferred?(machine: string, frame: DeferredFrame): void;
+  /** `false`: los eventos llegan con los ids de su máquina (el teléfono nombra cada tarea con su máquina aparte). */
+  panelIds?: boolean;
 };
 
 const OFF: readonly MachineState[] = ["offline", "stopped", "provisioning"];
@@ -131,6 +135,16 @@ export class Fleet {
       member.info = { ...info };
       if (!same) this.config.onChange?.(info.id);
     }
+  }
+
+  /** Una máquina renombrada en la cuenta (`PATCH /v1/computers/:id`): sus etiquetas leen el nombre nuevo. `true` si cambió. */
+  rename(machine: string, name: string): boolean {
+    const member = this.members.get(machine);
+    const next = name.trim();
+    if (!member || !next || member.info.name === next) return false;
+    member.info = { ...member.info, name: next };
+    this.config.onChange?.(machine);
+    return true;
   }
 
   setRegistry(list: AccountWorkspace[] | null) {
@@ -225,6 +239,7 @@ export class Fleet {
       order: this.machines().map((m) => m.id),
       registry: this.registry,
       shared: (s) => this.shared.has(s),
+      name: (m) => this.name(m),
     };
   }
 
@@ -254,6 +269,15 @@ export class Fleet {
     const { machine, command } = envelope;
     const { value } = await this.send(envelope);
     return this.encode(machine, value, command);
+  }
+
+  /**
+   * Como `call`, con la respuesta tal como la dio la máquina (sus ids sueltos) y,
+   * si salió de la copia del relay, su hora: para quien nombra la máquina aparte.
+   */
+  async raw(envelope: Envelope): Promise<{ value: unknown; at: number | null }> {
+    const { value, cached } = await this.send(envelope);
+    return { value, at: cachedAt(cached) };
   }
 
   /** La última rebanada de una lectura de `machine`, sin preguntar. */
@@ -350,6 +374,8 @@ export class Fleet {
     // Salvo si cambió la cola de aplazadas: la copia del relay ya la refleja y la de aquí no.
     const settled = !member?.fresh || member.fresh.has(key);
     if (before?.has && member && settled && classOf(envelope.command) === "read" && OFF.includes(member.link.state())) return { ...before, status: "cached", error: "machine_off" };
+    // Con otro contrato no se le pregunta: lo dirá su próximo `hello` (R14) o la lista de la cuenta.
+    if (member && this.isOutdated(member)) return this.settle(keep("outdated", "version_mismatch"), key);
     let slice: Slice;
     try {
       const { value, cached } = await this.send(envelope);
@@ -364,7 +390,14 @@ export class Fleet {
       else if (e.code === "license_required") slice = keep("license_required", e.code);
       else slice = keep("no_answer", e.code);
     }
+    return this.settle(slice, key);
+  }
+
+  /** Guarda la rebanada; si cambia el estado que la barra enseña de su máquina, avisa para repintarlo. */
+  private settle(slice: Slice, key: string): Slice {
+    const last = this.book.statuses()[slice.machine]?.status;
     this.book.put(slice, key);
+    if (this.book.statuses()[slice.machine]?.status !== last) this.config.onSlice?.(slice.machine);
     return slice;
   }
 
@@ -479,7 +512,8 @@ export class Fleet {
       }) ?? (() => {}),
       link.onEvents((page) => {
         if (!this.listening || this.isOutdated(member)) return;
-        const events = linkedEvents(page.events ?? [], member.info.linked ?? null).map((e) => ({ name: e.name, payload: encodeEvent(this.context(), info.id, e.name, e.payload) }));
+        const linked = linkedEvents(page.events ?? [], member.info.linked ?? null);
+        const events = this.config.panelIds === false ? linked.map((e) => ({ name: e.name, payload: e.payload })) : linked.map((e) => ({ name: e.name, payload: encodeEvent(this.context(), info.id, e.name, e.payload) }));
         this.config.onEvents?.(info.id, events, page.gap === true);
       }),
     );

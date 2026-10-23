@@ -147,9 +147,10 @@ workspaces, que va a la raíz que fijó la compilación,
 ```
 
 - `apps/mobile/src/lib/account.tsx` y `supabase.ts`: la sesión de la cuenta de Danil.
-- `apps/mobile/src/lib/machines.tsx`: `GET /v1/computers` y una sesión de relay por máquina
-  (`relayHost`), más el bridge si está emparejado (`bridgeHost`); la atención
-  de cada una y los avisos.
+- `apps/mobile/src/lib/machines.tsx`: `GET /v1/computers` y una sola flota para
+  todas (`accountFleet`, `@terminus/fleet`, una sesión de relay por máquina, lo
+  último de cada una guardado en `sliceStorage.ts`), más el bridge si está
+  emparejado (`bridgeHost`); la atención de cada una y los avisos.
 - `apps/mobile/src/lib/hosts.ts` y `engine.ts` (sin React Native): una máquina, la lista
   cerrada y lo que el teléfono hace con su motor. Las tareas de un workspace
   salen de `list_live_sessions` por carpeta y para `""`, como la ventana; una
@@ -349,7 +350,6 @@ en una VM real.
    `terminus-mobile://` (también para la vuelta de Google y Microsoft).
 2. **Gateway de push.** Un servicio que guarda la llave de APNs y la cuenta de
    FCM; las máquinas le piden enviar. Los avisos ya se calculan en la app.
-3. **La web al paquete compartido.** `apps/desktop/src/web/relay.ts`,
-   `computers.ts` y las reglas de `fleet.ts` (`wakes`, el orden y el grupo de
-   workspaces) están en `@terminus/computers`; la web debería importarlo en
-   vez de su copia.
+3. **La web al paquete compartido.** Hecho: la web, el escritorio y el
+   teléfono usan `@terminus/computers` y una sola flota, `@terminus/fleet`
+   (`accountFleet` en `apps/mobile/src/lib/hosts.ts`).

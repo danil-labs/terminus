@@ -9,7 +9,7 @@ import type { AccountProfileSource } from "../features/settings/account-profile"
 import type { Account } from "../features/settings/accounts-store";
 import type { WorkspaceAssetsSource } from "../web/workspace-assets";
 
-/** Una cuenta agrupada en la web: las máquinas donde tiene sesión (`web/fleet.ts`). */
+/** Una cuenta agrupada en la web: las máquinas donde tiene sesión (`@terminus/fleet`, `merge.ts`). */
 export type AccountMachinesProps = {
   account: Account;
   provider: string;

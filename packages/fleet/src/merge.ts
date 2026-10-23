@@ -27,6 +27,8 @@ export type MergeContext = {
   registry: readonly AccountWorkspace[] | null;
   /** Si `space` es un space compartido con la cuenta: el mismo id en todas, sin prefijo. */
   shared?: (space: string) => boolean;
+  /** El nombre de una máquina, para lo que solo se distingue por ella. */
+  name?(machine: string): string;
 };
 
 /** Llaves cuyo texto es un id de la máquina que lo mandó. */
@@ -104,6 +106,7 @@ export function merge(ctx: MergeContext, command: string, slices: readonly Slice
   if (command === "list_projects") return parts.length || inRegistry(ctx, workspace) ? mergeProjects(ctx, parts, workspace) : undefined;
   if (command === "list_spaces") return mergeSpaces(ctx, parts, workspace);
   if (!parts.length) return undefined;
+  if (command === "list_accounts") return mergeAccounts(ctx, parts);
   if (command === "list_workspace_attention") return joinAttention(parts.map((s) => ({ machine: s.machine, entries: entriesOf(encode(ctx, s.machine, s.value)) })));
   const encoded = parts.map((s) => {
     const value = encode(ctx, s.machine, s.value, command);
@@ -115,6 +118,8 @@ export function merge(ctx: MergeContext, command: string, slices: readonly Slice
     const at = (r: unknown) => (isRow(r) && typeof r.updated_at === "number" ? r.updated_at : 0);
     return all.sort((a, b) => at(b) - at(a));
   }
+  // Un objeto por id de tarea: el de cada máquina trae solo las suyas.
+  if (KEYED.has(command) && encoded.every(isRow)) return Object.assign({}, ...(encoded as Row[]));
   if (encoded.every(isRow)) {
     const joined: Row = { ...(encoded[0] as Row) };
     for (const p of encoded.slice(1) as Row[])
@@ -232,6 +237,39 @@ function mergeProjects(ctx: MergeContext, parts: Slice[], workspace: string | nu
     joined.set(p.id, { row, machines: home, remote: text(p.remote_url) || null, here: false });
   }
   return [...joined.values()].map((e) => ({ ...e.row, ...(e.remote ? { remote_url: e.remote } : {}), machines: e.machines }));
+}
+
+/**
+ * Una cuenta de IA por proveedor y correo, con las máquinas donde tiene sesión
+ * (`machines`); su id es el de la primera encendida. Sin correo queda sola y se
+ * nombra con su máquina (`groupAccounts` de `@terminus/computers`, la misma regla).
+ */
+function mergeAccounts(ctx: MergeContext, parts: Slice[]): unknown {
+  const lists = parts.filter((s) => isRow(s.value) && Array.isArray((s.value as Row).accounts));
+  const lead = lists[0];
+  if (!lead) return parts[0].value;
+  type Member = { machine: string; id: string; on: boolean };
+  const cards: { row: Row; members: Member[]; key: string | null; active: boolean }[] = [];
+  for (const s of lists) {
+    const list = s.value as Row;
+    for (const a of list.accounts as Row[]) {
+      if (typeof a?.id !== "string") continue;
+      const member = { machine: s.machine, id: s.machine === ctx.self ? a.id : wrap(s.machine, a.id), on: ctx.on(s.machine) };
+      const email = text(a.identity).toLowerCase();
+      let card = email ? cards.find((c) => c.key === email) : undefined;
+      if (card) card.members.push(member);
+      else {
+        card = { row: email ? a : { ...a, label: `${text(a.label) || a.id} · ${ctx.name?.(s.machine) ?? s.machine}` }, members: [member], key: email || null, active: false };
+        cards.push(card);
+      }
+      // La activa del panel es la de la primera máquina.
+      if (s === lead && list.active === a.id) card.active = true;
+    }
+  }
+  const shown = (c: (typeof cards)[number]) => c.members.find((m) => m.on) ?? c.members[0];
+  const accounts = cards.map((c) => ({ ...c.row, id: shown(c).id, machines: c.members }));
+  const active = accounts.find((_, i) => cards[i].active)?.id ?? null;
+  return { ...(lead.value as Row), active, accounts };
 }
 
 const entriesOf = (value: unknown): Entry[] => (Array.isArray(value) ? value.filter(isEntry) : []);

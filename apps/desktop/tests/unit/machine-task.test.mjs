@@ -2,7 +2,7 @@
  * Una tarea que corre en otra máquina, apagada: abre con lo último que se leyó, dice que
  * la máquina está apagada y lleva su chip; mandarle un mensaje la enciende, sale una vez y
  * la tarea se vuelve a leer. Un archivo que nombra su chat se lee en esa máquina. El proxy
- * (`fleet.rs`) se simula con sus respuestas. Monta `dist/`.
+ * (`features/machines/router.ts`) se simula con sus respuestas. Monta `dist/`.
  */
 import assert from "node:assert/strict";
 import test from "node:test";

@@ -439,6 +439,14 @@ export async function createTask(
   return value;
 }
 
+/**
+ * Comparte con la cuenta un space de esa máquina (`share_space`): desde ahí tiene
+ * el mismo id en todas, y una tarea nueva en otra máquina puede nacer en él.
+ */
+export async function shareSpace(host: Host, workspace: string, id: string) {
+  await host.call("share_space", workspace, { id });
+}
+
 export function stopTask(host: Host, workspace: string, folder: string, id: string) {
   return host.call("stop_turn", workspace, { project: folder, session: id });
 }

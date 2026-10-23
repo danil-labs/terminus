@@ -2,7 +2,7 @@
  * Varias computadoras detrás de un panel. Un workspace tiene el mismo id en cada
  * máquina que lo tiene (`apps/desktop/docs/account-workspace.md`): dos filas son
  * el mismo workspace solo si su id es igual, nunca por nombre ni remoto. Es la
- * regla de `Fleet` en `apps/desktop/src/web/fleet.ts`.
+ * regla de `merge` en `packages/fleet/src/merge.ts`.
  */
 import type { AccountProject, AccountWorkspace } from "./api.ts";
 

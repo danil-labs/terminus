@@ -2,6 +2,7 @@ import { createSignal } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
 import { imagenInerte } from "../../lib/links";
 import { capabilities } from "../../lib/platform";
+import { machineOf } from "../machines/store";
 
 /**
  * El logo del workspace como `data:` URI. La ventana no pinta un `file://`
@@ -53,7 +54,7 @@ export function urlDeLogo(path: string | null, workspace: string | null = null):
 function delMotor(path: string): Promise<string | null> {
   let pendiente = urls.get(path);
   if (!pendiente) {
-    pendiente = invoke<{ data_url: string | null }>("preview_file", { path, rel: path })
+    pendiente = invoke<{ data_url: string | null }>("preview_file", { path, rel: path }, machineOf(path))
       .then((v) => imagenInerte(v.data_url))
       .catch(() => {
         urls.delete(path);

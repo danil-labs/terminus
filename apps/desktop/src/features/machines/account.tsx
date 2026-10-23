@@ -34,7 +34,7 @@ import { capabilities, setCapabilities, type Capabilities } from "../../lib/plat
 import { deliver, listen } from "../../lib/serviceEvents";
 import { isMac } from "../../lib/window";
 import { Toast, ToastPortal } from "../../ui/Toast";
-import type { MachineStatus } from "../../web/fleet";
+import type { MachineStatus } from "../../web/SyncNote";
 import { type DanilSessionInfo, sessionForWorkspace, type WorkspaceAccount } from "../settings/danil-sessions";
 import { MachinePicker } from "./MachinePicker";
 import { createRouter, type Invoke, type Router, type SliceChange } from "./router";
@@ -145,6 +145,7 @@ export function startAccountMachines(target: Target = window) {
       onChange: () => bump((n) => n + 1),
       // La cola de aplazadas cambió (aquí, en la web o en el teléfono): la lista se relee.
       onDeferred: (machine) => router.deferredChanged(machine),
+      onSlice: () => bump((n) => n + 1),
       onEvents: (machine, events, gap) => {
         if (events.length) router.events(machine, events);
         if (gap) window.dispatchEvent(new CustomEvent("harness:service-resync"));
@@ -176,7 +177,7 @@ export function startAccountMachines(target: Target = window) {
         fleet.info(id)?.wakes ? async () => new WebSocket(screenUrl(endpoint, id), screenProtocols((await getToken()).token)) : null,
       remoteCreate: (workspace) => {
         const target = router.createsOn(workspace);
-        return target.machine !== self ? target : null;
+        return target && target.machine !== self ? target : null;
       },
       machineOnCreate: (workspace) => (
         <div class="flex items-center gap-1 pt-2 text-xs text-neutral-500" data-create-on="">

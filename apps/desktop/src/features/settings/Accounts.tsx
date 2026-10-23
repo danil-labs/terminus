@@ -46,6 +46,7 @@ import {
   type EnEspera,
   type LoginEvent,
 } from "./accounts-store";
+import { machineOf } from "../machines/store";
 
 /**
  * "Conectar", no "iniciar sesión": la app no inicia ninguna sesión —lo hace
@@ -231,7 +232,7 @@ export default function Accounts(props: {
     if (!id) return;
     setGuardandoClaveGo(true);
     try {
-      await invoke("set_go_usage_key", { provider: agente(), id, key: claveGo() });
+      await invoke("set_go_usage_key", { provider: agente(), id, key: claveGo() }, machineOf(id));
       setPidiendoClaveGo(null);
       setClaveGo("");
       setConectadaVez((c) => ({ ...c, [id]: (c[id] ?? 0) + 1 }));
@@ -247,7 +248,7 @@ export default function Accounts(props: {
     if (!id || !clave().trim()) return;
     setGuardandoClave(true);
     try {
-      await invoke("set_api_key", { provider: agente(), id, key: clave() });
+      await invoke("set_api_key", { provider: agente(), id, key: clave() }, machineOf(id));
       setPidiendoClave(null);
       // No se conserva ni un instante más de lo necesario: ya está en el
       // llavero, y dejarla en una señal la mantendría en memoria sin uso.
@@ -530,7 +531,7 @@ export default function Accounts(props: {
       const st = await invoke<AccountStatus>("account_status", {
         provider: agente(),
         id,
-      });
+      }, machineOf(id));
       setEstados((e) => ({ ...e, [id]: st }));
       setSinComprobar((c) => ({ ...c, [id]: false }));
       return st;
@@ -567,7 +568,7 @@ export default function Accounts(props: {
     if (recienCreada !== id || !hubaFallo) return;
     recienCreada = null;
     try {
-      if (await invoke<boolean>("discard_account", { provider: agente(), id })) {
+      if (await invoke<boolean>("discard_account", { provider: agente(), id }, machineOf(id))) {
         await refrescar();
       }
     } catch {
@@ -653,7 +654,7 @@ export default function Accounts(props: {
       if (!agentes().find((a) => a.id === agente())?.available) {
         await instalarCli();
       }
-      await invoke("login_account", { provider: agente(), id, mode: modo });
+      await invoke("login_account", { provider: agente(), id, mode: modo }, machineOf(id));
       if (modo === "terminal") {
         // El login ocurre fuera de la app: no llega ningún evento aquí, y no
         // hay nada que esperar ni panel que sostener.
@@ -691,7 +692,7 @@ export default function Accounts(props: {
     const id = enCurso();
     if (!id || !codigo().trim()) return;
     try {
-      await invoke("submit_login_code", { id, code: codigo() });
+      await invoke("submit_login_code", { id, code: codigo() }, machineOf(id));
       setPideCodigo(false);
       setCodigo("");
     } catch (e) {
@@ -705,7 +706,7 @@ export default function Accounts(props: {
   async function usar(id: string) {
     try {
       setRepuestas(null);
-      await invoke("set_active_account", { provider: agente(), id });
+      await invoke("set_active_account", { provider: agente(), id }, machineOf(id));
       await refrescar();
     } catch (e) {
       setFallo({ what: t("settings.accounts.error.activate"), detail: detalleDe(e) });
@@ -736,7 +737,7 @@ export default function Accounts(props: {
   async function quitar(id: string) {
     setPorQuitar(null);
     try {
-      await invoke("remove_account", { provider: agente(), id });
+      await invoke("remove_account", { provider: agente(), id }, machineOf(id));
       await refrescar();
     } catch (e) {
       setFallo({ what: t("settings.accounts.error.remove"), detail: detalleDe(e) });
@@ -758,7 +759,7 @@ export default function Accounts(props: {
 
   function cancelarConexion() {
     const id = enCurso();
-    if (id) invoke("cancel_login", { id }).catch(() => {});
+    if (id) invoke("cancel_login", { id }, machineOf(id)).catch(() => {});
     cancelarEspera();
     setEnCurso(null);
     setPideCodigo(false);
@@ -1345,7 +1346,7 @@ export default function Accounts(props: {
                       variant="outline"
                       size="compact"
                       onClick={() => {
-                        invoke("cancel_login", { id: id() }).catch(() => {});
+                        invoke("cancel_login", { id: id() }, machineOf(id())).catch(() => {});
                         void conectar(id(), "terminal");
                       }}
                     >
@@ -1404,7 +1405,7 @@ export default function Accounts(props: {
                 setClave("");
                 // El alta creó la cuenta antes de tener la clave, igual que con
                 // el login del CLI. Sin esto queda un objeto vacío en la lista.
-                if (id) void invoke("discard_account", { provider: agente(), id }).then(refrescar);
+                if (id) void invoke("discard_account", { provider: agente(), id }, machineOf(id)).then(refrescar);
               }}
             >
               {t("settings.accounts.cancel")}

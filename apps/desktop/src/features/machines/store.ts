@@ -60,10 +60,16 @@ export function setRunOn(workspace: string | null, id: string | null) {
   guardarElegidas(id ? { ...resto, [workspace]: id } : resto);
 }
 
-/** Con esta cabecera el proxy crea la tarea en esa máquina sin salir del workspace (`fleet.rs`). */
+/** Con esta cabecera la orden va a esa máquina sin salir del workspace (`router.ts`). */
 export function runOnOptions(workspace: string | null, project?: ProjectPlace) {
   const id = runOn(workspace, project);
   return id ? { headers: { "x-terminus-machine": id } } : undefined;
+}
+
+/** Las opciones de una orden sobre algo con id de panel (un space, una cuenta de IA): en la máquina que lo guarda. */
+export function machineOf(id: string | null | undefined) {
+  const machine = id ? (capabilities().taskMachine?.(id) ?? null) : null;
+  return machine ? { headers: { "x-terminus-machine": machine } } : undefined;
 }
 
 /** «Traer a esta Mac» o «a esta PC»: solo donde hay motor local, el escritorio. */

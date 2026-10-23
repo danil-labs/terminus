@@ -1,5 +1,11 @@
 # Máquina por tarea
 
+> **Retirado (fase 4 del plan multimáquina, 2026-10-23).** El reparto entre
+> máquinas por túnel SSH que describe este documento (`fleet.rs` y la parte de
+> `proxy.rs` que lo usaba) ya no existe: la ventana, la web y el teléfono usan
+> una sola flota, `packages/fleet`, por el relay de la cuenta
+> (`src/features/machines/router.ts`). Se conserva como historia del diseño.
+
 Hasta ahora, elegir otra máquina en «Ejecutar en» cambiaba el motor de la
 ventana entera (`machine_select`) y recargaba la página: otros workspaces,
 otras tareas, otro diario de eventos. Este documento recoge lo que se
@@ -75,8 +81,8 @@ La ventana conserva **una** máquina, la suya (la primera de la lista, `HOME` en
 corren las tareas que se crearon en ellas.
 
 1. **Enlace de workspaces.** Todo pasa por una sola función,
-   `Fleet::counterpart_workspace(machine, workspace)` en
-   `src-tauri/src/extracted/fleet.rs`. Devuelve el workspace de esa máquina que
+   `Fleet::counterpart_workspace(machine, workspace)` en el `fleet.rs` de la
+   ventana (retirado en la fase 4). Devolvía el workspace de esa máquina que
    corresponde al de la ventana:
    - el mismo id, si esa máquina lo lista: un workspace de la cuenta tiene el
      mismo id en todas ([`account-workspace.md`](account-workspace.md));
@@ -145,7 +151,7 @@ corren las tareas que se crearon en ellas.
 
 ## Lo implementado
 
-- `src-tauri/src/extracted/fleet.rs`:
+- `fleet.rs` de la ventana (retirado en la fase 4):
   - enlaces: `counterpart_workspace` y proyectos;
   - dueños de tareas;
   - enrutado: `target`, `forward`, `deliver`;
@@ -267,7 +273,7 @@ la comparten la web y el teléfono.
 
 Con la sesión de Danil abierta (`danil_connect_status` = `connected`), la
 ventana junta las tareas de todas las computadoras de la persona con las reglas
-de la web (`src/web/fleet.ts` y `src/web/transport.ts`), en un trozo perezoso
+de `packages/fleet` y del router `src/features/machines/router.ts`, el mismo de la web, en un trozo perezoso
 (`src/features/machines/account.tsx`):
 
 - El motor local sigue por el IPC nativo, con sus ids tal cual: eventos de

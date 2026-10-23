@@ -18,8 +18,8 @@ type Row = Record<string, unknown>;
  * `work_status`/`work_export`). `transfer` no: es del cliente, igual en origen y destino.
  */
 export const OWN_KEYS: ReadonlySet<string> = new Set(["session", "parent", "portfolio", "account", "space", "task"]);
-/** Listas que nombran cosas de cualquier máquina (las pestañas abiertas): cada una recibe solo las suyas. */
-export const SPREAD_KEYS: ReadonlySet<string> = new Set(["open"]);
+/** Listas que nombran cosas de cualquier máquina (las pestañas abiertas, las tareas cuyo git va primero): cada una recibe solo las suyas. */
+export const SPREAD_KEYS: ReadonlySet<string> = new Set(["open", "priority"]);
 
 /** Solo objetos planos: un `Channel` u otra clase viaja tal cual. */
 const isRow = (v: unknown): v is Row => {
