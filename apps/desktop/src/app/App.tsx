@@ -134,7 +134,8 @@ import {
   type DefaultPermissionModeChange,
 } from "../features/settings/DefaultPermissions";
 import type { ContextoDeProyectos } from "../features/settings/ManageProjects";
-import Settings from "../features/settings/Settings";
+// Configuración solo se abre a pedido: no entra en la carga inicial.
+const Settings = lazy(() => import("../features/settings/Settings"));
 import type { Startup } from "../features/settings/workspaces-store";
 import { createAttention, topState } from "../features/shell/attention";
 import TaskNotifier from "../features/shell/TaskNotifier";
@@ -8097,18 +8098,20 @@ export default function App() {
       {/* El nombre del workspace ya no se deduce de la ruta: lo lee el propio
           menú de la cabecera, que es quien sabe cuál está activo. */}
       <Show when={settings() !== null}>
-        <Settings
-          panel={settings() || undefined}
-          modelos={modelosParaAgentes()}
-          proyecto={proyectoAbierto() ?? project()}
-          agentesEnUso={agentesEnUso()}
-          onClose={cerrarAjustes}
-          proyectos={proyectosEnAjustes}
-          onAgentProfile={(enProyecto, name) => {
-            cerrarAjustes();
-            openAgentProfile(enProyecto, name);
-          }}
-        />
+        <Suspense fallback={null}>
+          <Settings
+            panel={settings() || undefined}
+            modelos={modelosParaAgentes()}
+            proyecto={proyectoAbierto() ?? project()}
+            agentesEnUso={agentesEnUso()}
+            onClose={cerrarAjustes}
+            proyectos={proyectosEnAjustes}
+            onAgentProfile={(enProyecto, name) => {
+              cerrarAjustes();
+              openAgentProfile(enProyecto, name);
+            }}
+          />
+        </Suspense>
       </Show>
     </div>
   );
