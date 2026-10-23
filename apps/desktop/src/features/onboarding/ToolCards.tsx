@@ -4,6 +4,7 @@ import { AvanceDeDescarga, BarraDeCarga, CodigoParaConfirmar, Peso } from "./Dow
 import ArrowRight from "lucide-solid/icons/arrow-right";
 import Check from "lucide-solid/icons/check";
 import ExternalLink from "lucide-solid/icons/external-link";
+import FileText from "lucide-solid/icons/file-text";
 import { createSignal, For, type JSX, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { createStore } from "solid-js/store";
 import { mb } from "../../lib/format";
@@ -38,6 +39,9 @@ type Proveedor = {
   connected: { identity: { user: string; name: string }; workspace?: string } | null;
 };
 type Conocido = { id: string; grupo: string; pide_sesion: boolean; conectado: boolean; sesiones?: string[] };
+/** Un `.bib` de un proyecto que sigue a Zotero (`zotero_bib_links`). `fallo` viene en inglés: lo leen también los agentes. */
+type VinculoBib = { archivo: string; coleccion?: string; ids?: string[]; sincronizado?: number; fallo?: string };
+const nombreDeArchivo = (ruta: string) => ruta.split(/[\\/]/).pop() || ruta;
 type AgenteMcp = { id: string; label: string; recibe: boolean; instalado: boolean; login?: boolean };
 type Plugin = { id: string; installed: boolean; installing: boolean; supported: boolean };
 type FalloDelMotor = { what: Frase; detail?: string };
@@ -224,6 +228,8 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
   const [drive, setDrive] = createSignal<EstadoDeDrive | null>(null);
   const [escritorio, setEscritorio] = createSignal<DriveDeEscritorio | null>(null);
   const [zotero, setZotero] = createSignal<EstadoDeZotero | null>(null);
+  const [bibs, setBibs] = createSignal<VinculoBib[]>([]);
+  const [sincronizandoBibs, setSincronizandoBibs] = createSignal(false);
   let intentoDeZotero = 0;
   let finDeZotero: ((a: InstalacionDeDrive) => void) | null = null;
   let vigiaDeZotero: ReturnType<typeof setTimeout> | undefined;
@@ -276,22 +282,20 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
     }
     const c = conocido(i);
     if (!c?.conectado) return { k: "libre" };
-    if (!c.pide_sesion) return { k: "conectada", detalle: descripcion(i.id) };
-    // El motor la autoriza una vez para todos los agentes: o la tienen todos o ninguno.
-    return (c.sesiones ?? []).length > 0
-      ? { k: "conectada", detalle: t("onboarding.tools.session_in") }
-      : { k: "detectada", detalle: t("onboarding.tools.needs_login") };
+    if (!c.pide_sesion || (c.sesiones ?? []).length > 0) return { k: "conectada", detalle: descripcion(i.id) };
+    return { k: "detectada", detalle: t("onboarding.tools.needs_login") };
   }
 
   async function cargar() {
     try {
-      const [p, c, a, d, o, z] = await Promise.all([
+      const [p, c, a, d, o, z, b] = await Promise.all([
         invoke<Proveedor[]>("list_git_hosts", { scope: await scope }),
         invoke<Conocido[]>("list_known_mcp"),
         invoke<AgenteMcp[]>("list_mcp_providers"),
         invoke<EstadoDeDrive>("google_drive_status").catch(() => null),
         invoke<DriveDeEscritorio>("google_drive_desktop_status").catch(() => null),
         invoke<EstadoDeZotero>("zotero_status").catch(() => null),
+        invoke<VinculoBib[]>("zotero_bib_links").catch(() => []),
       ]);
       if (cerrada) return;
       // Antes la guardaba la ventana; ahora es del motor, que la lee en cada turno.
@@ -305,6 +309,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
       setDrive(d);
       setEscritorio(o);
       setZotero(z);
+      setBibs(b);
       setProveedores(p);
       setConocidos(c);
       setAgentesMcp(a);
@@ -848,8 +853,62 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
             </div>
           </div>
         </Show>
+        {/* Los `.bib` que siguen a Zotero los vincula el agente («conecta refs.bib con mi colección X»). */}
+        <Show when={p.i.id === "zotero" && e()?.k === "conectada" && bibs().length > 0}>
+          <div class="grid gap-1 border-t border-border px-3 py-2">
+            <For each={bibs()}>
+              {(b) => (
+                <div class="flex min-h-7 min-w-0 items-center gap-2 text-xs">
+                  <FileText size={13} class="shrink-0 text-neutral-500" aria-hidden="true" />
+                  <span class="min-w-0 flex-1 truncate font-medium" title={b.archivo}>
+                    {nombreDeArchivo(b.archivo)}
+                  </span>
+                  <span class={cn("min-w-0 truncate", b.fallo ? "text-error-strong" : "text-neutral-500")} title={b.fallo ?? undefined}>
+                    {b.fallo
+                      ? t("settings.references.zotero.bib_failed")
+                      : b.coleccion
+                        ? t("settings.references.zotero.bib_collection", { name: b.coleccion })
+                        : t("settings.references.zotero.bib_cited")}
+                  </span>
+                  <RemoveButton
+                    icon="unlink"
+                    label={t("settings.references.zotero.bib_unlink", { name: nombreDeArchivo(b.archivo) })}
+                    onClick={() => void desvincularBib(b.archivo)}
+                  />
+                </div>
+              )}
+            </For>
+            <div class="flex justify-end">
+              <Button size="sm" variant="ghost" disabled={sincronizandoBibs()} onClick={() => void sincronizarBibs()}>
+                {sincronizandoBibs() ? t("settings.references.zotero.bib_syncing") : t("settings.references.zotero.bib_sync")}
+              </Button>
+            </div>
+          </div>
+        </Show>
       </div>
     );
+  }
+
+  /** «Sincronizar con Zotero»: vuelve a traer cada `.bib` vinculado; el fallo de uno queda en su fila. */
+  async function sincronizarBibs() {
+    setSincronizandoBibs(true);
+    setErrores("zotero", null);
+    try {
+      setBibs(await invoke<VinculoBib[]>("sync_zotero_bibs"));
+    } catch (x) {
+      setErrores("zotero", explicar(x));
+    } finally {
+      setSincronizandoBibs(false);
+    }
+  }
+
+  async function desvincularBib(archivo: string) {
+    try {
+      await invoke("unlink_zotero_bib", { path: archivo });
+      setBibs(await invoke<VinculoBib[]>("zotero_bib_links"));
+    } catch (x) {
+      setErrores("zotero", explicar(x));
+    }
   }
 
   /** Datos y token del servicio, con los textos que da el motor; Bitbucket con los del diseño. */

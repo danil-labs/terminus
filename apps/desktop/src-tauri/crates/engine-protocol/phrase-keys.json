@@ -380,6 +380,7 @@
     "settings.integrations.error_running",
     "settings.integrations.error_uninstall",
     "settings.integrations.unsupported",
+    "settings.references.zotero.error_bib",
     "settings.references.zotero.error_busy",
     "settings.references.zotero.error_closed",
     "settings.references.zotero.error_declined",
