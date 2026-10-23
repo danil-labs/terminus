@@ -1158,7 +1158,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
             <SettingsSection title={t("onboarding.tools.references.group")} description={t("onboarding.tools.references.about")}>
               <div class="mt-3">
                 <Suspense fallback={null}>
-                  <Integraciones solo={["zotero", "mendeley"]} onCambio={() => {}} />
+                  <Integraciones solo={["zotero"]} onCambio={() => {}} />
                 </Suspense>
               </div>
             </SettingsSection>
