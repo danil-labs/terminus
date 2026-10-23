@@ -81,14 +81,14 @@ export function statusGroupLabel(key: SidebarStatusKey): string {
   }
 }
 
-/** `machineName`: el nombre de una máquina; la clave `""` es la de la ventana. */
+/** `machineName`: el nombre de una máquina; la clave `""` es la de la ventana, y sin nombre es «Esta máquina». */
 export function groupLabel(
   group: SidebarGroup<unknown>,
   folderName: (id: string) => string,
   machineName: (id: string) => string = (id) => id,
 ): string {
   switch (group.kind) {
-    case "machine": return group.key ? machineName(group.key) : t("shell.sidebar.view.this_machine");
+    case "machine": return machineName(group.key) || t("shell.sidebar.view.this_machine");
     case "section": return sectionLabel(group.key as SidebarSection);
     case "status": return statusGroupLabel(group.key as SidebarStatusKey);
     case "folder": return group.key ? folderName(group.key) : t("shell.sidebar.view.no_folder");
