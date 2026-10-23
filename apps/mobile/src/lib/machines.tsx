@@ -14,7 +14,11 @@ import { COMPUTERS } from "./supabase";
 
 type Listener = (host: string, events: EngineEvent[], gap: boolean) => void;
 
-/** Lo que dijo `/v1/computers`: la licencia y el error no se confunden con «no tienes máquinas». */
+/**
+ * Lo que dijo `/v1/computers`, o que el relay detuvo las sesiones por la licencia
+ * (`license`: Terminus de pago; la lista ya no la pide). La licencia y el error no se
+ * confunden con «no tienes máquinas».
+ */
 export type Fleet = "loading" | "ok" | "license" | "error" | "signed_out";
 
 type Machines = {
@@ -31,6 +35,8 @@ type Machines = {
   pairing: Pairing | null;
   pair: (pairing: Pairing | null) => Promise<void>;
   reloadComputers: () => Promise<void>;
+  /** «Reintentar» del aviso de licencia: reabre las sesiones detenidas y relee la lista. */
+  retryLicense: () => void;
   /** Atención por máquina: `hostId → workspaces`. */
   attention: Record<string, WorkspaceAttention[]>;
   activity: { notice: Notice; at: number }[];
@@ -245,10 +251,18 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
   const titleOf = useCallback((key: string) => titles.current.get(key), []);
   const hostOf = useCallback((id: string) => hosts.find((h) => h.id === id), [hosts]);
 
+  const retryLicense = useCallback(() => {
+    machinesFleet?.retry();
+    void reloadComputers();
+  }, [machinesFleet, reloadComputers]);
+  // El relay detiene la sesión (`license_required`) aunque `/v1/computers` conteste: el
+  // aviso sale de la flota. `tick` cambia cuando una sesión se detiene o vuelve.
+  const fleetState: Fleet = fleet === "ok" && machinesFleet?.license() ? "license" : fleet;
+
   const value = useMemo<Machines>(
     () => ({
       ready: account.ready && pairingLoaded,
-      fleet,
+      fleet: fleetState,
       hosts,
       hostOf,
       registry,
@@ -257,6 +271,7 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
       pairing,
       pair,
       reloadComputers,
+      retryLicense,
       attention,
       activity,
       titleOf,
@@ -265,7 +280,7 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
       subscribe,
       tick,
     }),
-    [account.ready, pairingLoaded, fleet, hosts, hostOf, registry, preferred, rememberMachine, pairing, pair, reloadComputers, attention, activity, titleOf, rememberTitles, setOpenTask, subscribe, tick],
+    [account.ready, pairingLoaded, fleetState, retryLicense, hosts, hostOf, registry, preferred, rememberMachine, pairing, pair, reloadComputers, attention, activity, titleOf, rememberTitles, setOpenTask, subscribe, tick],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

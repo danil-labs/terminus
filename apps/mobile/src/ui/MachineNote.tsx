@@ -46,7 +46,7 @@ export function MachineNote({ hosts, fleet }: { hosts: Host[]; fleet: Fleet }) {
  */
 function LicenseNote() {
   const theme = useTheme();
-  const { reloadComputers } = useMachines();
+  const { retryLicense } = useMachines();
   const web = Platform.OS === "web";
   return (
     <View style={[styles.note, { backgroundColor: theme.muted }]} testID="machine-note-license">
@@ -63,7 +63,7 @@ function LicenseNote() {
           </Pressable>
         </>
       ) : null}
-      <Pressable testID="license-retry" onPress={() => void reloadComputers()}>
+      <Pressable testID="license-retry" onPress={retryLicense}>
         <Text style={{ color: theme.primary, fontWeight: "600" }}>{web ? w("danil.license.retry") : w("web.computers.retry")}</Text>
       </Pressable>
     </View>

@@ -97,6 +97,10 @@ export type AccountFleet = {
   set(computers: readonly Computer[]): Host[];
   /** Lo que se guardó de cada máquina, al cerrar o al irse la app al fondo. */
   flush(): void;
+  /** `license_required` si el relay detuvo alguna sesión por falta de Terminus de pago; `null` si no. */
+  license(): "license_required" | null;
+  /** «Reintentar» del aviso de licencia: reabre las sesiones detenidas. */
+  retry(): void;
   close(): void;
 };
 
@@ -260,6 +264,8 @@ export function accountFleet(config: AccountFleetConfig, factory?: SocketFactory
       });
     },
     flush: () => fleet.flush(),
+    license: () => fleet.license(),
+    retry: () => fleet.retry(),
     close: () => fleet.close(),
   };
 }
