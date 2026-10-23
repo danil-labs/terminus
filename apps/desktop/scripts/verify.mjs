@@ -569,6 +569,7 @@ const steps = [
   ["Cada workspace habla con su cuenta de Danil, y un motor anterior deja la cuenta única", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/danil-sessions.test.ts")], root],
   ["En el navegador la página de aprobación conecta una computadora a la cuenta", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-connect.test.mjs")], root],
   ["En el navegador se ve la persona de la cuenta de Danil y cambia su foto", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-account.test.mjs")], root],
+  ["En el navegador se listan las computadoras de la cuenta y se renombran en su sitio", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-account-computers.test.mjs")], root],
   ["La página de aprobación y la compatibilidad de contrato hablan con el plano de control", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/danil-connect-web.test.ts")], root],
   ["Con el stream empujado los lotes llegan a los oyentes y el historial se pagina", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/push-stream.test.mjs")], root],
   ["Al enviar a otra máquina la hoja lleva el trabajo sin subir, y traerlo de vuelta lo deja en una rama de aquí", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/carry-window.test.mjs")], root],

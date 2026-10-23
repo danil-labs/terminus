@@ -80,11 +80,12 @@ const HOME = { computer_id: "cmp_home", name: "Mi Mac", state: "online", provide
 const VM = { computer_id: "cmp_vm", name: "Danil VM", state: "stopped", provider: "aws-ec2" };
 const MAC = { computer_id: "cmp_mac", name: "Mac de Ana", state: "offline", provider: "self", kind: "physical" };
 
-async function open(name, { status = SIGNED_IN, token = TOKEN, computers = [HOME, VM, MAC], relays = {}, extra = {}, registry = null } = {}) {
+async function open(name, { status = SIGNED_IN, token = TOKEN, computers = [HOME, VM, MAC], relays = {}, extra = {}, registry = null, onRename = null } = {}) {
   const f = fleet(relays);
   const calls = [];
   const listed = [];
   const registered = [];
+  const renamed = [];
   const responses = local(calls, {
     danil_connect_status: status,
     ...(token ? { account_relay_token: token } : {}),
@@ -98,6 +99,17 @@ async function open(name, { status = SIGNED_IN, token = TOKEN, computers = [HOME
         if (String(url) === "https://relay.test/v1/workspaces") {
           registered.push(init?.headers?.authorization);
           return Promise.resolve(registry ? Response.json({ workspaces: registry }) : new Response("{}", { status: 404 }));
+        }
+        if (String(url).startsWith("https://relay.test/v1/computers/") && init?.method === "PATCH") {
+          const id = decodeURIComponent(String(url).split("/").pop());
+          const { name: given } = JSON.parse(init.body);
+          renamed.push({ id, name: given, authorization: init.headers?.authorization, type: init.headers?.["content-type"] });
+          const refused = onRename?.(id, given);
+          if (refused) return Promise.resolve(Response.json({ error: { code: refused.code } }, { status: refused.status }));
+          const at = computers.findIndex((c) => c.computer_id === id);
+          if (at < 0) return Promise.resolve(Response.json({ error: { code: "not_found" } }, { status: 404 }));
+          computers[at] = { ...computers[at], name: given.trim() };
+          return Promise.resolve(Response.json({ computer_id: id, name: given.trim() }));
         }
         if (String(url).startsWith("https://relay.test/v1/computers")) {
           listed.push(init?.headers?.authorization);
@@ -113,7 +125,7 @@ async function open(name, { status = SIGNED_IN, token = TOKEN, computers = [HOME
   const invoke = (command, args, options) => app.w.__TAURI_INTERNALS__.invoke(command, args, options);
   const relayCalls = (id, command) => (f.relays[id]?.calls ?? []).filter((c) => c.command === command);
   const native = (command) => calls.filter((c) => c.command === command);
-  return { app, f, invoke, relayCalls, native, listed, registered, doc: app.w.document, text: () => app.w.document.body.textContent ?? "" };
+  return { app, f, invoke, relayCalls, native, listed, registered, renamed, doc: app.w.document, text: () => app.w.document.body.textContent ?? "" };
 }
 
 test("signed out, the desktop is the local window as before", async () => {
@@ -242,7 +254,8 @@ test("a new task is born on this computer unless «Ejecutar en» picks another f
   assert.equal(relayCalls("cmp_vm", "send_message").length, 0);
 
   const doc = app.w.document;
-  await newTask(app);
+  doc.querySelector('[aria-label="Nueva tarea en Local"]').click();
+  assert.ok(await until(() => doc.querySelector('[aria-label="Ejecutar en"]')), "the composer offers «Ejecutar en»");
   doc.querySelector('[aria-label="Ejecutar en"]').click();
   assert.ok(await until(() => doc.querySelector('[data-machine-option="cmp_vm"]')), "the picker lists the account's machines");
   doc.querySelector('[data-machine-option="cmp_vm"]').click();
@@ -560,5 +573,76 @@ test("a machine just connected to the account adds its slice live, without recon
   await reread(app);
   assert.ok(doc.querySelector('[data-sesion="cmp_mac~t1"]'), "the new machine's tasks join");
   assert.equal(f.relays.cmp_vm.sockets.length, 1, "the VM was not reconnected");
+  assert.deepEqual(app.fallos, []);
+});
+
+test("Cuenta de Danil lists the account's computers; a name edited in place reaches «Ejecutar en» without restarting", async () => {
+  const seen = new Date(Date.now() - 60_000).toISOString();
+  const computers = [HOME, { ...VM, state: "online" }, { ...MAC, state: "offline", last_seen: seen }];
+  const { app, doc, f, renamed } = await open("desktop-account-computers", {
+    computers,
+    relays: {
+      cmp_vm: { table: remote("Panel", "Tarea de la VM"), state: "online" },
+      cmp_mac: { table: remote("Notas", "Tarea del Mac"), state: "online" },
+    },
+    onRename: (_, name) => (name.includes("!") ? { status: 400, code: "invalid_name" } : null),
+    extra: { work_status: { ahead: 0, dirty: false, files: [], large: [], submodules: [] } },
+  });
+  const w = app.w;
+  w.dispatchEvent(new w.CustomEvent("harness:open-settings", { detail: "cuenta-danil" }));
+  assert.ok(await until(() => doc.querySelectorAll("[data-account-computer]").length === 3), "the three computers of the account");
+  const rowOf = (id) => doc.querySelector(`[data-account-computer="${id}"]`);
+  const home = rowOf("cmp_home");
+  assert.ok(home.hasAttribute("data-self"));
+  assert.ok(home.textContent.includes("Mi Mac(esta computadora)"), home.textContent);
+  assert.match(home.querySelector("[data-computer-kind]").textContent, /^Esta (Mac|PC)$/);
+  assert.equal(rowOf("cmp_vm").querySelector("[data-computer-kind]").textContent, "VM de Danil");
+  assert.equal(rowOf("cmp_vm").querySelector("[data-computer-state]").textContent, "en línea");
+  assert.equal(rowOf("cmp_mac").querySelector("[data-computer-kind]").textContent, "Máquina propia");
+  assert.match(rowOf("cmp_mac").querySelector("[data-computer-state]").textContent, /^apagada · visto \d{1,2}:\d{2}/);
+
+  const edit = async (id, value, key = null) => {
+    rowOf(id).querySelector("[data-computer-name]")?.click();
+    assert.ok(await until(() => rowOf(id).querySelector("[data-computer-name-input]")), "the name turns into a field");
+    const input = rowOf(id).querySelector("[data-computer-name-input]");
+    input.value = value;
+    input.dispatchEvent(new w.Event("input", { bubbles: true }));
+    if (key) input.dispatchEvent(new w.KeyboardEvent("keydown", { key, bubbles: true }));
+    else input.form.requestSubmit();
+    await sleep(300);
+  };
+
+  // Esc cancels without asking the control plane, and Configuración stays open.
+  await edit("cmp_vm", "Otra cosa", "Escape");
+  assert.equal(rowOf("cmp_vm").querySelector("[data-computer-name-input]"), null);
+  assert.ok(rowOf("cmp_vm").textContent.includes("Danil VM"));
+  assert.equal(renamed.length, 0);
+
+  // A refused name says why and keeps the field.
+  await edit("cmp_vm", "VM!");
+  assert.equal(renamed.length, 1);
+  assert.equal(rowOf("cmp_vm").querySelector("[data-rename-error]")?.textContent, "El nombre debe tener de 1 a 60 caracteres, sin saltos de línea.");
+  assert.ok(rowOf("cmp_vm").querySelector("[data-computer-name-input]"), "the field stays to fix it");
+
+  await edit("cmp_vm", "  VM de trabajo ");
+  assert.deepEqual(renamed.at(-1), { id: "cmp_vm", name: "VM de trabajo", authorization: "Bearer client-tok", type: "application/json" });
+  assert.ok(await until(() => rowOf("cmp_vm").querySelector("[data-computer-name]")?.textContent.startsWith("VM de trabajo")), "the row shows the new name");
+  assert.equal(rowOf("cmp_vm").querySelector("[data-rename-error]"), null);
+
+  // The window's own name, also in «Esta computadora: …».
+  await edit("cmp_home", "Mac del estudio");
+  assert.ok(await until(() => doc.body.textContent.includes("Esta computadora: Mac del estudio")));
+
+  await sleep(1_200);
+  doc.querySelector('[aria-label="Cerrar configuración (Esc)"]').click();
+  assert.ok(await until(() => !doc.querySelector("[data-danil-account]")), "Configuración closes");
+  doc.querySelector('[aria-label="Nueva tarea en Local"]').click();
+  assert.ok(await until(() => doc.querySelector('[aria-label="Ejecutar en"]')), "the composer offers «Ejecutar en»");
+  doc.querySelector('[aria-label="Ejecutar en"]').click();
+  assert.ok(
+    await until(() => doc.querySelector('[data-machine-option="cmp_vm"]')?.textContent.includes("VM de trabajo")),
+    doc.querySelector('[data-machine-option="cmp_vm"]')?.textContent ?? "no option",
+  );
+  assert.equal(f.relays.cmp_vm.sockets.length, 1, "renaming does not reconnect the machine");
   assert.deepEqual(app.fallos, []);
 });

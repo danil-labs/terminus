@@ -5,7 +5,7 @@
  * that sets `window.terminusWeb` before this module loads can replace any
  * setting, or give `getToken` with `computerId` or `computers` and skip the session.
  */
-import { linkedWorkspaces, listComputers, listWorkspaces, screenProtocols, screenUrl } from "@terminus/computers";
+import { linkedWorkspaces, listComputers, listWorkspaces, renameComputer, screenProtocols, screenUrl } from "@terminus/computers";
 import { chosenWebLayout, MOBILE_WEB_DIR } from "@terminus/design";
 import { createSignal, lazy, Suspense } from "solid-js";
 import { t } from "../lib/i18n";
@@ -109,6 +109,12 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
           </Suspense>
         )
       : undefined,
+    accountComputers: {
+      list: async () => listComputers(base.endpoint, await base.getToken()),
+      rename: async (id, name) => renameComputer(base.endpoint, await base.getToken(), id, name),
+      outdated: (c) => machineCompatibility(c.contract) === "outdated",
+      onRenamed: (id, name) => rename(id, name),
+    },
     connectMachine: {
       list: async () => listComputers(base.endpoint, await base.getToken()),
       outdated: (c) => machineCompatibility(c.contract) === "outdated",
@@ -123,6 +129,15 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
         )
       : undefined,
   });
+  /** A name changed in Configuración: the chips, the toasts and the picker read it without reloading. */
+  function rename(id: string, name: string) {
+    if (!transport.fleet.rename(id, name)) return;
+    bump((n) => n + 1);
+    void import("../features/machines/store").then(({ machineNamesChanged, refetchMachines }) => {
+      machineNamesChanged();
+      void refetchMachines();
+    });
+  }
   installIpc(window, transport);
   for (const l of links) l.relay.start();
   void import("../app/main");
@@ -133,7 +148,11 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
   });
   return (fresh) => {
     let relinked = false;
-    for (const c of fresh) if (transport.fleet.relink(c.computer_id, linkedWorkspaces(c))) relinked = true;
+    for (const c of fresh) {
+      if (transport.fleet.relink(c.computer_id, linkedWorkspaces(c))) relinked = true;
+      // Renamed from another window or the phone.
+      if (c.name?.trim()) rename(c.computer_id, c.name.trim());
+    }
     // Every list of the window reads again, now filtered by the new links.
     if (relinked) for (const name of ["harness:workspace-name", "harness:service-resync"]) window.dispatchEvent(new CustomEvent(name));
   };

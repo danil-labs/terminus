@@ -70,8 +70,16 @@ export function runOnOptions(workspace: string | null, project?: ProjectPlace) {
 export const bringHereLabel = () => (isMac() ? t("shell.machines.bring_here_mac") : t("shell.machines.bring_here_pc"));
 export const canBringHere = () => !!capabilities().nativeWindow;
 
-export const machineName = (id: string, local = id === "local") =>
-  local ? (isMac() ? t("shell.machines.this_mac") : t("shell.machines.this_computer")) : (capabilities().machineName?.(id) ?? id);
+// Los nombres viven fuera de Solid (la flota): esta señal hace que quien los pinta los vuelva a leer.
+const [namesRead, setNamesRead] = createRoot(() => createSignal(0));
+
+/** Una máquina cambió de nombre: «Ejecutar en», etiquetas y avisos lo vuelven a leer. */
+export const machineNamesChanged = () => setNamesRead((n) => n + 1);
+
+export const machineName = (id: string, local = id === "local") => {
+  namesRead();
+  return local ? (isMac() ? t("shell.machines.this_mac") : t("shell.machines.this_computer")) : (capabilities().machineName?.(id) ?? id);
+};
 
 const ORIGINS = "machines.carry_origins";
 
