@@ -36,7 +36,7 @@ export type Answer<T> =
   | { kind: "error"; status: number | null; code?: string };
 
 /** Lo mínimo de `fetch` que usa el cliente. */
-export type Fetch = (input: string, init?: { method?: string; headers?: Record<string, string> }) => Promise<{
+export type Fetch = (input: string, init?: { method?: string; headers?: Record<string, string>; body?: string }) => Promise<{
   status: number;
   ok: boolean;
   json(): Promise<unknown>;
@@ -53,10 +53,12 @@ export function apiUrl(endpoint: string, path: string): string {
 
 const globalFetch: Fetch = (input, init) => (globalThis.fetch as unknown as Fetch)(input, init);
 
-async function request<T>(url: string, token: string, method: string, read: (body: unknown) => T, f: Fetch): Promise<Answer<T>> {
+async function request<T>(url: string, token: string, method: string, read: (body: unknown) => T, f: Fetch, payload?: unknown): Promise<Answer<T>> {
   let response: Awaited<ReturnType<Fetch>>;
   try {
-    response = await f(url, { method, headers: { authorization: `Bearer ${token}` } });
+    const headers: Record<string, string> = { authorization: `Bearer ${token}` };
+    if (payload === undefined) response = await f(url, { method, headers });
+    else response = await f(url, { method, headers: { ...headers, "content-type": "application/json" }, body: JSON.stringify(payload) });
   } catch {
     return { kind: "error", status: null };
   }
@@ -68,7 +70,9 @@ async function request<T>(url: string, token: string, method: string, read: (bod
   if (response.status === 404) return { kind: "missing" };
   if (!response.ok) {
     // `409 workspace_deleted` y compañía: el código del cuerpo dice qué pasó.
-    const code = ((await response.json().catch(() => null)) as { error?: unknown } | null)?.error;
+    // El plano de control dice `{ error: { code } }`; uno anterior, `{ error: "<code>" }`.
+    const said = ((await response.json().catch(() => null)) as { error?: unknown } | null)?.error;
+    const code = typeof said === "string" ? said : (said as { code?: unknown } | null | undefined)?.code;
     return typeof code === "string" ? { kind: "error", status: response.status, code } : { kind: "error", status: response.status };
   }
   if (response.status === 204) return { kind: "ok", value: read(null) };
@@ -92,6 +96,27 @@ export function listComputers(endpoint: string, token: string, f: Fetch = global
     f,
   );
 }
+
+/**
+ * Le pone otro nombre a una computadora de la cuenta (`PATCH /v1/computers/:id`).
+ * Un nombre que no cabe contesta `error` con `invalid_name`; una que ya no está, `missing`.
+ */
+export function renameComputer(endpoint: string, token: string, id: string, name: string, f: Fetch = globalFetch): Promise<Answer<{ computer_id: string; name: string }>> {
+  return request(
+    apiUrl(endpoint, `/v1/computers/${encodeURIComponent(id)}`),
+    token,
+    "PATCH",
+    (body) => {
+      const b = body as { computer_id?: unknown; name?: unknown } | null;
+      return { computer_id: typeof b?.computer_id === "string" ? b.computer_id : id, name: typeof b?.name === "string" ? b.name : name };
+    },
+    f,
+    { name },
+  );
+}
+
+/** El largo máximo del nombre de una computadora, el mismo que valida el plano de control. */
+export const COMPUTER_NAME_MAX = 60;
 
 /** Un proyecto del registro de la cuenta (`Project` de `GET /v1/workspaces`): el mismo id en cada máquina. */
 export type AccountProject = {

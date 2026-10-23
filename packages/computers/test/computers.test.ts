@@ -16,6 +16,7 @@ import {
   listWorkspacesWithDeleted,
   powerOf,
   purgeWorkspace,
+  renameComputer,
   restoreWorkspace,
   sessionProbe,
   sessionUrl,
@@ -314,4 +315,17 @@ test("la sonda de la sesión dice license_required con el 403 del relay", async 
   const reply = (status: number) => async () => ({ status, ok: false, json: async () => ({ error: status === 403 ? "license_required" : "websocket_required" }) });
   assert.equal(await sessionProbe("https://c.example", "t", "cmp_a", reply(403)), "license_required");
   assert.equal(await sessionProbe("https://c.example", "t", "cmp_a", reply(426)), null);
+});
+
+test("renombrar una computadora: PATCH con el nombre, y el error con su código", async () => {
+  const asked: Array<{ url: string; method?: string; body?: string; type?: string }> = [];
+  const reply = (status: number, body: unknown) => async (url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }) => {
+    asked.push({ url, method: init?.method, body: init?.body, type: init?.headers?.["content-type"] });
+    return { status, ok: status < 300, json: async () => body };
+  };
+  const ok = await renameComputer("https://c.example", "t", "cmp_a", "Mac del estudio", reply(200, { computer_id: "cmp_a", name: "Mac del estudio" }));
+  assert.deepEqual(ok, { kind: "ok", value: { computer_id: "cmp_a", name: "Mac del estudio" } });
+  assert.deepEqual(asked[0], { url: "https://c.example/v1/computers/cmp_a", method: "PATCH", body: JSON.stringify({ name: "Mac del estudio" }), type: "application/json" });
+  assert.deepEqual(await renameComputer("https://c.example", "t", "cmp_a", "", reply(400, { error: { code: "invalid_name" } })), { kind: "error", status: 400, code: "invalid_name" });
+  assert.deepEqual(await renameComputer("https://c.example", "t", "cmp_b", "X", reply(404, { error: { code: "not_found" } })), { kind: "missing" });
 });
