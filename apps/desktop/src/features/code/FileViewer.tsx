@@ -39,6 +39,7 @@ import { gramaticaDe, nombreDeLenguaje } from "./languages";
 import { sangriaDe } from "./indent";
 import { IconoDeArchivo } from "./FileIcon";
 import { esArbolDeCodigo } from "./treeKind";
+import PaginaEnVivo, { direccionDePagina } from "./PagePreview";
 import { delimiterFor } from "../viewers/csv";
 import {
   type DiagnosticoTypst,
@@ -305,6 +306,14 @@ export default function VisorDeArchivo(props: {
   let fila: HTMLDivElement | undefined;
   const partida = () => ladoCodigo() && ladoPrevia();
 
+  /** Un `.html` de la tarea se ve servido de su carpeta, y se recarga con cada lectura del disco. */
+  const [lecturas, setLecturas] = createSignal(0);
+  createEffect(on(contenido, () => setLecturas((n) => n + 1), { defer: true }));
+  const pagina = () =>
+    esHtml(props.ruta) && !previa() && props.arbol !== "terminus-chat-visuals"
+      ? direccionDePagina(props.project, props.session, props.arbol, props.ruta, lecturas())
+      : null;
+
   /** Los cambios se piden al mirarlos y tapan el lado del código; la vista previa sigue a su lado. */
   const [verCambios, setVerCambios] = createSignal(false);
   const mostrarCambios = () => verCambios() && hayCambios() && !previa();
@@ -496,7 +505,8 @@ export default function VisorDeArchivo(props: {
       setHayCambios(d !== null);
       // El disco dice lo que ya se sabía: lo guardó esta pestaña o cambió otro archivo de la tarea.
       // Tocar el editor ahí borraría lo tecleado desde entonces.
-      if (c.kind === contenido()?.kind && c.text === contenido()?.text) return;
+      // Con el peso: de un archivo recortado solo cruzan sus primeros 400 KB.
+      if (c.kind === contenido()?.kind && c.text === contenido()?.text && c.bytes === contenido()?.bytes) return;
       const entrada = comoEntra(borrador() !== null, sucio());
       if (entrada === "avisa") {
         setDesincronizado(true);
@@ -871,7 +881,14 @@ export default function VisorDeArchivo(props: {
           >
             <Show
               when={vistaTypst()}
-              fallback={<Previa texto={textoDeLaPrevia()} ruta={props.ruta} aSangre={deCodigo() !== false} />}
+              fallback={
+                <Show
+                  when={pagina()}
+                  fallback={<Previa texto={textoDeLaPrevia()} ruta={props.ruta} aSangre={deCodigo() !== false} />}
+                >
+                  {(url) => <PaginaEnVivo url={url()} nombre={props.ruta} />}
+                </Show>
+              }
             >
               <Suspense fallback={<p class="m-0 p-3 text-xs text-neutral-500">{t("code.file.opening")}</p>}>
                 <VistaPreviaTypst
