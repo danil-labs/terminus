@@ -27,7 +27,6 @@ const RECIBE_LA_TAREA = ["ring-2", "ring-primary"];
 export default function FolderGroupHeader(pp: {
   p: Project;
   abierto: boolean;
-  cuenta: number;
   tareas: SessionRow[];
   vivas: string[];
   aprobando: string[];
@@ -90,10 +89,7 @@ export default function FolderGroupHeader(pp: {
             onClick={() => pp.onAbrir()}
           >
             <span class="truncate">{p().name}</span>
-            <Show
-              when={!pp.abierto}
-              fallback={<span class="tabular-nums text-[0.6875rem] font-medium text-neutral-500">{pp.cuenta}</span>}
-            >
+            <Show when={!pp.abierto}>
               <EstadoDeTarea
                 ambito="plegadas"
                 aprobando={pp.tareas.some((x) => pp.aprobando.includes(x.id))}

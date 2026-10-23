@@ -391,21 +391,18 @@ export default function Sidebar(props: {
     />
   );
 
-  /** El rótulo de un tramo, con su cuenta a la derecha. */
-  const Rotulo = (p: { children: JSX.Element; cuenta: number; tono?: "need"; accion?: JSX.Element }) => (
+  /** El rótulo de un tramo. */
+  const Rotulo = (p: { children: JSX.Element; tono?: "need"; accion?: JSX.Element }) => (
     <div class={cn(
       "group flex h-7 min-w-0 items-center gap-1.5 px-2 pt-1 text-[0.6875rem] font-medium",
       p.accion && "pr-0",
       p.tono === "need" ? "text-warning" : "text-neutral-500",
     )}>
       {p.children}
-      <span class={cn("ml-auto shrink-0 tabular-nums", p.tono !== "need" && "text-neutral-700")}>{p.cuenta}</span>
+      <span class="ml-auto" />
       {p.accion}
     </div>
   );
-
-  /** Cuántas filas enseña un tramo: buscando, las que encontró. */
-  const cuentaDe = (clave: string, filas: SessionRow[]) => query() ? (searchCounts()[clave] ?? 0) : filas.length;
 
   /**
    * La carpeta que se está clonando, encima de la lista.
@@ -476,7 +473,6 @@ export default function Sidebar(props: {
                 class={cn("rounded-[var(--radius-sm)]", g().kind === "folder" && destinoEnVuelo() === "" && RECIBE_LA_TAREA)}
               >
                 <Rotulo
-                  cuenta={cuentaDe(clave(), g().tasks)}
                   tono={necesita() ? "need" : undefined}
                   accion={g().kind === "folder" && !g().key ? (
                     <button
@@ -503,7 +499,6 @@ export default function Sidebar(props: {
                 <FolderGroupHeader
                   p={proj()}
                   abierto={abierto()}
-                  cuenta={cuentaDe(clave(), g().tasks)}
                   tareas={g().tasks}
                   vivas={props.vivas}
                   aprobando={props.aprobando}
