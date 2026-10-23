@@ -44,16 +44,15 @@ registerHooks({
 });
 
 /**
- * El HTML de `dist`, **sin sus etiquetas de recurso**.
+ * El HTML de `dist`, **sin sus scripts ni sus precargas**.
  *
- * El `<script>` y el `<link>` se quitan porque el módulo lo carga este guarda a
- * mano; dejarlos puestos hace que jsdom los pida por HTTP a un servidor que no
- * existe y reporte **su** fallo como si fuera de la app. Lo único que hace
- * falta del documento es el `<div id="root">`, y ese se queda.
+ * El módulo lo carga este guarda a mano. La hoja de estilos se queda: jsdom no
+ * la pide y Vite, al ver su `<link>`, no espera un `load` que jsdom nunca da
+ * al abrir un trozo perezoso que comparte el CSS principal.
  */
 const HTML = indice
   .replace(/<script\b[^>]*><\/script>/g, "")
-  .replace(/<link\b[^>]*>/g, "");
+  .replace(/<link\b(?![^>]*\brel="stylesheet")[^>]*>/g, "");
 
 /** Los workspaces de la cuenta que contesta el plano de control simulado en esta pasada. */
 let registro;
