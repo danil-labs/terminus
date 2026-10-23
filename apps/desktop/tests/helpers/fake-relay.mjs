@@ -31,6 +31,13 @@ export const engine = {
   load_session: ({ id }) => ({ id, provider: "codex", sources: [], model: "gpt-5.6", effort: null, permission_mode: null, turns: [] }),
 };
 
+/** What an entry of `table` returns so the relay answers with that error instead of a value. */
+export class RelayError {
+  constructor(error) {
+    this.error = error;
+  }
+}
+
 /** One relay session socket per connection, speaking protocol v1 to the page. */
 /** The relay's wake list (protocol v1): only these start an off computer. */
 const INTENT = new Set(["send_message", "inject_message", "create_project", "create_agent", "add_account", "login_account", "submit_login_code", "respond_permission", "answer_question", "answer_shell_output", "run_shell_command", "queue_ready", "resume_awaiting_quota", "recreate_task_work", "add_workspace", "radiant_login", "materialize_workspace", "ensure_project"]);
@@ -80,11 +87,14 @@ export function relay({ state: initial = "online", wakeAfter = 300, cachedAt = n
       }
       const respond = () => {
         const answer = table[m.command];
+        const value = typeof answer === "function" ? answer(m.args) : answer;
         const reply = outdated
           ? { type: "result", id: m.id, error: { code: "version_mismatch" } }
           : answer === undefined
           ? { type: "result", id: m.id, error: { code: "command" } }
-          : { type: "result", id: m.id, value: typeof answer === "function" ? answer(m.args) : answer };
+          : value instanceof RelayError
+          ? { type: "result", id: m.id, error: value.error }
+          : { type: "result", id: m.id, value };
         if (this.readyState === 1) this.onmessage?.({ data: JSON.stringify(reply) });
       };
       if (state === "online") return void setTimeout(respond, delay);

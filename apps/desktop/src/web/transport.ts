@@ -71,7 +71,11 @@ export function failureOf(error: unknown): Failure {
   const e = (error ?? {}) as RelayFailure;
   const code = typeof e.code === "string" ? e.code : "io";
   const detail = e.detail as { what?: unknown } | string | undefined;
-  if (code === "operation_failed" && (typeof detail === "string" || detail?.what)) return detail as unknown as Failure;
+  // El motor de allá falló: su propio `Failure` viaja en `detail` (el relay lo manda como `command_failed`).
+  if (code === "operation_failed" || code === "command_failed") {
+    if (typeof detail === "string" && detail) return { what: detail, detail: code };
+    if (detail && typeof detail === "object" && detail.what) return detail as unknown as Failure;
+  }
   if (code === "machine_off") return { what: { clave: "shell.service.machine_off" }, detail: "machine_off" };
   if (code === "app_unavailable") return { what: { clave: "shell.service.engine_down" }, detail: "engine_down" };
   if (code === "start_failed" || code === "start_timeout") return { what: t("web.start_failed"), detail: code };

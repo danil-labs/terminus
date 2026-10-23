@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { engine, relay } from "../helpers/fake-relay.mjs";
+import { RelayError, engine, relay } from "../helpers/fake-relay.mjs";
 import { boot, sleep } from "../helpers/jsdom-app.mjs";
 
 test("the web build talks to the relay: calls, events and machine state", async () => {
@@ -111,5 +111,31 @@ test("the transport leaves out what the account may not see: workspaces, attenti
   assert.equal(tile("w2")?.dataset.attention, undefined, "and replaces what waited before");
   assert.equal(tile("z"), null);
 
+  assert.deepEqual(app.fallos, []);
+});
+
+test("an engine failure through the relay keeps its own reason, not the generic one", async () => {
+  const work = { what: { clave: "worktrees.error.work_in_tree" }, detail: "notas.md" };
+  const fake = relay({
+    table: {
+      ...engine,
+      delete_session: ({ id }) =>
+        new RelayError({ code: "command_failed", detail: id === "t1" ? work : "Esa tarea ya no existe", message_key: "cli.error.command_failed" }),
+    },
+  });
+  const app = await boot("listo", "web-transport-command-failed", {}, undefined, {}, {
+    web: true,
+    antes: (w) => {
+      globalThis.WebSocket = fake.Socket;
+      w.terminusWeb = { endpoint: "https://relay.test", computerId: "cmp_test", getToken: async () => "tok" };
+    },
+  });
+  await sleep(800);
+  const invoke = (command, args) => app.w.__TAURI_INTERNALS__.invoke(command, args);
+  const failure = (command, args) => invoke(command, args).then(() => assert.fail(`${command} did not fail`), (e) => e);
+
+  // Archivos sin Git: la ventana pregunta qué hacer con ellos en vez de un error sin explicación.
+  assert.deepEqual(await failure("delete_session", { project: "p1", id: "t1", force: false }), work);
+  assert.deepEqual(await failure("delete_session", { project: "p1", id: "t2", force: false }), { what: "Esa tarea ya no existe", detail: "command_failed" });
   assert.deepEqual(app.fallos, []);
 });
