@@ -7475,6 +7475,7 @@ export default function App() {
                           visible={visible()}
                           onSucio={(sucio) => pestanas.setDirty(id, sucio)}
                           onGuardador={(guardar) => pestanas.registerSaver(id, guardar)}
+                          onBorrado={() => cerrarPestanasYa([id])}
                           onAbrirOtro={(ruta) =>
                             pestanas.openContent({
                               clase: "archivo",

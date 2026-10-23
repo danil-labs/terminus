@@ -27,7 +27,7 @@ import { asFailure, type Failure, FailureNote } from "../../ui/Failure";
 import { ITEM_DE_MENU, Popover, PopoverContent } from "../../ui/Popover";
 import { IconoDeArchivo } from "./FileIcon";
 import { colorDeMarca, describirEstado, publicarLocales } from "./localStatus";
-import { alMoverseElArbol, avisarDeLosArboles } from "./refresh";
+import { alMoverseElArbol, avisarDeIdos, avisarDeLosArboles, idos } from "./refresh";
 import {
   arrastrarRuta,
   conVistaTypst,
@@ -149,6 +149,10 @@ export default function ArbolDeArchivos(props: {
         ? await invoke<Archivos>("preview_tree_files", { project: props.project, baseRef: props.preview.baseRef })
         : await invoke<Archivos>("tree_files", { project: props.project, session: props.session, tree: props.arbol });
       if (!vigente()) return;
+      if (!props.preview && !recortado() && !f.truncated) {
+        const fuera = idos(paths(), f.paths);
+        if (fuera.length > 0) avisarDeIdos(props.session, props.arbol, fuera);
+      }
       setPaths(f.paths);
       setCarpetas(f.folders);
       setNube(f.cloud_only ?? []);

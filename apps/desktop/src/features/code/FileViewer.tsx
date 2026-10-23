@@ -31,7 +31,7 @@ import { ariaDeAtajo, textoDeAtajo } from "../../lib/shortcuts";
 import { peso } from "../../lib/format";
 import { comoDiff, parsearDiff, type ArchivoDiff } from "./diff";
 import { CuerpoDeArchivo, SelectorDeDisposicion } from "./Changes";
-import { alMoverseElArbol, comoEntra } from "./refresh";
+import { IDOS, alMoverseElArbol, comoEntra, esBorrado, type DetalleDeIdos } from "./refresh";
 import { setMoviendoHueco } from "../../lib/sites";
 import { cargarEditor } from "./editorLoad";
 import { alternarAjuste, esAtajoDeAjuste } from "../../lib/wrap";
@@ -111,6 +111,9 @@ const PAUSA_DE_LA_PREVIA = 250;
 /** Cuánto espera, sin teclear, el guardado de un `.typ` en vivo: pone al día el disco, el índice y los cambios. */
 const PAUSA_DEL_INDICE = 1500;
 
+/** Cuánto se espera a releer un archivo que no está: reescribirlo puede ser borrarlo y crearlo. */
+const ESPERA_DEL_BORRADO = 600;
+
 /** Qué extensiones pinta `remark-gfm` como documento y no como código. */
 const MARKDOWN = ["md", "markdown"];
 
@@ -164,6 +167,8 @@ export default function VisorDeArchivo(props: {
   onAbrirOtro?: (ruta: string) => void;
   /** Si hay algo escrito que no está en disco: lo pinta la pestaña. */
   onSucio: (sucio: boolean) => void;
+  /** El archivo se borró y no había nada escrito, o se eligió cerrar: la pestaña se va sin preguntar. */
+  onBorrado?: () => void;
   /** Cómo guardar desde fuera, para cerrar la pestaña guardando. `null` al desmontarse. */
   onGuardador: (guardar: (() => Promise<boolean>) | null) => void;
 }) {
@@ -182,6 +187,8 @@ export default function VisorDeArchivo(props: {
   const [guardando, setGuardando] = createSignal(false);
   /** El archivo cambió en disco con algo escrito sin guardar. Guardar o descartar lo resuelven. */
   const [desincronizado, setDesincronizado] = createSignal(false);
+  /** Se borró con algo escrito: se avisa y se deja guardarlo de nuevo o cerrar. */
+  const [borrado, setBorrado] = createSignal(false);
   /** Aparte de `fallo`, que tapa el archivo entero. */
   const [falloAfuera, setFalloAfuera] = createSignal<Failure | null>(null);
 
@@ -345,6 +352,7 @@ export default function VisorDeArchivo(props: {
       setDiff(null);
       setHayCambios(true);
       setDesincronizado(false);
+      setBorrado(false);
       // Lo tecleado mientras viajaba el guardado no está en disco: soltarlo lo borraría del editor.
       if (borrador() === texto) setBorrador(null);
       escrituras++;
@@ -448,7 +456,8 @@ export default function VisorDeArchivo(props: {
       try {
         setContenido(await pedirContenido());
       } catch (e) {
-        setFallo(asFailure(e));
+        if (esBorrado(e)) void alBorrarse();
+        else setFallo(asFailure(e));
       } finally {
         setLeyendo(false);
       }
@@ -496,7 +505,8 @@ export default function VisorDeArchivo(props: {
       setContenido(c);
       if (entrada === "arrastra") setBorrador(c.text);
     } catch (e) {
-      setFallo(asFailure(e));
+      if (esBorrado(e)) void alBorrarse();
+      else setFallo(asFailure(e));
     }
   }
 
@@ -505,6 +515,36 @@ export default function VisorDeArchivo(props: {
     () => props.visible,
     () => void refrescar(),
   );
+
+  /**
+   * El archivo ya no está en el disco. Se mira otra vez tras una pausa: quien lo reescribe
+   * borrándolo y creándolo no cierra la pestaña. Sin nada escrito se cierra; con algo, avisa.
+   */
+  let confirmando = false;
+  async function alBorrarse() {
+    if (confirmando || props.suelto || previa()) return;
+    confirmando = true;
+    try {
+      await new Promise((listo) => setTimeout(listo, ESPERA_DEL_BORRADO));
+      await pedirContenido();
+      setBorrado(false);
+      void refrescar();
+    } catch (e) {
+      if (!esBorrado(e)) return void setFallo(asFailure(e));
+      if (sucio()) setBorrado(true);
+      else props.onBorrado?.();
+    } finally {
+      confirmando = false;
+    }
+  }
+
+  // Escondida también: el árbol avisa de lo que dejó de listar y solo esa pestaña lee.
+  const alIrse = (e: Event) => {
+    const d = (e as CustomEvent<DetalleDeIdos>).detail;
+    if (d.session === props.session && d.arbol === props.arbol && d.rutas.includes(props.ruta)) void alBorrarse();
+  };
+  window.addEventListener(IDOS, alIrse);
+  onCleanup(() => window.removeEventListener(IDOS, alIrse));
 
   function descartar() {
     // Con el archivo movido por debajo, lo que está en la mano es lo de antes: hay que traer lo del agente.
@@ -588,9 +628,9 @@ export default function VisorDeArchivo(props: {
   createEffect(
     on(borrador, () => {
       clearTimeout(guardadoEnEspera);
-      if (!typstVivo() || !editable() || !sucio() || desincronizado()) return;
+      if (!typstVivo() || !editable() || !sucio() || desincronizado() || borrado()) return;
       guardadoEnEspera = setTimeout(() => {
-        if (sucio() && !desincronizado()) void guardar();
+        if (sucio() && !desincronizado() && !borrado()) void guardar();
       }, PAUSA_DEL_INDICE);
     }),
   );
@@ -711,6 +751,18 @@ export default function VisorDeArchivo(props: {
           </Button>
         </Show>
       </div>
+
+      <Show when={borrado()}>
+        <div class="flex shrink-0 items-center gap-2 border-b border-border bg-surface-raised px-3 py-1.5">
+          <p class="m-0 min-w-0 flex-1 text-[0.6875rem] text-warning-strong">{t("code.file.deleted")}</p>
+          <Button variant="ghost" size="compact" class="shrink-0" disabled={guardando()} onClick={() => props.onBorrado?.()}>
+            {t("code.file.deleted.close")}
+          </Button>
+          <Button variant="secondary" size="compact" class="shrink-0" disabled={guardando()} onClick={() => void guardar()}>
+            {t("code.file.deleted.save")}
+          </Button>
+        </div>
+      </Show>
 
       {/* Sin este aviso, guardar pisaba el turno del agente en silencio. */}
       <Show when={desincronizado()}>

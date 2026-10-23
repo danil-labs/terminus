@@ -246,6 +246,7 @@ pub fn typst_live_complete(
     let proceso = vivo(&key)?;
     sincronizar(&proceso, &path, text).map_err(fallo)?;
     let uri = uri_dentro(&proceso.root, &path).map_err(fallo)?;
+    let referencia = matches!(trigger.as_deref(), Some("@" | "<"));
     let contexto = match trigger {
         Some(caracter) => json!({"triggerKind": 2, "triggerCharacter": caracter}),
         None => json!({"triggerKind": 1}),
@@ -268,7 +269,88 @@ pub fn typst_live_complete(
         },
         _ => Vec::new(),
     };
-    Ok(sugerencias(&proceso, &path, items))
+    let mut propuestas = sugerencias(&proceso, &path, items);
+    // Tinymist solo propone etiquetas con un documento que compiló alguna vez: si la vista
+    // arrancó con el proyecto roto (un `@fig-` a medio escribir ya guardado), contesta vacío.
+    if referencia && !propuestas.iter().any(|s| CON_CLAVE.contains(&s.kind)) {
+        let leidas = de_las_fuentes(&proceso, &path);
+        log::info!(
+            "[typst] Tinymist no dio etiquetas en {path}; {} salen de las fuentes",
+            leidas.len()
+        );
+        propuestas.extend(leidas);
+    }
+    Ok(propuestas)
+}
+
+/// Las clases de propuesta que son una etiqueta o una cita.
+const CON_CLAVE: [&str; 6] = ["cite", "heading", "figure", "table", "equation", "label"];
+
+/// Las etiquetas que ponen los `.typ` del proyecto y las claves de sus `.bib`, leídas del texto.
+fn de_las_fuentes(proceso: &Proceso, path: &str) -> Vec<Sugerencia> {
+    let fuentes = fuentes(proceso, path);
+    let mut vistas = HashSet::new();
+    let mut out = Vec::new();
+    for (_, texto) in &fuentes {
+        for etiqueta in etiquetas(texto) {
+            if !vistas.insert(etiqueta.clone()) {
+                continue;
+            }
+            let d = describir(&fuentes, &etiqueta);
+            out.push(Sugerencia {
+                kind: d.as_ref().map_or("label", |d| d.kind),
+                insert: etiqueta.clone(),
+                snippet: false,
+                line: None,
+                column: None,
+                detail: d.as_ref().and_then(|d| d.texto.clone()),
+                authors: None,
+                year: None,
+                image: d.and_then(|d| d.imagen),
+                label: etiqueta,
+            });
+        }
+    }
+    let mut citas: Vec<(String, Cita)> = bibliografia(&proceso.root, &fuentes)
+        .into_iter()
+        .filter(|(clave, _)| !vistas.contains(clave))
+        .collect();
+    citas.sort_by(|a, b| a.0.cmp(&b.0));
+    out.extend(citas.into_iter().map(|(clave, cita)| Sugerencia {
+        kind: "cite",
+        insert: clave.clone(),
+        snippet: false,
+        line: None,
+        column: None,
+        detail: cita.titulo,
+        authors: cita.autores,
+        year: cita.anio,
+        image: None,
+        label: clave,
+    }));
+    out
+}
+
+/// Las `<etiquetas>` que pone un texto, en orden y sin las que `ref(<x>)` o `cite(<x>)` solo usan.
+fn etiquetas(texto: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for (at, _) in texto.match_indices('<') {
+        let cola = &texto[at + 1..];
+        let fin = cola
+            .find(|c: char| !(c.is_alphanumeric() || matches!(c, '_' | '-' | ':' | '.')))
+            .unwrap_or(cola.len());
+        if fin == 0 || !cola[fin..].starts_with('>') {
+            continue;
+        }
+        if texto[..at].trim_end().ends_with(['(', ',', ':', '<']) {
+            continue;
+        }
+        let etiqueta = &cola[..fin];
+        if etiqueta.starts_with(|c: char| c.is_alphabetic() || c == '_') {
+            out.push(etiqueta.to_string());
+        }
+    }
+    out
 }
 
 const TOPE_DEL_DETALLE: usize = 240;
@@ -1285,4 +1367,20 @@ fn relativa(ruta: &str, raices: &[PathBuf]) -> Option<String> {
             .collect();
         (!partes.is_empty()).then(|| partes.join("/"))
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn las_etiquetas_salen_del_texto_aunque_no_compile() {
+        let texto = "= Intro <sec-intro>\n#figure(image(\"a.png\"), caption: [Uno]) <fig-uno>\n\
+                     Ver @fig-uno y #ref(<sec-intro>).\n$ x $ <eq:uno>\n@fig-\n<fig-uno>";
+        assert_eq!(
+            etiquetas(texto),
+            ["sec-intro", "fig-uno", "eq:uno", "fig-uno"]
+        );
+        assert!(etiquetas("#cite(<knuth>) a <- b, x < 3 > 2").is_empty());
+    }
 }
