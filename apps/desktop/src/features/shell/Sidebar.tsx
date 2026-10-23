@@ -1,4 +1,7 @@
 import Archive from "lucide-solid/icons/archive";
+import Folder from "lucide-solid/icons/folder";
+import FolderPlus from "lucide-solid/icons/folder-plus";
+import GitBranch from "lucide-solid/icons/git-branch";
 import History from "lucide-solid/icons/history";
 import Loader2 from "lucide-solid/icons/loader-2";
 import PanelLeftClose from "lucide-solid/icons/panel-left-close";
@@ -22,6 +25,7 @@ import { cn } from "../../lib/utils";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
 import { KeyedList } from "../../ui/KeyedList";
+import { ITEM_DE_MENU, Popover, PopoverContent, PopoverTrigger } from "../../ui/Popover";
 import { BotonConAtajo, TeclaDeAtajo } from "../../ui/Shortcut";
 import {
   SidebarContent,
@@ -32,7 +36,7 @@ import {
   SidebarMenuItem,
   Sidebar as SidebarShell,
 } from "../../ui/sidebar";
-import { type ClonEnCurso, faseDeClon } from "../projects/AddWorkdir";
+import { type ClonEnCurso, faseDeClon, type InicioDeCarpeta } from "../projects/AddWorkdir";
 import { AstroAvatar } from "../projects/AstroAvatar";
 import { watchHandlerStatuses } from "../projects/handlerPresence";
 import NewAgent, { type ModelChoices } from "../projects/NewAgent";
@@ -113,6 +117,7 @@ export default function Sidebar(props: {
   /** With more than one space, the folder leaves the active one instead of being deleted. */
   onRemoveFromSpace?: (id: string) => void;
   /** Abre «Añadir un proyecto»; `inicio` salta a uno de sus caminos. */
+  onAnadirCarpeta: (inicio: InicioDeCarpeta | null) => void;
   /** El clon que corre ahora mismo, si lo hay. Ver `projects/AddWorkdir.tsx`. */
   clon: ClonEnCurso | null;
   /** Devuelve el diálogo del clon, con su progreso y su cancelación. */
@@ -209,6 +214,26 @@ export default function Sidebar(props: {
   const reportResults = (key: string, count: number) => setSearchCounts(previous => previous[key] === count ? previous : { ...previous, [key]: count });
   const clearSearch = () => setSearchText("");
   createEffect(() => { if (props.collapsed) clearSearch(); });
+  const [menuCarpeta, setMenuCarpeta] = createSignal(false);
+  const anadirCarpeta = (inicio: InicioDeCarpeta) => {
+    setMenuCarpeta(false);
+    setDesplegado(false);
+    props.onAnadirCarpeta(inicio);
+  };
+  const OpcionDeCarpeta = (p: { inicio: InicioDeCarpeta; titulo: string; detalle: string; children: JSX.Element }) => (
+    <button
+      role="menuitem"
+      class={cn(ITEM_DE_MENU, "grid grid-cols-[16px_minmax(0,1fr)] items-start gap-2 [&_svg]:mt-px [&_svg]:text-neutral-500")}
+      data-folder-menu={p.inicio}
+      onClick={() => anadirCarpeta(p.inicio)}
+    >
+      {p.children}
+      <span class="grid min-w-0">
+        <span>{p.titulo}</span>
+        <span class="text-[0.6875rem] text-neutral-500">{p.detalle}</span>
+      </span>
+    </button>
+  );
   createEffect(() => recordarCarpetas(props.projects));
 
   /** De qué carpeta es cada tarea, por id: las acciones de la fila llegan con el id. */
@@ -623,6 +648,38 @@ export default function Sidebar(props: {
                   <TeclaDeAtajo accion="newTask" />
                 </Show>
               </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <Popover open={menuCarpeta()} onOpenChange={setMenuCarpeta} placement={props.collapsed ? "right-start" : "bottom-start"} gutter={4}>
+                <PopoverTrigger
+                  as={(disparador: object) => (
+                    <SidebarMenuButton
+                      {...disparador}
+                      class="bg-neutral-950 font-bold text-neutral-50 hover:bg-neutral-950"
+                      data-new-folder=""
+                      aria-haspopup="menu"
+                      aria-label={t("shell.sidebar.new_folder")}
+                      title={props.collapsed ? t("shell.sidebar.new_folder") : undefined}
+                    >
+                      <FolderPlus size={14} aria-hidden="true" />
+                      <Show when={!props.collapsed}>
+                        <span>{t("shell.sidebar.new_folder")}</span>
+                      </Show>
+                    </SidebarMenuButton>
+                  )}
+                />
+                <PopoverContent role="menu" aria-label={t("shell.sidebar.new_folder")} class="grid w-72 gap-0.5 p-1">
+                  <OpcionDeCarpeta inicio="carpeta" titulo={t("shell.sidebar.folder_menu.open")} detalle={t("projects.add.browse_help")}>
+                    <Folder size={15} aria-hidden="true" />
+                  </OpcionDeCarpeta>
+                  <OpcionDeCarpeta inicio="vacia" titulo={t("shell.sidebar.folder_menu.create")} detalle={t("projects.add.empty_help")}>
+                    <Plus size={15} aria-hidden="true" />
+                  </OpcionDeCarpeta>
+                  <OpcionDeCarpeta inicio="clonar" titulo={t("shell.sidebar.folder_menu.clone")} detalle={t("shell.sidebar.folder_menu.clone_help")}>
+                    <GitBranch size={15} aria-hidden="true" />
+                  </OpcionDeCarpeta>
+                </PopoverContent>
+              </Popover>
             </SidebarMenuItem>
             <Show when={props.collapsed}>
               <SidebarMenuItem>

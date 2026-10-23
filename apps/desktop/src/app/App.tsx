@@ -7869,6 +7869,10 @@ export default function App() {
               }
               onBorrarProyecto={borrarProyecto}
               onRemoveFromSpace={multipleSpaces() ? removeFromActiveSpace : undefined}
+              onAnadirCarpeta={(inicio) => batch(() => {
+                setInicioDeCarpeta(inicio);
+                setAnadiendoCarpeta(true);
+              })}
               clon={clonEnCurso()}
               onAbrirClon={() => setAnadiendoCarpeta(true)}
               proyectoAbierto={proyectoAbierto()}
