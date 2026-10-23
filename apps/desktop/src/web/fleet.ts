@@ -253,6 +253,14 @@ export class Fleet {
     return true;
   }
 
+  /** A machine renamed in the account (`PATCH /v1/computers/:id`): every label of it reads the new name. True if it changed. */
+  rename(machine: string, name: string): boolean {
+    const m = this.info(machine);
+    if (!m || !name || m.name === name) return false;
+    m.name = name;
+    return true;
+  }
+
   /** What `machine` answered, without the workspaces not linked to the account there. */
   linkedOnly(machine: string, command: string, value: unknown): unknown {
     const linked = this.info(machine)?.linked ?? null;

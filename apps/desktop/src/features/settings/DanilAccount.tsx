@@ -11,6 +11,7 @@ import type { DanilConnectStatus } from "./danil-account";
 import { createDanilAccounts, type DanilAccounts } from "./danil-accounts";
 import { createDanilSession, DanilSignInChoices, said } from "./danil-session";
 import { type DanilSessionInfo, sessionKey, statusOf } from "./danil-sessions";
+import { AccountComputersSection } from "../machines/AccountComputers";
 import { ConnectMachineSection } from "../machines/ConnectMachine";
 import { LICENSE_REQUIRED, startTrialInBrowser, TerminusLicense } from "./TerminusLicense";
 import { SettingsBlock, SettingsPanel, SettingsRow, SettingsSection } from "./layout";
@@ -29,6 +30,7 @@ function WebAccount(props: { source: AccountProfileSource }) {
       <SettingsSection title={t("danil.account.title")} description={t("danil.account.web_description")}>
         <AccountIdentityBlock identity={identity} />
       </SettingsSection>
+      <AccountComputersSection />
       <ConnectMachineSection />
     </SettingsPanel>
   );
@@ -68,6 +70,8 @@ function AccountList(props: { accounts: DanilAccounts }) {
   const many = () => keys().length > 1;
   const pending = () => a.pending();
   const problem = () => a.problem() ?? (pending()?.status === "error" ? (pending()?.error ?? "failed") : null);
+  // El nombre de esta computadora recién cambiado aquí, por cuenta: el motor lo sabe al volver a conectarse.
+  const [renamed, setRenamed] = createSignal<Record<string, string>>({});
 
   return (
     <SettingsPanel data-danil-account="sessions">
@@ -75,7 +79,7 @@ function AccountList(props: { accounts: DanilAccounts }) {
         <For each={keys()}>
           {(key) => (
             <Show when={a.connected().find((s) => sessionKey(s) === key)}>
-              {(session) => <SessionCard session={session()} accounts={a} many={many()} />}
+              {(session) => <SessionCard session={session()} accounts={a} many={many()} computerName={renamed()[key]} />}
             </Show>
           )}
         </For>
@@ -117,13 +121,27 @@ function AccountList(props: { accounts: DanilAccounts }) {
           {(code) => <p class="m-0 pt-2 text-[0.8125rem] text-error-strong" role="alert">{said(code())}</p>}
         </Show>
       </SettingsSection>
+      <For each={keys()}>
+        {(key) => (
+          <Show when={a.connected().find((s) => sessionKey(s) === key)}>
+            {(session) => (
+              <AccountComputersSection
+                account={key}
+                owner={many() ? session().email || session().name || key : null}
+                self={session().computer_id}
+                onSelfName={(name) => setRenamed((r) => ({ ...r, [key]: name }))}
+              />
+            )}
+          </Show>
+        )}
+      </For>
       <ConnectMachineSection />
     </SettingsPanel>
   );
 }
 
 /** Una cuenta: su persona (con la foto), esta computadora en ella, y sus acciones. */
-function SessionCard(props: { session: DanilSessionInfo; accounts: DanilAccounts; many: boolean }) {
+function SessionCard(props: { session: DanilSessionInfo; accounts: DanilAccounts; many: boolean; computerName?: string }) {
   const key = sessionKey(props.session) as string;
   const s = () => props.session;
   const identity = createAccountIdentity(engineAccountProfileOf(key), undefined, {
@@ -145,7 +163,7 @@ function SessionCard(props: { session: DanilSessionInfo; accounts: DanilAccounts
     <div class="grid border-b border-border last:border-b-0" data-danil-session={key} data-default={s().default ? "" : undefined}>
       <AccountIdentityBlock identity={shown} />
       <SettingsRow
-        label={t("danil.account.this_computer", { name: s().computer_name || s().computer_id || "" })}
+        label={t("danil.account.this_computer", { name: props.computerName || s().computer_name || s().computer_id || "" })}
         description={state()}
       >
         <Show when={props.many && s().default}>
@@ -189,6 +207,7 @@ function SessionCard(props: { session: DanilSessionInfo; accounts: DanilAccounts
 function SingleAccount() {
   const session = createDanilSession();
   const { view, status, name, setName, busy } = session;
+  const [renamed, setRenamed] = createSignal<string | null>(null);
 
   return (
     <SettingsPanel data-danil-account={status()?.state ?? view().t}>
@@ -207,7 +226,7 @@ function SingleAccount() {
           <Match when={status()?.state === "connected"}>
             <ConnectedIdentity status={status} />
             <SettingsRow
-              label={t("danil.account.this_computer", { name: status()?.name || status()?.computer_id || "" })}
+              label={t("danil.account.this_computer", { name: renamed() || status()?.name || status()?.computer_id || "" })}
               description={status()?.online ? t("danil.account.online") : t("danil.account.offline")}
             >
               <Button size="sm" variant="secondary" disabled={busy()} onClick={() => void session.signOut()}>
@@ -251,6 +270,7 @@ function SingleAccount() {
         </Show>
       </SettingsSection>
       <Show when={status()?.state === "connected"}>
+        <AccountComputersSection self={status()?.computer_id ?? null} onSelfName={setRenamed} />
         <ConnectMachineSection />
       </Show>
     </SettingsPanel>

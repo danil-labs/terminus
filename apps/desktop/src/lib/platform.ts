@@ -18,6 +18,16 @@ export type AccountMachinesProps = {
   refresh: () => void;
 };
 
+/** Las computadoras de la cuenta en Configuración: leerlas, renombrarlas y avisar del nombre nuevo. */
+export type AccountComputersSource = {
+  list: () => Promise<Answer<Computer[]>>;
+  rename: (id: string, name: string) => Promise<Answer<{ computer_id: string; name: string }>>;
+  /** Si su motor no habla el contrato de esta ventana. */
+  outdated?: (computer: Computer) => boolean;
+  /** Quien pinta nombres de máquina (la flota) toma el nuevo sin recargar. */
+  onRenamed: (id: string, name: string) => void;
+};
+
 export type Capabilities = {
   /** Controles de ventana propios, semáforo de macOS y bandeja. */
   nativeWindow: boolean;
@@ -71,6 +81,8 @@ export type Capabilities = {
    * cuenta y qué hacer cuando la nueva está en línea. El escritorio usa su token
    * de cliente (`features/machines/ConnectMachine.tsx`).
    */
+  /** Las computadoras de la cuenta con la sesión de la página (la web); el escritorio usa su token de cliente. */
+  accountComputers?: AccountComputersSource;
   connectMachine?: {
     list: () => Promise<Answer<Computer[]>>;
     outdated?: (computer: Computer) => boolean;

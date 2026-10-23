@@ -38,7 +38,7 @@ import type { MachineStatus } from "../../web/fleet";
 import { type DanilSessionInfo, sessionForWorkspace, type WorkspaceAccount } from "../settings/danil-sessions";
 import { MachinePicker } from "./MachinePicker";
 import { createRouter, type Invoke, type Router, type SliceChange } from "./router";
-import { refetchMachines } from "./store";
+import { machineNamesChanged, refetchMachines } from "./store";
 
 declare const __TERMINUS_CONTRACT__: string;
 
@@ -288,6 +288,7 @@ export function startAccountMachines(target: Target = window) {
     // The same account: machines that came, left or changed name are applied live, without tearing the rest down.
     if (installed?.key === key) {
       installed.fleet.setMachines(others.map(infoOf));
+      machineNamesChanged();
       return void refetchMachines();
     }
     uninstall();
