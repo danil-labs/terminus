@@ -20,7 +20,7 @@ repositories, and `GitHostInfo`. Files on disk keep their keys; the types that
 are stored and also travel cross the contract wrapped in `Wire`, which renames
 their keys. There are no aliases. This copy is byte-identical to the engine's.
 SHA-256:
-`60d64366043331fd68f5c9faa67ebad0d9c696d88445298d2c983a3b3e348fa0`.
+`83380f7f75a89b8a4b01d6995c04b90edd6e075f162338b5e92e087e94a75d1b`.
 
 seldon-host `4e21caf` (#66) added the Danil account (321 commands, 28 events):
 `danil_connect_start`, `danil_connect_status`, `danil_connect_options`,
@@ -216,3 +216,5 @@ seldon-host `feat/mcp-oauth-terminus` moves the «don't use» choice for Google
 Drive for desktop from the window to the engine, which tells agents which
 drives they can use: new `set_google_drive_desktop_use` (`{used}`) and
 `DesktopStatus.unused`. 368 commands, 32 events.
+
+seldon-host `feat/referencias-zotero-mendeley` (`3fbe495`, merged with dev `3464f3d`, #120) connects the person's reference libraries (377 commands, 33 events). Zotero, on this machine: `zotero_status` → `{installed, running, version, local_api, installer_bytes}` (`local_api`: `ready`, `disabled` when Zotero's local API is off, `unsupported` for Zotero 6, `unavailable` when Zotero does not answer), and `install_zotero` and `open_zotero` with `scope: "machine"`; `install_size` and `cancel_install` take `"zotero"` and progress goes through the `install` event. Mendeley, in the cloud with the workspace's account: `mendeley_status` → `{app_installed, configured, connected, account, signing_in}`, `mendeley_login` → `{url}`, `cancel_mendeley_login` and `disconnect_mendeley`, all with `{workspace?}`. New event `references` (`{workspace, library, ok, failure}`). This copy is `git show 3fbe495:crates/engine-protocol/commands.json` byte for byte; no `seldon-runtime` with it is published yet.

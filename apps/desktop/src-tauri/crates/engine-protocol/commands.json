@@ -560,6 +560,27 @@
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "workspace"
+        ]
+      },
+      "kind": "invoke",
+      "name": "cancel_mendeley_login",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "mendeley::cancel_mendeley_login",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
       "kind": "invoke",
       "name": "cancel_project_clone",
       "output": "",
@@ -1733,6 +1754,27 @@
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "workspace"
+        ]
+      },
+      "kind": "invoke",
+      "name": "disconnect_mendeley",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "mendeley::disconnect_mendeley",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
       "kind": "invoke",
       "name": "download_artifact",
       "output": "-> Result < Descarga , Failure >",
@@ -2374,6 +2416,16 @@
         }
       ],
       "path": "toolchain::install_tool",
+      "scope": "machine"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "install_zotero",
+      "output": "-> Result < () , Failure >",
+      "parameters": [],
+      "path": "zotero::install_zotero",
       "scope": "machine"
     },
     {
@@ -3312,6 +3364,48 @@
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "workspace"
+        ]
+      },
+      "kind": "invoke",
+      "name": "mendeley_login",
+      "output": "-> Result < MendeleyLogin , Failure >",
+      "parameters": [
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "mendeley::mendeley_login",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "ids": {
+        "workspace": [
+          "workspace"
+        ]
+      },
+      "kind": "invoke",
+      "name": "mendeley_status",
+      "output": "-> Result < MendeleyStatus , Failure >",
+      "parameters": [
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "mendeley::mendeley_status",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
       "kind": "invoke",
       "name": "move_session",
       "output": "-> Result < () , String >",
@@ -3437,6 +3531,16 @@
       "output": "-> Result < () , Failure >",
       "parameters": [],
       "path": "google_drive_desktop::open_google_drive_desktop",
+      "scope": "machine"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "open_zotero",
+      "output": "-> Result < () , Failure >",
+      "parameters": [],
+      "path": "zotero::open_zotero",
       "scope": "machine"
     },
     {
@@ -7813,6 +7917,16 @@
       ],
       "path": "chat::write_shell_input",
       "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "zotero_status",
+      "output": "-> ZoteroStatus",
+      "parameters": [],
+      "path": "zotero::zotero_status",
+      "scope": "workspace"
     }
   ],
   "events": [
@@ -7841,6 +7955,7 @@
     "providers",
     "question",
     "radiant",
+    "references",
     "session",
     "site",
     "sitio-pedido",
