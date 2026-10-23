@@ -35,6 +35,9 @@ const CREATE = new Set(["send_message", "run_shell_command", "create_project", "
 const WITH_SPACE = new Set([...CREATE, "create_empty_session", "move_task_to_space", "set_task_archived"]);
 /** De esta computadora por definición: sus cuentas de IA, su sesión de Danil, Radiant. */
 const OF_THIS_MACHINE = /(^|_)accounts?($|_)|login|^radiant_|^danil_|^account_relay_token$/;
+/** Las credenciales de la cuenta son del workspace: van a la máquina que lo atiende, como las demás órdenes con `scope`. */
+const ACCOUNT_CREDENTIALS = /^account_credentials?_|^github_account_/;
+const ofThisMachine = (command: string) => OF_THIS_MACHINE.test(command) && !ACCOUNT_CREDENTIALS.test(command);
 /** Las órdenes con canal pierden el canal por el relay: vuelve solo la respuesta final. */
 const CHANNELS: Record<string, string> = { clone_project: "progress", list_session_git: "progress", watch_task_tree: "changes" };
 const UNKNOWN = new Set(["command", "unsupported", "command_not_allowed"]);
@@ -495,7 +498,7 @@ export function createRouter(config: RouterConfig) {
     }
     const machine = headerOf(options, "x-terminus-machine");
     const workspace = headerOf(options, "x-terminus-workspace") ?? active;
-    if (local && OF_THIS_MACHINE.test(command)) return native(command, args, options);
+    if (local && ofThisMachine(command)) return native(command, args, options);
     if (!local && command in NO_SETUP) return NO_SETUP[command];
     if (FILES.test(command) && ((machine && machine !== self && fleet.has(machine)) || namesOther(args)))
       throw { what: t("shell.machines.local_only"), detail: "machine_files" };
@@ -503,7 +506,7 @@ export function createRouter(config: RouterConfig) {
       if (machine && machine !== self && fleet.has(machine)) return await remote(machine, command, args, callWorkspace(workspace, args));
       // Una máquina que ya no es de la cuenta no se cambia por otra en silencio.
       if (machine && machine !== self) throw new FleetError("unknown_machine", machine);
-      if (!local && OF_THIS_MACHINE.test(command)) return await ofAMachine(command, args, workspace);
+      if (!local && ofThisMachine(command)) return await ofAMachine(command, args, workspace);
       if (!local) {
         const named = homeOf(args);
         if (named && fleet.has(named)) return await remote(named, command, args, callWorkspace(workspace, args));

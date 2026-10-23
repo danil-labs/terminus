@@ -1,0 +1,129 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import {
+  type CredentialFetch,
+  type CredentialSource,
+  credentialMachines,
+  credentialSlot,
+  credentialsListingOf,
+  deleteCredential,
+  isAgentCredential,
+  listCredentials,
+  putCredential,
+  removeCredentialMachine,
+  restoreCredentialMachine,
+} from "../src/index.ts";
+
+type Seen = { url: string; method?: string; headers?: Record<string, string>; body?: string };
+
+function source(status: number, body: unknown, seen: Seen[] = []): CredentialSource {
+  const fetch: CredentialFetch = async (url, init) => {
+    seen.push({ url, method: init?.method, headers: init?.headers, body: init?.body });
+    return { status, ok: status >= 200 && status < 300, json: async () => body };
+  };
+  return { endpoint: "https://computers.example", getToken: async () => "jwt", fetch };
+}
+
+const CREDENTIAL = {
+  id: "cred_1",
+  workspace_id: "w1",
+  kind: "api_key",
+  provider: "opencode",
+  slot: "agentes/opencode:cuenta-1",
+  label: "Trabajo",
+  hint: "cdef",
+  delivery: "sealed",
+  status: "active",
+  config: { agent: "opencode", account: "cuenta-1" },
+  version: 3,
+  created_at: "2026-10-23T10:00:00Z",
+  updated_at: "2026-10-23T10:00:00Z",
+  machines: [
+    { computer_id: "cmp_vm", name: "vm-alberto", state: "pending", version: 2, created_at: null, last_seen_at: null },
+    { computer_id: "cmp_old", name: "vm-vieja", state: "removed", version: 1, created_at: null, last_seen_at: null },
+    { computer_id: "cmp_mac", name: "Mac", state: "active", version: 3, created_at: null, last_seen_at: null },
+    { name: "sin id" },
+  ],
+};
+
+test("lista las credenciales del workspace con sus máquinas y para quién sellar, con el JWT", async () => {
+  const seen: Seen[] = [];
+  const answer = await listCredentials(
+    source(200, { credentials: [CREDENTIAL, { id: "x" }], recipients: [{ computer_id: "cmp_mac", name: "Mac", public_key: "AAAA", online: true }, { computer_id: "cmp_vm", public_key: null }] }, seen),
+    "w 1",
+  );
+  assert.equal(seen[0]!.url, "https://computers.example/v1/workspaces/w%201/credentials");
+  assert.equal(seen[0]!.method, "GET");
+  assert.equal(seen[0]!.headers?.authorization, "Bearer jwt");
+  assert.equal(answer.kind, "ok");
+  if (answer.kind !== "ok") return;
+  assert.equal(answer.value.credentials.length, 1, "una fila sin kind ni slot no entra");
+  assert.equal(answer.value.credentials[0]!.machines.length, 3);
+  assert.deepEqual(answer.value.recipients, [
+    { computer_id: "cmp_mac", name: "Mac", public_key: "AAAA", online: true },
+    { computer_id: "cmp_vm", name: null, public_key: null, online: false },
+  ]);
+  assert.equal(answer.value.local_only, undefined, "el Worker no sabe de claves locales");
+  assert.deepEqual(credentialMachines(answer.value.credentials[0]!).map((m) => m.computer_id), ["cmp_mac", "cmp_vm", "cmp_old"]);
+});
+
+test("la lista del motor trae además las claves que solo están en esta máquina", () => {
+  const listing = credentialsListingOf({ credentials: [], recipients: [], local_only: [{ slot: "referencias/zotero-key", kind: "zotero", provider: "zotero", label: "Zotero", hint: "a1b2" }, { kind: "x" }] });
+  assert.deepEqual(listing.local_only, [{ slot: "referencias/zotero-key", kind: "zotero", provider: "zotero", label: "Zotero", hint: "a1b2" }]);
+  assert.throws(() => credentialsListingOf({ nope: true }));
+});
+
+test("crea o rota con PUT y las copias selladas", async () => {
+  const seen: Seen[] = [];
+  const put = {
+    kind: "zotero" as const,
+    provider: "zotero",
+    slot: credentialSlot.zotero(),
+    label: "Zotero",
+    hint: "a1b2",
+    config: {},
+    copies: [{ computer_id: "cmp_mac", sealed: "c2VhbGVk" }],
+  };
+  const answer = await putCredential(source(200, { credential: { ...CREDENTIAL, kind: "zotero", slot: put.slot } }, seen), "w1", put);
+  assert.equal(seen[0]!.method, "PUT");
+  assert.equal(seen[0]!.headers?.["content-type"], "application/json");
+  assert.deepEqual(JSON.parse(seen[0]!.body!), put);
+  assert.equal(answer.kind === "ok" && answer.value.slot, "referencias/zotero-key");
+});
+
+test("quita y vuelve a poner en una máquina, y borra de la cuenta", async () => {
+  const seen: Seen[] = [];
+  const removed = await removeCredentialMachine(source(200, { credential: CREDENTIAL }, seen), "w1", "cred_1", "cmp_vm");
+  const restored = await restoreCredentialMachine(source(200, { credential: CREDENTIAL }, seen), "w1", "cred_1", "cmp_vm");
+  const deleted = await deleteCredential(source(200, { ok: true }, seen), "w1", "cred_1");
+  assert.deepEqual(
+    seen.map((s) => `${s.method} ${s.url.replace("https://computers.example", "")}`),
+    [
+      "DELETE /v1/workspaces/w1/credentials/cred_1/machines/cmp_vm",
+      "POST /v1/workspaces/w1/credentials/cred_1/machines/cmp_vm/restore",
+      "DELETE /v1/workspaces/w1/credentials/cred_1",
+    ],
+  );
+  assert.equal(removed.kind, "ok");
+  assert.equal(restored.kind, "ok");
+  assert.deepEqual(deleted, { kind: "ok", value: null });
+});
+
+test("conserva el código del Worker en 403, 404 y los demás errores", async () => {
+  assert.deepEqual(await listCredentials(source(403, { error: { code: "license_required" } }), "w1"), { kind: "license", code: "license_required" });
+  assert.deepEqual(await listCredentials(source(404, { error: { code: "not_found" } }), "w1"), { kind: "missing", code: "not_found" });
+  assert.deepEqual(await listCredentials(source(404, null), "w1"), { kind: "missing" });
+  assert.deepEqual(await listCredentials(source(401, null), "w1"), { kind: "unauthorized" });
+  assert.deepEqual(await listCredentials(source(409, { error: { code: "version_conflict" } }), "w1"), { kind: "error", status: 409, code: "version_conflict" });
+  assert.deepEqual(await listCredentials(source(200, { nope: 1 }), "w1"), { kind: "error", status: 200 });
+  const offline: CredentialSource = { endpoint: "x.example", getToken: async () => "t", fetch: async () => Promise.reject(new Error("net")) };
+  assert.deepEqual(await listCredentials(offline, "w1"), { kind: "error", status: null });
+});
+
+test("los slots son los de la bóveda y una cuenta de agente reconoce su clave", () => {
+  assert.equal(credentialSlot.apiKey("opencode", "a"), "agentes/opencode:a");
+  assert.equal(credentialSlot.goUsageKey("opencode", "a"), "agentes/opencode:go-usage:a");
+  assert.equal(credentialSlot.mcpSecret("linear", "env", "LINEAR_API_KEY"), "mcp/linear/env/LINEAR_API_KEY");
+  assert.equal(isAgentCredential({ kind: "api_key", config: { agent: "opencode", account: "a" } }, "opencode", "a"), true);
+  assert.equal(isAgentCredential({ kind: "api_key", config: { agent: "opencode", account: "b" } }, "opencode", "a"), false);
+});

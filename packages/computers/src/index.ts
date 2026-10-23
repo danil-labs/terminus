@@ -128,3 +128,28 @@ export {
   restoreGithubMachine,
   setGithubAreas,
 } from "./github.ts";
+export {
+  type Credential,
+  type CredentialAnswer,
+  type CredentialDelivery,
+  type CredentialFetch,
+  type CredentialKind,
+  type CredentialMachine,
+  type CredentialMachineState,
+  type CredentialPut,
+  type CredentialRecipient,
+  type CredentialSource,
+  type CredentialsListing,
+  type LocalOnlyCredential,
+  credentialMachines,
+  credentialOf,
+  credentialSlot,
+  credentialsListingOf,
+  deleteCredential,
+  isAgentCredential,
+  listCredentials,
+  putCredential,
+  removeCredentialMachine,
+  restoreCredentialMachine,
+} from "./credentials.ts";
+export { type SealOptions, type SealRecipient, SEAL_MAX_BYTES, canSeal, fromBase64, sealCredential, sealForRecipients, toBase64 } from "./seal.ts";

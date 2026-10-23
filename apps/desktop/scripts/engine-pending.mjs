@@ -15,6 +15,9 @@ export const COMANDOS_PENDIENTES = {
   github_account_installations: GITHUB,
   github_account_set_areas: GITHUB,
   github_account_disconnect: GITHUB,
+  account_credentials_list: CREDENCIALES,
+  account_credentials_upload: CREDENCIALES,
+  account_credential_delete: CREDENCIALES,
   account_credential_remove_machine: CREDENCIALES,
   account_credential_restore_machine: CREDENCIALES,
   // Los visuales del chat por partes, con sus imágenes incrustadas (seldon-host `feat/chat-visuals-by-parts`).

@@ -202,6 +202,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
     accountProfile: webAccountProfile(base.endpoint, base.getToken, base.onUnauthorized),
     accountAssets: webWorkspaceAssets(base.endpoint, base.getToken, base.onUnauthorized),
     accountMemory: { endpoint: base.endpoint, getToken: token },
+    accountCredentials: { endpoint: base.endpoint, getToken: token },
     machineName: (id) => fleet.name(id),
     taskMachine: (id) => unwrap(id, fleet.remotes())?.machine ?? null,
     windowMachine: () => {
