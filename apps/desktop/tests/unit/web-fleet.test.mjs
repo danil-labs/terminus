@@ -2,8 +2,9 @@
  * The browser on the account's fleet with every machine off: the page opens
  * at once from the account registry and the relay's copy of each machine, no
  * «connecting» screen, the tasks of both machines in the list marked saved, and
- * nothing woken by opening. A machine of another contract shows outdated in
- * its slice without taking the page down. Mounts `dist-web/`.
+ * nothing woken by opening. A machine of another contract does not take the
+ * page down. The sidebar carries no strip with the state of each slice: that
+ * lives in each task's machine chip and in «Ejecutar en». Mounts `dist-web/`.
  */
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -53,14 +54,12 @@ test("with every machine off the page opens in under two seconds with the saved 
   assert.ok(text().includes("Tarea de la VM") && text().includes("Tarea de la Mac"), `the tasks of both machines within 2 s (${Date.now() - started} ms)`);
   assert.ok(!/Conectando con tu computadora|Connecting to your computer/.test(text()), "no connecting screen");
   assert.equal(doc.querySelector("[data-managed-setup]"), null);
-  const slices = [...doc.querySelectorAll("[data-machine-slice]")].map((li) => [li.getAttribute("data-machine-slice"), li.getAttribute("data-slice-status")]);
-  assert.deepEqual(slices.sort(), [["cmp_mac", "cached"], ["cmp_vm", "cached"]], "each slice says it is saved");
-  assert.match(doc.querySelector('[data-machine-slice="cmp_vm"]')?.textContent ?? "", /Danil VM · guardado/);
+  assert.equal(doc.querySelector("[data-machine-slices]"), null, "no strip of slice states in the sidebar");
   assert.ok(!Object.values(f.relays).some((r) => r.calls.some((c) => c.command === "send_message")), "opening wakes nothing");
   assert.deepEqual(app.fallos, []);
 });
 
-test("a machine of another contract shows outdated in its slice and the page opens with the other", async () => {
+test("a machine of another contract does not take the page down: it opens with the other", async () => {
   const { vm, mac } = tables();
   const f = fleet({ cmp_vm: { table: vm }, cmp_mac: { table: mac, outdated: true } });
   const app = await boot("listo", "web-fleet-outdated", {}, undefined, {}, {
@@ -76,8 +75,6 @@ test("a machine of another contract shows outdated in its slice and the page ope
   const started = Date.now();
   while (Date.now() - started < 5_000 && !text().includes("Tarea de la VM")) await sleep(50);
   assert.ok(text().includes("Tarea de la VM"), "the VM's tasks show");
-  while (Date.now() - started < 5_000 && !doc.querySelector('[data-machine-slice="cmp_mac"]')) await sleep(50);
-  assert.equal(doc.querySelector('[data-machine-slice="cmp_mac"]')?.getAttribute("data-slice-status"), "outdated");
-  assert.match(doc.querySelector('[data-machine-slice="cmp_mac"]')?.textContent ?? "", /Mac de Ana · desactualizada/);
+  assert.equal(doc.querySelector("[data-machine-slices]"), null, "no strip of slice states in the sidebar");
   assert.deepEqual(app.fallos, []);
 });

@@ -185,10 +185,6 @@ export function startAccountMachines(target: Target = window) {
           <MachinePicker workspace={workspace} />
         </div>
       ),
-      machineSlices: () => {
-        changed();
-        return fleet.sliceStatuses();
-      },
       machinesLicense: () => {
         changed();
         return fleet.license();
