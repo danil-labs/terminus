@@ -41,14 +41,20 @@ export type DeleteOutcome = {
 type Fila = {
   space?: string | null;
   archived?: boolean | null;
+  /** La máquina de la cuenta que tiene la tarea; sin ella, es de esta computadora. */
+  machine?: string | null;
 };
 
 export const spaceName = (i: { name: string | null } | null | undefined) =>
   i?.name ?? t("spaces.default_name");
 
-/** Si la fila se pinta en el escritorio `desk`. Sin escritorio se pinta todo. */
+/**
+ * Si la fila se pinta en el escritorio `desk`. Sin escritorio se pinta todo.
+ * Una tarea de otra máquina trae un space de esa máquina, que aquí no existe:
+ * filtrarla por él la escondería de todos los escritorios, así que se pinta.
+ */
 export function enEscritorio(row: Fila, desk: string | null): boolean {
-  if (desk === null) return true;
+  if (desk === null || row.machine) return true;
   return !row.space || row.space === desk;
 }
 
