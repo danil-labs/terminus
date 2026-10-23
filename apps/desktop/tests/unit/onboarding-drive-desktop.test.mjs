@@ -65,6 +65,12 @@ function motor(inicial, extra = {}) {
       m.llamadas.push("install");
       return null;
     },
+    // «No usar» lo guarda el motor (`DesktopStatus.unused`); la app de Google se queda.
+    set_google_drive_desktop_use: ({ used }) => {
+      m.llamadas.push(`use:${used}`);
+      m.estado.unused = !used;
+      return null;
+    },
     disconnect_google_drive: () => {
       m.llamadas.push("disconnect");
       return null;
@@ -83,8 +89,9 @@ async function aPersonaliza(m, nombre, ua = WINDOWS) {
   await sleep(800);
   button(app.w.document, "Continuar").click();
   await sleep(500);
+  // La tarjeta es la caja con borde; su primera fila (nombre y botón) va dentro.
   const card = () =>
-    [...app.w.document.querySelectorAll("strong")].find((s) => s.textContent === "Google Drive")?.closest("div");
+    [...app.w.document.querySelectorAll("strong")].find((s) => s.textContent === "Google Drive")?.closest("div.rounded-lg.border");
   return { app, card };
 }
 
@@ -145,11 +152,12 @@ test("Drive oficial ya con sesión sale conectada; desconectar no desinstala y �
   button(card(), "Dejar de usar Google Drive en Terminus (la app de Google sigue instalada)").click();
   await sleep(50);
   assert.ok(card().textContent.includes("Terminus no la usa"), card().textContent);
-  assert.deepEqual(m.llamadas, [], "dejar de usarla no le pide nada al motor");
+  assert.deepEqual(m.llamadas, ["use:false"], "dejar de usarla solo se guarda en el motor: no desinstala ni desconecta");
 
   button(card(), "Usar esta").click();
   await sleep(50);
   assert.ok(card().textContent.includes("Conectado"), card().textContent);
+  assert.deepEqual(m.llamadas, ["use:false", "use:true"], "«Usar esta» se lo dice al motor");
   assert.deepEqual(app.fallos, []);
 });
 

@@ -728,10 +728,11 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
         class={cn(
           "relative grid overflow-hidden rounded-lg border",
           permiso() && "sm:col-span-2",
-          fallo() && "animate-sacudir border-error-strong bg-surface-raised",
           e()?.k === "conectada" && p.i.via !== "incluido" && "border-success-strong/40 bg-success/5",
           ["conectando", "formulario", "descargando", "instalando", "sesion", "abriendo", "permiso"].includes(e()?.k ?? "") && "border-primary bg-primary/5",
           (!e() || ["libre", "saliendo", "detectada"].includes(e()!.k) || p.i.via === "incluido") && "border-border bg-surface-raised",
+          // Al final: `cn` deja la última clase de borde, y un fallo tiene que verse rojo.
+          fallo() && "animate-sacudir border-error-strong bg-surface-raised",
         )}
       >
         <div class="relative flex h-[56px] items-center gap-3 px-3 py-2">
