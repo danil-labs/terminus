@@ -43,6 +43,7 @@ import { ConexionesMenu } from "../settings/Tools";
 import {
   agentOptions,
   applySidebarView,
+  groupKey,
   groupLabel,
   loadSidebarView,
   saveSidebarView,
@@ -122,12 +123,18 @@ export default function Sidebar(props: {
   proyectoAbierto: string | null;
   /** La carpeta de «Nueva tarea» cuando eso es lo que se mira: su cabecera va marcada. */
   carpetaDelBorrador?: string | null;
-  /** Abre el proyecto en el panel principal: sus tareas y su contexto fijo. */
-  onAbrirProyecto: (id: string) => void;
+  /**
+   * Abre el proyecto en el panel principal: sus tareas y su contexto fijo.
+   * `machine`, la del grupo partido por máquina (`""` es esta): lo que se empiece ahí corre en ella.
+   */
+  onAbrirProyecto: (id: string, machine?: string) => void;
   /** Lo que se ofrece como modelo por defecto al crear un agente. */
   modelos: ModelChoices;
-  /** Empezar una tarea dentro de ese proyecto, sin pasar por su vista. `""` es sin carpeta. */
-  onNuevaTareaEn: (id: string) => void;
+  /**
+   * Empezar una tarea dentro de ese proyecto, sin pasar por su vista. `""` es sin carpeta.
+   * `machine`, la del grupo partido por máquina (`""` es esta): la tarea se lanza en ella.
+   */
+  onNuevaTareaEn: (id: string, machine?: string) => void;
   onDelete: (project: string, id: string) => Promise<boolean | void> | boolean | void;
   onMove: (project: string, id: string, to: string) => void;
   onEtapa: (project: string, id: string, etapa: Etapa | null) => void;
@@ -188,7 +195,8 @@ export default function Sidebar(props: {
   );
 
   // Los grupos por carpeta plegados; la clave es la de siempre para no perder
-  // lo que alguien ya había plegado.
+  // lo que alguien ya había plegado. El de otra máquina, partido, lleva la suya
+  // (`id@máquina`): plegar «Terminus · vm-principal» no pliega el de esta.
   const [cerrados, setCerrados] = createPref<string[]>("historial.cerrados", []);
   const alternarGrupo = (p: string) =>
     setCerrados(
@@ -452,10 +460,11 @@ export default function Sidebar(props: {
 
   const Grupo = (p: { grupo: SidebarGroup<SessionRow> }) => {
     const g = () => p.grupo;
-    const clave = () => g().kind === "section" ? g().key : `${g().kind}:${g().key}`;
+    const clave = () => g().kind === "section" ? g().key : groupKey(g());
+    const plegado = () => g().machine ? `${g().key}@${g().machine}` : g().key;
     const titulo = () => groupLabel(g(), (id) => nombreDe(id) ?? id, nombreDeMaquina);
     const proyecto = () => g().kind === "folder" ? props.projects.find((x) => x.id === g().key) : undefined;
-    const abierto = () => !!query() || g().kind !== "folder" || !cerrados().includes(g().key);
+    const abierto = () => !!query() || g().kind !== "folder" || !cerrados().includes(plegado());
     const necesita = () => g().kind === "status" && ["approving", "asked", "failed"].includes(g().key);
     return (
       <Show when={g().tasks.length > 0 || proyecto()}>
@@ -498,19 +507,21 @@ export default function Sidebar(props: {
               <Suspense>
                 <FolderGroupHeader
                   p={proj()}
+                  rotulo={g().machine === undefined ? undefined : titulo()}
+                  maquina={g().machine}
                   abierto={abierto()}
                   tareas={g().tasks}
                   vivas={props.vivas}
                   aprobando={props.aprobando}
                   proyectoAbierto={props.proyectoAbierto ?? props.carpetaDelBorrador ?? null}
-                  onToggle={() => alternarGrupo(proj().id)}
-                  onAbrir={() => { props.onAbrirProyecto(proj().id); setDesplegado(false); }}
+                  onToggle={() => alternarGrupo(plegado())}
+                  onAbrir={() => { props.onAbrirProyecto(proj().id, g().machine); setDesplegado(false); }}
                   onRenombrar={(name) => props.onRenombrarProyecto(proj().id, name)}
                   onBorrar={() => props.onBorrarProyecto(proj().id)}
                   onQuitarDelEspacio={props.onRemoveFromSpace ? () => props.onRemoveFromSpace?.(proj().id) : undefined}
-                  onNuevaTarea={() => props.onNuevaTareaEn(proj().id)}
+                  onNuevaTarea={() => props.onNuevaTareaEn(proj().id, g().machine)}
                   onNuevoAgente={() => setCreatingAgentIn({ id: proj().id, name: proj().name })}
-                  onLlevar={props.onCarryFolder && proj().kind === "git" ? () => props.onCarryFolder?.(proj().id) : undefined}
+                  onLlevar={props.onCarryFolder && proj().kind === "git" && !g().machine ? () => props.onCarryFolder?.(proj().id) : undefined}
                 />
               </Suspense>
             )}
@@ -552,7 +563,7 @@ export default function Sidebar(props: {
         <p class="m-0 px-2 pt-1 text-xs text-neutral-500" data-sidebar-filtered-empty="">{t("shell.sidebar.filter_empty")}</p>
       </Show>
 
-      <KeyedList each={grupos()} by={(g) => `${g.kind}:${g.key}`}>{(g) => <Grupo grupo={g()} />}</KeyedList>
+      <KeyedList each={grupos()} by={groupKey}>{(g) => <Grupo grupo={g()} />}</KeyedList>
     </div>
   );
 

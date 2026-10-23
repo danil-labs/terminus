@@ -26,6 +26,13 @@ const RECIBE_LA_TAREA = ["ring-2", "ring-primary"];
  */
 export default function FolderGroupHeader(pp: {
   p: Project;
+  /**
+   * El rótulo cuando la carpeta se parte por máquina («Terminus · vm-principal»);
+   * sin él, el nombre de la carpeta. Renombrar y borrar siguen nombrando la carpeta.
+   */
+  rotulo?: string;
+  /** La máquina del grupo partido; `""` es esta. */
+  maquina?: string;
   abierto: boolean;
   tareas: SessionRow[];
   vivas: string[];
@@ -44,6 +51,7 @@ export default function FolderGroupHeader(pp: {
   onLlevar?: () => void;
 }) {
   const p = () => pp.p;
+  const rotulo = () => pp.rotulo ?? p().name;
   const recibiendo = () => destinoEnVuelo() === p().id;
   const [nombre, setNombre] = createSignal("");
   // El menú tiene dos vistas, las acciones o la confirmación de borrado, en
@@ -54,6 +62,7 @@ export default function FolderGroupHeader(pp: {
   return (
     <div
       data-folder-group={p().id}
+      data-folder-machine={pp.maquina}
       class={cn(
         "group grid min-w-0 grid-cols-[20px_minmax(0,1fr)_auto_auto] items-center rounded-[var(--radius-sm)]",
         recibiendo() && RECIBE_LA_TAREA,
@@ -65,8 +74,8 @@ export default function FolderGroupHeader(pp: {
         aria-expanded={pp.abierto}
         aria-label={
           pp.abierto
-            ? t("shell.sidebar.collapse_group", { name: p().name })
-            : t("shell.sidebar.expand_group", { name: p().name })
+            ? t("shell.sidebar.collapse_group", { name: rotulo() })
+            : t("shell.sidebar.expand_group", { name: rotulo() })
         }
         onClick={() => pp.onToggle()}
       >
@@ -88,7 +97,7 @@ export default function FolderGroupHeader(pp: {
             onKeyDown={(e) => { if (e.key === "F2") { e.preventDefault(); setNombre(p().name); setRenombrando(true); } }}
             onClick={() => pp.onAbrir()}
           >
-            <span class="truncate">{p().name}</span>
+            <span class="truncate">{rotulo()}</span>
             <Show when={!pp.abierto}>
               <EstadoDeTarea
                 ambito="plegadas"
@@ -146,7 +155,7 @@ export default function FolderGroupHeader(pp: {
             <button
               {...disparador}
               class="mr-1 grid size-6 shrink-0 place-items-center rounded-sm text-neutral-500 opacity-0 outline-none hover:bg-surface-muted hover:text-neutral-950 focus-visible:opacity-100 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary group-hover:opacity-100 group-focus-within:opacity-100 data-[expanded]:opacity-100"
-              aria-label={t("shell.sidebar.project_actions", { name: p().name })}
+              aria-label={t("shell.sidebar.project_actions", { name: rotulo() })}
               aria-haspopup="menu"
               title={t("shell.sidebar.actions")}
             >
@@ -253,8 +262,8 @@ export default function FolderGroupHeader(pp: {
 
       <button
         class="mr-1 grid size-6 shrink-0 place-items-center rounded-sm text-neutral-500 opacity-0 outline-none hover:bg-surface-muted hover:text-neutral-950 focus-visible:opacity-100 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary group-hover:opacity-100 group-focus-within:opacity-100"
-        aria-label={t("shell.sidebar.new_task_in", { name: p().name })}
-        title={t("shell.sidebar.new_task_in", { name: p().name })}
+        aria-label={t("shell.sidebar.new_task_in", { name: rotulo() })}
+        title={t("shell.sidebar.new_task_in", { name: rotulo() })}
         onClick={(e) => {
           e.stopPropagation();
           pp.onNuevaTarea();

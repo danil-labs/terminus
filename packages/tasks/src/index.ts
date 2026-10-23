@@ -14,6 +14,7 @@ export {
   activityOf,
   agentOptions,
   applySidebarView,
+  groupKey,
   isPinned,
   needsYou,
   nonDefaultCount,

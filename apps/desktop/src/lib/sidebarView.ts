@@ -24,6 +24,7 @@ export {
   activityOf,
   agentOptions,
   applySidebarView,
+  groupKey,
   isPinned,
   nonDefaultCount,
   sameAgent,
@@ -91,7 +92,12 @@ export function groupLabel(
     case "machine": return machineName(group.key) || t("shell.sidebar.view.this_machine");
     case "section": return sectionLabel(group.key as SidebarSection);
     case "status": return statusGroupLabel(group.key as SidebarStatusKey);
-    case "folder": return group.key ? folderName(group.key) : t("shell.sidebar.view.no_folder");
+    case "folder": {
+      const folder = group.key ? folderName(group.key) : t("shell.sidebar.view.no_folder");
+      // Partida por máquina: «Terminus · Esta Mac», «Terminus · vm-principal».
+      if (group.machine === undefined) return folder;
+      return `${folder} · ${machineName(group.machine) || t("shell.sidebar.view.this_machine")}`;
+    }
     default: return group.key || t("shell.sidebar.view.no_agent");
   }
 }

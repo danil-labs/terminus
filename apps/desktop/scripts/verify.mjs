@@ -576,6 +576,7 @@ const steps = [
   ["Con el stream empujado los lotes llegan a los oyentes y el historial se pagina", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/push-stream.test.mjs")], root],
   ["Al enviar a otra máquina la hoja lleva el trabajo sin subir, y traerlo de vuelta lo deja en una rama de aquí", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/carry-window.test.mjs")], root],
   ["Una tarea de una máquina apagada abre y se enciende al mandarle algo", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/machine-task.test.mjs")], root],
+  ["Por carpeta, una carpeta en dos máquinas es un grupo por máquina y su «+» lanza en la suya", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/sidebar-folder-machines.test.mjs")], root],
   ["La flota: la máquina sale del sobre, toda espera tiene tope y nadie contestando no es una lista vacía", process.execPath, ["--test", "--experimental-strip-types", join(root, "../../packages/fleet/test/fleet.test.ts")], root],
   ["Danil Computers: sesión con contratos, renovación del token, motor y lápidas", process.execPath, ["--test", "--experimental-strip-types", join(root, "../../packages/computers/test/computers.test.ts")], root],
   ["Con la cuenta de Danil lo de esta computadora va nativo y primero; las otras suman su rebanada", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/machine-router.test.ts")], root],
