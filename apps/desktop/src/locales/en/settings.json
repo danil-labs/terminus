@@ -682,7 +682,14 @@
   "settings.references.zotero.error_install": "Zotero could not be installed. Try again.",
   "settings.references.zotero.error_not_installed": "Install Zotero first.",
   "settings.references.zotero.error_open": "Zotero could not be opened.",
-  "settings.references.zotero.error_closed": "Zotero is closed. Open it and try again.",
+  "settings.references.zotero.error_closed": "Zotero is closed or not responding. Open it; if it is already open, quit and reopen it.",
   "settings.references.zotero.error_local_api": "In Zotero: Settings → Advanced → “Allow other applications on this computer to communicate with Zotero”.",
+  "settings.references.zotero.error_bib": "Could not read the .bib files linked to Zotero.",
+  "settings.references.zotero.bib_collection": "follows the “{name}” collection",
+  "settings.references.zotero.bib_cited": "follows its citations",
+  "settings.references.zotero.bib_failed": "could not sync",
+  "settings.references.zotero.bib_unlink": "Stop syncing {name} with Zotero",
+  "settings.references.zotero.bib_sync": "Sync with Zotero",
+  "settings.references.zotero.bib_syncing": "Syncing…",
   "settings.references.zotero.error_too_old": "This Zotero version has no local API. Update Zotero to version 7 or newer."
 }

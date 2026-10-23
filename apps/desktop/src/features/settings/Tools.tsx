@@ -96,6 +96,16 @@ type AgenteMcp = {
 };
 
 /**
+ * Los remotos con cuenta los autoriza el motor, una vez para todos los agentes
+ * (`mcp_oauth`): una sola sesión, sin filas por agente. Solo los locales traen
+ * `escuchando`.
+ */
+const autorizaElMotor = (c: Conocido) => c.pide_sesion && c.escuchando === undefined;
+
+/** La clave de `enCurso` del inicio de sesión del motor, que no es de ningún agente. */
+const MOTOR = "motor";
+
+/**
  * El estado de un servidor en una palabra y un color, para ver de un vistazo.
  * Las clases son las del sistema —`tag`, `tag puesto`, `tag pendiente`, `tag
  * repo`, `tag falta`—: verde significa lo mismo aquí que en Proveedores.
@@ -123,6 +133,14 @@ function estado(
   // que la persona puede arreglar, y decirlo así lleva a la acción correcta.
   if (c.escuchando === false)
     return { texto: t("settings.tools.state.silent"), tono: "danger" };
+  // Con la sesión del motor, «conectado» y ya, como las demás tarjetas.
+  if (autorizaElMotor(c)) {
+    if ((c.sesiones ?? []).length === 0)
+      return { texto: t("settings.tools.state.needs_login"), tono: "warning" };
+    if (salud && salud !== "listo" && salud !== "pide-sesion")
+      return { texto: t("settings.tools.state.silent"), tono: "danger" };
+    return { texto: t("settings.tools.state.connected"), tono: "success" };
+  }
   if (salud === "listo")
     return { texto: t("settings.tools.state.ready"), tono: "success" };
   // «Pide sesión» lo pregunta la app, que no tiene credencial: un servidor de
@@ -205,8 +223,10 @@ export default function Herramientas(props: { solo?: string | string[] }) {
     setEnCurso((s) => new Set(s).add(k));
     setFallo(null);
     temporizadores.set(k, window.setTimeout(() => quitarEnCurso(k), 120_000));
+    // La del motor no es de un agente: `provider` solo dice quién la pidió.
+    const provider = agentId === MOTOR ? (reciben()[0]?.id ?? "") : agentId;
     try {
-      const m = await invoke<Frase>("mcp_login", { provider: agentId, id: servicioId });
+      const m = await invoke<Frase>("mcp_login", { provider, id: servicioId });
       setAviso(prosa(m));
     } catch (e) {
       setFallo(asFailure(e));
@@ -371,11 +391,16 @@ export default function Herramientas(props: { solo?: string | string[] }) {
     setFallo(null);
     try {
       if (c.conectado) {
+        // Quitar revoca también la sesión del motor: es la de todos los agentes.
         await invoke("disconnect_known_mcp", { id: c.id });
       } else {
         await invoke("connect_known_mcp", { id: c.id });
       }
       await cargar();
+      // Conectar uno con cuenta abre ya su inicio de sesión: sin él no sirve.
+      const ahora = conocidos().find((x) => x.id === c.id);
+      if (!c.conectado && ahora && autorizaElMotor(ahora) && (ahora.sesiones ?? []).length === 0)
+        void iniciarSesion(MOTOR, c.id);
     } catch (e) {
       setFallo(asFailure(e));
     } finally {
@@ -461,6 +486,10 @@ export default function Herramientas(props: { solo?: string | string[] }) {
               const chip = () => estado(c(), salud()[c().id]);
               /** Un local con la app cerrada. `undefined` en los remotos. */
               const muerta = () => c().escuchando === false;
+              /** Con la sesión del motor la tarjeta dice «conectado» y nada más. */
+              const listaYa = () => autorizaElMotor(c()) && c().conectado && (c().sesiones ?? []).length > 0;
+              const requiere = () => (listaYa() ? null : c().requiere);
+              const despues = () => c().conectado && !listaYa();
 
               return (
                 <li class="grid grid-cols-[minmax(0,1fr)] gap-1.5 rounded-md border border-border bg-surface-raised px-3 py-2.5">
@@ -482,6 +511,50 @@ export default function Herramientas(props: { solo?: string | string[] }) {
                     >
                       {chip().texto}
                     </Badge>
+                    {/* Sin sesión del motor, iniciarla es lo que falta. Mientras
+                        dura se puede abrir la página si el navegador no se
+                        abrió solo, o cancelar. */}
+                    <Show when={autorizaElMotor(c()) && c().conectado && (c().sesiones ?? []).length === 0}>
+                      <Show
+                        when={enCurso().has(claveLogin(MOTOR, c().id))}
+                        fallback={
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            class="shrink-0"
+                            onClick={() => void iniciarSesion(MOTOR, c().id)}
+                          >
+                            {t("settings.tools.login")}
+                          </Button>
+                        }
+                      >
+                        <span class="flex shrink-0 items-center gap-1">
+                          <Show
+                            when={urlDeLogin()}
+                            fallback={<span class="text-xs text-neutral-500">{t("settings.tools.opening")}</span>}
+                          >
+                            {(u) => (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                class="px-2 text-xs"
+                                onClick={() => void invoke("open_external", { target: u() })}
+                              >
+                                {t("settings.tools.open_login")}
+                              </Button>
+                            )}
+                          </Show>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            class="px-2 text-xs text-neutral-500"
+                            onClick={() => quitarEnCurso(claveLogin(MOTOR, c().id))}
+                          >
+                            {t("settings.tools.cancel_login")}
+                          </Button>
+                        </span>
+                      </Show>
+                    </Show>
                     {/* Ni conectar ni quitar son acciones del agente: ninguno
                         va en morado. La forma la da la jerarquía: conectar es
                         la acción de la fila y quitar es lo que se hace una
@@ -550,15 +623,15 @@ export default function Herramientas(props: { solo?: string | string[] }) {
                       no esté conectado, en gris: sin conectar no pasa nada, es
                       un requisito más, y en ámbar competiría con la tarjeta
                       que sí funciona. */}
-                  <Show when={c().requiere || c().conectado || muerta()}>
+                  <Show when={requiere() || despues() || muerta()}>
                     <div class="grid gap-1 text-xs text-neutral-500">
-                      <Show when={c().requiere}>
+                      <Show when={requiere()}>
                         {(q) => <p class="m-0">{prosa(q())}</p>}
                       </Show>
                       <Show when={muerta() && !c().conectado}>
                         <p class="m-0">{t("settings.tools.dead_before")}</p>
                       </Show>
-                      <Show when={c().conectado}>
+                      <Show when={despues()}>
                         <p class="m-0">{prosa(c().despues)}</p>
                       </Show>
                     </div>
@@ -617,7 +690,7 @@ export default function Herramientas(props: { solo?: string | string[] }) {
                       dicen lo que va a pasar cuando el agente lo use. En
                       `ghost` el botón conserva el alto y el sitio de la fila
                       sin gritar. */}
-                  <Show when={c().conectado && c().pide_sesion && reciben().length > 0}>
+                  <Show when={c().conectado && c().pide_sesion && !autorizaElMotor(c()) && reciben().length > 0}>
                     <div class="mt-0.5 grid gap-1 border-t border-border pt-2">
                       <p class="m-0 text-[0.6875rem] font-medium uppercase tracking-wide text-neutral-500">
                         {t("settings.tools.session")}
