@@ -20,6 +20,10 @@
  *   EXPO_PUBLIC_SUPABASE_URL=http://<ip>:8787 EXPO_PUBLIC_COMPUTERS_ENDPOINT=http://<ip>:8787 npm start
  *
  * y entrar con cualquier correo y contraseña. Sin dependencias.
+ *
+ * Para las pruebas, `POST /__fake/send?computer=cmp_mac` con `{ project, prompt,
+ * session? }` manda un mensaje como otro dispositivo: crea la tarea (sin
+ * `session`) o abre otro turno, con sus eventos por el relay.
  */
 import { createHash, randomUUID } from "node:crypto";
 import { createServer } from "node:http";
@@ -587,6 +591,17 @@ const server = createServer((request, response) => {
   if (url.pathname === "/auth/v1/token" && request.method === "POST") return json(response, 200, session());
   if (url.pathname === "/auth/v1/user") return json(response, 200, user);
   if (url.pathname === "/auth/v1/logout") return json(response, 204, {});
+  if (url.pathname === "/__fake/send" && request.method === "POST") {
+    const m = machines[url.searchParams.get("computer") ?? "cmp_mac"];
+    if (!m) return json(response, 404, { error: { code: "not_found" } });
+    let body = "";
+    request.on("data", (chunk) => (body += chunk));
+    request.on("end", () => {
+      const args = JSON.parse(body || "{}");
+      json(response, 200, { value: invoke(m, "send_message", { provider: "claude", ...args }) ?? null });
+    });
+    return;
+  }
   if (request.headers.authorization !== `Bearer ${TOKEN}`) return json(response, 401, { error: { code: "invalid_token" } });
   if (url.pathname === "/v1/computers" && request.method === "GET") return json(response, 200, Object.values(machines).map((m) => ({ ...m.row, state: m.state, last_seen: null })));
   // El registro de la cuenta: el workspace existe aunque sus máquinas estén apagadas.

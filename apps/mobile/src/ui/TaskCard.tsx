@@ -1,8 +1,10 @@
 import { folderColor } from "@terminus/design";
 import { type CardPull, type SidebarDensity, type TaskCard as Card, type PullTone, cardPull, type TaskGit, taskTitle } from "@terminus/tasks";
 import * as Haptics from "expo-haptics";
+import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { secondLine } from "../lib/cardLine";
+import { sameCard } from "../lib/reconcile";
 import type { Task } from "../lib/engine";
 import { lang, w } from "../lib/i18n";
 import { BrandMark } from "./BrandMark";
@@ -54,6 +56,30 @@ export function PullChip({ pull }: { pull: CardPull }) {
   );
 }
 
+type TaskCardProps = {
+  task: Task;
+  card: Card;
+  git?: TaskGit | null;
+  folderName: (id: string) => string | undefined;
+  density: SidebarDensity;
+  onPress: () => void;
+  onLongPress?: () => void;
+};
+
+/**
+ * Una tarjeta solo se repinta si cambia lo que enseña: su tarea (el mismo
+ * objeto mientras no cambie, `keepSame`), su tarjeta, su git, el nombre de su
+ * carpeta o la densidad. `onPress` y `onLongPress` llegan nuevas en cada render
+ * pero solo abren la tarea, que es la misma: no cuentan.
+ */
+const sameProps = (a: TaskCardProps, b: TaskCardProps) =>
+  a.task === b.task &&
+  a.density === b.density &&
+  a.git === b.git &&
+  !a.onLongPress === !b.onLongPress &&
+  sameCard(a.card, b.card) &&
+  (a.card.folder ? a.folderName(a.card.folder) : null) === (b.card.folder ? b.folderName(b.card.folder) : null);
+
 /**
  * La tarjeta de dos líneas del sidebar del escritorio (#151), en el teléfono.
  * Línea 1: la marca en su columna, el título y la chincheta. Línea 2: lo que te
@@ -64,7 +90,9 @@ export function PullChip({ pull }: { pull: CardPull }) {
  * de `list_session_git`), que quien pinta la lista pide solo para las visibles.
  * Mantenerla pulsada abre la vista previa (la tarjeta flotante del escritorio).
  */
-export function TaskCard({
+export const TaskCard = memo(TaskCardView, sameProps);
+
+function TaskCardView({
   task,
   card,
   git,
@@ -72,15 +100,7 @@ export function TaskCard({
   density,
   onPress,
   onLongPress,
-}: {
-  task: Task;
-  card: Card;
-  git?: TaskGit | null;
-  folderName: (id: string) => string | undefined;
-  density: SidebarDensity;
-  onPress: () => void;
-  onLongPress?: () => void;
-}) {
+}: TaskCardProps) {
   const theme = useTheme();
   const compact = density === "compact";
   const folder = card.folder ? { id: card.folder, name: folderName(card.folder) } : null;
