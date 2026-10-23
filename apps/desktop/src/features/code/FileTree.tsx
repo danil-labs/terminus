@@ -28,7 +28,18 @@ import { ITEM_DE_MENU, Popover, PopoverContent } from "../../ui/Popover";
 import { IconoDeArchivo } from "./FileIcon";
 import { colorDeMarca, describirEstado, publicarLocales } from "./localStatus";
 import { alMoverseElArbol, avisarDeLosArboles } from "./refresh";
-import { conVistaTypst, elegirPrincipal, esTypst, principalElegido, seguirPluginTypst } from "./typst";
+import {
+  arrastrarRuta,
+  conVistaTypst,
+  editorTypst,
+  elegirPrincipal,
+  esTypst,
+  fueArrastreDeRuta,
+  pedirInsercionDeRuta,
+  principalElegido,
+  rutaEnVuelo,
+  seguirPluginTypst,
+} from "./typst";
 import {
   type CambioKn,
   type Carpeta,
@@ -358,6 +369,12 @@ export default function ArbolDeArchivos(props: {
 
   // Con el teclado (Mayús+F10, la tecla de menú, Supr) el evento no trae
   // coordenadas: el menú sale pegado a la fila que tiene el foco.
+  /** El editor de Typst a la vista, si es de este árbol: recibe rutas arrastradas o del menú. */
+  const editorTypstAqui = () => {
+    const e = editorTypst();
+    return e && e.session === props.session && e.arbol === props.arbol ? e : null;
+  };
+
   function abrirMenu(e: MouseEvent | KeyboardEvent, nodo: Nodo | null, borrando = false) {
     if (!editable()) return;
     e.preventDefault();
@@ -524,7 +541,11 @@ export default function ArbolDeArchivos(props: {
                   data-ruta={a().ruta}
                   class={cn(clasesDeFila(), conOjo(a().ruta) && "pr-7")}
                   style={{ "padding-left": sangria() }}
+                  onPointerDown={(e) => {
+                    if (editorTypstAqui()) arrastrarRuta(e, props.session, props.arbol, a().ruta);
+                  }}
                   onClick={() => {
+                    if (fueArrastreDeRuta()) return;
                     setSeleccion({ ruta: a().ruta, tipo: "archivo" });
                     props.onAbrir(a().ruta, Boolean(a().cambio));
                   }}
@@ -718,6 +739,18 @@ export default function ArbolDeArchivos(props: {
         )}
       </Show>
 
+      <Show when={rutaEnVuelo()}>
+        {(v) => (
+          <div
+            class="pointer-events-none fixed z-[90] max-w-64 truncate rounded-md border border-border bg-surface-raised px-2 py-1 font-mono text-xs text-neutral-950 shadow-md"
+            style={{ left: `${v().x + 12}px`, top: `${v().y + 10}px` }}
+            aria-hidden="true"
+          >
+            {nombreDe(v().ruta)}
+          </div>
+        )}
+      </Show>
+
       <Popover
         open={menu() !== null}
         onOpenChange={(abierto) => {
@@ -766,6 +799,25 @@ export default function ArbolDeArchivos(props: {
                         <>
                           <Show when={nodo().tipo === "carpeta"}>
                             <span class="my-1 block h-px bg-border" />
+                          </Show>
+                          <Show when={nodo().tipo === "archivo" && editorTypstAqui()?.ruta !== nodo().ruta && editorTypstAqui()}>
+                            {(editor) => (
+                              <button
+                                role="menuitem"
+                                class={ITEM_DE_MENU}
+                                onClick={() => {
+                                  setMenu(null);
+                                  pedirInsercionDeRuta({
+                                    session: props.session,
+                                    arbol: props.arbol,
+                                    editor: editor().ruta,
+                                    destino: nodo().ruta,
+                                  });
+                                }}
+                              >
+                                {t("code.tree.insert_path")}
+                              </button>
+                            )}
                           </Show>
                           <button
                             role="menuitem"
