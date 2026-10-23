@@ -249,6 +249,7 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
             typst_live::typst_live_change,
             typst_live::typst_live_close_doc,
             typst_live::typst_live_reveal,
+            typst_live::typst_live_complete,
             typst_live::typst_live_stop,
             update::update_install,
             update::update_pending

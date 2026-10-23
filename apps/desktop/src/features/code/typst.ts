@@ -389,3 +389,88 @@ export function pedirArreglo(project: string, session: string, main: string, err
     }),
   );
 }
+
+/** El editor de Typst que se está mirando: el menú del árbol de esa tarea le ofrece meter rutas. */
+type EditorTypst = { session: string; arbol: string; ruta: string };
+const [editorTypst, setEditorTypst] = createSignal<EditorTypst | null>(null);
+export { editorTypst };
+
+export function mirarEditorTypst(e: EditorTypst) {
+  setEditorTypst(e);
+}
+
+export function dejarDeMirarEditorTypst(e: EditorTypst) {
+  const actual = editorTypst();
+  if (actual && actual.session === e.session && actual.arbol === e.arbol && actual.ruta === e.ruta) setEditorTypst(null);
+}
+
+/** `harness:insertar-ruta`: `destino` entra en el editor de `editor`; con `x` e `y`, donde se soltó. */
+export type InsercionDeRuta = { session: string; arbol: string; editor: string; destino: string; x?: number; y?: number };
+
+export function pedirInsercionDeRuta(p: InsercionDeRuta) {
+  window.dispatchEvent(new CustomEvent("harness:insertar-ruta", { detail: p }));
+}
+
+/** Un archivo del árbol en la mano, camino de un editor de Typst. */
+const [rutaEnVuelo, setRutaEnVuelo] = createSignal<{ ruta: string; x: number; y: number } | null>(null);
+export { rutaEnVuelo };
+
+let rutaRecienSoltada = false;
+/** El gesto que terminó fue un arrastre: el clic que lo sigue no abre el archivo. */
+export const fueArrastreDeRuta = () => rutaRecienSoltada;
+
+const UMBRAL_DEL_ARRASTRE = 5;
+
+/**
+ * Arrastrar una ruta del árbol a un editor de Typst, desde `pointerdown`. Con eventos de
+ * puntero por lo mismo que `lib/drag.ts`: con `dragDropEnabled`, WebView2 no entrega el HTML5.
+ */
+export function arrastrarRuta(inicio: PointerEvent, session: string, arbol: string, ruta: string) {
+  if (inicio.button !== 0) return;
+  const x0 = inicio.clientX;
+  const y0 = inicio.clientY;
+  let activo = false;
+  const limpiar = () => {
+    window.removeEventListener("pointermove", mover);
+    window.removeEventListener("pointerup", soltar);
+    window.removeEventListener("pointercancel", cancelar);
+    window.removeEventListener("keydown", alTeclear, true);
+    setRutaEnVuelo(null);
+    if (activo) document.body.style.userSelect = "";
+  };
+  const marcarArrastre = () => {
+    rutaRecienSoltada = true;
+    setTimeout(() => (rutaRecienSoltada = false));
+  };
+  const mover = (e: PointerEvent) => {
+    if (!activo) {
+      if (Math.hypot(e.clientX - x0, e.clientY - y0) < UMBRAL_DEL_ARRASTRE) return;
+      activo = true;
+      document.body.style.userSelect = "none";
+    }
+    setRutaEnVuelo({ ruta, x: e.clientX, y: e.clientY });
+  };
+  const soltar = (e: PointerEvent) => {
+    const eraArrastre = activo;
+    limpiar();
+    if (!eraArrastre) return;
+    marcarArrastre();
+    const editor = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>("[data-typst-editor]");
+    const destino = editor?.dataset.typstEditor;
+    if (destino) pedirInsercionDeRuta({ session, arbol, editor: destino, destino: ruta, x: e.clientX, y: e.clientY });
+  };
+  const cancelar = () => {
+    const eraArrastre = activo;
+    limpiar();
+    if (eraArrastre) marcarArrastre();
+  };
+  const alTeclear = (e: KeyboardEvent) => {
+    if (e.key !== "Escape" || !activo) return;
+    e.stopPropagation();
+    cancelar();
+  };
+  window.addEventListener("pointermove", mover);
+  window.addEventListener("pointerup", soltar);
+  window.addEventListener("pointercancel", cancelar);
+  window.addEventListener("keydown", alTeclear, true);
+}
