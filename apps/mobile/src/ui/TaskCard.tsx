@@ -34,7 +34,7 @@ export function MachineChip({ name, on, size = 12 }: { name: string; on: boolean
  * La tarjeta de dos líneas del sidebar del escritorio (#151), en el teléfono.
  * Línea 1: la marca en su columna, el título y la chincheta. Línea 2: lo que te
  * piden si te necesita (y el cuadrado de su carpeta); si no, la carpeta, la
- * cara del agente y la máquina. «Compacta», una sola línea con el cuadrado.
+ * máquina y la cara del agente. «Compacta», una sola línea con el cuadrado.
  * Qué va en cada línea lo decide `taskCard` de `@terminus/tasks`. Mantenerla
  * pulsada abre la vista previa (la tarjeta flotante del escritorio).
  */
@@ -108,8 +108,8 @@ export function TaskCard({
                   </Text>
                 </View>
               ) : null}
-              {card.agent ? <Avatar name={card.agent} size={14} round /> : null}
               {card.machine ? <MachineChip name={card.machine.id} on={card.machine.on} /> : null}
+              {card.agent ? <Avatar name={card.agent} size={14} round /> : null}
             </>
           )}
         </View>

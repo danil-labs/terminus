@@ -47,6 +47,7 @@ export function groupingLabel(group: SidebarGrouping): string {
     case "folder": return t("shell.sidebar.view.group_folder");
     case "status": return t("shell.sidebar.view.group_status");
     case "agent": return t("shell.sidebar.view.group_agent");
+    case "machine": return t("shell.sidebar.view.group_machine");
     default: return t("shell.sidebar.view.group_none");
   }
 }
@@ -59,6 +60,7 @@ export function scopeLabel(view: SidebarView, folderName: (id: string) => string
     case "folder": parts.push(t("shell.sidebar.view.scope_by_folder")); break;
     case "status": parts.push(t("shell.sidebar.view.scope_by_status")); break;
     case "agent": parts.push(t("shell.sidebar.view.scope_by_agent")); break;
+    case "machine": parts.push(t("shell.sidebar.view.scope_by_machine")); break;
   }
   return parts.join(" · ");
 }
@@ -79,8 +81,14 @@ export function statusGroupLabel(key: SidebarStatusKey): string {
   }
 }
 
-export function groupLabel(group: SidebarGroup<unknown>, folderName: (id: string) => string): string {
+/** `machineName`: el nombre de una máquina; la clave `""` es la de la ventana, y sin nombre es «Esta máquina». */
+export function groupLabel(
+  group: SidebarGroup<unknown>,
+  folderName: (id: string) => string,
+  machineName: (id: string) => string = (id) => id,
+): string {
   switch (group.kind) {
+    case "machine": return machineName(group.key) || t("shell.sidebar.view.this_machine");
     case "section": return sectionLabel(group.key as SidebarSection);
     case "status": return statusGroupLabel(group.key as SidebarStatusKey);
     case "folder": return group.key ? folderName(group.key) : t("shell.sidebar.view.no_folder");

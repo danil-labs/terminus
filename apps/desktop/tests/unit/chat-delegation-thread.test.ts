@@ -20,7 +20,7 @@ import {
   type Turn,
 } from "../../src/features/chat/transcript.ts";
 
-const tarea = (n: number) => ({ folder: "p", task: `hija${n}`, title: `Hija ${n}`, agent: "claude" });
+const tarea = (n: number) => ({ folder: "p", task: `hija${n}`, title: `Hija ${n}`, agent: "claude", provider: "claude" });
 const lanzada = (n: number): Msg => ({ role: "system", text: "", meta: "task_launched", fromTask: tarea(n), turno: `l${n}` });
 const paso = (): Msg => ({ role: "system", text: "Agent", meta: "usó" });
 const relevo = (titulo: string, texto: string) =>
