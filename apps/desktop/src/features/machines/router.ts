@@ -9,7 +9,7 @@
  * mandar. La cuenta y `danil_*` van siempre aquí. Un workspace de la cuenta que
  * esta computadora no tiene se lee de sus miembros y actúa en el primero.
  */
-import { type AccountWorkspace, callWorkspace } from "@terminus/computers";
+import { type AccountWorkspace, callWorkspace, isDeferrable } from "@terminus/computers";
 import { AttentionBook, type Envelope, type Fleet, FleetError, type Slice, unwrap } from "@terminus/fleet";
 import { t } from "../../lib/i18n.ts";
 
@@ -256,7 +256,17 @@ export function createRouter(config: RouterConfig) {
       const total = Array.isArray(session?.turns) ? session.turns.length : 0;
       return { ...session, history: { total, start: 0, end: total, limit: total, has_more: false } };
     }
-    return fleet.call({ machine, workspace, command, args });
+    const value = await fleet.call({ machine, workspace, command, args });
+    // Con la máquina apagada el relay la guardó y su copia ya la refleja: la lista se relee de allá.
+    if (isDeferrable(command)) deferredChanged(machine);
+    return value;
+  }
+
+  /** Cambió la cola de aplazadas de `machine`: sus lecturas salen otra vez al relay ya, sin esperar el respiro. */
+  function deferredChanged(machine: string) {
+    for (const id of [...lastRead.keys()]) if (id.startsWith(`[${JSON.stringify(machine)},`)) lastRead.delete(id);
+    notify("list_live_sessions");
+    notify("list_spaces");
   }
 
   /**
@@ -396,6 +406,7 @@ export function createRouter(config: RouterConfig) {
   return {
     handle,
     events,
+    deferredChanged,
     createsOn,
     activeWorkspace: () => active,
     forget(machine: string) {

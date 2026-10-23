@@ -295,3 +295,31 @@ de la web (`src/web/fleet.ts` y `src/web/transport.ts`), en un trozo perezoso
   una carpeta sin remoto (`remote_url`) que vive en otra máquina.
 - `attention` junta por workspace lo que dice cada máquina y llega a la ventana
   como una sola lista.
+
+## Acciones aplazadas con la máquina apagada
+
+Desde el 2026-10-23, archivar, desarchivar, borrar, renombrar, fijar o desfijar
+y mover de space una tarea de otra máquina apagada (VM o propia) **no la
+enciende ni da error**. El relay de computers la guarda en la cola de esa
+máquina y contesta enseguida; el motor la aplica, en orden, la siguiente vez
+que la máquina se conecta (el protocolo de danil-labs/computers y el
+conector de danil-labs/seldon-host, sección «Acciones aplazadas» en ambos).
+
+- La lista (`DEFERRED_COMMANDS` de `packages/computers`) coincide con la del
+  relay y con los `deferrable: true` de `commands.json`.
+- `packages/fleet` no enciende ni falla con esas acciones (`Fleet.defers`).
+  Mover a un space **de la cuenta** no se aplaza: ese space es de la cuenta y
+  sigue el camino de cualquier acción (enciende la VM; con la Mac apagada,
+  `machine_off`).
+- Cada cambio de la cola llega como frame `deferred` (`RelaySession.onDeferred`);
+  el router borra el respiro de esa máquina y la ventana relee la lista. La
+  copia del relay ya trae la cola aplicada: la fila archivada o borrada no
+  sale y las demás tocadas traen `deferred: true`, que `Sessions.tsx` pinta con
+  una marca discreta («Se aplica cuando su máquina se encienda»).
+- Archivar con la máquina apagada no pregunta `task_blockers`: no hay turnos
+  vivos ni se enciende solo para mirar el árbol. Si al aplicarse el motor lo
+  rechaza (por ejemplo, trabajo sin guardar en el árbol), el relay la descarta
+  y la tarea vuelve a verse en la lista, sin aviso.
+- La web (`web/transport.ts`) aplaza las mismas salvo mover de space, porque
+  aún no sabe qué spaces son de la cuenta; el teléfono (`apps/mobile`), fijar y
+  archivar.

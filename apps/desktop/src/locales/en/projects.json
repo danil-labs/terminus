@@ -265,6 +265,7 @@
     "other": "Expand the {count} subtasks of “{title}”"
   },
   "projects.sessions.worktree_missing": "Worktree disconnected: its folder is no longer on disk.",
+  "projects.sessions.deferred": "Applies when its machine is on",
   "projects.split.alone": "Open another tab to split the window",
   "projects.split.agent_page": "The agent page takes the whole screen",
   "projects.split.detach": "Split the window ({key})",

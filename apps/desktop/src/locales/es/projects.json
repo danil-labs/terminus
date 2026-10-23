@@ -265,6 +265,7 @@
     "other": "Desplegar las {count} subtareas de «{title}»"
   },
   "projects.sessions.worktree_missing": "Worktree desconectado: su carpeta ya no está en disco.",
+  "projects.sessions.deferred": "Se aplica cuando su máquina se encienda",
   "projects.split.alone": "Abre otra pestaña para poder partir la ventana",
   "projects.split.agent_page": "La página del agente ocupa la pantalla entera",
   "projects.split.detach": "Partir la ventana ({key})",

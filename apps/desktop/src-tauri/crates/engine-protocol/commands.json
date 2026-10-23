@@ -1529,6 +1529,7 @@
     {
       "async": false,
       "channel": null,
+      "deferrable": true,
       "kind": "invoke",
       "name": "delete_session",
       "output": "-> Result < () , Failure >",
@@ -3348,6 +3349,7 @@
     {
       "async": false,
       "channel": null,
+      "deferrable": true,
       "kind": "invoke",
       "name": "move_task_to_space",
       "output": "-> Result < SpaceRef , Failure >",
@@ -4325,6 +4327,7 @@
     {
       "async": false,
       "channel": null,
+      "deferrable": true,
       "kind": "invoke",
       "name": "rename_session",
       "output": "-> Result < () , Failure >",
@@ -5533,6 +5536,7 @@
     {
       "async": false,
       "channel": null,
+      "deferrable": true,
       "kind": "invoke",
       "name": "set_session_pinned",
       "output": "-> Result < () , String >",
@@ -5679,6 +5683,7 @@
     {
       "async": false,
       "channel": null,
+      "deferrable": true,
       "kind": "invoke",
       "name": "set_task_archived",
       "output": "-> Result < Option < crate :: spaces :: SpaceRef > , Failure >",

@@ -20,7 +20,7 @@ repositories, and `GitHostInfo`. Files on disk keep their keys; the types that
 are stored and also travel cross the contract wrapped in `Wire`, which renames
 their keys. There are no aliases. This copy is byte-identical to the engine's.
 SHA-256:
-`6ed6494ae988434f1ddfe63d5ae3d00d9689991c92742800f3cbf969b34304da`.
+`d4541d178c64a065c1a4a0c693817eb84ad17052fd605815295fa1696955ef8f`.
 
 seldon-host `4e21caf` (#66) added the Danil account (321 commands, 28 events):
 `danil_connect_start`, `danil_connect_status`, `danil_connect_options`,
@@ -224,3 +224,5 @@ seldon-host `fix/referencias-solo-zotero` (`66321d9`, on dev `c693504`) removes 
 seldon-host `fix/zotero-busqueda-y-bib-vinculado` (`83d6d51`, on dev `15d08e7`) lets a project `.bib` follow Zotero (376 commands, 32 events): `zotero_bib_links` and `sync_zotero_bibs` (no parameters) → `Vec<VinculoBib>` (`{archivo, coleccion?, ids?, sincronizado?, fallo?}`) and `unlink_zotero_bib` (`{path}`), all with `scope: "workspace"` on the current workspace. This copy is `git show 83d6d51:crates/engine-protocol/commands.json` byte for byte; no `seldon-runtime` with it is published yet.
 
 seldon-host `feat/account-spaces` shares spaces through the Danil account (377 commands, 32 events, on dev with the Zotero `.bib` links): new `share_space` (`{id}`) → `Space`, which publishes an existing space to the workspace's account so every machine keeps it with the same id; `Space` gains `account` (shared). Spaces created in a workspace linked to its account are shared from birth; spaces that existed before stay on their machine. This copy is that branch's `commands.json` byte for byte; no `seldon-runtime` with it is published yet.
+
+seldon-host `feat/deferred-actions` (`0c867e2`, on dev with `feat/account-spaces`) marks the five light task actions the Danil Computers relay may queue while the machine is off with `deferrable: true`: `set_task_archived`, `delete_session`, `rename_session`, `set_session_pinned` and `move_task_to_space` (377 commands, 32 events; no signature changes). They must match `DEFERRED_COMMANDS` in `packages/computers` and in the danil-labs/computers relay.

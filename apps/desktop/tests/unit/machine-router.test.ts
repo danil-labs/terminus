@@ -6,6 +6,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { isDeferrable } from "@terminus/computers";
 import { Fleet, type Link, type MachineInfo } from "@terminus/fleet";
 import "../helpers/catalog.ts";
 import { createRouter } from "../../src/features/machines/router.ts";
@@ -22,6 +23,8 @@ function fakeLink(answers: Record<string, unknown>, state: "online" | "offline" 
     call(id, command, workspace, _folder, args, timeout) {
       calls.push({ id, command, workspace, args: args as Args });
       return new Promise((resolve, reject) => {
+        // Como el relay: una acción ligera con la máquina apagada se guarda en su cola.
+        if (state !== "online" && isDeferrable(command)) return resolve({ value: null, cached: null, deferred: { queued_at: "2026-10-23T00:00:00Z" } });
         if (state !== "online") return reject({ code: "machine_off" });
         if (silent) return void setTimeout(() => reject({ code: "io", detail: "timeout" }), timeout ?? 50);
         const answer = answers[command];
@@ -291,4 +294,18 @@ test("a space that cannot be shared (workspace without account, older engine) is
   await router.handle("list_workspaces");
   await router.handle("send_message", { provider: "claude", project: "p1", session: null, prompt: "hola", space: "s1" }, on("cmp_vm"));
   assert.equal(vm.calls.find((c) => c.command === "send_message")?.args.space, null);
+});
+
+test("archiving or deleting a task of an off machine (Mac or VM) is queued by the relay: no error, no wake, and the list rereads", async () => {
+  const mac = fakeLink({}, "offline");
+  const vm = fakeLink({}, "stopped");
+  const { router, changes } = setup({ cmp_mac: mac, cmp_vm: vm });
+  assert.equal(await router.handle("set_task_archived", { project: "p1", id: "cmp_mac~t1", archived: true }, on("cmp_mac")), null);
+  assert.equal(await router.handle("delete_session", { project: "p1", id: "cmp_vm~t2", force: false }, on("cmp_vm")), null);
+  assert.deepEqual(mac.calls.map((c) => [c.command, c.args]), [["set_task_archived", { project: "p1", id: "t1", archived: true }]]);
+  assert.deepEqual(vm.calls.map((c) => c.command), ["delete_session"], "the VM is not started first");
+  await sleep(300);
+  assert.ok(changes.flat().includes("sessions"), "the task list reads again");
+  // Lo que corre un agente sigue diciendo que la Mac está apagada.
+  await assert.rejects(router.handle("send_message", { project: "p1", session: "cmp_mac~t1", prompt: "hola" }, on("cmp_mac")), (e: { detail: string }) => e.detail === "machine_off");
 });

@@ -13,6 +13,7 @@ import {
   type SocketFactory,
   CALL_TIMEOUT,
   INTENT_COMMANDS,
+  isDeferrable,
   WAKE_TIMEOUT,
   cachedAt,
   callWorkspace,
@@ -94,6 +95,8 @@ export function relayHost(computer: Computer, config: Omit<RelayConfig, "compute
   };
   relay.onState(changed);
   relay.onLink(changed);
+  // La cola de aplazadas cambió (aquí o en otro dispositivo): la lista se relee.
+  relay.onDeferred(changed);
   // Hasta que el relay diga su estado, vale el de la fila de `/v1/computers`.
   const state = () => (relay.state() === "unknown" ? computer.state : relay.state());
   const linked = linkedWorkspaces(computer);
@@ -117,12 +120,14 @@ export function relayHost(computer: Computer, config: Omit<RelayConfig, "compute
       allowed(command);
       const intent = INTENT_COMMANDS.has(command);
       const action = isAppAction(command);
+      // Fijar o archivar con la máquina apagada (VM o propia): el relay lo guarda y lo aplica al conectarse.
+      const deferred = isDeferrable(command) && host.power() === "off";
       // Una máquina propia apagada no se puede despertar: ni se intenta, el relay contestaría `start_failed`.
-      if ((intent || WAKES_FIRST.has(command)) && host.canAct() === "asleep") throw new HostError("machine_asleep", host.label);
+      if (!deferred && (intent || WAKES_FIRST.has(command)) && host.canAct() === "asleep") throw new HostError("machine_asleep", host.label);
       // Un motor que no habla este contrato no recibe acciones, como en la web.
       if (action && host.canAct() === "outdated") throw new HostError("machine_outdated", host.label);
       // Una acción que el relay no enciende por su cuenta: la VM se enciende antes por el plano de control.
-      if (WAKES_FIRST.has(command)) await host.wake();
+      if (!deferred && WAKES_FIRST.has(command)) await host.wake();
       try {
         // Con el workspace que nombran los argumentos: el relay rechaza (`workspace_mismatch`) uno distinto.
         const { value, cached } = await relay.call(requestId(), command, callWorkspace(workspace, args as Record<string, unknown>), null, args, intent ? WAKE_TIMEOUT : CALL_TIMEOUT);
