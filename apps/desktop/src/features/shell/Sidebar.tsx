@@ -400,17 +400,22 @@ export default function Sidebar(props: {
   );
 
   /** El rótulo de un tramo. */
-  const Rotulo = (p: { children: JSX.Element; tono?: "need"; accion?: JSX.Element }) => (
-    <div class={cn(
+  const Rotulo = (p: { children: JSX.Element; tono?: "need"; accion?: JSX.Element }) => {
+    // En un memo: con `class` como único atributo vivo, Solid lo reescribe en cada
+    // cambio del grupo aunque valga lo mismo (`tests/perf/open-task-cost.mjs`).
+    const clase = createMemo(() => cn(
       "group flex h-7 min-w-0 items-center gap-1.5 px-2 pt-1 text-[0.6875rem] font-medium",
       p.accion && "pr-0",
       p.tono === "need" ? "text-warning" : "text-neutral-500",
-    )}>
-      {p.children}
-      <span class="ml-auto" />
-      {p.accion}
-    </div>
-  );
+    ));
+    return (
+      <div class={clase()}>
+        {p.children}
+        <span class="ml-auto" />
+        {p.accion}
+      </div>
+    );
+  };
 
   /**
    * La carpeta que se está clonando, encima de la lista.
