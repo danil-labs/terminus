@@ -1,4 +1,5 @@
 import { invoke } from "../../lib/invoke.ts";
+import { machineOf } from "../machines/store";
 import type { ArbolEnTarea } from "../../lib/model";
 import { esDeCodigo } from "./workdirKind";
 
@@ -15,7 +16,7 @@ export function recordarArboles(session: string, arboles: readonly Pick<ArbolEnT
 }
 
 export async function arbolesDe(project: string, session: string): Promise<ArbolEnTarea[]> {
-  const arboles = await invoke<ArbolEnTarea[]>("list_task_trees", { project, session });
+  const arboles = await invoke<ArbolEnTarea[]>("list_task_trees", { project, session }, machineOf(session));
   recordarArboles(session, arboles);
   return arboles;
 }

@@ -104,7 +104,7 @@ import ArchivedTasks from "../features/projects/ArchivedTasks";
 import BaseBranchPicker from "../features/projects/BaseBranchPicker";
 import { watchHandlerStatus, watchHandlerStatuses } from "../features/projects/handlerPresence";
 import { EmptyContext, ProjectPicker } from "../features/projects/Projects";
-import { bringHereLabel, canBringHere, carryOrigin, machineName, machineOf, machines, refetchMachines, runOn, runOnOptions, setRunOn } from "../features/machines/store";
+import { bringHereLabel, canBringHere, carryOrigin, machineName, machineOf, machines, refetchMachines, runOn, runOnOptions, setRunOn, setTaskRowMachine } from "../features/machines/store";
 import type { CarriedBase, CarryCheck } from "../features/machines/carry";
 // Chunk aparte: solo lo carga quien crea una tarea, no la carga inicial.
 const MachinePicker = lazy(() =>
@@ -588,10 +588,9 @@ export default function App() {
    * su cabecera. La máquina sale de su fila (o de la pestaña que aún no la
    * tiene), nunca de los demás argumentos (`features/machines/router.ts`).
    */
-  const deLaTarea = (id: string | null | undefined): { headers: Record<string, string> } | undefined => {
-    const machine = id ? (filaDe(id)?.machine ?? capabilities().taskMachine?.(id) ?? null) : null;
-    return machine ? { headers: { "x-terminus-machine": machine } } : undefined;
-  };
+  // El árbol, el visor y kn piden por `machineOf` desde fuera de aquí: con la fila, no solo con el prefijo.
+  setTaskRowMachine((id) => filaDe(id)?.machine);
+  const deLaTarea = (id: string | null | undefined) => machineOf(id);
   /**
    * El space con que nace o sigue algo en `machine`. Uno de esta ventana viaja:
    * es de la cuenta, con el mismo id en todas (el router lo comparte antes si
@@ -4930,6 +4929,8 @@ export default function App() {
     const proyecto = project();
     const claveBorrador = claveAbierta();
     const lugar = projectList().find((p) => p.id === proyecto);
+    // La tarea nace en la máquina elegida, y lo que se crea dentro va a la misma.
+    const enSuMaquina = runOnOptions(workspaceActivo(), lugar);
     const { session } = await invoke<{ session: string; folder: string }>("create_empty_session", {
       provider: agent(),
       project: proyecto,
@@ -4937,13 +4938,13 @@ export default function App() {
       baseRef: draftBases()[claveBorrador] ?? null,
       agent: hablandoCon()?.name ?? null,
       space: escritorio(),
-    }, runOnOptions(workspaceActivo(), lugar));
+    }, enSuMaquina);
     let arbol = "";
     try {
-      const arboles = await invoke<ArbolEnTarea[]>("list_task_trees", { project: proyecto, session });
+      const arboles = await invoke<ArbolEnTarea[]>("list_task_trees", { project: proyecto, session }, enSuMaquina);
       arbol = arboles[0]?.key ?? "";
       const donde = { project: proyecto, session, tree: arbol, path: ruta };
-      await (tipo === "archivo" ? invoke("tree_create_file", donde) : invoke("tree_create_folder", donde));
+      await (tipo === "archivo" ? invoke("tree_create_file", donde, enSuMaquina) : invoke("tree_create_folder", donde, enSuMaquina));
     } catch (e) {
       // Sin lo que se pidió crear, la tarea vacía no tiene por qué estar.
       await invoke("delete_session", { project: proyecto, id: session, force: false }).catch(() => {});

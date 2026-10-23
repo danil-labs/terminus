@@ -13,6 +13,7 @@ import {
   type JSX,
 } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
+import { machineOf } from "../machines/store";
 import Navegador from "lucide-solid/icons/external-link";
 import IconoCodigo from "lucide-solid/icons/code";
 import IconoLado from "lucide-solid/icons/columns-2";
@@ -348,7 +349,7 @@ export default function VisorDeArchivo(props: {
         tree: props.arbol,
         path: props.ruta,
         text: texto,
-      });
+      }, machineOf(props.session));
       // Sin tirar el diff cacheado, la vista de cambios seguiría enseñando el de antes de escribir.
       setContenido({ ...contenido()!, text: texto });
       setDiff(null);
@@ -411,7 +412,7 @@ export default function VisorDeArchivo(props: {
       session: props.session,
       tree: props.arbol,
       path: props.ruta,
-    });
+    }, machineOf(props.session));
   }
 
   const pedirContenido = async (): Promise<Contenido> => {
@@ -437,7 +438,7 @@ export default function VisorDeArchivo(props: {
           session: props.session,
           tree: props.arbol,
           path: props.ruta,
-        });
+        }, machineOf(props.session));
   };
 
   /** Su diff con el archivo entero de contexto (`tree_patch`, `-U100000`). Vacío = no cambió. */
@@ -449,7 +450,7 @@ export default function VisorDeArchivo(props: {
           session: props.session,
           tree: props.arbol,
           path: props.ruta,
-        }).then((patch) => parsearDiff(patch)[0] ?? null);
+        }, machineOf(props.session)).then((patch) => parsearDiff(patch)[0] ?? null);
 
   // Siempre y no solo al mirarlo: sin saber si es texto no se sabe si se puede escribir.
   createEffect(
