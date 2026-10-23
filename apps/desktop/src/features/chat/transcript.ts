@@ -40,6 +40,8 @@ export type ChatEvent = {
     | "permission"
     | "notice"
     | "task_launched"
+    /** El motor guardó lo dicho hasta aquí en el turno `id` (un tramo); ver `tramoGuardado`. */
+    | "segment_saved"
     | "model"
     | "effort"
     /** El CLI está reintentando contra su proveedor: `meta` trae `"3/5"`. */
@@ -157,7 +159,7 @@ export function anexarDelta(
   if (d.startsMessage) return nuevo(d.text.replace(/^\n+/, ""));
   if (d.messageId) {
     for (let i = msgs.length - 1; i >= 0; i--) {
-      if (msgs[i].meta === "task_launched") break;
+      if (msgs[i].meta === "task_launched" || msgs[i].tramo) break;
       if (msgs[i].role === "agent" && msgs[i].nativeMessageId === d.messageId) {
         const copia = [...msgs];
         copia[i] = { ...msgs[i], text: msgs[i].text + d.text };
@@ -182,7 +184,8 @@ export function anexarDelta(
     return nuevo(d.text);
   }
   const ultimo = msgs[msgs.length - 1];
-  if (ultimo?.role === "agent") {
+  // Lo que ya está en un tramo guardado no crece: lo que sigue es del tramo siguiente.
+  if (ultimo?.role === "agent" && !ultimo.tramo) {
     return [...msgs.slice(0, -1), { ...ultimo, text: ultimo.text + d.text }];
   }
   return nuevo(d.text);
@@ -235,6 +238,36 @@ export function anexarImagen(msgs: Msg[], images: string[]): Msg[] {
     return copia;
   }
   return [...msgs, { role: "agent", text: "", images: images.slice() }];
+}
+
+/** Marca lo vivo que el motor guardó en el tramo `turno`; no lo quita: un `tool_done` tardío busca su fila. */
+export function tramoGuardado(msgs: Msg[], turno: string): Msg[] {
+  const suyo = (m: Msg) => !m.turno && !m.tramo && (m.role === "agent" || m.meta === "usó");
+  return msgs.some(suyo) ? msgs.map((m) => (suyo(m) ? { ...m, tramo: turno } : m)) : msgs;
+}
+
+/** Lo guardado y, detrás, lo vivo que el disco no trae: releer con el turno corriendo no repite sus tramos. */
+export function mensajesDelHilo(h: { base: Msg[]; vivo: Msg[]; guardados?: ReadonlySet<string> }): Msg[] {
+  const guardados = h.guardados;
+  const enDisco = (id?: string) => id !== undefined && guardados!.has(id);
+  const vivo = guardados?.size ? h.vivo.filter((m) => !enDisco(m.turno) && !enDisco(m.tramo)) : h.vivo;
+  return vivo.length ? [...h.base, ...vivo] : h.base;
+}
+
+/**
+ * Lo escrito en una subtarea que el motor pasó a su padre envuelto en el encargo
+ * de retomarla (`subagents::relay_prompt`, `launch::relevo_de`): el encargo es del CLI.
+ */
+const RELEVOS = [
+  /^\[Mensaje para tu subagente «(.+)»\]\nRetómalo con SendMessage usando to: "[^"\n]*" y pásale esto tal cual:\n\n([\s\S]*?)\n\nNo hagas tú su trabajo\. Cuando conteste, resume en una línea qué dijo\.$/,
+  /^\[Mensaje para tu subagente «(.+)»\]\nRetómalo con resume_agent si hace falta y usa send_input con id: "[^"\n]*"\. Pásale esto tal cual y espera su resultado:\n\n([\s\S]*)$/,
+];
+export function relevoDe(text: string): { titulo: string; texto: string } | null {
+  for (const forma of RELEVOS) {
+    const m = forma.exec(text);
+    if (m) return { titulo: m[1], texto: m[2] };
+  }
+  return null;
 }
 
 /** Una herramienta que el agente usó, tal como quedó **guardada** en el turno. */
@@ -523,9 +556,11 @@ export function transcripcion(turns: Turn[]): Msg[] {
     // Lo que el turno preguntó y lo que se contestó vuelve con él: una pregunta
     // que no sobrevive a cerrar la app deja la sesión esperando para siempre,
     // sin nadie que sepa que espera.
+    const relevo = t.role === "user" ? relevoDe(t.text) : null;
     const propio: Msg = {
       role: t.role as Msg["role"],
-      text: t.text,
+      text: relevo ? relevo.texto : t.text,
+      ...(relevo ? { relevo: { titulo: relevo.titulo } } : {}),
       task_mentions: t.task_mentions,
       // Un aviso de cierre —una interrupción— vive en el turno, no en el evento
       // de la ventana. Sin esto desaparecía al reabrir la tarea y una respuesta
