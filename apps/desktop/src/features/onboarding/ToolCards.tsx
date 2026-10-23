@@ -4,6 +4,7 @@ import { AvanceDeDescarga, BarraDeCarga, CodigoParaConfirmar, Peso } from "./Dow
 import ArrowRight from "lucide-solid/icons/arrow-right";
 import Check from "lucide-solid/icons/check";
 import ExternalLink from "lucide-solid/icons/external-link";
+import FileText from "lucide-solid/icons/file-text";
 import { createSignal, For, type JSX, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { createStore } from "solid-js/store";
 import { mb } from "../../lib/format";
@@ -38,6 +39,9 @@ type Proveedor = {
   connected: { identity: { user: string; name: string }; workspace?: string } | null;
 };
 type Conocido = { id: string; grupo: string; pide_sesion: boolean; conectado: boolean; sesiones?: string[] };
+/** Un `.bib` de un proyecto que sigue a Zotero (`zotero_bib_links`). `fallo` viene en inglés: lo leen también los agentes. */
+type VinculoBib = { archivo: string; coleccion?: string; ids?: string[]; sincronizado?: number; fallo?: string };
+const nombreDeArchivo = (ruta: string) => ruta.split(/[\\/]/).pop() || ruta;
 type AgenteMcp = { id: string; label: string; recibe: boolean; instalado: boolean; login?: boolean };
 type Plugin = { id: string; installed: boolean; installing: boolean; supported: boolean };
 type FalloDelMotor = { what: Frase; detail?: string };
@@ -224,6 +228,8 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
   const [drive, setDrive] = createSignal<EstadoDeDrive | null>(null);
   const [escritorio, setEscritorio] = createSignal<DriveDeEscritorio | null>(null);
   const [zotero, setZotero] = createSignal<EstadoDeZotero | null>(null);
+  const [bibs, setBibs] = createSignal<VinculoBib[]>([]);
+  const [sincronizandoBibs, setSincronizandoBibs] = createSignal(false);
   let intentoDeZotero = 0;
   let finDeZotero: ((a: InstalacionDeDrive) => void) | null = null;
   let vigiaDeZotero: ReturnType<typeof setTimeout> | undefined;
@@ -276,22 +282,20 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
     }
     const c = conocido(i);
     if (!c?.conectado) return { k: "libre" };
-    if (!c.pide_sesion) return { k: "conectada", detalle: descripcion(i.id) };
-    // El motor la autoriza una vez para todos los agentes: o la tienen todos o ninguno.
-    return (c.sesiones ?? []).length > 0
-      ? { k: "conectada", detalle: t("onboarding.tools.session_in") }
-      : { k: "detectada", detalle: t("onboarding.tools.needs_login") };
+    if (!c.pide_sesion || (c.sesiones ?? []).length > 0) return { k: "conectada", detalle: descripcion(i.id) };
+    return { k: "detectada", detalle: t("onboarding.tools.needs_login") };
   }
 
   async function cargar() {
     try {
-      const [p, c, a, d, o, z] = await Promise.all([
+      const [p, c, a, d, o, z, b] = await Promise.all([
         invoke<Proveedor[]>("list_git_hosts", { scope: await scope }),
         invoke<Conocido[]>("list_known_mcp"),
         invoke<AgenteMcp[]>("list_mcp_providers"),
         invoke<EstadoDeDrive>("google_drive_status").catch(() => null),
         invoke<DriveDeEscritorio>("google_drive_desktop_status").catch(() => null),
         invoke<EstadoDeZotero>("zotero_status").catch(() => null),
+        invoke<VinculoBib[]>("zotero_bib_links").catch(() => []),
       ]);
       if (cerrada) return;
       // Antes la guardaba la ventana; ahora es del motor, que la lee en cada turno.
@@ -305,6 +309,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
       setDrive(d);
       setEscritorio(o);
       setZotero(z);
+      setBibs(b);
       setProveedores(p);
       setConocidos(c);
       setAgentesMcp(a);
@@ -716,16 +721,20 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
     const cancelarEsta = () => (
       <CancelButton label={t("onboarding.tools.cancel_connect", { name: nombre })} onClick={() => void cancelar(p.i)} />
     );
+    // El aviso de Zotero se despliega dentro de su tarjeta, no en una caja aparte.
+    const permiso = () => p.i.id === "zotero" && e()?.k === "permiso";
     return (
       <div
         class={cn(
-          "relative flex h-[58px] items-center gap-3 overflow-hidden rounded-lg border px-3 py-2",
+          "relative grid overflow-hidden rounded-lg border",
+          permiso() && "sm:col-span-2",
           fallo() && "animate-sacudir border-error-strong bg-surface-raised",
           e()?.k === "conectada" && p.i.via !== "incluido" && "border-success-strong/40 bg-success/5",
           ["conectando", "formulario", "descargando", "instalando", "sesion", "abriendo", "permiso"].includes(e()?.k ?? "") && "border-primary bg-primary/5",
           (!e() || ["libre", "saliendo", "detectada"].includes(e()!.k) || p.i.via === "incluido") && "border-border bg-surface-raised",
         )}
       >
+        <div class="relative flex h-[56px] items-center gap-3 px-3 py-2">
         <span class="grid size-[26px] shrink-0 place-items-center rounded-md bg-surface-muted text-neutral-950">
           <MarcaIntegracion id={p.i.id} size={15} />
         </span>
@@ -778,11 +787,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
               <Spinner size={18} class="text-primary" />
               {cancelarEsta()}
             </Match>
-            <Match when={e()?.k === "permiso"}>
-              <Button size="compact" variant="secondary" onClick={() => void conectar(p.i)}>
-                {t("onboarding.ai.retry")}
-              </Button>
-            </Match>
+            <Match when={e()?.k === "permiso"}>{null}</Match>
             <Match when={e()?.k === "detectada"}>
               <Button size="compact" variant="secondary" onClick={() => void conectar(p.i)}>
                 {p.i.via === "drive" ? t("onboarding.ai.use_this") : t("onboarding.tools.authorize")}
@@ -831,8 +836,79 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
         <Show when={e()?.k === "instalando"}>
           <BarraDeCarga hecho={0} total={null} />
         </Show>
+        </div>
+        <Show when={permiso()}>
+          <div class="grid gap-2 border-t border-primary/30 px-3 py-3 motion-safe:animate-entrar" role="status">
+            <strong class="text-[13px] font-semibold">{t("onboarding.tools.references.zotero_permission_title")}</strong>
+            <p class="m-0 text-[13px]">{t("settings.references.zotero.error_local_api")}</p>
+            <div class="mt-0.5 flex flex-wrap items-center gap-2">
+              <span class="text-xs text-neutral-500">{t("onboarding.tools.references.zotero_permission_why")}</span>
+              <span class="flex-1" />
+              <Button size="sm" variant="ghost" onClick={() => void invoke("open_zotero").catch((x) => setErrores("zotero", explicar(x)))}>
+                {t("onboarding.tools.references.zotero_open")}
+              </Button>
+              <Button size="sm" onClick={() => void conectar(p.i)}>
+                {t("onboarding.ai.retry")}
+              </Button>
+            </div>
+          </div>
+        </Show>
+        {/* Los `.bib` que siguen a Zotero los vincula el agente («conecta refs.bib con mi colección X»). */}
+        <Show when={p.i.id === "zotero" && e()?.k === "conectada" && bibs().length > 0}>
+          <div class="grid gap-1 border-t border-border px-3 py-2">
+            <For each={bibs()}>
+              {(b) => (
+                <div class="flex min-h-7 min-w-0 items-center gap-2 text-xs">
+                  <FileText size={13} class="shrink-0 text-neutral-500" aria-hidden="true" />
+                  <span class="min-w-0 flex-1 truncate font-medium" title={b.archivo}>
+                    {nombreDeArchivo(b.archivo)}
+                  </span>
+                  <span class={cn("min-w-0 truncate", b.fallo ? "text-error-strong" : "text-neutral-500")} title={b.fallo ?? undefined}>
+                    {b.fallo
+                      ? t("settings.references.zotero.bib_failed")
+                      : b.coleccion
+                        ? t("settings.references.zotero.bib_collection", { name: b.coleccion })
+                        : t("settings.references.zotero.bib_cited")}
+                  </span>
+                  <RemoveButton
+                    icon="unlink"
+                    label={t("settings.references.zotero.bib_unlink", { name: nombreDeArchivo(b.archivo) })}
+                    onClick={() => void desvincularBib(b.archivo)}
+                  />
+                </div>
+              )}
+            </For>
+            <div class="flex justify-end">
+              <Button size="sm" variant="ghost" disabled={sincronizandoBibs()} onClick={() => void sincronizarBibs()}>
+                {sincronizandoBibs() ? t("settings.references.zotero.bib_syncing") : t("settings.references.zotero.bib_sync")}
+              </Button>
+            </div>
+          </div>
+        </Show>
       </div>
     );
+  }
+
+  /** «Sincronizar con Zotero»: vuelve a traer cada `.bib` vinculado; el fallo de uno queda en su fila. */
+  async function sincronizarBibs() {
+    setSincronizandoBibs(true);
+    setErrores("zotero", null);
+    try {
+      setBibs(await invoke<VinculoBib[]>("sync_zotero_bibs"));
+    } catch (x) {
+      setErrores("zotero", explicar(x));
+    } finally {
+      setSincronizandoBibs(false);
+    }
+  }
+
+  async function desvincularBib(archivo: string) {
+    try {
+      await invoke("unlink_zotero_bib", { path: archivo });
+      setBibs(await invoke<VinculoBib[]>("zotero_bib_links"));
+    } catch (x) {
+      setErrores("zotero", explicar(x));
+    }
   }
 
   /** Datos y token del servicio, con los textos que da el motor; Bitbucket con los del diseño. */
@@ -964,25 +1040,6 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
       <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
         <For each={visibles()}>{(i) => <Tarjeta i={i} />}</For>
       </div>
-      <Show when={estados.zotero?.k === "permiso"}>
-        <div class="grid gap-2 rounded-lg border border-primary bg-surface-raised px-4 py-3.5 motion-safe:animate-entrar" role="status">
-          <p class="m-0 flex items-center gap-2 text-[13px]">
-            <ZoteroMark size={16} />
-            <strong class="font-semibold">{t("onboarding.tools.references.zotero_permission_title")}</strong>
-          </p>
-          <p class="m-0 text-[13px]">{t("settings.references.zotero.error_local_api")}</p>
-          <div class="mt-0.5 flex flex-wrap items-center gap-2">
-            <span class="text-xs text-neutral-500">{t("onboarding.tools.references.zotero_permission_why")}</span>
-            <span class="flex-1" />
-            <Button size="sm" variant="ghost" onClick={() => void invoke("open_zotero").catch((x) => setErrores("zotero", explicar(x)))}>
-              {t("onboarding.tools.references.zotero_open")}
-            </Button>
-            <Button size="sm" onClick={() => void conectar(INTEGRACIONES().find((i) => i.id === "zotero")!)}>
-              {t("onboarding.ai.retry")}
-            </Button>
-          </div>
-        </div>
-      </Show>
       <Show when={falloDeCarga()}>{(e) => <ErrorDeTarjeta class="rounded-md border-t" texto={e()} />}</Show>
       <For each={integraciones().filter(formularioAbierto)}>{(i) => <Formulario i={i} />}</For>
       <VerMas
