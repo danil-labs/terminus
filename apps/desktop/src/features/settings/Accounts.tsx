@@ -453,6 +453,14 @@ export default function Accounts(props: {
         setConectadaVez((c) => ({ ...c, [account]: (c[account] ?? 0) + 1 }));
         return;
       }
+      // Codex abre el navegador él solo y su enlace llega como aviso, no
+      // como `url`. Ofrecerle la Terminal lanzaba un segundo `codex login`
+      // que cancela al primero por su puerto fijo: la pestaña ya abierta
+      // volvía a `127.0.0.1:1455` y fallaba.
+      if (/https:\/\//.test(text)) {
+        cancelarEspera();
+        setOfrecerTerminal(false);
+      }
       setSalida((s) => [...s, text].slice(-12));
     });
 
