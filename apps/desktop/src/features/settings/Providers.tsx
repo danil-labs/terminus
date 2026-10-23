@@ -583,14 +583,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                   }
                 >
                   <Show when={p.id === "github"}>
-                    <SettingsRow
-                      label={t("providers.github.host_mode.title")}
-                      description={
-                        <Show when={hostGithub()}>
-                          <span class="text-warning-strong" role="status">{t("providers.github.host_mode.warning")}</span>
-                        </Show>
-                      }
-                    >
+                    <SettingsRow label={t("providers.github.host_mode.title")}>
                       <Toggle
                         checked={hostGithub()}
                         label={t("providers.github.host_mode.title")}
@@ -599,9 +592,6 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                       />
                     </SettingsRow>
                     <Show when={hostFailure()}>{(f) => <FailureNote f={f()} />}</Show>
-                    <Show when={hostGithub()}>
-                      <p class="m-0 text-xs text-neutral-500">{t("providers.github.host_mode.managed_note")}</p>
-                    </Show>
                   </Show>
                   <Switch>
                     <Match when={p.connected && !esperaAqui() && !montajes()[p.id] ? p.connected : null}>
@@ -1124,7 +1114,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                             <Badge tone="warning">{t("providers.github.cli.attention")}</Badge>
                           </Show>
                         </summary>
-                        <SettingsRow label={t("providers.github.cli.title")} description={t("providers.github.cli.help")}>
+                        <SettingsRow label={t("providers.github.cli.title")}>
                           <Show when={cli()} fallback={
                             <Show when={loadingCli()} fallback={
                               <Show when={!cliFailure()}><span class="text-xs text-neutral-500">{t("providers.github.cli.unavailable")}</span></Show>
