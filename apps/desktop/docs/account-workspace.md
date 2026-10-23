@@ -81,12 +81,19 @@ Con proyectos pasa lo mismo: el mismo id en todas las máquinas.
 Con los spaces también, desde el 2026-10-23 (decisión de Alberto): un space
 compartido es del workspace, con el mismo id en todas las máquinas
 (`workspace_spaces` en el registro; en seldon-host, el documento del conector, «Spaces de
-la cuenta»). Nace compartido el que se crea en un workspace unido; los que ya
-existían se quedan en su máquina, sin subirse ni fundirse. Crear una tarea en
-otra máquina manda el space de la ventana: si aún no era de la cuenta, el
-router lo comparte antes (`share_space`) y allá se crea con ese id. La flota
-(`packages/fleet`) no le pone prefijo de máquina a un space compartido y junta
-`list_spaces` por id; uno de una sola máquina sigue con su prefijo.
+la cuenta»). Nace compartido el que se crea en un workspace unido, y los que
+ya existían en una máquina **pasan a la cuenta con su mismo id** en cuanto su
+workspace queda unido (el motor los publica; segunda decisión del mismo día,
+que reemplaza «no se migra nada»). Cada tarea conserva el id de su space. Dos
+spaces con el mismo nombre y distinto id (dos «General») no se funden: quedan
+los dos. Si una máquina sale de la cuenta, solo desaparecen sus tareas; el
+space sigue con su id para las demás, y solo borrarlo a propósito lo da de
+baja. Crear una tarea en otra máquina manda el space de la ventana: si aún no
+era de la cuenta, el router lo comparte antes (`share_space`) y allá se crea
+con ese id. La flota (`packages/fleet`) no le pone prefijo de máquina a un
+space compartido y junta `list_spaces` por id; uno de una sola máquina sigue
+con su prefijo. Cuando la flota aprende que un space ya es de la cuenta, el
+router hace que la ventana relea las tareas, que lo nombraban con prefijo.
 
 Las tareas sí conservan ids por máquina. Su dueña es la máquina que las creó, y
 la fila lleva `machine`. Dentro de un workspace, `(máquina, tarea)` es la llave.

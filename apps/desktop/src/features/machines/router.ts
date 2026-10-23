@@ -135,7 +135,7 @@ export function createRouter(config: RouterConfig) {
       .then((list) => {
         registryAt = Date.now();
         // Uno que falla deja el último bueno.
-        if (list) fleet.setRegistry(list);
+        if (list) learning(() => fleet.setRegistry(list));
       })
       .finally(() => {
         registryRead = null;
@@ -215,6 +215,14 @@ export function createRouter(config: RouterConfig) {
     }, NOTIFY_AFTER);
   }
 
+  /** `step` y, si con él la flota supo de un space más de la cuenta, la ventana relee las tareas. */
+  function learning<T>(step: () => T): T {
+    const known = fleet.sharedCount();
+    const out = step();
+    if (fleet.sharedCount() > known) notify("list_live_sessions");
+    return out;
+  }
+
   const differs = (a: Slice | null, b: Slice) => !a || a.status !== b.status || a.has !== b.has || JSON.stringify(a.value) !== JSON.stringify(b.value);
 
   /** Pregunta otra vez a `envelope.machine` si hace rato que no; si su rebanada cambió, la ventana relee. */
@@ -287,7 +295,7 @@ export function createRouter(config: RouterConfig) {
       }
     } else slices.push(...(await gather(envelopes)));
     if (command === "list_workspace_attention") for (const s of slices) if (s.has) attention.set(s.machine, fleet.encode(s.machine, s.value));
-    const merged = fleet.merge(command, slices, workspace);
+    const merged = learning(() => fleet.merge(command, slices, workspace));
     if (merged !== undefined) return merged;
     throw noAnswer(slices, workspace);
   }

@@ -161,6 +161,15 @@ export class Fleet {
     return this.shared.has(space);
   }
 
+  /**
+   * Cuántos spaces de la cuenta conoce; solo sube. Si subió tras una lectura,
+   * las tareas de otra máquina leídas antes nombraban con prefijo un space que
+   * ya es de la cuenta (al migrar sus spaces): la ventana las relee.
+   */
+  sharedCount(): number {
+    return this.shared.size;
+  }
+
   /** Aprende los spaces compartidos de una respuesta (`account: true`). */
   private learn(command: string, value: unknown) {
     if (!/space/.test(command)) return;

@@ -421,6 +421,45 @@ test("a space shared with the account keeps its id on every machine; one of a si
   assert.equal(link("cmp_vm").calls.at(-1)?.args.space, "h1", "once shared it travels bare");
 });
 
+test("migrated spaces: each keeps its id, two with the same name stay apart and the tasks name them bare", async () => {
+  const { fleet } = setup({
+    cmp_vm: {
+      answers: {
+        // The VM's own «Space 1» and «General», already moved to the account with their ids.
+        list_spaces: [
+          { id: "vmone001", name: null, folders: [], updated_at: 3, account: true },
+          { id: "general2", name: "General", folders: [], updated_at: 4, account: true },
+          { id: "general1", name: "General", folders: [], updated_at: 2, account: true },
+        ],
+        list_live_sessions: [{ ...row("t1"), space: "general2" }, { ...row("t2"), space: "vmone001" }],
+      },
+    },
+  });
+  const before = fleet.sharedCount();
+  const spaces = await fleet.read({ machine: "cmp_vm", workspace: "w", command: "list_spaces", args: {} });
+  const merged = fleet.merge("list_spaces", [local([{ id: "general1", name: "General", folders: [], updated_at: 2, account: true }]), spaces], "w") as { id: string; name: string | null }[];
+  assert.deepEqual(merged.map((s) => [s.id, s.name]), [["general1", "General"], ["vmone001", null], ["general2", "General"]], "never merged by name");
+  assert.ok(fleet.sharedCount() > before, "the fleet learned them: the window rereads the tasks");
+  const rows = await fleet.read({ machine: "cmp_vm", workspace: "w", command: "list_live_sessions", args: { project: "p1" } });
+  const tagged = fleet.merge("list_live_sessions", [rows], "w") as { id: string; space: string }[];
+  assert.deepEqual(tagged.map((r) => [r.id, r.space]), [["cmp_vm~t1", "general2"], ["cmp_vm~t2", "vmone001"]]);
+});
+
+test("a machine that leaves the account takes only its tasks: the space stays with its id", async () => {
+  const shared = { id: "trabajo1", name: "Trabajo", folders: [], updated_at: 5, account: true };
+  const { fleet } = setup({ cmp_vm: { answers: { list_spaces: [shared], list_live_sessions: [{ ...row("t9"), space: "trabajo1" }] } } });
+  const registry = (computers: string[]) => [{ id: "w", name: "W", projects: [], computers, spaces: [{ id: "trabajo1", name: "Trabajo", folders: [], position: 0, changed_at: 5 }] }];
+  fleet.setRegistry(registry(["cmp_vm", "cmp_mac"]));
+  assert.ok(fleet.membersOf("w").includes("cmp_vm"));
+  await fleet.read({ machine: "cmp_vm", workspace: "w", command: "list_live_sessions", args: { project: "p1" } });
+  // The VM leaves (its workspace is unlinked or its session closed): the registry no longer lists it.
+  fleet.setRegistry(registry(["cmp_mac"]));
+  assert.deepEqual(fleet.membersOf("w"), ["cmp_mac"], "its tasks are no longer read");
+  assert.ok(fleet.isShared("trabajo1"), "the space is still the account's");
+  const merged = fleet.merge("list_spaces", [local([{ ...shared, updated_at: 4 }])], "w") as { id: string }[];
+  assert.deepEqual(merged.map((s) => s.id), ["trabajo1"], "same id, not deleted");
+});
+
 test("without a window (the web) the registry's shared spaces show even when no machine answers", () => {
   const fleet = new Fleet({ self: null, connect: () => fakeLink({}), deadlines: { read: 40, action: 200, intent: 400 } });
   fleet.setRegistry([{ id: "w", name: "W", projects: [], computers: [], spaces: [{ id: "s1", name: "Trabajo", folders: ["p1"], position: 0, changed_at: 7 }] }]);
