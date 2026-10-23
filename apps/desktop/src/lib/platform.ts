@@ -3,7 +3,7 @@
  * el valor por defecto; la entrada web (`src/web/main.tsx`) lo fija antes de
  * importar la app y no cambia después.
  */
-import type { Answer, Computer, MemorySource } from "@terminus/computers";
+import type { Answer, Computer, CredentialSource, MemorySource } from "@terminus/computers";
 import type { JSX } from "solid-js";
 import type { AccountProfileSource } from "../features/settings/account-profile";
 import type { Account } from "../features/settings/accounts-store";
@@ -91,6 +91,12 @@ export type Capabilities = {
    * cliente de la cuenta de cada workspace (`memory-account.ts`).
    */
   accountMemory?: MemorySource;
+  /**
+   * Las credenciales de la cuenta (`/v1/workspaces/:id/credentials`) con la sesión
+   * de la persona: la web las lee, las quita por máquina y las sella en el
+   * navegador. La ventana pasa por los comandos del motor (`account_credentials_*`).
+   */
+  accountCredentials?: CredentialSource;
   /** Bajo la tarjeta de una cuenta: sus máquinas. */
   accountMachines?: (props: AccountMachinesProps) => JSX.Element;
   /**

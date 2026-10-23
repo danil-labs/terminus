@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createMemo, createSignal, createUniqueId, on, onCleanup, onMount, untrack, type JSX } from "solid-js";
+import { For, Show, Suspense, createEffect, createMemo, createSignal, createUniqueId, lazy, on, onCleanup, onMount, untrack, type JSX } from "solid-js";
 import { groupAccounts } from "@terminus/computers";
 import { enfocar } from "../../lib/focus";
 import { invoke } from "../../lib/invoke.ts";
@@ -48,6 +48,10 @@ import {
   type LoginEvent,
 } from "./accounts-store";
 import { machineOf } from "../machines/store";
+
+// Las claves en la cuenta de Danil: un trozo aparte, solo para agentes con API key.
+const CredentialsInUse = lazy(() => import("./credentials/AccountCredentials").then((m) => ({ default: m.CredentialsInUse })));
+const LocalKeysBanner = lazy(() => import("./credentials/AccountCredentials").then((m) => ({ default: m.LocalKeysBanner })));
 
 /**
  * "Conectar", no "iniciar sesión": la app no inicia ninguna sesión —lo hace
@@ -1038,6 +1042,12 @@ export default function Accounts(props: {
         </SettingsRow>
       </Show>
 
+      <Show when={claveDe() && !props.enAlta}>
+        <Suspense fallback={null}>
+          <LocalKeysBanner kinds={["api_key"]} />
+        </Suspense>
+      </Show>
+
       <Show when={hayCuentas()}>
       <ul class="m-0 grid list-none gap-2 p-0">
         <For each={tarjetas()}>
@@ -1180,6 +1190,11 @@ export default function Accounts(props: {
                 }
               />
               {capabilities().accountMachines?.({ account: a, provider: agente(), add: agregar, refresh: () => void refrescar() })}
+              <Show when={claveDe() && !props.enAlta}>
+                <Suspense fallback={null}>
+                  <CredentialsInUse match={(c) => c.kind === "api_key" && c.config.agent === agente() && c.config.account === a.id} />
+                </Suspense>
+              </Show>
               </>
             );
           }}
