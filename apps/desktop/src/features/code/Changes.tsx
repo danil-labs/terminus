@@ -1,5 +1,6 @@
 import { For, Show, createSignal, createMemo, onMount, type JSX } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
+import { machineOf } from "../machines/store";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import Columns2 from "lucide-solid/icons/columns-2";
@@ -162,7 +163,7 @@ export default function Cambios(props: {
       before: o.before,
       after: o.after,
       path,
-    });
+    }, machineOf(props.session));
     setRetirado(diff.retired);
     return diff.patch;
   }
@@ -175,7 +176,7 @@ export default function Cambios(props: {
             project: props.project,
             session: props.session,
             tree: o.arbol,
-          })
+          }, machineOf(props.session))
         : diffDelTurno(o, null).then(previaDePatch);
     pedido
       .then(setPrevia)
@@ -195,7 +196,7 @@ export default function Cambios(props: {
               session: props.session,
               tree: o.arbol,
               path: ruta,
-            })
+            }, machineOf(props.session))
           : await diffDelTurno(o, ruta);
       const [entero] = parsearDiff(patch);
       if (entero) setEnteros({ ...enteros(), [ruta]: entero });

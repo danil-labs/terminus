@@ -10,6 +10,7 @@ import type { Extension, Text } from "@codemirror/state";
 import { EditorView, ViewPlugin } from "@codemirror/view";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
+import { machineOf } from "../machines/store";
 import type { InsercionDeRuta } from "./typst";
 
 /**
@@ -178,7 +179,7 @@ function miniatura(donde: DondeTypst, ruta: string): Promise<string | null> {
       session: donde.session,
       tree: donde.arbol,
       path: ruta,
-    }).then(
+    }, machineOf(donde.session)).then(
       (c) => (c.kind === "image" ? c.data_url : null),
       () => null,
     );

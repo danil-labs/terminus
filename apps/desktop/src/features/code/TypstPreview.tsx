@@ -14,6 +14,7 @@ import ZoomOut from "lucide-solid/icons/zoom-out";
 import { For, Show, createEffect, createSignal, on, onCleanup, onMount } from "solid-js";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
+import { machineOf } from "../machines/store";
 import { seguirHueco, type Hueco } from "../../lib/sites";
 import { Button } from "../../ui/Button";
 import { FailureNote, asFailure, type Failure } from "../../ui/Failure";
@@ -200,7 +201,7 @@ export default function VistaPreviaTypst(props: {
           tree: props.arbol,
           path: props.ruta,
           main: principalElegido(props.project),
-        }),
+        }, machineOf(props.session)),
       );
     } catch (e) {
       setFallo(asFailure(e));

@@ -1,4 +1,5 @@
 import { invoke } from "../../lib/invoke.ts";
+import { machineOf } from "../machines/store";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import Cloud from "lucide-solid/icons/cloud";
@@ -147,7 +148,7 @@ export default function ArbolDeArchivos(props: {
       };
       const f: Archivos = props.preview
         ? await invoke<Archivos>("preview_tree_files", { project: props.project, baseRef: props.preview.baseRef })
-        : await invoke<Archivos>("tree_files", { project: props.project, session: props.session, tree: props.arbol });
+        : await invoke<Archivos>("tree_files", { project: props.project, session: props.session, tree: props.arbol }, machineOf(props.session));
       if (!vigente()) return;
       if (!props.preview && !recortado() && !f.truncated) {
         const fuera = idos(paths(), f.paths);
@@ -173,12 +174,12 @@ export default function ArbolDeArchivos(props: {
           ? localesDeKn(await invoke<CambioKn[]>("kn_status", {
             project: props.project,
             session: props.session,
-          }))
+          }, machineOf(props.session)))
           : localesDeGit(await invoke<EstadoGit[]>("tree_git_status", {
             project: props.project,
             session: props.session,
             tree: props.arbol,
-          }));
+          }, machineOf(props.session)));
         if (!vigente()) return;
         fijarLocales(leidos);
         setFalloEstado(null);
@@ -194,7 +195,7 @@ export default function ArbolDeArchivos(props: {
           project: props.project,
           session: props.session,
           tree: props.arbol,
-        });
+        }, machineOf(props.session));
         if (!vigente()) return;
         setCambios(c);
       } else {
@@ -220,7 +221,7 @@ export default function ArbolDeArchivos(props: {
   const pedirPagina = (ruta: string, desde: number): Promise<Pagina> =>
     props.preview
       ? invoke("preview_tree_folder", { project: props.project, path: ruta, offset: desde })
-      : invoke("tree_folder", { ...ids(), path: ruta, offset: desde });
+      : invoke("tree_folder", { ...ids(), path: ruta, offset: desde }, machineOf(props.session));
 
   function fijarPlegada(ruta: string, cambio: (antes: Plegada) => Plegada | null) {
     setPlegadas((prev) => {
@@ -384,8 +385,8 @@ export default function ArbolDeArchivos(props: {
       sinTarea
         ? sinTarea(n.tipo, path)
         : n.tipo === "archivo"
-          ? invoke("tree_create_file", { ...ids(), path })
-          : invoke("tree_create_folder", { ...ids(), path }),
+          ? invoke("tree_create_file", { ...ids(), path }, machineOf(props.session))
+          : invoke("tree_create_folder", { ...ids(), path }, machineOf(props.session)),
     );
     if (!hecho) return false;
     setNuevo(null);
@@ -406,7 +407,7 @@ export default function ArbolDeArchivos(props: {
   async function renombrar(desde: string, nombre: string): Promise<boolean> {
     if (nombreInvalido(nombre)) return false;
     const hasta = unir(padreDe(desde), nombre);
-    const hecho = await operar(() => invoke("tree_rename", { ...ids(), from: desde, to: hasta }));
+    const hecho = await operar(() => invoke("tree_rename", { ...ids(), from: desde, to: hasta }, machineOf(props.session)));
     if (!hecho) return false;
     setRenombrando(null);
     const s = seleccion();
@@ -417,7 +418,7 @@ export default function ArbolDeArchivos(props: {
 
   async function borrar(nodo: Nodo) {
     setMenu(null);
-    const hecho = await operar(() => invoke("tree_delete", { ...ids(), path: nodo.ruta }));
+    const hecho = await operar(() => invoke("tree_delete", { ...ids(), path: nodo.ruta }, machineOf(props.session)));
     if (!hecho) return;
     const s = seleccion();
     if (s && debajoDe(s.ruta, nodo.ruta)) setSeleccion(null);

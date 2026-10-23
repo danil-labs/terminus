@@ -66,9 +66,20 @@ export function runOnOptions(workspace: string | null, project?: ProjectPlace) {
   return id ? { headers: { "x-terminus-machine": id } } : undefined;
 }
 
-/** Las opciones de una orden sobre algo con id de panel (un space, una cuenta de IA): en la máquina que lo guarda. */
+/** La máquina de la fila de una tarea del riel; la registra `App.tsx`, que es quien tiene las filas. */
+let taskRowMachine: (id: string) => string | null | undefined = () => null;
+
+export function setTaskRowMachine(lookup: (id: string) => string | null | undefined) {
+  taskRowMachine = lookup;
+}
+
+/**
+ * Las opciones de una orden sobre algo con id de panel (una tarea, un space, una
+ * cuenta de IA): en la máquina que lo guarda. De una tarea manda su fila; si aún
+ * no la hay, su prefijo.
+ */
 export function machineOf(id: string | null | undefined) {
-  const machine = id ? (capabilities().taskMachine?.(id) ?? null) : null;
+  const machine = id ? (taskRowMachine(id) ?? capabilities().taskMachine?.(id) ?? null) : null;
   return machine ? { headers: { "x-terminus-machine": machine } } : undefined;
 }
 
