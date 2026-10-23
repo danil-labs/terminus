@@ -12,6 +12,7 @@
   "settings.account_card.progress": "{name}: te queda {left}% de {window}, {when}",
   "settings.account_card.remaining": "resta",
   "settings.account_card.stale": "esto es de {when}",
+  "settings.account_card.unverified": "sin comprobar",
   "settings.account_card.window_left": "resta {left}% · {when}",
   "settings.accounts.add": "+ Agregar cuenta",
   "settings.accounts.agent_fallback": "el agente",
