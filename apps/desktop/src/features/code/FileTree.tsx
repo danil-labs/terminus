@@ -52,6 +52,10 @@ const HuecoDeChevron = () => (
 
 export type Tipo = "archivo" | "carpeta";
 
+/** Una página de una carpeta plegada. `development::PaginaDeCarpeta`. */
+type Pagina = { paths: string[]; folders: Carpeta[]; next: number | null; total: number };
+type Plegada = Pagina & { cargando: boolean; fallo: Failure | null };
+
 const padreDe = (ruta: string) => ruta.slice(0, Math.max(0, ruta.lastIndexOf("/")));
 const nombreDe = (ruta: string) => ruta.slice(ruta.lastIndexOf("/") + 1);
 const unir = (padre: string, nombre: string) => (padre ? `${padre}/${nombre}` : nombre);
@@ -93,12 +97,23 @@ export default function ArbolDeArchivos(props: {
   const [fallo, setFallo] = createSignal<Failure | null>(null);
   const [abiertas, setAbiertas] = createSignal<Set<string>>(new Set());
   const [busca, setBusca] = createSignal("");
+  // Lo cargado de cada carpeta plegada que se abrió, por su ruta.
+  const [plegadas, setPlegadas] = createSignal<Map<string, Plegada>>(new Map());
+  const cargadas = createMemo(() => {
+    const rutas: string[] = [];
+    const subcarpetas: Carpeta[] = [];
+    for (const p of plegadas().values()) {
+      for (const r of p.paths) rutas.push(r);
+      for (const c of p.folders) subcarpetas.push(c);
+    }
+    return { rutas, subcarpetas };
+  });
 
   const nodos = createMemo(() =>
     construir(
-      paths(),
+      [...paths(), ...cargadas().rutas],
       cambios()?.files ?? [],
-      carpetas(),
+      [...carpetas(), ...cargadas().subcarpetas],
       locales(),
       nube(),
     ),
@@ -128,6 +143,7 @@ export default function ArbolDeArchivos(props: {
       setNube(f.cloud_only ?? []);
       setRecortado(f.truncated);
       setCargando(false);
+      void refrescarPlegadas();
       if (props.kind === "folder" || props.preview) {
         fijarLocales(new Map());
         setCambios(null);
@@ -185,6 +201,66 @@ export default function ArbolDeArchivos(props: {
   onCleanup(() => {
     lectura++;
   });
+
+  const pedirPagina = (ruta: string, desde: number) =>
+    props.preview
+      ? invoke<Pagina>("preview_tree_folder", { project: props.project, path: ruta, offset: desde })
+      : invoke<Pagina>("tree_folder", { ...ids(), path: ruta, offset: desde });
+
+  function fijarPlegada(ruta: string, cambio: (antes: Plegada) => Plegada | null) {
+    setPlegadas((prev) => {
+      const m = new Map(prev);
+      const antes = m.get(ruta) ?? { paths: [], folders: [], next: null, total: 0, cargando: false, fallo: null };
+      const despues = cambio(antes);
+      if (despues) m.set(ruta, despues);
+      else m.delete(ruta);
+      return m;
+    });
+  }
+
+  /** La primera página al abrir una carpeta plegada; con `desde`, la siguiente. */
+  async function cargarPlegada(ruta: string, desde = 0) {
+    fijarPlegada(ruta, (p) => ({ ...p, cargando: true, fallo: null }));
+    try {
+      const pagina = await pedirPagina(ruta, desde);
+      fijarPlegada(ruta, (p) => ({
+        paths: desde === 0 ? pagina.paths : [...p.paths, ...pagina.paths],
+        folders: desde === 0 ? pagina.folders : [...p.folders, ...pagina.folders],
+        next: pagina.next,
+        total: pagina.total,
+        cargando: false,
+        fallo: null,
+      }));
+    } catch (e) {
+      fijarPlegada(ruta, (p) => ({ ...p, cargando: false, fallo: asFailure(e) }));
+    }
+  }
+
+  // Al moverse el árbol, lo abierto se vuelve a leer hasta donde se había
+  // llegado; lo cerrado se suelta y se pide de nuevo al abrirlo.
+  async function refrescarPlegadas() {
+    for (const [ruta, p] of plegadas()) {
+      if (p.cargando) continue;
+      if (!abiertas().has(ruta)) {
+        fijarPlegada(ruta, () => null);
+        continue;
+      }
+      const hasta = Math.max(1, p.paths.length + p.folders.length);
+      const leida: Pagina = { paths: [], folders: [], next: 0, total: 0 };
+      try {
+        while (leida.next !== null && leida.paths.length + leida.folders.length < hasta) {
+          const pagina = await pedirPagina(ruta, leida.next);
+          leida.paths.push(...pagina.paths);
+          leida.folders.push(...pagina.folders);
+          leida.next = pagina.next;
+          leida.total = pagina.total;
+        }
+        fijarPlegada(ruta, () => ({ ...leida, cargando: false, fallo: null }));
+      } catch {
+        fijarPlegada(ruta, () => null);
+      }
+    }
+  }
 
   onMount(() => {
     if (!props.preview) void cargar();
@@ -410,6 +486,50 @@ export default function ArbolDeArchivos(props: {
   /** El ojo abierto es la elección de la persona: con ella, todo archivo de la tarea se ve junto a su PDF. */
   const principalTypst = () => principalElegido(props.project);
 
+  /** Lo que falta de una carpeta plegada abierta: cargando, vacía o «Mostrar más». */
+  function PieDePlegada(p: { ruta: string; hondura: number }) {
+    const estado = () => plegadas().get(p.ruta);
+    const sangria = () => `${p.hondura * SANGRIA + 12 + CHEVRON + 6}px`;
+    const nota = "m-0 py-1 pr-3 text-[0.6875rem] text-neutral-500";
+    createEffect(() => {
+      if (!plegadas().has(p.ruta)) void cargarPlegada(p.ruta);
+    });
+    return (
+      <Show when={estado()}>
+        {(e) => (
+          <>
+            <Show when={e().fallo}>
+              {(f) => (
+                <div class="py-1 pr-3" style={{ "padding-left": sangria() }} role="alert">
+                  <p class="m-0 text-xs text-error-strong">{t("code.tree.folded.failed")}</p>
+                  <FailureNote f={f()} />
+                </div>
+              )}
+            </Show>
+            <Show when={e().cargando}>
+              <p class={nota} style={{ "padding-left": sangria() }}>{t("code.tree.folded.loading")}</p>
+            </Show>
+            <Show when={!e().cargando && !e().fallo && e().total === 0}>
+              <p class={nota} style={{ "padding-left": sangria() }}>{t("code.tree.folded.empty")}</p>
+            </Show>
+            <Show when={!e().cargando && e().next !== null ? e().next : null}>
+              {(desde) => (
+                <button
+                  type="button"
+                  class="w-full py-1 pr-3 text-left text-[0.6875rem] text-primary outline-none hover:underline focus-visible:outline-2 focus-visible:outline-primary"
+                  style={{ "padding-left": sangria() }}
+                  onClick={() => void cargarPlegada(p.ruta, desde())}
+                >
+                  {t("code.tree.folded.more", { count: e().total - desde() })}
+                </button>
+              )}
+            </Show>
+          </>
+        )}
+      </Show>
+    );
+  }
+
   function Fila(p: { nodo: Nodo; hondura: number }) {
     const sangria = () => `${p.hondura * SANGRIA + 12}px`;
     const carpeta = () => (p.nodo.tipo === "carpeta" ? p.nodo : null);
@@ -443,8 +563,15 @@ export default function ArbolDeArchivos(props: {
                 )}
               >
                 <button
-                  class={clasesDeFila()}
+                  class={cn(clasesDeFila(), c().plegada || c().ignorada ? "opacity-60" : undefined)}
                   style={{ "padding-left": sangria() }}
+                  title={
+                    c().ignorada
+                      ? t("code.tree.folded.ignored")
+                      : c().plegada
+                        ? t("code.tree.folded.dependencies")
+                        : undefined
+                  }
                   aria-expanded={abierta(c().ruta)}
                   onClick={() => {
                     setSeleccion({ ruta: c().ruta, tipo: "carpeta" });
@@ -490,6 +617,9 @@ export default function ArbolDeArchivos(props: {
                 <For each={c().hijos}>
                   {(h) => <Fila nodo={h} hondura={p.hondura + 1} />}
                 </For>
+                <Show when={c().plegada && !busca().trim()}>
+                  <PieDePlegada ruta={c().ruta} hondura={p.hondura + 1} />
+                </Show>
               </Show>
             </>
           )}

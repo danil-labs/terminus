@@ -22,8 +22,8 @@ const LOCK = fileURLToPath(new URL("../../seldon-runtime.lock", import.meta.url)
 
 /** El contrato copiado cuyo motor aún no tiene release publicada, y qué falta. */
 const MOTOR_PENDIENTE = {
-  contract: "815e064458deae82ac7d2f520dd08fa341350cc4cd11e7c8b7a5c986f6dec343",
-  why: "el aislamiento del relay y la memoria sincronizada (seldon-host integration/plan-multi-machine: #106, #110, #108), llevar y traer trabajo entre máquinas (work_*, seldon-host #84–#87), una sesión de Danil por cuenta (feat/danil-session-per-account), el onboarding (#91), Google Drive (#92), Google Drive para escritorio (#95), el modelo local activo (#98), «Usar el GitHub de esta computadora» (#100) y la tarea vacía de la vista previa (create_empty_session, seldon-host feat/tarea-vacia): falta publicar seldon-runtime con ellos y fijarlo en seldon-runtime.lock",
+  contract: "a5bd3e381c0077cb01c3be6557ad077e796a01382f8ae6402e0c05edde85f60d",
+  why: "el aislamiento del relay y la memoria sincronizada (seldon-host integration/plan-multi-machine: #106, #110, #108), llevar y traer trabajo entre máquinas (work_*, seldon-host #84–#87), una sesión de Danil por cuenta (feat/danil-session-per-account), el onboarding (#91), Google Drive (#92), Google Drive para escritorio (#95), el modelo local activo (#98), «Usar el GitHub de esta computadora» (#100), la tarea vacía de la vista previa (create_empty_session, seldon-host feat/tarea-vacia) y las carpetas plegadas del árbol (tree_folder, seldon-host fix/arbol-carpetas-pesadas): falta publicar seldon-runtime con ellos y fijarlo en seldon-runtime.lock",
 };
 
 const vendored = createHash("sha256").update(readFileSync(CONTRACT)).digest("hex");
