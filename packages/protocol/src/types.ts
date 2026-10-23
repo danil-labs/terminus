@@ -90,7 +90,13 @@ export type Turn = {
   pieces?: TurnPiece[] | null;
   /** Un `!`: el comando va en `text`. */
   shell?: { cwd: string; output: string; exit_code: number | null; duration_ms: number; truncated: boolean } | null;
+  /** El encargado que escribió este input, si no fue la persona (`Turn::agent`). */
+  agent?: string | null;
+  /** La tarea que lo escribió por el CLI (`Turn::from_task`). */
+  from_task?: SenderTask | null;
 };
+/** La tarea que escribió un input, como era al escribirlo (`sessions::SenderTask`). */
+export type SenderTask = { folder: string; task: string; title: string; provider: string; model?: string | null };
 /** Un paso del turno; `images` son data URLs que produjo la herramienta. `ok: false` si falló. */
 export type TurnTool = { name?: string; target?: string | null; images?: string[]; ok?: boolean | null };
 /** Un trozo de `Turn.pieces`. */

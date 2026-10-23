@@ -13,9 +13,20 @@ export type Step = { kind: StepKind; name: string; target: string | null; ok: bo
 /** Una fila: uno o varios pasos seguidos de la misma clase, que se leen como un acto. */
 export type StepRow = { kind: StepKind; steps: Step[] };
 
+/**
+ * Quién escribió un input que no es de la persona: un encargado o una tarea por
+ * el CLI. Como en la ventana, va a la izquierda con su cara y su firma.
+ */
+export type Sender = { agent: string | null; task: string | null; provider: string | null };
+
+export function senderOf(turn: Turn): Sender | null {
+  if (turn.role !== "user" || (!turn.agent && !turn.from_task)) return null;
+  return { agent: turn.agent ?? null, task: turn.from_task?.title ?? null, provider: turn.from_task?.provider ?? null };
+}
+
 /** Un renglón de la conversación. */
 export type Line =
-  | { key: string; kind: "message"; role: string; text: string; images: string[]; attachments: string[] }
+  | { key: string; kind: "message"; role: string; text: string; images: string[]; attachments: string[]; from?: Sender | null }
   /** Lo que el agente dijo antes de su respuesta, mientras trabajaba. */
   | { key: string; kind: "progress"; text: string }
   | { key: string; kind: "steps"; rows: StepRow[] }
@@ -89,7 +100,8 @@ const toStep = (tool: TurnTool) => stepOf(tool.name ?? "", tool.target ?? null, 
  * final; sin él, los pasos delante del texto.
  */
 export function linesOfTurn(turn: Turn, key: string, images: string[]): Line[] {
-  const message = (text: string): Line => ({ key, kind: "message", role: turn.role, text, images, attachments: turn.attachments ?? [] });
+  const from = senderOf(turn);
+  const message = (text: string): Line => ({ key, kind: "message", role: turn.role, text, images, attachments: turn.attachments ?? [], from });
   if (turn.shell) return [{ key, kind: "shell", command: turn.text ?? "", output: turn.shell.output ?? "", exitCode: turn.shell.exit_code ?? null }];
   const tools = turn.tools ?? [];
   const pieces = turn.pieces ?? [];

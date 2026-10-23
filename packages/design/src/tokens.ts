@@ -14,6 +14,8 @@ export type ThemeTokens = {
   primary: string;
   onPrimary: string;
   userBubble: string;
+  /** The input of a handler or another task: neutral, so it doesn't compete with the person's. */
+  incomingBubble: string;
   success: string;
   error: string;
   info: string;
@@ -34,6 +36,7 @@ export const CSS_SOURCE: Partial<Record<keyof ThemeTokens, string>> = {
   text: "--color-neutral-950",
   textMuted: "--color-neutral-500",
   primary: "--color-primary",
+  incomingBubble: "--color-chat-incoming",
   approving: "--color-warning",
   asked: "--color-brand-yellow",
   failedMark: "--color-error-strong",
@@ -53,6 +56,7 @@ export const THEMES: { light: ThemeTokens; dark: ThemeTokens } = {
     primary: "#6539f5",
     onPrimary: "#ffffff",
     userBubble: "#efeafe",
+    incomingBubble: "#f3f4f8",
     success: "#15803d",
     error: "#dc2626",
     info: "#2563eb",
@@ -74,6 +78,7 @@ export const THEMES: { light: ThemeTokens; dark: ThemeTokens } = {
     onPrimary: "#111113",
     // `--color-chat-user`: brand yellow at 8% over `surface-raised`.
     userBubble: "#3c3b36",
+    incomingBubble: "#2c2c30",
     success: "#4ade80",
     error: "#f87171",
     info: "#60a5fa",

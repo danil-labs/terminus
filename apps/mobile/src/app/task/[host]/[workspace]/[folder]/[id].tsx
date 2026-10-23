@@ -36,6 +36,8 @@ import { type Theme, useTheme } from "../../../../../ui/theme";
 import { Icon, type IconName } from "../../../../../ui/Icon";
 import { openTask } from "../../../../../ui/components";
 import { KeyboardScreen } from "../../../../../ui/KeyboardScreen";
+import { BrandMark } from "../../../../../ui/BrandMark";
+import { Avatar } from "../../../../../ui/components";
 
 /** Kinds that change what the task reports: pending requests or whether it runs. */
 const REFRESH = new Set(["permission", "started", "done", "presence"]);
@@ -76,6 +78,8 @@ export default function TaskScreen() {
   const [live, setLive] = useState<readonly LivePiece[]>([]);
   const [note, setNote] = useState<string | null>(null);
   const [waking, setWaking] = useState(false);
+  // Lo que se mandó mientras la VM enciende: sin él, el mensaje desaparece el minuto o dos que tarda.
+  const [pending, setPending] = useState<string | null>(null);
   const [background, setBackground] = useState<Backdrop | null>(null);
   const list = useRef<FlatList<Line>>(null);
   const key = `${params.host}/${id}`;
@@ -187,6 +191,7 @@ export default function TaskScreen() {
       return false;
     } finally {
       setWaking(false);
+      setPending(null);
     }
   }
 
@@ -201,6 +206,7 @@ export default function TaskScreen() {
   const submit = (s: Submission) => {
     // Mandar es volver al final: lo que se acaba de escribir va abajo, como en el escritorio.
     toEnd();
+    if (!s.shell && host?.canAct() === "wakes" && host.power() !== "on") setPending(s.prompt);
     return act(() =>
       s.shell
         ? runShell(host!, workspace, { folder, session: id, command: s.command, provider: s.provider, model: s.model, effort: s.effort, permissionMode: s.permissionMode })
@@ -305,6 +311,7 @@ export default function TaskScreen() {
               <Row key={line.key} line={line} theme={theme} streaming={line.key === "live"} />
             ))}
             {running && !streaming ? <Text style={{ color: theme.textMuted }}>{t("state.working")}…</Text> : null}
+            {pending && waking ? <Bubble line={{ key: "pending", kind: "message", role: "user", text: pending, images: [], attachments: [] }} theme={theme} /> : null}
             {waking && host ? <Text style={{ color: theme.textMuted }}>{w("shell.machines.waking", { name: host.label })}</Text> : null}
             {asleep && host ? (
               <Text style={{ color: theme.textMuted }}>
@@ -399,34 +406,60 @@ const Row = memo(function Row({ line, theme, streaming, onQuickReply }: { line: 
 });
 
 function Bubble({ line, theme, streaming, onQuickReply }: { line: Extract<Line, { kind: "message" }>; theme: Theme; streaming?: boolean; onQuickReply?: (prompt: string) => Promise<boolean> }) {
-  const mine = line.role === "user";
+  const from = line.from ?? null;
+  const mine = line.role === "user" && !from;
   const system = line.role === "system";
   const shell = line.role === "shell";
   if (!line.text && !line.images.length && !line.attachments.length) return null;
   // Como en la ventana: lo de la persona va en globo; la respuesta del agente, sin globo y a todo el ancho.
-  const agent = !mine && !system && !shell;
-  return (
+  const agent = line.role !== "user" && !system && !shell;
+  const bubble = (
     <View
       style={
         agent
           ? styles.reply
           : [
               styles.bubble,
-              mine ? { alignSelf: "flex-end", backgroundColor: theme.userBubble } : { alignSelf: "stretch", backgroundColor: theme.surface },
+              from
+                ? [styles.incoming, { backgroundColor: theme.incomingBubble }]
+                : mine
+                  ? { alignSelf: "flex-end", backgroundColor: theme.userBubble, borderColor: theme.border }
+                  : { alignSelf: "stretch", backgroundColor: theme.surface, borderColor: theme.border },
               system ? { backgroundColor: theme.muted } : null,
-              { borderColor: theme.border },
             ]
       }
     >
       {line.attachments.length ? <Attachments paths={line.attachments} /> : null}
       {/* Lo que escribe la persona y la salida de un `!` van tal cual; lo del agente, con su markdown. */}
-      {line.text && (mine || system || shell) ? (
+      {line.text && (line.role === "user" || system || shell) ? (
         <Text selectable style={{ color: system ? theme.textMuted : theme.text, fontSize: shell ? 13 : 15, lineHeight: 21, fontFamily: shell ? MONO : undefined }}>
           {line.text}
         </Text>
       ) : line.text || line.images.length ? (
         <MessageBody text={line.text} streaming={streaming} images={line.images} onQuickReply={onQuickReply} />
       ) : null}
+    </View>
+  );
+  if (!from) return bubble;
+  // El input de un encargado u otra tarea va a la izquierda, con su cara y su firma encima del globo.
+  const signature = [from.agent, from.task].filter(Boolean).join(" · ");
+  return (
+    <View style={styles.incomingRow} testID="incoming-message">
+      <View style={styles.incomingFace}>
+        {from.agent ? (
+          <Avatar name={from.agent} size={28} round />
+        ) : (
+          <View style={[styles.taskFace, { backgroundColor: theme.muted, borderColor: theme.border }]}>
+            <BrandMark id={from.provider} size={16} color={theme.text} />
+          </View>
+        )}
+      </View>
+      <View style={styles.incomingColumn}>
+        <Text numberOfLines={1} style={[styles.signature, { color: theme.textMuted }]}>
+          {signature}
+        </Text>
+        {bubble}
+      </View>
     </View>
   );
 }
@@ -640,6 +673,12 @@ const styles = StyleSheet.create({
   footer: { gap: 8 },
   pending: { flexGrow: 0, maxHeight: "55%", paddingHorizontal: 12, paddingBottom: 8 },
   bubble: { maxWidth: "92%", borderRadius: 14, padding: 10, borderWidth: StyleSheet.hairlineWidth },
+  incoming: { alignSelf: "flex-start", maxWidth: "100%", borderColor: "transparent", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+  incomingRow: { flexDirection: "row", alignItems: "flex-end", gap: 8, maxWidth: "88%", alignSelf: "flex-start" },
+  incomingFace: { paddingBottom: 2 },
+  incomingColumn: { flexShrink: 1, gap: 3 },
+  taskFace: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth },
+  signature: { fontSize: 12, fontWeight: "600", paddingLeft: 2 },
   reply: { alignSelf: "stretch", paddingHorizontal: 4, paddingVertical: 2 },
   progress: { alignSelf: "stretch", paddingHorizontal: 4 },
   steps: { alignSelf: "stretch", gap: 4, paddingHorizontal: 4, paddingVertical: 2 },
