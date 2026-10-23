@@ -382,7 +382,13 @@ if (!roto) {
     unwatch_task_tree: ({ id }) => { watchedTrees.delete(id); },
     tree_files: ({ session }) => {
       treeReads.push(session);
-      return { paths: externalPaths, folders: [], truncated: false };
+      return { paths: externalPaths, folders: [{ path: ".venv", repo: false, lazy: true, ignored: true }], truncated: false };
+    },
+    tree_folder: ({ path, offset }) => {
+      const total = path === ".venv" ? 450 : 0;
+      const hasta = Math.min(total, offset + 300);
+      const paths = Array.from({ length: hasta - offset }, (_, i) => `${path}/m${String(offset + i).padStart(4, "0")}.py`);
+      return { paths, folders: [], next: hasta < total ? hasta : null, total };
     },
     tree_git_status: [],
     tree_summary: { base: "HEAD", files: [], added: 0, removed: 0 },
@@ -398,6 +404,22 @@ if (!roto) {
   await sleep(150);
   clickTree('[aria-label="Ver el árbol de trabajo"]');
   await sleep(150);
+  const venv = () => [...treeDocument.querySelectorAll('button[aria-expanded]')].find((button) => button.textContent.trim() === ".venv");
+  assert.ok(venv(), "a heavy ignored folder shows folded");
+  const enVenv = () => [...treeDocument.querySelectorAll("button[data-ruta]")].filter((b) => b.dataset.ruta.startsWith(".venv/")).length;
+  assert.equal(enVenv(), 0, "a folded folder lists nothing until it is opened");
+  venv().click();
+  await sleep(150);
+  assert.equal(enVenv(), 300, "opening a folded folder loads its first page");
+  const mas = [...treeDocument.querySelectorAll("button")].find((b) => b.textContent.includes("Mostrar más"));
+  assert.ok(mas, "a folded folder offers its next page");
+  mas.click();
+  await sleep(150);
+  assert.equal(enVenv(), 450, "the next page is appended");
+  assert.equal([...treeDocument.querySelectorAll("button")].some((b) => b.textContent.includes("Mostrar más")), false);
+  venv().click();
+  await sleep(50);
+  assert.equal(venv().getAttribute("aria-expanded"), "false");
   const directory = [...treeDocument.querySelectorAll('button[aria-expanded]')].find((button) => button.textContent.trim() === "src");
   assert.ok(directory);
   directory.click();

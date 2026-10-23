@@ -86,6 +86,15 @@
   "code.tree.local.retry": "Retry",
   "code.tree.kind.cloud": "Cloud",
   "code.tree.cloud": "In the cloud. It reaches this task once downloaded, between turns.",
+  "code.tree.folded.ignored": "Ignored by git. Its contents load when you open it.",
+  "code.tree.folded.dependencies": "A tool's dependencies or cache. Its contents load when you open it.",
+  "code.tree.folded.loading": "Loading…",
+  "code.tree.folded.empty": "Empty",
+  "code.tree.folded.more": {
+    "one": "Show more ({count} left)",
+    "other": "Show more ({count} left)"
+  },
+  "code.tree.folded.failed": "This folder could not be opened.",
   "code.editor.fold_line": "Fold line",
   "code.editor.unfold_line": "Unfold line",
   "code.editor.folded_code": "folded code",
@@ -118,6 +127,7 @@
   "code.tree.new_file.empty_task": "New file (opens a task without messaging the agent)",
   "code.tree.new_folder.empty_task": "New folder (opens a task without messaging the agent)",
   "code.tree.rename": "Rename",
+  "code.tree.insert_path": "Insert path in the document",
   "code.tree.name.new_file": "Name of the new file",
   "code.tree.name.new_folder": "Name of the new folder",
   "code.tree.name.rename": "New name for “{name}”",
@@ -192,5 +202,14 @@
   "code.typst.exported.open": "Open in your PDF viewer",
   "code.typst.error.no_main": "This task does not have the main document you chose. Pick another one with the eye in the file tree.",
   "code.typst.expand": "Expand the view",
-  "code.typst.collapse": "Back to side by side (Esc)"
+  "code.typst.collapse": "Back to side by side (Esc)",
+  "code.typst.complete.cite": "Citation",
+  "code.typst.complete.heading": "Section",
+  "code.typst.complete.figure": "Figure",
+  "code.typst.complete.table": "Table",
+  "code.typst.complete.equation": "Equation",
+  "code.typst.complete.label": "Label",
+  "code.typst.complete.file": "File",
+  "code.typst.complete.folder": "Folder",
+  "code.typst.complete.function": "Function"
 }
