@@ -86,6 +86,15 @@
   "code.tree.local.retry": "Reintentar",
   "code.tree.kind.cloud": "Nube",
   "code.tree.cloud": "En la nube. Llega a esta tarea al descargarse, entre turnos.",
+  "code.tree.folded.ignored": "Git la ignora. Lo de dentro se carga al abrirla.",
+  "code.tree.folded.dependencies": "Dependencias o caché de una herramienta. Lo de dentro se carga al abrirla.",
+  "code.tree.folded.loading": "Cargando…",
+  "code.tree.folded.empty": "Vacía",
+  "code.tree.folded.more": {
+    "one": "Mostrar más ({count} restante)",
+    "other": "Mostrar más ({count} restantes)"
+  },
+  "code.tree.folded.failed": "No se pudo abrir esta carpeta.",
   "code.editor.fold_line": "Plegar línea",
   "code.editor.unfold_line": "Desplegar línea",
   "code.editor.folded_code": "código plegado",

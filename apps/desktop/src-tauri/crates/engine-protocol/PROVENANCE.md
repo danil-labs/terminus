@@ -20,7 +20,7 @@ repositories, and `GitHostInfo`. Files on disk keep their keys; the types that
 are stored and also travel cross the contract wrapped in `Wire`, which renames
 their keys. There are no aliases. This copy is byte-identical to the engine's.
 SHA-256:
-`29b952368255ede3371b3f83e32f29407f2b728c1901e52079e387d50a06c956`.
+`f2c4d3c316c9cc47a8f026e3e059c8d00bb3364d89a99ebc8c5cf5a8e5a9809b`.
 
 seldon-host `4e21caf` (#66) added the Danil account (321 commands, 28 events):
 `danil_connect_start`, `danil_connect_status`, `danil_connect_options`,
@@ -199,6 +199,14 @@ directory?}`): where a folder created from scratch is born when the person picks
 a location other than the workspace default. Without it nothing changes. The
 same commit makes that default the person's Documents folder
 (`<Documents>/Terminus`) instead of one inside the engine's data.
+
+seldon-host dev `340fe91` (#119) folds heavy and ignored folders in the task
+tree (369 commands). `tree_folder` (`{project, session, tree, path, offset}`)
+and `preview_tree_folder` (`{project, path, offset}`) → `PaginaDeCarpeta`
+`{paths, folders, next, total}` give one level of a folded folder, 300 entries
+per page. `CarpetaDelArbol` gains `lazy` and `ignored`; the manifest keeps only
+type names, so those fields do not move the hash. This copy is
+`git show 340fe91:crates/engine-protocol/commands.json` byte for byte.
 
 Endpoint, selection and StreamPage extend the transport; they do not convert
 domain data. The token travels in RPC1 only between authenticated local

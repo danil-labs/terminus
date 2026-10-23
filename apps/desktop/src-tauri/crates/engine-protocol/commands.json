@@ -3590,6 +3590,32 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "preview_tree_folder",
+      "output": "-> Result < PaginaDeCarpeta , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        },
+        {
+          "key": "offset",
+          "name": "offset",
+          "type": "u32"
+        }
+      ],
+      "path": "development::preview_tree_folder",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "preview_tree_show",
       "output": "-> Result < Contenido , Failure >",
       "parameters": [
@@ -6802,6 +6828,42 @@
         }
       ],
       "path": "development::tree_files",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "tree_folder",
+      "output": "-> Result < PaginaDeCarpeta , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "tree",
+          "name": "tree",
+          "type": "String"
+        },
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        },
+        {
+          "key": "offset",
+          "name": "offset",
+          "type": "u32"
+        }
+      ],
+      "path": "development::tree_folder",
       "scope": "workspace"
     },
     {
