@@ -79,6 +79,7 @@
   "providers.github.cli.unavailable": "Estado no disponible",
   "providers.github.host_mode.title": "Usar el GitHub de esta computadora",
   "providers.github.host_mode.save_failed": "No se pudo guardar el ajuste de GitHub de este workspace.",
+  "providers.github.host_mode.ignored": "Esta computadora no tiene un gh con sesión en GitHub: se usa la conexión del workspace. Apágalo.",
   "providers.github.change": "pull request",
   "providers.github.change_short": "PR",
   "providers.github.checks": "Comprobaciones",
