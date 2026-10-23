@@ -1,5 +1,5 @@
 import { Stack, router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Image, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { type ChatEvent, type Question, type Turn, DEFAULT_CHAT_VEIL } from "@terminus/protocol";
 import {
@@ -96,23 +96,33 @@ export default function TaskScreen() {
     [host],
   );
 
+  // La tarea abierta ahora: una lectura de la anterior que llega tarde no la pisa.
+  const keyNow = useRef(key);
+  keyNow.current = key;
   const refresh = useCallback(async () => {
     if (!host) return;
+    const asked = `${host.id}/${id}`;
     const next = await loadTask(host, workspace, folder, id);
+    if (keyNow.current !== asked) return;
     setView(next);
     setLive([]);
   }, [host, workspace, folder, id]);
 
+  // Otra tarea empieza de cero. Solo al cambiar de tarea: que la máquina cambie de objeto (la lista de
+  // computadoras se releyó) no vacía la conversación, solo la relee.
   useEffect(() => {
     setOpenTask(key);
     setView(null);
     follow.current = OPENED;
     setJump({ shown: false, unseen: 0 });
+    return () => setOpenTask(null);
+  }, [key, setOpenTask]);
+
+  useEffect(() => {
     void refresh()
       .then(() => host && markSeen(host, workspace, id))
       .catch(fail);
-    return () => setOpenTask(null);
-  }, [key, refresh, setOpenTask, fail, host, workspace, id]);
+  }, [refresh, fail, host, workspace, id]);
 
   // El fondo del workspace en la máquina de la tarea o en la cuenta; leerlo nunca la enciende.
   useEffect(() => {
@@ -367,7 +377,8 @@ function ChatBackdrop({ background, theme }: { background: Backdrop | null; them
 
 const MONO = Platform.select({ ios: "Menlo", default: "monospace" });
 
-function Row({ line, theme, streaming, onQuickReply }: { line: Line; theme: Theme; streaming?: boolean; onQuickReply?: (prompt: string) => Promise<boolean> }) {
+/** Una línea solo se repinta si cambia: `linesOf` le deja el mismo objeto a la que no cambió. */
+const Row = memo(function Row({ line, theme, streaming, onQuickReply }: { line: Line; theme: Theme; streaming?: boolean; onQuickReply?: (prompt: string) => Promise<boolean> }) {
   if (line.kind === "steps") return <Steps rows={line.rows} theme={theme} />;
   if (line.kind === "progress")
     return (
@@ -379,7 +390,7 @@ function Row({ line, theme, streaming, onQuickReply }: { line: Line; theme: Them
     );
   if (line.kind === "shell") return <ShellRun command={line.command} output={line.output} exitCode={line.exitCode} theme={theme} />;
   return <Bubble line={line} theme={theme} streaming={streaming} onQuickReply={onQuickReply} />;
-}
+});
 
 function Bubble({ line, theme, streaming, onQuickReply }: { line: Extract<Line, { kind: "message" }>; theme: Theme; streaming?: boolean; onQuickReply?: (prompt: string) => Promise<boolean> }) {
   const mine = line.role === "user";
