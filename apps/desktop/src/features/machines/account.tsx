@@ -24,7 +24,7 @@ import {
   wakes,
 } from "@terminus/computers";
 import { Fleet, type MachineInfo, unwrap } from "@terminus/fleet";
-import { createSignal, For } from "solid-js";
+import { createRoot, createSignal, For } from "solid-js";
 import { render } from "solid-js/web";
 import { t } from "../../lib/i18n";
 import { setMachineRoute } from "../../lib/invoke";
@@ -60,7 +60,9 @@ let started = false;
 let installed: Installed | null = null;
 let syncing: Promise<void> | null = null;
 
-const homeName = () => (isMac() ? t("shell.machines.this_mac") : t("shell.machines.this_computer"));
+/** El nombre con que la cuenta conoce a esta computadora («Macbook m4»); sin él, «Esta Mac». */
+const [selfName, setSelfName] = createRoot(() => createSignal<string | null>(null));
+const homeName = () => selfName() ?? (isMac() ? t("shell.machines.this_mac") : t("shell.machines.this_computer"));
 
 /** Tell every list of the window to read again: the machines behind it changed. */
 function refresh() {
@@ -279,6 +281,7 @@ export function startAccountMachines(target: Target = window) {
       return uninstall();
     }
     if (answer.kind !== "ok") return;
+    setSelfName(answer.value.find((c) => c.computer_id === self)?.name?.trim() || null);
     const others = orderComputers(answer.value.filter((c) => c.computer_id !== self));
     const key = JSON.stringify([self, account, client.endpoint]);
     if (!others.length) return uninstall();

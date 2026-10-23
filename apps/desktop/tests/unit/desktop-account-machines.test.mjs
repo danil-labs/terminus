@@ -273,6 +273,15 @@ test("the task card says its machine, and the folder chip adds no native tooltip
   assert.ok(machine.parentElement.parentElement.textContent.includes("Máquina"));
   assert.ok(machine.parentElement.textContent.includes("Mac de Ana"));
   assert.equal(machine.getAttribute("aria-label"), "apagada");
+  // Una tarea de esta computadora también dice su máquina: con varias, no se adivina.
+  const local = [...doc.querySelectorAll("[data-sesion]")].find((el) => !el.getAttribute("data-sesion").includes("~"));
+  assert.ok(local, "there is a task of this computer");
+  local.parentElement.dispatchEvent(new app.w.PointerEvent("pointerenter", { pointerType: "mouse" }));
+  await sleep(900);
+  const aqui = [...doc.querySelectorAll("[data-hover-machine]")].find((el) => !el.getAttribute("data-hover-machine").startsWith("cmp_vm") && el.getAttribute("data-hover-machine") !== "cmp_mac");
+  assert.ok(aqui, "the card of a local task has a machine row");
+  assert.ok(aqui.parentElement.textContent.includes("Mi Mac"), "its name in the account, not «Esta Mac»");
+  assert.equal(aqui.getAttribute("aria-label"), "encendida");
   assert.deepEqual(app.fallos, []);
 });
 

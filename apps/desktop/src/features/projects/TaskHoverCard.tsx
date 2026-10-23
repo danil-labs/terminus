@@ -13,7 +13,7 @@ import { t } from "../../lib/i18n";
 import type { AgentModels, AgentProfile, HandlerStatus } from "../../lib/model";
 import { nombreDeModelo } from "../../lib/models";
 import { MarcaAgente } from "../../ui/icons";
-import { machineName } from "../machines/store";
+import { machineName, machines } from "../machines/store";
 import { AstroAvatar } from "./AstroAvatar";
 import { workLabel } from "./branchLabel";
 import { displayName } from "./profiles";
@@ -85,6 +85,14 @@ export function TaskHoverCard(props: TaskHoverCardProps) {
     ? nombreDeModelo(props.task.model, props.models)
     : t("projects.hover_card.default_model");
   const proveedor = () => props.providerLabel ?? props.task.provider;
+  /** En qué máquina corre: la de la fila o, con más de una máquina, esta computadora. */
+  const maquina = () => {
+    const remota = props.task.machine;
+    if (remota) return { id: remota, on: props.task.machine_on !== false, local: false };
+    const todas = machines();
+    const aqui = todas.length > 1 ? todas.find((m) => m.local) : undefined;
+    return aqui ? { id: aqui.id, on: true, local: true } : null;
+  };
 
   return (
     <div class="flex flex-col gap-1.5 text-xs text-neutral-950">
@@ -118,16 +126,17 @@ export function TaskHoverCard(props: TaskHoverCardProps) {
           </Fila>
         )}
       </Show>
-      {/* Solo con más de una máquina: la fila trae `machine` cuando hay varias, como su chip. */}
-      <Show when={props.task.machine}>
-        {(machine) => (
+      {/* Solo con más de una máquina. Una fila de otra trae `machine`; la de esta
+          computadora no, y se dice igual, con el nombre de esta máquina. */}
+      <Show when={maquina()}>
+        {(m) => (
           <Fila label={t("projects.hover_card.machine")}>
             <span
-              data-hover-machine={machine()}
-              class={`inline-block size-1.5 shrink-0 rounded-full ${props.task.machine_on === false ? "bg-neutral-300" : "bg-success"}`}
-              aria-label={props.task.machine_on === false ? t("shell.machines.off") : t("shell.machines.on")}
+              data-hover-machine={m().id}
+              class={`inline-block size-1.5 shrink-0 rounded-full ${m().on ? "bg-success" : "bg-neutral-300"}`}
+              aria-label={m().on ? t("shell.machines.on") : t("shell.machines.off")}
             />
-            <span class="truncate">{machineName(machine())}</span>
+            <span class="truncate">{machineName(m().id, false)}</span>
           </Fila>
         )}
       </Show>
