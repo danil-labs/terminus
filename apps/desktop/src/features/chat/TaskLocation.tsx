@@ -72,7 +72,7 @@ export default function TaskLocation(props: TaskLocationProps) {
         <span data-task-location-machine="" class="min-w-0 truncate">{nombre()}</span>
         <span
           aria-hidden="true"
-          class={cn("size-1.5 shrink-0 rounded-full", !props.on ? "bg-neutral-300" : local() ? "bg-success" : "bg-info")}
+          class={cn("size-1.5 shrink-0 rounded-full", props.on ? "bg-success" : "bg-neutral-300")}
         />
       </Pista>
       <Show when={props.project}>
