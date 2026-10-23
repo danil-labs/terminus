@@ -47,6 +47,8 @@ export const APP_READS = [
   // Llevar el trabajo de una carpeta a la máquina donde nace la tarea: qué hay sin subir y la llave para sellar.
   "work_status",
   "work_key",
+  // El PR de cada tarea en su tarjeta: git por carpeta, primero las tareas visibles.
+  "list_session_git",
 ] as const;
 
 export const APP_ACTIONS = [

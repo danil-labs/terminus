@@ -8,6 +8,7 @@ import { taskInSpace, taskKey } from "../../lib/engine";
 import { lang, t, w } from "../../lib/i18n";
 import { useMachines } from "../../lib/machines";
 import { Notifications } from "../../lib/notifications";
+import { useTaskGit } from "../../lib/useTaskGit";
 import { spaceName, useWorkspaces } from "../../lib/workspaces";
 import { AgentDock } from "../../ui/AgentDock";
 import { Avatar, Badge, openPreview, openTask } from "../../ui/components";
@@ -28,7 +29,7 @@ const NEEDS_YOU = new Set(["approving", "asked", "failed"]);
 export default function Tasks() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { attention, hosts, fleet } = useMachines();
+  const { attention, hosts, hostOf, fleet } = useMachines();
   const { list, current, snapshot, loading, reload, space, selectSpace, view, setView } = useWorkspaces();
   const [askNotifications, setAskNotifications] = useState(false);
 
@@ -60,6 +61,8 @@ export default function Tasks() {
     approving: [...marks.attention].filter(([, s]) => s === "approving").map(([k]) => k),
     folderOf: (row) => row.task.folderKey,
   });
+  // El PR de la línea 2: git solo de las tarjetas en pantalla; en «Compacta» no hay línea 2.
+  const git = useTaskGit(hostOf, effective.density === "compact" ? [] : groups.flatMap((group) => group.tasks.map(({ task }) => task)));
   const agents = (snapshot?.agents ?? []).filter((a) => a.places.some((p) => inSpace(`${p.host}/${p.folder}`)));
   const changed = nonDefaultCount(view);
 
@@ -164,6 +167,7 @@ export default function Tasks() {
                 key={taskKey(task)}
                 task={task}
                 card={cardOf(task, marks, effective.group === "folder")}
+                git={git[taskKey(task)]}
                 folderName={folderName}
                 density={effective.density}
                 onPress={() => openTask(task.host, task.workspace, task.folder, task.id)}
