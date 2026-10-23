@@ -78,6 +78,8 @@ export class Fleet {
   readonly self: string | null;
   private members = new Map<string, Member>();
   private registry: AccountWorkspace[] | null = null;
+  /** Los spaces compartidos con la cuenta que se conocen: del registro y de las respuestas con `account`. */
+  private shared = new Set<string>();
   private readonly book: SliceBook;
   private readonly deadlines: Deadlines;
   private readonly inflight = new Map<string, Promise<Slice>>();
@@ -124,6 +126,23 @@ export class Fleet {
 
   setRegistry(list: AccountWorkspace[] | null) {
     this.registry = list;
+    for (const w of list ?? []) for (const s of w.spaces ?? []) this.shared.add(s.id);
+  }
+
+  /** Un space que ya es de la cuenta (`share_space`): viaja sin prefijo a cualquier máquina. */
+  markShared(space: string) {
+    if (space) this.shared.add(space);
+  }
+
+  isShared(space: string): boolean {
+    return this.shared.has(space);
+  }
+
+  /** Aprende los spaces compartidos de una respuesta (`account: true`). */
+  private learn(command: string, value: unknown) {
+    if (!/space/.test(command)) return;
+    for (const r of Array.isArray(value) ? value : [value])
+      if (r && typeof r === "object" && (r as Row).account === true && typeof (r as Row).id === "string") this.shared.add((r as Row).id as string);
   }
 
   getRegistry(): AccountWorkspace[] | null {
@@ -187,19 +206,27 @@ export class Fleet {
 
   /** `args` para `machine`; lanza `cross_machine` si nombran algo de otra. */
   argsFor(machine: string, args: Row): Row {
-    return argsFor(args, machine, this.remotes(), this.self);
+    return argsFor(args, machine, this.remotes(), this.self, (s) => this.shared.has(s));
   }
 
   context(): MergeContext {
-    return { self: this.self, on: (m) => m === this.self || this.power(m) === "on", order: this.machines().map((m) => m.id), registry: this.registry };
+    return {
+      self: this.self,
+      on: (m) => m === this.self || this.power(m) === "on",
+      order: this.machines().map((m) => m.id),
+      registry: this.registry,
+      shared: (s) => this.shared.has(s),
+    };
   }
 
   encode(machine: string, value: unknown, command = ""): unknown {
+    this.learn(command, value);
     return encode(this.context(), machine, value, command);
   }
 
   /** Las rebanadas juntas; `undefined` si ninguna trae valor (`merge.ts`). */
   merge(command: string, slices: readonly Slice[], workspace: string | null = null): unknown {
+    for (const s of slices) if (s.has) this.learn(command, s.value);
     return merge(this.context(), command, slices, workspace);
   }
 

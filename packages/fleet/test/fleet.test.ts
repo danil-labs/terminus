@@ -366,3 +366,37 @@ test("without a Terminus license a machine keeps its slice with a named state, a
   assert.equal(fleet.license(), null);
   assert.equal((await fleet.read(envelope)).status, "ok");
 });
+
+test("a space shared with the account keeps its id on every machine; one of a single machine keeps its prefix", async () => {
+  const { fleet, link } = setup({
+    cmp_vm: {
+      answers: {
+        list_spaces: [
+          { id: "s1", name: "Trabajo", folders: [], updated_at: 5, account: true },
+          { id: "v1", name: null, folders: [], updated_at: 1 },
+        ],
+        list_live_sessions: [{ ...row("t9"), space: "s1" }, { ...row("t8"), space: "v1" }],
+      },
+    },
+  });
+  const spaces = await fleet.read({ machine: "cmp_vm", workspace: "w", command: "list_spaces", args: {} });
+  const merged = fleet.merge("list_spaces", [local([{ id: "s1", name: "Viejo", folders: [], updated_at: 2, account: true }, { id: "h1", name: null, folders: [], updated_at: 1 }]), spaces], "w") as { id: string; name: string | null }[];
+  assert.deepEqual(merged.map((s) => [s.id, s.name]), [["s1", "Trabajo"], ["h1", null], ["cmp_vm~v1", null]], "one per id, the newest copy wins");
+  const rows = await fleet.read({ machine: "cmp_vm", workspace: "w", command: "list_live_sessions", args: { project: "p1" } });
+  const tagged = fleet.merge("list_live_sessions", [rows], "w") as { id: string; space: string }[];
+  assert.deepEqual(tagged.map((r) => [r.id, r.space]), [["cmp_vm~t9", "s1"], ["cmp_vm~t8", "cmp_vm~v1"]], "a task in a shared space names it bare");
+  // The window's shared space travels bare to another machine; its own unshared one does not.
+  await fleet.call({ machine: "cmp_vm", workspace: "w", command: "send_message", args: { project: "p1", session: null, space: "s1" } }).catch(() => {});
+  assert.equal(link("cmp_vm").calls.at(-1)?.args.space, "s1");
+  await assert.rejects(fleet.call({ machine: "cmp_vm", workspace: "w", command: "send_message", args: { project: "p1", session: null, space: "h1" } }), (e: FleetError) => e.code === "cross_machine");
+  fleet.markShared("h1");
+  await fleet.call({ machine: "cmp_vm", workspace: "w", command: "send_message", args: { project: "p1", session: null, space: "h1" } }).catch(() => {});
+  assert.equal(link("cmp_vm").calls.at(-1)?.args.space, "h1", "once shared it travels bare");
+});
+
+test("without a window (the web) the registry's shared spaces show even when no machine answers", () => {
+  const fleet = new Fleet({ self: null, connect: () => fakeLink({}), deadlines: { read: 40, action: 200, intent: 400 } });
+  fleet.setRegistry([{ id: "w", name: "W", projects: [], computers: [], spaces: [{ id: "s1", name: "Trabajo", folders: ["p1"], position: 0, changed_at: 7 }] }]);
+  assert.deepEqual(fleet.merge("list_spaces", [], "w"), [{ id: "s1", name: "Trabajo", folders: ["p1"], created_at: 0, updated_at: 7, account: true }]);
+  assert.equal(fleet.merge("list_spaces", [], "otro"), undefined, "nothing known is no answer, never []");
+});

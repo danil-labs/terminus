@@ -28,7 +28,7 @@ export type ProjectCloneEvent = {
   error?: { what?: Frase; detail?: string } | string;
 };
 /** `list_spaces`. */
-export type Space = { id: string; name: string | null; folders: string[] };
+export type Space = { id: string; name: string | null; folders: string[]; account?: boolean };
 
 /** `list_live_sessions`: una tarea abierta de una carpeta. */
 export type SessionRow = {

@@ -98,6 +98,7 @@ const SIN_INTERFAZ = {
   materialize_workspace: "lo pide la web por el relay a la máquina elegida (web/transport.ts); la ventana local abre sus propios workspaces",
   ensure_project: "lo pide la web por el relay antes de crear una tarea en otra máquina; el motor lo llama solo en send_message y run_shell_command",
   sync_workspace: "lo llama el conector del motor al recibir workspace.changed del relay",
+  share_space: "lo pide el router de máquinas (features/machines/router.ts, `native`) antes de crear algo en otra máquina desde un space de esta",
   danil_workspace_link:
     "la sincronización sigue a la sesión de Danil: el motor vincula todos los workspaces; sin interruptor por workspace",
   danil_workspace_unlink:
