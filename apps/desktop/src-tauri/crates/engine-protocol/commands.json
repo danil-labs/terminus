@@ -1117,6 +1117,11 @@
           "key": "id",
           "name": "id",
           "type": "Option < String >"
+        },
+        {
+          "key": "directory",
+          "name": "directory",
+          "type": "Option < String >"
         }
       ],
       "path": "projects::create_project",

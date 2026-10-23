@@ -323,7 +323,8 @@ export default function TabStrip(props: {
                 <div
                   role="tab"
                   aria-selected={active()}
-                  tabindex={active() ? 0 : -1}
+                  // Sin activa (la tapa una página) la primera recibe el foco con Tab.
+                  tabindex={active() || (i() === 0 && !props.tabs.some((x) => x.id === props.activeId)) ? 0 : -1}
                   data-pestana={i()}
                   title={statusDecorated(
                     dirty()

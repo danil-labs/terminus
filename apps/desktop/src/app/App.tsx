@@ -565,6 +565,10 @@ export default function App() {
     (proyectoDeLaVista() !== null || viendoArchivadas()) &&
     !!sitio &&
     sameSite(sitio, paneles.activeSite());
+  /** La pestaña que se ve en `sitio`: ninguna cuando Archivadas o la página
+   *  de un proyecto la tapan, aunque siga siendo la activa de su ventana. */
+  const pestanaDelanteEn = (sitio: SitioDePanel) =>
+    tapadoPorElProyecto(sitio) ? null : paneles.activeTabAt(sitio);
   /** Sitios sin pestaña delante, restando el que ocupa la vista de proyecto. */
   const sitiosEnBlanco = () =>
     paneles
@@ -6958,7 +6962,7 @@ export default function App() {
                 <TabStrip
                   session={filaDe}
                   tabs={pestanasDe(sitio)}
-                  activeId={paneles.activeTabAt(sitio)}
+                  activeId={pestanaDelanteEn(sitio)}
                   liveIds={vivas()}
                   approvingIds={permissions().map((p) => p.session)}
                   waitingIds={preguntadas()}
@@ -7008,7 +7012,7 @@ export default function App() {
                   <TabStrip
                     session={filaDe}
                     tabs={pestanasDe(sitio)}
-                    activeId={paneles.activeTabAt(sitio)}
+                    activeId={pestanaDelanteEn(sitio)}
                     liveIds={vivas()}
                     approvingIds={permissions().map((p) => p.session)}
                     waitingIds={preguntadas()}
@@ -7177,7 +7181,7 @@ export default function App() {
               <TabStrip
                 session={filaDe}
                 tabs={pestanasDe(sitio)}
-                activeId={paneles.activeTabAt(sitio)}
+                activeId={pestanaDelanteEn(sitio)}
                 liveIds={vivas()}
                 approvingIds={permissions().map((p) => p.session)}
                 waitingIds={preguntadas()}

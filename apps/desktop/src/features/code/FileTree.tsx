@@ -202,10 +202,10 @@ export default function ArbolDeArchivos(props: {
     lectura++;
   });
 
-  const pedirPagina = (ruta: string, desde: number) =>
+  const pedirPagina = (ruta: string, desde: number): Promise<Pagina> =>
     props.preview
-      ? invoke<Pagina>("preview_tree_folder", { project: props.project, path: ruta, offset: desde })
-      : invoke<Pagina>("tree_folder", { ...ids(), path: ruta, offset: desde });
+      ? invoke("preview_tree_folder", { project: props.project, path: ruta, offset: desde })
+      : invoke("tree_folder", { ...ids(), path: ruta, offset: desde });
 
   function fijarPlegada(ruta: string, cambio: (antes: Plegada) => Plegada | null) {
     setPlegadas((prev) => {
