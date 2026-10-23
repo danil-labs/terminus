@@ -716,16 +716,20 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
     const cancelarEsta = () => (
       <CancelButton label={t("onboarding.tools.cancel_connect", { name: nombre })} onClick={() => void cancelar(p.i)} />
     );
+    // El aviso de Zotero se despliega dentro de su tarjeta, no en una caja aparte.
+    const permiso = () => p.i.id === "zotero" && e()?.k === "permiso";
     return (
       <div
         class={cn(
-          "relative flex h-[58px] items-center gap-3 overflow-hidden rounded-lg border px-3 py-2",
+          "relative grid overflow-hidden rounded-lg border",
+          permiso() && "sm:col-span-2",
           fallo() && "animate-sacudir border-error-strong bg-surface-raised",
           e()?.k === "conectada" && p.i.via !== "incluido" && "border-success-strong/40 bg-success/5",
           ["conectando", "formulario", "descargando", "instalando", "sesion", "abriendo", "permiso"].includes(e()?.k ?? "") && "border-primary bg-primary/5",
           (!e() || ["libre", "saliendo", "detectada"].includes(e()!.k) || p.i.via === "incluido") && "border-border bg-surface-raised",
         )}
       >
+        <div class="relative flex h-[56px] items-center gap-3 px-3 py-2">
         <span class="grid size-[26px] shrink-0 place-items-center rounded-md bg-surface-muted text-neutral-950">
           <MarcaIntegracion id={p.i.id} size={15} />
         </span>
@@ -778,11 +782,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
               <Spinner size={18} class="text-primary" />
               {cancelarEsta()}
             </Match>
-            <Match when={e()?.k === "permiso"}>
-              <Button size="compact" variant="secondary" onClick={() => void conectar(p.i)}>
-                {t("onboarding.ai.retry")}
-              </Button>
-            </Match>
+            <Match when={e()?.k === "permiso"}>{null}</Match>
             <Match when={e()?.k === "detectada"}>
               <Button size="compact" variant="secondary" onClick={() => void conectar(p.i)}>
                 {p.i.via === "drive" ? t("onboarding.ai.use_this") : t("onboarding.tools.authorize")}
@@ -830,6 +830,23 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
         </Show>
         <Show when={e()?.k === "instalando"}>
           <BarraDeCarga hecho={0} total={null} />
+        </Show>
+        </div>
+        <Show when={permiso()}>
+          <div class="grid gap-2 border-t border-primary/30 px-3 py-3 motion-safe:animate-entrar" role="status">
+            <strong class="text-[13px] font-semibold">{t("onboarding.tools.references.zotero_permission_title")}</strong>
+            <p class="m-0 text-[13px]">{t("settings.references.zotero.error_local_api")}</p>
+            <div class="mt-0.5 flex flex-wrap items-center gap-2">
+              <span class="text-xs text-neutral-500">{t("onboarding.tools.references.zotero_permission_why")}</span>
+              <span class="flex-1" />
+              <Button size="sm" variant="ghost" onClick={() => void invoke("open_zotero").catch((x) => setErrores("zotero", explicar(x)))}>
+                {t("onboarding.tools.references.zotero_open")}
+              </Button>
+              <Button size="sm" onClick={() => void conectar(p.i)}>
+                {t("onboarding.ai.retry")}
+              </Button>
+            </div>
+          </div>
         </Show>
       </div>
     );
@@ -964,25 +981,6 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
       <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
         <For each={visibles()}>{(i) => <Tarjeta i={i} />}</For>
       </div>
-      <Show when={estados.zotero?.k === "permiso"}>
-        <div class="grid gap-2 rounded-lg border border-primary bg-surface-raised px-4 py-3.5 motion-safe:animate-entrar" role="status">
-          <p class="m-0 flex items-center gap-2 text-[13px]">
-            <ZoteroMark size={16} />
-            <strong class="font-semibold">{t("onboarding.tools.references.zotero_permission_title")}</strong>
-          </p>
-          <p class="m-0 text-[13px]">{t("settings.references.zotero.error_local_api")}</p>
-          <div class="mt-0.5 flex flex-wrap items-center gap-2">
-            <span class="text-xs text-neutral-500">{t("onboarding.tools.references.zotero_permission_why")}</span>
-            <span class="flex-1" />
-            <Button size="sm" variant="ghost" onClick={() => void invoke("open_zotero").catch((x) => setErrores("zotero", explicar(x)))}>
-              {t("onboarding.tools.references.zotero_open")}
-            </Button>
-            <Button size="sm" onClick={() => void conectar(INTEGRACIONES().find((i) => i.id === "zotero")!)}>
-              {t("onboarding.ai.retry")}
-            </Button>
-          </div>
-        </div>
-      </Show>
       <Show when={falloDeCarga()}>{(e) => <ErrorDeTarjeta class="rounded-md border-t" texto={e()} />}</Show>
       <For each={integraciones().filter(formularioAbierto)}>{(i) => <Formulario i={i} />}</For>
       <VerMas
