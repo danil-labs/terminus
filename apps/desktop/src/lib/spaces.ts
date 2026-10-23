@@ -59,6 +59,14 @@ export function rememberTaskSpace(task: string, space: string) {
   escribirPref(TASK_SPACES, Object.fromEntries(kept));
 }
 
+/** Deja de recordarlo: la tarea vuelve al space de su máquina. */
+export function forgetTaskSpace(task: string) {
+  const all = leerPref<Record<string, string>>(TASK_SPACES, {});
+  if (!(task in all)) return;
+  delete all[task];
+  escribirPref(TASK_SPACES, all);
+}
+
 const originSpace = (row: Fila): string | null =>
   row.machine && row.id ? (leerPref<Record<string, string>>(TASK_SPACES, {})[row.id] ?? null) : null;
 

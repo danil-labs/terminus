@@ -213,6 +213,7 @@ import {
   carpetasDelEscritorio,
   enEscritorio,
   escritorioDeFila,
+  forgetTaskSpace,
   rememberTaskSpace,
   type Space,
   spaceName,
@@ -899,7 +900,18 @@ export default function App() {
 
   async function moveToSpace(project: string, id: string, space: string) {
     try {
+      const machine = filaDe(id)?.machine ?? null;
+      const target = spaces().find((i) => i.id === space);
+      // Una tarea de otra máquina a un space de esta ventana: esa máquina no lo
+      // conoce, así que la ventana recuerda dónde va (`lib/spaces.ts`).
+      if (machine && target && capabilities().taskMachine?.(space) !== machine) {
+        rememberTaskSpace(id, space);
+        setSesiones((prev) => ({ ...prev }));
+        setAviso({ texto: t("spaces.move.toast", { name: spaceName(target) }), boton: t("spaces.toast.go"), ir: () => void abrirSesion(project, id) });
+        return;
+      }
       const destino = await invoke<{ id: string; name: string | null }>("move_task_to_space", { project, id, space });
+      if (machine) forgetTaskSpace(id);
       await refreshSessions(grupos());
       setAviso({
         texto: t("spaces.move.toast", { name: spaceName(destino) }),
