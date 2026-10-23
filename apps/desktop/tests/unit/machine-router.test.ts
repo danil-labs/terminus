@@ -118,6 +118,17 @@ test("moving a VM task to this window's space goes to the VM with the same id, a
   assert.deepEqual(vm.calls.find((c) => c.command === "move_task_to_space")?.args, { project: "p1", id: "t1", space: "s1" });
 });
 
+test("learning that a space is the account's (its spaces just migrated) makes the window read the tasks again, once", async () => {
+  const { router, changes } = setup({}, { list_spaces: [{ id: "s2", name: "General", folders: [], created_at: 1, updated_at: 1, account: true }] });
+  await router.handle("list_workspaces");
+  await router.handle("list_spaces");
+  await sleep(300);
+  assert.deepEqual(changes, [["sessions"]], "tasks of other machines named it with a prefix before");
+  await router.handle("list_spaces");
+  await sleep(300);
+  assert.deepEqual(changes, [["sessions"]], "nothing new, no reread");
+});
+
 test("this computer's list answers at once with its own rows; the VM's slice is added when it arrives", async () => {
   const vm = fakeLink({ list_live_sessions: [row("t1", "vm")] });
   const { router, changes } = setup({ cmp_vm: vm });
