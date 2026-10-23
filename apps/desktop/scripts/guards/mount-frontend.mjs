@@ -1995,7 +1995,14 @@ if (!roto) {
   folderName.dispatchEvent(new sidebarControls.w.Event("input", { bubbles: true }));
   folderName.closest("form").dispatchEvent(new sidebarControls.w.Event("submit", { bubbles: true, cancelable: true }));
   await sleep(100);
-  assert.equal(controlsDoc.querySelector('[data-destino="loose"]'), null, "una carpeta recién creada y sin tareas no aparece en el riel");
+  // Agrupando por carpeta, la recién creada aparece ya, sin tareas, y se sigue en «Nueva tarea» dentro de ella.
+  for (let i = 0; i < 80 && !controlsDoc.querySelector('[data-folder-group="loose"] [data-folder-open]'); i++) await sleep(25);
+  const sueltaEnElRiel = controlsDoc.querySelector('[data-sidebar-group="loose"]');
+  assert.ok(sueltaEnElRiel, "una carpeta recién creada y sin tareas aparece en el riel");
+  assert.equal(sueltaEnElRiel.querySelector("[data-folder-empty]")?.textContent, "Sin tareas todavía");
+  assert.ok(sueltaEnElRiel.querySelector('button[aria-label="Nueva tarea en Carpeta suelta"]'), "con su «+»");
+  assert.equal(sueltaEnElRiel.querySelector("[data-folder-open]").dataset.active, "true", "y marcada mientras se mira su «Nueva tarea»");
+  assert.match(controlsDoc.querySelector('button[aria-label="Proyecto"]')?.textContent ?? "", /Carpeta suelta/, "«Nueva tarea» queda en la carpeta recién creada");
   assert.deepEqual(sidebarControls.fallos, []);
   const openClone = async () => {
     await abrirAnadirProyecto(sidebarControls);
