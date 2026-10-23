@@ -674,6 +674,7 @@
   "settings.google_drive_desktop.error_install": "Google Drive could not be installed. Try again.",
   "settings.google_drive_desktop.error_not_installed": "Install Google Drive first.",
   "settings.google_drive_desktop.error_open": "Google Drive could not be opened.",
+  "settings.google_drive_desktop.error_save": "I couldn't save the Google Drive preference.",
   "settings.references.error_workspace": "The workspace was not found.",
   "settings.references.zotero.error_busy": "Zotero is already being installed.",
   "settings.references.zotero.error_download": "Zotero could not be downloaded. Check your connection and try again.",

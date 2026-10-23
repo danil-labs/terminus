@@ -222,8 +222,15 @@ export function createRouter(config: RouterConfig) {
         refresh(envelope, before);
       }
     } else {
-      // Sin parte de aquí, esta lectura sí espera a sus máquinas, con su tope.
-      slices.push(...(await Promise.all(envelopes.map((e) => fleet.read(e)))));
+      // Sin parte de aquí: lo último de cada máquina ya, y se relee detrás. Solo sin
+      // nada guardado de ninguna se espera a que contesten, con su tope.
+      const known = envelopes.map((envelope) => ({ envelope, before: fleet.peek(envelope) }));
+      if (known.some(({ before }) => before?.has)) {
+        for (const { envelope, before } of known) {
+          if (before) slices.push(before);
+          refresh(envelope, before);
+        }
+      } else slices.push(...(await Promise.all(envelopes.map((e) => fleet.read(e)))));
     }
     if (command === "list_workspace_attention") for (const s of slices) if (s.has) attention.set(s.machine, fleet.encode(s.machine, s.value));
     const merged = fleet.merge(command, slices, workspace);

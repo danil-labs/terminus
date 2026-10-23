@@ -303,6 +303,9 @@ export class Fleet {
     const before = this.book.get(machine, key);
     const keep = (status: Slice["status"], error?: string): Slice =>
       before?.has ? { ...before, status, error } : { machine, status, has: false, value: null, at: null, error };
+    // Una máquina apagada no contesta: su última rebanada es la respuesta, sin salir a la red.
+    const member = this.members.get(machine);
+    if (before?.has && member && classOf(envelope.command) === "read" && OFF.includes(member.link.state())) return { ...before, status: "cached", error: "machine_off" };
     let slice: Slice;
     try {
       const { value, cached } = await this.send(envelope);

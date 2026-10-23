@@ -5365,6 +5365,22 @@
     {
       "async": false,
       "channel": null,
+      "kind": "invoke",
+      "name": "set_google_drive_desktop_use",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "used",
+          "name": "used",
+          "type": "bool"
+        }
+      ],
+      "path": "google_drive_desktop::set_google_drive_desktop_use",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
       "ids": {
         "workspace": [
           "workspace"
