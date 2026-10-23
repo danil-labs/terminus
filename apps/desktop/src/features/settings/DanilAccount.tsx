@@ -133,6 +133,8 @@ function SessionCard(props: { session: DanilSessionInfo; accounts: DanilAccounts
   const [listed, setListed] = createSignal<AccountProfile | null>(null);
   createEffect(on(s, (session) => void profileFromStatus(statusOf(session)).then(setListed).catch(() => {})));
   const shown: AccountIdentityState = { ...identity, profile: () => identity.profile() ?? listed() ?? null };
+  /** Cerrar la sesión deja sin sincronizar todos sus workspaces de aquí: se confirma antes. */
+  const [asking, setAsking] = createSignal(false);
   const state = () =>
     t("danil.accounts.row", {
       status: s().online ? t("danil.accounts.online") : t("danil.accounts.offline"),
@@ -154,10 +156,31 @@ function SessionCard(props: { session: DanilSessionInfo; accounts: DanilAccounts
             {t("danil.accounts.make_default")}
           </Button>
         </Show>
-        <Button size="sm" variant="secondary" disabled={props.accounts.busy()} onClick={() => void props.accounts.signOut(key)}>
-          {t("danil.account.sign_out")}
-        </Button>
+        <Show when={!asking()}>
+          <Button size="sm" variant="secondary" disabled={props.accounts.busy()} onClick={() => setAsking(true)} data-danil-sign-out="">
+            {t("danil.account.sign_out")}
+          </Button>
+        </Show>
       </SettingsRow>
+      <Show when={asking()}>
+        <SettingsRow label={t("danil.accounts.sign_out_confirm", { count: s().workspaces.length })} data-danil-sign-out-confirm="">
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={props.accounts.busy()}
+            onClick={() => {
+              setAsking(false);
+              void props.accounts.signOut(key);
+            }}
+            data-danil-sign-out-yes=""
+          >
+            {t("danil.account.sign_out")}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setAsking(false)}>
+            {t("danil.workspace.leave_no")}
+          </Button>
+        </SettingsRow>
+      </Show>
     </div>
   );
 }

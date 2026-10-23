@@ -105,7 +105,11 @@ test("the workspace shows its account, syncs with it, and moves to another signe
   assert.ok(section(w).textContent.includes("Cuenta de este workspace"));
   assert.equal(select(w).value, "u_alberto", "the open workspace's account is chosen");
   const options = [...select(w).options].map((o) => o.textContent);
-  assert.deepEqual(options, ["alberto@danil.ai", "alberto@dondebanco.org", "Conectar otra cuenta…"], "the default first, then the others, then another one");
+  assert.deepEqual(
+    options,
+    ["alberto@danil.ai", "alberto@dondebanco.org", "Sin cuenta (no se sincroniza)", "Conectar otra cuenta…"],
+    "the default first, then the others, no account, then another one",
+  );
   assert.ok(section(w).textContent.includes("Se sincroniza con alberto@danil.ai"));
 
   await choose(w, "u_fdb");
@@ -113,6 +117,46 @@ test("the workspace shows its account, syncs with it, and moves to another signe
   assert.equal(select(w).value, "u_fdb");
   assert.ok(section(w).textContent.includes("Se sincroniza con alberto@dondebanco.org"), section(w).textContent);
   assert.equal(w.document.querySelector("[role=alert]"), null);
+  assert.deepEqual(app.fallos, []);
+});
+
+test("a workspace nobody chose an account for says so, and the sidebar footer shows nobody", async () => {
+  const e = engine({ map: { w2: "u_fdb" } });
+  const app = await openWorkspaces("danil-workspace-account-none", e);
+  const { w } = app;
+  assert.equal(section(w)?.dataset.workspaceAccount, "none");
+  assert.ok(section(w).textContent.includes("No es de ninguna cuenta: no se ve en la web ni en el teléfono."), section(w).textContent);
+  assert.equal(select(w).value, "", "the picker says «Sin cuenta»");
+  assert.equal(w.document.querySelector("[data-danil-foot]"), null, "the sidebar footer shows nobody for a workspace without an account");
+
+  await choose(w, "u_alberto");
+  assert.deepEqual(e.calls.find((c) => c.command === "danil_workspace_set_account")?.args, { workspace: "w", account: "u_alberto" });
+  assert.ok(section(w).textContent.includes("Se sincroniza con alberto@danil.ai"), section(w).textContent);
+  assert.deepEqual(app.fallos, []);
+});
+
+test("«Sin cuenta» asks first and then takes the workspace out of its account only", async () => {
+  const e = engine();
+  const app = await openWorkspaces("danil-workspace-account-leave", e);
+  const { w } = app;
+  await choose(w, "");
+  const ask = () => w.document.querySelector("[data-workspace-leave]");
+  assert.ok(ask(), "it asks before leaving the account");
+  assert.ok(ask().textContent.includes("Se quita de alberto@danil.ai: deja de verse en su web y su teléfono."), ask().textContent);
+  assert.equal(select(w).value, "u_alberto", "nothing changed yet");
+  assert.ok(!e.calls.some((c) => c.command === "danil_workspace_set_account"));
+  [...ask().querySelectorAll("button")].find((b) => b.textContent === "Cancelar").click();
+  await sleep(200);
+  assert.equal(ask(), null);
+  assert.ok(!e.calls.some((c) => c.command === "danil_workspace_set_account"), "cancel keeps it in its account");
+
+  await choose(w, "");
+  ask().querySelector("[data-workspace-leave-yes]").click();
+  await sleep(300);
+  assert.deepEqual(e.calls.find((c) => c.command === "danil_workspace_set_account")?.args, { workspace: "w", account: null });
+  assert.ok(!e.calls.some((c) => c.command === "danil_disconnect"), "the account stays signed in");
+  assert.equal(select(w).value, "");
+  assert.ok(section(w).textContent.includes("No es de ninguna cuenta"), section(w).textContent);
   assert.deepEqual(app.fallos, []);
 });
 
@@ -203,7 +247,6 @@ test("the sidebar footer shows the open workspace's account and follows a switch
   e.state.sessions = [ALBERTO];
   app.emit("danil-sessions", e.state.sessions);
   await sleep(400);
-  assert.equal(foot()?.dataset.danilFoot, "signed_out", "its account signed out: not the other account");
-  assert.equal(foot().getAttribute("title"), "alberto@dondebanco.org · sin sesión en esta computadora");
+  assert.equal(foot(), null, "its account signed out: nobody, and not the other account");
   assert.deepEqual(app.fallos, []);
 });
