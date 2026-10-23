@@ -45,9 +45,9 @@ class FakeSocket implements SocketLike {
     const answer = FakeSocket.replies.get(this.computer)?.(m);
     if (answer !== undefined) setTimeout(() => this.push({ type: "result", id: m.id, ...(answer as object) }), 0);
   }
-  close(code = 1000) {
+  close(code = 1000, reason?: string) {
     this.readyState = 3;
-    this.onclose?.({ code });
+    this.onclose?.({ code, reason });
   }
 }
 
@@ -145,5 +145,22 @@ test("altas y bajas de máquinas se aplican en vivo, sin reabrir las demás", as
   assert.equal(socketOf("cmp_vm"), vmSocket, "la VM sigue con su sesión");
   machines.set([MAC]);
   assert.equal(vmSocket.readyState, 3, "la que se fue se cierra");
+  machines.close();
+});
+
+test("sin Terminus de pago el relay detiene la sesión: la flota lo dice y «Reintentar» la reabre", async () => {
+  const { machines } = await start([{ ...VM, state: "online" }]);
+  socketOf("cmp_vm").open("online");
+  assert.equal(machines.license(), null);
+  const before = FakeSocket.all.filter((s) => s.computer === "cmp_vm").length;
+  socketOf("cmp_vm").close(4003, "license_required");
+  await sleep(10);
+  assert.equal(machines.license(), "license_required");
+  // Detenida: no reintenta sola en bucle.
+  assert.equal(FakeSocket.all.filter((s) => s.computer === "cmp_vm").length, before);
+  machines.retry();
+  await sleep(0);
+  assert.equal(machines.license(), null);
+  assert.equal(FakeSocket.all.filter((s) => s.computer === "cmp_vm").length, before + 1);
   machines.close();
 });

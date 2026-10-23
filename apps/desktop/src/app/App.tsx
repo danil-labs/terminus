@@ -95,7 +95,8 @@ const Screen = lazy(() => import("../features/screen/Screen"));
 const MachinesLicense = lazy(() =>
   import("../features/settings/TerminusLicense").then((m) => ({
     default: (props: { onRetry: () => void }) => (
-      <m.TerminusLicense compact onStart={m.startTrialInBrowser} onRetry={props.onRetry} />
+      // En el escritorio, el navegador de la persona; en la web, la página de cobro (mismo origen).
+      <m.TerminusLicense compact onStart={capabilities().nativeWindow ? m.startTrialInBrowser : m.startTrialInPage} onRetry={props.onRetry} />
     ),
   })),
 );
