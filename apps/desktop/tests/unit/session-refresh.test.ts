@@ -202,3 +202,21 @@ test("releer un mensaje que cambió conserva lo que no cambió de dentro", () =>
   const conCampo = reutilizar<Record<string, unknown>>({ a: 1 }, { a: 1, b: undefined });
   assert.ok("b" in conCampo);
 });
+
+test("una carpeta que no contesta no congela la barra: vence, se queda lo que había y las demás se pintan", async () => {
+  let lists: SessionLists<string> = { app: ["vieja"] };
+  const timers: { run: () => void; ms: number }[] = [];
+  const refresh = sessionRefresh<string>({
+    // `app` no vuelve nunca; `otra` contesta.
+    read: (project) => (project === "app" ? new Promise<string[]>(() => {}) : Promise.resolve(["nueva"])),
+    apply: (update) => { lists = update(lists); },
+    projects: () => ["app", "otra"],
+    key: (row) => row,
+    schedule: (run, ms) => { timers.push({ run, ms }); return timers.length; },
+    cancel: () => {},
+    timeout: 5,
+  });
+  await refresh.refresh(["app", "otra"]);
+  assert.deepEqual(lists, { app: ["vieja"], otra: ["nueva"] });
+  assert.equal(timers.at(-1)?.ms, 1000, "la carpeta vencida se reintenta");
+});
