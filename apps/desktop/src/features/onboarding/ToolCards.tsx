@@ -302,9 +302,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
     esperandoMcp = null;
     void cargar();
   });
-  const url = listen<string>("mcp-login", (e) => {
-    if (esperandoMcp) invoke("open_external", { target: e.payload }).catch(() => {});
-  });
+  // `mcp-login` no se abre aquí: el CLI o el motor ya abrieron esa pestaña.
   const alDrive = listen<AvanceDeDrive>("google-drive", (e) => {
     const a = e.payload;
     if (a.kind === "connection") return void cargar();
@@ -342,7 +340,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
   onCleanup(() => {
     cerrada = true;
     clearTimeout(vigiaDeSesion);
-    for (const l of [fin, url, alDrive, alInstalar]) void l.then((f) => f());
+    for (const l of [fin, alDrive, alInstalar]) void l.then((f) => f());
     for (const i of integraciones()) {
       if ((i.via === "proveedor" || i.via === "drive") && estados[i.id]?.k === "conectando") void cancelar(i);
     }

@@ -22,8 +22,8 @@ const LOCK = fileURLToPath(new URL("../../seldon-runtime.lock", import.meta.url)
 
 /** El contrato copiado cuyo motor aún no tiene release publicada, y qué falta. */
 const MOTOR_PENDIENTE = {
-  contract: "43db399c8227b52e6fc5f240681c55d1dc81cb88a292cbf76d56ed1fc37e4d85",
-  why: "llevar y traer trabajo entre máquinas (work_*, seldon-host #84–#87), una sesión de Danil por cuenta (feat/danil-session-per-account), el onboarding (#91), Google Drive (#92), Google Drive para escritorio (#95), el modelo local activo (#98), «Usar el GitHub de esta computadora» (#100) y la tarea vacía de la vista previa (create_empty_session, seldon-host feat/tarea-vacia): falta publicar seldon-runtime con ellos y fijarlo en seldon-runtime.lock",
+  contract: "29b952368255ede3371b3f83e32f29407f2b728c1901e52079e387d50a06c956",
+  why: "el aislamiento del relay y la memoria sincronizada (seldon-host integration/plan-multi-machine: #106, #110, #108), llevar y traer trabajo entre máquinas (work_*, seldon-host #84–#87), una sesión de Danil por cuenta (feat/danil-session-per-account), el onboarding (#91), Google Drive (#92), Google Drive para escritorio (#95), el modelo local activo (#98), «Usar el GitHub de esta computadora» (#100) y la tarea vacía de la vista previa (create_empty_session, seldon-host feat/tarea-vacia) y las carpetas nuevas en Documentos (#118): falta publicar seldon-runtime con ellos y fijarlo en seldon-runtime.lock",
 };
 
 const vendored = createHash("sha256").update(readFileSync(CONTRACT)).digest("hex");

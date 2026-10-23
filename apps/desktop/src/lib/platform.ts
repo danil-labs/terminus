@@ -3,6 +3,7 @@
  * el valor por defecto; la entrada web (`src/web/main.tsx`) lo fija antes de
  * importar la app y no cambia después.
  */
+import type { Answer, Computer, MemorySource } from "@terminus/computers";
 import type { JSX } from "solid-js";
 import type { AccountProfileSource } from "../features/settings/account-profile";
 import type { Account } from "../features/settings/accounts-store";
@@ -35,6 +36,8 @@ export type Capabilities = {
   sidebarExtra?: () => JSX.Element;
   /** El nombre de una máquina por su id. */
   machineName?: (id: string) => string;
+  /** La máquina de la cuenta que guarda una tarea o un space por su id de panel (`<máquina>~<id>`); `null` si es de la ventana. */
+  taskMachine?: (id: string) => string | null;
   /** La que corre las tareas que llegan sin `machine`; sin esto, la de la ventana. */
   windowMachine?: () => { id: string; name: string; local: boolean } | undefined;
   /** Dónde se crea un proyecto nuevo, en el diálogo de añadirlo. */
@@ -45,8 +48,31 @@ export type Capabilities = {
   browserFiles?: boolean;
   /** El visor de la pantalla de una VM administrada (solo ver); `null` si esa máquina no tiene. */
   machineScreen?: (machine: string) => (() => Promise<WebSocket>) | null;
+  /** El estado de la rebanada de cada otra máquina (`@terminus/fleet`): `ok`, `cached`, `no_answer`, `off` u `outdated`, con su hora. */
+  machineSlices?: () => Record<string, { status: "ok" | "cached" | "no_answer" | "off" | "outdated" | "license_required"; at: number | null }>;
+  /** `license_required` si el relay detuvo las otras máquinas por falta de Terminus de pago (aviso `TerminusLicense`); `null` si no. */
+  machinesLicense?: () => "license_required" | null;
+  /** «Reintentar» del aviso de licencia: vuelve a abrir las sesiones de las otras máquinas. */
+  retryMachines?: () => void;
+  /**
+   * La memoria versionada de los workspaces en la cuenta (`/v1/workspaces/:id/memory/*`)
+   * con la sesión de la persona: en la web, la pestaña Memoria la lee y la escribe
+   * ahí, aunque todas las máquinas estén apagadas. La ventana usa el token de
+   * cliente de la cuenta de cada workspace (`memory-account.ts`).
+   */
+  accountMemory?: MemorySource;
   /** Bajo la tarjeta de una cuenta: sus máquinas. */
   accountMachines?: (props: AccountMachinesProps) => JSX.Element;
+  /**
+   * «Conectar otra máquina» con la sesión de la página (la web): la lista de la
+   * cuenta y qué hacer cuando la nueva está en línea. El escritorio usa su token
+   * de cliente (`features/machines/ConnectMachine.tsx`).
+   */
+  connectMachine?: {
+    list: () => Promise<Answer<Computer[]>>;
+    outdated?: (computer: Computer) => boolean;
+    onReady: (computer: Computer) => void;
+  };
 };
 
 const DESKTOP: Capabilities = { nativeWindow: true, updater: true, localSetup: true, computerStatus: false, danilAccount: true, radiant: true };

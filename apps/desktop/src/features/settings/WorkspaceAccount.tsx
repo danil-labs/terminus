@@ -12,6 +12,7 @@ import { Select } from "../../ui/Select";
 import { createDanilAccounts } from "./danil-accounts";
 import { said } from "./danil-session";
 import { accountChoices, changeProblem, setWorkspaceAccount, syncLine } from "./danil-sessions";
+import { LICENSE_REQUIRED, startTrialInBrowser, TerminusLicense } from "./TerminusLicense";
 
 /** El valor del selector que no es una cuenta: abre el inicio de sesión de otra. */
 const OTHER = "+other";
@@ -117,7 +118,10 @@ export default function WorkspaceAccount(props: { workspace: string; name: strin
             </button>
           </p>
         </Show>
-        <Show when={message()}>
+        <Show when={message() === LICENSE_REQUIRED}>
+          <TerminusLicense onStart={startTrialInBrowser} onRetry={() => void accounts.add()} busy={accounts.busy()} compact />
+        </Show>
+        <Show when={message() !== LICENSE_REQUIRED && message()}>
           {(code) => (
             <p class="m-0 text-error-strong" role="alert">
               {problemText(code())}
