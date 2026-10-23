@@ -525,7 +525,8 @@ export default function Sessions(props: {
   /**
    * El cuerpo de una fila del riel. Línea 1: estado en su columna fija,
    * título y chincheta. Línea 2: lo que te piden si te necesita; si no,
-   * carpeta, cara del agente y PR. Lo demás vive en la tarjeta flotante.
+   * proveedor, carpeta, máquina (si no es esta), cara del agente y PR. Lo
+   * demás vive en la tarjeta flotante.
    */
   const FilaDelRiel = (r: { s: SessionRow; actividad: TaskActivity; titulo: JSX.Element }) => {
     // Qué lleva la línea 2 lo decide la tarjeta compartida con el teléfono (`@terminus/tasks`).
@@ -573,10 +574,17 @@ export default function Sessions(props: {
               when={teNecesita()}
               fallback={
                 <>
+                  <Show when={tarjeta().provider}>
+                    {(proveedor) => <span data-session-provider class="flex shrink-0" title={proveedor()} aria-label={proveedor()}><MarcaAgente id={proveedor()} size={13} /></span>}
+                  </Show>
                   <Show when={!props.hideFolder && props.carpetaDe?.(r.s)}>
                     {(nombre) => <FolderChip id={projectOf(r.s)} name={nombre()} untitled={props.sidebar} class="max-w-[108px] shrink-0" />}
                   </Show>
                   <WorktreeFaltante />
+                  {/* En qué máquina corre, solo si no es esta: con una sola máquina no sale. */}
+                  <Show when={tarjeta().machine}>
+                    {(machine) => <MachineChip machine={machine().id} on={machine().on} class="max-w-[96px]" />}
+                  </Show>
                   <Show when={tarjeta().agent}>
                     {(agente) => (
                       <TooltipRoot openDelay={RETARDO_TOOLTIP} placement="top" gutter={4}>
@@ -592,10 +600,6 @@ export default function Sessions(props: {
                         <TooltipContent class="pointer-events-none">{nombreDelAgente()}</TooltipContent>
                       </TooltipRoot>
                     )}
-                  </Show>
-                  {/* En qué máquina corre, si no es esta. En el sidebar lo dice su tarjeta flotante. */}
-                  <Show when={!props.sidebar && tarjeta().machine}>
-                    {(machine) => <MachineChip machine={machine().id} on={machine().on} class="max-w-[96px]" />}
                   </Show>
                   <ChipDeGit />
                 </>
