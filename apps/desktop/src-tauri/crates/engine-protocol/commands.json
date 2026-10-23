@@ -4795,6 +4795,21 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "set_google_drive_desktop_use",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "used",
+          "name": "used",
+          "type": "bool"
+        }
+      ],
+      "path": "google_drive_desktop::set_google_drive_desktop_use"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "set_integration_enabled",
       "output": "-> Result < () , Failure >",
       "parameters": [

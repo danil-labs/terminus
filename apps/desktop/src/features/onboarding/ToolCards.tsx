@@ -9,7 +9,7 @@ import { createStore } from "solid-js/store";
 import { mb } from "../../lib/format";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
-import { escribirPref, leerPref } from "../../lib/prefs";
+import { borrarPref, leerPref } from "../../lib/prefs";
 import { prosa, type Frase } from "../../lib/prose";
 import { cn } from "../../lib/utils";
 import { isMac } from "../../lib/window";
@@ -61,6 +61,8 @@ type DriveDeEscritorio = {
   running: boolean;
   mounts: { email: string | null; path: string }[];
   installer_bytes: number | null;
+  /** La persona pidió que los agentes de este workspace no usen las unidades; lo guarda el motor. */
+  unused?: boolean;
 };
 /** El evento `install` de la app oficial; en `error`, `failure` es una clave del catálogo. */
 type InstalacionDeDrive = {
@@ -233,7 +235,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
       const m = unidad(escritorio());
       if (!m) return { k: "libre" };
       const donde = [m.email, m.path].filter(Boolean).join(" · ");
-      return leerPref(SIN_USAR_DRIVE, false) ? { k: "detectada", detalle: donde } : { k: "conectada", detalle: donde };
+      return escritorio()?.unused ? { k: "detectada", detalle: donde } : { k: "conectada", detalle: donde };
     }
     if (i.via === "drive") {
       const d = drive();
@@ -249,11 +251,10 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
     const c = conocido(i);
     if (!c?.conectado) return { k: "libre" };
     if (!c.pide_sesion) return { k: "conectada", detalle: descripcion(i.id) };
-    const con = agentesMcp().find((a) => c.sesiones?.includes(a.id));
-    return {
-      k: "conectada",
-      detalle: con ? t("onboarding.tools.session_in", { agent: con.label }) : t("onboarding.tools.needs_login"),
-    };
+    // El motor la autoriza una vez para todos los agentes: o la tienen todos o ninguno.
+    return (c.sesiones ?? []).length > 0
+      ? { k: "conectada", detalle: t("onboarding.tools.session_in") }
+      : { k: "detectada", detalle: t("onboarding.tools.needs_login") };
   }
 
   async function cargar() {
@@ -266,6 +267,14 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
         invoke<DriveDeEscritorio>("google_drive_desktop_status").catch(() => null),
       ]);
       if (cerrada) return;
+      // Antes la guardaba la ventana; ahora es del motor, que la lee en cada turno.
+      if (o && leerPref(SIN_USAR_DRIVE, false)) {
+        borrarPref(SIN_USAR_DRIVE);
+        if (!o.unused) {
+          await invoke("set_google_drive_desktop_use", { used: false }).catch(() => {});
+          o.unused = true;
+        }
+      }
       setDrive(d);
       setEscritorio(o);
       setProveedores(p);
@@ -301,9 +310,6 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
     if (esperandoMcp) setEstados(esperandoMcp, { k: "libre" });
     esperandoMcp = null;
     void cargar();
-  });
-  const url = listen<string>("mcp-login", (e) => {
-    if (esperandoMcp) invoke("open_external", { target: e.payload }).catch(() => {});
   });
   const alDrive = listen<AvanceDeDrive>("google-drive", (e) => {
     const a = e.payload;
@@ -342,7 +348,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
   onCleanup(() => {
     cerrada = true;
     clearTimeout(vigiaDeSesion);
-    for (const l of [fin, url, alDrive, alInstalar]) void l.then((f) => f());
+    for (const l of [fin, alDrive, alInstalar]) void l.then((f) => f());
     for (const i of integraciones()) {
       if ((i.via === "proveedor" || i.via === "drive") && estados[i.id]?.k === "conectando") void cancelar(i);
     }
@@ -357,8 +363,8 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
   const contarConectadas = () => props.onCambio(integraciones().filter((x) => estados[x.id]?.k === "conectada").length);
 
   function usarUnidad(i: Integracion, o: DriveDeEscritorio) {
-    setEscritorio(o);
-    escribirPref(SIN_USAR_DRIVE, false);
+    setEscritorio({ ...o, unused: false });
+    void invoke("set_google_drive_desktop_use", { used: true }).catch((e) => setErrores(i.id, explicar(e)));
     setEstados(i.id, guardado(i));
     contarConectadas();
   }
@@ -484,9 +490,9 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
     setEstados(i.id, { k: "conectando" });
     try {
       await invoke("connect_known_mcp", { id: i.id });
-      const agente = agenteDeSesion();
-      if (c.pide_sesion && agente) {
-        await invoke("mcp_login", { provider: agente.id, id: i.id });
+      // Lo autoriza el motor para todos los agentes; `provider` solo dice quién lo pidió.
+      if (c.pide_sesion) {
+        await invoke("mcp_login", { provider: agenteDeSesion()?.id ?? "", id: i.id });
         return;
       }
     } catch (e) {
@@ -549,7 +555,12 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
     setErrores(i.id, null);
     // Solo deja de usarla Terminus: la app de Google sigue instalada y con su sesión.
     if (i.via === "drive" && oficial()) {
-      escribirPref(SIN_USAR_DRIVE, true);
+      try {
+        await invoke("set_google_drive_desktop_use", { used: false });
+        setEscritorio((o) => (o ? { ...o, unused: true } : o));
+      } catch (e) {
+        setErrores(i.id, explicar(e));
+      }
       setEstados(i.id, guardado(i));
       return contarConectadas();
     }
@@ -577,7 +588,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
       case "formulario":
         return t("onboarding.tools.fill_below");
       case "detectada":
-        return t("onboarding.tools.drive_app.unused", { where: e.detalle });
+        return i.via === "drive" ? t("onboarding.tools.drive_app.unused", { where: e.detalle }) : e.detalle;
       case "descargando":
         return i.via === "drive" && oficial() ? t("onboarding.tools.drive_app.downloading") : t("onboarding.tools.downloading_cli_start");
       case "instalando":
@@ -656,7 +667,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
             </Match>
             <Match when={e()?.k === "detectada"}>
               <Button size="compact" variant="secondary" onClick={() => void conectar(p.i)}>
-                {t("onboarding.ai.use_this")}
+                {p.i.via === "drive" ? t("onboarding.ai.use_this") : t("onboarding.tools.authorize")}
               </Button>
             </Match>
             <Match when={e()?.k === "instalando"}>

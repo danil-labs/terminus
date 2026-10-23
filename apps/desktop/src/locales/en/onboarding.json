@@ -128,8 +128,8 @@
   "onboarding.tools.size.computer-use": "30–75 MB",
   "onboarding.tools.connected": "Connected",
   "onboarding.tools.included": "Included",
-  "onboarding.tools.session_in": "Signed in with {agent}",
-  "onboarding.tools.needs_login": "Connected · sign in from Settings",
+  "onboarding.tools.session_in": "Authorized for all your agents",
+  "onboarding.tools.needs_login": "Connected · not authorized yet",
   "onboarding.tools.fill_below": "Fill in the details below",
   "onboarding.tools.finish_in_browser": "Finish in your browser…",
   "onboarding.tools.downloading_cli_start": "Downloading its CLI…",
@@ -184,5 +184,6 @@
   "onboarding.login.opening_browser": "Opening the browser so you can sign in…",
   "onboarding.login.waiting_code": "Waiting for the code the browser gives you…",
   "onboarding.login.waiting_browser": "Waiting for you to finish in the browser…",
-  "onboarding.login.confirm_in_browser": "Confirm it in your browser"
+  "onboarding.login.confirm_in_browser": "Confirm it in your browser",
+  "onboarding.tools.authorize": "Authorize"
 }

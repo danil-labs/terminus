@@ -673,5 +673,6 @@
   "settings.google_drive_desktop.error_declined": "Google Drive was not installed because administrator permission was not given. Try again and accept the system prompt.",
   "settings.google_drive_desktop.error_install": "Google Drive could not be installed. Try again.",
   "settings.google_drive_desktop.error_not_installed": "Install Google Drive first.",
-  "settings.google_drive_desktop.error_open": "Google Drive could not be opened."
+  "settings.google_drive_desktop.error_open": "Google Drive could not be opened.",
+  "settings.google_drive_desktop.error_save": "I couldn't save the Google Drive preference."
 }

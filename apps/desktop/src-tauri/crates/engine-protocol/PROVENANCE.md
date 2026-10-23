@@ -20,7 +20,7 @@ repositories, and `GitHostInfo`. Files on disk keep their keys; the types that
 are stored and also travel cross the contract wrapped in `Wire`, which renames
 their keys. There are no aliases. This copy is byte-identical to the engine's.
 SHA-256:
-`43db399c8227b52e6fc5f240681c55d1dc81cb88a292cbf76d56ed1fc37e4d85`.
+`f4f8e4cea3e93720a76b3b34756d9c7d5b2f07cc7acd55beaad25bbea8829929`.
 
 seldon-host `4e21caf` (#66) added the Danil account (321 commands, 28 events):
 `danil_connect_start`, `danil_connect_status`, `danil_connect_options`,
@@ -181,3 +181,8 @@ copy is `git show 3274de5:crates/engine-protocol/commands.json` byte for byte.
 Endpoint, selection and StreamPage extend the transport; they do not convert
 domain data. The token travels in RPC1 only between authenticated local
 processes, read from a protected file; it is never handed to the webview.
+
+seldon-host `feat/mcp-oauth-terminus` moves the «don't use» choice for Google
+Drive for desktop from the window to the engine, which tells agents which
+drives they can use: new `set_google_drive_desktop_use` (`{used}`) and
+`DesktopStatus.unused`. 368 commands, 32 events.
