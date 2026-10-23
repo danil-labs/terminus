@@ -1242,7 +1242,8 @@ export default function App() {
   const avisoDeMaquina = () => {
     // Una tarea que nace aún no tiene id: su pestaña provisional es la que se mira.
     const id = sessionId() ?? pestanas.active();
-    const waking = id ? encendiendo()[id] : undefined;
+    // Antes de crearla, mientras se revisa qué llevar, el aviso cuelga del borrador.
+    const waking = (id ? encendiendo()[id] : undefined) ?? (sessionId() ? undefined : encendiendo()[claveAbierta()]);
     if (waking) return t("shell.machines.waking", { name: machineName(waking) });
     const off = id ? apagadas()[id] : undefined;
     return off ? t("shell.machines.asleep_notice", { name: machineName(off) }) : null;
@@ -5880,11 +5881,18 @@ export default function App() {
         });
         return "sheet";
       }
+      // Pedir la llave al destino lo enciende si está apagado: el borrador dice que se está encendiendo.
+      if (machines().find((m) => m.id === target)?.on === false) anotar(setEncendiendo, draftKey, target);
       const check = source ? await mod.checkCarry({ workspace, project: proyecto, source, target }) : null;
       if (!check) return "none";
       setHojaDeLlevar({ key: draftKey, check });
       return "sheet";
+    } catch (e) {
+      // No encendió: el mensaje se queda en la caja y se dice por qué.
+      setError(prosaDe(e));
+      return "sheet";
     } finally {
+      anotar(setEncendiendo, draftKey, null);
       decidiendoLlevar = false;
     }
   }
