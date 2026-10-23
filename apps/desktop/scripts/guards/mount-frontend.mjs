@@ -1130,7 +1130,7 @@ if (!roto) {
     ["cloud-folder", "cloud-git", "local-folder"], "una carpeta sin tareas aparece en el riel");
   for (const [id, name] of [["cloud-folder", "Nube"], ["cloud-git", "Git en nube"], ["local-folder", "Local"]]) {
     const grupo = cloudIcons.w.document.querySelector(`[data-sidebar-group="${id}"]`);
-    assert.equal(grupo.querySelector("[data-folder-open]").textContent.trim(), `${name}0`);
+    assert.equal(grupo.querySelector("[data-folder-open]").textContent.trim(), name, "sin contador junto al nombre");
     assert.equal(grupo.querySelector("[data-folder-empty]")?.textContent, "Sin tareas todavía");
     assert.ok(grupo.querySelector(`button[aria-label="Nueva tarea en ${name}"]`), "su «+» empieza una tarea en ella");
   }
