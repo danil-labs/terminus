@@ -11,8 +11,10 @@ test("si te necesita, la línea 2 es lo que pide", () => {
   assert.equal(card.request, "¿Borro la rama?");
 });
 
-test("si no, carpeta, agente y máquina; el chat del agente no repite su cara", () => {
-  const card = taskCard({ ...row, machine: "Mac", machine_on: false }, { live: ["t1"], approving: [] });
+test("si no, proveedor, carpeta, máquina y agente; el chat del agente no repite su cara", () => {
+  const card = taskCard({ ...row, provider: "claude", machine: "Mac", machine_on: false }, { live: ["t1"], approving: [] });
+  assert.equal(card.provider, "claude");
+  assert.equal(taskCard(row, { live: [], approving: [] }).machine, null);
   assert.equal(card.state, "working");
   assert.equal(card.request, null);
   assert.equal(card.folder, "p1");

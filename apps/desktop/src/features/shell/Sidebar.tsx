@@ -51,6 +51,7 @@ import {
 } from "../../lib/sidebarView";
 import type { DockAgent } from "./dockLayout";
 import { flattenTasks, folderCounts } from "./sidebarTasks";
+import { machineName, machines } from "../machines/store";
 
 // Fuera de la carga inicial: el botón y el dock llegan un instante después de la lista.
 const SidebarFilter = lazy(() => import("./SidebarFilter").then((m) => ({ default: m.SidebarFilter })));
@@ -223,6 +224,7 @@ export default function Sidebar(props: {
 
   const todas = createMemo(() => flattenTasks(props.sessions, !!query()));
   const cuentas = createMemo(() => folderCounts(todas()));
+  const variasMaquinas = () => machines().length > 1 || todas().some((x) => !!x.row.machine);
   /**
    * La vista que se aplica: de las carpetas elegidas, las que siguen teniendo
    * tareas. Si ninguna sigue, son todas: un filtro que deja la lista vacía sin
@@ -449,7 +451,7 @@ export default function Sidebar(props: {
   const Grupo = (p: { grupo: SidebarGroup<SessionRow> }) => {
     const g = () => p.grupo;
     const clave = () => g().kind === "section" ? g().key : `${g().kind}:${g().key}`;
-    const titulo = () => groupLabel(g(), (id) => nombreDe(id) ?? id);
+    const titulo = () => groupLabel(g(), (id) => nombreDe(id) ?? id, (id) => machineName(id));
     const proyecto = () => g().kind === "folder" ? props.projects.find((x) => x.id === g().key) : undefined;
     const abierto = () => !!query() || g().kind !== "folder" || !cerrados().includes(g().key);
     const necesita = () => g().kind === "status" && ["approving", "asked", "failed"].includes(g().key);
@@ -662,6 +664,7 @@ export default function Sidebar(props: {
                   onChange={cambiarVista}
                   folders={carpetasDelFiltro()}
                   agents={agentesDelFiltro()}
+                  machines={variasMaquinas()}
                 />
               </Suspense>
             </div>

@@ -14,7 +14,7 @@ export type SidebarView = {
   density: SidebarDensity;
 };
 
-export type SidebarGrouping = "none" | "folder" | "status" | "agent";
+export type SidebarGrouping = "none" | "folder" | "status" | "agent" | "machine";
 export type SidebarDensity = "comfortable" | "compact";
 export type SidebarSection = "active";
 
@@ -25,7 +25,7 @@ export const DEFAULT_SIDEBAR_VIEW: SidebarView = {
   density: "comfortable",
 };
 
-export const GROUPINGS: readonly SidebarGrouping[] = ["none", "folder", "status", "agent"];
+export const GROUPINGS: readonly SidebarGrouping[] = ["none", "folder", "status", "agent", "machine"];
 export const DENSITIES: readonly SidebarDensity[] = ["comfortable", "compact"];
 
 /** Lo que la lista sabe de una fila (`SessionRow`) y basta para colocarla. */
@@ -33,6 +33,8 @@ export type SidebarTask = {
   id: string;
   folder?: string | null;
   agent?: string | null;
+  /** La máquina que la corre si no es la de la ventana; sin ella, es de esta. */
+  machine?: string | null;
   pinned?: boolean | null;
   chat_de_agente?: boolean;
   inbox?: boolean;
@@ -54,8 +56,8 @@ export type SidebarContext<T extends SidebarTask = SidebarTask> = {
 };
 
 export type SidebarGroup<T> = {
-  kind: "section" | "folder" | "status" | "agent";
-  /** Sección, id de carpeta, estado o nombre de agente; `""` es sin carpeta o sin agente. */
+  kind: "section" | "folder" | "status" | "agent" | "machine";
+  /** Sección, id de carpeta, estado, nombre de agente o máquina; `""` es sin carpeta, sin agente o esta máquina. */
   key: string;
   tasks: T[];
 };
@@ -180,6 +182,10 @@ export function applySidebarView<T extends SidebarTask>(
   if (view.group === "status") {
     groups = groupBy(visible, (task) => statusKeyOf(task, ctx));
     order = [...TASK_STATES, "idle", "finished"];
+  } else if (view.group === "machine") {
+    // Esta máquina primero; las demás, en el orden en que aparece su tarea más nueva.
+    groups = groupBy(visible, (task) => task.machine ?? "");
+    order = ["", ...[...groups.keys()].filter((key) => key !== "")];
   } else {
     // Un agente con otra mayúscula cae en el mismo grupo, con el nombre de su tarea más nueva.
     const spelling = new Map<string, string>();

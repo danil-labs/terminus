@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { DEFAULT_SIDEBAR_VIEW, agentOptions, applySidebarView } from "../src/index.ts";
+import { DEFAULT_SIDEBAR_VIEW, agentOptions, applySidebarView, groupLabel } from "../src/index.ts";
 
 const task = (id: string, agent: string | null, extra: object = {}) => ({ id, agent, esperando: false, ...extra });
 const ctx = { live: [], approving: [] };
@@ -27,4 +27,12 @@ test("filtrar y agrupar por agente no distinguen mayúsculas", () => {
   assert.deepEqual(filtered[0].tasks.map((t) => t.id), ["t1", "t2"]);
   const grouped = applySidebarView(tasks, { ...DEFAULT_SIDEBAR_VIEW, group: "agent" }, ctx);
   assert.deepEqual(grouped.map((g) => [g.key, g.tasks.length]), [["Cottonmouth", 2], ["bill", 1]]);
+});
+
+test("por máquina, la de la ventana primero y las demás por su tarea más nueva", () => {
+  const tasks = [task("t1", null, { machine: "vm-2" }), task("t2", null), task("t3", null, { machine: "vm-1" }), task("t4", null, { machine: "vm-2" })];
+  const grouped = applySidebarView(tasks, { ...DEFAULT_SIDEBAR_VIEW, group: "machine" }, ctx);
+  assert.deepEqual(grouped.map((g) => [g.key, g.tasks.map((t) => t.id)]), [["", ["t2"]], ["vm-2", ["t1", "t4"]], ["vm-1", ["t3"]]]);
+  assert.equal(groupLabel("es", grouped[0], (id) => id), "Esta máquina");
+  assert.equal(groupLabel("es", grouped[1], (id) => id, (id) => id.toUpperCase()), "VM-2");
 });

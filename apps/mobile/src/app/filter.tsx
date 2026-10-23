@@ -90,7 +90,7 @@ export default function Filter() {
 
       <View style={[styles.rule, { backgroundColor: theme.border }]} />
       <Title>{w("shell.sidebar.view.group")}</Title>
-      {GROUPINGS.map((g) => (
+      {GROUPINGS.filter((g) => g !== "machine" || view.group === g || tasks.some((task) => !!task.machine)).map((g) => (
         <Option key={g} testID={`filter-group-${g}`} on={view.group === g} onPress={() => set({ group: g })} aside={g === DEFAULT_SIDEBAR_VIEW.group ? w("shell.sidebar.view.default") : undefined}>
           {text(groupingLabel(lang, g))}
         </Option>
