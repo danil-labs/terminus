@@ -66,6 +66,8 @@ export type CarryCheck = {
 };
 
 const KEYS = "machines.carry_keys";
+/** Por qué la máquina de destino no contestó (`router.ts`): apagada, sin poder encenderla o sin llegar a tiempo. */
+const NOT_STARTED = new Set(["start_failed", "machine_off", "machine_timeout"]);
 const pinned = () => leerPref<Record<string, string>>(KEYS, {});
 
 /** Fija la llave de una máquina: la primera vez sola (TOFU), después al pulsar «Confiar en la nueva llave». */
@@ -78,7 +80,14 @@ export function trustKey(machine: string, key: string) {
  * escritorio: siempre se sella para el motor de destino, `.env` incluidos.
  */
 async function keyFor(target: string): Promise<{ recipientKey: string | null; keyChanged: boolean }> {
-  const key = await engine.key(target).then((k) => k.publicKey).catch(() => null);
+  const key = await engine
+    .key(target)
+    .then((k) => k.publicKey)
+    .catch((error) => {
+      // Que no encendiera no es un motor sin `work_key`: la persona lo ve y el mensaje espera.
+      if (NOT_STARTED.has((error as { detail?: unknown } | null)?.detail as string)) throw error;
+      return null;
+    });
   if (!key) return { recipientKey: null, keyChanged: false };
   const verdict = keyVerdict(pinned()[target], key);
   if (verdict === "new") trustKey(target, key);

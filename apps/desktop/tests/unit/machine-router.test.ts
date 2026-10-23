@@ -7,7 +7,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { isDeferrable } from "@terminus/computers";
-import { Fleet, type Link, type MachineInfo } from "@terminus/fleet";
+import { Fleet, type Link, type MachineInfo, classOf } from "@terminus/fleet";
 import "../helpers/catalog.ts";
 import { createRouter } from "../../src/features/machines/router.ts";
 
@@ -308,4 +308,100 @@ test("archiving or deleting a task of an off machine (Mac or VM) is queued by th
   assert.ok(changes.flat().includes("sessions"), "the task list reads again");
   // Lo que corre un agente sigue diciendo que la Mac está apagada.
   await assert.rejects(router.handle("send_message", { project: "p1", session: "cmp_mac~t1", prompt: "hola" }, on("cmp_mac")), (e: { detail: string }) => e.detail === "machine_off");
+});
+
+/**
+ * Una VM apagada que enciende de verdad: el plano de control (`wake`) la pone
+ * `starting` y luego `online`; mientras, como el relay, una intención espera
+ * guardada y se entrega una vez al conectar, y cualquier otra acción contesta `machine_off`.
+ */
+function bootingVm(answers: Record<string, unknown>, starts: (() => boolean) = () => true) {
+  let state: "stopped" | "starting" | "online" = "stopped";
+  const listeners = new Set<(s: string) => void>();
+  const delivered: Call[] = [];
+  const waiting: (() => void)[] = [];
+  const set = (next: typeof state) => {
+    state = next;
+    for (const l of [...listeners]) l(next);
+    if (next === "online") for (const deliver of waiting.splice(0)) deliver();
+  };
+  const woken: string[] = [];
+  const link: Link = {
+    state: () => state,
+    call(id, command, workspace, _folder, args) {
+      return new Promise((resolve, reject) => {
+        const deliver = () => {
+          delivered.push({ id, command, workspace, args: args as Args });
+          resolve({ value: answers[command] ?? null, cached: null });
+        };
+        if (state === "online") return deliver();
+        if (classOf(command) === "intent") {
+          waiting.push(deliver);
+          if (state === "stopped") {
+            set("starting");
+            setTimeout(() => set("online"), 20);
+          }
+          return;
+        }
+        reject({ code: "machine_off" });
+      });
+    },
+    onState: (l) => {
+      listeners.add(l as (s: string) => void);
+      return () => listeners.delete(l as (s: string) => void);
+    },
+    onEvents: () => () => {},
+    subscribe() {},
+    start() {},
+    close() {},
+  };
+  const wake = async (machine: string) => {
+    woken.push(machine);
+    if (!starts()) return false;
+    set("starting");
+    setTimeout(() => set("online"), 20);
+    return true;
+  };
+  return { link, wake, woken, delivered };
+}
+
+function bootSetup(vm: ReturnType<typeof bootingVm>) {
+  const fleet = new Fleet({ self: "cmp_home", connect: () => vm.link, wake: vm.wake, deadlines: { read: 40, action: 200, intent: 400 } });
+  const router = createRouter({
+    self: "cmp_home",
+    fleet,
+    native: async (command) => (command === "list_workspaces" ? { workspaces: [{ id: "w", name: "W" }], active: "w" } : null),
+  });
+  fleet.setMachines([VM]);
+  return router;
+}
+
+test("a new task on an off VM: the carry key wakes it once through the control plane, and the first message is delivered exactly once there", async () => {
+  const vm = bootingVm({ work_key: { publicKey: "k" }, send_message: "t9" });
+  const router = bootSetup(vm);
+  await router.handle("list_workspaces");
+  // Antes del primer mensaje en otra máquina el escritorio pide la llave del destino: es una acción, no una intención.
+  assert.deepEqual(await router.handle("work_key", {}, on("cmp_vm")), { publicKey: "k" });
+  assert.deepEqual(vm.woken, ["cmp_vm"], "the control plane is asked to start it, once");
+  const task = await router.handle("send_message", { provider: "claude", project: "p1", session: null, prompt: "hola" }, on("cmp_vm"));
+  assert.equal(task, "cmp_vm~t9");
+  assert.deepEqual(vm.delivered.map((c) => c.command), ["work_key", "send_message"], "each one reaches the engine once");
+  assert.deepEqual(vm.woken, ["cmp_vm"], "an awake VM is not started again");
+});
+
+test("an off VM that is only sent a message is started by the relay: no control-plane call, delivered once when it connects", async () => {
+  const vm = bootingVm({ send_message: "t9" });
+  const router = bootSetup(vm);
+  await router.handle("list_workspaces");
+  assert.equal(await router.handle("send_message", { provider: "claude", project: "p1", session: null, prompt: "hola" }, on("cmp_vm")), "cmp_vm~t9");
+  assert.deepEqual(vm.woken, []);
+  assert.equal(vm.delivered.filter((c) => c.command === "send_message").length, 1);
+});
+
+test("when the control plane refuses to start the VM (the 401 of 2026-10-23) the window says it could not start, and nothing is sent", async () => {
+  const vm = bootingVm({ work_key: { publicKey: "k" } }, () => false);
+  const router = bootSetup(vm);
+  await router.handle("list_workspaces");
+  await assert.rejects(router.handle("work_key", {}, on("cmp_vm")), (e: { detail: string }) => e.detail === "start_failed");
+  assert.deepEqual(vm.delivered, []);
 });
