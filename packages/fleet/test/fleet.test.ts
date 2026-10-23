@@ -205,6 +205,7 @@ test("a VM off answers from the relay's copy with its time; a copy kept here sur
   assert.deepEqual(kept?.value, [row("t1")]);
   const again = await later.fleet.read({ machine: "cmp_vm", workspace: "w", command: "list_live_sessions", args: { project: "p1" } });
   assert.deepEqual([again.status, again.value], ["cached", [row("t1")]], "machine_off keeps the copy instead of emptying it");
+  assert.equal(later.link("cmp_vm").calls.length, 0, "a machine off with a copy here is not asked: nothing to wait for");
 });
 
 test("merged rows say their machine and the state of its slice; the window's rows stay as they are", async () => {

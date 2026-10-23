@@ -78,6 +78,9 @@ export function conservarPorElFinal<T>(previous: T[], incoming: T[]): T[] {
   return kept.length === previous.length && kept.every((row, i) => row === previous[i]) ? previous : kept;
 }
 
+/** Lo más que espera la barra a la lectura de una carpeta. */
+export const READ_TIMEOUT = 20_000;
+
 // Descartar una respuesta cuando salió otra después deja la lista vacía si esa
 // otra no vuelve; pintar vacío ante un fallo esconde las tareas hasta el
 // siguiente aviso.
@@ -91,6 +94,12 @@ export function sessionRefresh<T>(options: {
   cancel?: (handle: unknown) => void;
   /** Cuánto espera `gathered` a juntar en una sola lectura los avisos que llegan seguidos. */
   gather?: number;
+  /**
+   * El tope de la lectura de una carpeta. La que no vuelve a tiempo cuenta como
+   * fallida —se queda lo que había y se reintenta—: una carpeta colgada no
+   * congela la barra entera.
+   */
+  timeout?: number;
 }) {
   const schedule = options.schedule ?? ((run, ms) => setTimeout(run, ms));
   const cancel = options.cancel ?? ((handle) => clearTimeout(handle as ReturnType<typeof setTimeout>));
@@ -110,11 +119,18 @@ export function sessionRefresh<T>(options: {
   async function refresh(projects: string[]): Promise<void> {
     const current = generation;
     const request = ++started;
+    const timeout = options.timeout ?? READ_TIMEOUT;
     const results = await Promise.all(projects.map(async (project) => {
+      let handle: ReturnType<typeof setTimeout> | undefined;
       try {
-        return [project, await options.read(project)] as const;
+        const late = new Promise<null>((done) => {
+          handle = setTimeout(() => done(null), timeout);
+        });
+        return [project, await Promise.race([options.read(project), late])] as const;
       } catch {
         return [project, null] as const;
+      } finally {
+        clearTimeout(handle);
       }
     }));
     if (current !== generation || request < applied) return;

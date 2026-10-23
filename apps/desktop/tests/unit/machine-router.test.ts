@@ -115,6 +115,26 @@ test("a workspace only other machines have, with nobody answering, is a named er
   assert.ok(Date.now() - started < 1_000, "bounded");
 });
 
+test("a workspace only other machines have answers at once from their last slice, and reads again behind", async () => {
+  let title = "vieja";
+  let slow = false;
+  const vm = fakeLink({ list_live_sessions: () => (slow ? new Promise(() => {}) : [row("t1", title)]) });
+  const { router, fleet } = setup({ cmp_vm: vm });
+  fleet.setRegistry([{ id: "w2", name: "Producto", projects: [], computers: ["cmp_vm"] }]);
+  await router.handle("list_workspaces");
+  await router.handle("set_active_workspace", { id: "w2" });
+  const first = (await router.handle("list_live_sessions", { project: "p1" })) as { title: string }[];
+  assert.deepEqual(first.map((r) => r.title), ["vieja"], "with nothing kept, the first read waits for the VM");
+  await sleep(1_600);
+  title = "nueva";
+  slow = true;
+  const started = Date.now();
+  const again = (await router.handle("list_live_sessions", { project: "p1" })) as { title: string }[];
+  assert.ok(Date.now() - started < 30, "with a slice kept, nothing waits on the VM");
+  assert.deepEqual(again.map((r) => r.title), ["vieja"]);
+  assert.equal(vm.calls.length, 2, "and the VM is asked again behind");
+});
+
 test("the account and danil_* always stay on this computer, whatever the header says", async () => {
   const vm = fakeLink({ danil_sessions: [{ account: "x" }], list_accounts: { accounts: [{ id: "a" }] } });
   const { router, native } = setup({ cmp_vm: vm });
