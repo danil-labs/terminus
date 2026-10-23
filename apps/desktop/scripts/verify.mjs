@@ -564,6 +564,7 @@ const steps = [
   ["La flota: la máquina sale del sobre, toda espera tiene tope y nadie contestando no es una lista vacía", process.execPath, ["--test", "--experimental-strip-types", join(root, "../../packages/fleet/test/fleet.test.ts")], root],
   ["Danil Computers: sesión con contratos, renovación del token, motor y lápidas", process.execPath, ["--test", "--experimental-strip-types", join(root, "../../packages/computers/test/computers.test.ts")], root],
   ["Con la cuenta de Danil lo de esta computadora va nativo y primero; las otras suman su rebanada", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/machine-router.test.ts")], root],
+  ["Una tarea de otra máquina se ve en el escritorio aunque su space sea de esa máquina", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/spaces-remote-task.test.ts")], root],
   ["Con la cuenta de Danil el escritorio junta las tareas de todas sus computadoras", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/desktop-account-machines.test.mjs")], root],
   ["Sin el stream empujado la ventana sondea como siempre", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/push-fallback.test.mjs")], root],
   ["Una respuesta con visual no desaparece del chat aunque el turno no se guarde o el visual no se lea", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/chat-turn-unsaved.test.mjs")], root],
