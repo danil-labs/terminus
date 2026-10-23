@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { comoEntra, decidir } from "../../src/features/code/refresh.ts";
+import { comoEntra, decidir, esBorrado, idos } from "../../src/features/code/refresh.ts";
 
 /**
  * **Las dos decisiones de editar el mismo árbol que el agente.**
@@ -71,4 +71,18 @@ test("el turno de otra tarea no la hace leer ni la deja apuntada", () => {
     decidir({ mio: false, visible: true, pendiente: false }, "aviso"),
     { pendiente: false, refrescar: false },
   );
+});
+
+test("lo que el árbol deja de listar es lo que se fue, nunca en la primera lectura", () => {
+  assert.deepEqual(idos([], ["a.typ"]), []);
+  assert.deepEqual(idos(["main.typ", "secciones/01.typ", "refs.bib"], ["secciones/01.typ", "nuevo.typ"]), [
+    "main.typ",
+    "refs.bib",
+  ]);
+});
+
+test("solo la frase del motor de «ya no está» cuenta como borrado", () => {
+  assert.equal(esBorrado({ what: { clave: "development.error.open_gone" }, detail: "no está en el disco: main.typ" }), true);
+  assert.equal(esBorrado({ what: "git no pudo completar la operación sobre la copia de trabajo.", detail: "show" }), false);
+  assert.equal(esBorrado(new Error("x")), false);
 });
