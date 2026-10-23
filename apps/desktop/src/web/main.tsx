@@ -5,7 +5,7 @@
  * that sets `window.terminusWeb` before this module loads can replace any
  * setting, or give `getToken` with `computerId` or `computers` and skip the session.
  */
-import { linkedWorkspaces, listWorkspaces, screenProtocols, screenUrl } from "@terminus/computers";
+import { linkedWorkspaces, listComputers, listWorkspaces, screenProtocols, screenUrl } from "@terminus/computers";
 import { chosenWebLayout, MOBILE_WEB_DIR } from "@terminus/design";
 import { createSignal, lazy, Suspense } from "solid-js";
 import { t } from "../lib/i18n";
@@ -86,6 +86,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
     browserFiles: true,
     sidebarExtra: () => <HomeLink />,
     accountProfile: webAccountProfile(base.endpoint, base.getToken, base.onUnauthorized),
+    accountMemory: { endpoint: base.endpoint, getToken: async () => base.getToken() },
     machineName: (id) => transport.fleet.name(id),
     windowMachine: () => {
       const first = transport.fleet.machines[0];
@@ -106,6 +107,12 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
           </Suspense>
         )
       : undefined,
+    connectMachine: {
+      list: async () => listComputers(base.endpoint, await base.getToken()),
+      outdated: (c) => machineCompatibility(c.contract) === "outdated",
+      // Esta página arma un relay por computadora al cargar: la nueva entra recargando.
+      onReady: () => window.location.reload(),
+    },
     accountMachines: multi
       ? (props) => (
           <Suspense fallback={null}>

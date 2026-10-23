@@ -12,6 +12,7 @@ import {
   type CarryEngine,
   type CarryProgress,
   CarryError,
+  PART_ATTEMPTS,
   cancelCarry,
   carryWork,
   initialSelection,
@@ -50,7 +51,7 @@ const status = (extra: Partial<WorkStatus> = {}): WorkStatus => ({
 type Machine = { transfers: Map<string, Buffer>; projects: Set<string>; calls: string[]; missingBase?: boolean };
 
 /** Dos motores en memoria con las reglas del contrato: partes idempotentes por offset, sha256 al importar. */
-function fakeEngines(payload: Buffer, opts: { failWriteAt?: number[]; tooLarge?: boolean } = {}) {
+function fakeEngines(payload: Buffer, opts: { failWriteAt?: number[]; failWith?: string; tooLarge?: boolean } = {}) {
   const machines: Record<string, Machine> = {
     mac: { transfers: new Map(), projects: new Set(["p1"]), calls: [] },
     vm: { transfers: new Map(), projects: new Set(["p1"]), calls: [] },
@@ -81,7 +82,7 @@ function fakeEngines(payload: Buffer, opts: { failWriteAt?: number[]; tooLarge?:
     async writePart(machine, { transfer, offset, data }) {
       if (failWriteAt[0] === offset) {
         failWriteAt.shift();
-        throw { what: { clave: "shell.service.unreachable" }, detail: "io" };
+        throw { what: { clave: "shell.service.unreachable" }, detail: opts.failWith ?? "io" };
       }
       machines[machine].calls.push(`write@${offset}`);
       const bytes = Buffer.from(data, "base64");
@@ -157,8 +158,23 @@ test("copia por partes y la tarea nace en la foto, con el mismo contenido en las
   assert.equal(seen.find((p) => p.step === "copy" && p.bytes > 0)?.parts, 3);
 });
 
+test("el relay perdió el conector en una parte: se repite esa parte sola y la copia sigue", async () => {
+  const { engine, machines } = fakeEngines(payload, { failWriteAt: [PART], failWith: "machine_lost" });
+  const result = await carryWork(engine, job(), newState("op-lost"), {});
+  assert.equal(result.baseRef, "w1");
+  assert.deepEqual(machines.vm.calls.filter((c) => c.startsWith("write@")), ["write@0", `write@${PART}`, `write@${2 * PART}`]);
+  assert.ok(machines.vm.transfers.get("t-op-lost")?.equals(payload));
+});
+
+test("una parte que falla con un error del motor no se repite sola", async () => {
+  const { engine, machines } = fakeEngines(payload, { failWriteAt: [PART], failWith: "work.error.storage" });
+  await assert.rejects(carryWork(engine, job(), newState("op-engine"), {}), (e: unknown) => e instanceof CarryError && e.failure.code === "interrupted");
+  assert.deepEqual(machines.vm.calls.filter((c) => c.startsWith("write@")), ["write@0"]);
+});
+
 test("se cortó la copia: dice en qué parte y reintentar sigue desde ahí sin volver a exportar", async () => {
-  const { engine, machines } = fakeEngines(payload, { failWriteAt: [PART] });
+  // Tantas veces seguidas como intentos tiene una parte: ya no es un tropiezo del camino.
+  const { engine, machines } = fakeEngines(payload, { failWriteAt: Array(PART_ATTEMPTS).fill(PART), failWith: "machine_timeout" });
   const state = newState("op2");
   await assert.rejects(carryWork(engine, job(), state, {}), (e: unknown) => {
     assert.ok(e instanceof CarryError);

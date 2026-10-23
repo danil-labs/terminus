@@ -23,7 +23,7 @@ import { Toggle } from "../../ui/Toggle";
 import { copyText } from "../../lib/clipboard";
 import { df, elapsed, peso } from "../../lib/format";
 import { t } from "../../lib/i18n";
-import { type CarryCheck, bytesPerSecond, createsProject, engine, ignoredAllowed, jobFor, partSize, trustKey, viaSsh } from "./carry";
+import { type CarryCheck, bytesPerSecond, createsProject, engine, ignoredAllowed, jobFor, partSize, trustKey } from "./carry";
 import { machineName } from "./store";
 
 /** Lo que se pide al exportar mientras la persona decide; se rehace al cambiar la selección. */
@@ -254,11 +254,7 @@ export default function CarrySheet(props: {
             </Show>
             <p class="m-0">{t("work.carry.taken_at", { time: df({ hour: "2-digit", minute: "2-digit" }).format(takenAtMs(s())) })}</p>
           </Show>
-          <Show when={props.check.recipientKey} fallback={
-            <Show when={viaSsh() && selection().files.length}>
-              <p class="m-0 flex items-center gap-1"><Lock size={12} aria-hidden="true" />{t("work.carry.ssh")}</p>
-            </Show>
-          }>
+          <Show when={props.check.recipientKey}>
             <p class="m-0 flex items-center gap-1" data-carry-sealed><Lock size={12} aria-hidden="true" />{t("work.carry.sealed", { machine: target() })}</p>
           </Show>
           <Show when={keyChanged()}>

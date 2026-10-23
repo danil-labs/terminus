@@ -96,6 +96,8 @@ export const INTENT_COMMANDS: ReadonlySet<string> = new Set([
   // Las partes nunca: su contenido no puede quedar guardado en `pending:`.
   "work_import",
   "work_cancel",
+  // Exportar despierta la de origen al traer de vuelta (computers#16): 330 s, como cualquier intención.
+  "work_export",
 ]);
 
 /** Lecturas que el relay guarda y contesta desde su copia (`MIRROR_COMMANDS` de `computers/src/mirror.ts`). */

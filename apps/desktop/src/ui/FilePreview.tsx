@@ -1,5 +1,5 @@
 import { Match, Show, Suspense, Switch, createResource, createSignal, lazy, onCleanup, onMount } from "solid-js";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../lib/invoke";
 import FileIcon from "lucide-solid/icons/file";
 import FileText from "lucide-solid/icons/file-text";
 import FileSpreadsheet from "lucide-solid/icons/file-spreadsheet";
