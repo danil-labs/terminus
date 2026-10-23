@@ -5,7 +5,7 @@
  * `service_poll` reads the `subscribe` feeds; window-only commands and plugins
  * answer from the browser or refuse with a sentence the interface already knows.
  */
-import { type AccountWorkspace, INTENT_COMMANDS, callWorkspace } from "@terminus/computers";
+import { type AccountWorkspace, INTENT_COMMANDS, callWorkspace, isDeferrable } from "@terminus/computers";
 import { t } from "../lib/i18n";
 import { leerPref } from "../lib/prefs";
 import { deliver } from "../lib/serviceEvents.ts";
@@ -43,7 +43,14 @@ export type MachineLink = { info: MachineInfo; relay: RelayLike; onSync?: SyncLi
 export type RegistrySource = () => Promise<AccountWorkspace[] | null>;
 
 /** What the transport uses of a relay session (`./relay` or `@terminus/computers`). */
-export type RelayLike = Pick<RelaySession, "state" | "connected" | "onState" | "onEvents" | "onLink" | "call" | "subscribe">;
+export type RelayLike = Pick<RelaySession, "state" | "connected" | "onState" | "onEvents" | "onLink" | "call" | "subscribe"> & Partial<Pick<RelaySession, "onDeferred">>;
+
+/**
+ * Lo que el relay guarda con la máquina apagada y aplica al conectarse, sin
+ * encenderla (`computers/src/deferred.ts`). Mover de space no: en la web aún no
+ * se sabe si el space es de la cuenta, y ese no entra a la cola.
+ */
+const DEFERS = (command: string) => isDeferrable(command) && command !== "move_task_to_space";
 
 /**
  * The desktop's own engine, reached through the window's native IPC: its ids
@@ -215,6 +222,8 @@ function createLink(relay: RelayLike, computerId: string, onSync: SyncListener, 
     onSync(null);
   });
   relay.onLink(wake);
+  // La cola de aplazadas cambió: la lista se relee (la copia del relay ya la refleja).
+  relay.onDeferred?.(() => window.dispatchEvent(new CustomEvent("harness:machine-slices", { detail: { changes: ["sessions", "spaces"] } })));
 
   const reads = new ReadCache(computerId);
 
@@ -244,7 +253,7 @@ function createLink(relay: RelayLike, computerId: string, onSync: SyncListener, 
     };
     for (;;) {
       // A read still asks: the relay may answer it from its own copy.
-      if (waits && !key && OFF.includes(relay.state())) {
+      if (waits && !key && !DEFERS(command) && OFF.includes(relay.state())) {
         const answer = await offline();
         if (answer) return answer.value;
         continue;
@@ -405,7 +414,9 @@ export function createWebTransport(
     args = withoutChannel(command, args);
     const l = link(machine);
     const asleep = !fleet.info(machine)?.wakes && OFF.includes(l.relay.state());
-    if (asleep && !READ.test(command)) throw off(machine);
+    // Apagada no hay turnos ni árbol que revisar: archivar sigue y se aplaza.
+    if (command === "task_blockers" && OFF.includes(l.relay.state())) return { unsaved: [], not_finished: false };
+    if (asleep && !READ.test(command) && !DEFERS(command)) throw off(machine);
     const settles = command in ASLEEP_EMPTY && fleet.inRegistry(workspace);
     try {
       const value = await l.send(command, callWorkspace(workspace, args), args, !asleep && !settles);

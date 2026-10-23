@@ -5,6 +5,8 @@
  *
  * - La máquina sale solo del sobre; los argumentos nunca la eligen (`ids.ts`).
  * - Toda espera tiene tope (`deadlines.ts`) y un solo reintento.
+ * - Una acción ligera (`isDeferrable`) a una máquina apagada no la enciende ni
+ *   falla: el relay la guarda y la aplica al conectarse; la lista la refleja.
  * - Los miembros de un workspace salen del registro de la cuenta, no de la
  *   última respuesta.
  * - Altas, bajas y renombres de máquinas se aplican en vivo, sin cerrar las demás.
@@ -12,7 +14,7 @@
  * La máquina de la ventana no pasa por aquí: quien la tiene la lee nativa y
  * suma su rebanada con `merge`.
  */
-import { type AccountWorkspace, type Blocked, type CallResult, type EngineInfo, type EventsPage, type MachineState, cachedAt, callWorkspace, linkedAttention, linkedEvents, linkedListing, requestId } from "../../computers/src/index.ts";
+import { type AccountWorkspace, type Blocked, type CallResult, type DeferredFrame, type EngineInfo, type EventsPage, type MachineState, cachedAt, callWorkspace, isDeferrable, linkedAttention, linkedEvents, linkedListing, requestId } from "../../computers/src/index.ts";
 import { DEADLINES, type Deadlines, classOf } from "./deadlines.ts";
 import { FleetError, fromRelay } from "./errors.ts";
 import { argsFor } from "./ids.ts";
@@ -42,6 +44,9 @@ export type Link = {
   blocked?(): Blocked | null;
   onBlocked?(listener: (blocked: Blocked | null) => void): () => void;
   retry?(): void;
+  /** Cada cambio de la cola de acciones aplazadas de la máquina; una sesión de antes no lo tiene. */
+  onDeferred?(listener: (frame: DeferredFrame) => void): () => void;
+  deferred?(): DeferredFrame;
 };
 
 export type FleetEvent = { name: string; payload: unknown };
@@ -60,6 +65,8 @@ export type FleetConfig = {
   onChange?(machine: string): void;
   /** Eventos de otra máquina, ya con los ids del panel. `gap`: se perdieron algunos y hay que releer. */
   onEvents?(machine: string, events: FleetEvent[], gap: boolean): void;
+  /** Cambió la cola de acciones aplazadas de `machine` (se encoló o se aplicó una): la lista se relee. */
+  onDeferred?(machine: string, frame: DeferredFrame): void;
 };
 
 const OFF: readonly MachineState[] = ["offline", "stopped", "provisioning"];
@@ -71,8 +78,10 @@ const RETRY_READ = new Set(["machine_lost", "machine_timeout", "io"]);
 /**
  * `outdated`: el relay contestó `version_mismatch`. `engine`: lo que dijo el último
  * `hello` (`true` compatible), que manda sobre el contrato que listó el plano de control.
+ * `fresh`: con la cola de aplazadas cambiada (`null` si no cambió), las lecturas que ya
+ * se volvieron a pedir al relay; las demás no salen de la última rebanada guardada.
  */
-type Member = { info: MachineInfo; link: Link; stops: (() => void)[]; was: MachineState; outdated: boolean; engine: boolean | null };
+type Member = { info: MachineInfo; link: Link; stops: (() => void)[]; was: MachineState; outdated: boolean; engine: boolean | null; fresh: Set<string> | null };
 
 export class Fleet {
   readonly self: string | null;
@@ -237,8 +246,9 @@ export class Fleet {
 
   /**
    * Una llamada a otra máquina. Una lectura con la máquina apagada contesta la
-   * copia del relay o `machine_off`; una acción a una apagada la enciende antes
-   * si se puede, o falla con `machine_off` (con `canWake`) sin esperar.
+   * copia del relay o `machine_off`; una acción ligera (`isDeferrable`) la guarda
+   * el relay sin encenderla; otra acción a una apagada la enciende antes si se
+   * puede, o falla con `machine_off` (con `canWake`) sin esperar.
    */
   async call(envelope: Envelope): Promise<unknown> {
     const { machine, command } = envelope;
@@ -283,6 +293,11 @@ export class Fleet {
     if (member.link.state() === "online") return;
     if (!member.info.wakes) throw new FleetError("machine_off", machine, null, false);
     await this.wakeMember(member);
+  }
+
+  /** Las acciones aplazadas de `machine` que esperan a que se conecte. */
+  deferred(machine: string): DeferredFrame["actions"] {
+    return this.members.get(machine)?.link.deferred?.().actions ?? [];
   }
 
   /** Por qué está detenida la sesión con `machine` (`license_required`), o `null`. */
@@ -332,12 +347,15 @@ export class Fleet {
       before?.has ? { ...before, status, error } : { machine, status, has: false, value: null, at: null, error };
     // Una máquina apagada no contesta: su última rebanada es la respuesta, sin salir a la red.
     const member = this.members.get(machine);
-    if (before?.has && member && classOf(envelope.command) === "read" && OFF.includes(member.link.state())) return { ...before, status: "cached", error: "machine_off" };
+    // Salvo si cambió la cola de aplazadas: la copia del relay ya la refleja y la de aquí no.
+    const settled = !member?.fresh || member.fresh.has(key);
+    if (before?.has && member && settled && classOf(envelope.command) === "read" && OFF.includes(member.link.state())) return { ...before, status: "cached", error: "machine_off" };
     let slice: Slice;
     try {
       const { value, cached } = await this.send(envelope);
       const at = cachedAt(cached);
       slice = { machine, status: cached ? "cached" : "ok", has: true, value, at: at ?? Date.now() };
+      member?.fresh?.add(key);
     } catch (error) {
       const e = fromRelay(error, machine);
       if (e.code === "cross_machine" || e.code === "unknown_machine") throw e;
@@ -362,7 +380,8 @@ export class Fleet {
     const kind = classOf(command);
     if (kind !== "read" && this.isOutdated(member)) throw new FleetError("version_mismatch", machine);
     const off = OFF.includes(member.link.state());
-    if (off && kind !== "read") {
+    // Archivar, borrar, renombrar, fijar o mover de space: el relay la guarda sin encenderla.
+    if (off && kind !== "read" && !this.defers(command, args)) {
       if (!member.info.wakes) throw new FleetError("machine_off", machine, null, false);
       // El relay enciende la VM solo con un intent; otra acción la enciende antes el plano de control.
       if (kind === "action") await this.wakeMember(member);
@@ -385,6 +404,16 @@ export class Fleet {
     };
     const result = await attempt(false);
     return { value: this.linkedOnly(member, command, result.value), cached: result.cached };
+  }
+
+  /**
+   * Si el relay guarda esta acción con la máquina apagada. Mover a un space de
+   * la cuenta no: ese space es de la cuenta (`share_space`), no de la cola de
+   * una máquina, y sigue el camino de cualquier acción.
+   */
+  private defers(command: string, args: Row): boolean {
+    if (!isDeferrable(command)) return false;
+    return !(command === "move_task_to_space" && typeof args.space === "string" && this.shared.has(args.space));
   }
 
   /** Enciende la VM y espera a que diga `online`, con el tope de un intent. */
@@ -425,7 +454,7 @@ export class Fleet {
 
   private add(info: MachineInfo) {
     const link = this.config.connect(info);
-    const member: Member = { info, link, stops: [], was: link.state(), outdated: false, engine: null };
+    const member: Member = { info, link, stops: [], was: link.state(), outdated: false, engine: null, fresh: null };
     member.stops.push(
       link.onState((state) => {
         if (OUTDATED.includes(state)) member.outdated = true;
@@ -443,6 +472,11 @@ export class Fleet {
         this.config.onChange?.(info.id);
       }) ?? (() => {}),
       link.onBlocked?.(() => this.config.onChange?.(info.id)) ?? (() => {}),
+      link.onDeferred?.((frame) => {
+        if (!frame.actions.length && !frame.done.length && !member.fresh) return;
+        member.fresh = new Set();
+        this.config.onDeferred?.(info.id, frame);
+      }) ?? (() => {}),
       link.onEvents((page) => {
         if (!this.listening || this.isOutdated(member)) return;
         const events = linkedEvents(page.events ?? [], member.info.linked ?? null).map((e) => ({ name: e.name, payload: encodeEvent(this.context(), info.id, e.name, e.payload) }));

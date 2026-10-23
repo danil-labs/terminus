@@ -461,7 +461,7 @@ export async function attentionOf(host: Host): Promise<WorkspaceAttention[]> {
 
 // --- Fijar y archivar (la vista previa) -----------------------------------------
 
-/** Fijar o desfijar, como la ventana (`set_session_pinned`). Enciende la VM si está apagada. */
+/** Fijar o desfijar, como la ventana (`set_session_pinned`). Con la máquina apagada, el relay lo aplaza. */
 export async function setPinned(host: Host, workspace: string, folder: string, id: string, pinned: boolean) {
   await host.call("set_session_pinned", workspace, { project: folder, id, pinned });
 }
@@ -469,10 +469,14 @@ export async function setPinned(host: Host, workspace: string, folder: string, i
 /**
  * Archivar, como «Archivar» de la tarjeta del escritorio: primero pregunta qué
  * lo impide (`task_blockers`); con cambios sin guardar no archiva y lo dice,
- * para decidir desde la ventana. Enciende la VM si está apagada.
+ * para decidir desde la ventana. Con la máquina apagada no la enciende: el
+ * relay guarda el archivado y lo aplica al conectarse.
  */
 export async function archiveTask(host: Host, workspace: string, folder: string, id: string): Promise<{ archived: true } | { blocked: TaskBlockers["unsaved"] }> {
-  await host.wake();
+  if (host.power() === "off") {
+    await host.call("set_task_archived", workspace, { project: folder, id, archived: true, space: null });
+    return { archived: true };
+  }
   const { value } = await host.call<TaskBlockers | null>("task_blockers", workspace, { project: folder, id, finish: false });
   const unsaved = value?.unsaved ?? [];
   if (unsaved.length) return { blocked: unsaved };

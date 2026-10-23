@@ -100,6 +100,22 @@ export const INTENT_COMMANDS: ReadonlySet<string> = new Set([
   "work_export",
 ]);
 
+/**
+ * Acciones ligeras que, con la máquina apagada (VM o propia), el relay guarda y
+ * aplica al volver a conectarse, sin encenderla (`DEFERRED_COMMANDS` de
+ * `computers/src/deferred.ts`; los `deferrable: true` de `commands.json`). La
+ * respuesta llega enseguida con `deferred.queued_at` y la lista ya lo refleja.
+ */
+export const DEFERRED_COMMANDS: ReadonlySet<string> = new Set([
+  "set_task_archived",
+  "delete_session",
+  "rename_session",
+  "set_session_pinned",
+  "move_task_to_space",
+]);
+
+export const isDeferrable = (command: string) => DEFERRED_COMMANDS.has(command);
+
 /** Lecturas que el relay guarda y contesta desde su copia (`MIRROR_COMMANDS` de `computers/src/mirror.ts`). */
 export const MIRROR_COMMANDS: ReadonlySet<string> = new Set([
   "workspaces_startup",

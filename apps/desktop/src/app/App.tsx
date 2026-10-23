@@ -904,7 +904,9 @@ export default function App() {
     try {
       // A la máquina de la tarea: el router comparte antes con la cuenta el
       // space de esta ventana y allá se crea con el mismo id.
-      const destino = await invoke<{ id: string; name: string | null }>("move_task_to_space", { project, id, space }, deLaTarea(id));
+      // Con la máquina de la tarea apagada el relay lo aplaza y no hay respuesta del motor: el space es el pedido.
+      const destino = (await invoke<{ id: string; name: string | null } | null>("move_task_to_space", { project, id, space }, deLaTarea(id)))
+        ?? spaces().find((i) => i.id === space) ?? null;
       await refreshSessions(grupos());
       setAviso({
         texto: t("spaces.move.toast", { name: spaceName(destino) }),

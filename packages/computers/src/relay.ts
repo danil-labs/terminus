@@ -40,7 +40,16 @@ export type RelayFailure = { code?: string; message_key?: string; detail?: unkno
 
 /** Una lectura que el relay contestó desde su copia con la computadora apagada. */
 export type Cached = { updated_at: string | number };
-export type CallResult = { value: unknown; cached: Cached | null };
+/** `deferred`: la máquina estaba apagada y el relay guardó la acción para aplicarla al conectarse. */
+export type CallResult = { value: unknown; cached: Cached | null; deferred?: { queued_at: string } | null };
+
+/** Una acción aplazada en la cola del relay (`{"type":"deferred"}`). */
+export type DeferredAction = { id: string; command: string; workspace: string | null; folder: string | null; args: unknown; queued_at: string };
+/**
+ * La cola de la máquina para esta persona, al abrir la sesión y cada vez que
+ * cambia; `done`, las que acaban de salir (`applied`, `discarded`, `expired`).
+ */
+export type DeferredFrame = { actions: DeferredAction[]; done: { id: string; outcome: string }[] };
 
 export type EventsPage = {
   cursor: number | null;
@@ -155,6 +164,8 @@ export class RelaySession {
   private stateListeners = new Set<(state: MachineState) => void>();
   private eventListeners = new Set<(page: EventsPage) => void>();
   private linkListeners = new Set<(open: boolean) => void>();
+  private deferredListeners = new Set<(frame: DeferredFrame) => void>();
+  private queue: DeferredFrame = { actions: [], done: [] };
 
   private readonly config: RelayConfig;
   private readonly factory: SocketFactory;
@@ -213,6 +224,16 @@ export class RelaySession {
   onEngine(listener: (engine: EngineInfo) => void): () => void {
     this.engineListeners.add(listener);
     return () => void this.engineListeners.delete(listener);
+  }
+
+  /** Las acciones aplazadas de esta máquina según el último frame del relay. */
+  deferred(): DeferredFrame {
+    return this.queue;
+  }
+
+  onDeferred(listener: (frame: DeferredFrame) => void): () => void {
+    this.deferredListeners.add(listener);
+    return () => void this.deferredListeners.delete(listener);
   }
 
   onLink(listener: (open: boolean) => void): () => void {
@@ -409,7 +430,12 @@ export class RelaySession {
         if (message.error !== undefined && message.error !== null) call.reject(message.error as RelayFailure);
         else {
           const cached = message.cached as Cached | undefined;
-          call.resolve({ value: message.value ?? null, cached: cached && typeof cached === "object" ? cached : null });
+          const deferred = message.deferred as { queued_at: string } | undefined;
+          call.resolve({
+            value: message.value ?? null,
+            cached: cached && typeof cached === "object" ? cached : null,
+            deferred: deferred && typeof deferred === "object" ? deferred : null,
+          });
         }
         return;
       }
@@ -422,6 +448,13 @@ export class RelaySession {
       case "state": {
         this.machine = String(message.state) as MachineState;
         for (const listener of this.stateListeners) listener(this.machine);
+        return;
+      }
+      case "deferred": {
+        const actions = Array.isArray(message.actions) ? (message.actions as DeferredAction[]) : [];
+        const done = Array.isArray(message.done) ? (message.done as DeferredFrame["done"]) : [];
+        this.queue = { actions, done };
+        for (const listener of this.deferredListeners) listener(this.queue);
         return;
       }
       case "engine": {

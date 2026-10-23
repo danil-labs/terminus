@@ -143,6 +143,8 @@ export function startAccountMachines(target: Target = window) {
       wake: async (id) => (await startComputer(endpoint, (await getToken()).token, id)).kind === "ok",
       storage: localStorage,
       onChange: () => bump((n) => n + 1),
+      // La cola de aplazadas cambió (aquí, en la web o en el teléfono): la lista se relee.
+      onDeferred: (machine) => router.deferredChanged(machine),
       onEvents: (machine, events, gap) => {
         if (events.length) router.events(machine, events);
         if (gap) window.dispatchEvent(new CustomEvent("harness:service-resync"));

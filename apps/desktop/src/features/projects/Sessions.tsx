@@ -144,6 +144,12 @@ export type SessionRow = {
   /** La máquina que la corre si no es la de la ventana (`fleet.rs`); apagada, `machine_on` es `false`. */
   machine?: string;
   machine_on?: boolean;
+  /**
+   * El relay guardó un cambio (archivar, renombrar, fijar, mover) con la máquina
+   * apagada y lo aplica al conectarse (`computers/src/deferred.ts`); hasta
+   * entonces la fila lo enseña con una marca discreta, sin error.
+   */
+  deferred?: boolean;
   /** Con la cuenta de Danil, el estado de la rebanada de su máquina (`@terminus/fleet`) y cuándo se leyó. */
   machine_status?: "ok" | "cached" | "no_answer" | "off" | "outdated" | "license_required";
   machine_at?: number | null;
@@ -324,6 +330,16 @@ export default function Sessions(props: {
     const row = props.sessions.find((s) => s.id === id);
     return row ? projectOf(row) : props.de;
   };
+  /** La cabecera que lleva una orden a la máquina de una tarea de otra máquina. */
+  const enSuMaquina = (id: string) => {
+    const machine = props.sessions.find((s) => s.id === id)?.machine;
+    return machine ? { headers: { "x-terminus-machine": machine } } : undefined;
+  };
+  /** Una tarea de otra máquina que está apagada: lo que se le pide lo guarda el relay. */
+  const apagada = (id: string) => {
+    const row = props.sessions.find((s) => s.id === id);
+    return !!row?.machine && row.machine_on === false;
+  };
   const avisarCambio = (project: string) =>
     window.dispatchEvent(new CustomEvent("harness:tasks-changed", { detail: { project } }));
   const otherSpaces = (row: SessionRow) =>
@@ -340,7 +356,7 @@ export default function Sessions(props: {
     setActionFailure(null);
     try {
       const project = projectOfId(id);
-      await invoke("finish_task", { project, id });
+      await invoke("finish_task", { project, id }, enSuMaquina(id));
       // `anunciar` no actualiza esta ventana: su firma es la de quien
       // escribió, y el sondeo la descarta. Sin este aviso el archivado
       // queda en disco y la lista de aquí sigue mostrando la fila.
@@ -358,7 +374,7 @@ export default function Sessions(props: {
     setActionFailure(null);
     try {
       const project = projectOfId(id);
-      await invoke("set_task_archived", { project, id, archived: true });
+      await invoke("set_task_archived", { project, id, archived: true }, enSuMaquina(id));
       avisarCambio(project);
       setMenu(null);
     } catch (error) {
@@ -373,11 +389,17 @@ export default function Sessions(props: {
   const intentar = async (id: string, finish: boolean, rect?: DOMRect) => {
     const marcar = finish ? setFinishing : setArchiving;
     if ((finish ? finishing() : archiving()).includes(id)) return;
+    // Apagada no hay turnos que matar ni árbol que mirar: archivar se aplaza
+    // (el relay lo aplica al conectarse) y no se enciende solo para preguntar.
+    if (!finish && apagada(id)) {
+      await archiveTask(id);
+      return;
+    }
     marcar(ids => [...ids, id]);
     setActionFailure(null);
     let blockers: Blockers;
     try {
-      blockers = await invoke<Blockers>("task_blockers", { project: projectOfId(id), id, finish });
+      blockers = await invoke<Blockers>("task_blockers", { project: projectOfId(id), id, finish }, enSuMaquina(id));
     } catch (error) {
       setActionFailure(asFailure(error));
       return;
@@ -398,7 +420,7 @@ export default function Sessions(props: {
     marcar(ids => [...ids, a.id]);
     try {
       for (const work of a.blockers.unsaved) {
-        await invoke("discard_task_changes", { project: projectOfId(a.id), id: work.session, files: work.files });
+        await invoke("discard_task_changes", { project: projectOfId(a.id), id: work.session, files: work.files }, enSuMaquina(a.id));
       }
     } catch (error) {
       setActionFailure(asFailure(error));
@@ -865,6 +887,9 @@ export default function Sessions(props: {
                 {/* En el sidebar la máquina la dice su tarjeta flotante. */}
                 <Show when={!props.sidebar && f.s.machine}>
                   {(machine) => <MachineChip machine={machine()} on={f.s.machine_on !== false} class="max-w-[96px]" />}
+                </Show>
+                <Show when={f.s.deferred}>
+                  <span data-deferred class="shrink-0 text-neutral-500" title={t("projects.sessions.deferred")} aria-label={t("projects.sessions.deferred")}>⧗</span>
                 </Show>
                 {/* El botón del cohete es translúcido: sin desvanecer, el mensaje se lee a
                     través. Máscara y no velo: el fondo del riel cambia con el tema y el wallpaper. */}

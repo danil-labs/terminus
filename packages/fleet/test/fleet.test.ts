@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { type CallResult, type EventsPage, INTENT_COMMANDS, type MachineState } from "../../computers/src/index.ts";
+import { type CallResult, type DeferredFrame, type EventsPage, INTENT_COMMANDS, type MachineState, isDeferrable } from "../../computers/src/index.ts";
 import { Fleet, type FleetError, type Link, type MachineInfo, type Slice, SLICES_KEY, classOf } from "../src/index.ts";
 
 type Answer = unknown | ((args: Record<string, unknown>) => unknown);
@@ -24,8 +24,19 @@ function fakeLink(options: FakeOptions = {}) {
   let retries = 0;
   let closed = false;
   const subscribed: (number | null)[] = [];
-  const link: Link & { calls: typeof calls; setState(s: MachineState): void; push(p: EventsPage): void; hello(contract: string): void; block(b: "license_required" | null): void; retries(): number; closed(): boolean; subscribed: typeof subscribed; options: FakeOptions } = {
+  const deferredListeners = new Set<(f: DeferredFrame) => void>();
+  let queue: DeferredFrame = { actions: [], done: [] };
+  const link: Link & { calls: typeof calls; setState(s: MachineState): void; push(p: EventsPage): void; hello(contract: string): void; block(b: "license_required" | null): void; retries(): number; closed(): boolean; subscribed: typeof subscribed; options: FakeOptions; queueFrame(f: DeferredFrame): void } = {
     calls,
+    deferred: () => queue,
+    onDeferred(l) {
+      deferredListeners.add(l);
+      return () => void deferredListeners.delete(l);
+    },
+    queueFrame(f) {
+      queue = f;
+      for (const l of deferredListeners) l(f);
+    },
     subscribed,
     options,
     state: () => state,
@@ -64,6 +75,12 @@ function fakeLink(options: FakeOptions = {}) {
         const answer = options.answers?.[command];
         const value = typeof answer === "function" ? (answer as (a: Record<string, unknown>) => unknown)(args as Record<string, unknown>) : answer;
         if (state !== "online") {
+          // Como el relay: una acción ligera se guarda en la cola sin encender.
+          if (isDeferrable(command)) {
+            const queued_at = new Date().toISOString();
+            link.queueFrame({ actions: [...queue.actions, { id, command, workspace, folder: null, args, queued_at }], done: [] });
+            return resolve({ value: null, cached: null, deferred: { queued_at } });
+          }
           // Como el relay: un intent enciende la VM y se entrega con su `hello`.
           if (INTENT_COMMANDS.has(command)) {
             link.setState("starting");
@@ -243,7 +260,7 @@ test("machines are added, removed and renamed live without reconnecting the othe
 
 test("an action to an own machine that is off fails at once with machine_off; to a VM it wakes it first", async () => {
   const woken: string[] = [];
-  const { fleet, link } = setup({ cmp_vm: { state: "stopped", answers: { rename_session: null, send_message: "t1" } }, cmp_mac: { state: "offline" } }, [VM, MAC], {
+  const { fleet, link } = setup({ cmp_vm: { state: "stopped", answers: { set_session_stage: null, send_message: "t1" } }, cmp_mac: { state: "offline" } }, [VM, MAC], {
     wake: async (machine) => {
       woken.push(machine);
       setTimeout(() => link(machine).setState("online"), 20);
@@ -253,7 +270,7 @@ test("an action to an own machine that is off fails at once with machine_off; to
   await assert.rejects(fleet.call({ machine: "cmp_mac", workspace: "w", command: "send_message", args: { project: "p1" } }), (e: FleetError) => e.code === "machine_off" && !e.canWake);
   assert.equal(link("cmp_mac").calls.length, 0, "nothing tries to start the person's own machine");
 
-  await fleet.call({ machine: "cmp_vm", workspace: "w", command: "rename_session", args: { project: "p1", id: "cmp_vm~t1", title: "x" } });
+  await fleet.call({ machine: "cmp_vm", workspace: "w", command: "set_session_stage", args: { project: "p1", id: "cmp_vm~t1", stage: null } });
   assert.deepEqual(woken, ["cmp_vm"], "a non-intent action starts the VM through the control plane first");
   assert.equal(link("cmp_vm").calls.at(-1)?.timeout, 200);
 });
@@ -399,4 +416,68 @@ test("without a window (the web) the registry's shared spaces show even when no 
   fleet.setRegistry([{ id: "w", name: "W", projects: [], computers: [], spaces: [{ id: "s1", name: "Trabajo", folders: ["p1"], position: 0, changed_at: 7 }] }]);
   assert.deepEqual(fleet.merge("list_spaces", [], "w"), [{ id: "s1", name: "Trabajo", folders: ["p1"], created_at: 0, updated_at: 7, account: true }]);
   assert.equal(fleet.merge("list_spaces", [], "otro"), undefined, "nothing known is no answer, never []");
+});
+
+test("archive, delete, rename, pin or move to an off machine (VM or own) is queued by the relay: no wake, no machine_off", async () => {
+  const woken: string[] = [];
+  const deferredOf: string[] = [];
+  const { fleet, link } = setup({ cmp_vm: { state: "stopped" }, cmp_mac: { state: "offline" } }, [VM, MAC], {
+    wake: async (machine) => {
+      woken.push(machine);
+      return true;
+    },
+    onDeferred: (machine) => deferredOf.push(machine),
+  });
+  for (const machine of ["cmp_vm", "cmp_mac"]) {
+    const id = `${machine}~t1`;
+    assert.equal(await fleet.call({ machine, workspace: "w", command: "set_task_archived", args: { project: "p1", id, archived: true, space: null } }), null);
+    assert.equal(await fleet.call({ machine, workspace: "w", command: "delete_session", args: { project: "p1", id: `${machine}~t2`, force: false } }), null);
+    const [archive, remove] = link(machine).calls;
+    assert.deepEqual(archive.args, { project: "p1", id: "t1", archived: true, space: null }, "the machine gets its own ids");
+    assert.equal(remove.command, "delete_session");
+  }
+  assert.deepEqual(woken, [], "a light action never starts a machine");
+  assert.deepEqual(fleet.deferred("cmp_vm").map((a) => a.command), ["set_task_archived", "delete_session"]);
+  assert.deepEqual(deferredOf, ["cmp_vm", "cmp_vm", "cmp_mac", "cmp_mac"], "every change of the queue asks for a reread");
+});
+
+test("send_message to an off VM still starts it: it is not deferred", async () => {
+  const { fleet, link } = setup({ cmp_vm: { state: "stopped", answers: { send_message: "r1" } } }, [VM]);
+  await fleet.call({ machine: "cmp_vm", workspace: "w", command: "send_message", args: { project: "p1" } });
+  assert.equal(link("cmp_vm").state(), "online");
+  assert.deepEqual(fleet.deferred("cmp_vm"), []);
+});
+
+test("after the queue changes, a read of an off machine asks the relay again (its copy reflects the queue) once per read", async () => {
+  const rows = [row("t1"), row("t2")];
+  const { fleet, link } = setup({ cmp_vm: { state: "stopped", cachedAt: "2026-10-23T10:00:00Z", answers: { list_live_sessions: () => rows } } }, [VM]);
+  const read = () => fleet.read({ machine: "cmp_vm", workspace: "w", command: "list_live_sessions", args: { project: "p1" } });
+  await read();
+  await read();
+  assert.equal(link("cmp_vm").calls.length, 1, "with nothing queued, an off machine with a copy here is asked once");
+  await fleet.call({ machine: "cmp_vm", workspace: "w", command: "set_task_archived", args: { project: "p1", id: "cmp_vm~t1", archived: true } });
+  rows.shift();
+  const after = await read();
+  assert.deepEqual((after.value as { id: string }[]).map((r) => r.id), ["t2"], "the relay's copy with the queue applied");
+  await read();
+  assert.equal(link("cmp_vm").calls.filter((c) => c.command === "list_live_sessions").length, 2, "and then it is settled again");
+});
+
+test("moving a task to a space of the account is not deferred: it follows the path of any action", async () => {
+  const woken: string[] = [];
+  const { fleet, link } = setup({ cmp_vm: { state: "stopped", answers: { move_task_to_space: { id: "s1", name: "Trabajo" } } }, cmp_mac: { state: "offline" } }, [VM, MAC], {
+    wake: async (machine) => {
+      woken.push(machine);
+      setTimeout(() => link(machine).setState("online"), 20);
+      return true;
+    },
+  });
+  fleet.markShared("s1");
+  await fleet.call({ machine: "cmp_vm", workspace: "w", command: "move_task_to_space", args: { project: "p1", id: "cmp_vm~t1", space: "s1" } });
+  assert.deepEqual(woken, ["cmp_vm"]);
+  assert.deepEqual(fleet.deferred("cmp_vm"), []);
+  await assert.rejects(fleet.call({ machine: "cmp_mac", workspace: "w", command: "move_task_to_space", args: { project: "p1", id: "cmp_mac~t1", space: "s1" } }), (e: FleetError) => e.code === "machine_off");
+  // A space only that machine has is still deferred.
+  await fleet.call({ machine: "cmp_mac", workspace: "w", command: "move_task_to_space", args: { project: "p1", id: "cmp_mac~t1", space: "cmp_mac~v1" } });
+  assert.deepEqual(fleet.deferred("cmp_mac").map((a) => a.args), [{ project: "p1", id: "t1", space: "v1" }]);
 });

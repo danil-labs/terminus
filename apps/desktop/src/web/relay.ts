@@ -83,6 +83,7 @@ export class RelaySession {
   private stateListeners = new Set<(state: MachineState) => void>();
   private eventListeners = new Set<(page: EventsPage) => void>();
   private linkListeners = new Set<(open: boolean) => void>();
+  private deferredListeners = new Set<(done: number) => void>();
 
   constructor(
     private readonly config: RelayConfig,
@@ -109,6 +110,12 @@ export class RelaySession {
   onEvents(listener: (page: EventsPage) => void): () => void {
     this.eventListeners.add(listener);
     return () => this.eventListeners.delete(listener);
+  }
+
+  /** Cada cambio de la cola de acciones aplazadas (`{"type":"deferred"}`); `done`, cuántas salieron. */
+  onDeferred(listener: (done: number) => void): () => void {
+    this.deferredListeners.add(listener);
+    return () => this.deferredListeners.delete(listener);
   }
 
   onLink(listener: (open: boolean) => void): () => void {
@@ -230,6 +237,11 @@ export class RelaySession {
       return;
     }
     switch (message.type) {
+      case "deferred": {
+        const done = Array.isArray(message.done) ? message.done.length : 0;
+        for (const listener of this.deferredListeners) listener(done);
+        return;
+      }
       case "result": {
         const id = String(message.id);
         const call = this.pending.get(id);
