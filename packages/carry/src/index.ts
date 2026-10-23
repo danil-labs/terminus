@@ -5,7 +5,6 @@ export {
   IGNORED_MAX,
   LARGE_NEW,
   MAX_BYTES,
-  PART_DESKTOP,
   PART_RELAY,
   WARN_BYTES,
   bringBranch,
@@ -38,4 +37,6 @@ export {
   errorKey,
   newState,
   prepare,
+  PART_ATTEMPTS,
+  transient,
 } from "./run.ts";

@@ -1,7 +1,10 @@
 import { hasAccountWorkspaces, hasLinkedWorkspaces, listWorkspaces } from "@terminus/computers";
 import { type JSX, Match, onMount, Show, Switch, createSignal } from "solid-js";
 import { t } from "../lib/i18n";
+import { startTrialInPage, TerminusLicense } from "../features/settings/TerminusLicense";
 import { Button } from "../ui/Button";
+import { ConnectMachine } from "../features/machines/ConnectMachine";
+import { machineCompatibility } from "./compatibility";
 import { type Answer, type Computer, listComputers } from "./computers";
 import type { Session } from "./session";
 
@@ -67,6 +70,9 @@ export function Gate(props: { session: Session; endpoint: string; initial?: Gate
     </Button>
   );
 
+  // Sobre la app ya montada (sin `onOpen`) solo una carga nueva vuelve a abrir las sesiones.
+  const retryLicense = () => (props.onOpen ? void load() : window.location.reload());
+
   return (
     <main class="flex h-full flex-col overflow-y-auto bg-bg px-10 py-10" data-web-gate={view().t}>
       <h1 class="m-0 mb-5 text-3xl leading-tight font-display font-bold tracking-[-0.03em] text-neutral-950">Terminus</h1>
@@ -74,9 +80,21 @@ export function Gate(props: { session: Session; endpoint: string; initial?: Gate
         <Match when={view().t === "waiting"}>
           <p class="m-0 text-sm text-neutral-500">{t("web.computers.waiting")}</p>
         </Match>
-        <Match when={view().t === "license"}>{message(t("web.computers.license"))}</Match>
+        <Match when={view().t === "license"}>
+          <TerminusLicense onStart={startTrialInPage} onRetry={retryLicense} />
+        </Match>
         <Match when={view().t === "not_yours"}>{message(t("web.computers.not_yours"))}</Match>
-        <Match when={view().t === "none"}>{message(t("web.computers.none"), retry())}</Match>
+        <Match when={view().t === "none"}>
+          {message(t("web.computers.none"))}
+          {/* La primera máquina propia, sin salir de aquí: en línea, la puerta vuelve a leer y abre. */}
+          <div class="mt-6 max-w-[60ch]" data-web-connect="">
+            <ConnectMachine
+              list={() => computersOf(props.endpoint, props.session)}
+              outdated={(c) => machineCompatibility(c.contract) === "outdated"}
+              onReady={() => void load()}
+            />
+          </div>
+        </Match>
         <Match when={view().t === "no_workspaces"}>{message(t("web.computers.no_workspaces"), retry())}</Match>
         <Match when={view().t === "error"}>{message(t("web.computers.error"), retry())}</Match>
       </Switch>

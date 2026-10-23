@@ -141,6 +141,7 @@
   "shell.sidebar.show": "Mostrar el historial",
   "shell.sidebar.filter_empty": "No hay tareas con estos filtros.",
   "shell.sidebar.empty": "Todavía no hay tareas.",
+  "shell.sidebar.folder_empty": "Sin tareas todavía",
   "shell.sidebar.tasks": "Tareas",
   "shell.storage.activity.days": {
     "one": "hace {count} día",

@@ -20,7 +20,7 @@ repositories, and `GitHostInfo`. Files on disk keep their keys; the types that
 are stored and also travel cross the contract wrapped in `Wire`, which renames
 their keys. There are no aliases. This copy is byte-identical to the engine's.
 SHA-256:
-`f4f8e4cea3e93720a76b3b34756d9c7d5b2f07cc7acd55beaad25bbea8829929`.
+`60d64366043331fd68f5c9faa67ebad0d9c696d88445298d2c983a3b3e348fa0`.
 
 seldon-host `4e21caf` (#66) added the Danil account (321 commands, 28 events):
 `danil_connect_start`, `danil_connect_status`, `danil_connect_options`,
@@ -177,6 +177,36 @@ baseRef?, agent?, space?}`) → `{session, folder}` does what the first
 `baseRef` with git, the task's kn copy without git), without a turn. `title` is
 provisional: the person's first `send_message` on that task replaces it. This
 copy is `git show 3274de5:crates/engine-protocol/commands.json` byte for byte.
+
+seldon-host `integration/plan-multi-machine` (`5b8f29a`: dev with #106, #110,
+#108 and #113) is the contract of the multi-machine plan (367 commands, 32
+events). #106 and #110 annotate every command without changing any name or
+signature: `ids` says which arguments are workspace or account ids, which the
+engine checks against the relay envelope and the session's account
+(`workspace_mismatch`); `relay: false` refuses a command through the relay
+(`set_active_workspace`: the open workspace belongs to each window); and
+`scope: "machine"` lets 41 commands run through the relay only for the default
+session (else `command_not_allowed` with `{command, scope: "machine"}`). A
+relayed call without a workspace answers `command_failed`. #108 adds
+`sync_workspace_memory` and removes `retire_memory_entry`.
+`create_empty_session` is unchanged apart from `scope: "workspace"`. This copy
+is `git show 5b8f29a:crates/engine-protocol/commands.json` byte for byte; no
+`seldon-runtime` with it is published yet.
+
+seldon-host `fix/carpetas-nuevas-en-documentos` (`8cb37ac`) adds an optional
+`directory` to `create_project` (`{name, workingDirectory?, space?, id?,
+directory?}`): where a folder created from scratch is born when the person picks
+a location other than the workspace default. Without it nothing changes. The
+same commit makes that default the person's Documents folder
+(`<Documents>/Terminus`) instead of one inside the engine's data.
+
+seldon-host dev `340fe91` (#119) folds heavy and ignored folders in the task
+tree (369 commands). `tree_folder` (`{project, session, tree, path, offset}`)
+and `preview_tree_folder` (`{project, path, offset}`) → `PaginaDeCarpeta`
+`{paths, folders, next, total}` give one level of a folded folder, 300 entries
+per page. `CarpetaDelArbol` gains `lazy` and `ignored`; the manifest keeps only
+type names, so those fields do not move the hash. This copy is
+`git show 340fe91:crates/engine-protocol/commands.json` byte for byte.
 
 Endpoint, selection and StreamPage extend the transport; they do not convert
 domain data. The token travels in RPC1 only between authenticated local

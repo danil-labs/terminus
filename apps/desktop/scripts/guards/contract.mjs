@@ -22,8 +22,8 @@ const LOCK = fileURLToPath(new URL("../../seldon-runtime.lock", import.meta.url)
 
 /** El contrato copiado cuyo motor aún no tiene release publicada, y qué falta. */
 const MOTOR_PENDIENTE = {
-  contract: "f4f8e4cea3e93720a76b3b34756d9c7d5b2f07cc7acd55beaad25bbea8829929",
-  why: "llevar y traer trabajo entre máquinas (work_*, seldon-host #84–#87), una sesión de Danil por cuenta (feat/danil-session-per-account), el onboarding (#91), Google Drive (#92), Google Drive para escritorio (#95), el modelo local activo (#98), «Usar el GitHub de esta computadora» (#100), la tarea vacía de la vista previa (create_empty_session, seldon-host feat/tarea-vacia) y «no usar» Google Drive para escritorio en el motor (set_google_drive_desktop_use, seldon-host feat/mcp-oauth-terminus): falta publicar seldon-runtime con ellos y fijarlo en seldon-runtime.lock",
+  contract: "60d64366043331fd68f5c9faa67ebad0d9c696d88445298d2c983a3b3e348fa0",
+  why: "el aislamiento del relay y la memoria sincronizada (seldon-host integration/plan-multi-machine: #106, #110, #108), llevar y traer trabajo entre máquinas (work_*, seldon-host #84–#87), una sesión de Danil por cuenta (feat/danil-session-per-account), el onboarding (#91), Google Drive (#92), Google Drive para escritorio (#95), el modelo local activo (#98), «Usar el GitHub de esta computadora» (#100) y la tarea vacía de la vista previa (create_empty_session, seldon-host feat/tarea-vacia), las carpetas nuevas en Documentos (#118) y las carpetas plegadas del árbol (tree_folder, #119) y Terminus como único cliente de MCP (#120): falta publicar seldon-runtime con ellos y fijarlo en seldon-runtime.lock",
 };
 
 const vendored = createHash("sha256").update(readFileSync(CONTRACT)).digest("hex");

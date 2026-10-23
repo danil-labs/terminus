@@ -424,7 +424,9 @@ export default function AnadirCarpeta(props: {
               onSubmit={(e) => {
                 e.preventDefault();
                 void terminar(
-                  invoke<Project>("create_project", { name: nombre(), space: spaceAlli() }, enRemota()),
+                  invoke<Project>("create_project", {
+                    name: nombre(), space: spaceAlli(), directory: remota() ? undefined : (destino() ?? undefined),
+                  }, enRemota()),
                 );
               }}
             >
@@ -440,6 +442,21 @@ export default function AnadirCarpeta(props: {
                   onInput={(e) => setNombre(e.currentTarget.value)}
                 />
               </label>
+              <div class="grid gap-1">
+                <span class="text-[0.8125rem] text-neutral-500">{t("projects.add.clone_directory")}</span>
+                <p class="m-0 break-all font-mono text-xs">{destino() ?? directorio()}</p>
+                <Show when={remota()}>{(m) => <p class="m-0 text-xs text-neutral-500">{t("projects.add.remote_directory", { name: machineName(m().machine) })}</p>}</Show>
+                <Show when={!remota()}><Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  class="justify-self-start"
+                  disabled={trabajando() || eligiendo()}
+                  onClick={() => void elegirDestino()}
+                >
+                  {t("projects.add.change_directory")}
+                </Button></Show>
+              </div>
               <Show when={fallo()}>{(f) => <FailureNote f={f()} />}</Show>
               <div class="flex items-center justify-end gap-2">
                 <Button

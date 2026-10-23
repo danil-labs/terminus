@@ -47,7 +47,6 @@
   "work.carry.skipped": "{dirs} are not copied",
   "work.carry.lfs": "Uses Git LFS: its files do not travel; {machine} downloads them from the remote if they are there.",
   "work.carry.submodules": "Has submodules: their commits do not travel; {machine} downloads them from the remote if they are there.",
-  "work.carry.ssh": "They travel through the machine's SSH tunnel; Danil does not see them.",
   "work.carry.preparing": "Preparing the copy…",
   "work.carry.size": "{size} · about {eta}",
   "work.carry.size_warn": "It is {size}: it will take a while to copy.",

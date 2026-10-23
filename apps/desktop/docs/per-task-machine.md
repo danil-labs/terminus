@@ -220,11 +220,13 @@ la comparten la web y el teléfono.
   `recipientKey` en `work_export`; el archivo viaja cifrado para ese motor.
   La primera llave de cada máquina se fija en las preferencias
   (`machines.carry_keys`, TOFU); si cambia, la hoja lo avisa y no deja llevar
-  hasta «Confiar en la nueva llave». El escritorio por el túnel SSH no sella.
+  hasta «Confiar en la nueva llave». El escritorio también sella: con
+  `@terminus/fleet` todo cliente va por el relay, `.env` incluidos.
 - Web: la misma ventana por el relay, con partes de 512 KiB; los archivos que
   git ignora solo viajan sellados. Si la máquina de la carpeta está apagada,
-  se avisa y se puede seguir sin el trabajo sin subir. `work_import` y
-  `work_cancel` están en `INTENT_COMMANDS` (`packages/computers`); las partes no.
+  se avisa y se puede seguir sin el trabajo sin subir. `work_export`,
+  `work_import` y `work_cancel` están en `INTENT_COMMANDS` (`packages/computers`):
+  despiertan la máquina y tienen 330 s; las partes no, son llamadas de 60 s.
 - Pruebas: `tests/unit/carry-work.test.ts` (orquestación contra dos motores
   falsos), `tests/unit/carry-window.test.mjs` (`dist/` en jsdom) y
   `tests/unit/web-carry.test.mjs` (`dist-web/` contra el relay falso).

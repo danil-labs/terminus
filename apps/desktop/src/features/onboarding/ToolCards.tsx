@@ -311,6 +311,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
     esperandoMcp = null;
     void cargar();
   });
+  // `mcp-login` no se abre aquí: el CLI o el motor ya abrieron esa pestaña.
   const alDrive = listen<AvanceDeDrive>("google-drive", (e) => {
     const a = e.payload;
     if (a.kind === "connection") return void cargar();

@@ -23,7 +23,8 @@
           "type": "bool"
         }
       ],
-      "path": "limits::account_limits"
+      "path": "limits::account_limits",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -43,7 +44,8 @@
           "type": "String"
         }
       ],
-      "path": "accounts::account_status"
+      "path": "accounts::account_status",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -63,7 +65,8 @@
           "type": "String"
         }
       ],
-      "path": "accounts::add_account"
+      "path": "accounts::add_account",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -78,7 +81,8 @@
           "type": "String"
         }
       ],
-      "path": "context::add_folder"
+      "path": "context::add_folder",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -93,7 +97,8 @@
           "type": "String"
         }
       ],
-      "path": "mcp::add_mcp_servers"
+      "path": "mcp::add_mcp_servers",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -113,7 +118,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "context::add_repo_url"
+      "path": "context::add_repo_url",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -143,11 +149,17 @@
           "type": "Option < String >"
         }
       ],
-      "path": "skill_sources::add_skill_source"
+      "path": "skill_sources::add_skill_source",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "id"
+        ]
+      },
       "kind": "invoke",
       "name": "add_workspace",
       "output": "-> Result < Wire < Workspace > , String >",
@@ -178,7 +190,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "workspaces::add_workspace"
+      "path": "workspaces::add_workspace",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -193,7 +206,8 @@
           "type": "String"
         }
       ],
-      "path": "accounts::adopt_system_session"
+      "path": "accounts::adopt_system_session",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -202,7 +216,8 @@
       "name": "agentsview_status",
       "output": "-> Result < IntegrationStatus , String >",
       "parameters": [],
-      "path": "integrations::agentsview_status"
+      "path": "integrations::agentsview_status",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -227,7 +242,8 @@
           "type": "Vec < questions :: RespuestaEnviada >"
         }
       ],
-      "path": "chat::answer_question"
+      "path": "chat::answer_question",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -267,7 +283,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "chat::answer_shell_output"
+      "path": "chat::answer_shell_output",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -276,7 +293,8 @@
       "name": "archived_tasks",
       "output": "-> Result < ArchivedTasks , Failure >",
       "parameters": [],
-      "path": "spaces::archived_tasks"
+      "path": "spaces::archived_tasks",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -291,7 +309,8 @@
           "type": "String"
         }
       ],
-      "path": "versions::artifact_history"
+      "path": "versions::artifact_history",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -316,7 +335,8 @@
           "type": "String"
         }
       ],
-      "path": "chat::ask_side_question"
+      "path": "chat::ask_side_question",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -336,7 +356,8 @@
           "type": "String"
         }
       ],
-      "path": "projects::attach_known_source"
+      "path": "projects::attach_known_source",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -371,7 +392,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "context::attach_repo"
+      "path": "context::attach_repo",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -396,7 +418,8 @@
           "type": "String"
         }
       ],
-      "path": "preview::attachment_preview"
+      "path": "preview::attachment_preview",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -416,7 +439,8 @@
           "type": "String"
         }
       ],
-      "path": "history::backup_task_work"
+      "path": "history::backup_task_work",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -441,11 +465,17 @@
           "type": "Value"
         }
       ],
-      "path": "mcp::call_mcp_app_tool"
+      "path": "mcp::call_mcp_app_tool",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "scope"
+        ]
+      },
       "kind": "invoke",
       "name": "cancel_browser_login",
       "output": "-> Result < () , Failure >",
@@ -461,11 +491,17 @@
           "type": "Option < String >"
         }
       ],
-      "path": "git_hosts::cancel_browser_login"
+      "path": "git_hosts::cancel_browser_login",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "workspace"
+        ]
+      },
       "kind": "invoke",
       "name": "cancel_google_drive_login",
       "output": "-> Result < () , Failure >",
@@ -476,7 +512,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "google_drive::cancel_google_drive_login"
+      "path": "google_drive::cancel_google_drive_login",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -491,7 +528,8 @@
           "type": "String"
         }
       ],
-      "path": "cancel::cancel_install"
+      "path": "cancel::cancel_install",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -500,7 +538,8 @@
       "name": "cancel_local_model",
       "output": "",
       "parameters": [],
-      "path": "models::cancel_local_model"
+      "path": "models::cancel_local_model",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -515,7 +554,8 @@
           "type": "String"
         }
       ],
-      "path": "accounts::cancel_login"
+      "path": "accounts::cancel_login",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -530,7 +570,8 @@
           "type": "String"
         }
       ],
-      "path": "projects::cloning::cancel_project_clone"
+      "path": "projects::cloning::cancel_project_clone",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -555,7 +596,8 @@
           "type": "String"
         }
       ],
-      "path": "chat::cancel_question"
+      "path": "chat::cancel_question",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -580,7 +622,8 @@
           "type": "FolderChange"
         }
       ],
-      "path": "handler_catalog::change_agent_folders"
+      "path": "handler_catalog::change_agent_folders",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -589,7 +632,8 @@
       "name": "chat_background",
       "output": "-> Result < Option < ChatBackground > , crate :: util :: Failure >",
       "parameters": [],
-      "path": "handlers::chat_background"
+      "path": "handlers::chat_background",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -604,11 +648,17 @@
           "type": "Option < bool >"
         }
       ],
-      "path": "env::check_environment"
+      "path": "env::check_environment",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "scope"
+        ]
+      },
       "kind": "invoke",
       "name": "check_git_host",
       "output": "-> Result < GitHostInfo , Failure >",
@@ -624,11 +674,17 @@
           "type": "Option < String >"
         }
       ],
-      "path": "git_hosts::check_git_host"
+      "path": "git_hosts::check_git_host",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "workspace"
+        ]
+      },
       "kind": "invoke",
       "name": "check_google_drive",
       "output": "-> Result < GoogleDriveStatus , Failure >",
@@ -639,7 +695,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "google_drive::check_google_drive"
+      "path": "google_drive::check_google_drive",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -654,7 +711,8 @@
           "type": "Plugin"
         }
       ],
-      "path": "integrations::check_integration"
+      "path": "integrations::check_integration",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -663,7 +721,8 @@
       "name": "check_mcp",
       "output": "-> Result < Vec < (String , Salud) > , Failure >",
       "parameters": [],
-      "path": "mcp::check_mcp"
+      "path": "mcp::check_mcp",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -678,7 +737,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "handlers::choose_chat_background"
+      "path": "handlers::choose_chat_background",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -698,11 +758,17 @@
           "type": "Option < String >"
         }
       ],
-      "path": "cli::cli_task_opened"
+      "path": "cli::cli_task_opened",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": "progress",
+      "ids": {
+        "workspace": [
+          "workspace"
+        ]
+      },
       "kind": "stream",
       "name": "clone_project",
       "output": "-> Result < Project , crate :: util :: Failure >",
@@ -758,7 +824,8 @@
           "type": "tauri :: ipc :: Channel < cloning :: Progress >"
         }
       ],
-      "path": "projects::clone_project"
+      "path": "projects::clone_project",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -773,7 +840,8 @@
           "type": "String"
         }
       ],
-      "path": "mcp::close_mcp_app"
+      "path": "mcp::close_mcp_app",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -798,7 +866,8 @@
           "type": "u16"
         }
       ],
-      "path": "ports::close_port"
+      "path": "ports::close_port",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -818,7 +887,8 @@
           "type": "u32"
         }
       ],
-      "path": "ports::close_process"
+      "path": "ports::close_process",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -827,7 +897,8 @@
       "name": "collect_orphans",
       "output": "-> Result < Liberado , String >",
       "parameters": [],
-      "path": "storage::collect_orphans"
+      "path": "storage::collect_orphans",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -847,11 +918,17 @@
           "type": "String"
         }
       ],
-      "path": "accounts::connect_api_key"
+      "path": "accounts::connect_api_key",
+      "scope": "machine"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "scope"
+        ]
+      },
       "kind": "invoke",
       "name": "connect_git_host",
       "output": "-> Result < GitHostInfo , Failure >",
@@ -877,7 +954,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "git_hosts::connect_git_host"
+      "path": "git_hosts::connect_git_host",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -892,7 +970,8 @@
           "type": "String"
         }
       ],
-      "path": "mcp::connect_known_mcp"
+      "path": "mcp::connect_known_mcp",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -901,7 +980,8 @@
       "name": "consent_text",
       "output": "-> (Vec < Frase > , u32)",
       "parameters": [],
-      "path": "workspaces::consent_text"
+      "path": "workspaces::consent_text",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -931,7 +1011,8 @@
           "type": "Alcance"
         }
       ],
-      "path": "handlers::create_agent"
+      "path": "handlers::create_agent",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -966,7 +1047,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "sessions::create_agent_thread"
+      "path": "sessions::create_agent_thread",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1006,7 +1088,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "chat::create_empty_session"
+      "path": "chat::create_empty_session",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1034,9 +1117,15 @@
           "key": "id",
           "name": "id",
           "type": "Option < String >"
+        },
+        {
+          "key": "directory",
+          "name": "directory",
+          "type": "Option < String >"
         }
       ],
-      "path": "projects::create_project"
+      "path": "projects::create_project",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1056,11 +1145,17 @@
           "type": "Option < Vec < String > >"
         }
       ],
-      "path": "spaces::create_space"
+      "path": "spaces::create_space",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "account": [
+          "account"
+        ]
+      },
       "kind": "invoke",
       "name": "danil_account_refresh",
       "output": "-> Result < Status , Failure >",
@@ -1071,11 +1166,17 @@
           "type": "Option < String >"
         }
       ],
-      "path": "danil::danil_account_refresh"
+      "path": "danil::danil_account_refresh",
+      "relay": false
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "account": [
+          "account"
+        ]
+      },
       "kind": "invoke",
       "name": "danil_account_remove_photo",
       "output": "-> Result < Status , Failure >",
@@ -1086,11 +1187,17 @@
           "type": "Option < String >"
         }
       ],
-      "path": "danil::danil_account_remove_photo"
+      "path": "danil::danil_account_remove_photo",
+      "relay": false
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "account": [
+          "account"
+        ]
+      },
       "kind": "invoke",
       "name": "danil_account_set_photo",
       "output": "-> Result < Status , Failure >",
@@ -1106,11 +1213,17 @@
           "type": "Option < String >"
         }
       ],
-      "path": "danil::danil_account_set_photo"
+      "path": "danil::danil_account_set_photo",
+      "relay": false
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "account": [
+          "account"
+        ]
+      },
       "kind": "invoke",
       "name": "danil_client_token",
       "output": "-> Result < ClientToken , Failure >",
@@ -1121,7 +1234,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "danil::danil_client_token"
+      "path": "danil::danil_client_token",
+      "relay": false
     },
     {
       "async": false,
@@ -1130,11 +1244,17 @@
       "name": "danil_connect_options",
       "output": "-> Result < Vec < ConnectOption > , Failure >",
       "parameters": [],
-      "path": "danil::danil_connect_options"
+      "path": "danil::danil_connect_options",
+      "relay": false
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "workspace"
+        ]
+      },
       "kind": "invoke",
       "name": "danil_connect_start",
       "output": "-> Result < Start , Failure >",
@@ -1160,7 +1280,8 @@
           "type": "Option < bool >"
         }
       ],
-      "path": "danil::danil_connect_start"
+      "path": "danil::danil_connect_start",
+      "relay": false
     },
     {
       "async": false,
@@ -1169,11 +1290,17 @@
       "name": "danil_connect_status",
       "output": "-> Result < Status , Failure >",
       "parameters": [],
-      "path": "danil::danil_connect_status"
+      "path": "danil::danil_connect_status",
+      "relay": false
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "account": [
+          "account"
+        ]
+      },
       "kind": "invoke",
       "name": "danil_disconnect",
       "output": "-> Result < Status , Failure >",
@@ -1184,7 +1311,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "danil::danil_disconnect"
+      "path": "danil::danil_disconnect",
+      "relay": false
     },
     {
       "async": false,
@@ -1193,11 +1321,17 @@
       "name": "danil_sessions",
       "output": "-> Result < Vec < SessionInfo > , Failure >",
       "parameters": [],
-      "path": "danil::danil_sessions"
+      "path": "danil::danil_sessions",
+      "relay": false
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "account": [
+          "account"
+        ]
+      },
       "kind": "invoke",
       "name": "danil_set_default_account",
       "output": "-> Result < Vec < SessionInfo > , Failure >",
@@ -1208,11 +1342,17 @@
           "type": "String"
         }
       ],
-      "path": "danil::danil_set_default_account"
+      "path": "danil::danil_set_default_account",
+      "relay": false
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "workspace"
+        ]
+      },
       "kind": "invoke",
       "name": "danil_workspace_account",
       "output": "-> Result < WorkspaceAccountOf , Failure >",
@@ -1223,11 +1363,17 @@
           "type": "Option < String >"
         }
       ],
-      "path": "danil::danil_workspace_account"
+      "path": "danil::danil_workspace_account",
+      "relay": false
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "workspace"
+        ]
+      },
       "kind": "invoke",
       "name": "danil_workspace_link",
       "output": "-> Result < WorkspaceLinkStatus , Failure >",
@@ -1243,11 +1389,17 @@
           "type": "Option < String >"
         }
       ],
-      "path": "danil::danil_workspace_link"
+      "path": "danil::danil_workspace_link",
+      "relay": false
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "workspace"
+        ]
+      },
       "kind": "invoke",
       "name": "danil_workspace_link_status",
       "output": "-> Result < WorkspaceLinkStatus , Failure >",
@@ -1258,11 +1410,20 @@
           "type": "Option < String >"
         }
       ],
-      "path": "danil::danil_workspace_link_status"
+      "path": "danil::danil_workspace_link_status",
+      "relay": false
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "account": [
+          "account"
+        ],
+        "workspace": [
+          "workspace"
+        ]
+      },
       "kind": "invoke",
       "name": "danil_workspace_set_account",
       "output": "-> Result < WorkspaceAccountOf , Failure >",
@@ -1278,11 +1439,17 @@
           "type": "Option < String >"
         }
       ],
-      "path": "danil::danil_workspace_set_account"
+      "path": "danil::danil_workspace_set_account",
+      "relay": false
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "workspace"
+        ]
+      },
       "kind": "invoke",
       "name": "danil_workspace_unlink",
       "output": "-> Result < WorkspaceLinkStatus , Failure >",
@@ -1293,7 +1460,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "danil::danil_workspace_unlink"
+      "path": "danil::danil_workspace_unlink",
+      "relay": false
     },
     {
       "async": false,
@@ -1313,7 +1481,8 @@
           "type": "String"
         }
       ],
-      "path": "handlers::delete_agent"
+      "path": "handlers::delete_agent",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1338,7 +1507,8 @@
           "type": "String"
         }
       ],
-      "path": "memory::commands::delete_memory_entry"
+      "path": "memory::commands::delete_memory_entry",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1353,7 +1523,8 @@
           "type": "String"
         }
       ],
-      "path": "projects::delete_project"
+      "path": "projects::delete_project",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1378,7 +1549,8 @@
           "type": "Option < bool >"
         }
       ],
-      "path": "sessions::delete_session"
+      "path": "sessions::delete_session",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1398,7 +1570,8 @@
           "type": "Consent"
         }
       ],
-      "path": "spaces::delete_space"
+      "path": "spaces::delete_space",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1423,7 +1596,8 @@
           "type": "String"
         }
       ],
-      "path": "sessions::detach_session_source"
+      "path": "sessions::detach_session_source",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1443,7 +1617,8 @@
           "type": "String"
         }
       ],
-      "path": "context::detach_source"
+      "path": "context::detach_source",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1463,7 +1638,8 @@
           "type": "String"
         }
       ],
-      "path": "accounts::discard_account"
+      "path": "accounts::discard_account",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1488,11 +1664,17 @@
           "type": "Vec < String >"
         }
       ],
-      "path": "history::discard_task_changes"
+      "path": "history::discard_task_changes",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "scope"
+        ]
+      },
       "kind": "invoke",
       "name": "disconnect_git_host",
       "output": "-> Result < () , Failure >",
@@ -1508,11 +1690,17 @@
           "type": "Option < String >"
         }
       ],
-      "path": "git_hosts::disconnect_git_host"
+      "path": "git_hosts::disconnect_git_host",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "workspace"
+        ]
+      },
       "kind": "invoke",
       "name": "disconnect_google_drive",
       "output": "-> Result < () , Failure >",
@@ -1523,7 +1711,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "google_drive::disconnect_google_drive"
+      "path": "google_drive::disconnect_google_drive",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1538,7 +1727,8 @@
           "type": "String"
         }
       ],
-      "path": "mcp::disconnect_known_mcp"
+      "path": "mcp::disconnect_known_mcp",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1563,7 +1753,8 @@
           "type": "String"
         }
       ],
-      "path": "versions::download_artifact"
+      "path": "versions::download_artifact",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1572,7 +1763,8 @@
       "name": "empty_build_cache",
       "output": "-> Result < Liberado , String >",
       "parameters": [],
-      "path": "storage::empty_build_cache"
+      "path": "storage::empty_build_cache",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1587,7 +1779,8 @@
           "type": "String"
         }
       ],
-      "path": "projects::ensure_project"
+      "path": "projects::ensure_project",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1607,7 +1800,8 @@
           "type": "String"
         }
       ],
-      "path": "export::export_chat"
+      "path": "export::export_chat",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1622,11 +1816,17 @@
           "type": "String"
         }
       ],
-      "path": "preview::file_size"
+      "path": "preview::file_size",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "scope"
+        ]
+      },
       "kind": "invoke",
       "name": "finish_browser_login",
       "output": "-> Result < GitHostInfo , Failure >",
@@ -1642,11 +1842,17 @@
           "type": "Option < String >"
         }
       ],
-      "path": "git_hosts::finish_browser_login"
+      "path": "git_hosts::finish_browser_login",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "scope"
+        ]
+      },
       "kind": "invoke",
       "name": "finish_git_host_setup",
       "output": "-> Result < GitHostInfo , Failure >",
@@ -1662,11 +1868,17 @@
           "type": "Option < String >"
         }
       ],
-      "path": "git_hosts::finish_git_host_setup"
+      "path": "git_hosts::finish_git_host_setup",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "workspace"
+        ]
+      },
       "kind": "invoke",
       "name": "finish_google_drive_login",
       "output": "-> Result < GoogleDriveStatus , Failure >",
@@ -1677,7 +1889,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "google_drive::finish_google_drive_login"
+      "path": "google_drive::finish_google_drive_login",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1697,7 +1910,8 @@
           "type": "String"
         }
       ],
-      "path": "history::finish_task"
+      "path": "history::finish_task",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1706,7 +1920,8 @@
       "name": "get_profile",
       "output": "-> Profile",
       "parameters": [],
-      "path": "workspaces::get_profile"
+      "path": "workspaces::get_profile",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1715,7 +1930,8 @@
       "name": "get_project_directory",
       "output": "-> Result < PathBuf , Failure >",
       "parameters": [],
-      "path": "workspaces::get_project_directory"
+      "path": "workspaces::get_project_directory",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1724,11 +1940,17 @@
       "name": "get_radiant_identity",
       "output": "-> Result < Identity , Failure >",
       "parameters": [],
-      "path": "radiant::get_radiant_identity"
+      "path": "radiant::get_radiant_identity",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "scope"
+        ]
+      },
       "kind": "invoke",
       "name": "git_host_areas",
       "output": "-> Result < Vec < Project > , Failure >",
@@ -1744,11 +1966,17 @@
           "type": "Option < String >"
         }
       ],
-      "path": "git_hosts::git_host_areas"
+      "path": "git_hosts::git_host_areas",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "scope"
+        ]
+      },
       "kind": "invoke",
       "name": "git_host_available_areas",
       "output": "-> Result < Vec < Project > , Failure >",
@@ -1764,11 +1992,17 @@
           "type": "Option < String >"
         }
       ],
-      "path": "git_hosts::git_host_available_areas"
+      "path": "git_hosts::git_host_available_areas",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "scope"
+        ]
+      },
       "kind": "invoke",
       "name": "git_host_pending_setup",
       "output": "-> Result < Option < String > , Failure >",
@@ -1784,11 +2018,17 @@
           "type": "Option < String >"
         }
       ],
-      "path": "git_hosts::git_host_pending_setup"
+      "path": "git_hosts::git_host_pending_setup",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "scope"
+        ]
+      },
       "kind": "invoke",
       "name": "git_host_projects",
       "output": "-> Result < Vec < RemoteRepo > , Failure >",
@@ -1814,7 +2054,8 @@
           "type": "Option < bool >"
         }
       ],
-      "path": "git_hosts::git_host_projects"
+      "path": "git_hosts::git_host_projects",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1823,11 +2064,17 @@
       "name": "google_drive_desktop_status",
       "output": "-> DesktopStatus",
       "parameters": [],
-      "path": "google_drive_desktop::google_drive_desktop_status"
+      "path": "google_drive_desktop::google_drive_desktop_status",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "workspace"
+        ]
+      },
       "kind": "invoke",
       "name": "google_drive_status",
       "output": "-> Result < GoogleDriveStatus , Failure >",
@@ -1838,7 +2085,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "google_drive::google_drive_status"
+      "path": "google_drive::google_drive_status",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1858,7 +2106,8 @@
           "type": "String"
         }
       ],
-      "path": "chat::guardar_imagen_pegada"
+      "path": "chat::guardar_imagen_pegada",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1878,7 +2127,8 @@
           "type": "String"
         }
       ],
-      "path": "mcp::has_mcp_app"
+      "path": "mcp::has_mcp_app",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1893,7 +2143,8 @@
           "type": "String"
         }
       ],
-      "path": "handlers::import_chat_background"
+      "path": "handlers::import_chat_background",
+      "relay": false
     },
     {
       "async": false,
@@ -1908,7 +2159,8 @@
           "type": "String"
         }
       ],
-      "path": "handlers::import_chat_background_data"
+      "path": "handlers::import_chat_background_data",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1953,7 +2205,8 @@
           "type": "Option < Vec < crate :: recipients :: Recipient > >"
         }
       ],
-      "path": "chat::inject_message"
+      "path": "chat::inject_message",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -1968,7 +2221,8 @@
           "type": "String"
         }
       ],
-      "path": "bootstrap::install_base_tool"
+      "path": "bootstrap::install_base_tool",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -1983,7 +2237,8 @@
           "type": "String"
         }
       ],
-      "path": "locales::install_bundled_language_pack"
+      "path": "locales::install_bundled_language_pack",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -1992,7 +2247,8 @@
       "name": "install_gh",
       "output": "-> Result < String , String >",
       "parameters": [],
-      "path": "github::install_gh"
+      "path": "github::install_gh",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -2001,7 +2257,8 @@
       "name": "install_google_drive",
       "output": "-> Result < () , Failure >",
       "parameters": [],
-      "path": "google_drive::install_google_drive"
+      "path": "google_drive::install_google_drive",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -2010,7 +2267,8 @@
       "name": "install_google_drive_desktop",
       "output": "-> Result < () , Failure >",
       "parameters": [],
-      "path": "google_drive_desktop::install_google_drive_desktop"
+      "path": "google_drive_desktop::install_google_drive_desktop",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -2025,7 +2283,8 @@
           "type": "Plugin"
         }
       ],
-      "path": "integrations::install_integration"
+      "path": "integrations::install_integration",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -2040,7 +2299,8 @@
           "type": "String"
         }
       ],
-      "path": "locales::install_language_pack"
+      "path": "locales::install_language_pack",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -2055,7 +2315,8 @@
           "type": "String"
         }
       ],
-      "path": "models::install_local_model"
+      "path": "models::install_local_model",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -2064,7 +2325,8 @@
       "name": "install_local_runtime",
       "output": "-> Result < () , Failure >",
       "parameters": [],
-      "path": "models::install_local_runtime"
+      "path": "models::install_local_runtime",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -2079,7 +2341,8 @@
           "type": "String"
         }
       ],
-      "path": "agents::install_provider"
+      "path": "agents::install_provider",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -2094,7 +2357,8 @@
           "type": "String"
         }
       ],
-      "path": "cancel::install_size"
+      "path": "cancel::install_size",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2109,7 +2373,8 @@
           "type": "String"
         }
       ],
-      "path": "toolchain::install_tool"
+      "path": "toolchain::install_tool",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -2118,7 +2383,8 @@
       "name": "keep_awake_status",
       "output": "-> Status",
       "parameters": [],
-      "path": "awake::keep_awake_status"
+      "path": "awake::keep_awake_status",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2138,7 +2404,8 @@
           "type": "bool"
         }
       ],
-      "path": "kn_cloud::kn_cloud_start"
+      "path": "kn_cloud::kn_cloud_start",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2153,7 +2420,8 @@
           "type": "String"
         }
       ],
-      "path": "kn_cloud::kn_cloud_state"
+      "path": "kn_cloud::kn_cloud_state",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2173,7 +2441,8 @@
           "type": "String"
         }
       ],
-      "path": "kn::kn_finish"
+      "path": "kn::kn_finish",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2193,7 +2462,8 @@
           "type": "String"
         }
       ],
-      "path": "kn::kn_pending"
+      "path": "kn::kn_pending",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2213,7 +2483,8 @@
           "type": "String"
         }
       ],
-      "path": "kn::kn_status"
+      "path": "kn::kn_status",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2233,7 +2504,8 @@
           "type": "String"
         }
       ],
-      "path": "kn::kn_update"
+      "path": "kn::kn_update",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2248,11 +2520,17 @@
           "type": "String"
         }
       ],
-      "path": "accounts::list_accounts"
+      "path": "accounts::list_accounts",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "workspace"
+        ]
+      },
       "kind": "invoke",
       "name": "list_active_turns",
       "output": "-> Vec < String >",
@@ -2263,7 +2541,8 @@
           "type": "String"
         }
       ],
-      "path": "turn::list_active_turns"
+      "path": "turn::list_active_turns",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2278,7 +2557,8 @@
           "type": "String"
         }
       ],
-      "path": "handlers::list_agent_profiles"
+      "path": "handlers::list_agent_profiles",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2293,7 +2573,8 @@
           "type": "String"
         }
       ],
-      "path": "handlers::list_agent_status"
+      "path": "handlers::list_agent_status",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2308,7 +2589,8 @@
           "type": "String"
         }
       ],
-      "path": "handlers::list_agents"
+      "path": "handlers::list_agents",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2323,7 +2605,8 @@
           "type": "String"
         }
       ],
-      "path": "sessions::list_archived"
+      "path": "sessions::list_archived",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2332,7 +2615,8 @@
       "name": "list_bundled_language_packs",
       "output": "-> Vec < Disponible >",
       "parameters": [],
-      "path": "locales::list_bundled_language_packs"
+      "path": "locales::list_bundled_language_packs",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2352,7 +2636,8 @@
           "type": "String"
         }
       ],
-      "path": "sessions::list_delegated_sessions"
+      "path": "sessions::list_delegated_sessions",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2367,11 +2652,17 @@
           "type": "Option < bool >"
         }
       ],
-      "path": "deps::list_dependencies"
+      "path": "deps::list_dependencies",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "scope"
+        ]
+      },
       "kind": "invoke",
       "name": "list_git_hosts",
       "output": "-> Result < Vec < GitHostInfo > , Failure >",
@@ -2382,7 +2673,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "git_hosts::list_git_hosts"
+      "path": "git_hosts::list_git_hosts",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2391,7 +2683,8 @@
       "name": "list_governed_mcp_logins",
       "output": "-> Result < Vec < LoginGobernado > , Failure >",
       "parameters": [],
-      "path": "mcp::list_governed_mcp_logins"
+      "path": "mcp::list_governed_mcp_logins",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2400,7 +2693,8 @@
       "name": "list_integrations",
       "output": "-> Result < IntegrationCatalog , Failure >",
       "parameters": [],
-      "path": "integrations::list_integrations"
+      "path": "integrations::list_integrations",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2409,7 +2703,8 @@
       "name": "list_known_mcp",
       "output": "-> Result < Vec < ConocidoInfo > , Failure >",
       "parameters": [],
-      "path": "mcp::list_known_mcp"
+      "path": "mcp::list_known_mcp",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2418,7 +2713,8 @@
       "name": "list_language_packs",
       "output": "-> Result < Vec < Paquete > , String >",
       "parameters": [],
-      "path": "locales::list_language_packs"
+      "path": "locales::list_language_packs",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2438,7 +2734,8 @@
           "type": "Option < Vec < String > >"
         }
       ],
-      "path": "sessions::list_live_sessions"
+      "path": "sessions::list_live_sessions",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2447,7 +2744,8 @@
       "name": "list_live_turns",
       "output": "-> Vec < TurnoEnVuelo >",
       "parameters": [],
-      "path": "turn::list_live_turns"
+      "path": "turn::list_live_turns",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2456,7 +2754,8 @@
       "name": "list_local_models",
       "output": "-> Result < Vec < ModelState > , Failure >",
       "parameters": [],
-      "path": "models::list_local_models"
+      "path": "models::list_local_models",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2465,7 +2764,8 @@
       "name": "list_machine_agents",
       "output": "-> Result < Catalogo , String >",
       "parameters": [],
-      "path": "handler_catalog::list_machine_agents"
+      "path": "handler_catalog::list_machine_agents",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2474,7 +2774,8 @@
       "name": "list_mcp_providers",
       "output": "-> Vec < AgenteMcp >",
       "parameters": [],
-      "path": "mcp::list_mcp_providers"
+      "path": "mcp::list_mcp_providers",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2483,7 +2784,8 @@
       "name": "list_mcp_servers",
       "output": "-> Result < Vec < ServidorInfo > , Failure >",
       "parameters": [],
-      "path": "mcp::list_mcp_servers"
+      "path": "mcp::list_mcp_servers",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2503,7 +2805,8 @@
           "type": "Scope"
         }
       ],
-      "path": "memory::commands::list_memory_entries"
+      "path": "memory::commands::list_memory_entries",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2533,7 +2836,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "mentions::list_mentions"
+      "path": "mentions::list_mentions",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2548,7 +2852,8 @@
           "type": "String"
         }
       ],
-      "path": "models::list_models"
+      "path": "models::list_models",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2563,7 +2868,8 @@
           "type": "String"
         }
       ],
-      "path": "agents::list_permission_modes"
+      "path": "agents::list_permission_modes",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2572,11 +2878,17 @@
       "name": "list_ports",
       "output": "-> Result < Puertos , String >",
       "parameters": [],
-      "path": "ports::list_ports"
+      "path": "ports::list_ports",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "workspace"
+        ]
+      },
       "kind": "invoke",
       "name": "list_project_repositories",
       "output": "-> Result < Wire < Vec < ProjectRepository > > , Failure >",
@@ -2587,7 +2899,8 @@
           "type": "String"
         }
       ],
-      "path": "projects::list_project_repositories"
+      "path": "projects::list_project_repositories",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2596,7 +2909,8 @@
       "name": "list_projects",
       "output": "-> Result < Vec < ProjectInfo > , String >",
       "parameters": [],
-      "path": "projects::list_projects"
+      "path": "projects::list_projects",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2605,7 +2919,8 @@
       "name": "list_providers",
       "output": "-> Vec < AgentInfo >",
       "parameters": [],
-      "path": "agents::list_providers"
+      "path": "agents::list_providers",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2614,7 +2929,8 @@
       "name": "list_radiant_connections",
       "output": "-> Result < Vec < RemoteConnection > , Failure >",
       "parameters": [],
-      "path": "governed::list_radiant_connections"
+      "path": "governed::list_radiant_connections",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2623,7 +2939,8 @@
       "name": "list_radiant_workspaces",
       "output": "-> Result < Vec < RemoteWorkspace > , Failure >",
       "parameters": [],
-      "path": "radiant::list_radiant_workspaces"
+      "path": "radiant::list_radiant_workspaces",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2653,7 +2970,8 @@
           "type": "tauri :: ipc :: Channel < Rows >"
         }
       ],
-      "path": "development::list_session_git"
+      "path": "development::list_session_git",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2662,7 +2980,8 @@
       "name": "list_skill_sources",
       "output": "-> Result < Listado , String >",
       "parameters": [],
-      "path": "skill_sources::list_skill_sources"
+      "path": "skill_sources::list_skill_sources",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2677,7 +2996,8 @@
           "type": "String"
         }
       ],
-      "path": "agents::list_slash_menu"
+      "path": "agents::list_slash_menu",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2692,7 +3012,8 @@
           "type": "String"
         }
       ],
-      "path": "context::list_source_branches"
+      "path": "context::list_source_branches",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2701,7 +3022,8 @@
       "name": "list_source_skills",
       "output": "-> Vec < SkillDeFuente >",
       "parameters": [],
-      "path": "practices::list_source_skills"
+      "path": "practices::list_source_skills",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2710,7 +3032,8 @@
       "name": "list_sources",
       "output": "-> Result < Vec < SourceInfo > , String >",
       "parameters": [],
-      "path": "context::list_sources"
+      "path": "context::list_sources",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2719,7 +3042,8 @@
       "name": "list_spaces",
       "output": "-> Result < Vec < Space > , Failure >",
       "parameters": [],
-      "path": "spaces::list_spaces"
+      "path": "spaces::list_spaces",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2734,7 +3058,8 @@
           "type": "bool"
         }
       ],
-      "path": "storage::list_storage"
+      "path": "storage::list_storage",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2743,7 +3068,8 @@
       "name": "list_surfaces",
       "output": "-> Vec < Superficie >",
       "parameters": [],
-      "path": "surfaces::list_surfaces"
+      "path": "surfaces::list_surfaces",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2752,7 +3078,8 @@
       "name": "list_system_sessions",
       "output": "-> Vec < SystemSession >",
       "parameters": [],
-      "path": "accounts::list_system_sessions"
+      "path": "accounts::list_system_sessions",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -2761,7 +3088,8 @@
       "name": "list_task_mentions",
       "output": "-> Result < Vec < Candidate > , String >",
       "parameters": [],
-      "path": "workspace::task_mentions::list_task_mentions"
+      "path": "workspace::task_mentions::list_task_mentions",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2781,7 +3109,8 @@
           "type": "String"
         }
       ],
-      "path": "development::list_task_trees"
+      "path": "development::list_task_trees",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2790,7 +3119,8 @@
       "name": "list_workspace_attention",
       "output": "-> Vec < WorkspaceAttention >",
       "parameters": [],
-      "path": "attention::list_workspace_attention"
+      "path": "attention::list_workspace_attention",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2799,7 +3129,8 @@
       "name": "list_workspaces",
       "output": "-> Result < Startup , String >",
       "parameters": [],
-      "path": "workspaces::list_workspaces"
+      "path": "workspaces::list_workspaces",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2819,7 +3150,8 @@
           "type": "String"
         }
       ],
-      "path": "chat::load_queue"
+      "path": "chat::load_queue",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2839,7 +3171,8 @@
           "type": "String"
         }
       ],
-      "path": "sessions::load_session"
+      "path": "sessions::load_session",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2848,7 +3181,8 @@
       "name": "local_downloads",
       "output": "-> Vec < Progress >",
       "parameters": [],
-      "path": "models::local_downloads"
+      "path": "models::local_downloads",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2857,7 +3191,8 @@
       "name": "local_runtime",
       "output": "-> RuntimeInfo",
       "parameters": [],
-      "path": "models::local_runtime"
+      "path": "models::local_runtime",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2882,11 +3217,17 @@
           "type": "String"
         }
       ],
-      "path": "accounts::login_account"
+      "path": "accounts::login_account",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "workspace"
+        ]
+      },
       "kind": "invoke",
       "name": "mark_task_seen",
       "output": "-> Result < () , String >",
@@ -2902,11 +3243,17 @@
           "type": "String"
         }
       ],
-      "path": "attention::mark_task_seen"
+      "path": "attention::mark_task_seen",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "id"
+        ]
+      },
       "kind": "invoke",
       "name": "materialize_workspace",
       "output": "-> Result < crate :: wire :: Wire < crate :: workspaces :: Workspace > , Failure >",
@@ -2917,7 +3264,8 @@
           "type": "String"
         }
       ],
-      "path": "danil::materialize_workspace"
+      "path": "danil::materialize_workspace",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2937,7 +3285,8 @@
           "type": "String"
         }
       ],
-      "path": "mcp::mcp_login"
+      "path": "mcp::mcp_login",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2957,7 +3306,8 @@
           "type": "String"
         }
       ],
-      "path": "mcp::mcp_logout"
+      "path": "mcp::mcp_logout",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -2982,7 +3332,8 @@
           "type": "String"
         }
       ],
-      "path": "sessions::move_session"
+      "path": "sessions::move_session",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3007,7 +3358,8 @@
           "type": "String"
         }
       ],
-      "path": "spaces::move_task_to_space"
+      "path": "spaces::move_task_to_space",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3016,7 +3368,8 @@
       "name": "observability_connect",
       "output": "-> Result < Conexion , String >",
       "parameters": [],
-      "path": "observability::observability_connect"
+      "path": "observability::observability_connect",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -3025,7 +3378,8 @@
       "name": "observability_disconnect",
       "output": "-> Result < () , String >",
       "parameters": [],
-      "path": "observability::observability_disconnect"
+      "path": "observability::observability_disconnect",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -3040,7 +3394,8 @@
           "type": "String"
         }
       ],
-      "path": "preview::office_preview"
+      "path": "preview::office_preview",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3055,7 +3410,8 @@
           "type": "String"
         }
       ],
-      "path": "env::open_external"
+      "path": "env::open_external",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -3070,7 +3426,8 @@
           "type": "String"
         }
       ],
-      "path": "env::open_file_external"
+      "path": "env::open_file_external",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -3079,7 +3436,8 @@
       "name": "open_google_drive_desktop",
       "output": "-> Result < () , Failure >",
       "parameters": [],
-      "path": "google_drive_desktop::open_google_drive_desktop"
+      "path": "google_drive_desktop::open_google_drive_desktop",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -3094,7 +3452,8 @@
           "type": "String"
         }
       ],
-      "path": "chat::pending_requests"
+      "path": "chat::pending_requests",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3114,7 +3473,8 @@
           "type": "Vec < String >"
         }
       ],
-      "path": "preview::prepare_attachments"
+      "path": "preview::prepare_attachments",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3134,7 +3494,8 @@
           "type": "String"
         }
       ],
-      "path": "preview::prepare_print"
+      "path": "preview::prepare_print",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -3154,7 +3515,8 @@
           "type": "Option < Vec < String > >"
         }
       ],
-      "path": "bootstrap::prepare_runtime"
+      "path": "bootstrap::prepare_runtime",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -3179,7 +3541,8 @@
           "type": "String"
         }
       ],
-      "path": "fork::prepare_session_continuation"
+      "path": "fork::prepare_session_continuation",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3199,7 +3562,8 @@
           "type": "String"
         }
       ],
-      "path": "preview::preview_file"
+      "path": "preview::preview_file",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3219,7 +3583,34 @@
           "type": "Option < String >"
         }
       ],
-      "path": "development::preview_tree_files"
+      "path": "development::preview_tree_files",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "preview_tree_folder",
+      "output": "-> Result < PaginaDeCarpeta , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        },
+        {
+          "key": "offset",
+          "name": "offset",
+          "type": "u32"
+        }
+      ],
+      "path": "development::preview_tree_folder",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3244,7 +3635,8 @@
           "type": "String"
         }
       ],
-      "path": "development::preview_tree_show"
+      "path": "development::preview_tree_show",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3269,7 +3661,8 @@
           "type": "Option < bool >"
         }
       ],
-      "path": "worktrees::project_base_branches"
+      "path": "worktrees::project_base_branches",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3284,7 +3677,8 @@
           "type": "String"
         }
       ],
-      "path": "projects::cloning::project_clone_status"
+      "path": "projects::cloning::project_clone_status",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3299,7 +3693,8 @@
           "type": "String"
         }
       ],
-      "path": "worktrees::project_setup_command"
+      "path": "worktrees::project_setup_command",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3314,7 +3709,8 @@
           "type": "String"
         }
       ],
-      "path": "agents::provider_download_size"
+      "path": "agents::provider_download_size",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3334,7 +3730,8 @@
           "type": "String"
         }
       ],
-      "path": "publications::publications_of"
+      "path": "publications::publications_of",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3354,7 +3751,8 @@
           "type": "String"
         }
       ],
-      "path": "chat::queue_ready"
+      "path": "chat::queue_ready",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3363,7 +3761,8 @@
       "name": "radiant_cancel_login",
       "output": "-> Result < Status , Failure >",
       "parameters": [],
-      "path": "radiant::radiant_cancel_login"
+      "path": "radiant::radiant_cancel_login",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3378,7 +3777,8 @@
           "type": "String"
         }
       ],
-      "path": "governed::radiant_connect_account"
+      "path": "governed::radiant_connect_account",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3387,7 +3787,8 @@
       "name": "radiant_govern_disable",
       "output": "-> Result < Status , Failure >",
       "parameters": [],
-      "path": "governed::radiant_govern_disable"
+      "path": "governed::radiant_govern_disable",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3396,7 +3797,8 @@
       "name": "radiant_govern_enable",
       "output": "-> Result < Status , Failure >",
       "parameters": [],
-      "path": "governed::radiant_govern_enable"
+      "path": "governed::radiant_govern_enable",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3405,7 +3807,8 @@
       "name": "radiant_govern_refresh",
       "output": "-> Result < Status , Failure >",
       "parameters": [],
-      "path": "governed::radiant_govern_refresh"
+      "path": "governed::radiant_govern_refresh",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3414,7 +3817,8 @@
       "name": "radiant_governance_status",
       "output": "-> Result < Status , Failure >",
       "parameters": [],
-      "path": "governed::radiant_governance_status"
+      "path": "governed::radiant_governance_status",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3423,7 +3827,8 @@
       "name": "radiant_login",
       "output": "-> Result < Status , Failure >",
       "parameters": [],
-      "path": "radiant::radiant_login"
+      "path": "radiant::radiant_login",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3432,7 +3837,8 @@
       "name": "radiant_logout",
       "output": "-> Result < Status , Failure >",
       "parameters": [],
-      "path": "radiant::radiant_logout"
+      "path": "radiant::radiant_logout",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3447,7 +3853,8 @@
           "type": "String"
         }
       ],
-      "path": "radiant::radiant_select_organization"
+      "path": "radiant::radiant_select_organization",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3462,7 +3869,8 @@
           "type": "String"
         }
       ],
-      "path": "radiant::radiant_select_workspace"
+      "path": "radiant::radiant_select_workspace",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3477,7 +3885,8 @@
           "type": "String"
         }
       ],
-      "path": "radiant::radiant_set_server"
+      "path": "radiant::radiant_set_server",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3486,7 +3895,8 @@
       "name": "radiant_status",
       "output": "-> Result < Status , Failure >",
       "parameters": [],
-      "path": "radiant::radiant_status"
+      "path": "radiant::radiant_status",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3501,7 +3911,8 @@
           "type": "bool"
         }
       ],
-      "path": "radiant::usage_report::radiant_usage_set_opt_in"
+      "path": "radiant::usage_report::radiant_usage_set_opt_in",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3510,7 +3921,8 @@
       "name": "radiant_usage_status",
       "output": "-> Result < Status , Failure >",
       "parameters": [],
-      "path": "radiant::usage_report::radiant_usage_status"
+      "path": "radiant::usage_report::radiant_usage_status",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3525,7 +3937,8 @@
           "type": "String"
         }
       ],
-      "path": "drawio::read_drawio_asset"
+      "path": "drawio::read_drawio_asset",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3545,7 +3958,8 @@
           "type": "String"
         }
       ],
-      "path": "mcp::read_mcp_app"
+      "path": "mcp::read_mcp_app",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3565,7 +3979,8 @@
           "type": "String"
         }
       ],
-      "path": "mcp::read_mcp_app_resource"
+      "path": "mcp::read_mcp_app_resource",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3580,7 +3995,8 @@
           "type": "VersionRef"
         }
       ],
-      "path": "versions::read_version"
+      "path": "versions::read_version",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3605,7 +4021,8 @@
           "type": "Vec < String >"
         }
       ],
-      "path": "storage::reclaim_storage"
+      "path": "storage::reclaim_storage",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3635,7 +4052,8 @@
           "type": "u64"
         }
       ],
-      "path": "export::record_export"
+      "path": "export::record_export",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3655,7 +4073,8 @@
           "type": "String"
         }
       ],
-      "path": "history::recreate_task_work"
+      "path": "history::recreate_task_work",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3675,7 +4094,8 @@
           "type": "String"
         }
       ],
-      "path": "chat::launch::reintentar_reanudacion_por_entregas"
+      "path": "chat::launch::reintentar_reanudacion_por_entregas",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3695,7 +4115,8 @@
           "type": "String"
         }
       ],
-      "path": "accounts::remove_account"
+      "path": "accounts::remove_account",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3704,7 +4125,8 @@
       "name": "remove_gh",
       "output": "-> Result < () , String >",
       "parameters": [],
-      "path": "github::remove_gh"
+      "path": "github::remove_gh",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -3713,7 +4135,8 @@
       "name": "remove_google_drive",
       "output": "-> Result < () , Failure >",
       "parameters": [],
-      "path": "google_drive::remove_google_drive"
+      "path": "google_drive::remove_google_drive",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -3728,7 +4151,8 @@
           "type": "String"
         }
       ],
-      "path": "locales::remove_language_pack"
+      "path": "locales::remove_language_pack",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -3743,7 +4167,8 @@
           "type": "String"
         }
       ],
-      "path": "models::remove_local_model"
+      "path": "models::remove_local_model",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -3752,7 +4177,8 @@
       "name": "remove_local_runtime",
       "output": "-> Result < () , Failure >",
       "parameters": [],
-      "path": "models::remove_local_runtime"
+      "path": "models::remove_local_runtime",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -3767,7 +4193,8 @@
           "type": "String"
         }
       ],
-      "path": "mcp::remove_mcp_server"
+      "path": "mcp::remove_mcp_server",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3782,7 +4209,8 @@
           "type": "String"
         }
       ],
-      "path": "agents::remove_provider"
+      "path": "agents::remove_provider",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -3797,7 +4225,8 @@
           "type": "String"
         }
       ],
-      "path": "skill_sources::remove_skill_source"
+      "path": "skill_sources::remove_skill_source",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3812,7 +4241,8 @@
           "type": "String"
         }
       ],
-      "path": "context::remove_source"
+      "path": "context::remove_source",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3827,11 +4257,17 @@
           "type": "String"
         }
       ],
-      "path": "toolchain::remove_tool"
+      "path": "toolchain::remove_tool",
+      "scope": "machine"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "id"
+        ]
+      },
       "kind": "invoke",
       "name": "remove_workspace",
       "output": "-> Result < () , String >",
@@ -3842,7 +4278,8 @@
           "type": "String"
         }
       ],
-      "path": "workspaces::remove_workspace"
+      "path": "workspaces::remove_workspace",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3862,7 +4299,8 @@
           "type": "String"
         }
       ],
-      "path": "projects::rename_project"
+      "path": "projects::rename_project",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3887,7 +4325,8 @@
           "type": "String"
         }
       ],
-      "path": "sessions::rename_session"
+      "path": "sessions::rename_session",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3907,11 +4346,17 @@
           "type": "String"
         }
       ],
-      "path": "spaces::rename_space"
+      "path": "spaces::rename_space",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "id"
+        ]
+      },
       "kind": "invoke",
       "name": "rename_workspace",
       "output": "-> Result < Wire < Workspace > , String >",
@@ -3927,7 +4372,8 @@
           "type": "String"
         }
       ],
-      "path": "workspaces::rename_workspace"
+      "path": "workspaces::rename_workspace",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3952,7 +4398,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "context::repo_branches"
+      "path": "context::repo_branches",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -3986,7 +4433,8 @@
           "type": "bool"
         }
       ],
-      "path": "chat::respond_permission"
+      "path": "chat::respond_permission",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4011,7 +4459,8 @@
           "type": "PathBuf"
         }
       ],
-      "path": "history::restore_task_work"
+      "path": "history::restore_task_work",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4026,7 +4475,8 @@
           "type": "VersionRef"
         }
       ],
-      "path": "versions::restore_version"
+      "path": "versions::restore_version",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4041,36 +4491,17 @@
           "type": "String"
         }
       ],
-      "path": "chat::resume_awaiting_quota"
+      "path": "chat::resume_awaiting_quota",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
-      "kind": "invoke",
-      "name": "retire_memory_entry",
-      "output": "-> Result < () , String >",
-      "parameters": [
-        {
-          "key": "project",
-          "name": "project",
-          "type": "String"
-        },
-        {
-          "key": "scope",
-          "name": "scope",
-          "type": "Scope"
-        },
-        {
-          "key": "File",
-          "name": "_file",
-          "type": "String"
-        }
-      ],
-      "path": "memory::commands::retire_memory_entry"
-    },
-    {
-      "async": false,
-      "channel": null,
+      "ids": {
+        "workspace": [
+          "workspace"
+        ]
+      },
       "kind": "invoke",
       "name": "reuse_project",
       "output": "-> Result < Project , Failure >",
@@ -4091,7 +4522,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "projects::reuse_project"
+      "path": "projects::reuse_project",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4166,7 +4598,8 @@
           "type": "Option < bool >"
         }
       ],
-      "path": "chat::run_shell_command"
+      "path": "chat::run_shell_command",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4196,7 +4629,8 @@
           "type": "String"
         }
       ],
-      "path": "handlers::save_agent_declaration"
+      "path": "handlers::save_agent_declaration",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4231,7 +4665,8 @@
           "type": "f32"
         }
       ],
-      "path": "handlers::save_agent_profile"
+      "path": "handlers::save_agent_profile",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4256,11 +4691,17 @@
           "type": "Wire < Vec < Queued > >"
         }
       ],
-      "path": "chat::save_queue"
+      "path": "chat::save_queue",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "scope"
+        ]
+      },
       "kind": "invoke",
       "name": "select_git_host_area",
       "output": "-> Result < GitHostInfo , Failure >",
@@ -4286,7 +4727,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "git_hosts::select_git_host_area"
+      "path": "git_hosts::select_git_host_area",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4411,7 +4853,8 @@
           "type": "Option < bool >"
         }
       ],
-      "path": "chat::send_message"
+      "path": "chat::send_message",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4425,6 +4868,11 @@
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "workspace"
+        ]
+      },
       "kind": "desktop",
       "name": "service_poll",
       "output": "-> std :: result :: Result < Value , String >",
@@ -4484,7 +4932,8 @@
           "type": "String"
         }
       ],
-      "path": "sessions::session_folder"
+      "path": "sessions::session_folder",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4504,7 +4953,8 @@
           "type": "String"
         }
       ],
-      "path": "usage::session_usage"
+      "path": "usage::session_usage",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4524,7 +4974,8 @@
           "type": "String"
         }
       ],
-      "path": "worktrees::session_worktree"
+      "path": "worktrees::session_worktree",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4544,7 +4995,8 @@
           "type": "String"
         }
       ],
-      "path": "accounts::set_active_account"
+      "path": "accounts::set_active_account",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4559,11 +5011,17 @@
           "type": "String"
         }
       ],
-      "path": "models::set_active_local_model"
+      "path": "models::set_active_local_model",
+      "scope": "machine"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "id"
+        ]
+      },
       "kind": "invoke",
       "name": "set_active_workspace",
       "output": "-> Result < () , String >",
@@ -4574,7 +5032,8 @@
           "type": "String"
         }
       ],
-      "path": "workspaces::set_active_workspace"
+      "path": "workspaces::set_active_workspace",
+      "relay": false
     },
     {
       "async": false,
@@ -4599,7 +5058,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "handlers::set_agent_avatar"
+      "path": "handlers::set_agent_avatar",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4624,7 +5084,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "handlers::set_agent_background"
+      "path": "handlers::set_agent_background",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4649,7 +5110,8 @@
           "type": "bool"
         }
       ],
-      "path": "handlers::set_agent_hidden"
+      "path": "handlers::set_agent_hidden",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4684,7 +5146,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "handlers::set_agent_model"
+      "path": "handlers::set_agent_model",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4709,7 +5172,8 @@
           "type": "String"
         }
       ],
-      "path": "accounts::set_api_key"
+      "path": "accounts::set_api_key",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4739,7 +5203,8 @@
           "type": "Option < serde_json :: Value >"
         }
       ],
-      "path": "handlers::set_chat_background"
+      "path": "handlers::set_chat_background",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4764,7 +5229,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "chat::set_effort"
+      "path": "chat::set_effort",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4789,7 +5255,8 @@
           "type": "String"
         }
       ],
-      "path": "accounts::set_go_usage_key"
+      "path": "accounts::set_go_usage_key",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4804,11 +5271,17 @@
           "type": "bool"
         }
       ],
-      "path": "google_drive_desktop::set_google_drive_desktop_use"
+      "path": "google_drive_desktop::set_google_drive_desktop_use",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "workspace"
+        ]
+      },
       "kind": "invoke",
       "name": "set_integration_enabled",
       "output": "-> Result < () , Failure >",
@@ -4829,7 +5302,8 @@
           "type": "bool"
         }
       ],
-      "path": "integrations::set_integration_enabled"
+      "path": "integrations::set_integration_enabled",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4844,11 +5318,17 @@
           "type": "Mode"
         }
       ],
-      "path": "awake::set_keep_awake"
+      "path": "awake::set_keep_awake",
+      "scope": "machine"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "id"
+        ]
+      },
       "kind": "invoke",
       "name": "set_memory_provider",
       "output": "-> Result < Wire < Workspace > , String >",
@@ -4869,7 +5349,8 @@
           "type": "bool"
         }
       ],
-      "path": "workspaces::set_memory_provider"
+      "path": "workspaces::set_memory_provider",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4894,7 +5375,8 @@
           "type": "String"
         }
       ],
-      "path": "chat::set_permission_mode"
+      "path": "chat::set_permission_mode",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4909,7 +5391,8 @@
           "type": "String"
         }
       ],
-      "path": "workspaces::set_profile"
+      "path": "workspaces::set_profile",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -4929,7 +5412,8 @@
           "type": "String"
         }
       ],
-      "path": "worktrees::set_project_base_branch"
+      "path": "worktrees::set_project_base_branch",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4944,7 +5428,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "workspaces::set_project_directory"
+      "path": "workspaces::set_project_directory",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4964,7 +5449,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "worktrees::set_project_setup_command"
+      "path": "worktrees::set_project_setup_command",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -4984,7 +5470,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "projects::set_project_work_tree"
+      "path": "projects::set_project_work_tree",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -5004,7 +5491,8 @@
           "type": "bool"
         }
       ],
-      "path": "workspaces::set_provider_consent"
+      "path": "workspaces::set_provider_consent",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -5019,7 +5507,8 @@
           "type": "String"
         }
       ],
-      "path": "context::set_root"
+      "path": "context::set_root",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -5044,7 +5533,8 @@
           "type": "bool"
         }
       ],
-      "path": "sessions::set_session_pinned"
+      "path": "sessions::set_session_pinned",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -5069,7 +5559,8 @@
           "type": "Option < Etapa >"
         }
       ],
-      "path": "sessions::set_session_stage"
+      "path": "sessions::set_session_stage",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -5089,7 +5580,8 @@
           "type": "bool"
         }
       ],
-      "path": "skill_sources::set_skill_source_enabled"
+      "path": "skill_sources::set_skill_source_enabled",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -5114,7 +5606,8 @@
           "type": "String"
         }
       ],
-      "path": "context::set_source_branch"
+      "path": "context::set_source_branch",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -5139,7 +5632,8 @@
           "type": "bool"
         }
       ],
-      "path": "context::set_source_skill"
+      "path": "context::set_source_skill",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -5159,7 +5653,8 @@
           "type": "Vec < String >"
         }
       ],
-      "path": "spaces::set_space_folders"
+      "path": "spaces::set_space_folders",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -5189,11 +5684,17 @@
           "type": "Option < String >"
         }
       ],
-      "path": "history::set_task_archived"
+      "path": "history::set_task_archived",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "id"
+        ]
+      },
       "kind": "invoke",
       "name": "set_workspace_host_github",
       "output": "-> Result < Wire < Workspace > , Failure >",
@@ -5209,11 +5710,17 @@
           "type": "bool"
         }
       ],
-      "path": "workspaces::set_workspace_host_github"
+      "path": "workspaces::set_workspace_host_github",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "id"
+        ]
+      },
       "kind": "invoke",
       "name": "set_workspace_language",
       "output": "-> Result < Wire < Workspace > , String >",
@@ -5229,11 +5736,17 @@
           "type": "Option < String >"
         }
       ],
-      "path": "workspaces::set_workspace_language"
+      "path": "workspaces::set_workspace_language",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "id"
+        ]
+      },
       "kind": "invoke",
       "name": "set_workspace_logo",
       "output": "-> Result < LogoGuardado , Failure >",
@@ -5249,11 +5762,17 @@
           "type": "Option < String >"
         }
       ],
-      "path": "workspaces::set_workspace_logo"
+      "path": "workspaces::set_workspace_logo",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "id"
+        ]
+      },
       "kind": "invoke",
       "name": "set_workspace_logo_png",
       "output": "-> Result < LogoGuardado , Failure >",
@@ -5269,11 +5788,17 @@
           "type": "String"
         }
       ],
-      "path": "workspaces::set_workspace_logo_png"
+      "path": "workspaces::set_workspace_logo_png",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "id"
+        ]
+      },
       "kind": "invoke",
       "name": "set_workspace_output_language",
       "output": "-> Result < Wire < Workspace > , String >",
@@ -5289,11 +5814,17 @@
           "type": "Option < String >"
         }
       ],
-      "path": "workspaces::set_workspace_output_language"
+      "path": "workspaces::set_workspace_output_language",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "id"
+        ]
+      },
       "kind": "invoke",
       "name": "set_workspace_permission_mode",
       "output": "-> Result < Wire < Workspace > , Failure >",
@@ -5309,7 +5840,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "workspaces::set_workspace_permission_mode"
+      "path": "workspaces::set_workspace_permission_mode",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -5329,11 +5861,17 @@
           "type": "String"
         }
       ],
-      "path": "context::set_workspace_source"
+      "path": "context::set_workspace_source",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "id"
+        ]
+      },
       "kind": "invoke",
       "name": "set_workspace_terminal_theme",
       "output": "-> Result < Wire < Workspace > , String >",
@@ -5349,11 +5887,17 @@
           "type": "Option < String >"
         }
       ],
-      "path": "workspaces::set_workspace_terminal_theme"
+      "path": "workspaces::set_workspace_terminal_theme",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "id"
+        ]
+      },
       "kind": "invoke",
       "name": "set_workspace_worktrees_root",
       "output": "-> Result < Wire < Workspace > , Failure >",
@@ -5369,7 +5913,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "workspaces::set_workspace_worktrees_root"
+      "path": "workspaces::set_workspace_worktrees_root",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -5378,7 +5923,8 @@
       "name": "setup_required",
       "output": "-> bool",
       "parameters": [],
-      "path": "bootstrap::setup_required"
+      "path": "bootstrap::setup_required",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -5626,7 +6172,8 @@
       "name": "skill_source_freshness",
       "output": "-> Result < Vec < crate :: context :: Frescura > , String >",
       "parameters": [],
-      "path": "skill_sources::skill_source_freshness"
+      "path": "skill_sources::skill_source_freshness",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -5646,7 +6193,8 @@
           "type": "String"
         }
       ],
-      "path": "chat::sleep_session"
+      "path": "chat::sleep_session",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -5666,7 +6214,8 @@
           "type": "bool"
         }
       ],
-      "path": "context::source_detail"
+      "path": "context::source_detail",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -5675,7 +6224,8 @@
       "name": "source_freshness",
       "output": "-> Result < Vec < Frescura > , String >",
       "parameters": [],
-      "path": "context::source_freshness"
+      "path": "context::source_freshness",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -5684,7 +6234,8 @@
       "name": "sources_in_use",
       "output": "-> Vec < String >",
       "parameters": [],
-      "path": "turn::sources_in_use"
+      "path": "turn::sources_in_use",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -5699,11 +6250,17 @@
           "type": "String"
         }
       ],
-      "path": "spaces::space_delete_preview"
+      "path": "spaces::space_delete_preview",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "scope"
+        ]
+      },
       "kind": "invoke",
       "name": "start_browser_login",
       "output": "-> Result < Wait , Failure >",
@@ -5719,11 +6276,17 @@
           "type": "Option < String >"
         }
       ],
-      "path": "git_hosts::start_browser_login"
+      "path": "git_hosts::start_browser_login",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "workspace"
+        ]
+      },
       "kind": "invoke",
       "name": "start_google_drive_login",
       "output": "-> Result < Wait , Failure >",
@@ -5734,7 +6297,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "google_drive::start_google_drive_login"
+      "path": "google_drive::start_google_drive_login",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -5749,11 +6313,17 @@
           "type": "String"
         }
       ],
-      "path": "models::start_local_model"
+      "path": "models::start_local_model",
+      "scope": "machine"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "workspace"
+        ]
+      },
       "kind": "invoke",
       "name": "start_project_clone",
       "output": "-> Result < cloning :: Started , crate :: util :: Failure >",
@@ -5804,7 +6374,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "projects::start_project_clone"
+      "path": "projects::start_project_clone",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -5813,7 +6384,8 @@
       "name": "stop_local_model",
       "output": "-> Result < () , Failure >",
       "parameters": [],
-      "path": "models::stop_local_model"
+      "path": "models::stop_local_model",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -5828,7 +6400,8 @@
           "type": "String"
         }
       ],
-      "path": "chat::stop_shell_command"
+      "path": "chat::stop_shell_command",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -5848,7 +6421,8 @@
           "type": "String"
         }
       ],
-      "path": "chat::stop_turn"
+      "path": "chat::stop_turn",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -5868,11 +6442,17 @@
           "type": "String"
         }
       ],
-      "path": "accounts::submit_login_code"
+      "path": "accounts::submit_login_code",
+      "scope": "workspace"
     },
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "id"
+        ]
+      },
       "kind": "invoke",
       "name": "sync_workspace",
       "output": "-> Result < crate :: wire :: Wire < crate :: workspaces :: Workspace > , Failure >",
@@ -5883,7 +6463,29 @@
           "type": "String"
         }
       ],
-      "path": "danil::sync_workspace"
+      "path": "danil::sync_workspace",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "ids": {
+        "workspace": [
+          "id"
+        ]
+      },
+      "kind": "invoke",
+      "name": "sync_workspace_memory",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "danil::sync_workspace_memory",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -5908,7 +6510,8 @@
           "type": "bool"
         }
       ],
-      "path": "history::task_blockers"
+      "path": "history::task_blockers",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -5928,7 +6531,8 @@
           "type": "String"
         }
       ],
-      "path": "sessions::task_coordinator"
+      "path": "sessions::task_coordinator",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -5948,7 +6552,8 @@
           "type": "String"
         }
       ],
-      "path": "history::task_history"
+      "path": "history::task_history",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -5963,7 +6568,8 @@
           "type": "String"
         }
       ],
-      "path": "chat::tasks_awaiting_quota"
+      "path": "chat::tasks_awaiting_quota",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -5983,7 +6589,8 @@
           "type": "String"
         }
       ],
-      "path": "telegram::telegram_disable"
+      "path": "telegram::telegram_disable",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6008,7 +6615,8 @@
           "type": "String"
         }
       ],
-      "path": "telegram::telegram_set_token"
+      "path": "telegram::telegram_set_token",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6028,7 +6636,8 @@
           "type": "String"
         }
       ],
-      "path": "telegram::telegram_start_pairing"
+      "path": "telegram::telegram_start_pairing",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6048,7 +6657,8 @@
           "type": "String"
         }
       ],
-      "path": "telegram::telegram_status"
+      "path": "telegram::telegram_status",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6073,7 +6683,8 @@
           "type": "String"
         }
       ],
-      "path": "development::tree_changes"
+      "path": "development::tree_changes",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6103,7 +6714,8 @@
           "type": "String"
         }
       ],
-      "path": "development::tree_create_file"
+      "path": "development::tree_create_file",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6133,7 +6745,8 @@
           "type": "String"
         }
       ],
-      "path": "development::tree_create_folder"
+      "path": "development::tree_create_folder",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6163,7 +6776,8 @@
           "type": "String"
         }
       ],
-      "path": "development::tree_delete"
+      "path": "development::tree_delete",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6203,7 +6817,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "development::tree_diff"
+      "path": "development::tree_diff",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6228,7 +6843,44 @@
           "type": "String"
         }
       ],
-      "path": "development::tree_files"
+      "path": "development::tree_files",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "tree_folder",
+      "output": "-> Result < PaginaDeCarpeta , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "tree",
+          "name": "tree",
+          "type": "String"
+        },
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        },
+        {
+          "key": "offset",
+          "name": "offset",
+          "type": "u32"
+        }
+      ],
+      "path": "development::tree_folder",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6253,7 +6905,8 @@
           "type": "String"
         }
       ],
-      "path": "development::tree_git_status"
+      "path": "development::tree_git_status",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6283,7 +6936,8 @@
           "type": "String"
         }
       ],
-      "path": "development::tree_office_preview"
+      "path": "development::tree_office_preview",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6313,7 +6967,8 @@
           "type": "String"
         }
       ],
-      "path": "development::tree_open_external"
+      "path": "development::tree_open_external",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -6343,7 +6998,8 @@
           "type": "String"
         }
       ],
-      "path": "development::tree_patch"
+      "path": "development::tree_patch",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6378,7 +7034,8 @@
           "type": "String"
         }
       ],
-      "path": "development::tree_rename"
+      "path": "development::tree_rename",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6408,7 +7065,8 @@
           "type": "String"
         }
       ],
-      "path": "development::tree_show"
+      "path": "development::tree_show",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6433,7 +7091,8 @@
           "type": "String"
         }
       ],
-      "path": "development::tree_summary"
+      "path": "development::tree_summary",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6468,7 +7127,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "development::tree_typst_export"
+      "path": "development::tree_typst_export",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6503,7 +7163,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "development::tree_typst_target"
+      "path": "development::tree_typst_target",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6538,7 +7199,8 @@
           "type": "String"
         }
       ],
-      "path": "development::tree_write"
+      "path": "development::tree_write",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6553,7 +7215,8 @@
           "type": "String"
         }
       ],
-      "path": "sessions::turn_authors"
+      "path": "sessions::turn_authors",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6698,7 +7361,8 @@
           "type": "Plugin"
         }
       ],
-      "path": "integrations::uninstall_integration"
+      "path": "integrations::uninstall_integration",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -6718,7 +7382,8 @@
           "type": "String"
         }
       ],
-      "path": "practices::uninstall_source_skill"
+      "path": "practices::uninstall_source_skill",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6733,7 +7398,8 @@
           "type": "String"
         }
       ],
-      "path": "development::unwatch_task_tree"
+      "path": "development::unwatch_task_tree",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6748,7 +7414,8 @@
           "type": "Plugin"
         }
       ],
-      "path": "integrations::update_integration"
+      "path": "integrations::update_integration",
+      "scope": "machine"
     },
     {
       "async": false,
@@ -6763,7 +7430,8 @@
           "type": "String"
         }
       ],
-      "path": "skill_sources::update_skill_source"
+      "path": "skill_sources::update_skill_source",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6778,7 +7446,8 @@
           "type": "String"
         }
       ],
-      "path": "context::update_source"
+      "path": "context::update_source",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6803,7 +7472,8 @@
           "type": "tauri :: ipc :: Channel < () >"
         }
       ],
-      "path": "development::watch_task_tree"
+      "path": "development::watch_task_tree",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6868,7 +7538,8 @@
           "type": "String"
         }
       ],
-      "path": "carry::work_cancel"
+      "path": "carry::work_cancel",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6918,7 +7589,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "carry::work_export"
+      "path": "carry::work_export",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6963,7 +7635,8 @@
           "type": "Option < Create >"
         }
       ],
-      "path": "carry::work_import"
+      "path": "carry::work_import",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6972,7 +7645,8 @@
       "name": "work_key",
       "output": "-> Result < WorkKey , Failure >",
       "parameters": [],
-      "path": "carry::work_key"
+      "path": "carry::work_key",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -6997,7 +7671,8 @@
           "type": "u32"
         }
       ],
-      "path": "carry::work_read_part"
+      "path": "carry::work_read_part",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -7017,7 +7692,8 @@
           "type": "Option < String >"
         }
       ],
-      "path": "carry::work_status"
+      "path": "carry::work_status",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -7042,7 +7718,8 @@
           "type": "String"
         }
       ],
-      "path": "carry::work_write_part"
+      "path": "carry::work_write_part",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -7051,7 +7728,8 @@
       "name": "workspaces_startup",
       "output": "-> Result < Startup , String >",
       "parameters": [],
-      "path": "workspaces::workspaces_startup"
+      "path": "workspaces::workspaces_startup",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -7076,7 +7754,8 @@
           "type": "String"
         }
       ],
-      "path": "worktrees::worktree_rename_branch"
+      "path": "worktrees::worktree_rename_branch",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -7111,7 +7790,8 @@
           "type": "String"
         }
       ],
-      "path": "memory::commands::write_memory_entry"
+      "path": "memory::commands::write_memory_entry",
+      "scope": "workspace"
     },
     {
       "async": false,
@@ -7131,7 +7811,8 @@
           "type": "String"
         }
       ],
-      "path": "chat::write_shell_input"
+      "path": "chat::write_shell_input",
+      "scope": "workspace"
     }
   ],
   "events": [
