@@ -9,7 +9,8 @@
  *
  * Dos máquinas comparten el workspace «Producto» (cada motor con sus ids): la VM
  * de Danil (`aws-ec2`, apagada, con copia en el espejo) y una Mac propia
- * (`kind: physical`, encendida; apagada con `--mac-off`). Cada una tiene su motor en memoria: tareas, un
+ * (`kind: physical`, encendida; apagada con `--mac-off`). `--workspace-mode <id>` le
+ * pone a «Producto» un modo de permisos predeterminado. Cada una tiene su motor en memoria: tareas, un
  * agente, permisos y eventos; y lo que pide la app además de la lista: fijar y
  * archivar, el cuadro de escribir (modelos, permisos, `/`, `@`, ramas, `!` e
  * imágenes adjuntas con las reglas del motor) y las cuentas de IA con su
@@ -30,6 +31,7 @@ const option = (name, fallback) => {
 const PORT = Number(option("port", "8787"));
 const LICENSE = !process.argv.includes("--license");
 const WAKE_MS = Number(option("wake-ms", "800"));
+const WORKSPACE_MODE = option("workspace-mode", null);
 const TOKEN = "fake-jwt";
 const INTENT = new Set(["send_message", "inject_message", "create_project", "start_project_clone", "create_agent", "create_agent_thread", "login_account", "submit_login_code", "respond_permission", "answer_question", "answer_shell_output", "run_shell_command", "queue_ready", "resume_awaiting_quota", "recreate_task_work"]);
 const MIRROR = new Set(["workspaces_startup", "list_workspaces", "list_projects", "list_spaces", "list_live_sessions", "list_agent_status", "list_providers", "load_session", "pending_requests", "list_active_turns", "list_workspace_attention", "list_agents"]);
@@ -193,7 +195,7 @@ function invoke(m, command, args) {
       if (clone && !clone.done) clone.cancelled = true;
       return null;
     }
-    case "list_workspaces": return { workspaces: [{ id: e.ws, name: "Producto" }], active: e.ws };
+    case "list_workspaces": return { workspaces: [{ id: e.ws, name: "Producto", default_permission_mode: WORKSPACE_MODE }], active: e.ws };
     case "list_projects": return e.projects.map((p) => ({ ...p, working_directory: `/lab/${p.name}` }));
     case "list_spaces": return [{ id: "s1", name: null, folders: e.projects.map((p) => p.id) }];
     case "list_live_sessions": return [...e.sessions.values()].filter((s) => s.project === args.project && !s.archived).map(row);
@@ -220,6 +222,7 @@ function invoke(m, command, args) {
         emit(m, "session", { workspace: e.ws, project: args.project, session: id });
       }
       // Lo que eligió el cuadro queda en el turno, para que la prueba lo lea de vuelta.
+      console.log(`send_message ${JSON.stringify({ prompt: args.prompt, provider: args.provider, permissionMode: args.permissionMode ?? null })}`);
       turn(m, s, String(args.prompt), { model: args.model ?? null, attachments: args.attachments ?? [], effort: args.effort ?? null, permissionMode: args.permissionMode ?? null, baseRef: args.baseRef ?? null });
       return s.id;
     }

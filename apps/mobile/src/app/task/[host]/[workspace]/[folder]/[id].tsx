@@ -68,7 +68,7 @@ export default function TaskScreen() {
   const { getToken } = useAccount();
   const accountBackground = registry?.find((w) => w.id === workspace)?.background_url ?? null;
   const host = hostOf(params.host);
-  const { snapshot } = useWorkspaces();
+  const { snapshot, list: workspaces } = useWorkspaces();
   const [view, setView] = useState<TaskView | null>(null);
   const [live, setLive] = useState<readonly LivePiece[]>([]);
   const [note, setNote] = useState<string | null>(null);
@@ -242,11 +242,14 @@ export default function TaskScreen() {
   const scope = useMemo(() => (host ? { host, hostId: params.host, workspace, folder, session: id } : null), [host, params.host, workspace, folder, id]);
   // Una respuesta rápida se manda como un mensaje, con el proveedor y el modelo con que sigue la tarea.
   // Estable entre lecturas (lee la vista y `submit` del último render), para que el memo de `MessageBody` se sostenga.
+  // El modo con que sigue la tarea. Con `null` el motor correría el suyo por omisión, no el que guardó la tarea.
+  const savedMode = view?.session.permission_mode ?? null;
+  const workspaceMode = workspaces.find((w) => w.id === workspace)?.defaultPermissionMode ?? null;
   const latest = useRef({ view, submit });
   latest.current = { view, submit };
   const quickReply = useCallback((prompt: string) => {
     const { view: now, submit: send } = latest.current;
-    return now ? send({ shell: false, prompt, ...taskDefaults(now), effort: null, permissionMode: null, attachments: [] }) : Promise.resolve(false);
+    return now ? send({ shell: false, prompt, ...taskDefaults(now), effort: null, permissionMode: now.session.permission_mode ?? null, attachments: [] }) : Promise.resolve(false);
   }, []);
 
   return (
@@ -328,6 +331,8 @@ export default function TaskScreen() {
         providers={snapshot?.providers[params.host] ?? []}
         provider={view?.session.provider ?? null}
         model={view ? taskDefaults(view).model : null}
+        permissionMode={workspaceMode}
+        savedPermissionMode={savedMode}
         providerLocked={Boolean(view?.session.turns.length)}
         running={running}
         disabled={asleep || waking || !view}
