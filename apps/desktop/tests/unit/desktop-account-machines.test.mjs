@@ -183,8 +183,10 @@ async function newTask(app) {
   [...doc.querySelectorAll("button")].find((b) => b.textContent?.trim().startsWith("Nueva tarea"))?.click();
   await sleep(300);
   doc.querySelector('button[aria-label="Proyecto"]').click();
-  assert.ok(await until(() => [...doc.querySelectorAll("button")].some((b) => b.textContent?.trim().startsWith("Local") || b.textContent?.trim().startsWith("P1"))), "the folder picker opens");
-  [...doc.querySelectorAll("button")].find((b) => b.textContent?.trim().startsWith("Local") || b.textContent?.trim().startsWith("P1")).click();
+  // Inside the picker: the sidebar has its own «P1» button too (the folder's group).
+  const option = () => [...doc.querySelectorAll("[role=dialog] button")].find((b) => b.textContent?.trim().startsWith("Local") || b.textContent?.trim().startsWith("P1"));
+  assert.ok(await until(() => option()), "the folder picker opens");
+  option().click();
   await sleep(300);
 }
 
@@ -206,7 +208,10 @@ test("signed in, the tasks of every machine show together; a VM task's actions g
   assert.ok(doc.querySelector('[data-sesion="t1"]'), "the local task keeps its id");
   assert.ok(doc.querySelector('[data-sesion="cmp_vm~t1"]'), "the VM task has its namespaced id");
   assert.ok(doc.querySelector('[data-sesion="cmp_mac~t1"]'));
-  assert.equal(doc.querySelector("[data-sesion] [data-machine]"), null, "a sidebar row leaves its machine to the task card");
+  // Since #294 a row says its machine only when the task runs on another one.
+  assert.equal(doc.querySelector('[data-sesion="t1"] [data-machine]'), null, "a local task's row names no machine");
+  assert.equal(doc.querySelector('[data-sesion="cmp_vm~t1"] [data-machine]')?.getAttribute("data-machine"), "cmp_vm", "the VM task's row names the VM");
+  assert.equal(doc.querySelector('[data-sesion="cmp_mac~t1"] [data-machine]')?.getAttribute("data-machine"), "cmp_mac");
   assert.ok(relayCalls("cmp_vm", "list_projects").some((c) => c.workspace === "w"), "the VM reads its own workspace");
   assert.ok(native("list_projects").length > 0, "the local engine still answers through the window");
 

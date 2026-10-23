@@ -74,7 +74,8 @@ test("the account's workspaces show with their machines asleep, not the create-w
   assert.deepEqual(listed.workspaces.map((w) => [w.id, w.name, w.machines]), [["w1", "Producto", ["cmp_vm"]]], "the registry's workspace, on the VM");
   assert.equal(listed.active, "w1", "and it is the open one");
   assert.ok(text().includes("Producto"), "the panel opens on it");
-  assert.ok(text().includes("Todavía no hay tareas"), "with an empty task list, not an error");
+  // Grouped by folder (the default), an empty project is its own group with «Sin tareas todavía».
+  assert.ok(doc.querySelector('[data-sidebar-group="p1"] [data-folder-empty]'), "with an empty task list, not an error");
   const projects = await invoke("list_projects");
   assert.deepEqual(projects.map((p) => [p.id, p.machines, p.remote_url]), [["p1", ["cmp_vm"], "https://github.com/ana/app"]], "its project, from the registry");
   // Nadie contestó y no hay nada guardado: se dice por qué, nunca una lista vacía que no es cierta.
