@@ -1,6 +1,6 @@
 {
   "danil.account.title": "Cuenta de Danil",
-  "danil.account.description": "Inicia sesión con tu cuenta de Danil. Esta computadora queda registrada en tu cuenta. Con la sesión iniciada, todos los workspaces de esta computadora se ven en la web y el teléfono.",
+  "danil.account.description": "Inicia sesión con tu cuenta de Danil en esta computadora. La sesión es de la app, no de un workspace: ningún workspace entra a la cuenta hasta que se elige.",
   "danil.account.name_label": "Nombre de esta computadora",
   "danil.account.name_hint": "Así verás esta computadora en tu cuenta de Danil. No cambia tu nombre en la cuenta.",
   "danil.account.continue_as": "Continuar como {email}",
@@ -74,7 +74,7 @@
   "danil.error.account_not_found": "Esa cuenta ya no tiene sesión en esta computadora. Vuelve a iniciar sesión con ella.",
   "danil.error.workspace_id_taken": "Este workspace sigue siendo de la otra cuenta. Inicia sesión con esa cuenta en esta computadora para moverlo.",
   "danil.accounts.title": "Cuentas de Danil",
-  "danil.accounts.description": "Cada workspace es de una cuenta de Danil y se sincroniza solo con ella: se ve en la web y el teléfono de esa cuenta, nunca en otra. Ningún workspace entra solo a una cuenta: la de cada uno se elige en Workspaces.",
+  "danil.accounts.description": "Las sesiones de Danil de esta computadora, para toda la app. Iniciar sesión no mete ningún workspace a la cuenta: cada uno elige la suya, arriba o en Workspaces, y solo así se ve en la web y el teléfono de esa cuenta.",
   "danil.accounts.default": "Principal",
   "danil.accounts.make_default": "Usar como principal",
   "danil.accounts.add": "Agregar otra cuenta",
@@ -100,7 +100,7 @@
   "danil.workspace.unsynced_account": "Sin sincronizar: {email} no tiene sesión en esta computadora.",
   "danil.workspace.failed": "No se pudo cambiar la cuenta de este workspace.",
   "danil.workspace.no_account_option": "Sin cuenta (no se sincroniza)",
-  "danil.workspace.no_account": "No es de ninguna cuenta: no se ve en la web ni en el teléfono.",
+  "danil.workspace.no_account": "Este workspace no es de ninguna cuenta: no se ve en la web ni en el teléfono.",
   "danil.workspace.leave_confirm": "Se quita de {email}: deja de verse en su web y su teléfono. Su sesión sigue para los demás workspaces.",
   "danil.workspace.leave_yes": "Quitar de la cuenta",
   "danil.workspace.leave_no": "Cancelar",
@@ -157,5 +157,7 @@
   "danil.computers.rename_failed.not_found": "Esa computadora ya no está en tu cuenta.",
   "danil.computers.rename_failed.unauthorized": "Tu sesión de Danil venció. Vuelve a iniciar sesión.",
   "danil.computers.rename_failed.offline": "Sin conexión con Danil: el nombre no se guardó.",
-  "danil.computers.rename_failed.other": "Danil no guardó el nombre. Inténtalo de nuevo."
+  "danil.computers.rename_failed.other": "Danil no guardó el nombre. Inténtalo de nuevo.",
+  "danil.here.title": "Este workspace: {name}",
+  "danil.workspace.use": "Usar {email}"
 }
