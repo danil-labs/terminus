@@ -6511,6 +6511,16 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "sync_zotero_bibs",
+      "output": "-> Result < Vec < VinculoBib > , Failure >",
+      "parameters": [],
+      "path": "zotero::sync_zotero_bibs",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "task_blockers",
       "output": "-> Result < Blockers , Failure >",
       "parameters": [
@@ -7409,6 +7419,22 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "unlink_zotero_bib",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "path",
+          "name": "path",
+          "type": "String"
+        }
+      ],
+      "path": "zotero::unlink_zotero_bib",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "unwatch_task_tree",
       "output": "",
       "parameters": [
@@ -7832,6 +7858,16 @@
         }
       ],
       "path": "chat::write_shell_input",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "zotero_bib_links",
+      "output": "-> Result < Vec < VinculoBib > , Failure >",
+      "parameters": [],
+      "path": "zotero::zotero_bib_links",
       "scope": "workspace"
     },
     {
