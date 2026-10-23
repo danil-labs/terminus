@@ -79,6 +79,7 @@
   "providers.github.cli.unavailable": "Status unavailable",
   "providers.github.host_mode.title": "Use this computer's GitHub",
   "providers.github.host_mode.save_failed": "Could not save this workspace's GitHub setting.",
+  "providers.github.host_mode.ignored": "This computer has no gh signed in to GitHub: the workspace's connection is used instead. Turn it off.",
   "providers.github.change": "pull request",
   "providers.github.change_short": "PR",
   "providers.github.checks": "Checks",

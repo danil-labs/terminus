@@ -138,7 +138,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
       if (state === "esperando" || state === "instalando") void cancelarNavegador(id);
     }
   });
-  const [cli, setCli] = createSignal<{ available: boolean; version: string | null; managed_supported: boolean; installable: boolean } | null>(null);
+  const [cli, setCli] = createSignal<{ available: boolean; version: string | null; managed_supported: boolean; installable: boolean; host_signed_in?: boolean } | null>(null);
   const [loadingCli, setLoadingCli] = createSignal(true);
   const [installingCli, setInstallingCli] = createSignal(false);
   const [cliFailure, setCliFailure] = createSignal<Failure | null>(null);
@@ -168,6 +168,9 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
       .then((s) => setHostGithub(!!s.workspaces.find((w) => w.id === s.active)?.host_github))
       .catch(() => {});
   });
+  // Sólo tiene sentido con un gh con sesión en esta máquina; un motor que no
+  // lo publica todavía cae en «hay gh». Encendido se enseña igual, para apagarlo.
+  const hostUsable = () => { const c = cli(); return !!c && (c.host_signed_in ?? c.available); };
   async function changeHostGithub(enabled: boolean) {
     const id = await scope;
     if (id === "pending") return;
@@ -582,8 +585,11 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                     </Switch>
                   }
                 >
-                  <Show when={p.id === "github"}>
-                    <SettingsRow label={t("providers.github.host_mode.title")}>
+                  <Show when={p.id === "github" && (hostUsable() || hostGithub())}>
+                    <SettingsRow
+                      label={t("providers.github.host_mode.title")}
+                      description={hostGithub() && !hostUsable() ? t("providers.github.host_mode.ignored") : undefined}
+                    >
                       <Toggle
                         checked={hostGithub()}
                         label={t("providers.github.host_mode.title")}
