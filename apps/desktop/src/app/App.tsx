@@ -213,6 +213,7 @@ import {
   carpetasDelEscritorio,
   enEscritorio,
   escritorioDeFila,
+  rememberTaskSpace,
   type Space,
   spaceName,
 } from "../lib/spaces";
@@ -5460,6 +5461,11 @@ export default function App() {
         // mensaje; lo que llega de otro canal no trae ninguno.
         space: espacioPara(m.space, opciones?.headers?.["x-terminus-machine"]),
       }, opciones);
+      // Una tarea nueva en otra máquina nace en el space de esa máquina: la
+      // ventana recuerda el escritorio donde se creó (`lib/spaces.ts`).
+      if (!abierta && m.space && opciones?.headers?.["x-terminus-machine"] && !espacioPara(m.space, opciones.headers["x-terminus-machine"])) {
+        rememberTaskSpace(id, m.space);
+      }
       if (provisional && naceDormida) {
         anotar(setEncendiendo, provisional, null);
         void refetchMachines();
