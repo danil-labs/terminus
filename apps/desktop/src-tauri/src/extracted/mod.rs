@@ -14,6 +14,7 @@ mod linux_engine;
 mod local_image;
 #[cfg(target_os = "macos")]
 mod master_handoff;
+mod page_preview;
 mod placement;
 mod proxy;
 mod sites;
@@ -179,6 +180,9 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
                     if url.scheme() == "tauri"
                         || url.host_str() == Some("tauri.localhost")
                         || url.as_str() == "about:srcdoc"
+                        // El marco de la vista previa de un `.html`: en macOS y Linux esto también filtra marcos.
+                        || url.scheme() == page_preview::SCHEME
+                        || url.host_str() == Some("terminus-page.localhost")
                     {
                         return true;
                     }
@@ -206,6 +210,12 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
         .register_asynchronous_uri_scheme_protocol(
             local_image::SCHEME,
             |_ctx, request, responder| local_image::atender(request, responder),
+        )
+        .register_asynchronous_uri_scheme_protocol(
+            page_preview::SCHEME,
+            |ctx, request, responder| {
+                page_preview::atender(ctx.app_handle().clone(), request, responder)
+            },
         )
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
