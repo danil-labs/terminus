@@ -178,6 +178,16 @@ async function openTask(app, id) {
 }
 
 /** A new task in folder P1, from the composer. */
+/**
+ * The «+» of this computer's «Local» group. Since f86188a a folder with tasks on
+ * several machines is one group per machine («Local · Esta computadora»); this
+ * one is `data-folder-machine=""`, or the only group when the folder is not split.
+ */
+function localNewTask(doc) {
+  const group = doc.querySelector('[data-folder-machine=""]') ?? doc.querySelector("[data-folder-group]:not([data-folder-machine])");
+  return group?.querySelector('[aria-label^="Nueva tarea en Local"]');
+}
+
 async function newTask(app) {
   const doc = app.w.document;
   [...doc.querySelectorAll("button")].find((b) => b.textContent?.trim().startsWith("Nueva tarea"))?.click();
@@ -259,7 +269,7 @@ test("a new task is born on this computer unless «Ejecutar en» picks another f
   assert.equal(relayCalls("cmp_vm", "send_message").length, 0);
 
   const doc = app.w.document;
-  doc.querySelector('[aria-label="Nueva tarea en Local"]').click();
+  localNewTask(doc).click();
   assert.ok(await until(() => doc.querySelector('[aria-label="Ejecutar en"]')), "the composer offers «Ejecutar en»");
   doc.querySelector('[aria-label="Ejecutar en"]').click();
   assert.ok(await until(() => doc.querySelector('[data-machine-option="cmp_vm"]')), "the picker lists the account's machines");
@@ -641,7 +651,7 @@ test("Cuenta de Danil lists the account's computers; a name edited in place reac
   await sleep(1_200);
   doc.querySelector('[aria-label="Cerrar configuración (Esc)"]').click();
   assert.ok(await until(() => !doc.querySelector("[data-danil-account]")), "Configuración closes");
-  doc.querySelector('[aria-label="Nueva tarea en Local"]').click();
+  localNewTask(doc).click();
   assert.ok(await until(() => doc.querySelector('[aria-label="Ejecutar en"]')), "the composer offers «Ejecutar en»");
   doc.querySelector('[aria-label="Ejecutar en"]').click();
   assert.ok(
