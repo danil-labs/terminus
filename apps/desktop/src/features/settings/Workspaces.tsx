@@ -1,4 +1,4 @@
-import { For, Show, Suspense, createSignal, lazy, onMount, splitProps, type JSX } from "solid-js";
+import { For, Show, Suspense, createResource, createSignal, lazy, onMount, splitProps, type JSX } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
 import { open } from "@tauri-apps/plugin-dialog";
 import Check from "lucide-solid/icons/check";
@@ -32,6 +32,8 @@ import {
   type Workspace,
 } from "./workspaces-store";
 import { capabilities } from "../../lib/platform";
+import { elegirArchivoDeImagen } from "../../lib/pick-image";
+import { blobToDataUrl } from "./account-profile";
 
 // Chunk aparte: la cuenta de Danil del workspace solo pesa al abrir esta pantalla.
 const WorkspaceAccount = lazy(() => import("./WorkspaceAccount"));
@@ -301,10 +303,14 @@ function CarpetaDeCopias(props: { workspace: Workspace; onCambio: () => void }) 
 
 const IMAGENES_DE_LOGO = ["png", "jpg", "jpeg", "webp"];
 
+const pngDeBase64 = (base64: string) => new Blob([Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))], { type: "image/png" });
+
 /**
  * El logo que pinta la columna y el menú del nombre. Se copia dentro del
  * workspace: la carpeta elegida puede no estar mañana. `fila` es la de Estilo;
- * sin ella va metida en la tarjeta del workspace.
+ * sin ella va metida en la tarjeta del workspace. En la web, el de un
+ * workspace de la cuenta se elige con el selector de la página y se guarda en
+ * la cuenta (`capabilities().accountAssets`).
  */
 export function LogoDelWorkspace(props: {
   workspace: Workspace;
@@ -314,14 +320,26 @@ export function LogoDelWorkspace(props: {
   const [guardando, setGuardando] = createSignal(false);
   const [fallo, setFallo] = createSignal<Failure | null>(null);
   const [recorte, setRecorte] = createSignal<string | null>(null);
+  const cuenta = capabilities().accountAssets;
+  const [version, setVersion] = createSignal(0);
+  const [logoDeLaCuenta] = createResource(
+    () => (cuenta ? { id: props.workspace.id, v: version() } : null),
+    ({ id }) => cuenta?.read(id, "logo").catch(() => undefined) ?? undefined,
+  );
+  const tieneLogo = () => !!props.workspace.logo || !!logoDeLaCuenta();
+  const cambiado = () => {
+    setVersion((n) => n + 1);
+    anunciarRenombrado();
+    props.onCambio();
+  };
 
   async function quitar() {
     setGuardando(true);
     setFallo(null);
     try {
-      await invoke("set_workspace_logo", { id: props.workspace.id, source: null });
-      anunciarRenombrado();
-      props.onCambio();
+      if (!(cuenta && (await cuenta.remove(props.workspace.id, "logo"))))
+          await invoke("set_workspace_logo", { id: props.workspace.id, source: null });
+      cambiado();
     } catch (e) {
       setFallo(asFailure(e));
     } finally {
@@ -333,10 +351,10 @@ export function LogoDelWorkspace(props: {
     setGuardando(true);
     setFallo(null);
     try {
-      await invoke("set_workspace_logo_png", { id: props.workspace.id, pngBase64 });
+      if (!(cuenta && (await cuenta.put(props.workspace.id, "logo", pngDeBase64(pngBase64)))))
+        await invoke("set_workspace_logo_png", { id: props.workspace.id, pngBase64 });
       setRecorte(null);
-      anunciarRenombrado();
-      props.onCambio();
+      cambiado();
     } catch (e) {
       setFallo(asFailure(e));
     } finally {
@@ -345,6 +363,15 @@ export function LogoDelWorkspace(props: {
   }
 
   async function elegir() {
+    if (cuenta) {
+      const file = await elegirArchivoDeImagen(IMAGENES_DE_LOGO);
+      if (!file) return;
+      setFallo(null);
+      const src = imagenInerte(await blobToDataUrl(file).catch(() => null));
+      if (!src) return setFallo({ what: "settings.workspaces.logo.unreadable", detail: "" });
+      setRecorte(src);
+      return;
+    }
     const chosen = await open({
       multiple: false,
       directory: false,
@@ -377,18 +404,18 @@ export function LogoDelWorkspace(props: {
       aria-hidden="true"
       class={`relative grid shrink-0 place-items-center overflow-hidden rounded-lg border border-border bg-surface font-semibold text-neutral-700 ${tamano}`}
     >
-      <MarcaDeWorkspace name={props.workspace.name} logo={props.workspace.logo} />
+      <MarcaDeWorkspace id={props.workspace.id} name={props.workspace.name} logo={props.workspace.logo} />
     </span>
   );
   const acciones = (
     <>
       <Button size="sm" variant="outline" disabled={guardando()} onClick={() => void elegir()}>
         <ImagePlus size={14} />
-        {props.workspace.logo
+        {tieneLogo()
           ? t("settings.workspaces.logo.change")
           : t("settings.workspaces.logo.pick")}
       </Button>
-      <Show when={props.workspace.logo}>
+      <Show when={tieneLogo()}>
         <Button size="sm" variant="ghost" disabled={guardando()} onClick={() => void quitar()}>
           {t("settings.workspaces.logo.clear")}
         </Button>

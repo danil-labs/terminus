@@ -19,12 +19,14 @@ export function monogram(name: string) {
 }
 
 /** El logo del workspace, o sus iniciales si no hay imagen o todavía no carga. */
-export function MarcaDeWorkspace(props: { name: string; logo?: string | null }) {
+/** `id`: en la web, el logo de un workspace de la cuenta sale de la cuenta (`urlDeLogo`). */
+export function MarcaDeWorkspace(props: { id?: string; name: string; logo?: string | null }) {
   const [url, setUrl] = createSignal<string | null>(null);
   createEffect(() => {
     const path = props.logo ?? null;
+    const workspace = props.id ?? null;
     const gen = generacionDeLogo();
-    if (!path) {
+    if (!path && !workspace) {
       setUrl(null);
       return;
     }
@@ -32,7 +34,7 @@ export function MarcaDeWorkspace(props: { name: string; logo?: string | null }) 
     onCleanup(() => {
       vivo = false;
     });
-    void urlDeLogo(path).then((siguiente) => {
+    void urlDeLogo(path, workspace).then((siguiente) => {
       if (vivo && generacionDeLogo() === gen) setUrl(siguiente);
     });
   });
@@ -141,7 +143,7 @@ export default function WorkspaceColumn(props: {
             >
               <span class="absolute inset-0 overflow-hidden rounded-[inherit]">
                 <span class="relative grid size-full place-items-center">
-                  <MarcaDeWorkspace name={p.w.name} logo={p.w.logo} />
+                  <MarcaDeWorkspace id={p.w.id} name={p.w.name} logo={p.w.logo} />
                 </span>
               </span>
               <Show when={state()}>
