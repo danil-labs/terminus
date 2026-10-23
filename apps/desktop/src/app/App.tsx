@@ -162,6 +162,7 @@ import { capabilities } from "../lib/platform";
 import { pedirElCampo } from "../lib/focus";
 import { lastRoster, rememberRoster } from "../lib/handlerRoster";
 import { aplicarLenguaDeWorkspace, clavesConocidas, t } from "../lib/i18n";
+import { moveAttachments, NotMovable } from "../lib/remoteAttachments";
 import { invoke } from "../lib/invoke.ts";
 import { connected } from "../lib/engineConnection";
 import { openChatVisual, readChatVisual } from "../features/chat/readVisual";
@@ -1810,10 +1811,43 @@ export default function App() {
             id,
             rel,
           }, deLaTarea(id))
-        : await invoke<Preview>("preview_file", { path: rel, rel });
+        : await previewOn(rel, id);
       return p.data_url ?? null;
     } catch {
       return null;
+    }
+  }
+
+  // Lo que se mandó a una tarea de otra máquina vive allá; lo que todavía no
+  // salió (el globo mientras se manda) sigue en la de la ventana.
+  async function previewOn(path: string, id: string | null): Promise<Preview> {
+    const there = deLaTarea(id);
+    if (!there) return invoke<Preview>("preview_file", { path, rel: path });
+    try {
+      return await invoke<Preview>("preview_file", { path, rel: path }, there);
+    } catch {
+      return invoke<Preview>("preview_file", { path, rel: path });
+    }
+  }
+
+  /**
+   * Los adjuntos con las rutas de la máquina donde corre el turno. Se
+   * prepararon en el motor de la ventana (`agregarArchivos`, `pegarImagen`); si
+   * el turno va a otra, sus imágenes viajan allá antes de mandar
+   * (`lib/remoteAttachments.ts`).
+   */
+  async function attachmentsFor(paths: string[], options: { headers: Record<string, string> } | undefined): Promise<string[]> {
+    const machine = options?.headers["x-terminus-machine"];
+    if (!machine || paths.length === 0 || machines().find((x) => x.id === machine)?.local) return paths;
+    try {
+      return await moveAttachments(paths, {
+        read: (path) => invoke<Preview>("preview_file", { path, rel: path }),
+        save: (mime, datos) => invoke<string>("guardar_imagen_pegada", { mime, datos }, options),
+        prepare: (saved) => invoke<string[]>("prepare_attachments", { project: project(), paths: saved }, options),
+      });
+    } catch (e) {
+      if (!(e instanceof NotMovable)) throw e;
+      throw { what: t("chat.attachments.remote_images_only", { names: e.names.join(", "), machine: machineName(machine) }), detail: "remote_images_only" };
     }
   }
 
@@ -5439,6 +5473,7 @@ export default function App() {
       // La respuesta de una persona no existe en la interfaz hasta que Rust la
       // validó y la escribió: primero persistir, y solo entonces pintarla.
       const opciones = abierta ? deLaTarea(abierta) : llevado ? { headers: { "x-terminus-machine": llevado.target } } : runOnOptions(workspaceActivo(), lugar);
+      const attachments = await attachmentsFor(m.attachments, opciones);
       const id = await invoke<string>("send_message", {
         provider: m.provider,
         project: proyecto,
@@ -5452,7 +5487,7 @@ export default function App() {
         model: m.model,
         effort: m.effort,
         permissionMode: m.permission_mode,
-        attachments: m.attachments,
+        attachments,
         // Viaja con el turno: en el primero la tarea aún no existe, y guardarlo
         // después llegaba tarde a su propio contexto.
         sources: pendientes,
