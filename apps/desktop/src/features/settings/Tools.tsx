@@ -133,7 +133,6 @@ function estado(
   // que la persona puede arreglar, y decirlo así lleva a la acción correcta.
   if (c.escuchando === false)
     return { texto: t("settings.tools.state.silent"), tono: "danger" };
-  // Con la sesión del motor, «conectado» y ya, como las demás tarjetas.
   if (autorizaElMotor(c)) {
     if ((c.sesiones ?? []).length === 0)
       return { texto: t("settings.tools.state.needs_login"), tono: "warning" };

@@ -282,7 +282,6 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
     }
     const c = conocido(i);
     if (!c?.conectado) return { k: "libre" };
-    // El motor la autoriza una vez para todos los agentes: conectada es conectada, como las demás.
     if (!c.pide_sesion || (c.sesiones ?? []).length > 0) return { k: "conectada", detalle: descripcion(i.id) };
     return { k: "detectada", detalle: t("onboarding.tools.needs_login") };
   }
