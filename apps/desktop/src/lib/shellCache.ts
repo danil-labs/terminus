@@ -8,12 +8,15 @@ import type { Space } from "./spaces";
  * sirve para actuar. Se guarda con espera y acotada; una foto que no cabe se
  * recorta por carpeta y, si aun así no cabe, no se guarda.
  */
+/** El estado de la rebanada de otra máquina de la cuenta; sus filas vuelven como copia (`cached`) con su hora. */
+export type SliceState = { status: NonNullable<SessionRow["machine_status"]>; at: number | null };
 export type ShellSnapshot = {
   workspace: string;
   projects: Project[];
   sessions: Record<string, SessionRow[]>;
   spaces: Space[];
   desk: string | null;
+  slices?: Record<string, SliceState>;
 };
 
 // La versión 2 trae filas con `provider` y `agent`; una foto de la 1 se descarta.
@@ -41,7 +44,12 @@ export function readShellCache(): ShellSnapshot | null {
   if (!entry) return null;
   try {
     const snapshot = JSON.parse(entry.snapshot) as ShellSnapshot;
-    return snapshot.workspace === value.last && Array.isArray(snapshot.projects) ? snapshot : null;
+    if (snapshot.workspace !== value.last || !Array.isArray(snapshot.projects)) return null;
+    // Una foto no es una respuesta: lo que otra máquina dijo vuelve como copia de esa hora.
+    const copy = (row: SessionRow): SessionRow => (row.machine && row.machine_status === "ok" ? { ...row, machine_status: "cached" } : row);
+    const sessions = Object.fromEntries(Object.entries(snapshot.sessions).map(([folder, rows]) => [folder, rows.map(copy)]));
+    const slices = snapshot.slices && Object.fromEntries(Object.entries(snapshot.slices).map(([m, s]) => [m, s.status === "ok" ? { ...s, status: "cached" as const } : s]));
+    return { ...snapshot, sessions, ...(slices ? { slices } : {}) };
   } catch {
     return null;
   }
@@ -67,7 +75,8 @@ export function encodeSnapshot(snapshot: ShellSnapshot, rows: number): string {
   const sessions = Object.entries(snapshot.sessions)
     .map(([folder, values]) => `${JSON.stringify(folder)}:${list(values.slice(0, rows))}`)
     .join(",");
-  return `{"workspace":${JSON.stringify(snapshot.workspace)},"projects":${list(snapshot.projects)},"sessions":{${sessions}},"spaces":${list(snapshot.spaces)},"desk":${JSON.stringify(snapshot.desk)}}`;
+  const slices = snapshot.slices && Object.keys(snapshot.slices).length ? `,"slices":${JSON.stringify(snapshot.slices)}` : "";
+  return `{"workspace":${JSON.stringify(snapshot.workspace)},"projects":${list(snapshot.projects)},"sessions":{${sessions}},"spaces":${list(snapshot.spaces)},"desk":${JSON.stringify(snapshot.desk)}${slices}}`;
 }
 
 export function writeShellCache(snapshot: ShellSnapshot, now = Date.now()) {

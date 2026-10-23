@@ -75,5 +75,20 @@ export async function untilConnected<T>(
   }
 }
 
+type Route = (command: string, args?: InvokeArgs, options?: InvokeOptions) => Promise<unknown>;
+let route: Route | null = null;
+
+/**
+ * Con la cuenta de Danil, quien reparte entre las máquinas de la cuenta
+ * (`features/machines/router.ts`); `null` deja solo el motor de la ventana. El
+ * IPC global de Tauri no se toca: lo de esta computadora sigue siendo nativo.
+ */
+export function setMachineRoute(next: Route | null) {
+  route = next;
+}
+
+const call = <T>(command: string, args?: InvokeArgs, options?: InvokeOptions): Promise<T> =>
+  (route ? route(command, args, options) : tauri<T>(command, args, options)) as Promise<T>;
+
 export const invoke = <T>(command: string, args?: InvokeArgs, options?: InvokeOptions): Promise<T> =>
-  untilConnected(() => retrying(() => tauri<T>(command, args, options), sleep, (e) => canRepeat(command, e)));
+  untilConnected(() => retrying(() => call<T>(command, args, options), sleep, (e) => canRepeat(command, e)));

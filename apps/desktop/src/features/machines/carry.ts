@@ -17,7 +17,6 @@ import {
   type Part,
   type WorkStatus,
   CarryError,
-  PART_DESKTOP,
   PART_RELAY,
   cancelCarry,
   carryWork,
@@ -30,7 +29,6 @@ import {
 import "../../locales/workPhrases";
 import { invoke } from "../../lib/invoke";
 import type { Project } from "../../lib/model";
-import { capabilities } from "../../lib/platform";
 import { escribirPref, leerPref } from "../../lib/prefs";
 import { t } from "../../lib/i18n";
 import { type CarryOrigin, machineName, rememberOrigin } from "./store";
@@ -60,8 +58,8 @@ export type CarryCheck = {
   /** Al traer: la tarea de la otra máquina cuyo worktree se trae. */
   task: { id: string; title: string } | null;
   /**
-   * La llave del destino con la que se sella, o `null` si viaja sin sellar (el
-   * escritorio por SSH, o un motor sin `work_key`). `keyChanged`: no es la fijada.
+   * La llave del destino con la que se sella, o `null` si viaja sin sellar (un
+   * motor sin `work_key`). `keyChanged`: no es la fijada.
    */
   recipientKey: string | null;
   keyChanged: boolean;
@@ -75,11 +73,11 @@ export function trustKey(machine: string, key: string) {
   escribirPref(KEYS, { ...pinned(), [machine]: key });
 }
 
-/** El escritorio llega a sus máquinas por un túnel SSH y no sella; la web y el teléfono sellan siempre. */
-export const seals = () => !viaSsh();
-
+/**
+ * Todo va por el relay de la cuenta (`@terminus/fleet`), también desde el
+ * escritorio: siempre se sella para el motor de destino, `.env` incluidos.
+ */
 async function keyFor(target: string): Promise<{ recipientKey: string | null; keyChanged: boolean }> {
-  if (!seals()) return { recipientKey: null, keyChanged: false };
   const key = await engine.key(target).then((k) => k.publicKey).catch(() => null);
   if (!key) return { recipientKey: null, keyChanged: false };
   const verdict = keyVerdict(pinned()[target], key);
@@ -120,8 +118,8 @@ export async function checkBring(input: { workspace: string; project: Project; s
     engine.status(input.source, { project: input.project.id, task: input.task.id }),
     targetHasProject(input.target, input.project).catch(() => null),
   ]);
-  // Traer es del escritorio: llega por el túnel SSH y no se sella.
-  return { ...input, status, hasProject, recipientKey: null, keyChanged: false };
+  // Traer pasa por el relay como llevar: se sella para el motor de esta máquina.
+  return { ...input, status, hasProject, ...(await keyFor(input.target)) };
 }
 
 /** «Seguir en una tarea nueva aquí» (D4): título, último mensaje del agente y los commits; no la transcripción. */
@@ -165,16 +163,15 @@ function update(key: string, change: (c: Carry) => Carry) {
   setCarries((all) => (all[key] ? { ...all, [key]: change(all[key]) } : all));
 }
 
-/** Sin medir: cifras prudentes para el tiempo estimado, por el túnel SSH y por el relay. */
-const SSH_BYTES_PER_SECOND = 4 * 1024 * 1024;
+/** Sin medir: una cifra prudente para el tiempo estimado por el relay. */
 const RELAY_BYTES_PER_SECOND = 1024 * 1024;
-export const bytesPerSecond = () => (viaSsh() ? SSH_BYTES_PER_SECOND : RELAY_BYTES_PER_SECOND);
+export const bytesPerSecond = () => RELAY_BYTES_PER_SECOND;
 
-/** Partes de 4 MiB por SSH y de 512 KiB por el relay (`MAX_FRAME` y el espejo del relay). */
-export const partSize = () => (viaSsh() ? PART_DESKTOP : PART_RELAY);
+/** Partes de 512 KiB: cada una es una llamada corta del relay (plazo de 60 s). */
+export const partSize = () => PART_RELAY;
 
-/** Por el relay los archivos ignorados (`.env`) solo viajan sellados (D3). */
-export const ignoredAllowed = (check: Pick<CarryCheck, "recipientKey">) => viaSsh() || !!check.recipientKey;
+/** Los archivos ignorados (`.env`) solo viajan sellados (D3). */
+export const ignoredAllowed = (check: Pick<CarryCheck, "recipientKey">) => !!check.recipientKey;
 
 /** Lo elegido en la hoja queda esperando el envío del borrador `key`. */
 export function planCarry(key: string, check: CarryCheck, job: CarryJob, state: CarryState, ready: CarryResult | null = null) {
@@ -294,6 +291,3 @@ export function sourceOf(project: Project, windowMachine: string): string | null
   if (!project.machines) return windowMachine;
   return project.machines.includes(windowMachine) ? windowMachine : (project.machines[0] ?? null);
 }
-
-/** En el escritorio el trabajo va por el túnel SSH; en la web y el teléfono, por el relay. */
-export const viaSsh = () => !!capabilities().nativeWindow;

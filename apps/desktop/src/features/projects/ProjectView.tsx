@@ -7,7 +7,7 @@ import GitBranch from "lucide-solid/icons/git-branch";
 import Plus from "lucide-solid/icons/plus";
 import SquarePen from "lucide-solid/icons/square-pen";
 import X from "lucide-solid/icons/x";
-import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, lazy, on, onCleanup, Show, Suspense } from "solid-js";
 import { rememberRoster } from "../../lib/handlerRoster";
 import { copyText } from "../../lib/clipboard";
 import { t } from "../../lib/i18n";
@@ -36,11 +36,13 @@ import MaterialPicker from "../settings/MaterialPicker";
 import { AstroAvatar } from "./AstroAvatar";
 import BaseBranchPicker from "./BaseBranchPicker";
 import { watchHandlerStatuses } from "./handlerPresence";
-import Memoria from "./Memoria";
 import NewAgent, { type ModelChoices } from "./NewAgent";
 import { displayName, notifyProfiles, watchProfiles } from "./profiles";
 import Sessions, { type SessionRow } from "./Sessions";
 import type { Etapa } from "./TaskStage";
+
+// Fuera de la carga inicial: la memoria se pinta abajo de la vista y trae el cliente de la cuenta.
+const Memoria = lazy(() => import("./Memoria"));
 
 function SelectorDeRama(props: { project: string; source: Source }) {
   const [abierto, setAbierto] = createSignal(false);
@@ -173,6 +175,8 @@ function SelectorDeRama(props: { project: string; source: Source }) {
  * aquí: la leen todos los proyectos y se cambia en Configuración.
  */
 export default function VistaDeProyecto(props: {
+  /** El workspace abierto: la memoria de la cuenta y su historial son suyos. */
+  workspace?: string | null;
   proyecto: Project;
   /** El catálogo del workspace: es quien sabe nombrar y ubicar cada fuente. */
   sources: Source[];
@@ -734,11 +738,14 @@ export default function VistaDeProyecto(props: {
           </Show>
         </section>
 
-        <Memoria
-          project={props.proyecto.id}
-          agents={props.agents}
-          encargados={encargados().agents.map((e) => e.name)}
-        />
+        <Suspense>
+          <Memoria
+            project={props.proyecto.id}
+            workspace={props.workspace}
+            agents={props.agents}
+            encargados={encargados().agents.map((e) => e.name)}
+          />
+        </Suspense>
       </div>
     </div>
   );

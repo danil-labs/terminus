@@ -1,7 +1,7 @@
 /**
  * El puente: el cliente pide al origen el archivo de transferencia, lo copia
  * por partes al destino y le pide importarlo. Los motores nunca hablan entre
- * sí, así que funciona igual por el túnel del escritorio que por el relay.
+ * sí: el cliente hace de puente por el relay, en el escritorio, la web y el teléfono.
  *
  *   despertar el destino → clonar si falta → exportar → partes → importar
  *
@@ -113,6 +113,18 @@ export function base64Bytes(data: string): number {
   return Math.max(0, Math.floor((data.length * 3) / 4) - pad);
 }
 
+/** Intentos por parte ante un fallo del camino, no del motor. */
+export const PART_ATTEMPTS = 3;
+/** Los errores con nombre de la flota que dicen «se cortó», no «está mal». */
+const TRANSIENT = new Set(["machine_lost", "machine_timeout", "io"]);
+
+/** Si un error es del camino (relay, conector), en la forma de la ventana (`detail`) o de la flota (`code`). */
+export function transient(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const e = error as { detail?: unknown; code?: unknown };
+  return (typeof e.detail === "string" && TRANSIENT.has(e.detail)) || (typeof e.code === "string" && TRANSIENT.has(e.code));
+}
+
 function fail(failure: CarryFailure): never {
   throw new CarryError(failure);
 }
@@ -176,6 +188,7 @@ export async function carryWork(engine: CarryEngine, job: CarryJob, state: Carry
 
     progress({ step: "copy" });
     const exported = await prepare(engine, job, state);
+    let attempts = 0;
     while (state.offset < exported.bytes) {
       stop();
       progress({ step: "copy" });
@@ -185,7 +198,11 @@ export async function carryWork(engine: CarryEngine, job: CarryJob, state: Carry
         if (size === 0 && !part.eof) throw new Error("empty_part");
         await engine.writePart(job.target, { transfer: exported.transfer, offset: state.offset, data: part.data });
         state.offset = part.eof ? exported.bytes : state.offset + size;
+        attempts = 0;
       } catch (cause) {
+        // El relay perdió el conector o la parte no llegó a tiempo: se repite esa
+        // misma parte (idempotente por `offset`) antes de pedirle a la persona.
+        if (transient(cause) && ++attempts < PART_ATTEMPTS) continue;
         fail({ code: "interrupted", part: partAt(state.offset, job.partSize), parts: partsOf(exported.bytes, job.partSize), cause });
       }
     }

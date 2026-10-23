@@ -11,6 +11,8 @@ import type { DanilConnectStatus } from "./danil-account";
 import { createDanilAccounts, type DanilAccounts } from "./danil-accounts";
 import { createDanilSession, DanilSignInChoices, said } from "./danil-session";
 import { type DanilSessionInfo, sessionKey, statusOf } from "./danil-sessions";
+import { ConnectMachineSection } from "../machines/ConnectMachine";
+import { LICENSE_REQUIRED, startTrialInBrowser, TerminusLicense } from "./TerminusLicense";
 import { SettingsBlock, SettingsPanel, SettingsRow, SettingsSection } from "./layout";
 
 /** Configuración → Cuenta de Danil. Chunk aparte: solo lo carga quien abre esta sección. */
@@ -27,6 +29,7 @@ function WebAccount(props: { source: AccountProfileSource }) {
       <SettingsSection title={t("danil.account.title")} description={t("danil.account.web_description")}>
         <AccountIdentityBlock identity={identity} />
       </SettingsSection>
+      <ConnectMachineSection />
     </SettingsPanel>
   );
 }
@@ -64,6 +67,7 @@ function AccountList(props: { accounts: DanilAccounts }) {
   const keys = () => a.connected().map(sessionKey).filter((k): k is string => Boolean(k));
   const many = () => keys().length > 1;
   const pending = () => a.pending();
+  const problem = () => a.problem() ?? (pending()?.status === "error" ? (pending()?.error ?? "failed") : null);
 
   return (
     <SettingsPanel data-danil-account="sessions">
@@ -104,10 +108,16 @@ function AccountList(props: { accounts: DanilAccounts }) {
             </Show>
           </SettingsRow>
         </Show>
-        <Show when={a.problem() ?? (pending()?.status === "error" ? (pending()?.error ?? "failed") : null)}>
+        <Show when={problem() === LICENSE_REQUIRED}>
+          <SettingsBlock>
+            <TerminusLicense onStart={startTrialInBrowser} onRetry={() => void a.add()} busy={a.busy()} />
+          </SettingsBlock>
+        </Show>
+        <Show when={problem() !== LICENSE_REQUIRED && problem()}>
           {(code) => <p class="m-0 pt-2 text-[0.8125rem] text-error-strong" role="alert">{said(code())}</p>}
         </Show>
       </SettingsSection>
+      <ConnectMachineSection />
     </SettingsPanel>
   );
 }
@@ -208,10 +218,18 @@ function SingleAccount() {
             </SettingsBlock>
           </Match>
         </Switch>
+        <Show when={session.license()}>
+          <SettingsBlock>
+            <TerminusLicense onStart={startTrialInBrowser} onRetry={() => void session.retry()} busy={busy()} />
+          </SettingsBlock>
+        </Show>
         <Show when={session.message()}>
           {(text) => <p class="m-0 pt-2 text-[0.8125rem] text-error-strong" role="alert">{text()}</p>}
         </Show>
       </SettingsSection>
+      <Show when={status()?.state === "connected"}>
+        <ConnectMachineSection />
+      </Show>
     </SettingsPanel>
   );
 }
