@@ -103,6 +103,15 @@ export function accountChoices(list: DanilSessionInfo[] | null | undefined, curr
   return choices;
 }
 
+/** La cuenta que acaba de entrar: la primera con sesión que no estaba en `known`. */
+export function newSessionKey(known: string[], list: DanilSessionInfo[] | null | undefined): string | null {
+  for (const s of connectedSessions(list)) {
+    const key = sessionKey(s);
+    if (key && !known.includes(key)) return key;
+  }
+  return null;
+}
+
 /** La sesión con la que habla un workspace; `null` si su cuenta no tiene sesión aquí. */
 export function sessionForWorkspace(list: DanilSessionInfo[] | null | undefined, of: WorkspaceAccount | null) {
   if (!of) return defaultSession(list);

@@ -1,6 +1,6 @@
 {
   "danil.account.title": "Danil account",
-  "danil.account.description": "Sign in with your Danil account. This computer is registered to your account. While you are signed in, every workspace on this computer can be seen on the web and the phone.",
+  "danil.account.description": "Sign in with your Danil account on this computer. The session belongs to the app, not to a workspace: no workspace joins the account until someone chooses it.",
   "danil.account.name_label": "This computer's name",
   "danil.account.name_hint": "This is how this computer shows in your Danil account. It doesn't change your name in the account.",
   "danil.account.continue_as": "Continue as {email}",
@@ -74,7 +74,7 @@
   "danil.error.account_not_found": "That account is no longer signed in on this computer. Sign in with it again.",
   "danil.error.workspace_id_taken": "This workspace still belongs to the other account. Sign in to that account on this computer to move it.",
   "danil.accounts.title": "Danil accounts",
-  "danil.accounts.description": "Each workspace belongs to one Danil account and syncs only with it: it shows on that account's web and phone, never on another. No workspace joins an account on its own: choose each one's account in Workspaces.",
+  "danil.accounts.description": "This computer's Danil sessions, for the whole app. Signing in puts no workspace in the account: each one chooses its own, above or in Workspaces, and only then shows on that account's web and phone.",
   "danil.accounts.default": "Default",
   "danil.accounts.make_default": "Make default",
   "danil.accounts.add": "Add another account",
@@ -100,7 +100,7 @@
   "danil.workspace.unsynced_account": "Not synced: {email} is not signed in on this computer.",
   "danil.workspace.failed": "Could not change this workspace's account.",
   "danil.workspace.no_account_option": "No account (not synced)",
-  "danil.workspace.no_account": "Not in any account: it doesn't show on the web or the phone.",
+  "danil.workspace.no_account": "This workspace belongs to no account: it doesn't show on the web or the phone.",
   "danil.workspace.leave_confirm": "It leaves {email}: it stops showing on that account's web and phone. The account stays signed in for its other workspaces.",
   "danil.workspace.leave_yes": "Remove from account",
   "danil.workspace.leave_no": "Cancel",
@@ -157,5 +157,7 @@
   "danil.computers.rename_failed.not_found": "That computer is no longer in your account.",
   "danil.computers.rename_failed.unauthorized": "Your Danil session expired. Sign in again.",
   "danil.computers.rename_failed.offline": "No connection to Danil: the name was not saved.",
-  "danil.computers.rename_failed.other": "Danil didn't save the name. Try again."
+  "danil.computers.rename_failed.other": "Danil didn't save the name. Try again.",
+  "danil.here.title": "This workspace: {name}",
+  "danil.workspace.use": "Use {email}"
 }

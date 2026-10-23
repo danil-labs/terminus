@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, Match, on, Show, Switch } from "solid-js";
+import { createEffect, createSignal, For, type JSX, Match, on, Show, Switch } from "solid-js";
 import { t } from "../../lib/i18n";
 import { capabilities } from "../../lib/platform";
 import { Badge } from "../../ui/Badge";
@@ -9,12 +9,15 @@ import type { AccountProfile, AccountProfileSource } from "./account-profile";
 import { AccountIdentityBlock, type AccountIdentityState, createAccountIdentity } from "./AccountIdentity";
 import type { DanilConnectStatus } from "./danil-account";
 import { createDanilAccounts, type DanilAccounts } from "./danil-accounts";
+import { claimNextSession } from "./danil-claim";
 import { createDanilSession, DanilSignInChoices, said } from "./danil-session";
 import { type DanilSessionInfo, sessionKey, statusOf } from "./danil-sessions";
 import { AccountComputersSection } from "../machines/AccountComputers";
 import { ConnectMachineSection } from "../machines/ConnectMachine";
 import { LICENSE_REQUIRED, startTrialInBrowser, TerminusLicense } from "./TerminusLicense";
 import { SettingsBlock, SettingsPanel, SettingsRow, SettingsSection } from "./layout";
+import { createWorkspaces } from "./workspaces-store";
+import WorkspaceAccount from "./WorkspaceAccount";
 
 /** Configuración → Cuenta de Danil. Chunk aparte: solo lo carga quien abre esta sección. */
 export default function DanilAccount() {
@@ -37,11 +40,42 @@ function WebAccount(props: { source: AccountProfileSource }) {
 }
 
 /**
+ * Lo que la sección sabe del workspace abierto: las sesiones son de la
+ * computadora, y ninguna lo mete a una cuenta salvo que se elija aquí.
+ */
+type Here = {
+  /** «Este workspace»: de qué cuenta es, o que no es de ninguna. */
+  section: () => JSX.Element;
+  /** Antes de iniciar sesión: sin cuenta, el workspace queda en la que entre. */
+  beforeSignIn: () => void;
+};
+
+/**
  * En el escritorio: una sesión por cuenta. Sin ninguna (o con un motor que no
  * las trae) es la cuenta única de siempre; con alguna, la lista de cuentas.
  */
 function MachineAccount() {
-  const accounts = createDanilAccounts();
+  const accounts = createDanilAccounts({ workspace: "active" });
+  const workspaces = createWorkspaces();
+  // `null` es un motor sin sesiones por cuenta: ahí no hay cuenta por workspace.
+  const open = () => (accounts.sessions() ? workspaces.actual() : null);
+  const here: Here = {
+    section: () => (
+      <Show when={open()}>
+        {(w) => (
+          <SettingsSection title={t("danil.here.title", { name: w().name })} data-danil-here="">
+            <SettingsBlock>
+              <WorkspaceAccount workspace={w().id} name={w().name} placement="section" />
+            </SettingsBlock>
+          </SettingsSection>
+        )}
+      </Show>
+    ),
+    beforeSignIn: () => {
+      const w = open();
+      if (w && accounts.of()?.account === null) claimNextSession(w.id, accounts.sessions());
+    },
+  };
   return (
     <Switch>
       <Match when={accounts.sessions() === undefined}>
@@ -54,17 +88,17 @@ function MachineAccount() {
         </SettingsPanel>
       </Match>
       <Match when={accounts.connected().length > 0}>
-        <AccountList accounts={accounts} />
+        <AccountList accounts={accounts} here={here} />
       </Match>
       <Match when={true}>
-        <SingleAccount />
+        <SingleAccount here={accounts.sessions() ? here : null} />
       </Match>
     </Switch>
   );
 }
 
 /** Las cuentas con sesión en esta computadora, la que se está agregando y «Agregar otra cuenta». */
-function AccountList(props: { accounts: DanilAccounts }) {
+function AccountList(props: { accounts: DanilAccounts; here: Here }) {
   const a = props.accounts;
   const keys = () => a.connected().map(sessionKey).filter((k): k is string => Boolean(k));
   const many = () => keys().length > 1;
@@ -73,8 +107,14 @@ function AccountList(props: { accounts: DanilAccounts }) {
   // El nombre de esta computadora recién cambiado aquí, por cuenta: el motor lo sabe al volver a conectarse.
   const [renamed, setRenamed] = createSignal<Record<string, string>>({});
 
+  const add = () => {
+    props.here.beforeSignIn();
+    return a.add();
+  };
+
   return (
     <SettingsPanel data-danil-account="sessions">
+      {props.here.section()}
       <SettingsSection title={t("danil.accounts.title")} description={t("danil.accounts.description")}>
         <For each={keys()}>
           {(key) => (
@@ -92,7 +132,7 @@ function AccountList(props: { accounts: DanilAccounts }) {
                 variant="secondary"
                 class="justify-self-start"
                 disabled={a.busy()}
-                onClick={() => void a.add()}
+                onClick={() => void add()}
                 data-danil-add=""
               >
                 {t("danil.accounts.add")}
@@ -114,7 +154,7 @@ function AccountList(props: { accounts: DanilAccounts }) {
         </Show>
         <Show when={problem() === LICENSE_REQUIRED}>
           <SettingsBlock>
-            <TerminusLicense onStart={startTrialInBrowser} onRetry={() => void a.add()} busy={a.busy()} />
+            <TerminusLicense onStart={startTrialInBrowser} onRetry={() => void add()} busy={a.busy()} />
           </SettingsBlock>
         </Show>
         <Show when={problem() !== LICENSE_REQUIRED && problem()}>
@@ -127,7 +167,7 @@ function AccountList(props: { accounts: DanilAccounts }) {
             {(session) => (
               <AccountComputersSection
                 account={key}
-                owner={many() ? session().email || session().name || key : null}
+                owner={session().email || session().name || key}
                 self={session().computer_id}
                 onSelfName={(name) => setRenamed((r) => ({ ...r, [key]: name }))}
               />
@@ -203,14 +243,18 @@ function SessionCard(props: { session: DanilSessionInfo; accounts: DanilAccounts
   );
 }
 
-/** La cuenta única: iniciar sesión registra esta computadora en la cuenta. */
-function SingleAccount() {
+/**
+ * La cuenta única: iniciar sesión registra esta computadora en la cuenta. Con
+ * `here` (motor con sesiones por cuenta), arriba el workspace abierto.
+ */
+function SingleAccount(props: { here?: Here | null }) {
   const session = createDanilSession();
   const { view, status, name, setName, busy } = session;
   const [renamed, setRenamed] = createSignal<string | null>(null);
 
   return (
     <SettingsPanel data-danil-account={status()?.state ?? view().t}>
+      {props.here?.section()}
       <SettingsSection title={t("danil.account.title")} description={t("danil.account.description")}>
         <Switch>
           <Match when={view().t === "loading"}>
@@ -256,13 +300,20 @@ function SingleAccount() {
                 <Input value={name()} onInput={(e) => setName(e.currentTarget.value)} disabled={busy()} data-machine-name="" />
                 <span class="text-xs">{t("danil.account.name_hint")}</span>
               </label>
-              <DanilSignInChoices session={session} />
+              <DanilSignInChoices session={session} onStart={props.here?.beforeSignIn} />
             </SettingsBlock>
           </Match>
         </Switch>
         <Show when={session.license()}>
           <SettingsBlock>
-            <TerminusLicense onStart={startTrialInBrowser} onRetry={() => void session.retry()} busy={busy()} />
+            <TerminusLicense
+              onStart={startTrialInBrowser}
+              onRetry={() => {
+                if (status()?.state !== "connected") props.here?.beforeSignIn();
+                void session.retry();
+              }}
+              busy={busy()}
+            />
           </SettingsBlock>
         </Show>
         <Show when={session.message()}>

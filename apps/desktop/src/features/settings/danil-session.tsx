@@ -113,13 +113,17 @@ export function createDanilSession({ oneClick = ONE_CLICK_SIGN_IN } = {}) {
 export type DanilSession = ReturnType<typeof createDanilSession>;
 
 /** Las maneras de entrar: un botón por correo conocido (si está encendido) y el navegador. */
-export function DanilSignInChoices(props: { session: DanilSession }) {
+/** `onStart`: justo antes de pedir la entrada, con cualquiera de las maneras. */
+export function DanilSignInChoices(props: { session: DanilSession; onStart?: () => void }) {
   const s = props.session;
   return (
     <div class="flex flex-wrap items-center gap-2">
       <For each={s.options()}>
         {(o) => (
-          <Button size="sm" disabled={s.busy()} onClick={() => void s.withWorkspace(o)}>
+          <Button size="sm" disabled={s.busy()} onClick={() => {
+            props.onStart?.();
+            void s.withWorkspace(o);
+          }}>
             {t("danil.account.continue_as", { email: o.email })}
           </Button>
         )}
@@ -128,7 +132,10 @@ export function DanilSignInChoices(props: { session: DanilSession }) {
         size="sm"
         variant={s.options().length ? "secondary" : "primary"}
         disabled={s.busy()}
-        onClick={() => void s.withBrowser()}
+        onClick={() => {
+          props.onStart?.();
+          void s.withBrowser();
+        }}
       >
         {s.options().length ? t("danil.account.sign_in_other") : t("danil.account.sign_in")}
       </Button>

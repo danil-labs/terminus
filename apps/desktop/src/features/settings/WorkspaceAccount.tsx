@@ -9,6 +9,8 @@ import { createEffect, createSignal, For, Show } from "solid-js";
 import { t } from "../../lib/i18n";
 import { Button } from "../../ui/Button";
 import { Select } from "../../ui/Select";
+import { cn } from "../../lib/utils";
+import { claimNextSession } from "./danil-claim";
 import { createDanilAccounts } from "./danil-accounts";
 import { said } from "./danil-session";
 import { accountChoices, changeProblem, setWorkspaceAccount, syncLine } from "./danil-sessions";
@@ -19,7 +21,11 @@ const OTHER = "+other";
 /** «Sin cuenta»: el workspace no se sincroniza con ninguna. */
 const NONE = "";
 
-export default function WorkspaceAccount(props: { workspace: string; name: string }) {
+/**
+ * `placement`: `card` en su tarjeta de Workspaces; `section` arriba de Cuentas
+ * de Danil, donde el inicio de sesión sin ninguna cuenta ya está más abajo.
+ */
+export default function WorkspaceAccount(props: { workspace: string; name: string; placement?: "card" | "section" }) {
   const accounts = createDanilAccounts({ workspace: () => props.workspace });
   const [saving, setSaving] = createSignal(false);
   const [problem, setProblem] = createSignal<string | null>(null);
@@ -31,6 +37,11 @@ export default function WorkspaceAccount(props: { workspace: string; name: strin
   const line = () => syncLine(accounts.of(), accounts.sessions());
   const adding = () => accounts.pending()?.status === "pending";
   const message = () => problem() ?? accounts.problem();
+  /** Entrar desde un workspace sin cuenta lo deja en la que entra. */
+  const signIn = async () => {
+    if (accounts.of()?.account === null) claimNextSession(props.workspace, accounts.sessions());
+    await accounts.add();
+  };
   let picker: HTMLSelectElement | undefined;
   // Las opciones se rehacen con cada evento de sesiones: la elegida se vuelve a poner después.
   createEffect(() => {
@@ -56,7 +67,7 @@ export default function WorkspaceAccount(props: { workspace: string; name: strin
       // El selector se queda en la cuenta actual: la otra se elige cuando tenga sesión.
       select.value = current();
       setProblem(null);
-      await accounts.add();
+      await signIn();
       select.value = current();
       return;
     }
@@ -88,16 +99,32 @@ export default function WorkspaceAccount(props: { workspace: string; name: strin
 
   return (
     <Show when={accounts.sessions() && accounts.of()}>
-      <div class="grid gap-1 pl-[27px] text-xs" data-workspace-account={line().kind}>
-        <span class="text-neutral-500">{t("danil.workspace.title")}</span>
+      <div class={cn("grid gap-1 text-xs", props.placement !== "section" && "pl-[27px]")} data-workspace-account={line().kind}>
+        <Show when={props.placement !== "section"}>
+          <span class="text-neutral-500">{t("danil.workspace.title")}</span>
+        </Show>
+        {/* Sin cuenta, cada cuenta con sesión aquí lo liga con un clic. */}
+        <Show when={!current() && !leaving() && choices().some((c) => c.signedIn)}>
+          <div class="flex flex-wrap items-center gap-2" data-workspace-use="">
+            <For each={choices().filter((c) => c.signedIn)}>
+              {(c) => (
+                <Button size="sm" variant="outline" disabled={saving() || accounts.busy()} onClick={() => void change(c.value, picker)}>
+                  {t("danil.workspace.use", { email: c.label })}
+                </Button>
+              )}
+            </For>
+          </div>
+        </Show>
         <Show
           when={choices().length}
           fallback={
-            <div class="flex items-center gap-2">
-              <Button size="sm" variant="outline" disabled={accounts.busy() || adding()} onClick={() => void accounts.add()}>
-                {t("danil.account.sign_in")}
-              </Button>
-            </div>
+            <Show when={props.placement !== "section"}>
+              <div class="flex items-center gap-2">
+                <Button size="sm" variant="outline" disabled={accounts.busy() || adding()} onClick={() => void signIn()}>
+                  {t("danil.account.sign_in")}
+                </Button>
+              </div>
+            </Show>
           }
         >
           <Select
@@ -156,7 +183,7 @@ export default function WorkspaceAccount(props: { workspace: string; name: strin
           </p>
         </Show>
         <Show when={message() === LICENSE_REQUIRED}>
-          <TerminusLicense onStart={startTrialInBrowser} onRetry={() => void accounts.add()} busy={accounts.busy()} compact />
+          <TerminusLicense onStart={startTrialInBrowser} onRetry={() => void signIn()} busy={accounts.busy()} compact />
         </Show>
         <Show when={message() !== LICENSE_REQUIRED && message()}>
           {(code) => (
