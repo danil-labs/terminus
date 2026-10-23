@@ -17,9 +17,12 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "../../ui/DropdownMenu";
 import { SettingsBlock, SettingsPanel, SettingsRow, SettingsSection } from "./layout";
+import type { GithubAccountState } from "./github-account/GithubAccount";
 
 // La tarjeta de Drive es la del alta; su chunk solo lo carga quien abre Fuentes.
 const Integraciones = lazy(() => import("../onboarding/ToolCards").then((m) => ({ default: m.Integraciones })));
+// GitHub de la cuenta de Danil: con sesión, su tarjeta reemplaza la local.
+const GithubAccount = lazy(() => import("./github-account/GithubAccount"));
 
 /**
  * Proveedores de código: de dónde salen los proyectos de la organización.
@@ -131,6 +134,11 @@ export default function Providers(props: { solo?: string | string[] }) {
 function WorkspaceProviders(props: { solo?: string | string[] }) {
   const startup = invoke<Startup>("list_workspaces");
   const scope = startup.then((s) => s.active ?? "pending");
+  const [scopeId, setScopeId] = createSignal<string | null>(null);
+  void scope.then((id) => setScopeId(id === "pending" ? null : id), () => {});
+  const [githubAccount, setGithubAccount] = createSignal<GithubAccountState>({ mode: "unknown", connected: false, reauthorize: false });
+  /** La tarjeta local se ve sin sesión de Danil, con un motor sin GitHub de la cuenta o mientras la local manda. */
+  const githubLocal = (id: string) => id !== "github" || githubAccount().mode === "local";
   let disposed = false;
   onCleanup(() => {
     disposed = true;
@@ -569,6 +577,13 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                         <Badge>{t("settings.providers.state.off")}</Badge>
                       }
                     >
+                      <Match when={p.id === "github" && githubAccount().mode === "account"}>
+                        <Show when={githubAccount().connected} fallback={<Badge>{t("settings.providers.state.off")}</Badge>}>
+                          <Show when={githubAccount().reauthorize} fallback={<Badge tone="success">{t("settings.providers.state.on")}</Badge>}>
+                            <Badge tone="warning">{t("providers.github.account.reauthorize_badge")}</Badge>
+                          </Show>
+                        </Show>
+                      </Match>
                       <Match when={estado() === "comprobando"}>
                         <Badge>{t("settings.providers.state.checking")}</Badge>
                       </Match>
@@ -599,6 +614,14 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                     </SettingsRow>
                     <Show when={hostFailure()}>{(f) => <FailureNote f={f()} />}</Show>
                   </Show>
+                  <Show when={p.id === "github" ? scopeId() : null}>
+                    {(id) => (
+                      <Suspense fallback={null}>
+                        <GithubAccount scope={id()} local={!!p.connected} onState={setGithubAccount} />
+                      </Suspense>
+                    )}
+                  </Show>
+                  <Show when={githubLocal(p.id)}>
                   <Switch>
                     <Match when={p.connected && !esperaAqui() && !montajes()[p.id] ? p.connected : null}>
                       {(c) => (
@@ -979,6 +1002,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                       </form>
                     </Match>
                   </Switch>
+                  </Show>
 
                   <Show when={falla()}>
                     {(f) => (
