@@ -95,10 +95,9 @@ export function createSidebar() {
 /**
  * La columna izquierda, montada sobre el shell de `ui/sidebar.tsx`.
  *
- * **Solo tareas, en una lista plana de todas las carpetas.** La carpeta es un
- * dato de cada fila y no un nivel de la lista: una carpeta sin tareas no
- * aparece nunca. Arriba lo que te necesita, en medio lo demás y lo asentado
- * plegado al final.
+ * **Las tareas de todas las carpetas, por carpeta salvo que se elija otra
+ * agrupación.** Por carpeta, una sin tareas también tiene su cabecera: la
+ * recién agregada se ve. Sin agrupar, la carpeta es un dato de cada fila.
  */
 export default function Sidebar(props: {
   projects: Project[];
@@ -125,6 +124,8 @@ export default function Sidebar(props: {
   onAbrirClon: () => void;
   /** Qué proyecto se está mirando en el panel principal, si alguno. */
   proyectoAbierto: string | null;
+  /** La carpeta de «Nueva tarea» cuando eso es lo que se mira: su cabecera va marcada. */
+  carpetaDelBorrador?: string | null;
   /** Abre el proyecto en el panel principal: sus tareas y su contexto fijo. */
   onAbrirProyecto: (id: string) => void;
   /** Lo que se ofrece como modelo por defecto al crear un agente. */
@@ -269,10 +270,15 @@ export default function Sidebar(props: {
       const i = props.projects.findIndex((p) => p.id === g.key);
       return i === -1 ? props.projects.length : i;
     };
-    return vistaEfectiva().group === "folder"
-      ? todosLosGrupos.map((g, i) => ({ g, i })).sort((a, b) => orden(a.g) - orden(b.g) || a.i - b.i).map(({ g }) => g)
-      : todosLosGrupos;
+    if (vistaEfectiva().group !== "folder") return todosLosGrupos;
+    // Por carpeta, una sin tareas también es grupo, con su «+»: la recién agregada no puede faltar.
+    const elegidas = vista().folders;
+    const vacias = props.projects
+      .filter((p) => (cuentas().get(p.id) ?? 0) === 0 && (elegidas.length === 0 || elegidas.includes(p.id)))
+      .map((p): SidebarGroup<SessionRow> => ({ kind: "folder", key: p.id, tasks: [] }));
+    return [...todosLosGrupos, ...vacias].map((g, i) => ({ g, i })).sort((a, b) => orden(a.g) - orden(b.g) || a.i - b.i).map(({ g }) => g);
   });
+  const hayCarpetasVacias = () => grupos().some((g) => g.kind === "folder" && g.key && g.tasks.length === 0);
   const carpetasDelFiltro = createMemo(() => props.projects
     .filter((p) => (cuentas().get(p.id) ?? 0) > 0)
     .map((p) => ({ id: p.id, name: p.name, count: cuentas().get(p.id) ?? 0 })));
@@ -473,7 +479,7 @@ export default function Sidebar(props: {
     const abierto = () => !!query() || g().kind !== "folder" || !cerrados().includes(g().key);
     const necesita = () => g().kind === "status" && ["approving", "asked", "failed"].includes(g().key);
     return (
-      <Show when={g().tasks.length > 0}>
+      <Show when={g().tasks.length > 0 || proyecto()}>
         <section
           data-sidebar-section={g().kind === "section" ? g().key : undefined}
           data-sidebar-group={g().kind === "section" ? undefined : g().key}
@@ -519,7 +525,7 @@ export default function Sidebar(props: {
                   tareas={g().tasks}
                   vivas={props.vivas}
                   aprobando={props.aprobando}
-                  proyectoAbierto={props.proyectoAbierto}
+                  proyectoAbierto={props.proyectoAbierto ?? props.carpetaDelBorrador ?? null}
                   onToggle={() => alternarGrupo(proj().id)}
                   onAbrir={() => { props.onAbrirProyecto(proj().id); setDesplegado(false); }}
                   onRenombrar={(name) => props.onRenombrarProyecto(proj().id, name)}
@@ -533,7 +539,12 @@ export default function Sidebar(props: {
             )}
           </Show>
           <Show when={abierto()}>
-            <Historial filas={g().tasks} clave={clave()} sinCarpeta={g().kind === "folder" && !!g().key} />
+            <Show
+              when={g().tasks.length > 0}
+              fallback={<p class="m-0 py-0.5 pl-7 text-[0.6875rem] text-neutral-500" data-folder-empty="">{t("shell.sidebar.folder_empty")}</p>}
+            >
+              <Historial filas={g().tasks} clave={clave()} sinCarpeta={g().kind === "folder" && !!g().key} />
+            </Show>
           </Show>
         </section>
       </Show>
@@ -547,7 +558,7 @@ export default function Sidebar(props: {
     <div data-sidebar-tasks class="grid min-w-0 gap-1">
       <Show when={props.clon}>{(c) => <FilaDeClon clon={c()} />}</Show>
 
-      <Show when={todas().length === 0 && !query()}>
+      <Show when={todas().length === 0 && !query() && !hayCarpetasVacias()}>
         <Show
           when={props.projects.length === 0}
           fallback={<p class="m-0 px-2 pt-1 text-xs text-neutral-500" data-sidebar-empty="">{t("shell.sidebar.empty")}</p>}
