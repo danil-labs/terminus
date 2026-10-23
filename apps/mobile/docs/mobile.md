@@ -101,8 +101,19 @@ workspaces, que va a la raíz que fijó la compilación,
 `EXPO_PUBLIC_TERMINUS_WEB_BASE`). Lo que cambia en el navegador va en archivos `.web.ts(x)`:
 
 - **Sesión:** la de la app de Danil en el mismo origen (`supabase.web.ts`),
-  como la web de escritorio; sin sesión se va a su inicio (`signin.web.tsx`).
-  No hay bridge.
+  como la web de escritorio; sin sesión se va a su inicio con
+  `?next=/terminus/m/` para volver aquí (`signin.web.tsx`). No hay bridge.
+- **Instalable (PWA):** `public/index.html` es la plantilla de Expo con las
+  etiquetas de iOS y Android y `viewport-fit=cover`; `public/icons/` sale de
+  `assets/icon.png` (192, 512, maskable 512 con el isotipo al 66 % y
+  `apple-touch-icon` de 180). El manifest y sus cabeceras los escribe
+  `apps/desktop/scripts/web-phone-pwa.mjs`: `id` y `start_url` `/terminus/m/`
+  (no se cambian: obligaría a reinstalar) y `scope: "/"`, porque el inicio de
+  sesión de Danil vive en `/` y en iOS fuera del scope abriría Safari aparte.
+  La app de Danil tiene su propio manifest con `id: "/"`; el `id` distinto deja
+  instalar las dos. Sin service worker: `index.html` y el manifest se revalidan
+  y solo `_expo/static/*` (con hash) se guarda largo. En iOS la app instalada no
+  comparte almacenamiento con Safari: se inicia sesión una vez dentro de ella.
 - **Lo que se recuerda:** `localStorage` en lugar del llavero (`store.web.ts`).
 - **Visualizaciones y archivos HTML:** el `iframe` de la ventana (`srcdoc`,
   `allow-scripts` sin `allow-same-origin`) en lugar del WebView. Un PDF no se

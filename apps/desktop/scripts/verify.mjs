@@ -542,6 +542,7 @@ const steps = [
   ["La carga inicial no pesa más que su techo", process.execPath, [join(root, "tests/perf/bundle-size.mjs")], root],
   ["El front monta", process.execPath, [join(root, "scripts/guards/mount-frontend.mjs")], root],
   ["Empaqueta la entrada del navegador", process.execPath, [join(root, "node_modules/vite/bin/vite.js"), "build", "--mode", "web"], root],
+  ["La versión del teléfono se instala como app y siempre carga lo último", process.execPath, ["--test", join(root, "tests/unit/web-phone-pwa.test.mjs")], root],
   ["En el navegador la interfaz habla con el relay", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-transport.test.mjs")], root],
   ["En el navegador la sesión de Danil elige la computadora y explica por qué no entra", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-gate.test.mjs")], root],
   ["En el navegador la preparación de una computadora gestionada no enseña el instalador", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-setup.test.mjs")], root],
