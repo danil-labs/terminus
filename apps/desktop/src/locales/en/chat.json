@@ -53,6 +53,7 @@
   "chat.attachments.paste_empty": "The clipboard image is empty.",
   "chat.attachments.paste_too_large": "The image is {size} MB and the limit is {tope} MB. Save it to a file and attach it.",
   "chat.attachments.paste_save_failed": "Could not save the pasted image.",
+  "chat.attachments.remote_images_only": "Only PNG, JPG, WebP or GIF images up to 4 MB can be taken to {machine}. Could not take: {names}.",
   "chat.attachments.web_images_only": "From the web you can only attach PNG, JPG, WebP or GIF images for now. Not attached: {names}.",
   "chat.composer.placeholder.answer": "Answer what it asked to keep going",
   "chat.composer.placeholder.deliver": "Delivered to whoever you named; no turn runs here",

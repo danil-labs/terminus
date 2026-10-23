@@ -500,6 +500,12 @@ const steps = [
     root,
   ],
   [
+    "Una imagen adjunta en esta Mac viaja como bytes a la máquina de la tarea",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/remote-attachments.test.ts")],
+    root,
+  ],
+  [
     "La cola sale en la tarea en la que se escribió",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/queue.test.ts")],
