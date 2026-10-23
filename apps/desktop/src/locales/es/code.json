@@ -127,6 +127,7 @@
   "code.tree.new_file.empty_task": "Nuevo archivo (abre una tarea sin escribirle al agente)",
   "code.tree.new_folder.empty_task": "Nueva carpeta (abre una tarea sin escribirle al agente)",
   "code.tree.rename": "Renombrar",
+  "code.tree.insert_path": "Insertar ruta en el documento",
   "code.tree.name.new_file": "Nombre del archivo nuevo",
   "code.tree.name.new_folder": "Nombre de la carpeta nueva",
   "code.tree.name.rename": "Nuevo nombre para «{name}»",
@@ -201,5 +202,14 @@
   "code.typst.exported.open": "Abrir en tu visor de PDF",
   "code.typst.error.no_main": "Esta tarea no tiene el documento principal que elegiste. Elige otro con el ojo del árbol de archivos.",
   "code.typst.expand": "Ampliar la vista",
-  "code.typst.collapse": "Volver a lado a lado (Esc)"
+  "code.typst.collapse": "Volver a lado a lado (Esc)",
+  "code.typst.complete.cite": "Cita",
+  "code.typst.complete.heading": "Sección",
+  "code.typst.complete.figure": "Figura",
+  "code.typst.complete.table": "Tabla",
+  "code.typst.complete.equation": "Ecuación",
+  "code.typst.complete.label": "Etiqueta",
+  "code.typst.complete.file": "Archivo",
+  "code.typst.complete.folder": "Carpeta",
+  "code.typst.complete.function": "Función"
 }

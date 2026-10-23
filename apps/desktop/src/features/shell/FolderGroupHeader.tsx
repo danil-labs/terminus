@@ -20,8 +20,8 @@ import EstadoDeTarea from "../projects/TaskStatus";
 const RECIBE_LA_TAREA = ["ring-2", "ring-primary"];
 
 /**
- * La cabecera de un grupo por carpeta. Solo existe si la carpeta tiene
- * tareas; es además el destino del arrastre y la puerta a lo que se hace
+ * La cabecera de un grupo por carpeta, también de una sin tareas; es además
+ * el destino del arrastre y la puerta a lo que se hace
  * con la carpeta mientras eso no viva en Ajustes.
  */
 export default function FolderGroupHeader(pp: {

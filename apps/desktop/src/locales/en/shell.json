@@ -141,6 +141,7 @@
   "shell.sidebar.show": "Show the history",
   "shell.sidebar.filter_empty": "No tasks match these filters.",
   "shell.sidebar.empty": "No tasks yet.",
+  "shell.sidebar.folder_empty": "No tasks yet",
   "shell.sidebar.tasks": "Tasks",
   "shell.storage.activity.days": {
     "one": "{count} day ago",

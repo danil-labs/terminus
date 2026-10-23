@@ -149,10 +149,10 @@ const SIN_USABLE = {
 const boot = (entorno, version, respuestas = RESPUESTAS, userAgent) =>
   mount(entorno, version, respuestas, userAgent);
 
-/** El riel agrupado por carpeta: es donde una carpeta tiene cabecera y se abre su vista. */
-const POR_CARPETA = { "harness.layout.sidebar.view.w": JSON.stringify({ group: "folder" }) };
+/** El riel agrupado por carpeta, que es su vista por omisión: una carpeta tiene cabecera y se abre su vista. */
+const SIN_AGRUPAR = { "harness.layout.sidebar.view.w": JSON.stringify({ group: "none" }) };
 const bootPorCarpeta = async (entorno, version, respuestas = RESPUESTAS) => {
-  const app = await mount(entorno, version, respuestas, undefined, POR_CARPETA);
+  const app = await mount(entorno, version, respuestas);
   // La cabecera de carpeta llega en su propio trozo: se espera a que pinte.
   for (let i = 0; i < 80 && !app.w.document.querySelector("[data-folder-open]"); i++) await sleep(25);
   return app;
@@ -534,7 +534,7 @@ if (!roto) {
   // El riel solo lista tareas, de todas las carpetas en una lista: los agentes ya no tienen sección.
   assert.equal(bubbleDocument.querySelector("[data-sidebar-agents]"), null, "el riel no lista agentes");
   const filasDelRiel = () => [...bubbleDocument.querySelectorAll('[data-sidebar-tasks] [data-sesion]')].map((f) => f.dataset.sesion);
-  assert.ok(bubbleDocument.querySelector('[data-sidebar-tasks] [data-sesion="s-task"] [data-session-agent]'), "sin agrupar, la tarea lleva la pastilla de su agente");
+  assert.ok(bubbleDocument.querySelector('[data-sidebar-tasks] [data-sesion="s-task"] [data-session-agent]'), "la tarea lleva la pastilla de su agente");
   const buscadorDelRiel = bubbleDocument.querySelector('[data-sidebar-search] input[role="searchbox"]');
   assert.ok(buscadorDelRiel, "el buscador del riel está siempre a la vista");
   buscadorDelRiel.value = "REVISAR";
@@ -1124,9 +1124,17 @@ if (!roto) {
       { id: "local-folder", name: "Local", sources: [], kind: "folder", cloud: null },
     ],
   });
-  // Sin tareas, ninguna carpeta aparece en el riel: lista tareas, no carpetas.
-  assert.equal(cloudIcons.w.document.querySelector("[data-folder-group]"), null, "una carpeta sin tareas no aparece en el riel");
-  assert.ok(!/Nube|Git en nube|Local/.test(cloudIcons.w.document.querySelector("[data-sidebar-tasks]")?.textContent ?? ""));
+  // Agrupando por carpeta, que es lo de omisión, una carpeta sin tareas tiene su grupo, su «+» y su estado vacío.
+  for (let i = 0; i < 80 && cloudIcons.w.document.querySelectorAll("[data-folder-group]").length < 3; i++) await sleep(25);
+  assert.deepEqual([...cloudIcons.w.document.querySelectorAll("[data-folder-group]")].map((el) => el.dataset.folderGroup),
+    ["cloud-folder", "cloud-git", "local-folder"], "una carpeta sin tareas aparece en el riel");
+  for (const [id, name] of [["cloud-folder", "Nube"], ["cloud-git", "Git en nube"], ["local-folder", "Local"]]) {
+    const grupo = cloudIcons.w.document.querySelector(`[data-sidebar-group="${id}"]`);
+    assert.equal(grupo.querySelector("[data-folder-open]").textContent.trim(), `${name}0`);
+    assert.equal(grupo.querySelector("[data-folder-empty]")?.textContent, "Sin tareas todavía");
+    assert.ok(grupo.querySelector(`button[aria-label="Nueva tarea en ${name}"]`), "su «+» empieza una tarea en ella");
+  }
+  assert.equal(cloudIcons.w.document.querySelector("[data-sidebar-empty]"), null, "con carpetas a la vista no dice que no hay nada");
   assert.doesNotMatch(cloudIcons.w.document.body.textContent, /google_drive|one_drive/);
   assert.deepEqual(cloudIcons.fallos, []);
   const forkCalls = [];
@@ -1794,7 +1802,7 @@ if (!roto) {
     list_live_sessions: ({ project }) => project === "folder" ? sidebarResponses.list_live_sessions : [],
     list_session_git: {},
   };
-  const flat = await boot("listo", "5-flat", groupedResponses);
+  const flat = await mount("listo", "5-flat", groupedResponses, undefined, SIN_AGRUPAR);
   assert.equal(flat.w.document.querySelector("[data-folder-group]"), null, "sin agrupar no hay filas de carpeta");
   // `p` te necesita: su segunda línea es lo que pide, con el color de la carpeta al final.
   assert.ok(flat.w.document.querySelector('[data-sesion="p"] [data-session-request]'), "lo que te piden ocupa la segunda línea");
@@ -2009,7 +2017,14 @@ if (!roto) {
   folderName.dispatchEvent(new sidebarControls.w.Event("input", { bubbles: true }));
   folderName.closest("form").dispatchEvent(new sidebarControls.w.Event("submit", { bubbles: true, cancelable: true }));
   await sleep(100);
-  assert.equal(controlsDoc.querySelector('[data-destino="loose"]'), null, "una carpeta recién creada y sin tareas no aparece en el riel");
+  // Agrupando por carpeta, la recién creada aparece ya, sin tareas, y se sigue en «Nueva tarea» dentro de ella.
+  for (let i = 0; i < 80 && !controlsDoc.querySelector('[data-folder-group="loose"] [data-folder-open]'); i++) await sleep(25);
+  const sueltaEnElRiel = controlsDoc.querySelector('[data-sidebar-group="loose"]');
+  assert.ok(sueltaEnElRiel, "una carpeta recién creada y sin tareas aparece en el riel");
+  assert.equal(sueltaEnElRiel.querySelector("[data-folder-empty]")?.textContent, "Sin tareas todavía");
+  assert.ok(sueltaEnElRiel.querySelector('button[aria-label="Nueva tarea en Carpeta suelta"]'), "con su «+»");
+  assert.equal(sueltaEnElRiel.querySelector("[data-folder-open]").dataset.active, "true", "y marcada mientras se mira su «Nueva tarea»");
+  assert.match(controlsDoc.querySelector('button[aria-label="Proyecto"]')?.textContent ?? "", /Carpeta suelta/, "«Nueva tarea» queda en la carpeta recién creada");
   assert.deepEqual(sidebarControls.fallos, []);
   const openClone = async () => {
     await abrirAnadirProyecto(sidebarControls);
