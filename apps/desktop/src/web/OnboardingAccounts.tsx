@@ -40,7 +40,7 @@ export function OnboardingAccounts(props: { workspace: string; onDone: () => voi
       atrasRotulo={t("web.onboarding.accounts.later")}
       primario={{ rotulo: t("web.onboarding.accounts.finish"), onClick: leave, disabled: !Object.values(connected()).some(Boolean) }}
     >
-      <Show when={providers()} fallback={<p role="status" class="m-0 text-sm text-neutral-500">{t("web.setup.connecting")}</p>}>
+      <Show when={providers()} fallback={<p role="status" class="m-0 text-sm text-neutral-500">{t("web.onboarding.providers_loading")}</p>}>
         {(list) => (
           <div class="grid gap-2.5">
             <For each={list()} fallback={<p class="m-0 text-sm text-neutral-500">{t("web.onboarding.accounts.none")}</p>}>

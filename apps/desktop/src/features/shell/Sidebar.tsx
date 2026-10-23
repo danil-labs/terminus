@@ -33,6 +33,7 @@ import {
   Sidebar as SidebarShell,
 } from "../../ui/sidebar";
 import { type ClonEnCurso, faseDeClon } from "../projects/AddWorkdir";
+import { MachineSlices } from "../machines/MachineSlices";
 import { AstroAvatar } from "../projects/AstroAvatar";
 import { watchHandlerStatuses } from "../projects/handlerPresence";
 import NewAgent, { type ModelChoices } from "../projects/NewAgent";
@@ -646,6 +647,9 @@ export default function Sidebar(props: {
               </SidebarMenuItem>
             </Show>
           </SidebarMenu>
+          <Show when={!props.collapsed}>
+            <MachineSlices />
+          </Show>
 
           <Show when={!props.collapsed}>
             <div data-sidebar-scope class="flex min-w-0 items-center gap-1">

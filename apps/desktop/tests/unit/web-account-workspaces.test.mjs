@@ -77,7 +77,8 @@ test("the account's workspaces show with their machines asleep, not the create-w
   assert.ok(text().includes("Todavía no hay tareas"), "with an empty task list, not an error");
   const projects = await invoke("list_projects");
   assert.deepEqual(projects.map((p) => [p.id, p.machines, p.remote_url]), [["p1", ["cmp_vm"], "https://github.com/ana/app"]], "its project, from the registry");
-  assert.deepEqual(await invoke("list_live_sessions", { project: "p1", open: [] }), [], "an empty task list, not an error");
+  // Nadie contestó y no hay nada guardado: se dice por qué, nunca una lista vacía que no es cierta.
+  await assert.rejects(invoke("list_live_sessions", { project: "p1", open: [] }), (e) => e.detail === "machine_off", "the VM is off, said by name");
   assert.ok(!f.relays.cmp_vm.calls.some((c) => c.command === "send_message"), "reading wakes nothing");
 
   const id = await invoke("send_message", { project: "p1", session: null, prompt: "hola", provider: "codex" });

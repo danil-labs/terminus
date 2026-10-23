@@ -83,6 +83,8 @@ export const APP_ACTIONS = [
   "work_write_part",
   "work_import",
   "work_cancel",
+  // Una tarea nueva en otra máquina dentro del space de esta: el space se comparte antes con la cuenta.
+  "share_space",
 ] as const;
 
 export const APP_COMMANDS: readonly AppCommand[] = [...APP_READS, ...APP_ACTIONS];

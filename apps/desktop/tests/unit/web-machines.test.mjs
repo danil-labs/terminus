@@ -2,8 +2,9 @@
  * One panel over every computer of the person: the browser build opens a relay
  * session per computer, joins their workspaces and projects by id (the same on
  * every machine) and their tasks (each with its machine and an id that cannot
- * collide), sends each command to the machine it names, creates where the
- * person chose (making the workspace that machine's own first), fails short and
+ * collide), sends each command to the machine of its envelope (the
+ * `x-terminus-machine` header, never its arguments), creates where the person
+ * chose (making the workspace that machine's own first), fails short and
  * neutral on a computer that is off and cannot be woken, leaves out one that
  * speaks another contract, and groups AI accounts by provider and email.
  * Mounts `dist-web/`.
@@ -47,10 +48,18 @@ async function until(check, ms = 8000) {
 const VM = { computer_id: "cmp_vm", name: "Danil VM", state: "online", provider: "aws-ec2" };
 const MAC = { computer_id: "cmp_mac", name: "Mac de Ana", state: "online", provider: "self", kind: "physical" };
 
-async function open(name, computers, relays) {
+/** The account's registry: `w` (and any other given) on the machines named. */
+const registry = (spaces) =>
+  Object.entries(spaces).map(([id, computers]) => ({ id, name: id === "w" ? "W" : id, radiant_workspace_id: null, settings: null, settings_version: 1, created_at: "2026-10-01T10:00:00Z", updated_at: "2026-10-01T10:00:00Z", projects: [], computers }));
+
+/** The envelope of a call to a machine, as the window builds it from the task's row. */
+const on = (machine) => ({ headers: { "x-terminus-machine": machine } });
+
+async function open(name, computers, relays, workspaces) {
   const f = fleet(relays);
   const app = await boot("listo", name, {}, undefined, {}, {
     web: true,
+    workspaces,
     antes: (w) => {
       globalThis.WebSocket = f.Socket;
       w.terminusWeb = { endpoint: "https://relay.test", computers, getToken: async () => "tok" };
@@ -83,13 +92,14 @@ test("two machines show together and each command goes to the machine it names",
   assert.equal(git["cmp_mac~t1"].branch, "feat/notas");
   assert.deepEqual(calls("cmp_mac", "list_session_git").at(-1).args.priority, ["t1"], "the Mac is asked with its own task ids");
 
-  const task = await invoke("load_session", { project: "pm", id: "cmp_mac~t1" });
+  const task = await invoke("load_session", { project: "pm", id: "cmp_mac~t1" }, on("cmp_mac"));
   assert.equal(task.id, "cmp_mac~t1");
   const read = calls("cmp_mac", "load_session").at(-1);
   assert.deepEqual([read.args.project, read.args.id, read.workspace], ["pm", "t1", "w"], "the Mac reads its task with the same project and workspace ids");
   assert.equal(calls("cmp_vm", "load_session").length, 0, "the VM is not asked for the Mac's task");
 
-  assert.equal(await invoke("send_message", { session: "cmp_mac~t1", text: "hola" }), "cmp_mac~t1");
+  assert.equal(await invoke("send_message", { session: "cmp_mac~t1", text: "hola" }, on("cmp_mac")), "cmp_mac~t1");
+  await assert.rejects(invoke("send_message", { session: "cmp_mac~t1", text: "hola" }, on("cmp_vm")), (e) => e.detail === "cross_machine", "an id of another machine in the args is refused, not followed");
   assert.equal(calls("cmp_mac", "send_message").length, 1);
   assert.equal(calls("cmp_vm", "send_message").length, 0);
 
@@ -98,9 +108,9 @@ test("two machines show together and each command goes to the machine it names",
   await invoke("create_project", { name: "Otro" }, { headers: { "x-terminus-machine": "cmp_mac" } });
   assert.equal(calls("cmp_mac", "create_project").length, 1, "the picked machine makes it");
   await invoke("create_project", { name: "Tercero" });
-  assert.equal(calls("cmp_mac", "create_project").length, 2, "then the last machine used is the default");
+  assert.equal(calls("cmp_vm", "create_project").length, 2, "without a choice it is the workspace's first machine again, as on the desktop");
   const machines = await invoke("machine_list");
-  assert.deepEqual(machines.map((m) => [m.id, m.active, m.hosts]), [["cmp_vm", false, true], ["cmp_mac", true, true]]);
+  assert.deepEqual(machines.map((m) => [m.id, m.active, m.hosts]), [["cmp_vm", true, true], ["cmp_mac", false, true]]);
 
   doc.querySelector('[data-sesion="cmp_vm~t1"]').click();
   await sleep(600);
@@ -136,14 +146,11 @@ test("workspaces join by id alone, never by name, and a project is one row with 
   assert.deepEqual(list.workspaces.map((w) => [w.id, w.name, w.machines]), [["w", "W", ["cmp_vm", "cmp_mac"]], ["x", "Notas", ["cmp_vm"]], ["y", "Notas", ["cmp_mac"]]], "the same id is one workspace; the same name is not");
   const y = list.workspaces.find((w) => w.id === "y");
   assert.equal(y.logo, `cmp_mac~${LOGO}`, "a logo path carries its machine");
-  assert.equal((await invoke("preview_file", { path: y.logo, rel: y.logo })).data_url, PNG, "and is read there");
+  assert.equal((await invoke("preview_file", { path: y.logo, rel: y.logo }, on("cmp_mac"))).data_url, PNG, "and is read there");
   assert.equal(calls("cmp_vm", "preview_file").length, 0);
 
   const projects = await invoke("list_projects");
   assert.deepEqual(projects.map((p) => [p.id, p.name, p.machines]), [["p1", "Panel", ["cmp_vm", "cmp_mac"]], ["pv", "Solo VM", ["cmp_vm"]], ["pm", "Solo Mac", ["cmp_mac"]]]);
-  await invoke("list_live_sessions", { project: "pm" });
-  assert.ok(calls("cmp_mac", "list_live_sessions").some((c) => c.args.project === "pm"));
-  assert.ok(!calls("cmp_vm", "list_live_sessions").some((c) => c.args.project === "pm"), "the tasks of a project are asked only where its folder is");
   assert.deepEqual(app.fallos, []);
 });
 
@@ -163,7 +170,7 @@ test("a new task is born on the machine chosen, with the same project id, and ma
       }),
     },
     cmp_mac: { table: table("Panel", "Tarea del Mac", { list_workspaces: macListing, workspaces_startup: macListing, list_projects: [folder("p1", "Panel", { remote_url: "https://github.com/danil/panel" })], set_active_workspace: null }) },
-  });
+  }, registry({ w: ["cmp_vm", "cmp_mac"], w2: ["cmp_mac"] }));
 
   const projects = await invoke("list_projects");
   assert.deepEqual(projects.map((p) => [p.id, p.machines, p.remote_url]), [["p1", ["cmp_mac"], "https://github.com/danil/panel"]], "the VM knows it from the account but has no folder yet");
@@ -177,7 +184,7 @@ test("a new task is born on the machine chosen, with the same project id, and ma
   await invoke("list_projects");
   assert.equal((await invoke("machine_list")).find((m) => m.id === "cmp_vm").hosts, false, "the VM lacks the open workspace");
   assert.equal(await invoke("send_message", { project: "p1", session: null, prompt: "otra" }, vm), "cmp_vm~r1");
-  assert.deepEqual(calls("cmp_vm", "materialize_workspace").map((c) => [c.args.id, c.workspace]), [["w2", null]], "the VM makes the workspace its own with the same id");
+  assert.deepEqual(calls("cmp_vm", "materialize_workspace").map((c) => [c.args.id, c.workspace]), [["w2", "w2"]], "the VM makes the workspace its own with the same id, said in the envelope");
   assert.deepEqual(calls("cmp_vm", "send_message").at(-1).workspace, "w2", "and then gets the task in it");
   const after = await invoke("list_workspaces");
   assert.deepEqual(after.workspaces.find((w) => w.id === "w2").machines, ["cmp_vm", "cmp_mac"]);
@@ -191,7 +198,7 @@ test("«Ejecutar en» disables, with the reason, a machine that cannot make the 
     cmp_vm: { table: table("Panel", "Tarea de la VM", {}, "pv") },
     cmp_mac: { table: table("Notas", "Tarea del Mac", {}, "pm") },
     cmp_old: { table: table("Nada", "Nada", { list_workspaces: empty, workspaces_startup: empty, list_projects: [] }) },
-  });
+  }, registry({ w: ["cmp_vm", "cmp_mac"] }));
 
   const old = { headers: { "x-terminus-machine": "cmp_old" } };
   await assert.rejects(invoke("send_message", { project: "pv", session: null, prompt: "hola" }, old), (e) => {
@@ -232,7 +239,7 @@ test("an action on a computer that is off and cannot be woken fails short and ne
   const machine = doc.querySelector('[data-hover-machine="cmp_mac"]');
   assert.ok(machine?.parentElement.textContent.includes("Mac de Ana"), "the task card names its machine");
   assert.equal(machine.getAttribute("aria-label"), "apagada");
-  await assert.rejects(invoke("send_message", { session: "cmp_mac~t1", text: "hola" }), (e) => {
+  await assert.rejects(invoke("send_message", { session: "cmp_mac~t1", text: "hola" }, on("cmp_mac")), (e) => {
     assert.equal(e.what, "Mac de Ana está apagada. Enciéndela para seguir.");
     return true;
   });
@@ -259,7 +266,7 @@ test("a machine with another engine contract needs an update and never breaks th
   const before = calls("cmp_old", "list_projects").length;
   await invoke("list_projects");
   assert.equal(calls("cmp_old", "list_projects").length, before, "it is left out of later reads");
-  await assert.rejects(invoke("send_message", { session: "cmp_old~t1", text: "hola" }), (e) => {
+  await assert.rejects(invoke("send_message", { session: "cmp_old~t1", text: "hola" }, on("cmp_old")), (e) => {
     assert.equal(e.what, "Servidor viejo necesita actualizarse antes de usarla desde aquí.");
     return true;
   });
@@ -285,7 +292,7 @@ test("AI accounts are grouped by provider and email with the machines they are s
   assert.equal(other.label, "Cuenta 2 · Danil VM", "an account without email stays its own, named with its machine");
   assert.deepEqual(other.machines.map((m) => m.machine), ["cmp_vm"]);
 
-  await invoke("remove_account", { provider: "claude", id: "cmp_mac~m1" });
+  await invoke("remove_account", { provider: "claude", id: "cmp_mac~m1" }, on("cmp_mac"));
   assert.deepEqual(calls("cmp_mac", "remove_account").map((c) => c.args.id), ["m1"], "signing out is per machine");
   assert.equal(calls("cmp_vm", "remove_account").length, 0);
   await invoke("add_account", { provider: "claude", label: "" }, { headers: { "x-terminus-machine": "cmp_mac" } }).catch(() => {});
@@ -313,7 +320,7 @@ test("a computer the relay cannot start answers off at once, never starting", as
     cmp_vm: { table: table("Panel", "Tarea de la VM") },
     cmp_own: { table: table("Notas", "Tarea del portátil"), state: "offline", notStartable: true },
   });
-  await assert.rejects(invoke("send_message", { session: "cmp_own~t1", text: "hola" }), (e) => {
+  await assert.rejects(invoke("send_message", { session: "cmp_own~t1", text: "hola" }, on("cmp_own")), (e) => {
     assert.equal(e.what, "Portátil está apagada. Enciéndela para seguir.");
     return true;
   });

@@ -62,8 +62,6 @@ const RITMO_CONSEJOS = 5000;
 const RITMO_FOTO = 5000;
 const CON_DESCRIPCION = new Set(["pnpm", "bun", "agent-browser", "uv", "python"]);
 
-// Una computadora gestionada llega preparada: en el navegador solo se ve su estado.
-const PreparacionGestionada = lazy(() => import("../../web/ManagedSetup"));
 // Conectar la IA y personalizar solo se cargan en el primer arranque: la carga inicial está en su techo.
 const MapaDeConexiones = lazy(() => import("../onboarding/ConnectAI").then((m) => ({ default: m.MapaDeConexiones })));
 const PanelDeIA = lazy(() => import("../onboarding/ConnectAI").then((m) => ({ default: m.PanelDeIA })));
@@ -74,7 +72,8 @@ const VistaSencilla = lazy(() => import("../onboarding/Prepare").then((m) => ({ 
 const VistaTerminal = lazy(() => import("../onboarding/Prepare").then((m) => ({ default: m.VistaTerminal })));
 
 export default function Setup(props: { children: JSX.Element }) {
-  if (!capabilities().localSetup) return <PreparacionGestionada>{props.children}</PreparacionGestionada>;
+  // En el navegador no hay instalador: cada máquina de la cuenta llega preparada y la app abre sin esperarla.
+  if (!capabilities().localSetup) return props.children;
   const [reporte, setReporte] = createSignal<EnvReport | null>(null);
   const [mostrar, setMostrar] = createSignal<boolean | null>(null);
   const [seguir, setSeguir] = createSignal(false);

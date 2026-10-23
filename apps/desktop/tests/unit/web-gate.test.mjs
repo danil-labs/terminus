@@ -63,7 +63,7 @@ test("the web build uses the stored session, opens every computer and explains r
     assert.equal(requests[0]?.token, "Bearer stored", "the API gets the session the app stored");
     assert.equal(w.document.querySelector("[data-web-gate]"), null, "several computers open without a picker");
     assert.deepEqual(
-      fake.sockets.map((s) => s.url).sort(),
+      fake.sockets.map((s) => s.url.split("?")[0]).sort(),
       ["wss://computers.danil.ai/v1/computers/cmp_a/session", "wss://computers.danil.ai/v1/computers/cmp_b/session"],
       "one relay session per computer",
     );

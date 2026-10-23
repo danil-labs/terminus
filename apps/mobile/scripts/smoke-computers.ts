@@ -55,7 +55,7 @@ import {
   workspaceEntries,
   workspacesOf,
 } from "../src/lib/engine.ts";
-import { type Host, HostError, relayHost } from "../src/lib/hosts.ts";
+import { type Host, HostError, accountFleet } from "../src/lib/hosts.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -78,13 +78,14 @@ async function hostsAt(endpoint: string) {
   const answer = await listComputers(endpoint, "fake-jwt");
   assert.equal(answer.kind, "ok");
   const computers = answer.kind === "ok" ? answer.value : [];
-  const hosts = orderComputers(computers).map((c) =>
-    relayHost(c, { endpoint, getToken: () => "fake-jwt", wake: async () => (await startComputer(endpoint, "fake-jwt", c.computer_id)).kind === "ok" }),
-  );
+  // Una sola flota para todas, como la app (`machines.tsx`).
+  const machines = accountFleet({ endpoint, getToken: () => "fake-jwt", wake: async (id) => (await startComputer(endpoint, "fake-jwt", id)).kind === "ok" });
+  const hosts = machines.set(computers);
+  const close = () => machines.close();
   const events = new Map<string, EngineEvent[]>();
   for (const h of hosts) h.onEvents((list) => events.set(h.id, [...(events.get(h.id) ?? []), ...list]));
   await sleep(200);
-  return { hosts, events, byId: (id: string) => hosts.find((h) => h.id === id) as Host };
+  return { hosts, events, close, byId: (id: string) => hosts.find((h) => h.id === id) as Host };
 }
 
 const steps: string[] = [];
@@ -100,7 +101,7 @@ const ok = (step: string) => {
   const endpoint = `http://127.0.0.1:${port}`;
   try {
     assert.equal((await listComputers(endpoint, "otro")).kind, "unauthorized");
-    const { hosts, events, byId } = await hostsAt(endpoint);
+    const { hosts, events, byId, close } = await hostsAt(endpoint);
     const vm = byId("cmp_vm");
     const mac = byId("cmp_mac");
     assert.equal(vm.managed, true);
@@ -168,7 +169,7 @@ const ok = (step: string) => {
     assert.equal((await loadTask(mac, "w-prod", "p-mac-api", pid)).permissions.length, 0);
     ok("en la Mac: la tarea pide permiso, se aprueba desde el teléfono y termina; avisos de aprobación y de terminada");
 
-    for (const h of hosts) h.close();
+    close();
   } finally {
     child.kill();
   }
@@ -180,7 +181,7 @@ const ok = (step: string) => {
   const child = await fake(port, "--mac-off");
   const endpoint = `http://127.0.0.1:${port}`;
   try {
-    const { hosts, byId } = await hostsAt(endpoint);
+    const { hosts, byId, close } = await hostsAt(endpoint);
     const mac = byId("cmp_mac");
     assert.equal(mac.power(), "off");
     assert.equal(mac.canAct(), "asleep");
@@ -206,7 +207,7 @@ const ok = (step: string) => {
     const folders = withAccountFolders({ folders: [], spaces: [] }, accountList, "w-prod", ["cmp_mac"]).folders;
     assert.deepEqual(folders.map((f) => f.key), ["cmp_mac/p-mac-api"], "con sus carpetas del registro");
     ok("el registro de la cuenta (GET /v1/workspaces) trae el workspace y sus carpetas con la máquina apagada");
-    for (const h of hosts) h.close();
+    close();
   } finally {
     child.kill();
   }
@@ -218,19 +219,20 @@ const ok = (step: string) => {
   const child = await fake(port);
   const endpoint = `http://127.0.0.1:${port}`;
   try {
-    const { hosts, events, byId } = await hostsAt(endpoint);
+    const { hosts, events, byId, close } = await hostsAt(endpoint);
     const vm = byId("cmp_vm");
     const mac = byId("cmp_mac");
     const live = async (h: Host, ws: string) => (await snapshotOf(h, ws)).tasks;
 
-    // Fijar con la VM apagada: no es intención del relay, la enciende el plano de control antes.
+    // Fijar ya no enciende la VM (con ella apagada el relay lo aplaza, #307, y este falso no aplaza): se enciende antes.
     assert.equal(vm.power(), "off");
+    await vm.wake();
     await setPinned(vm, "w-prod", "p-vm-web", "t-vm-1", true);
     assert.equal(vm.power(), "on");
     assert.equal((await live(vm, "w-prod")).find((t) => t.id === "t-vm-1")?.pinned, true);
     await setPinned(vm, "w-prod", "p-vm-web", "t-vm-1", false);
     assert.equal((await live(vm, "w-prod")).find((t) => t.id === "t-vm-1")?.pinned, false);
-    ok("Fijar y Desfijar desde la vista previa (set_session_pinned); con la VM apagada, primero la enciende");
+    ok("Fijar y Desfijar desde la vista previa (set_session_pinned) en la VM encendida");
 
     const blocked = await archiveTask(mac, "w-prod", "p-mac-web", "t-mac-2");
     assert.ok("blocked" in blocked && blocked.blocked[0].files.includes("src/home.tsx"));
@@ -315,7 +317,7 @@ const ok = (step: string) => {
     await assert.rejects(slow, (e: HostError) => (e.detail as { what?: { clave?: string } })?.what?.clave === "projects.error.clone_cancelled");
     ok("«Nueva carpeta» (create_project) y «Clonar repo» (start_project_clone + project_clone): avance, carpeta listada, URL rechazada y cancelar");
 
-    for (const h of hosts) h.close();
+    close();
   } finally {
     child.kill();
   }

@@ -95,12 +95,20 @@ export class SliceBook {
     this.flush();
   }
 
-  /** El estado de cada máquina en su lectura más reciente. */
+  /**
+   * El estado de cada máquina: el de su lectura más reciente, salvo que esa no
+   * sea de ahora ni diga otro contrato o licencia y haya algo guardado: entonces
+   * `cached` con la hora de la copia más nueva. Una lectura sin copia no tapa las que sí la tienen.
+   */
   statuses(): Record<string, { status: SliceStatus; at: number | null }> {
     const out: Record<string, { status: SliceStatus; at: number | null }> = {};
     for (const [machine, of] of this.slices) {
-      const last = [...of.values()].at(-1);
-      if (last) out[machine] = { status: last.status, at: last.at };
+      const all = [...of.values()];
+      const last = all.at(-1);
+      if (!last) continue;
+      const saved = all.filter((s) => s.has && s.status !== "ok" && s.at !== null);
+      const settled = last.status === "ok" || last.status === "outdated" || last.status === "license_required";
+      out[machine] = !settled && saved.length ? { status: "cached", at: Math.max(...saved.map((s) => s.at as number)) } : { status: last.status, at: last.at };
     }
     return out;
   }

@@ -40,6 +40,7 @@ import { displayName, notifyProfiles } from "../projects/profiles";
 import { SettingsPanel, SettingsRow, SettingsSection } from "./layout";
 import { LogoDelWorkspace } from "./Workspaces";
 import { createWorkspaces } from "./workspaces-store";
+import { machineOf } from "../machines/store";
 
 const IMAGES = ["png", "jpg", "jpeg", "webp"];
 
@@ -189,7 +190,7 @@ export default function Appearance(props: { proyecto: string }) {
   const [vistaPropia] = createResource(propia, async (ruta) => {
     if (!ruta) return null;
     try {
-      return (await invoke<Preview>("preview_file", { path: ruta, rel: ruta })).data_url;
+      return (await invoke<Preview>("preview_file", { path: ruta, rel: ruta }, machineOf(ruta))).data_url;
     } catch {
       return null;
     }

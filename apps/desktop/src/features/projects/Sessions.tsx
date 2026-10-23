@@ -141,7 +141,7 @@ export type SessionRow = {
   chat_de_agente: boolean;
   /** De qué espacio es (`spaces::of_rows`). Ver `lib/spaces.ts`. */
   space?: string | null;
-  /** La máquina que la corre si no es la de la ventana (`fleet.rs`); apagada, `machine_on` es `false`. */
+  /** La máquina que la corre si no es la de la ventana (`@terminus/fleet`); apagada, `machine_on` es `false`. */
   machine?: string;
   machine_on?: boolean;
   /**

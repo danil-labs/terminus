@@ -12,6 +12,7 @@ import {
   type TaskSeen,
 } from "../../lib/spaces";
 import { invoke } from "../../lib/invoke.ts";
+import { machineOf } from "../machines/store";
 import type { Project } from "../../lib/model";
 import { Button } from "../../ui/Button";
 import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
@@ -33,7 +34,7 @@ export default function DeleteSpace(props: {
   onTocadas: (folders: string[]) => void;
 }) {
   const [previa, { mutate }] = createResource(() => props.space.id, (id) =>
-    invoke<DeletePreview>("space_delete_preview", { id }),
+    invoke<DeletePreview>("space_delete_preview", { id }, machineOf(id)),
   );
   const [marcas, setMarcas] = createSignal(new Map<string, "new" | "changed">());
   const [fallos, setFallos] = createSignal<{ task: string; title: string; error: Failure }[]>([]);
@@ -51,7 +52,7 @@ export default function DeleteSpace(props: {
   const carpeta = (id: string) => props.proyectos.find((p) => p.id === id)?.name ?? id;
   const nombre = () => spaceName(props.space);
 
-  const releer = () => invoke<DeletePreview>("space_delete_preview", { id: props.space.id });
+  const releer = () => invoke<DeletePreview>("space_delete_preview", { id: props.space.id }, machineOf(props.space.id));
 
   const confirmar = async () => {
     const vista = previa();
@@ -63,7 +64,7 @@ export default function DeleteSpace(props: {
       const salida = await invoke<DeleteOutcome>("delete_space", {
         id: props.space.id,
         seen: { tasks: vista.tasks, discard: sinCommitear().length > 0 },
-      });
+      }, machineOf(props.space.id));
       if (salida.deleted) {
         props.onEliminada(enviadas.size);
         return;

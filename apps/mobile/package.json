@@ -10,6 +10,7 @@
     "@terminus/chat": "file:../../packages/chat",
     "@terminus/computers": "file:../../packages/computers",
     "@terminus/design": "file:../../packages/design",
+    "@terminus/fleet": "file:../../packages/fleet",
     "@terminus/protocol": "file:../../packages/protocol",
     "@terminus/tasks": "file:../../packages/tasks",
     "expo": "~58.0.16",

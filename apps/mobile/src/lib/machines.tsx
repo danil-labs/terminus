@@ -1,12 +1,13 @@
-import { type AccountWorkspace, type Answer, type Computer, listComputers, listWorkspaces, orderComputers, startComputer } from "@terminus/computers";
+import { type AccountWorkspace, type Answer, type Computer, listComputers, listWorkspaces, startComputer } from "@terminus/computers";
 import { type EngineEvent, type WorkspaceAttention, mergeAttention } from "@terminus/protocol";
 import { store } from "./store";
+import { sliceStorage } from "./sliceStorage";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AppState, Platform } from "react-native";
 import { useAccount } from "./account";
 import { BRIDGE_ENABLED, BRIDGE_WITHOUT_ACCOUNT, loadPairing, savePairing } from "./bridge";
 import { type Notice, attentionOf, noticer } from "./engine";
-import { type Host, type Pairing, bridgeHost, relayHost } from "./hosts";
+import { type AccountFleet, type Host, type Pairing, accountFleet, bridgeHost } from "./hosts";
 import { t } from "./i18n";
 import { Notifications } from "./notifications";
 import { COMPUTERS } from "./supabase";
@@ -134,24 +135,43 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
     return () => sub.remove();
   }, [reloadComputers]);
 
-  // Una sesión de relay por computadora y el bridge si está emparejado.
+  // Una sola flota por sesión de Danil (`@terminus/fleet`), como el escritorio y la web: una sesión de relay por computadora.
+  const [machinesFleet, setMachinesFleet] = useState<AccountFleet | null>(null);
   useEffect(() => {
-    // En el orden de la web: las administradas primero; la primera encabeza un workspace compartido.
-    const next: Host[] = orderComputers(computers).map((computer) =>
-      relayHost(computer, {
+    if (!signedIn) return setMachinesFleet(null);
+    let made: AccountFleet | null = null;
+    let gone = false;
+    void sliceStorage().then((storage) => {
+      if (gone) return;
+      made = accountFleet({
         endpoint: COMPUTERS,
         getToken: account.getToken,
         onUnauthorized: () => void account.unauthorized(),
         // Fijar, archivar o cerrar una sesión no son intenciones del relay: la VM se enciende por aquí.
-        wake: async () => (await startComputer(COMPUTERS, await account.getToken(), computer.computer_id)).kind === "ok",
-        beforeReconnect: async () => {
+        wake: async (computer) => (await startComputer(COMPUTERS, await account.getToken(), computer)).kind === "ok",
+        beforeReconnect: (computer) => async () => {
           const answer = await computersOf(account.getToken, account.unauthorized);
           if (answer.kind === "license") setFleet("license");
-          if (answer.kind === "ok" && !answer.value.some((c) => c.computer_id === computer.computer_id)) return false;
+          if (answer.kind === "ok" && !answer.value.some((c) => c.computer_id === computer)) return false;
           return answer.kind !== "license" && answer.kind !== "unauthorized";
         },
-      }),
-    );
+        storage,
+      });
+      setMachinesFleet(made);
+    });
+    // Al irse al fondo se guarda lo último de cada máquina.
+    const sub = AppState.addEventListener("change", (state) => state !== "active" && made?.flush());
+    return () => {
+      gone = true;
+      sub.remove();
+      made?.close();
+    };
+  }, [signedIn, account.getToken, account.unauthorized]);
+
+  // Las computadoras de la cuenta en la flota (altas y bajas en vivo) y el bridge si está emparejado.
+  useEffect(() => {
+    // En el orden de la web: las administradas primero; la primera encabeza un workspace compartido.
+    const next: Host[] = machinesFleet ? machinesFleet.set(computers) : [];
     // Sin la sesión de Danil no se sincroniza: el bridge también la pide, salvo el lab sin cuenta.
     if (pairing && (signedIn || BRIDGE_WITHOUT_ACCOUNT)) next.push(bridgeHost(pairing, t("machines.network")));
     setHosts(next);
@@ -187,9 +207,10 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
     });
     return () => {
       for (const off of unsubscribe) off();
-      for (const host of next) host.close();
+      // Las computadoras las cierra la flota cuando dejan la cuenta; el bridge, aquí.
+      for (const host of next) if (host.kind === "bridge") host.close();
     };
-  }, [computers, pairing, signedIn, account.getToken, account.unauthorized]);
+  }, [machinesFleet, computers, pairing, signedIn]);
 
   const pair = useCallback(async (next: Pairing | null) => {
     await savePairing(next);

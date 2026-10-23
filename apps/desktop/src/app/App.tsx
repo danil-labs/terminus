@@ -104,7 +104,7 @@ import ArchivedTasks from "../features/projects/ArchivedTasks";
 import BaseBranchPicker from "../features/projects/BaseBranchPicker";
 import { watchHandlerStatus, watchHandlerStatuses } from "../features/projects/handlerPresence";
 import { EmptyContext, ProjectPicker } from "../features/projects/Projects";
-import { bringHereLabel, canBringHere, carryOrigin, machineName, machines, refetchMachines, runOn, runOnOptions, setRunOn } from "../features/machines/store";
+import { bringHereLabel, canBringHere, carryOrigin, machineName, machineOf, machines, refetchMachines, runOn, runOnOptions, setRunOn } from "../features/machines/store";
 import type { CarriedBase, CarryCheck } from "../features/machines/carry";
 // Chunk aparte: solo lo carga quien crea una tarea, no la carga inicial.
 const MachinePicker = lazy(() =>
@@ -880,14 +880,14 @@ export default function App() {
 
   async function renameSpace(id: string, name: string) {
     try {
-      replaceSpace(await invoke<Space>("rename_space", { id, name }));
+      replaceSpace(await invoke<Space>("rename_space", { id, name }, machineOf(id)));
     } catch (e) {
       setError(prosaDe(e));
     }
   }
 
   async function updateSpaceFolders(id: string, folders: string[]) {
-    replaceSpace(await invoke<Space>("set_space_folders", { id, folders }));
+    replaceSpace(await invoke<Space>("set_space_folders", { id, folders }, machineOf(id)));
   }
 
   async function removeFromActiveSpace(folder: string) {
@@ -1910,6 +1910,9 @@ export default function App() {
   // material»: traer un repositorio a mitad de una tarea por aquí cierra la
   // conversación y deja la anterior abandonada, sin error y sin aviso. Para
   // eso está `recargarMaterial`.
+  /** En la web una máquina apagada tiene su indicador y su rebanada: lo que no contestó no es un error. */
+  const apagadaEnLaWeb = (e: unknown) => !!capabilities().computerStatus && (e as { detail?: unknown } | null)?.detail === "machine_off";
+
   async function aplicar(a: Startup) {
     guardarCache.flush();
     const activo = a.workspaces.find((w) => w.id === a.active);
@@ -2003,18 +2006,19 @@ export default function App() {
       // encadenadas sumaban sus latencias en el arranque. `list_sources`
       // esperaba a que volviera `list_projects` para preguntar algo que
       // no usa su respuesta.
+      // Las fuentes que no llegan (su máquina apagada, sin copia) dejan las de antes y no tumban las carpetas.
       const [proyectos, fuentes] = await Promise.all([
         invoke<Project[]>("list_projects"),
-        invoke<Source[]>("list_sources"),
+        invoke<Source[]>("list_sources").catch(() => null),
       ]);
       if (generation !== sessionGeneration) return;
       setProjectList(proyectos);
-      setSources(fuentes);
+      if (fuentes) setSources(fuentes);
     } catch (e) {
       if (generation !== sessionGeneration) return;
       setProjectList([]);
       setSources([]);
-      setError(prosaDe(e));
+      if (!apagadaEnLaWeb(e)) setError(prosaDe(e));
     }
     if (primeras) {
       // Si cambiaron las carpetas, `grupos` relee también las nuevas; esta lectura ya vale para las de siempre.
@@ -2082,7 +2086,8 @@ export default function App() {
     const closeTab = listen("close-tab", closeActiveTab);
     onCleanup(() => void closeTab.then((unlisten) => unlisten()));
 
-    void invoke<Agent[]>("list_providers").then(setAgents);
+    // Sin respuesta (una máquina apagada sin copia, en la web) se queda la lista de antes.
+    void invoke<Agent[]>("list_providers").then(setAgents).catch(() => {});
     // Lo primero de todo: sin workspace no hay dónde leer ni escribir. El
     // arranque migra lo que hubiera suelto de antes y devuelve cuál quedó
     // activo. Lo que el workspace tiene es su fuente de contexto, no «dónde
@@ -2113,7 +2118,8 @@ export default function App() {
           setTimeout(() => void arrancar(quedan - 1), 1000);
           return;
         }
-        setError(prosaDe(e));
+        // En la web una máquina apagada tiene su indicador: no es un error, y al encenderse trae sus workspaces.
+        if (!apagadaEnLaWeb(e)) setError(prosaDe(e));
         if (enCache()) {
           batch(() => {
             setEnCache(false);
@@ -2836,7 +2842,7 @@ export default function App() {
     // chat el mismo agente seguía diciendo «no está instalado», con el
     // campo muerto hasta cerrar y volver a abrir la app.
     const agentsEv = listen("providers", () => {
-      void invoke<Agent[]>("list_providers").then(setAgents);
+      void invoke<Agent[]>("list_providers").then(setAgents).catch(() => {});
       // Y qué se puede usar, que es lo que decide el menú. Conectar una cuenta
       // desde Configuración añade una entrada aquí; desinstalar un CLI se la
       // lleva. Sin esto había que cerrar la app para verlo.
@@ -6445,7 +6451,7 @@ export default function App() {
       () => cellProfile().background ?? undefined,
       async (ruta) => {
         try {
-          return (await invoke<Preview>("preview_file", { path: ruta, rel: ruta })).data_url;
+          return (await invoke<Preview>("preview_file", { path: ruta, rel: ruta }, machineOf(ruta))).data_url;
         } catch {
           return null;
         }
@@ -6869,7 +6875,7 @@ export default function App() {
   const [fondoPropioUrl] = createResource(fondoPropio, async (ruta) => {
     if (!ruta) return null;
     try {
-      return (await invoke<Preview>("preview_file", { path: ruta, rel: ruta })).data_url;
+      return (await invoke<Preview>("preview_file", { path: ruta, rel: ruta }, machineOf(ruta))).data_url;
     } catch {
       return null;
     }

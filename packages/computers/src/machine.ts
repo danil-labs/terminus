@@ -34,7 +34,7 @@ export const UNWAKEABLE_KINDS: ReadonlySet<string> = new Set(["physical", "compu
  * Si el relay puede encender esta computadora: una VM administrada sí, una
  * máquina propia no. Manda `wakeable` si el plano de control lo dice; si no,
  * `kind`; si no, el proveedor (una fila sin proveedor es de antes de que
- * existiera y es una VM). Misma regla que `wakes()` de la web (`web/fleet.ts`).
+ * existiera y es una VM). La usan la web, el escritorio y el teléfono.
  */
 export function wakes(c: Pick<Computer, "provider" | "kind" | "wakeable">): boolean {
   if (typeof c.wakeable === "boolean") return c.wakeable;

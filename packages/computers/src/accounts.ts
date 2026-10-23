@@ -3,7 +3,7 @@
  * web (#154): una tarjeta por proveedor y correo, con su consumo leído una
  * vez (de la primera máquina encendida donde está) y una chapa por máquina
  * donde tiene la sesión iniciada. Sin correo, la cuenta queda sola y se nombra
- * con su máquina. Es la regla de `mergeAccounts` en `apps/desktop/src/web/fleet.ts`.
+ * con su máquina. Es la regla de `mergeAccounts` en `packages/fleet/src/merge.ts`.
  */
 import { word } from "../../design/src/index.ts";
 

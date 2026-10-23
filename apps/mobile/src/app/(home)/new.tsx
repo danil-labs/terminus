@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import type { BaseBranches } from "@terminus/protocol";
 import { carryForNewTask } from "../../lib/carry";
-import { baseBranchesOf, createTask, runShell, suggestedDefaults } from "../../lib/engine";
+import { baseBranchesOf, createTask, runShell, shareSpace, suggestedDefaults } from "../../lib/engine";
 import { store } from "../../lib/store";
 import { HostError } from "../../lib/hosts";
 import { t, w } from "../../lib/i18n";
@@ -85,7 +85,12 @@ export default function NewTask() {
     setNote(null);
     setWaking(act === "wakes" && power !== "on");
     try {
-      const spaceId = spaceOn(host.id);
+      // Un space que la máquina de destino no tiene se comparte antes desde la que lo guarda, con el mismo id.
+      let spaceId = spaceOn(host.id);
+      const owner = !spaceId && space ? Object.entries(space.on)[0] : undefined;
+      const keeper = owner ? hostsOfCurrent.find((h) => h.id === owner[0]) : undefined;
+      const keeperWs = keeper ? current?.members.get(keeper.id) : undefined;
+      if (owner && keeper && keeperWs) spaceId = await shareSpace(keeper, keeperWs, owner[1]).then(() => owner[1], () => null);
       let baseRef = branch;
       let unwrapSnapshot = false;
       const from = target.host !== host.id ? hostsOfCurrent.find((h) => h.id === target.host) : undefined;

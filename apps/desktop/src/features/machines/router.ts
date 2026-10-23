@@ -1,16 +1,19 @@
 /**
- * El escritorio con la cuenta de Danil, local primero: lo de esta computadora
- * va siempre nativo y pinta aunque no haya red; las otras máquinas de la cuenta
- * solo suman su rebanada (`@terminus/fleet`), y cuando una cambia la ventana
- * vuelve a leer (`harness:machine-slices`).
+ * Las máquinas de la cuenta detrás de la ventana (`@terminus/fleet`). En el
+ * escritorio, local primero: lo de esta computadora va siempre nativo y pinta
+ * aunque no haya red; las otras solo suman su rebanada. En la web (`self` y
+ * `native` en `null`) todo es de otras máquinas: lo guardado de cada una pinta
+ * ya y lo vivo llega detrás. Cuando una rebanada cambia, la ventana vuelve a
+ * leer (`harness:machine-slices`).
  *
  * La máquina de una llamada es la de la cabecera `x-terminus-machine`, o la de
  * la ventana; un id de otra máquina en los argumentos es un error antes de
- * mandar. La cuenta y `danil_*` van siempre aquí. Un workspace de la cuenta que
- * esta computadora no tiene se lee de sus miembros y actúa en el primero.
+ * mandar. En el escritorio la cuenta y `danil_*` van siempre aquí. Un workspace
+ * de la cuenta que esta computadora no tiene se lee de sus miembros y actúa en
+ * el primero.
  */
 import { type AccountWorkspace, callWorkspace, isDeferrable } from "@terminus/computers";
-import { AttentionBook, type Envelope, type Fleet, FleetError, type Slice, unwrap } from "@terminus/fleet";
+import { AttentionBook, type Envelope, type Fleet, FleetError, type Slice, classOf, unwrap } from "@terminus/fleet";
 import { t } from "../../lib/i18n.ts";
 
 type Args = Record<string, unknown>;
@@ -22,7 +25,7 @@ type Failure = { what: unknown; detail: unknown };
  * Lecturas del contenido de un workspace: cada máquina suma su parte. `list_live_turns`
  * no: son los procesos de esta computadora, los que cerrar la ventana detiene.
  */
-const FAN = new Set(["list_projects", "list_portfolios", "list_live_sessions", "list_active_turns", "list_spaces", "list_workspace_attention"]);
+const FAN = new Set(["list_projects", "list_portfolios", "list_live_sessions", "list_active_turns", "list_spaces", "list_workspace_attention", "list_session_git"]);
 const LISTING = new Set(["list_workspaces", "workspaces_startup"]);
 /** Lo que crea algo nuevo: en un workspace que esa máquina no tiene, primero lo hace suyo. */
 const CREATE = new Set(["send_message", "run_shell_command", "create_project", "clone_project", "start_project_clone"]);
@@ -51,6 +54,12 @@ const NOTIFY_AFTER = 200;
 /** Cuánto vale una lectura del registro de la cuenta, y cuánto espera una lista por ella. */
 const REGISTRY_FOR = 30_000;
 const REGISTRY_WAIT = 4_000;
+/** Cuánto espera lo que la ventana no relee sola (workspaces, cuentas) a lo vivo antes de contestar con lo guardado. */
+const FRESH_WAIT = 1_500;
+/** Lo que espera `service_poll` en la web: los eventos ya llegan solos (`events`). */
+const POLL_WAIT = 20_000;
+/** En la web no hay instalador: lo que la ventana pregunta de él se contesta aquí. */
+const NO_SETUP: Record<string, unknown> = { setup_required: false, prepare_runtime: { stages: [], running: false }, list_live_turns: [] };
 
 /** Qué vuelve a leer la ventana cuando cambia la rebanada de una lectura. */
 export type SliceChange = "sessions" | "projects" | "spaces" | "attention";
@@ -64,10 +73,11 @@ const CHANGES: Record<string, SliceChange> = {
 };
 
 export type RouterConfig = {
-  self: string;
+  /** La máquina de la ventana; `null` en la web. */
+  self: string | null;
   fleet: Fleet;
-  /** El IPC de la ventana: el motor de esta computadora. */
-  native: Invoke;
+  /** El IPC de la ventana: el motor de esta computadora; `null` en la web. */
+  native: Invoke | null;
   /** El registro de la cuenta (`GET /v1/workspaces`), o `null` si no se pudo leer. */
   registry?: () => Promise<AccountWorkspace[] | null>;
   /** Cambió la rebanada de otra máquina: la ventana vuelve a leer eso. */
@@ -101,10 +111,13 @@ function withoutChannel(command: string, args: Args): Args {
 }
 
 export function createRouter(config: RouterConfig) {
-  const { self, fleet, native } = config;
+  const { self, fleet } = config;
+  const native: Invoke = config.native ?? (() => Promise.reject(new FleetError("unknown_machine", null)));
+  /** Con motor propio (el escritorio); sin él, la web. */
+  const local = config.native !== null;
   const attention = new AttentionBook();
   /** Los workspaces que esta computadora tiene, según su última lista; `null` antes de leerla. */
-  let local: Set<string> | null = null;
+  let listed: Set<string> | null = null;
   let active: string | null = null;
   /** Máquinas cuyo motor no sabe hacer suyo un workspace de la cuenta. */
   const stale = new Set<string>();
@@ -130,12 +143,14 @@ export function createRouter(config: RouterConfig) {
     return Promise.race([registryRead, new Promise<void>((done) => setTimeout(done, REGISTRY_WAIT))]);
   };
 
-  const hasHere = (workspace: string | null) => !workspace || local === null || local.has(workspace);
-  /** Un workspace de la cuenta que esta computadora no tiene: vive en sus otras máquinas. */
-  const elsewhere = (workspace: string | null) => !hasHere(workspace) && fleet.inRegistry(workspace);
+  const hasHere = (workspace: string | null) => local && (!workspace || listed === null || listed.has(workspace));
+  /** Un workspace de la cuenta que esta computadora no tiene: vive en sus otras máquinas. En la web, todos. */
+  const elsewhere = (workspace: string | null) => !local || (!hasHere(workspace) && fleet.inRegistry(workspace));
+  /** Las máquinas de un workspace; sin workspace (en la web), todas. */
+  const membersOf = (workspace: string | null) => (workspace ? fleet.membersOf(workspace) : fleet.machines().map((m) => m.id));
   /** La máquina que atiende un workspace que no está aquí: la primera encendida de sus miembros, o la primera. */
   const leadOf = (workspace: string | null): string | null => {
-    const members = fleet.membersOf(workspace).filter((m) => fleet.power(m) !== "outdated");
+    const members = membersOf(workspace).filter((m) => fleet.power(m) !== "outdated");
     return members.find((m) => fleet.power(m) === "on") ?? members[0] ?? null;
   };
   /** Sin elegir, lo nuevo nace en la máquina de la ventana; en un workspace que no está aquí, en su primera. */
@@ -152,6 +167,8 @@ export function createRouter(config: RouterConfig) {
         console.error(`[máquinas] bug: ${error.code}`, error.machine, error.detail);
         return { what: { clave: "shell.service.failed" }, detail: error.code };
       case "machine_off":
+        // Una VM que no se pudo encender no es lo mismo que una máquina propia apagada.
+        if (error.canWake && error.detail === "start_failed") return { what: t("web.start_failed"), detail: "start_failed" };
         return { what: t("web.machines.off_action", { name }), detail: "machine_off" };
       case "version_mismatch":
         return { what: t("web.machines.outdated_action", { name }), detail: "version_mismatch" };
@@ -170,6 +187,8 @@ export function createRouter(config: RouterConfig) {
         if (own && typeof own === "object" && "what" in own) return own as Failure;
         return { what: { clave: "shell.service.failed" }, detail: error.code };
       }
+      case "revoked":
+        return { what: t("web.revoked"), detail: "revoked" };
       case "workspace_not_linked":
         return { what: t("web.workspace_not_linked"), detail: "workspace_not_linked" };
       case "operation_failed": {
@@ -212,54 +231,90 @@ export function createRouter(config: RouterConfig) {
     );
   }
 
+  /**
+   * Lo de cada máquina: lo guardado ya, y se relee detrás (si cambia, la ventana
+   * relee); la que no tiene nada guardado de esta lectura se espera. Con `fresh`, lo que la ventana no vuelve a leer sola (la lista de
+   * workspaces, las cuentas) espera a lo vivo un momento (`FRESH_WAIT`). Solo sin
+   * nada guardado de ninguna (ni el registro de la cuenta, con `settles`) se
+   * espera a que contesten, con su tope. Una apagada con copia contesta de su copia sin preguntar.
+   */
+  async function gather(envelopes: Envelope[], { settles = false, fresh = false } = {}): Promise<Slice[]> {
+    const before = envelopes.map((envelope) => fleet.peek(envelope));
+    if (!settles && !before.some((b) => b?.has)) return Promise.all(envelopes.map((e) => fleet.read(e)));
+    if (!fresh) {
+      // La que tiene algo guardado de esta lectura contesta ya; la que no, se espera con su tope.
+      return Promise.all(
+        envelopes.map((envelope, i) => {
+          const kept = before[i];
+          if (!kept?.has) return fleet.read(envelope);
+          refresh(envelope, kept);
+          return kept;
+        }),
+      );
+    }
+    const live = Promise.all(envelopes.map((e) => fleet.read(e)));
+    const quick = await Promise.race([live, new Promise<null>((done) => setTimeout(() => done(null), FRESH_WAIT))]);
+    if (quick) return quick;
+    void live.then(
+      (slices) => {
+        if (slices.some((slice, i) => differs(before[i], slice))) notify(envelopes[0]?.command ?? "");
+      },
+      () => {},
+    );
+    return before.filter((b): b is Slice => !!b);
+  }
+
+  /** Nadie trajo nada: se dice por qué, y la ventana se queda con lo que tenía. */
+  function noAnswer(slices: Slice[], workspace: string | null): Failure {
+    const failed = slices.find((s) => s.error) ?? slices[0];
+    const code = failed?.status === "outdated" ? "version_mismatch" : failed?.error === "machine_off" || !failed ? "machine_off" : (failed.error ?? "machine_timeout");
+    return named(new FleetError(code, failed?.machine ?? leadOf(workspace)));
+  }
+
   /** Una lectura de la barra: lo de aquí ya, más lo último de cada otra máquina del workspace. */
   async function fanRead(command: string, args: Args, workspace: string | null, options: Options): Promise<unknown> {
     const members = command === "list_workspace_attention" ? fleet.machines().map((m) => m.id) : fleet.membersOf(workspace);
-    const envelopes = members.map((machine) => ({ machine, workspace, command, args }));
-    const here = !elsewhere(workspace);
+    // El canal de avance se queda en la ventana: por el relay vuelve solo la respuesta final.
+    const envelopes = members.map((machine) => ({ machine, workspace, command, args: withoutChannel(command, args) }));
     const slices: Slice[] = [];
-    if (here) {
-      const value = await native(command, fleet.argsFor(self, args), options);
-      slices.push({ machine: self, status: "ok", has: true, value, at: Date.now() });
+    if (!elsewhere(workspace)) {
+      const value = await native(command, fleet.argsFor(self as string, args), options);
+      slices.push({ machine: self as string, status: "ok", has: true, value, at: Date.now() });
       for (const envelope of envelopes) {
         const before = fleet.peek(envelope);
         if (before) slices.push(before);
         refresh(envelope, before);
       }
-    } else {
-      // Sin parte de aquí: lo último de cada máquina ya, y se relee detrás. Solo sin
-      // nada guardado de ninguna se espera a que contesten, con su tope.
-      const known = envelopes.map((envelope) => ({ envelope, before: fleet.peek(envelope) }));
-      if (known.some(({ before }) => before?.has)) {
-        for (const { envelope, before } of known) {
-          if (before) slices.push(before);
-          refresh(envelope, before);
-        }
-      } else slices.push(...(await Promise.all(envelopes.map((e) => fleet.read(e)))));
-    }
+    } else slices.push(...(await gather(envelopes)));
     if (command === "list_workspace_attention") for (const s of slices) if (s.has) attention.set(s.machine, fleet.encode(s.machine, s.value));
     const merged = fleet.merge(command, slices, workspace);
     if (merged !== undefined) return merged;
-    // Nadie trajo nada: se dice por qué, y la ventana se queda con lo que tenía.
-    const failed = slices.find((s) => s.error) ?? slices[0];
-    throw named(new FleetError(failed?.error === "machine_off" || !failed ? "machine_off" : (failed.error ?? "machine_timeout"), failed?.machine ?? leadOf(workspace)));
+    throw noAnswer(slices, workspace);
   }
 
-  /** Una llamada a otra máquina, con el workspace del sobre. */
+  /** Una llamada a otra máquina, con el workspace del sobre. Una lectura sale de su rebanada: apagada con copia, no se pregunta. */
   async function remote(machine: string, command: string, args: Args, workspace: string | null): Promise<unknown> {
     args = withoutChannel(command, args);
     if (CREATE.has(command) && workspace && fleet.inRegistry(workspace) && !fleet.membersOf(workspace).includes(machine)) await materialize(machine, workspace);
-    if (WITH_SPACE.has(command)) args = await withSharedSpace(args);
+    if (WITH_SPACE.has(command)) args = await withSharedSpace(machine, workspace, args);
     if (command === "load_history") {
       // El relay no pagina: la tarea entera, con la forma de la página.
-      const session = (await fleet.call({ machine, workspace, command: "load_session", args: { project: args.project, id: args.id } })) as { turns?: unknown[] } | null;
+      const session = (await remote(machine, "load_session", { project: args.project, id: args.id }, workspace)) as { turns?: unknown[] } | null;
       const total = Array.isArray(session?.turns) ? session.turns.length : 0;
       return { ...session, history: { total, start: 0, end: total, limit: total, has_more: false } };
     }
-    const value = await fleet.call({ machine, workspace, command, args });
-    // Con la máquina apagada el relay la guardó y su copia ya la refleja: la lista se relee de allá.
-    if (isDeferrable(command)) deferredChanged(machine);
-    return value;
+    const envelope = { machine, workspace, command, args };
+    // Apagada no hay turnos ni árbol que revisar: archivar sigue y se aplaza.
+    if (command === "task_blockers" && fleet.power(machine) === "off") return { unsaved: [], not_finished: false };
+    if (classOf(command) !== "read") {
+      const value = await fleet.call(envelope);
+      // Con la máquina apagada el relay la guardó y su copia ya la refleja: la lista se relee de allá.
+      if (isDeferrable(command)) deferredChanged(machine);
+      return value;
+    }
+    const slice = await fleet.read(envelope);
+    if (!slice.has) throw noAnswer([slice], workspace);
+    return fleet.encode(machine, slice.value, command);
   }
 
   /** Cambió la cola de aplazadas de `machine`: sus lecturas salen otra vez al relay ya, sin esperar el respiro. */
@@ -270,18 +325,24 @@ export function createRouter(config: RouterConfig) {
   }
 
   /**
-   * Lo nuevo en otra máquina nace en el space de la ventana: uno de esta
-   * computadora que aún no es de la cuenta se comparte antes (`share_space`), y
-   * allá se crea con el mismo id. Si no se puede compartir (workspace sin cuenta,
-   * motor anterior), nace sin space, como antes.
+   * Lo nuevo en otra máquina nace en el space de la ventana: uno que aún no es
+   * de la cuenta se comparte antes (`share_space`) en la máquina que lo guarda
+   * (esta computadora, o en la web la de su prefijo), y allá se crea con el mismo
+   * id. Si no se puede compartir (workspace sin cuenta, motor anterior), nace sin space.
    */
-  async function withSharedSpace(args: Args): Promise<Args> {
+  async function withSharedSpace(machine: string, workspace: string | null, args: Args): Promise<Args> {
     const space = args.space;
-    if (typeof space !== "string" || !space || fleet.isShared(space) || unwrap(space, fleet.remotes())) return args;
+    if (typeof space !== "string" || !space) return args;
+    const own = unwrap(space, fleet.remotes());
+    const id = own?.id ?? space;
+    if (fleet.isShared(id)) return own ? { ...args, space: id } : args;
+    if (own?.machine === machine) return args;
     try {
-      await native("share_space", { id: space });
-      fleet.markShared(space);
-      return args;
+      if (own) await fleet.call({ machine: own.machine, workspace, command: "share_space", args: { id } });
+      else if (local) await native("share_space", { id });
+      else return { ...args, space: null };
+      fleet.markShared(id);
+      return { ...args, space: id };
     } catch {
       return { ...args, space: null };
     }
@@ -303,23 +364,56 @@ export function createRouter(config: RouterConfig) {
 
   async function listing(command: string, args: Args, options: Options): Promise<unknown> {
     await readRegistry();
+    if (!local) return webListing(command, args);
     const value = (await native(command, args, options)) as { workspaces?: { id?: unknown }[]; active?: unknown } | null;
-    if (Array.isArray(value?.workspaces)) local = new Set(value.workspaces.map((w) => w?.id).filter((id): id is string => typeof id === "string"));
+    if (Array.isArray(value?.workspaces)) listed = new Set(value.workspaces.map((w) => w?.id).filter((id): id is string => typeof id === "string"));
     if (active === null && typeof value?.active === "string") active = value.active;
-    const merged = fleet.merge(command, [{ machine: self, status: "ok", has: true, value, at: Date.now() }], null) as { active?: unknown } | undefined;
+    const merged = fleet.merge(command, [{ machine: self as string, status: "ok", has: true, value, at: Date.now() }], null) as { active?: unknown } | undefined;
     if (!merged) return value;
     // El activo es el de esta ventana, aunque sea un workspace que solo tienen otras máquinas.
     return active && elsewhere(active) ? { ...merged, active } : merged;
   }
 
+  /** En la web: ninguna máquina ni el registro dijeron los workspaces la última vez. */
+  let unlisted = false;
+  /** Los workspaces en la web: los del registro de la cuenta ya, más lo que lista cada máquina. El activo es de esta página. */
+  async function webListing(command: string, args: Args): Promise<unknown> {
+    const envelopes = fleet.machines().map((m) => ({ machine: m.id, workspace: null, command, args }));
+    const slices = await gather(envelopes, { settles: !!fleet.getRegistry(), fresh: true });
+    const merged = fleet.merge(command, slices, null) as { workspaces?: { id?: unknown }[]; active?: unknown } | undefined;
+    unlisted = !merged;
+    if (!merged) throw noAnswer(slices, null);
+    const ids = (merged.workspaces ?? []).map((w) => w?.id).filter((id): id is string => typeof id === "string");
+    // Una máquina sin workspaces no deja la página sin ninguno abierto: el primero de la cuenta.
+    if (!active || !ids.includes(active)) active = typeof merged.active === "string" && ids.includes(merged.active) ? merged.active : (ids[0] ?? null);
+    return { ...merged, active };
+  }
+
   async function poll(args: Args, options: Options): Promise<unknown> {
+    if (!local) return webPoll();
     const page = (await native("service_poll", args, options)) as { batches?: { events?: { name: string; payload: unknown }[] }[] } | null;
     // El `attention` de aquí habla solo de esta máquina: la ventana recibe la lista de todas.
     if (page && Array.isArray(page.batches) && fleet.machines().length)
       page.batches = page.batches.map((b) =>
-        Array.isArray(b?.events) ? { ...b, events: b.events.map((e) => (e.name === "attention" ? { ...e, payload: attention.update(self, e.payload) } : e)) } : b,
+        Array.isArray(b?.events) ? { ...b, events: b.events.map((e) => (e.name === "attention" ? { ...e, payload: attention.update(self as string, e.payload) } : e)) } : b,
       );
     return page;
+  }
+
+  /** En la web los eventos de cada máquina llegan solos (`events`); el sondeo solo marca el paso. */
+  let tick = 0;
+  const pollers = new Set<() => void>();
+  function webPoll(): Promise<unknown> {
+    return new Promise((done) => {
+      const finish = () => {
+        clearTimeout(timer);
+        pollers.delete(finish);
+        tick += 1;
+        done({ cursor: tick, gap: false, replay: false, runtime: "fleet", reset: false });
+      };
+      const timer = setTimeout(finish, POLL_WAIT);
+      pollers.add(finish);
+    });
   }
 
   function machineList() {
@@ -327,8 +421,9 @@ export function createRouter(config: RouterConfig) {
     const lead = defaultMachine(workspace);
     const members = new Set(fleet.membersOf(workspace));
     return [
-      { id: self, local: true, active: lead === self, on: true, hosts: hasHere(workspace), materializes: true },
-      ...fleet.machines().map((m) => ({
+      ...(self !== null ? [{ id: self, local: true, active: lead === self, on: true, hosts: hasHere(workspace), materializes: true }] : []),
+      // Una de otro contrato no corre tareas nuevas hasta actualizarse.
+      ...fleet.machines().filter((m) => fleet.power(m.id) !== "outdated").map((m) => ({
         id: m.id,
         local: false,
         active: lead === m.id,
@@ -339,24 +434,41 @@ export function createRouter(config: RouterConfig) {
     ];
   }
 
+  /** Lo de una máquina sin máquina en el sobre, en la web: las cuentas de todas juntas; lo demás, en la que atiende el workspace. */
+  async function ofAMachine(command: string, args: Args, workspace: string | null): Promise<unknown> {
+    if (command === "list_accounts") {
+      const envelopes = fleet.machines().map((m) => ({ machine: m.id, workspace: null, command, args }));
+      const slices = await gather(envelopes, { fresh: true });
+      const merged = fleet.merge(command, slices, null);
+      if (merged !== undefined) return merged;
+      throw noAnswer(slices, null);
+    }
+    const lead = leadOf(workspace) ?? leadOf(null);
+    if (!lead) throw { what: t("web.machines.none_for_workspace"), detail: "no_machine" };
+    return remote(lead, command, args, null);
+  }
+
   async function handle(command: string, args: Args = {}, options?: Options): Promise<unknown> {
     if (command === "machine_list") return machineList();
     if (command === "machine_select") {
       const id = args.id;
       if (typeof id === "string" && (id === self || fleet.has(id))) return { runtime: null };
     }
-    if (OF_THIS_MACHINE.test(command)) return native(command, args, options);
     const machine = headerOf(options, "x-terminus-machine");
     const workspace = headerOf(options, "x-terminus-workspace") ?? active;
+    if (local && OF_THIS_MACHINE.test(command)) return native(command, args, options);
+    if (!local && command in NO_SETUP) return NO_SETUP[command];
     if (FILES.test(command) && ((machine && machine !== self && fleet.has(machine)) || namesOther(args)))
       throw { what: t("shell.machines.local_only"), detail: "machine_files" };
     try {
       if (machine && machine !== self && fleet.has(machine)) return await remote(machine, command, args, callWorkspace(workspace, args));
-      // Una máquina que no es de la cuenta (la red local de `fleet.rs`) la resuelve el proxy de la ventana.
-      if (machine && machine !== self) return await native(command, args, options);
-      const opts = machine === self ? withoutHeader(options, "x-terminus-machine") : options;
+      // Una máquina que ya no es de la cuenta no se cambia por otra en silencio.
+      if (machine && machine !== self) throw new FleetError("unknown_machine", machine);
+      if (!local && OF_THIS_MACHINE.test(command)) return await ofAMachine(command, args, workspace);
+      const opts = withoutHeader(options, "x-terminus-machine");
       if (command === "set_active_workspace" && typeof args.id === "string") {
         const id = args.id;
+        // En la web el activo es de la página: el relay no lo cambia en ninguna máquina.
         if (elsewhere(id)) {
           active = id;
           return null;
@@ -370,9 +482,10 @@ export function createRouter(config: RouterConfig) {
       if (FAN.has(command)) return await fanRead(command, args, workspace, opts);
       if (elsewhere(workspace)) {
         const lead = leadOf(workspace);
-        if (lead) return await remote(lead, command, args, workspace);
+        if (lead) return await remote(lead, command, args, callWorkspace(workspace, args));
+        if (!local) throw { what: t("web.machines.none_for_workspace"), detail: "no_machine" };
       }
-      const value = await native(command, fleet.argsFor(self, args), opts);
+      const value = await native(command, fleet.argsFor(self as string, args), opts);
       if (command === "remove_workspace" && args.id === active) active = null;
       return value;
     } catch (error) {
@@ -382,6 +495,7 @@ export function createRouter(config: RouterConfig) {
   }
 
   const namesOther = (args: Args) => {
+    if (self === null) return true;
     try {
       fleet.argsFor(self, args);
       return false;
@@ -395,12 +509,13 @@ export function createRouter(config: RouterConfig) {
     config.deliver?.(list.map((e) => (e.name === "attention" ? { ...e, payload: attention.update(machine, e.payload) } : e)));
   }
 
-  /** Dónde se crea algo nuevo de `workspace` ahora y si esa máquina lo encabeza. */
-  function createsOn(workspace: string | null): { machine: string; lead: boolean } {
+  /** Dónde se crea algo nuevo de `workspace` ahora y si esa máquina lo encabeza; `null` si ninguna puede. */
+  function createsOn(workspace: string | null): { machine: string; lead: boolean } | null {
     const ws = workspace ?? active;
     const picked = config.pickedFor?.(ws) ?? null;
-    const machine = picked && (picked === self || fleet.has(picked)) ? picked : defaultMachine(ws);
-    return { machine, lead: machine === defaultMachine(ws) };
+    const lead = defaultMachine(ws);
+    const machine = picked && (picked === self || fleet.has(picked)) ? picked : lead;
+    return machine ? { machine, lead: machine === lead } : null;
   }
 
   return {
@@ -409,11 +524,14 @@ export function createRouter(config: RouterConfig) {
     deferredChanged,
     createsOn,
     activeWorkspace: () => active,
+    /** Si nadie dijo los workspaces la última vez: al encenderse una máquina, la ventana los vuelve a leer. */
+    unlisted: () => unlisted,
     forget(machine: string) {
       attention.forget(machine);
     },
     close() {
       clearTimeout(notifyTimer);
+      for (const finish of [...pollers]) finish();
       fleet.close();
     },
   };

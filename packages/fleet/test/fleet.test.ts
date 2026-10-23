@@ -481,3 +481,44 @@ test("moving a task to a space of the account is not deferred: it follows the pa
   await fleet.call({ machine: "cmp_mac", workspace: "w", command: "move_task_to_space", args: { project: "p1", id: "cmp_mac~t1", space: "cmp_mac~v1" } });
   assert.deepEqual(fleet.deferred("cmp_mac").map((a) => a.args), [{ project: "p1", id: "t1", space: "v1" }]);
 });
+
+test("raw answers with the machine's own ids and the relay copy's time, for a client that names the machine apart", async () => {
+  const { fleet } = setup({ cmp_vm: { state: "offline", cachedAt: "2026-10-22T10:00:00Z", answers: { load_session: ({ id }: Record<string, unknown>) => ({ id, session: id }) } } }, [VM], { self: null });
+  const { value, at } = await fleet.raw({ machine: "cmp_vm", workspace: "w", command: "load_session", args: { project: "p1", id: "t1" } });
+  assert.deepEqual(value, { id: "t1", session: "t1" }, "no prefix");
+  assert.equal(at, Date.parse("2026-10-22T10:00:00Z"));
+});
+
+test("with panelIds false the events keep the ids of their machine", async () => {
+  const seen: unknown[] = [];
+  const { fleet, link } = setup({ cmp_vm: {} }, [VM], { self: null, panelIds: false, onEvents: (_m, events) => seen.push(...events) });
+  fleet.subscribeEvents();
+  link("cmp_vm").push({ cursor: 1, events: [{ name: "session", payload: { session: "t1", project: "p1" } }] });
+  assert.deepEqual(seen, [{ name: "session", payload: { session: "t1", project: "p1" } }]);
+});
+
+test("AI accounts of every machine join by email, each with the machines where it is signed in", () => {
+  const { fleet } = setup({ cmp_vm: { state: "online" }, cmp_mac: { state: "offline" } }, [VM, MAC], { self: null });
+  const slice = (machine: string, value: unknown): Slice => ({ machine, status: "ok", has: true, value, at: 0 });
+  const merged = fleet.merge("list_accounts", [
+    slice("cmp_vm", { active: "a1", accounts: [{ id: "a1", identity: "Ana@Example.com" }, { id: "a2", label: "Sin correo" }] }),
+    slice("cmp_mac", { active: null, accounts: [{ id: "b1", identity: "ana@example.com" }] }),
+  ]) as { active: string; accounts: { id: string; label?: string; machines: { machine: string; id: string; on: boolean }[] }[] };
+  assert.equal(merged.accounts.length, 2);
+  assert.deepEqual(merged.accounts[0].machines, [
+    { machine: "cmp_vm", id: "cmp_vm~a1", on: true },
+    { machine: "cmp_mac", id: "cmp_mac~b1", on: false },
+  ]);
+  assert.equal(merged.accounts[0].id, "cmp_vm~a1", "the id is the one of a machine that is on");
+  assert.equal(merged.active, "cmp_vm~a1");
+  assert.equal(merged.accounts[1].label, "Sin correo · Danil VM", "without an email it is named with its machine");
+});
+
+test("the git of the tasks of a folder: each machine gets only its own priority ids and the answers join by task", async () => {
+  const { fleet, link } = setup({ cmp_vm: { answers: { list_session_git: { t1: { branch: "vm" } } } }, cmp_mac: { answers: { list_session_git: { t1: { branch: "mac" } } } } }, [VM, MAC], { self: null });
+  const args = { project: "p1", priority: ["cmp_vm~t1", "cmp_mac~t1"] };
+  const slices = await Promise.all(["cmp_vm", "cmp_mac"].map((machine) => fleet.read({ machine, workspace: "w", command: "list_session_git", args })));
+  assert.deepEqual(link("cmp_vm").calls[0].args.priority, ["t1"]);
+  assert.deepEqual(link("cmp_mac").calls[0].args.priority, ["t1"]);
+  assert.deepEqual(fleet.merge("list_session_git", slices), { "cmp_vm~t1": { branch: "vm" }, "cmp_mac~t1": { branch: "mac" } });
+});

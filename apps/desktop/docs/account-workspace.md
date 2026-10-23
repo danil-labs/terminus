@@ -170,7 +170,8 @@ Sobre seldon-host#72 (`feat/workspace-danil-link`); ver «Conciliación».
    `GET /v1/workspaces` más los workspaces locales sin ligar del motor de esta
    máquina.
    - Se borran `mergeWorkspaces`, el agrupado por nombre y los prefijos de
-     workspace en `src/web/fleet.ts`.
+     workspace de la flota vieja de la web (borrada en la fase 4; hoy
+     `packages/fleet/src/merge.ts`).
    - Se borran `groupWorkspaces` en `packages/computers` y en el móvil
      (`apps/mobile/src/lib/workspaces.tsx:189`).
 2. **Proyectos una sola vez.** El sidebar lista los proyectos de la cuenta, ya no
@@ -446,7 +447,7 @@ workspaces ligados):
 - La web, el escritorio con cuenta de Danil (`features/machines/account.tsx`,
   con el token de cliente) y el móvil leen `GET /v1/workspaces`
   (`listWorkspaces` en `packages/computers`) y lo juntan con lo que listan las
-  máquinas encendidas (`Fleet.setRegistry` en `src/web/fleet.ts`,
+  máquinas encendidas (`Fleet.setRegistry` en `packages/fleet/src/fleet.ts`,
   `withRegistry` en el paquete). La fila de una máquina que contesta manda; el
   registro suma los workspaces cuyas máquinas duermen y, como miembros, las
   computadoras ligadas que no contestaron. El activo es el abierto si sigue en

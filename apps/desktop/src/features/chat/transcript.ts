@@ -441,7 +441,7 @@ export type Session = {
   observed_model?: string | null;
   /** Solo de `load_history`: qué tramo de la transcripción entera son estos `turns`. */
   history?: HistoryPage | null;
-  /** Su máquina está apagada: esto es lo último que se leyó de ella (`fleet.rs`). */
+  /** Su máquina está apagada: esto es lo último que se leyó de ella (su rebanada, `@terminus/fleet`). */
   offline?: { machine: string } | null;
 };
 
