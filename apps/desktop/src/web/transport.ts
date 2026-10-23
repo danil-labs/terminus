@@ -1,10 +1,13 @@
 /**
  * What the Tauri window does for each invoke, in a browser: window-only
  * commands and plugins answer from the browser or refuse with a sentence the
- * interface already knows; every engine command goes to the machines of the
- * account through the same router as the desktop (`features/machines/router.ts`).
+ * interface already knows; what the control plane answers (GitHub of the
+ * account, `github-account.ts`) goes to the Worker with the person's session;
+ * every other engine command goes to the machines of the account through the
+ * same router as the desktop (`features/machines/router.ts`).
  */
-import { t } from "../lib/i18n";
+import { t } from "../lib/i18n.ts";
+import type { ControlPlaneCommands } from "./github-account.ts";
 
 type Args = Record<string, unknown>;
 type Options = { headers?: HeadersInit } | undefined;
@@ -47,7 +50,7 @@ const QUIET = new Set([
 
 const isWeb = (url: unknown): url is string => typeof url === "string" && /^https?:\/\//i.test(url);
 
-export function createWebTransport(engine: Engine, version: string, host: BrowserHost): WebTransport {
+export function createWebTransport(engine: Engine, version: string, host: BrowserHost, controlPlane?: ControlPlaneCommands): WebTransport {
   function dialog(args: Args): string {
     const message = String(args.message ?? "");
     const buttons = args.buttons as string | Record<string, string[] | string> | undefined;
@@ -99,6 +102,7 @@ export function createWebTransport(engine: Engine, version: string, host: Browse
         return null;
       }
       if (REFUSED.test(command)) throw desktopOnly(command);
+      if (controlPlane?.answers(command)) return controlPlane.handle(command, args);
       return engine.handle(command, args, options);
     },
   };

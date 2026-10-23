@@ -6,6 +6,17 @@
  * los tiene, la entrada sobra y los guardas fallan hasta quitarla: esta lista
  * solo se vacía.
  */
-export const COMANDOS_PENDIENTES = {};
+const GITHUB = "GitHub en la cuenta de Danil (seldon-host feat/github-account, contrato del Worker qzpannk9 § Motor)";
+const CREDENCIALES = "credenciales de la cuenta de Danil (seldon-host feat/account-credentials, contrato de credenciales § 5)";
+
+export const COMANDOS_PENDIENTES = {
+  github_account_status: GITHUB,
+  github_account_authorize: GITHUB,
+  github_account_installations: GITHUB,
+  github_account_set_areas: GITHUB,
+  github_account_disconnect: GITHUB,
+  account_credential_remove_machine: CREDENCIALES,
+  account_credential_restore_machine: CREDENCIALES,
+};
 
 export const EVENTOS_PENDIENTES = {};
