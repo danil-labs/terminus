@@ -21,7 +21,7 @@ export type SidebarSection = "active";
 export const DEFAULT_SIDEBAR_VIEW: SidebarView = {
   folders: [],
   agent: null,
-  group: "none",
+  group: "folder",
   density: "comfortable",
 };
 
@@ -104,7 +104,7 @@ export function sanitizeSidebarView(raw: unknown): SidebarView {
   return {
     folders,
     agent: typeof v.agent === "string" && v.agent !== "" ? v.agent : null,
-    group: GROUPINGS.includes(v.group as SidebarGrouping) ? (v.group as SidebarGrouping) : "none",
+    group: GROUPINGS.includes(v.group as SidebarGrouping) ? (v.group as SidebarGrouping) : DEFAULT_SIDEBAR_VIEW.group,
     density: DENSITIES.includes(v.density as SidebarDensity) ? (v.density as SidebarDensity) : "comfortable",
   };
 }

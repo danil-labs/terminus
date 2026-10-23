@@ -401,6 +401,8 @@ export type ChatProps = {
    * la tarea nueva abre por donde iba la otra.
    */
   conversacion: string;
+  /** Una tarea que ya existe pero no tiene mensajes: se ve como «Nueva tarea». */
+  sinEmpezar?: boolean;
   /** Dónde se dejó de leer la última vez que este hilo estuvo montado. */
   lectura?: Lectura | null;
   /** Recibe al desmontar dónde se estaba leyendo, o `null` si seguía al fondo. */
@@ -847,10 +849,10 @@ export default function Chat(props: ChatProps) {
   const vacia = createMemo(() => props.msgs.length === 0);
 
   /**
-   * Si la caja va centrada: hilo vacío de una tarea que todavía no existe.
-   * Centrar solo con agente dejaba «Nueva tarea» a secas al pie.
+   * Si la caja va centrada: hilo vacío de una tarea que todavía no existe o
+   * que nació sin mensajes. Centrar solo con agente dejaba «Nueva tarea» a secas al pie.
    */
-  const centrada = createMemo(() => vacia() && props.conversacion === "");
+  const centrada = createMemo(() => vacia() && (props.conversacion === "" || !!props.sinEmpezar));
 
   /** El saludo de una tarea nueva se elige al abrirla: una de las frases o la de la hora. */
   const SALUDOS = 10;

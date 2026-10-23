@@ -47,10 +47,10 @@ test("without grouping there is one list: tasks that need you stay in place, pin
     task("archived", { archived: true }),
     task("chat", { chat_de_agente: true }),
   ];
-  const groups = applySidebarView(tasks, DEFAULT_SIDEBAR_VIEW, idle);
+  const groups = applySidebarView(tasks, view({ group: "none" }), idle);
   assert.deepEqual(groups.map((g) => g.key), ["active"]);
   assert.deepEqual(ids(groups[0].tasks), ["pinned", "chat", "new", "asks", "done"]);
-  assert.deepEqual(ids(applySidebarView([], DEFAULT_SIDEBAR_VIEW, idle)[0].tasks), []);
+  assert.deepEqual(ids(applySidebarView([], view({ group: "none" }), idle)[0].tasks), []);
 });
 
 test("folders and agent filter before grouping", () => {
@@ -120,7 +120,10 @@ test("each workspace and space keeps its own view; the old global one is ignored
 });
 
 test("the badge counts each setting away from its default", () => {
+  assert.equal(DEFAULT_SIDEBAR_VIEW.group, "folder", "grouping by folder is the default");
   assert.equal(nonDefaultCount(DEFAULT_SIDEBAR_VIEW), 0);
+  assert.equal(nonDefaultCount(view({ group: "folder" })), 0);
+  assert.equal(nonDefaultCount(view({ group: "none" })), 1);
   assert.equal(nonDefaultCount(view({ folders: ["a", "b"] })), 1);
   assert.equal(nonDefaultCount(view({ folders: ["a"], agent: "ada", group: "agent", density: "compact" })), 4);
 });
@@ -128,9 +131,10 @@ test("the badge counts each setting away from its default", () => {
 test("the scope line says what is shown, in the app language", () => {
   const name = (id: string) => ({ f1: "terminus", f2: "web" })[id] ?? id;
   elegirLengua("es");
-  assert.equal(scopeLabel(DEFAULT_SIDEBAR_VIEW, name), "Todas las carpetas");
+  assert.equal(scopeLabel(DEFAULT_SIDEBAR_VIEW, name), "Todas las carpetas · por carpeta");
+  assert.equal(scopeLabel(view({ group: "none" }), name), "Todas las carpetas");
   assert.equal(scopeLabel(view({ folders: ["f1"], group: "status" }), name), "terminus · por estado");
-  assert.equal(scopeLabel(view({ folders: ["f1", "f2"], agent: "ada" }), name), "terminus, web · ada");
+  assert.equal(scopeLabel(view({ folders: ["f1", "f2"], agent: "ada", group: "none" }), name), "terminus, web · ada");
   assert.equal(groupLabel({ kind: "folder", key: "", tasks: [] }, name), "Sin carpeta");
   assert.equal(groupLabel({ kind: "section", key: "active", tasks: [] }, name), "Tareas");
   elegirLengua("en");
