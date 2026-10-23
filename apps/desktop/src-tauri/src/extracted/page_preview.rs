@@ -31,12 +31,12 @@ fn politica() -> String {
     [
         "sandbox allow-scripts".to_string(),
         "default-src 'none'".to_string(),
-        format!("script-src {ORIGEN} https: 'unsafe-inline' 'unsafe-eval'"),
-        format!("style-src {ORIGEN} https: 'unsafe-inline'"),
-        format!("font-src {ORIGEN} https: data:"),
-        format!("img-src {ORIGEN} https: data: blob:"),
-        format!("media-src {ORIGEN} https: data: blob:"),
-        // Leer sí, de su propia carpeta; mandar a la red no.
+        format!("script-src {ORIGEN} 'unsafe-inline' 'unsafe-eval'"),
+        format!("style-src {ORIGEN} 'unsafe-inline'"),
+        format!("font-src {ORIGEN} data:"),
+        format!("img-src {ORIGEN} data: blob:"),
+        format!("media-src {ORIGEN} data: blob:"),
+        // Sólo su carpeta: nada de la red, ni para cargar ni para enviar.
         format!("connect-src {ORIGEN}"),
         format!("frame-src {ORIGEN}"),
         format!("worker-src {ORIGEN} blob:"),
