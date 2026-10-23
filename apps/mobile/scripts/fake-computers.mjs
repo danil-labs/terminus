@@ -44,7 +44,7 @@ const MIRROR = new Set(["workspaces_startup", "list_workspaces", "list_projects"
 
 function engine(name, ws, projects, tasks, accounts) {
   const now = Date.now();
-  const sessions = new Map(tasks.map((t, i) => [t.id, { ...t, created_at: now - (i + 1) * 60_000, updated_at: now - i * 60_000, turns: [{ id: `${t.id}-u`, role: "user", text: t.title }, { id: `${t.id}-a`, role: "agent", text: `Hecho en ${name}.` }], pending: null }]));
+  const sessions = new Map(tasks.map((t, i) => [t.id, { ...t, created_at: now - (i + 1) * 60_000, updated_at: now - i * 60_000, turns: [{ id: `${t.id}-u`, role: "user", text: t.title }, { id: `${t.id}-a`, role: "agent", text: `Hecho en ${name}.` }, ...(t.incoming ?? [])], pending: null }]));
   return { name, ws, projects, sessions, live: new Set(), cursor: 0, events: [], accounts, files: new Set(), logins: new Map() };
 }
 
@@ -67,7 +67,11 @@ const machines = {
     row: { computer_id: "cmp_mac", name: "Mac de Alberto", plan: null, provider: null, kind: "physical", host_version: "0.3.0" },
     state: process.argv.includes("--mac-off") ? "offline" : "online",
     engine: engine("la Mac", "w-prod", [{ id: "p-mac-web", name: "web" }, { id: "p-mac-api", name: "api" }], [
-      { id: "t-mac-1", project: "p-mac-api", title: "Subir la API a v2", agent: null, provider: "claude", model: null },
+      { id: "t-mac-1", project: "p-mac-api", title: "Subir la API a v2", agent: null, provider: "claude", model: null, incoming: [
+        // Inputs que no son de la persona: de un encargado y de otra tarea por el CLI.
+        { id: "t-mac-1-in1", role: "user", text: "Revisa que el cliente siga usando /v1 antes de borrarlo.", agent: "Ada" },
+        { id: "t-mac-1-in2", role: "user", text: "Listo: el login ya usa la API v2.", from_task: { folder: "p-mac-web", task: "t-mac-2", title: "Rediseñar el inicio", provider: "claude", model: "claude-opus-5-5" } },
+      ] },
       { id: "t-mac-2", project: "p-mac-web", title: "Rediseñar el inicio", agent: null, provider: "claude", model: "claude-opus-5-5", unsaved: ["src/home.tsx"] },
     ], {
       claude: [{ id: "a-mac-1", label: "Cuenta 1", created_at: Date.now(), identity: "Ana@Example.com", authenticated_at: Date.now() }],

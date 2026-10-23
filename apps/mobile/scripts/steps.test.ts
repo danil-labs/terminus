@@ -56,3 +56,13 @@ test("en vivo: los pasos corren y cierran, y el texto anterior queda como avance
   assert.ok(lines[1].kind === "steps" && !lines[1].rows[0].steps[0].running && lines[1].rows[0].steps[0].ok === true);
   assert.equal(lines[2].key, "live");
 });
+
+test("el input de un encargado o de otra tarea lleva quién lo escribió; el de la persona, no", () => {
+  const [mine] = linesOfTurn({ role: "user", text: "hola" }, "t0", []);
+  assert.equal(mine.kind === "message" && mine.from, null);
+  const [byAgent] = linesOfTurn({ role: "user", text: "revisa esto", agent: "Ada" }, "t1", []);
+  assert.deepEqual(byAgent.kind === "message" && byAgent.from, { agent: "Ada", task: null, provider: null });
+  const fromTask = { folder: "web", task: "t-9", title: "Arreglar el login", provider: "codex" };
+  const [byTask] = linesOfTurn({ role: "user", text: "listo", from_task: fromTask }, "t2", []);
+  assert.deepEqual(byTask.kind === "message" && byTask.from, { agent: null, task: "Arreglar el login", provider: "codex" });
+});

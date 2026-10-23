@@ -40,6 +40,8 @@ export default function NewTask() {
   const [picker, setPicker] = useState<"machine" | "folder" | "branch" | "agent" | AddFolderMode | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [waking, setWaking] = useState(false);
+  // Lo que se mandó mientras la VM enciende: sin él, el mensaje desaparece el minuto o dos que tarda.
+  const [pending, setPending] = useState<string | null>(null);
 
   useEffect(() => {
     if (params.folder) setFolder(params.folder);
@@ -83,7 +85,9 @@ export default function NewTask() {
   async function start(s: Submission) {
     if (!host || !workspace || !target) return false;
     setNote(null);
-    setWaking(act === "wakes" && power !== "on");
+    const wakes = act === "wakes" && power !== "on";
+    setWaking(wakes);
+    if (wakes) setPending(s.shell ? `!${s.command}` : s.prompt);
     try {
       // Un space que la máquina de destino no tiene se comparte antes desde la que lo guarda, con el mismo id.
       let spaceId = spaceOn(host.id);
@@ -126,6 +130,7 @@ export default function NewTask() {
       return false;
     } finally {
       setWaking(false);
+      setPending(null);
     }
   }
 
@@ -182,6 +187,11 @@ export default function NewTask() {
         </Text>
       </View>
       <View style={{ flex: 1 }} />
+      {pending && waking ? (
+        <View style={[styles.pending, { backgroundColor: theme.userBubble, borderColor: theme.border }]}>
+          <Text style={{ color: theme.text, fontSize: 15, lineHeight: 21 }}>{pending}</Text>
+        </View>
+      ) : null}
       {notice || note ? (
         <View style={styles.notes}>
           {notice ? <Text style={{ color: theme.textMuted }}>{notice}</Text> : null}
@@ -271,5 +281,6 @@ export default function NewTask() {
 const styles = StyleSheet.create({
   top: { paddingHorizontal: 16, paddingTop: 12, gap: 4 },
   notes: { paddingHorizontal: 16, paddingBottom: 6, gap: 4 },
+  pending: { alignSelf: "flex-end", maxWidth: "92%", marginHorizontal: 12, marginBottom: 8, borderRadius: 14, padding: 10, borderWidth: StyleSheet.hairlineWidth },
   selectors: { flexDirection: "row", flexWrap: "wrap", gap: 6, paddingHorizontal: 2 },
 });
