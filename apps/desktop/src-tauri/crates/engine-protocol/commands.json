@@ -560,27 +560,6 @@
     {
       "async": false,
       "channel": null,
-      "ids": {
-        "workspace": [
-          "workspace"
-        ]
-      },
-      "kind": "invoke",
-      "name": "cancel_mendeley_login",
-      "output": "-> Result < () , Failure >",
-      "parameters": [
-        {
-          "key": "workspace",
-          "name": "workspace",
-          "type": "Option < String >"
-        }
-      ],
-      "path": "mendeley::cancel_mendeley_login",
-      "scope": "workspace"
-    },
-    {
-      "async": false,
-      "channel": null,
       "kind": "invoke",
       "name": "cancel_project_clone",
       "output": "",
@@ -1749,27 +1728,6 @@
         }
       ],
       "path": "mcp::disconnect_known_mcp",
-      "scope": "workspace"
-    },
-    {
-      "async": false,
-      "channel": null,
-      "ids": {
-        "workspace": [
-          "workspace"
-        ]
-      },
-      "kind": "invoke",
-      "name": "disconnect_mendeley",
-      "output": "-> Result < () , Failure >",
-      "parameters": [
-        {
-          "key": "workspace",
-          "name": "workspace",
-          "type": "Option < String >"
-        }
-      ],
-      "path": "mendeley::disconnect_mendeley",
       "scope": "workspace"
     },
     {
@@ -3359,48 +3317,6 @@
         }
       ],
       "path": "mcp::mcp_logout",
-      "scope": "workspace"
-    },
-    {
-      "async": false,
-      "channel": null,
-      "ids": {
-        "workspace": [
-          "workspace"
-        ]
-      },
-      "kind": "invoke",
-      "name": "mendeley_login",
-      "output": "-> Result < MendeleyLogin , Failure >",
-      "parameters": [
-        {
-          "key": "workspace",
-          "name": "workspace",
-          "type": "Option < String >"
-        }
-      ],
-      "path": "mendeley::mendeley_login",
-      "scope": "workspace"
-    },
-    {
-      "async": false,
-      "channel": null,
-      "ids": {
-        "workspace": [
-          "workspace"
-        ]
-      },
-      "kind": "invoke",
-      "name": "mendeley_status",
-      "output": "-> Result < MendeleyStatus , Failure >",
-      "parameters": [
-        {
-          "key": "workspace",
-          "name": "workspace",
-          "type": "Option < String >"
-        }
-      ],
-      "path": "mendeley::mendeley_status",
       "scope": "workspace"
     },
     {
@@ -7955,7 +7871,6 @@
     "providers",
     "question",
     "radiant",
-    "references",
     "session",
     "site",
     "sitio-pedido",

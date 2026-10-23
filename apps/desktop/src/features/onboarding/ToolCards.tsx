@@ -19,7 +19,7 @@ import { detalleDe, prosaDe } from "../../ui/Failure";
 import { CancelButton, RemoveButton } from "../../ui/IconAction";
 import { Input } from "../../ui/Input";
 import { MarcaProveedor } from "../../ui/icons";
-import { GoogleDriveMark, MarcaPlugin, MendeleyMark, ZoteroMark } from "../../ui/toolMarks";
+import { GoogleDriveMark, MarcaPlugin, ZoteroMark } from "../../ui/toolMarks";
 import { Spinner } from "../../ui/Spinner";
 import { ErrorDeTarjeta } from "./ConnectAI";
 import { explicar } from "./connect-store";
@@ -84,17 +84,6 @@ type EstadoDeZotero = {
   local_api: "ready" | "disabled" | "unsupported" | "unavailable";
   installer_bytes: number | null;
 };
-/** Mendeley en la nube, con la cuenta de este workspace; `app_installed` solo informa. */
-type EstadoDeMendeley = {
-  app_installed: boolean;
-  configured: boolean;
-  connected: boolean;
-  account: { name: string | null; email: string | null } | null;
-  signing_in: boolean;
-};
-/** El evento `references`: una biblioteca terminó de conectarse o cambió; `failure` es una clave del catálogo. */
-type AvisoDeReferencias = { workspace: string; library: string; ok: boolean; failure: string | null };
-const REFERENCIAS = ["zotero", "mendeley"];
 const SIN_USAR_DRIVE = "onboarding.drive-desktop-unused";
 const CADA_CUANTO_SESION = 2500;
 
@@ -129,7 +118,6 @@ const INTEGRACIONES = (): Integracion[] => [
   { id: "excalidraw", nombre: "Excalidraw", comun: false, via: "incluido" },
   { id: "notion", nombre: "Notion", comun: false, via: "mcp" },
   { id: "zotero", nombre: "Zotero", comun: false, via: "referencias" },
-  { id: "mendeley", nombre: "Mendeley", comun: false, via: "referencias" },
 ];
 const RECOMENDADOS = ["drawio", "typst", "libreoffice"];
 const ORDEN_PLUGINS = ["drawio", "typst", "libreoffice", "agentsview", "computer-use"];
@@ -155,7 +143,6 @@ function MarcaIntegracion(props: { id: string; size?: number }) {
     <Switch fallback={<MarcaProveedor id={props.id} size={props.size} />}>
       <Match when={props.id === "drive"}><GoogleDriveMark size={props.size} /></Match>
       <Match when={props.id === "zotero"}><ZoteroMark size={props.size} /></Match>
-      <Match when={props.id === "mendeley"}><MendeleyMark size={props.size} /></Match>
     </Switch>
   );
 }
@@ -218,15 +205,12 @@ export function VerMas(props: {
 /** Las integraciones: cada tarjeta mide lo mismo en todos sus estados y se conecta o desconecta en su sitio. */
 export function Integraciones(props: { onCambio: (conectadas: number) => void; solo?: string[] }) {
   /** Con `solo`, únicamente esas tarjetas y todas a la vista: Configuración monta así la de Drive. */
-  const [mendeley, setMendeley] = createSignal<EstadoDeMendeley | null>(null);
-  // Mendeley sólo existe con la app de Terminus registrada en su sitio de desarrolladores.
-  const disponibles = () => INTEGRACIONES().filter((i) => i.id !== "mendeley" || mendeley()?.configured === true);
   const integraciones = () =>
     props.solo
-      ? disponibles()
+      ? INTEGRACIONES()
           .filter((i) => props.solo?.includes(i.id))
           .map((i) => ({ ...i, comun: true }))
-      : disponibles();
+      : INTEGRACIONES();
   const [proveedores, setProveedores] = createSignal<Proveedor[]>([]);
   const [conocidos, setConocidos] = createSignal<Conocido[]>([]);
   const [agentesMcp, setAgentesMcp] = createSignal<AgenteMcp[]>([]);
@@ -273,13 +257,6 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
       if (z.local_api === "ready") return { k: "conectada", detalle: t("onboarding.tools.references.zotero_ready", { version: z.version ?? "" }) };
       return z.local_api === "disabled" ? { k: "permiso" } : { k: "libre" };
     }
-    if (i.id === "mendeley") {
-      const m = mendeley();
-      if (m?.signing_in) return { k: "conectando" };
-      if (!m?.connected) return { k: "libre" };
-      const quien = [m.account?.name, m.account?.email].filter(Boolean).join(" · ");
-      return { k: "conectada", detalle: quien || t("onboarding.tools.connected") };
-    }
     if (i.via === "drive" && oficial()) {
       const m = unidad(escritorio());
       if (!m) return { k: "libre" };
@@ -308,14 +285,13 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
 
   async function cargar() {
     try {
-      const [p, c, a, d, o, z, m] = await Promise.all([
+      const [p, c, a, d, o, z] = await Promise.all([
         invoke<Proveedor[]>("list_git_hosts", { scope: await scope }),
         invoke<Conocido[]>("list_known_mcp"),
         invoke<AgenteMcp[]>("list_mcp_providers"),
         invoke<EstadoDeDrive>("google_drive_status").catch(() => null),
         invoke<DriveDeEscritorio>("google_drive_desktop_status").catch(() => null),
         invoke<EstadoDeZotero>("zotero_status").catch(() => null),
-        invoke<EstadoDeMendeley>("mendeley_status").catch(() => null),
       ]);
       if (cerrada) return;
       // Antes la guardaba la ventana; ahora es del motor, que la lee en cada turno.
@@ -329,7 +305,6 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
       setDrive(d);
       setEscritorio(o);
       setZotero(z);
-      setMendeley(m);
       setProveedores(p);
       setConocidos(c);
       setAgentesMcp(a);
@@ -399,23 +374,6 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
     if (a.kind === "installing") setEstados("zotero", { k: "instalando" });
     else if (a.bytes > 0) setEstados("zotero", { k: "descargando", hecho: a.done, total: a.bytes });
   });
-  // El motor abre el navegador del login de Mendeley; aquí solo se espera el final.
-  const alReferencias = listen<AvisoDeReferencias>("references", (e) => {
-    const a = e.payload;
-    if (a.library !== "mendeley") return;
-    if (!a.ok && estados.mendeley?.k === "conectando") {
-      setErrores("mendeley", falloDeInstalacion(a.failure, "settings.references.mendeley.error_login"));
-      setEstados("mendeley", { k: "libre" });
-    }
-    void invoke<EstadoDeMendeley>("mendeley_status")
-      .then((m) => {
-        if (cerrada) return;
-        setMendeley(m);
-        if (estados.mendeley?.k !== "saliendo") setEstados("mendeley", guardado(INTEGRACIONES().find((i) => i.id === "mendeley")!));
-        contarConectadas();
-      })
-      .catch(() => {});
-  });
   const alInstalar = listen<InstalacionDeDrive>("install", (e) => {
     const a = e.payload;
     if (a.operation !== "google-drive-desktop") return;
@@ -428,9 +386,9 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
     cerrada = true;
     clearTimeout(vigiaDeSesion);
     clearTimeout(vigiaDeZotero);
-    for (const l of [fin, alDrive, alInstalar, alInstalarZotero, alReferencias]) void l.then((f) => f());
+    for (const l of [fin, alDrive, alInstalar, alInstalarZotero]) void l.then((f) => f());
     for (const i of integraciones()) {
-      if ((i.via === "proveedor" || i.via === "drive" || i.id === "mendeley") && estados[i.id]?.k === "conectando") void cancelar(i);
+      if ((i.via === "proveedor" || i.via === "drive") && estados[i.id]?.k === "conectando") void cancelar(i);
     }
   });
 
@@ -584,22 +542,10 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
     }
   }
 
-  async function conectarMendeley(i: Integracion) {
-    setEstados(i.id, { k: "conectando" });
-    try {
-      await invoke<{ url: string }>("mendeley_login");
-    } catch (e) {
-      if (estados[i.id]?.k !== "conectando") return;
-      setErrores(i.id, explicar(e));
-      setEstados(i.id, { k: "libre" });
-    }
-  }
-
   async function conectar(i: Integracion) {
     setErrores(i.id, null);
     setMotivos(i.id, null);
     if (i.id === "zotero") return conectarZotero(i);
-    if (i.id === "mendeley") return conectarMendeley(i);
     if (i.via === "drive") return conectarDrive(i);
     if (i.via === "proveedor") {
       const p = proveedor(i.id);
@@ -685,8 +631,6 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
       finDeZotero = null;
       clearTimeout(vigiaDeZotero);
       if (e === "descargando") void invoke("cancel_install", { operation: "zotero" }).catch(() => {});
-    } else if (i.id === "mendeley") {
-      if (e === "conectando") void invoke("cancel_mendeley_login").catch(() => {});
     } else if (i.via === "drive" && oficial()) {
       intentoDeDrive++;
       finDeInstalacion = null;
@@ -718,8 +662,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
     }
     setEstados(i.id, { k: "saliendo" });
     try {
-      if (i.id === "mendeley") await invoke("disconnect_mendeley");
-      else if (i.via === "drive") await invoke("disconnect_google_drive");
+      if (i.via === "drive") await invoke("disconnect_google_drive");
       else if (i.via === "proveedor") await invoke("disconnect_git_host", { id: i.id, scope: await scope });
       else await invoke("disconnect_known_mcp", { id: i.id });
     } catch (e) {
@@ -762,7 +705,6 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
         return t("onboarding.ai.disconnecting");
       default:
         if (i.id === "zotero" && zotero()?.installed && !zotero()?.running) return t("onboarding.tools.references.zotero_closed");
-        if (i.id === "mendeley" && mendeley()?.app_installed) return t("onboarding.tools.references.mendeley_app");
         return descripcion(i.id);
     }
   };
@@ -1016,23 +958,12 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
   };
   // Como el diseño: la pila de «Ver más» enseña todo lo que no es común, aunque ya esté a la vista.
   const escondidas = () => integraciones().filter((i) => !i.comun);
-  const deReferencias = () => visibles().filter((i) => REFERENCIAS.includes(i.id));
 
   return (
     <>
       <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-        <For each={visibles().filter((i) => !REFERENCIAS.includes(i.id))}>{(i) => <Tarjeta i={i} />}</For>
+        <For each={visibles()}>{(i) => <Tarjeta i={i} />}</For>
       </div>
-      <Show when={deReferencias().length > 0}>
-        <div class="grid gap-1.5">
-          <Show when={!props.solo}>
-            <span class="text-[11px] font-semibold tracking-[0.04em] text-neutral-500 uppercase">{t("onboarding.tools.references.group")}</span>
-          </Show>
-          <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-            <For each={deReferencias()}>{(i) => <Tarjeta i={i} />}</For>
-          </div>
-        </div>
-      </Show>
       <Show when={estados.zotero?.k === "permiso"}>
         <div class="grid gap-2 rounded-lg border border-primary bg-surface-raised px-4 py-3.5 motion-safe:animate-entrar" role="status">
           <p class="m-0 flex items-center gap-2 text-[13px]">

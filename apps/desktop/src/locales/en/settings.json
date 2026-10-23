@@ -675,7 +675,6 @@
   "settings.google_drive_desktop.error_not_installed": "Install Google Drive first.",
   "settings.google_drive_desktop.error_open": "Google Drive could not be opened.",
   "settings.google_drive_desktop.error_save": "I couldn't save the Google Drive preference.",
-  "settings.references.error_workspace": "The workspace was not found.",
   "settings.references.zotero.error_busy": "Zotero is already being installed.",
   "settings.references.zotero.error_download": "Zotero could not be downloaded. Check your connection and try again.",
   "settings.references.zotero.error_signature": "The downloaded installer is not the official Zotero one, so it was not installed. Try again.",
@@ -685,9 +684,5 @@
   "settings.references.zotero.error_open": "Zotero could not be opened.",
   "settings.references.zotero.error_closed": "Zotero is closed. Open it and try again.",
   "settings.references.zotero.error_local_api": "In Zotero: Settings → Advanced → “Allow other applications on this computer to communicate with Zotero”.",
-  "settings.references.zotero.error_too_old": "This Zotero version has no local API. Update Zotero to version 7 or newer.",
-  "settings.references.mendeley.error_not_configured": "This Terminus build does not include the Mendeley connection.",
-  "settings.references.mendeley.error_port": "Could not wait for Mendeley’s answer: another program is using its port. Close it and try again.",
-  "settings.references.mendeley.error_login": "Mendeley could not be connected. Try again.",
-  "settings.references.mendeley.error_disconnect": "Mendeley could not be disconnected."
+  "settings.references.zotero.error_too_old": "This Zotero version has no local API. Update Zotero to version 7 or newer."
 }
