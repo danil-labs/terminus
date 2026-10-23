@@ -77,6 +77,7 @@ const steps = [
   ["Las tareas de la página de un agente se paginan sin separar subtareas de su padre", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/agent-page-tasks.test.ts")], root],
   ["El riel de subtareas lanzadas suelta las que ya se terminaron", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/delegated-rail.test.ts")], root],
   ["La búsqueda de tareas ignora acentos y encuentra varias palabras", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/task-search.test.ts")], root],
+  ["La vista de Typst solo acompaña a un .typ, no al archivo que se abre después", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/typst-scope.test.ts")], root],
   ["El dock de agentes ordena por estado y cabe en una fila", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/agent-dock.test.ts")], root],
   ["El sidebar junta las tareas de todas las carpetas sin repetirlas", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/sidebar-tasks.test.ts")], root],
   ["El sidebar filtra por carpeta y agente y reparte en secciones o grupos", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/sidebar-view.test.ts")], root],

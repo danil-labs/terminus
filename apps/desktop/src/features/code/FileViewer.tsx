@@ -61,6 +61,7 @@ import {
   mirarEditorTypst,
   dejarDeMirarEditorTypst,
 } from "./typst";
+import { llevaVistaTypst } from "./typstScope";
 
 const EditorDeCodigo = lazy(cargarEditor);
 const VistaPreviaTypst = lazy(() => import("./TypstPreview"));
@@ -135,9 +136,6 @@ export function esHtml(ruta: string) {
 }
 
 const IMAGES = ["png", "jpg", "jpeg", "gif", "webp", "svg", "ico"];
-
-/** Lo que tiene su propio visor: con el ojo puesto se sigue abriendo así, sin el PDF de Typst al lado. */
-const CON_VISOR_PROPIO = [...IMAGES, "pdf", "bmp", "tif", "tiff", "heic", "zip", "mp3", "mp4", "wav", "mov"];
 
 /** Las que el visor pinta como imagen; un PDF tiene su propio visor. */
 export function isImage(path: string) {
@@ -229,15 +227,10 @@ export default function VisorDeArchivo(props: {
   seguirPluginTypst();
   const typst = () => esTypst(props.ruta) && !previa();
   /**
-   * El ojo es el interruptor: con un principal elegido, todo archivo de la tarea se ve junto
-   * al PDF, en un panel que no depende de la pestaña. Sin ojo, un `.typ` es solo código.
+   * El ojo es el interruptor: con un principal elegido, un `.typ` se ve junto al PDF. Otro
+   * archivo abierto en la misma pestaña usa su propia previa o se queda en código.
    */
-  const vistaTypst = () =>
-    conVistaTypst() &&
-    !previa() &&
-    principalElegido(props.project) !== null &&
-    !CON_VISOR_PROPIO.includes(extension(props.ruta)) &&
-    !OFFICE.includes(extension(props.ruta));
+  const vistaTypst = () => conVistaTypst() && !previa() && llevaVistaTypst(props.ruta, principalElegido(props.project));
   /** El tiempo real, las marcas y el guardado solo: un `.typ` con la vista encendida. */
   const typstVivo = () => typst() && vistaTypst();
   const conPrevia = () =>
