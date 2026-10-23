@@ -10,7 +10,7 @@ import { delegatedRailRows } from "./delegatedRail";
 
 export { delegatedAttention } from "./delegatedRail";
 
-export type DelegatedListProps = Omit<ComponentProps<typeof Sessions>, "sessions" | "flat" | "includeArchived" | "groupByAuthor" | "groupByHandler">;
+export type DelegatedListProps = Omit<ComponentProps<typeof Sessions>, "sessions" | "flat" | "card" | "hoverCardPlacement" | "includeArchived" | "groupByAuthor" | "groupByHandler">;
 
 export function delegatedDescendants(rows: SessionRow[], root: string): SessionRow[] {
   const selected = new Set([root]);
@@ -43,15 +43,18 @@ export function delegatedFamilies(rows: SessionRow[]): Map<string, string[]> {
   return families;
 }
 
+/** Las delegadas con la tarjeta del riel (`taskCard`): estado y título; proveedor, carpeta, máquina, agente y PR. */
 export function DelegatedTaskList(props: {
   rows: SessionRow[];
   list: (folder: string) => DelegatedListProps;
   readOnly?: boolean;
+  hoverCardPlacement?: "left-start" | "right-start";
 }) {
   const folders = createMemo(() => [...new Set(props.rows.map(row => row.folder ?? ""))]);
   return <For each={folders()}>{folder => <Sessions {...props.list(folder)}
     sessions={props.rows.filter(row => (row.folder ?? "") === folder)}
-    flat includeArchived readOnly={props.readOnly} groupByAuthor={false} groupByHandler={false} />}</For>;
+    flat card hoverCardPlacement={props.hoverCardPlacement}
+    includeArchived readOnly={props.readOnly} groupByAuthor={false} groupByHandler={false} />}</For>;
 }
 
 export function DelegatedLaunch(props: {
@@ -112,7 +115,8 @@ export default function DelegatedActivity(props: {
         <div data-delegated-list class="max-h-[min(55vh,420px)] overflow-y-auto overscroll-contain">
           <Show when={props.error}>{error => <><FailureNote f={asFailure(error())} /><Button variant="ghost" size="sm" onClick={props.onRetry}>{t("chat.delegation.retry")}</Button></>}</Show>
           <Show when={shown().length} fallback={<p class="m-0 px-2 py-3 text-xs text-neutral-500">{props.loading ? t("chat.delegation.loading") : t("chat.delegation.idle")}</p>}>
-            <DelegatedTaskList rows={shown()} list={folder => ({ ...props.list(folder), onPick: id => {
+            {/* El panel cuelga a la izquierda del botón: la tarjeta flotante también. */}
+            <DelegatedTaskList rows={shown()} hoverCardPlacement="left-start" list={folder => ({ ...props.list(folder), onPick: id => {
               setOpen(false);
               props.list(folder).onPick(id);
             } })} />

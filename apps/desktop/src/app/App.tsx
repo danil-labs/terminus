@@ -6361,6 +6361,7 @@ export default function App() {
     const delegatedList = (folder: string): DelegatedListProps => ({
       relatedSessions: [...Object.values(sesionesConEstado()).flat(), ...delegatedRows()],
       de: folder, current: pp.sesion ?? null, vivas: vivas(), aprobando: permissions().map(item => item.session),
+      carpetaDe: () => projectList().find(item => item.id === folder)?.name,
       destinos: projectList().filter(item => item.id !== folder).map(item => ({ id: item.id, name: item.name })),
       onPick: id => { void abrirSesion(folder, id); },
       onDelete: id => void borrarSesion(folder, id),

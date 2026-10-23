@@ -18,6 +18,7 @@ export function WithTaskHoverCard(props: TaskHoverCardProps & {
   children: JSX.Element;
   class?: string;
   disabled?: boolean;
+  placement?: "left-start" | "right-start";
 }) {
   let fila: HTMLDivElement | undefined;
   let tarjeta: HTMLDivElement | undefined;
@@ -85,7 +86,7 @@ export function WithTaskHoverCard(props: TaskHoverCardProps & {
         open={open()}
         onOpenChange={(next) => { if (!next) ocultar(); }}
         anchorRef={() => fila}
-        placement="right-start"
+        placement={props.placement ?? "right-start"}
         gutter={8}
       >
         <PopoverContent

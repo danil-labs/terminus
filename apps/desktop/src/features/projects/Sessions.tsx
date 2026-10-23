@@ -323,7 +323,16 @@ export default function Sessions(props: {
   density?: "comfortable" | "compact";
   /** Bajo la cabecera de su carpeta, la fila no repite la carpeta. */
   hideFolder?: boolean;
+  /**
+   * La tarjeta del riel fuera del riel (las delegadas): su fila, su tarjeta
+   * flotante y su densidad, sin lo que el riel hace con la lista.
+   */
+  card?: boolean;
+  /** Hacia dónde sale la tarjeta flotante; el riel la saca a la derecha. */
+  hoverCardPlacement?: "left-start" | "right-start";
 }) {
+  /** Fila de dos líneas con tarjeta flotante: el riel y quien la pide. */
+  const tarjetaDelRiel = () => !!props.sidebar || !!props.card;
   const compacta = () => props.density === "compact";
   const projectOf = (row: SessionRow) => props.projectOf?.(row) ?? props.de;
   const projectOfId = (id: string) => {
@@ -640,17 +649,18 @@ export default function Sessions(props: {
     );
   };
 
-  /** En el riel la fila lleva su tarjeta flotante; en las demás listas, no. */
+  /** En el riel y en las delegadas la fila lleva su tarjeta flotante; en las demás listas, no. */
   const ConTarjeta = (c: { s: SessionRow; children: JSX.Element }) => (
-    <Show when={props.sidebar} fallback={c.children}>
+    <Show when={tarjetaDelRiel()} fallback={c.children}>
       <WithTaskHoverCard
         task={c.s}
+        placement={props.hoverCardPlacement}
         folderName={props.carpetaDe?.(c.s)}
         folderId={projectOf(c.s) || undefined}
         git={gitDe(c.s)}
         agentProfile={c.s.agent ? profiles()[c.s.agent] : undefined}
         agentStatus={props.vivas.includes(c.s.id) ? "working" : undefined}
-        disabled={renombrando() === c.s.id || menu() === c.s.id || !!tareaEnVuelo()}
+        disabled={props.readOnly || renombrando() === c.s.id || menu() === c.s.id || !!tareaEnVuelo()}
         onOpen={() => props.onPick(c.s.id)}
         onPin={() => void setPinned(c.s)}
         onArchive={() => void intentar(c.s.id, false)}
@@ -701,10 +711,10 @@ export default function Sessions(props: {
           // El cohete es absoluto: sin este hueco el título se mete debajo. Por
           // `:has`, no por clase reactiva: cada fila mutaría al llegar git.
           <div class="flex min-w-0 items-center gap-1 text-[0.8125rem] leading-[1.35] [:has(>[data-finish-slot])_&]:pr-16">
-            <Show when={fijada(f.s) && !props.sidebar}>{marcaDeFijada()}</Show>
+            <Show when={fijada(f.s) && !tarjetaDelRiel()}>{marcaDeFijada()}</Show>
             <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"><WithMentions>{f.s.subagent ? readableSessionTitle(title()) : title()}</WithMentions></span>
-                <Show when={props.sidebar && fijada(f.s)}>{marcaDeFijada()}</Show>
-                <Show when={props.sidebar && compacta() && !props.hideFolder}>
+                <Show when={tarjetaDelRiel() && fijada(f.s)}>{marcaDeFijada()}</Show>
+                <Show when={tarjetaDelRiel() && compacta() && !props.hideFolder}>
                   <span title={props.carpetaDe?.(f.s)} class="ml-auto flex shrink-0 pl-1"><FolderSquare id={projectOf(f.s)} /></span>
                 </Show>
           </div>
@@ -862,7 +872,7 @@ export default function Sessions(props: {
             Y las menciones del título se pintan COMO MENCIONES: el
             nombre de una tarea referencia entidades reales, y
             aplanarlo a texto en el historial es donde se perdería. */}
-          <Show when={props.sidebar} fallback={
+          <Show when={tarjetaDelRiel()} fallback={
           <div class="flex items-start gap-1.5">
             {/* **El hueco se reserva aunque no haya nada que plegar**, igual
               que en la fila de un proyecto: sin él, la fila con hijas
