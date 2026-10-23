@@ -229,10 +229,6 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
           <AccountMachines {...props} machines={machines} />
         </Suspense>
       ) : null,
-    machineSlices: () => {
-      changed();
-      return fleet.sliceStatuses();
-    },
     machinesLicense: () => {
       changed();
       return fleet.license();

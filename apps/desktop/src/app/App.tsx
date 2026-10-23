@@ -443,8 +443,7 @@ export default function App() {
   const guardarCache = shellCacheWriter();
   createEffect(() => {
     const workspace = workspaceActivo();
-    const slices = capabilities().machineSlices?.();
-    const snapshot = { workspace, projects: projectList(), sessions: sesiones(), spaces: spaces(), desk: escritorio(), ...(slices ? { slices } : {}) };
+    const snapshot = { workspace, projects: projectList(), sessions: sesiones(), spaces: spaces(), desk: escritorio() };
     if (enCache() || bloqueo() || !workspace) return;
     // A mitad de un cambio de workspace las filas aún son del anterior: esa foto no se guarda.
     const carpetas = ["", ...snapshot.projects.map((p) => p.id)];

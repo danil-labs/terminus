@@ -61,8 +61,6 @@ export type Capabilities = {
   browserFiles?: boolean;
   /** El visor de la pantalla de una VM administrada (solo ver); `null` si esa máquina no tiene. */
   machineScreen?: (machine: string) => (() => Promise<WebSocket>) | null;
-  /** El estado de la rebanada de cada otra máquina (`@terminus/fleet`): `ok`, `cached`, `no_answer`, `off` u `outdated`, con su hora. */
-  machineSlices?: () => Record<string, { status: "ok" | "cached" | "no_answer" | "off" | "outdated" | "license_required"; at: number | null }>;
   /** `license_required` si el relay detuvo las otras máquinas por falta de Terminus de pago (aviso `TerminusLicense`); `null` si no. */
   machinesLicense?: () => "license_required" | null;
   /** «Reintentar» del aviso de licencia: vuelve a abrir las sesiones de las otras máquinas. */
