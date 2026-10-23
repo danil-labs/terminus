@@ -2,7 +2,7 @@
 /**
  * Un Danil Computers falso para probar la app sin la sesión de nadie:
  * el login de Supabase (`/auth/v1/token`), el plano de control
- * (`/v1/computers`, `/start`, `/v1/workspaces`) y el relay (`/v1/computers/:id/session`, protocolo
+ * (`/v1/computers`, `/start`, `/v1/workspaces`, la memoria `/v1/workspaces/:id/memory/*`) y el relay (`/v1/computers/:id/session`, protocolo
  * v1 con espejo), sobre HTTP y WebSocket reales en localhost.
  *
  *   node apps/mobile/scripts/fake-computers.mjs [--port 8787] [--mac-off] [--license]
@@ -458,13 +458,95 @@ function upgrade(request, raw, computer) {
   raw.on("error", () => sockets.delete(socket));
 }
 
+// --- Memoria del workspace (`/v1/workspaces/:id/memory/*`, computers#19) ----------
+// Un repo por workspace en memoria: commits lineales con la foto entera. Misma regla
+// de conflicto que el Worker: gana la escritura y la versión pisada queda en
+// `<base>.conflicto-<autor>.md`; un borrado contra otra versión responde 409.
+
+const oidOf = (content) => createHash("sha1").update(`blob ${Buffer.byteLength(content)}\0${content}`).digest("hex");
+const entryText = (body, type, agent) =>
+  `---\ntype: ${type}\nmodified: ${new Date().toISOString().replace(/\.\d{3}Z$/, "Z")}\norigin:\n  workspace: w-prod\n  project: p-mac-api\n${agent ? `  agent: ${agent}\n` : ""}---\n\n${body}\n`;
+const memoryCommits = [];
+function memoryCommit(files, message, author) {
+  const commit = createHash("sha1").update(`${memoryCommits.length}${message}`).digest("hex");
+  memoryCommits.push({ commit, message, author, at: new Date().toISOString(), files });
+  return commit;
+}
+memoryCommit(new Map([["projects/p-mac-api/memory/deploy.md", entryText("Desplegar con pnpm deploy", "procedimiento", "claude")]]), "memory: add deploy.md", { name: "Claude", email: "agent@vm" });
+memoryCommit(
+  new Map([
+    ["projects/p-mac-api/memory/deploy.md", entryText("Desplegar con wrangler deploy --env staging", "procedimiento", "codex")],
+    ["projects/p-mac-api/memory/deploy.conflicto-mac.md", entryText("Desplegar con pnpm deploy", "procedimiento", "claude")],
+    ["memory/regla.md", entryText("Las migraciones van en danil-workspace", "decisión")],
+  ]),
+  "memory: edit deploy.md",
+  { name: "Mac", email: "ana@mac" },
+);
+const memoryHead = () => memoryCommits.at(-1);
+const memorySlug = (text) => (text ?? "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "anterior";
+
+async function memory(request, response, url) {
+  const m = /^\/v1\/workspaces\/([^/]+)\/memory\/(files|file|history|log)$/.exec(url.pathname);
+  if (!m) return false;
+  if (decodeURIComponent(m[1]) !== "w-prod") return json(response, 404, { error: { code: "not_found" } }), true;
+  const path = url.searchParams.get("path");
+  const ref = url.searchParams.get("ref") ?? "main";
+  const filesAt = (r) => (r === "main" ? memoryHead().files : memoryCommits.find((c) => c.commit === r)?.files) ?? null;
+  if (m[2] === "files") {
+    const files = filesAt(ref) ?? new Map();
+    json(response, 200, { commit: memoryHead().commit, files: [...files].sort(([a], [b]) => a.localeCompare(b)).map(([p, c]) => ({ path: p, oid: oidOf(c) })) });
+    return true;
+  }
+  if (m[2] === "log") return json(response, 200, { commits: [...memoryCommits].reverse().map(({ files: _f, ...c }) => c) }), true;
+  if (m[2] === "history") {
+    const versions = [];
+    let previous;
+    for (const c of memoryCommits) {
+      const now = c.files.get(path);
+      if (now !== previous) versions.unshift({ commit: c.commit, message: c.message, author: c.author, at: c.at, oid: now === undefined ? null : oidOf(now) });
+      previous = now;
+    }
+    return json(response, 200, { path, versions }), true;
+  }
+  if (request.method === "GET") {
+    const content = filesAt(ref)?.get(path);
+    return json(response, content === undefined ? 404 : 200, content === undefined ? { error: { code: "not_found" } } : { path, ref, oid: oidOf(content), content }), true;
+  }
+  const files = new Map(memoryHead().files);
+  const author = { name: user.email, email: user.email };
+  if (request.method === "DELETE") {
+    const current = files.has(path) ? oidOf(files.get(path)) : null;
+    if (current === null) return json(response, 404, { error: { code: "not_found" } }), true;
+    if (current !== url.searchParams.get("base")) return json(response, 409, { error: { code: "memory_conflict" }, current }), true;
+    files.delete(path);
+    return json(response, 200, { status: "deleted", commit: memoryCommit(files, `memory: delete ${path} (web)`, author), path }), true;
+  }
+  if (request.method !== "PUT") return json(response, 405, { error: { code: "method_not_allowed" } }), true;
+  let raw = "";
+  for await (const chunk of request) raw += chunk;
+  const body = JSON.parse(raw || "{}");
+  const current = files.has(body.path) ? oidOf(files.get(body.path)) : null;
+  let copy = null;
+  if (current !== null && current !== body.base) {
+    let who = "anterior";
+    for (let i = memoryCommits.length - 1; i >= 0; i -= 1) if (memoryCommits[i].files.get(body.path) !== memoryCommits[i - 1]?.files.get(body.path)) { who = memoryCommits[i].author.name; break; }
+    const stem = body.path.slice(0, -3);
+    copy = `${stem}.conflicto-${memorySlug(who)}.md`;
+    for (let n = 2; files.has(copy); n += 1) copy = `${stem}.conflicto-${memorySlug(who)}-${n}.md`;
+    files.set(copy, files.get(body.path));
+  }
+  files.set(body.path, body.content);
+  json(response, 200, { status: "written", commit: memoryCommit(files, `memory: edit ${body.path} (web)`, author), path: body.path, conflict_copy: copy, changed: true });
+  return true;
+}
+
 // --- HTTP -------------------------------------------------------------------------
 
 const user = { id: "00000000-0000-4000-8000-000000000001", aud: "authenticated", role: "authenticated", email: "persona@example.com", app_metadata: {}, user_metadata: {}, created_at: new Date().toISOString() };
 const session = () => ({ access_token: TOKEN, refresh_token: "fake-refresh", token_type: "bearer", expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, user });
 
 function json(response, status, body) {
-  response.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": "*", "access-control-allow-headers": "*" });
+  response.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "GET, POST, PUT, DELETE, OPTIONS" });
   response.end(JSON.stringify(body));
 }
 
@@ -493,6 +575,10 @@ const server = createServer((request, response) => {
         },
       ],
     });
+  if (url.pathname.includes("/memory/")) {
+    void memory(request, response, url).then((handled) => handled || json(response, 404, { error: { code: "not_found" } }));
+    return;
+  }
   const start = /^\/v1\/computers\/([^/]+)\/start$/.exec(url.pathname);
   if (start && request.method === "POST") {
     const m = machines[start[1]];

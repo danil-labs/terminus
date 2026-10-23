@@ -19,6 +19,7 @@ import {
   signInWithWorkspace,
   signOut,
 } from "./danil-account";
+import { LICENSE_REQUIRED } from "./TerminusLicense";
 
 export type DanilView =
   | { t: "loading" }
@@ -43,6 +44,7 @@ export function createDanilSession({ oneClick = ONE_CLICK_SIGN_IN } = {}) {
   const [options, setOptions] = createSignal<DanilConnectOption[]>([]);
   const [name, setName] = createSignal("");
   const [busy, setBusy] = createSignal(false);
+  /** El código del último fallo al pedir algo; se traduce al pintarlo. */
   const [problem, setProblem] = createSignal<string | null>(null);
 
   const show = (status: DanilConnectStatus | null) => {
@@ -56,7 +58,7 @@ export function createDanilSession({ oneClick = ONE_CLICK_SIGN_IN } = {}) {
       .then(show)
       .catch(() => {
         setView({ t: "failed" });
-        setProblem(t("danil.account.failed"));
+        setProblem("failed");
       });
     if (oneClick && ONE_CLICK_SIGN_IN) void readDanilOptions().then(setOptions);
     const changes = listen<DanilConnectStatus>("danil-connect", (e) => show(e.payload));
@@ -74,11 +76,13 @@ export function createDanilSession({ oneClick = ONE_CLICK_SIGN_IN } = {}) {
     try {
       show(await action());
     } catch (e) {
-      setProblem(said(failureCode(e)));
+      setProblem(failureCode(e) ?? "failed");
     } finally {
       setBusy(false);
     }
   }
+
+  const code = () => problem() ?? (status()?.state === "error" || status()?.error ? (status()?.error ?? "failed") : null);
 
   return {
     view,
@@ -87,11 +91,18 @@ export function createDanilSession({ oneClick = ONE_CLICK_SIGN_IN } = {}) {
     name,
     setName,
     busy,
-    /** Lo que falló al pedir algo, o el error que trae el estado. */
-    message: () => problem() ?? (status()?.state === "error" || status()?.error ? said(status()?.error) : null),
+    /** Lo que falló al pedir algo, o el error que trae el estado; sin licencia lo dice `license`. */
+    message: () => {
+      const c = code();
+      return c && c !== LICENSE_REQUIRED ? said(c) : null;
+    },
+    license: () => code() === LICENSE_REQUIRED,
     withBrowser: () => run(() => signInWithBrowser(name())),
     withWorkspace: (o: DanilConnectOption) => run(() => signInWithWorkspace(name(), o.workspace)),
     signOut: () => run(signOut),
+    /** Tras activar la licencia: con sesión se vuelve a preguntar a Danil; sin ella, se entra de nuevo. */
+    retry: () =>
+      status()?.state === "connected" ? run(() => invoke<DanilConnectStatus>("danil_account_refresh", {})) : run(() => signInWithBrowser(name())),
     reopen: () => {
       const url = status()?.verification_uri_complete;
       if (url) void invoke("open_external", { target: url }).catch(() => {});

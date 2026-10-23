@@ -37,7 +37,7 @@ function desktopBase(): string {
 export default function WorkspaceSwitcher() {
   const theme = useTheme();
   const { email, signOut, session } = useAccount();
-  const { attention, hosts, pairing, pair } = useMachines();
+  const { attention, hosts, pairing, pair, registry } = useMachines();
   const { list, current, select } = useWorkspaces();
   const several = hosts.length > 1;
   const labelOf = (id: string) => hosts.find((h) => h.id === id)?.label ?? id;
@@ -68,6 +68,26 @@ export default function WorkspaceSwitcher() {
           />
         );
       })}
+
+      {session && registry?.length ? (
+        <>
+          <SectionTitle>{t("memory.title")}</SectionTitle>
+          {registry.map((workspace) => (
+            <Row
+              key={workspace.id}
+              testID={`memory-${workspace.id}`}
+              left={<Icon name="brain" size={20} color={theme.textMuted} />}
+              title={t("memory.open", { name: workspace.name })}
+              subtitle={t("memory.subtitle")}
+              right={<Icon name="chevron-right" size={16} color={theme.textMuted} />}
+              onPress={() => {
+                router.back();
+                router.push({ pathname: "/memory/[workspace]", params: { workspace: workspace.id } });
+              }}
+            />
+          ))}
+        </>
+      ) : null}
 
       <SectionTitle>{t("machines.title")}</SectionTitle>
       {hosts.map((host) => (
