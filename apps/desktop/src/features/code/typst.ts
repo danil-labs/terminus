@@ -35,9 +35,7 @@ type AvisoTypst = {
   pages: number | null;
 };
 
-export function esTypst(ruta: string) {
-  return ruta.toLowerCase().endsWith(".typ");
-}
+export { esTypst } from "./typstScope";
 
 /** Si el plugin Typst está activo en este workspace: sin él, un `.typ` es un archivo de texto más. */
 const [pluginTypst, setPluginTypst] = createSignal(false);
