@@ -903,7 +903,7 @@ export default function App() {
       const machine = filaDe(id)?.machine ?? null;
       const target = spaces().find((i) => i.id === space);
       // Una tarea de otra máquina a un space de esta ventana: esa máquina no lo
-      // conoce, así que la ventana recuerda dónde va (`lib/spaces.ts`).
+      // conoce: la ventana recuerda dónde va (`lib/spaces.ts`).
       if (machine && target && capabilities().taskMachine?.(space) !== machine) {
         rememberTaskSpace(id, space);
         setSesiones((prev) => ({ ...prev }));
