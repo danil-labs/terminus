@@ -5,15 +5,20 @@
  * patrón y el velo y deja la imagen salvo que llegue otra; la imagen se quita
  * con `choose_chat_background` sin ruta.
  *
- * Una ruta solo viaja justo después de importarla en el workspace abierto:
- * la copia de otro workspace nunca se manda. Un motor anterior, que no conoce
- * `set_chat_background`, solo recibe `choose_chat_background` con esa copia o,
- * si la persona quitó la imagen, sin ruta.
+ * La imagen elegida se reduce (`shrink-image.ts`) y viaja como `data:`. En la
+ * web, la de un workspace de la cuenta se lee y se sube a la cuenta
+ * (`capabilities().accountAssets`); el motor la baja al reconciliar.
  */
 import { type ChatBackgroundChange, chatBackgroundView } from "@terminus/protocol";
+import { blobToDataUrl } from "../features/settings/account-profile.ts";
 import { VELO_DE_FONDO, VELO_DE_PANELES, VELO_DE_PESTANAS, fondoDe, type FondoDeChat } from "./chat-background.ts";
 import * as store from "./chat-background-store.ts";
 import { invoke } from "./invoke.ts";
+import { capabilities } from "./platform.ts";
+import { shrinkImage } from "./shrink-image.ts";
+
+/** El tope de un motor anterior: si lo rechaza, se reduce hasta ahí y se intenta otra vez. */
+const TOPE_DE_MOTOR_ANTERIOR = 700_000;
 
 const velos = () => ({ chat: store.veloDeFondo(), tabs: store.veloDePestanas(), panels: store.veloDePaneles() });
 
@@ -24,14 +29,41 @@ export function ordenDesconocida(error: unknown): boolean {
   return detail === "command" || detail === "unsupported" || code === "command" || what?.clave === "shell.service.command";
 }
 
-/** Guarda en el workspace; solo ante un motor que no conoce la orden pasa la copia recién importada por `choose_chat_background`. */
-async function guardarEnElMotor(cambio: ChatBackgroundChange): Promise<void> {
+/** El motor o la cuenta rechazaron la imagen por su peso. */
+function demasiadoGrande(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const { detail, what } = error as { detail?: unknown; what?: { clave?: unknown } };
+  return what?.clave === "settings.appearance.background.too_big" || detail === "image_too_large";
+}
+
+/** Guarda en el workspace; solo ante un motor que no conoce la orden pasa la imagen nueva por `choose_chat_background`. */
+async function guardarEnElMotor(cambio: ChatBackgroundChange): Promise<unknown> {
   try {
-    await invoke("set_chat_background", { ...cambio });
+    return await invoke<unknown>("set_chat_background", { ...cambio });
   } catch (error) {
     if (!ordenDesconocida(error)) throw error;
     if (cambio.path) await invoke("choose_chat_background", { path: cambio.path });
+    else if (cambio.dataUrl) {
+      const copia = await invoke<string>("import_chat_background_data", { dataUrl: cambio.dataUrl });
+      await invoke("choose_chat_background", { path: copia });
+    }
+    return null;
   }
+}
+
+/**
+ * En la web, el fondo de un workspace de la cuenta: su imagen manda; el patrón
+ * y los velos son los del motor o, con la máquina apagada, los de la cuenta.
+ * `null` si la cuenta no lo conoce.
+ */
+async function fondoDeLaCuenta(workspace: string | null, respuesta: unknown, sinMotor: boolean): Promise<unknown | null> {
+  const cuenta = capabilities().accountAssets;
+  if (!cuenta || !workspace) return null;
+  const [imagen, ajuste] = await Promise.all([cuenta.read(workspace, "background"), cuenta.setting(workspace)]).catch(() => [undefined, null] as const);
+  if (imagen === undefined) return null;
+  const base = (sinMotor ? ajuste : respuesta) ?? {};
+  const motor = (base as { data_url?: unknown }).data_url;
+  return { preset: null, veil: null, ...base, data_url: imagen ?? (typeof motor === "string" ? motor : null) };
 }
 
 /** El patrón y los velos elegidos; nunca una ruta: la imagen guardada en el workspace queda. */
@@ -53,14 +85,21 @@ export async function cargarFondoDelWorkspace(workspace: string | null): Promise
   const esta = ++lectura;
   // Antes de leer: aunque la lectura falle, lo que se importe después es de este workspace.
   store.setWorkspaceAbierto(workspace);
-  let respuesta: unknown;
+  let respuesta: unknown = null;
+  let sinMotor = false;
   try {
     respuesta = await invoke<unknown>("chat_background");
   } catch {
-    if (esta === lectura) store.setImagenDelWorkspace(null);
-    return;
+    sinMotor = true;
   }
   if (esta !== lectura) return;
+  const deLaCuenta = await fondoDeLaCuenta(workspace, respuesta, sinMotor);
+  if (esta !== lectura) return;
+  if (deLaCuenta) respuesta = deLaCuenta;
+  else if (sinMotor) {
+    store.setImagenDelWorkspace(null);
+    return;
+  }
   store.setImagenDelWorkspace(null);
   const vista = chatBackgroundView(respuesta);
   const r = (respuesta ?? {}) as { data_url?: unknown; veil?: unknown };
@@ -83,37 +122,50 @@ export async function cargarFondoDelWorkspace(workspace: string | null): Promise
 
 /** Lo elegido en Estilo, al workspace abierto. */
 export function guardarFondo(): Promise<void> {
-  return guardarEnElMotor(eleccion()).catch(() => {});
+  return guardarEnElMotor(eleccion()).then(
+    () => {},
+    () => {},
+  );
 }
 
 /** Quitar la imagen propia (lo pidió la persona): el workspace vuelve al patrón de la app. */
 export async function quitarFondoPropio(): Promise<void> {
+  const workspace = store.workspaceAbierto();
+  const cuenta = capabilities().accountAssets;
+  if (cuenta && workspace) await cuenta.remove(workspace, "background").catch(() => false);
   await invoke("choose_chat_background", { path: null }).catch(() => {});
   await guardarFondo();
 }
 
-/** La imagen que eligió la persona: el motor la copia en el workspace abierto, y esa copia es la única ruta que se manda. */
-export async function elegirFondoPropio(ruta: string): Promise<FondoDeChat> {
-  const workspace = store.workspaceAbierto();
-  const copia = await invoke<string>("import_chat_background", { source: ruta });
-  // Se cambió de workspace mientras se copiaba: la copia es del anterior y no se pinta ni se manda aquí.
-  if (store.workspaceAbierto() !== workspace) return store.fondoDeChat();
-  store.ponerFondoPropio(copia);
-  await guardarEnElMotor({ ...eleccion(), preset: null, path: copia });
-  return "propia";
+/**
+ * La imagen que eligió la persona, reducida, al workspace abierto: en la web,
+ * a la cuenta si el workspace está en ella; si no, a su motor como `data:`.
+ * Un motor anterior que la rechaza por su peso la recibe reducida a su tope.
+ */
+export async function elegirFondoPropio(archivo: Blob): Promise<FondoDeChat> {
+  const imagen = await shrinkImage(archivo);
+  try {
+    return await subirFondo(imagen);
+  } catch (error) {
+    if (!demasiadoGrande(error) || imagen.size <= TOPE_DE_MOTOR_ANTERIOR) throw error;
+    return subirFondo(await shrinkImage(archivo, TOPE_DE_MOTOR_ANTERIOR));
+  }
 }
 
-/**
- * En la web la imagen viaja como `data:` dentro de `set_chat_background`: el
- * relay no deja pasar `import_chat_background` (una ruta de la máquina) y
- * nunca se manda una ruta.
- */
-export async function elegirFondoDelNavegador(dataUrl: string): Promise<FondoDeChat> {
+async function subirFondo(imagen: Blob): Promise<FondoDeChat> {
   const workspace = store.workspaceAbierto();
-  const respuesta = await invoke<unknown>("set_chat_background", { ...eleccion(), preset: null, dataUrl });
+  const dataUrl = await blobToDataUrl(imagen);
+  const cuenta = capabilities().accountAssets;
+  const enLaCuenta = !!cuenta && !!workspace && (await cuenta.put(workspace, "background", imagen));
+  const respuesta = enLaCuenta ? null : await guardarEnElMotor({ ...eleccion(), preset: null, dataUrl });
+  // Se cambió de workspace mientras se guardaba: la imagen es del anterior y no se pinta aquí.
   if (store.workspaceAbierto() !== workspace) return store.fondoDeChat();
+  store.olvidarFondoPropio();
   store.setImagenDelWorkspace(chatBackgroundView(respuesta).image ?? dataUrl);
-  return store.elegirFondoDeChat("propia");
+  const fondo = store.elegirFondoDeChat("propia");
+  // El patrón y los velos siguen yendo al motor, si está encendido.
+  if (enLaCuenta) void guardarFondo();
+  return fondo;
 }
 
 /** Los deslizadores cambian a cada paso: al motor va el último, un momento después. */

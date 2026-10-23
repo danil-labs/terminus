@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { APP_READS, chatBackgroundView, isAppCommand } from "../src/index.ts";
+import { APP_READS, chatBackgroundImageUrl, chatBackgroundView, isAppCommand } from "../src/index.ts";
 
 const PNG = "data:image/png;base64,iVBORw0KGgo=";
 
@@ -24,4 +24,13 @@ test("el teléfono puede leer el fondo", () => {
   assert.ok((APP_READS as readonly string[]).includes("chat_background"));
   assert.ok(isAppCommand("chat_background"));
   assert.ok(!isAppCommand("set_chat_background"));
+});
+
+test("la imagen en la cuenta (`image_url`) solo sin patrón y solo por https", () => {
+  const url = "https://computers.danil.ai/v1/workspaces/w1/background?v=abc";
+  assert.equal(chatBackgroundImageUrl({ preset: null, data_url: null, image_url: url, veil: null }), url);
+  assert.equal(chatBackgroundImageUrl({ preset: "dusk", data_url: null, image_url: url, veil: null }), null);
+  assert.equal(chatBackgroundImageUrl({ preset: null, data_url: null, image_url: "http://x.test/a", veil: null }), null);
+  assert.equal(chatBackgroundImageUrl({ preset: null, data_url: PNG, veil: null }), null, "un motor anterior no la manda");
+  assert.equal(chatBackgroundImageUrl(null), null);
 });

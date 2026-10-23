@@ -290,6 +290,18 @@ const steps = [
     root,
   ],
   [
+    "El fondo del chat se reduce por pasos de calidad y tamaño hasta 1,5 MB",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/shrink-image.test.ts")],
+    root,
+  ],
+  [
+    "En el navegador el logo y el fondo de un workspace se leen y se cambian en la cuenta",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/web-workspace-assets.test.ts")],
+    root,
+  ],
+  [
     "El recorte del logo conserva el cuadrado elegido",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/logo-crop.test.ts")],

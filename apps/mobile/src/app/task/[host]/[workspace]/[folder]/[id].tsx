@@ -1,8 +1,9 @@
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { type ChatBackgroundView, type ChatEvent, type Question, type Turn, DEFAULT_CHAT_VEIL } from "@terminus/protocol";
+import { type ChatEvent, type Question, type Turn, DEFAULT_CHAT_VEIL } from "@terminus/protocol";
 import {
+  type ChatBackdropView,
   type PendingQuestion,
   type Permission,
   type TaskView,
@@ -21,7 +22,9 @@ import {
 import { HostError } from "../../../../../lib/hosts";
 import { type Line, type LivePiece, type StepRow, applyLive, bareCommand, fileName, linesOfLive, linesOfTurn } from "../../../../../lib/steps";
 import { t, w } from "../../../../../lib/i18n";
+import { useAccount } from "../../../../../lib/account";
 import { useMachines } from "../../../../../lib/machines";
+import { COMPUTERS } from "../../../../../lib/supabase";
 import { useWorkspaces } from "../../../../../lib/workspaces";
 import { Attachments, MessageBody, toolImages } from "../../../../../ui/chat/Message";
 import { ChatScopeContext } from "../../../../../ui/chat/scope";
@@ -60,14 +63,16 @@ export default function TaskScreen() {
   const params = useLocalSearchParams<{ host: string; workspace: string; folder: string; id: string }>();
   const { workspace, id } = params;
   const folder = params.folder === "_" ? "" : params.folder;
-  const { hostOf, subscribe, setOpenTask, tick, titleOf } = useMachines();
+  const { hostOf, subscribe, setOpenTask, tick, titleOf, registry } = useMachines();
+  const { getToken } = useAccount();
+  const accountBackground = registry?.find((w) => w.id === workspace)?.background_url ?? null;
   const host = hostOf(params.host);
   const { snapshot } = useWorkspaces();
   const [view, setView] = useState<TaskView | null>(null);
   const [live, setLive] = useState<readonly LivePiece[]>([]);
   const [note, setNote] = useState<string | null>(null);
   const [waking, setWaking] = useState(false);
-  const [background, setBackground] = useState<ChatBackgroundView | null>(null);
+  const [background, setBackground] = useState<Backdrop | null>(null);
   const list = useRef<FlatList<Line>>(null);
   const key = `${params.host}/${id}`;
 
@@ -99,16 +104,19 @@ export default function TaskScreen() {
     return () => setOpenTask(null);
   }, [key, refresh, setOpenTask, fail, host, workspace, id]);
 
-  // El fondo del workspace en la máquina de la tarea; leerlo nunca la enciende.
+  // El fondo del workspace en la máquina de la tarea o en la cuenta; leerlo nunca la enciende.
   useEffect(() => {
     setBackground(null);
     if (!host) return;
     let current = true;
-    void chatBackgroundOf(host, workspace).then((next) => current && setBackground(next));
+    void chatBackgroundOf(host, workspace, accountBackground, COMPUTERS).then(async (next) => {
+      const token = next.remote ? await getToken().catch(() => null) : null;
+      if (current) setBackground({ ...next, token });
+    });
     return () => {
       current = false;
     };
-  }, [host, workspace]);
+  }, [host, workspace, accountBackground, getToken]);
 
   // La máquina se encendió (o volvió): la copia deja paso a lo vivo.
   useEffect(() => {
@@ -276,12 +284,20 @@ export default function TaskScreen() {
   );
 }
 
+type Backdrop = ChatBackdropView & { token: string | null };
+
 /** La imagen del workspace con su velo; un patrón del escritorio queda en el fondo liso del tema. */
-function ChatBackdrop({ background, theme }: { background: ChatBackgroundView | null; theme: Theme }) {
-  if (!background?.image) return null;
+function ChatBackdrop({ background, theme }: { background: Backdrop | null; theme: Theme }) {
+  const source =
+    background?.remote && background.token
+      ? { uri: background.remote, headers: { Authorization: `Bearer ${background.token}` } }
+      : background?.image
+        ? { uri: background.image }
+        : null;
+  if (!background || !source) return null;
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <Image source={{ uri: background.image }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      <Image source={source} style={StyleSheet.absoluteFill} resizeMode="cover" />
       <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.surface, opacity: background.veil.chat ?? DEFAULT_CHAT_VEIL }]} />
     </View>
   );

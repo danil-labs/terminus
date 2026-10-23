@@ -111,12 +111,15 @@ export type AccountWorkspace = {
   id: string;
   name: string;
   radiant_workspace_id?: string | null;
-  settings?: Partial<Record<"lengua" | "lengua_de_salida" | "default_permission_mode" | "terminal_theme", string | null>> | null;
+  settings?: Partial<Record<"lengua" | "lengua_de_salida" | "default_permission_mode" | "terminal_theme" | "chat_background", string | null>> | null;
   settings_version?: number;
   created_at?: string | null;
   updated_at?: string | null;
   projects: AccountProject[];
   computers: string[];
+  /** El logo y el fondo de los chats en la cuenta (`GET …/logo|background`, con la sesión); `null` sin imagen. Un plano de control anterior no los manda. */
+  logo_url?: string | null;
+  background_url?: string | null;
   /** Con lápida (`include_deleted=1`): cuándo se borró. Un borrado no revive al volver a atarlo; solo con `restore`. */
   deleted_at?: string | null;
 };

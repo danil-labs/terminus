@@ -7,6 +7,7 @@ import type { Answer, Computer, MemorySource } from "@terminus/computers";
 import type { JSX } from "solid-js";
 import type { AccountProfileSource } from "../features/settings/account-profile";
 import type { Account } from "../features/settings/accounts-store";
+import type { WorkspaceAssetsSource } from "../web/workspace-assets";
 
 /** Una cuenta agrupada en la web: las máquinas donde tiene sesión (`web/fleet.ts`). */
 export type AccountMachinesProps = {
@@ -32,6 +33,8 @@ export type Capabilities = {
   danilAccount?: boolean;
   /** La persona de la cuenta de Danil leída sin el motor (la web, con su sesión): pie y Configuración. */
   accountProfile?: AccountProfileSource;
+  /** El logo y el fondo de los workspaces leídos y cambiados en la cuenta con la sesión (la web). */
+  accountAssets?: WorkspaceAssetsSource;
   /** Botón extra al lado de la búsqueda de la barra lateral (en la web, volver a Danil Agents). */
   sidebarExtra?: () => JSX.Element;
   /** El nombre de una máquina por su id. */
