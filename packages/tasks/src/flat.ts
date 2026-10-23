@@ -10,12 +10,17 @@ export type LauncherRow = {
   launcher_available?: boolean;
 };
 
+/** La tarea que lanzó a esta (`parent` de un subagente, `launched_by` de una delegada), o `null`. */
+export function launcherOf(session: LauncherRow): string | null {
+  return session.parent ?? session.launched_by ?? null;
+}
+
 /**
  * Si la lista esconde una tarea para mostrarla bajo su lanzador. Solo cuenta un
  * lanzador de la misma lista: el de otra carpeta no la muestra en esta.
  */
 export function shownUnderLauncher(session: LauncherRow, rows: readonly { id: string }[]): boolean {
-  const launcher = session.parent ?? session.launched_by;
+  const launcher = launcherOf(session);
   return !!launcher && session.launcher_available !== false
     && rows.some((row) => row.id === launcher);
 }
@@ -57,6 +62,15 @@ export function flattenTasks<R extends FlatRow>(
     }
   }
   return out.sort((a, b) => b.row.created_at - a.row.created_at);
+}
+
+/**
+ * Las tareas vivas que `launcher` lanzó, de la más nueva a la más vieja: las que
+ * la lista esconde bajo él (el panel «N tareas delegadas» del escritorio).
+ */
+export function delegatedOf<R extends FlatRow>(rows: readonly R[], launcher: string): R[] {
+  return rows.filter((row) => !row.archived && row.id !== launcher && launcherOf(row) === launcher)
+    .sort((a, b) => b.created_at - a.created_at);
 }
 
 /** Cuántas tareas tiene cada carpeta, antes de filtrar: el filtro solo ofrece carpetas con tareas. */

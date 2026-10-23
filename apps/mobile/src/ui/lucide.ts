@@ -27,6 +27,7 @@ export const ICONS = {
   "clock": [{"kind": "path", "d": "M12 6v6l4 2"}, {"kind": "circle", "cx": 12.0, "cy": 12.0, "r": 10.0}],
   "copy": [{"kind": "rect", "width": 14.0, "height": 14.0, "x": 8.0, "y": 8.0, "rx": 2.0, "ry": 2.0}, {"kind": "path", "d": "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"}],
   "corner-down-left": [{"kind": "path", "d": "M20 4v7a4 4 0 0 1-4 4H4"}, {"kind": "path", "d": "m9 10-5 5 5 5"}],
+  "corner-down-right": [{"kind": "path", "d": "m15 10 5 5-5 5"}, {"kind": "path", "d": "M4 4v7a4 4 0 0 0 4 4h12"}],
   "external-link": [{"kind": "path", "d": "M15 3h6v6"}, {"kind": "path", "d": "M10 14 21 3"}, {"kind": "path", "d": "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"}],
   "file": [{"kind": "path", "d": "M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"}, {"kind": "path", "d": "M14 2v4a2 2 0 0 0 2 2h4"}],
   "folder": [{"kind": "path", "d": "M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"}],

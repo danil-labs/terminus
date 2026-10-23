@@ -22,7 +22,7 @@ export {
   sanitizeSidebarView,
   statusKeyOf,
 } from "./view.ts";
-export { type FlatRow, type FlatTask, type LauncherRow, flattenTasks, folderCounts, shownUnderLauncher } from "./flat.ts";
+export { type FlatRow, type FlatTask, type LauncherRow, delegatedOf, flattenTasks, folderCounts, launcherOf, shownUnderLauncher } from "./flat.ts";
 export {
   type AgentPresence,
   type DockAgent,

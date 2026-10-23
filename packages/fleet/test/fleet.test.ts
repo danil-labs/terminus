@@ -232,6 +232,16 @@ test("merged rows say their machine and the state of its slice; the window's row
   assert.deepEqual(merged.map((r) => [r.id, r.machine ?? null, r.machine_status ?? null, r.machine_on ?? null]), [["cmp_vm~t1", "cmp_vm", "ok", true], ["t1", null, null, null]]);
 });
 
+test("a delegated task of another machine names its launcher with the same prefix as the ids, so the list hides it under it", async () => {
+  const rows = [{ ...row("l"), updated_at: 2 }, { ...row("d"), updated_at: 1, launched_by: "l", launcher_available: true }, { ...row("s"), parent: "l" }];
+  const { fleet } = setup({ cmp_vm: { answers: { list_live_sessions: rows } } }, [VM]);
+  const vm = await fleet.read({ machine: "cmp_vm", workspace: "w", command: "list_live_sessions", args: { project: "p1" } });
+  const merged = fleet.merge("list_live_sessions", [vm], "w") as Record<string, unknown>[];
+  assert.deepEqual(merged.map((r) => [r.id, r.launched_by ?? null, r.parent ?? null]), [["cmp_vm~l", null, null], ["cmp_vm~d", "cmp_vm~l", null], ["cmp_vm~s", null, "cmp_vm~l"]]);
+  const mine = fleet.merge("list_live_sessions", [local(rows)], "w") as Record<string, unknown>[];
+  assert.equal(mine[1].launched_by, "l", "the window's own rows keep their ids");
+});
+
 test("workspace members come from the account registry, not from whoever answered last", () => {
   const { fleet } = setup({}, [VM, MAC]);
   fleet.setRegistry([{ id: "w", name: "W", projects: [], computers: ["cmp_home", "cmp_vm"] } as never]);

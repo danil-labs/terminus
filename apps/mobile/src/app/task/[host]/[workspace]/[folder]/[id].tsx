@@ -2,10 +2,12 @@ import { Stack, router, useLocalSearchParams } from "expo-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Image, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { type ChatEvent, type Question, type Turn, DEFAULT_CHAT_VEIL } from "@terminus/protocol";
+import { delegatedOf, taskTitle } from "@terminus/tasks";
 import {
   type ChatBackdropView,
   type PendingQuestion,
   type Permission,
+  type Task,
   type TaskView,
   answerQuestion,
   chatBackgroundOf,
@@ -21,7 +23,7 @@ import {
 } from "../../../../../lib/engine";
 import { HostError } from "../../../../../lib/hosts";
 import { type Line, type LivePiece, type StepRow, applyLive, bareCommand, fileName, linesOfLive, linesOfTurn } from "../../../../../lib/steps";
-import { t, w } from "../../../../../lib/i18n";
+import { lang, t, w } from "../../../../../lib/i18n";
 import { type Follow, OPENED, jumped, scrolled, shouldStick, showJump, unseen } from "../../../../../lib/follow";
 import { useAccount } from "../../../../../lib/account";
 import { useMachines } from "../../../../../lib/machines";
@@ -32,6 +34,7 @@ import { ChatScopeContext } from "../../../../../ui/chat/scope";
 import { Composer, type Submission } from "../../../../../ui/Composer";
 import { type Theme, useTheme } from "../../../../../ui/theme";
 import { Icon, type IconName } from "../../../../../ui/Icon";
+import { openTask } from "../../../../../ui/components";
 import { KeyboardScreen } from "../../../../../ui/KeyboardScreen";
 
 /** Kinds that change what the task reports: pending requests or whether it runs. */
@@ -76,6 +79,8 @@ export default function TaskScreen() {
   const [background, setBackground] = useState<Backdrop | null>(null);
   const list = useRef<FlatList<Line>>(null);
   const key = `${params.host}/${id}`;
+  // Las que esta tarea lanzó: la lista las esconde bajo ella, como el riel del escritorio.
+  const delegated = useMemo(() => delegatedOf((snapshot?.delegated ?? []).filter((task) => task.host === params.host), id), [snapshot, params.host, id]);
   // Si el chat sigue el final, como el hilo del escritorio (ver `lib/follow.ts`). Ref y no estado:
   // cambia con cada evento de scroll; solo el botón, que se ve, va en estado.
   const follow = useRef<Follow>(OPENED);
@@ -279,6 +284,7 @@ export default function TaskScreen() {
         }}
       />
       <ChatBackdrop background={background} theme={theme} />
+      {delegated.length ? <Delegated tasks={delegated} theme={theme} /> : null}
       <View style={styles.thread}>
       <FlatList
         ref={list}
@@ -421,6 +427,31 @@ function Bubble({ line, theme, streaming, onQuickReply }: { line: Extract<Line, 
       ) : line.text || line.images.length ? (
         <MessageBody text={line.text} streaming={streaming} images={line.images} onQuickReply={onQuickReply} />
       ) : null}
+    </View>
+  );
+}
+
+/** «N tareas delegadas», como el panel del lanzador en el escritorio: se abre con un toque y cada una lleva a su chat. */
+function Delegated({ tasks, theme }: { tasks: Task[]; theme: Theme }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <View testID="delegated" style={[styles.delegated, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+      <Pressable onPress={() => setOpen((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: open }} hitSlop={6} style={styles.delegatedRow}>
+        <Icon name={open ? "chevron-down" : "chevron-right"} size={14} color={theme.textMuted} />
+        <Text style={{ color: theme.text, fontSize: 13, fontWeight: "500" }}>
+          {t(tasks.length === 1 ? "task.delegated.one" : "task.delegated.many", { count: tasks.length })}
+        </Text>
+      </Pressable>
+      {open
+        ? tasks.map((task) => (
+            <Pressable key={task.id} onPress={() => openTask(task.host, task.workspace, task.folder, task.id)} accessibilityRole="link" style={styles.delegatedRow}>
+              <Icon name="corner-down-right" size={14} color={theme.textMuted} />
+              <Text numberOfLines={1} style={{ color: theme.text, fontSize: 14, flex: 1 }}>
+                {taskTitle(lang, task)}
+              </Text>
+            </Pressable>
+          ))
+        : null}
     </View>
   );
 }
@@ -584,6 +615,8 @@ function QuestionCard({
 const styles = StyleSheet.create({
   banner: { padding: 8, borderRadius: 8, fontSize: 13 },
   thread: { flex: 1 },
+  delegated: { marginHorizontal: 12, marginTop: 8, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth },
+  delegatedRow: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 6 },
   list: { padding: 12, gap: 8 },
   // Como el del escritorio: una píldora centrada por encima del borde de abajo del hilo.
   toBottom: {
