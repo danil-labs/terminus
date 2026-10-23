@@ -28,6 +28,25 @@ export type AccountComputersSource = {
   onRenamed: (id: string, name: string) => void;
 };
 
+/** Un workspace de otra cuenta de Danil de este navegador: se ve en la columna y abrirlo recarga con su cuenta. */
+export type OtherWorkspace = { id: string; name: string; logo: () => Promise<string | null> };
+
+/** Otra cuenta de Danil de este navegador (`web/accounts.ts`). `signedIn: false`: su sesión caducó; `stale`: su lista es la guardada. */
+export type OtherAccount = { user_id: string; email: string | null; name: string | null; extra: boolean; signedIn: boolean; stale: boolean; workspaces: OtherWorkspace[] };
+
+/** Las cuentas de Danil de la web: la abierta y las demás con sus workspaces (`docs/web-multi-account.md`). */
+export type WebAccountsSource = {
+  current: { user_id: string; email: string | null; name: string | null; extra: boolean };
+  /** Reactivo: cambia al volver a leer los registros. */
+  others: () => OtherAccount[];
+  /** Abre un workspace de otra cuenta: la página se recarga con esa cuenta. */
+  open: (workspace: string) => void;
+  /** «Agregar cuenta»; `email`, para volver a entrar con una que caducó. */
+  add: (email?: string | null) => void;
+  /** Olvida una cuenta extra en este navegador. */
+  remove: (userId: string) => Promise<void>;
+};
+
 export type Capabilities = {
   /** Controles de ventana propios, semáforo de macOS y bandeja. */
   nativeWindow: boolean;
@@ -81,6 +100,8 @@ export type Capabilities = {
    */
   /** Las computadoras de la cuenta con la sesión de la página (la web); el escritorio usa su token de cliente. */
   accountComputers?: AccountComputersSource;
+  /** Varias cuentas de Danil en una ventana (la web); el escritorio no la da. */
+  webAccounts?: WebAccountsSource;
   connectMachine?: {
     list: () => Promise<Answer<Computer[]>>;
     outdated?: (computer: Computer) => boolean;
