@@ -147,6 +147,7 @@ import Paneles from "../features/shell/Panels";
 import Sidebar, { createSidebar } from "../features/shell/Sidebar";
 import { sidebarViewKey } from "../lib/sidebarView";
 import { recordarCarpetas } from "../lib/folderKinds";
+import { lista } from "../lib/format";
 import ColumnaLateral from "../features/shell/SideColumn";
 import SpaceBar from "../features/shell/SpaceBar";
 import TitleBar from "../features/shell/TitleBar";
@@ -1847,7 +1848,7 @@ export default function App() {
       });
     } catch (e) {
       if (!(e instanceof NotMovable)) throw e;
-      throw { what: t("chat.attachments.remote_images_only", { names: e.names.join(", "), machine: machineName(machine) }), detail: "remote_images_only" };
+      throw { what: t("chat.attachments.remote_images_only", { names: lista(e.names), machine: machineName(machine) }), detail: "remote_images_only" };
     }
   }
 
