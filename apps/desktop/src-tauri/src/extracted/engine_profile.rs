@@ -29,9 +29,24 @@ pub fn dir() -> Option<PathBuf> {
     base.map(|base| base.join("terminus"))
 }
 
-/// La raíz como la comparan la ventana y el CLI: canónica y sin el prefijo `\\?\`.
+/// La raíz como la comparan la ventana y el CLI, sin el prefijo `\\?\`. Si aún no existe, el
+/// antepasado más profundo que existe canonicalizado más el resto, como `normal()` del CLI.
 pub fn canonical(path: &Path) -> PathBuf {
-    dunce::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+    let absolute = std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf());
+    let mut rest = Vec::new();
+    let mut current = absolute.as_path();
+    loop {
+        if let Ok(found) = dunce::canonicalize(current) {
+            return rest.iter().rev().fold(found, |acc, part| acc.join(part));
+        }
+        match (current.parent(), current.file_name()) {
+            (Some(parent), Some(name)) => {
+                rest.push(name.to_os_string());
+                current = parent;
+            }
+            _ => return absolute,
+        }
+    }
 }
 
 /// `locks/<sha256 de la raíz canónica en UTF-8>.lock`, el mismo que toma el CLI antes de arrancar.
@@ -193,8 +208,24 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::merge;
+    use super::{canonical, merge};
     use serde_json::json;
+
+    #[test]
+    fn a_root_that_does_not_exist_yet_hashes_like_the_cli() {
+        let folder = tempfile::tempdir().unwrap();
+        let real = dunce::canonicalize(folder.path()).unwrap();
+        let missing = folder.path().join("ai.danil.terminus").join("engine");
+        assert_eq!(
+            canonical(&missing),
+            real.join("ai.danil.terminus").join("engine")
+        );
+        if cfg!(windows) {
+            let spelled = folder.path().to_string_lossy().to_uppercase();
+            let spelled = std::path::PathBuf::from(spelled).join("ai.danil.terminus");
+            assert_eq!(canonical(&spelled), real.join("ai.danil.terminus"));
+        }
+    }
 
     #[test]
     fn the_window_keeps_other_profiles_and_only_production_takes_default() {

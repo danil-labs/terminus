@@ -220,7 +220,10 @@ which root to use without a window:
 Paths are canonical, without `\\?\` on Windows. The SHA-256 is computed again
 only when the binary's size or times change (`engine-mark.json`). The start
 lock is `<same folder>/locks/<sha256>.lock`, where `<sha256>` is the lowercase
-hex SHA-256 of the canonical data root in UTF-8. It is best effort: the window
+hex SHA-256 of the canonical data root in UTF-8; a root that does not exist
+yet is its deepest existing ancestor, canonical, plus the rest, as the CLI
+computes it. Both take it with the same primitive (`LockFileEx` over the whole
+range on Windows, `flock` on Unix). It is best effort: the window
 waits up to 5 minutes for it and, without it, the root lock still stops a
 second engine.
 
