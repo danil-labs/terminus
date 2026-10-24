@@ -1,6 +1,6 @@
-import { Stack, router, useLocalSearchParams } from "expo-router";
+import { Stack, router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, Image, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { AppState, FlatList, Image, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { type ChatEvent, type Question, type Turn, DEFAULT_CHAT_VEIL } from "@terminus/protocol";
 import { delegatedOf, taskTitle } from "@terminus/tasks";
 import {
@@ -11,6 +11,7 @@ import {
   type TaskView,
   answerQuestion,
   chatBackgroundOf,
+  coalesced,
   injectIntoTask,
   loadTask,
   markSeen,
@@ -22,7 +23,7 @@ import {
   taskDefaults,
 } from "../../../../../lib/engine";
 import { HostError } from "../../../../../lib/hosts";
-import { type Line, type LivePiece, type StepRow, applyLive, bareCommand, fileName, linesOfLive, linesOfTurn } from "../../../../../lib/steps";
+import { type Line, type LivePiece, type StepRow, applyLive, bareCommand, fileName, linesOfLive, linesOfTurn, liveAfterRead } from "../../../../../lib/steps";
 import { lang, t, w } from "../../../../../lib/i18n";
 import { type Follow, OPENED, jumped, scrolled, shouldStick, showJump, unseen } from "../../../../../lib/follow";
 import { useAccount } from "../../../../../lib/account";
@@ -40,7 +41,9 @@ import { BrandMark } from "../../../../../ui/BrandMark";
 import { Avatar } from "../../../../../ui/components";
 
 /** Kinds that change what the task reports: pending requests or whether it runs. */
-const REFRESH = new Set(["permission", "started", "done", "presence"]);
+const REFRESH = new Set(["permission", "started", "done", "presence", "segment_saved"]);
+/** Tras estos, lo que llegó en vivo ya está guardado: la lectura lo reemplaza (`liveAfterRead`). */
+const SAVED = new Set(["done", "segment_saved"]);
 
 const sameLine = (a: Line, b: Line) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -69,7 +72,7 @@ export default function TaskScreen() {
   const params = useLocalSearchParams<{ host: string; workspace: string; folder: string; id: string }>();
   const { workspace, id } = params;
   const folder = params.folder === "_" ? "" : params.folder;
-  const { hostOf, subscribe, setOpenTask, tick, titleOf, registry } = useMachines();
+  const { hostOf, subscribe, setOpenTask, titleOf, registry } = useMachines();
   const { getToken } = useAccount();
   const accountBackground = registry?.find((w) => w.id === workspace)?.background_url ?? null;
   const host = hostOf(params.host);
@@ -108,20 +111,34 @@ export default function TaskScreen() {
   // La tarea abierta ahora: una lectura de la anterior que llega tarde no la pisa.
   const keyNow = useRef(key);
   keyNow.current = key;
-  const refresh = useCallback(async () => {
+  // Lo vivo al momento, sin esperar al render: un evento y la lectura que provoca llegan en el mismo lote.
+  const liveNow = useRef<readonly LivePiece[]>([]);
+  const putLive = (next: readonly LivePiece[]) => {
+    liveNow.current = next;
+    setLive(next);
+  };
+  // `resync`: lo vivo que había al empezar ya está guardado (ver `liveAfterRead`). Leer nunca enciende la máquina.
+  const load = async (resync: boolean) => {
     if (!host) return;
     const asked = `${host.id}/${id}`;
+    const before = liveNow.current;
     const next = await loadTask(host, workspace, folder, id);
     if (keyNow.current !== asked) return;
     setView(next);
-    setLive([]);
-  }, [host, workspace, folder, id]);
+    putLive(liveAfterRead(liveNow.current, before, { running: next.running, resync }));
+  };
+  const loadNow = useRef(load);
+  loadNow.current = load;
+  // Una sola lectura a la vez: las que piden el foco, volver al frente, la máquina y los eventos se juntan.
+  const reader = useRef(coalesced((resync: boolean) => loadNow.current(resync), (a, b) => a || b));
+  const refresh = useCallback((resync = true) => reader.current(resync), [host, workspace, folder, id]);
 
   // Otra tarea empieza de cero. Solo al cambiar de tarea: que la máquina cambie de objeto (la lista de
   // computadoras se releyó) no vacía la conversación, solo la relee.
   useEffect(() => {
     setOpenTask(key);
     setView(null);
+    putLive([]);
     follow.current = OPENED;
     setJump({ shown: false, unseen: 0 });
     return () => setOpenTask(null);
@@ -147,10 +164,33 @@ export default function TaskScreen() {
     };
   }, [host, workspace, accountBackground, getToken]);
 
-  // La máquina se encendió (o volvió): la copia deja paso a lo vivo.
+  // La máquina cambió: encendida, la copia deja paso a lo vivo; apagada, se ve lo último que guardó en el
+  // relay (con su aviso). El enlace que se reabre también avisa aquí: se relee por si algo pasó sin verse.
   useEffect(() => {
-    if (host?.power() === "on" && view?.cachedAt) void refresh().catch(fail);
-  }, [tick]);
+    if (!host) return;
+    let power = host.power();
+    return host.onChange(() => {
+      const changed = host.power() !== power;
+      power = host.power();
+      void refresh(changed).catch(fail);
+    });
+  }, [host, refresh, fail]);
+
+  // Al volver a la app o a esta pantalla (desde otra de la pila) se relee: lo que terminó mientras no se veía.
+  const reread = useRef((_resync: boolean) => {});
+  reread.current = (resync) => void refresh(resync).catch(fail);
+  const focused = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      // El primer foco es la apertura, que ya lee arriba.
+      if (focused.current) reread.current(false);
+      focused.current = true;
+    }, []),
+  );
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => state === "active" && reread.current(true));
+    return () => sub.remove();
+  }, []);
 
   useEffect(
     () =>
@@ -162,15 +202,15 @@ export default function TaskScreen() {
           const chat = event.payload as ChatEvent;
           if (chat.session !== id) continue;
           if (event.name !== "chat") {
-            void refresh().catch(fail);
+            void refresh(false).catch(fail);
             continue;
           }
-          if (chat.kind === "delta" || chat.kind === "tool" || chat.kind === "tool_done") setLive((now) => applyLive(now, chat));
+          if (chat.kind === "delta" || chat.kind === "tool" || chat.kind === "tool_done") putLive(applyLive(liveNow.current, chat));
           if (chat.kind === "done") {
             void refresh()
               .then(() => host && markSeen(host, workspace, id))
               .catch(fail);
-          } else if (REFRESH.has(chat.kind)) void refresh().catch(fail);
+          } else if (REFRESH.has(chat.kind)) void refresh(SAVED.has(chat.kind)).catch(fail);
         }
       }),
     [subscribe, params.host, id, refresh, fail, host, workspace],

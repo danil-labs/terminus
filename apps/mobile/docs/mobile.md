@@ -32,7 +32,12 @@ como la web.
   luego el proveedor (`aws-ec2`, o ninguno en filas viejas). Un motor que no
   habla el contrato (`outdated`) no recibe acciones. Con la VM apagada las
   lecturas vienen de la copia del relay (`cached: {updated_at}`) y la app dice
-  de qué hora es; sin copia, `machine_off` es una lista vacía.
+  de qué hora es; sin copia, `machine_off` es una lista vacía. Una VM que se
+  apaga mientras la app la ve se vuelve a leer una vez de esa copia, que trae
+  lo último que guardó al apagarse. El chat abierto se relee al volver a la
+  app o a la pantalla, cuando su máquina cambia (encendida, apagada, el enlace
+  que se reabre) y tras `segment_saved`; las lecturas se juntan y no borran lo
+  que se escribe en vivo.
 - **Lista cerrada de comandos en los dos caminos** (`APP_COMMANDS` en
   `packages/protocol`): son funciones de ventana con el contrato renombrado.
   El relay de Danil Computers solo bloquea las funciones de escritorio, así que
