@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { useState } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { MOBILE_WEB_DIR, WEB_LAYOUT_KEY } from "@terminus/design";
 import type { AttentionState } from "@terminus/protocol";
@@ -11,6 +12,7 @@ import { useWorkspaces } from "../lib/workspaces";
 import { Avatar, Badge, Dot, Row, SectionTitle, SheetTitle } from "../ui/components";
 import { TaskMark, type TaskState, topState } from "../ui/TaskStatus";
 import { Icon } from "../ui/Icon";
+import { matches, NoMatch, SearchField } from "../ui/Search";
 import { useTheme } from "../ui/theme";
 
 const NEEDS_YOU = new Set<AttentionState>(["approving", "asked", "failed"]);
@@ -44,11 +46,17 @@ export default function WorkspaceSwitcher() {
   const power = (host: Host) =>
     host.power() === "on" ? w("web.computers.state.online") : host.power() === "starting" ? w("web.computers.state.starting") : host.power() === "outdated" ? w("web.computers.state.outdated") : w("web.computers.state.offline");
   const dot = (host: Host) => (host.power() === "on" ? theme.success : host.power() === "starting" ? theme.info : theme.border);
+  // Un workspace coincide por su nombre o por el de una de sus máquinas.
+  const [query, setQuery] = useState("");
+  const workspaces = list.filter((workspace) => matches(query, workspace.name, ...workspace.hosts.map(labelOf)));
+  const machines = hosts.filter((host) => matches(query, host.label));
 
   return (
-    <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ paddingVertical: 8 }}>
+    <ScrollView contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingVertical: 8 }}>
       <SheetTitle>{t("workspaces.title")}</SheetTitle>
-      {list.map((workspace) => {
+      <SearchField testID="workspaces-search" value={query} onChange={setQuery} placeholder={t("search.workspaces")} />
+      {query.trim() && !workspaces.length && !machines.length ? <NoMatch /> : null}
+      {workspaces.map((workspace) => {
         const tasks = Object.entries(attention).flatMap(([host, ws]) => ws.filter((x) => x.workspace === workspace.members.get(host)).flatMap((x) => x.tasks));
         const pending = tasks.filter((task) => NEEDS_YOU.has(task.state)).length;
         const folded = topState(tasks.map((task) => task.state as TaskState));
@@ -89,8 +97,8 @@ export default function WorkspaceSwitcher() {
         </>
       ) : null}
 
-      <SectionTitle>{t("machines.title")}</SectionTitle>
-      {hosts.map((host) => (
+      {machines.length ? <SectionTitle>{t("machines.title")}</SectionTitle> : null}
+      {machines.map((host) => (
         <Row
           key={host.id}
           testID={`machine-${host.id}`}

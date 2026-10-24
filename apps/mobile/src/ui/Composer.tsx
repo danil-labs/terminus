@@ -22,6 +22,7 @@ import { effectiveMode, enterAction, hasSomethingToSend } from "../lib/composer"
 import { lang, phrase, t, w } from "../lib/i18n";
 import { BrandMark } from "./BrandMark";
 import { Icon } from "./Icon";
+import { matches, NoMatch } from "./Search";
 import { Sheet, SheetOption, SheetSection } from "./Sheet";
 import { useTheme } from "./theme";
 
@@ -508,55 +509,63 @@ export function Composer({
         ))}
       </Sheet>
 
-      <Sheet visible={sheet === "model"} title={w("chat.model.title")} onClose={() => setSheet(null)}>
-        <SheetSection>{w("chat.model.providers")}</SheetSection>
-        {providerLocked ? <Text style={[styles.hint, { color: theme.textMuted, paddingHorizontal: 18 }]}>{w("chat.model.locked")}</Text> : null}
-        {usable.map((p) => (
-          <SheetOption
-            key={p.id}
-            left={<BrandMark id={p.id} size={17} color={theme.text} />}
-            label={p.label}
-            selected={p.id === current}
-            disabled={providerLocked && p.id !== current}
-            onPress={() => {
-              if (p.id === current) return;
-              setProvider(p.id);
-              setModel(null);
-              setEffort(null);
-            }}
-          />
-        ))}
-        <SheetSection>{w("chat.model.listbox")}</SheetSection>
-        {!models ? <Text style={[styles.hint, { color: theme.textMuted, paddingHorizontal: 18 }]}>{t("composer.loading")}</Text> : null}
-        {models && !models.models.length ? <Text style={[styles.hint, { color: theme.textMuted, paddingHorizontal: 18 }]}>{w("chat.model.empty")}</Text> : null}
-        {models?.models.map((m) => (
-          <SheetOption
-            key={m.id}
-            label={m.label || modelName(m.id, models)}
-            detail={m.note ? phrase(m.note) : null}
-            selected={model === m.id}
-            onPress={() => {
-              setModel(m.id);
-              if (effort && !m.efforts.includes(effort)) setEffort(null);
-            }}
-          />
-        ))}
-        {efforts.length ? (
-          <>
-            <SheetSection>{w("chat.effort.label")}</SheetSection>
-            <View style={styles.efforts}>
-              {[null, ...efforts].map((e) => (
-                <Pressable
-                  key={e ?? "auto"}
-                  onPress={() => setEffort(e)}
-                  style={[styles.effort, { borderColor: e === effort ? theme.primary : theme.border, backgroundColor: e === effort ? theme.primary : "transparent" }]}
-                >
-                  <Text style={{ color: e === effort ? theme.onPrimary : theme.text, fontWeight: e === effort ? "700" : "500" }}>{effortLabel(e)}</Text>
-                </Pressable>
+      <Sheet visible={sheet === "model"} title={w("chat.model.title")} search={t("search.models")} onClose={() => setSheet(null)}>
+        {(query) => {
+          const shownModels = models?.models.filter((m) => matches(query, m.label, m.id, modelName(m.id, models))) ?? [];
+          return (
+            <>
+              <SheetSection>{w("chat.model.providers")}</SheetSection>
+              {providerLocked ? <Text style={[styles.hint, { color: theme.textMuted, paddingHorizontal: 18 }]}>{w("chat.model.locked")}</Text> : null}
+              {usable.map((p) => (
+                <SheetOption
+                  key={p.id}
+                  left={<BrandMark id={p.id} size={17} color={theme.text} />}
+                  label={p.label}
+                  selected={p.id === current}
+                  disabled={providerLocked && p.id !== current}
+                  onPress={() => {
+                    if (p.id === current) return;
+                    setProvider(p.id);
+                    setModel(null);
+                    setEffort(null);
+                  }}
+                />
               ))}
-            </View>
-          </>
-        ) : null}
+              <SheetSection>{w("chat.model.listbox")}</SheetSection>
+              {!models ? <Text style={[styles.hint, { color: theme.textMuted, paddingHorizontal: 18 }]}>{t("composer.loading")}</Text> : null}
+              {models && !models.models.length ? <Text style={[styles.hint, { color: theme.textMuted, paddingHorizontal: 18 }]}>{w("chat.model.empty")}</Text> : null}
+              {models && models.models.length > 0 && !shownModels.length ? <NoMatch /> : null}
+              {shownModels.map((m) => (
+                <SheetOption
+                  key={m.id}
+                  label={m.label || modelName(m.id, models)}
+                  detail={m.note ? phrase(m.note) : null}
+                  selected={model === m.id}
+                  onPress={() => {
+                    setModel(m.id);
+                    if (effort && !m.efforts.includes(effort)) setEffort(null);
+                  }}
+                />
+              ))}
+              {efforts.length ? (
+                <>
+                  <SheetSection>{w("chat.effort.label")}</SheetSection>
+                  <View style={styles.efforts}>
+                    {[null, ...efforts].map((e) => (
+                      <Pressable
+                        key={e ?? "auto"}
+                        onPress={() => setEffort(e)}
+                        style={[styles.effort, { borderColor: e === effort ? theme.primary : theme.border, backgroundColor: e === effort ? theme.primary : "transparent" }]}
+                      >
+                        <Text style={{ color: e === effort ? theme.onPrimary : theme.text, fontWeight: e === effort ? "700" : "500" }}>{effortLabel(e)}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </>
+              ) : null}
+            </>
+          );
+        }}
       </Sheet>
     </View>
   );

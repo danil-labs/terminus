@@ -15,6 +15,7 @@ import { Avatar, openTask } from "../../ui/components";
 import { Composer, SelectorChip, type Submission } from "../../ui/Composer";
 import { Icon } from "../../ui/Icon";
 import { KeyboardScreen } from "../../ui/KeyboardScreen";
+import { matches, NoMatch } from "../../ui/Search";
 import { Sheet, SheetOption } from "../../ui/Sheet";
 import { FolderSquare } from "../../ui/TaskCard";
 import { useTheme } from "../../ui/theme";
@@ -214,33 +215,43 @@ export default function NewTask() {
         onSubmit={start}
       />
 
-      <Sheet visible={picker === "machine"} title={w("shell.machines.label")} onClose={() => setPicker(null)}>
-        {hostsOfCurrent.map((h) => (
-          <SheetOption
-            key={h.id}
-            testID={`machine-${h.id}`}
-            icon="server"
-            label={h.label}
-            detail={`${stateOf(h)} · ${h.managed ? t("machines.managed") : t("machines.own")}`}
-            selected={h.id === host?.id}
-            onPress={() => {
-              setHostId(h.id);
-              setFolder(null);
-              setPicker(null);
-            }}
-          />
-        ))}
+      <Sheet visible={picker === "machine"} title={w("shell.machines.label")} search={t("search.machines")} onClose={() => setPicker(null)}>
+        {(query) => {
+          const shown = hostsOfCurrent.filter((h) => matches(query, h.label));
+          return shown.length ? shown.map((h) => (
+            <SheetOption
+              key={h.id}
+              testID={`machine-${h.id}`}
+              icon="server"
+              label={h.label}
+              detail={`${stateOf(h)} · ${h.managed ? t("machines.managed") : t("machines.own")}`}
+              selected={h.id === host?.id}
+              onPress={() => {
+                setHostId(h.id);
+                setFolder(null);
+                setPicker(null);
+              }}
+            />
+          )) : <NoMatch />;
+        }}
       </Sheet>
-      <Sheet visible={picker === "folder"} title={t("new.folder")} onClose={() => setPicker(null)}>
-        {folders.map((f) => (
-          <SheetOption key={f.key} testID={`folder-${f.id}`} left={<FolderSquare id={f.key} size={10} />} label={f.name}
-            detail={f.host === host?.id ? (f.working_directory ?? null) : t("new.carry_from", { name: hostsOfCurrent.find((h) => h.id === f.host)?.label ?? f.host })} selected={f.id === target?.id} onPress={() => {
-            setFolder(f.id);
-            setPicker(null);
-          }} />
-        ))}
-        <SheetOption testID="add-folder" icon="plus" label={t("folder.new")} disabled={act === "asleep" || act === "outdated"} onPress={() => setPicker("new-folder")} />
-        <SheetOption testID="add-clone" icon="git-branch" label={t("clone.title")} disabled={act === "asleep" || act === "outdated"} onPress={() => setPicker("clone")} />
+      <Sheet visible={picker === "folder"} title={t("new.folder")} search={t("search.folders")} onClose={() => setPicker(null)}>
+        {(query) => {
+          const shown = folders.filter((f) => matches(query, f.name, f.working_directory));
+          return (
+            <>
+              {shown.length ? shown.map((f) => (
+                <SheetOption key={f.key} testID={`folder-${f.id}`} left={<FolderSquare id={f.key} size={10} />} label={f.name}
+                  detail={f.host === host?.id ? (f.working_directory ?? null) : t("new.carry_from", { name: hostsOfCurrent.find((h) => h.id === f.host)?.label ?? f.host })} selected={f.id === target?.id} onPress={() => {
+                  setFolder(f.id);
+                  setPicker(null);
+                }} />
+              )) : <NoMatch />}
+              <SheetOption testID="add-folder" icon="plus" label={t("folder.new")} disabled={act === "asleep" || act === "outdated"} onPress={() => setPicker("new-folder")} />
+              <SheetOption testID="add-clone" icon="git-branch" label={t("clone.title")} disabled={act === "asleep" || act === "outdated"} onPress={() => setPicker("clone")} />
+            </>
+          );
+        }}
       </Sheet>
       <AddFolderSheets
         mode={picker === "clone" || picker === "new-folder" ? picker : null}
@@ -254,25 +265,37 @@ export default function NewTask() {
           void reload();
         }}
       />
-      <Sheet visible={picker === "branch"} title={w("worktrees.base.from")} onClose={() => setPicker(null)}>
-        {branches?.branches.map((b) => (
-          <SheetOption key={b.reference} icon="git-branch" label={b.name} detail={b.remote ?? null} selected={b.reference === selectedBranch} onPress={() => {
-            setBranch(b.reference === branches.selected ? null : b.reference);
-            setPicker(null);
-          }} />
-        ))}
+      <Sheet visible={picker === "branch"} title={w("worktrees.base.from")} search={t("search.branches")} onClose={() => setPicker(null)}>
+        {(query) => {
+          const shown = (branches?.branches ?? []).filter((b) => matches(query, b.name, b.remote));
+          return shown.length ? shown.map((b) => (
+            <SheetOption key={b.reference} icon="git-branch" label={b.name} detail={b.remote ?? null} selected={b.reference === selectedBranch} onPress={() => {
+              setBranch(b.reference === branches?.selected ? null : b.reference);
+              setPicker(null);
+            }} />
+          )) : <NoMatch />;
+        }}
       </Sheet>
-      <Sheet visible={picker === "agent"} title={t("new.agent")} onClose={() => setPicker(null)}>
-        <SheetOption icon="user-round" label={t("new.no_agent")} selected={!chosenAgent} onPress={() => {
-          setAgent(null);
-          setPicker(null);
-        }} />
-        {agents.map((a) => (
-          <SheetOption key={a.name} testID={`agent-${a.name}`} left={<Avatar name={a.name} size={22} round />} label={a.name} detail={a.description} selected={chosenAgent === a.name} onPress={() => {
-            setAgent(a.name);
-            setPicker(null);
-          }} />
-        ))}
+      <Sheet visible={picker === "agent"} title={t("new.agent")} search={t("search.agents")} onClose={() => setPicker(null)}>
+        {(query) => {
+          const shown = agents.filter((a) => matches(query, a.name, a.description));
+          return (
+            <>
+              {query.trim() ? null : (
+                <SheetOption icon="user-round" label={t("new.no_agent")} selected={!chosenAgent} onPress={() => {
+                  setAgent(null);
+                  setPicker(null);
+                }} />
+              )}
+              {shown.length ? shown.map((a) => (
+                <SheetOption key={a.name} testID={`agent-${a.name}`} left={<Avatar name={a.name} size={22} round />} label={a.name} detail={a.description} selected={chosenAgent === a.name} onPress={() => {
+                  setAgent(a.name);
+                  setPicker(null);
+                }} />
+              )) : <NoMatch />}
+            </>
+          );
+        }}
       </Sheet>
     </KeyboardScreen>
   );
