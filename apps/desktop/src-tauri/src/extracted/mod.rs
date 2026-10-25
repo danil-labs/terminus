@@ -4,6 +4,7 @@
 mod appearance;
 mod desktop;
 mod engine;
+mod engine_profile;
 pub mod env;
 mod instance;
 mod launcher;
