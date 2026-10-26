@@ -549,6 +549,14 @@ export function createRouter(config: RouterConfig) {
 
   /** Eventos de otra máquina: `attention` sale como la lista de todas. */
   function events(machine: string, list: { name: string; payload: unknown }[]) {
+    // Un cambio de tarea invalida el intervalo: la relectura que dispara el
+    // evento debe consultar la VM aunque acabemos de leer su lista.
+    if (list.some((event) => event.name === "session")) {
+      for (const id of lastRead.keys()) {
+        const [owner, command] = JSON.parse(id) as [string, string];
+        if (owner === machine && FAN.has(command)) lastRead.delete(id);
+      }
+    }
     config.deliver?.(list.map((e) => (e.name === "attention" ? { ...e, payload: attention.update(machine, e.payload) } : e)));
   }
 

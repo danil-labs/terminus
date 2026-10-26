@@ -416,3 +416,24 @@ test("when the control plane refuses to start the VM (the 401 of 2026-10-23) the
   await assert.rejects(router.handle("work_key", {}, on("cmp_vm")), (e: { detail: string }) => e.detail === "start_failed");
   assert.deepEqual(vm.delivered, []);
 });
+
+
+test("a VM archive event refreshes its task list inside the read throttle", async () => {
+  const answers: Record<string, unknown> = {
+    list_workspaces: { workspaces: [{ id: "w", name: "W" }], active: "w" },
+    list_live_sessions: [row("remote")],
+  };
+  const { router, changes } = setup({ cmp_vm: fakeLink(answers) });
+  await router.handle("list_workspaces");
+  const args = { project: "p1" };
+  await router.handle("list_live_sessions", args);
+  await sleep(250);
+  assert.ok((await router.handle("list_live_sessions", args) as { id: string }[]).some(r => r.id === "cmp_vm~remote"));
+  changes.length = 0;
+  answers.list_live_sessions = [];
+  router.events("cmp_vm", [{ name: "session", payload: { workspace: "w", project: "p1", session: "cmp_vm~remote" } }]);
+  await router.handle("list_live_sessions", args);
+  await sleep(250);
+  assert.ok(changes.some(c => c.includes("sessions")));
+  assert.deepEqual((await router.handle("list_live_sessions", args) as { id: string }[]).map(r => r.id), ["t1"]);
+});
