@@ -8,6 +8,7 @@ Las fuentes versionadas son los SVG de `src/`. Hay tres íconos, y no se mezclan
 | `src/installer-macos.svg` | El disco del `.dmg`: una placa clara con una flecha de descarga | Escritorio y Finder mientras el disco está montado (`../macos/volume.icns`) |
 | `src/installer-windows.svg` | El `setup.exe`: el ícono de la app con una insignia de instalar | Descargas de Windows (`../windows/installer.ico`) |
 | `src/dmg-background.svg` | La ventana del `.dmg` (660×400): «Arrastra Terminus a Aplicaciones» | Al abrir el `.dmg` (`../macos/dmg-background*.png`) |
+| `src/nsis-sidebar.svg`, `src/nsis-header.svg` | La barra lateral (164×314) y el encabezado (150×57) del asistente de NSIS | Instalador de Windows (`../windows/nsis-*.bmp`, BMP de 24 bits) |
 | `src/phone-*.svg`, `src/android-*.svg` | La app a sangre (iOS y la PWA recortan la forma) y las capas del ícono adaptativo de Android | `apps/mobile/assets` y `apps/mobile/public/icons` |
 
 El instalador se dibuja distinto de la app a propósito: si el disco montado se
@@ -35,7 +36,8 @@ teléfono tiene sus propios íconos en `apps/mobile/assets` y `apps/mobile/publi
 pnpm tauri icon src-tauri/icons/source-1024.png
 ```
 
-Los instaladores:
+Los instaladores (las imágenes de NSIS se rasterizan igual y se pasan a BMP con
+`magick <png> -background white -alpha remove -type TrueColor BMP3:<bmp>`):
 
 ```bash
 mkdir /tmp/volume.iconset
