@@ -71,6 +71,23 @@ async function open(name, computers, relays, workspaces) {
   return { app, f, invoke, calls, doc: app.w.document, text: () => app.w.document.body.textContent ?? "" };
 }
 
+test("a primary context on another machine clears the empty-context notice", async () => {
+  const configured = { workspaces: [{ ...SAME, context_root: "/lab/context" }], active: "w" };
+  const { app, invoke, text } = await open("web-context-source", [VM, MAC], {
+    cmp_vm: { table: table("Panel", "VM") },
+    cmp_mac: { table: table("Notas", "Mac", { list_workspaces: configured, workspaces_startup: configured }) },
+  });
+  try {
+    for (const command of ["workspaces_startup", "list_workspaces"]) {
+      const startup = await invoke(command);
+      assert.equal(startup.workspaces[0].context_root, "/lab/context");
+    }
+    assert.ok(!text().includes("Sin fuente de contexto"), "the workspace has context on the Mac");
+  } finally {
+    app.w.close();
+  }
+});
+
 test("two machines show together and each command goes to the machine it names", async () => {
   const { app, invoke, calls, doc, text } = await open("web-machines", [VM, MAC], {
     cmp_vm: { table: table("Panel", "Tarea de la VM", { list_slash_menu: { commands: [], skills: [], side_question: "btw" } }, "pv") },
