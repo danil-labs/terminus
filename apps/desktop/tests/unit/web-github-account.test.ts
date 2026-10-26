@@ -8,9 +8,18 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import "../helpers/catalog.ts";
 import { returnToOf, webGithubAccount } from "../../src/web/github-account.ts";
+import { notHere } from "../../src/features/settings/github-account/failures.ts";
 import { type BrowserHost, createWebTransport } from "../../src/web/transport.ts";
 
 type Seen = { url: string; method?: string; headers?: Record<string, string>; body?: string };
+
+test("a Worker without GitHub account routes keeps the local connection available", async () => {
+  for (const body of [{ error: "not_found" }, null]) {
+    const { transport } = setup(() => ({ status: 404, body }));
+    await assert.rejects(transport.handle("github_account_status", { scope: "w" }), notHere);
+  }
+  assert.equal(notHere({ detail: "credentials.error.github_unavailable" }), false, "an actual service failure is still reported");
+});
 
 const host: BrowserHost = {
   openUrl: () => {},

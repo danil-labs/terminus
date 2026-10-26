@@ -23,7 +23,7 @@ const KNOWN = new Set([
 ]);
 
 /** Sin estos no hay GitHub de la cuenta aquí: un motor que aún no tiene los comandos, sin sesión, sin licencia o un Worker sin la App. */
-const NOT_HERE = new Set(["command", "unsupported", "command_not_allowed", "not_linked", "workspace_not_linked", "github_disabled", "license_required"]);
+const NOT_HERE = new Set(["command", "unsupported", "command_not_allowed", "not_found", "http_404", "not_linked", "workspace_not_linked", "github_disabled", "license_required"]);
 
 export function githubAccountFailure(code: string | null): Failure {
   const c = code ?? "offline";
