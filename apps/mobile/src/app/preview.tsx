@@ -51,7 +51,7 @@ export default function Preview() {
   const several = hosts.length > 1;
   const git = effectiveGit(book, task, snapshot?.tasks ?? []);
   const running = marks.live.has(`${task.host}/${task.id}`) || marks.attention.get(`${task.host}/${task.id}`) === "approving";
-  const ready = !preview.pinned && host.power() === "on" && host.canAct() === "now" && canFinishTask(task, git, running || finishing);
+  const ready = host.power() === "on" && host.canAct() === "now" && canFinishTask(task, git, running || finishing);
   const pull = cardPull({ ...git, shared_with: null });
   const removed = () => { void reload(); router.back(); };
   const frame = (content: ReactNode) => Platform.OS === "web" ? <Sheet visible onClose={() => { if (!finishing) router.back(); }}>{content}</Sheet> : content;
@@ -128,7 +128,6 @@ const styles = StyleSheet.create({
   sheet: { paddingHorizontal: 20, paddingTop: 22, gap: 12 },
   head: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   title: { flex: 1, fontSize: 17, fontWeight: "600", lineHeight: 22 },
-  excerpt: { borderLeftWidth: 2, paddingLeft: 10, fontSize: 14, lineHeight: 20 },
   rows: { gap: 8 },
   field: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 22 },
   label: { width: 84, fontSize: 13 },

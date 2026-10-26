@@ -112,7 +112,7 @@ function TaskCardView({
   const folder = card.folder ? { id: card.folder, name: folderName(card.folder) } : null;
   const pull = cardPull(git);
   const chips = secondLine(card, pull, compact);
-  const ready = !card.pinned && online && canFinishTask(task, git, card.activity.viva || card.activity.aprobando);
+  const ready = online && canFinishTask(task, git, card.activity.viva || card.activity.aprobando);
   const branch = !git?.shared_with ? git?.branch : null;
   return (
     <Pressable

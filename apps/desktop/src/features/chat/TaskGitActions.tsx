@@ -1,4 +1,3 @@
-import { isPinned, type SidebarTask } from "@terminus/tasks";
 import Rocket from "lucide-solid/icons/rocket";
 import { createEffect, createMemo, createSignal, on, onCleanup, Show } from "solid-js";
 import { invoke } from "../../lib/invoke";
@@ -9,7 +8,7 @@ import { asFailure, type Failure, FailureNote } from "../../ui/Failure";
 import { canFinishTask, effectiveTaskGit, retainGitObservation, watchSessionGit, type GitStatus } from "../projects/taskGit";
 import SessionGit, { sessionGitDescription } from "../projects/SessionGit";
 
-type Task = Partial<Pick<SidebarTask, "pinned" | "inbox" | "chat_de_agente">> & { id: string; parent?: string | null; subagent?: string | null; archived?: boolean | null };
+type Task = { id: string; parent?: string | null; subagent?: string | null; archived?: boolean | null };
 type Blockers = { unsaved: unknown[]; not_finished?: boolean };
 
 export default function TaskGitActions(props: {
@@ -38,7 +37,7 @@ export default function TaskGitActions(props: {
     const git = effectiveTaskGit(task(), rows(), context().tasks);
     return context().on ? git : { ...git, stale: true };
   });
-  const ready = () => !isPinned({ ...task(), esperando: false }) && !context().readOnly && context().on && canFinishTask(task(), status(), context().busy || finishing());
+  const ready = () => !context().readOnly && context().on && canFinishTask(task(), status(), context().busy || finishing());
   let read = () => {};
   let previousScope: string | undefined;
   createEffect(on(() => [scope(), online()] as const, ([key]) => {
