@@ -31,13 +31,15 @@ import {
   PopoverTrigger,
 } from "../../ui/Popover";
 import { ProgressBar } from "../../ui/ProgressBar";
-import AccountCard from "../settings/AccountCard";
+import { sharedLazy } from "../../lib/sharedLazy";
 import type { Account, AccountList, AccountStatus } from "../settings/accounts-store";
 import KeepAwake from "./KeepAwake";
 import PuertosAbiertos from "./OpenPorts";
-import Almacenamiento from "./Storage";
 import BotonDeTema from "./ThemeButton";
 import PieVersion from "./VersionFooter";
+
+const AccountCard = sharedLazy(() => import("../settings/AccountCard"));
+const Almacenamiento = sharedLazy(() => import("./Storage"));
 
 // Consumo de las cuentas activas; las lecturas fallidas conservan el último dato marcado como antiguo.
 // El refresco automático debe respetar el caché y evitar cuentas sin consumo disponible.
