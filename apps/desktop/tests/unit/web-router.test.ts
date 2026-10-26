@@ -213,7 +213,7 @@ test("on the web a prefixed task id goes to that machine when the call has no ma
 });
 
 test("on the web a login follows the account id's machine, not the workspace lead", async () => {
-  const account = (id: string, plan: string) => ({ id, identity: "ana@danil.ai", plan, authenticated_at: 1 });
+  const account = (id: string, plan: string) => ({ id, identity: "ana", plan, authenticated_at: 1 });
   const vm = fakeLink({
     list_accounts: { accounts: [account("a1", "personal")], active: null },
     login_account: null,
