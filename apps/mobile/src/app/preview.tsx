@@ -22,6 +22,7 @@ import { useTheme } from "../ui/theme";
  * Título, carpeta, agente, proveedor y modelo, la
  * máquina si hay más de una; y Abrir, Fijar y Archivar con los mismos comandos
  * que la ventana (`set_session_pinned`, `task_blockers` y `set_task_archived`).
+ * Finalizar usa el estado Git compartido y el cierre validado por el motor.
  * Abrirla no enciende nada; fijar o archivar encienden la VM si está apagada.
  */
 export default function Preview() {

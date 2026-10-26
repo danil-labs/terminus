@@ -8,7 +8,7 @@ import { type GitBook, gitAsks, gitAsksKey, staleGit, withGitAnswer } from "./ta
 const EVERY_MS = 30_000;
 
 /**
- * El git de las tarjetas visibles, por `host/id`. Una llamada por máquina y
+ * El git de las tarjetas visibles, por `host/id`. Un recorrido por máquina y
  * carpeta (`gitAsks`), al cambiar lo visible y cada 30 s con la app al frente.
  * Leer nunca enciende: a una máquina que no está encendida no se le pregunta y
  * lo suyo queda viejo (`stale`).
