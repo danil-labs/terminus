@@ -39,6 +39,8 @@ export const APP_READS = [
   // (su árbol `terminus-chat-visuals`), y las imágenes, archivos y adjuntos que
   // el mensaje nombra por su ruta en la máquina.
   "tree_show",
+  // Un visual que no cabe de una vez: por partes de 512 KiB, con sus imágenes incrustadas.
+  "chat_visual_part",
   "preview_file",
   "attachment_preview",
   // Carpeta nueva y clonar en la máquina: dónde quedan y cómo va un clon.

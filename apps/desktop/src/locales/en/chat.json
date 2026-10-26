@@ -401,7 +401,7 @@
   "chat.visual.loading": "Loading visualization…",
   "chat.visual.failed": "Could not load the visualization. Check the file and try again.",
   "chat.visual.invalid": "The visualization requires a valid HTML file from this task.",
-  "chat.visual.too_large": "The visualization exceeds the 512 KiB limit.",
+  "chat.visual.too_large": "The visualization is too large to show in the chat.",
   "chat.visual.collapse": "Collapse visualization",
   "chat.visual.budget": "This thread reached its limit of 16 loaded visualizations. Close a visualization to load another.",
   "chat.visual.open_browser": "Open in browser",
