@@ -916,10 +916,12 @@ test("Git observations share one read per machine and keep routing explicit", as
   const { watchSessionGit } = await import("../../src/features/projects/taskGit.ts");
   const previousWindow = globalThis.window;
   const previousDocument = globalThis.document;
+  let failure: unknown = null;
   const calls: { remote: boolean; machine?: string; workspace?: string }[] = [];
   const fake = Object.assign(new EventTarget(), { __TAURI_INTERNALS__: {
     transformCallback: () => 1,
     invoke: async (_: string, args: { remote: boolean }, options?: { headers?: Record<string, string> }) => {
+      if (failure) throw failure;
       const machine = options?.headers?.["x-terminus-machine"];
       calls.push({ remote: args.remote, machine, workspace: options?.headers?.["x-terminus-workspace"] });
       return { s: { ...UNKNOWN_GIT, kind: "branch", branch: "feature", head: "head", repository: machine, checked_at: args.remote ? 2 : 1 } };
@@ -943,6 +945,16 @@ test("Git observations share one read per machine and keep routing explicit", as
     again.prioritize(["s"]);
     await tick();
     assert.equal(calls.length, before, "otra vista de la misma tarea no duplica el recorrido");
+    failure = { what: "Git unavailable", detail: "github_not_connected" };
+    mac.refresh();
+    await tick(); await tick();
+    assert.deepEqual(mac.error(), failure, "the chat can show the engine failure");
+    assert.equal(mac.rows().s.stale, true);
+    failure = null;
+    mac.refresh();
+    await tick(); await tick();
+    assert.equal(mac.error(), null, "a successful retry clears the failure");
+
   } finally {
     mac.release(); again.release(); vm.release();
     Object.defineProperty(globalThis, "window", { configurable: true, value: previousWindow, writable: true });

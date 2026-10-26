@@ -529,5 +529,31 @@ test("el composer web sigue las credenciales de la máquina elegida y de la tare
   doc.querySelector('[data-sesion="cmp_vm~t1"]').click();
   assert.ok(await until(() => calls("cmp_vm", "list_surfaces").length > before), "la tarea abierta usa la máquina del borrador");
   assert.ok(await until(() => !doc.querySelector('[aria-label*="Sonnet del Mac"]')), "la tarea de la VM conserva el modelo del Mac");
+  assert.ok(await until(() => doc.querySelector("[data-task-git-actions]")));
+  await sleep(100);
   assert.deepEqual(app.fallos, []);
+  app.w.close();
+});
+
+test("a web chat keeps Finish visible while Git is unknown and enables it for a merged current HEAD", async () => {
+  let known = false;
+  const git = { kind: "branch", kn: null, branch: "feature", alias: null, head: "head", repository: "/lab/p1", shared_with: null, pull_known: true, checked_at: 1, stale: false, has_remote: true, merged_locally: false, pull: { number: 371, state: "merged", head_sha: "head" } };
+  const { app, doc, calls } = await open("web-finish-git-state", [MAC], {
+    cmp_mac: { table: table("Panel", "Trabajo integrado", { list_session_git: () => known ? { t1: git } : {} }) },
+  });
+  try {
+    const card = doc.querySelector('[data-sesion="cmp_mac~t1"]');
+    assert.ok(card);
+    card.click();
+    assert.ok(await until(() => doc.querySelector("[data-task-finish]")), "unknown Git does not hide the rocket");
+    assert.equal(doc.querySelector("[data-task-finish]").disabled, true);
+    doc.querySelector("[data-task-pr]").click();
+    assert.ok(await until(() => [...doc.querySelectorAll("button")].some(b => b.textContent === "Actualizar estado")));
+    known = true;
+    [...doc.querySelectorAll("button")].find(b => b.textContent === "Actualizar estado").click();
+    assert.ok(await until(() => doc.querySelector("[data-task-finish]")?.disabled === false), "the live merged HEAD enables Finish");
+    assert.ok(calls("cmp_mac", "list_session_git").some(c => c.args.remote === false));
+    assert.ok(calls("cmp_mac", "list_session_git").some(c => c.args.remote === true));
+    assert.equal(calls("cmp_mac", "finish_task").length, 0, "reading state never finishes a task");
+  } finally { app.w.close(); }
 });
