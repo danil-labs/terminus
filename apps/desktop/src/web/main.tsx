@@ -33,7 +33,7 @@ import { type OtherAccount, setCapabilities, type WebAccountsSource } from "../l
 import { deliver } from "../lib/serviceEvents";
 // In the page, not in the lazy app chunk: the stylesheet loads with the HTML.
 import "../styles/global.css";
-import { machineCompatibility } from "./compatibility";
+import { machineCompatibility, machineContracts } from "./compatibility";
 import { HomeLink } from "./HomeLink";
 import { installIpc } from "./ipc";
 import { webAccountProfile } from "./account";
@@ -45,7 +45,6 @@ import type { MachineRow, MachineStatus } from "./SyncNote";
 import { type BrowserHost, createWebTransport } from "./transport";
 
 declare const __TERMINUS_VERSION__: string;
-declare const __TERMINUS_CONTRACT__: string;
 /** Set at build time in `vite.config.ts`; all public values. */
 declare const __TERMINUS_WEB__: WebSettings;
 
@@ -138,8 +137,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
           getToken: base.getToken,
           onUnauthorized: base.onUnauthorized,
           beforeReconnect: before?.(info.id),
-          // Con otro contrato el relay ni reenvía ni contesta del espejo: `version_mismatch`.
-          contracts: [__TERMINUS_CONTRACT__],
+          contracts: machineContracts(),
           // Un upgrade sin licencia no trae cuerpo: se pregunta por HTTP para no reintentar en bucle.
           probe: async () => sessionProbe(base.endpoint, await token(), info.id),
         }),

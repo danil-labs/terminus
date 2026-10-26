@@ -10,6 +10,7 @@ import {
   defaultComputer,
   groupWorkspaces,
   machineCompatibility,
+  machineContracts,
   isManaged,
   wakes,
   listComputers,
@@ -177,6 +178,12 @@ test("el contrato: igual es ok, distinto es desactualizado, sin dato no se sabe"
   assert.equal(machineCompatibility("ABC", "abc"), "ok");
   assert.equal(machineCompatibility("abc", "def"), "outdated");
   assert.equal(machineCompatibility(null, "abc"), "unknown");
+  const base = "d4541d178c64a065c1a4a0c693817eb84ad17052fd605815295fa1696955ef8f";
+  const extended = "3972c281dba1b61f9ad06fc82fbf059af3dbc55770b0a1bcb59ce786ec0a56f1";
+  assert.equal(machineCompatibility(extended, base), "ok");
+  assert.deepEqual(machineContracts(base), [base, extended]);
+  assert.deepEqual(machineContracts("unknown"), ["unknown"]);
+  assert.deepEqual(machineContracts(null), []);
 });
 
 test("llevar trabajo: exportar, importar y cancelar despiertan; las partes, la llave y el estado ni esperan en pending; nada se copia al espejo", async () => {
