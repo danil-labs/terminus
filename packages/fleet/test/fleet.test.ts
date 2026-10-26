@@ -546,21 +546,33 @@ test("with panelIds false the events keep the ids of their machine", async () =>
   assert.deepEqual(seen, [{ name: "session", payload: { session: "t1", project: "p1" } }]);
 });
 
-test("AI accounts of every machine join by email, each with the machines where it is signed in", () => {
+test("AI credentials keep their machine even when their email matches", () => {
   const { fleet } = setup({ cmp_vm: { state: "online" }, cmp_mac: { state: "offline" } }, [VM, MAC], { self: null });
   const slice = (machine: string, value: unknown): Slice => ({ machine, status: "ok", has: true, value, at: 0 });
   const merged = fleet.merge("list_accounts", [
     slice("cmp_vm", { active: "a1", accounts: [{ id: "a1", identity: "Ana@Example.com" }, { id: "a2", label: "Sin correo" }] }),
     slice("cmp_mac", { active: null, accounts: [{ id: "b1", identity: "ana@example.com" }] }),
   ]) as { active: string; accounts: { id: string; label?: string; machines: { machine: string; id: string; on: boolean }[] }[] };
-  assert.equal(merged.accounts.length, 2);
+  assert.equal(merged.accounts.length, 3);
   assert.deepEqual(merged.accounts[0].machines, [
     { machine: "cmp_vm", id: "cmp_vm~a1", on: true },
-    { machine: "cmp_mac", id: "cmp_mac~b1", on: false },
   ]);
   assert.equal(merged.accounts[0].id, "cmp_vm~a1", "the id is the one of a machine that is on");
   assert.equal(merged.active, "cmp_vm~a1");
   assert.equal(merged.accounts[1].label, "Sin correo · Danil VM", "without an email it is named with its machine");
+  assert.deepEqual(merged.accounts[2].machines, [{ machine: "cmp_mac", id: "cmp_mac~b1", on: false }]);
+});
+
+test("Claude Team and Personal with the same email keep their ids and active selection", () => {
+  const { fleet } = setup({ cmp_vm: { state: "online" }, cmp_mac: { state: "online" } }, [VM, MAC], { self: null });
+  const slice = (machine: string, value: unknown): Slice => ({ machine, status: "ok", has: true, value, at: 0 });
+  const merged = fleet.merge("list_accounts", [
+    slice("cmp_vm", { provider: "claude", active: "team", accounts: [{ id: "personal", identity: "ana@example.com", label: "Personal" }, { id: "team", identity: "ana@example.com", label: "Team" }] }),
+    slice("cmp_mac", { provider: "claude", active: "personal", accounts: [{ id: "personal", identity: "ana@example.com", label: "Otra sesión" }] }),
+  ]) as { active: string; accounts: { id: string; label: string; machines: { id: string; machine: string }[] }[] };
+  assert.equal(merged.active, "cmp_vm~team");
+  assert.deepEqual(merged.accounts.map((a) => [a.id, a.label]), [["cmp_vm~personal", "Personal"], ["cmp_vm~team", "Team"], ["cmp_mac~personal", "Otra sesión"]]);
+  assert.deepEqual(merged.accounts.map((a) => a.machines.map((m) => m.id)), [["cmp_vm~personal"], ["cmp_vm~team"], ["cmp_mac~personal"]]);
 });
 
 test("the git of the tasks of a folder: each machine gets only its own priority ids and the answers join by task", async () => {

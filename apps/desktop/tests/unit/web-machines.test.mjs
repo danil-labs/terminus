@@ -6,7 +6,7 @@
  * `x-terminus-machine` header, never its arguments), creates where the person
  * chose (making the workspace that machine's own first), fails short and
  * neutral on a computer that is off and cannot be woken, leaves out one that
- * speaks another contract, and groups AI accounts by provider and email.
+ * speaks another contract, and keeps each registered AI credential separate.
  * Mounts `dist-web/`.
  */
 import assert from "node:assert/strict";
@@ -275,22 +275,32 @@ test("a machine with another engine contract needs an update and never breaks th
   assert.deepEqual(app.fallos, []);
 });
 
-test("AI accounts are grouped by provider and email with the machines they are signed in on", async () => {
-  const vmAccounts = { provider: "claude", env_var: "", shared_credential: null, secret_note: null, active: "a1", accounts: [account("a1", "ana@example.com"), account("a2", null, "Cuenta 2")] };
+test("AI credentials with the same email keep separate cards and machine actions", async () => {
+  const vmAccounts = { provider: "claude", env_var: "", shared_credential: null, secret_note: null, active: "a1", accounts: [account("a1", "ana@example.com", "Personal"), account("a2", "ana@example.com", "Team")] };
   const macAccounts = { provider: "claude", env_var: "", shared_credential: null, secret_note: null, active: "m1", accounts: [account("m1", "Ana@Example.com")] };
   const { app, invoke, calls } = await open("web-machines-accounts", [VM, MAC], {
-    cmp_vm: { table: table("Panel", "Tarea de la VM", { list_accounts: vmAccounts }) },
+    cmp_vm: { table: table("Panel", "Tarea de la VM", {
+      list_accounts: vmAccounts,
+      account_limits: ({ id }) => ({ mode: "read", plan: id === "a1" ? "Personal" : "Team", windows: [] }),
+      set_active_account: null,
+    }) },
     cmp_mac: { table: table("Notas", "Tarea del Mac", { list_accounts: macAccounts }) },
   });
 
   const list = await invoke("list_accounts", { provider: "claude" });
-  assert.equal(list.accounts.length, 2, "one card per provider and email, plus the one without email");
+  assert.equal(list.accounts.length, 3, "Personal, Team and the Mac credential stay separate despite sharing email");
   const [ana, other] = list.accounts;
   assert.equal(ana.id, "cmp_vm~a1");
-  assert.deepEqual(ana.machines.map((m) => [m.machine, m.id, m.on]), [["cmp_vm", "cmp_vm~a1", true], ["cmp_mac", "cmp_mac~m1", true]]);
+  assert.deepEqual(ana.machines.map((m) => [m.machine, m.id, m.on]), [["cmp_vm", "cmp_vm~a1", true]]);
+  assert.deepEqual(list.accounts[2].machines.map((m) => [m.machine, m.id, m.on]), [["cmp_mac", "cmp_mac~m1", true]]);
   assert.equal(list.active, "cmp_vm~a1");
-  assert.equal(other.label, "Cuenta 2 · Danil VM", "an account without email stays its own, named with its machine");
+  assert.equal(other.label, "Team", "the second credential keeps its own label");
   assert.deepEqual(other.machines.map((m) => m.machine), ["cmp_vm"]);
+  const personal = await invoke("account_limits", { provider: "claude", id: ana.id, force: false }, on("cmp_vm"));
+  const team = await invoke("account_limits", { provider: "claude", id: other.id, force: false }, on("cmp_vm"));
+  assert.deepEqual([personal.plan, team.plan], ["Personal", "Team"], "each card reads its own subscription usage");
+  await invoke("set_active_account", { provider: "claude", id: other.id }, on("cmp_vm"));
+  assert.equal(calls("cmp_vm", "set_active_account").at(-1).args.id, "a2", "Team can be selected independently");
 
   await invoke("remove_account", { provider: "claude", id: "cmp_mac~m1" }, on("cmp_mac"));
   assert.deepEqual(calls("cmp_mac", "remove_account").map((c) => c.args.id), ["m1"], "signing out is per machine");
