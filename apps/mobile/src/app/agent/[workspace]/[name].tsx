@@ -7,6 +7,7 @@ import { createTask, runShell, suggestedDefaults, type Task, taskKey } from "../
 import { HostError } from "../../../lib/hosts";
 import { lang, t, w } from "../../../lib/i18n";
 import { useMachines } from "../../../lib/machines";
+import { effectiveGit } from "../../../lib/taskGit";
 import { useTaskGit } from "../../../lib/useTaskGit";
 import { useWorkspaces } from "../../../lib/workspaces";
 import { Avatar, openPreview, openTask } from "../../../ui/components";
@@ -78,12 +79,13 @@ export default function AgentScreen() {
           <TaskCard
             task={item}
             card={cardOf(item, marks)}
-            git={git[taskKey(item)]}
+            git={effectiveGit(git, item, snapshot?.tasks ?? [])}
             folderName={folderName}
             density={view.density}
             onPress={() => openTask(item.host, item.workspace, item.folder, item.id)}
             onLongPress={() => openPreview(item.host, item.id)}
-            onFinish={() => openPreview(item.host, item.id)}
+            onFinish={() => openPreview(item.host, item.id, "finish")}
+            online={hostOf(item.host)?.power() === "on" && hostOf(item.host)?.canAct() === "now"}
           />
         )}
         ListEmptyComponent={<Text style={[styles.empty, { color: theme.textMuted }]}>{t("agent.empty")}</Text>}

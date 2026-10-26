@@ -1,3 +1,4 @@
+import { resolveTaskGit as resolveSharedTaskGit } from "@terminus/tasks";
 import { Channel } from "@tauri-apps/api/core";
 import { invoke } from "../../lib/invoke.ts";
 import { type Accessor, createSignal } from "solid-js";
@@ -89,10 +90,12 @@ function drainRemote() {
   }
 }
 
-export function watchSessionGit(project: string) {
-  let entry = projects.get(project);
+export function watchSessionGit(project: string, routing?: { workspace: string; machine?: string }) {
+  const key = routing?.machine ? JSON.stringify([routing.workspace, routing.machine, project]) : project;
+  const options = routing?.machine ? { headers: { "x-terminus-workspace": routing.workspace, "x-terminus-machine": routing.machine } } : undefined;
+  let entry = projects.get(key);
   if (!entry) {
-    const [rows, setRows] = createSignal<Record<string, GitStatus>>(unpark(project));
+    const [rows, setRows] = createSignal<Record<string, GitStatus>>(unpark(key));
     const interests = new Map<symbol, string[]>();
     let disposed = false;
     let generation = 0;
@@ -118,7 +121,7 @@ export function watchSessionGit(project: string) {
         run: async () => {
           try {
             if (!current(started) || document.hidden) return;
-            const result = await readTaskGit(remote => withDeadline(invoke<Record<string, GitStatus>>("list_session_git", { project, remote, priority: priority(), progress: new Channel<Record<string, GitStatus>>() })), { phase: "remote" });
+            const result = await readTaskGit(remote => withDeadline(invoke<Record<string, GitStatus>>("list_session_git", { project, remote, priority: priority(), progress: new Channel<Record<string, GitStatus>>() }, options)), { phase: "remote" });
             if (current(started)) setRows(previous => {
               const merged = mergeRemoteGit(previous, result);
               const next = localFailed || Date.now() - lastLocal >= 30_000 ? staleGit(merged) : merged;
@@ -150,7 +153,7 @@ export function watchSessionGit(project: string) {
           if (!current(started) || !localBusy || sequence !== localSequence) return;
           setRows(previous => conservarFilas(previous, { ...previous, ...retainGitObservation(previous, partial) }));
         });
-        const local = await readTaskGit(remote => withDeadline(invoke<Record<string, GitStatus>>("list_session_git", { project, remote, priority: priority(), progress })), { phase: "local" });
+        const local = await readTaskGit(remote => withDeadline(invoke<Record<string, GitStatus>>("list_session_git", { project, remote, priority: priority(), progress }, options)), { phase: "local" });
         if (!current(started)) return;
         lastLocal = Date.now();
         localFailed = false;
@@ -198,7 +201,7 @@ export function watchSessionGit(project: string) {
       window.removeEventListener("harness:workspace", workspace);
       document.removeEventListener("visibilitychange", visible);
     } };
-    projects.set(project, entry);
+    projects.set(key, entry);
     entry.refresh();
   }
   const token = Symbol();
@@ -207,15 +210,16 @@ export function watchSessionGit(project: string) {
   return { rows: current.rows, refresh: current.refresh,
     prioritize: (ids: string[]) => {
       if (JSON.stringify(current.interests.get(token)) === JSON.stringify(ids)) return;
+      const covered = new Set([...current.interests.values()].flat());
       current.interests.set(token, ids);
-      current.refresh();
+      if (ids.some(id => !covered.has(id))) current.refresh();
     },
     release: () => {
       current.interests.delete(token);
-      if (current.interests.size === 0 && projects.get(project) === current) {
+      if (current.interests.size === 0 && projects.get(key) === current) {
         current.dispose();
-        projects.delete(project);
-        park(project, current.rows());
+        projects.delete(key);
+        park(key, current.rows());
       }
     },
   };
@@ -236,34 +240,8 @@ export function gitReviewSignals(status?: GitStatus) {
 
 type TaskGitSession = { id: string; parent?: string | null; subagent?: string | null };
 
-function resolveTaskGit(
-  session: TaskGitSession,
-  rows: Record<string, GitStatus>,
-  sessions: TaskGitSession[],
-): { status: GitStatus; owner: string | null } {
-  const origin = rows[session.id] ?? UNKNOWN_GIT;
-  const withOrigin = (status: GitStatus) =>
-    origin.shared_with && status.shared_with !== origin.shared_with
-      ? { ...status, shared_with: origin.shared_with }
-      : status;
-  const visited = new Set<string>();
-  let current = session;
-  while (!visited.has(current.id)) {
-    visited.add(current.id);
-    const status = rows[current.id] ?? UNKNOWN_GIT;
-    const shared = status.shared_with ?? (current.subagent ? current.parent : null);
-    const own = { status: withOrigin(status), owner: current.id };
-    // Guardado propio gana. Un borrador en una hija no tapa al padre ya
-    // integrado: finalizarla debe seguir disponible.
-    if (status.kind === "kn" && status.kn === "saved") return own;
-    if (status.kind === "kn" && status.kn === "draft" && !shared) return own;
-    if (!shared) return own;
-    const parent = sessions.find(row => row.id === shared);
-    // Sin la dueña en la lista nadie más enseña esta rama: la fila se queda con ella.
-    if (!parent) return own;
-    current = parent;
-  }
-  return { status: UNKNOWN_GIT, owner: null };
+function resolveTaskGit(session: TaskGitSession, rows: Record<string, GitStatus>, sessions: TaskGitSession[]) {
+  return resolveSharedTaskGit(session, rows, sessions, UNKNOWN_GIT);
 }
 
 export function effectiveTaskGit(

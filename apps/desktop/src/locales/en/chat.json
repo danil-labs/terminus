@@ -1,4 +1,10 @@
 {
+  "chat.task.details": "Task details",
+  "chat.task.refresh": "Refresh status",
+  "chat.task.finish_confirm": "This conversation will be archived and its worktree and local branch deleted. The PR and conversation history are kept.",
+  "chat.task.finish_shared": "This subtask will be archived. The shared worktree and branch are kept.",
+  "chat.task.finish_unavailable": "The task must be integrated with no turn in progress. Connect the machine and refresh its status to check.",
+  "chat.task.finish_blocked": "There are unsaved changes or unintegrated work. Nothing was deleted.",
   "chat.search.split_hint": "Split view ({key}). Requires another open tab in this view.",
   "chat.search.split": "Split view",
   "chat.search.join": "Join views",

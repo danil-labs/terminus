@@ -8,7 +8,7 @@
  * pudo releer (la máquina no contesta, o está apagada) se conserva con
  * `stale`: la tarjeta lo enseña en gris, sin afirmar ni el rojo del CI.
  */
-import type { TaskGitStatus } from "@terminus/tasks";
+import { resolveTaskGit, UNKNOWN_TASK_GIT, type TaskGitStatus, type TaskGitSession } from "@terminus/tasks";
 
 export type GitAsk = { host: string; workspace: string; project: string; priority: string[] };
 
@@ -29,6 +29,8 @@ export const gitAsksKey = (asks: readonly GitAsk[]) =>
   asks.map((a) => `${a.host}/${a.workspace}/${a.project}:${a.priority.join(",")}`).sort().join("|");
 
 export type GitBook = Readonly<Record<string, TaskGitStatus>>;
+
+const UNKNOWN_GIT: TaskGitStatus = { ...UNKNOWN_TASK_GIT, stale: true };
 
 const isRow = (v: unknown): v is TaskGitStatus => !!v && typeof v === "object" && "pull_known" in v;
 
@@ -62,4 +64,10 @@ export function staleGit(book: GitBook, host: string, ids: readonly string[]): G
     next[key] = { ...before, stale: true };
   }
   return next ?? book;
+}
+
+/** Resuelve la rama compartida dentro de la misma máquina y workspace. */
+export function effectiveGit(book: GitBook, task: TaskGitSession & { host: string; workspace: string }, tasks: readonly (TaskGitSession & { host: string; workspace: string })[]): TaskGitStatus {
+  const rows = Object.fromEntries(Object.entries(book).filter(([key]) => key.startsWith(`${task.host}/`)).map(([key, value]) => [key.slice(task.host.length + 1), value]));
+  return resolveTaskGit(task, rows, tasks.filter((row) => row.host === task.host && row.workspace === task.workspace), UNKNOWN_GIT).status;
 }

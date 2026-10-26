@@ -36,12 +36,12 @@ export async function readTaskGit<T>(
 /** La UI ofrece la acción; `finish_task` vuelve a validar y ejecuta el cierre en el motor. */
 export function canFinishTask(
   session: { archived?: boolean | null; subagent?: string | null },
-  status: TaskGitStatus | null | undefined,
+  status: TaskGit | null | undefined,
   busy: boolean,
 ): boolean {
   if (!status || session.archived || busy || status.stale) return false;
   if (status.kind === "kn") return status.kn === "saved";
   if (status.kind !== "branch" || !status.head) return false;
   if (status.pull) return status.pull_known && status.pull.state === "merged" && status.pull.head_sha === status.head;
-  return status.merged_locally && (status.pull_known || !status.has_remote);
+  return status.merged_locally === true && (status.pull_known || status.has_remote === false);
 }

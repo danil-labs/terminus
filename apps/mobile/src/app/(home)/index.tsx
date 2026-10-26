@@ -8,6 +8,7 @@ import { taskInSpace, taskKey } from "../../lib/engine";
 import { lang, t, w } from "../../lib/i18n";
 import { useMachines } from "../../lib/machines";
 import { Notifications } from "../../lib/notifications";
+import { effectiveGit } from "../../lib/taskGit";
 import { useTaskGit } from "../../lib/useTaskGit";
 import { spaceName, useWorkspaces } from "../../lib/workspaces";
 import { AgentDock } from "../../ui/AgentDock";
@@ -173,12 +174,13 @@ export default function Tasks() {
                 key={taskKey(task)}
                 task={task}
                 card={cardOf(task, marks, effective.group === "folder")}
-                git={git[taskKey(task)]}
+                git={effectiveGit(git, task, snapshot?.tasks ?? [])}
                 folderName={folderName}
                 density={effective.density}
                 onPress={() => openTask(task.host, task.workspace, task.folder, task.id)}
                 onLongPress={() => openPreview(task.host, task.id)}
-                onFinish={() => openPreview(task.host, task.id)}
+                onFinish={() => openPreview(task.host, task.id, "finish")}
+                online={hostOf(task.host)?.power() === "on" && hostOf(task.host)?.canAct() === "now"}
               />
             ))}
             {!group.tasks.length ? <Text style={[styles.empty, { color: theme.textMuted }]}>{t("folder.empty")}</Text> : null}

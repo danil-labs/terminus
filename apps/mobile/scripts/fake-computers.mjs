@@ -280,6 +280,13 @@ function invoke(m, command, args) {
       emit(m, "session", { workspace: e.ws, project: s.project, session: s.id });
       return null;
     }
+    case "delete_session": {
+      const s = e.sessions.get(args.id);
+      if (!s || s.project !== args.project || s.unsaved?.length || e.live.has(s.id) || args.force !== false) throw { code: "command_failed", detail: "task has work" };
+      e.sessions.delete(s.id);
+      emit(m, "session", { workspace: e.ws, project: s.project, session: s.id });
+      return null;
+    }
     case "set_task_archived": {
       const s = e.sessions.get(args.id);
       if (!s) throw { code: "command_failed", detail: "no such task" };

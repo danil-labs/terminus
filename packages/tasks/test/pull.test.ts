@@ -45,3 +45,31 @@ test("git viejo: el número sigue, pero en gris y sin rojo", () => {
   assert.equal(stale?.tone, "muted");
   assert.equal(stale?.numberTone, "muted");
 });
+
+test("finalizar requiere la revisión integrada exacta y un estado vigente", async () => {
+  const { canFinishTask } = await import("../src/index.ts");
+  const merged = git({ state: "merged" }, { kind: "branch" });
+  assert.equal(canFinishTask({}, merged, false), true);
+  for (const status of [git({}, { kind: "branch" }), { ...merged, head: "nuevo" }, { ...merged, stale: true }, { ...merged, pull_known: false }, undefined]) {
+    assert.equal(canFinishTask({}, status, false), false);
+  }
+  assert.equal(canFinishTask({}, merged, true), false);
+  assert.equal(canFinishTask({ archived: true }, merged, false), false);
+  assert.equal(canFinishTask({}, { ...merged, pull: null, merged_locally: true, has_remote: false }, false), true);
+  assert.equal(canFinishTask({}, { ...merged, kind: "kn", kn: "saved" }, false), true);
+});
+
+test("una subtarea hereda el Git de su dueña conservando la carpeta compartida", async () => {
+  const { canFinishTask, resolveTaskGit } = await import("../src/index.ts");
+  const root = { id: "root" };
+  const child = { id: "child", parent: "root", subagent: "native" };
+  const merged = git({ state: "merged" }, { kind: "branch" });
+  const unknown = git({}, { kind: "unknown", pull: null, head: null, stale: true });
+  const result = resolveTaskGit(child, { root: merged, child: { ...unknown, shared_with: "root" } }, [root, child], unknown);
+  assert.equal(result.owner, "root");
+  assert.equal(result.status.shared_with, "root");
+  assert.equal(canFinishTask(child, result.status, false), true);
+  const cycle = resolveTaskGit(child, { root: { ...unknown, shared_with: "child" }, child: { ...unknown, shared_with: "root" } }, [root, child], unknown);
+  assert.equal(cycle.owner, null);
+  assert.equal(canFinishTask(child, cycle.status, false), false);
+});

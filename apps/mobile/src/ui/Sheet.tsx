@@ -64,6 +64,7 @@ export function SheetOption({
   disabled,
   onPress,
   testID,
+  destructive = false,
 }: {
   label: string;
   detail?: string | null;
@@ -73,18 +74,20 @@ export function SheetOption({
   disabled?: boolean;
   onPress: () => void;
   testID?: string;
+  destructive?: boolean;
 }) {
   const theme = useTheme();
   return (
     <Pressable
       testID={testID}
+      accessibilityRole="button"
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [styles.option, { backgroundColor: pressed ? theme.muted : "transparent", opacity: disabled ? 0.45 : 1 }]}
     >
-      {left ?? (icon ? <Icon name={icon} size={17} color={theme.textMuted} /> : null)}
+      {left ?? (icon ? <Icon name={icon} size={17} color={destructive ? theme.failedMark : theme.textMuted} /> : null)}
       <View style={{ flex: 1, gap: 1 }}>
-        <Text numberOfLines={1} style={{ color: theme.text, fontSize: 16, fontWeight: selected ? "600" : "400" }}>
+        <Text numberOfLines={1} style={{ color: destructive ? theme.failedMark : theme.text, fontSize: 16, fontWeight: selected ? "600" : "400" }}>
           {label}
         </Text>
         {detail ? (

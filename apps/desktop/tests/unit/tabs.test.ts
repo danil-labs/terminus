@@ -544,7 +544,7 @@ test("the shared remote queue starts active work before background projects", as
   } });
   Object.defineProperty(globalThis, "window", { configurable: true, value: fake, writable: true });
   Object.defineProperty(globalThis, "document", { configurable: true, value: Object.assign(new EventTarget(), { hidden: false }), writable: true });
-  const observers = ["background-1", "background-2", "selected"].map(watchSessionGit);
+  const observers = ["background-1", "background-2", "selected"].map(project => watchSessionGit(project));
   try {
     observers[2].prioritize(["active"]);
     await new Promise(resolve => setTimeout(resolve, 0));
@@ -910,4 +910,42 @@ test("la pantalla de una máquina es una sola pestaña que no se guarda", () => 
     tira("pantalla").open().map((p) => p.id),
     ["s1"],
   );
+});
+
+test("Git observations share one read per machine and keep routing explicit", async () => {
+  const { watchSessionGit } = await import("../../src/features/projects/taskGit.ts");
+  const previousWindow = globalThis.window;
+  const previousDocument = globalThis.document;
+  const calls: { remote: boolean; machine?: string; workspace?: string }[] = [];
+  const fake = Object.assign(new EventTarget(), { __TAURI_INTERNALS__: {
+    transformCallback: () => 1,
+    invoke: async (_: string, args: { remote: boolean }, options?: { headers?: Record<string, string> }) => {
+      const machine = options?.headers?.["x-terminus-machine"];
+      calls.push({ remote: args.remote, machine, workspace: options?.headers?.["x-terminus-workspace"] });
+      return { s: { ...UNKNOWN_GIT, kind: "branch", branch: "feature", head: "head", repository: machine, checked_at: args.remote ? 2 : 1 } };
+    },
+  } });
+  Object.defineProperty(globalThis, "window", { configurable: true, value: fake, writable: true });
+  Object.defineProperty(globalThis, "document", { configurable: true, value: Object.assign(new EventTarget(), { hidden: false }), writable: true });
+  const mac = watchSessionGit("machine-scope-test", { workspace: "w", machine: "mac" });
+  const again = watchSessionGit("machine-scope-test", { workspace: "w", machine: "mac" });
+  const vm = watchSessionGit("machine-scope-test", { workspace: "w", machine: "vm" });
+  const tick = () => new Promise(resolve => setTimeout(resolve, 0));
+  try {
+    mac.prioritize(["s"]);
+    vm.prioritize(["s"]);
+    await tick(); await tick();
+    assert.deepEqual(calls.filter(call => !call.remote).map(call => call.machine).sort(), ["mac", "vm"]);
+    assert.ok(calls.every(call => call.workspace === "w"));
+    assert.equal(mac.rows().s.repository, "mac");
+    assert.equal(vm.rows().s.repository, "vm");
+    const before = calls.length;
+    again.prioritize(["s"]);
+    await tick();
+    assert.equal(calls.length, before, "otra vista de la misma tarea no duplica el recorrido");
+  } finally {
+    mac.release(); again.release(); vm.release();
+    Object.defineProperty(globalThis, "window", { configurable: true, value: previousWindow, writable: true });
+    Object.defineProperty(globalThis, "document", { configurable: true, value: previousDocument, writable: true });
+  }
 });

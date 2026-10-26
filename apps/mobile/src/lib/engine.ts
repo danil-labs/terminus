@@ -568,20 +568,12 @@ export async function archiveTask(host: Host, workspace: string, folder: string,
     await host.call("set_task_archived", workspace, { project: folder, id, archived: true, space: null });
     return { archived: true };
   }
-  const { value } = await host.call<TaskBlockers | null>("task_blockers", workspace, { project: folder, id, finish: false });
-  const unsaved = value?.unsaved ?? [];
+  const { value, cachedAt } = await host.call<TaskBlockers | null>("task_blockers", workspace, { project: folder, id, finish: false });
+  if (!value || cachedAt !== null || !Array.isArray(value.unsaved)) throw new HostError("task_status_unavailable");
+  const unsaved = value.unsaved;
   if (unsaved.length) return { blocked: unsaved };
   await host.call("set_task_archived", workspace, { project: folder, id, archived: true, space: null });
   return { archived: true };
-}
-
-export async function finishTask(host: Host, workspace: string, folder: string, id: string): Promise<{ finished: true } | { blocked: TaskBlockers }> {
-  if (host.power() !== "on") await host.wake();
-  const { value } = await host.call<TaskBlockers | null>("task_blockers", workspace, { project: folder, id, finish: true });
-  if (!value || !Array.isArray(value.unsaved)) throw new HostError("bad_reply", "task_blockers");
-  if (value.unsaved.length || value.not_finished) return { blocked: value };
-  await host.call("finish_task", workspace, { project: folder, id });
-  return { finished: true };
 }
 
 // --- El cuadro de escribir -----------------------------------------------------
@@ -924,4 +916,20 @@ export async function cloneRepo(
 
 export function cancelClone(host: Host, workspace: string, operation: string) {
   return host.call("cancel_project_clone", workspace, { operation, workspace });
+}
+
+/** Finalizar siempre comprueba los bloqueos en la máquina; leer o fallar no la enciende. */
+export async function finishTask(host: Host, workspace: string, folder: string, id: string): Promise<{ finished: true } | { blocked: TaskBlockers }> {
+  if (host.power() !== "on") throw new HostError("machine_asleep", host.label);
+  const { value, cachedAt } = await host.call<TaskBlockers>("task_blockers", workspace, { project: folder, id, finish: true });
+  if (!value || cachedAt !== null || !Array.isArray(value.unsaved)) throw new HostError("task_status_unavailable");
+  if (value.not_finished || value.unsaved.length) return { blocked: value };
+  await host.call("finish_task", workspace, { project: folder, id });
+  return { finished: true };
+}
+
+/** El borrado es explícito, en línea y sin forzar el descarte de archivos. */
+export async function deleteTask(host: Host, workspace: string, folder: string, id: string) {
+  if (host.power() !== "on") throw new HostError("machine_asleep", host.label);
+  await host.call("delete_session", workspace, { project: folder, id, force: false });
 }

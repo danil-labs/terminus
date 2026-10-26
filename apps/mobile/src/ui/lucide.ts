@@ -14,6 +14,7 @@ export type LucideShape =
   | { kind: "ellipse"; cx: number; cy: number; rx: number; ry: number };
 
 export const ICONS = {
+  "trash-2": [{"kind": "path", "d": "M10 11v6"}, {"kind": "path", "d": "M14 11v6"}, {"kind": "path", "d": "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"}, {"kind": "path", "d": "M3 6h18"}, {"kind": "path", "d": "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"}],
   "archive": [{"kind": "rect", "width": 20.0, "height": 5.0, "x": 2.0, "y": 3.0, "rx": 1.0}, {"kind": "path", "d": "M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"}, {"kind": "path", "d": "M10 12h4"}],
   "arrow-down": [{"kind": "path", "d": "M12 5v14"}, {"kind": "path", "d": "m19 12-7 7-7-7"}],
   "arrow-left": [{"kind": "path", "d": "m12 19-7-7 7-7"}, {"kind": "path", "d": "M19 12H5"}],
@@ -55,6 +56,8 @@ export const ICONS = {
   "square": [{"kind": "rect", "width": 18.0, "height": 18.0, "x": 3.0, "y": 3.0, "rx": 2.0}],
   "terminal": [{"kind": "path", "d": "M12 19h8"}, {"kind": "path", "d": "m4 17 6-6-6-6"}],
   "user-round": [{"kind": "circle", "cx": 12.0, "cy": 8.0, "r": 5.0}, {"kind": "path", "d": "M20 21a8 8 0 0 0-16 0"}],
+  "rocket": [{"kind":"path","d":"M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"},{"kind":"path","d":"M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"},{"kind":"path","d":"M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"},{"kind":"path","d":"M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"}],
+  "ellipsis": [{"kind":"circle","cx":5,"cy":12,"r":1},{"kind":"circle","cx":12,"cy":12,"r":1},{"kind":"circle","cx":19,"cy":12,"r":1}],
   "x": [{"kind": "path", "d": "M18 6 6 18"}, {"kind": "path", "d": "m6 6 12 12"}],
 } satisfies Record<string, LucideShape[]>;
 

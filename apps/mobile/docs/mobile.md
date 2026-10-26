@@ -179,7 +179,7 @@ Los avisos salen en la app, igual para los dos caminos: una tarea que entra en
 | `(home)/index` | Tareas: workspace, spaces, alcance y filtro, dock de agentes y la lista plana |
 | `(home)/notifications` | «Ahora» de todas las máquinas y «Antes», lo que llegó con la app abierta |
 | `(home)/new` | Nueva tarea: el cuadro de escribir con «Ejecutar en» (la última usada, si no la VM), carpeta, rama base y agente; `!` la crea con un comando. La hoja de Carpeta termina en «Nueva carpeta» y «Clonar repo» (ver «Carpetas nuevas») |
-| `preview` | Vista previa de una tarea (mantener pulsada su tarjeta): Abrir, Fijar, Archivar |
+| `preview` | Menú de una tarea (⋯ o pulsación larga): PR, Abrir, Fijar, Archivar, Eliminar y Finalizar con confirmación; el cohete de la lista abre directamente la confirmación |
 | `accounts` | Proveedores de IA: cuentas por proveedor y correo, consumo, máquinas, iniciar y cerrar sesión |
 | `filter` | Hoja «Filtrar y agrupar» |
 | `agents` | Hoja «Ver todos» del dock |
@@ -201,7 +201,7 @@ lleva su comentario allí:
 
 | Para qué | Lecturas | Acciones |
 |---|---|---|
-| Vista previa | `task_blockers` | `set_session_pinned`, `set_task_archived` |
+| Vista previa y finalizar | `task_blockers` | `set_session_pinned`, `set_task_archived`, `finish_task`, `delete_session` |
 | Cuadro de escribir | `list_models`, `list_permission_modes`, `list_slash_menu`, `list_mentions`, `project_base_branches` | `run_shell_command`, `stop_shell_command`, `guardar_imagen_pegada`, `prepare_attachments` |
 | Cuentas de IA | `list_accounts`, `account_status`, `account_limits` | `add_account`, `login_account`, `submit_login_code`, `cancel_login`, `discard_account`, `remove_account` |
 | Fondo del chat | `chat_background` | — |
