@@ -1,16 +1,26 @@
 //! Terminus abierto desde el disco del .dmg (o trasladado por Gatekeeper) no se
 //! actualiza y desaparece al expulsarlo: antes de lanzar el motor ofrece copiarlo
 //! a Aplicaciones, lo abre desde ahí y expulsa el disco al salir.
-use super::util::Frase;
+use super::util::{output_with_timeout, Frase};
+use crate::util::no_console_window;
+use core_foundation::{array::CFArray, base::TCFType, string::CFString};
 use serde_json::Value;
 use std::{
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    time::Duration,
 };
 
 const ES: &str = include_str!("../../../src/locales/es/shell.json");
 const EN: &str = include_str!("../../../src/locales/en/shell.json");
 const APPLICATIONS: &str = "/Applications";
+const COPY_TIMEOUT: Duration = Duration::from_secs(300);
+const OPEN_TIMEOUT: Duration = Duration::from_secs(30);
+
+#[link(name = "CoreFoundation", kind = "framework")]
+extern "C" {
+    fn CFLocaleCopyPreferredLanguages() -> core_foundation::array::CFArrayRef;
+}
 
 /// `true` si esta copia ya abrió la de Aplicaciones y tiene que salir.
 pub fn offer() -> bool {
@@ -57,10 +67,9 @@ pub fn offer() -> bool {
             .show();
         return false;
     }
-    if Command::new("/usr/bin/open")
-        .arg("-n")
-        .arg(&target)
-        .status()
+    let mut open = Command::new("/usr/bin/open");
+    open.arg("-n").arg(&target);
+    if output_with_timeout(no_console_window(&mut open), OPEN_TIMEOUT)
         .map_or(true, |s| !s.success())
     {
         return false;
@@ -103,21 +112,22 @@ fn install(source: &Path, target: &Path) -> std::io::Result<()> {
     if had_previous {
         std::fs::rename(target, &aside)?;
     }
-    let copied = Command::new("/usr/bin/ditto")
-        .arg(source)
-        .arg(target)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .output()?;
-    if !copied.status.success() {
+    let mut ditto = Command::new("/usr/bin/ditto");
+    ditto.arg(source).arg(target);
+    let copied =
+        output_with_timeout(no_console_window(&mut ditto), COPY_TIMEOUT).and_then(|status| {
+            if status.success() {
+                Ok(())
+            } else {
+                Err(std::io::Error::other(format!("ditto: {status}")))
+            }
+        });
+    if let Err(error) = copied {
         let _ = std::fs::remove_dir_all(target);
         if had_previous {
             let _ = std::fs::rename(&aside, target);
         }
-        return Err(std::io::Error::other(
-            String::from_utf8_lossy(&copied.stderr).trim().to_owned(),
-        ));
+        return Err(error);
     }
     let _ = std::fs::remove_dir_all(&aside);
     Ok(())
@@ -126,7 +136,8 @@ fn install(source: &Path, target: &Path) -> std::io::Result<()> {
 /// El disco no se expulsa mientras esta copia corre desde él: un `sh` aparte espera a que salga.
 fn eject_after_exit(volume: &Path) {
     let script = r#"while kill -0 "$1" 2>/dev/null; do sleep 0.5; done; /usr/bin/hdiutil detach "$2" -quiet"#;
-    let _ = Command::new("/bin/sh")
+    let mut sh = Command::new("/bin/sh"); // proceso largo: a propósito, nadie lo espera
+    let _ = no_console_window(&mut sh)
         .arg("-c")
         .arg(script)
         .arg("sh")
@@ -141,18 +152,11 @@ fn eject_after_exit(volume: &Path) {
 
 /// La primera lengua de las preferencias del sistema; una app abierta desde Finder no trae `LANG`.
 fn spanish() -> bool {
-    Command::new("/usr/bin/defaults")
-        .args(["read", "-g", "AppleLanguages"])
-        .stderr(Stdio::null())
-        .output()
-        .ok()
-        .and_then(|out| {
-            String::from_utf8_lossy(&out.stdout)
-                .split(['(', ',', '\n'])
-                .map(|item| item.trim().trim_matches('"').to_owned())
-                .find(|item| !item.is_empty())
-        })
-        .is_some_and(|first| first.starts_with("es"))
+    let languages: CFArray<CFString> =
+        unsafe { TCFType::wrap_under_create_rule(CFLocaleCopyPreferredLanguages()) };
+    languages
+        .get(0)
+        .is_some_and(|first| first.to_string().starts_with("es"))
 }
 
 #[cfg(test)]
