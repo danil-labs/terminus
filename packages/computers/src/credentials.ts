@@ -44,7 +44,15 @@ export type Credential = {
 export type CredentialRecipient = { computer_id: string; name: string | null; public_key: string | null; online: boolean };
 
 /** Una clave de la bóveda de esta máquina que no está en la cuenta (solo el motor la da). */
-export type LocalOnlyCredential = { slot: string; kind: CredentialKind; provider: string; label: string | null; hint: string | null };
+export type LocalOnlyCredential = {
+  slot: string;
+  kind: CredentialKind;
+  provider: string;
+  label: string | null;
+  hint: string | null;
+  /** El último fallo al subirla sola (`credentials.error.<código>`), si lo hubo. */
+  upload_error?: string | null;
+};
 
 export type CredentialsListing = {
   credentials: Credential[];
@@ -161,7 +169,16 @@ export function credentialsListingOf(raw: unknown): CredentialsListing {
   if (Array.isArray(raw.local_only))
     listing.local_only = raw.local_only.flatMap((l): LocalOnlyCredential[] =>
       isObj(l) && str(l.slot)
-        ? [{ slot: l.slot as string, kind: (str(l.kind) ?? "api_key") as CredentialKind, provider: str(l.provider) ?? "", label: str(l.label), hint: str(l.hint) }]
+        ? [
+            {
+              slot: l.slot as string,
+              kind: (str(l.kind) ?? "api_key") as CredentialKind,
+              provider: str(l.provider) ?? "",
+              label: str(l.label),
+              hint: str(l.hint),
+              ...(str(l.upload_error) ? { upload_error: str(l.upload_error) } : {}),
+            },
+          ]
         : [],
     );
   return listing;
