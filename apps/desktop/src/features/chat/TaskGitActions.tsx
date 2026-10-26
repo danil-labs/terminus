@@ -106,7 +106,7 @@ export default function TaskGitActions(props: {
       </Button>
 
     </div></Show>
-    <Dialog open={sheet() !== null} onOpenChange={(value) => { if (!value && !finishing()) setSheet(null); }}>
+    <Show when={sheet() !== null}><Dialog open={sheet() !== null} onOpenChange={(value) => { if (!value && !finishing()) setSheet(null); }}>
       <DialogContent>
         <DialogTitle class="text-base font-semibold">{sheet() === "finish" ? t("projects.sessions.finish") : t("chat.task.details")}</DialogTitle>
         <p class="mt-3 break-words text-sm font-medium">{props.title}</p>
@@ -121,6 +121,6 @@ export default function TaskGitActions(props: {
           <Button disabled={!ready()} data-task-finish-confirm onClick={() => sheet() === "finish" ? void finish() : setSheet("finish")}>{t("projects.sessions.finish")}</Button>
         </div>
       </DialogContent>
-    </Dialog>
+    </Dialog></Show>
   </>;
 }
