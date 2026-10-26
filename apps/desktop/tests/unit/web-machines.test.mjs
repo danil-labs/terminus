@@ -310,6 +310,49 @@ test("AI credentials with the same email keep separate cards and machine actions
   assert.deepEqual(app.fallos, []);
 });
 
+test("one subscription shows both machine chips while Team keeps its own card and actions", async () => {
+  const list = (active, accounts) => ({ provider: "codex", env_var: "", shared_credential: null, secret_note: null, active, accounts });
+  const status = (id, plan) => ({ id, authenticated: true, detail: `ana@example.com · ${plan}` });
+  const { app, calls, doc } = await open("web-account-subscriptions", [VM, MAC], {
+    cmp_vm: { table: table("Panel", "VM", {
+      list_language_packs: [],
+      list_bundled_language_packs: [],
+      get_profile: { name: "Fixture" },
+      get_project_directory: "/lab",
+      list_accounts: list("personal", [account("personal", "ana@example.com"), account("team", "ana@example.com")]),
+      account_status: ({ id }) => status(id, id === "personal" ? "Pro" : "Team"),
+      account_limits: ({ id }) => ({ mode: "read", plan: id === "personal" ? "Pro" : "Team", windows: [] }),
+      set_active_account: null,
+      tasks_awaiting_quota: [],
+    }) },
+    cmp_mac: { table: table("Notas", "Mac", {
+      list_accounts: list("copy", [account("copy", "Ana@Example.com")]),
+      account_status: ({ id }) => status(id, "Pro"),
+      account_limits: { mode: "read", plan: "Pro", windows: [] },
+    }) },
+  });
+  const button = (label) => [...doc.querySelectorAll("button")].find((b) => b.textContent?.trim() === label || b.getAttribute("aria-label") === label);
+  button("Configuración").click();
+  assert.ok(await until(() => button("Proveedores de IA")));
+  button("Proveedores de IA").click();
+  assert.ok(await until(() => doc.querySelectorAll('[data-account-machines="cmp_vm~personal"] [data-account-machine]').length === 2));
+  assert.equal(doc.querySelectorAll("[data-account-machines]").length, 2, "one Pro card and one Team card");
+  const personal = doc.querySelector('[data-account-machines="cmp_vm~personal"]');
+  const team = doc.querySelector('[data-account-machines="cmp_vm~team"]');
+  assert.deepEqual([...personal.querySelectorAll("[data-account-machine]")].map((m) => m.dataset.accountMachine), ["cmp_vm", "cmp_mac"]);
+  assert.deepEqual([...team.querySelectorAll("[data-account-machine]")].map((m) => m.dataset.accountMachine), ["cmp_vm"]);
+  const useTeam = [...team.previousElementSibling.querySelectorAll("button")].find((b) => b.textContent.trim() === "Usar esta");
+  assert.ok(useTeam);
+  useTeam.click();
+  assert.ok(await until(() => calls("cmp_vm", "set_active_account").some((c) => c.args.id === "team")));
+  const mac = doc.querySelector('[data-account-machines="cmp_vm~personal"] [data-account-machine="cmp_mac"]');
+  mac.querySelector("button").click();
+  mac.querySelector("[data-sign-out-yes]").click();
+  assert.ok(await until(() => calls("cmp_mac", "remove_account").some((c) => c.args.id === "copy")));
+  assert.equal(calls("cmp_vm", "remove_account").length, 0, "sign out removes only the selected machine's credential");
+  assert.deepEqual(app.fallos, []);
+});
+
 test("provider login from settings receives its link and code", async () => {
   let created = false;
   const { app, f, calls, doc } = await open("web-settings-login", [VM, MAC], {

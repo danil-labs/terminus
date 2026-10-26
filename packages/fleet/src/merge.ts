@@ -244,8 +244,8 @@ function mergeProjects(ctx: MergeContext, parts: Slice[], workspace: string | nu
 }
 
 /**
- * Cada credencial conserva su id, máquina y consumo. El correo no une cuentas:
- * Claude Personal y Team pueden compartirlo. La misma regla sirve al teléfono.
+ * El correo solo no une cuentas: Claude Personal y Team pueden compartirlo.
+ * Si el motor conoce el tipo, las copias conservan sus ids por máquina.
  */
 function mergeAccounts(ctx: MergeContext, parts: Slice[]): unknown {
   const lists = parts.filter((s) => isRow(s.value) && Array.isArray((s.value as Row).accounts));
@@ -264,7 +264,7 @@ function mergeAccounts(ctx: MergeContext, parts: Slice[]): unknown {
     machines: g.members.map((m) => ({ ...m, id: panelId(m.machine, m.id) })),
   }));
   const activeId = (lead.value as Row).active;
-  const active = typeof activeId === "string" && accounts.some((a) => a.id === panelId(lead.machine, activeId)) ? panelId(lead.machine, activeId) : null;
+  const active = typeof activeId === "string" ? accounts.find((a) => a.machines.some((m) => m.machine === lead.machine && m.id === panelId(lead.machine, activeId)))?.id ?? null : null;
   return { ...(lead.value as Row), active, accounts };
 }
 

@@ -21,7 +21,7 @@ type Login = LoginProgress & { host: Host; workspace: string | null; provider: P
 
 /**
  * Proveedores de IA: las cuentas de la persona en todas sus máquinas, como el
- * panel de la web (#154). Una tarjeta por proveedor y correo con su consumo
+ * panel de la web (#154). Una tarjeta por proveedor, correo y tipo con su consumo
  * (leído una vez, de una máquina encendida) y una chapa por máquina donde
  * tiene la sesión iniciada: encendida o apagada (neutra), con su ✕ para
  * cerrarla. «Iniciar sesión en otra máquina» corre el inicio sin pantalla de
@@ -63,14 +63,21 @@ export default function Accounts() {
               return { machine: h.id, on: h.power() === "on", accounts: (list?.accounts ?? []) as AiAccount[] };
             }),
           );
-          const groups = groupAccounts(provider.id, perHost);
+          const readings = new Map<string, AccountLimits | null>();
+          for (const list of perHost) {
+            const host = hosts.find((h) => h.id === list.machine);
+            for (const account of list.accounts) {
+              const reading = host && list.on && account.authenticated_at ? await limitsOf(host, scopeOf(host), provider.id, account.id) : null;
+              readings.set(JSON.stringify([list.machine, account.id]), reading);
+            }
+          }
+          const groups = groupAccounts(provider.id, perHost.map((list) => ({ ...list, accounts: list.accounts.map((a) => {
+            const reading = readings.get(JSON.stringify([list.machine, a.id]));
+            const plan = reading?.mode === "read" ? reading.plan : reading?.mode === "waiting" ? reading.last?.plan : null;
+            return { ...a, plan };
+          }) })));
           const limits: Record<string, AccountLimits | null> = {};
-          await Promise.all(
-            groups.map(async (g) => {
-              const host = hosts.find((h) => h.id === g.usageFrom.machine);
-              limits[g.key] = host && g.usageFrom.on && g.row.authenticated_at ? await limitsOf(host, scopeOf(host), provider.id, g.usageFrom.id) : null;
-            }),
-          );
+          for (const g of groups) limits[g.key] = readings.get(JSON.stringify([g.usageFrom.machine, g.usageFrom.id])) ?? null;
           return { provider, groups, limits };
         }),
       );
