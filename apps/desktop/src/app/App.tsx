@@ -163,7 +163,7 @@ import { capabilities } from "../lib/platform";
 import { pedirElCampo } from "../lib/focus";
 import { lastRoster, rememberRoster } from "../lib/handlerRoster";
 import { aplicarLenguaDeWorkspace, clavesConocidas, t } from "../lib/i18n";
-import { moveAttachments, NotMovable } from "../lib/remoteAttachments";
+import { attachmentsOn, NotMovable } from "../lib/remoteAttachments";
 import { invoke } from "../lib/invoke.ts";
 import { connected } from "../lib/engineConnection";
 import { openChatVisual, readChatVisual } from "../features/chat/readVisual";
@@ -595,6 +595,11 @@ export default function App() {
   // El árbol, el visor y kn piden por `machineOf` desde fuera de aquí: con la fila, no solo con el prefijo.
   setTaskRowMachine((id) => filaDe(id)?.machine);
   const deLaTarea = (id: string | null | undefined) => machineOf(id);
+  const enMaquina = (machine: string | undefined) => (machine ? { headers: { "x-terminus-machine": machine } } : undefined);
+  // En qué máquina vive cada adjunto que no está en el motor de la ventana:
+  // la imagen pegada recién guardada y su copia ya preparada.
+  const pegadasEn = new Map<string, string>();
+  const adjuntosEn = new Map<string, string>();
   /**
    * El space con que nace o sigue algo en `machine`. Uno de esta ventana viaja:
    * es de la cuenta, con el mismo id en todas (el router lo comparte antes si
@@ -1033,10 +1038,14 @@ export default function App() {
   async function agregarArchivos(paths: string[]) {
     const key = claveAbierta();
     const workspace = workspaceActivo();
+    // Una imagen pegada ya está en la máquina del turno: su copia se prepara allá.
+    const machine = paths.length ? pegadasEn.get(paths[0]) : undefined;
+    const opciones = machine && paths.every((p) => pegadasEn.get(p) === machine) ? enMaquina(machine) : undefined;
     const prepared = await invoke<string[]>("prepare_attachments", {
       project: project(),
       paths,
-    });
+    }, opciones);
+    if (machine) for (const path of prepared) adjuntosEn.set(path, machine);
     if (workspace !== workspaceActivo()) return;
     editarBorrador(key, (b) => ({
       ...b,
@@ -1831,28 +1840,37 @@ export default function App() {
   }
 
   /**
-   * Los adjuntos con las rutas de la máquina donde corre el turno. Se
-   * prepararon en el motor de la ventana (`agregarArchivos`, `pegarImagen`); si
-   * el turno va a otra, sus imágenes viajan allá antes de mandar
-   * (`lib/remoteAttachments.ts`).
+   * Los adjuntos con las rutas de la máquina donde corre el turno. Un archivo
+   * soltado o elegido se prepara en el motor de la ventana; una imagen pegada,
+   * en la máquina del turno (`pegarImagen`). Lo que no está ya allá viaja
+   * antes de mandar (`lib/remoteAttachments.ts`).
    */
-  async function attachmentsFor(paths: string[], options: { headers: Record<string, string> } | undefined): Promise<string[]> {
+  async function attachmentsFor(paths: string[], options: { headers: Record<string, string> } | undefined, proyecto: string): Promise<string[]> {
     const machine = options?.headers["x-terminus-machine"];
-    if (!machine || paths.length === 0 || machines().find((x) => x.id === machine)?.local) return paths;
+    const local = (id: string | undefined) => !id || !!machines().find((x) => x.id === id)?.local;
+    const alla = (path: string) => adjuntosEn.get(path) === machine || (local(adjuntosEn.get(path)) && local(machine));
     try {
-      return await moveAttachments(paths, {
-        read: (path) => invoke<Preview>("preview_file", { path, rel: path }),
+      const listas = await attachmentsOn(paths, alla, {
+        read: (path) => invoke<Preview>("preview_file", { path, rel: path }, enMaquina(adjuntosEn.get(path))),
         save: (mime, datos) => invoke<string>("guardar_imagen_pegada", { mime, datos }, options),
-        prepare: (saved) => invoke<string[]>("prepare_attachments", { project: project(), paths: saved }, options),
+        prepare: (saved) => invoke<string[]>("prepare_attachments", { project: proyecto, paths: saved }, options),
       });
+      if (machine) for (const path of listas) adjuntosEn.set(path, machine);
+      return listas;
     } catch (e) {
       if (!(e instanceof NotMovable)) throw e;
-      throw { what: t("chat.attachments.remote_images_only", { names: lista(e.names), machine: machineName(machine) }), detail: "remote_images_only" };
+      throw { what: t("chat.attachments.remote_images_only", { names: lista(e.names), machine: machineName(machine ?? "local") }), detail: "remote_images_only" };
     }
   }
 
-  function pegarImagen(mime: string, datos: string): Promise<string> {
-    return invoke<string>("guardar_imagen_pegada", { mime, datos });
+  /** Los bytes ya están en la ventana: van directo a la máquina del turno, sin pasar por la miniatura de 4 MB. */
+  async function pegarImagen(mime: string, datos: string): Promise<string> {
+    const abierta = sessionId();
+    const opciones = abierta ? deLaTarea(abierta) : runOnOptions(workspaceActivo(), projectList().find((p) => p.id === project()));
+    const ruta = await invoke<string>("guardar_imagen_pegada", { mime, datos }, opciones);
+    const machine = opciones?.headers["x-terminus-machine"];
+    if (machine) pegadasEn.set(ruta, machine);
+    return ruta;
   }
 
   // La carpeta de trabajo de la tarea: se abre afuera desde la cabecera y la
@@ -5478,7 +5496,7 @@ export default function App() {
       // La respuesta de una persona no existe en la interfaz hasta que Rust la
       // validó y la escribió: primero persistir, y solo entonces pintarla.
       const opciones = abierta ? deLaTarea(abierta) : llevado ? { headers: { "x-terminus-machine": llevado.target } } : runOnOptions(workspaceActivo(), lugar);
-      const attachments = await attachmentsFor(m.attachments, opciones);
+      const attachments = await attachmentsFor(m.attachments, opciones, proyecto);
       const id = await invoke<string>("send_message", {
         provider: m.provider,
         project: proyecto,
@@ -6164,13 +6182,14 @@ export default function App() {
     const sourceWorkspace = workspaceActivo();
     setInjecting((items) => [...items, { session: abierta, id }]);
     try {
+      const attachments = await attachmentsFor(m.attachments, deLaTarea(abierta), sourceProject);
       await invoke("inject_message", {
         project: sourceProject,
         session: abierta,
         prompt: m.text,
         taskMentions: m.task_mentions ?? [],
         queueId: id,
-        attachments: m.attachments,
+        attachments,
       }, deLaTarea(abierta));
       if (workspaceActivo() !== sourceWorkspace) return;
       // El turno sigue siendo el mismo, pero lo que contesta cambió: sin esto
@@ -6181,7 +6200,7 @@ export default function App() {
       const saved = savedQueues.get(abierta);
       if (saved) savedQueues.set(abierta, { ...saved, items: saved.items.filter((item) => item.id !== id) });
       if (sessionId() === abierta && project() === sourceProject) setCola((c) => c.filter((q) => q.id !== id));
-      anexar(abierta, (ms) => [...ms, { role: "user", text: m.text, task_mentions: m.task_mentions, attachments: m.attachments.length ? m.attachments : undefined }]);
+      anexar(abierta, (ms) => [...ms, { role: "user", text: m.text, task_mentions: m.task_mentions, attachments: attachments.length ? attachments : undefined }]);
     } catch (e) {
       const clave = claveDe(e);
       // El turno acaba de cerrar: el mensaje sigue en la cola y sale como el siguiente.
