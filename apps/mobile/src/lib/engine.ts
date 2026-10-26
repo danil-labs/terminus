@@ -30,12 +30,11 @@ import type {
   Space,
   TaskBlockers,
   Startup,
-  TreeContent,
   Turn,
   Workspace,
   WorkspaceAttention,
 } from "@terminus/protocol";
-import { MAX_VISUAL_BYTES, VISUAL_FILE, VISUAL_TREE } from "@terminus/chat/visual";
+import { readVisualHtml, type VisualPart, type VisualWhole, VISUAL_FILE, VISUAL_TREE } from "@terminus/chat/visual";
 import { type AccountWorkspace, groupWorkspaces, linkedAttention, onlyLinked, registryProjects, withRegistry } from "@terminus/computers";
 import { type ChatBackgroundView, chatBackgroundImageUrl, chatBackgroundView, isSingleAttention } from "@terminus/protocol";
 import { type FlatRow, flattenTasks, launcherOf } from "@terminus/tasks";
@@ -355,6 +354,38 @@ export async function loadTask(host: Host, workspace: string, folder: string, id
   return { session, permissions: pending?.permissions ?? [], questions, running: live.includes(id), cachedAt: at.cachedAt };
 }
 
+/**
+ * Una lectura que se pide desde muchos lados (volver al frente, el foco, un evento, la
+ * máquina que cambia) sin pisarse: con una en marcha, las que se piden mientras tanto se
+ * juntan (`merge`) en una sola que corre al terminar, y todas esperan a esa. Así nunca
+ * hay dos a la vez y la última petición siempre ve una lectura que empezó después de ella.
+ */
+export function coalesced<T>(run: (arg: T) => Promise<void>, merge: (a: T, b: T) => T): (arg: T) => Promise<void> {
+  let running: Promise<void> | null = null;
+  let queued: { arg: T } | null = null;
+  return (arg) => {
+    if (running) {
+      queued = { arg: queued ? merge(queued.arg, arg) : arg };
+      return running;
+    }
+    running = (async () => {
+      try {
+        let current = arg;
+        for (;;) {
+          await run(current);
+          if (!queued) return;
+          current = queued.arg;
+          queued = null;
+        }
+      } finally {
+        running = null;
+        queued = null;
+      }
+    })();
+    return running;
+  };
+}
+
 /** Lo que el cuadro de escribir elige para un mensaje, como la ventana. */
 export type Draft = {
   prompt: string;
@@ -627,13 +658,21 @@ export async function previewFile(host: Host, workspace: string, path: string, t
   return answer.value;
 }
 
-/** El HTML de una visualización del chat, del árbol de la tarea; las mismas comprobaciones que la ventana. */
+/** El HTML de una visualización del chat, por partes o de una vez; el mismo lector que la ventana. */
 export async function readVisual(host: Host, workspace: string, folder: string, session: string, file: string): Promise<string> {
   if (file.length > 128 || !VISUAL_FILE.test(file)) throw new HostError("invalid_visual_file");
-  const { value } = await host.call<TreeContent>("tree_show", workspace, { project: folder, session, tree: VISUAL_TREE, path: file });
-  if (!value || value.truncated || value.bytes > MAX_VISUAL_BYTES) throw new HostError("visual_too_large");
-  if (value.kind !== "text" || typeof value.text !== "string") throw new HostError("invalid_visual_file");
-  return value.text;
+  try {
+    return await readVisualHtml({
+      part: async (offset, size, revision) =>
+        (await host.call<VisualPart>("chat_visual_part", workspace, { project: folder, session, file, offset, size, revision: revision ?? null })).value,
+      whole: async () =>
+        (await host.call<VisualWhole>("tree_show", workspace, { project: folder, session, tree: VISUAL_TREE, path: file })).value,
+    });
+  } catch (error) {
+    const detail = error && typeof error === "object" && "detail" in error ? error.detail : null;
+    if (detail === "invalid_visual_file" || detail === "visual_too_large" || detail === "visual_read_failed") throw new HostError(detail);
+    throw error;
+  }
 }
 
 // --- Cuentas de IA ---------------------------------------------------------------

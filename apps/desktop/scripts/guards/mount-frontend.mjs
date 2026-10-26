@@ -1804,9 +1804,9 @@ if (!roto) {
   };
   const flat = await mount("listo", "5-flat", groupedResponses, undefined, SIN_AGRUPAR);
   assert.equal(flat.w.document.querySelector("[data-folder-group]"), null, "sin agrupar no hay filas de carpeta");
-  // `p` te necesita: su segunda línea es lo que pide, con el color de la carpeta al final.
-  assert.ok(flat.w.document.querySelector('[data-sesion="p"] [data-session-request]'), "lo que te piden ocupa la segunda línea");
-  assert.ok(flat.w.document.querySelector('[data-sesion="p"] [data-folder-square="folder"]'), "la carpeta va como dato de la fila");
+  // `p` falló (por su delegada) y no pide nada: su segunda línea es la normal.
+  assert.equal(flat.w.document.querySelector('[data-sesion="p"] [data-session-request]'), null, "una fallida no enseña su último mensaje");
+  assert.ok(flat.w.document.querySelector('[data-sesion="p"] [data-folder-chip="folder"]'), "la carpeta va como dato de la fila");
   assert.deepEqual(flat.fallos, []);
   flat.w.close();
   const grouped = await bootPorCarpeta("listo", 5, groupedResponses);

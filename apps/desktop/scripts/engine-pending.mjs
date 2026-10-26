@@ -6,6 +6,10 @@
  * los tiene, la entrada sobra y los guardas fallan hasta quitarla: esta lista
  * solo se vacía.
  */
-export const COMANDOS_PENDIENTES = {};
+export const COMANDOS_PENDIENTES = {
+  // Los visuales del chat por partes, con sus imágenes incrustadas (seldon-host `feat/chat-visuals-by-parts`).
+  // Hasta que el pin lo traiga, la ventana cae a `tree_show` (512 KiB).
+  chat_visual_part: "seldon-host feat/chat-visuals-by-parts",
+};
 
 export const EVENTOS_PENDIENTES = {};

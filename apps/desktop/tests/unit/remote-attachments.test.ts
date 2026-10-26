@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { moveAttachments, NotMovable, type AttachmentMover } from "../../src/lib/remoteAttachments.ts";
+import { attachmentsOn, moveAttachments, NotMovable, type AttachmentMover } from "../../src/lib/remoteAttachments.ts";
 
 /** Dos motores: la Mac de la ventana tiene los archivos; la VM, lo que se le sube. */
 function motores(mac: Record<string, string | null>) {
@@ -56,4 +56,14 @@ test("sin adjuntos no se llama a ningún motor", async () => {
   const { c, llamadas } = motores({});
   assert.deepEqual(await moveAttachments([], c), []);
   assert.deepEqual(llamadas, []);
+});
+
+test("una imagen pegada que ya está en la VM no viaja otra vez; las de la Mac sí, y el orden se conserva", async () => {
+  const { c, llamadas } = motores({ "/Users/alberto/b.png": "data:image/png;base64,BBBB" });
+  const enLaVm = "/home/alberto/.terminus/attachments/y/pegada.png";
+  const rutas = await attachmentsOn([enLaVm, "/Users/alberto/b.png"], (ruta) => ruta === enLaVm, c);
+  assert.deepEqual(rutas, [enLaVm, "/home/alberto/.terminus/attachments/x/captura-0.png"]);
+  assert.equal(llamadas.some((l) => l.includes(enLaVm)), false);
+  assert.deepEqual(await attachmentsOn([enLaVm], () => true, c), [enLaVm]);
+  assert.equal(llamadas.length, 3);
 });

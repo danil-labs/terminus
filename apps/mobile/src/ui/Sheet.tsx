@@ -1,17 +1,36 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Icon, type IconName } from "./Icon";
+import { SearchField } from "./Search";
 import { useTheme } from "./theme";
 
 /**
  * Una hoja desde abajo para los selectores del cuadro de escribir (modelo,
  * permisos, máquina, carpeta, rama, adjuntar): el popover del escritorio en el
- * teléfono. Se cierra tocando fuera o con el gesto atrás de Android.
+ * teléfono. Se cierra tocando fuera o con el gesto atrás de Android. Con
+ * `search` lleva un buscador arriba y `children` es una función que recibe lo
+ * buscado; la búsqueda se borra al cerrar.
  */
-export function Sheet({ visible, title, onClose, children }: { visible: boolean; title?: string; onClose: () => void; children: ReactNode }) {
+export function Sheet({
+  visible,
+  title,
+  search,
+  onClose,
+  children,
+}: {
+  visible: boolean;
+  title?: string;
+  search?: string;
+  onClose: () => void;
+  children: ReactNode | ((query: string) => ReactNode);
+}) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const [query, setQuery] = useState("");
+  useEffect(() => {
+    if (!visible) setQuery("");
+  }, [visible]);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       <KeyboardAvoidingView style={styles.root} behavior="padding">
@@ -19,8 +38,9 @@ export function Sheet({ visible, title, onClose, children }: { visible: boolean;
         <View style={[styles.sheet, { backgroundColor: theme.surface, paddingBottom: insets.bottom + 12, borderColor: theme.border }]}>
           <View style={[styles.grabber, { backgroundColor: theme.border }]} />
           {title ? <Text style={[styles.title, { color: theme.text }]}>{title}</Text> : null}
+          {search ? <SearchField testID="sheet-search" value={query} onChange={setQuery} placeholder={search} /> : null}
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 4 }}>
-            {children}
+            {typeof children === "function" ? children(query) : children}
           </ScrollView>
         </View>
       </KeyboardAvoidingView>

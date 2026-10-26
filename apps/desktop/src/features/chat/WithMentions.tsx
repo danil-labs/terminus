@@ -1,6 +1,7 @@
 import { For, Show } from "solid-js";
 import { splitMentions } from "../../lib/mentions";
-import type { MentionTarget, TaskMention } from "../../lib/taskMentions";
+import { capabilities } from "../../lib/platform";
+import { mentionedSession, type MentionTarget, type TaskMention } from "../../lib/taskMentions";
 import { cn } from "../../lib/utils";
 
 /**
@@ -15,16 +16,17 @@ export function WithMentions(props: {
   taskMentions?: TaskMention[];
   onOpenTask?: (folder: string, task: string) => void;
 }) {
-  const chunks = (): { text: string; reference: string | null; target?: MentionTarget }[] => {
+  const chunks = (): { text: string; reference: string | null; target?: MentionTarget; task?: string | null }[] => {
     const mentions = props.taskMentions ?? [];
     if (!mentions.length) return splitMentions(props.children);
-    const result: { text: string; reference: string | null; target?: MentionTarget }[] = [];
+    const result: { text: string; reference: string | null; target?: MentionTarget; task?: string | null }[] = [];
     let end = 0;
     for (const mention of mentions) {
       if (mention.start < end || mention.end > props.children.length ||
         props.children.slice(mention.start, mention.end) !== mention.text) continue;
       result.push(...splitMentions(props.children.slice(end, mention.start)));
-      result.push({ text: mention.text, reference: mention.text, target: mention.target });
+      // La de otra máquina se abre con su id de panel (`elsewhere`).
+      result.push({ text: mention.text, reference: mention.text, target: mention.target, task: mentionedSession(mention, capabilities().windowMachine?.()?.id ?? null) });
       end = mention.end;
     }
     result.push(...splitMentions(props.children.slice(end)));
@@ -52,7 +54,7 @@ export function WithMentions(props: {
                 type="button"
                 class={cn("cursor-pointer rounded-sm bg-surface-muted px-1 font-mono text-[0.92em] text-link hover:underline focus-visible:outline-2 focus-visible:outline-primary", props.class)}
                 onClick={() => {
-                  if (t.target?.kind === "task") props.onOpenTask?.(t.target.projectId, t.target.sessionId);
+                  if (t.target?.kind === "task") props.onOpenTask?.(t.target.projectId, t.task ?? t.target.sessionId);
                 }}
               >
                 {t.text}

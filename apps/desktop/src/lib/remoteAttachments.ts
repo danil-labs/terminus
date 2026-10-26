@@ -49,3 +49,14 @@ export async function moveAttachments(paths: string[], c: AttachmentMover): Prom
   for (const { image } of read) saved.push(await c.save(image!.mime, image!.datos));
   return c.prepare(saved);
 }
+
+/**
+ * Como `moveAttachments`, pero solo lleva las que no están ya en la máquina
+ * del turno (`here`); las demás conservan su ruta y su lugar.
+ */
+export async function attachmentsOn(paths: string[], here: (path: string) => boolean, c: AttachmentMover): Promise<string[]> {
+  const moving = paths.filter((p) => !here(p));
+  if (moving.length === 0) return paths;
+  const moved = await moveAttachments(moving, c);
+  return paths.map((p) => (here(p) ? p : moved.shift()!));
+}
