@@ -407,6 +407,17 @@ test("provider login from settings receives its link and code", async () => {
   assert.deepEqual(app.fallos, []);
 });
 
+test("the audited additive engine works in the panel and through the relay contract gate", async () => {
+  const contract = "3972c281dba1b61f9ad06fc82fbf059af3dbc55770b0a1bcb59ce786ec0a56f1";
+  const { app, calls, doc, text } = await open("web-machines-additive-contract", [{ ...VM, contract }], {
+    cmp_vm: { table: table("Panel actualizado", "Tarea de la VM"), contract },
+  });
+  assert.equal(doc.querySelector('[data-machine-row="cmp_vm"]')?.dataset.state, "online");
+  assert.ok(calls("cmp_vm", "list_projects").length > 0);
+  assert.ok(text().includes("Panel actualizado"));
+  assert.deepEqual(app.fallos, []);
+});
+
 test("the computer list says which engine needs an update before anything is asked", async () => {
   const own = createHash("sha256").update(readFileSync(new URL("../../src-tauri/crates/engine-protocol/commands.json", import.meta.url))).digest("hex");
   const { app, calls, doc, text } = await open("web-machines-contract", [{ ...VM, contract: own }, { ...MAC, contract: "0".repeat(64) }], {

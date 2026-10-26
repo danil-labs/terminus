@@ -4,11 +4,21 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { machineCompatibility } from "../../src/web/compatibility.ts";
+import { machineCompatibility, machineContracts } from "../../src/web/compatibility.ts";
 import { webAccountProfile } from "../../src/web/account.ts";
 import { approveDevice, denyDevice, lookupDevice, normalizeCode } from "../../src/web/connect/devices.ts";
 
 const API = "https://computers.danil.ai";
+
+test("the audited visual-parts extension keeps existing web calls compatible", () => {
+  const base = "d4541d178c64a065c1a4a0c693817eb84ad17052fd605815295fa1696955ef8f";
+  const extended = "3972c281dba1b61f9ad06fc82fbf059af3dbc55770b0a1bcb59ce786ec0a56f1";
+  assert.equal(machineCompatibility(extended, base), "ok");
+  assert.equal(machineCompatibility(base, extended), "ok");
+  assert.equal(machineCompatibility("0".repeat(64), base), "outdated");
+  assert.deepEqual(machineContracts(base), [base, extended]);
+  assert.deepEqual(machineContracts("0".repeat(64)), ["0".repeat(64)]);
+});
 
 function fake(handler: (url: string, init: RequestInit) => { status: number; body?: unknown }) {
   const seen: { url: string; init: RequestInit }[] = [];
