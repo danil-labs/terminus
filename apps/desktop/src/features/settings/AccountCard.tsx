@@ -31,6 +31,11 @@ export default function AccountCard(props: {
   active: boolean;
   status?: AccountStatus;
   checkingStatus?: boolean;
+  /**
+   * La cuenta estaba autenticada y la última consulta de estado no respondió.
+   * Lo que quedó en `status` es de antes y no se enseña como «conectada».
+   */
+  statusUnknown?: boolean;
   limits?: Query;
   lastGood?: Read;
   loadingLimits?: boolean;
@@ -91,6 +96,14 @@ export default function AccountCard(props: {
       fallback={<StatusTag row={fila()}>{t("settings.account_card.checking")}</StatusTag>}
     >
       <Show
+        when={!props.statusUnknown}
+        fallback={
+          <StatusTag row={fila()} tone="disconnected">
+            {t("settings.account_card.unverified")}
+          </StatusTag>
+        }
+      >
+      <Show
         when={
           autenticada() !== undefined &&
           !props.status?.unreadable &&
@@ -103,6 +116,7 @@ export default function AccountCard(props: {
             ? t("settings.account_card.connected")
             : t("settings.account_card.disconnected")}
         </StatusTag>
+      </Show>
       </Show>
     </Show>
   );

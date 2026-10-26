@@ -14,6 +14,8 @@ export type Space = {
   folders: string[];
   created_at: number;
   updated_at: number;
+  /** De la cuenta de Danil: el mismo id en todas las máquinas del workspace. */
+  account?: boolean;
 };
 
 export type SpaceRef = { id: string; name: string | null; deleted?: boolean };
@@ -39,23 +41,36 @@ export type DeleteOutcome = {
 };
 
 type Fila = {
+  id?: string;
   space?: string | null;
   archived?: boolean | null;
+  /** La máquina de la cuenta que tiene la tarea; sin ella, es de esta computadora. */
+  machine?: string | null;
 };
 
 export const spaceName = (i: { name: string | null } | null | undefined) =>
   i?.name ?? t("spaces.default_name");
 
-/** Si la fila se pinta en el escritorio `desk`. Sin escritorio se pinta todo. */
+/**
+ * Si la fila se pinta en el escritorio `desk`. Sin escritorio se pinta todo.
+ * Una tarea de otra máquina en un space de la cuenta trae el mismo id que aquí;
+ * en uno que solo tiene esa máquina, el de esa máquina (con su prefijo).
+ */
 export function enEscritorio(row: Fila, desk: string | null): boolean {
   if (desk === null) return true;
   return !row.space || row.space === desk;
 }
 
-/** De qué escritorio vivo es la fila, o `null` si de ninguno en concreto. */
+/**
+ * De qué escritorio vivo es la fila, o `null` si de ninguno en concreto. Una
+ * tarea de otra máquina en un space que solo tiene esa máquina no lleva a
+ * ninguno: abrirla no saca a la persona del escritorio donde la ve.
+ */
 export function escritorioDeFila(row: Fila | undefined, vivas: readonly Space[]): string | null {
   if (!row || !row.space) return null;
-  return vivas.some((i) => i.id === row.space) ? row.space : null;
+  const viva = vivas.find((i) => i.id === row.space);
+  if (!viva || (row.machine && !viva.account)) return null;
+  return viva.id;
 }
 
 /**

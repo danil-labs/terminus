@@ -1,4 +1,5 @@
 export {
+  type AgentOption,
   type SidebarContext,
   type SidebarDensity,
   type SidebarGroup,
@@ -11,14 +12,17 @@ export {
   DENSITIES,
   GROUPINGS,
   activityOf,
+  agentOptions,
   applySidebarView,
+  groupKey,
   isPinned,
   needsYou,
   nonDefaultCount,
+  sameAgent,
   sanitizeSidebarView,
   statusKeyOf,
 } from "./view.ts";
-export { type FlatRow, type FlatTask, type LauncherRow, flattenTasks, folderCounts, shownUnderLauncher } from "./flat.ts";
+export { type FlatRow, type FlatTask, type LauncherRow, delegatedOf, flattenTasks, folderCounts, launcherOf, shownUnderLauncher } from "./flat.ts";
 export {
   type AgentPresence,
   type DockAgent,
@@ -43,3 +47,4 @@ export {
   taskPreview,
   taskTitle,
 } from "./preview.ts";
+export { type CardPull, type CheckState, type PullTone, type TaskGit, cardPull } from "./pull.ts";

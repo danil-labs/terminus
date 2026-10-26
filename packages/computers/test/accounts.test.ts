@@ -2,17 +2,30 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { groupAccounts, resetLabel, usageTone, windowLabel, windowLeft } from "../src/index.ts";
 
-test("una tarjeta por correo con sus máquinas; el consumo se lee de una encendida", () => {
+test("cada credencial conserva su tarjeta y su máquina aunque comparta correo", () => {
   const groups = groupAccounts("claude", [
     { machine: "vm", on: false, accounts: [{ id: "a1", label: "Trabajo", identity: "Ana@Example.com" }, { id: "a2", label: "Sin correo", identity: null }] },
     { machine: "mac", on: true, accounts: [{ id: "m1", label: "", identity: "ana@example.com" }] },
   ]);
-  assert.equal(groups.length, 2);
+  assert.equal(groups.length, 3);
   assert.equal(groups[0].email, "ana@example.com");
-  assert.deepEqual(groups[0].members, [{ machine: "vm", id: "a1", on: false }, { machine: "mac", id: "m1", on: true }]);
-  assert.deepEqual(groups[0].usageFrom, { machine: "mac", id: "m1", on: true });
+  assert.deepEqual(groups[0].members, [{ machine: "vm", id: "a1", on: false }]);
+  assert.deepEqual(groups[0].usageFrom, { machine: "vm", id: "a1", on: false });
+  assert.deepEqual(groups[2].usageFrom, { machine: "mac", id: "m1", on: true });
   assert.equal(groups[1].email, null);
   assert.equal(groups[1].key, "claude:vm~a2");
+});
+
+test("Claude Personal y Team del mismo correo conservan consumo y cierre de sesión independientes", () => {
+  const groups = groupAccounts("claude", [
+    { machine: "vm", on: true, accounts: [{ id: "personal", label: "Personal", identity: "ana@example.com" }, { id: "team", label: "Team", identity: "ana@example.com" }] },
+    { machine: "mac", on: true, accounts: [{ id: "personal", label: "Otra credencial", identity: "ana@example.com" }] },
+  ]);
+  assert.equal(new Set(groups.map((g) => g.key)).size, 3);
+  assert.deepEqual(groups.map((g) => [g.row.label, g.usageFrom.machine, g.usageFrom.id]), [
+    ["Personal", "vm", "personal"], ["Team", "vm", "team"], ["Otra credencial", "mac", "personal"],
+  ]);
+  assert.ok(groups.every((g) => g.members.length === 1));
 });
 
 test("lo que queda, su tono y cuándo vuelve, con las palabras del escritorio", () => {

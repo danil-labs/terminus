@@ -13,9 +13,20 @@ export type Step = { kind: StepKind; name: string; target: string | null; ok: bo
 /** Una fila: uno o varios pasos seguidos de la misma clase, que se leen como un acto. */
 export type StepRow = { kind: StepKind; steps: Step[] };
 
+/**
+ * Quién escribió un input que no es de la persona: un encargado o una tarea por
+ * el CLI. Como en la ventana, va a la izquierda con su cara y su firma.
+ */
+export type Sender = { agent: string | null; task: string | null; provider: string | null };
+
+export function senderOf(turn: Turn): Sender | null {
+  if (turn.role !== "user" || (!turn.agent && !turn.from_task)) return null;
+  return { agent: turn.agent ?? null, task: turn.from_task?.title ?? null, provider: turn.from_task?.provider ?? null };
+}
+
 /** Un renglón de la conversación. */
 export type Line =
-  | { key: string; kind: "message"; role: string; text: string; images: string[]; attachments: string[] }
+  | { key: string; kind: "message"; role: string; text: string; images: string[]; attachments: string[]; from?: Sender | null }
   /** Lo que el agente dijo antes de su respuesta, mientras trabajaba. */
   | { key: string; kind: "progress"; text: string }
   | { key: string; kind: "steps"; rows: StepRow[] }
@@ -89,7 +100,8 @@ const toStep = (tool: TurnTool) => stepOf(tool.name ?? "", tool.target ?? null, 
  * final; sin él, los pasos delante del texto.
  */
 export function linesOfTurn(turn: Turn, key: string, images: string[]): Line[] {
-  const message = (text: string): Line => ({ key, kind: "message", role: turn.role, text, images, attachments: turn.attachments ?? [] });
+  const from = senderOf(turn);
+  const message = (text: string): Line => ({ key, kind: "message", role: turn.role, text, images, attachments: turn.attachments ?? [], from });
   if (turn.shell) return [{ key, kind: "shell", command: turn.text ?? "", output: turn.shell.output ?? "", exitCode: turn.shell.exit_code ?? null }];
   const tools = turn.tools ?? [];
   const pieces = turn.pieces ?? [];
@@ -145,6 +157,30 @@ export function applyLive(live: readonly LivePiece[], event: { kind: string; tex
     return live.map((p, j) => (j === i && "step" in p ? { step: done(p.step) } : p));
   }
   return live;
+}
+
+/**
+ * Lo vivo después de releer la tarea. `before` es lo vivo cuando empezó la lectura.
+ * - El turno ya no corre: lo guardado lo trae todo.
+ * - `resync` (terminó, guardó un tramo —`segment_saved`—, se perdieron eventos, volvió al
+ *   frente): lo que había al empezar ya está guardado; queda solo lo que llegó durante la
+ *   lectura, con el pedazo de texto que se siguió escribiendo sobre el último.
+ * - Si no (el foco, un aviso, la máquina que cambia), lo que se escribe en vivo se queda:
+ *   releer no borra la respuesta a medias.
+ */
+export function liveAfterRead(now: readonly LivePiece[], before: readonly LivePiece[], read: { running: boolean; resync: boolean }): readonly LivePiece[] {
+  if (!read.running) return now.length ? [] : now;
+  if (!read.resync || !before.length) return now;
+  // Lo vivo empezó de nuevo durante la lectura (no es continuación de `before`): se queda.
+  if (now.length < before.length) return now;
+  const rest = now.slice(before.length);
+  const last = before.length - 1;
+  const was = before[last];
+  const is = now[last];
+  if (was && is && "text" in was && "text" in is && is.text.length > was.text.length && is.text.startsWith(was.text)) {
+    return [{ text: is.text.slice(was.text.length) }, ...rest];
+  }
+  return rest;
 }
 
 /** Los renglones de lo que llega en vivo: el último texto es la respuesta que se está escribiendo. */

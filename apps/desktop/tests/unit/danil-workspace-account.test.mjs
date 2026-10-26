@@ -40,7 +40,7 @@ const FDB = { ...ALBERTO, account: "u_fdb", email: "alberto@dondebanco.org", nam
 const unknown = () => Object.assign(new Error("command"), { what: { clave: "shell.service.command" }, detail: "command" });
 
 /** El motor: sesiones, el mapa workspace → cuenta y el workspace abierto. */
-function engine({ sessions = [ALBERTO, FDB], map = { w: "u_alberto", w2: "u_fdb" }, active = "w", setAccount } = {}) {
+function engine({ sessions = [ALBERTO, FDB], map = { w: "u_alberto", w2: "u_fdb" }, active = "w", setAccount, status } = {}) {
   const state = { sessions, map, active };
   const calls = [];
   const record = (command, reply) => (args) => {
@@ -64,7 +64,8 @@ function engine({ sessions = [ALBERTO, FDB], map = { w: "u_alberto", w2: "u_fdb"
         state.active = id;
         return null;
       }),
-      danil_connect_status: () => ({ state: "connected", computer_id: "cmp_a", account: "u_alberto", email: "alberto@danil.ai", online: true }),
+      danil_connect_status: () =>
+        status ?? (state.sessions.length ? { state: "connected", computer_id: "cmp_a", account: "u_alberto", email: "alberto@danil.ai", online: true } : { state: "disconnected", name: "Mac de Alberto" }),
       danil_sessions: record("danil_sessions", () => state.sessions),
       danil_workspace_account: record("danil_workspace_account", ({ workspace }) => of(workspace)),
       danil_workspace_set_account: record(
@@ -105,7 +106,11 @@ test("the workspace shows its account, syncs with it, and moves to another signe
   assert.ok(section(w).textContent.includes("Cuenta de este workspace"));
   assert.equal(select(w).value, "u_alberto", "the open workspace's account is chosen");
   const options = [...select(w).options].map((o) => o.textContent);
-  assert.deepEqual(options, ["alberto@danil.ai", "alberto@dondebanco.org", "Conectar otra cuenta…"], "the default first, then the others, then another one");
+  assert.deepEqual(
+    options,
+    ["alberto@danil.ai", "alberto@dondebanco.org", "Sin cuenta (no se sincroniza)", "Conectar otra cuenta…"],
+    "the default first, then the others, no account, then another one",
+  );
   assert.ok(section(w).textContent.includes("Se sincroniza con alberto@danil.ai"));
 
   await choose(w, "u_fdb");
@@ -113,6 +118,46 @@ test("the workspace shows its account, syncs with it, and moves to another signe
   assert.equal(select(w).value, "u_fdb");
   assert.ok(section(w).textContent.includes("Se sincroniza con alberto@dondebanco.org"), section(w).textContent);
   assert.equal(w.document.querySelector("[role=alert]"), null);
+  assert.deepEqual(app.fallos, []);
+});
+
+test("a workspace nobody chose an account for says so, and the sidebar footer shows nobody", async () => {
+  const e = engine({ map: { w2: "u_fdb" } });
+  const app = await openWorkspaces("danil-workspace-account-none", e);
+  const { w } = app;
+  assert.equal(section(w)?.dataset.workspaceAccount, "none");
+  assert.ok(section(w).textContent.includes("Este workspace no es de ninguna cuenta: no se ve en la web ni en el teléfono."), section(w).textContent);
+  assert.equal(select(w).value, "", "the picker says «Sin cuenta»");
+  assert.equal(w.document.querySelector("[data-danil-foot]"), null, "the sidebar footer shows nobody for a workspace without an account");
+
+  await choose(w, "u_alberto");
+  assert.deepEqual(e.calls.find((c) => c.command === "danil_workspace_set_account")?.args, { workspace: "w", account: "u_alberto" });
+  assert.ok(section(w).textContent.includes("Se sincroniza con alberto@danil.ai"), section(w).textContent);
+  assert.deepEqual(app.fallos, []);
+});
+
+test("«Sin cuenta» asks first and then takes the workspace out of its account only", async () => {
+  const e = engine();
+  const app = await openWorkspaces("danil-workspace-account-leave", e);
+  const { w } = app;
+  await choose(w, "");
+  const ask = () => w.document.querySelector("[data-workspace-leave]");
+  assert.ok(ask(), "it asks before leaving the account");
+  assert.ok(ask().textContent.includes("Se quita de alberto@danil.ai: deja de verse en su web y su teléfono."), ask().textContent);
+  assert.equal(select(w).value, "u_alberto", "nothing changed yet");
+  assert.ok(!e.calls.some((c) => c.command === "danil_workspace_set_account"));
+  [...ask().querySelectorAll("button")].find((b) => b.textContent === "Cancelar").click();
+  await sleep(200);
+  assert.equal(ask(), null);
+  assert.ok(!e.calls.some((c) => c.command === "danil_workspace_set_account"), "cancel keeps it in its account");
+
+  await choose(w, "");
+  ask().querySelector("[data-workspace-leave-yes]").click();
+  await sleep(300);
+  assert.deepEqual(e.calls.find((c) => c.command === "danil_workspace_set_account")?.args, { workspace: "w", account: null });
+  assert.ok(!e.calls.some((c) => c.command === "danil_disconnect"), "the account stays signed in");
+  assert.equal(select(w).value, "");
+  assert.ok(section(w).textContent.includes("no es de ninguna cuenta"), section(w).textContent);
   assert.deepEqual(app.fallos, []);
 });
 
@@ -125,6 +170,100 @@ test("«Conectar otra cuenta…» starts another sign-in and leaves the workspac
   assert.equal(e.calls.find((c) => c.command === "open_external")?.args?.target, "https://app.danil.ai/terminus/connect?code=WDJB-MJHT");
   assert.equal(select(w).value, "u_alberto", "the picker stays on the current account");
   assert.ok(!e.calls.some((c) => c.command === "danil_workspace_set_account"), "nothing moves until the new account is chosen");
+  assert.deepEqual(app.fallos, []);
+});
+
+test("«Conectar otra cuenta…» on a workspace with an account does not move it when the new one signs in", async () => {
+  const e = engine();
+  const app = await openWorkspaces("danil-workspace-account-add-keep", e);
+  const { w } = app;
+  await choose(w, "+other");
+  const YTW = { ...ALBERTO, account: "u_ytw", email: "alberto@yucatantechweek.mx", computer_id: "cmp_c", default: false, workspaces: [] };
+  e.state.sessions = [...e.state.sessions, YTW];
+  app.emit("danil-sessions", e.state.sessions);
+  await sleep(400);
+  assert.ok(!e.calls.some((c) => c.command === "danil_workspace_set_account"), "it already had an account: it stays there");
+  assert.deepEqual(app.fallos, []);
+});
+
+async function openDanilAccounts(name, e) {
+  const app = await boot("listo", name, { ...BASE, ...e.table });
+  app.w.dispatchEvent(new app.w.CustomEvent("harness:open-settings", { detail: "cuenta-danil" }));
+  await sleep(1000);
+  return app;
+}
+const here = (w) => w.document.querySelector("[data-danil-here]");
+const buttonIn = (root, label) => [...(root?.querySelectorAll("button") ?? [])].find((b) => b.textContent.trim() === label);
+
+test("Cuentas de Danil is the app's, and on top says the open workspace belongs to no account and links it with one click", async () => {
+  const e = engine({ map: {} });
+  const app = await openDanilAccounts("danil-accounts-here-none", e);
+  const { w } = app;
+  assert.ok(here(w), w.document.body.textContent.slice(0, 400));
+  assert.ok(here(w).textContent.includes("Este workspace: Danil"), here(w).textContent);
+  assert.ok(here(w).textContent.includes("Este workspace no es de ninguna cuenta"), here(w).textContent);
+  assert.ok(!here(w).textContent.includes("Cuenta de este workspace"), "the section title already says so");
+  const nav = w.document.querySelector("#cfg-tab-cuenta-danil");
+  assert.equal(nav?.closest("div[role=presentation]")?.querySelector("p")?.textContent, "Aplicación", "in the app's group, not the workspace's connections");
+  assert.ok(w.document.querySelector("[data-danil-account]").textContent.includes("Iniciar sesión no mete ningún workspace a la cuenta"));
+
+  buttonIn(here(w), "Usar alberto@danil.ai").click();
+  await sleep(400);
+  assert.deepEqual(
+    e.calls.filter((c) => c.command === "danil_workspace_set_account").map((c) => c.args),
+    [{ workspace: "w", account: "u_alberto" }],
+    "one click, only the open workspace",
+  );
+  assert.ok(here(w).textContent.includes("Se sincroniza con alberto@danil.ai"), here(w).textContent);
+  assert.equal(buttonIn(here(w), "Usar alberto@danil.ai"), undefined, "with an account, no more «Usar…»");
+  assert.deepEqual(app.fallos, []);
+});
+
+test("signing in another account from a workspace without one links that workspace, and no other", async () => {
+  const e = engine({ map: { w2: "u_fdb" } });
+  const app = await openDanilAccounts("danil-accounts-add-claims", e);
+  const { w } = app;
+  buttonIn(w.document.querySelector("[data-danil-account]"), "Agregar otra cuenta").click();
+  await sleep(300);
+  assert.deepEqual(e.calls.find((c) => c.command === "danil_connect_start")?.args, { add: true });
+  assert.ok(!e.calls.some((c) => c.command === "danil_workspace_set_account"), "nothing until it signs in");
+
+  const YTW = { ...ALBERTO, account: "u_ytw", email: "alberto@yucatantechweek.mx", computer_id: "cmp_c", default: false, workspaces: [] };
+  e.state.sessions = [...e.state.sessions, YTW];
+  app.emit("danil-sessions", e.state.sessions);
+  await sleep(400);
+  assert.deepEqual(
+    e.calls.filter((c) => c.command === "danil_workspace_set_account").map((c) => c.args),
+    [{ workspace: "w", account: "u_ytw" }],
+    "the open workspace goes to the account that signed in; the others are left alone",
+  );
+  app.emit("danil-sessions", e.state.sessions);
+  await sleep(200);
+  assert.equal(e.calls.filter((c) => c.command === "danil_workspace_set_account").length, 1, "only once");
+  assert.deepEqual(app.fallos, []);
+});
+
+test("the first sign-in on this computer, from a workspace, links that workspace", async () => {
+  const e = engine({ sessions: [], map: {} });
+  e.table.danil_connect_start = (args) => {
+    e.calls.push({ command: "danil_connect_start", args });
+    return { state: "pending", user_code: "WDJB-MJHT", verification_uri_complete: "https://app.danil.ai/terminus/connect?code=WDJB-MJHT" };
+  };
+  const app = await openDanilAccounts("danil-accounts-first-claims", e);
+  const { w } = app;
+  assert.ok(here(w)?.textContent.includes("Este workspace no es de ninguna cuenta"), w.document.body.textContent.slice(0, 400));
+  assert.equal(here(w).querySelectorAll("button").length, 0, "no second sign-in button up there: it is just below");
+  buttonIn(w.document.querySelector("[data-danil-account]"), "Iniciar sesión con Danil").click();
+  await sleep(300);
+  assert.ok(e.calls.some((c) => c.command === "danil_connect_start"));
+
+  e.state.sessions = [ALBERTO];
+  app.emit("danil-connect", { state: "connected", computer_id: "cmp_a", account: "u_alberto", email: "alberto@danil.ai", online: true });
+  await sleep(500);
+  assert.deepEqual(
+    e.calls.filter((c) => c.command === "danil_workspace_set_account").map((c) => c.args),
+    [{ workspace: "w", account: "u_alberto" }],
+  );
   assert.deepEqual(app.fallos, []);
 });
 
@@ -203,7 +342,6 @@ test("the sidebar footer shows the open workspace's account and follows a switch
   e.state.sessions = [ALBERTO];
   app.emit("danil-sessions", e.state.sessions);
   await sleep(400);
-  assert.equal(foot()?.dataset.danilFoot, "signed_out", "its account signed out: not the other account");
-  assert.equal(foot().getAttribute("title"), "alberto@dondebanco.org · sin sesión en esta computadora");
+  assert.equal(foot(), null, "its account signed out: nobody, and not the other account");
   assert.deepEqual(app.fallos, []);
 });

@@ -117,6 +117,7 @@ test("a workspace talks as its account; signed out, as nobody", async () => {
   }, "signed in but not joined (workspace_id_taken) is not called synced");
   assert.deepEqual(syncLine({ account: "u_ytw", email: "a@ytw.mx", signed_in: false, linked: false }, list), { kind: "unsynced", email: "a@ytw.mx" });
   assert.deepEqual(syncLine(null, list), { kind: "unsynced", email: null });
+  assert.deepEqual(syncLine({ account: null, email: null, signed_in: false, linked: false }, list), { kind: "none" }, "nobody chose an account");
 });
 
 test("adding an account starts the flow with add and opens the approval page", async () => {
@@ -168,4 +169,15 @@ test("an account that is no longer signed in is told apart when changing a works
   const refused = await setWorkspaceAccount("w1", "u_gone").catch((e: unknown) => e);
   assert.equal(changeProblem(null, refused), "account_not_found");
   assert.equal(changeProblem(null, new Error("x")), "failed");
+});
+
+test("the account that just signed in is the first connected one that was not there before", async () => {
+  const { newSessionKey } = await sessions();
+  const s = (account: string | null, status = "connected", computer_id: string | null = null) =>
+    ({ account, email: null, name: null, photo: null, computer_id, default: false, workspaces: [], status, online: true }) as never;
+  assert.equal(newSessionKey(["u_a"], [s("u_a")]), null, "the same account signing in again is not new");
+  assert.equal(newSessionKey(["u_a"], [s("u_a"), s(null, "pending")]), null, "a pending one is not an account yet");
+  assert.equal(newSessionKey(["u_a"], [s("u_a"), s("u_b")]), "u_b");
+  assert.equal(newSessionKey([], [s(null, "connected", "cmp_x")]), "cmp_x", "without a person id, its computer names it");
+  assert.equal(newSessionKey([], null), null);
 });

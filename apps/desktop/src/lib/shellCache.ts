@@ -41,7 +41,11 @@ export function readShellCache(): ShellSnapshot | null {
   if (!entry) return null;
   try {
     const snapshot = JSON.parse(entry.snapshot) as ShellSnapshot;
-    return snapshot.workspace === value.last && Array.isArray(snapshot.projects) ? snapshot : null;
+    if (snapshot.workspace !== value.last || !Array.isArray(snapshot.projects)) return null;
+    // Una foto no es una respuesta: lo que otra máquina dijo vuelve como copia de esa hora.
+    const copy = (row: SessionRow): SessionRow => (row.machine && row.machine_status === "ok" ? { ...row, machine_status: "cached" } : row);
+    const sessions = Object.fromEntries(Object.entries(snapshot.sessions).map(([folder, rows]) => [folder, rows.map(copy)]));
+    return { ...snapshot, sessions };
   } catch {
     return null;
   }

@@ -279,6 +279,13 @@
   --animate-barrido: barrido 1.6s steps(16) infinite;
   /* Lo que aparece en su sitio: sube poco y se enciende. */
   --animate-entrar: entrar 0.35s ease both;
+  /* Lo que falló tiembla de lado a lado una vez. */
+  --animate-sacudir: sacudir 0.45s ease-in-out both;
+  @keyframes sacudir {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-6px); }
+    40%, 80% { transform: translateX(6px); }
+  }
   @keyframes entrar {
     from {
       opacity: 0;

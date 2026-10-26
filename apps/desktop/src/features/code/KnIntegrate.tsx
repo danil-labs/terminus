@@ -1,5 +1,6 @@
 import { For, Show, createSignal } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
+import { machineOf } from "../machines/store";
 import { Button } from "../../ui/Button";
 import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
 import { FailureNote, asFailure, type Failure } from "../../ui/Failure";
@@ -46,7 +47,7 @@ export default function KnIntegrate(props: {
       setPendientes(await invoke<Resumen>("kn_pending", {
         project: props.project,
         session: props.session,
-      }));
+      }, machineOf(props.session)));
     } catch (e) {
       setFallo(asFailure(e));
     }
@@ -57,7 +58,7 @@ export default function KnIntegrate(props: {
     setOcupado("finish");
     setFallo(null);
     try {
-      await invoke("kn_finish", { project: props.project, session: props.session });
+      await invoke("kn_finish", { project: props.project, session: props.session }, machineOf(props.session));
       setAbierto(false);
       avisarDeLosArboles(props.session);
     } catch (e) {
@@ -72,11 +73,11 @@ export default function KnIntegrate(props: {
     setOcupado("update");
     setFallo(null);
     try {
-      await invoke("kn_update", { project: props.project, session: props.session });
+      await invoke("kn_update", { project: props.project, session: props.session }, machineOf(props.session));
       setPendientes(await invoke<Resumen>("kn_pending", {
         project: props.project,
         session: props.session,
-      }));
+      }, machineOf(props.session)));
     } catch (e) {
       setFallo(asFailure(e));
     } finally {

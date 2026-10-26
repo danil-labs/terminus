@@ -1,5 +1,6 @@
 import { Show } from "solid-js";
 import { clavesConocidas, t } from "../lib/i18n";
+import { SIN_ESPACIO, textoSinEspacio } from "../lib/no-space";
 import { prosa, type Prosa } from "../lib/prose";
 
 /**
@@ -50,6 +51,7 @@ export function asFailure(e: unknown): Failure {
 export function prosaDe(e: unknown, datos?: Record<string, string | number>): string {
   if (e && typeof e === "object" && "what" in e) return prosa((e as Failure).what);
   const clave = claveDe(e);
+  if (clave === SIN_ESPACIO) return textoSinEspacio(datos);
   return clave ? t(clave, datos) : String(e);
 }
 

@@ -1,5 +1,6 @@
 import { createSignal } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
+import { machineOf } from "../machines/store";
 
 /**
  * La cara propia, ya leída como `data:` URI. La política de la ventana no
@@ -25,7 +26,7 @@ export function generacionDeAvatar(): number {
 export function urlDeAvatar(path: string): Promise<string | null> {
   let pendiente = urls.get(path);
   if (!pendiente) {
-    pendiente = invoke<{ data_url: string | null }>("preview_file", { path, rel: path })
+    pendiente = invoke<{ data_url: string | null }>("preview_file", { path, rel: path }, machineOf(path))
       .then((v) => v.data_url)
       .catch(() => null);
     urls.set(path, pendiente);

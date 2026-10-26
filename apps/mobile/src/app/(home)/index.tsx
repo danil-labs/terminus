@@ -1,4 +1,4 @@
-import { applySidebarView, folderCounts, groupLabel, nonDefaultCount, scopeLabel, type SidebarView } from "@terminus/tasks";
+import { applySidebarView, folderCounts, groupKey, groupLabel, nonDefaultCount, scopeLabel, type SidebarView } from "@terminus/tasks";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -8,6 +8,7 @@ import { taskInSpace, taskKey } from "../../lib/engine";
 import { lang, t, w } from "../../lib/i18n";
 import { useMachines } from "../../lib/machines";
 import { Notifications } from "../../lib/notifications";
+import { useTaskGit } from "../../lib/useTaskGit";
 import { spaceName, useWorkspaces } from "../../lib/workspaces";
 import { AgentDock } from "../../ui/AgentDock";
 import { Avatar, Badge, openPreview, openTask } from "../../ui/components";
@@ -28,7 +29,7 @@ const NEEDS_YOU = new Set(["approving", "asked", "failed"]);
 export default function Tasks() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { attention, hosts, fleet } = useMachines();
+  const { attention, hosts, hostOf, fleet } = useMachines();
   const { list, current, snapshot, loading, reload, space, selectSpace, view, setView } = useWorkspaces();
   const [askNotifications, setAskNotifications] = useState(false);
 
@@ -55,11 +56,19 @@ export default function Tasks() {
   // Como el escritorio: de las carpetas elegidas, las que siguen teniendo tareas.
   const kept = view.folders.filter((f) => (counts.get(f) ?? 0) > 0);
   const effective: SidebarView = kept.length === view.folders.length ? view : { ...view, folders: kept };
-  const groups = applySidebarView(tasks.map((task) => ({ ...cardTask(task, marks), task })), effective, {
+  // Se agrupa por el id de la carpeta en la cuenta, el mismo en todas las máquinas: una carpeta con
+  // tareas en dos máquinas sale en un grupo por máquina («Terminus · vm-principal»), y el filtro las junta.
+  const folderIdOf = (key: string) => snapshot?.folders.find((f) => f.key === key)?.id ?? key.slice(key.indexOf("/") + 1);
+  const groups = applySidebarView(tasks.map((task) => ({ ...cardTask(task, marks), task })), { ...effective, folders: effective.folders.map(folderIdOf) }, {
     live: marks.live,
     approving: [...marks.attention].filter(([, s]) => s === "approving").map(([k]) => k),
-    folderOf: (row) => row.task.folderKey,
+    folderOf: (row) => row.task.folder,
+    machineOf: (row) => row.task.host,
   });
+  // El PR de la línea 2: git solo de las tarjetas en pantalla; en «Compacta» no hay línea 2.
+  const git = useTaskGit(hostOf, effective.density === "compact" ? [] : groups.flatMap((group) => group.tasks.map(({ task }) => task)));
+  const groupFolderName = (id: string) => snapshot?.folders.find((f) => f.id === id)?.name ?? id;
+  const machineName = (id: string) => hosts.find((h) => h.id === id)?.label ?? id;
   const agents = (snapshot?.agents ?? []).filter((a) => a.places.some((p) => inSpace(`${p.host}/${p.folder}`)));
   const changed = nonDefaultCount(view);
 
@@ -157,13 +166,14 @@ export default function Tasks() {
         />
 
         {groups.map((group) => (
-          <View key={`${group.kind}-${group.key}`} style={styles.group}>
-            <Text style={[styles.groupTitle, { color: theme.textMuted }]}>{groupLabel(lang, group, (id) => folderName(id) ?? id)}</Text>
+          <View key={groupKey(group)} style={styles.group}>
+            <Text style={[styles.groupTitle, { color: theme.textMuted }]}>{groupLabel(lang, group, groupFolderName, machineName)}</Text>
             {group.tasks.map(({ task }) => (
               <TaskCard
                 key={taskKey(task)}
                 task={task}
                 card={cardOf(task, marks, effective.group === "folder")}
+                git={git[taskKey(task)]}
                 folderName={folderName}
                 density={effective.density}
                 onPress={() => openTask(task.host, task.workspace, task.folder, task.id)}

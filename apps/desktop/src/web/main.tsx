@@ -1,37 +1,57 @@
 /**
  * The browser entry (`web.html`, `pnpm web:build`), served by the Danil app on
  * its own origin. It reads the Supabase session that app stored, lists the
- * person's computers and mounts the app over one relay session each. A page
- * that sets `window.terminusWeb` before this module loads can replace any
- * setting, or give `getToken` with `computerId` or `computers` and skip the session.
+ * person's computers and mounts the app at once over the account's fleet
+ * (`@terminus/fleet`, the desktop's router): each machine is one relay session
+ * and one slice, the saved one first and the live one behind; nothing waits for
+ * a machine to answer. A page that sets `window.terminusWeb` before this module
+ * loads can replace any setting, or give `getToken` with `computerId` or
+ * `computers` and skip the session.
  */
-import { linkedWorkspaces, listWorkspaces, screenProtocols, screenUrl } from "@terminus/computers";
+import {
+  type Computer,
+  type MachineState,
+  RelaySession,
+  linkedWorkspaces,
+  listComputers,
+  listWorkspaces,
+  orderComputers,
+  renameComputer,
+  screenProtocols,
+  screenUrl,
+  sessionProbe,
+  startComputer,
+  wakes,
+} from "@terminus/computers";
 import { chosenWebLayout, MOBILE_WEB_DIR } from "@terminus/design";
+import { Fleet, type Link, type MachineInfo, unwrap } from "@terminus/fleet";
 import { createSignal, lazy, Suspense } from "solid-js";
+import { createRouter, type Router, type SliceChange } from "../features/machines/router";
 import { t } from "../lib/i18n";
+import { leerPref } from "../lib/prefs";
 import { setCapabilities } from "../lib/platform";
+import { deliver } from "../lib/serviceEvents";
 // In the page, not in the lazy app chunk: the stylesheet loads with the HTML.
 import "../styles/global.css";
-import type { Computer } from "./computers";
 import { machineCompatibility } from "./compatibility";
-import { wakes } from "./fleet";
 import { HomeLink } from "./HomeLink";
 import { installIpc } from "./ipc";
 import { webAccountProfile } from "./account";
-import { type RelayConfig, RelaySession } from "./relay";
-import type { MachineRow } from "./SyncNote";
+import { webWorkspaceAssets } from "./workspace-assets";
+import type { MachineRow, MachineStatus } from "./SyncNote";
 import { type BrowserHost, createWebTransport } from "./transport";
 
 declare const __TERMINUS_VERSION__: string;
+declare const __TERMINUS_CONTRACT__: string;
 /** Set at build time in `vite.config.ts`; all public values. */
 declare const __TERMINUS_WEB__: WebSettings;
 
 type WebSettings = { endpoint: string; supabaseUrl: string; supabaseKey: string; login: string };
 
-export type TerminusWebConfig = Partial<WebSettings & RelayConfig & { computers: Computer[] }>;
-type Base = Omit<RelayConfig, "computerId" | "beforeReconnect">;
+type Base = { endpoint: string; getToken: () => string | Promise<string>; onUnauthorized?: () => void };
+export type TerminusWebConfig = Partial<WebSettings & Base & { computerId: string; computers: Computer[] }>;
 
-/** How often the page lists the computers again to pick up workspaces linked or unlinked since it loaded; the desktop's cadence. */
+/** How often the page lists the computers again to pick up machines and links changed since it loaded; the desktop's cadence. */
 const RELIST = 10 * 60_000;
 
 const Picker = lazy(() => import("../features/machines/MachinePicker").then((m) => ({ default: m.MachinePicker })));
@@ -46,36 +66,122 @@ const browser: BrowserHost = {
   readText: () => navigator.clipboard.readText(),
 };
 
-/** Mounts the app; what it returns applies a newer computer list's linked workspaces without remounting. */
+const pageStorage = () => {
+  try {
+    return localStorage;
+  } catch {
+    return null;
+  }
+};
+
+/** The machine picked in «Ejecutar en» for `workspace` (`features/machines/store.ts`), remembered per workspace. */
+const pickedFor = (workspace: string | null) => (workspace ? (leerPref<Record<string, string>>("machines.run_on", {})[workspace] ?? null) : null);
+
+const infoOf = (c: Computer): MachineInfo => ({
+  id: c.computer_id,
+  name: c.name?.trim() || c.computer_id,
+  wakes: wakes(c),
+  outdated: machineCompatibility(c.contract) === "outdated",
+  linked: linkedWorkspaces(c),
+});
+
+/**
+ * A relay session whose state, until the relay says it, is the one of its row
+ * in `/v1/computers`: a machine listed off with a saved slice is not asked.
+ */
+function rowLink(relay: RelaySession, row: () => string | undefined): Link {
+  return {
+    state: () => (relay.state() === "unknown" ? ((row() as MachineState | undefined) ?? "unknown") : relay.state()),
+    call: (id, command, workspace, folder, args, timeout) => relay.call(id, command, workspace, folder, args, timeout),
+    onState: (listener) => relay.onState(listener),
+    onEvents: (listener) => relay.onEvents(listener),
+    onEngine: (listener) => relay.onEngine(listener),
+    blocked: () => relay.blocked(),
+    onBlocked: (listener) => relay.onBlocked(listener),
+    retry: () => relay.retry(),
+    onDeferred: (listener) => relay.onDeferred(listener),
+    deferred: () => relay.deferred(),
+    subscribe: (after) => relay.subscribe(after),
+    start: () => relay.start(),
+    close: () => relay.close(),
+  };
+}
+
+/** Another machine's slice changed: the window rereads just that. */
+function slicesChanged(changes: SliceChange[]) {
+  window.dispatchEvent(new CustomEvent("harness:machine-slices", { detail: { changes } }));
+  if (changes.includes("attention")) window.dispatchEvent(new CustomEvent("harness:service-resync"));
+}
+
+/** Mounts the app; what it returns applies a newer computer list (machines, names, links) without remounting. */
 function mountApp(computers: Computer[], base: Base, before?: (id: string) => () => Promise<boolean>): (computers: Computer[]) => void {
   const [changed, bump] = createSignal(0);
-  const links = computers.map((c) => {
-    const [at, setAt] = createSignal<number | null>(null);
-    const relay = new RelaySession({ ...base, computerId: c.computer_id, beforeReconnect: before?.(c.computer_id) });
-    relay.onState(() => bump((n) => n + 1));
-    const info = {
-      id: c.computer_id,
-      name: c.name || c.computer_id,
-      wakes: wakes(c),
-      outdated: machineCompatibility(c.contract) === "outdated",
-      linked: linkedWorkspaces(c),
-    };
-    return { info, relay, onSync: setAt, at };
+  let rows = new Map(computers.map((c) => [c.computer_id, c]));
+  const token = async () => base.getToken();
+  let router: Router | null = null;
+  const powers = new Map<string, string>();
+  const fleet = new Fleet({
+    self: null,
+    connect: (info) =>
+      rowLink(
+        new RelaySession({
+          endpoint: base.endpoint,
+          computerId: info.id,
+          getToken: base.getToken,
+          onUnauthorized: base.onUnauthorized,
+          beforeReconnect: before?.(info.id),
+          // Con otro contrato el relay ni reenvía ni contesta del espejo: `version_mismatch`.
+          contracts: [__TERMINUS_CONTRACT__],
+          // Un upgrade sin licencia no trae cuerpo: se pregunta por HTTP para no reintentar en bucle.
+          probe: async () => sessionProbe(base.endpoint, await token(), info.id),
+        }),
+        () => rows.get(info.id)?.state,
+      ),
+    compatible: (contract) => {
+      const verdict = machineCompatibility(contract);
+      return verdict === "unknown" ? null : verdict === "ok";
+    },
+    wake: async (id) => (await startComputer(base.endpoint, await token(), id)).kind === "ok",
+    storage: pageStorage(),
+    onSlice: () => bump((n) => n + 1),
+    // La cola de aplazadas cambió (aquí, en el escritorio o en el teléfono): la lista se relee.
+    onDeferred: (machine) => router?.deferredChanged(machine),
+    onChange: (machine) => {
+      bump((n) => n + 1);
+      const now = fleet.power(machine);
+      // Sin workspaces de nadie al abrir: la primera máquina que se enciende los trae.
+      if (now === "on" && powers.get(machine) !== "on" && router?.unlisted()) window.dispatchEvent(new CustomEvent("harness:workspace"));
+      powers.set(machine, now);
+    },
+    onEvents: (machine, events, gap) => {
+      if (events.length) router?.events(machine, events);
+      if (gap) window.dispatchEvent(new CustomEvent("harness:service-resync"));
+    },
   });
   // The account's workspaces list even with every machine of theirs asleep; an older control plane answers none.
   const registry = async () => {
-    const answer = await listWorkspaces(base.endpoint, await base.getToken());
+    const answer = await listWorkspaces(base.endpoint, await token());
+    if (answer.kind === "unauthorized") base.onUnauthorized?.();
     return answer.kind === "ok" ? answer.value : null;
   };
-  const transport = createWebTransport(links, __TERMINUS_VERSION__, browser, () => bump((n) => n + 1), null, registry);
+  const active = createRouter({ self: null, fleet, native: null, registry, onSlices: slicesChanged, deliver, pickedFor });
+  router = active;
+  fleet.setMachines(orderComputers(computers).map(infoOf));
+  fleet.subscribeEvents();
+
+  const status = (id: string): MachineStatus => {
+    const power = fleet.power(id);
+    return power === "on" ? "online" : power === "off" ? "offline" : power;
+  };
   const machines = (): MachineRow[] => {
     changed();
-    return transport.fleet.machines.map((m) => {
-      const l = links.find((x) => x.info.id === m.id);
-      return { id: m.id, name: m.name, status: transport.status(m.id), at: l?.at() ?? null };
-    });
+    const slices = fleet.sliceStatuses();
+    return fleet.machines().map((m) => ({ id: m.id, name: m.name, status: status(m.id), at: slices[m.id]?.status === "cached" ? slices[m.id].at : null }));
   };
-  const multi = transport.fleet.multi;
+  const several = () => {
+    changed();
+    return fleet.machines().length > 1;
+  };
   // A file dropped outside the chat would replace the page with it.
   for (const type of ["dragover", "drop"]) window.addEventListener(type, (e) => e.preventDefault());
   setCapabilities({
@@ -86,36 +192,66 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
     browserFiles: true,
     sidebarExtra: () => <HomeLink />,
     accountProfile: webAccountProfile(base.endpoint, base.getToken, base.onUnauthorized),
-    machineName: (id) => transport.fleet.name(id),
+    accountAssets: webWorkspaceAssets(base.endpoint, base.getToken, base.onUnauthorized),
+    accountMemory: { endpoint: base.endpoint, getToken: token },
+    machineName: (id) => fleet.name(id),
+    taskMachine: (id) => unwrap(id, fleet.remotes())?.machine ?? null,
     windowMachine: () => {
-      const first = transport.fleet.machines[0];
-      return first && { id: first.id, name: first.name, local: false };
+      const id = active.createsOn(null)?.machine;
+      return id ? { id, name: fleet.name(id), local: false } : undefined;
     },
-    remoteCreate: (workspace) => transport.createsOn(workspace),
-    machineScreen: (id) =>
-      links.some(({ info }) => info.id === id && info.wakes)
-        ? async () => new WebSocket(screenUrl(base.endpoint, id), screenProtocols(await base.getToken()))
-        : null,
-    machineOnCreate: multi
-      ? (workspace) => (
-          <Suspense fallback={null}>
-            <div class="flex items-center gap-1 pt-2 text-xs text-neutral-500" data-create-on="">
-              <span>{t("web.machines.create_on")}</span>
-              <Picker workspace={workspace} />
-            </div>
-          </Suspense>
-        )
-      : undefined,
-    accountMachines: multi
-      ? (props) => (
-          <Suspense fallback={null}>
-            <AccountMachines {...props} machines={machines} />
-          </Suspense>
-        )
-      : undefined,
+    remoteCreate: (workspace) => active.createsOn(workspace),
+    machineScreen: (id) => (fleet.info(id)?.wakes ? async () => new WebSocket(screenUrl(base.endpoint, id), screenProtocols(await token())) : null),
+    machineOnCreate: (workspace) =>
+      several() ? (
+        <Suspense fallback={null}>
+          <div class="flex items-center gap-1 pt-2 text-xs text-neutral-500" data-create-on="">
+            <span>{t("web.machines.create_on")}</span>
+            <Picker workspace={workspace} />
+          </div>
+        </Suspense>
+      ) : null,
+    accountComputers: {
+      list: async () => listComputers(base.endpoint, await token()),
+      rename: async (id, name) => renameComputer(base.endpoint, await token(), id, name),
+      outdated: (c) => machineCompatibility(c.contract) === "outdated",
+      onRenamed: (id, name) => rename(id, name),
+    },
+    connectMachine: {
+      list: async () => listComputers(base.endpoint, await token()),
+      outdated: (c) => machineCompatibility(c.contract) === "outdated",
+      // La nueva suma su rebanada sin recargar la página ni cerrar las demás.
+      onReady: () => void relistNow?.(),
+    },
+    accountMachines: (props) =>
+      several() ? (
+        <Suspense fallback={null}>
+          <AccountMachines {...props} machines={machines} />
+        </Suspense>
+      ) : null,
+    machinesLicense: () => {
+      changed();
+      return fleet.license();
+    },
+    retryMachines: () => {
+      fleet.retry();
+      for (const name of ["harness:workspace-name", "harness:service-resync"]) window.dispatchEvent(new CustomEvent(name));
+    },
   });
-  installIpc(window, transport);
-  for (const l of links) l.relay.start();
+  /** A name changed in Configuración: the chips, the toasts and the picker read it without reloading. */
+  function rename(id: string, name: string) {
+    if (!fleet.rename(id, name)) return;
+    namesChanged();
+  }
+  function namesChanged() {
+    bump((n) => n + 1);
+    void import("../features/machines/store").then(({ machineNamesChanged, refetchMachines }) => {
+      machineNamesChanged();
+      void refetchMachines();
+    });
+  }
+  installIpc(window, createWebTransport(active, __TERMINUS_VERSION__, browser));
+  window.addEventListener("pagehide", () => fleet.flush());
   void import("../app/main");
   void Promise.all([import("solid-js/web"), import("./SyncNote"), import("./phrases")]).then(([{ render }, { SyncNote }]) => {
     const layer = document.createElement("div");
@@ -123,12 +259,18 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
     render(() => <SyncNote machines={machines} />, layer);
   });
   return (fresh) => {
-    let relinked = false;
-    for (const c of fresh) if (transport.fleet.relink(c.computer_id, linkedWorkspaces(c))) relinked = true;
-    // Every list of the window reads again, now filtered by the new links.
-    if (relinked) for (const name of ["harness:workspace-name", "harness:service-resync"]) window.dispatchEvent(new CustomEvent(name));
+    rows = new Map(fresh.map((c) => [c.computer_id, c]));
+    const before = fleet.machines().map((m) => `${m.id}\u0000${m.name}`).join("\n");
+    fleet.setMachines(orderComputers(fresh).map(infoOf));
+    // Renamed from another window or the phone.
+    if (fleet.machines().map((m) => `${m.id}\u0000${m.name}`).join("\n") !== before) namesChanged();
+    // Every list of the window reads again, with the machines and links as they are now.
+    for (const name of ["harness:workspace-name", "harness:service-resync"]) window.dispatchEvent(new CustomEvent(name));
   };
 }
+
+/** Lists the computers again now; set once the page is mounted with a session. */
+let relistNow: (() => Promise<void>) | null = null;
 
 async function start(settings: WebSettings) {
   const [{ render }, { Gate, computersOf }, { supabaseSession }, { aplicarLengua }] = await Promise.all([
@@ -179,11 +321,12 @@ async function start(settings: WebSettings) {
               return false;
             },
           );
-          // A workspace the engine links (signing in to Danil links them all) shows up here without reloading the page.
+          // A machine connected or a workspace linked since the page loaded shows up here without reloading it.
           const relist = async () => {
             const answer = await computersOf(endpoint, session).catch(() => null);
             if (answer?.kind === "ok") relink(answer.value);
           };
+          relistNow = relist;
           if (!relisting) {
             relisting = true;
             setInterval(() => void relist(), RELIST);

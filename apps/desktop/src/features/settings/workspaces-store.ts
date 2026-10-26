@@ -35,6 +35,8 @@ export type Workspace = {
   worktrees_root: string | null;
   /** Con qué modo de permisos arranca lo nuevo. `null` es el último elegido a mano. */
   default_permission_mode: string | null;
+  /** «Usar el GitHub de esta computadora». Un motor anterior no lo manda. */
+  host_github?: boolean;
   git_host: string | null;
   remote: string | null;
   /** Dónde vive la memoria de este workspace — espejo de `memoria::Proveedor`. */

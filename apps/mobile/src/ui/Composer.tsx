@@ -4,7 +4,7 @@ import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, type TextInputKeyPressEvent, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ATTACHMENT_MIMES,
@@ -18,9 +18,11 @@ import {
   usableProviders,
 } from "../lib/engine";
 import type { Host } from "../lib/hosts";
+import { effectiveMode, enterAction, hasSomethingToSend } from "../lib/composer";
 import { lang, phrase, t, w } from "../lib/i18n";
 import { BrandMark } from "./BrandMark";
 import { Icon } from "./Icon";
+import { matches, NoMatch } from "./Search";
 import { Sheet, SheetOption, SheetSection } from "./Sheet";
 import { useTheme } from "./theme";
 
@@ -33,6 +35,8 @@ type Queued = { id: string; text: string; attachments: string[] };
 const SLASH = /^\/([\w:-]*)$/;
 const MENTION = /(?:^|\s)@("?)([^\s"]*)$/;
 const EFFORT_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
+// Los modos de cada máquina y proveedor que ya se vieron: con la máquina apagada, el cuadro sigue sabiendo cuáles sostiene.
+const knownModes = new Map<string, PermissionModeOption[]>();
 
 function effortLabel(effort: string | null) {
   if (!effort) return w("chat.effort.agent_decides");
@@ -46,7 +50,8 @@ function effortLabel(effort: string | null) {
  * enviar, que con un turno corriendo es detener. `/` abre los comandos y las
  * skills del agente; `@`, los archivos y carpetas; `!` lo vuelve terminal
  * («Ejecutar»). Escribir mientras trabaja deja el mensaje en cola, con
- * «Mandar ahora». Los selectores son hojas desde abajo.
+ * «Mandar ahora». Los selectores son hojas desde abajo. La tecla de retorno
+ * manda; en la web, Shift+Enter hace salto de línea, como en el escritorio.
  */
 export function Composer({
   host,
@@ -56,6 +61,8 @@ export function Composer({
   providers,
   provider: initialProvider,
   model: initialModel,
+  permissionMode = null,
+  savedPermissionMode = null,
   providerLocked = false,
   running = false,
   disabled = false,
@@ -76,6 +83,10 @@ export function Composer({
   providers: ProviderInfo[];
   provider: string | null;
   model: string | null;
+  /** El modo de permisos del workspace para las tareas nuevas. Si el proveedor no lo sostiene, el suyo por omisión. */
+  permissionMode?: string | null;
+  /** El modo que guarda la tarea abierta: manda sobre el del workspace, como al reanudar en la ventana. */
+  savedPermissionMode?: string | null;
   /** Una tarea que ya contestó no cambia de proveedor, como en la ventana. */
   providerLocked?: boolean;
   running?: boolean;
@@ -111,6 +122,12 @@ export function Composer({
   const [sheet, setSheet] = useState<"model" | "mode" | "attach" | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const draining = useRef(false);
+  // Dos retornos seguidos llegan antes de que el cuadro se vacíe: el segundo no manda ni encola el mismo texto.
+  const sending = useRef(false);
+  const taken = useRef<string | null>(null);
+  useEffect(() => {
+    if (text !== taken.current) taken.current = null;
+  }, [text]);
 
   useEffect(() => {
     const show = Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow", () => setKeyboard(true));
@@ -130,13 +147,17 @@ export function Composer({
 
   // Modelos y permisos del proveedor elegido; la barra de `/` se pide al usarla.
   useEffect(() => {
+    const key = `${host?.id}/${current}`;
     setModels(null);
-    setModes([]);
+    setModes(knownModes.get(key) ?? []);
     setSlash(null);
     if (!host || !workspace || !current || host.power() !== "on") return;
     let alive = true;
     void modelsOf(host, workspace, current).then((m) => alive && setModels(m));
-    void permissionModesOf(host, workspace, current).then((m) => alive && setModes(m));
+    void permissionModesOf(host, workspace, current).then((m) => {
+      if (m.length) knownModes.set(key, m);
+      if (alive) setModes(m.length ? m : (knownModes.get(key) ?? []));
+    });
     return () => {
       alive = false;
     };
@@ -172,7 +193,9 @@ export function Composer({
   const chosen = models?.models.find((m) => m.id === model) ?? null;
   const modelText = model ? modelName(model, models) : previewLabel(lang, "default_model");
   const efforts = chosen?.efforts ?? models?.models[0]?.efforts ?? [];
-  const modeOption = modes.find((m) => m.id === mode) ?? modes.find((m) => m.por_omision) ?? null;
+  // Lo que se ve es lo que se manda: el elegido, o el de la tarea o el workspace, o el del proveedor.
+  const sentMode = effectiveMode(modes, mode, { saved: savedPermissionMode, workspace: permissionMode });
+  const modeOption = modes.find((m) => m.id === sentMode) ?? null;
   const uploading = attachments.some((a) => !a.path && !a.error);
   const ready = Boolean(host && workspace !== null && folder !== null && current) && !disabled && !busy && !uploading;
   const hasText = Boolean(text.trim()) || attachments.some((a) => a.path);
@@ -180,32 +203,40 @@ export function Composer({
   async function submit(body: string, paths: string[]) {
     if (!current) return false;
     if (body.startsWith("!")) {
-      return onSubmit({ shell: true, command: body.slice(1).trim(), provider: current, model, effort, permissionMode: mode });
+      return onSubmit({ shell: true, command: body.slice(1).trim(), provider: current, model, effort, permissionMode: sentMode });
     }
-    return onSubmit({ shell: false, prompt: body, provider: current, model, effort, permissionMode: mode, attachments: paths });
+    return onSubmit({ shell: false, prompt: body, provider: current, model, effort, permissionMode: sentMode, attachments: paths });
   }
 
   async function send() {
     const body = text.trim();
     const paths = attachments.flatMap((a) => (a.path ? [a.path] : []));
-    if (!ready || (!body && !paths.length)) return;
+    if (!ready || sending.current || taken.current === text || !hasSomethingToSend(body, paths.length)) return;
+    taken.current = text;
     if (running && !body.startsWith("!")) {
       setQueue((old) => [...old, { id: `${Date.now()}`, text: body, attachments: paths }]);
       setText("");
       setAttachments([]);
       return;
     }
+    sending.current = true;
     setBusy(true);
     setNote(null);
     setText("");
     const kept = attachments;
     setAttachments([]);
-    const ok = await submit(body, paths);
-    if (!ok) {
-      setText(body);
-      setAttachments(kept);
+    let ok = false;
+    try {
+      ok = await submit(body, paths);
+    } finally {
+      if (!ok) {
+        taken.current = null;
+        setText(body);
+        setAttachments(kept);
+      }
+      sending.current = false;
+      setBusy(false);
     }
-    setBusy(false);
   }
 
   async function addFiles(files: { name: string; mime: string; size: number | null; read: () => Promise<string> }[]) {
@@ -284,6 +315,14 @@ export function Composer({
     const q = mentionQuery.toLowerCase();
     return mentions.fuentes.filter((f) => f.ruta.toLowerCase().includes(q)).slice(0, 40);
   }, [mentionQuery, mentions]);
+
+  // En la web, react-native-web deja pasar el evento del navegador: Shift+Enter sigue su curso.
+  function onWebKey(e: TextInputKeyPressEvent) {
+    const key = e as unknown as { key: string; shiftKey?: boolean; nativeEvent: { isComposing?: boolean; keyCode?: number }; preventDefault: () => void };
+    if (enterAction({ key: key.key, shiftKey: key.shiftKey, isComposing: key.nativeEvent.isComposing, keyCode: key.nativeEvent.keyCode }) !== "send") return;
+    key.preventDefault();
+    void send();
+  }
 
   const showStop = running && !hasText && Boolean(onStop);
   const sendLabel = shell ? w("chat.composer.run") : w("chat.composer.send");
@@ -371,6 +410,12 @@ export function Composer({
           editable={!disabled}
           multiline
           textAlignVertical="top"
+          // El teclado dice «Enviar». En iOS y Android el retorno manda y no mete salto de línea.
+          returnKeyType="send"
+          enterKeyHint="send"
+          submitBehavior={Platform.OS === "web" ? undefined : "submit"}
+          onSubmitEditing={Platform.OS === "web" ? undefined : () => void send()}
+          onKeyPress={Platform.OS === "web" ? onWebKey : undefined}
         />
         <View style={styles.row}>
           {shell ? (
@@ -457,63 +502,70 @@ export function Composer({
             disabled={Boolean(m.falta)}
             selected={(modeOption?.id ?? null) === m.id}
             onPress={() => {
-              setMode(m.por_omision ? null : m.id);
+              setMode(m.id);
               setSheet(null);
             }}
           />
         ))}
       </Sheet>
 
-      <Sheet visible={sheet === "model"} title={w("chat.model.title")} onClose={() => setSheet(null)}>
-        <SheetSection>{w("chat.model.providers")}</SheetSection>
-        {providerLocked ? <Text style={[styles.hint, { color: theme.textMuted, paddingHorizontal: 18 }]}>{w("chat.model.locked")}</Text> : null}
-        {usable.map((p) => (
-          <SheetOption
-            key={p.id}
-            left={<BrandMark id={p.id} size={17} color={theme.text} />}
-            label={p.label}
-            selected={p.id === current}
-            disabled={providerLocked && p.id !== current}
-            onPress={() => {
-              if (p.id === current) return;
-              setProvider(p.id);
-              setModel(null);
-              setEffort(null);
-              setMode(null);
-            }}
-          />
-        ))}
-        <SheetSection>{w("chat.model.listbox")}</SheetSection>
-        {!models ? <Text style={[styles.hint, { color: theme.textMuted, paddingHorizontal: 18 }]}>{t("composer.loading")}</Text> : null}
-        {models && !models.models.length ? <Text style={[styles.hint, { color: theme.textMuted, paddingHorizontal: 18 }]}>{w("chat.model.empty")}</Text> : null}
-        {models?.models.map((m) => (
-          <SheetOption
-            key={m.id}
-            label={m.label || modelName(m.id, models)}
-            detail={m.note ? phrase(m.note) : null}
-            selected={model === m.id}
-            onPress={() => {
-              setModel(m.id);
-              if (effort && !m.efforts.includes(effort)) setEffort(null);
-            }}
-          />
-        ))}
-        {efforts.length ? (
-          <>
-            <SheetSection>{w("chat.effort.label")}</SheetSection>
-            <View style={styles.efforts}>
-              {[null, ...efforts].map((e) => (
-                <Pressable
-                  key={e ?? "auto"}
-                  onPress={() => setEffort(e)}
-                  style={[styles.effort, { borderColor: e === effort ? theme.primary : theme.border, backgroundColor: e === effort ? theme.primary : "transparent" }]}
-                >
-                  <Text style={{ color: e === effort ? theme.onPrimary : theme.text, fontWeight: e === effort ? "700" : "500" }}>{effortLabel(e)}</Text>
-                </Pressable>
+      <Sheet visible={sheet === "model"} title={w("chat.model.title")} search={t("search.models")} onClose={() => setSheet(null)}>
+        {(query) => {
+          const shownModels = models?.models.filter((m) => matches(query, m.label, m.id, modelName(m.id, models))) ?? [];
+          return (
+            <>
+              <SheetSection>{w("chat.model.providers")}</SheetSection>
+              {providerLocked ? <Text style={[styles.hint, { color: theme.textMuted, paddingHorizontal: 18 }]}>{w("chat.model.locked")}</Text> : null}
+              {usable.map((p) => (
+                <SheetOption
+                  key={p.id}
+                  left={<BrandMark id={p.id} size={17} color={theme.text} />}
+                  label={p.label}
+                  selected={p.id === current}
+                  disabled={providerLocked && p.id !== current}
+                  onPress={() => {
+                    if (p.id === current) return;
+                    setProvider(p.id);
+                    setModel(null);
+                    setEffort(null);
+                  }}
+                />
               ))}
-            </View>
-          </>
-        ) : null}
+              <SheetSection>{w("chat.model.listbox")}</SheetSection>
+              {!models ? <Text style={[styles.hint, { color: theme.textMuted, paddingHorizontal: 18 }]}>{t("composer.loading")}</Text> : null}
+              {models && !models.models.length ? <Text style={[styles.hint, { color: theme.textMuted, paddingHorizontal: 18 }]}>{w("chat.model.empty")}</Text> : null}
+              {models && models.models.length > 0 && !shownModels.length ? <NoMatch /> : null}
+              {shownModels.map((m) => (
+                <SheetOption
+                  key={m.id}
+                  label={m.label || modelName(m.id, models)}
+                  detail={m.note ? phrase(m.note) : null}
+                  selected={model === m.id}
+                  onPress={() => {
+                    setModel(m.id);
+                    if (effort && !m.efforts.includes(effort)) setEffort(null);
+                  }}
+                />
+              ))}
+              {efforts.length ? (
+                <>
+                  <SheetSection>{w("chat.effort.label")}</SheetSection>
+                  <View style={styles.efforts}>
+                    {[null, ...efforts].map((e) => (
+                      <Pressable
+                        key={e ?? "auto"}
+                        onPress={() => setEffort(e)}
+                        style={[styles.effort, { borderColor: e === effort ? theme.primary : theme.border, backgroundColor: e === effort ? theme.primary : "transparent" }]}
+                      >
+                        <Text style={{ color: e === effort ? theme.onPrimary : theme.text, fontWeight: e === effort ? "700" : "500" }}>{effortLabel(e)}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </>
+              ) : null}
+            </>
+          );
+        }}
       </Sheet>
     </View>
   );

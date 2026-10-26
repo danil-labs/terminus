@@ -14,6 +14,7 @@ export function groupingLabel(lang: Lang, group: SidebarGrouping): string {
     case "folder": return word(lang, "shell.sidebar.view.group_folder");
     case "status": return word(lang, "shell.sidebar.view.group_status");
     case "agent": return word(lang, "shell.sidebar.view.group_agent");
+    case "machine": return word(lang, "shell.sidebar.view.group_machine");
     default: return word(lang, "shell.sidebar.view.group_none");
   }
 }
@@ -26,6 +27,7 @@ export function scopeLabel(lang: Lang, view: SidebarView, folderName: (id: strin
     case "folder": parts.push(word(lang, "shell.sidebar.view.scope_by_folder")); break;
     case "status": parts.push(word(lang, "shell.sidebar.view.scope_by_status")); break;
     case "agent": parts.push(word(lang, "shell.sidebar.view.scope_by_agent")); break;
+    case "machine": parts.push(word(lang, "shell.sidebar.view.scope_by_machine")); break;
   }
   return parts.join(" · ");
 }
@@ -46,11 +48,22 @@ export function statusGroupLabel(lang: Lang, key: SidebarStatusKey): string {
   }
 }
 
-export function groupLabel(lang: Lang, group: SidebarGroup<unknown>, folderName: (id: string) => string): string {
+/** `machineName`: el nombre de una máquina; la clave `""` es la de la ventana. */
+export function groupLabel(
+  lang: Lang,
+  group: SidebarGroup<unknown>,
+  folderName: (id: string) => string,
+  machineName: (id: string) => string = (id) => id,
+): string {
   switch (group.kind) {
+    case "machine": return group.key ? machineName(group.key) : word(lang, "shell.sidebar.view.this_machine");
     case "section": return sectionLabel(lang, group.key as SidebarSection);
     case "status": return statusGroupLabel(lang, group.key as SidebarStatusKey);
-    case "folder": return group.key ? folderName(group.key) : word(lang, "shell.sidebar.view.no_folder");
+    case "folder": {
+      const folder = group.key ? folderName(group.key) : word(lang, "shell.sidebar.view.no_folder");
+      if (group.machine === undefined) return folder;
+      return `${folder} · ${(group.machine && machineName(group.machine)) || word(lang, "shell.sidebar.view.this_machine")}`;
+    }
     default: return group.key || word(lang, "shell.sidebar.view.no_agent");
   }
 }

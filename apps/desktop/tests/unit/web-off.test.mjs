@@ -1,7 +1,8 @@
 /**
  * Opening Terminus in the browser on a computer that is off: the panel mounts
- * without starting it, reads wait instead of failing, the off notice shows,
- * and the first message wakes it through the relay. Mounts `dist-web/`.
+ * without starting it or waiting for it, reads say it is off without an error
+ * notice, and the first message wakes it through the relay; once on, the panel
+ * reads again. Mounts `dist-web/`.
  */
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -52,7 +53,7 @@ test("an off computer mounts as it is and wakes with the first message", async (
 
     const before = fake.calls.filter((c) => c.command === "list_projects").length;
     const sent = w.__TAURI_INTERNALS__.invoke("send_message", { session: "t1", text: "hola" });
-    assert.deepEqual(await sent, { session: "t1" }, "an intent reaches the relay, which wakes the computer");
+    assert.deepEqual(await sent, { session: "cmp_a~t1" }, "an intent reaches the relay, which wakes the computer; its ids keep their machine");
     await sleep(6000);
     assert.ok(fake.calls.filter((c) => c.command === "list_projects").length > before, "waiting reads go out once it is on");
     assert.ok(text().includes("Tarea t1"), "and the panel fills in");

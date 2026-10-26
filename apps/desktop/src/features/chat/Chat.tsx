@@ -39,6 +39,7 @@ import { taskChatPresentation } from "./TaskChatPresentation";
 import { CHUNK, blockOfMessage, chunkAt, chunkIds, chunkOf, chunkStart, headChunk, tailChunk, type Lectura } from "./threadWindow";
 import { workLabel } from "../projects/branchLabel";
 import { sangrarTerminal } from "./terminalIndent";
+import { ponerLanzamiento } from "./launchGroups";
 import { FIN_DE_ARCHIVO, TECLAS_DE_TERMINAL, pideClave } from "./commandInput";
 import { claseDelTramo, finishEdit, highlightSpans, placeLabel, referenceId, searchPlaces, searchTasks, taskLabel, type MentionTarget, type PendingEdit, type PlaceCandidate, type TextEdit, type TaskCandidate, type TaskMention, tramosDelMensaje } from "../../lib/taskMentions";
 import {
@@ -106,6 +107,7 @@ import { Button } from "../../ui/Button";
 import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
 import { asFailure, type Failure, FailureNote, prosaDe } from "../../ui/Failure";
 import { MarcaAgente } from "../../ui/icons";
+import { FileMachine } from "../../ui/fileMachine";
 import { Markdown } from "../../ui/Markdown";
 import { createVisualBudget, type VisualBudget } from "./visualBudget";
 import ChatVisual from "./ChatVisual";
@@ -214,6 +216,10 @@ export type Msg = {
    * la pregunta que la provocó sin depender de que estén una debajo de la otra.
    */
   turno?: string;
+  /** El turno guardado en el que el motor ya escribió este mensaje vivo (`segment_saved`). */
+  tramo?: string;
+  /** La subtarea a la que la persona escribió por su padre. Ver `relevoDe`. */
+  relevo?: { titulo: string };
 
   nativeId?: string;
   /**
@@ -400,6 +406,8 @@ export type ChatProps = {
    * la tarea nueva abre por donde iba la otra.
    */
   conversacion: string;
+  /** Una tarea que ya existe pero no tiene mensajes: se ve como «Nueva tarea». */
+  sinEmpezar?: boolean;
   /** Dónde se dejó de leer la última vez que este hilo estuvo montado. */
   lectura?: Lectura | null;
   /** Recibe al desmontar dónde se estaba leyendo, o `null` si seguía al fondo. */
@@ -415,6 +423,8 @@ export type ChatProps = {
   coordinator?: JSX.Element;
   /** Máquina / proyecto / rama, arriba a la izquierda (`TaskLocation`). */
   location?: JSX.Element;
+  /** La máquina de la tarea si no es la de la ventana: los archivos del chat se leen allí. */
+  machine?: string;
   chatEstado?: HandlerStatus;
   /** Cómo se le llama y con qué cara, si eligió otras en su perfil. */
   chatName?: string | null;
@@ -603,6 +613,7 @@ export type ChatProps = {
   onEntradaDeComando?: (texto: string, eco: boolean) => Promise<boolean>;
   visualScope?: string;
   readVisual?: (file: string) => Promise<string>;
+  openVisual?: (file: string) => Promise<void>;
   /**
    * La miniatura de un adjunto ya mandado, de ruta relativa a `data:` URI.
    * Aquí y no dentro de `Adjuntos`: este componente no conoce el proyecto
@@ -843,10 +854,21 @@ export default function Chat(props: ChatProps) {
   const vacia = createMemo(() => props.msgs.length === 0);
 
   /**
-   * Si la caja va centrada: hilo vacío de una tarea que todavía no existe.
-   * Centrar solo con agente dejaba «Nueva tarea» a secas al pie.
+   * Si la caja va centrada: hilo vacío de una tarea que todavía no existe o
+   * que nació sin mensajes. Centrar solo con agente dejaba «Nueva tarea» a secas al pie.
    */
-  const centrada = createMemo(() => vacia() && props.conversacion === "");
+  const centrada = createMemo(() => vacia() && (props.conversacion === "" || !!props.sinEmpezar));
+
+  /** El saludo de una tarea nueva se elige al abrirla: una de las frases o la de la hora. */
+  const SALUDOS = 10;
+  const saludo = createMemo(() => {
+    if (!centrada()) return "";
+    const n = Math.floor(Math.random() * (SALUDOS + 1));
+    if (n < SALUDOS) return t(`chat.greeting.${n + 1}`);
+    const hora = new Date().getHours();
+    if (hora >= 5 && hora < 12) return t("chat.greeting.morning");
+    return hora >= 12 && hora < 19 ? t("chat.greeting.afternoon") : t("chat.greeting.evening");
+  });
 
   /**
    * Cuánto tiene que tardar la lectura para que el esqueleto ayude. El
@@ -1505,7 +1527,11 @@ export default function Chat(props: ChatProps) {
       // Terminus ya no avisa en el chat que una tarea lanzada terminó; las
       // filas que quedaron guardadas de antes tampoco se pintan.
       if (m.meta === "task_completed") return;
-      if (m.shell || m.meta === "task_launched") {
+      if (m.meta === "task_launched") {
+        ponerLanzamiento(out, { tipo: "msg", msg: m, i }, (b) => b.tipo === "msg" && b.msg.meta === "task_launched");
+        return;
+      }
+      if (m.shell) {
         out.push({ tipo: "msg", msg: m, i });
         return;
       }
@@ -2016,7 +2042,7 @@ export default function Chat(props: ChatProps) {
 
       {/* Pegada a la caja y encima: lo que va a salir después está donde se
           escribió, no en una columna aparte. */}
-      <ColaDeMensajes {...props.cola} compact={presentation().compactQueue} />
+      <ColaDeMensajes {...props.cola} compact={presentation().compactQueue} onOpenTask={props.onOpenTask} />
 
       {/* Las dos interrupciones viven en el mismo sitio, pero no pesan igual.
           La pregunta es una decisión de producto; el permiso ejecuta algo y
@@ -2659,7 +2685,7 @@ export default function Chat(props: ChatProps) {
   );
 
   return (
-    <>
+    <FileMachine.Provider value={() => props.machine}>
       <Dialog open={forkTurn() !== null} onOpenChange={(open) => { if (!open && !forkeando()) setForkTurn(null); }}>
         <DialogContent>
           <DialogTitle class="text-base font-semibold">{t("chat.continuation.title")}</DialogTitle>
@@ -2851,6 +2877,7 @@ export default function Chat(props: ChatProps) {
                       visualBudget={visualBudget}
                       visualScope={props.visualScope}
                       readVisual={props.readVisual}
+                      openVisual={props.openVisual}
                       pasos={fromWork(b(), (t) => t.pasos, [])}
                       avance={fromWork(b(), (t) => t.avance ?? SIN_AVANCE, SIN_AVANCE)}
                       msg={fromWork(b(), (t) => t.msg, SIN_MENSAJE)}
@@ -3064,6 +3091,13 @@ export default function Chat(props: ChatProps) {
                           </Show>
                         </div>
                       </Show>
+                      <Show when={m().relevo}>
+                        {(relevo) => (
+                          <div class="mb-1 text-right text-[0.72rem] text-neutral-500">
+                            {t("chat.subagent.relayed", { title: relevo().titulo })}
+                          </div>
+                        )}
+                      </Show>
                       <Show when={!m().encargado && !m().fromTask ? m().channel : undefined}>
                         {(channel) => (
                           <div class="mb-1 text-right text-[0.72rem] text-neutral-500">
@@ -3270,6 +3304,13 @@ export default function Chat(props: ChatProps) {
               <Show when={props.chatDescription}><p class="m-0 max-w-[36rem] text-sm text-neutral-700">{props.chatDescription}</p></Show>
             </div>}
           </Show>
+          <Show when={centrada() && !props.chatEncargado && !props.recovery ? saludo() : null}>
+            {(texto) => (
+              <h1 class="m-0 mb-6 max-w-[860px] px-6 text-center font-display text-3xl font-bold tracking-[-0.02em] text-neutral-950">
+                {texto()}
+              </h1>
+            )}
+          </Show>
           {/* El puntero vuelve aquí: la capa entera lo deja pasar para que se
               pueda seleccionar el texto que sigue visible detrás. */}
           <div
@@ -3323,7 +3364,7 @@ export default function Chat(props: ChatProps) {
       </Show>
       </div>
     </Show>
-    </>
+    </FileMachine.Provider>
   );
 }
 
@@ -3425,6 +3466,7 @@ function TrabajoDeAgente(props: {
   visualBudget: VisualBudget;
   visualScope?: string;
   readVisual?: (file: string) => Promise<string>;
+  openVisual?: (file: string) => Promise<void>;
   searchBlock?: number;
   pasos: Paso[];
   avance: Avance[];
@@ -3511,7 +3553,7 @@ function TrabajoDeAgente(props: {
       <Show when={texto()}>
         {(md) => (
           <AltoMonotono vivo={props.vivo} searchBlock={props.searchBlock}>
-            <TextoConSiguientes texto={md()} vivo={props.vivo} rapida={props.rapida} readVisual={props.readVisual} owner={props.visualScope ?? ""} visualBudget={props.visualBudget} />
+            <TextoConSiguientes texto={md()} vivo={props.vivo} rapida={props.rapida} readVisual={props.readVisual} openVisual={props.openVisual} owner={props.visualScope ?? ""} visualBudget={props.visualBudget} />
           </AltoMonotono>
         )}
       </Show>
@@ -3592,7 +3634,7 @@ type RespuestaRapida = {
  * `Index` y no `For`: cada token trae partes nuevas y `For` remontaría el
  * markdown entero en cada una.
  */
-function TextoConSiguientes(props: { texto: string; vivo: boolean; rapida: RespuestaRapida | null; owner: string; visualBudget: VisualBudget; readVisual?: (file: string) => Promise<string> }) {
+function TextoConSiguientes(props: { texto: string; vivo: boolean; rapida: RespuestaRapida | null; owner: string; visualBudget: VisualBudget; readVisual?: (file: string) => Promise<string>; openVisual?: (file: string) => Promise<void> }) {
   const partes = createMemo(() => {
     const visuals = props.readVisual ? splitChatVisuals(props.texto, props.vivo) : [{ kind: "markdown" as const, markdown: props.texto }];
     return visuals.flatMap<Visual | NextStepsPart>((part) => part.kind === "visual" ? [part] : splitNextSteps(part.markdown, props.vivo));
@@ -3632,7 +3674,7 @@ function TextoConSiguientes(props: { texto: string; vivo: boolean; rapida: Respu
             />
           </Show>
           }>
-            <ChatVisual visual={parte() as Visual} owner={props.owner} budget={props.visualBudget} read={(file) => props.readVisual!(file)} />
+            <ChatVisual visual={parte() as Visual} owner={props.owner} budget={props.visualBudget} read={(file) => props.readVisual!(file)} open={props.openVisual} />
           </Show>
         );
       }}

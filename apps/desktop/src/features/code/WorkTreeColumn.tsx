@@ -4,6 +4,7 @@ import { Button } from "../../ui/Button";
 import { asFailure, type Failure, FailureNote } from "../../ui/Failure";
 import RightPanelHeader from "../shell/RightPanelHeader";
 import Codigo from "./Code";
+import type { Tipo } from "./FileTree";
 import VistaPreviaDeTarea from "./TaskPreview";
 
 /**
@@ -21,6 +22,8 @@ export default function ColumnaDeTrabajo(props: {
   visible: boolean;
   /** Escribir la conversación en la carpeta de trabajo y abrirla. */
   onExportarChat: () => Promise<void>;
+  /** Antes de la tarea: crearla vacía con lo nuevo dentro y abrirla. */
+  onCrearSinTarea?: (tipo: Tipo, ruta: string) => Promise<void>;
   /** Abrir un archivo del árbol como pestaña del centro. */
   onAbrirArchivo: (arbol: string, ruta: string, cambiado: boolean) => void;
   /** Algo del árbol cambió de ruta o se borró: sus pestañas lo siguen o se cierran. */
@@ -69,6 +72,7 @@ export default function ColumnaDeTrabajo(props: {
             project={props.project}
             baseRef={props.baseRef}
             visible={props.visible}
+            onCrear={props.onCrearSinTarea}
             onAbrir={props.onAbrirArchivo}
           />
         </Show>

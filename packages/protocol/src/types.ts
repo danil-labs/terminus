@@ -7,12 +7,16 @@ export type EngineError = { code: string; message_key?: string; detail?: unknown
 
 /** La cuenta de Danil vinculada a un workspace (`danil` de `list_workspaces`). */
 export type WorkspaceDanil = { user_id: string; email?: string | null; name?: string | null };
-/** Un workspace tiene el mismo id en cada máquina que lo tiene (`groupWorkspaces`). */
-export type Workspace = { id: string; name: string; provider?: string | null; remote?: string | null; danil?: WorkspaceDanil | null };
+/**
+ * Un workspace tiene el mismo id en cada máquina que lo tiene (`groupWorkspaces`).
+ * `default_permission_mode`, el modo con que arranca una tarea nueva si la
+ * persona eligió uno (`workspaces::Workspace::default_permission_mode`).
+ */
+export type Workspace = { id: string; name: string; provider?: string | null; remote?: string | null; danil?: WorkspaceDanil | null; default_permission_mode?: string | null };
 /** `list_workspaces`. */
 export type Startup = { workspaces: Workspace[]; active: string | null };
 /** `list_projects`: una carpeta del workspace. */
-export type Project = { id: string; name: string; working_directory?: string | null };
+export type Project = { id: string; name: string; working_directory?: string | null; kind?: "git" | "folder"; remote_url?: string | null };
 /**
  * Evento `project_clone` y respuesta de `project_clone_status`: el clon que pidió
  * `start_project_clone`. Termina con `done` y `project`, o con `error` (un
@@ -28,7 +32,7 @@ export type ProjectCloneEvent = {
   error?: { what?: Frase; detail?: string } | string;
 };
 /** `list_spaces`. */
-export type Space = { id: string; name: string | null; folders: string[] };
+export type Space = { id: string; name: string | null; folders: string[]; account?: boolean };
 
 /** `list_live_sessions`: una tarea abierta de una carpeta. */
 export type SessionRow = {
@@ -86,7 +90,13 @@ export type Turn = {
   pieces?: TurnPiece[] | null;
   /** Un `!`: el comando va en `text`. */
   shell?: { cwd: string; output: string; exit_code: number | null; duration_ms: number; truncated: boolean } | null;
+  /** El encargado que escribió este input, si no fue la persona (`Turn::agent`). */
+  agent?: string | null;
+  /** La tarea que lo escribió por el CLI (`Turn::from_task`). */
+  from_task?: SenderTask | null;
 };
+/** La tarea que escribió un input, como era al escribirlo (`sessions::SenderTask`). */
+export type SenderTask = { folder: string; task: string; title: string; provider: string; model?: string | null };
 /** Un paso del turno; `images` son data URLs que produjo la herramienta. `ok: false` si falló. */
 export type TurnTool = { name?: string; target?: string | null; images?: string[]; ok?: boolean | null };
 /** Un trozo de `Turn.pieces`. */
@@ -105,7 +115,7 @@ export type FilePreview = {
 /** `tree_show`: un archivo de un árbol de la tarea. */
 export type TreeContent = { kind: string; text: string; bytes: number; truncated: boolean };
 /** `load_session`. */
-export type OpenedSession = { id: string; provider: string; model: string | null; agent?: string | null; turns: Turn[] };
+export type OpenedSession = { id: string; provider: string; model: string | null; agent?: string | null; permission_mode?: string | null; turns: Turn[] };
 
 /** `pending_requests`. */
 export type PendingRequests = {

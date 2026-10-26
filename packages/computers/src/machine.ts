@@ -34,7 +34,7 @@ export const UNWAKEABLE_KINDS: ReadonlySet<string> = new Set(["physical", "compu
  * Si el relay puede encender esta computadora: una VM administrada sí, una
  * máquina propia no. Manda `wakeable` si el plano de control lo dice; si no,
  * `kind`; si no, el proveedor (una fila sin proveedor es de antes de que
- * existiera y es una VM). Misma regla que `wakes()` de la web (`web/fleet.ts`).
+ * existiera y es una VM). La usan la web, el escritorio y el teléfono.
  */
 export function wakes(c: Pick<Computer, "provider" | "kind" | "wakeable">): boolean {
   if (typeof c.wakeable === "boolean") return c.wakeable;
@@ -92,7 +92,29 @@ export const INTENT_COMMANDS: ReadonlySet<string> = new Set([
   // Workspaces de la cuenta: crear aquí uno de la cuenta con su id y clonar un proyecto suyo.
   "materialize_workspace",
   "ensure_project",
+  // Llevar trabajo: importar despierta el destino (`{probe: true}`) y cancelar borra allá.
+  // Las partes nunca: su contenido no puede quedar guardado en `pending:`.
+  "work_import",
+  "work_cancel",
+  // Exportar despierta la de origen al traer de vuelta (computers#16): 330 s, como cualquier intención.
+  "work_export",
 ]);
+
+/**
+ * Acciones ligeras que, con la máquina apagada (VM o propia), el relay guarda y
+ * aplica al volver a conectarse, sin encenderla (`DEFERRED_COMMANDS` de
+ * `computers/src/deferred.ts`; los `deferrable: true` de `commands.json`). La
+ * respuesta llega enseguida con `deferred.queued_at` y la lista ya lo refleja.
+ */
+export const DEFERRED_COMMANDS: ReadonlySet<string> = new Set([
+  "set_task_archived",
+  "delete_session",
+  "rename_session",
+  "set_session_pinned",
+  "move_task_to_space",
+]);
+
+export const isDeferrable = (command: string) => DEFERRED_COMMANDS.has(command);
 
 /** Lecturas que el relay guarda y contesta desde su copia (`MIRROR_COMMANDS` de `computers/src/mirror.ts`). */
 export const MIRROR_COMMANDS: ReadonlySet<string> = new Set([

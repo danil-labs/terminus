@@ -81,8 +81,10 @@ export default function Onboarding(props: {
                       </div>
                     )}
                   </Show>
-                  <div class="mt-auto">
+                  <div class="flex flex-1 flex-col justify-center">
                     <MapaDeConexiones c={conexiones} />
+                  </div>
+                  <div>
                     <div class="mt-4 border-t border-border pt-4">
                       <Comprobacion
                         filas={[

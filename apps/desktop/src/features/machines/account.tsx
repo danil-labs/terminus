@@ -1,12 +1,12 @@
 /**
- * With the Danil account signed in, this window shows the tasks of every
- * computer of the person, as the web does (`web/transport.ts`): its own engine
- * keeps the native IPC and its ids; each other computer is one relay session.
- * With one session per account, it is the account of the open workspace: its
- * client token, its computers and its registry; switching to a workspace of
- * another account installs that one. Without an account, or with no other
- * computer, nothing is installed and the window is exactly the local one.
- * Loaded lazily from `app/main.tsx`.
+ * With the Danil account signed in, this window adds the tasks of the other
+ * computers of the person to its own (`router.ts`, `@terminus/fleet`): its own
+ * engine keeps the native IPC and paints first, and each other computer is one
+ * relay session that only adds its slice. With one session per account, it is
+ * the account of the open workspace: its client token, its computers and its
+ * registry; switching to a workspace of another account installs that one.
+ * Without an account, or with no other computer, nothing is installed and the
+ * window is exactly the local one. Loaded lazily from `app/main.tsx`.
  */
 import "../../web/phrases";
 import {
@@ -19,27 +19,29 @@ import {
   RelaySession,
   screenProtocols,
   screenUrl,
+  sessionProbe,
+  startComputer,
   wakes,
 } from "@terminus/computers";
-import { createSignal, For } from "solid-js";
+import { Fleet, type MachineInfo, unwrap } from "@terminus/fleet";
+import { createRoot, createSignal, For } from "solid-js";
 import { render } from "solid-js/web";
 import { t } from "../../lib/i18n";
+import { setMachineRoute } from "../../lib/invoke";
 import { whenConnected } from "../../lib/engineConnection";
+import { leerPref } from "../../lib/prefs";
 import { capabilities, setCapabilities, type Capabilities } from "../../lib/platform";
-import { listen } from "../../lib/serviceEvents";
+import { deliver, listen } from "../../lib/serviceEvents";
 import { isMac } from "../../lib/window";
 import { Toast, ToastPortal } from "../../ui/Toast";
-import type { MachineStatus } from "../../web/fleet";
-import { type BrowserHost, createWebTransport, type WebTransport } from "../../web/transport";
+import type { MachineStatus } from "../../web/SyncNote";
 import { type DanilSessionInfo, sessionForWorkspace, type WorkspaceAccount } from "../settings/danil-sessions";
 import { MachinePicker } from "./MachinePicker";
-import { refetchMachines } from "./store";
+import { createRouter, type Invoke, type Router, type SliceChange } from "./router";
+import { machineNamesChanged, refetchMachines } from "./store";
 
 declare const __TERMINUS_CONTRACT__: string;
 
-type Args = Record<string, unknown>;
-type Options = { headers?: HeadersInit } | undefined;
-type Invoke = (command: string, args?: Args, options?: Options) => Promise<unknown>;
 type Internals = { invoke: Invoke };
 type Target = Window & { __TAURI_INTERNALS__?: Internals };
 
@@ -47,59 +49,20 @@ type Target = Window & { __TAURI_INTERNALS__?: Internals };
 type ClientToken = { token: string; expires_at: number; endpoint: string; computer_id: string };
 type DanilStatus = { state: string; computer_id?: string | null };
 
-/** Handled by the window itself, never by an engine. */
-const WINDOW = new Set([
-  "request_close",
-  "close_confirmed",
-  "window_to_background",
-  "tray_update",
-  "quit_completely",
-  "restart_app",
-  "tray_notify",
-  "window_ready",
-  "window_vitals",
-  "window_painted",
-  "window_background",
-  "launcher_state",
-  "launcher_continue",
-  "service_filter",
-  "service_prepare_update",
-  "service_cancel_update",
-  "update_install",
-  "update_pending",
-  "account_relay_token",
-  "open_external",
-]);
-/** What opens a file of a task in this computer: a task of another machine has its files there. */
-const FILES = /^(site_|typst_live_)|^(open_file_external|tree_open_external)$/;
 const RELIST = 10 * 60_000;
 const TOKEN_MARGIN = 60_000;
 const TOAST_FOR = 5_000;
 
-const HOST: BrowserHost = {
-  openUrl: () => {},
-  confirm: () => false,
-  alert: () => {},
-  reload: () => window.location.reload(),
-  writeText: async () => {},
-  readText: async () => "",
-};
-
-type Installed = { key: string; transport: WebTransport; relays: RelaySession[]; restore: () => void };
+/** Who the fan-out is for: this computer, its account and the control plane. Another one installs anew. */
+type Installed = { key: string; fleet: Fleet; router: Router; restore: () => void };
 
 let started = false;
 let installed: Installed | null = null;
 let syncing: Promise<void> | null = null;
 
-const homeName = () => (isMac() ? t("shell.machines.this_mac") : t("shell.machines.this_computer"));
-
-/** Every string in `args` that names another machine's workspace, folder or task. */
-function namesRemote(transport: WebTransport, value: unknown): boolean {
-  if (typeof value === "string") return transport.fleet.unwrap(value) !== null;
-  if (Array.isArray(value)) return value.some((v) => namesRemote(transport, v));
-  if (value && typeof value === "object") return Object.values(value).some((v) => namesRemote(transport, v));
-  return false;
-}
+/** El nombre con que la cuenta conoce a esta computadora («Macbook m4»); sin él, «Esta Mac». */
+const [selfName, setSelfName] = createRoot(() => createSignal<string | null>(null));
+const homeName = () => selfName() ?? (isMac() ? t("shell.machines.this_mac") : t("shell.machines.this_computer"));
 
 /** Tell every list of the window to read again: the machines behind it changed. */
 function refresh() {
@@ -108,6 +71,23 @@ function refresh() {
   }
   void refetchMachines();
 }
+
+/** Another machine's slice changed: the window rereads just that. */
+function slicesChanged(changes: SliceChange[]) {
+  window.dispatchEvent(new CustomEvent("harness:machine-slices", { detail: { changes } }));
+  if (changes.includes("attention")) window.dispatchEvent(new CustomEvent("harness:service-resync"));
+}
+
+const infoOf = (c: Computer): MachineInfo => ({
+  id: c.computer_id,
+  name: c.name?.trim() || c.computer_id,
+  wakes: wakes(c),
+  outdated: machineCompatibility(c.contract, __TERMINUS_CONTRACT__) === "outdated",
+  linked: linkedWorkspaces(c),
+});
+
+/** The machine picked in «Ejecutar en» for `workspace` (`store.ts`), remembered per workspace. */
+const pickedFor = (workspace: string | null) => (workspace ? (leerPref<Record<string, string>>("machines.run_on", {})[workspace] ?? null) : null);
 
 export function startAccountMachines(target: Target = window) {
   if (started) return;
@@ -135,59 +115,68 @@ export function startAccountMachines(target: Target = window) {
     const gone = installed;
     installed = null;
     gone.restore();
-    for (const r of gone.relays) r.close();
     refresh();
   };
 
   function install(self: string, endpoint: string, others: Computer[], key: string) {
     const [changed, bump] = createSignal(0);
-    const relays: RelaySession[] = [];
-    const links = others.map((c) => {
-      const relay = new RelaySession({
-        endpoint,
-        computerId: c.computer_id,
-        getToken: async () => (await getToken()).token,
-        onUnauthorized: () => {
-          token = null;
-          void sync();
-        },
-      });
-      relays.push(relay);
-      relay.onState(() => bump((n) => n + 1));
-      const info = {
-        id: c.computer_id,
-        name: c.name?.trim() || c.computer_id,
-        wakes: wakes(c),
-        outdated: machineCompatibility(c.contract, __TERMINUS_CONTRACT__) === "outdated",
-        linked: linkedWorkspaces(c),
-      };
-      return { info, relay };
+    const fleet = new Fleet({
+      self,
+      connect: (info) =>
+        new RelaySession({
+          endpoint,
+          computerId: info.id,
+          // Con otro contrato el relay ni reenvía ni contesta del espejo: `version_mismatch`.
+          contracts: [__TERMINUS_CONTRACT__],
+          getToken: async () => (await getToken()).token,
+          // Un upgrade sin licencia no trae cuerpo: se pregunta por HTTP para no reintentar en bucle.
+          probe: async () => sessionProbe(endpoint, (await getToken()).token, info.id),
+          onUnauthorized: () => {
+            token = null;
+            void sync();
+          },
+        }),
+      compatible: (contract) => {
+        const verdict = machineCompatibility(contract, __TERMINUS_CONTRACT__);
+        return verdict === "unknown" ? null : verdict === "ok";
+      },
+      wake: async (id) => (await startComputer(endpoint, (await getToken()).token, id)).kind === "ok",
+      storage: localStorage,
+      onChange: () => bump((n) => n + 1),
+      // La cola de aplazadas cambió (aquí, en la web o en el teléfono): la lista se relee.
+      onDeferred: (machine) => router.deferredChanged(machine),
+      onSlice: () => bump((n) => n + 1),
+      onEvents: (machine, events, gap) => {
+        if (events.length) router.events(machine, events);
+        if (gap) window.dispatchEvent(new CustomEvent("harness:service-resync"));
+      },
     });
-    const registry = async () => {
-      const answer = await listWorkspaces(endpoint, (await getToken()).token);
-      if (answer.kind === "unauthorized") token = null;
-      return answer.kind === "ok" ? answer.value : null;
-    };
-    const transport = createWebTransport(
-      links,
-      "",
-      HOST,
-      () => bump((n) => n + 1),
-      { info: { id: self, name: homeName(), wakes: false }, call: (command, args, options) => native(command, args, options) },
-      registry,
-    );
+    const router = createRouter({
+      self,
+      fleet,
+      native,
+      registry: async () => {
+        const answer = await listWorkspaces(endpoint, (await getToken()).token);
+        if (answer.kind === "unauthorized") token = null;
+        return answer.kind === "ok" ? answer.value : null;
+      },
+      onSlices: slicesChanged,
+      deliver,
+      pickedFor,
+    });
+    fleet.setMachines(others.map(infoOf));
+    fleet.subscribeEvents();
 
     const previous: Capabilities = capabilities();
     setCapabilities({
       ...previous,
-      machineName: (id) => (id === self ? homeName() : transport.fleet.name(id)),
+      machineName: (id) => (id === self ? homeName() : fleet.name(id)),
+      taskMachine: (id) => unwrap(id, fleet.remotes())?.machine ?? null,
       windowMachine: () => ({ id: self, name: homeName(), local: true }),
       machineScreen: (id) =>
-        links.some(({ info }) => info.id === id && info.wakes)
-          ? async () => new WebSocket(screenUrl(endpoint, id), screenProtocols((await getToken()).token))
-          : null,
+        fleet.info(id)?.wakes ? async () => new WebSocket(screenUrl(endpoint, id), screenProtocols((await getToken()).token)) : null,
       remoteCreate: (workspace) => {
-        const target = transport.createsOn(workspace);
+        const target = router.createsOn(workspace);
         return target && target.machine !== self ? target : null;
       },
       machineOnCreate: (workspace) => (
@@ -196,58 +185,69 @@ export function startAccountMachines(target: Target = window) {
           <MachinePicker workspace={workspace} />
         </div>
       ),
+      machinesLicense: () => {
+        changed();
+        return fleet.license();
+      },
+      retryMachines: () => {
+        fleet.retry();
+        refresh();
+      },
     });
-    const route: Invoke = (command, args = {}, options) => {
-      if (command.startsWith("plugin:") || WINDOW.has(command)) return native(command, args, options);
-      if (FILES.test(command)) {
-        if (!namesRemote(transport, args)) return native(command, args, options);
-        return Promise.reject({ what: t("shell.machines.local_only"), detail: "machine_files" });
-      }
-      return transport.handle(command, args, options) as Promise<unknown>;
-    };
-    internals.invoke = route;
+    const route = (command: string, args?: unknown, options?: { headers?: HeadersInit }) => router.handle(command, (args ?? {}) as Record<string, unknown>, options);
+    setMachineRoute(route);
     const layer = document.createElement("div");
     document.body.append(layer);
+    const status = (id: string): MachineStatus => {
+      const power = fleet.power(id);
+      return power === "on" ? "online" : power === "off" ? "offline" : power;
+    };
     const unmount = render(
       () => (
         <MachineToasts
           machines={() => {
             changed();
-            return links.map(({ info, relay }) => ({ id: info.id, name: info.name, status: transport.status(info.id), known: relay.state() !== "unknown" }));
+            return fleet.machines().map((info) => ({ id: info.id, name: info.name, status: status(info.id), known: fleet.state(info.id) !== "unknown" }));
           }}
         />
       ),
       layer,
     );
+    const onPageHide = () => fleet.flush();
+    window.addEventListener("pagehide", onPageHide);
     installed = {
       key,
-      transport,
-      relays,
+      fleet,
+      router,
       restore: () => {
-        if (internals.invoke === route) internals.invoke = native;
+        setMachineRoute(null);
+        window.removeEventListener("pagehide", onPageHide);
         setCapabilities(previous);
         unmount();
         layer.remove();
+        router.close();
       },
     };
-    for (const r of relays) r.start();
     // The groups of workspaces and the open one come from this read; the lists read after it.
-    void transport
+    void router
       .handle("list_workspaces", {})
       .catch(() => null)
       .then(() => {
-        if (installed?.transport === transport) refresh();
+        if (installed?.router === router) refresh();
       });
   }
 
   /**
-   * The computer and account the open workspace talks as. An engine without
-   * `danil_sessions` has one session, the one of `danil_connect_status`.
+   * The computer and account the window's workspace talks as, asked for that
+   * workspace by name: the engine's own open one may be another. An engine
+   * without `danil_sessions` has one session, the one of `danil_connect_status`.
    */
   async function whoAmI(): Promise<{ self: string | null; account: string | null }> {
     const sessions = (await invoke("danil_sessions", {}).catch(() => null)) as DanilSessionInfo[] | null;
     if (Array.isArray(sessions)) {
-      const of = (await invoke("danil_workspace_account", {}).catch(() => null)) as WorkspaceAccount | null;
+      const listed = installed ? null : ((await invoke("list_workspaces", {}).catch(() => null)) as { active?: unknown } | null);
+      const workspace = installed?.router.activeWorkspace() ?? (typeof listed?.active === "string" ? listed.active : null);
+      const of = (await invoke("danil_workspace_account", workspace ? { workspace } : {}).catch(() => null)) as WorkspaceAccount | null;
       const session = sessionForWorkspace(sessions, of);
       return { self: session?.computer_id ?? null, account: session?.account ?? session?.computer_id ?? null };
     }
@@ -255,7 +255,7 @@ export function startAccountMachines(target: Target = window) {
     return { self: status?.state === "connected" ? (status.computer_id ?? null) : null, account: null };
   }
 
-  /** Reads the account and its computers; installs, replaces or removes the fan-out to match. */
+  /** Reads the account and its computers; installs, updates or removes the fan-out to match. */
   async function check() {
     const who = await whoAmI();
     const self = who.self;
@@ -280,11 +280,18 @@ export function startAccountMachines(target: Target = window) {
       return uninstall();
     }
     if (answer.kind !== "ok") return;
+    setSelfName(answer.value.find((c) => c.computer_id === self)?.name?.trim() || null);
     const others = orderComputers(answer.value.filter((c) => c.computer_id !== self));
-    const key = JSON.stringify([self, account, client.endpoint, others.map((c) => [c.computer_id, c.name, c.contract, wakes(c), c.workspaces ?? null])]);
-    if (installed?.key === key) return;
+    const key = JSON.stringify([self, account, client.endpoint]);
+    if (!others.length) return uninstall();
+    // The same account: machines that came, left or changed name are applied live, without tearing the rest down.
+    if (installed?.key === key) {
+      installed.fleet.setMachines(others.map(infoOf));
+      machineNamesChanged();
+      return void refetchMachines();
+    }
     uninstall();
-    if (others.length) install(self, client.endpoint, others, key);
+    install(self, client.endpoint, others, key);
   }
 
   let again = false;
@@ -311,6 +318,8 @@ export function startAccountMachines(target: Target = window) {
     void listen("danil-sessions", () => void sync());
     // Another workspace may belong to another account: its computers are others.
     window.addEventListener("harness:workspace", () => void sync());
+    // Una máquina recién conectada («Conectar otra máquina») suma su rebanada sin desmontar las demás.
+    window.addEventListener("harness:account-computers", () => void sync());
     setInterval(() => void sync(), RELIST);
     return sync();
   });

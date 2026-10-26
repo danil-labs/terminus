@@ -14,18 +14,18 @@ export type SidebarView = {
   density: SidebarDensity;
 };
 
-export type SidebarGrouping = "none" | "folder" | "status" | "agent";
+export type SidebarGrouping = "none" | "folder" | "status" | "agent" | "machine";
 export type SidebarDensity = "comfortable" | "compact";
 export type SidebarSection = "active";
 
 export const DEFAULT_SIDEBAR_VIEW: SidebarView = {
   folders: [],
   agent: null,
-  group: "none",
+  group: "folder",
   density: "comfortable",
 };
 
-export const GROUPINGS: readonly SidebarGrouping[] = ["none", "folder", "status", "agent"];
+export const GROUPINGS: readonly SidebarGrouping[] = ["none", "folder", "status", "agent", "machine"];
 export const DENSITIES: readonly SidebarDensity[] = ["comfortable", "compact"];
 
 /** Lo que la lista sabe de una fila (`SessionRow`) y basta para colocarla. */
@@ -33,6 +33,8 @@ export type SidebarTask = {
   id: string;
   folder?: string | null;
   agent?: string | null;
+  /** La máquina que la corre si no es la de la ventana; sin ella, es de esta. */
+  machine?: string | null;
   pinned?: boolean | null;
   chat_de_agente?: boolean;
   inbox?: boolean;
@@ -51,16 +53,55 @@ export type SidebarContext<T extends SidebarTask = SidebarTask> = {
   approving: Iterable<string>;
   /** De qué carpeta es la tarea; por omisión `task.folder`. */
   folderOf?: (task: T) => string | null | undefined;
+  /** En qué máquina corre; por omisión `task.machine`, y `""` es esta. */
+  machineOf?: (task: T) => string | null | undefined;
 };
 
 export type SidebarGroup<T> = {
-  kind: "section" | "folder" | "status" | "agent";
-  /** Sección, id de carpeta, estado o nombre de agente; `""` es sin carpeta o sin agente. */
+  kind: "section" | "folder" | "status" | "agent" | "machine";
+  /** Sección, id de carpeta, estado, nombre de agente o máquina; `""` es sin carpeta, sin agente o esta máquina. */
   key: string;
+  /**
+   * Solo en una carpeta con tareas en más de una máquina: cada máquina es su
+   * propio grupo, porque en disco son clones distintos. `""` es esta máquina.
+   */
+  machine?: string;
   tasks: T[];
 };
 
 export type SidebarStatusKey = TaskState | "idle" | "finished";
+
+/**
+ * Un agente con otra mayúscula es el mismo agente: en Windows y macOS su
+ * carpeta es una sola, y una tarea guarda el nombre como se escribió.
+ */
+export function sameAgent(a: string | null | undefined, b: string | null | undefined): boolean {
+  return !!a && !!b && a.toLowerCase() === b.toLowerCase();
+}
+
+/** Una opción de «Agente» del filtro; `installed` falso es un agente que ya no está pero tiene tareas. */
+export type AgentOption = { name: string; installed: boolean };
+
+/**
+ * Las opciones de «Agente»: los instalados y, de los desinstalados, solo los
+ * que aún tienen tareas sin archivar. Sin repetir un agente por mayúsculas;
+ * manda como se escribe el instalado. Primero los instalados, por nombre.
+ */
+export function agentOptions(installed: Iterable<string>, tasks: Iterable<SidebarTask>): AgentOption[] {
+  const options = new Map<string, AgentOption>();
+  for (const name of installed) {
+    if (name && !options.has(name.toLowerCase())) options.set(name.toLowerCase(), { name, installed: true });
+  }
+  for (const task of tasks) {
+    const name = task.agent;
+    if (name && !task.archived && !options.has(name.toLowerCase())) options.set(name.toLowerCase(), { name, installed: false });
+  }
+  const byName = (a: AgentOption, b: AgentOption) => {
+    const x = a.name.toLowerCase(), y = b.name.toLowerCase();
+    return x < y ? -1 : x > y ? 1 : 0;
+  };
+  return [...options.values()].sort((a, b) => Number(b.installed) - Number(a.installed) || byName(a, b));
+}
 
 /** Una vista guardada, tal cual o reparada: lo que no se entiende vuelve al valor por defecto. */
 export function sanitizeSidebarView(raw: unknown): SidebarView {
@@ -72,7 +113,7 @@ export function sanitizeSidebarView(raw: unknown): SidebarView {
   return {
     folders,
     agent: typeof v.agent === "string" && v.agent !== "" ? v.agent : null,
-    group: GROUPINGS.includes(v.group as SidebarGrouping) ? (v.group as SidebarGrouping) : "none",
+    group: GROUPINGS.includes(v.group as SidebarGrouping) ? (v.group as SidebarGrouping) : DEFAULT_SIDEBAR_VIEW.group,
     density: DENSITIES.includes(v.density as SidebarDensity) ? (v.density as SidebarDensity) : "comfortable",
   };
 }
@@ -139,7 +180,7 @@ export function applySidebarView<T extends SidebarTask>(
   const folderOf = (task: T) => (ctx.folderOf ? ctx.folderOf(task) : task.folder) ?? "";
   const visible = tasks.filter((task) => !task.archived
     && (view.folders.length === 0 || view.folders.includes(folderOf(task)))
-    && (view.agent === null || task.agent === view.agent));
+    && (view.agent === null || sameAgent(task.agent, view.agent)));
 
   if (view.group === "none") return [{ kind: "section", key: "active", tasks: pinnedFirst(visible) }];
 
@@ -148,12 +189,34 @@ export function applySidebarView<T extends SidebarTask>(
   if (view.group === "status") {
     groups = groupBy(visible, (task) => statusKeyOf(task, ctx));
     order = [...TASK_STATES, "idle", "finished"];
+  } else if (view.group === "machine") {
+    // Esta máquina primero; las demás, en el orden en que aparece su tarea más nueva.
+    groups = groupBy(visible, (task) => task.machine ?? "");
+    order = ["", ...[...groups.keys()].filter((key) => key !== "")];
   } else {
-    groups = groupBy(visible, view.group === "folder" ? folderOf : (task) => task.agent ?? "");
+    // Un agente con otra mayúscula cae en el mismo grupo, con el nombre de su tarea más nueva.
+    const spelling = new Map<string, string>();
+    for (const task of visible) if (task.agent && !spelling.has(task.agent.toLowerCase())) spelling.set(task.agent.toLowerCase(), task.agent);
+    const agentOf = (task: T) => (task.agent ? spelling.get(task.agent.toLowerCase())! : "");
+    groups = groupBy(visible, view.group === "folder" ? folderOf : agentOf);
     order = [...[...groups.keys()].filter((key) => key !== ""), ""];
   }
   const kind = view.group;
-  return order.filter((key) => groups.has(key)).map((key) => ({ kind, key, tasks: pinnedFirst(groups.get(key)!) }));
+  const machineOf = (task: T) => (ctx.machineOf ? ctx.machineOf(task) : task.machine) ?? "";
+  return order.filter((key) => groups.has(key)).flatMap((key): SidebarGroup<T>[] => {
+    const tasks = groups.get(key)!;
+    // Una carpeta en dos máquinas son dos clones: un grupo por máquina, esta primero
+    // y las demás por su tarea más nueva. En una sola máquina, el grupo de siempre.
+    const byMachine = kind === "folder" && key !== "" ? groupBy(tasks, machineOf) : null;
+    if (!byMachine || byMachine.size < 2) return [{ kind, key, tasks: pinnedFirst(tasks) }];
+    const machines = [...byMachine.keys()].sort((a, b) => Number(b === "") - Number(a === ""));
+    return machines.map((machine) => ({ kind, key, machine, tasks: pinnedFirst(byMachine.get(machine)!) }));
+  });
+}
+
+/** La clave de un grupo para listas y plegado: la de la carpeta, más la máquina si se partió. */
+export function groupKey(group: Pick<SidebarGroup<unknown>, "kind" | "key" | "machine">): string {
+  return group.machine === undefined ? `${group.kind}:${group.key}` : `${group.kind}:${group.key}@${group.machine}`;
 }
 
 /** Cuántas opciones del filtro no están en su valor por defecto: el número del botón. */

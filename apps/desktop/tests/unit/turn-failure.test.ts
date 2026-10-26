@@ -23,7 +23,7 @@ import { transcripcion as transcript } from "../../src/features/chat/transcript.
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 
 test("el bloqueo de otra app se traduce al releer el fallo guardado", () => {
-  assert.match(failureText({ text: "accounts.error.home_other_app" }), /Otra app de Terminus/);
+  assert.match(failureText({ text: "accounts.error.home_other_app" }), /Otra ventana de Terminus/);
 });
 
 test("cada clase de fallo dice algo distinto", () => {

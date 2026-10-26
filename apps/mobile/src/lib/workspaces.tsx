@@ -5,6 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { type Agent, type Folder, type HostSnapshot, type MergedSpace, type Task, type WorkspaceEntry, mergeSnapshots, snapshotOf, taskKey, withAccountFolders, workspaceEntries, workspacesOf } from "./engine";
 import type { Host } from "./hosts";
 import { useMachines } from "./machines";
+import { keepSame } from "./reconcile";
 
 export type { MergedSpace, WorkspaceEntry };
 
@@ -14,6 +15,8 @@ export type Snapshot = {
   folders: Folder[];
   spaces: MergedSpace[];
   tasks: Task[];
+  /** Las que cuelgan de su lanzador: no salen en la lista, sí en el chat de este. */
+  delegated: Task[];
   agents: Agent[];
   /** `host/id` de las tareas con un turno en marcha. */
   live: Set<string>;
@@ -37,6 +40,7 @@ type Workspaces = {
   setView: (view: SidebarView) => void;
   /** Las máquinas que tienen el workspace actual. */
   hostsOfCurrent: Host[];
+  /** Relee el workspace; con el gesto de la lista enseña que carga. */
   reload: () => Promise<void>;
 };
 
@@ -67,6 +71,10 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   currentNow.current = currentId;
   const perHostNow = useRef(perHost);
   const shown = useRef(0);
+  // Lo último que contestó cada máquina del workspace abierto: hasta que vuelva a contestar, su parte se queda.
+  const parts = useRef<{ entry: string | null; byHost: Map<string, HostSnapshot> }>({ entry: null, byHost: new Map() });
+  const hasSnapshot = useRef(false);
+  hasSnapshot.current = snapshot !== null;
 
   useEffect(() => {
     void store.get(KEY).then((saved) => {
@@ -79,9 +87,10 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   const list = useMemo<WorkspaceEntry[]>(() => workspaceEntries(hosts, perHost, registry), [hosts, perHost, registry]);
 
   const machineCount = hosts.length;
-  const reload = useCallback(async () => {
+  // `quiet`: la recarga que dispara un evento o un cambio de máquina no enseña que carga si ya hay lista.
+  const load = useCallback(async (quiet: boolean) => {
     const mine = ++asked.current;
-    setLoading(true);
+    if (!quiet || !hasSnapshot.current) setLoading(true);
     // La máquina de cada tarea solo se dice con más de una máquina.
     const tag = (hostId: string) => {
       if (machineCount < 2) return null;
@@ -89,20 +98,25 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
       return host ? { machine: host.label, on: host.power() === "on" } : null;
     };
     // Cada máquina se pinta al contestar: una lenta o sin conexión no detiene la lista. Una recarga más nueva que ya pintó manda.
-    const load = async (entry: WorkspaceEntry) => {
+    // Mientras tanto, y si no contesta, vale lo último que dijo: sus tareas no se van de la lista para volver un momento después.
+    const loadEntry = async (entry: WorkspaceEntry) => {
       const having = hosts.filter((h) => entry.members.has(h.id));
-      const parts: (HostSnapshot | null)[] = having.map(() => null);
+      const before = parts.current.entry === entry.id ? parts.current.byHost : new Map<string, HostSnapshot>();
+      const answered = having.map((h) => before.get(h.id) ?? null);
       const show = () => {
         if (mine < shown.current || (currentNow.current !== null && currentNow.current !== entry.id)) return;
         shown.current = mine;
+        parts.current = { entry: entry.id, byHost: new Map(answered.flatMap((p, i) => (p ? [[having[i].id, p] as const] : []))) };
         // Lo que ninguna máquina contestó lo pone el registro de la cuenta: un workspace dormido abre con sus carpetas.
-        const merged = withAccountFolders(mergeSnapshots(parts.filter((p) => p !== null), tag), registry, entry.id, having.map((h) => h.id));
+        const merged = withAccountFolders(mergeSnapshots(answered.filter((p) => p !== null), tag), registry, entry.id, having.map((h) => h.id));
         rememberTitles(merged.tasks.map((task) => [taskKey(task), task.title]));
-        setSnapshot(merged);
+        // Solo cambia lo que cambió: las filas iguales conservan su objeto y sus tarjetas no se repintan.
+        setSnapshot((old) => (old ? keepSame<Snapshot>(old, merged) : merged));
       };
       await Promise.all(
         having.map(async (host, i) => {
-          parts[i] = await snapshotOf(host, entry.members.get(host.id) as string).catch(() => null);
+          const part = await snapshotOf(host, entry.members.get(host.id) as string).catch(() => null);
+          if (part) answered[i] = part;
           show();
         }),
       );
@@ -113,7 +127,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     try {
       // Con lo que ya se sabe del workspace, sus tareas se piden a la vez que la lista de workspaces.
       const early = pick(workspaceEntries(hosts, perHostNow.current, registry));
-      const first = early ? load(early) : null;
+      const first = early ? loadEntry(early) : null;
       const answers = await Promise.all(hosts.map(async (host) => [host.id, (await workspacesOf(host).catch(() => ({ list: null }))).list] as const));
       if (mine !== asked.current) return void (await first);
       const byHost = Object.fromEntries(answers);
@@ -128,16 +142,18 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         shown.current = mine;
         return setSnapshot(null);
       }
-      await (sameEntry(early, entry) && first ? first : load(entry));
+      await (sameEntry(early, entry) && first ? first : loadEntry(entry));
     } finally {
       if (mine === asked.current) setLoading(false);
     }
   }, [hosts, registry, rememberTitles, machineCount]);
+  const reload = useCallback(() => load(false), [load]);
+  const refresh = useCallback(() => load(true), [load]);
 
   // Al cambiar las máquinas, su estado o el workspace.
   useEffect(() => {
-    void reload();
-  }, [reload, tick]);
+    void refresh();
+  }, [refresh, tick]);
 
   useEffect(
     () =>
@@ -153,9 +169,9 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
           });
         if (!relevant) return;
         if (pending.current) clearTimeout(pending.current);
-        pending.current = setTimeout(() => void reload(), 600);
+        pending.current = setTimeout(() => void refresh(), 600);
       }),
-    [subscribe, reload, currentId, list],
+    [subscribe, refresh, currentId, list],
   );
 
   const select = useCallback((id: string) => {

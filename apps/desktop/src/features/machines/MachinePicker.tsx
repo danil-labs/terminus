@@ -3,8 +3,11 @@ import Check from "lucide-solid/icons/check";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import Server from "lucide-solid/icons/server";
 import Laptop from "lucide-solid/icons/laptop";
+import Plus from "lucide-solid/icons/plus";
+import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
 import { ITEM_DE_MENU, Popover, PopoverContent, PopoverTrigger } from "../../ui/Popover";
 import { t } from "../../lib/i18n";
+import { ConnectMachine, connectSource } from "./ConnectMachine";
 import { type Machine, type ProjectPlace, machineName, machines, refetchMachines, runOn, setRunOn, unavailable } from "./store";
 
 let pedida = false;
@@ -13,8 +16,8 @@ let pedida = false;
  * «Ejecutar en»: la máquina donde corre la tarea que se va a crear, recordada por
  * workspace. La ventana sigue en su workspace; elegir una apagada no la enciende,
  * la enciende enviar. Una máquina sin el workspace lo crea con el mismo id al
- * enviar; la que no puede, o no tiene la carpeta de un proyecto sin remoto, se
- * ve desactivada con la razón.
+ * enviar; la que no puede se ve desactivada con la razón. Un proyecto sin
+ * remoto se lleva desde su máquina mientras esté encendida (`carry.ts`).
  */
 export function MachinePicker(props: { workspace: string | null; project?: ProjectPlace }) {
   if (!pedida) {
@@ -23,6 +26,8 @@ export function MachinePicker(props: { workspace: string | null; project?: Proje
   }
 
   const [abierto, setAbierto] = createSignal(false);
+  const [conectando, setConectando] = createSignal(false);
+  const fuente = connectSource();
   const elegida = () => {
     const id = runOn(props.workspace, props.project);
     return machines().find((m) => (id ? m.id === id : m.active));
@@ -86,8 +91,40 @@ export function MachinePicker(props: { workspace: string | null; project?: Proje
               )}
             </For>
           </div>
+          <Show when={fuente}>
+            <button
+              class={`${ITEM_DE_MENU} flex items-center gap-2 border-t border-border`}
+              data-connect-machine-item=""
+              onClick={() => {
+                setAbierto(false);
+                setConectando(true);
+              }}
+            >
+              <Plus size={12} aria-hidden="true" />
+              <span class="flex-1 truncate">{t("danil.connect_machine.button")}</span>
+            </button>
+          </Show>
         </PopoverContent>
       </Popover>
+      <Show when={fuente}>
+        {(f) => (
+          <Dialog open={conectando()} onOpenChange={setConectando}>
+            <DialogContent class="max-w-[520px]">
+              <DialogTitle class="mb-3 text-sm font-semibold">{t("danil.connect_machine.title")}</DialogTitle>
+              <Show when={conectando()}>
+                <ConnectMachine
+                  {...f()}
+                  onReady={(c) => {
+                    setConectando(false);
+                    f().onReady(c);
+                    void refetchMachines();
+                  }}
+                />
+              </Show>
+            </DialogContent>
+          </Dialog>
+        )}
+      </Show>
     </Show>
   );
 }

@@ -10,8 +10,8 @@
  * intente, permisos y avisos, y la lista cerrada de comandos. Y lo que se
  * agregó para parecerse al escritorio: fijar y archivar desde la vista previa
  * (encendiendo la VM), el cuadro de escribir (modelos, permisos, `/`, `@`,
- * ramas, `!`, imágenes adjuntas y la cola), y las cuentas de IA juntadas por
- * correo con su consumo, el inicio de sesión sin pantalla en otra máquina y
+ * ramas, `!`, imágenes adjuntas y la cola), y las credenciales de IA con su
+ * consumo propio, el inicio de sesión sin pantalla en otra máquina y
  * cerrar la sesión en una.
  */
 import assert from "node:assert/strict";
@@ -55,7 +55,7 @@ import {
   workspaceEntries,
   workspacesOf,
 } from "../src/lib/engine.ts";
-import { type Host, HostError, relayHost } from "../src/lib/hosts.ts";
+import { type Host, HostError, accountFleet } from "../src/lib/hosts.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -78,13 +78,14 @@ async function hostsAt(endpoint: string) {
   const answer = await listComputers(endpoint, "fake-jwt");
   assert.equal(answer.kind, "ok");
   const computers = answer.kind === "ok" ? answer.value : [];
-  const hosts = orderComputers(computers).map((c) =>
-    relayHost(c, { endpoint, getToken: () => "fake-jwt", wake: async () => (await startComputer(endpoint, "fake-jwt", c.computer_id)).kind === "ok" }),
-  );
+  // Una sola flota para todas, como la app (`machines.tsx`).
+  const machines = accountFleet({ endpoint, getToken: () => "fake-jwt", wake: async (id) => (await startComputer(endpoint, "fake-jwt", id)).kind === "ok" });
+  const hosts = machines.set(computers);
+  const close = () => machines.close();
   const events = new Map<string, EngineEvent[]>();
   for (const h of hosts) h.onEvents((list) => events.set(h.id, [...(events.get(h.id) ?? []), ...list]));
   await sleep(200);
-  return { hosts, events, byId: (id: string) => hosts.find((h) => h.id === id) as Host };
+  return { hosts, events, close, byId: (id: string) => hosts.find((h) => h.id === id) as Host };
 }
 
 const steps: string[] = [];
@@ -100,7 +101,7 @@ const ok = (step: string) => {
   const endpoint = `http://127.0.0.1:${port}`;
   try {
     assert.equal((await listComputers(endpoint, "otro")).kind, "unauthorized");
-    const { hosts, events, byId } = await hostsAt(endpoint);
+    const { hosts, events, byId, close } = await hostsAt(endpoint);
     const vm = byId("cmp_vm");
     const mac = byId("cmp_mac");
     assert.equal(vm.managed, true);
@@ -168,7 +169,7 @@ const ok = (step: string) => {
     assert.equal((await loadTask(mac, "w-prod", "p-mac-api", pid)).permissions.length, 0);
     ok("en la Mac: la tarea pide permiso, se aprueba desde el teléfono y termina; avisos de aprobación y de terminada");
 
-    for (const h of hosts) h.close();
+    close();
   } finally {
     child.kill();
   }
@@ -180,7 +181,7 @@ const ok = (step: string) => {
   const child = await fake(port, "--mac-off");
   const endpoint = `http://127.0.0.1:${port}`;
   try {
-    const { hosts, byId } = await hostsAt(endpoint);
+    const { hosts, byId, close } = await hostsAt(endpoint);
     const mac = byId("cmp_mac");
     assert.equal(mac.power(), "off");
     assert.equal(mac.canAct(), "asleep");
@@ -193,7 +194,7 @@ const ok = (step: string) => {
     assert.equal(mac.power(), "off");
     ok("una máquina propia apagada: lecturas vacías sin error y la acción no se manda (machine_asleep)");
     await assert.rejects(setPinned(mac, "w-prod", "p-mac-api", "t-mac-1", true), (e: HostError) => e.code === "machine_asleep");
-    await assert.rejects(addAccount(mac, "claude"), (e: HostError) => e.code === "machine_asleep");
+    await assert.rejects(addAccount(mac, "w-prod", "claude"), (e: HostError) => e.code === "machine_asleep");
     assert.equal(mac.power(), "off");
     ok("fijar o iniciar sesión en una máquina propia apagada tampoco se intenta");
 
@@ -206,7 +207,7 @@ const ok = (step: string) => {
     const folders = withAccountFolders({ folders: [], spaces: [] }, accountList, "w-prod", ["cmp_mac"]).folders;
     assert.deepEqual(folders.map((f) => f.key), ["cmp_mac/p-mac-api"], "con sus carpetas del registro");
     ok("el registro de la cuenta (GET /v1/workspaces) trae el workspace y sus carpetas con la máquina apagada");
-    for (const h of hosts) h.close();
+    close();
   } finally {
     child.kill();
   }
@@ -218,19 +219,20 @@ const ok = (step: string) => {
   const child = await fake(port);
   const endpoint = `http://127.0.0.1:${port}`;
   try {
-    const { hosts, events, byId } = await hostsAt(endpoint);
+    const { hosts, events, byId, close } = await hostsAt(endpoint);
     const vm = byId("cmp_vm");
     const mac = byId("cmp_mac");
     const live = async (h: Host, ws: string) => (await snapshotOf(h, ws)).tasks;
 
-    // Fijar con la VM apagada: no es intención del relay, la enciende el plano de control antes.
+    // Fijar ya no enciende la VM (con ella apagada el relay lo aplaza, #307, y este falso no aplaza): se enciende antes.
     assert.equal(vm.power(), "off");
+    await vm.wake();
     await setPinned(vm, "w-prod", "p-vm-web", "t-vm-1", true);
     assert.equal(vm.power(), "on");
     assert.equal((await live(vm, "w-prod")).find((t) => t.id === "t-vm-1")?.pinned, true);
     await setPinned(vm, "w-prod", "p-vm-web", "t-vm-1", false);
     assert.equal((await live(vm, "w-prod")).find((t) => t.id === "t-vm-1")?.pinned, false);
-    ok("Fijar y Desfijar desde la vista previa (set_session_pinned); con la VM apagada, primero la enciende");
+    ok("Fijar y Desfijar desde la vista previa (set_session_pinned) en la VM encendida");
 
     const blocked = await archiveTask(mac, "w-prod", "p-mac-web", "t-mac-2");
     assert.ok("blocked" in blocked && blocked.blocked[0].files.includes("src/home.tsx"));
@@ -266,34 +268,34 @@ const ok = (step: string) => {
     assert.equal(ran.session.turns.at(-1)?.text, "$ ls\nok");
     ok("«Mandar ahora» (inject_message) y `!` sin tarea crea una con el comando (run_shell_command)");
 
-    // Las cuentas: la misma persona en las dos máquinas se ve una vez, con el consumo leído de una.
-    const lists = await Promise.all(hosts.map(async (h) => ({ machine: h.id, on: h.power() === "on", accounts: ((await accountsOf(h, "claude"))?.accounts ?? []) as AiAccount[] })));
+    // El mismo correo no une credenciales: cada una conserva su máquina y consumo.
+    const lists = await Promise.all(hosts.map(async (h) => ({ machine: h.id, on: h.power() === "on", accounts: ((await accountsOf(h, "w-prod", "claude"))?.accounts ?? []) as AiAccount[] })));
     const groups = groupAccounts("claude", lists);
-    assert.equal(groups.length, 1);
-    assert.deepEqual(groups[0].members.map((m) => m.machine), ["cmp_vm", "cmp_mac"]);
-    const limits = await limitsOf(byId(groups[0].usageFrom.machine), "claude", groups[0].usageFrom.id);
+    assert.equal(groups.length, 2);
+    assert.deepEqual(groups.map((g) => g.members.map((m) => m.machine)), [["cmp_vm"], ["cmp_mac"]]);
+    const limits = await limitsOf(byId(groups[0].usageFrom.machine), "w-prod", "claude", groups[0].usageFrom.id);
     assert.equal(limits?.mode, "read");
     assert.match(windowLabel("es", limits?.mode === "read" ? limits.windows[0] : { used_pct: 0, resets_at: null }), /^resta 62% · reset en 3 h$/);
-    ok("cuentas: una tarjeta por proveedor y correo con sus dos máquinas, el consumo una vez («resta 62% · reset en 3 h»)");
+    ok("cuentas: cada credencial conserva su tarjeta y consumo aunque comparta correo («resta 62% · reset en 3 h»)");
 
     const accountEvents = (h: Host, id: string) => (events.get(h.id) ?? []).filter((e) => e.name === "account" && (e.payload as LoginEvent).account === id).map((e) => e.payload as LoginEvent);
-    const codexId = await addAccount(vm, "codex");
-    await beginLogin(vm, "codex", codexId);
+    const codexId = await addAccount(vm, "w-prod", "codex");
+    await beginLogin(vm, "w-prod", "codex", codexId);
     await until("codex termina solo", () => accountEvents(vm, codexId).some((e) => e.kind === "done"));
     assert.deepEqual(accountEvents(vm, codexId).map((e) => e.kind), ["url", "confirm", "done"]);
     assert.equal(accountEvents(vm, codexId).find((e) => e.kind === "confirm")?.text, "WXYZ-1234");
-    assert.equal((await accountsOf(vm, "codex"))?.accounts[0].identity, "ana@example.com");
-    const claudeId = await addAccount(mac, "claude");
-    await beginLogin(mac, "claude", claudeId);
+    assert.equal((await accountsOf(vm, "w-prod", "codex"))?.accounts[0].identity, "ana@example.com");
+    const claudeId = await addAccount(mac, "w-prod", "claude");
+    await beginLogin(mac, "w-prod", "claude", claudeId);
     await until("claude pide el código", () => accountEvents(mac, claudeId).some((e) => e.kind === "code"));
-    await submitLoginCode(mac, claudeId, "good-code");
+    await submitLoginCode(mac, "w-prod", claudeId, "good-code");
     await until("claude termina", () => accountEvents(mac, claudeId).some((e) => e.kind === "done"));
     assert.equal(accountEvents(mac, claudeId).at(-1)?.text, "");
     ok("iniciar sesión en otra máquina sin pantalla: Codex con enlace y código a comparar; Claude con enlace y código pegado");
 
-    await signOutAccount(mac, "claude", "a-mac-1");
-    assert.ok(!(await accountsOf(mac, "claude"))?.accounts.some((a) => a.id === "a-mac-1"));
-    assert.ok((await accountsOf(vm, "claude"))?.accounts.some((a) => a.id === "a-vm-1"), "en la otra máquina sigue");
+    await signOutAccount(mac, "w-prod", "claude", "a-mac-1");
+    assert.ok(!(await accountsOf(mac, "w-prod", "claude"))?.accounts.some((a) => a.id === "a-mac-1"));
+    assert.ok((await accountsOf(vm, "w-prod", "claude"))?.accounts.some((a) => a.id === "a-vm-1"), "en la otra máquina sigue");
     ok("cerrar la sesión en una máquina (remove_account) deja la de las demás");
 
     // Carpetas nuevas en la máquina elegida: vacía y clonada, con su avance por eventos.
@@ -315,7 +317,7 @@ const ok = (step: string) => {
     await assert.rejects(slow, (e: HostError) => (e.detail as { what?: { clave?: string } })?.what?.clave === "projects.error.clone_cancelled");
     ok("«Nueva carpeta» (create_project) y «Clonar repo» (start_project_clone + project_clone): avance, carpeta listada, URL rechazada y cancelar");
 
-    for (const h of hosts) h.close();
+    close();
   } finally {
     child.kill();
   }

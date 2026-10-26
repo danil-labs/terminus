@@ -238,11 +238,12 @@ const destinosDe = (
 ];
 
 const GRUPOS: { nombre: () => string; ids: string[] }[] = [
-  { nombre: () => t("settings.nav.group_app"), ids: ["general", "appearance", "entorno"] },
+  // Las sesiones de Danil son de la computadora, no del workspace abierto.
+  { nombre: () => t("settings.nav.group_app"), ids: ["general", "appearance", "entorno", "cuenta-danil"] },
   { nombre: () => t("settings.nav.group_custom"), ids: ["skills", "agentes", "proyectos", "plugins"] },
   {
     nombre: () => t("settings.nav.group_connections"),
-    ids: ["cuenta-danil", "proveedores-ia", "fuentes", "radiant"],
+    ids: ["proveedores-ia", "fuentes", "radiant"],
   },
 ];
 

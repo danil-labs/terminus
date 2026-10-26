@@ -30,6 +30,7 @@ import SessionGit, { gitAppearance, sessionGitDescription } from "./SessionGit";
 import { WithTaskHoverCard } from "./TaskHoverCardTrigger";
 import { hoverCardPull } from "./hoverCardPull";
 import { MachineChip } from "../machines/MachineChip";
+import { bringHereLabel, canBringHere } from "../machines/store";
 import { createTaskHistories } from "./taskHistories";
 
 // Solo hace falta cuando algo estorba al terminar o archivar: fuera de la carga inicial.
@@ -140,9 +141,18 @@ export type SessionRow = {
   chat_de_agente: boolean;
   /** De qué espacio es (`spaces::of_rows`). Ver `lib/spaces.ts`. */
   space?: string | null;
-  /** La máquina que la corre si no es la de la ventana (`fleet.rs`); apagada, `machine_on` es `false`. */
+  /** La máquina que la corre si no es la de la ventana (`@terminus/fleet`); apagada, `machine_on` es `false`. */
   machine?: string;
   machine_on?: boolean;
+  /**
+   * El relay guardó un cambio (archivar, renombrar, fijar, mover) con la máquina
+   * apagada y lo aplica al conectarse (`computers/src/deferred.ts`); hasta
+   * entonces la fila lo enseña con una marca discreta, sin error.
+   */
+  deferred?: boolean;
+  /** Con la cuenta de Danil, el estado de la rebanada de su máquina (`@terminus/fleet`) y cuándo se leyó. */
+  machine_status?: "ok" | "cached" | "no_answer" | "off" | "outdated" | "license_required";
+  machine_at?: number | null;
 };
 
 type EstadoDelWorktree = { available: boolean; owned: boolean };
@@ -303,6 +313,8 @@ export default function Sessions(props: {
   /** El nombre de la carpeta, que no cambia al moverla de espacio. */
   carpeta?: string;
   onMoveToSpace?: (id: string, space: string) => void;
+  /** Traer a la máquina de la ventana el trabajo de una tarea que corre en otra. */
+  onBringHere?: (id: string) => void;
   /** Con tareas de varias carpetas en la misma lista, la de cada fila. Sin esto es `de`. */
   projectOf?: (row: SessionRow) => string;
   destinosDe?: (row: SessionRow) => { id: string; name: string }[];
@@ -311,12 +323,31 @@ export default function Sessions(props: {
   density?: "comfortable" | "compact";
   /** Bajo la cabecera de su carpeta, la fila no repite la carpeta. */
   hideFolder?: boolean;
+  /**
+   * La tarjeta del riel fuera del riel (las delegadas): su fila, su tarjeta
+   * flotante y su densidad, sin lo que el riel hace con la lista.
+   */
+  card?: boolean;
+  /** Hacia dónde sale la tarjeta flotante; el riel la saca a la derecha. */
+  hoverCardPlacement?: "left-start" | "right-start";
 }) {
+  /** Fila de dos líneas con tarjeta flotante: el riel y quien la pide. */
+  const tarjetaDelRiel = () => !!props.sidebar || !!props.card;
   const compacta = () => props.density === "compact";
   const projectOf = (row: SessionRow) => props.projectOf?.(row) ?? props.de;
   const projectOfId = (id: string) => {
     const row = props.sessions.find((s) => s.id === id);
     return row ? projectOf(row) : props.de;
+  };
+  /** La cabecera que lleva una orden a la máquina de una tarea de otra máquina. */
+  const enSuMaquina = (id: string) => {
+    const machine = props.sessions.find((s) => s.id === id)?.machine;
+    return machine ? { headers: { "x-terminus-machine": machine } } : undefined;
+  };
+  /** Una tarea de otra máquina que está apagada: lo que se le pide lo guarda el relay. */
+  const apagada = (id: string) => {
+    const row = props.sessions.find((s) => s.id === id);
+    return !!row?.machine && row.machine_on === false;
   };
   const avisarCambio = (project: string) =>
     window.dispatchEvent(new CustomEvent("harness:tasks-changed", { detail: { project } }));
@@ -334,7 +365,7 @@ export default function Sessions(props: {
     setActionFailure(null);
     try {
       const project = projectOfId(id);
-      await invoke("finish_task", { project, id });
+      await invoke("finish_task", { project, id }, enSuMaquina(id));
       // `anunciar` no actualiza esta ventana: su firma es la de quien
       // escribió, y el sondeo la descarta. Sin este aviso el archivado
       // queda en disco y la lista de aquí sigue mostrando la fila.
@@ -352,7 +383,7 @@ export default function Sessions(props: {
     setActionFailure(null);
     try {
       const project = projectOfId(id);
-      await invoke("set_task_archived", { project, id, archived: true });
+      await invoke("set_task_archived", { project, id, archived: true }, enSuMaquina(id));
       avisarCambio(project);
       setMenu(null);
     } catch (error) {
@@ -367,11 +398,17 @@ export default function Sessions(props: {
   const intentar = async (id: string, finish: boolean, rect?: DOMRect) => {
     const marcar = finish ? setFinishing : setArchiving;
     if ((finish ? finishing() : archiving()).includes(id)) return;
+    // Apagada no hay turnos que matar ni árbol que mirar: archivar se aplaza
+    // (el relay lo aplica al conectarse) y no se enciende solo para preguntar.
+    if (!finish && apagada(id)) {
+      await archiveTask(id);
+      return;
+    }
     marcar(ids => [...ids, id]);
     setActionFailure(null);
     let blockers: Blockers;
     try {
-      blockers = await invoke<Blockers>("task_blockers", { project: projectOfId(id), id, finish });
+      blockers = await invoke<Blockers>("task_blockers", { project: projectOfId(id), id, finish }, enSuMaquina(id));
     } catch (error) {
       setActionFailure(asFailure(error));
       return;
@@ -392,7 +429,7 @@ export default function Sessions(props: {
     marcar(ids => [...ids, a.id]);
     try {
       for (const work of a.blockers.unsaved) {
-        await invoke("discard_task_changes", { project: projectOfId(a.id), id: work.session, files: work.files });
+        await invoke("discard_task_changes", { project: projectOfId(a.id), id: work.session, files: work.files }, enSuMaquina(a.id));
       }
     } catch (error) {
       setActionFailure(asFailure(error));
@@ -484,7 +521,7 @@ export default function Sessions(props: {
   const filteredSessions = createMemo(() => !query() ? enBarra() : enBarra().filter(session => {
     const git = effectiveTaskGit(session, gitRows(), props.relatedSessions ?? props.sessions);
     const agente = session.agent ? displayName(session.agent, profiles()[session.agent]) : null;
-    return matchesTaskQuery([session.title, session.last_message, git?.branch, git?.alias, agente], query());
+    return matchesTaskQuery([session.title, session.last_message, git?.branch, git?.alias, agente, props.carpetaDe?.(session)], query());
   }));
   if (props.onSearchResults) {
     createEffect(() => props.onSearchResults?.(filteredSessions().length));
@@ -519,7 +556,8 @@ export default function Sessions(props: {
   /**
    * El cuerpo de una fila del riel. Línea 1: estado en su columna fija,
    * título y chincheta. Línea 2: lo que te piden si te necesita; si no,
-   * carpeta, cara del agente y PR. Lo demás vive en la tarjeta flotante.
+   * proveedor, carpeta, máquina (si no es esta), cara del agente y PR. Lo
+   * demás vive en la tarjeta flotante.
    */
   const FilaDelRiel = (r: { s: SessionRow; actividad: TaskActivity; titulo: JSX.Element }) => {
     // Qué lleva la línea 2 lo decide la tarjeta compartida con el teléfono (`@terminus/tasks`).
@@ -567,10 +605,17 @@ export default function Sessions(props: {
               when={teNecesita()}
               fallback={
                 <>
+                  <Show when={tarjeta().provider}>
+                    {(proveedor) => <span data-session-provider class="flex shrink-0" title={proveedor()} aria-label={proveedor()}><MarcaAgente id={proveedor()} size={13} /></span>}
+                  </Show>
                   <Show when={!props.hideFolder && props.carpetaDe?.(r.s)}>
                     {(nombre) => <FolderChip id={projectOf(r.s)} name={nombre()} untitled={props.sidebar} class="max-w-[108px] shrink-0" />}
                   </Show>
                   <WorktreeFaltante />
+                  {/* En qué máquina corre, solo si no es esta: con una sola máquina no sale. */}
+                  <Show when={tarjeta().machine}>
+                    {(machine) => <MachineChip machine={machine().id} on={machine().on} class="max-w-[96px]" />}
+                  </Show>
                   <Show when={tarjeta().agent}>
                     {(agente) => (
                       <TooltipRoot openDelay={RETARDO_TOOLTIP} placement="top" gutter={4}>
@@ -586,10 +631,6 @@ export default function Sessions(props: {
                         <TooltipContent class="pointer-events-none">{nombreDelAgente()}</TooltipContent>
                       </TooltipRoot>
                     )}
-                  </Show>
-                  {/* En qué máquina corre, si no es esta. En el sidebar lo dice su tarjeta flotante. */}
-                  <Show when={!props.sidebar && tarjeta().machine}>
-                    {(machine) => <MachineChip machine={machine().id} on={machine().on} class="max-w-[96px]" />}
                   </Show>
                   <ChipDeGit />
                 </>
@@ -608,17 +649,18 @@ export default function Sessions(props: {
     );
   };
 
-  /** En el riel la fila lleva su tarjeta flotante; en las demás listas, no. */
+  /** En el riel y en las delegadas la fila lleva su tarjeta flotante; en las demás listas, no. */
   const ConTarjeta = (c: { s: SessionRow; children: JSX.Element }) => (
-    <Show when={props.sidebar} fallback={c.children}>
+    <Show when={tarjetaDelRiel()} fallback={c.children}>
       <WithTaskHoverCard
         task={c.s}
+        placement={props.hoverCardPlacement}
         folderName={props.carpetaDe?.(c.s)}
         folderId={projectOf(c.s) || undefined}
         git={gitDe(c.s)}
         agentProfile={c.s.agent ? profiles()[c.s.agent] : undefined}
         agentStatus={props.vivas.includes(c.s.id) ? "working" : undefined}
-        disabled={renombrando() === c.s.id || menu() === c.s.id || !!tareaEnVuelo()}
+        disabled={props.readOnly || renombrando() === c.s.id || menu() === c.s.id || !!tareaEnVuelo()}
         onOpen={() => props.onPick(c.s.id)}
         onPin={() => void setPinned(c.s)}
         onArchive={() => void intentar(c.s.id, false)}
@@ -669,10 +711,10 @@ export default function Sessions(props: {
           // El cohete es absoluto: sin este hueco el título se mete debajo. Por
           // `:has`, no por clase reactiva: cada fila mutaría al llegar git.
           <div class="flex min-w-0 items-center gap-1 text-[0.8125rem] leading-[1.35] [:has(>[data-finish-slot])_&]:pr-16">
-            <Show when={fijada(f.s) && !props.sidebar}>{marcaDeFijada()}</Show>
+            <Show when={fijada(f.s) && !tarjetaDelRiel()}>{marcaDeFijada()}</Show>
             <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"><WithMentions>{f.s.subagent ? readableSessionTitle(title()) : title()}</WithMentions></span>
-                <Show when={props.sidebar && fijada(f.s)}>{marcaDeFijada()}</Show>
-                <Show when={props.sidebar && compacta() && !props.hideFolder}>
+                <Show when={tarjetaDelRiel() && fijada(f.s)}>{marcaDeFijada()}</Show>
+                <Show when={tarjetaDelRiel() && compacta() && !props.hideFolder}>
                   <span title={props.carpetaDe?.(f.s)} class="ml-auto flex shrink-0 pl-1"><FolderSquare id={projectOf(f.s)} /></span>
                 </Show>
           </div>
@@ -830,7 +872,7 @@ export default function Sessions(props: {
             Y las menciones del título se pintan COMO MENCIONES: el
             nombre de una tarea referencia entidades reales, y
             aplanarlo a texto en el historial es donde se perdería. */}
-          <Show when={props.sidebar} fallback={
+          <Show when={tarjetaDelRiel()} fallback={
           <div class="flex items-start gap-1.5">
             {/* **El hueco se reserva aunque no haya nada que plegar**, igual
               que en la fila de un proyecto: sin él, la fila con hijas
@@ -855,6 +897,9 @@ export default function Sessions(props: {
                 {/* En el sidebar la máquina la dice su tarjeta flotante. */}
                 <Show when={!props.sidebar && f.s.machine}>
                   {(machine) => <MachineChip machine={machine()} on={f.s.machine_on !== false} class="max-w-[96px]" />}
+                </Show>
+                <Show when={f.s.deferred}>
+                  <span data-deferred class="shrink-0 text-neutral-500" title={t("projects.sessions.deferred")} aria-label={t("projects.sessions.deferred")}>⧗</span>
                 </Show>
                 {/* El botón del cohete es translúcido: sin desvanecer, el mensaje se lee a
                     través. Máscara y no velo: el fondo del riel cambia con el tema y el wallpaper. */}
@@ -1107,6 +1152,20 @@ export default function Sessions(props: {
                         }}
                       >
                         {t("projects.sessions.remove_from_project")}
+                      </button>
+                    </Show>
+
+                    <Show when={props.onBringHere && f.s.machine && canBringHere()}>
+                      <button
+                        role="menuitem"
+                        class={ITEM_DE_MENU}
+                        data-bring-here-menu
+                        onClick={() => {
+                          setMenu(null);
+                          props.onBringHere?.(f.s.id);
+                        }}
+                      >
+                        {bringHereLabel()}
                       </button>
                     </Show>
 

@@ -3,17 +3,29 @@
  * el valor por defecto; la entrada web (`src/web/main.tsx`) lo fija antes de
  * importar la app y no cambia después.
  */
+import type { Answer, Computer, MemorySource } from "@terminus/computers";
 import type { JSX } from "solid-js";
 import type { AccountProfileSource } from "../features/settings/account-profile";
 import type { Account } from "../features/settings/accounts-store";
+import type { WorkspaceAssetsSource } from "../web/workspace-assets";
 
-/** Una cuenta agrupada en la web: las máquinas donde tiene sesión (`web/fleet.ts`). */
+/** Una cuenta agrupada en la web: las máquinas donde tiene sesión (`@terminus/fleet`, `merge.ts`). */
 export type AccountMachinesProps = {
   account: Account;
   provider: string;
   /** Agrega y conecta una cuenta en otra máquina con el flujo de siempre. */
   add: (options: { headers: Record<string, string> }) => Promise<void>;
   refresh: () => void;
+};
+
+/** Las computadoras de la cuenta en Configuración: leerlas, renombrarlas y avisar del nombre nuevo. */
+export type AccountComputersSource = {
+  list: () => Promise<Answer<Computer[]>>;
+  rename: (id: string, name: string) => Promise<Answer<{ computer_id: string; name: string }>>;
+  /** Si su motor no habla el contrato de esta ventana. */
+  outdated?: (computer: Computer) => boolean;
+  /** Quien pinta nombres de máquina (la flota) toma el nuevo sin recargar. */
+  onRenamed: (id: string, name: string) => void;
 };
 
 export type Capabilities = {
@@ -31,10 +43,14 @@ export type Capabilities = {
   danilAccount?: boolean;
   /** La persona de la cuenta de Danil leída sin el motor (la web, con su sesión): pie y Configuración. */
   accountProfile?: AccountProfileSource;
+  /** El logo y el fondo de los workspaces leídos y cambiados en la cuenta con la sesión (la web). */
+  accountAssets?: WorkspaceAssetsSource;
   /** Botón extra al lado de la búsqueda de la barra lateral (en la web, volver a Danil Agents). */
   sidebarExtra?: () => JSX.Element;
   /** El nombre de una máquina por su id. */
   machineName?: (id: string) => string;
+  /** La máquina de la cuenta que guarda una tarea o un space por su id de panel (`<máquina>~<id>`); `null` si es de la ventana. */
+  taskMachine?: (id: string) => string | null;
   /** La que corre las tareas que llegan sin `machine`; sin esto, la de la ventana. */
   windowMachine?: () => { id: string; name: string; local: boolean } | undefined;
   /** Dónde se crea un proyecto nuevo, en el diálogo de añadirlo. */
@@ -45,8 +61,31 @@ export type Capabilities = {
   browserFiles?: boolean;
   /** El visor de la pantalla de una VM administrada (solo ver); `null` si esa máquina no tiene. */
   machineScreen?: (machine: string) => (() => Promise<WebSocket>) | null;
+  /** `license_required` si el relay detuvo las otras máquinas por falta de Terminus de pago (aviso `TerminusLicense`); `null` si no. */
+  machinesLicense?: () => "license_required" | null;
+  /** «Reintentar» del aviso de licencia: vuelve a abrir las sesiones de las otras máquinas. */
+  retryMachines?: () => void;
+  /**
+   * La memoria versionada de los workspaces en la cuenta (`/v1/workspaces/:id/memory/*`)
+   * con la sesión de la persona: en la web, la pestaña Memoria la lee y la escribe
+   * ahí, aunque todas las máquinas estén apagadas. La ventana usa el token de
+   * cliente de la cuenta de cada workspace (`memory-account.ts`).
+   */
+  accountMemory?: MemorySource;
   /** Bajo la tarjeta de una cuenta: sus máquinas. */
   accountMachines?: (props: AccountMachinesProps) => JSX.Element;
+  /**
+   * «Conectar otra máquina» con la sesión de la página (la web): la lista de la
+   * cuenta y qué hacer cuando la nueva está en línea. El escritorio usa su token
+   * de cliente (`features/machines/ConnectMachine.tsx`).
+   */
+  /** Las computadoras de la cuenta con la sesión de la página (la web); el escritorio usa su token de cliente. */
+  accountComputers?: AccountComputersSource;
+  connectMachine?: {
+    list: () => Promise<Answer<Computer[]>>;
+    outdated?: (computer: Computer) => boolean;
+    onReady: (computer: Computer) => void;
+  };
 };
 
 const DESKTOP: Capabilities = { nativeWindow: true, updater: true, localSetup: true, computerStatus: false, danilAccount: true, radiant: true };

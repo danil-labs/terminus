@@ -149,10 +149,10 @@ const SIN_USABLE = {
 const boot = (entorno, version, respuestas = RESPUESTAS, userAgent) =>
   mount(entorno, version, respuestas, userAgent);
 
-/** El riel agrupado por carpeta: es donde una carpeta tiene cabecera y se abre su vista. */
-const POR_CARPETA = { "harness.layout.sidebar.view.w": JSON.stringify({ group: "folder" }) };
+/** El riel agrupado por carpeta, que es su vista por omisión: una carpeta tiene cabecera y se abre su vista. */
+const SIN_AGRUPAR = { "harness.layout.sidebar.view.w": JSON.stringify({ group: "none" }) };
 const bootPorCarpeta = async (entorno, version, respuestas = RESPUESTAS) => {
-  const app = await mount(entorno, version, respuestas, undefined, POR_CARPETA);
+  const app = await mount(entorno, version, respuestas);
   // La cabecera de carpeta llega en su propio trozo: se espera a que pinte.
   for (let i = 0; i < 80 && !app.w.document.querySelector("[data-folder-open]"); i++) await sleep(25);
   return app;
@@ -382,7 +382,13 @@ if (!roto) {
     unwatch_task_tree: ({ id }) => { watchedTrees.delete(id); },
     tree_files: ({ session }) => {
       treeReads.push(session);
-      return { paths: externalPaths, folders: [], truncated: false };
+      return { paths: externalPaths, folders: [{ path: ".venv", repo: false, lazy: true, ignored: true }], truncated: false };
+    },
+    tree_folder: ({ path, offset }) => {
+      const total = path === ".venv" ? 450 : 0;
+      const hasta = Math.min(total, offset + 300);
+      const paths = Array.from({ length: hasta - offset }, (_, i) => `${path}/m${String(offset + i).padStart(4, "0")}.py`);
+      return { paths, folders: [], next: hasta < total ? hasta : null, total };
     },
     tree_git_status: [],
     tree_summary: { base: "HEAD", files: [], added: 0, removed: 0 },
@@ -398,6 +404,22 @@ if (!roto) {
   await sleep(150);
   clickTree('[aria-label="Ver el árbol de trabajo"]');
   await sleep(150);
+  const venv = () => [...treeDocument.querySelectorAll('button[aria-expanded]')].find((button) => button.textContent.trim() === ".venv");
+  assert.ok(venv(), "a heavy ignored folder shows folded");
+  const enVenv = () => [...treeDocument.querySelectorAll("button[data-ruta]")].filter((b) => b.dataset.ruta.startsWith(".venv/")).length;
+  assert.equal(enVenv(), 0, "a folded folder lists nothing until it is opened");
+  venv().click();
+  await sleep(150);
+  assert.equal(enVenv(), 300, "opening a folded folder loads its first page");
+  const mas = [...treeDocument.querySelectorAll("button")].find((b) => b.textContent.includes("Mostrar más"));
+  assert.ok(mas, "a folded folder offers its next page");
+  mas.click();
+  await sleep(150);
+  assert.equal(enVenv(), 450, "the next page is appended");
+  assert.equal([...treeDocument.querySelectorAll("button")].some((b) => b.textContent.includes("Mostrar más")), false);
+  venv().click();
+  await sleep(50);
+  assert.equal(venv().getAttribute("aria-expanded"), "false");
   const directory = [...treeDocument.querySelectorAll('button[aria-expanded]')].find((button) => button.textContent.trim() === "src");
   assert.ok(directory);
   directory.click();
@@ -512,11 +534,9 @@ if (!roto) {
   // El riel solo lista tareas, de todas las carpetas en una lista: los agentes ya no tienen sección.
   assert.equal(bubbleDocument.querySelector("[data-sidebar-agents]"), null, "el riel no lista agentes");
   const filasDelRiel = () => [...bubbleDocument.querySelectorAll('[data-sidebar-tasks] [data-sesion]')].map((f) => f.dataset.sesion);
-  assert.ok(bubbleDocument.querySelector('[data-sidebar-tasks] [data-sesion="s-task"] [data-session-agent]'), "sin agrupar, la tarea lleva la pastilla de su agente");
-  bubbleDocument.querySelector('button[aria-label="Buscar tareas"]').click();
-  await sleep(50);
+  assert.ok(bubbleDocument.querySelector('[data-sidebar-tasks] [data-sesion="s-task"] [data-session-agent]'), "la tarea lleva la pastilla de su agente");
   const buscadorDelRiel = bubbleDocument.querySelector('[data-sidebar-search] input[role="searchbox"]');
-  assert.ok(buscadorDelRiel, "la lupa abre el buscador bajo los controles del sidebar");
+  assert.ok(buscadorDelRiel, "el buscador del riel está siempre a la vista");
   buscadorDelRiel.value = "REVISAR";
   buscadorDelRiel.dispatchEvent(new bubbleApp.w.Event("input", { bubbles: true }));
   await sleep(80);
@@ -528,8 +548,9 @@ if (!roto) {
   assert.deepEqual(filasDelRiel(), ["s-transfer"], "encuentra la tarea por el nombre de su agente");
   buscadorDelRiel.dispatchEvent(new bubbleApp.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   await sleep(80);
-  assert.equal(bubbleDocument.querySelector('[data-sidebar-search] input[role="searchbox"]'), null, "Escape cierra el buscador");
-  assert.ok(filasDelRiel().includes("s-task") && filasDelRiel().includes("s-plain"), "cerrar la búsqueda devuelve la lista entera");
+  assert.equal(buscadorDelRiel.value, "", "Escape limpia la búsqueda");
+  assert.ok(bubbleDocument.querySelector('[data-sidebar-search] input[role="searchbox"]'), "y el buscador sigue a la vista");
+  assert.ok(filasDelRiel().includes("s-task") && filasDelRiel().includes("s-plain"), "limpiar la búsqueda devuelve la lista entera");
 
   // Los agentes están en el dock del pie: pulsar uno abre su chat, como su fila
   // de antes; el clic derecho ofrece ver sus tareas, que filtra la lista.
@@ -556,7 +577,7 @@ if (!roto) {
   verSusTareas.dispatchEvent(new bubbleApp.w.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
   await sleep(120);
   assert.ok(filasDelRiel().includes("s-task") && !filasDelRiel().includes("s-plain"), "ver sus tareas filtra por el agente");
-  assert.match(bubbleDocument.querySelector("[data-sidebar-scope]").textContent, /Holmes/, "la línea de alcance dice el filtro");
+  assert.match(bubbleDocument.querySelector('[data-sidebar-scope] button[aria-haspopup="menu"]').getAttribute("aria-label"), /\(1 cambiados\)/, "el filtro cuenta el cambio");
   bubbleDocument.querySelector('button[aria-haspopup="menu"][aria-label^="Filtrar y agrupar"]').click();
   await sleep(80);
   [...bubbleDocument.querySelectorAll('[role="menu"] [role="group"][aria-label="Agente"] [role="menuitemradio"]')].find((b) => b.textContent.trim() === "Todos").click();
@@ -1103,9 +1124,17 @@ if (!roto) {
       { id: "local-folder", name: "Local", sources: [], kind: "folder", cloud: null },
     ],
   });
-  // Sin tareas, ninguna carpeta aparece en el riel: lista tareas, no carpetas.
-  assert.equal(cloudIcons.w.document.querySelector("[data-folder-group]"), null, "una carpeta sin tareas no aparece en el riel");
-  assert.ok(!/Nube|Git en nube|Local/.test(cloudIcons.w.document.querySelector("[data-sidebar-tasks]")?.textContent ?? ""));
+  // Agrupando por carpeta, que es lo de omisión, una carpeta sin tareas tiene su grupo, su «+» y su estado vacío.
+  for (let i = 0; i < 80 && cloudIcons.w.document.querySelectorAll("[data-folder-group]").length < 3; i++) await sleep(25);
+  assert.deepEqual([...cloudIcons.w.document.querySelectorAll("[data-folder-group]")].map((el) => el.dataset.folderGroup),
+    ["cloud-folder", "cloud-git", "local-folder"], "una carpeta sin tareas aparece en el riel");
+  for (const [id, name] of [["cloud-folder", "Nube"], ["cloud-git", "Git en nube"], ["local-folder", "Local"]]) {
+    const grupo = cloudIcons.w.document.querySelector(`[data-sidebar-group="${id}"]`);
+    assert.equal(grupo.querySelector("[data-folder-open]").textContent.trim(), name, "sin contador junto al nombre");
+    assert.equal(grupo.querySelector("[data-folder-empty]")?.textContent, "Sin tareas todavía");
+    assert.ok(grupo.querySelector(`button[aria-label="Nueva tarea en ${name}"]`), "su «+» empieza una tarea en ella");
+  }
+  assert.equal(cloudIcons.w.document.querySelector("[data-sidebar-empty]"), null, "con carpetas a la vista no dice que no hay nada");
   assert.doesNotMatch(cloudIcons.w.document.body.textContent, /google_drive|one_drive/);
   assert.deepEqual(cloudIcons.fallos, []);
   const forkCalls = [];
@@ -1474,8 +1503,6 @@ if (!roto) {
   assert.equal(row("own"), null, "la delegación no llena el sidebar");
   assert.equal(row("p").querySelectorAll('[aria-label="Fallo o interrupción"]').length, 1,
     "una subtarea fallida ocupa el único indicador del coordinador");
-  sidebar.w.document.querySelector('button[aria-label="Buscar tareas"]').click();
-  await sleep(50);
   const taskSearch = sidebar.w.document.querySelector('[data-sidebar-search] input[role="searchbox"]');
   const searchTasks = async value => {
     taskSearch.value = value;
@@ -1775,7 +1802,7 @@ if (!roto) {
     list_live_sessions: ({ project }) => project === "folder" ? sidebarResponses.list_live_sessions : [],
     list_session_git: {},
   };
-  const flat = await boot("listo", "5-flat", groupedResponses);
+  const flat = await mount("listo", "5-flat", groupedResponses, undefined, SIN_AGRUPAR);
   assert.equal(flat.w.document.querySelector("[data-folder-group]"), null, "sin agrupar no hay filas de carpeta");
   // `p` te necesita: su segunda línea es lo que pide, con el color de la carpeta al final.
   assert.ok(flat.w.document.querySelector('[data-sesion="p"] [data-session-request]'), "lo que te piden ocupa la segunda línea");
@@ -1990,7 +2017,14 @@ if (!roto) {
   folderName.dispatchEvent(new sidebarControls.w.Event("input", { bubbles: true }));
   folderName.closest("form").dispatchEvent(new sidebarControls.w.Event("submit", { bubbles: true, cancelable: true }));
   await sleep(100);
-  assert.equal(controlsDoc.querySelector('[data-destino="loose"]'), null, "una carpeta recién creada y sin tareas no aparece en el riel");
+  // Agrupando por carpeta, la recién creada aparece ya, sin tareas, y se sigue en «Nueva tarea» dentro de ella.
+  for (let i = 0; i < 80 && !controlsDoc.querySelector('[data-folder-group="loose"] [data-folder-open]'); i++) await sleep(25);
+  const sueltaEnElRiel = controlsDoc.querySelector('[data-sidebar-group="loose"]');
+  assert.ok(sueltaEnElRiel, "una carpeta recién creada y sin tareas aparece en el riel");
+  assert.equal(sueltaEnElRiel.querySelector("[data-folder-empty]")?.textContent, "Sin tareas todavía");
+  assert.ok(sueltaEnElRiel.querySelector('button[aria-label="Nueva tarea en Carpeta suelta"]'), "con su «+»");
+  assert.equal(sueltaEnElRiel.querySelector("[data-folder-open]").dataset.active, "true", "y marcada mientras se mira su «Nueva tarea»");
+  assert.match(controlsDoc.querySelector('button[aria-label="Proyecto"]')?.textContent ?? "", /Carpeta suelta/, "«Nueva tarea» queda en la carpeta recién creada");
   assert.deepEqual(sidebarControls.fallos, []);
   const openClone = async () => {
     await abrirAnadirProyecto(sidebarControls);
@@ -3678,11 +3712,11 @@ if (!roto) {
   const d2 = plegado.w.document;
   const ocultarRiel = d2.querySelector('button[aria-label="Ocultar el historial"]');
   assert.equal(ocultarRiel.parentElement.querySelector('button[aria-label="Proyectos"]'), null, "el encabezado del riel no repite «Proyectos»: ya lo dice la sección de abajo");
-  assert.equal(ocultarRiel.nextElementSibling?.getAttribute("aria-label"), "Buscar tareas", "la lupa comparte la fila con el control del sidebar");
+  assert.ok(d2.querySelector('[data-sidebar-search] input[role="searchbox"]'), "el buscador del riel está a la vista");
   assert.equal(d2.querySelector("[data-title-bar]").classList.contains("pl-[84px]"), false, "en pantalla completa la fila no reserva el semáforo");
   ocultarRiel.click();
   await sleep(100);
-  assert.equal(d2.querySelector('button[aria-label="Buscar tareas"]'), null, "la lupa desaparece cuando el sidebar está cerrado");
+  assert.equal(d2.querySelector('[data-sidebar-search]'), null, "el buscador desaparece cuando el sidebar está cerrado");
   assert.ok(d2.querySelector('[data-conversacion] button[aria-label="Mostrar el historial"]'), "con el riel oculto, la fila de pestañas lo trae de vuelta");
   assert.equal(d2.querySelector("[data-title-bar] [data-workspace-name]")?.textContent.trim(), LARGO, "y la fila del título no cambia");
   assert.equal(d2.querySelector("[data-window-branch]"), null, "sin título de ventana no se nombra ninguna build");
@@ -3849,8 +3883,6 @@ if (!roto) {
   assert.ok(finishButton("merged"));
   assert.equal(finishApp.w.document.querySelector('[role="alertdialog"]'), null);
   rejectFinish = false;
-  finishApp.w.document.querySelector('button[aria-label="Buscar tareas"]').click();
-  await sleep(50);
   const finishSearch = finishApp.w.document.querySelector('[data-sidebar-search] input[role="searchbox"]');
   finishSearch.value = "Tarea";
   finishSearch.dispatchEvent(new finishApp.w.Event("input", { bubbles: true }));
@@ -4051,6 +4083,7 @@ if (!roto) {
     add_account: ({ provider: agent }) => ({ id: agent === "codex" ? "a1" : "k1", label: "", created_at: 1, identity: null, authenticated_at: null }),
     login_account: null,
     set_api_key: ({ key }) => { altaClaves.push(key); },
+    connect_api_key: ({ provider, key }) => { altaClaves.push(key); return { id: `k-${provider}`, label: "", created_at: 1, identity: null, authenticated_at: 1 }; },
     account_status: ({ id }) => ({ id, authenticated: id === "a1", detail: "" }),
     set_active_account: () => { altaSesion = true; },
     discard_account: true,
@@ -4086,8 +4119,6 @@ if (!roto) {
   altaBoton("Continuar").click();
   await sleep(150);
   assert.equal(altaTitulo(), "Personaliza Terminus.");
-  altaDoc.querySelector('button[aria-label="Renombrar el workspace"]').click();
-  await sleep(30);
   const altaNombre = altaDoc.querySelector('input[aria-label="Workspace"]');
   altaNombre.value = "Norte";
   altaNombre.dispatchEvent(new alta.w.InputEvent("input", { bubbles: true }));

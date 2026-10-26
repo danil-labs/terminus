@@ -78,3 +78,11 @@ test("la misma foto no se vuelve a escribir", () => {
   writeShellCache(snapshot("a", 4), 3);
   assert.notEqual(store.get("harness:shell-cache"), before);
 });
+
+test("con otra máquina, las filas de la foto vuelven como copia de esa hora", () => {
+  const vm = { ...row("cmp_vm~t1"), machine: "cmp_vm", machine_on: false, machine_status: "ok", machine_at: 5 } as Snapshot["sessions"][string][number];
+  const late = { ...row("cmp_mac~t2"), machine: "cmp_mac", machine_on: true, machine_status: "no_answer", machine_at: 3 } as Snapshot["sessions"][string][number];
+  writeShellCache({ ...snapshot("a", 1), sessions: { "": [row("a0"), vm, late], p: [] } }, 1);
+  const read = readShellCache();
+  assert.deepEqual(read?.sessions[""].map((r) => [r.id, r.machine_status ?? null, r.machine_at ?? null]), [["a0", null, null], ["cmp_vm~t1", "cached", 5], ["cmp_mac~t2", "no_answer", 3]]);
+});

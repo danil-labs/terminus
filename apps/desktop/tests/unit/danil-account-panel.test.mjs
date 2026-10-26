@@ -120,6 +120,48 @@ test("la cuenta de Danil entra con el navegador, muestra el código y cierra ses
   assert.equal(panel()?.dataset.danilAccount, "disconnected");
 });
 
+test("sin licencia, la sección abre la prueba en el navegador y reintenta", async () => {
+  let licensed = false;
+  const calls = [];
+  const record = (command, reply) => (args) => {
+    calls.push({ command, args });
+    return reply(args);
+  };
+  const app = await boot("listo", "danil-account-license", {
+    ...BASE,
+    danil_connect_status: { state: "disconnected", name: "alberto-mbp" },
+    danil_connect_start: record("danil_connect_start", () => {
+      if (!licensed) throw Object.assign(new Error("license_required"), { what: { clave: "danil.error.license_required" }, detail: "license_required" });
+      return { state: "pending", user_code: "WDJB-MJHT", verification_uri_complete: "https://app.danil.ai/terminus/connect?code=WDJB-MJHT" };
+    }),
+    open_external: record("open_external", () => null),
+  });
+  const { w } = app;
+  const panel = () => w.document.querySelector("[data-danil-account]");
+  const text = () => panel()?.textContent ?? "";
+  const button = (label) => [...(panel()?.querySelectorAll("button") ?? [])].find((b) => b.textContent.trim() === label);
+  w.dispatchEvent(new w.CustomEvent("harness:open-settings", { detail: "cuenta-danil" }));
+  await sleep(800);
+
+  button("Iniciar sesión con Danil").click();
+  await sleep(300);
+  assert.ok(text().includes("Activa Terminus"), text());
+  assert.ok(text().includes("7 días gratis, sin tarjeta; después, 99 MXN al mes con IVA incluido."), text());
+  assert.ok(!text().includes("no tiene licencia"), "the bare refusal is gone");
+
+  button("Empezar prueba gratis").click();
+  await sleep(100);
+  assert.equal(calls.find((c) => c.command === "open_external")?.args?.target, "https://app.danil.ai/modules/billing?modulo=terminus");
+
+  licensed = true;
+  button("Ya lo activé · Reintentar").click();
+  await sleep(300);
+  assert.equal(calls.filter((c) => c.command === "danil_connect_start").length, 2, "retrying signs in again");
+  assert.ok(!text().includes("Activa Terminus"), text());
+  assert.ok(text().includes("Confirma en el navegador · código WDJB-MJHT"), text());
+  assert.deepEqual(app.fallos, []);
+});
+
 test("con un motor que no trae el flujo, la sección lo dice en vez de fallar", async () => {
   // Lo que contesta el proxy de la ventana a un nombre que su contrato no trae.
   const unknown = () => Object.assign(new Error("command"), { what: { clave: "shell.service.command" }, detail: "command" });
@@ -284,6 +326,20 @@ test("con una sesión por cuenta, la sección lista las cuentas, agrega otra, ca
 
   app.emit("danil-sessions", sessions);
   button(card("u_alberto"), "Cerrar sesión").click();
+  await settle();
+  assert.ok(!calls.some((c) => c.command === "danil_disconnect"), "signing out asks first");
+  assert.ok(
+    card("u_alberto").textContent.includes("Cerrar sesión deja sin sincronizar su workspace en esta computadora."),
+    card("u_alberto").textContent,
+  );
+  assert.ok(card("u_alberto").textContent.includes("elige «Sin cuenta» en Workspaces"), "it says how to remove just one");
+  button(card("u_alberto"), "Cancelar").click();
+  await settle();
+  assert.equal(card("u_alberto").querySelector("[data-danil-sign-out-confirm]"), null, "cancel leaves it signed in");
+  assert.ok(!calls.some((c) => c.command === "danil_disconnect"));
+  button(card("u_alberto"), "Cerrar sesión").click();
+  await settle();
+  card("u_alberto").querySelector("[data-danil-sign-out-yes]").click();
   await settle();
   assert.deepEqual(calls.find((c) => c.command === "danil_disconnect")?.args, { account: "u_alberto" }, "only that account");
   assert.equal(panel().querySelectorAll("[data-danil-session]").length, 1);

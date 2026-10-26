@@ -78,6 +78,23 @@ Hay dos caminos:
 
 Con proyectos pasa lo mismo: el mismo id en todas las máquinas.
 
+Con los spaces también, desde el 2026-10-23 (decisión de Alberto): un space
+compartido es del workspace, con el mismo id en todas las máquinas
+(`workspace_spaces` en el registro; en seldon-host, el documento del conector, «Spaces de
+la cuenta»). Nace compartido el que se crea en un workspace unido, y los que
+ya existían en una máquina **pasan a la cuenta con su mismo id** en cuanto su
+workspace queda unido (el motor los publica; segunda decisión del mismo día,
+que reemplaza «no se migra nada»). Cada tarea conserva el id de su space. Dos
+spaces con el mismo nombre y distinto id (dos «General») no se funden: quedan
+los dos. Si una máquina sale de la cuenta, solo desaparecen sus tareas; el
+space sigue con su id para las demás, y solo borrarlo a propósito lo da de
+baja. Crear una tarea en otra máquina manda el space de la ventana: si aún no
+era de la cuenta, el router lo comparte antes (`share_space`) y allá se crea
+con ese id. La flota (`packages/fleet`) no le pone prefijo de máquina a un
+space compartido y junta `list_spaces` por id; uno de una sola máquina sigue
+con su prefijo. Cuando la flota aprende que un space ya es de la cuenta, el
+router hace que la ventana relea las tareas, que lo nombraban con prefijo.
+
 Las tareas sí conservan ids por máquina. Su dueña es la máquina que las creó, y
 la fila lleva `machine`. Dentro de un workspace, `(máquina, tarea)` es la llave.
 
@@ -160,7 +177,8 @@ Sobre seldon-host#72 (`feat/workspace-danil-link`); ver «Conciliación».
    `GET /v1/workspaces` más los workspaces locales sin ligar del motor de esta
    máquina.
    - Se borran `mergeWorkspaces`, el agrupado por nombre y los prefijos de
-     workspace en `src/web/fleet.ts`.
+     workspace de la flota vieja de la web (borrada en la fase 4; hoy
+     `packages/fleet/src/merge.ts`).
    - Se borran `groupWorkspaces` en `packages/computers` y en el móvil
      (`apps/mobile/src/lib/workspaces.tsx:189`).
 2. **Proyectos una sola vez.** El sidebar lista los proyectos de la cuenta, ya no
@@ -436,7 +454,7 @@ workspaces ligados):
 - La web, el escritorio con cuenta de Danil (`features/machines/account.tsx`,
   con el token de cliente) y el móvil leen `GET /v1/workspaces`
   (`listWorkspaces` en `packages/computers`) y lo juntan con lo que listan las
-  máquinas encendidas (`Fleet.setRegistry` en `src/web/fleet.ts`,
+  máquinas encendidas (`Fleet.setRegistry` en `packages/fleet/src/fleet.ts`,
   `withRegistry` en el paquete). La fila de una máquina que contesta manda; el
   registro suma los workspaces cuyas máquinas duermen y, como miembros, las
   computadoras ligadas que no contestaron. El activo es el abierto si sigue en
