@@ -62,6 +62,7 @@
   "shell.service.machine_starting": "La máquina de este host se está encendiendo. Lo que envíes espera y se entrega en cuanto esté lista.",
   "shell.service.engine_missing": "Terminus no encuentra su motor (seldon-runtime) junto a la app; puede que el antivirus lo haya puesto en cuarentena. Restáuralo desde la cuarentena o reinstala Terminus, y vuelve a abrir la ventana.",
   "shell.service.failed": "Terminus no pudo completar la operación.",
+  "shell.service.too_large": "Lo que pediste es demasiado grande para traerlo a la ventana de una vez.",
   "shell.service.no_host": "No hay ningún Terminus corriendo sobre estos datos. Abre Terminus y vuelve a intentar.",
   "shell.service.unreachable": "Terminus no respondió. Si acaba de actualizarse, reinicia la app.",
   "shell.service.version": "Terminus quedó a medias entre dos versiones. Reinicia la app.",
