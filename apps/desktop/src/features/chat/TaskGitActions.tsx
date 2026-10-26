@@ -1,5 +1,4 @@
 import Rocket from "lucide-solid/icons/rocket";
-import MoreHorizontal from "lucide-solid/icons/more-horizontal";
 import { createEffect, createMemo, createSignal, on, onCleanup, Show } from "solid-js";
 import { invoke } from "../../lib/invoke";
 import { t } from "../../lib/i18n";
@@ -98,17 +97,15 @@ export default function TaskGitActions(props: {
     }
   };
   return <>
-    <div data-task-git-actions class="ml-auto flex min-w-0 shrink-0 items-center gap-1">
-      <button type="button" data-task-pr aria-label={sessionGitDescription(status()) || t("chat.task.details")} onClick={() => setSheet("details")} class="flex min-h-9 min-w-0 items-center rounded-sm px-1 text-xs outline-none hover:bg-neutral-200 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary">
+    <Show when={status().kind !== "unknown" && status().kind !== "none"}><div data-task-git-actions class="ml-auto flex min-w-0 shrink-0 items-center gap-1">
+      <Show when={status().pull}><button type="button" data-task-pr aria-label={sessionGitDescription(status()) || t("chat.task.details")} onClick={() => setSheet("details")} class="flex min-h-9 min-w-0 items-center rounded-sm px-1 text-xs outline-none hover:bg-neutral-200 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary">
         <SessionGit status={status()} compact />
-      </button>
+      </button></Show>
       <Button variant="ghost" size="icon" data-task-finish disabled={!ready()} aria-busy={finishing()} aria-label={t("projects.sessions.finish")} title={ready() ? t("projects.sessions.finish") : t("chat.task.finish_unavailable")} class="size-9 shrink-0 text-brand-purple" onClick={() => setSheet("finish")}>
         <Rocket size={17} />
       </Button>
-      <Button variant="ghost" size="icon" class="size-9 shrink-0" aria-label={t("chat.task.details")} onClick={() => setSheet("details")}>
-        <MoreHorizontal size={17} />
-      </Button>
-    </div>
+
+    </div></Show>
     <Dialog open={sheet() !== null} onOpenChange={(value) => { if (!value && !finishing()) setSheet(null); }}>
       <DialogContent>
         <DialogTitle class="text-base font-semibold">{sheet() === "finish" ? t("projects.sessions.finish") : t("chat.task.details")}</DialogTitle>
