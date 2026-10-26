@@ -49,7 +49,7 @@ const OWN_ID = new Set(["load_session", "add_account", "create_space", "rename_s
 /** Respuestas que son un space o una lista de spaces. */
 const SPACES = new Set(["list_spaces", "create_space", "rename_space", "set_space_folders", "move_task_to_space", "share_space"]);
 /** Filas que la barra marca con su máquina. */
-const TAGGED = new Set(["list_live_sessions"]);
+const TAGGED = new Set(["list_live_sessions", "list_task_mentions"]);
 
 const isRow = (v: unknown): v is Row => !!v && typeof v === "object" && !Array.isArray(v);
 const text = (v: unknown) => (typeof v === "string" ? v.trim() : "");
@@ -61,6 +61,7 @@ export function encode(ctx: MergeContext, machine: string, value: unknown, comma
   if (command === "list_active_turns" && Array.isArray(value)) return value.map((v) => (typeof v === "string" ? wrap(machine, v) : v));
   if (command === "send_message" && typeof value === "string") return wrap(machine, value);
   const walk = (v: unknown, key: string | null): unknown => {
+    if (key === "task_mentions" && Array.isArray(v)) return v.map((m) => mentionOf(machine, m));
     if (typeof v === "string") {
       if (!key || !v) return v;
       if (key === "space" && ctx.shared?.(v)) return v;
@@ -75,9 +76,21 @@ export function encode(ctx: MergeContext, machine: string, value: unknown, comma
   const sharedRow = (row: Row) => SPACES.has(command) && typeof row.id === "string" && (row.account === true || !!ctx.shared?.(row.id));
   const ownId = (row: Row) => (typeof row.id === "string" && !sharedRow(row) ? { ...row, id: wrap(machine, row.id) } : row);
   if (ROW_IDS.has(command) && Array.isArray(out)) return out.map((r) => (isRow(r) ? ownId(r) : r));
+  if (command === "list_task_mentions" && Array.isArray(out)) return out.map((r) => (isRow(r) && isRow(r.target) ? { ...r, target: taskOf(machine, r.target) } : r));
   if (OWN_ID.has(command) && isRow(out)) return ownId(out);
   if (KEYED.has(command) && isRow(out)) return Object.fromEntries(Object.entries(out).map(([id, v]) => [wrap(machine, id), v]));
   return out;
+}
+
+/** El objetivo de una mención de tarea de `machine`, con el id del panel. */
+function taskOf(machine: string, target: Row): Row {
+  return target.kind === "task" && typeof target.sessionId === "string" ? { ...target, sessionId: wrap(machine, target.sessionId) } : target;
+}
+
+/** Una mención guardada en `machine`: la tarea es de allá, salvo que diga en cuál otra vive (`elsewhere`). */
+function mentionOf(machine: string, m: unknown): unknown {
+  if (!isRow(m) || !isRow(m.target)) return m;
+  return isRow(m.elsewhere) ? m : { ...m, target: taskOf(machine, m.target) };
 }
 
 /** Un evento de `machine` para el panel: también el id suelto de `account-rejected`. */
