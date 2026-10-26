@@ -148,7 +148,7 @@ function TaskCardView({
         ) : null}
         {compact && folder ? <FolderSquare id={folder.id} /> : null}
         {compact && pull ? <PullChip pull={pull} git={git} /> : compact && branch ? <Icon name="git-branch" size={12} color={theme.textMuted} /> : null}
-        {onFinish ? <Pressable testID={`finish-${task.host}-${task.id}`} accessibilityRole="button" accessibilityLabel={`${t("task.header.finish")}: ${taskTitle(lang, task)}`} accessibilityState={{ disabled: !ready }} disabled={!ready} hitSlop={8} onPress={(event) => { event.stopPropagation(); onFinish(); }} style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", marginVertical: -8, opacity: ready ? 1 : 0.3 }}>
+        {onFinish && pull?.state === "merged" && !git?.stale ? <Pressable testID={`finish-${task.host}-${task.id}`} accessibilityRole="button" accessibilityLabel={`${t("task.header.finish")}: ${taskTitle(lang, task)}`} accessibilityState={{ disabled: !ready }} disabled={!ready} hitSlop={8} onPress={(event) => { event.stopPropagation(); onFinish(); }} style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", marginVertical: -8, opacity: ready ? 1 : 0.3 }}>
           <Icon name="rocket" size={18} color={theme.merged} />
         </Pressable> : null}
         {onLongPress ? <Pressable accessibilityRole="button" accessibilityLabel={`${t("task.actions.menu")}: ${taskTitle(lang, task)}`} hitSlop={8} onPress={(event) => { event.stopPropagation(); onLongPress(); }} style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", marginVertical: -8 }}>

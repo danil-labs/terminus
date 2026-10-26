@@ -109,7 +109,7 @@ export default function Preview() {
       <Pressable accessibilityRole="button" disabled={finishing} onPress={() => { router.back(); openTask(task.host, task.workspace, task.folder, task.id); }} style={[styles.button, { backgroundColor: theme.primary, borderColor: theme.primary }]}>
         <Text style={{ color: theme.onPrimary, fontWeight: "600" }}>{previewLabel(lang, "open")}</Text>
       </Pressable>
-      <SheetOption testID="preview-finish" icon="rocket" label={t("task.header.finish")} disabled={!ready} onPress={() => setConfirm(true)} />
+      {pull?.state === "merged" && !git.stale ? <SheetOption testID="preview-finish" icon="rocket" label={t("task.header.finish")} disabled={!ready} onPress={() => setConfirm(true)} /> : null}
       <TaskActions host={host} task={task} running={running} onBusy={setFinishing} onChanged={() => { void reload(); }} onRemoved={() => { void reload(); router.back(); }} />
     </View>
   );
