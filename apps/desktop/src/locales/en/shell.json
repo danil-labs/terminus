@@ -62,6 +62,7 @@
   "shell.service.machine_starting": "This host's machine is starting. What you send waits and is delivered as soon as it is ready.",
   "shell.service.engine_missing": "Terminus cannot find its engine (seldon-runtime) next to the app; an antivirus may have quarantined it. Restore it from quarantine or reinstall Terminus, then open the window again.",
   "shell.service.failed": "Terminus couldn't complete the operation.",
+  "shell.service.too_large": "What you asked for is too large to bring into the window at once.",
   "shell.service.no_host": "No Terminus is running on this data. Open Terminus and try again.",
   "shell.service.unreachable": "Terminus didn't respond. If it just updated, restart the app.",
   "shell.service.version": "Terminus is stuck between two versions. Restart the app.",

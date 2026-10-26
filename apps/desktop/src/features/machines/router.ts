@@ -47,6 +47,7 @@ const SERVICE_KEYS: Record<string, string> = {
   command: "shell.service.command",
   unsupported: "shell.service.command",
   command_not_allowed: "shell.service.command",
+  response_too_large: "shell.service.too_large",
 };
 /** Cada cuánto se vuelve a preguntar la misma lectura a otra máquina mientras la ventana la repite. */
 const REFRESH_GAP = 1_500;

@@ -299,6 +299,7 @@ fn failure(error: &Error) -> Value {
         "invalid_token" | "io" => "shell.service.unreachable",
         "version_mismatch" | "service_version" => "shell.service.version",
         "no_host" => "shell.service.no_host",
+        "response_too_large" => super::util::Frase::new("shell.service.too_large").0,
         "command" | "unsupported" => "shell.service.command",
         _ => "shell.service.failed",
     };
@@ -943,4 +944,16 @@ pub(super) fn machine_list(app: tauri::AppHandle) -> Result<Value, Value> {
         .ok_or_else(|| failure(&Error::new("app_unavailable")))?;
     let on = answers(&state.client());
     Ok(json!([{"id": "local", "local": !state.remote(), "active": true, "on": on, "hosts": true}]))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn una_respuesta_demasiado_grande_lo_dice() {
+        let f = failure(&Error::new("response_too_large"));
+        assert_eq!(f["what"]["clave"], "shell.service.too_large");
+        assert_eq!(f["detail"], "response_too_large");
+    }
 }
