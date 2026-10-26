@@ -37,6 +37,7 @@ import { machineCompatibility } from "./compatibility";
 import { HomeLink } from "./HomeLink";
 import { installIpc } from "./ipc";
 import { webAccountProfile } from "./account";
+import { webGithubAccount } from "./github-account";
 import { type Account, type Listing, SLOT_PREFIX, loadAccounts, ownerOf, pickAccount, readListings, rememberLast, removeExtra, savedListings } from "./accounts";
 import { forgetShellCache, setShellCacheScope } from "../lib/shellCache";
 import { webWorkspaceAssets } from "./workspace-assets";
@@ -260,7 +261,9 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
       void refetchMachines();
     });
   }
-  installIpc(window, createWebTransport(active, __TERMINUS_VERSION__, browser));
+  // GitHub de la cuenta lo contesta el Worker con la sesión: no espera a que despierte una máquina.
+  const github = webGithubAccount({ endpoint: base.endpoint, getToken: base.getToken, onUnauthorized: base.onUnauthorized, href: () => window.location.href });
+  installIpc(window, createWebTransport(active, __TERMINUS_VERSION__, browser, github));
   window.addEventListener("pagehide", () => fleet.flush());
   void import("../app/main");
   void Promise.all([import("solid-js/web"), import("./SyncNote"), import("./phrases")]).then(([{ render }, { SyncNote }]) => {
