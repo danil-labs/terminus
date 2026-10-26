@@ -602,7 +602,7 @@ export function SelectorChip({ icon, left, label, value, onPress, testID, muted 
 
 const styles = StyleSheet.create({
   wrap: { paddingHorizontal: 10, paddingTop: 6, gap: 6 },
-  box: { borderWidth: 0, borderRadius: 20, paddingTop: 4, paddingBottom: 6, paddingHorizontal: 6 },
+  box: { borderWidth: 0, borderRadius: 20, paddingTop: 4, paddingBottom: 6, paddingHorizontal: 6, ...Platform.select({ web: { outlineStyle: "solid", outlineWidth: 0, boxShadow: "none" } }) },
   input: { fontSize: 16, lineHeight: 21, minHeight: 40, maxHeight: 21 * 6 + 16, paddingHorizontal: 8, paddingTop: 9, paddingBottom: 6, borderWidth: 0, backgroundColor: "transparent", ...Platform.select({ web: { outlineStyle: "solid", outlineWidth: 0, boxShadow: "none" } }) },
   row: { flexDirection: "row", alignItems: "center", gap: 6 },
   round: { width: 34, height: 34, alignItems: "center", justifyContent: "center", borderRadius: 17 },
