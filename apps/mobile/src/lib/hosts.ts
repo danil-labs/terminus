@@ -71,6 +71,7 @@ function allowed(command: string) {
 export const WAKES_FIRST: ReadonlySet<string> = new Set([
   "set_session_pinned",
   "set_task_archived",
+  "finish_task",
   "guardar_imagen_pegada",
   "prepare_attachments",
   "add_account",

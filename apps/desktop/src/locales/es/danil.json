@@ -159,5 +159,46 @@
   "danil.computers.rename_failed.offline": "Sin conexión con Danil: el nombre no se guardó.",
   "danil.computers.rename_failed.other": "Danil no guardó el nombre. Inténtalo de nuevo.",
   "danil.here.title": "Este workspace: {name}",
-  "danil.workspace.use": "Usar {email}"
+  "danil.workspace.use": "Usar {email}",
+  "danil.credentials.in_use": "En uso en: {machines}",
+  "danil.credentials.in_use_none": "Aún no está en ninguna máquina",
+  "danil.credentials.pending_on": "pendiente en {machines}",
+  "danil.credentials.state.pending": "pendiente",
+  "danil.credentials.state.removed": "quitada",
+  "danil.credentials.remove": "Quitar",
+  "danil.credentials.restore": "Volver a poner",
+  "danil.credentials.cancel": "Cancelar",
+  "danil.credentials.remove_from": "Quitar de {machine}",
+  "danil.credentials.remove_warning": "Quitarla de {machine} no la revoca en {provider}. Si esa máquina ya la tuvo, la clave sigue valiendo allá: para revocarla de verdad, cámbiala en {provider}.",
+  "danil.credentials.delete": "Borrar de la cuenta",
+  "danil.credentials.delete_yes": "Borrar de la cuenta",
+  "danil.credentials.delete_warning": "Se borra de tu cuenta y de todas tus máquinas, pero no se revoca en {provider}: para que deje de valer, revócala allá.",
+  "danil.credentials.mcp_title": "Claves de MCP en tu cuenta",
+  "danil.credentials.zotero_title": "Clave de Zotero en tu cuenta",
+  "danil.credentials.rotate.open": "Cambiar la clave",
+  "danil.credentials.rotate.label": "Clave nueva para {name}",
+  "danil.credentials.rotate.placeholder": "Pega la clave nueva",
+  "danil.credentials.rotate.save": "Guardar en todas",
+  "danil.credentials.rotate.help": "Se cifra en este navegador para cada una de tus máquinas. Danil guarda las copias cifradas y no puede leerlas.",
+  "danil.credentials.rotate.no_webcrypto": "Este navegador no puede cifrar la clave. Cámbiala desde la app de escritorio o con un navegador actualizado.",
+  "danil.credentials.failed.unauthorized": "Tu sesión de Danil venció. Vuelve a iniciar sesión.",
+  "danil.credentials.failed.license": "Tu cuenta de Danil no tiene Terminus activo.",
+  "danil.credentials.failed.offline": "Sin conexión con Danil. Inténtalo de nuevo.",
+  "danil.credentials.failed.other": "Danil no pudo con las claves de tu cuenta. Inténtalo de nuevo.",
+  "danil.credentials.local.title": {
+    "one": "Tienes {count} clave solo en esta máquina. ¿Subirla a tu cuenta?",
+    "other": "Tienes {count} claves solo en esta máquina. ¿Subirlas a tu cuenta?"
+  },
+  "danil.credentials.local.title_on": {
+    "one": "Tienes {count} clave solo en {machine}. ¿Subirla a tu cuenta?",
+    "other": "Tienes {count} claves solo en {machine}. ¿Subirlas a tu cuenta?"
+  },
+  "danil.credentials.local.help": "Elige cuáles. Se cifran para cada una de tus máquinas y llegan a todas; Danil no puede leerlas.",
+  "danil.credentials.local.later": "Ahora no",
+  "danil.credentials.local.upload": {
+    "one": "Subir {count}",
+    "other": "Subir {count}"
+  },
+  "danil.credentials.failed.recipient": "Una de las máquinas ya no está ligada a este workspace. Vuelve a abrir Configuración e inténtalo de nuevo.",
+  "danil.credentials.provider_opencode_go": "OpenCode Go"
 }

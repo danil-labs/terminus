@@ -208,7 +208,9 @@ function mergeWorkspaces(ctx: MergeContext, parts: Slice[]): unknown {
   for (const s of lists)
     for (const w of (s.value as Row).workspaces as Row[]) {
       if (typeof w?.id !== "string") continue;
-      const seen = rows.get(w.id) ?? { row: w, owner: s.machine, machines: new Set<string>() };
+      const seen = rows.get(w.id) ?? { row: { ...w }, owner: s.machine, machines: new Set<string>() };
+      // La raíz es local a cada máquina; basta que una tenga contexto para el aviso del workspace.
+      if (!text(seen.row.context_root) && text(w.context_root)) seen.row.context_root = w.context_root;
       seen.machines.add(s.machine);
       rows.set(w.id, seen);
     }

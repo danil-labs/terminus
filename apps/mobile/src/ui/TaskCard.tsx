@@ -1,5 +1,5 @@
 import { folderColor } from "@terminus/design";
-import { type CardPull, type SidebarDensity, type TaskCard as Card, type PullTone, cardPull, canFinishTask, type TaskGit, taskTitle } from "@terminus/tasks";
+import { type CardPull, type SidebarDensity, type TaskCard as Card, type PullTone, cardPull, canFinishTask, type TaskGit, type TaskGitStatus, taskTitle } from "@terminus/tasks";
 import * as Haptics from "expo-haptics";
 import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -63,7 +63,7 @@ export function PullChip({ pull, git }: { pull: CardPull; git?: TaskGit | null }
 type TaskCardProps = {
   task: Task;
   card: Card;
-  git?: TaskGit | null;
+  git?: TaskGitStatus | null;
   folderName: (id: string) => string | undefined;
   density: SidebarDensity;
   onPress: () => void;
@@ -85,14 +85,14 @@ const sameProps = (a: TaskCardProps, b: TaskCardProps) =>
   a.online === b.online &&
   !a.onFinish === !b.onFinish &&
   !a.onLongPress === !b.onLongPress &&
+  !a.onFinish === !b.onFinish &&
   sameCard(a.card, b.card) &&
   (a.card.folder ? a.folderName(a.card.folder) : null) === (b.card.folder ? b.folderName(b.card.folder) : null);
 
 /**
  * La tarjeta de dos líneas del sidebar del escritorio (#151), en el teléfono.
- * Línea 1: la marca en su columna, el título y la chincheta. Línea 2: lo que te
- * piden si te necesita (su PR y el cuadrado de su carpeta); si no, proveedor ·
- * carpeta · máquina · cara del agente · PR, como el riel del escritorio.
+ * Línea 1: la marca en su columna, el título y la chincheta. Línea 2: proveedor ·
+ * carpeta · máquina · cara del agente · PR, incluso cuando espera respuesta.
  * «Compacta», una sola línea con el cuadrado. Qué va en cada línea lo deciden
  * `taskCard` de `@terminus/tasks` y `secondLine`; el PR sale de `git` (una fila
  * de `list_session_git`), que quien pinta la lista pide solo para las visibles.
@@ -116,7 +116,8 @@ function TaskCardView({
   const folder = card.folder ? { id: card.folder, name: folderName(card.folder) } : null;
   const pull = cardPull(git);
   const chips = secondLine(card, pull, compact);
-  const ready = online && canFinishTask(task, git, card.activity.viva);
+  const branch = !git?.shared_with ? git?.branch : null;
+  const ready = online && canFinishTask(task, git, card.activity.viva || card.activity.aprobando);
   return (
     <Pressable
       testID={`task-${task.host}-${task.id}`}
@@ -161,20 +162,12 @@ function TaskCardView({
         <View style={[styles.line, styles.second]}>
           {chips.map((chip) => {
             switch (chip) {
-              case "request":
-                return (
-                  <Text key={chip} numberOfLines={1} style={[styles.request, { color: theme.text }]}>
-                    {card.request ?? ""}
-                  </Text>
-                );
               case "provider":
                 return (
                   <View key={chip} testID="task-provider" accessibilityRole="image" accessibilityLabel={card.provider ?? ""}>
                     <BrandMark id={card.provider} size={13} color={theme.text} />
                   </View>
                 );
-              case "folder-square":
-                return folder ? <FolderSquare key={chip} id={folder.id} /> : null;
               case "folder":
                 return folder ? (
                   <View key={chip} style={styles.chip}>
@@ -192,6 +185,12 @@ function TaskCardView({
                 return pull ? <PullChip key={chip} pull={pull} git={git} /> : null;
             }
           })}
+          {!pull && branch ? (
+            <View style={styles.chip} accessibilityLabel={branch}>
+              <Icon name="git-branch" size={11} color={theme.textMuted} />
+              <Text numberOfLines={1} style={[styles.meta, { color: theme.textMuted, maxWidth: 160 }]}>{branch}</Text>
+            </View>
+          ) : null}
         </View>
       )}
     </Pressable>
@@ -205,7 +204,6 @@ const styles = StyleSheet.create({
   mark: { width: 18, alignItems: "center" },
   hollow: { width: 9, height: 9, borderRadius: 5, borderWidth: 1.5 },
   title: { flex: 1, fontSize: 15, fontWeight: "500" },
-  request: { flex: 1, fontSize: 13 },
   chip: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1 },
   meta: { fontSize: 12 },
 });

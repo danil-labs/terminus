@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
+import { readTaskGit, type TaskGitStatus } from "@terminus/tasks";
 import type { Host } from "./hosts";
 import { type GitBook, gitAsks, gitAsksKey, staleGit, withGitAnswer } from "./taskGit";
 
@@ -7,7 +8,7 @@ import { type GitBook, gitAsks, gitAsksKey, staleGit, withGitAnswer } from "./ta
 const EVERY_MS = 30_000;
 
 /**
- * El git de las tarjetas visibles, por `host/id`. Una llamada por máquina y
+ * El git de las tarjetas visibles, por `host/id`. Un recorrido por máquina y
  * carpeta (`gitAsks`), al cambiar lo visible y cada 30 s con la app al frente.
  * Leer nunca enciende: a una máquina que no está encendida no se le pregunta y
  * lo suyo queda viejo (`stale`).
@@ -23,29 +24,44 @@ export function useTaskGit(hostOf: (id: string) => Host | undefined, visible: re
   const powerKey = asks.map((ask) => hostOf(ask.host)?.power()).join("|");
   useEffect(() => {
     let live = true;
-    let sequence = 0;
-    const read = () => {
-      const request = ++sequence;
+    let reading = false;
+    const read = async () => {
+      if (reading) return;
+      reading = true;
       const { asks, hostOf } = latest.current;
-      for (const ask of asks) {
-        const host = hostOf(ask.host);
-        if (!host || host.power() !== "on") {
-          setBook((b) => staleGit(b, ask.host, ask.priority));
-          continue;
-        }
-        host
-          .call<unknown>("list_session_git", ask.workspace, { project: ask.project, remote: true, priority: ask.priority })
-          .then(({ value, cachedAt }) => live && request === sequence && setBook((b) => host.power() === "on" && cachedAt === null ? withGitAnswer(b, ask.host, value) : staleGit(b, ask.host, ask.priority)))
-          .catch(() => live && request === sequence && setBook((b) => staleGit(b, ask.host, ask.priority)));
+      try {
+        await Promise.all(asks.map(async (ask) => {
+          const host = hostOf(ask.host);
+          if (!host || host.power() !== "on") {
+            setBook((b) => staleGit(b, ask.host, ask.priority));
+            return;
+          }
+          const publish = (value: unknown) => live && setBook((b) => withGitAnswer(b, ask.host, value));
+          try {
+            const rows = await readTaskGit(
+              async remote => {
+                const answer = await host.call<Record<string, TaskGitStatus>>("list_session_git", ask.workspace, { project: ask.project, remote, priority: ask.priority });
+                if (host.power() !== "on" || answer.cachedAt !== null) throw new Error("stale_git");
+                return answer.value;
+              },
+              { onLocal: publish, current: () => live },
+            );
+            publish(rows);
+          } catch {
+            if (live) setBook(b => staleGit(b, ask.host, ask.priority));
+          }
+        }));
+      } finally {
+        reading = false;
       }
     };
     read();
-    const activity = AppState.addEventListener("change", (state) => { if (state === "active") read(); });
     const timer = setInterval(() => AppState.currentState === "active" && read(), EVERY_MS);
+    const foreground = AppState.addEventListener("change", state => { if (state === "active") void read(); });
     return () => {
       live = false;
       clearInterval(timer);
-      activity.remove();
+      foreground.remove();
     };
   }, [key, revision, powerKey]);
   return book;

@@ -1,3 +1,4 @@
+import { readTaskGit } from "@terminus/tasks";
 import Rocket from "lucide-solid/icons/rocket";
 import { createEffect, createMemo, createSignal, on, onCleanup, Show } from "solid-js";
 import { invoke } from "../../lib/invoke";
@@ -52,7 +53,10 @@ export default function TaskGitActions(props: {
     read = () => {
       if (!context().on) return;
       const request = ++sequence;
-      void invoke<Record<string, GitStatus>>("list_session_git", args, opts).then((value) => {
+      void readTaskGit(remote => invoke<Record<string, GitStatus>>("list_session_git", { ...args, remote }, opts), {
+        current: () => live && request === sequence && scope() === key,
+        onLocal: value => { if (live && request === sequence && scope() === key) setRows(before => retainGitObservation(before, value)); },
+      }).then((value) => {
         if (live && request === sequence && scope() === key) {
           setRows((before) => retainGitObservation(before, value));
           setFailure(null);

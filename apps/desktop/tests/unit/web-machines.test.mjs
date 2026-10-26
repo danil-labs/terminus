@@ -71,10 +71,35 @@ async function open(name, computers, relays, workspaces) {
   return { app, f, invoke, calls, doc: app.w.document, text: () => app.w.document.body.textContent ?? "" };
 }
 
+test("a primary context on another machine clears the empty-context notice", async () => {
+  const configured = { workspaces: [{ ...SAME, context_root: "/lab/context" }], active: "w" };
+  const { app, invoke, text } = await open("web-context-source", [VM, MAC], {
+    cmp_vm: { table: table("Panel", "VM") },
+    cmp_mac: { table: table("Notas", "Mac", { list_workspaces: configured, workspaces_startup: configured }) },
+  });
+  try {
+    for (const command of ["workspaces_startup", "list_workspaces"]) {
+      const startup = await invoke(command);
+      assert.equal(startup.workspaces[0].context_root, "/lab/context");
+    }
+    assert.ok(!text().includes("Sin fuente de contexto"), "the workspace has context on the Mac");
+  } finally {
+    app.w.close();
+  }
+});
+
 test("two machines show together and each command goes to the machine it names", async () => {
   const { app, invoke, calls, doc, text } = await open("web-machines", [VM, MAC], {
-    cmp_vm: { table: table("Panel", "Tarea de la VM", {}, "pv") },
-    cmp_mac: { table: table("Notas", "Tarea del Mac", { list_session_git: ({ project: p }) => (p === "pm" ? { t1: { kind: "branch", branch: "feat/notas", repository: "/lab/pm" } } : {}) }, "pm") },
+    cmp_vm: { table: table("Panel", "Tarea de la VM", { list_slash_menu: { commands: [], skills: [], side_question: "btw" } }, "pv") },
+    cmp_mac: { table: table("Notas", "Tarea del Mac", {
+      list_slash_menu: { commands: [], skills: [], side_question: "btw" },
+      ask_side_question: { answer: "Respuesta de la Mac" },
+      list_workspace_attention: [{ workspace: "w", tasks: [{ session: "t1", project: "pm", state: "unseen" }] }],
+      mark_task_seen: null,
+      load_session: (args) => ({ ...engine.load_session(args), turns: [{ id: "a1", role: "agent", text: "Respuesta guardada", at: 1 }] }),
+      prepare_session_continuation: { path: "/lab/continuation.md", last_prompt: "", last_reply: "Respuesta guardada", sources: [], excluded_sources: [] },
+      list_session_git: ({ project: p }) => (p === "pm" ? { t1: { kind: "branch", branch: "feat/notas", repository: "/lab/pm" } } : {}),
+    }, "pm") },
   });
 
   assert.ok(text().includes("Panel") && text().includes("Notas"), "the projects of both machines are in the sidebar");
@@ -112,11 +137,51 @@ test("two machines show together and each command goes to the machine it names",
   const machines = await invoke("machine_list");
   assert.deepEqual(machines.map((m) => [m.id, m.active, m.hosts]), [["cmp_vm", true, true], ["cmp_mac", false, true]]);
 
-  doc.querySelector('[data-sesion="cmp_vm~t1"]').click();
+  doc.querySelector('[data-sesion="cmp_mac~t1"]').click();
   await sleep(600);
   const where = doc.querySelector("[data-task-location]");
-  assert.equal(where?.querySelector("[data-task-location-machine]")?.textContent, "Danil VM", "the task window names the machine that runs it");
-  assert.equal(where?.querySelector("[data-task-location-project]")?.textContent, "Panel");
+  assert.equal(where?.querySelector("[data-task-location-machine]")?.textContent, "Mac de Ana", "the task window names the machine that runs it");
+  assert.equal(where?.querySelector("[data-task-location-project]")?.textContent, "Notas");
+  assert.ok(calls("cmp_mac", "list_mentions").some((c) => c.args.session === "t1" && c.workspace === "w"), "opening the second machine’s task reads its mention files on that machine");
+  assert.ok(!calls("cmp_vm", "list_mentions").some((c) => c.args.session === "t1"), "the first machine never receives the other machine’s task");
+  const field = doc.querySelector("textarea");
+  field.value = "/btw ¿Qué está pasando?";
+  field.dispatchEvent(new app.w.Event("input", { bubbles: true }));
+  field.closest("form").dispatchEvent(new app.w.Event("submit", { bubbles: true, cancelable: true }));
+  assert.ok(await until(() => text().includes("Respuesta de la Mac")), "the side question is answered by the task’s machine");
+  assert.equal(calls("cmp_mac", "ask_side_question").at(-1)?.args.session, "t1");
+  assert.equal(calls("cmp_vm", "ask_side_question").length, 0);
+  assert.ok(calls("cmp_mac", "mark_task_seen").some((c) => c.args.session === "t1"), "opening the task marks it seen on its machine");
+  assert.equal(calls("cmp_vm", "mark_task_seen").length, 0);
+  assert.ok(calls("cmp_mac", "task_history").some((c) => c.args.id === "t1" && c.workspace === "w"), "the task’s work history is read from its machine");
+  assert.ok(!calls("cmp_vm", "task_history").some((c) => c.args.project === "pm"), "another machine’s history never goes to the default machine");
+  doc.querySelector('[aria-label="Crear tarea desde aquí"]').click();
+  await sleep(100);
+  const continueButton = [...doc.querySelectorAll("button")].find((b) => b.textContent === "Conversación completa");
+  assert.ok(continueButton, "the continuation dialog opens");
+  continueButton.click();
+  assert.ok(await until(() => calls("cmp_mac", "prepare_session_continuation").length === 1), "the continuation is prepared on the task’s machine");
+  assert.equal(calls("cmp_mac", "prepare_session_continuation")[0].args.id, "t1");
+  assert.equal(calls("cmp_vm", "prepare_session_continuation").length, 0);
+  assert.deepEqual(app.fallos, []);
+});
+
+test("the usage strip reads an account from its machine when the default machine has no account list", async () => {
+  const providers = [{ id: "codex", label: "Codex", available: true, driver: true, limits: true }];
+  const { app, calls } = await open("web-machines-usage", [VM, MAC], {
+    cmp_vm: { table: table("Panel", "Tarea de la VM", { list_providers: providers, list_accounts: null }) },
+    cmp_mac: { table: table("Notas", "Tarea del Mac", {
+      list_providers: providers,
+      list_accounts: { provider: "codex", accounts: [account("m1", "ana@example.com")], active: "m1" },
+      account_limits: { mode: "read", windows: [], at: Date.now() },
+      account_status: { id: "m1", authenticated: true, detail: "" },
+    }) },
+  });
+  assert.ok(await until(() => calls("cmp_mac", "account_limits").length > 0), "usage is read from the machine with the account");
+  assert.equal(calls("cmp_mac", "account_limits").at(-1).args.id, "m1");
+  assert.equal(calls("cmp_mac", "account_status").at(-1)?.args.id, "m1");
+  assert.equal(calls("cmp_vm", "account_limits").length, 0);
+  assert.equal(calls("cmp_vm", "account_status").length, 0);
   assert.deepEqual(app.fallos, []);
 });
 

@@ -1,3 +1,4 @@
+import { machineOf } from "../machines/store";
 import { invoke } from "../../lib/invoke.ts";
 import { manifiesto, t } from "../../lib/i18n.ts";
 
@@ -129,7 +130,7 @@ export const NOMBRE_VIA: Record<string, string> = {
 };
 
 export const publicacionesDe = (project: string, session: string) =>
-  invoke<Publicacion[]>("publications_of", { project, session });
+  invoke<Publicacion[]>("publications_of", { project, session }, machineOf(session));
 
 export const registrarSalida = (
   referencia: VersionRef,
