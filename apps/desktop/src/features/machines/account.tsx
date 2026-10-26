@@ -15,6 +15,7 @@ import {
   listComputers,
   listWorkspaces,
   machineCompatibility,
+  machineContracts,
   orderComputers,
   RelaySession,
   screenProtocols,
@@ -126,8 +127,7 @@ export function startAccountMachines(target: Target = window) {
         new RelaySession({
           endpoint,
           computerId: info.id,
-          // Con otro contrato el relay ni reenvía ni contesta del espejo: `version_mismatch`.
-          contracts: [__TERMINUS_CONTRACT__],
+          contracts: machineContracts(__TERMINUS_CONTRACT__),
           getToken: async () => (await getToken()).token,
           // Un upgrade sin licencia no trae cuerpo: se pregunta por HTTP para no reintentar en bucle.
           probe: async () => sessionProbe(endpoint, (await getToken()).token, info.id),
