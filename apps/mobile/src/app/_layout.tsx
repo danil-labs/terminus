@@ -8,6 +8,7 @@ import { AccountProvider } from "../lib/account";
 import { MachinesProvider } from "../lib/machines";
 import { Notifications } from "../lib/notifications";
 import { t, w } from "../lib/i18n";
+import { pinToVisibleArea } from "../lib/viewport";
 import { WorkspacesProvider } from "../lib/workspaces";
 import { useTheme } from "../ui/theme";
 
@@ -43,6 +44,9 @@ export default function RootLayout() {
     const to = new URLSearchParams(window.location.search).get("to");
     if (to?.startsWith("/") && !to.startsWith("//")) router.replace(to as never);
   }, []);
+
+  // En el navegador el teclado no achica la página: sin esto se lleva la barra de arriba.
+  useEffect(pinToVisibleArea, []);
 
   useEffect(() => {
     if (!Notifications) return;
