@@ -379,7 +379,7 @@ export function Composer({
 
       {header}
 
-      <View style={[styles.box, { borderColor: shell ? theme.text : theme.border, backgroundColor: theme.surface }]}>
+      <View style={[styles.box, { backgroundColor: theme.surface }]}>
         {attachments.length ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.files}>
             {attachments.map((a) => (
@@ -407,7 +407,7 @@ export function Composer({
           }}
           placeholder={placeholder}
           placeholderTextColor={theme.textMuted}
-          editable={!disabled}
+          underlineColorAndroid="transparent"
           multiline
           textAlignVertical="top"
           // El teclado dice «Enviar». En iOS y Android el retorno manda y no mete salto de línea.
@@ -602,8 +602,8 @@ export function SelectorChip({ icon, left, label, value, onPress, testID, muted 
 
 const styles = StyleSheet.create({
   wrap: { paddingHorizontal: 10, paddingTop: 6, gap: 6 },
-  box: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 20, paddingTop: 4, paddingBottom: 6, paddingHorizontal: 6 },
-  input: { fontSize: 16, lineHeight: 21, minHeight: 40, maxHeight: 21 * 6 + 16, paddingHorizontal: 8, paddingTop: 9, paddingBottom: 6 },
+  box: { borderWidth: 0, borderRadius: 20, paddingTop: 4, paddingBottom: 6, paddingHorizontal: 6, ...Platform.select({ web: { outlineStyle: "solid", outlineWidth: 0, boxShadow: "none" } }) },
+  input: { fontSize: 16, lineHeight: 21, minHeight: 40, maxHeight: 21 * 6 + 16, paddingHorizontal: 8, paddingTop: 9, paddingBottom: 6, borderWidth: 0, backgroundColor: "transparent", ...Platform.select({ web: { outlineStyle: "solid", outlineWidth: 0, boxShadow: "none" } }) },
   row: { flexDirection: "row", alignItems: "center", gap: 6 },
   round: { width: 34, height: 34, alignItems: "center", justifyContent: "center", borderRadius: 17 },
   pill: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 14, paddingHorizontal: 9, height: 28 },

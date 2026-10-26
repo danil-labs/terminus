@@ -10,16 +10,31 @@ export function pinToVisibleArea(): () => void {
   const viewport = window.visualViewport;
   const root = document.getElementById("root");
   if (!viewport || !root) return () => {};
-  Object.assign(root.style, { position: "fixed", left: "0", right: "0", top: "0" });
+  const previous = {
+    position: root.style.position,
+    left: root.style.left,
+    right: root.style.right,
+    top: root.style.top,
+    height: root.style.height,
+    overflow: root.style.overflow,
+  };
+  // Al enfocar, el navegador puede desplazar también el documento. Usamos sus
+  // coordenadas (pageTop), sin depender del comportamiento de `fixed` con el teclado.
+  Object.assign(root.style, { position: "absolute", left: "0", right: "0", overflow: "hidden" });
   const fit = () => {
     root.style.height = `${viewport.height}px`;
-    root.style.transform = `translateY(${viewport.offsetTop}px)`;
+    root.style.top = `${viewport.pageTop}px`;
   };
   fit();
   viewport.addEventListener("resize", fit);
   viewport.addEventListener("scroll", fit);
+  window.addEventListener("scroll", fit);
+  window.addEventListener("resize", fit);
   return () => {
     viewport.removeEventListener("resize", fit);
     viewport.removeEventListener("scroll", fit);
+    window.removeEventListener("scroll", fit);
+    window.removeEventListener("resize", fit);
+    Object.assign(root.style, previous);
   };
 }
