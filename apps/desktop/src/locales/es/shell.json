@@ -276,5 +276,10 @@
   "shell.machines.bring_here_pc": "Traer a esta PC",
   "shell.machines.carry_to": "Llevar a otra máquina…",
   "shell.machines.carry_none": "No hay otra máquina encendida con este workspace a la que llevarla.",
-  "shell.machines.local_only": "Esto se abre en la máquina de la tarea, no en esta."
+  "shell.machines.local_only": "Esto se abre en la máquina de la tarea, no en esta.",
+  "shell.relocate.title": "Terminus está abierto desde el instalador",
+  "shell.relocate.body": "Muévelo a Aplicaciones para que se actualice y siga ahí cuando expulses el disco.",
+  "shell.relocate.move": "Mover a Aplicaciones",
+  "shell.relocate.later": "Ahora no",
+  "shell.relocate.failed": "No se pudo copiar Terminus a Aplicaciones: {error}\n\nArrástralo desde la ventana del disco a Aplicaciones."
 }
