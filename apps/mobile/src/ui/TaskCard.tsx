@@ -99,7 +99,7 @@ export const TaskCard = memo(TaskCardView, sameProps);
 function TaskCardView({
   task,
   card,
-  git,
+  git: observed,
   folderName,
   density,
   onPress,
@@ -108,6 +108,7 @@ function TaskCardView({
   online,
 }: TaskCardProps) {
   const theme = useTheme();
+  const git = observed && !online ? { ...observed, stale: true } : observed;
   const compact = density === "compact";
   const folder = card.folder ? { id: card.folder, name: folderName(card.folder) } : null;
   const pull = cardPull(git);
