@@ -45,7 +45,7 @@ const MIRROR = new Set(["workspaces_startup", "list_workspaces", "list_projects"
 function engine(name, ws, projects, tasks, accounts) {
   const now = Date.now();
   const sessions = new Map(tasks.map((t, i) => [t.id, { ...t, created_at: now - (i + 1) * 60_000, updated_at: now - i * 60_000, turns: [{ id: `${t.id}-u`, role: "user", text: t.title }, { id: `${t.id}-a`, role: "agent", text: `Hecho en ${name}.` }, ...(t.incoming ?? [])], pending: null }]));
-  return { name, ws, projects, sessions, live: new Set(), cursor: 0, events: [], accounts, files: new Set(), logins: new Map() };
+  return { name, ws, projects, sessions, live: new Set(), cursor: 0, events: [], accounts, files: new Set(), logins: new Map(), gitObserved: new Set() };
 }
 
 const HOUR = 3_600_000;
@@ -225,7 +225,10 @@ function invoke(m, command, args) {
     case "list_providers": return [{ id: "codex", label: "Codex", available: true, driver: true }, { id: "claude", label: "Claude", available: true, driver: true }];
     case "list_active_turns": return [...e.live];
     case "list_workspace_attention": return attentionOf(e);
-    case "list_session_git": return gitOf(e, args.project);
+    case "list_session_git": {
+      if (!args.remote) e.gitObserved.add(args.project);
+      return e.gitObserved.has(args.project) ? gitOf(e, args.project) : {};
+    }
     case "load_session": {
       const s = e.sessions.get(args.id);
       if (!s) throw { code: "command_failed", detail: "no such task" };
@@ -268,7 +271,14 @@ function invoke(m, command, args) {
     }
     case "task_blockers": {
       const s = e.sessions.get(args.id);
-      return { unsaved: s?.unsaved ? [{ session: s.id, title: s.title, files: s.unsaved }] : [], not_finished: false };
+      return { unsaved: s?.unsaved ? [{ session: s.id, title: s.title, files: s.unsaved }] : [], not_finished: Boolean(args.finish && (!s || PULLS[s.id]?.state !== "merged" || e.live.has(s.id))) };
+    }
+    case "finish_task": {
+      const s = e.sessions.get(args.id);
+      if (!s || s.project !== args.project || s.unsaved?.length || e.live.has(s.id) || PULLS[s.id]?.state !== "merged") throw { code: "command_failed", detail: "task not ready to finish" };
+      s.archived = true;
+      emit(m, "session", { workspace: e.ws, project: s.project, session: s.id });
+      return null;
     }
     case "set_task_archived": {
       const s = e.sessions.get(args.id);

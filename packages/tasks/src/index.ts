@@ -48,3 +48,4 @@ export {
   taskTitle,
 } from "./preview.ts";
 export { type CardPull, type CheckState, type PullTone, type TaskGit, cardPull } from "./pull.ts";
+export { type KnState, type ReviewState, type TaskGitStatus, UNKNOWN_TASK_GIT, canFinishTask, readTaskGit } from "./git.ts";

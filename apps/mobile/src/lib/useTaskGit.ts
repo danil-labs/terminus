@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
+import { readTaskGit, type TaskGitStatus } from "@terminus/tasks";
 import type { Host } from "./hosts";
 import { type GitBook, gitAsks, gitAsksKey, staleGit, withGitAnswer } from "./taskGit";
 
@@ -22,25 +23,40 @@ export function useTaskGit(hostOf: (id: string) => Host | undefined, visible: re
   latest.current = { asks, hostOf };
   useEffect(() => {
     let live = true;
-    const read = () => {
+    let reading = false;
+    const read = async () => {
+      if (reading) return;
+      reading = true;
       const { asks, hostOf } = latest.current;
-      for (const ask of asks) {
-        const host = hostOf(ask.host);
-        if (!host || host.power() !== "on") {
-          setBook((b) => staleGit(b, ask.host, ask.priority));
-          continue;
-        }
-        host
-          .call<unknown>("list_session_git", ask.workspace, { project: ask.project, remote: true, priority: ask.priority })
-          .then(({ value }) => live && setBook((b) => withGitAnswer(b, ask.host, value)))
-          .catch(() => live && setBook((b) => staleGit(b, ask.host, ask.priority)));
+      try {
+        await Promise.all(asks.map(async (ask) => {
+          const host = hostOf(ask.host);
+          if (!host || host.power() !== "on") {
+            setBook((b) => staleGit(b, ask.host, ask.priority));
+            return;
+          }
+          const publish = (value: unknown) => live && setBook((b) => withGitAnswer(b, ask.host, value));
+          try {
+            const rows = await readTaskGit(
+              async remote => (await host.call<Record<string, TaskGitStatus>>("list_session_git", ask.workspace, { project: ask.project, remote, priority: ask.priority })).value,
+              { onLocal: publish, current: () => live },
+            );
+            publish(rows);
+          } catch {
+            if (live) setBook(b => staleGit(b, ask.host, ask.priority));
+          }
+        }));
+      } finally {
+        reading = false;
       }
     };
     read();
     const timer = setInterval(() => AppState.currentState === "active" && read(), EVERY_MS);
+    const foreground = AppState.addEventListener("change", state => { if (state === "active") void read(); });
     return () => {
       live = false;
       clearInterval(timer);
+      foreground.remove();
     };
   }, [key]);
   return book;
