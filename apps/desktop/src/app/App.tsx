@@ -2566,8 +2566,10 @@ export default function App() {
         if (kind === "started" && workspace) liveThreads.add(liveThreadKey(workspace, session));
         enviarFiltro();
         if (kind === "started" && esDelWorkspaceAbierto(workspace)) {
-          pendingStarts.delete(session);
+          const lanzadoAqui = pendingStarts.delete(session);
           advanceTurn(session);
+          // Lo que el servicio escribió al lanzarlo solo —la línea del cupo— está en disco y no llega por eventos.
+          if (!lanzadoAqui) releerUna(session);
           setSettlingTurns((ids) => ids.filter((id) => id !== session));
           finishedTurns.delete(session);
           setEnFondo((ids) => ids.filter((id) => id !== session));

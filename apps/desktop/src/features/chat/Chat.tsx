@@ -130,6 +130,7 @@ import Entrega, { type Producido } from "./Delivery";
 import {
   type CambioPorCupo,
   type FalloDelTurno,
+  cupoResuelveElFallo,
   gestoDelFallo,
   prosaDelCambioPorCupo,
   prosaDelFallo,
@@ -1589,6 +1590,9 @@ export default function Chat(props: ChatProps) {
       }
       // Lo dice el pie de la tarjeta del `!`: una fila aparte hacía saltar la altura.
       if (m.meta === "shell_reply") return;
+      // La línea del cupo resuelve el fallo que la precede: las dos juntas se leen como un error que sigue abierto.
+      const anterior = out.at(-1);
+      if (m.meta === "cupo" && anterior?.tipo === "msg" && cupoResuelveElFallo(anterior.msg.fallo?.clase)) out.pop();
       if (
         m.role !== "system" ||
         m.meta === "fallo" ||
@@ -3761,7 +3765,15 @@ function LineaDeSistema(props: { texto: string }) {
 /** La tarea siguió en otra cuenta, o en la misma cuando volvió su cupo. */
 function SiguioTrasElCupo(props: { cambio: CambioPorCupo }) {
   return (
-    <div class="col-start-1 flex items-center gap-3 py-2 text-xs text-neutral-500" role="status">
+    <div
+      class="col-start-1 flex items-center gap-3 py-2 text-xs"
+      classList={{
+        "text-info-strong": Boolean(props.cambio.to),
+        "text-neutral-500": !props.cambio.to,
+      }}
+      role="status"
+      data-quota-row={props.cambio.to ? "switched" : "resumed"}
+    >
       <span class="h-px flex-1 bg-border" aria-hidden="true" />
       <span>{prosaDelCambioPorCupo(props.cambio)}</span>
       <span class="h-px flex-1 bg-border" aria-hidden="true" />
