@@ -28,6 +28,27 @@ test("Claude Personal y Team del mismo correo conservan consumo y cierre de sesi
   assert.ok(groups.every((g) => g.members.length === 1));
 });
 
+test("la misma suscripción une máquinas, elige una encendida y conserva el id de cada chip", () => {
+  const groups = groupAccounts("claude", [
+    { machine: "vm", on: false, accounts: [{ id: "personal", identity: "Ana@Example.com", plan: " Pro " }, { id: "team", identity: "ana@example.com", plan: "Team" }] },
+    { machine: "mac", on: true, accounts: [{ id: "copy", identity: "ana@example.com", plan: "pro" }] },
+  ]);
+  assert.equal(groups.length, 2);
+  assert.deepEqual(groups[0].members, [{ machine: "vm", id: "personal", on: false }, { machine: "mac", id: "copy", on: true }]);
+  assert.equal(groups[0].row.id, "copy");
+  assert.deepEqual(groups[0].usageFrom, { machine: "mac", id: "copy", on: true });
+  assert.deepEqual(groups[1].members, [{ machine: "vm", id: "team", on: false }]);
+});
+
+test("el tipo desconocido y dos cuentas del mismo tipo en una máquina no se atribuyen por correo", () => {
+  const groups = groupAccounts("claude", [
+    { machine: "vm", on: true, accounts: [{ id: "a", identity: "ana@example.com", plan: "team" }, { id: "b", identity: "ana@example.com", plan: "team" }] },
+    { machine: "mac", on: true, accounts: [{ id: "c", identity: "ana@example.com", plan: "team" }, { id: "unknown", identity: "ana@example.com", plan: null }] },
+  ]);
+  assert.equal(groups.length, 4);
+  assert.ok(groups.every((g) => g.members.length === 1));
+});
+
 test("lo que queda, su tono y cuándo vuelve, con las palabras del escritorio", () => {
   assert.equal(windowLeft({ used_pct: 37.6 }), 62);
   assert.equal(windowLeft({ used_pct: 120 }), 0);
