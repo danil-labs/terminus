@@ -18,7 +18,7 @@ import { useTheme } from "../ui/theme";
 /**
  * La vista previa de una tarea al mantener pulsada su tarjeta: la tarjeta
  * flotante del sidebar del escritorio (`TaskHoverCard`) como hoja del sistema.
- * Título, lo último que se dijo, carpeta, agente, proveedor y modelo, la
+ * Título, carpeta, agente, proveedor y modelo, la
  * máquina si hay más de una; y Abrir, Fijar y Archivar con los mismos comandos
  * que la ventana (`set_session_pinned`, `task_blockers` y `set_task_archived`).
  * Abrirla no enciende nada; fijar o archivar encienden la VM si está apagada.
@@ -73,11 +73,6 @@ export default function Preview() {
       <View style={styles.head}>
         <Text style={[styles.title, { color: theme.text }]}>{preview.title}</Text>
       </View>
-      {preview.excerpt ? (
-        <Text numberOfLines={4} style={[styles.excerpt, { color: theme.textMuted, borderColor: theme.border }]}>
-          {preview.excerpt}
-        </Text>
-      ) : null}
       <View style={styles.rows}>
         {preview.folder ? (
           <Field label={previewLabel(lang, "folder")}>
@@ -157,7 +152,6 @@ const styles = StyleSheet.create({
   sheet: { paddingHorizontal: 20, paddingTop: 22, gap: 12 },
   head: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   title: { flex: 1, fontSize: 17, fontWeight: "600", lineHeight: 22 },
-  excerpt: { borderLeftWidth: 2, paddingLeft: 10, fontSize: 14, lineHeight: 20 },
   rows: { gap: 8 },
   field: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 22 },
   label: { width: 84, fontSize: 13 },

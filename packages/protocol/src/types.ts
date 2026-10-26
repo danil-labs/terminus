@@ -84,6 +84,7 @@ export type Turn = {
   model?: string | null;
   tools?: TurnTool[];
   questions?: Question[] | null;
+  answers?: Answer[] | null;
   /** Rutas en la máquina de lo que la persona adjuntó (las viejas, `entradas/…`). */
   attachments?: string[] | null;
   /** El turno en su orden: lo que el agente dijo, con las herramientas (`tool` indexa `tools`) donde las usó. */

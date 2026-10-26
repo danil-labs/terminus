@@ -327,7 +327,7 @@ export const taskKey = (task: { host: string; id: string }) => `${task.host}/${t
 // --- Una tarea ---------------------------------------------------------------
 
 export type Permission = { request_id: string; tool: string; target: string | null };
-export type PendingQuestion = { request_id: string; turn: string; questions: Question[] };
+export type PendingQuestion = { request_id: string | null; turn: string; questions: Question[] };
 
 export type TaskView = {
   session: OpenedSession;
@@ -346,11 +346,18 @@ export async function loadTask(host: Host, workspace: string, folder: string, id
   ]);
   if (!session) throw new HostError("machine_off", host.label);
   const turns = session.turns ?? [];
-  // `pending_requests` solo da el turno de la pregunta; el contenido está en ese turno.
-  const questions = (pending?.questions ?? []).map((q) => ({
-    ...q,
-    questions: [...turns].reverse().find((t: Turn) => t.id === q.turn && t.questions?.length)?.questions ?? [],
-  }));
+  // Las preguntas por archivo sobreviven al proceso; las respuestas guardadas
+  // son la fuente de verdad, igual que en escritorio.
+  const answered = new Set(turns.flatMap((t) => t.answers ?? []).map((a) => JSON.stringify([a.turn, a.question])));
+  const questions: PendingQuestion[] = turns.flatMap((t) => {
+    if (!t.id) return [];
+    const remaining = (t.questions ?? []).filter((q) => !answered.has(JSON.stringify([t.id, q.id])));
+    return remaining.length ? [{
+      turn: t.id,
+      request_id: pending?.questions.find((q) => q.turn === t.id)?.request_id ?? null,
+      questions: remaining,
+    }] : [];
+  });
   return { session, permissions: pending?.permissions ?? [], questions, running: live.includes(id), cachedAt: at.cachedAt };
 }
 
@@ -506,14 +513,30 @@ export function respondPermission(host: Host, workspace: string, id: string, req
   return host.call("respond_permission", workspace, { session: id, requestId, allow });
 }
 
-export function answerQuestion(host: Host, workspace: string, id: string, pending: PendingQuestion, chosen: Record<string, string[]>, free: Record<string, string>) {
+export async function answerQuestion(host: Host, workspace: string, folder: string, id: string, pending: PendingQuestion, chosen: Record<string, string[]>, free: Record<string, string>) {
   const respuestas: Answer[] = pending.questions.map((q) => ({
     turn: pending.turn,
     question: q.id,
     chosen: chosen[q.id] ?? [],
     free_text: free[q.id]?.trim() || null,
   }));
-  return host.call("answer_question", workspace, { session: id, requestId: pending.request_id, respuestas });
+  // El proceso puede haber terminado o la pregunta haberse respondido en otro cliente.
+  const current = await loadTask(host, workspace, folder, id);
+  const question = current.questions.find((q) => q.turn === pending.turn);
+  if (!question) return;
+  const remaining = respuestas.filter((a) => question.questions.some((q) => q.id === a.question));
+  if (question.request_id) {
+    return host.call("answer_question", workspace, { session: id, requestId: question.request_id, respuestas: remaining });
+  }
+  return host.call("send_message", workspace, {
+    ...MESSAGE_DEFAULTS,
+    project: folder,
+    session: id,
+    provider: current.session.provider,
+    model: taskDefaults(current).model,
+    prompt: "",
+    respuestas: remaining,
+  });
 }
 
 export function markSeen(host: Host, workspace: string, id: string) {

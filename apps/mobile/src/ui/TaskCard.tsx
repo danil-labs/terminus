@@ -82,9 +82,8 @@ const sameProps = (a: TaskCardProps, b: TaskCardProps) =>
 
 /**
  * La tarjeta de dos líneas del sidebar del escritorio (#151), en el teléfono.
- * Línea 1: la marca en su columna, el título y la chincheta. Línea 2: lo que te
- * piden si te necesita (su PR y el cuadrado de su carpeta); si no, proveedor ·
- * carpeta · máquina · cara del agente · PR, como el riel del escritorio.
+ * Línea 1: la marca en su columna, el título y la chincheta. Línea 2: proveedor ·
+ * carpeta · máquina · cara del agente · PR, incluso cuando espera respuesta.
  * «Compacta», una sola línea con el cuadrado. Qué va en cada línea lo deciden
  * `taskCard` de `@terminus/tasks` y `secondLine`; el PR sale de `git` (una fila
  * de `list_session_git`), que quien pinta la lista pide solo para las visibles.
@@ -143,20 +142,12 @@ function TaskCardView({
         <View style={[styles.line, styles.second]}>
           {chips.map((chip) => {
             switch (chip) {
-              case "request":
-                return (
-                  <Text key={chip} numberOfLines={1} style={[styles.request, { color: theme.text }]}>
-                    {card.request ?? ""}
-                  </Text>
-                );
               case "provider":
                 return (
                   <View key={chip} testID="task-provider" accessibilityRole="image" accessibilityLabel={card.provider ?? ""}>
                     <BrandMark id={card.provider} size={13} color={theme.text} />
                   </View>
                 );
-              case "folder-square":
-                return folder ? <FolderSquare key={chip} id={folder.id} /> : null;
               case "folder":
                 return folder ? (
                   <View key={chip} style={styles.chip}>
@@ -187,7 +178,6 @@ const styles = StyleSheet.create({
   mark: { width: 18, alignItems: "center" },
   hollow: { width: 9, height: 9, borderRadius: 5, borderWidth: 1.5 },
   title: { flex: 1, fontSize: 15, fontWeight: "500" },
-  request: { flex: 1, fontSize: 13 },
   chip: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1 },
   meta: { fontSize: 12 },
 });
