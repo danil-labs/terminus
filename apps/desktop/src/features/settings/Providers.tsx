@@ -23,6 +23,8 @@ import type { GithubAccountState } from "./github-account/GithubAccount";
 const Integraciones = lazy(() => import("../onboarding/ToolCards").then((m) => ({ default: m.Integraciones })));
 // GitHub de la cuenta de Danil: con sesión, su tarjeta reemplaza la local.
 const GithubAccount = lazy(() => import("./github-account/GithubAccount"));
+const CredentialsInUse = lazy(() => import("./credentials/AccountCredentials").then((m) => ({ default: m.CredentialsInUse })));
+const LocalKeysBanner = lazy(() => import("./credentials/AccountCredentials").then((m) => ({ default: m.LocalKeysBanner })));
 
 /**
  * Proveedores de código: de dónde salen los proyectos de la organización.
@@ -1179,6 +1181,8 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
               <div class="mt-3">
                 <Suspense fallback={null}>
                   <Integraciones solo={["zotero"]} onCambio={() => {}} />
+                  <LocalKeysBanner kinds={["zotero"]} />
+                  <CredentialsInUse kinds={["zotero"]} title={t("danil.credentials.zotero_title")} />
                 </Suspense>
               </div>
             </SettingsSection>

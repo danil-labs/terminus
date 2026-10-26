@@ -63,6 +63,8 @@ export const APP_ACTIONS = [
   // La tarjeta de vista previa: Fijar y Archivar.
   "set_session_pinned",
   "set_task_archived",
+  "finish_task",
+  "delete_session",
   // `!` en el cuadro: un comando de terminal en la carpeta de la tarea.
   "run_shell_command",
   "stop_shell_command",

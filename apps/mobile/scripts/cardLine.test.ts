@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { cardPull, type TaskGit, taskCard } from "@terminus/tasks";
 import { secondLine } from "../src/lib/cardLine.ts";
-import { gitAsks, gitAsksKey, staleGit, withGitAnswer } from "../src/lib/taskGit.ts";
+import { effectiveGit, gitAsks, gitAsksKey, staleGit, withGitAnswer } from "../src/lib/taskGit.ts";
 
 const row = { id: "t1", title: "Tarea", esperando: false, folder: "p1", agent: "Ada", provider: "claude", machine: "vm", machine_on: true, last_message: "¿Sigo?" };
 const card = (extra: Record<string, unknown> = {}) => taskCard({ ...row, ...extra }, { live: [], approving: [] });
@@ -36,8 +36,8 @@ test("compacta no lleva línea 2, ni proveedor ni PR", () => {
   assert.deepEqual(secondLine(card(), cardPull(git()), true), []);
 });
 
-test("si te necesita: lo que pide, el PR y el cuadrado de la carpeta", () => {
-  assert.deepEqual(secondLine(card({ esperando: true }), cardPull(git()), false), ["request", "pull", "folder-square"]);
+test("si te necesita conserva metadatos, sin mostrar el último mensaje", () => {
+  assert.deepEqual(secondLine(card({ esperando: true }), cardPull(git()), false), ["provider", "folder", "machine", "agent", "pull"]);
 });
 
 test("si falló, la línea normal: no el último mensaje", () => {
@@ -79,4 +79,16 @@ test("git leído: por host/id; lo que no se pudo releer queda viejo, no se borra
   assert.equal(off["vm/a"].stale, true);
   assert.equal(cardPull(off["vm/a"])?.tone, "muted");
   assert.equal(staleGit(off, "vm", ["a"]), off);
+});
+
+test("una rama compartida se resuelve dentro de la máquina y workspace elegidos", () => {
+  const child = { host: "mac", workspace: "w", id: "child", parent: "parent", subagent: "a" };
+  const parent = { host: "mac", workspace: "w", id: "parent" };
+  const own = git({ shared_with: "parent", pull: null });
+  const merged = git({ pull: { number: 8, state: "merged", head_sha: "abc" } });
+  const book = { "mac/child": own, "mac/parent": merged, "vm/parent": git() };
+  assert.equal(effectiveGit(book, child, [child, parent]).pull?.state, "merged");
+  assert.equal(effectiveGit(book, child, [child, { ...parent, host: "vm" }]).pull, null);
+  assert.equal(effectiveGit(book, child, [child, { ...parent, workspace: "other" }]).pull, null);
+  assert.equal(effectiveGit({}, child, [child]).stale, true);
 });

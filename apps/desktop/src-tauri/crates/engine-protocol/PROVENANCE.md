@@ -20,7 +20,7 @@ repositories, and `GitHostInfo`. Files on disk keep their keys; the types that
 are stored and also travel cross the contract wrapped in `Wire`, which renames
 their keys. There are no aliases. This copy is byte-identical to the engine's.
 SHA-256:
-`d4541d178c64a065c1a4a0c693817eb84ad17052fd605815295fa1696955ef8f`.
+`f33064bff6afb3708517c13a90f327af5333cbd82b15a589a2373c80d79e6d51`.
 
 seldon-host `4e21caf` (#66) added the Danil account (321 commands, 28 events):
 `danil_connect_start`, `danil_connect_status`, `danil_connect_options`,
@@ -226,3 +226,5 @@ seldon-host `fix/zotero-busqueda-y-bib-vinculado` (`83d6d51`, on dev `15d08e7`) 
 seldon-host `feat/account-spaces` shares spaces through the Danil account (377 commands, 32 events, on dev with the Zotero `.bib` links): new `share_space` (`{id}`) → `Space`, which publishes an existing space to the workspace's account so every machine keeps it with the same id; `Space` gains `account` (shared). Spaces created in a workspace linked to its account are shared from birth; spaces that existed before stay on their machine. This copy is that branch's `commands.json` byte for byte; no `seldon-runtime` with it is published yet.
 
 seldon-host `feat/deferred-actions` (`0c867e2`, on dev with `feat/account-spaces`) marks the five light task actions the Danil Computers relay may queue while the machine is off with `deferrable: true`: `set_task_archived`, `delete_session`, `rename_session`, `set_session_pinned` and `move_task_to_space` (377 commands, 32 events; no signature changes). They must match `DEFERRED_COMMANDS` in `packages/computers` and in the danil-labs/computers relay.
+
+seldon-host dev `e567260` merges the Danil account's credentials (#145) and GitHub in the account (#144), on top of the chat visuals by parts (391 commands, 32 events). Credentials, all with `scope: "workspace"` on the request's workspace: `account_credentials_list` → `{credentials, recipients, local_only: [{slot, kind, provider, label, hint, upload_error?}]}`, `account_credentials_upload` (`{slots}`) → `{uploaded, failed: [{slot, error}]}`, `account_credential_delete` (`{credential}`), and `account_credential_remove_machine` / `account_credential_restore_machine` (`{credential, computer}`) → the credential; `sync_account_credentials` and `reseal_account_credential` are for the connector. GitHub: `github_account_status`, `github_account_authorize`, `github_account_installations`, `github_account_set_areas`, `github_account_disconnect` and `github_account_changed`. Errors are `credentials.error.<code>`. This copy is `git show e567260:crates/engine-protocol/commands.json` byte for byte; no `seldon-runtime` with it is published yet.

@@ -15,6 +15,7 @@ export type TaskLocationProps = {
   /** El `machine` de la fila; sin él, la máquina de la ventana. */
   machine?: string;
   on: boolean;
+  actions?: JSX.Element;
   project?: string;
   /** La carpeta de trabajo de la tarea (su worktree). */
   path?: string;
@@ -69,7 +70,7 @@ export default function TaskLocation(props: TaskLocationProps) {
       data-task-location=""
       data-task-location-on={props.on ? "true" : "false"}
       aria-label={t("chat.location.label")}
-      class="relative z-10 flex min-w-0 shrink-0 items-center gap-px px-3.5 pt-2 text-xs text-neutral-500"
+      class="relative z-10 flex min-w-0 shrink-0 items-center gap-px px-3.5 pt-1 text-xs text-neutral-500"
     >
       <Pista
         class={cn("max-w-[40%] shrink", !props.on && "opacity-65")}
@@ -125,6 +126,7 @@ export default function TaskLocation(props: TaskLocationProps) {
           </Pista>
         )}
       </Show>
+      {props.actions}
     </nav>
   );
 }

@@ -37,6 +37,7 @@ import { type Theme, useTheme } from "../../../../../ui/theme";
 import { Icon, type IconName } from "../../../../../ui/Icon";
 import { openTask } from "../../../../../ui/components";
 import { KeyboardScreen } from "../../../../../ui/KeyboardScreen";
+import { TaskHeader } from "../../../../../ui/TaskHeader";
 import { BrandMark } from "../../../../../ui/BrandMark";
 import { Avatar } from "../../../../../ui/components";
 
@@ -76,7 +77,7 @@ export default function TaskScreen() {
   const { getToken } = useAccount();
   const accountBackground = registry?.find((w) => w.id === workspace)?.background_url ?? null;
   const host = hostOf(params.host);
-  const { snapshot, list: workspaces } = useWorkspaces();
+  const { snapshot, list: workspaces, reload } = useWorkspaces();
   const [view, setView] = useState<TaskView | null>(null);
   const [live, setLive] = useState<readonly LivePiece[]>([]);
   const [note, setNote] = useState<string | null>(null);
@@ -257,7 +258,7 @@ export default function TaskScreen() {
 
   const decide = (permission: Permission, allow: boolean) => host && void act(() => respondPermission(host, workspace, id, permission.request_id, allow));
   const answer = (pending: PendingQuestion, chosen: Record<string, string[]>, free: Record<string, string>) =>
-    host && void act(() => answerQuestion(host, workspace, id, pending, chosen, free));
+    host && void act(() => answerQuestion(host, workspace, folder, id, pending, chosen, free));
   // Un `!` en marcha se detiene con su comando; si no había, se detiene el turno.
   const stop = () =>
     host &&
@@ -316,20 +317,23 @@ export default function TaskScreen() {
   return (
     <KeyboardScreen>
       <ChatScopeContext.Provider value={scope}>
-      <Stack.Screen
-        options={{
-          title: titleOf(key) ?? title,
-          // Abierta desde un enlace (en el navegador o un aviso) no hay a dónde volver: la flecha lleva a Tareas.
-          headerLeft: router.canGoBack()
-            ? undefined
-            : () => (
-                <Pressable hitSlop={10} onPress={() => router.replace("/")} accessibilityLabel={t("task.back")} style={{ paddingRight: 12 }}>
-                  <Icon name="arrow-left" size={22} color={theme.text} />
-                </Pressable>
-              ),
-        }}
-      />
+      <Stack.Screen options={{ title: titleOf(key) ?? title, headerShown: false }} />
       <ChatBackdrop background={background} theme={theme} />
+      <TaskHeader
+        key={`${params.host}/${workspace}/${id}`}
+        title={titleOf(key) || title || id}
+        hostId={params.host}
+        host={host}
+        hostOf={hostOf}
+        workspace={workspace}
+        folder={folder}
+        id={id}
+        task={[...(snapshot?.tasks ?? []), ...(snapshot?.delegated ?? [])].find((task) => task.host === params.host && task.workspace === workspace && task.id === id)}
+        tasks={[...(snapshot?.tasks ?? []), ...(snapshot?.delegated ?? [])].filter((task) => task.host === params.host && task.workspace === workspace)}
+        running={running || waking}
+        onChanged={() => { void reload(); }}
+        onFinished={() => { void reload(); router.replace("/"); }}
+      />
       {delegated.length ? <Delegated tasks={delegated} theme={theme} /> : null}
       <View style={styles.thread}>
       <FlatList
@@ -382,7 +386,7 @@ export default function TaskScreen() {
             <PermissionCard key={p.request_id} permission={p} theme={theme} disabled={asleep} onDecide={(allow) => decide(p, allow)} />
           ))}
           {questions.map((q) => (
-            <QuestionCard key={q.request_id} pending={q} theme={theme} disabled={asleep} onAnswer={(c, f) => answer(q, c, f)} />
+            <QuestionCard key={q.turn} pending={q} theme={theme} disabled={asleep} onAnswer={(c, f) => answer(q, c, f)} />
           ))}
         </ScrollView>
       ) : null}

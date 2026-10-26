@@ -9,6 +9,7 @@ import { test } from "node:test";
 import { isDeferrable } from "@terminus/computers";
 import { Fleet, type Link, type MachineInfo, classOf } from "@terminus/fleet";
 import "../helpers/catalog.ts";
+import { withoutAbout } from "../../src/lib/taskMentions.ts";
 import { createRouter } from "../../src/features/machines/router.ts";
 
 type Args = Record<string, unknown>;
@@ -181,6 +182,18 @@ test("the account and danil_* always stay on this computer, whatever the header 
   assert.deepEqual(await router.handle("list_accounts", {}), { accounts: [], active: null });
   assert.equal(vm.calls.length, 0);
   assert.deepEqual(native.map((c) => c.command), ["danil_sessions", "list_accounts"]);
+});
+
+test("the account's credentials are the workspace's: here by default, on the machine of the header when it names one", async () => {
+  const listing = { credentials: [], recipients: [], local_only: [] };
+  const vm = fakeLink({ account_credentials_list: { ...listing, from: "vm" }, account_credential_remove_machine: { credential: null } });
+  const { router, native } = setup({ cmp_vm: vm }, { account_credentials_list: listing });
+  await router.handle("list_workspaces");
+  assert.deepEqual(await router.handle("account_credentials_list", {}), listing);
+  assert.deepEqual(await router.handle("account_credentials_list", {}, on("cmp_vm")), { ...listing, from: "vm" });
+  await router.handle("account_credential_remove_machine", { credential: "c1", computer: "cmp_home" }, on("cmp_vm"));
+  assert.deepEqual(native.filter((c) => c.command.startsWith("account_credential")).map((c) => c.command), ["account_credentials_list"]);
+  assert.deepEqual(vm.calls.map((c) => [c.command, c.workspace]), [["account_credentials_list", "w"], ["account_credential_remove_machine", "w"]]);
 });
 
 test("without a pick something new is born on the window's machine; «Ejecutar en» decides only when set", async () => {
@@ -415,4 +428,43 @@ test("when the control plane refuses to start the VM (the 401 of 2026-10-23) the
   await router.handle("list_workspaces");
   await assert.rejects(router.handle("work_key", {}, on("cmp_vm")), (e: { detail: string }) => e.detail === "start_failed");
   assert.deepEqual(vm.delivered, []);
+});
+
+
+test("a VM archive event refreshes its task list inside the read throttle", async () => {
+  const answers: Record<string, unknown> = {
+    list_workspaces: { workspaces: [{ id: "w", name: "W" }], active: "w" },
+    list_live_sessions: [row("remote")],
+  };
+  const { router, changes } = setup({ cmp_vm: fakeLink(answers) });
+  await router.handle("list_workspaces");
+  const args = { project: "p1" };
+  await router.handle("list_live_sessions", args);
+  await sleep(250);
+  assert.ok((await router.handle("list_live_sessions", args) as { id: string }[]).some(r => r.id === "cmp_vm~remote"));
+  changes.length = 0;
+  answers.list_live_sessions = [];
+  router.events("cmp_vm", [{ name: "session", payload: { workspace: "w", project: "p1", session: "cmp_vm~remote" } }]);
+  await router.handle("list_live_sessions", args);
+  await sleep(250);
+  assert.ok(changes.some(c => c.includes("sessions")));
+  assert.deepEqual((await router.handle("list_live_sessions", args) as { id: string }[]).map(r => r.id), ["t1"]);
+});
+
+
+test("local composer mentions omit about with or without the machine router", async () => {
+  const { router, native } = setup({});
+  const mention = { target: { kind: "task", projectId: "p1", sessionId: "t1", about: { title: "Local task" } }, start: 0, end: 2, text: "@x" };
+  const clean = { target: { kind: "task", projectId: "p1", sessionId: "t1" }, start: 0, end: 2, text: "@x" };
+  try {
+    for (const key of ["taskMentions", "task_mentions"]) {
+      const args = { project: "p1", session: "t9", prompt: "@x", [key]: [mention] };
+      assert.deepEqual(withoutAbout(args)?.[key], [clean], "direct native IPC");
+      await router.handle("send_message", args);
+      assert.deepEqual(native.at(-1)?.args[key], [clean], "native IPC with the account router");
+      assert.equal(mention.target.about.title, "Local task", "the draft keeps its display metadata");
+    }
+  } finally {
+    router.close();
+  }
 });

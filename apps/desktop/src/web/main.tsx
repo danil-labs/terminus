@@ -58,6 +58,20 @@ export type TerminusWebConfig = Partial<
 /** How often the page lists the computers again to pick up machines and links changed since it loaded; the desktop's cadence. */
 const RELIST = 10 * 60_000;
 
+/**
+ * A tab opened before a deploy asks for chunks the new build no longer has, and
+ * the Worker answers them with the page (`not_found_handling`): the lazy screen
+ * stays blank. Reload into the new build, once per window of time so a chunk
+ * that is really broken does not loop.
+ */
+const RELOADED_AT = "terminus.web.reloaded-at";
+window.addEventListener("vite:preloadError", (event) => {
+  if (Date.now() - Number(sessionStorage.getItem(RELOADED_AT) ?? 0) < 30_000) return;
+  sessionStorage.setItem(RELOADED_AT, String(Date.now()));
+  event.preventDefault();
+  window.location.reload();
+});
+
 const Picker = lazy(() => import("../features/machines/MachinePicker").then((m) => ({ default: m.MachinePicker })));
 const AccountMachines = lazy(() => import("./AccountMachines"));
 
@@ -202,6 +216,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
     accountProfile: webAccountProfile(base.endpoint, base.getToken, base.onUnauthorized),
     accountAssets: webWorkspaceAssets(base.endpoint, base.getToken, base.onUnauthorized),
     accountMemory: { endpoint: base.endpoint, getToken: token },
+    accountCredentials: { endpoint: base.endpoint, getToken: token },
     machineName: (id) => fleet.name(id),
     taskMachine: (id) => unwrap(id, fleet.remotes())?.machine ?? null,
     windowMachine: () => {

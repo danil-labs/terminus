@@ -1,12 +1,16 @@
 import { folderColor } from "@terminus/design";
-import { previewLabel, taskPreview } from "@terminus/tasks";
+import { canFinishTask, cardPull, previewLabel, taskPreview } from "@terminus/tasks";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState, type ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cardTask, marksOf } from "../lib/cards";
-import { archiveTask, setPinned } from "../lib/engine";
-import { HostError } from "../lib/hosts";
+import { effectiveGit } from "../lib/taskGit";
+import { useTaskGit } from "../lib/useTaskGit";
+import { TaskFinishConfirmation } from "../ui/TaskFinishConfirmation";
+import { Sheet, SheetOption } from "../ui/Sheet";
+import { PullChip } from "../ui/TaskCard";
+import { TaskActions } from "../ui/TaskActions";
 import { lang, t, w } from "../lib/i18n";
 import { useMachines } from "../lib/machines";
 import { useWorkspaces } from "../lib/workspaces";
@@ -18,7 +22,7 @@ import { useTheme } from "../ui/theme";
 /**
  * La vista previa de una tarea al mantener pulsada su tarjeta: la tarjeta
  * flotante del sidebar del escritorio (`TaskHoverCard`) como hoja del sistema.
- * Título, lo último que se dijo, carpeta, agente, proveedor y modelo, la
+ * Título, carpeta, agente, proveedor y modelo, la
  * máquina si hay más de una; y Abrir, Fijar y Archivar con los mismos comandos
  * que la ventana (`set_session_pinned`, `task_blockers` y `set_task_archived`).
  * Abrirla no enciende nada; fijar o archivar encienden la VM si está apagada.
@@ -26,13 +30,16 @@ import { useTheme } from "../ui/theme";
 export default function Preview() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { host: hostId, id } = useLocalSearchParams<{ host: string; id: string }>();
+  const { host: hostId, id, intent } = useLocalSearchParams<{ host: string; id: string; intent?: string }>();
+  const [finishing, setFinishing] = useState(false);
+  const [confirm, setConfirm] = useState(intent === "finish");
+  const [revision, setRevision] = useState(0);
   const { hostOf, attention, hosts } = useMachines();
   const { snapshot, current, reload } = useWorkspaces();
-  const [busy, setBusy] = useState<string | null>(null);
-  const [note, setNote] = useState<string | null>(null);
+
   const task = snapshot?.tasks.find((x) => x.host === hostId && x.id === id);
   const host = hostOf(hostId);
+  const book = useTaskGit(hostOf, task ? [task] : [], revision);
   if (!task || !host) return <View style={{ height: 120 }} />;
 
   const marks = marksOf(attention, current?.members, snapshot?.live ?? new Set());
@@ -42,42 +49,26 @@ export default function Preview() {
   const folderName = snapshot?.folders.find((f) => f.key === task.folderKey)?.name;
   const provider = snapshot?.providers[task.host]?.find((p) => p.id === task.provider);
   const several = hosts.length > 1;
+  const git = effectiveGit(book, task, snapshot?.tasks ?? []);
+  const running = marks.live.has(`${task.host}/${task.id}`) || marks.attention.get(`${task.host}/${task.id}`) === "approving";
+  const ready = host.power() === "on" && host.canAct() === "now" && canFinishTask(task, git, running || finishing);
+  const pull = cardPull({ ...git, shared_with: null });
+  const removed = () => { void reload(); router.back(); };
+  const frame = (content: ReactNode) => Platform.OS === "web" ? <Sheet visible onClose={() => { if (!finishing) router.back(); }}>{content}</Sheet> : content;
+  if (confirm) return frame(<View style={[styles.sheet, { backgroundColor: theme.surface, paddingBottom: insets.bottom + 16 }]}>
+    <Text style={[styles.title, { color: theme.text }]}>{t("task.header.finish_on", { name: host.label })}</Text>
+    <Text style={{ color: theme.text, fontWeight: "600" }}>{preview.title}</Text>
+    {pull ? <PullChip pull={pull} git={git} /> : null}
+    <TaskFinishConfirmation host={host} workspace={task.workspace} folder={task.folder} id={task.id} shared={!!git.shared_with} ready={ready} onBusy={setFinishing} onBlocked={() => setRevision((n) => n + 1)} onFinished={removed} />
+    <SheetOption label={t("task.header.cancel")} disabled={finishing} onPress={() => intent === "finish" ? router.back() : setConfirm(false)} />
+  </View>);
 
-  async function run(what: "pin" | "unpin" | "archive") {
-    if (!host || !task) return;
-    setBusy(what);
-    setNote(host.power() !== "on" && host.canAct() === "wakes" ? w("shell.machines.waking", { name: host.label }) : null);
-    try {
-      if (what === "archive") {
-        const result = await archiveTask(host, task.workspace, task.folder, task.id);
-        if ("blocked" in result) {
-          setNote(t("preview.blocked", { count: result.blocked.reduce((n, b) => n + b.files.length, 0) }));
-          return;
-        }
-      } else await setPinned(host, task.workspace, task.folder, task.id, what === "pin");
-      void reload();
-      router.back();
-    } catch (error) {
-      const name = host.label;
-      if (error instanceof HostError && error.code === "machine_asleep") setNote(w("web.machines.off_action", { name }));
-      else if (error instanceof HostError && error.code === "machine_outdated") setNote(w("web.machines.outdated_action", { name }));
-      else if (error instanceof HostError && (error.code === "start_failed" || error.code === "start_timeout")) setNote(t("machines.start_failed", { name }));
-      else setNote(t("task.error", { detail: error instanceof Error ? error.message : String(error) }));
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  return (
+  return frame(
     <View style={[styles.sheet, { backgroundColor: theme.surface, paddingBottom: insets.bottom + 16 }]} testID="task-preview">
       <View style={styles.head}>
         <Text style={[styles.title, { color: theme.text }]}>{preview.title}</Text>
       </View>
-      {preview.excerpt ? (
-        <Text numberOfLines={4} style={[styles.excerpt, { color: theme.textMuted, borderColor: theme.border }]}>
-          {preview.excerpt}
-        </Text>
-      ) : null}
+      {pull ? <PullChip pull={pull} git={git} /> : null}
       <View style={styles.rows}>
         {preview.folder ? (
           <Field label={previewLabel(lang, "folder")}>
@@ -114,31 +105,11 @@ export default function Preview() {
           </Field>
         ) : null}
       </View>
-      <View style={styles.actions}>
-        {preview.actions.map((action) => (
-          <Pressable
-            key={action}
-            testID={`preview-${action}`}
-            disabled={busy !== null}
-            onPress={() => {
-              if (action === "open") {
-                router.back();
-                openTask(task.host, task.workspace, task.folder, task.id);
-              } else void run(action);
-            }}
-            style={({ pressed }) => [
-              styles.button,
-              { borderColor: theme.border, backgroundColor: pressed ? theme.muted : "transparent", opacity: busy && busy !== action ? 0.5 : 1 },
-              action === "open" ? { backgroundColor: theme.primary, borderColor: theme.primary } : null,
-            ]}
-          >
-            {action === "pin" || action === "unpin" ? <Icon name={action === "pin" ? "pin" : "pin-off"} size={14} color={theme.text} /> : null}
-            {action === "archive" ? <Icon name="archive" size={14} color={theme.text} /> : null}
-            <Text style={{ color: action === "open" ? theme.onPrimary : theme.text, fontWeight: "600" }}>{busy === action ? "…" : previewLabel(lang, action)}</Text>
-          </Pressable>
-        ))}
-      </View>
-      {note ? <Text style={[styles.note, { color: theme.textMuted }]}>{note}</Text> : null}
+      <Pressable accessibilityRole="button" disabled={finishing} onPress={() => { router.back(); openTask(task.host, task.workspace, task.folder, task.id); }} style={[styles.button, { backgroundColor: theme.primary, borderColor: theme.primary }]}>
+        <Text style={{ color: theme.onPrimary, fontWeight: "600" }}>{previewLabel(lang, "open")}</Text>
+      </Pressable>
+      <SheetOption testID="preview-finish" icon="rocket" label={t("task.header.finish")} disabled={!ready} onPress={() => setConfirm(true)} />
+      <TaskActions host={host} task={task} running={running} onBusy={setFinishing} onChanged={() => { void reload(); }} onRemoved={() => { void reload(); router.back(); }} />
     </View>
   );
 }
@@ -157,14 +128,11 @@ const styles = StyleSheet.create({
   sheet: { paddingHorizontal: 20, paddingTop: 22, gap: 12 },
   head: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   title: { flex: 1, fontSize: 17, fontWeight: "600", lineHeight: 22 },
-  excerpt: { borderLeftWidth: 2, paddingLeft: 10, fontSize: 14, lineHeight: 20 },
   rows: { gap: 8 },
   field: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 22 },
   label: { width: 84, fontSize: 13 },
   fieldValue: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 },
   square: { width: 9, height: 9, borderRadius: 2 },
   value: { flex: 1, fontSize: 14 },
-  actions: { flexDirection: "row", gap: 8, marginTop: 4 },
-  button: { flex: 1, flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center", borderWidth: 1, borderRadius: 10, paddingVertical: 11 },
-  note: { fontSize: 13 },
+  button: { minHeight: 48, flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center", borderWidth: 1, borderRadius: 10, paddingVertical: 11 },
 });
