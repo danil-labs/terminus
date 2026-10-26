@@ -199,8 +199,8 @@ const roto = normal.fallos.length > 0 || !normal.pintado.trim() || enElEsqueleto
 if (!roto) {
   await sleep(1600);
   const storage = normal.w.document.querySelector('button[aria-label^="Archivos del espacio:"]');
-  if (normal.storageQueries.join(",") !== "false,true" || !storage?.textContent?.includes("1.0 GB")) {
-    console.error("El contador de almacenamiento debe sustituir la caché antigua sin abrir el panel.");
+  if (normal.storageQueries.join(",") !== "false" || !storage) {
+    console.error("El arranque lee el almacenamiento guardado sin barrer el disco.");
     process.exit(1);
   }
   // Y una sola vez. El barrido recorre `node_modules` y `target` de cada tarea:
@@ -209,12 +209,20 @@ if (!roto) {
   normal.emit("harness:turn", 0);
   normal.w.dispatchEvent(new normal.w.Event("focus"));
   await sleep(1800);
-  if (normal.storageQueries.join(",") !== "false,true") {
+  if (normal.storageQueries.join(",") !== "false") {
     console.error(
       `Con el panel cerrado no se vuelve a barrer el disco: ${normal.storageQueries.join(",")}.`,
     );
     process.exit(1);
   }
+  storage.click();
+  await sleep(100);
+  if (normal.storageQueries.join(",") !== "false,true" || !storage.textContent?.includes("1.0 GB")) {
+    console.error("Abrir almacenamiento mide en el momento y actualiza el contador.");
+    process.exit(1);
+  }
+  normal.w.document.dispatchEvent(new normal.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  await sleep(50);
   const placeholder = normal.w.document.querySelector("textarea")?.getAttribute("placeholder");
   if (!placeholder?.startsWith("Pregunta algo")) {
     console.error(
@@ -1804,9 +1812,9 @@ if (!roto) {
   };
   const flat = await mount("listo", "5-flat", groupedResponses, undefined, SIN_AGRUPAR);
   assert.equal(flat.w.document.querySelector("[data-folder-group]"), null, "sin agrupar no hay filas de carpeta");
-  // `p` te necesita: su segunda línea es lo que pide, con el color de la carpeta al final.
-  assert.ok(flat.w.document.querySelector('[data-sesion="p"] [data-session-request]'), "lo que te piden ocupa la segunda línea");
-  assert.ok(flat.w.document.querySelector('[data-sesion="p"] [data-folder-square="folder"]'), "la carpeta va como dato de la fila");
+  // `p` falló (por su delegada) y no pide nada: su segunda línea es la normal.
+  assert.equal(flat.w.document.querySelector('[data-sesion="p"] [data-session-request]'), null, "una fallida no enseña su último mensaje");
+  assert.ok(flat.w.document.querySelector('[data-sesion="p"] [data-folder-chip="folder"]'), "la carpeta va como dato de la fila");
   assert.deepEqual(flat.fallos, []);
   flat.w.close();
   const grouped = await bootPorCarpeta("listo", 5, groupedResponses);

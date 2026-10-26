@@ -113,15 +113,37 @@ export function zonasEncima(): readonly Hueco[] {
   return nativeModals() > 0 ? [TODA] : zonas();
 }
 
+const seCruzan = (a: Hueco, b: Hueco) =>
+  a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+
 /** Si algo abierto en el DOM se cruza con `hueco`. Tocarse por el borde no cuenta. */
 export function hayCapaEncima(hueco: Hueco) {
-  return zonasEncima().some(
-    (z) =>
-      z.x < hueco.x + hueco.width &&
-      hueco.x < z.x + z.width &&
-      z.y < hueco.y + hueco.height &&
-      hueco.y < z.y + z.height,
-  );
+  return zonasEncima().some((z) => seCruzan(z, hueco));
+}
+
+const area = (h: Hueco) => h.width * h.height;
+
+/** Las franjas de `h` a cada lado de `z`: izquierda, derecha, arriba y abajo. */
+function alrededor(h: Hueco, z: Hueco): Hueco[] {
+  const derecha = h.x + h.width;
+  const abajo = h.y + h.height;
+  return [
+    { x: h.x, y: h.y, width: z.x - h.x, height: h.height },
+    { x: z.x + z.width, y: h.y, width: derecha - (z.x + z.width), height: h.height },
+    { x: h.x, y: h.y, width: h.width, height: z.y - h.y },
+    { x: h.x, y: z.y + z.height, width: h.width, height: abajo - (z.y + z.height) },
+  ].filter((f) => f.width >= 1 && f.height >= 1);
+}
+
+/**
+ * El rectángulo más grande de `hueco` que no tapa nada abierto, o `null` si deja menos de la mitad.
+ * Un globo que asoma por un borde encoge la capa en vez de esconderla.
+ */
+export function huecoLibre(hueco: Hueco): Hueco | null {
+  let libres = [hueco];
+  for (const z of zonasEncima()) libres = libres.flatMap((h) => (seCruzan(h, z) ? alrededor(h, z) : [h]));
+  const mayor = libres.reduce<Hueco | null>((m, h) => (!m || area(h) > area(m) ? h : m), null);
+  return mayor && area(mayor) * 2 >= area(hueco) ? mayor : null;
 }
 
 let observando: MutationObserver | null = null;

@@ -21,10 +21,7 @@ const PROVENANCE = fileURLToPath(new URL("../../src-tauri/crates/engine-protocol
 const LOCK = fileURLToPath(new URL("../../seldon-runtime.lock", import.meta.url));
 
 /** El contrato copiado cuyo motor aún no tiene release publicada, y qué falta. */
-const MOTOR_PENDIENTE = {
-  contract: "d4541d178c64a065c1a4a0c693817eb84ad17052fd605815295fa1696955ef8f",
-  why: "el aislamiento del relay y la memoria sincronizada (seldon-host integration/plan-multi-machine: #106, #110, #108), llevar y traer trabajo entre máquinas (work_*, seldon-host #84–#87), una sesión de Danil por cuenta (feat/danil-session-per-account), el onboarding (#91), Google Drive (#92), Google Drive para escritorio (#95), el modelo local activo (#98), «Usar el GitHub de esta computadora» (#100), la tarea vacía de la vista previa (create_empty_session, seldon-host feat/tarea-vacia), las carpetas nuevas en Documentos (#118), las carpetas plegadas del árbol (tree_folder, #119), Terminus como único cliente de MCP (#120), Referencias solo con Zotero (seldon-host #121, #122 y fix/referencias-solo-zotero), los .bib vinculados a Zotero (seldon-host fix/zotero-busqueda-y-bib-vinculado), los spaces de la cuenta (share_space, seldon-host #129) y las acciones aplazadas (deferrable, seldon-host feat/deferred-actions): falta publicar seldon-runtime con ellos y fijarlo en seldon-runtime.lock",
-};
+const MOTOR_PENDIENTE = null;
 
 const vendored = createHash("sha256").update(readFileSync(CONTRACT)).digest("hex");
 const declared = /SHA-256:\s*`([0-9a-f]{64})`/.exec(readFileSync(PROVENANCE, "utf8"))?.[1];

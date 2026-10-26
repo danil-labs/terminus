@@ -599,3 +599,31 @@ test("the git of the tasks of a folder: each machine gets only its own priority 
   assert.deepEqual(link("cmp_mac").calls[0].args.priority, ["t1"]);
   assert.deepEqual(fleet.merge("list_session_git", slices), { "cmp_vm~t1": { branch: "vm" }, "cmp_mac~t1": { branch: "mac" } });
 });
+
+test("a task of another machine can be mentioned: listed with its panel id and sent where it does not live as elsewhere", async () => {
+  const candidate = (id: string, title: string) => ({ target: { kind: "task", projectId: "p1", sessionId: id }, title, projectName: "Terminus", alias: "", branch: "feat/x", available: true, archived: false, updatedAt: 1 });
+  const { fleet, link } = setup({ cmp_vm: { answers: { list_task_mentions: [candidate("t1", "En la VM")] } } }, [VM]);
+  const vm = await fleet.read({ machine: "cmp_vm", workspace: "w", command: "list_task_mentions", args: {} });
+  const merged = fleet.merge("list_task_mentions", [local([candidate("t1", "Aquí")]), vm], "w") as { target: { sessionId: string }; machine?: string }[];
+  assert.deepEqual(merged.map((c) => [c.target.sessionId, c.machine ?? null]), [["t1", null], ["cmp_vm~t1", "cmp_vm"]]);
+
+  const about = { machine_name: "vm-principal", title: "En la VM", branch: "feat/x" };
+  const vmTask = { target: { kind: "task", projectId: "p1", sessionId: "cmp_vm~t1", about }, start: 0, end: 2, text: "@x" };
+  const homeTask = { target: { kind: "task", projectId: "p1", sessionId: "t2", about: { machine_name: "Mac", title: "Aquí" } }, start: 3, end: 5, text: "@y" };
+  const here = fleet.argsFor("cmp_home", { prompt: "@x @y", task_mentions: [vmTask, homeTask] }).task_mentions as Record<string, unknown>[];
+  assert.deepEqual(here[0], { target: { kind: "task", projectId: "p1", sessionId: "t1" }, start: 0, end: 2, text: "@x", elsewhere: { machine: "cmp_vm", ...about } });
+  assert.deepEqual(here[1], { target: { kind: "task", projectId: "p1", sessionId: "t2" }, start: 3, end: 5, text: "@y" }, "its own task goes bare, without what the window saw");
+
+  await fleet.call({ machine: "cmp_vm", workspace: "w", command: "inject_message", args: { project: "p1", session: "cmp_vm~t9", prompt: "@x @y", task_mentions: [vmTask, homeTask] } });
+  const sent = link("cmp_vm").calls.at(-1)?.args.task_mentions as Record<string, unknown>[];
+  assert.deepEqual(sent[0], { target: { kind: "task", projectId: "p1", sessionId: "t1" }, start: 0, end: 2, text: "@x" });
+  assert.deepEqual(sent[1].elsewhere, { machine: "cmp_home", machine_name: "Mac", title: "Aquí" });
+
+  const stored = { turns: [{ task_mentions: [{ target: { kind: "task", projectId: "p1", sessionId: "t1" } }, { target: { kind: "task", projectId: "p1", sessionId: "t2" }, elsewhere: { machine: "cmp_home" } }] }] };
+  const read = fleet.encode("cmp_vm", stored, "load_session") as typeof stored;
+  assert.deepEqual(read.turns[0].task_mentions.map((m) => m.target.sessionId), ["cmp_vm~t1", "t2"], "a mention saved there opens the task where it lives");
+  assert.deepEqual(fleet.argsFor("cmp_home", { task_mentions: read.turns[0].task_mentions }).task_mentions, [
+    { target: { kind: "task", projectId: "p1", sessionId: "t1" }, elsewhere: { machine: "cmp_vm" } },
+    { target: { kind: "task", projectId: "p1", sessionId: "t2" } },
+  ], "sent again from the queue, each one still says where it lives");
+});
