@@ -529,7 +529,10 @@ test("el composer web sigue las credenciales de la máquina elegida y de la tare
   doc.querySelector('[data-sesion="cmp_vm~t1"]').click();
   assert.ok(await until(() => calls("cmp_vm", "list_surfaces").length > before), "la tarea abierta usa la máquina del borrador");
   assert.ok(await until(() => !doc.querySelector('[aria-label*="Sonnet del Mac"]')), "la tarea de la VM conserva el modelo del Mac");
+  assert.ok(await until(() => doc.querySelector("[data-task-git-actions]")));
+  await sleep(100);
   assert.deepEqual(app.fallos, []);
+  app.w.close();
 });
 
 test("a web chat keeps Finish visible while Git is unknown and enables it for a merged current HEAD", async () => {
