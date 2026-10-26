@@ -2,30 +2,11 @@ import { Channel } from "@tauri-apps/api/core";
 import { invoke } from "../../lib/invoke.ts";
 import { type Accessor, createSignal } from "solid-js";
 
-export type CheckState = "unknown" | "none" | "pending" | "success" | "failure";
-export type ReviewState = "unknown" | "unreviewed" | "approved" | "changes_requested";
-export type KnState = "clean" | "draft" | "saved";
-
-export type GitStatus = {
-  kind: "none" | "unknown" | "branch" | "detached" | "kn";
-  kn: KnState | null;
-  branch: string | null;
-  alias: string | null;
-  head: string | null;
-  repository: string;
-  shared_with: string | null;
-  pull: { git_host?: string; number: number; state: "open" | "draft" | "merged" | "closed"; head_sha: string; checks?: CheckState; review?: ReviewState } | null;
-  pull_known: boolean;
-  checked_at: number | null;
-  stale: boolean;
-  has_remote: boolean;
-  merged_locally: boolean;
-};
-
-export const UNKNOWN_GIT: GitStatus = {
-  kind: "unknown", kn: null, branch: null, alias: null, head: null, repository: "", shared_with: null, pull: null,
-  pull_known: false, checked_at: null, stale: false, has_remote: false, merged_locally: false,
-};
+import { type TaskGitStatus, readTaskGit, UNKNOWN_TASK_GIT } from "@terminus/tasks";
+export type { CheckState, KnState, ReviewState } from "@terminus/tasks";
+export { canFinishTask } from "@terminus/tasks";
+export type GitStatus = TaskGitStatus;
+export const UNKNOWN_GIT: GitStatus = UNKNOWN_TASK_GIT;
 
 export function retainGitObservation(previous: Record<string, GitStatus>, incoming: Record<string, GitStatus>) {
   return Object.fromEntries(Object.entries(incoming).map(([id, row]) => {
@@ -137,7 +118,7 @@ export function watchSessionGit(project: string) {
         run: async () => {
           try {
             if (!current(started) || document.hidden) return;
-            const result = await withDeadline(invoke<Record<string, GitStatus>>("list_session_git", { project, remote: true, priority: priority(), progress: new Channel<Record<string, GitStatus>>() }));
+            const result = await readTaskGit(remote => withDeadline(invoke<Record<string, GitStatus>>("list_session_git", { project, remote, priority: priority(), progress: new Channel<Record<string, GitStatus>>() })), { phase: "remote" });
             if (current(started)) setRows(previous => {
               const merged = mergeRemoteGit(previous, result);
               const next = localFailed || Date.now() - lastLocal >= 30_000 ? staleGit(merged) : merged;
@@ -169,7 +150,7 @@ export function watchSessionGit(project: string) {
           if (!current(started) || !localBusy || sequence !== localSequence) return;
           setRows(previous => conservarFilas(previous, { ...previous, ...retainGitObservation(previous, partial) }));
         });
-        const local = await withDeadline(invoke<Record<string, GitStatus>>("list_session_git", { project, remote: false, priority: priority(), progress }));
+        const local = await readTaskGit(remote => withDeadline(invoke<Record<string, GitStatus>>("list_session_git", { project, remote, priority: priority(), progress })), { phase: "local" });
         if (!current(started)) return;
         lastLocal = Date.now();
         localFailed = false;
@@ -251,20 +232,6 @@ export function gitReviewSignals(status?: GitStatus) {
   if (!pull || !status.pull_known || !status.head || status.head !== pull.head_sha
     || (pull.state !== "open" && pull.state !== "draft")) return null;
   return { checks: pull.checks ?? "unknown", review: pull.review ?? "unknown" };
-}
-
-export function canFinishTask(
-  session: { archived?: boolean | null; subagent?: string | null },
-  status: GitStatus,
-  busy: boolean,
-) {
-  if (session.archived || busy || status.stale) return false;
-  if (status.kind === "kn") return status.kn === "saved";
-  if (status.kind !== "branch" || !status.head) return false;
-  // La misma regla que `ready_to_finish` en Rust: si hay PR manda el PR; si
-  // no lo hay, o no hay remoto que lo tenga, la integración en la base local.
-  if (status.pull) return status.pull_known && status.pull.state === "merged" && status.pull.head_sha === status.head;
-  return status.merged_locally && (status.pull_known || !status.has_remote);
 }
 
 type TaskGitSession = { id: string; parent?: string | null; subagent?: string | null };

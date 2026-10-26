@@ -1,15 +1,16 @@
 import { folderColor } from "@terminus/design";
-import { previewLabel, taskPreview } from "@terminus/tasks";
+import { canFinishTask, previewLabel, taskPreview, type PreviewAction } from "@terminus/tasks";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cardTask, marksOf } from "../lib/cards";
-import { archiveTask, setPinned } from "../lib/engine";
+import { archiveTask, finishTask, setPinned, taskKey } from "../lib/engine";
 import { HostError } from "../lib/hosts";
 import { lang, t, w } from "../lib/i18n";
 import { useMachines } from "../lib/machines";
 import { useWorkspaces } from "../lib/workspaces";
+import { useTaskGit } from "../lib/useTaskGit";
 import { BrandMark } from "../ui/BrandMark";
 import { Avatar, openTask } from "../ui/components";
 import { Icon } from "../ui/Icon";
@@ -21,6 +22,7 @@ import { useTheme } from "../ui/theme";
  * Título, carpeta, agente, proveedor y modelo, la
  * máquina si hay más de una; y Abrir, Fijar y Archivar con los mismos comandos
  * que la ventana (`set_session_pinned`, `task_blockers` y `set_task_archived`).
+ * Finalizar usa el estado Git compartido y el cierre validado por el motor.
  * Abrirla no enciende nada; fijar o archivar encienden la VM si está apagada.
  */
 export default function Preview() {
@@ -33,6 +35,7 @@ export default function Preview() {
   const [note, setNote] = useState<string | null>(null);
   const task = snapshot?.tasks.find((x) => x.host === hostId && x.id === id);
   const host = hostOf(hostId);
+  const git = useTaskGit(hostOf, task ? [task] : []);
   if (!task || !host) return <View style={{ height: 120 }} />;
 
   const marks = marksOf(attention, current?.members, snapshot?.live ?? new Set());
@@ -42,13 +45,21 @@ export default function Preview() {
   const folderName = snapshot?.folders.find((f) => f.key === task.folderKey)?.name;
   const provider = snapshot?.providers[task.host]?.find((p) => p.id === task.provider);
   const several = hosts.length > 1;
+  const finish = !preview.pinned && canFinishTask(task, git[taskKey(task)], marks.live.has(taskKey(task)) || marks.attention.get(taskKey(task)) === "approving");
+  const actions: (PreviewAction | "finish")[] = [...preview.actions, ...(finish ? ["finish" as const] : [])];
 
-  async function run(what: "pin" | "unpin" | "archive") {
+  async function run(what: "pin" | "unpin" | "archive" | "finish") {
     if (!host || !task) return;
     setBusy(what);
     setNote(host.power() !== "on" && host.canAct() === "wakes" ? w("shell.machines.waking", { name: host.label }) : null);
     try {
-      if (what === "archive") {
+      if (what === "finish") {
+        const result = await finishTask(host, task.workspace, task.folder, task.id);
+        if ("blocked" in result) {
+          setNote(result.blocked.not_finished ? w("projects.sessions.blockers_not_finished") : t("preview.blocked", { count: result.blocked.unsaved.reduce((n, b) => n + b.files.length, 0) }));
+          return;
+        }
+      } else if (what === "archive") {
         const result = await archiveTask(host, task.workspace, task.folder, task.id);
         if ("blocked" in result) {
           setNote(t("preview.blocked", { count: result.blocked.reduce((n, b) => n + b.files.length, 0) }));
@@ -110,10 +121,11 @@ export default function Preview() {
         ) : null}
       </View>
       <View style={styles.actions}>
-        {preview.actions.map((action) => (
+        {actions.map((action) => (
           <Pressable
             key={action}
             testID={`preview-${action}`}
+            accessibilityHint={action === "finish" ? w("projects.sessions.finish_description") : undefined}
             disabled={busy !== null}
             onPress={() => {
               if (action === "open") {
@@ -123,13 +135,14 @@ export default function Preview() {
             }}
             style={({ pressed }) => [
               styles.button,
+              finish ? { flexBasis: "40%" } : null,
               { borderColor: theme.border, backgroundColor: pressed ? theme.muted : "transparent", opacity: busy && busy !== action ? 0.5 : 1 },
               action === "open" ? { backgroundColor: theme.primary, borderColor: theme.primary } : null,
             ]}
           >
             {action === "pin" || action === "unpin" ? <Icon name={action === "pin" ? "pin" : "pin-off"} size={14} color={theme.text} /> : null}
             {action === "archive" ? <Icon name="archive" size={14} color={theme.text} /> : null}
-            <Text style={{ color: action === "open" ? theme.onPrimary : theme.text, fontWeight: "600" }}>{busy === action ? "…" : previewLabel(lang, action)}</Text>
+            <Text style={{ color: action === "open" ? theme.onPrimary : theme.text, fontWeight: "600" }}>{busy === action ? "…" : action === "finish" ? w("projects.sessions.finish") : previewLabel(lang, action)}</Text>
           </Pressable>
         ))}
       </View>
@@ -158,7 +171,7 @@ const styles = StyleSheet.create({
   fieldValue: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 },
   square: { width: 9, height: 9, borderRadius: 2 },
   value: { flex: 1, fontSize: 14 },
-  actions: { flexDirection: "row", gap: 8, marginTop: 4 },
-  button: { flex: 1, flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center", borderWidth: 1, borderRadius: 10, paddingVertical: 11 },
+  actions: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
+  button: { flex: 1, minHeight: 44, flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center", borderWidth: 1, borderRadius: 10, paddingVertical: 11 },
   note: { fontSize: 13 },
 });

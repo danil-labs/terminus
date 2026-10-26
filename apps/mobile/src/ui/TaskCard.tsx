@@ -1,5 +1,5 @@
 import { folderColor } from "@terminus/design";
-import { type CardPull, type SidebarDensity, type TaskCard as Card, type PullTone, cardPull, type TaskGit, taskTitle } from "@terminus/tasks";
+import { type CardPull, type SidebarDensity, type TaskCard as Card, type PullTone, cardPull, canFinishTask, type TaskGitStatus, taskTitle } from "@terminus/tasks";
 import * as Haptics from "expo-haptics";
 import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -59,11 +59,12 @@ export function PullChip({ pull }: { pull: CardPull }) {
 type TaskCardProps = {
   task: Task;
   card: Card;
-  git?: TaskGit | null;
+  git?: TaskGitStatus | null;
   folderName: (id: string) => string | undefined;
   density: SidebarDensity;
   onPress: () => void;
   onLongPress?: () => void;
+  onFinish?: () => void;
 };
 
 /**
@@ -77,6 +78,7 @@ const sameProps = (a: TaskCardProps, b: TaskCardProps) =>
   a.density === b.density &&
   a.git === b.git &&
   !a.onLongPress === !b.onLongPress &&
+  !a.onFinish === !b.onFinish &&
   sameCard(a.card, b.card) &&
   (a.card.folder ? a.folderName(a.card.folder) : null) === (b.card.folder ? b.folderName(b.card.folder) : null);
 
@@ -99,12 +101,15 @@ function TaskCardView({
   density,
   onPress,
   onLongPress,
+  onFinish,
 }: TaskCardProps) {
   const theme = useTheme();
   const compact = density === "compact";
   const folder = card.folder ? { id: card.folder, name: folderName(card.folder) } : null;
   const pull = cardPull(git);
   const chips = secondLine(card, pull, compact);
+  const finish = !card.pinned && canFinishTask(task, git, card.activity.viva || card.activity.aprobando);
+  const branch = !git?.shared_with ? git?.branch : null;
   return (
     <Pressable
       testID={`task-${task.host}-${task.id}`}
@@ -137,6 +142,19 @@ function TaskCardView({
           </View>
         ) : null}
         {compact && folder ? <FolderSquare id={folder.id} /> : null}
+        {compact && pull ? <PullChip pull={pull} /> : compact && branch ? <Icon name="git-branch" size={12} color={theme.textMuted} /> : null}
+        {finish && onFinish ? (
+          <Pressable
+            testID="task-finish"
+            accessibilityRole="button"
+            accessibilityLabel={w("projects.sessions.finish")}
+            accessibilityHint={w("projects.sessions.finish_description")}
+            hitSlop={8}
+            onPress={event => { event.stopPropagation(); onFinish(); }}
+          >
+            <Text style={[styles.meta, { color: theme.primary }]}>{w("projects.sessions.finish")}</Text>
+          </Pressable>
+        ) : null}
       </View>
       {compact ? null : (
         <View style={[styles.line, styles.second]}>
@@ -165,6 +183,12 @@ function TaskCardView({
                 return pull ? <PullChip key={chip} pull={pull} /> : null;
             }
           })}
+          {!pull && branch ? (
+            <View style={styles.chip} accessibilityLabel={branch}>
+              <Icon name="git-branch" size={11} color={theme.textMuted} />
+              <Text numberOfLines={1} style={[styles.meta, { color: theme.textMuted, maxWidth: 160 }]}>{branch}</Text>
+            </View>
+          ) : null}
         </View>
       )}
     </Pressable>

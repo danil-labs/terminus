@@ -575,6 +575,15 @@ export async function archiveTask(host: Host, workspace: string, folder: string,
   return { archived: true };
 }
 
+export async function finishTask(host: Host, workspace: string, folder: string, id: string): Promise<{ finished: true } | { blocked: TaskBlockers }> {
+  if (host.power() !== "on") await host.wake();
+  const { value } = await host.call<TaskBlockers | null>("task_blockers", workspace, { project: folder, id, finish: true });
+  if (!value || !Array.isArray(value.unsaved)) throw new HostError("bad_reply", "task_blockers");
+  if (value.unsaved.length || value.not_finished) return { blocked: value };
+  await host.call("finish_task", workspace, { project: folder, id });
+  return { finished: true };
+}
+
 // --- El cuadro de escribir -----------------------------------------------------
 
 /** Los proveedores con los que se puede empezar algo en esa máquina. */

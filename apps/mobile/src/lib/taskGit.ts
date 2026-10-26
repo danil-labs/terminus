@@ -8,7 +8,7 @@
  * pudo releer (la máquina no contesta, o está apagada) se conserva con
  * `stale`: la tarjeta lo enseña en gris, sin afirmar ni el rojo del CI.
  */
-import type { TaskGit } from "@terminus/tasks";
+import type { TaskGitStatus } from "@terminus/tasks";
 
 export type GitAsk = { host: string; workspace: string; project: string; priority: string[] };
 
@@ -28,9 +28,9 @@ export function gitAsks(visible: readonly { host: string; workspace: string; fol
 export const gitAsksKey = (asks: readonly GitAsk[]) =>
   asks.map((a) => `${a.host}/${a.workspace}/${a.project}:${a.priority.join(",")}`).sort().join("|");
 
-export type GitBook = Readonly<Record<string, TaskGit>>;
+export type GitBook = Readonly<Record<string, TaskGitStatus>>;
 
-const isRow = (v: unknown): v is TaskGit => !!v && typeof v === "object" && "pull_known" in v;
+const isRow = (v: unknown): v is TaskGitStatus => !!v && typeof v === "object" && "pull_known" in v;
 
 /**
  * La respuesta de una carpeta en el libro. Una fila que el motor no pudo leer
@@ -38,7 +38,7 @@ const isRow = (v: unknown): v is TaskGit => !!v && typeof v === "object" && "pul
  */
 export function withGitAnswer(book: GitBook, host: string, answer: unknown): GitBook {
   if (!answer || typeof answer !== "object") return book;
-  let next: Record<string, TaskGit> | null = null;
+  let next: Record<string, TaskGitStatus> | null = null;
   for (const [id, row] of Object.entries(answer as Record<string, unknown>)) {
     if (!isRow(row)) continue;
     const key = `${host}/${id}`;
@@ -53,7 +53,7 @@ export function withGitAnswer(book: GitBook, host: string, answer: unknown): Git
 
 /** Lo que ya se sabía de esas tareas, ahora viejo: no se pudo releer. */
 export function staleGit(book: GitBook, host: string, ids: readonly string[]): GitBook {
-  let next: Record<string, TaskGit> | null = null;
+  let next: Record<string, TaskGitStatus> | null = null;
   for (const id of ids) {
     const key = `${host}/${id}`;
     const before = book[key];

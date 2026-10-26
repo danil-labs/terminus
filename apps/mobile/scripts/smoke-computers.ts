@@ -19,12 +19,15 @@ import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { groupAccounts, groupWorkspaces, listComputers, listWorkspaces, orderComputers, startComputer, windowLabel } from "@terminus/computers";
+import { readTaskGit, canFinishTask, type TaskGitStatus } from "@terminus/tasks";
 import type { AiAccount, EngineEvent, LoginEvent } from "@terminus/protocol";
 import {
   type Notice,
   accountsOf,
   addAccount,
   archiveTask,
+  finishTask,
+  stopTask,
   baseBranchesOf,
   beginLogin,
   cancelClone,
@@ -316,6 +319,16 @@ const ok = (step: string) => {
     await cancelClone(vm, "w-vm", "00000000-0000-4000-8000-000000000003");
     await assert.rejects(slow, (e: HostError) => (e.detail as { what?: { clave?: string } })?.what?.clave === "projects.error.clone_cancelled");
     ok("«Nueva carpeta» (create_project) y «Clonar repo» (start_project_clone + project_clone): avance, carpeta listada, URL rechazada y cancelar");
+
+    await stopTask(mac, "w-prod", "p-mac-api", "t-mac-1");
+    const { value: beforeGit } = await mac.call("list_session_git", "w-prod", { project: "p-mac-api", remote: true });
+    assert.deepEqual(beforeGit, {}, "el motor no descubre tareas solo con el refresco remoto");
+    const git = await readTaskGit(async remote => (await mac.call<Record<string, TaskGitStatus>>("list_session_git", "w-prod", { project: "p-mac-api", remote, priority: ["t-mac-1"] })).value);
+    assert.equal(canFinishTask({}, git["t-mac-1"], false), true);
+    assert.deepEqual(await finishTask(mac, "w-prod", "p-mac-api", "t-mac-1"), { finished: true });
+    assert.equal((await live(mac, "w-prod")).some(t => t.id === "t-mac-1"), false);
+    assert.ok("blocked" in await finishTask(mac, "w-prod", "p-mac-web", "t-mac-2"));
+    ok("Git y Finalizar: lectura local y PR por el mismo motor; el cierre valida bloqueos y retira la tarea");
 
     close();
   } finally {
