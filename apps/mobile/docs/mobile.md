@@ -32,7 +32,12 @@ como la web.
   luego el proveedor (`aws-ec2`, o ninguno en filas viejas). Un motor que no
   habla el contrato (`outdated`) no recibe acciones. Con la VM apagada las
   lecturas vienen de la copia del relay (`cached: {updated_at}`) y la app dice
-  de qué hora es; sin copia, `machine_off` es una lista vacía.
+  de qué hora es; sin copia, `machine_off` es una lista vacía. Una VM que se
+  apaga mientras la app la ve se vuelve a leer una vez de esa copia, que trae
+  lo último que guardó al apagarse. El chat abierto se relee al volver a la
+  app o a la pantalla, cuando su máquina cambia (encendida, apagada, el enlace
+  que se reabre) y tras `segment_saved`; las lecturas se juntan y no borran lo
+  que se escribe en vivo.
 - **Lista cerrada de comandos en los dos caminos** (`APP_COMMANDS` en
   `packages/protocol`): son funciones de ventana con el contrato renombrado.
   El relay de Danil Computers solo bloquea las funciones de escritorio, así que
@@ -200,7 +205,7 @@ lleva su comentario allí:
 | Cuadro de escribir | `list_models`, `list_permission_modes`, `list_slash_menu`, `list_mentions`, `project_base_branches` | `run_shell_command`, `stop_shell_command`, `guardar_imagen_pegada`, `prepare_attachments` |
 | Cuentas de IA | `list_accounts`, `account_status`, `account_limits` | `add_account`, `login_account`, `submit_login_code`, `cancel_login`, `discard_account`, `remove_account` |
 | Fondo del chat | `chat_background` | — |
-| Chat enriquecido | `tree_show` (solo el árbol `terminus-chat-visuals`), `preview_file`, `attachment_preview` | — |
+| Chat enriquecido | `tree_show` (solo el árbol `terminus-chat-visuals`), `chat_visual_part`, `preview_file`, `attachment_preview` | — |
 | Carpetas nuevas | `get_project_directory`, `project_clone_status` | `create_project`, `start_project_clone`, `cancel_project_clone` |
 | PR en la tarjeta | `list_session_git` (por carpeta, con las visibles en `priority`) | — |
 | Llevar trabajo | `work_status`, `work_key` | `work_export`, `work_read_part`, `work_write_part`, `work_import`, `work_cancel` |

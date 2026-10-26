@@ -183,6 +183,14 @@ const es = {
   "memory.disabled": "La memoria de la cuenta no está disponible ahora.",
   "memory.signed_out": "Tu sesión venció. Vuelve a entrar con tu cuenta de Danil.",
   "memory.error": "No se pudo leer o guardar la memoria. Intenta otra vez.",
+  "search.machines": "Buscar máquina",
+  "search.folders": "Buscar carpeta",
+  "search.branches": "Buscar rama",
+  "search.agents": "Buscar agente",
+  "search.models": "Buscar modelo",
+  "search.workspaces": "Buscar workspace o máquina",
+  "search.clear": "Borrar búsqueda",
+  "search.no_match": "Nada coincide con la búsqueda.",
 } as const;
 
 type Key = keyof typeof es;
@@ -369,6 +377,14 @@ const en: Record<Key, string> = {
   "memory.disabled": "The account's memory is not available right now.",
   "memory.signed_out": "Your session expired. Sign in again with your Danil account.",
   "memory.error": "Could not read or save the memory. Try again.",
+  "search.machines": "Search machines",
+  "search.folders": "Search folders",
+  "search.branches": "Search branches",
+  "search.agents": "Search agents",
+  "search.models": "Search models",
+  "search.workspaces": "Search workspaces or machines",
+  "search.clear": "Clear search",
+  "search.no_match": "Nothing matches the search.",
 };
 
 /** The language the app speaks, also for the words that come from `@terminus/design`. */

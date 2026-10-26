@@ -176,3 +176,23 @@ test("nobody answering is a named error, never an empty list", async () => {
   await router.handle("list_workspaces");
   await assert.rejects(router.handle("list_live_sessions", { project: "", open: [] }), (e: { detail: string }) => e.detail === "machine_off");
 });
+
+test("web account creation, listing and login carry the selected workspace", async () => {
+  const vm = fakeLink({
+    add_account: { id: "a1" },
+    list_accounts: { accounts: [{ id: "a1" }], active: "a1" },
+    login_account: null,
+  });
+  const { router } = web({ cmp_vm: vm });
+  try {
+    await router.handle("list_workspaces");
+    const created = await router.handle("add_account", { provider: "codex", label: "" }) as { id: string };
+    await router.handle("list_accounts", { provider: "codex" });
+    await router.handle("login_account", { provider: "codex", id: created.id, mode: "tuberia" }, on("cmp_vm"));
+    const calls = vm.calls.filter((c) => /account/.test(c.command));
+    assert.deepEqual(calls.map((c) => [c.command, c.workspace]), [["add_account", "w"], ["list_accounts", "w"], ["login_account", "w"]]);
+    assert.equal(calls[2].args.id, "a1");
+  } finally {
+    router.close();
+  }
+});

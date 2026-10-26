@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 // abajo son identificadores en vez de frases.
 import "../helpers/catalog.ts";
 import {
+  cupoResuelveElFallo as quotaResolves,
   gestoDelFallo as failureAction,
   prosaDelCambioPorCupo as quotaChangeText,
   prosaDelFallo as failureText,
@@ -142,16 +143,32 @@ test("un cupo en espera dice cuándo sigue solo, no cuándo vuelve", () => {
 test("la línea del cupo dice a qué cuenta pasó y por qué", () => {
   const until = new Date(2026, 8, 25, 7, 0).getTime();
   const change = quotaChangeText({ from: "Cuenta 1", to: "Cuenta 2", until: until });
-  assert.match(change, /^Se cambió a Cuenta 2 porque Cuenta 1 se quedó sin cupo hasta las .*7:00/);
+  assert.match(
+    change,
+    /^Se acabó el cupo de Cuenta 1; la tarea siguió con Cuenta 2\. Cuenta 1 vuelve el .*2026.*7:00/,
+  );
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 0, 0);
+  const today = quotaChangeText({ from: "Cuenta 1", to: "Cuenta 2", until: todayEnd.getTime() });
+  assert.match(today, /Cuenta 1 vuelve a las .*11:59|Cuenta 1 vuelve a las .*23:59/);
+  assert.doesNotMatch(today, /\d{4}/, `sobra la fecha: ${today}`);
   assert.equal(
     quotaChangeText({ from: "Cuenta 1", to: "Cuenta 2" }),
-    "Se cambió a Cuenta 2 porque Cuenta 1 se quedó sin cupo.",
+    "Se acabó el cupo de Cuenta 1; la tarea siguió con Cuenta 2.",
   );
   assert.equal(
     quotaChangeText({ from: "Cuenta 1" }),
     "Volvió el cupo de Cuenta 1; la tarea sigue.",
   );
   assert.equal(quotaChangeText({}), "Volvió el cupo; la tarea sigue.");
+});
+
+test("solo el cupo y el saldo agotados quedan resueltos por la línea del cupo", () => {
+  assert.ok(quotaResolves("sin_cupo"));
+  assert.ok(quotaResolves("sin_saldo"));
+  for (const other of ["credencial", "proveedor_caido", "tope_de_gasto", "desconocido", undefined]) {
+    assert.ok(!quotaResolves(other), `«${other}» no lo resuelve otra cuenta`);
+  }
 });
 
 test("las filas de la Bandeja antigua sobreviven a reabrir su historial", () => {

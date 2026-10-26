@@ -78,7 +78,7 @@ const ARBOL_VACIO = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
 /** Lo que ES binario de verdad y tiene que seguir estándolo. */
 const BINARIO_LEGITIMO =
-  /\.(png|jpe?g|gif|webp|svgz|ico|icns|woff2?|ttf|otf|eot|pdf|zip|gz|tar|mp4|mov|mp3|wav|dmg|msi|exe|dll|so|dylib|a|node|wasm)$/i;
+  /\.(png|jpe?g|gif|webp|bmp|svgz|ico|icns|woff2?|ttf|otf|eot|pdf|zip|gz|tar|mp4|mov|mp3|wav|dmg|msi|exe|dll|so|dylib|a|node|wasm)$/i;
 
 function diff(args) {
   return execFileSync("git", ["diff", "--numstat", ...args], OPCIONES);

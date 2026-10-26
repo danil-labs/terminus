@@ -10,8 +10,8 @@
  * intente, permisos y avisos, y la lista cerrada de comandos. Y lo que se
  * agregó para parecerse al escritorio: fijar y archivar desde la vista previa
  * (encendiendo la VM), el cuadro de escribir (modelos, permisos, `/`, `@`,
- * ramas, `!`, imágenes adjuntas y la cola), y las cuentas de IA juntadas por
- * correo con su consumo, el inicio de sesión sin pantalla en otra máquina y
+ * ramas, `!`, imágenes adjuntas y la cola), y las credenciales de IA con su
+ * consumo propio, el inicio de sesión sin pantalla en otra máquina y
  * cerrar la sesión en una.
  */
 import assert from "node:assert/strict";
@@ -194,7 +194,7 @@ const ok = (step: string) => {
     assert.equal(mac.power(), "off");
     ok("una máquina propia apagada: lecturas vacías sin error y la acción no se manda (machine_asleep)");
     await assert.rejects(setPinned(mac, "w-prod", "p-mac-api", "t-mac-1", true), (e: HostError) => e.code === "machine_asleep");
-    await assert.rejects(addAccount(mac, "claude"), (e: HostError) => e.code === "machine_asleep");
+    await assert.rejects(addAccount(mac, "w-prod", "claude"), (e: HostError) => e.code === "machine_asleep");
     assert.equal(mac.power(), "off");
     ok("fijar o iniciar sesión en una máquina propia apagada tampoco se intenta");
 
@@ -268,34 +268,34 @@ const ok = (step: string) => {
     assert.equal(ran.session.turns.at(-1)?.text, "$ ls\nok");
     ok("«Mandar ahora» (inject_message) y `!` sin tarea crea una con el comando (run_shell_command)");
 
-    // Las cuentas: la misma persona en las dos máquinas se ve una vez, con el consumo leído de una.
-    const lists = await Promise.all(hosts.map(async (h) => ({ machine: h.id, on: h.power() === "on", accounts: ((await accountsOf(h, "claude"))?.accounts ?? []) as AiAccount[] })));
+    // El mismo correo no une credenciales: cada una conserva su máquina y consumo.
+    const lists = await Promise.all(hosts.map(async (h) => ({ machine: h.id, on: h.power() === "on", accounts: ((await accountsOf(h, "w-prod", "claude"))?.accounts ?? []) as AiAccount[] })));
     const groups = groupAccounts("claude", lists);
-    assert.equal(groups.length, 1);
-    assert.deepEqual(groups[0].members.map((m) => m.machine), ["cmp_vm", "cmp_mac"]);
-    const limits = await limitsOf(byId(groups[0].usageFrom.machine), "claude", groups[0].usageFrom.id);
+    assert.equal(groups.length, 2);
+    assert.deepEqual(groups.map((g) => g.members.map((m) => m.machine)), [["cmp_vm"], ["cmp_mac"]]);
+    const limits = await limitsOf(byId(groups[0].usageFrom.machine), "w-prod", "claude", groups[0].usageFrom.id);
     assert.equal(limits?.mode, "read");
     assert.match(windowLabel("es", limits?.mode === "read" ? limits.windows[0] : { used_pct: 0, resets_at: null }), /^resta 62% · reset en 3 h$/);
-    ok("cuentas: una tarjeta por proveedor y correo con sus dos máquinas, el consumo una vez («resta 62% · reset en 3 h»)");
+    ok("cuentas: cada credencial conserva su tarjeta y consumo aunque comparta correo («resta 62% · reset en 3 h»)");
 
     const accountEvents = (h: Host, id: string) => (events.get(h.id) ?? []).filter((e) => e.name === "account" && (e.payload as LoginEvent).account === id).map((e) => e.payload as LoginEvent);
-    const codexId = await addAccount(vm, "codex");
-    await beginLogin(vm, "codex", codexId);
+    const codexId = await addAccount(vm, "w-prod", "codex");
+    await beginLogin(vm, "w-prod", "codex", codexId);
     await until("codex termina solo", () => accountEvents(vm, codexId).some((e) => e.kind === "done"));
     assert.deepEqual(accountEvents(vm, codexId).map((e) => e.kind), ["url", "confirm", "done"]);
     assert.equal(accountEvents(vm, codexId).find((e) => e.kind === "confirm")?.text, "WXYZ-1234");
-    assert.equal((await accountsOf(vm, "codex"))?.accounts[0].identity, "ana@example.com");
-    const claudeId = await addAccount(mac, "claude");
-    await beginLogin(mac, "claude", claudeId);
+    assert.equal((await accountsOf(vm, "w-prod", "codex"))?.accounts[0].identity, "ana@example.com");
+    const claudeId = await addAccount(mac, "w-prod", "claude");
+    await beginLogin(mac, "w-prod", "claude", claudeId);
     await until("claude pide el código", () => accountEvents(mac, claudeId).some((e) => e.kind === "code"));
-    await submitLoginCode(mac, claudeId, "good-code");
+    await submitLoginCode(mac, "w-prod", claudeId, "good-code");
     await until("claude termina", () => accountEvents(mac, claudeId).some((e) => e.kind === "done"));
     assert.equal(accountEvents(mac, claudeId).at(-1)?.text, "");
     ok("iniciar sesión en otra máquina sin pantalla: Codex con enlace y código a comparar; Claude con enlace y código pegado");
 
-    await signOutAccount(mac, "claude", "a-mac-1");
-    assert.ok(!(await accountsOf(mac, "claude"))?.accounts.some((a) => a.id === "a-mac-1"));
-    assert.ok((await accountsOf(vm, "claude"))?.accounts.some((a) => a.id === "a-vm-1"), "en la otra máquina sigue");
+    await signOutAccount(mac, "w-prod", "claude", "a-mac-1");
+    assert.ok(!(await accountsOf(mac, "w-prod", "claude"))?.accounts.some((a) => a.id === "a-mac-1"));
+    assert.ok((await accountsOf(vm, "w-prod", "claude"))?.accounts.some((a) => a.id === "a-vm-1"), "en la otra máquina sigue");
     ok("cerrar la sesión en una máquina (remove_account) deja la de las demás");
 
     // Carpetas nuevas en la máquina elegida: vacía y clonada, con su avance por eventos.

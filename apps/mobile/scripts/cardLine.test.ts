@@ -40,6 +40,10 @@ test("si te necesita: lo que pide, el PR y el cuadrado de la carpeta", () => {
   assert.deepEqual(secondLine(card({ esperando: true }), cardPull(git()), false), ["request", "pull", "folder-square"]);
 });
 
+test("si falló, la línea normal: no el último mensaje", () => {
+  assert.deepEqual(secondLine(card({ outcome: "failed" }), null, false), ["provider", "folder", "machine", "agent"]);
+});
+
 test("PR con checks fallidos: número en rojo; con git viejo, gris", () => {
   const failing = cardPull(git({}, "failure"));
   assert.equal(failing?.numberTone, "failure");

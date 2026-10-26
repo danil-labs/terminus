@@ -3,7 +3,7 @@ import { createEffect, createRoot, createSignal, on } from "solid-js";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
 import { createPref } from "../../lib/prefs";
-import { hayCapaEncima, moviendoHueco, zonasEncima, type Hueco } from "../../lib/sites";
+import { huecoLibre, moviendoHueco, zonasEncima, type Hueco } from "../../lib/sites";
 
 /** `environment/typst.rs` · `Diagnostico`. */
 export type DiagnosticoTypst = {
@@ -247,11 +247,11 @@ function colocarAhora(clave: string) {
   if (!capa?.label) return;
   const label = capa.label;
   const visible = [...(ocupantes.get(clave)?.values() ?? [])].find((o) => o.visible && o.hueco.width >= 1);
-  const esconder = !visible || hayCapaEncima(visible.hueco) || moviendoHueco();
-  const destino = esconder ? "escondida" : JSON.stringify(visible.hueco);
+  const libre = visible && !moviendoHueco() ? huecoLibre(visible.hueco) : null;
+  const destino = libre ? JSON.stringify(libre) : "escondida";
   if (destino === capa.ultima) return;
   capa.ultima = destino;
-  const orden = esconder ? () => invoke("site_hide", { label }) : () => invoke("site_place", { label, ...visible.hueco });
+  const orden = libre ? () => invoke("site_place", { label, ...libre }) : () => invoke("site_hide", { label });
   capa.cola = capa.cola.then(orden).catch(() => {});
 }
 

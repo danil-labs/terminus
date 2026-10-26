@@ -41,7 +41,7 @@ import { workLabel } from "../projects/branchLabel";
 import { sangrarTerminal } from "./terminalIndent";
 import { ponerLanzamiento } from "./launchGroups";
 import { FIN_DE_ARCHIVO, TECLAS_DE_TERMINAL, pideClave } from "./commandInput";
-import { claseDelTramo, finishEdit, highlightSpans, placeLabel, referenceId, searchPlaces, searchTasks, taskLabel, type MentionTarget, type PendingEdit, type PlaceCandidate, type TextEdit, type TaskCandidate, type TaskMention, tramosDelMensaje } from "../../lib/taskMentions";
+import { claseDelTramo, finishEdit, highlightSpans, placeLabel, referenceId, searchPlaces, searchTasks, taskLabel, taskTarget, type MentionTarget, type PendingEdit, type PlaceCandidate, type TextEdit, type TaskCandidate, type TaskMention, tramosDelMensaje } from "../../lib/taskMentions";
 import {
   groupRecipients,
   type Recipient,
@@ -130,6 +130,7 @@ import Entrega, { type Producido } from "./Delivery";
 import {
   type CambioPorCupo,
   type FalloDelTurno,
+  cupoResuelveElFallo,
   gestoDelFallo,
   prosaDelCambioPorCupo,
   prosaDelFallo,
@@ -580,6 +581,8 @@ export type ChatProps = {
   taskMentions?: TaskMention[];
   mentionProject?: string;
   mentionSession?: string | null;
+  /** Con varias máquinas, el nombre de cada una (`null`, la de la ventana): la mención guarda dónde vive la tarea. */
+  mentionMachineName?: (id: string | null) => string | undefined;
   placeCandidates?: PlaceCandidate[];
   /**
    * Los encargados a los que esta caja puede dirigir el mensaje. Encabezan el
@@ -1079,7 +1082,7 @@ export default function Chat(props: ChatProps) {
       .slice(0, 40).map(task => ({
         value: referenceId(task.target),
         title: task.title || workLabel(task.branch, task.alias) || task.target.sessionId,
-        detail: [workLabel(task.branch, task.alias), task.projectName].filter(Boolean).join(" · "),
+        detail: [workLabel(task.branch, task.alias), task.projectName, task.machine && props.mentionMachineName?.(task.machine)].filter(Boolean).join(" · "),
         label: task.available ? (task.archived ? t("chat.mentions.archived_task") : t("chat.mentions.task")) : t("chat.mentions.no_worktree"),
         group: material,
       }));
@@ -1234,7 +1237,7 @@ export default function Chat(props: ChatProps) {
 
   function mentionedReference(value: string): { target: MentionTarget; label: string } | undefined {
     const task = props.taskCandidates?.find(c => referenceId(c.target) === value);
-    if (task) return { target: task.target, label: taskLabel(task) };
+    if (task) return { target: taskTarget(task, props.mentionMachineName), label: taskLabel(task) };
     const place = props.placeCandidates?.find(c => referenceId(c.target) === value);
     return place && { target: place.target, label: placeLabel(place) };
   }
@@ -1589,6 +1592,9 @@ export default function Chat(props: ChatProps) {
       }
       // Lo dice el pie de la tarjeta del `!`: una fila aparte hacía saltar la altura.
       if (m.meta === "shell_reply") return;
+      // La línea del cupo resuelve el fallo que la precede: las dos juntas se leen como un error que sigue abierto.
+      const anterior = out.at(-1);
+      if (m.meta === "cupo" && anterior?.tipo === "msg" && cupoResuelveElFallo(anterior.msg.fallo?.clase)) out.pop();
       if (
         m.role !== "system" ||
         m.meta === "fallo" ||
@@ -3761,7 +3767,15 @@ function LineaDeSistema(props: { texto: string }) {
 /** La tarea siguió en otra cuenta, o en la misma cuando volvió su cupo. */
 function SiguioTrasElCupo(props: { cambio: CambioPorCupo }) {
   return (
-    <div class="col-start-1 flex items-center gap-3 py-2 text-xs text-neutral-500" role="status">
+    <div
+      class="col-start-1 flex items-center gap-3 py-2 text-xs"
+      classList={{
+        "text-info-strong": Boolean(props.cambio.to),
+        "text-neutral-500": !props.cambio.to,
+      }}
+      role="status"
+      data-quota-row={props.cambio.to ? "switched" : "resumed"}
+    >
       <span class="h-px flex-1 bg-border" aria-hidden="true" />
       <span>{prosaDelCambioPorCupo(props.cambio)}</span>
       <span class="h-px flex-1 bg-border" aria-hidden="true" />

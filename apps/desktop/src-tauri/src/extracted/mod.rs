@@ -17,6 +17,8 @@ mod master_handoff;
 mod page_preview;
 mod placement;
 mod proxy;
+#[cfg(target_os = "macos")]
+mod relocate;
 mod sites;
 mod startup;
 mod tray;
@@ -50,6 +52,10 @@ fn open() -> Result<()> {
     let selection = match args.as_slice() {
         // La ventana abre ya; el motor se busca o se lanza detrás (`launcher::connect`).
         [_] => {
+            #[cfg(target_os = "macos")]
+            if relocate::offer() {
+                return Ok(());
+            }
             let found = engine::paths()?;
             engine::prepare(&found)?;
             let launcher = match launcher::reason(&found) {

@@ -1,11 +1,12 @@
 import { hasAccountWorkspaces, hasLinkedWorkspaces, listWorkspaces } from "@terminus/computers";
-import { type JSX, Match, onMount, Show, Switch, createSignal } from "solid-js";
+import { type JSX, For, Match, onMount, Show, Switch, createSignal } from "solid-js";
 import { t } from "../lib/i18n";
 import { startTrialInPage, TerminusLicense } from "../features/settings/TerminusLicense";
 import { Button } from "../ui/Button";
 import { ConnectMachine } from "../features/machines/ConnectMachine";
 import { machineCompatibility } from "./compatibility";
 import { type Answer, type Computer, listComputers } from "./computers";
+import type { WebAccountsSource } from "../lib/platform";
 import type { Session } from "./session";
 
 /** What stands between the page and the app: the session, the license, having a computer and a workspace linked to the account. */
@@ -29,7 +30,7 @@ async function accountHasWorkspaces(endpoint: string, session: Session, computer
  * Opening is not intent to work: every computer of the person mounts as it is,
  * on or off, and wakes with the first action. `?computer=` opens only that one.
  */
-export function Gate(props: { session: Session; endpoint: string; initial?: GateView; onOpen?: (computers: Computer[]) => void }) {
+export function Gate(props: { session: Session; endpoint: string; initial?: GateView; onOpen?: (computers: Computer[]) => void; accounts?: WebAccountsSource }) {
   const [view, setView] = createSignal<GateView>(props.initial ?? { t: "waiting" });
 
   async function load() {
@@ -70,6 +71,8 @@ export function Gate(props: { session: Session; endpoint: string; initial?: Gate
     </Button>
   );
 
+  const openable = () => (props.accounts?.others() ?? []).filter((a) => a.signedIn && a.workspaces.length > 0);
+
   // Sobre la app ya montada (sin `onOpen`) solo una carga nueva vuelve a abrir las sesiones.
   const retryLicense = () => (props.onOpen ? void load() : window.location.reload());
 
@@ -98,6 +101,21 @@ export function Gate(props: { session: Session; endpoint: string; initial?: Gate
         <Match when={view().t === "no_workspaces"}>{message(t("web.computers.no_workspaces"), retry())}</Match>
         <Match when={view().t === "error"}>{message(t("web.computers.error"), retry())}</Match>
       </Switch>
+      {/* Esta cuenta no abre (licencia, sin computadoras): las otras de este navegador sí pueden. */}
+      <Show when={view().t !== "waiting" && openable().length > 0}>
+        <div class="mt-8 max-w-[60ch]" data-web-gate-accounts="">
+          <p class="m-0 mb-3 text-sm text-neutral-700">{t("web.computers.other_accounts")}</p>
+          <div class="flex flex-wrap gap-2">
+            <For each={openable()}>
+              {(a) => (
+                <Button size="sm" variant="secondary" onClick={() => props.accounts?.open(a.workspaces[0].id)}>
+                  {t("web.computers.open_account", { email: a.email ?? a.user_id })}
+                </Button>
+              )}
+            </For>
+          </div>
+        </div>
+      </Show>
     </main>
   );
 }

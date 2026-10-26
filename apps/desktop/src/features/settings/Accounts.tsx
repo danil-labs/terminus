@@ -1,4 +1,5 @@
-import { For, Show, createEffect, createSignal, createUniqueId, on, onCleanup, onMount, untrack, type JSX } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, createUniqueId, on, onCleanup, onMount, untrack, type JSX } from "solid-js";
+import { groupAccounts } from "@terminus/computers";
 import { enfocar } from "../../lib/focus";
 import { invoke } from "../../lib/invoke.ts";
 import { textoDeFalta } from "../../lib/no-space";
@@ -99,6 +100,16 @@ export default function Accounts(props: {
   const [lista, setLista] = createSignal<AccountList | null>(null);
   const [cargando, setCargando] = createSignal(true);
   const [estados, setEstados] = createSignal<Record<string, AccountStatus>>({});
+  const tarjetas = createMemo<Account[]>(() => {
+    const accounts = lista()?.accounts ?? [];
+    if (!accounts.some((a) => a.machines?.length)) return accounts;
+    const groups = groupAccounts(agente(), accounts.flatMap((a) => (a.machines ?? []).map((m) => ({
+      machine: m.machine,
+      on: m.on,
+      accounts: [{ ...a, id: m.id, plan: accountPresentation(a, estados()[m.id]).plan }],
+    }))));
+    return groups.map((g) => ({ ...g.row, machines: g.members }));
+  });
   const [comprobando, setComprobando] = createSignal<Record<string, boolean>>({});
   // Las que la última consulta de estado no pudo responder. No es «sin
   // conectar» —nadie lo dijo— ni «conectada»: una cuenta cuyo `account_status`
@@ -162,6 +173,7 @@ export default function Accounts(props: {
   }
 
   const proveedor = () => agentes().find((a) => a.id === agente());
+  const terminalLocal = (id: string) => capabilities().nativeWindow && !machineOf(id);
   const externalInstallUrl = () => proveedor()?.external_install_url;
   const faltaExterno = () => !proveedor() || Boolean(externalInstallUrl()) && !proveedor()?.available;
   const [revisandoCli, setRevisandoCli] = createSignal(false);
@@ -811,7 +823,7 @@ export default function Accounts(props: {
                     {t("settings.account_card.active")}
                   </Badge>
                   <span class="shrink-0">
-                    {t("settings.accounts.count", { count: lista()?.accounts.length ?? 0 })}
+                    {t("settings.accounts.count", { count: tarjetas().length })}
                   </span>
                 </span>
               )}
@@ -1028,9 +1040,9 @@ export default function Accounts(props: {
 
       <Show when={hayCuentas()}>
       <ul class="m-0 grid list-none gap-2 p-0">
-        <For each={lista()?.accounts ?? []}>
+        <For each={tarjetas()}>
           {(a, i) => {
-            const activa = () => a.id === lista()?.active;
+            const activa = () => a.id === lista()?.active || !!a.machines?.some((m) => m.id === lista()?.active);
             const estado = () => estados()[a.id];
 
             return (
@@ -1337,7 +1349,7 @@ export default function Accounts(props: {
                 {/* El agente lleva un rato sin decir nada. Puede ser que esté
                     esperando algo que solo sabe pedir con una terminal de verdad, y
                     esto es lo único que lo destraba. */}
-                <Show when={ofrecerTerminal()}>
+                <Show when={ofrecerTerminal() && terminalLocal(id())}>
                   <div class="flex flex-wrap items-center gap-2 text-xs text-neutral-500">
                     <span>
                       {t("settings.accounts.no_response", { agent: etiqueta() })}
@@ -1468,13 +1480,15 @@ export default function Accounts(props: {
               <Button size="sm" onClick={() => void conectar(f().id)}>
                 {t("settings.accounts.retry")}
               </Button>
-              <Button
-                variant="outline"
-                size="compact"
-                onClick={() => void conectar(f().id, "terminal")}
-              >
-                {t("settings.accounts.open_terminal")}
-              </Button>
+              <Show when={terminalLocal(f().id)}>
+                <Button
+                  variant="outline"
+                  size="compact"
+                  onClick={() => void conectar(f().id, "terminal")}
+                >
+                  {t("settings.accounts.open_terminal")}
+                </Button>
+              </Show>
             </div>
           </div>
           </SettingsBlock>
