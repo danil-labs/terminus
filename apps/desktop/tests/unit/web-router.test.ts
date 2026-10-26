@@ -196,3 +196,59 @@ test("web account creation, listing and login carry the selected workspace", asy
     router.close();
   }
 });
+
+test("on the web a prefixed task id goes to that machine when the call has no machine header", async () => {
+  const vm = fakeLink({ task_history: { branch: "vm" } });
+  const mac = fakeLink({ task_history: { branch: "mac" } });
+  const { router } = web({ cmp_vm: vm, cmp_mac: mac });
+  try {
+    await router.handle("list_workspaces");
+    const seen = await router.handle("task_history", { project: "p1", id: "cmp_mac~t2" }) as { branch: string };
+    assert.equal(seen.branch, "mac");
+    assert.deepEqual(mac.calls.filter((c) => c.command === "task_history").map((c) => c.args.id), ["t2"]);
+    assert.equal(vm.calls.filter((c) => c.command === "task_history").length, 0);
+  } finally {
+    router.close();
+  }
+});
+
+test("on the web a login follows the account id's machine, not the workspace lead", async () => {
+  const account = (id: string, plan: string) => ({ id, identity: "ana@danil.ai", plan, authenticated_at: 1 });
+  const vm = fakeLink({
+    list_accounts: { accounts: [account("a1", "personal")], active: null },
+    login_account: null,
+  });
+  const mac = fakeLink({
+    list_accounts: { accounts: [account("a2", "team")], active: null },
+    login_account: null,
+  });
+  const { router } = web({ cmp_vm: vm, cmp_mac: mac });
+  try {
+    await router.handle("list_workspaces");
+    const list = await router.handle("list_accounts", { provider: "claude" }) as { accounts: { id: string }[] };
+    const team = list.accounts.find((a) => a.id.startsWith("cmp_mac~"));
+    assert.ok(team, "the Team card keeps the Mac's id");
+    await router.handle("login_account", { provider: "claude", id: team.id, mode: "tuberia" });
+    assert.deepEqual(mac.calls.filter((c) => c.command === "login_account").map((c) => c.args.id), ["a2"]);
+    assert.equal(vm.calls.filter((c) => c.command === "login_account").length, 0);
+  } finally {
+    router.close();
+  }
+});
+
+test("on the web arguments that name two machines are still refused", async () => {
+  const vm = fakeLink({ send_message: "x" });
+  const mac = fakeLink({ send_message: "x" });
+  const { router } = web({ cmp_vm: vm, cmp_mac: mac });
+  try {
+    await router.handle("list_workspaces");
+    await assert.rejects(
+      router.handle("send_message", { project: "p1", session: "cmp_mac~t2", space: "cmp_vm~s1", prompt: "hola" }),
+      (e: { detail: string }) => e.detail === "cross_machine",
+    );
+    assert.equal(vm.calls.filter((c) => c.command === "send_message").length, 0);
+    assert.equal(mac.calls.filter((c) => c.command === "send_message").length, 0);
+  } finally {
+    router.close();
+  }
+});

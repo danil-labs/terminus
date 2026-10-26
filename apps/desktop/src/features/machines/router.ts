@@ -7,10 +7,12 @@
  * leer (`harness:machine-slices`).
  *
  * La máquina de una llamada es la de la cabecera `x-terminus-machine`, o la de
- * la ventana; un id de otra máquina en los argumentos es un error antes de
- * mandar. En el escritorio la cuenta y `danil_*` van siempre aquí. Un workspace
- * de la cuenta que esta computadora no tiene se lee de sus miembros y actúa en
- * el primero.
+ * la ventana. En el escritorio un id de otra máquina sin esa cabecera es un
+ * error antes de mandar: el id no elige la máquina. En la web no hay máquina de
+ * la ventana; si los argumentos nombran una sola (el id con su prefijo), la
+ * llamada va allá, y si nombran dos se rechaza igual. En el escritorio la cuenta
+ * y `danil_*` van siempre aquí. Un workspace de la cuenta que esta computadora
+ * no tiene se lee de sus miembros y actúa en el primero.
  */
 import { type AccountWorkspace, callWorkspace, isDeferrable } from "@terminus/computers";
 import { AttentionBook, type Envelope, type Fleet, FleetError, type Slice, classOf, unwrap } from "@terminus/fleet";
@@ -444,7 +446,33 @@ export function createRouter(config: RouterConfig) {
     ];
   }
 
-  /** Lo de una máquina sin máquina en el sobre, en la web: las cuentas de todas juntas; lo demás, en la que atiende el workspace. */
+  /**
+   * En la web los ids de otra máquina llevan su prefijo. Si los argumentos
+   * nombran una sola, esa es la máquina de la llamada; si nombran dos, `null`
+   * y el candado de la flota la rechaza.
+   */
+  const OWN_ARG = new Set(["id", "session", "parent", "portfolio", "account", "space", "task"]);
+  function homeOf(args: Args): string | null {
+    const found = new Set<string>();
+    const walk = (value: unknown, key: string | null): void => {
+      if (typeof value === "string") {
+        if (!key || !OWN_ARG.has(key)) return;
+        const own = unwrap(value, fleet.remotes());
+        if (own) found.add(own.machine);
+        return;
+      }
+      if (Array.isArray(value)) {
+        for (const item of value) walk(item, key);
+        return;
+      }
+      if (!value || typeof value !== "object" || Object.getPrototypeOf(value) !== Object.prototype) return;
+      for (const [k, item] of Object.entries(value as Record<string, unknown>)) walk(item, k);
+    };
+    walk(args, null);
+    return found.size === 1 ? [...found][0] : null;
+  }
+
+  /** Lo de una máquina sin máquina en el sobre, en la web: las cuentas de todas juntas; lo demás, en la que nombra el id o en la que atiende el workspace. */
   async function ofAMachine(command: string, args: Args, workspace: string | null): Promise<unknown> {
     if (command === "list_accounts") {
       const envelopes = membersOf(workspace).map((machine) => ({ machine, workspace, command, args }));
@@ -453,7 +481,8 @@ export function createRouter(config: RouterConfig) {
       if (merged !== undefined) return merged;
       throw noAnswer(slices, workspace);
     }
-    const lead = leadOf(workspace) ?? leadOf(null);
+    const named = homeOf(args);
+    const lead = (named && fleet.has(named) ? named : null) ?? leadOf(workspace) ?? leadOf(null);
     if (!lead) throw { what: t("web.machines.none_for_workspace"), detail: "no_machine" };
     return remote(lead, command, args, callWorkspace(workspace, args));
   }
@@ -475,6 +504,10 @@ export function createRouter(config: RouterConfig) {
       // Una máquina que ya no es de la cuenta no se cambia por otra en silencio.
       if (machine && machine !== self) throw new FleetError("unknown_machine", machine);
       if (!local && OF_THIS_MACHINE.test(command)) return await ofAMachine(command, args, workspace);
+      if (!local) {
+        const named = homeOf(args);
+        if (named && fleet.has(named)) return await remote(named, command, args, callWorkspace(workspace, args));
+      }
       const opts = withoutHeader(options, "x-terminus-machine");
       if (command === "set_active_workspace" && typeof args.id === "string") {
         const id = args.id;
