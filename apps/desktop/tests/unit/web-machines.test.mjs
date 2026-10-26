@@ -300,6 +300,60 @@ test("AI accounts are grouped by provider and email with the machines they are s
   assert.deepEqual(app.fallos, []);
 });
 
+test("provider login from settings receives its link and code", async () => {
+  let created = false;
+  const { app, f, calls, doc } = await open("web-settings-login", [VM, MAC], {
+    cmp_vm: { table: table("Panel", "VM", {
+      list_language_packs: [],
+      list_bundled_language_packs: [],
+      get_profile: { name: "Fixture" },
+      get_project_directory: "/lab",
+      list_accounts: () => ({ provider: "codex", active: null, accounts: created ? [account("new", null)] : [] }),
+      add_account: () => { created = true; return account("new", null); },
+      login_account: null,
+      account_status: { authenticated: false, detail: "" },
+      tasks_awaiting_quota: [],
+    }) },
+    cmp_mac: { table: table("Notas", "Mac", {
+      list_accounts: { provider: "codex", active: null, accounts: [] },
+      add_account: account("mac-new", null),
+      login_account: null,
+    }) },
+  });
+  const button = (label) => [...doc.querySelectorAll("button")].find((b) => b.textContent?.trim() === label || b.getAttribute("aria-label") === label);
+  button("Configuración").click();
+  assert.ok(await until(() => button("Proveedores de IA")));
+  button("Proveedores de IA").click();
+  assert.ok(await until(() => button("+ Agregar cuenta")));
+  button("+ Agregar cuenta").click();
+  assert.ok(await until(() => calls("cmp_vm", "login_account").length));
+  app.w.open = () => null;
+  f.relays.cmp_vm.push({ type: "events", cursor: 1, runtime: "rt1", gap: false, events: [
+    { name: "account", payload: { account: "new", kind: "url", text: "https://auth.example/device" } },
+    { name: "account", payload: { account: "new", kind: "confirm", text: "ABCD-1234" } },
+  ] });
+  assert.ok(await until(() => doc.body.textContent.includes("ABCD-1234")), "the login dialog shows the code");
+  assert.ok(button("Abrir navegador"), "the login dialog offers the provider's page");
+  f.relays.cmp_vm.push({ type: "events", cursor: 2, runtime: "rt1", gap: false, events: [
+    { name: "account", payload: { account: "new", kind: "done", text: "Login failed" } },
+  ] });
+  assert.ok(await until(() => button("Reintentar")), "a failed login can be retried");
+  assert.equal(button("Abrir en la Terminal"), undefined, "web login never offers a terminal on the remote machine");
+  assert.ok(await until(() => doc.querySelector("[data-sign-in-elsewhere]")));
+  const elsewhere = doc.querySelector("[data-sign-in-elsewhere]");
+  elsewhere.dispatchEvent(new app.w.PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" }));
+  elsewhere.click();
+  assert.ok(await until(() => doc.querySelector('[data-sign-in-on="cmp_mac"]')));
+  doc.querySelector('[data-sign-in-on="cmp_mac"]').dispatchEvent(new app.w.KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
+  assert.ok(await until(() => calls("cmp_mac", "login_account").length), "sign in elsewhere starts the CLI on the chosen machine");
+  assert.deepEqual(calls("cmp_mac", "login_account")[0].args, { provider: "codex", id: "mac-new", mode: "tuberia" });
+  f.relays.cmp_mac.push({ type: "events", cursor: 1, runtime: "rt1", gap: false, events: [
+    { name: "account", payload: { account: "mac-new", kind: "confirm", text: "MAC-1234" } },
+  ] });
+  assert.ok(await until(() => doc.body.textContent.includes("MAC-1234")), "the chosen machine's login reaches the same dialog");
+  assert.deepEqual(app.fallos, []);
+});
+
 test("the computer list says which engine needs an update before anything is asked", async () => {
   const own = createHash("sha256").update(readFileSync(new URL("../../src-tauri/crates/engine-protocol/commands.json", import.meta.url))).digest("hex");
   const { app, calls, doc, text } = await open("web-machines-contract", [{ ...VM, contract: own }, { ...MAC, contract: "0".repeat(64) }], {
