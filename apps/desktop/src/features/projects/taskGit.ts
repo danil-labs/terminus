@@ -87,6 +87,16 @@ function unpark(project: string) {
   held?.forget();
   return held?.rows ?? {};
 }
+// Sin corte, una lectura colgada se quedaba su turno hasta reiniciar: la local congelaba
+// su carpeta y dos remotas toda la cola. El motor corta cada consulta a GitHub a los 12 s.
+export const GIT_READ_DEADLINE = 120_000;
+function withDeadline<T>(read: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error("git_read_timeout")), GIT_READ_DEADLINE);
+  });
+  return Promise.race([read, late]).finally(() => clearTimeout(timer));
+}
 const remoteQueue = new Map<symbol, { rank: () => number; run: () => Promise<void> }>();
 let remoteRunning = 0;
 function drainRemote() {
@@ -127,7 +137,7 @@ export function watchSessionGit(project: string) {
         run: async () => {
           try {
             if (!current(started) || document.hidden) return;
-            const result = await invoke<Record<string, GitStatus>>("list_session_git", { project, remote: true, priority: priority(), progress: new Channel<Record<string, GitStatus>>() });
+            const result = await withDeadline(invoke<Record<string, GitStatus>>("list_session_git", { project, remote: true, priority: priority(), progress: new Channel<Record<string, GitStatus>>() }));
             if (current(started)) setRows(previous => {
               const merged = mergeRemoteGit(previous, result);
               const next = localFailed || Date.now() - lastLocal >= 30_000 ? staleGit(merged) : merged;
@@ -159,7 +169,7 @@ export function watchSessionGit(project: string) {
           if (!current(started) || !localBusy || sequence !== localSequence) return;
           setRows(previous => conservarFilas(previous, { ...previous, ...retainGitObservation(previous, partial) }));
         });
-        const local = await invoke<Record<string, GitStatus>>("list_session_git", { project, remote: false, priority: priority(), progress });
+        const local = await withDeadline(invoke<Record<string, GitStatus>>("list_session_git", { project, remote: false, priority: priority(), progress }));
         if (!current(started)) return;
         lastLocal = Date.now();
         localFailed = false;
