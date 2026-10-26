@@ -562,6 +562,51 @@ test("the shared remote queue starts active work before background projects", as
 });
 
 
+test("a Git read that never answers frees its turn: the PR of a newer task still arrives", async (t) => {
+  const { GIT_READ_DEADLINE, watchSessionGit } = await import("../../src/features/projects/taskGit.ts");
+  const previousWindow = globalThis.window;
+  const previousDocument = globalThis.document;
+  const row = { ...UNKNOWN_GIT, kind: "branch" as const, branch: "feature", head: "a", repository: "repo" };
+  const pull = { number: 317, state: "merged" as const, head_sha: "a" };
+  const calls: string[] = [];
+  let firstLocal = true;
+  const fake = Object.assign(new EventTarget(), { __TAURI_INTERNALS__: { transformCallback: () => 1,
+    invoke: async (_: string, args: { project: string; remote: boolean }) => {
+      calls.push(`${args.project}:${args.remote ? "remote" : "local"}`);
+      // Dos remotas colgadas ocupan los dos turnos de la cola compartida.
+      if (args.remote && args.project.startsWith("hung-")) return new Promise(() => {});
+      if (!args.remote && args.project === "hung-local" && firstLocal) { firstLocal = false; return new Promise(() => {}); }
+      return args.remote ? { s: { ...row, pull, pull_known: true, checked_at: 2 } } : { s: { ...row, checked_at: 1 } };
+    },
+  } });
+  Object.defineProperty(globalThis, "window", { configurable: true, value: fake, writable: true });
+  Object.defineProperty(globalThis, "document", { configurable: true, value: Object.assign(new EventTarget(), { hidden: false }), writable: true });
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const flush = async () => { for (let i = 0; i < 10; i++) await new Promise(resolve => setImmediate(resolve)); };
+  const watchers = [watchSessionGit("hung-a"), watchSessionGit("hung-b")];
+  try {
+    await flush();
+    watchers.push(watchSessionGit("newer"), watchSessionGit("hung-local"));
+    await flush();
+    assert.ok(!calls.includes("newer:remote"), "la cola tenía turno libre: la prueba no cuelga nada");
+    assert.equal(watchers[2].rows().s.pull, null);
+    assert.equal(watchers[3].rows().s, undefined);
+    // El barrido de cada 15 s pide otra lectura mientras la colgada sigue ocupada.
+    watchers[3].refresh();
+    await flush();
+    t.mock.timers.tick(GIT_READ_DEADLINE);
+    await flush();
+    assert.ok(calls.includes("newer:remote"), "las remotas colgadas siguen ocupando la cola");
+    assert.equal(watchers[2].rows().s.pull?.number, 317);
+    assert.equal(watchers[3].rows().s?.branch, "feature", "la lectura local colgada congeló su carpeta");
+  } finally {
+    for (const watcher of watchers) watcher.release();
+    t.mock.timers.reset();
+    Object.defineProperty(globalThis, "window", { configurable: true, value: previousWindow, writable: true });
+    Object.defineProperty(globalThis, "document", { configurable: true, value: previousDocument, writable: true });
+  }
+});
+
 test("local progress paints before completion and rejects superseded channels", async () => {
   const { watchSessionGit } = await import("../../src/features/projects/taskGit.ts");
   const previousWindow = globalThis.window;
