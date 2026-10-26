@@ -23,31 +23,34 @@ export default function TaskGitActions(props: {
   tasks: Task[];
   onFinished: () => void;
 }) {
+  // Las props JSX pueden crear memos al leerse: se capturan con dueño antes de usarlas en callbacks asíncronos.
+  const context = createMemo(() => ({ workspace: props.workspace, project: props.project, session: props.session, machine: props.machine, on: props.on, busy: props.busy, readOnly: props.readOnly, title: props.title, tasks: props.tasks, onFinished: props.onFinished }));
   const [rows, setRows] = createSignal<Record<string, GitStatus>>({});
   const [sheet, setSheet] = createSignal<"details" | "finish" | null>(null);
   const [finishing, setFinishing] = createSignal(false);
   const [failure, setFailure] = createSignal<Failure | null>(null);
-  const scope = () => JSON.stringify([props.workspace, props.project, props.session, props.machine]);
-  const options = () => ({ headers: { "x-terminus-workspace": props.workspace, ...(props.machine ? { "x-terminus-machine": props.machine } : {}) } });
-  const task = () => props.tasks.find((row) => row.id === props.session) ?? { id: props.session };
+  const scope = createMemo(() => JSON.stringify([context().workspace, context().project, context().session, context().machine]));
+  const online = createMemo(() => context().on);
+  const options = () => ({ headers: { "x-terminus-workspace": context().workspace, ...(context().machine ? { "x-terminus-machine": context().machine } : {}) } });
+  const task = () => context().tasks.find((row) => row.id === context().session) ?? { id: context().session };
   const status = createMemo(() => {
-    const git = effectiveTaskGit(task(), rows(), props.tasks);
-    return props.on ? git : { ...git, stale: true };
+    const git = effectiveTaskGit(task(), rows(), context().tasks);
+    return context().on ? git : { ...git, stale: true };
   });
-  const ready = () => !props.readOnly && props.on && canFinishTask(task(), status(), props.busy || finishing());
+  const ready = () => !context().readOnly && context().on && canFinishTask(task(), status(), context().busy || finishing());
   let read = () => {};
   let previousScope: string | undefined;
-  createEffect(on(() => [scope(), props.on] as const, ([key]) => {
+  createEffect(on(() => [scope(), online()] as const, ([key]) => {
     let live = true;
     let sequence = 0;
     if (previousScope !== key) setRows({});
     previousScope = key;
     setFailure(null);
     setSheet(null);
-    const args = { project: props.project, remote: true, priority: [props.session] };
+    const args = { project: context().project, remote: true, priority: [context().session] };
     const opts = options();
     read = () => {
-      if (!props.on) return;
+      if (!context().on) return;
       const request = ++sequence;
       void invoke<Record<string, GitStatus>>("list_session_git", args, opts).then((value) => {
         if (live && request === sequence && scope() === key) {
@@ -68,7 +71,7 @@ export default function TaskGitActions(props: {
     document.addEventListener("visibilitychange", focus);
     onCleanup(() => {
       live = false;
-      clearInterval(timer);
+      window.clearInterval(timer);
       window.removeEventListener("focus", focus);
       document.removeEventListener("visibilitychange", focus);
     });
@@ -76,20 +79,20 @@ export default function TaskGitActions(props: {
   const finish = async () => {
     if (!ready()) return;
     const key = scope();
-    const args = { project: props.project, id: props.session };
+    const args = { project: context().project, id: context().session };
     const opts = options();
     setFinishing(true);
     setFailure(null);
     try {
       const blockers = await invoke<Blockers>("task_blockers", { ...args, finish: true }, opts);
-      if (scope() !== key || !props.on) return;
+      if (scope() !== key || !context().on) return;
       if (blockers.unsaved.length || blockers.not_finished) {
         setFailure({ what: t("chat.task.finish_blocked"), detail: "" });
         read();
         return;
       }
       await invoke("finish_task", args, opts);
-      if (scope() === key) props.onFinished();
+      if (scope() === key) context().onFinished();
     } catch (error) {
       if (scope() === key) setFailure(asFailure(error));
     } finally {
@@ -109,11 +112,11 @@ export default function TaskGitActions(props: {
     <Show when={sheet() !== null}><Dialog open={sheet() !== null} onOpenChange={(value) => { if (!value && !finishing()) setSheet(null); }}>
       <DialogContent>
         <DialogTitle class="text-base font-semibold">{sheet() === "finish" ? t("projects.sessions.finish") : t("chat.task.details")}</DialogTitle>
-        <p class="mt-3 break-words text-sm font-medium">{props.title}</p>
+        <p class="mt-3 break-words text-sm font-medium">{context().title}</p>
         <Show when={sheet() === "details"} fallback={<p class="mt-3 text-sm text-neutral-500">{status().shared_with || task().subagent ? t("chat.task.finish_shared") : t("chat.task.finish_confirm")}</p>}>
           <p class="mt-3 text-sm text-neutral-500">{sessionGitDescription(status()) || t("projects.git.unknown")}</p>
           <Show when={!ready()}><p class="mt-3 text-sm text-neutral-500">{t("chat.task.finish_unavailable")}</p></Show>
-          <Button variant="outline" size="compact" class="mt-3" onClick={read} disabled={!props.on}>{t("chat.task.refresh")}</Button>
+          <Button variant="outline" size="compact" class="mt-3" onClick={read} disabled={!context().on}>{t("chat.task.refresh")}</Button>
         </Show>
         <Show when={failure()}>{(error) => <div class="mt-3"><FailureNote f={error()} /></div>}</Show>
         <div class="mt-4 flex justify-end gap-2">
