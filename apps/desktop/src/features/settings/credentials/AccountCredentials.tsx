@@ -10,13 +10,14 @@ import { type Credential, type CredentialKind, type CredentialMachine, credentia
 import { createMemo, createSignal, For, onMount, Show } from "solid-js";
 import { manifiesto, t } from "../../../lib/i18n";
 import { capabilities } from "../../../lib/platform";
+import { prosa } from "../../../lib/prose";
 import { Badge } from "../../../ui/Badge";
 import { Button } from "../../../ui/Button";
 import { type Failure, FailureNote } from "../../../ui/Failure";
 import { Input } from "../../../ui/Input";
 import { machineName, machines } from "../../machines/store";
 import { SettingsBlock } from "../layout";
-import { act, credentialsView, reloadCredentials } from "./store";
+import { act, credentialsView, failureOf, reloadCredentials } from "./store";
 
 const nameOf = (m: Pick<CredentialMachine, "computer_id" | "name">) => m.name?.trim() || capabilities().machineName?.(m.computer_id) || m.computer_id;
 const PROVIDERS: Record<string, string> = { opencode: "OpenCode", zotero: "Zotero", github: "GitHub" };
@@ -306,6 +307,13 @@ export function LocalKeysBanner(props: { kinds: CredentialKind[] }) {
                   <span class="min-w-0 truncate">{l.label ?? l.slot}</span>
                   <Show when={l.hint}>{(hint) => <Badge forma="dato">{`••••${hint()}`}</Badge>}</Show>
                 </label>
+                <Show when={l.upload_error}>
+                  {(code) => (
+                    <p class="m-0 pl-6 text-[0.6875rem] text-warning-strong" data-upload-error={l.slot}>
+                      {prosa(failureOf({ what: { clave: code() }, detail: "" }).what)}
+                    </p>
+                  )}
+                </Show>
               </li>
             )}
           </For>

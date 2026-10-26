@@ -68,8 +68,19 @@ test("lista las credenciales del workspace con sus máquinas y para quién sella
 });
 
 test("la lista del motor trae además las claves que solo están en esta máquina", () => {
-  const listing = credentialsListingOf({ credentials: [], recipients: [], local_only: [{ slot: "referencias/zotero-key", kind: "zotero", provider: "zotero", label: "Zotero", hint: "a1b2" }, { kind: "x" }] });
-  assert.deepEqual(listing.local_only, [{ slot: "referencias/zotero-key", kind: "zotero", provider: "zotero", label: "Zotero", hint: "a1b2" }]);
+  const listing = credentialsListingOf({
+    credentials: [],
+    recipients: [],
+    local_only: [
+      { slot: "referencias/zotero-key", kind: "zotero", provider: "zotero", label: "Zotero", hint: "a1b2" },
+      { slot: "agentes/opencode-zen:a", kind: "api_key", provider: "opencode", label: "A", hint: "9999", upload_error: "credentials.error.offline" },
+      { kind: "x" },
+    ],
+  });
+  assert.deepEqual(listing.local_only, [
+    { slot: "referencias/zotero-key", kind: "zotero", provider: "zotero", label: "Zotero", hint: "a1b2" },
+    { slot: "agentes/opencode-zen:a", kind: "api_key", provider: "opencode", label: "A", hint: "9999", upload_error: "credentials.error.offline" },
+  ]);
   assert.throws(() => credentialsListingOf({ nope: true }));
 });
 
