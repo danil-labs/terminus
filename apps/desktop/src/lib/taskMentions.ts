@@ -1,10 +1,13 @@
 import type { Trigger } from "./mentions.ts";
 
-export type TaskTarget = { kind: "task"; projectId: string; sessionId: string };
+/** Lo que la ventana vio de una tarea de otra máquina: el motor que no la tiene se la cuenta al agente con esto. */
+export type TaskAbout = { machine_name?: string; title?: string; branch?: string; folder_name?: string };
+/** `about` solo cuando la tarea vive en otra máquina que la que recibe el mensaje; el router lo vuelve `elsewhere`. */
+export type TaskTarget = { kind: "task"; projectId: string; sessionId: string; about?: TaskAbout };
 export type FolderTarget = { kind: "folder"; projectId: string };
 export type PortfolioTarget = { kind: "portfolio"; portfolioId: string };
 export type MentionTarget = TaskTarget | FolderTarget | PortfolioTarget;
-export type TaskMention = { target: MentionTarget; start: number; end: number; text: string };
+export type TaskMention = { target: MentionTarget; start: number; end: number; text: string; elsewhere?: TaskAbout & { machine: string } };
 export type PlaceCandidate = { target: FolderTarget; name: string; detail: string; updatedAt: number };
 export type TaskCandidate = {
   target: TaskTarget;
@@ -15,6 +18,8 @@ export type TaskCandidate = {
   available: boolean;
   archived: boolean;
   updatedAt: number;
+  /** La máquina de la fila si no es la de la ventana (`@terminus/fleet`). */
+  machine?: string;
 };
 export type MentionDraft = { text: string; task_mentions?: TaskMention[] };
 
@@ -92,6 +97,43 @@ export function editMentions(before: MentionDraft, text: string, edit?: TextEdit
 
 export function taskLabel(task: TaskCandidate): string {
   return mentionLabel(task.branch || task.alias || task.title, task.target.sessionId);
+}
+
+/**
+ * La mención de `task`. Con varias máquinas (`machineName`) lleva lo que se ve
+ * de ella aquí: la máquina del mensaje se sabe al mandarlo, y si es otra, el
+ * router lo vuelve `elsewhere`; si es la suya, lo quita.
+ */
+export function taskTarget(task: TaskCandidate, machineName?: (id: string | null) => string | undefined): TaskTarget {
+  if (!machineName) return task.target;
+  const about: TaskAbout = {
+    machine_name: machineName(task.machine ?? null),
+    title: task.title || undefined,
+    branch: task.branch || undefined,
+    folder_name: task.projectName || undefined,
+  };
+  return { ...task.target, about };
+}
+
+/** Sin router la mención va tal cual al motor de la ventana, que no conoce `about`. */
+export function withoutAbout(args: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  const mentions = args?.task_mentions;
+  if (!Array.isArray(mentions) || !mentions.some(m => m?.target?.about)) return args;
+  return {
+    ...args,
+    task_mentions: mentions.map(m => {
+      if (!m?.target?.about) return m;
+      const { about: _, ...target } = m.target;
+      return { ...m, target };
+    }),
+  };
+}
+
+/** El id de panel de la tarea de una mención guardada: la que dice `elsewhere` vive en esa máquina. */
+export function mentionedSession(m: TaskMention, self: string | null): string | null {
+  if (m.target.kind !== "task") return null;
+  const home = m.elsewhere?.machine;
+  return home && home !== self && !m.target.sessionId.startsWith(`${home}~`) ? `${home}~${m.target.sessionId}` : m.target.sessionId;
 }
 
 export function placeLabel(place: PlaceCandidate): string {

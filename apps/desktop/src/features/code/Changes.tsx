@@ -68,6 +68,8 @@ export type Cambios = {
 
 type DiffDeArbol = {
   patch: string;
+  /** Un motor anterior no lo manda y no recorta. */
+  truncated?: boolean;
   retired: boolean;
 };
 
@@ -94,7 +96,7 @@ export type Origen =
  * llega como texto y punto. Contar aquí evita un segundo viaje al backend para
  * pedir lo que ya está en la mano.
  */
-function previaDePatch(patch: string): Cambios {
+function previaDePatch({ patch, truncated }: DiffDeArbol): Cambios {
   const archivos = parsearDiff(patch);
   return {
     base: "",
@@ -107,7 +109,7 @@ function previaDePatch(patch: string): Cambios {
     added: archivos.reduce((n, a) => n + a.added, 0),
     removed: archivos.reduce((n, a) => n + a.removed, 0),
     patch,
-    truncated: false,
+    truncated: Boolean(truncated),
     warnings: [],
   };
 }
@@ -155,7 +157,7 @@ export default function Cambios(props: {
   async function diffDelTurno(
     o: Extract<Origen, { tipo: "turno" }>,
     path: string | null,
-  ): Promise<string> {
+  ): Promise<DiffDeArbol> {
     const diff = await invoke<DiffDeArbol>("tree_diff", {
       project: props.project,
       session: props.session,
@@ -165,7 +167,7 @@ export default function Cambios(props: {
       path,
     }, machineOf(props.session));
     setRetirado(diff.retired);
-    return diff.patch;
+    return diff;
   }
 
   onMount(() => {
@@ -197,7 +199,7 @@ export default function Cambios(props: {
               tree: o.arbol,
               path: ruta,
             }, machineOf(props.session))
-          : await diffDelTurno(o, ruta);
+          : (await diffDelTurno(o, ruta)).patch;
       const [entero] = parsearDiff(patch);
       if (entero) setEnteros({ ...enteros(), [ruta]: entero });
     } catch (e) {

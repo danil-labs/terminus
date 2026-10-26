@@ -22,7 +22,7 @@ export function startConnect(settings: ConnectSettings, root: HTMLElement) {
     return;
   }
   const leave = () => window.location.assign(loginReturningHere(settings.login));
-  const session = supabaseSession(settings.supabaseUrl, settings.supabaseKey, leave);
+  const session = supabaseSession(settings.supabaseUrl, settings.supabaseKey, { onGone: leave });
   const code = normalizeCode(new URLSearchParams(window.location.search).get("code"));
   render(() => <ConnectPage session={session} endpoint={settings.endpoint} code={code} />, root);
 }

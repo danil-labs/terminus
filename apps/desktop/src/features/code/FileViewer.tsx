@@ -52,7 +52,6 @@ import {
   diagnosticosDelArchivo,
   esTypst,
   pedirArreglo,
-  principalElegido,
   revelarEnElArbol,
   seguirPluginTypst,
   salto,
@@ -228,10 +227,10 @@ export default function VisorDeArchivo(props: {
   seguirPluginTypst();
   const typst = () => esTypst(props.ruta) && !previa();
   /**
-   * El ojo es el interruptor: con un principal elegido, un `.typ` se ve junto al PDF. Otro
-   * archivo abierto en la misma pestaña usa su propia previa o se queda en código.
+   * Un `.typ` se ve junto al PDF de su documento: el principal del ojo o, sin él, el `main.typ`
+   * más cercano. Otro archivo abierto en la misma pestaña usa su propia previa o se queda en código.
    */
-  const vistaTypst = () => conVistaTypst() && !previa() && llevaVistaTypst(props.ruta, principalElegido(props.project));
+  const vistaTypst = () => conVistaTypst() && !previa() && llevaVistaTypst(props.ruta);
   /** El tiempo real, las marcas y el guardado solo: un `.typ` con la vista encendida. */
   const typstVivo = () => typst() && vistaTypst();
   const conPrevia = () =>

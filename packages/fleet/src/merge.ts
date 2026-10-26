@@ -8,7 +8,7 @@
  * máquina (`ids.ts`). Las filas de otra máquina dicen cuál es y en qué estado
  * está su rebanada.
  */
-import { type AccountWorkspace, registryProjects } from "../../computers/src/index.ts";
+import { type AccountRowLike, type AccountWorkspace, groupAccounts, registryProjects } from "../../computers/src/index.ts";
 import { mergeAttention } from "../../protocol/src/index.ts";
 import { wrap } from "./ids.ts";
 import type { Slice } from "./slices.ts";
@@ -49,7 +49,7 @@ const OWN_ID = new Set(["load_session", "add_account", "create_space", "rename_s
 /** Respuestas que son un space o una lista de spaces. */
 const SPACES = new Set(["list_spaces", "create_space", "rename_space", "set_space_folders", "move_task_to_space", "share_space"]);
 /** Filas que la barra marca con su máquina. */
-const TAGGED = new Set(["list_live_sessions"]);
+const TAGGED = new Set(["list_live_sessions", "list_task_mentions"]);
 
 const isRow = (v: unknown): v is Row => !!v && typeof v === "object" && !Array.isArray(v);
 const text = (v: unknown) => (typeof v === "string" ? v.trim() : "");
@@ -61,6 +61,7 @@ export function encode(ctx: MergeContext, machine: string, value: unknown, comma
   if (command === "list_active_turns" && Array.isArray(value)) return value.map((v) => (typeof v === "string" ? wrap(machine, v) : v));
   if (command === "send_message" && typeof value === "string") return wrap(machine, value);
   const walk = (v: unknown, key: string | null): unknown => {
+    if (key === "task_mentions" && Array.isArray(v)) return v.map((m) => mentionOf(machine, m));
     if (typeof v === "string") {
       if (!key || !v) return v;
       if (key === "space" && ctx.shared?.(v)) return v;
@@ -75,9 +76,21 @@ export function encode(ctx: MergeContext, machine: string, value: unknown, comma
   const sharedRow = (row: Row) => SPACES.has(command) && typeof row.id === "string" && (row.account === true || !!ctx.shared?.(row.id));
   const ownId = (row: Row) => (typeof row.id === "string" && !sharedRow(row) ? { ...row, id: wrap(machine, row.id) } : row);
   if (ROW_IDS.has(command) && Array.isArray(out)) return out.map((r) => (isRow(r) ? ownId(r) : r));
+  if (command === "list_task_mentions" && Array.isArray(out)) return out.map((r) => (isRow(r) && isRow(r.target) ? { ...r, target: taskOf(machine, r.target) } : r));
   if (OWN_ID.has(command) && isRow(out)) return ownId(out);
   if (KEYED.has(command) && isRow(out)) return Object.fromEntries(Object.entries(out).map(([id, v]) => [wrap(machine, id), v]));
   return out;
+}
+
+/** El objetivo de una mención de tarea de `machine`, con el id del panel. */
+function taskOf(machine: string, target: Row): Row {
+  return target.kind === "task" && typeof target.sessionId === "string" ? { ...target, sessionId: wrap(machine, target.sessionId) } : target;
+}
+
+/** Una mención guardada en `machine`: la tarea es de allá, salvo que diga en cuál otra vive (`elsewhere`). */
+function mentionOf(machine: string, m: unknown): unknown {
+  if (!isRow(m) || !isRow(m.target)) return m;
+  return isRow(m.elsewhere) ? m : { ...m, target: taskOf(machine, m.target) };
 }
 
 /** Un evento de `machine` para el panel: también el id suelto de `account-rejected`. */
@@ -244,35 +257,27 @@ function mergeProjects(ctx: MergeContext, parts: Slice[], workspace: string | nu
 }
 
 /**
- * Una cuenta de IA por proveedor y correo, con las máquinas donde tiene sesión
- * (`machines`); su id es el de la primera encendida. Sin correo queda sola y se
- * nombra con su máquina (`groupAccounts` de `@terminus/computers`, la misma regla).
+ * El correo solo no une cuentas: Claude Personal y Team pueden compartirlo.
+ * Si el motor conoce el tipo, las copias conservan sus ids por máquina.
  */
 function mergeAccounts(ctx: MergeContext, parts: Slice[]): unknown {
   const lists = parts.filter((s) => isRow(s.value) && Array.isArray((s.value as Row).accounts));
   const lead = lists[0];
   if (!lead) return parts[0].value;
-  type Member = { machine: string; id: string; on: boolean };
-  const cards: { row: Row; members: Member[]; key: string | null; active: boolean }[] = [];
-  for (const s of lists) {
-    const list = s.value as Row;
-    for (const a of list.accounts as Row[]) {
-      if (typeof a?.id !== "string") continue;
-      const member = { machine: s.machine, id: s.machine === ctx.self ? a.id : wrap(s.machine, a.id), on: ctx.on(s.machine) };
-      const email = text(a.identity).toLowerCase();
-      let card = email ? cards.find((c) => c.key === email) : undefined;
-      if (card) card.members.push(member);
-      else {
-        card = { row: email ? a : { ...a, label: `${text(a.label) || a.id} · ${ctx.name?.(s.machine) ?? s.machine}` }, members: [member], key: email || null, active: false };
-        cards.push(card);
-      }
-      // La activa del panel es la de la primera máquina.
-      if (s === lead && list.active === a.id) card.active = true;
-    }
-  }
-  const shown = (c: (typeof cards)[number]) => c.members.find((m) => m.on) ?? c.members[0];
-  const accounts = cards.map((c) => ({ ...c.row, id: shown(c).id, machines: c.members }));
-  const active = accounts.find((_, i) => cards[i].active)?.id ?? null;
+  const groups = groupAccounts(String((lead.value as Row).provider ?? ""), lists.map((s) => ({
+    machine: s.machine,
+    on: ctx.on(s.machine),
+    accounts: ((s.value as Row).accounts as Row[]).filter((a): a is Row & AccountRowLike => typeof a?.id === "string"),
+  })));
+  const panelId = (machine: string, id: string) => machine === ctx.self ? id : wrap(machine, id);
+  const accounts = groups.map((g) => ({
+    ...g.row,
+    ...(!g.email ? { label: `${text(g.row.label) || g.row.id} · ${ctx.name?.(g.usageFrom.machine) ?? g.usageFrom.machine}` } : {}),
+    id: panelId(g.usageFrom.machine, g.row.id),
+    machines: g.members.map((m) => ({ ...m, id: panelId(m.machine, m.id) })),
+  }));
+  const activeId = (lead.value as Row).active;
+  const active = typeof activeId === "string" ? accounts.find((a) => a.machines.some((m) => m.machine === lead.machine && m.id === panelId(lead.machine, activeId)))?.id ?? null : null;
   return { ...(lead.value as Row), active, accounts };
 }
 

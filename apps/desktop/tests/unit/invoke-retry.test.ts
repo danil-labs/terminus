@@ -49,6 +49,12 @@ test("a read is repeated after io, a write is not", () => {
   assert.equal(canRepeat("delete_workspace", io), false);
 });
 
+test("the disk sweep is not repeated after io: it is still running in the engine", () => {
+  const io = { detail: "io" };
+  assert.equal(canRepeat("list_storage", io), false);
+  assert.equal(canRepeat("list_storage", { detail: "service_busy" }), true);
+});
+
 test("antes del motor la orden espera a que conecte y se repite una vez", async () => {
   let up = false;
   let attempts = 0;

@@ -25,11 +25,11 @@ import {
 } from "@terminus/computers";
 import { chosenWebLayout, MOBILE_WEB_DIR } from "@terminus/design";
 import { Fleet, type Link, type MachineInfo, unwrap } from "@terminus/fleet";
-import { createSignal, lazy, Suspense } from "solid-js";
+import { type Accessor, createSignal, lazy, Suspense } from "solid-js";
 import { createRouter, type Router, type SliceChange } from "../features/machines/router";
 import { t } from "../lib/i18n";
 import { leerPref } from "../lib/prefs";
-import { setCapabilities } from "../lib/platform";
+import { type OtherAccount, setCapabilities, type WebAccountsSource } from "../lib/platform";
 import { deliver } from "../lib/serviceEvents";
 // In the page, not in the lazy app chunk: the stylesheet loads with the HTML.
 import "../styles/global.css";
@@ -38,6 +38,8 @@ import { HomeLink } from "./HomeLink";
 import { installIpc } from "./ipc";
 import { webAccountProfile } from "./account";
 import { webGithubAccount } from "./github-account";
+import { type Account, type Listing, SLOT_PREFIX, loadAccounts, ownerOf, pickAccount, readListings, rememberLast, removeExtra, savedListings } from "./accounts";
+import { forgetShellCache, setShellCacheScope } from "../lib/shellCache";
 import { webWorkspaceAssets } from "./workspace-assets";
 import type { MachineRow, MachineStatus } from "./SyncNote";
 import { type BrowserHost, createWebTransport } from "./transport";
@@ -50,7 +52,9 @@ declare const __TERMINUS_WEB__: WebSettings;
 type WebSettings = { endpoint: string; supabaseUrl: string; supabaseKey: string; login: string };
 
 type Base = { endpoint: string; getToken: () => string | Promise<string>; onUnauthorized?: () => void };
-export type TerminusWebConfig = Partial<WebSettings & Base & { computerId: string; computers: Computer[] }>;
+export type TerminusWebConfig = Partial<
+  WebSettings & Base & { computerId: string; computers: Computer[]; webAccounts: WebAccountsSource; addAccount: import("./AddAccount").AddAccountOptions }
+>;
 
 /** How often the page lists the computers again to pick up machines and links changed since it loaded; the desktop's cadence. */
 const RELIST = 10 * 60_000;
@@ -114,8 +118,11 @@ function slicesChanged(changes: SliceChange[]) {
   if (changes.includes("attention")) window.dispatchEvent(new CustomEvent("harness:service-resync"));
 }
 
+/** What only a page with Danil accounts adds (`start`): the account's own saved slices, the other accounts and the workspace asked in `?w=`. */
+type Mounted = { storage: ReturnType<typeof pageStorage>; webAccounts?: WebAccountsSource; workspace?: string | null };
+
 /** Mounts the app; what it returns applies a newer computer list (machines, names, links) without remounting. */
-function mountApp(computers: Computer[], base: Base, before?: (id: string) => () => Promise<boolean>): (computers: Computer[]) => void {
+function mountApp(computers: Computer[], base: Base, before?: (id: string) => () => Promise<boolean>, mounted: Mounted = { storage: pageStorage() }): (computers: Computer[]) => void {
   const [changed, bump] = createSignal(0);
   let rows = new Map(computers.map((c) => [c.computer_id, c]));
   const token = async () => base.getToken();
@@ -143,7 +150,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
       return verdict === "unknown" ? null : verdict === "ok";
     },
     wake: async (id) => (await startComputer(base.endpoint, await token(), id)).kind === "ok",
-    storage: pageStorage(),
+    storage: mounted.storage,
     onSlice: () => bump((n) => n + 1),
     // La cola de aplazadas cambió (aquí, en el escritorio o en el teléfono): la lista se relee.
     onDeferred: (machine) => router?.deferredChanged(machine),
@@ -167,6 +174,8 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
   };
   const active = createRouter({ self: null, fleet, native: null, registry, onSlices: slicesChanged, deliver, pickedFor });
   router = active;
+  // `?w=`: the page opens on that workspace of this account (the router keeps it while it is listed).
+  if (mounted.workspace) void active.handle("set_active_workspace", { id: mounted.workspace }).catch(() => undefined);
   fleet.setMachines(orderComputers(computers).map(infoOf));
   fleet.subscribeEvents();
 
@@ -234,6 +243,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
       changed();
       return fleet.license();
     },
+    webAccounts: mounted.webAccounts,
     retryMachines: () => {
       fleet.retry();
       for (const name of ["harness:workspace-name", "harness:service-resync"]) window.dispatchEvent(new CustomEvent(name));
@@ -275,6 +285,40 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
 /** Lists the computers again now; set once the page is mounted with a session. */
 let relistNow: (() => Promise<void>) | null = null;
 
+/** The page's own address without query: where every account switch and sign-in returns. */
+const home = () => `${window.location.origin}${import.meta.env.BASE_URL}`;
+
+/** One logo reader per other account, with that account's token; kept across re-reads so its list is not fetched again. */
+const otherAssets = new Map<string, ReturnType<typeof webWorkspaceAssets>>();
+
+/** The other accounts of this browser for the column: each one's workspaces from its registry, its logos with its own token. */
+function othersOf(accounts: readonly Account[], current: Account, listings: ReadonlyMap<string, Listing>, endpoint: string): OtherAccount[] {
+  return accounts
+    .filter((a) => a.user_id !== current.user_id)
+    .map((a) => {
+      const listing = listings.get(a.user_id);
+      let assets = otherAssets.get(a.user_id);
+      if (!assets) {
+        assets = webWorkspaceAssets(endpoint, () => a.client.getToken());
+        otherAssets.set(a.user_id, assets);
+      }
+      const reader = assets;
+      return {
+        user_id: a.user_id,
+        email: a.email,
+        name: a.name,
+        extra: a.slot !== null,
+        signedIn: a.signedIn && !listing?.refused,
+        stale: listing?.stale ?? true,
+        workspaces: (listing?.workspaces ?? []).map((w) => ({
+          id: w.id,
+          name: w.name,
+          logo: async () => (a.signedIn && w.logo_url ? ((await reader.read(w.id, "logo").catch(() => null)) ?? null) : null),
+        })),
+      };
+    });
+}
+
 async function start(settings: WebSettings) {
   const [{ render }, { Gate, computersOf }, { supabaseSession }, { aplicarLengua }] = await Promise.all([
     import("solid-js/web"),
@@ -290,7 +334,87 @@ async function start(settings: WebSettings) {
     console.error("terminus web: built without TERMINUS_WEB_SUPABASE_URL and TERMINUS_WEB_SUPABASE_KEY");
     return;
   }
-  const session = supabaseSession(settings.supabaseUrl, settings.supabaseKey, leave);
+  const storage = pageStorage();
+  const params = new URLSearchParams(window.location.search);
+  /** A session ended (`null`: the primary, else an extra's slot); set once the page knows which account it mounted. */
+  let ended: (slot: string | null) => void = () => undefined;
+  const primary = supabaseSession(settings.supabaseUrl, settings.supabaseKey, { onGone: () => ended(null) });
+  const clients = new Map<string, ReturnType<typeof supabaseSession>>();
+  const clientFor = (slot: string) => {
+    let c = clients.get(slot);
+    if (!c) {
+      c = supabaseSession(settings.supabaseUrl, settings.supabaseKey, { storageKey: SLOT_PREFIX + slot, onGone: () => ended(slot) });
+      clients.set(slot, c);
+    }
+    return c;
+  };
+
+  // «Agregar cuenta» and its return from Google or Microsoft: a page of their own.
+  const callback = params.get("account-callback");
+  if (params.has("add-account") || callback) {
+    const { startAddAccount } = await import("./AddAccount");
+    const accounts = await loadAccounts({ storage, primary, clientFor });
+    startAddAccount(document.getElementById("root") as HTMLElement, { storage, accounts, clientFor, home: home(), email: params.get("email"), callback, code: params.get("code"), error: params.get("error_description") ?? params.get("error") });
+    return;
+  }
+
+  let accounts = await loadAccounts({ storage, primary, clientFor });
+  if (!accounts.some((a) => a.signedIn)) return leave();
+  const list = (token: string) => listWorkspaces(endpoint, token);
+  // The account is picked with the saved lists; the network only when `?w=` is not in them.
+  const wanted = params.get("w");
+  let listings = savedListings(storage, accounts);
+  const fresh = readListings(storage, accounts, list);
+  if (wanted && !ownerOf(wanted, listings)) listings = await fresh;
+  const { account } = pickAccount(accounts, listings, wanted, storage);
+  if (!account) return leave();
+  const current = account;
+  rememberLast(storage, current.user_id);
+  if (wanted) {
+    params.delete("w");
+    const rest = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}${window.location.hash}`);
+  }
+  // The sidebar's saved snapshot of another account's workspace never paints here.
+  if (accounts.length > 1) setShellCacheScope({ mine: (w) => listings.get(current.user_id)?.workspaces.some((x) => x.id === w) ?? false, prefer: wanted });
+
+  // The mounted account's session ended: another account opens, or the login. Another's: its workspaces show it.
+  const [others, setOthers] = createSignal<OtherAccount[]>(othersOf(accounts, current, listings, endpoint));
+  const reread = async () => {
+    accounts = await loadAccounts({ storage, primary, clientFor });
+    listings = await readListings(storage, accounts, list);
+    setOthers(othersOf(accounts, current, listings, endpoint));
+  };
+  void fresh.then((next) => {
+    listings = next;
+    setOthers(othersOf(accounts, current, listings, endpoint));
+  });
+  ended = (slot) => {
+    if (slot === current.slot) {
+      if (accounts.some((a) => a.signedIn && a.user_id !== current.user_id)) window.location.assign(home());
+      else leave();
+    } else void reread();
+  };
+
+  const webAccounts: WebAccountsSource = {
+    current: { user_id: current.user_id, email: current.email, name: current.name, extra: current.slot !== null },
+    others: others as Accessor<OtherAccount[]>,
+    open: (workspace) => {
+      const owner = [...listings].find(([, l]) => l.workspaces.some((w) => w.id === workspace))?.[0];
+      if (owner) rememberLast(storage, owner);
+      window.location.assign(`${home()}?w=${encodeURIComponent(workspace)}`);
+    },
+    add: (email) => window.location.assign(`${home()}?add-account${email ? `&email=${encodeURIComponent(email)}` : ""}`),
+    remove: async (userId) => {
+      const gone = accounts.find((a) => a.user_id === userId);
+      if (!gone || gone.slot === null) return;
+      forgetShellCache(listings.get(userId)?.workspaces.map((w) => w.id) ?? []);
+      await removeExtra(storage, gone);
+      if (userId === current.user_id) window.location.assign(home());
+      else await reread();
+    },
+  };
+  const session = current.client;
 
   /** A refusal found after mounting covers the app: retrying the socket would not change it. */
   let blocked = false;
@@ -300,7 +424,7 @@ async function start(settings: WebSettings) {
     const layer = document.createElement("div");
     layer.className = "fixed inset-0 z-50";
     document.body.append(layer);
-    render(() => <Gate session={session} endpoint={endpoint} initial={initial} />, layer);
+    render(() => <Gate session={session} endpoint={endpoint} initial={initial} accounts={webAccounts} />, layer);
   };
 
   const dispose = render(
@@ -308,6 +432,7 @@ async function start(settings: WebSettings) {
       <Gate
         session={session}
         endpoint={endpoint}
+        accounts={webAccounts}
         onOpen={(computers) => {
           dispose();
           const several = computers.length > 1;
@@ -323,11 +448,13 @@ async function start(settings: WebSettings) {
               } else return answer.kind !== "unauthorized";
               return false;
             },
+            { storage, webAccounts, workspace: wanted },
           );
           // A machine connected or a workspace linked since the page loaded shows up here without reloading it.
           const relist = async () => {
             const answer = await computersOf(endpoint, session).catch(() => null);
             if (answer?.kind === "ok") relink(answer.value);
+            await reread().catch(() => undefined);
           };
           relistNow = relist;
           if (!relisting) {
@@ -365,7 +492,7 @@ function toPhone(): boolean {
     window.location.replace(`${phone}?to=${encodeURIComponent(path.slice(phone.length - 1) + window.location.search)}`);
     return true;
   }
-  if (path.startsWith(phone) || connecting || preset || chosenWebLayout(window) !== "mobile") return false;
+  if (path.startsWith(phone) || connecting || preset || given.addAccount || chosenWebLayout(window) !== "mobile") return false;
   window.location.replace(phone);
   return true;
 }
@@ -373,5 +500,8 @@ function toPhone(): boolean {
 if (toPhone()) {
   // Se va al del teléfono: no se monta nada aquí.
 } else if (connecting) void import("./connect/main").then((m) => m.startConnect({ ...__TERMINUS_WEB__, ...given } as WebSettings, document.getElementById("root") as HTMLElement));
-else if (preset && given.getToken) mountApp(preset, { ...__TERMINUS_WEB__, ...given } as Base);
+else if (given.addAccount) {
+  const options = given.addAccount;
+  void import("./AddAccount").then((m) => m.startAddAccount(document.getElementById("root") as HTMLElement, options));
+} else if (preset && given.getToken) mountApp(preset, { ...__TERMINUS_WEB__, ...given } as Base, undefined, { storage: pageStorage(), webAccounts: given.webAccounts });
 else void start({ ...__TERMINUS_WEB__, ...given } as WebSettings);

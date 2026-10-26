@@ -148,24 +148,84 @@ identity except `ai.danil.terminus`). Then everything lives under one root:
 | `selection.json` | the selection the window builds |
 | `engine-launch.log` | the engine's stdout and stderr when the window starts it, plus one line per launch: on Windows, whether the window and the engine are in a Job Object and whether breakaway was accepted |
 | `launch.lock` | held while a window looks for or starts the engine |
+| `engine-mark.json` | size and times of the engine binary when its SHA-256 for `engine.json` was computed |
 
 `<local data>` is `%LOCALAPPDATA%` on Windows, `~/Library/Application Support`
 on macOS and `$XDG_DATA_HOME` (or `~/.local/share`) on Linux. The engine always
 gets that lab identity: it never reads the data or the keychain entries of
 `ai.danil.terminus`. Its keychain names derive from that identity.
 
-With the lock held, the window asks the engine named by
-`engine/seldon-endpoint.json` for its `status`. If it answers, the window reuses
-it; two windows share one engine. If not, the window starts the packaged
-engine, waits up to 5 minutes for a descriptor written by that process while
-it stays alive (a rejection or crash ends the wait at once; a startup that checks
-many account files can take more than 30 seconds on a loaded machine), ten
-minutes with `--adopt-existing`: adopting a real 0.2.74 root took about 25 s,
-and the handoff screen shows that step meanwhile), and writes
-`selection.json`. If the binary is missing, the error is
-`engine_missing`; if it exits or does not answer, `engine_start_failed`. The
-startup notice then names the folder with the logs and links the 0.2.74
-release, whose data the engine never touched.
+With `launch.lock` held, the window also takes the start lock it shares with
+the `terminus` CLI (below), so a window and a terminal never start two engines
+on one root. Then it asks the engine named by `engine/seldon-endpoint.json` for
+its `status`. If it answers with this window's contract and its
+`data_directory` is this root (both canonical), the window connects to it,
+whoever started it: another window, the CLI or a previous session; two windows
+share one engine. An engine of another contract or build is handled as in
+[Updating on Windows](#updating-on-windows): the window waits for its tasks or
+offers «Actualizar ya»; it never uses the engine's own handoff.
+
+If nothing answers, the window does not trust a probe: the engine holds
+`seldon-runtime.lock` in the data root exclusively for as long as it lives, so
+the window opens it without creating it and tries to lock it, as the engine's
+`running()` does. Held means an engine is starting, closing or saturated: the
+window keeps probing every half second for up to 5 minutes and does not start
+another one; then it fails with `service_busy` (`reason: root_locked`). A
+descriptor that is not private (`invalid_token`) with the root held fails at
+once. Free means no engine: the window starts the packaged engine, waits up to
+5 minutes for a descriptor written by that process while it stays alive (a
+rejection or crash ends the wait at once; a startup that checks many account
+files can take more than 30 seconds on a loaded machine), ten minutes with
+`--adopt-existing`: adopting a real 0.2.74 root took about 25 s, and the
+handoff screen shows that step meanwhile), and writes `selection.json`. If the
+binary is missing, the error is `engine_missing`; if it exits or does not
+answer, `engine_start_failed`. The startup notice then names the folder with
+the logs and links the 0.2.74 release, whose data the engine never touched.
+
+### `engine.json` for the CLI
+
+Each time it selects an engine, the window writes its profile into the
+person's `engine.json`, so `terminus` in a terminal knows which binary and
+which root to use without a window:
+
+- Windows: `%APPDATA%\terminus\engine.json`; macOS and Linux:
+  `$XDG_CONFIG_HOME/terminus/engine.json` or `~/.config/terminus/engine.json`.
+- A release writes the profile `desktop`; the lab writes `desktop-lab`.
+- Other profiles (`host` from `install.sh`, `vm` from `remote-host`) and
+  unknown fields are kept. Only `desktop` takes `default`, and only when it is
+  missing or names a profile that does not exist.
+- A file of another `version` or that is not JSON is left as it is.
+- The write is atomic (temporary file and rename) under
+  `locks/engine.json.lock`, and only when the profile changed.
+
+```json
+{
+  "version": 1,
+  "default": "desktop",
+  "profiles": {
+    "desktop": {
+      "engine": "C:\\Users\\<user>\\AppData\\Local\\Terminus\\seldon-runtime.exe",
+      "sha256": "<SHA-256 of that binary>",
+      "data_dir": "C:\\Users\\<user>\\AppData\\Local\\ai.danil.terminus",
+      "resource_dir": "C:\\Users\\<user>\\AppData\\Local\\Terminus",
+      "identity": "ai.danil.terminus",
+      "production": true,
+      "managed": null
+    }
+  }
+}
+```
+
+`engine` is the binary the window starts (the stable copy inside an AppImage).
+Paths are canonical, without `\\?\` on Windows. The SHA-256 is computed again
+only when the binary's size or times change (`engine-mark.json`). The start
+lock is `<same folder>/locks/<sha256>.lock`, where `<sha256>` is the lowercase
+hex SHA-256 of the canonical data root in UTF-8; a root that does not exist
+yet is its deepest existing ancestor, canonical, plus the rest, as the CLI
+computes it. Both take it with the same primitive (`LockFileEx` over the whole
+range on Windows, `flock` on Unix). It is best effort: the window
+waits up to 5 minutes for it and, without it, the root lock still stops a
+second engine.
 
 ## Handoff from 0.2.74
 

@@ -505,7 +505,7 @@ export default function ArbolDeArchivos(props: {
   }
 
   /** El documento Typst que se compila en esta tarea: el que resolvió la última compilación. */
-  /** El ojo abierto es la elección de la persona: con ella, todo archivo de la tarea se ve junto a su PDF. */
+  /** El ojo abierto es la elección de la persona; sin ella, la vista compila el `main.typ` más cercano. */
   const principalTypst = () => principalElegido(props.project);
 
   /** Lo que falta de una carpeta plegada abierta: cargando, vacía o «Mostrar más». */
