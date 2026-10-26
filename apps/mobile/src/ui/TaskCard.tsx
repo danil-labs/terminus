@@ -89,14 +89,10 @@ const sameProps = (a: TaskCardProps, b: TaskCardProps) =>
   (a.card.folder ? a.folderName(a.card.folder) : null) === (b.card.folder ? b.folderName(b.card.folder) : null);
 
 /**
- * La tarjeta de dos líneas del sidebar del escritorio (#151), en el teléfono.
- * Línea 1: la marca en su columna, el título y la chincheta. Línea 2: lo que te
- * piden si te necesita (su PR y el cuadrado de su carpeta); si no, proveedor ·
- * carpeta · máquina · cara del agente · PR, como el riel del escritorio.
- * «Compacta», una sola línea con el cuadrado. Qué va en cada línea lo deciden
- * `taskCard` de `@terminus/tasks` y `secondLine`; el PR sale de `git` (una fila
- * de `list_session_git`), que quien pinta la lista pide solo para las visibles.
- * Mantenerla pulsada abre la vista previa (la tarjeta flotante del escritorio).
+ * La lista del teléfono: título, marca y acciones en la primera línea;
+ * proveedor, carpeta, máquina, agente y PR o rama en la segunda. Compacta
+ * conserva las señales de Git y el cohete en una sola línea. La lista lee el
+ * Git por carpeta; pulsar el cohete confirma sin abrir la conversación.
  */
 export const TaskCard = memo(TaskCardView, sameProps);
 
@@ -116,7 +112,8 @@ function TaskCardView({
   const folder = card.folder ? { id: card.folder, name: folderName(card.folder) } : null;
   const pull = cardPull(git);
   const chips = secondLine(card, pull, compact);
-  const ready = online && canFinishTask(task, git, card.activity.viva);
+  const ready = !card.pinned && online && canFinishTask(task, git, card.activity.viva || card.activity.aprobando);
+  const branch = !git?.shared_with ? git?.branch : null;
   return (
     <Pressable
       testID={`task-${task.host}-${task.id}`}
@@ -149,7 +146,7 @@ function TaskCardView({
           </View>
         ) : null}
         {compact && folder ? <FolderSquare id={folder.id} /> : null}
-        {compact && pull ? <PullChip pull={pull} git={git} /> : null}
+        {compact && pull ? <PullChip pull={pull} git={git} /> : compact && branch ? <Icon name="git-branch" size={12} color={theme.textMuted} /> : null}
         {onFinish ? <Pressable testID={`finish-${task.host}-${task.id}`} accessibilityRole="button" accessibilityLabel={`${t("task.header.finish")}: ${taskTitle(lang, task)}`} accessibilityState={{ disabled: !ready }} disabled={!ready} hitSlop={8} onPress={(event) => { event.stopPropagation(); onFinish(); }} style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", marginVertical: -8, opacity: ready ? 1 : 0.3 }}>
           <Icon name="rocket" size={18} color={theme.merged} />
         </Pressable> : null}
@@ -161,20 +158,12 @@ function TaskCardView({
         <View style={[styles.line, styles.second]}>
           {chips.map((chip) => {
             switch (chip) {
-              case "request":
-                return (
-                  <Text key={chip} numberOfLines={1} style={[styles.request, { color: theme.text }]}>
-                    {card.request ?? ""}
-                  </Text>
-                );
               case "provider":
                 return (
                   <View key={chip} testID="task-provider" accessibilityRole="image" accessibilityLabel={card.provider ?? ""}>
                     <BrandMark id={card.provider} size={13} color={theme.text} />
                   </View>
                 );
-              case "folder-square":
-                return folder ? <FolderSquare key={chip} id={folder.id} /> : null;
               case "folder":
                 return folder ? (
                   <View key={chip} style={styles.chip}>
@@ -192,6 +181,10 @@ function TaskCardView({
                 return pull ? <PullChip key={chip} pull={pull} git={git} /> : null;
             }
           })}
+          {!pull && branch ? <View style={styles.chip} accessibilityLabel={branch}>
+            <Icon name="git-branch" size={11} color={theme.textMuted} />
+            <Text numberOfLines={1} style={[styles.meta, { color: theme.textMuted, maxWidth: 160 }]}>{branch}</Text>
+          </View> : null}
         </View>
       )}
     </Pressable>

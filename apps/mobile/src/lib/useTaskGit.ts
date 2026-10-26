@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
+import { readTaskGit, type TaskGitStatus } from "@terminus/tasks";
 import type { Host } from "./hosts";
 import { type GitBook, gitAsks, gitAsksKey, staleGit, withGitAnswer } from "./taskGit";
 
@@ -23,30 +24,37 @@ export function useTaskGit(hostOf: (id: string) => Host | undefined, visible: re
   const powerKey = asks.map((ask) => hostOf(ask.host)?.power()).join("|");
   useEffect(() => {
     let live = true;
-    let sequence = 0;
-    const read = () => {
-      const request = ++sequence;
+    let reading = false;
+    const read = async () => {
+      if (reading) return;
+      reading = true;
       const { asks, hostOf } = latest.current;
-      for (const ask of asks) {
-        const host = hostOf(ask.host);
-        if (!host || host.power() !== "on") {
-          setBook((b) => staleGit(b, ask.host, ask.priority));
-          continue;
-        }
-        host
-          .call<unknown>("list_session_git", ask.workspace, { project: ask.project, remote: true, priority: ask.priority })
-          .then(({ value, cachedAt }) => live && request === sequence && setBook((b) => host.power() === "on" && cachedAt === null ? withGitAnswer(b, ask.host, value) : staleGit(b, ask.host, ask.priority)))
-          .catch(() => live && request === sequence && setBook((b) => staleGit(b, ask.host, ask.priority)));
-      }
+      try {
+        await Promise.all(asks.map(async (ask) => {
+          const host = hostOf(ask.host);
+          if (!host || host.power() !== "on") {
+            if (live) setBook((b) => staleGit(b, ask.host, ask.priority));
+            return;
+          }
+          const publish = (answer: { value: Record<string, TaskGitStatus>; cachedAt: number | null }) => {
+            if (live) setBook((b) => host.power() === "on" && answer.cachedAt === null ? withGitAnswer(b, ask.host, answer.value) : staleGit(b, ask.host, ask.priority));
+          };
+          try {
+            const answer = await readTaskGit(
+              remote => host.call<Record<string, TaskGitStatus>>("list_session_git", ask.workspace, { project: ask.project, remote, priority: ask.priority }),
+              { onLocal: publish, current: () => live && host.power() === "on" },
+            );
+            publish(answer);
+          } catch {
+            if (live) setBook((b) => staleGit(b, ask.host, ask.priority));
+          }
+        }));
+      } finally { reading = false; }
     };
-    read();
-    const activity = AppState.addEventListener("change", (state) => { if (state === "active") read(); });
-    const timer = setInterval(() => AppState.currentState === "active" && read(), EVERY_MS);
-    return () => {
-      live = false;
-      clearInterval(timer);
-      activity.remove();
-    };
+    void read();
+    const activity = AppState.addEventListener("change", state => { if (state === "active") void read(); });
+    const timer = setInterval(() => { if (AppState.currentState === "active") void read(); }, EVERY_MS);
+    return () => { live = false; clearInterval(timer); activity.remove(); };
   }, [key, revision, powerKey]);
   return book;
 }

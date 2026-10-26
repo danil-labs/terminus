@@ -328,7 +328,7 @@ type LiveTurn = {
 // Sin botón todavía: expone `sleep_session` para el gesto «Dormir» que la
 // pantalla aún no ofrece.
 export async function sleepSession(project: string, session: string) {
-  await invoke<void>("sleep_session", { project, session });
+  await invoke<void>("sleep_session", { project, session }, machineOf(session));
 }
 
 /** La página de Archivadas ocupa el sitio de la vista de proyecto; ningún id de carpeta empieza así. */
@@ -1531,7 +1531,7 @@ export default function App() {
     setAlMargen({ session, question, answer: null, failure: null });
     const vigente = () => turno === preguntasAlMargen && sessionId() === session;
     try {
-      const { answer } = await invoke<{ answer: string }>("ask_side_question", { project: project(), session, question });
+      const { answer } = await invoke<{ answer: string }>("ask_side_question", { project: project(), session, question }, deLaTarea(session));
       if (vigente()) setAlMargen({ session, question, answer, failure: null });
     } catch (e) {
       if (vigente()) setAlMargen({ session, question, answer: null, failure: asFailure(e) });
@@ -3920,7 +3920,7 @@ export default function App() {
         sources: fs,
         excludedSources: excluidas,
         session,
-      })
+      }, deLaTarea(session))
         .then((result) => {
           if (current) setMentionSources(result);
         })
@@ -5042,7 +5042,7 @@ export default function App() {
       await (tipo === "archivo" ? invoke("tree_create_file", donde, enSuMaquina) : invoke("tree_create_folder", donde, enSuMaquina));
     } catch (e) {
       // Sin lo que se pidió crear, la tarea vacía no tiene por qué estar.
-      await invoke("delete_session", { project: proyecto, id: session, force: false }).catch(() => {});
+      await invoke("delete_session", { project: proyecto, id: session, force: false }, enSuMaquina).catch(() => {});
       throw e;
     }
     void refreshSessions([proyecto]);
@@ -5180,7 +5180,7 @@ export default function App() {
     const context = await invoke<{
       path: string; last_prompt: string; last_reply: string;
       sources: string[]; excluded_sources: string[];
-    }>("prepare_session_continuation", { project: proyecto, id, turno })
+    }>("prepare_session_continuation", { project: proyecto, id, turno }, deLaTarea(id))
       .catch((e) => { throw prosaDe(e); });
     if (workspace !== workspaceActivo() || id !== sessionId() || proyecto !== project()) return;
     const prompt = mode === "full"

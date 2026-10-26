@@ -258,7 +258,7 @@ export default function TaskScreen() {
 
   const decide = (permission: Permission, allow: boolean) => host && void act(() => respondPermission(host, workspace, id, permission.request_id, allow));
   const answer = (pending: PendingQuestion, chosen: Record<string, string[]>, free: Record<string, string>) =>
-    host && void act(() => answerQuestion(host, workspace, id, pending, chosen, free));
+    host && void act(() => answerQuestion(host, workspace, folder, id, pending, chosen, free));
   // Un `!` en marcha se detiene con su comando; si no había, se detiene el turno.
   const stop = () =>
     host &&
@@ -386,7 +386,7 @@ export default function TaskScreen() {
             <PermissionCard key={p.request_id} permission={p} theme={theme} disabled={asleep} onDecide={(allow) => decide(p, allow)} />
           ))}
           {questions.map((q) => (
-            <QuestionCard key={q.request_id} pending={q} theme={theme} disabled={asleep} onAnswer={(c, f) => answer(q, c, f)} />
+            <QuestionCard key={q.turn} pending={q} theme={theme} disabled={asleep} onAnswer={(c, f) => answer(q, c, f)} />
           ))}
         </ScrollView>
       ) : null}

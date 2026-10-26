@@ -1,4 +1,4 @@
-import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
+import { For, Show, Suspense, createSignal, lazy, onCleanup, onMount } from "solid-js";
 import { listen } from "../../lib/serviceEvents";
 import { invoke } from "../../lib/invoke.ts";
 import Plug from "lucide-solid/icons/plug";
@@ -13,6 +13,10 @@ import { ITEM_DE_MENU, Popover, PopoverContent, PopoverTrigger } from "../../ui/
 import { Badge } from "../../ui/Badge";
 import { lockedBy } from "../../lib/governance";
 import { GovernedNotice } from "./Governed";
+
+// Fuera de la carga inicial: este archivo también da el vistazo del riel.
+const CredentialsInUse = lazy(() => import("./credentials/AccountCredentials").then((m) => ({ default: m.CredentialsInUse })));
+const LocalKeysBanner = lazy(() => import("./credentials/AccountCredentials").then((m) => ({ default: m.LocalKeysBanner })));
 import {
   mcpLoginUrl,
   mcpPendingSignIn,
@@ -898,6 +902,13 @@ export default function Herramientas(props: { solo?: string | string[] }) {
             </ul>
           </Show>
         </section>
+      </Show>
+
+      <Show when={!props.solo}>
+        <Suspense fallback={null}>
+          <LocalKeysBanner kinds={["mcp_secret"]} />
+          <CredentialsInUse kinds={["mcp_secret"]} title={t("danil.credentials.mcp_title")} />
+        </Suspense>
       </Show>
 
       {/* Lo que contestó el inicio de sesión. Con caja y no como párrafo suelto:

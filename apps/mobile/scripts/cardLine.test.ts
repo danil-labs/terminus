@@ -36,8 +36,8 @@ test("compacta no lleva línea 2, ni proveedor ni PR", () => {
   assert.deepEqual(secondLine(card(), cardPull(git()), true), []);
 });
 
-test("si te necesita: lo que pide, el PR y el cuadrado de la carpeta", () => {
-  assert.deepEqual(secondLine(card({ esperando: true }), cardPull(git()), false), ["request", "pull", "folder-square"]);
+test("si te necesita conserva metadatos, sin mostrar el último mensaje", () => {
+  assert.deepEqual(secondLine(card({ esperando: true }), cardPull(git()), false), ["provider", "folder", "machine", "agent", "pull"]);
 });
 
 test("si falló, la línea normal: no el último mensaje", () => {

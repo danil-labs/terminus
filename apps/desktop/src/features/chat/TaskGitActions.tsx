@@ -1,3 +1,4 @@
+import { isPinned, type SidebarTask } from "@terminus/tasks";
 import Rocket from "lucide-solid/icons/rocket";
 import { createEffect, createMemo, createSignal, on, onCleanup, Show } from "solid-js";
 import { invoke } from "../../lib/invoke";
@@ -5,10 +6,10 @@ import { t } from "../../lib/i18n";
 import { Button } from "../../ui/Button";
 import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
 import { asFailure, type Failure, FailureNote } from "../../ui/Failure";
-import { canFinishTask, effectiveTaskGit, retainGitObservation, type GitStatus } from "../projects/taskGit";
+import { canFinishTask, effectiveTaskGit, retainGitObservation, watchSessionGit, type GitStatus } from "../projects/taskGit";
 import SessionGit, { sessionGitDescription } from "../projects/SessionGit";
 
-type Task = { id: string; parent?: string | null; subagent?: string | null; archived?: boolean | null };
+type Task = Partial<Pick<SidebarTask, "pinned" | "inbox" | "chat_de_agente">> & { id: string; parent?: string | null; subagent?: string | null; archived?: boolean | null };
 type Blockers = { unsaved: unknown[]; not_finished?: boolean };
 
 export default function TaskGitActions(props: {
@@ -37,44 +38,23 @@ export default function TaskGitActions(props: {
     const git = effectiveTaskGit(task(), rows(), context().tasks);
     return context().on ? git : { ...git, stale: true };
   });
-  const ready = () => !context().readOnly && context().on && canFinishTask(task(), status(), context().busy || finishing());
+  const ready = () => !isPinned({ ...task(), esperando: false }) && !context().readOnly && context().on && canFinishTask(task(), status(), context().busy || finishing());
   let read = () => {};
   let previousScope: string | undefined;
   createEffect(on(() => [scope(), online()] as const, ([key]) => {
-    let live = true;
-    let sequence = 0;
     if (previousScope !== key) setRows({});
     previousScope = key;
     setFailure(null);
     setSheet(null);
-    const args = { project: context().project, remote: true, priority: [context().session] };
-    const opts = options();
-    read = () => {
-      if (!context().on) return;
-      const request = ++sequence;
-      void invoke<Record<string, GitStatus>>("list_session_git", args, opts).then((value) => {
-        if (live && request === sequence && scope() === key) {
-          setRows((before) => retainGitObservation(before, value));
-          setFailure(null);
-        }
-      }).catch((error) => {
-        if (live && request === sequence && scope() === key) {
-          setRows((before) => Object.fromEntries(Object.entries(before).map(([id, row]) => [id, { ...row, stale: true }])));
-          setFailure(asFailure(error));
-        }
-      });
-    };
-    read();
-    const focus = () => { if (!document.hidden) read(); };
-    const timer = window.setInterval(focus, 30_000);
-    window.addEventListener("focus", focus);
-    document.addEventListener("visibilitychange", focus);
-    onCleanup(() => {
-      live = false;
-      window.clearInterval(timer);
-      window.removeEventListener("focus", focus);
-      document.removeEventListener("visibilitychange", focus);
+    if (!context().on) { read = () => {}; return; }
+    const observation = watchSessionGit(context().project, { workspace: context().workspace, machine: context().machine });
+    observation.prioritize([context().session]);
+    read = observation.refresh;
+    createEffect(() => {
+      const value = observation.rows();
+      setRows((before) => retainGitObservation(before, value));
     });
+    onCleanup(() => { read = () => {}; observation.release(); });
   }));
   const finish = async () => {
     if (!ready()) return;

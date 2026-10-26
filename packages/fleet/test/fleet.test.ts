@@ -627,3 +627,18 @@ test("a task of another machine can be mentioned: listed with its panel id and s
     { target: { kind: "task", projectId: "p1", sessionId: "t2" } },
   ], "sent again from the queue, each one still says where it lives");
 });
+
+
+test("workspace context survives when only a later machine has a primary source", () => {
+  const { fleet } = setup({ cmp_vm: {}, cmp_mac: {} });
+  const first = { id: "w", context_root: null };
+  const slices: Slice[] = [
+    { ...local({ active: "w", workspaces: [first] }), machine: "cmp_vm" },
+    { ...local({ active: "w", workspaces: [{ id: "w", context_root: "/lab/context" }] }), machine: "cmp_mac" },
+  ];
+  for (const command of ["list_workspaces", "workspaces_startup"]) {
+    const result = fleet.merge(command, slices) as { workspaces: { context_root: string | null }[] };
+    assert.equal(result.workspaces[0].context_root, "/lab/context");
+    assert.equal(first.context_root, null, "merging does not change a machine's saved slice");
+  }
+});

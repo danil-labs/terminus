@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { canFinishTask, cardPull, type TaskGit } from "@terminus/tasks";
+import { canFinishTask, cardPull, isPinned, type TaskGit } from "@terminus/tasks";
 import { useState } from "react";
 import { ActivityIndicator, Keyboard, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -42,7 +42,7 @@ export function TaskHeader(props: {
   const on = props.host?.power() === "on" && props.host.canAct() === "now";
   const git: TaskGit | undefined = raw && !on ? { ...raw, stale: true } : raw;
   const pull = cardPull(git ? { ...git, shared_with: null } : git);
-  const ready = on && canFinishTask(props.task ?? {}, git, props.running || finishing);
+  const ready = !isPinned(props.task ?? { id: props.id, esperando: false }) && on && canFinishTask(props.task ?? {}, git, props.running || finishing);
   const current = git?.pull_known && git.head && git.head === git.pull?.head_sha;
   const checks = current ? git?.pull?.checks ?? "unknown" : "unknown";
   const review = current ? git?.pull?.review ?? "unknown" : "unknown";

@@ -1,3 +1,4 @@
+import { machineOf } from "../machines/store";
 import { listen } from "../../lib/serviceEvents";
 import Bug from "lucide-solid/icons/bug";
 import ChartNoAxesCombined from "lucide-solid/icons/chart-no-axes-combined";
@@ -157,7 +158,7 @@ export default function UsageBar(props: {
         id,
         // force es el nombre del parámetro del puente; otro nombre no forzaría la consulta.
         force: force,
-      });
+      }, machineOf(id));
       setReads((p) => ({ ...p, [k]: r }));
       const lastGood = legible(r);
       if (lastGood) setLastGoodReads((p) => ({ ...p, [k]: lastGood }));
@@ -252,7 +253,7 @@ export default function UsageBar(props: {
             const status = await invoke<AccountStatus>("account_status", {
               provider: p.agent,
               id: p.cuenta.id,
-            });
+            }, machineOf(p.cuenta.id));
             if (!alive) return;
             setStatuses((previous) => ({
               ...previous,

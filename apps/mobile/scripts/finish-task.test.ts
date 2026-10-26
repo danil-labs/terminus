@@ -34,7 +34,7 @@ test("una máquina apagada, una respuesta vieja o un fallo no permite eliminar t
   const asleep = machine({ power: "off" });
   await assert.rejects(finishTask(asleep.host, "w", "p", "t"), (error) => error instanceof HostError && error.code === "machine_asleep");
   assert.deepEqual(asleep.calls, []);
-  for (const options of [{ cachedAt: 100 }, { reject: true }, { blockers: null }]) {
+  for (const options of [{ cachedAt: 100 }, { reject: true }, { blockers: null }, { blockers: {} }, { blockers: { unsaved: {} } }]) {
     const { host, calls } = machine(options);
     await assert.rejects(finishTask(host, "w", "p", "t"));
     assert.equal(calls.some((call) => call.command === "finish_task"), false);
@@ -53,7 +53,7 @@ test("eliminar se limita a la máquina elegida, sin forzar y sin encenderla", as
 });
 
 test("archivar no toma una copia vieja o una respuesta vacía como permiso", async () => {
-  for (const options of [{ cachedAt: 100 }, { blockers: null }]) {
+  for (const options of [{ cachedAt: 100 }, { blockers: null }, { blockers: {} }, { blockers: { unsaved: {} } }]) {
     const { host, calls } = machine(options);
     await assert.rejects(archiveTask(host, "w", "p", "t"), (error) => error instanceof HostError && error.code === "task_status_unavailable");
     assert.equal(calls.some((call) => call.command === "set_task_archived"), false);

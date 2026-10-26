@@ -8,7 +8,7 @@
  * pudo releer (la máquina no contesta, o está apagada) se conserva con
  * `stale`: la tarjeta lo enseña en gris, sin afirmar ni el rojo del CI.
  */
-import { resolveTaskGit, type TaskGit, type TaskGitSession } from "@terminus/tasks";
+import { resolveTaskGit, UNKNOWN_TASK_GIT, type TaskGitStatus, type TaskGitSession } from "@terminus/tasks";
 
 export type GitAsk = { host: string; workspace: string; project: string; priority: string[] };
 
@@ -28,11 +28,11 @@ export function gitAsks(visible: readonly { host: string; workspace: string; fol
 export const gitAsksKey = (asks: readonly GitAsk[]) =>
   asks.map((a) => `${a.host}/${a.workspace}/${a.project}:${a.priority.join(",")}`).sort().join("|");
 
-export type GitBook = Readonly<Record<string, TaskGit>>;
+export type GitBook = Readonly<Record<string, TaskGitStatus>>;
 
-const UNKNOWN_GIT: TaskGit = { kind: "unknown", head: null, shared_with: null, pull: null, pull_known: false, stale: true };
+const UNKNOWN_GIT: TaskGitStatus = { ...UNKNOWN_TASK_GIT, stale: true };
 
-const isRow = (v: unknown): v is TaskGit => !!v && typeof v === "object" && "pull_known" in v;
+const isRow = (v: unknown): v is TaskGitStatus => !!v && typeof v === "object" && "pull_known" in v;
 
 /**
  * La respuesta de una carpeta en el libro. Una fila que el motor no pudo leer
@@ -40,7 +40,7 @@ const isRow = (v: unknown): v is TaskGit => !!v && typeof v === "object" && "pul
  */
 export function withGitAnswer(book: GitBook, host: string, answer: unknown): GitBook {
   if (!answer || typeof answer !== "object") return book;
-  let next: Record<string, TaskGit> | null = null;
+  let next: Record<string, TaskGitStatus> | null = null;
   for (const [id, row] of Object.entries(answer as Record<string, unknown>)) {
     if (!isRow(row)) continue;
     const key = `${host}/${id}`;
@@ -55,7 +55,7 @@ export function withGitAnswer(book: GitBook, host: string, answer: unknown): Git
 
 /** Lo que ya se sabía de esas tareas, ahora viejo: no se pudo releer. */
 export function staleGit(book: GitBook, host: string, ids: readonly string[]): GitBook {
-  let next: Record<string, TaskGit> | null = null;
+  let next: Record<string, TaskGitStatus> | null = null;
   for (const id of ids) {
     const key = `${host}/${id}`;
     const before = book[key];
@@ -67,7 +67,7 @@ export function staleGit(book: GitBook, host: string, ids: readonly string[]): G
 }
 
 /** Resuelve la rama compartida dentro de la misma máquina y workspace. */
-export function effectiveGit(book: GitBook, task: TaskGitSession & { host: string; workspace: string }, tasks: readonly (TaskGitSession & { host: string; workspace: string })[]): TaskGit {
+export function effectiveGit(book: GitBook, task: TaskGitSession & { host: string; workspace: string }, tasks: readonly (TaskGitSession & { host: string; workspace: string })[]): TaskGitStatus {
   const rows = Object.fromEntries(Object.entries(book).filter(([key]) => key.startsWith(`${task.host}/`)).map(([key, value]) => [key.slice(task.host.length + 1), value]));
   return resolveTaskGit(task, rows, tasks.filter((row) => row.host === task.host && row.workspace === task.workspace), UNKNOWN_GIT).status;
 }

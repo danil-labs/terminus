@@ -57,15 +57,6 @@ export function cardPull(git: TaskGit | null | undefined): CardPull | null {
   return { number: pull.number, state, tone, numberTone: failing && !git.stale ? "failure" : tone };
 }
 
-/** La misma condición para finalizar en todos los clientes; el motor vuelve a comprobarla al actuar. */
-export function canFinishTask(session: { archived?: boolean | null; subagent?: string | null }, status: TaskGit | null | undefined, busy: boolean): boolean {
-  if (!status || session.archived || busy || status.stale) return false;
-  if (status.kind === "kn") return status.kn === "saved";
-  if (status.kind !== "branch" || !status.head) return false;
-  if (status.pull) return status.pull_known && status.pull.state === "merged" && status.pull.head_sha === status.head;
-  return status.merged_locally === true && (status.pull_known || status.has_remote === false);
-}
-
 export type TaskGitSession = { id: string; parent?: string | null; subagent?: string | null };
 
 export function resolveTaskGit<T extends TaskGit>(

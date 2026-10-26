@@ -159,5 +159,46 @@
   "danil.computers.rename_failed.offline": "No connection to Danil: the name was not saved.",
   "danil.computers.rename_failed.other": "Danil didn't save the name. Try again.",
   "danil.here.title": "This workspace: {name}",
-  "danil.workspace.use": "Use {email}"
+  "danil.workspace.use": "Use {email}",
+  "danil.credentials.in_use": "In use on: {machines}",
+  "danil.credentials.in_use_none": "Not on any machine yet",
+  "danil.credentials.pending_on": "pending on {machines}",
+  "danil.credentials.state.pending": "pending",
+  "danil.credentials.state.removed": "removed",
+  "danil.credentials.remove": "Remove",
+  "danil.credentials.restore": "Put back",
+  "danil.credentials.cancel": "Cancel",
+  "danil.credentials.remove_from": "Remove from {machine}",
+  "danil.credentials.remove_warning": "Removing it from {machine} does not revoke it at {provider}. If that machine already had it, the key still works there: to really revoke it, change it at {provider}.",
+  "danil.credentials.delete": "Delete from account",
+  "danil.credentials.delete_yes": "Delete from account",
+  "danil.credentials.delete_warning": "It is deleted from your account and all your machines, but not revoked at {provider}: to stop it working, revoke it there.",
+  "danil.credentials.mcp_title": "MCP keys in your account",
+  "danil.credentials.zotero_title": "Zotero key in your account",
+  "danil.credentials.rotate.open": "Change key",
+  "danil.credentials.rotate.label": "New key for {name}",
+  "danil.credentials.rotate.placeholder": "Paste the new key",
+  "danil.credentials.rotate.save": "Save on all",
+  "danil.credentials.rotate.help": "It is encrypted in this browser for each of your machines. Danil keeps the encrypted copies and cannot read them.",
+  "danil.credentials.rotate.no_webcrypto": "This browser cannot encrypt the key. Change it from the desktop app or with an up-to-date browser.",
+  "danil.credentials.failed.unauthorized": "Your Danil session expired. Sign in again.",
+  "danil.credentials.failed.license": "Your Danil account has no active Terminus.",
+  "danil.credentials.failed.offline": "No connection to Danil. Try again.",
+  "danil.credentials.failed.other": "Danil could not handle your account's keys. Try again.",
+  "danil.credentials.local.title": {
+    "one": "You have {count} key only on this machine. Upload it to your account?",
+    "other": "You have {count} keys only on this machine. Upload them to your account?"
+  },
+  "danil.credentials.local.title_on": {
+    "one": "You have {count} key only on {machine}. Upload it to your account?",
+    "other": "You have {count} keys only on {machine}. Upload them to your account?"
+  },
+  "danil.credentials.local.help": "Choose which. They are encrypted for each of your machines and reach all of them; Danil cannot read them.",
+  "danil.credentials.local.later": "Not now",
+  "danil.credentials.local.upload": {
+    "one": "Upload {count}",
+    "other": "Upload {count}"
+  },
+  "danil.credentials.failed.recipient": "One of the machines is no longer linked to this workspace. Reopen Settings and try again.",
+  "danil.credentials.provider_opencode_go": "OpenCode Go"
 }

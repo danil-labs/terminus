@@ -22,7 +22,7 @@ import { useTheme } from "../ui/theme";
 /**
  * La vista previa de una tarea al mantener pulsada su tarjeta: la tarjeta
  * flotante del sidebar del escritorio (`TaskHoverCard`) como hoja del sistema.
- * Título, lo último que se dijo, carpeta, agente, proveedor y modelo, la
+ * Título, carpeta, agente, proveedor y modelo, la
  * máquina si hay más de una; y Abrir, Fijar y Archivar con los mismos comandos
  * que la ventana (`set_session_pinned`, `task_blockers` y `set_task_archived`).
  * Abrirla no enciende nada; fijar o archivar encienden la VM si está apagada.
@@ -50,8 +50,8 @@ export default function Preview() {
   const provider = snapshot?.providers[task.host]?.find((p) => p.id === task.provider);
   const several = hosts.length > 1;
   const git = effectiveGit(book, task, snapshot?.tasks ?? []);
-  const running = marks.live.has(`${task.host}/${task.id}`);
-  const ready = host.power() === "on" && host.canAct() === "now" && canFinishTask(task, git, running || finishing);
+  const running = marks.live.has(`${task.host}/${task.id}`) || marks.attention.get(`${task.host}/${task.id}`) === "approving";
+  const ready = !preview.pinned && host.power() === "on" && host.canAct() === "now" && canFinishTask(task, git, running || finishing);
   const pull = cardPull({ ...git, shared_with: null });
   const removed = () => { void reload(); router.back(); };
   const frame = (content: ReactNode) => Platform.OS === "web" ? <Sheet visible onClose={() => { if (!finishing) router.back(); }}>{content}</Sheet> : content;
@@ -68,11 +68,6 @@ export default function Preview() {
       <View style={styles.head}>
         <Text style={[styles.title, { color: theme.text }]}>{preview.title}</Text>
       </View>
-      {preview.excerpt ? (
-        <Text numberOfLines={4} style={[styles.excerpt, { color: theme.textMuted, borderColor: theme.border }]}>
-          {preview.excerpt}
-        </Text>
-      ) : null}
       {pull ? <PullChip pull={pull} git={git} /> : null}
       <View style={styles.rows}>
         {preview.folder ? (
