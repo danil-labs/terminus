@@ -205,7 +205,7 @@ lleva su comentario allí:
 | Cuadro de escribir | `list_models`, `list_permission_modes`, `list_slash_menu`, `list_mentions`, `project_base_branches` | `run_shell_command`, `stop_shell_command`, `guardar_imagen_pegada`, `prepare_attachments` |
 | Cuentas de IA | `list_accounts`, `account_status`, `account_limits` | `add_account`, `login_account`, `submit_login_code`, `cancel_login`, `discard_account`, `remove_account` |
 | Fondo del chat | `chat_background` | — |
-| Chat enriquecido | `tree_show` (solo el árbol `terminus-chat-visuals`), `preview_file`, `attachment_preview` | — |
+| Chat enriquecido | `tree_show` (solo el árbol `terminus-chat-visuals`), `chat_visual_part`, `preview_file`, `attachment_preview` | — |
 | Carpetas nuevas | `get_project_directory`, `project_clone_status` | `create_project`, `start_project_clone`, `cancel_project_clone` |
 | PR en la tarjeta | `list_session_git` (por carpeta, con las visibles en `priority`) | — |
 | Llevar trabajo | `work_status`, `work_key` | `work_export`, `work_read_part`, `work_write_part`, `work_import`, `work_cancel` |
