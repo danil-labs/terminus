@@ -1497,14 +1497,15 @@ export default function App() {
   // no la mandó se ven igual desde aquí, y el menú enseña las skills igual. Se
   // vuelve a pedir al cerrar cada turno: los de ACP la publican dentro de uno.
   const cargarComandos = (a: string) => {
+    const revision = composerRevision;
     const poner = (menu: SlashMenu) => {
       // La respuesta de un agente que ya no es el de la caja ofrecería sus comandos.
-      if (a !== agent()) return;
+      if (a !== agent() || revision !== composerRevision) return;
       setCliCommands(menu.commands);
       setSkills(menu.skills);
       setSideCommand(menu.side_question ?? null);
     };
-    void invoke<SlashMenu>("list_slash_menu", { provider: a })
+    void invoke<SlashMenu>("list_slash_menu", { provider: a }, composerOptions())
       .then(poner)
       .catch(() => poner({ commands: [], skills: [] }));
   };
@@ -3632,6 +3633,33 @@ export default function App() {
   // Antes del motor no: el arranque reinicia las lecturas y las relee en `aplicar`.
   createEffect(on(grupos, (g) => { if (connected()) void refreshSessions(g); }));
 
+  const composerMachine = createMemo(() => {
+    const id = sessionId();
+    const active = machines().find((m) => m.active)?.id ?? null;
+    return id
+      ? machineOf(id)?.headers["x-terminus-machine"] ?? active
+      : runOn(workspaceActivo(), projectList().find((p) => p.id === project())) ?? active;
+  });
+  const composerOptions = () => {
+    const machine = composerMachine();
+    const workspace = workspaceActivo();
+    return { headers: {
+      ...(machine && machine !== "local" ? { "x-terminus-machine": machine } : {}),
+      ...(workspace ? { "x-terminus-workspace": workspace } : {}),
+    } };
+  };
+  let composerRevision = 0;
+  const catalogosEnVuelo = new Map<string, Promise<void>>();
+  createEffect(on([composerMachine, workspaceActivo], () => {
+    composerRevision++;
+    catalogosEnVuelo.clear();
+    batch(() => {
+      setCatalogos({});
+      setSuperficies(null);
+    });
+    if (connected() && workspaceActivo()) void cargarSuperficies(false);
+  }, { defer: true }));
+
   // El catálogo depende del agente. No se resetea el modelo elegido aquí: al
   // abrir una sesión se fijan agente y modelo juntos, y un efecto que limpiara
   // el modelo correría después y borraría el que se acaba de restaurar.
@@ -3642,13 +3670,14 @@ export default function App() {
   //
   // `forzar` es de quien sabe que cambió de qué depende la respuesta: la cuenta
   // activa, la clave o el consentimiento del workspace.
-  const catalogosEnVuelo = new Map<string, Promise<void>>();
   function cargarModelos(a: string, forzar = false) {
     if (!forzar && untrack(() => catalogos()[a])) return Promise.resolve();
     const yaVa = catalogosEnVuelo.get(a);
     if (yaVa) return yaVa;
-    const pedido = invoke<AgentModels>("list_models", { provider: a })
+    const revision = composerRevision;
+    const pedido = invoke<AgentModels>("list_models", { provider: a }, composerOptions())
       .then((catalogo) => {
+        if (revision !== composerRevision) return;
         setCatalogos((actuales) => ({ ...actuales, [a]: catalogo }));
         // La primera carga tiene que dejar una elección ejecutable. Este punto
         // conoce qué petición terminó; un catálogo de otro agente no puede
@@ -3664,9 +3693,12 @@ export default function App() {
         }
       })
       .catch(() => {
+        if (revision !== composerRevision) return;
         setCatalogos((actuales) => ({ ...actuales, [a]: null }));
       })
-      .finally(() => catalogosEnVuelo.delete(a));
+      .finally(() => {
+        if (catalogosEnVuelo.get(a) === pedido) catalogosEnVuelo.delete(a);
+      });
     catalogosEnVuelo.set(a, pedido);
     return pedido;
   }
@@ -3682,14 +3714,15 @@ export default function App() {
   // backend niega el turno igual (`chat::send_message`), pero enterarse
   // al mandar es tarde: se baja al primero disponible, y se ve.
   createEffect(
-    on(agent, (a) => {
+    on([agent, composerMachine, workspaceActivo], ([a]) => {
+      const revision = composerRevision;
       if (!a) {
         setModos([]);
         return;
       }
-      void invoke<ModoDePermiso[]>("list_permission_modes", { provider: a })
+      void invoke<ModoDePermiso[]>("list_permission_modes", { provider: a }, composerOptions())
         .then((lista) => {
-          if (a !== agent()) return;
+          if (a !== agent() || revision !== composerRevision) return;
           batch(() => {
             setModos(lista);
             const puede = lista.filter((m) => !m.falta);
@@ -3701,7 +3734,7 @@ export default function App() {
             }
           });
         })
-        .catch(() => setModos([]));
+        .catch(() => { if (revision === composerRevision) setModos([]); });
     }),
   );
 
@@ -3731,8 +3764,10 @@ export default function App() {
   // se toca lo elegido: quien acaba de elegir una superficie no ve cómo se le
   // mueve el selector por una consulta que termina tarde.
   async function cargarSuperficies(inicial: boolean) {
+    const revision = composerRevision;
     try {
-      const s = await invoke<Superficie[]>("list_surfaces");
+      const s = await invoke<Superficie[]>("list_surfaces", {}, composerOptions());
+      if (revision !== composerRevision) return;
       const primera = s.find((x) => x.usable);
       batch(() => {
         setSuperficies(s);
@@ -3759,6 +3794,7 @@ export default function App() {
       // índice como `forzar`, y el primero de la lista no forzaría nunca.
       await Promise.all([...agentes].map((a) => cargarModelos(a, !inicial)));
     } catch {
+      if (revision !== composerRevision) return;
       setSuperficies([]);
     }
   }
@@ -3854,7 +3890,7 @@ export default function App() {
 
   // Lo que el menú de la barra ofrece depende del agente y del workspace, no
   // del proyecto: sus comandos, y las skills que la proyección pone en su carpeta.
-  createEffect(on(agent, (a) => cargarComandos(a)));
+  createEffect(on([agent, composerMachine, workspaceActivo], ([a]) => cargarComandos(a)));
 
   /**
    * Lo que esta tarea le va a adjuntar al turno: lo que ya lee más lo que está
@@ -6796,6 +6832,7 @@ export default function App() {
         onAdjuntos={setArchivos}
         onAgregarAdjuntos={agregarArchivos}
         agent={agent()}
+        modelOptions={composerOptions()}
         /* Lo utilizable, más la superficie de la tarea abierta si dejó de
            serlo: una tarea viva no puede cambiar de agente en silencio. El
            `&&` va dentro del accesor y no aquí — ver `menuDeSuperficies`. */

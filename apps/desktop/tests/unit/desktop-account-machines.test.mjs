@@ -661,3 +661,25 @@ test("Cuenta de Danil lists the account's computers; a name edited in place reac
   assert.equal(f.relays.cmp_vm.sockets.length, 1, "renaming does not reconnect the machine");
   assert.deepEqual(app.fallos, []);
 });
+
+test("el composer ofrece los modelos autenticados de la máquina seleccionada", async () => {
+  const { app, doc, relayCalls } = await open("desktop-composer-machine", {
+    computers: [HOME, { ...MAC, state: "online" }],
+    relays: { cmp_mac: { table: remote("Panel", "Tarea del Mac", {
+      list_surfaces: [{ id: "claude", provider: "claude", label: "Claude Code", catalogo: "todo", usable: true, marca: null, porque: null }],
+      list_models: ({ provider }) => ({ provider, models: [{ id: "remote-sonnet", label: "Sonnet del Mac", efforts: [], default_effort: null }], fallback: false }),
+    }) } },
+  });
+  doc.querySelector('[aria-label="Ejecutar en"]').click();
+  await sleep(150);
+  doc.querySelector('[data-machine-option="cmp_mac"]').click();
+  await sleep(600);
+  assert.ok(relayCalls("cmp_mac", "list_surfaces").length, "el Mac no recibió la consulta de credenciales");
+  assert.ok(doc.querySelector('[aria-label*="Sonnet del Mac"]'), "el composer conserva el modelo del motor local");
+  doc.querySelector('[aria-label="Ejecutar en"]').click();
+  await sleep(150);
+  doc.querySelector('[data-machine-option="cmp_home"]').click();
+  await sleep(600);
+  assert.equal(doc.querySelector('[aria-label*="Sonnet del Mac"]'), null, "el modelo remoto sigue al volver a esta máquina");
+  assert.deepEqual(app.fallos, []);
+});
