@@ -71,6 +71,7 @@ const steps = [
   ["El motor fijado habla el contrato copiado", process.execPath, [join(root, "scripts/guards/contract.mjs")], root],
   ["El runtime del artefacto no se rompe en silencio", process.execPath, [join(root, "scripts/guards/artifact.mjs")], root],
   ["Llevar trabajo a otra máquina copia por partes, sigue desde la que falló y limpia al cancelar", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/carry-work.test.ts")], root],
+  ["Los visuales del chat llegan por partes y caen a tree_show con un motor anterior", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/chat-visual-parts.test.ts")], root],
   ["La foto del sidebar se guarda acotada y con espera", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/shell-cache.test.ts")], root],
   ["La nota de la versión sale en el idioma de la app", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/release-notes.test.ts")], root],
   ["Las tareas de la página de un agente se paginan sin separar subtareas de su padre", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/agent-page-tasks.test.ts")], root],

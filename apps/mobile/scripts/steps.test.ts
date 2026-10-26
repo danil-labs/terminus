@@ -7,7 +7,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Turn } from "@terminus/protocol";
-import { applyLive, bareCommand, linesOfLive, linesOfTurn } from "../src/lib/steps.ts";
+import { coalesced } from "../src/lib/engine.ts";
+import { type LivePiece, applyLive, bareCommand, linesOfLive, linesOfTurn, liveAfterRead } from "../src/lib/steps.ts";
 
 test("con el orden registrado: avance, pasos y la respuesta al final", () => {
   const turn: Turn = {
@@ -65,4 +66,41 @@ test("el input de un encargado o de otra tarea lleva quién lo escribió; el de 
   const fromTask = { folder: "web", task: "t-9", title: "Arreglar el login", provider: "codex" };
   const [byTask] = linesOfTurn({ role: "user", text: "listo", from_task: fromTask }, "t2", []);
   assert.deepEqual(byTask.kind === "message" && byTask.from, { agent: null, task: "Arreglar el login", provider: "codex" });
+});
+
+test("releer con el turno corriendo no borra lo que se escribe en vivo; tras guardar un tramo queda solo lo nuevo", () => {
+  const before = applyLive(applyLive([], { kind: "tool", text: "Read", target: "a.ts" }), { kind: "delta", text: "Ya lo" });
+  // Durante la lectura siguió llegando texto y otra herramienta.
+  const now = applyLive(applyLive(before, { kind: "delta", text: " vi." }), { kind: "tool", text: "Bash", target: "ls" });
+  assert.equal(liveAfterRead(now, before, { running: true, resync: false }), now, "el foco o un aviso no tocan lo vivo");
+  const rest = liveAfterRead(now, before, { running: true, resync: true });
+  assert.deepEqual(rest.map((p) => ("text" in p ? p.text : p.step.name)), [" vi.", "Bash"], "lo guardado sale de lo vivo; lo que llegó después se queda");
+  assert.deepEqual(liveAfterRead(before, before, { running: true, resync: true }), []);
+  assert.deepEqual(liveAfterRead(now, before, { running: false, resync: false }), [], "el turno terminó: lo guardado lo trae todo");
+  const empty: readonly LivePiece[] = [];
+  assert.equal(liveAfterRead(empty, before, { running: false, resync: true }), empty);
+});
+
+test("las lecturas pedidas con una en marcha se juntan en una sola, que empieza después", async () => {
+  const runs: boolean[] = [];
+  let release: () => void = () => {};
+  const read = coalesced(
+    (resync: boolean) => {
+      runs.push(resync);
+      return new Promise<void>((resolve) => (release = resolve));
+    },
+    (a, b) => a || b,
+  );
+  const first = read(false);
+  const second = read(false);
+  const third = read(true);
+  assert.deepEqual(runs, [false], "nunca dos a la vez");
+  release();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(runs, [false, true], "las dos pedidas durante la primera, en una, con `resync` si alguna lo pidió");
+  release();
+  await Promise.all([first, second, third]);
+  void read(false);
+  assert.deepEqual(runs, [false, true, false], "terminada, la siguiente corre al momento");
+  release();
 });

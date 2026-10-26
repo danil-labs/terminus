@@ -401,7 +401,7 @@
   "chat.visual.loading": "Cargando visualización…",
   "chat.visual.failed": "No se pudo cargar la visualización. Revisa el archivo e inténtalo de nuevo.",
   "chat.visual.invalid": "La visualización requiere un archivo HTML válido de esta tarea.",
-  "chat.visual.too_large": "La visualización supera el límite de 512 KiB.",
+  "chat.visual.too_large": "La visualización es demasiado grande para mostrarla en el chat.",
   "chat.visual.collapse": "Reducir visualización",
   "chat.visual.budget": "Este hilo alcanzó el límite de 16 visualizaciones cargadas. Cierra una visualización para cargar otra.",
   "chat.visual.open_browser": "Abrir en el navegador",
