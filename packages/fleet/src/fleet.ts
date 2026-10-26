@@ -82,8 +82,10 @@ const RETRY_READ = new Set(["machine_lost", "machine_timeout", "io"]);
 /**
  * `outdated`: el relay contestó `version_mismatch`. `engine`: lo que dijo el último
  * `hello` (`true` compatible), que manda sobre el contrato que listó el plano de control.
- * `fresh`: con la cola de aplazadas cambiada (`null` si no cambió), las lecturas que ya
- * se volvieron a pedir al relay; las demás no salen de la última rebanada guardada.
+ * `fresh`: con la cola de aplazadas cambiada, o la máquina recién apagada (`null` si
+ * nada de eso), las lecturas que ya se volvieron a pedir al relay; las demás no salen
+ * de la última rebanada guardada. Al apagarse, la VM deja en el relay su copia, más
+ * nueva que lo leído aquí mientras estaba encendida (la respuesta que terminó al final).
  */
 type Member = { info: MachineInfo; link: Link; stops: (() => void)[]; was: MachineState; outdated: boolean; engine: boolean | null; fresh: Set<string> | null };
 
@@ -501,6 +503,8 @@ export class Fleet {
       link.onState((state) => {
         if (OUTDATED.includes(state)) member.outdated = true;
         const cameOn = state === "online" && member.was !== "online";
+        // Se apagó en esta sesión: cada lectura vuelve a pedirse una vez a la copia del relay (no la enciende).
+        if (OFF.includes(state) && (member.was === "online" || member.was === "starting")) member.fresh = new Set();
         member.was = state;
         if (cameOn && this.listening) this.config.onEvents?.(info.id, [], true);
         this.config.onChange?.(info.id);

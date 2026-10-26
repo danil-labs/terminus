@@ -159,6 +159,30 @@ export function applyLive(live: readonly LivePiece[], event: { kind: string; tex
   return live;
 }
 
+/**
+ * Lo vivo después de releer la tarea. `before` es lo vivo cuando empezó la lectura.
+ * - El turno ya no corre: lo guardado lo trae todo.
+ * - `resync` (terminó, guardó un tramo —`segment_saved`—, se perdieron eventos, volvió al
+ *   frente): lo que había al empezar ya está guardado; queda solo lo que llegó durante la
+ *   lectura, con el pedazo de texto que se siguió escribiendo sobre el último.
+ * - Si no (el foco, un aviso, la máquina que cambia), lo que se escribe en vivo se queda:
+ *   releer no borra la respuesta a medias.
+ */
+export function liveAfterRead(now: readonly LivePiece[], before: readonly LivePiece[], read: { running: boolean; resync: boolean }): readonly LivePiece[] {
+  if (!read.running) return now.length ? [] : now;
+  if (!read.resync || !before.length) return now;
+  // Lo vivo empezó de nuevo durante la lectura (no es continuación de `before`): se queda.
+  if (now.length < before.length) return now;
+  const rest = now.slice(before.length);
+  const last = before.length - 1;
+  const was = before[last];
+  const is = now[last];
+  if (was && is && "text" in was && "text" in is && is.text.length > was.text.length && is.text.startsWith(was.text)) {
+    return [{ text: is.text.slice(was.text.length) }, ...rest];
+  }
+  return rest;
+}
+
 /** Los renglones de lo que llega en vivo: el último texto es la respuesta que se está escribiendo. */
 export function linesOfLive(live: readonly LivePiece[]): Line[] {
   const out: Line[] = [];

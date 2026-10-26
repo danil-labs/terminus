@@ -225,7 +225,23 @@ test("a VM off answers from the relay's copy with its time; a copy kept here sur
   assert.equal(later.link("cmp_vm").calls.length, 0, "a machine off with a copy here is not asked: nothing to wait for");
 });
 
-test("merged rows say their machine and the state of its slice; the window's rows stay as they are", async () => {
+test("a VM that turns off is asked once more for the relay's copy, newer than what was read while it ran", async () => {
+  const answers: Record<string, Answer> = { load_session: { turns: ["pregunta"] } };
+  const { fleet, link } = setup({ cmp_vm: { cachedAt: "2026-10-24T10:00:00Z", answers } }, [VM]);
+  const read = () => fleet.read({ machine: "cmp_vm", workspace: "w", command: "load_session", args: { id: "t1" } });
+  assert.equal((await read()).status, "ok");
+  // La respuesta terminó sin que nadie la leyera y la VM dejó su copia al apagarse.
+  answers.load_session = { turns: ["pregunta", "respuesta"] };
+  link("cmp_vm").setState("stopped");
+  const off = await read();
+  assert.deepEqual([off.status, off.value], ["cached", { turns: ["pregunta", "respuesta"] }]);
+  assert.equal(off.at, Date.parse("2026-10-24T10:00:00Z"));
+  const calls = link("cmp_vm").calls.length;
+  assert.equal((await read()).status, "cached");
+  assert.equal(link("cmp_vm").calls.length, calls, "once asked, the copy here answers again without the network");
+});
+
+test("merged rows say their machine and the state of its slice;the window's rows stay as they are", async () => {
   const { fleet } = setup({ cmp_vm: { answers: { list_live_sessions: [{ ...row("t1"), updated_at: 5 }] } } }, [VM]);
   const vm = await fleet.read({ machine: "cmp_vm", workspace: "w", command: "list_live_sessions", args: { project: "p1" } });
   const merged = fleet.merge("list_live_sessions", [local([{ ...row("t1"), updated_at: 1 }]), vm], "w") as Record<string, unknown>[];

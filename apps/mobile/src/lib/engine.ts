@@ -355,6 +355,38 @@ export async function loadTask(host: Host, workspace: string, folder: string, id
   return { session, permissions: pending?.permissions ?? [], questions, running: live.includes(id), cachedAt: at.cachedAt };
 }
 
+/**
+ * Una lectura que se pide desde muchos lados (volver al frente, el foco, un evento, la
+ * máquina que cambia) sin pisarse: con una en marcha, las que se piden mientras tanto se
+ * juntan (`merge`) en una sola que corre al terminar, y todas esperan a esa. Así nunca
+ * hay dos a la vez y la última petición siempre ve una lectura que empezó después de ella.
+ */
+export function coalesced<T>(run: (arg: T) => Promise<void>, merge: (a: T, b: T) => T): (arg: T) => Promise<void> {
+  let running: Promise<void> | null = null;
+  let queued: { arg: T } | null = null;
+  return (arg) => {
+    if (running) {
+      queued = { arg: queued ? merge(queued.arg, arg) : arg };
+      return running;
+    }
+    running = (async () => {
+      try {
+        let current = arg;
+        for (;;) {
+          await run(current);
+          if (!queued) return;
+          current = queued.arg;
+          queued = null;
+        }
+      } finally {
+        running = null;
+        queued = null;
+      }
+    })();
+    return running;
+  };
+}
+
 /** Lo que el cuadro de escribir elige para un mensaje, como la ventana. */
 export type Draft = {
   prompt: string;
