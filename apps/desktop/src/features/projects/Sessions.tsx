@@ -555,15 +555,15 @@ export default function Sessions(props: {
 
   /**
    * El cuerpo de una fila del riel. Línea 1: estado en su columna fija,
-   * título y chincheta. Línea 2: lo que te piden si te necesita; si no,
-   * proveedor, carpeta, máquina (si no es esta), cara del agente y PR. Lo
-   * demás vive en la tarjeta flotante.
+   * título y chincheta. Línea 2: lo que te piden si espera aprobación o
+   * respuesta; si no (también si falló), proveedor, carpeta, máquina (si no
+   * es esta), cara del agente y PR. Lo demás vive en la tarjeta flotante.
    */
   const FilaDelRiel = (r: { s: SessionRow; actividad: TaskActivity; titulo: JSX.Element }) => {
     // Qué lleva la línea 2 lo decide la tarjeta compartida con el teléfono (`@terminus/tasks`).
     const tarjeta = () => taskCard(r.s, { live: props.vivas, approving: props.aprobando, hideFolder: props.hideFolder });
     const estado = () => taskPriority(r.actividad);
-    const teNecesita = () => tarjeta().needsYou;
+    const pide = () => tarjeta().request;
     const pull = () => hoverCardPull(gitDe(r.s));
     // Rojo si el CI falló; si no, el color del estado del PR, como su icono.
     const colorDelPr = () => pull()?.checks === "failure" && !gitDe(r.s).stale ? "text-error-strong"
@@ -602,7 +602,7 @@ export default function Sessions(props: {
         <Show when={!compacta()}>
           <div data-session-preview class="col-start-2 mt-0.5 flex h-4 min-w-0 items-center gap-1.5 text-[0.6875rem] font-normal leading-tight text-neutral-500">
             <Show
-              when={teNecesita()}
+              when={pide()}
               fallback={
                 <>
                   <Show when={tarjeta().provider}>
@@ -636,7 +636,7 @@ export default function Sessions(props: {
                 </>
               }
             >
-              <span data-session-request class="min-w-0 flex-1 truncate text-neutral-700">{r.s.last_message}</span>
+              <span data-session-request class="min-w-0 flex-1 truncate text-neutral-700">{pide()}</span>
               <ChipDeGit />
               <Show when={!props.hideFolder}>
                 <span title={props.carpetaDe?.(r.s)} class="flex shrink-0"><FolderSquare id={projectOf(r.s)} /></span>
