@@ -108,6 +108,7 @@ export function Composer({
   // La selección solo se impone al insertar una mención: controlada siempre, en Android el cursor salta.
   const [forced, setForced] = useState<{ start: number; end: number } | null>(null);
   const [keyboard, setKeyboard] = useState(false);
+  const [focused, setFocused] = useState(false);
   const [provider, setProvider] = useState<string | null>(initialProvider);
   const [model, setModel] = useState<string | null>(initialModel);
   const [effort, setEffort] = useState<string | null>(null);
@@ -379,7 +380,7 @@ export function Composer({
 
       {header}
 
-      <View style={[styles.box, { borderColor: shell ? theme.text : theme.border, backgroundColor: theme.surface }]}>
+      <View style={[styles.box, { borderColor: shell || focused ? theme.text : theme.border, backgroundColor: theme.surface }]}>
         {attachments.length ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.files}>
             {attachments.map((a) => (
@@ -407,7 +408,9 @@ export function Composer({
           }}
           placeholder={placeholder}
           placeholderTextColor={theme.textMuted}
-          editable={!disabled}
+          // La disponibilidad bloquea el envío, no la escritura del borrador ni el teclado.
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           multiline
           textAlignVertical="top"
           // El teclado dice «Enviar». En iOS y Android el retorno manda y no mete salto de línea.
@@ -603,7 +606,7 @@ export function SelectorChip({ icon, left, label, value, onPress, testID, muted 
 const styles = StyleSheet.create({
   wrap: { paddingHorizontal: 10, paddingTop: 6, gap: 6 },
   box: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 20, paddingTop: 4, paddingBottom: 6, paddingHorizontal: 6 },
-  input: { fontSize: 16, lineHeight: 21, minHeight: 40, maxHeight: 21 * 6 + 16, paddingHorizontal: 8, paddingTop: 9, paddingBottom: 6 },
+  input: { fontSize: 16, lineHeight: 21, minHeight: 40, maxHeight: 21 * 6 + 16, paddingHorizontal: 8, paddingTop: 9, paddingBottom: 6, backgroundColor: "transparent", ...Platform.select({ web: { outlineWidth: 0 } }) },
   row: { flexDirection: "row", alignItems: "center", gap: 6 },
   round: { width: 34, height: 34, alignItems: "center", justifyContent: "center", borderRadius: 17 },
   pill: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 14, paddingHorizontal: 9, height: 28 },
