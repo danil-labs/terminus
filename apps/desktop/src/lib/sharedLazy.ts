@@ -10,7 +10,7 @@ export function sharedLazy<P extends object>(load: () => Promise<{ default: Comp
   let pending: Promise<void> | undefined;
   return (props: P) => {
     // Si falla la carga, la siguiente instancia la vuelve a pedir.
-    pending ??= load().then((mod) => { setLoaded(() => mod.default); }, () => { pending = undefined; });
+    if (!pending) pending = load().then((mod) => { setLoaded(() => mod.default); }, () => { pending = undefined; });
     return createMemo(() => {
       const Comp = loaded();
       return Comp ? untrack(() => Comp(props)) : null;
