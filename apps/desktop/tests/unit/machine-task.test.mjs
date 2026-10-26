@@ -169,3 +169,44 @@ test("el PDF que nombra el chat de una tarea de otra máquina se lee en esa máq
     assert.deepEqual(asked.map((r) => r.machine), asked.map(() => "vm"), `${command} fue al motor de la ventana`);
   }
 });
+
+test("el composer consulta la máquina elegida y descarta respuestas tardías", async () => {
+  const app = await boot("listo", "machine-composer-accounts", responses({
+    list_live_sessions: ({ project }) => project === "p1" ? [row("r1", { machine: "vm", machine_on: true })] : [],
+    load_session: ({ id }) => session(id, [turn(0, "Hola"), turn(1, "Respuesta")]),
+  }));
+  await sleep(600);
+  const doc = app.w.document;
+  const original = app.w.__TAURI_INTERNALS__.invoke;
+  const calls = [];
+  let finishVm;
+  app.w.__TAURI_INTERNALS__.invoke = (command, args, options) => {
+    const machine = options?.headers?.["x-terminus-machine"];
+    calls.push({ command, machine });
+    if (command === "list_surfaces") {
+      if (machine === "vm") return new Promise((resolve) => { finishVm = resolve; });
+      return Promise.resolve([{ id: "codex", provider: "codex", label: "Codex", catalogo: "todo", usable: true, marca: null, porque: null }]);
+    }
+    if (command === "list_models") return Promise.resolve({ provider: args.provider, models: [{ id: machine === "vm" ? "vm-model" : "local-model", label: machine === "vm" ? "VM model" : "Local model", efforts: [], default_effort: null }], fallback: false });
+    return original(command, args, options);
+  };
+  const pick = async (id) => {
+    doc.querySelector('[aria-label="Ejecutar en"]').click();
+    await sleep(100);
+    doc.querySelector(`[data-machine-option="${id}"]`).click();
+    await sleep(150);
+  };
+  await pick("vm");
+  assert.ok(calls.some((c) => c.command === "list_surfaces" && c.machine === "vm"), "no consulta las credenciales de la máquina elegida");
+  await pick("local");
+  assert.ok(calls.some((c) => c.command === "list_models" && c.machine === undefined), "no relee el catálogo al volver a la máquina local");
+  finishVm([{ id: "claude", provider: "claude", label: "Claude Code", catalogo: "todo", usable: true, marca: null, porque: null }]);
+  await sleep(150);
+  assert.ok(doc.querySelector('[aria-label*="Local model"]'), "la respuesta tardía de la VM reemplazó el catálogo local");
+  await openTask(app, "r1");
+  assert.equal(calls.filter((c) => c.command === "list_surfaces").at(-1).machine, "vm", "abrir la tarea no sigue la máquina donde corre");
+  finishVm([{ id: "codex", provider: "codex", label: "Codex", catalogo: "todo", usable: true, marca: null, porque: null }]);
+  await sleep(150);
+  assert.ok(doc.querySelector('[aria-label*="VM model"]'), "la tarea remota conserva los modelos locales");
+  assert.deepEqual(app.fallos, []);
+});
