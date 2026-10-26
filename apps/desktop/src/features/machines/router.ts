@@ -445,15 +445,15 @@ export function createRouter(config: RouterConfig) {
   /** Lo de una máquina sin máquina en el sobre, en la web: las cuentas de todas juntas; lo demás, en la que atiende el workspace. */
   async function ofAMachine(command: string, args: Args, workspace: string | null): Promise<unknown> {
     if (command === "list_accounts") {
-      const envelopes = fleet.machines().map((m) => ({ machine: m.id, workspace: null, command, args }));
+      const envelopes = membersOf(workspace).map((machine) => ({ machine, workspace, command, args }));
       const slices = await gather(envelopes, { fresh: true });
-      const merged = fleet.merge(command, slices, null);
+      const merged = fleet.merge(command, slices, workspace);
       if (merged !== undefined) return merged;
-      throw noAnswer(slices, null);
+      throw noAnswer(slices, workspace);
     }
     const lead = leadOf(workspace) ?? leadOf(null);
     if (!lead) throw { what: t("web.machines.none_for_workspace"), detail: "no_machine" };
-    return remote(lead, command, args, null);
+    return remote(lead, command, args, callWorkspace(workspace, args));
   }
 
   async function handle(command: string, args: Args = {}, options?: Options): Promise<unknown> {
