@@ -43,6 +43,7 @@ function staleGit(rows: Record<string, GitStatus>) {
 }
 
 type Entry = {
+  error: Accessor<unknown>;
   rows: Accessor<Record<string, GitStatus>>;
   refresh: () => void;
   dispose: () => void;
@@ -96,6 +97,7 @@ export function watchSessionGit(project: string, routing?: { workspace: string; 
   let entry = projects.get(key);
   if (!entry) {
     const [rows, setRows] = createSignal<Record<string, GitStatus>>(unpark(key));
+    const [error, setError] = createSignal<unknown>(null);
     const interests = new Map<symbol, string[]>();
     let disposed = false;
     let generation = 0;
@@ -122,15 +124,18 @@ export function watchSessionGit(project: string, routing?: { workspace: string; 
           try {
             if (!current(started) || document.hidden) return;
             const result = await readTaskGit(remote => withDeadline(invoke<Record<string, GitStatus>>("list_session_git", { project, remote, priority: priority(), progress: new Channel<Record<string, GitStatus>>() }, options)), { phase: "remote" });
-            if (current(started)) setRows(previous => {
+            if (current(started)) {
+              if (!localFailed) setError(null);
+              setRows(previous => {
               const merged = mergeRemoteGit(previous, result);
               const next = localFailed || Date.now() - lastLocal >= 30_000 ? staleGit(merged) : merged;
               // El remoto pregunta cada 3 s y casi siempre trae lo mismo.
               return conservarFilas(previous, Object.fromEntries(Object.entries(next).map(([id, row]) =>
                 [id, previous[id] && mismoGit(previous[id], row) ? previous[id] : row])));
-            });
-          } catch {
-            if (current(started)) setRows(staleGit);
+              });
+            }
+          } catch (error) {
+            if (current(started)) { setError(error); setRows(staleGit); }
           } finally {
             if (current(started)) remoteBusy = false;
           }
@@ -155,13 +160,14 @@ export function watchSessionGit(project: string, routing?: { workspace: string; 
         });
         const local = await readTaskGit(remote => withDeadline(invoke<Record<string, GitStatus>>("list_session_git", { project, remote, priority: priority(), progress }, options)), { phase: "local" });
         if (!current(started)) return;
+        setError(null);
         lastLocal = Date.now();
         localFailed = false;
         setRows(previous => conservarFilas(previous, retainGitObservation(previous, local)));
         localReady = true;
         void remote();
-      } catch {
-        if (current(started)) { localFailed = true; setRows(staleGit); }
+      } catch (error) {
+        if (current(started)) { localFailed = true; setError(error); setRows(staleGit); }
       } finally {
         if (current(started)) {
           localBusy = false;
@@ -192,7 +198,7 @@ export function watchSessionGit(project: string, routing?: { workspace: string; 
     window.addEventListener("harness:workspace", workspace);
     window.addEventListener("focus", focus);
     document.addEventListener("visibilitychange", visible);
-    entry = { rows, refresh: () => void refresh(), interests, dispose: () => {
+    entry = { rows, error, refresh: () => void refresh(), interests, dispose: () => {
       disposed = true;
       remoteQueue.delete(queueKey);
       clearInterval(timer);
@@ -207,7 +213,7 @@ export function watchSessionGit(project: string, routing?: { workspace: string; 
   const token = Symbol();
   const current = entry;
   current.interests.set(token, []);
-  return { rows: current.rows, refresh: current.refresh,
+  return { rows: current.rows, error: current.error, refresh: current.refresh,
     prioritize: (ids: string[]) => {
       if (JSON.stringify(current.interests.get(token)) === JSON.stringify(ids)) return;
       const covered = new Set([...current.interests.values()].flat());

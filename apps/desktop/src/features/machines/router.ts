@@ -117,6 +117,13 @@ function withoutChannel(command: string, args: Args): Args {
   return rest;
 }
 
+/** Una copia de Git sirve para mostrar el último estado, nunca para autorizar el cierre. */
+function gitSlice(slice: Slice): Slice {
+  if (slice.status === "ok" || !slice.value || typeof slice.value !== "object" || Array.isArray(slice.value)) return slice;
+  return { ...slice, value: Object.fromEntries(Object.entries(slice.value).map(([id, row]) =>
+    [id, row && typeof row === "object" ? { ...row, stale: true } : row])) };
+}
+
 export function createRouter(config: RouterConfig) {
   const { self, fleet } = config;
   const native: Invoke = config.native ?? (() => Promise.reject(new FleetError("unknown_machine", null)));
@@ -300,9 +307,13 @@ export function createRouter(config: RouterConfig) {
         if (before) slices.push(before);
         refresh(envelope, before);
       }
-    } else slices.push(...(await gather(envelopes)));
+    } else {
+      // El refresco remoto de Git depende de que la observación local haya terminado en el motor.
+      const result = command === "list_session_git" ? await Promise.all(envelopes.map(envelope => fleet.read(envelope))) : await gather(envelopes);
+      slices.push(...result);
+    }
     if (command === "list_workspace_attention") for (const s of slices) if (s.has) attention.set(s.machine, fleet.encode(s.machine, s.value));
-    const merged = learning(() => fleet.merge(command, slices, workspace));
+    const merged = learning(() => fleet.merge(command, command === "list_session_git" ? slices.map(gitSlice) : slices, workspace));
     if (merged !== undefined) return merged;
     throw noAnswer(slices, workspace);
   }
@@ -329,7 +340,7 @@ export function createRouter(config: RouterConfig) {
     }
     const slice = await fleet.read(envelope);
     if (!slice.has) throw noAnswer([slice], workspace);
-    return fleet.encode(machine, slice.value, command);
+    return fleet.encode(machine, command === "list_session_git" ? gitSlice(slice).value : slice.value, command);
   }
 
   /** Cambió la cola de aplazadas de `machine`: sus lecturas salen otra vez al relay ya, sin esperar el respiro. */
