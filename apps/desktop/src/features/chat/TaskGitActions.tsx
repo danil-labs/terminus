@@ -45,7 +45,7 @@ export default function TaskGitActions(props: {
     previousScope = key;
     setFailure(null);
     setSheet(null);
-    if (!context().on) { read = () => {}; return; }
+    if (!context().on || !context().project) { read = () => {}; return; }
     const observation = watchSessionGit(context().project, { workspace: context().workspace, machine: context().machine });
     observation.prioritize([context().session]);
     read = observation.refresh;
