@@ -435,3 +435,23 @@ test("a computer the relay cannot start answers off at once, never starting", as
   assert.equal(doc.querySelector('[data-machine-row="cmp_own"]')?.dataset.state, "offline", "it never shows as starting");
   assert.deepEqual(app.fallos, []);
 });
+
+test("el composer web sigue las credenciales de la máquina elegida y de la tarea abierta", async () => {
+  const { app, doc, calls } = await open("web-composer-machine", [VM, MAC], {
+    cmp_vm: { table: table("Panel", "Tarea de la VM") },
+    cmp_mac: { table: table("Panel", "Tarea del Mac", {
+      list_surfaces: [{ id: "claude", provider: "claude", label: "Claude Code", catalogo: "todo", usable: true, marca: null, porque: null }],
+      list_models: ({ provider }) => ({ provider, models: [{ id: "remote-sonnet", label: "Sonnet del Mac", efforts: [], default_effort: null }], fallback: false }),
+    }) },
+  });
+  doc.querySelector('[aria-label="Ejecutar en"]').click();
+  assert.ok(await until(() => doc.querySelector('[data-machine-option="cmp_mac"]')));
+  doc.querySelector('[data-machine-option="cmp_mac"]').click();
+  assert.ok(await until(() => doc.querySelector('[aria-label*="Sonnet del Mac"]')), "el composer sigue ofreciendo solo lo autenticado en la VM");
+  assert.ok(calls("cmp_mac", "list_surfaces").length, "no consulta las credenciales del Mac");
+  const before = calls("cmp_vm", "list_surfaces").length;
+  doc.querySelector('[data-sesion="cmp_vm~t1"]').click();
+  assert.ok(await until(() => calls("cmp_vm", "list_surfaces").length > before), "la tarea abierta usa la máquina del borrador");
+  assert.ok(await until(() => !doc.querySelector('[aria-label*="Sonnet del Mac"]')), "la tarea de la VM conserva el modelo del Mac");
+  assert.deepEqual(app.fallos, []);
+});

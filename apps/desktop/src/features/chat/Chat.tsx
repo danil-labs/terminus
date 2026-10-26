@@ -475,6 +475,7 @@ export type ChatProps = {
    */
   cambiosDelTurno: (code: CodeRange[]) => JSX.Element;
   agent: string;
+  modelOptions?: { headers: Record<string, string> };
   /**
    * Lo que se puede elegir para trabajar. `null` mientras no se ha leído.
    * Ya viene filtrado por `superficies.paraElMenu`: lo utilizable, más
@@ -2613,6 +2614,7 @@ export default function Chat(props: ChatProps) {
                   y «Modelos gratuitos» son dos entradas del mismo proveedor. */}
               <SelectorDeModelo
                 pildora
+                invokeOptions={props.modelOptions}
                 marca={actual()?.provider ?? props.agent}
                 models={opciones()}
                 superficie={props.superficie}
