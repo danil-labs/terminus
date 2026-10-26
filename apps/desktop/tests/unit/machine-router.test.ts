@@ -9,6 +9,7 @@ import { test } from "node:test";
 import { isDeferrable } from "@terminus/computers";
 import { Fleet, type Link, type MachineInfo, classOf } from "@terminus/fleet";
 import "../helpers/catalog.ts";
+import { withoutAbout } from "../../src/lib/taskMentions.ts";
 import { createRouter } from "../../src/features/machines/router.ts";
 
 type Args = Record<string, unknown>;
@@ -448,4 +449,22 @@ test("a VM archive event refreshes its task list inside the read throttle", asyn
   await sleep(250);
   assert.ok(changes.some(c => c.includes("sessions")));
   assert.deepEqual((await router.handle("list_live_sessions", args) as { id: string }[]).map(r => r.id), ["t1"]);
+});
+
+
+test("local composer mentions omit about with or without the machine router", async () => {
+  const { router, native } = setup({});
+  const mention = { target: { kind: "task", projectId: "p1", sessionId: "t1", about: { title: "Local task" } }, start: 0, end: 2, text: "@x" };
+  const clean = { target: { kind: "task", projectId: "p1", sessionId: "t1" }, start: 0, end: 2, text: "@x" };
+  try {
+    for (const key of ["taskMentions", "task_mentions"]) {
+      const args = { project: "p1", session: "t9", prompt: "@x", [key]: [mention] };
+      assert.deepEqual(withoutAbout(args)?.[key], [clean], "direct native IPC");
+      await router.handle("send_message", args);
+      assert.deepEqual(native.at(-1)?.args[key], [clean], "native IPC with the account router");
+      assert.equal(mention.target.about.title, "Local task", "the draft keeps its display metadata");
+    }
+  } finally {
+    router.close();
+  }
 });

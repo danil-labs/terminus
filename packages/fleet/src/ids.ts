@@ -53,7 +53,7 @@ export function argsFor(
   shared: (space: string) => boolean = () => false,
 ): Row {
   const walk = (value: unknown, key: string | null): unknown => {
-    if (key === "task_mentions" && Array.isArray(value)) return value.map((m) => mentionFor(m, machine, remotes, self));
+    if ((key === "task_mentions" || key === "taskMentions") && Array.isArray(value)) return value.map((m) => mentionFor(m, machine, remotes, self));
     if (typeof value === "string") {
       const own = unwrap(value, remotes);
       if (own) {

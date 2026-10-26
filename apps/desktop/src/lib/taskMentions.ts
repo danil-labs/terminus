@@ -117,16 +117,20 @@ export function taskTarget(task: TaskCandidate, machineName?: (id: string | null
 
 /** Sin router la mención va tal cual al motor de la ventana, que no conoce `about`. */
 export function withoutAbout(args: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
-  const mentions = args?.task_mentions;
-  if (!Array.isArray(mentions) || !mentions.some(m => m?.target?.about)) return args;
-  return {
-    ...args,
-    task_mentions: mentions.map(m => {
-      if (!m?.target?.about) return m;
-      const { about: _, ...target } = m.target;
-      return { ...m, target };
-    }),
-  };
+  let out = args;
+  for (const key of ["taskMentions", "task_mentions"]) {
+    const mentions = out?.[key];
+    if (!Array.isArray(mentions) || !mentions.some(m => m?.target?.about)) continue;
+    out = {
+      ...out,
+      [key]: mentions.map(m => {
+        if (!m?.target?.about) return m;
+        const { about: _, ...target } = m.target;
+        return { ...m, target };
+      }),
+    };
+  }
+  return out;
 }
 
 /** El id de panel de la tarea de una mención guardada: la que dice `elsewhere` vive en esa máquina. */

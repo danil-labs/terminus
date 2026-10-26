@@ -629,6 +629,17 @@ test("a task of another machine can be mentioned: listed with its panel id and s
 });
 
 
+test("composer taskMentions reach the receiving engine with its own ids and no UI metadata", async () => {
+  const { fleet, link } = setup({ cmp_vm: { answers: { send_message: "t9" } } }, [VM]);
+  const remote = { target: { kind: "task", projectId: "p1", sessionId: "cmp_vm~t1", about: { title: "VM task" } }, start: 0, end: 2, text: "@x" };
+  const home = { target: { kind: "task", projectId: "p1", sessionId: "t2", about: { title: "Home task" } }, start: 3, end: 5, text: "@y" };
+  await fleet.call({ machine: "cmp_vm", workspace: "w", command: "send_message", args: { project: "p1", session: "cmp_vm~t9", prompt: "@x @y", taskMentions: [remote, home] } });
+  assert.deepEqual(link("cmp_vm").calls.at(-1)?.args.taskMentions, [
+    { target: { kind: "task", projectId: "p1", sessionId: "t1" }, start: 0, end: 2, text: "@x" },
+    { target: { kind: "task", projectId: "p1", sessionId: "t2" }, start: 3, end: 5, text: "@y", elsewhere: { machine: "cmp_home", title: "Home task" } },
+  ]);
+});
+
 test("workspace context survives when only a later machine has a primary source", () => {
   const { fleet } = setup({ cmp_vm: {}, cmp_mac: {} });
   const first = { id: "w", context_root: null };
