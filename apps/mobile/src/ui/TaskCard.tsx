@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { secondLine } from "../lib/cardLine";
 import { sameCard } from "../lib/reconcile";
 import type { Task } from "../lib/engine";
-import { lang, w } from "../lib/i18n";
+import { lang, t, w } from "../lib/i18n";
 import { BrandMark } from "./BrandMark";
 import { Avatar } from "./components";
 import { Icon, type IconName } from "./Icon";
@@ -138,6 +138,9 @@ function TaskCardView({
           </View>
         ) : null}
         {compact && folder ? <FolderSquare id={folder.id} /> : null}
+        {onLongPress ? <Pressable accessibilityRole="button" accessibilityLabel={t("task.actions.menu")} hitSlop={8} onPress={(event) => { event.stopPropagation(); onLongPress(); }} style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", marginVertical: -8 }}>
+          <Icon name="ellipsis" size={17} color={theme.textMuted} />
+        </Pressable> : null}
       </View>
       {compact ? null : (
         <View style={[styles.line, styles.second]}>

@@ -1,12 +1,11 @@
 import { folderColor } from "@terminus/design";
 import { previewLabel, taskPreview } from "@terminus/tasks";
 import { router, useLocalSearchParams } from "expo-router";
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cardTask, marksOf } from "../lib/cards";
-import { archiveTask, setPinned } from "../lib/engine";
-import { HostError } from "../lib/hosts";
+import { TaskActions } from "../ui/TaskActions";
 import { lang, t, w } from "../lib/i18n";
 import { useMachines } from "../lib/machines";
 import { useWorkspaces } from "../lib/workspaces";
@@ -29,8 +28,7 @@ export default function Preview() {
   const { host: hostId, id } = useLocalSearchParams<{ host: string; id: string }>();
   const { hostOf, attention, hosts } = useMachines();
   const { snapshot, current, reload } = useWorkspaces();
-  const [busy, setBusy] = useState<string | null>(null);
-  const [note, setNote] = useState<string | null>(null);
+
   const task = snapshot?.tasks.find((x) => x.host === hostId && x.id === id);
   const host = hostOf(hostId);
   if (!task || !host) return <View style={{ height: 120 }} />;
@@ -42,31 +40,6 @@ export default function Preview() {
   const folderName = snapshot?.folders.find((f) => f.key === task.folderKey)?.name;
   const provider = snapshot?.providers[task.host]?.find((p) => p.id === task.provider);
   const several = hosts.length > 1;
-
-  async function run(what: "pin" | "unpin" | "archive") {
-    if (!host || !task) return;
-    setBusy(what);
-    setNote(host.power() !== "on" && host.canAct() === "wakes" ? w("shell.machines.waking", { name: host.label }) : null);
-    try {
-      if (what === "archive") {
-        const result = await archiveTask(host, task.workspace, task.folder, task.id);
-        if ("blocked" in result) {
-          setNote(t("preview.blocked", { count: result.blocked.reduce((n, b) => n + b.files.length, 0) }));
-          return;
-        }
-      } else await setPinned(host, task.workspace, task.folder, task.id, what === "pin");
-      void reload();
-      router.back();
-    } catch (error) {
-      const name = host.label;
-      if (error instanceof HostError && error.code === "machine_asleep") setNote(w("web.machines.off_action", { name }));
-      else if (error instanceof HostError && error.code === "machine_outdated") setNote(w("web.machines.outdated_action", { name }));
-      else if (error instanceof HostError && (error.code === "start_failed" || error.code === "start_timeout")) setNote(t("machines.start_failed", { name }));
-      else setNote(t("task.error", { detail: error instanceof Error ? error.message : String(error) }));
-    } finally {
-      setBusy(null);
-    }
-  }
 
   return (
     <View style={[styles.sheet, { backgroundColor: theme.surface, paddingBottom: insets.bottom + 16 }]} testID="task-preview">
@@ -114,31 +87,10 @@ export default function Preview() {
           </Field>
         ) : null}
       </View>
-      <View style={styles.actions}>
-        {preview.actions.map((action) => (
-          <Pressable
-            key={action}
-            testID={`preview-${action}`}
-            disabled={busy !== null}
-            onPress={() => {
-              if (action === "open") {
-                router.back();
-                openTask(task.host, task.workspace, task.folder, task.id);
-              } else void run(action);
-            }}
-            style={({ pressed }) => [
-              styles.button,
-              { borderColor: theme.border, backgroundColor: pressed ? theme.muted : "transparent", opacity: busy && busy !== action ? 0.5 : 1 },
-              action === "open" ? { backgroundColor: theme.primary, borderColor: theme.primary } : null,
-            ]}
-          >
-            {action === "pin" || action === "unpin" ? <Icon name={action === "pin" ? "pin" : "pin-off"} size={14} color={theme.text} /> : null}
-            {action === "archive" ? <Icon name="archive" size={14} color={theme.text} /> : null}
-            <Text style={{ color: action === "open" ? theme.onPrimary : theme.text, fontWeight: "600" }}>{busy === action ? "…" : previewLabel(lang, action)}</Text>
-          </Pressable>
-        ))}
-      </View>
-      {note ? <Text style={[styles.note, { color: theme.textMuted }]}>{note}</Text> : null}
+      <Pressable accessibilityRole="button" onPress={() => { router.back(); openTask(task.host, task.workspace, task.folder, task.id); }} style={[styles.button, { backgroundColor: theme.primary, borderColor: theme.primary }]}>
+        <Text style={{ color: theme.onPrimary, fontWeight: "600" }}>{previewLabel(lang, "open")}</Text>
+      </Pressable>
+      <TaskActions host={host} task={task} running={marks.live.has(`${task.host}/${task.id}`)} onChanged={() => { void reload(); }} onRemoved={() => { void reload(); router.back(); }} />
     </View>
   );
 }
@@ -164,7 +116,5 @@ const styles = StyleSheet.create({
   fieldValue: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 },
   square: { width: 9, height: 9, borderRadius: 2 },
   value: { flex: 1, fontSize: 14 },
-  actions: { flexDirection: "row", gap: 8, marginTop: 4 },
-  button: { flex: 1, flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center", borderWidth: 1, borderRadius: 10, paddingVertical: 11 },
-  note: { fontSize: 13 },
+  button: { minHeight: 48, flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center", borderWidth: 1, borderRadius: 10, paddingVertical: 11 },
 });

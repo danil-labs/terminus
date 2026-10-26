@@ -13,10 +13,15 @@ export type CheckState = "unknown" | "none" | "pending" | "success" | "failure";
 
 /** Lo que la tarjeta lee de una fila de `list_session_git` (es parte de su `GitStatus`). */
 export type TaskGit = {
+  kind?: "none" | "unknown" | "branch" | "detached" | "kn";
+  kn?: "clean" | "draft" | "saved" | null;
+  branch?: string | null;
+  has_remote?: boolean;
+  merged_locally?: boolean;
   head: string | null;
   /** La tarea comparte el árbol de otra: su PR se dice en la fila de esa. */
   shared_with: string | null;
-  pull: { number: number; state: "open" | "draft" | "merged" | "closed"; head_sha: string; checks?: CheckState } | null;
+  pull: { number: number; state: "open" | "draft" | "merged" | "closed"; head_sha: string; checks?: CheckState; review?: "unknown" | "unreviewed" | "approved" | "changes_requested" } | null;
   pull_known: boolean;
   stale: boolean;
 };
@@ -50,4 +55,45 @@ export function cardPull(git: TaskGit | null | undefined): CardPull | null {
           ? "merged"
           : "muted";
   return { number: pull.number, state, tone, numberTone: failing && !git.stale ? "failure" : tone };
+}
+
+/** La misma condición para finalizar en todos los clientes; el motor vuelve a comprobarla al actuar. */
+export function canFinishTask(session: { archived?: boolean | null; subagent?: string | null }, status: TaskGit | null | undefined, busy: boolean): boolean {
+  if (!status || session.archived || busy || status.stale) return false;
+  if (status.kind === "kn") return status.kn === "saved";
+  if (status.kind !== "branch" || !status.head) return false;
+  if (status.pull) return status.pull_known && status.pull.state === "merged" && status.pull.head_sha === status.head;
+  return status.merged_locally === true && (status.pull_known || status.has_remote === false);
+}
+
+export type TaskGitSession = { id: string; parent?: string | null; subagent?: string | null };
+
+export function resolveTaskGit<T extends TaskGit>(
+  session: TaskGitSession,
+  rows: Record<string, T>,
+  sessions: TaskGitSession[],
+  fallback: T,
+): { status: T; owner: string | null } {
+  const origin = rows[session.id] ?? fallback;
+  const withOrigin = (status: T) =>
+    origin.shared_with && status.shared_with !== origin.shared_with
+      ? { ...status, shared_with: origin.shared_with }
+      : status;
+  const visited = new Set<string>();
+  let current = session;
+  while (!visited.has(current.id)) {
+    visited.add(current.id);
+    const status = rows[current.id] ?? fallback;
+    const shared = status.shared_with ?? (current.subagent ? current.parent : null);
+    const own = { status: withOrigin(status), owner: current.id };
+    // Guardado propio gana; un borrador de una hija no tapa al padre integrado.
+    if (status.kind === "kn" && status.kn === "saved") return own;
+    if (status.kind === "kn" && status.kn === "draft" && !shared) return own;
+    if (!shared) return own;
+    const parent = sessions.find(row => row.id === shared);
+    // Sin la dueña en la lista nadie más enseña esta rama: la fila se queda con ella.
+    if (!parent) return own;
+    current = parent;
+  }
+  return { status: fallback, owner: null };
 }

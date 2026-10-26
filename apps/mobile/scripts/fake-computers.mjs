@@ -270,6 +270,20 @@ function invoke(m, command, args) {
       const s = e.sessions.get(args.id);
       return { unsaved: s?.unsaved ? [{ session: s.id, title: s.title, files: s.unsaved }] : [], not_finished: false };
     }
+    case "delete_session": {
+      const s = e.sessions.get(args.id);
+      if (!s || s.unsaved?.length || e.live.has(s.id) || args.force !== false) throw { code: "command_failed", detail: "task has work" };
+      e.sessions.delete(s.id);
+      emit(m, "session", { workspace: e.ws, project: s.project, session: s.id });
+      return null;
+    }
+    case "finish_task": {
+      const s = e.sessions.get(args.id);
+      if (!s || s.unsaved?.length || e.live.has(s.id) || PULLS[s.id]?.state !== "merged") throw { code: "command_failed", detail: "task not ready" };
+      s.archived = true;
+      emit(m, "session", { workspace: e.ws, project: s.project, session: s.id });
+      return null;
+    }
     case "set_task_archived": {
       const s = e.sessions.get(args.id);
       if (!s) throw { code: "command_failed", detail: "no such task" };

@@ -1,3 +1,4 @@
+import { resolveTaskGit as resolveSharedTaskGit } from "@terminus/tasks";
 import { Channel } from "@tauri-apps/api/core";
 import { invoke } from "../../lib/invoke.ts";
 import { type Accessor, createSignal } from "solid-js";
@@ -243,50 +244,12 @@ export function gitReviewSignals(status?: GitStatus) {
   return { checks: pull.checks ?? "unknown", review: pull.review ?? "unknown" };
 }
 
-export function canFinishTask(
-  session: { archived?: boolean | null; subagent?: string | null },
-  status: GitStatus,
-  busy: boolean,
-) {
-  if (session.archived || busy || status.stale) return false;
-  if (status.kind === "kn") return status.kn === "saved";
-  if (status.kind !== "branch" || !status.head) return false;
-  // La misma regla que `ready_to_finish` en Rust: si hay PR manda el PR; si
-  // no lo hay, o no hay remoto que lo tenga, la integración en la base local.
-  if (status.pull) return status.pull_known && status.pull.state === "merged" && status.pull.head_sha === status.head;
-  return status.merged_locally && (status.pull_known || !status.has_remote);
-}
+export { canFinishTask } from "@terminus/tasks";
 
 type TaskGitSession = { id: string; parent?: string | null; subagent?: string | null };
 
-function resolveTaskGit(
-  session: TaskGitSession,
-  rows: Record<string, GitStatus>,
-  sessions: TaskGitSession[],
-): { status: GitStatus; owner: string | null } {
-  const origin = rows[session.id] ?? UNKNOWN_GIT;
-  const withOrigin = (status: GitStatus) =>
-    origin.shared_with && status.shared_with !== origin.shared_with
-      ? { ...status, shared_with: origin.shared_with }
-      : status;
-  const visited = new Set<string>();
-  let current = session;
-  while (!visited.has(current.id)) {
-    visited.add(current.id);
-    const status = rows[current.id] ?? UNKNOWN_GIT;
-    const shared = status.shared_with ?? (current.subagent ? current.parent : null);
-    const own = { status: withOrigin(status), owner: current.id };
-    // Guardado propio gana. Un borrador en una hija no tapa al padre ya
-    // integrado: finalizarla debe seguir disponible.
-    if (status.kind === "kn" && status.kn === "saved") return own;
-    if (status.kind === "kn" && status.kn === "draft" && !shared) return own;
-    if (!shared) return own;
-    const parent = sessions.find(row => row.id === shared);
-    // Sin la dueña en la lista nadie más enseña esta rama: la fila se queda con ella.
-    if (!parent) return own;
-    current = parent;
-  }
-  return { status: UNKNOWN_GIT, owner: null };
+function resolveTaskGit(session: TaskGitSession, rows: Record<string, GitStatus>, sessions: TaskGitSession[]) {
+  return resolveSharedTaskGit(session, rows, sessions, UNKNOWN_GIT);
 }
 
 export function effectiveTaskGit(

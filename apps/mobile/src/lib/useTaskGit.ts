@@ -12,7 +12,7 @@ const EVERY_MS = 30_000;
  * Leer nunca enciende: a una máquina que no está encendida no se le pregunta y
  * lo suyo queda viejo (`stale`).
  */
-export function useTaskGit(hostOf: (id: string) => Host | undefined, visible: readonly { host: string; workspace: string; folder: string; id: string }[]): GitBook {
+export function useTaskGit(hostOf: (id: string) => Host | undefined, visible: readonly { host: string; workspace: string; folder: string; id: string }[], revision = 0): GitBook {
   const [book, setBook] = useState<GitBook>({});
   const asks = useMemo(() => gitAsks(visible), [visible]);
   const key = gitAsksKey(asks);
@@ -20,9 +20,12 @@ export function useTaskGit(hostOf: (id: string) => Host | undefined, visible: re
   // visible y `hostOf` cambian de objeto, no de contenido (`key` lo resume).
   const latest = useRef({ asks, hostOf });
   latest.current = { asks, hostOf };
+  const powerKey = asks.map((ask) => hostOf(ask.host)?.power()).join("|");
   useEffect(() => {
     let live = true;
+    let sequence = 0;
     const read = () => {
+      const request = ++sequence;
       const { asks, hostOf } = latest.current;
       for (const ask of asks) {
         const host = hostOf(ask.host);
@@ -32,16 +35,18 @@ export function useTaskGit(hostOf: (id: string) => Host | undefined, visible: re
         }
         host
           .call<unknown>("list_session_git", ask.workspace, { project: ask.project, remote: true, priority: ask.priority })
-          .then(({ value }) => live && setBook((b) => withGitAnswer(b, ask.host, value)))
-          .catch(() => live && setBook((b) => staleGit(b, ask.host, ask.priority)));
+          .then(({ value, cachedAt }) => live && request === sequence && setBook((b) => host.power() === "on" && cachedAt === null ? withGitAnswer(b, ask.host, value) : staleGit(b, ask.host, ask.priority)))
+          .catch(() => live && request === sequence && setBook((b) => staleGit(b, ask.host, ask.priority)));
       }
     };
     read();
+    const activity = AppState.addEventListener("change", (state) => { if (state === "active") read(); });
     const timer = setInterval(() => AppState.currentState === "active" && read(), EVERY_MS);
     return () => {
       live = false;
       clearInterval(timer);
+      activity.remove();
     };
-  }, [key]);
+  }, [key, revision, powerKey]);
   return book;
 }
