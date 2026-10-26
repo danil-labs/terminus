@@ -1,3 +1,4 @@
+import { machineOf } from "../machines/store";
 import { invoke } from "../../lib/invoke.ts";
 import { listen } from "../../lib/serviceEvents";
 import { Show, createMemo, createResource, createSignal, onCleanup, onMount } from "solid-js";
@@ -30,7 +31,7 @@ export function createTaskWork(
     equals: (a, b) => a?.project === b?.project && a?.id === b?.id,
   });
   const result = createResource(target, (value) =>
-    invoke<TaskWork>("task_history", value).catch((e) => {
+    invoke<TaskWork>("task_history", value, machineOf(value.id)).catch((e) => {
       onFailure?.(asFailure(e));
       return undefined;
     }),
@@ -59,7 +60,7 @@ export function ResumeTask(props: { project: string; id: string; onChanged: () =
     setBusy(true);
     setFailure(null);
     try {
-      await invoke("recreate_task_work", { project: props.project, id: props.id });
+      await invoke("recreate_task_work", { project: props.project, id: props.id }, machineOf(props.id));
       props.onChanged();
     } catch (e) {
       setFailure(asFailure(e));
