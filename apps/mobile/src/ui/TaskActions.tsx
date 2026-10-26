@@ -2,7 +2,7 @@ import { isPinned } from "@terminus/tasks";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { archiveTask, deleteTask, setPinned, type Task } from "../lib/engine";
-import type { Host } from "../lib/hosts";
+import { HostError, type Host } from "../lib/hosts";
 import { t } from "../lib/i18n";
 import { SheetOption } from "./Sheet";
 import { useTheme } from "./theme";
@@ -43,7 +43,7 @@ export function TaskActions({ host, task, running, onRemoved, onChanged, onBusy 
         if (live.current) onRemoved();
       }
     } catch (failure) {
-      if (live.current) setError(t("task.error", { detail: failure instanceof Error ? failure.message : String(failure) }));
+      if (live.current) setError(failure instanceof HostError && failure.code === "task_status_unavailable" ? t("task.header.status_unavailable") : t("task.error", { detail: failure instanceof Error ? failure.message : String(failure) }));
     } finally {
       submitting.current = false;
       if (live.current) { setBusy(false); onBusy?.(false); }

@@ -179,7 +179,7 @@ Los avisos salen en la app, igual para los dos caminos: una tarea que entra en
 | `(home)/index` | Tareas: workspace, spaces, alcance y filtro, dock de agentes y la lista plana |
 | `(home)/notifications` | «Ahora» de todas las máquinas y «Antes», lo que llegó con la app abierta |
 | `(home)/new` | Nueva tarea: el cuadro de escribir con «Ejecutar en» (la última usada, si no la VM), carpeta, rama base y agente; `!` la crea con un comando. La hoja de Carpeta termina en «Nueva carpeta» y «Clonar repo» (ver «Carpetas nuevas») |
-| `preview` | Menú de una tarea (⋯ o pulsación larga): Abrir, Fijar, Archivar y Eliminar con confirmación |
+| `preview` | Menú de una tarea (⋯ o pulsación larga): PR, Abrir, Fijar, Archivar, Eliminar y Finalizar con confirmación; el cohete de la lista abre directamente la confirmación |
 | `accounts` | Proveedores de IA: cuentas por proveedor y correo, consumo, máquinas, iniciar y cerrar sesión |
 | `filter` | Hoja «Filtrar y agrupar» |
 | `agents` | Hoja «Ver todos» del dock |

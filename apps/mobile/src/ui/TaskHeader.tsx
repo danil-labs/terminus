@@ -1,13 +1,15 @@
 import { router } from "expo-router";
-import { canFinishTask, cardPull, resolveTaskGit, type TaskGit } from "@terminus/tasks";
-import { useEffect, useRef, useState } from "react";
+import { canFinishTask, cardPull, type TaskGit } from "@terminus/tasks";
+import { useState } from "react";
 import { ActivityIndicator, Keyboard, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { finishTask, type Task } from "../lib/engine";
+import { type Task } from "../lib/engine";
 import type { Host } from "../lib/hosts";
-import { t, w } from "../lib/i18n";
+import { t } from "../lib/i18n";
 import { useTaskGit } from "../lib/useTaskGit";
 import { Icon, type IconName } from "./Icon";
+import { effectiveGit } from "../lib/taskGit";
+import { TaskFinishConfirmation } from "./TaskFinishConfirmation";
 import { TaskActions } from "./TaskActions";
 import { Sheet, SheetOption } from "./Sheet";
 import { useTheme } from "./theme";
@@ -35,13 +37,8 @@ export function TaskHeader(props: {
   const [sheet, setSheet] = useState<"menu" | "details" | "finish" | null>(null);
   const [revision, setRevision] = useState(0);
   const [finishing, setFinishing] = useState(false);
-  const [failure, setFailure] = useState<string | null>(null);
-  const live = useRef(true);
-  const submitting = useRef(false);
-  useEffect(() => { live.current = true; return () => { live.current = false; }; }, []);
   const book = useTaskGit(props.hostOf, [{ host: props.hostId, workspace: props.workspace, folder: props.folder, id: props.id }], revision);
-  const rows = Object.fromEntries(Object.entries(book).filter(([key]) => key.startsWith(`${props.hostId}/`)).map(([key, value]) => [key.slice(props.hostId.length + 1), value]));
-  const raw = resolveTaskGit(props.task ?? { id: props.id }, rows, props.tasks, { head: null, shared_with: null, pull: null, pull_known: false, stale: true } as TaskGit).status;
+  const raw = effectiveGit(book, { ...props.task, id: props.id, host: props.hostId, workspace: props.workspace }, props.tasks);
   const on = props.host?.power() === "on" && props.host.canAct() === "now";
   const git: TaskGit | undefined = raw && !on ? { ...raw, stale: true } : raw;
   const pull = cardPull(git ? { ...git, shared_with: null } : git);
@@ -51,27 +48,8 @@ export function TaskHeader(props: {
   const review = current ? git?.pull?.review ?? "unknown" : "unknown";
   const color = git?.stale ? theme.textMuted : pull?.numberTone === "failure" ? theme.failedMark : pull?.tone === "merged" ? theme.merged : pull?.tone === "open" ? theme.unseenMark : theme.textMuted;
   const state = pull ? t(`task.git.${pull.state}`) : git?.kind === "kn" && git.kn === "saved" ? t("task.git.saved") : t("task.git.unknown");
-  const open = (next: "menu" | "details" | "finish") => { Keyboard.dismiss(); setFailure(null); setSheet(next); };
-  const close = () => { if (!submitting.current && !finishing) setSheet(null); };
-  const finish = async () => {
-    if (!ready || !props.host || submitting.current) return;
-    submitting.current = true;
-    setFinishing(true);
-    setFailure(null);
-    try {
-      const result = await finishTask(props.host, props.workspace, props.folder, props.id);
-      if (!live.current) return;
-      if ("blocked" in result) {
-        setFailure(t("task.header.blocked"));
-        setRevision((n) => n + 1);
-      } else props.onFinished();
-    } catch (error) {
-      if (live.current) setFailure(t("task.error", { detail: error instanceof Error ? error.message : String(error) }));
-    } finally {
-      submitting.current = false;
-      if (live.current) setFinishing(false);
-    }
-  };
+  const open = (next: "menu" | "details" | "finish") => { if (finishing) return; Keyboard.dismiss(); setSheet(next); };
+  const close = () => { if (!finishing) setSheet(null); };
   return <>
     <View testID="task-header" style={{ paddingTop: insets.top, backgroundColor: theme.surface, borderBottomColor: theme.border, borderBottomWidth: StyleSheet.hairlineWidth }}>
       <View style={styles.bar}>
@@ -115,13 +93,7 @@ export function TaskHeader(props: {
           {!ready ? <Text style={[styles.description, { color: theme.textMuted }]}>{t("task.header.finish_unavailable")}</Text> : null}
           <SheetOption label={t("task.header.refresh")} disabled={!on} onPress={() => setRevision((n) => n + 1)} />
           <SheetOption label={t("task.header.finish")} icon="rocket" disabled={!ready} onPress={() => open("finish")} />
-        </> : <>
-          <Text style={[styles.description, { color: theme.textMuted }]}>{t(git?.shared_with ? "task.header.finish_shared" : "task.header.finish_description")}</Text>
-          {failure ? <Text accessibilityRole="alert" style={{ color: theme.failedMark }}>{failure}</Text> : null}
-          <Pressable testID="task-finish-confirm" accessibilityRole="button" disabled={!ready || finishing} onPress={() => void finish()} style={[styles.confirm, { backgroundColor: theme.primary, opacity: ready || finishing ? 1 : 0.4 }]}>
-            <Text style={{ color: theme.onPrimary, fontWeight: "600" }}>{t(finishing ? "task.header.finishing" : "task.header.finish")}</Text>
-          </Pressable>
-        </>}
+        </> : props.host ? <TaskFinishConfirmation host={props.host} workspace={props.workspace} folder={props.folder} id={props.id} shared={!!git?.shared_with} ready={!!ready} onBusy={setFinishing} onBlocked={() => setRevision((n) => n + 1)} onFinished={props.onFinished} /> : null}
         <SheetOption label={t(sheet === "finish" ? "task.header.cancel" : "task.header.close")} onPress={close} disabled={finishing} />
       </View>
     </Sheet>
@@ -142,5 +114,4 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: 20, gap: 12 },
   fullTitle: { fontSize: 17, fontWeight: "600" },
   description: { fontSize: 14, lineHeight: 21 },
-  confirm: { minHeight: 48, borderRadius: 12, alignItems: "center", justifyContent: "center", marginTop: 8 },
 });

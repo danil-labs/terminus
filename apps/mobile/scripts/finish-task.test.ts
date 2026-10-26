@@ -55,7 +55,7 @@ test("eliminar se limita a la máquina elegida, sin forzar y sin encenderla", as
 test("archivar no toma una copia vieja o una respuesta vacía como permiso", async () => {
   for (const options of [{ cachedAt: 100 }, { blockers: null }]) {
     const { host, calls } = machine(options);
-    await assert.rejects(archiveTask(host, "w", "p", "t"));
+    await assert.rejects(archiveTask(host, "w", "p", "t"), (error) => error instanceof HostError && error.code === "task_status_unavailable");
     assert.equal(calls.some((call) => call.command === "set_task_archived"), false);
   }
 });

@@ -1,10 +1,15 @@
 import { folderColor } from "@terminus/design";
-import { previewLabel, taskPreview } from "@terminus/tasks";
+import { canFinishTask, cardPull, previewLabel, taskPreview } from "@terminus/tasks";
 import { router, useLocalSearchParams } from "expo-router";
-import type { ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useState, type ReactNode } from "react";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cardTask, marksOf } from "../lib/cards";
+import { effectiveGit } from "../lib/taskGit";
+import { useTaskGit } from "../lib/useTaskGit";
+import { TaskFinishConfirmation } from "../ui/TaskFinishConfirmation";
+import { Sheet, SheetOption } from "../ui/Sheet";
+import { PullChip } from "../ui/TaskCard";
 import { TaskActions } from "../ui/TaskActions";
 import { lang, t, w } from "../lib/i18n";
 import { useMachines } from "../lib/machines";
@@ -25,12 +30,16 @@ import { useTheme } from "../ui/theme";
 export default function Preview() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { host: hostId, id } = useLocalSearchParams<{ host: string; id: string }>();
+  const { host: hostId, id, intent } = useLocalSearchParams<{ host: string; id: string; intent?: string }>();
+  const [finishing, setFinishing] = useState(false);
+  const [confirm, setConfirm] = useState(intent === "finish");
+  const [revision, setRevision] = useState(0);
   const { hostOf, attention, hosts } = useMachines();
   const { snapshot, current, reload } = useWorkspaces();
 
   const task = snapshot?.tasks.find((x) => x.host === hostId && x.id === id);
   const host = hostOf(hostId);
+  const book = useTaskGit(hostOf, task ? [task] : [], revision);
   if (!task || !host) return <View style={{ height: 120 }} />;
 
   const marks = marksOf(attention, current?.members, snapshot?.live ?? new Set());
@@ -40,8 +49,21 @@ export default function Preview() {
   const folderName = snapshot?.folders.find((f) => f.key === task.folderKey)?.name;
   const provider = snapshot?.providers[task.host]?.find((p) => p.id === task.provider);
   const several = hosts.length > 1;
+  const git = effectiveGit(book, task, snapshot?.tasks ?? []);
+  const running = marks.live.has(`${task.host}/${task.id}`);
+  const ready = host.power() === "on" && host.canAct() === "now" && canFinishTask(task, git, running || finishing);
+  const pull = cardPull({ ...git, shared_with: null });
+  const removed = () => { void reload(); router.back(); };
+  const frame = (content: ReactNode) => Platform.OS === "web" ? <Sheet visible onClose={() => { if (!finishing) router.back(); }}>{content}</Sheet> : content;
+  if (confirm) return frame(<View style={[styles.sheet, { backgroundColor: theme.surface, paddingBottom: insets.bottom + 16 }]}>
+    <Text style={[styles.title, { color: theme.text }]}>{t("task.header.finish_on", { name: host.label })}</Text>
+    <Text style={{ color: theme.text, fontWeight: "600" }}>{preview.title}</Text>
+    {pull ? <PullChip pull={pull} git={git} /> : null}
+    <TaskFinishConfirmation host={host} workspace={task.workspace} folder={task.folder} id={task.id} shared={!!git.shared_with} ready={ready} onBusy={setFinishing} onBlocked={() => setRevision((n) => n + 1)} onFinished={removed} />
+    <SheetOption label={t("task.header.cancel")} disabled={finishing} onPress={() => intent === "finish" ? router.back() : setConfirm(false)} />
+  </View>);
 
-  return (
+  return frame(
     <View style={[styles.sheet, { backgroundColor: theme.surface, paddingBottom: insets.bottom + 16 }]} testID="task-preview">
       <View style={styles.head}>
         <Text style={[styles.title, { color: theme.text }]}>{preview.title}</Text>
@@ -51,6 +73,7 @@ export default function Preview() {
           {preview.excerpt}
         </Text>
       ) : null}
+      {pull ? <PullChip pull={pull} git={git} /> : null}
       <View style={styles.rows}>
         {preview.folder ? (
           <Field label={previewLabel(lang, "folder")}>
@@ -87,10 +110,11 @@ export default function Preview() {
           </Field>
         ) : null}
       </View>
-      <Pressable accessibilityRole="button" onPress={() => { router.back(); openTask(task.host, task.workspace, task.folder, task.id); }} style={[styles.button, { backgroundColor: theme.primary, borderColor: theme.primary }]}>
+      <Pressable accessibilityRole="button" disabled={finishing} onPress={() => { router.back(); openTask(task.host, task.workspace, task.folder, task.id); }} style={[styles.button, { backgroundColor: theme.primary, borderColor: theme.primary }]}>
         <Text style={{ color: theme.onPrimary, fontWeight: "600" }}>{previewLabel(lang, "open")}</Text>
       </Pressable>
-      <TaskActions host={host} task={task} running={marks.live.has(`${task.host}/${task.id}`)} onChanged={() => { void reload(); }} onRemoved={() => { void reload(); router.back(); }} />
+      <SheetOption testID="preview-finish" icon="rocket" label={t("task.header.finish")} disabled={!ready} onPress={() => setConfirm(true)} />
+      <TaskActions host={host} task={task} running={running} onBusy={setFinishing} onChanged={() => { void reload(); }} onRemoved={() => { void reload(); router.back(); }} />
     </View>
   );
 }

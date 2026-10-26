@@ -546,7 +546,7 @@ export async function archiveTask(host: Host, workspace: string, folder: string,
     return { archived: true };
   }
   const { value, cachedAt } = await host.call<TaskBlockers | null>("task_blockers", workspace, { project: folder, id, finish: false });
-  if (!value || cachedAt !== null) throw new Error("task_blockers unavailable");
+  if (!value || cachedAt !== null) throw new HostError("task_status_unavailable");
   const unsaved = value.unsaved;
   if (unsaved.length) return { blocked: unsaved };
   await host.call("set_task_archived", workspace, { project: folder, id, archived: true, space: null });
@@ -899,7 +899,7 @@ export function cancelClone(host: Host, workspace: string, operation: string) {
 export async function finishTask(host: Host, workspace: string, folder: string, id: string): Promise<{ finished: true } | { blocked: TaskBlockers }> {
   if (host.power() !== "on") throw new HostError("machine_asleep", host.label);
   const { value, cachedAt } = await host.call<TaskBlockers>("task_blockers", workspace, { project: folder, id, finish: true });
-  if (!value || cachedAt !== null) throw new Error("task_blockers unavailable");
+  if (!value || cachedAt !== null) throw new HostError("task_status_unavailable");
   if (value.not_finished || value.unsaved.length) return { blocked: value };
   await host.call("finish_task", workspace, { project: folder, id });
   return { finished: true };

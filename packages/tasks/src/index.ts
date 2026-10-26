@@ -47,4 +47,4 @@ export {
   taskPreview,
   taskTitle,
 } from "./preview.ts";
-export { type CardPull, type CheckState, type PullTone, type TaskGit, canFinishTask, cardPull, resolveTaskGit } from "./pull.ts";
+export { type CardPull, type CheckState, type PullTone, type TaskGit, type TaskGitSession, canFinishTask, cardPull, resolveTaskGit } from "./pull.ts";
