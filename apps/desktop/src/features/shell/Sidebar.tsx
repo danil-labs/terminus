@@ -16,6 +16,7 @@ import { lastRoster, rememberRoster } from "../../lib/handlerRoster";
 import { invoke } from "../../lib/invoke.ts";
 import type { AgentProfile, HandlerList, HandlerStatus, Project } from "../../lib/model";
 import { createPref } from "../../lib/prefs";
+import { sharedLazy } from "../../lib/sharedLazy";
 import { ariaDeAtajo } from "../../lib/shortcuts";
 import { capabilities } from "../../lib/platform";
 import { cn } from "../../lib/utils";
@@ -57,7 +58,7 @@ import { machineName, machines } from "../machines/store";
 // Fuera de la carga inicial: el botón y el dock llegan un instante después de la lista.
 const SidebarFilter = lazy(() => import("./SidebarFilter").then((m) => ({ default: m.SidebarFilter })));
 const AgentDock = lazy(() => import("./AgentDock"));
-const FolderGroupHeader = lazy(() => import("./FolderGroupHeader"));
+const FolderGroupHeader = sharedLazy(() => import("./FolderGroupHeader"));
 const DanilFooterEntry = lazy(() => import("./DanilFooterEntry"));
 
 /* El ancho vive en `ColumnaLateral`, que es la columna que envuelve a esta
