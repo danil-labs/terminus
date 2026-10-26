@@ -4,6 +4,90 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "account_credential_delete",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "credential",
+          "name": "credential",
+          "type": "String"
+        }
+      ],
+      "path": "credentials::account_credential_delete",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "account_credential_remove_machine",
+      "output": "-> Result < Value , Failure >",
+      "parameters": [
+        {
+          "key": "credential",
+          "name": "credential",
+          "type": "String"
+        },
+        {
+          "key": "computer",
+          "name": "computer",
+          "type": "String"
+        }
+      ],
+      "path": "credentials::account_credential_remove_machine",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "account_credential_restore_machine",
+      "output": "-> Result < Value , Failure >",
+      "parameters": [
+        {
+          "key": "credential",
+          "name": "credential",
+          "type": "String"
+        },
+        {
+          "key": "computer",
+          "name": "computer",
+          "type": "String"
+        }
+      ],
+      "path": "credentials::account_credential_restore_machine",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "account_credentials_list",
+      "output": "-> Result < CredentialsList , Failure >",
+      "parameters": [],
+      "path": "credentials::account_credentials_list",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "account_credentials_upload",
+      "output": "-> Result < UploadReport , Failure >",
+      "parameters": [
+        {
+          "key": "slots",
+          "name": "slots",
+          "type": "Vec < String >"
+        }
+      ],
+      "path": "credentials::account_credentials_upload",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "account_limits",
       "output": "-> Query",
       "parameters": [
@@ -2056,6 +2140,137 @@
         }
       ],
       "path": "git_hosts::git_host_projects",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "ids": {
+        "workspace": [
+          "scope"
+        ]
+      },
+      "kind": "invoke",
+      "name": "github_account_authorize",
+      "output": "-> Result < Value , Failure >",
+      "parameters": [
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "danil::github_account_authorize",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "ids": {
+        "workspace": [
+          "id"
+        ]
+      },
+      "kind": "invoke",
+      "name": "github_account_changed",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "danil::github_account_changed",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "ids": {
+        "workspace": [
+          "scope"
+        ]
+      },
+      "kind": "invoke",
+      "name": "github_account_disconnect",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "danil::github_account_disconnect",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "ids": {
+        "workspace": [
+          "scope"
+        ]
+      },
+      "kind": "invoke",
+      "name": "github_account_installations",
+      "output": "-> Result < Value , Failure >",
+      "parameters": [
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "danil::github_account_installations",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "ids": {
+        "workspace": [
+          "scope"
+        ]
+      },
+      "kind": "invoke",
+      "name": "github_account_set_areas",
+      "output": "-> Result < Value , Failure >",
+      "parameters": [
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Option < String >"
+        },
+        {
+          "key": "areas",
+          "name": "areas",
+          "type": "Vec < SelectedArea >"
+        }
+      ],
+      "path": "danil::github_account_set_areas",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "ids": {
+        "workspace": [
+          "scope"
+        ]
+      },
+      "kind": "invoke",
+      "name": "github_account_status",
+      "output": "-> Result < Value , Failure >",
+      "parameters": [
+        {
+          "key": "scope",
+          "name": "scope",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "danil::github_account_status",
       "scope": "workspace"
     },
     {
@@ -4436,6 +4651,42 @@
     {
       "async": false,
       "channel": null,
+      "ids": {
+        "workspace": [
+          "workspace"
+        ]
+      },
+      "kind": "invoke",
+      "name": "reseal_account_credential",
+      "output": "-> Result < Vec < ResealOutcome > , Failure >",
+      "parameters": [
+        {
+          "key": "workspace",
+          "name": "workspace",
+          "type": "String"
+        },
+        {
+          "key": "credential",
+          "name": "credential",
+          "type": "String"
+        },
+        {
+          "key": "version",
+          "name": "version",
+          "type": "i64"
+        },
+        {
+          "key": "targets",
+          "name": "targets",
+          "type": "Vec < ResealTarget >"
+        }
+      ],
+      "path": "credentials::reseal_account_credential",
+      "relay": false
+    },
+    {
+      "async": false,
+      "channel": null,
       "kind": "invoke",
       "name": "respond_permission",
       "output": "-> Result < Wire < Turn > , String >",
@@ -6495,6 +6746,27 @@
         ]
       },
       "kind": "invoke",
+      "name": "sync_account_credentials",
+      "output": "-> Result < () , Failure >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "credentials::sync_account_credentials",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "ids": {
+        "workspace": [
+          "id"
+        ]
+      },
+      "kind": "invoke",
       "name": "sync_workspace",
       "output": "-> Result < crate :: wire :: Wire < crate :: workspaces :: Workspace > , Failure >",
       "parameters": [
@@ -7086,6 +7358,47 @@
         }
       ],
       "path": "development::tree_rename",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "chat_visual_part",
+      "output": "-> Result < crate :: delivery :: chat_visuals :: VisualPart , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "file",
+          "name": "file",
+          "type": "String"
+        },
+        {
+          "key": "offset",
+          "name": "offset",
+          "type": "u64"
+        },
+        {
+          "key": "size",
+          "name": "size",
+          "type": "u32"
+        },
+        {
+          "key": "revision",
+          "name": "revision",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "development::chat_visual_part",
       "scope": "workspace"
     },
     {
