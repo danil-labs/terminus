@@ -41,7 +41,7 @@ import { workLabel } from "../projects/branchLabel";
 import { sangrarTerminal } from "./terminalIndent";
 import { ponerLanzamiento } from "./launchGroups";
 import { FIN_DE_ARCHIVO, TECLAS_DE_TERMINAL, pideClave } from "./commandInput";
-import { claseDelTramo, finishEdit, highlightSpans, placeLabel, referenceId, searchPlaces, searchTasks, taskLabel, type MentionTarget, type PendingEdit, type PlaceCandidate, type TextEdit, type TaskCandidate, type TaskMention, tramosDelMensaje } from "../../lib/taskMentions";
+import { claseDelTramo, finishEdit, highlightSpans, placeLabel, referenceId, searchPlaces, searchTasks, taskLabel, taskTarget, type MentionTarget, type PendingEdit, type PlaceCandidate, type TextEdit, type TaskCandidate, type TaskMention, tramosDelMensaje } from "../../lib/taskMentions";
 import {
   groupRecipients,
   type Recipient,
@@ -580,6 +580,8 @@ export type ChatProps = {
   taskMentions?: TaskMention[];
   mentionProject?: string;
   mentionSession?: string | null;
+  /** Con varias máquinas, el nombre de cada una (`null`, la de la ventana): la mención guarda dónde vive la tarea. */
+  mentionMachineName?: (id: string | null) => string | undefined;
   placeCandidates?: PlaceCandidate[];
   /**
    * Los encargados a los que esta caja puede dirigir el mensaje. Encabezan el
@@ -1079,7 +1081,7 @@ export default function Chat(props: ChatProps) {
       .slice(0, 40).map(task => ({
         value: referenceId(task.target),
         title: task.title || workLabel(task.branch, task.alias) || task.target.sessionId,
-        detail: [workLabel(task.branch, task.alias), task.projectName].filter(Boolean).join(" · "),
+        detail: [workLabel(task.branch, task.alias), task.projectName, task.machine && props.mentionMachineName?.(task.machine)].filter(Boolean).join(" · "),
         label: task.available ? (task.archived ? t("chat.mentions.archived_task") : t("chat.mentions.task")) : t("chat.mentions.no_worktree"),
         group: material,
       }));
@@ -1234,7 +1236,7 @@ export default function Chat(props: ChatProps) {
 
   function mentionedReference(value: string): { target: MentionTarget; label: string } | undefined {
     const task = props.taskCandidates?.find(c => referenceId(c.target) === value);
-    if (task) return { target: task.target, label: taskLabel(task) };
+    if (task) return { target: taskTarget(task, props.mentionMachineName), label: taskLabel(task) };
     const place = props.placeCandidates?.find(c => referenceId(c.target) === value);
     return place && { target: place.target, label: placeLabel(place) };
   }

@@ -25,7 +25,7 @@ type Failure = { what: unknown; detail: unknown };
  * Lecturas del contenido de un workspace: cada máquina suma su parte. `list_live_turns`
  * no: son los procesos de esta computadora, los que cerrar la ventana detiene.
  */
-const FAN = new Set(["list_projects", "list_portfolios", "list_live_sessions", "list_active_turns", "list_spaces", "list_workspace_attention", "list_session_git"]);
+const FAN = new Set(["list_projects", "list_portfolios", "list_live_sessions", "list_active_turns", "list_spaces", "list_workspace_attention", "list_session_git", "list_task_mentions"]);
 const LISTING = new Set(["list_workspaces", "workspaces_startup"]);
 /** Lo que crea algo nuevo: en un workspace que esa máquina no tiene, primero lo hace suyo. */
 const CREATE = new Set(["send_message", "run_shell_command", "create_project", "clone_project", "start_project_clone"]);
@@ -62,7 +62,7 @@ const POLL_WAIT = 20_000;
 const NO_SETUP: Record<string, unknown> = { setup_required: false, prepare_runtime: { stages: [], running: false }, list_live_turns: [] };
 
 /** Qué vuelve a leer la ventana cuando cambia la rebanada de una lectura. */
-export type SliceChange = "sessions" | "projects" | "spaces" | "attention";
+export type SliceChange = "sessions" | "projects" | "spaces" | "attention" | "mentions";
 const CHANGES: Record<string, SliceChange> = {
   list_live_sessions: "sessions",
   list_active_turns: "sessions",
@@ -70,6 +70,7 @@ const CHANGES: Record<string, SliceChange> = {
   list_portfolios: "projects",
   list_spaces: "spaces",
   list_workspace_attention: "attention",
+  list_task_mentions: "mentions",
 };
 
 export type RouterConfig = {

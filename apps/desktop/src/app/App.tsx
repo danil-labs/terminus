@@ -2962,6 +2962,7 @@ export default function App() {
       const changes = (event as CustomEvent<{ changes?: string[] } | null>).detail?.changes ?? [];
       if (changes.includes("sessions")) void refreshSessionsOnEvent(grupos());
       if (changes.includes("spaces")) void reloadSpaces();
+      if (changes.includes("mentions") && input().includes("@")) void refreshTaskCandidates();
       if (changes.includes("projects")) {
         const workspace = workspaceActivo();
         void invoke<Project[]>("list_projects").then((items) => {
@@ -6829,6 +6830,7 @@ export default function App() {
         taskMentions={borrador().task_mentions}
         mentionProject={project()}
         mentionSession={sessionId()}
+        mentionMachineName={capabilities().taskMachine ? (id) => (id ? capabilities().machineName?.(id) : capabilities().windowMachine?.()?.name) : undefined}
         onMentionHistory={navigateMentionHistory}
         placeCandidates={placeCandidates()}
         recipientCandidates={recipientCandidates()}

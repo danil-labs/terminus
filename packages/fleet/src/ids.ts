@@ -53,6 +53,7 @@ export function argsFor(
   shared: (space: string) => boolean = () => false,
 ): Row {
   const walk = (value: unknown, key: string | null): unknown => {
+    if (key === "task_mentions" && Array.isArray(value)) return value.map((m) => mentionFor(m, machine, remotes, self));
     if (typeof value === "string") {
       const own = unwrap(value, remotes);
       if (own) {
@@ -82,4 +83,27 @@ function mine(list: unknown[], machine: string, remotes: ReadonlySet<string>, se
     if (own) return own.machine === machine ? [own.id] : [];
     return self === null || machine === self ? [v] : [];
   });
+}
+
+/** Lo que la ventana vio de una tarea de otra máquina al mencionarla: el motor que no la tiene lo cuenta con esto. */
+const ABOUT = ["machine_name", "title", "branch", "folder_name"] as const;
+
+/**
+ * Una mención como la entiende `machine`. Una tarea suya va con su id suelto;
+ * una de otra máquina, con su id de allá y `elsewhere`, porque este motor no
+ * la tiene en su disco. `about` es de la ventana y no viaja.
+ */
+function mentionFor(value: unknown, machine: string, remotes: ReadonlySet<string>, self: string | null): unknown {
+  if (!isRow(value) || !isRow(value.target) || value.target.kind !== "task" || typeof value.target.sessionId !== "string") return value;
+  const { about, ...target } = value.target as Row & { about?: unknown };
+  const { elsewhere, ...mention } = value as Row & { elsewhere?: unknown };
+  const before = isRow(elsewhere) ? elsewhere : {};
+  const own = unwrap(target.sessionId as string, remotes);
+  const home = own?.machine ?? (typeof before.machine === "string" ? before.machine : self);
+  const id = own?.id ?? (target.sessionId as string);
+  if (!home || home === machine) return { ...mention, target: { ...target, sessionId: id } };
+  const seen = { ...before, ...(isRow(about) ? about : {}) };
+  const out: Row = { machine: home };
+  for (const k of ABOUT) if (typeof seen[k] === "string" && seen[k]) out[k] = seen[k];
+  return { ...mention, target: { ...target, sessionId: id }, elsewhere: out };
 }
