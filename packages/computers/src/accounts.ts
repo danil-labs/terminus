@@ -1,9 +1,8 @@
 /**
  * Las cuentas de IA de la persona en todas sus máquinas, como el panel de la
- * web (#154): una tarjeta por proveedor y correo, con su consumo leído una
- * vez (de la primera máquina encendida donde está) y una chapa por máquina
- * donde tiene la sesión iniciada. Sin correo, la cuenta queda sola y se nombra
- * con su máquina. Es la regla de `mergeAccounts` en `packages/fleet/src/merge.ts`.
+ * web: cada credencial registrada conserva su tarjeta y su consumo. El correo
+ * es una etiqueta: una persona puede tener cuentas Personal y Team con el
+ * mismo correo. Sin un id compartido de credencial no se unen máquinas.
  */
 import { word } from "../../design/src/index.ts";
 
@@ -15,15 +14,15 @@ export type AccountRowLike = { id: string; label?: string | null; identity?: str
 export type AccountMember = { machine: string; id: string; on: boolean };
 
 export type AccountGroup<R extends AccountRowLike = AccountRowLike> = {
-  /** `provider:correo`, o `provider:máquina~id` sin correo. */
+  /** `provider:máquina~id`: el correo no identifica una credencial. */
   key: string;
   provider: string;
-  /** La fila de la primera máquina que la tiene. */
+  /** La fila de la credencial registrada en esa máquina. */
   row: R;
   /** El correo en minúsculas; `null` si el CLI no lo dice. */
   email: string | null;
   members: AccountMember[];
-  /** De qué máquina se lee el consumo: la primera encendida, si no la primera. */
+  /** De qué credencial y máquina se lee el consumo. */
   usageFrom: AccountMember;
 };
 
@@ -40,13 +39,7 @@ export function groupAccounts<R extends AccountRowLike>(
       if (typeof row?.id !== "string") continue;
       const member = { machine, id: row.id, on };
       const email = text(row.identity).toLowerCase() || null;
-      const known = email ? groups.find((g) => g.email === email) : undefined;
-      if (known) {
-        known.members.push(member);
-        if (!known.usageFrom.on && on) known.usageFrom = member;
-      } else {
-        groups.push({ key: `${provider}:${email ?? `${machine}~${row.id}`}`, provider, row, email, members: [member], usageFrom: member });
-      }
+      groups.push({ key: `${provider}:${machine}~${row.id}`, provider, row, email, members: [member], usageFrom: member });
     }
   }
   return groups;

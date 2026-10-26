@@ -8,7 +8,7 @@
  * máquina (`ids.ts`). Las filas de otra máquina dicen cuál es y en qué estado
  * está su rebanada.
  */
-import { type AccountWorkspace, registryProjects } from "../../computers/src/index.ts";
+import { type AccountRowLike, type AccountWorkspace, groupAccounts, registryProjects } from "../../computers/src/index.ts";
 import { mergeAttention } from "../../protocol/src/index.ts";
 import { wrap } from "./ids.ts";
 import type { Slice } from "./slices.ts";
@@ -244,35 +244,27 @@ function mergeProjects(ctx: MergeContext, parts: Slice[], workspace: string | nu
 }
 
 /**
- * Una cuenta de IA por proveedor y correo, con las máquinas donde tiene sesión
- * (`machines`); su id es el de la primera encendida. Sin correo queda sola y se
- * nombra con su máquina (`groupAccounts` de `@terminus/computers`, la misma regla).
+ * Cada credencial conserva su id, máquina y consumo. El correo no une cuentas:
+ * Claude Personal y Team pueden compartirlo. La misma regla sirve al teléfono.
  */
 function mergeAccounts(ctx: MergeContext, parts: Slice[]): unknown {
   const lists = parts.filter((s) => isRow(s.value) && Array.isArray((s.value as Row).accounts));
   const lead = lists[0];
   if (!lead) return parts[0].value;
-  type Member = { machine: string; id: string; on: boolean };
-  const cards: { row: Row; members: Member[]; key: string | null; active: boolean }[] = [];
-  for (const s of lists) {
-    const list = s.value as Row;
-    for (const a of list.accounts as Row[]) {
-      if (typeof a?.id !== "string") continue;
-      const member = { machine: s.machine, id: s.machine === ctx.self ? a.id : wrap(s.machine, a.id), on: ctx.on(s.machine) };
-      const email = text(a.identity).toLowerCase();
-      let card = email ? cards.find((c) => c.key === email) : undefined;
-      if (card) card.members.push(member);
-      else {
-        card = { row: email ? a : { ...a, label: `${text(a.label) || a.id} · ${ctx.name?.(s.machine) ?? s.machine}` }, members: [member], key: email || null, active: false };
-        cards.push(card);
-      }
-      // La activa del panel es la de la primera máquina.
-      if (s === lead && list.active === a.id) card.active = true;
-    }
-  }
-  const shown = (c: (typeof cards)[number]) => c.members.find((m) => m.on) ?? c.members[0];
-  const accounts = cards.map((c) => ({ ...c.row, id: shown(c).id, machines: c.members }));
-  const active = accounts.find((_, i) => cards[i].active)?.id ?? null;
+  const groups = groupAccounts(String((lead.value as Row).provider ?? ""), lists.map((s) => ({
+    machine: s.machine,
+    on: ctx.on(s.machine),
+    accounts: ((s.value as Row).accounts as Row[]).filter((a): a is Row & AccountRowLike => typeof a?.id === "string"),
+  })));
+  const panelId = (machine: string, id: string) => machine === ctx.self ? id : wrap(machine, id);
+  const accounts = groups.map((g) => ({
+    ...g.row,
+    ...(!g.email ? { label: `${text(g.row.label) || g.row.id} · ${ctx.name?.(g.usageFrom.machine) ?? g.usageFrom.machine}` } : {}),
+    id: panelId(g.usageFrom.machine, g.row.id),
+    machines: g.members.map((m) => ({ ...m, id: panelId(m.machine, m.id) })),
+  }));
+  const activeId = (lead.value as Row).active;
+  const active = typeof activeId === "string" && accounts.some((a) => a.id === panelId(lead.machine, activeId)) ? panelId(lead.machine, activeId) : null;
   return { ...(lead.value as Row), active, accounts };
 }
 

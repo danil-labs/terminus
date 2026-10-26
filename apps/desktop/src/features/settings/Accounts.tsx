@@ -162,6 +162,7 @@ export default function Accounts(props: {
   }
 
   const proveedor = () => agentes().find((a) => a.id === agente());
+  const terminalLocal = (id: string) => capabilities().nativeWindow && !machineOf(id);
   const externalInstallUrl = () => proveedor()?.external_install_url;
   const faltaExterno = () => !proveedor() || Boolean(externalInstallUrl()) && !proveedor()?.available;
   const [revisandoCli, setRevisandoCli] = createSignal(false);
@@ -1337,7 +1338,7 @@ export default function Accounts(props: {
                 {/* El agente lleva un rato sin decir nada. Puede ser que esté
                     esperando algo que solo sabe pedir con una terminal de verdad, y
                     esto es lo único que lo destraba. */}
-                <Show when={ofrecerTerminal()}>
+                <Show when={ofrecerTerminal() && terminalLocal(id())}>
                   <div class="flex flex-wrap items-center gap-2 text-xs text-neutral-500">
                     <span>
                       {t("settings.accounts.no_response", { agent: etiqueta() })}
@@ -1468,13 +1469,15 @@ export default function Accounts(props: {
               <Button size="sm" onClick={() => void conectar(f().id)}>
                 {t("settings.accounts.retry")}
               </Button>
-              <Button
-                variant="outline"
-                size="compact"
-                onClick={() => void conectar(f().id, "terminal")}
-              >
-                {t("settings.accounts.open_terminal")}
-              </Button>
+              <Show when={terminalLocal(f().id)}>
+                <Button
+                  variant="outline"
+                  size="compact"
+                  onClick={() => void conectar(f().id, "terminal")}
+                >
+                  {t("settings.accounts.open_terminal")}
+                </Button>
+              </Show>
             </div>
           </div>
           </SettingsBlock>
