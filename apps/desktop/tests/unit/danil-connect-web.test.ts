@@ -13,10 +13,14 @@ const API = "https://computers.danil.ai";
 test("the audited visual-parts extension keeps existing web calls compatible", () => {
   const base = "d4541d178c64a065c1a4a0c693817eb84ad17052fd605815295fa1696955ef8f";
   const extended = "3972c281dba1b61f9ad06fc82fbf059af3dbc55770b0a1bcb59ce786ec0a56f1";
+  const credentials = "f33064bff6afb3708517c13a90f327af5333cbd82b15a589a2373c80d79e6d51";
   assert.equal(machineCompatibility(extended, base), "ok");
   assert.equal(machineCompatibility(base, extended), "ok");
+  assert.equal(machineCompatibility(base, credentials), "ok");
+  assert.equal(machineCompatibility(extended, credentials), "ok");
+  assert.equal(machineCompatibility(credentials, base), "ok");
   assert.equal(machineCompatibility("0".repeat(64), base), "outdated");
-  assert.deepEqual(machineContracts(base), [base, extended]);
+  assert.deepEqual(machineContracts(base), [base, extended, credentials]);
   assert.deepEqual(machineContracts("0".repeat(64)), ["0".repeat(64)]);
 });
 

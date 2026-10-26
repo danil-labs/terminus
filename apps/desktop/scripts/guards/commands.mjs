@@ -72,6 +72,10 @@ const SIN_INTERFAZ = {
   set_session_pinned: "el gesto de fijar lo implementa la tarea de frontend en paralelo",
   // Lo pide el conector del motor al recibir `memory.changed` del relay (seldon-host #108).
   sync_workspace_memory: "la sincronización de la memoria la programa el conector; ninguna pantalla la pide",
+  // Los pide el conector al recibir `credentials.changed` y `credentials.reseal` del relay (seldon-host #144, #145).
+  sync_account_credentials: "la reconciliación de las credenciales la programa el conector; ninguna pantalla la pide",
+  reseal_account_credential: "sellar para otra máquina lo pide el relay al conector; ninguna pantalla lo hace",
+  github_account_changed: "tirar la caché del token de GitHub lo pide el conector con `credentials.changed`; ninguna pantalla lo hace",
   // El backend prepara los árboles; esta lectura aún no tiene pantalla.
   session_worktree: "el árbol y sus notas aún no se pintan en ninguna pantalla",
   // El renombre lo hace hoy el agente con `git branch -m`; la app lo reconcilia.

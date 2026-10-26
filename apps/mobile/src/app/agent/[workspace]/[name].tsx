@@ -28,7 +28,7 @@ export default function AgentScreen() {
   // El PR de la línea 2: git solo de las filas que la lista dice que se ven.
   const [seen, setSeen] = useState<ReadonlySet<string>>(new Set());
   const onSeen = useRef<FlatListProps<Task>["onViewableItemsChanged"]>(({ viewableItems }) => setSeen(new Set(viewableItems.map((v) => v.key)))).current;
-  const git = useTaskGit(hostOf, view.density === "compact" ? [] : tasks.filter((task) => seen.has(taskKey(task))));
+  const git = useTaskGit(hostOf, tasks.filter((task) => seen.has(taskKey(task))));
   const folderName = (id: string) => snapshot?.folders.find((f) => f.id === id)?.name;
   // En qué máquina se habla con él: la preferida entre las que lo tienen.
   const host = preferred(hostsOfCurrent.filter((h) => agent?.places.some((p) => p.host === h.id)));
@@ -83,6 +83,7 @@ export default function AgentScreen() {
             density={view.density}
             onPress={() => openTask(item.host, item.workspace, item.folder, item.id)}
             onLongPress={() => openPreview(item.host, item.id)}
+            onFinish={() => openPreview(item.host, item.id)}
           />
         )}
         ListEmptyComponent={<Text style={[styles.empty, { color: theme.textMuted }]}>{t("agent.empty")}</Text>}

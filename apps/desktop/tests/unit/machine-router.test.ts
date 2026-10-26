@@ -184,6 +184,18 @@ test("the account and danil_* always stay on this computer, whatever the header 
   assert.deepEqual(native.map((c) => c.command), ["danil_sessions", "list_accounts"]);
 });
 
+test("the account's credentials are the workspace's: here by default, on the machine of the header when it names one", async () => {
+  const listing = { credentials: [], recipients: [], local_only: [] };
+  const vm = fakeLink({ account_credentials_list: { ...listing, from: "vm" }, account_credential_remove_machine: { credential: null } });
+  const { router, native } = setup({ cmp_vm: vm }, { account_credentials_list: listing });
+  await router.handle("list_workspaces");
+  assert.deepEqual(await router.handle("account_credentials_list", {}), listing);
+  assert.deepEqual(await router.handle("account_credentials_list", {}, on("cmp_vm")), { ...listing, from: "vm" });
+  await router.handle("account_credential_remove_machine", { credential: "c1", computer: "cmp_home" }, on("cmp_vm"));
+  assert.deepEqual(native.filter((c) => c.command.startsWith("account_credential")).map((c) => c.command), ["account_credentials_list"]);
+  assert.deepEqual(vm.calls.map((c) => [c.command, c.workspace]), [["account_credentials_list", "w"], ["account_credential_remove_machine", "w"]]);
+});
+
 test("without a pick something new is born on the window's machine; «Ejecutar en» decides only when set", async () => {
   const vm = fakeLink({});
   const plain = setup({ cmp_vm: vm });
