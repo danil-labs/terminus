@@ -35,8 +35,15 @@ export function neverRan(e: unknown): boolean {
  */
 const READ = /^(list_|load_|read_|get_)|_status$/;
 
+/**
+ * Lecturas que tras `io` siguen corriendo en el motor: el barrido de disco pasa
+ * de los 30 s del transporte, y repetirlo lo forma detrás de sí mismo.
+ */
+const SLOW_READS = new Set(["list_storage"]);
+
 export function canRepeat(command: string, e: unknown): boolean {
-  return neverRan(e) || (READ.test(command) && detailOf(e) === "io");
+  if (neverRan(e)) return true;
+  return READ.test(command) && !SLOW_READS.has(command) && detailOf(e) === "io";
 }
 
 const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms));

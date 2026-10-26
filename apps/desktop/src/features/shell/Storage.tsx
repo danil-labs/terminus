@@ -175,6 +175,9 @@ export default function Almacenamiento(props: {
     // `target` de cada tarea: medido en un log de 4 h 43, 112 barridos, 55 s de
     // mediana y 2 h 43 de disco, con el panel cerrado casi todo el rato.
     let medidoCerrado = false;
+    // Y no durante el arranque: el barrido le compite el disco a la barra
+    // lateral y al árbol de archivos, que son lo primero que se mira.
+    const quietUntil = Date.now() + 120_000;
     const update = () => {
       // Medir encima de un borrado devuelve una foto a medias; el que borra
       // pide la suya al acabar.
@@ -193,7 +196,11 @@ export default function Almacenamiento(props: {
       scheduled = setTimeout(() => {
         scheduled = undefined;
         update();
-      }, Math.max(1500, freshness - (Date.now() - lastRefresh)));
+      }, Math.max(
+        1500,
+        freshness - (Date.now() - lastRefresh),
+        abierto() ? 0 : quietUntil - Date.now(),
+      ));
     };
     const visible = () => {
       if (document.visibilityState === "visible") schedule();
@@ -203,6 +210,14 @@ export default function Almacenamiento(props: {
       runningTurns = (event as CustomEvent<number>).detail;
       if (runningTurns === 0) schedule();
     };
+    // Lo guardado primero; se barre sólo si está viejo, como al montar.
+    const readSaved = (read: Promise<void>) => {
+      const askedAt = Date.now();
+      void read.then(() => {
+        lastRefresh = datos()?.medido_en ?? 0;
+        if (!disposed && lastRefresh < askedAt - freshness) schedule();
+      });
+    };
     const changed = () => {
       medidoCerrado = false;
       setDatos(null);
@@ -210,14 +225,9 @@ export default function Almacenamiento(props: {
       setGruposAbiertos({});
       setFallo({});
       setLiberado({});
-      lastRefresh = Date.now();
-      void refresh.reset();
+      readSaved(refresh.reset(false));
     };
-    const mountedAt = Date.now();
-    void consultar(false).then(() => {
-      lastRefresh = datos()?.medido_en ?? 0;
-      if (!disposed && lastRefresh < mountedAt - freshness) schedule();
-    });
+    readSaved(consultar(false));
     const interval = setInterval(visible, freshness);
     window.addEventListener("harness:turn", turnsChanged);
     window.addEventListener("harness:workspace", changed);
