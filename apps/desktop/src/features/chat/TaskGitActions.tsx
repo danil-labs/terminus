@@ -52,6 +52,8 @@ export default function TaskGitActions(props: {
     createEffect(() => {
       const value = observation.rows();
       setRows((before) => retainGitObservation(before, value));
+      const error = observation.error();
+      setFailure(error ? asFailure(error) : null);
     });
     onCleanup(() => { read = () => {}; observation.release(); });
   }));
@@ -79,10 +81,12 @@ export default function TaskGitActions(props: {
     }
   };
   return <>
-    <Show when={status().kind !== "unknown" && status().kind !== "none"}><div data-task-git-actions class="ml-auto flex min-w-0 shrink-0 items-center gap-1">
-      <Show when={status().pull}><button type="button" data-task-pr aria-label={sessionGitDescription(status()) || t("chat.task.details")} onClick={() => setSheet("details")} class="flex min-h-9 min-w-0 items-center rounded-sm px-1 text-xs outline-none hover:bg-neutral-200 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary">
-        <SessionGit status={status()} compact />
-      </button></Show>
+    <Show when={!!context().project}><div data-task-git-actions class="ml-auto flex min-w-0 shrink-0 items-center gap-1">
+      <button type="button" data-task-pr aria-label={sessionGitDescription(status()) || t("chat.task.details")} onClick={() => setSheet("details")} class="flex min-h-9 min-w-0 items-center rounded-sm px-1 text-xs outline-none hover:bg-neutral-200 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary">
+        <Show when={status().pull || status().branch || status().kind === "kn"} fallback={<span>{t("projects.git.unknown")}</span>}>
+          <SessionGit status={status()} compact />
+        </Show>
+      </button>
       <Button variant="ghost" size="icon" data-task-finish disabled={!ready()} aria-busy={finishing()} aria-label={t("projects.sessions.finish")} title={ready() ? t("projects.sessions.finish") : t("chat.task.finish_unavailable")} class="size-9 shrink-0 text-brand-purple" onClick={() => setSheet("finish")}>
         <Rocket size={17} />
       </Button>

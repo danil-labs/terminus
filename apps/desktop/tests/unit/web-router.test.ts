@@ -252,3 +252,50 @@ test("on the web arguments that name two machines are still refused", async () =
     router.close();
   }
 });
+
+test("web Git observes the machine before refreshing its PR after cached empty results", async () => {
+  let observed = false;
+  let restarted = false;
+  const merged = { kind: "branch", branch: "feature", head: "head", repository: "repo", pull_known: true, stale: false, has_remote: true, merged_locally: false, pull: { number: 371, state: "merged", head_sha: "head" } };
+  const mac = fakeLink({ list_session_git: async (args: Args) => {
+    if (!restarted) return {};
+    if (!args.remote) {
+      await new Promise(resolve => setTimeout(resolve, 15));
+      observed = true;
+      return { task: { ...merged, pull: null, pull_known: false } };
+    }
+    return observed ? { task: merged } : {};
+  } });
+  const call = mac.call.bind(mac);
+  mac.call = async (...args) => {
+    const result = await call(...args);
+    return { ...result, value: await result.value };
+  };
+  const { router } = web({ cmp_mac: mac });
+  await router.handle("list_workspaces");
+  const args = { project: "p", priority: ["cmp_mac~task"] };
+  await router.handle("list_session_git", { ...args, remote: false });
+  await router.handle("list_session_git", { ...args, remote: true });
+  restarted = true;
+  try {
+    await router.handle("list_session_git", { ...args, remote: false });
+    assert.equal(observed, true, "the local phase must reach the engine before the remote phase");
+    const rows = await router.handle("list_session_git", { ...args, remote: true }) as Record<string, typeof merged>;
+    assert.equal(rows["cmp_mac~task"].pull?.state, "merged");
+  } finally { router.close(); }
+});
+
+test("web Git from an offline machine stays stale for fan and scoped reads", async () => {
+  const mac = fakeLink({ list_session_git: { task: { kind: "branch", branch: "feature", head: "head", stale: false, pull_known: true, pull: { number: 371, state: "merged", head_sha: "head" } } } });
+  const { router } = web({ cmp_mac: mac });
+  await router.handle("list_workspaces");
+  const args = { project: "p", remote: false, priority: ["cmp_mac~task"] };
+  await router.handle("list_session_git", args);
+  mac.setState("offline");
+  try {
+    for (const options of [undefined, on("cmp_mac")]) {
+      const rows = await router.handle("list_session_git", args, options) as Record<string, { stale: boolean }>;
+      assert.equal(rows["cmp_mac~task"].stale, true);
+    }
+  } finally { router.close(); }
+});
