@@ -203,6 +203,7 @@ lleva su comentario allí:
 |---|---|---|
 | Vista previa y finalizar | `task_blockers` | `set_session_pinned`, `set_task_archived`, `finish_task`, `delete_session` |
 | Cuadro de escribir | `list_models`, `list_permission_modes`, `list_slash_menu`, `list_mentions`, `project_base_branches` | `run_shell_command`, `stop_shell_command`, `guardar_imagen_pegada`, `prepare_attachments` |
+| Almacenamiento por máquina (en Consumos) | `list_workspaces` sin workspace para capacidad; `list_storage` al abrir el detalle del workspace | — |
 | Identidad de agentes | `list_agent_profiles`, `preview_file` | — |
 | Cuentas de IA | `list_accounts`, `account_status`, `account_limits` | `add_account`, `login_account`, `submit_login_code`, `cancel_login`, `discard_account`, `remove_account` |
 | Fondo del chat | `chat_background` | — |
@@ -211,6 +212,13 @@ lleva su comentario allí:
 | Registros de actividad por máquina | `list_activity`, `read_activity`, `read_activity_log` | — |
 | PR en la tarjeta | `list_session_git` (por carpeta, con las visibles en `priority`) | — |
 | Llevar trabajo | `work_status`, `work_key` | `work_export`, `work_read_part`, `work_write_part`, `work_import`, `work_cancel` |
+
+En Consumos, «Almacenamiento» consulta el resumen de disco al desplegarlo y el
+workspace seleccionado al abrir una máquina o medir manualmente. No hay
+barridos periódicos ni acciones de limpieza. Capacidad física y tamaño lógico
+se muestran separados; un motor sin resumen conserva «capacidad no disponible».
+Las respuestas de un contexto anterior se descartan y una desconexión conserva
+la fecha de los datos anteriores, marcados como desactualizados.
 
 **Qué enciende la VM.** El relay solo enciende con su lista de intención
 (`INTENT_COMMANDS`: escribir, crear, aprobar, `!`, iniciar sesión…). Fijar,

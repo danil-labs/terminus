@@ -77,7 +77,10 @@ export class SliceBook {
     if (!slice.has || (slice.status !== "ok" && slice.status !== "cached")) return;
     let text: string;
     try {
-      text = JSON.stringify(slice.value ?? null);
+      const value = slice.value;
+      const saved = value && typeof value === "object" && !Array.isArray(value) && "machine_resources" in value
+        ? Object.fromEntries(Object.entries(value).filter(([name]) => name !== "machine_resources")) : value;
+      text = JSON.stringify(saved ?? null);
     } catch {
       return;
     }

@@ -483,3 +483,21 @@ test("local composer mentions omit about with or without the machine router", as
     router.close();
   }
 });
+
+test("explicit local storage never falls back and its disk listing stays direct", async () => {
+  const vm = fakeLink({ list_workspaces: { workspaces: [{ id: "remote", name: "Remote" }], active: "remote" }, reclaim_storage: { bytes: 999 } });
+  const resources = { measured_at: 1, storage: [] };
+  const { router, native, fleet } = setup({ cmp_vm: vm }, { list_workspaces: { workspaces: [{ id: "w", name: "W" }], active: "w", machine_resources: resources }, reclaim_storage: { bytes: 1 } });
+  await router.handle("list_workspaces");
+  fleet.setRegistry([{ id: "remote", name: "Remote", computers: ["cmp_vm"] }] as never);
+  await router.handle("set_active_workspace", { id: "remote" });
+  const target = { headers: { "x-terminus-machine": "cmp_home", "x-terminus-workspace": "remote" } };
+  await assert.rejects(router.handle("reclaim_storage", {}, target), (error: { detail: string }) => error.detail === "workspace_missing");
+  assert.equal(vm.calls.filter((call) => call.command === "reclaim_storage").length, 0);
+  assert.equal(native.filter((call) => call.command === "reclaim_storage").length, 0);
+  const result = await router.handle("list_workspaces", {}, target) as { machine_resources?: unknown };
+  assert.deepEqual(result.machine_resources, resources);
+  assert.equal(router.activeWorkspace(), "remote");
+  assert.equal(new Headers((native.at(-1)?.options as { headers?: HeadersInit })?.headers).get("x-terminus-workspace"), null);
+  router.close();
+});

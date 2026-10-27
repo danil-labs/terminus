@@ -229,7 +229,9 @@ function mergeWorkspaces(ctx: MergeContext, parts: Slice[]): unknown {
   const lead = lists[0];
   const live = lists.map((s) => (s.value as Row).active).find((a): a is string => typeof a === "string" && rows.has(a)) ?? null;
   const base = lead ? (encode(ctx, lead.machine, lead.value) as Row) : { migrations: [] };
-  return { ...base, workspaces, active: live ?? (lead ? null : (workspaces[0]?.id ?? null)) };
+  const { machine_resources: _resources, ...listing } = base;
+  const machine_resources_by_machine = Object.fromEntries(lists.filter((s) => isRow(s.value) && (s.value as Row).machine_resources).map((s) => [s.machine, (s.value as Row).machine_resources]));
+  return { ...listing, machine_resources_by_machine, workspaces, active: live ?? (lead ? null : (workspaces[0]?.id ?? null)) };
 }
 
 /**
