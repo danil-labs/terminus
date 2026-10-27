@@ -95,15 +95,14 @@ async function keyFor(target: string): Promise<{ recipientKey: string | null; ke
 }
 
 /**
- * Si el destino tiene la carpeta del proyecto: por su lista, con el mismo id o,
- * si no, el mismo nombre. `machines` sale de la copia en caché de cada máquina;
+ * Si el destino tiene la carpeta del proyecto: por su lista, con el mismo id. `machines` sale de la copia en caché de cada máquina;
  * que no la incluya puede ser que esa copia aún no llegó, y entonces se le
  * pregunta a ella antes de clonar otra vez.
  */
 async function targetHasProject(target: string, project: Project): Promise<boolean> {
   if (project.machines?.includes(target)) return true;
   const theirs = await invoke<Project[]>("list_projects", {}, on(target));
-  const same = theirs.find((p) => p.id === project.id) ?? theirs.find((p) => p.name === project.name);
+  const same = theirs.find((p) => p.id === project.id);
   return !!same && !!(same.working_directory ?? same.work_tree);
 }
 
