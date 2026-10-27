@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
 import { createInbox, type Account, type Conversation, type Message } from "../../../../packages/attention/src/inbox.ts";
 import { useAccount } from "../lib/account";
+import { supabase } from "../lib/supabase";
 import { t } from "../lib/i18n";
 import { Row, SectionTitle } from "./components";
 import { useTheme } from "./theme";
@@ -28,6 +29,14 @@ export function AlphaInboxLive({ exit }: { exit(): void }) {
     setAccounts([]); setAccount(null); setConversation(null); setConversations([]); setMessages([]); setMore(false); setError(false); setBusy(false);
     return () => { generation.current++; };
   }, [session.session?.user.id]);
+  useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange(event => {
+      if (event !== "SIGNED_OUT") return;
+      generation.current++;
+      setAccounts([]); setAccount(null); setConversation(null); setConversations([]); setMessages([]); setMore(false); setError(false); setBusy(false);
+    });
+    return () => data.subscription.unsubscribe();
+  }, []);
   async function load(nextAccount: Account | null, nextConversation: Conversation | null, append = false) {
     const request = ++generation.current;
     setBusy(true); setError(false); setForbidden(false);
