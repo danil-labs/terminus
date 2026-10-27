@@ -32,6 +32,7 @@ const es = {
   "alpha.more": "Cargar más",
   "alpha.exit_real": "Cerrar lectura conectada",
 
+  "alpha.pending_filter": "Solo atención pendiente · demo",
   "alpha.title": "Inbox alfa",
   "alpha.unavailable": "El Inbox externo no está conectado en esta versión.",
   "alpha.intro": "Conversaciones externas separadas de tus tareas privadas. No hay cuenta operativa vinculada.",
@@ -358,6 +359,7 @@ const en: Record<Key, string> = {
   "alpha.more": "Load more",
   "alpha.exit_real": "Close connected view",
 
+  "alpha.pending_filter": "Needs attention only · demo",
   "alpha.title": "Alpha Inbox",
   "alpha.unavailable": "The external Inbox is not connected in this build.",
   "alpha.intro": "External conversations separate from your private tasks. No operational account is linked.",

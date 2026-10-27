@@ -156,5 +156,6 @@
   "web.alpha.public_human": "Equipo · respuesta pública",
   "web.alpha.public_agent": "Agente · respuesta pública",
   "web.alpha.validation_warning": "Lectura de datos reales. Integración alfa pendiente de validación autenticada.",
-  "web.alpha.signout": "Cerrar sesión"
+  "web.alpha.signout": "Cerrar sesión",
+  "web.alpha.session_required": "Inicia sesión para conectar la lectura real. Tu demo sigue disponible sin conexión."
 }

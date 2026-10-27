@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, Switch, View } from "react-native";
 import { t } from "../lib/i18n";
 import { useAccount } from "../lib/account";
+import { AgentDock } from "../ui/AgentDock";
 import { AlphaInboxLive } from "../ui/AlphaInboxLive";
 import { Avatar, Row, SectionTitle } from "../ui/components";
 import { useTheme } from "../ui/theme";
@@ -15,6 +16,7 @@ export default function AlphaInbox() {
   const accountSession = useAccount();
   const [live, setLive] = useState(false);
   const [demo, setDemo] = useState(false);
+  const [onlyPending, setOnlyPending] = useState(false);
   const [page, setPage] = useState<Page>("list");
   const [knowledge, setKnowledge] = useState(t("alpha.knowledge_value"));
   const [tool, setTool] = useState(true);
@@ -53,6 +55,8 @@ export default function AlphaInbox() {
         </View>
         {page !== "list" && action(t("alpha.back"), () => setPage(page === "agent" || page === "integrations" ? "settings" : page === "details" ? "conversation" : "list"))}
         {page === "list" && <>
+          <Row title={t("alpha.pending_filter")} right={<Switch accessibilityLabel={t("alpha.pending_filter")} value={onlyPending} onValueChange={setOnlyPending} trackColor={{ true: theme.primary, false: theme.border }}/>} />
+          <AgentDock agents={[{name: "atencion-demo", status: "asleep", liveTasks: 0}]} selected={null} onTalk={() => setPage("conversation")} onShowTasks={() => setOnlyPending(true)} onSeeAll={() => setPage("settings")} />
           <SectionTitle>{t("alpha.list")}</SectionTitle>
           <Row left={<Avatar name={t("alpha.customer")} />} title={t("alpha.customer")} subtitle={t("alpha.preview")} onPress={() => setPage("conversation")} />
 

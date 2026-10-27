@@ -79,9 +79,9 @@ async function computersOf(getToken: () => Promise<string>, unauthorized: () => 
   return listComputers(COMPUTERS, await getToken());
 }
 
-export function MachinesProvider({ children }: { children: ReactNode }) {
+export function MachinesProvider({ children, active = true }: { children: ReactNode; active?: boolean }) {
   const account = useAccount();
-  const signedIn = Boolean(account.session);
+  const signedIn = active && Boolean(account.session);
   const [computers, setComputers] = useState<Computer[]>([]);
   const [registry, setRegistry] = useState<AccountWorkspace[] | null>(null);
   const [fleet, setFleet] = useState<Fleet>("loading");
@@ -93,10 +93,12 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
   const [activity, setActivity] = useState<{ notice: Notice; at: number }[]>([]);
   const [last, setLast] = useState<string | null>(null);
   const listeners = useRef(new Set<Listener>());
+  const reloadGeneration = useRef(0);
   const openTask = useRef<string | null>(null);
   const titles = useRef(new Map<string, string>());
 
   useEffect(() => {
+    if (!active) { setPairing(null); setPairingLoaded(true); return; }
     void loadPairing().then((saved) => {
       setPairing(BRIDGE_ENABLED ? saved : null);
       setPairingLoaded(true);
@@ -105,9 +107,10 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
     if (Platform.OS === "android" && Notifications) {
       void Notifications.setNotificationChannelAsync(CHANNEL, { name: t("notify.channel"), importance: Notifications.AndroidImportance.HIGH });
     }
-  }, []);
+  }, [active]);
 
   const reloadComputers = useCallback(async () => {
+    const request = ++reloadGeneration.current;
     if (!signedIn) {
       setComputers([]);
       setRegistry(null);
@@ -118,6 +121,7 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
       computersOf(account.getToken, account.unauthorized).catch((): Answer<Computer[]> => ({ kind: "error", status: null })),
       account.getToken().then((token) => listWorkspaces(COMPUTERS, token)).catch(() => null),
     ]);
+    if (request !== reloadGeneration.current) return;
     // Un plano de control sin el registro, o un fallo de red, deja la lista de antes.
     if (workspaces?.kind === "ok") setRegistry((old) => (JSON.stringify(old) === JSON.stringify(workspaces.value) ? old : workspaces.value));
     if (answer.kind === "ok") {
@@ -138,7 +142,7 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
     void reloadComputers();
     // Al volver al frente, la lista (y su estado) puede haber cambiado. Nunca enciende nada.
     const sub = AppState.addEventListener("change", (state) => state === "active" && void reloadComputers());
-    return () => sub.remove();
+    return () => { sub.remove(); reloadGeneration.current++; };
   }, [reloadComputers]);
 
   // Una sola flota por sesión de Danil (`@terminus/fleet`), como el escritorio y la web: una sesión de relay por computadora.
@@ -177,9 +181,9 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
   // Las computadoras de la cuenta en la flota (altas y bajas en vivo) y el bridge si está emparejado.
   useEffect(() => {
     // En el orden de la web: las administradas primero; la primera encabeza un workspace compartido.
-    const next: Host[] = machinesFleet ? machinesFleet.set(computers) : [];
+    const next: Host[] = active && machinesFleet ? machinesFleet.set(computers) : [];
     // Sin la sesión de Danil no se sincroniza: el bridge también la pide, salvo el lab sin cuenta.
-    if (pairing && (signedIn || BRIDGE_WITHOUT_ACCOUNT)) next.push(bridgeHost(pairing, t("machines.network")));
+    if (active && pairing && (signedIn || BRIDGE_WITHOUT_ACCOUNT)) next.push(bridgeHost(pairing, t("machines.network")));
     setHosts(next);
     const unsubscribe = next.flatMap((host) => {
       const notices = noticer(host.id);
@@ -216,7 +220,7 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
       // Las computadoras las cierra la flota cuando dejan la cuenta; el bridge, aquí.
       for (const host of next) if (host.kind === "bridge") host.close();
     };
-  }, [machinesFleet, computers, pairing, signedIn]);
+  }, [active, machinesFleet, computers, pairing, signedIn]);
 
   const pair = useCallback(async (next: Pairing | null) => {
     await savePairing(next);

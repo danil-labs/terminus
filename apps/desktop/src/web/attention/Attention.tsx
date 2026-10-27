@@ -22,6 +22,7 @@ export function Attention(props: { settings: { supabaseUrl: string; supabaseKey:
   const [older, setOlder] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal('');
+  const [notice, setNotice] = createSignal('');
   const [draft, setDraft] = createSignal('');
   const [detail, setDetail] = createSignal(false);
   const [plugins, setPlugins] = createSignal(false);
@@ -40,6 +41,11 @@ export function Attention(props: { settings: { supabaseUrl: string; supabaseKey:
   });
   onCleanup(() => { epoch++; threadEpoch++; subscription.data.subscription.unsubscribe(); });
   async function connect() {
+    const attempt = ++epoch;
+    const current = await session.client.auth.getSession();
+    if (attempt !== epoch) return;
+    if (!current.data.session) { reset(); setMode('none'); setNotice(t('web.alpha.session_required')); return; }
+    setNotice('');
     reset(); setMode('live'); setAccounts([]); setBusy(true);
     const request = epoch;
     try { const value = await api.accounts(); if (request === epoch) setAccounts(value); }
@@ -47,7 +53,7 @@ export function Attention(props: { settings: { supabaseUrl: string; supabaseKey:
     finally { if (request === epoch) setBusy(false); }
   }
   function demo() {
-    reset(); setAccounts([]); setMode('demo');
+    reset(); setNotice(''); setAccounts([]); setMode('demo');
     setRows([1, 2, 3].map((id) => ({ id, account_id: 1, contact_name: t(`web.alpha.contact${id}`), channel_name: id === 2 ? 'Web' : 'WhatsApp', last_message: t(`web.alpha.preview${id}`), ai_assistance: id !== 1, unread_count: id === 1 ? 2 : 0 })));
   }
   async function load(id: number, append = false) {
@@ -95,7 +101,7 @@ export function Attention(props: { settings: { supabaseUrl: string; supabaseKey:
       </aside>
       <div class="flex min-w-0 flex-1 flex-col">
         <div class="flex items-center gap-2 border-b border-border px-4 py-2 md:hidden"><Button size="sm" variant="ghost" onClick={() => setView('inbox')}>{label('inbox')}</Button><Button size="sm" variant="ghost" onClick={() => setView('settings')}>{label('settings')}</Button></div>
-    <Show when={mode() !== 'none'} fallback={<section class="mx-auto flex max-w-2xl flex-col gap-5 p-8"><h1 class="font-display text-3xl font-bold">{label('welcome')}</h1><p>{label('intro')}</p><p class="text-sm text-warning-strong">{label('validation_warning')}</p><p class="text-sm text-warning-strong">{label('production_warning')}</p><div class="flex flex-wrap gap-3"><Button onClick={() => void connect()}>{label('connect')}</Button><Button variant="secondary" onClick={demo}>{label('demo')}</Button><Button as="a" href={props.settings.login} variant="ghost">{label('signin')}</Button></div></section>}>
+    <Show when={mode() !== 'none'} fallback={<section class="mx-auto flex max-w-2xl flex-col gap-5 p-8"><h1 class="font-display text-3xl font-bold">{label('welcome')}</h1><p>{label('intro')}</p><Show when={notice()}><p role="status" class="text-sm text-warning-strong">{notice()}</p></Show><p class="text-sm text-warning-strong">{label('validation_warning')}</p><p class="text-sm text-warning-strong">{label('production_warning')}</p><div class="flex flex-wrap gap-3"><Button onClick={() => void connect()}>{label('connect')}</Button><Button variant="secondary" onClick={demo}>{label('demo')}</Button><Button as="a" href={props.settings.login} variant="ghost">{label('signin')}</Button></div></section>}>
       <Show when={mode() === 'live'}><div class="flex flex-wrap items-center gap-3 border-b border-border px-5 py-3"><label class="text-sm">{label('account')} <select class="ml-2 rounded-md border border-border bg-surface px-2 py-1" value={account() ?? ''} onChange={e => { if (e.currentTarget.value) void load(Number(e.currentTarget.value)); }}><option value="">{label('select_account')}</option><For each={accounts()}>{a => <option value={a.id}>{a.name || String(a.id)} · {a.id}</option>}</For></select></label><Show when={account()}><Button size="sm" variant="secondary" disabled={busy()} onClick={() => void load(account() as number)}>{label('refresh')}</Button></Show><Show when={!busy() && accounts().length === 0 && !error()}><p class="text-sm">{label('no_accounts')}</p></Show></div></Show>
       <Show when={error()}><div role="alert" class="border-b border-border px-5 py-3 text-sm text-error-strong">{label('error')} {error()} <Button size="sm" variant="ghost" onClick={() => void connect()}>{label('retry')}</Button><a class="ml-3 underline" href={props.settings.login}>{label('signin')}</a></div></Show>
       <Show when={busy()}><p role="status" class="px-5 py-2 text-xs text-neutral-500">{label('loading')}</p></Show>

@@ -156,5 +156,6 @@
   "web.alpha.public_human": "Team · public reply",
   "web.alpha.public_agent": "Agent · public reply",
   "web.alpha.validation_warning": "Reading real data. Alpha integration pending authenticated validation.",
-  "web.alpha.signout": "Sign out"
+  "web.alpha.signout": "Sign out",
+  "web.alpha.session_required": "Sign in to connect live reading. The offline demo remains available."
 }
