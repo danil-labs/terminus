@@ -1583,6 +1583,7 @@ if (!roto) {
   sidebar.emit("chat", { kind: "done", project: "", session: "p", workspace: "w", ok: true });
   await sleep(150);
   assert.doesNotMatch(tab("p").getAttribute("aria-label"), /sin leer/);
+  keepActiveView(sidebar);
   row("own").click();
   await sleep(160);
   assert.ok(tab("own").querySelector('[aria-label="Fallo o interrupción"].text-error-strong svg.lucide-circle-alert'));

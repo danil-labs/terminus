@@ -618,11 +618,6 @@ export default function App() {
           }
           paneles.sync(pestanas.open().map((p) => p.id));
         });
-        // Y la activa se pone delante: abrir una conversación desde el
-        // historial no pasa por `activarPestana`, llama a `abrirSesion`
-        // directo. Sin esto la pestaña entra detrás de la que ya estaba
-        // —la fila del historial se marca y la pantalla no cambia.
-        if (activa) paneles.activate(activa);
       },
     ),
   );
