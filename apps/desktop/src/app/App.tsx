@@ -149,6 +149,7 @@ import { sidebarViewKey } from "../lib/sidebarView";
 import { recordarCarpetas } from "../lib/folderKinds";
 import { lista } from "../lib/format";
 import ColumnaLateral from "../features/shell/SideColumn";
+import { createSpaceNavigationOrder } from "../lib/space-navigation-order";
 import SpaceBar from "../features/shell/SpaceBar";
 import TitleBar from "../features/shell/TitleBar";
 import UsageBar from "../features/shell/UsageBar";
@@ -430,7 +431,9 @@ export default function App() {
   const pestanaActiva = () => (proyectoAbierto() ? null : pestanas.active());
   // Los escritorios del workspace (`lib/spaces.ts`). Sin lista —un servicio
   // que no los conoce— la ventana se pinta como antes de los espacios.
-  const [spaces, setSpaces] = createSignal<Space[]>([]);
+  const [rawSpaces, setSpaces] = createSignal<Space[]>([]);
+  const spaceOrder = createSpaceNavigationOrder(() => workspaceActivo() ?? "", () => setError(t("spaces.order.error")));
+  const spaces = createMemo(() => spaceOrder.arrange(rawSpaces()));
   const [escritorio, setEscritorio] = createSignal<string | null>(null);
   const activeSpace = () => spaces().find((i) => i.id === escritorio()) ?? null;
   const multipleSpaces = () => spaces().length > 1;
@@ -7939,6 +7942,8 @@ export default function App() {
             spaces().length > 0
               ? (nombre) => (
                   <SpaceBar
+                    onReorder={spaceOrder.save}
+                    reordering={spaceOrder.saving()}
                     workspace={nombre()}
                     workspaceId={workspaceActivo() ?? ""}
                     spaces={spaces()}

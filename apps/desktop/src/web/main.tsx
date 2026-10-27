@@ -15,6 +15,7 @@ import {
   linkedWorkspaces,
   listComputers,
   listWorkspaces,
+  createSpaceOrderSource,
   orderComputers,
   renameComputer,
   screenProtocols,
@@ -212,6 +213,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
   // A file dropped outside the chat would replace the page with it.
   for (const type of ["dragover", "drop"]) window.addEventListener(type, (e) => e.preventDefault());
   setCapabilities({
+    spaceOrder: createSpaceOrderSource(base.endpoint, token),
     nativeWindow: false,
     updater: false,
     localSetup: false,
