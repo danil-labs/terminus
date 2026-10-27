@@ -7,12 +7,10 @@ import {
   createSignal,
   on,
   onCleanup,
-  onMount,
 } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
 import { t } from "../../lib/i18n";
 import { peso } from "../../lib/format";
-import { storageRefresh } from "../../lib/storageRefresh";
 import { haceCuanto } from "../../lib/limits";
 import { cn } from "../../lib/utils";
 import HardDrive from "lucide-solid/icons/hard-drive";
@@ -30,10 +28,9 @@ import {
   TooltipTrigger,
 } from "../../ui/Tooltip";
 import { Badge } from "../../ui/Badge";
+import { ProgressBar } from "../../ui/ProgressBar";
+import { type Machine, machineName } from "../machines/store";
 import { prosaDe } from "../../ui/Failure";
-
-// El repositorio principal es de la persona; se mide el workspace, incluidos
-// sus worktrees. Refrescar solo la sesión deja fuera lo que más puede crecer.
 
 type Clase = "recuperable" | "git" | "fuente" | "trabajo" | "registro";
 
@@ -70,6 +67,23 @@ type Almacen = {
   medido_en: number;
   aviso: string | null;
 };
+
+type MachineResources = {
+  measured_at: number;
+  error?: "measurement_failed" | "unsupported";
+  storage: {
+    id: string;
+    label: string;
+    total_bytes: number;
+    free_bytes: number;
+    available_bytes: number;
+    terminus_bytes: null;
+    attribution: "unknown";
+  }[];
+};
+
+type Summary = { resources?: MachineResources; loading: boolean; error?: string };
+type Target = { machine: string; workspace: string; generation: number };
 
 type Liberado = {
   bytes: number;
@@ -126,6 +140,7 @@ function nombreBloque(b: Bloque): string {
 }
 
 export default function Almacenamiento(props: {
+  workspace: string | null;
   /** Tareas con un turno vivo. */
   trabajando: string[];
   /** Tareas con una pestaña abierta en esta ventana. */
@@ -141,109 +156,144 @@ export default function Almacenamiento(props: {
   /** Grupos plegados o desplegados a mano. Sin entrada, abre solo el más pesado. */
   const [gruposAbiertos, setGruposAbiertos] = createSignal<Record<string, boolean>>({});
   const [compartidoAbierto, setCompartidoAbierto] = createSignal(false);
-  /** La tarea que se está vaciando: sus botones se bloquean solos. */
-  const [vaciando, setVaciando] = createSignal<Record<string, boolean>>({});
   /** Lo que dijo el backend cuando no se pudo, en la fila que lo pidió. */
   const [fallo, setFallo] = createSignal<Record<string, string>>({});
   /** Lo que se liberó, en la fila que lo pidió. Un borrado sin confirmación se
    *  lee como que no pasó nada: la lista se reordena y ya. */
   const [liberado, setLiberado] = createSignal<Record<string, string>>({});
-  const [recogiendo, setRecogiendo] = createSignal(false);
-  /** La caché de compilación se está vaciando: su botón se bloquea solo. */
-  const [vaciandoCache, setVaciandoCache] = createSignal(false);
 
-  const refresh = storageRefresh<Almacen>({
-    read: (refrescar) => invoke<Almacen>("list_storage", { refrescar }),
-    receive: setDatos,
-    measuring: setMidiendo,
-    fail: (e) => setDatos((previo) => ({
-      tareas: [], archivadas: { cuantas: 0, bytes: 0, recuperable: 0 },
-      bytes: 0, recuperable: 0, compartido: [], sueltos: [], medido_en: 0,
-      ...previo,
-      aviso: prosaDe(e),
-    })),
-  });
-  const consultar = refresh.refresh;
+  const [inventory, setInventory] = createSignal<Machine[]>([]);
+  const [machine, setMachine] = createSignal<string | null>(null);
+  const [summaries, setSummaries] = createSignal<Record<string, Summary>>({});
+  const [inventoryError, setInventoryError] = createSignal("");
+  const [readError, setReadError] = createSignal("");
+  const [listing, setListing] = createSignal(false);
+  const [operationPending, setOperationPending] = createSignal(false);
+  let generation = 0;
+  let inventoryRequest = 0;
+  let detailRequest = 0;
+  const summaryRequests = new Map<string, number>();
+  let disposed = false;
+  let dataTarget: Target | null = null;
 
-  onMount(() => {
-    const freshness = 300_000;
-    let disposed = false;
-    let runningTurns = 0;
-    let lastRefresh = 0;
-    let scheduled: ReturnType<typeof setTimeout> | undefined;
-    // Cerrado se mide una vez por arranque. El barrido recorre `node_modules` y
-    // `target` de cada tarea: medido en un log de 4 h 43, 112 barridos, 55 s de
-    // mediana y 2 h 43 de disco, con el panel cerrado casi todo el rato.
-    let medidoCerrado = false;
-    const update = () => {
-      // Medir encima de un borrado devuelve una foto a medias; el que borra
-      // pide la suya al acabar.
-      if (clearing()) return;
-      if (!abierto()) {
-        // Con un turno vivo el barrido le compite el disco.
-        if (runningTurns > 0) return;
-        if (medidoCerrado) return;
-        medidoCerrado = true;
+  const selected = () => inventory().find((m) => m.id === machine());
+  const current = (target: Target) => !disposed && target.generation === generation
+    && target.workspace === props.workspace && target.machine === machine();
+  const destination = (target: Target) => ({ headers: {
+    "x-terminus-machine": target.machine,
+    "x-terminus-workspace": target.workspace,
+  } });
+  const target = (): Target | null => {
+    const m = selected();
+    const workspace = props.workspace;
+    return m?.on && m.hosts !== false && workspace
+      ? { machine: m.id, workspace, generation } : null;
+  };
+  const canClean = () => !!dataTarget && current(dataTarget) && !!target()
+    && !clearing() && !listing() && !midiendo() && !readError() && !datos()?.aviso;
+
+  async function readSummary(m: Machine) {
+    if (!m.on || disposed) return;
+    const context = generation;
+    const workspace = props.workspace;
+    const request = (summaryRequests.get(m.id) ?? 0) + 1;
+    summaryRequests.set(m.id, request);
+    const valid = () => !disposed && context === generation && workspace === props.workspace
+      && summaryRequests.get(m.id) === request;
+    setSummaries((prev) => ({ ...prev, [m.id]: { ...prev[m.id], loading: true, error: undefined } }));
+    try {
+      // Startup directo: el resumen de disco no requiere ni materializa un workspace.
+      const startup = await invoke<{ machine_resources?: MachineResources }>("list_workspaces", {}, {
+        headers: { "x-terminus-machine": m.id },
+      });
+      if (valid()) setSummaries((prev) => ({ ...prev, [m.id]: {
+        resources: startup.machine_resources, loading: false,
+      } }));
+    } catch (error) {
+      if (valid()) setSummaries((prev) => ({ ...prev, [m.id]: {
+        ...prev[m.id], loading: false, error: prosaDe(error),
+      } }));
+    }
+  }
+
+  async function consultar(refrescar = true) {
+    const captured = target();
+    if (!captured || clearing()) return;
+    const request = ++detailRequest;
+    setMidiendo(true);
+    setReadError("");
+    try {
+      const value = await invoke<Almacen>("list_storage", { refrescar }, destination(captured));
+      if (current(captured) && request === detailRequest) {
+        dataTarget = captured;
+        setDatos(value);
       }
-      lastRefresh = Date.now();
-      void consultar(true);
-    };
-    const schedule = () => {
-      if (scheduled !== undefined) return;
-      scheduled = setTimeout(() => {
-        scheduled = undefined;
-        update();
-      }, Math.max(1500, freshness - (Date.now() - lastRefresh)));
-    };
-    const visible = () => {
-      if (document.visibilityState === "visible") schedule();
-    };
-    createEffect(on(abierto, (open) => open && schedule(), { defer: true }));
-    const turnsChanged = (event: Event) => {
-      runningTurns = (event as CustomEvent<number>).detail;
-      if (runningTurns === 0) schedule();
-    };
-    const changed = () => {
-      medidoCerrado = false;
-      setDatos(null);
-      setAbiertas({});
-      setGruposAbiertos({});
-      setFallo({});
-      setLiberado({});
-      lastRefresh = Date.now();
-      void refresh.reset();
-    };
-    const mountedAt = Date.now();
-    void consultar(false).then(() => {
-      lastRefresh = datos()?.medido_en ?? 0;
-      if (!disposed && lastRefresh < mountedAt - freshness) schedule();
-    });
-    const interval = setInterval(visible, freshness);
-    window.addEventListener("harness:turn", turnsChanged);
-    window.addEventListener("harness:workspace", changed);
-    window.addEventListener("focus", visible);
-    document.addEventListener("visibilitychange", visible);
-    onCleanup(() => {
-      disposed = true;
-      refresh.dispose();
-      clearTimeout(scheduled);
-      clearInterval(interval);
-      window.removeEventListener("harness:turn", turnsChanged);
-      window.removeEventListener("harness:workspace", changed);
-      window.removeEventListener("focus", visible);
-      document.removeEventListener("visibilitychange", visible);
-    });
-  });
+    } catch (error) {
+      if (current(captured) && request === detailRequest) setReadError(prosaDe(error));
+    } finally {
+      if (current(captured) && request === detailRequest) setMidiendo(false);
+    }
+  }
 
-  /** Hay un borrado en marcha. Un `remove_dir_all` de decenas de gigas tarda
-   *  minutos, y lo que se mida encima suena a que el disco está roto: el panel
-   *  espera en vez de contar a medias. */
-  const clearing = createMemo(
-    () =>
-      vaciandoCache() ||
-      recogiendo() ||
-      Object.values(vaciando()).some(Boolean),
-  );
+  function resetDetail() {
+    detailRequest++;
+    dataTarget = null;
+    setDatos(null);
+    setReadError("");
+    setMidiendo(false);
+    setAbiertas({});
+    setGruposAbiertos({});
+    setFallo({});
+    setLiberado({});
+    setCompartidoAbierto(false);
+  }
+
+  function choose(m: Machine) {
+    if (clearing() || m.id === machine()) return;
+    setMachine(m.id);
+    resetDetail();
+    void openInventory();
+  }
+
+  async function openInventory(expected?: Target) {
+    if (clearing() || (expected && !current(expected))) return;
+    const context = expected?.generation ?? generation;
+    const workspace = expected?.workspace ?? props.workspace;
+    const request = ++inventoryRequest;
+    setListing(true);
+    setInventoryError("");
+    try {
+      const list = await invoke<Machine[]>("machine_list", {}, workspace
+        ? { headers: { "x-terminus-workspace": workspace } } : undefined);
+      if (disposed || context !== generation || request !== inventoryRequest) return;
+      setInventory(list);
+      if (!list.some((m) => m.id === machine())) {
+        setMachine((list.find((m) => m.active) ?? list[0])?.id ?? null);
+        resetDetail();
+      }
+      for (const m of list) if (m.on) void readSummary(m);
+      void consultar();
+    } catch (error) {
+      if (!disposed && context === generation && request === inventoryRequest) setInventoryError(prosaDe(error));
+    } finally {
+      if (!disposed && context === generation && request === inventoryRequest) setListing(false);
+    }
+  }
+
+  createEffect(on(() => props.workspace, () => {
+    generation++;
+    inventoryRequest++;
+    setInventory([]);
+    setMachine(null);
+    setSummaries({});
+    setInventoryError("");
+    setListing(false);
+    resetDetail();
+    if (abierto() && !clearing()) void openInventory();
+  }));
+  onCleanup(() => { disposed = true; generation++; detailRequest++; inventoryRequest++; });
+
+  const clearing = operationPending;
 
   const tareas = createMemo(() => datos()?.tareas ?? []);
   /** El peso de la tarea más gorda: es la escala de las barras. */
@@ -279,61 +329,59 @@ export default function Almacenamiento(props: {
     return total ? Math.min(1, (datos()?.recuperable ?? 0) / total) : 0;
   };
 
-  async function vaciar(tarea: TareaConPeso, rutas: string[]) {
-    const clave = `${tarea.project}/${tarea.session}`;
-    setVaciando((v) => ({ ...v, [clave]: true }));
-    setFallo((f) => ({ ...f, [clave]: "" }));
-    setLiberado((l) => ({ ...l, [clave]: "" }));
+  async function clean(key: string, perform: (captured: Target) => Promise<Liberado>) {
+    const captured = target();
+    if (!captured || !canClean()) return;
+    setOperationPending(true);
+    setFallo((prev) => ({ ...prev, [key]: "" }));
+    setLiberado((prev) => ({ ...prev, [key]: "" }));
     try {
-      const r = await invoke<Liberado>("reclaim_storage", {
-        project: tarea.project,
-        session: tarea.session,
-        rutas,
+      const list = await invoke<Machine[]>("machine_list", {}, {
+        headers: { "x-terminus-workspace": captured.workspace },
       });
-      if (r.detalle) setFallo((f) => ({ ...f, [clave]: r.detalle }));
-      if (r.cuantos) {
-        const frase = t("shell.storage.freed", { size: peso(r.bytes) });
-        setLiberado((l) => ({ ...l, [clave]: frase }));
+      if (!current(captured)) return;
+      setInventory(list);
+      const ready = list.find((m) => m.id === captured.machine);
+      if (!ready?.on || ready.hosts === false) {
+        setFallo((prev) => ({ ...prev, [key]: !ready?.on ? t("shell.storage.offline") : t("shell.storage.workspace_missing") }));
+        return;
       }
-    } catch (e) {
-      setFallo((f) => ({ ...f, [clave]: prosaDe(e) }));
+      const result = await perform(captured);
+      if (current(captured)) {
+        if (result.detalle) setFallo((prev) => ({ ...prev, [key]: result.detalle }));
+        setLiberado((prev) => ({ ...prev, [key]: t("shell.storage.removed_logical", { size: peso(result.bytes) }) }));
+      }
+    } catch (error) {
+      if (current(captured)) setFallo((prev) => ({ ...prev, [key]: prosaDe(error) }));
     } finally {
-      setVaciando((v) => ({ ...v, [clave]: false }));
-      // El comando de limpieza ya actualizó la medición del workspace.
-      await consultar(false);
+      setOperationPending(false);
+      if (current(captured)) {
+        await openInventory(captured);
+      } else if (abierto()) {
+        void openInventory();
+      }
     }
+  }
+
+  async function vaciar(tarea: TareaConPeso, rutas: string[]) {
+    const project = tarea.project;
+    const session = tarea.session;
+    const paths = [...rutas];
+    await clean(`${project}/${session}`, (captured) => invoke<Liberado>("reclaim_storage", {
+      project, session, rutas: paths,
+    }, destination(captured)));
   }
 
   async function vaciarCache() {
-    setVaciandoCache(true);
-    try {
-      const r = await invoke<Liberado>("empty_build_cache");
-      if (r.cuantos) {
-        const frase = t("shell.storage.freed", { size: peso(r.bytes) });
-        setLiberado((l) => ({ ...l, cache: frase }));
-      }
-    } catch (e) {
-      setFallo((f) => ({ ...f, cache: prosaDe(e) }));
-    } finally {
-      setVaciandoCache(false);
-      await consultar(false);
-    }
+    await clean("cache", (captured) => invoke<Liberado>("empty_build_cache", {}, destination(captured)));
   }
 
   async function recoger() {
-    setRecogiendo(true);
-    try {
-      await invoke<Liberado>("collect_orphans");
-    } catch {
-      // No hay nada que la persona pueda arreglar desde aquí: lo que quede se
-      // vuelve a enseñar en la lista, que es la señal.
-    } finally {
-      setRecogiendo(false);
-      await consultar(false);
-    }
+    await clean("orphans", (captured) => invoke<Liberado>("collect_orphans", {}, destination(captured)));
   }
 
   function abrirTarea(tarea: TareaConPeso) {
+    if (!selected()?.active || !dataTarget || !current(dataTarget)) return;
     setAbierto(false);
     props.onAbrirTarea(tarea.project, tarea.session);
   }
@@ -397,6 +445,7 @@ export default function Almacenamiento(props: {
 
   function Estado(props2: { session: string }) {
     return (
+      <Show when={selected()?.active}>
       <Show
         when={props.trabajando.includes(props2.session)}
         fallback={
@@ -406,6 +455,7 @@ export default function Almacenamiento(props: {
         }
       >
         <Badge tone="success" class="px-1.5 py-0 text-[0.625rem]">{t("shell.storage.state.working")}</Badge>
+      </Show>
       </Show>
     );
   }
@@ -452,14 +502,14 @@ export default function Almacenamiento(props: {
             {peso(props2.t.bytes)}
           </span>
           <span class="hidden shrink-0 items-center gap-0.5 group-hover:flex group-focus-within:flex">
-            <Accion etiqueta={t("shell.storage.open_task")} onClick={() => abrirTarea(props2.t)}>
+            <Accion disabled={!selected()?.active} etiqueta={t("shell.storage.open_task")} onClick={() => abrirTarea(props2.t)}>
               <SquareArrowOutUpRight size={12} aria-hidden />
             </Accion>
             <Show when={tirables().length}>
               <Accion
                 etiqueta={t("shell.storage.empty_task", { size: peso(props2.t.recuperable) })}
                 tono="aviso"
-                disabled={vaciando()[clave()]}
+                disabled={!canClean()}
                 onClick={vaciarTodo}
               >
                 <Trash2 size={12} aria-hidden />
@@ -505,7 +555,7 @@ export default function Almacenamiento(props: {
                     <Accion
                       etiqueta={t("shell.storage.empty_one")}
                       tono="aviso"
-                      disabled={vaciando()[clave()]}
+                      disabled={!canClean()}
                       onClick={() => void vaciar(props2.t, [b.rel])}
                     >
                       <Trash2 size={12} aria-hidden />
@@ -519,6 +569,7 @@ export default function Almacenamiento(props: {
               <button
                 type="button"
                 class="flex items-center gap-1.5 rounded-md border border-border-strong bg-surface px-2 py-1 text-[0.6875rem] font-medium text-neutral-950 outline-none hover:bg-surface-muted focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
+                disabled={!selected()?.active}
                 onClick={() => abrirTarea(props2.t)}
               >
                 <SquareArrowOutUpRight size={12} aria-hidden />
@@ -528,7 +579,7 @@ export default function Almacenamiento(props: {
                 <button
                   type="button"
                   class="flex items-center gap-1.5 rounded-md border border-warning-strong/40 bg-warning/10 px-2 py-1 text-[0.6875rem] font-medium text-warning-strong outline-none hover:bg-warning/20 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary disabled:opacity-60"
-                  disabled={vaciando()[clave()]}
+                  disabled={!canClean()}
                   onClick={vaciarTodo}
                 >
                   <Trash2 size={12} aria-hidden />
@@ -597,12 +648,80 @@ export default function Almacenamiento(props: {
     );
   }
 
+  function comparable(disk: MachineResources["storage"][number]) {
+    return [disk.total_bytes, disk.free_bytes, disk.available_bytes].every((n) => Number.isFinite(n) && n >= 0)
+      && disk.total_bytes > 0 && disk.free_bytes <= disk.total_bytes && disk.available_bytes <= disk.free_bytes;
+  }
+
+  function Disk(props2: { disk: MachineResources["storage"][number] }) {
+    const used = () => props2.disk.total_bytes - props2.disk.free_bytes;
+    return (
+      <div class="mt-2">
+        <p class="m-0 truncate text-[0.6875rem] text-neutral-500">{t("shell.storage.engine_data")}</p>
+        <Show when={comparable(props2.disk)} fallback={<p class="m-0 text-xs text-neutral-500">{t("shell.storage.capacity_unavailable")}</p>}>
+          <ProgressBar class="my-1.5 h-2 border border-neutral-500" value={used()} max={props2.disk.total_bytes}
+            label={t("shell.storage.disk_aria", { used: peso(used()), free: peso(props2.disk.free_bytes), total: peso(props2.disk.total_bytes) })}
+            barClass="bg-neutral-500" />
+          <p class="m-0 flex flex-wrap gap-x-3 text-[0.6875rem] text-neutral-500">
+            <span>{t("shell.storage.disk_used", { size: peso(used()) })}</span>
+            <span>{t("shell.storage.disk_free", { size: peso(props2.disk.free_bytes) })}</span>
+            <span>{t("shell.storage.disk_total", { size: peso(props2.disk.total_bytes) })}</span>
+          </p>
+          <Show when={props2.disk.available_bytes !== props2.disk.free_bytes}>
+            <p class="m-0 mt-1 text-[0.6875rem] text-neutral-500">{t("shell.storage.disk_available", { size: peso(props2.disk.available_bytes) })}</p>
+          </Show>
+        </Show>
+      </div>
+    );
+  }
+
+  function MachineDisks(props2: { machine: Machine }) {
+    const summary = () => summaries()[props2.machine.id];
+    return (
+      <>
+        <Show when={summary()?.loading}><p class="m-0 mt-1 text-xs text-neutral-500">{t("shell.storage.measuring")}</p></Show>
+        <Show when={summary()?.error}><p role="alert" class="m-0 mt-1 whitespace-pre-wrap text-xs text-error-strong">{summary()?.error}</p></Show>
+        <Show when={summary()?.resources} fallback={<Show when={!summary()?.loading}><p class="m-0 mt-1 text-xs text-neutral-500">{t("shell.storage.capacity_unavailable")}</p></Show>}>
+          {(resources) => <>
+            <Show when={resources().error}>
+              <p role="alert" class="m-0 mt-1 text-xs text-warning-strong">{resources().error === "measurement_failed" ? t("shell.storage.measurement_failed") : t("shell.storage.unsupported")}</p>
+            </Show>
+            <p class="m-0 mt-1 text-[0.6875rem] text-neutral-500">{resources().error ? t("shell.storage.attempted", { when: haceCuanto(resources().measured_at) }) : t("shell.storage.measured", { when: haceCuanto(resources().measured_at) })}</p>
+            <For each={resources().storage}>{(disk) => <Disk disk={disk} />}</For>
+            <Show when={resources().storage.length === 0 && !resources().error}><p class="m-0 mt-1 text-xs text-neutral-500">{t("shell.storage.capacity_unavailable")}</p></Show>
+          </>}
+        </Show>
+        <p class="m-0 mt-2 text-[0.6875rem] text-neutral-500">{t("shell.storage.attribution_unknown")}</p>
+      </>
+    );
+  }
+
+  function MachineRow(props2: { machine: Machine }) {
+    const summary = () => summaries()[props2.machine.id];
+    return (
+      <button type="button" disabled={clearing()} aria-pressed={machine() === props2.machine.id}
+        class={cn("block w-full border-b border-border px-3 py-2 text-left outline-none hover:bg-surface-muted focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-60", machine() === props2.machine.id && "bg-surface-muted")}
+        onClick={() => choose(props2.machine)}>
+        <span class="flex items-center justify-between gap-2 text-xs">
+          <span class="truncate font-semibold text-neutral-950">{machineName(props2.machine.id, props2.machine.local)}</span>
+          <span class="shrink-0 text-neutral-500">{!props2.machine.on ? t("shell.storage.offline") : summary()?.loading ? t("shell.storage.measuring") : summary()?.error || summary()?.resources?.error ? t("shell.storage.summary_error") : t("shell.machines.on")}</span>
+        </span>
+        <Show when={summary()?.resources} fallback={<span class="block mt-1 text-[0.6875rem] text-neutral-500">{t("shell.storage.capacity_unavailable")}</span>}>
+          {(resources) => <>
+            <span class="block mt-1 text-[0.6875rem] text-neutral-500">{resources().error ? t("shell.storage.attempted", { when: haceCuanto(resources().measured_at) }) : t("shell.storage.measured", { when: haceCuanto(resources().measured_at) })}</span>
+            <For each={resources().storage}>{(disk) => <Disk disk={disk} />}</For>
+          </>}
+        </Show>
+      </button>
+    );
+  }
+
   return (
     <Popover
       open={abierto()}
       onOpenChange={(v: boolean) => {
         setAbierto(v);
-        if (v && !clearing()) void consultar(true);
+        if (v && !clearing()) void openInventory();
       }}
       placement="top"
       gutter={6}
@@ -616,32 +735,21 @@ export default function Almacenamiento(props: {
           <button
             {...p}
             class="flex shrink-0 items-center gap-1 rounded-sm px-1.5 py-0.5 text-neutral-500 outline-none transition-colors hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary data-[expanded]:bg-surface-muted"
-            aria-label={datos()?.aviso ? t("shell.storage.unavailable") : !datos()
-              ? t("shell.storage.measuring")
-              : t("shell.storage.aria", {
-                total: peso(datos()?.bytes ?? 0),
-                free: peso(datos()?.recuperable ?? 0),
-              })}
-            title={clearing()
-              ? t("shell.storage.emptying")
-              : midiendo()
-                ? t("shell.storage.measuring")
-                : haceCuanto(datos()?.medido_en ?? 0)}
+            aria-label={t("shell.storage.title")}
+            title={t("shell.storage.title")}
           >
             <HardDrive
               size={12}
               class={midiendo() || clearing() ? "animate-pulse" : undefined}
               aria-hidden
             />
-            <span class="font-mono tabular-nums">{datos()?.aviso
-              ? t("shell.storage.unavailable")
-              : datos() ? peso(datos()?.bytes ?? 0) : t("shell.storage.measuring")}</span>
+            <span>{t("shell.storage.title")}</span>
           </button>
         )}
       />
 
       <PopoverContent
-        class="flex max-h-[min(560px,var(--kb-popper-content-available-height))] w-[440px] flex-col p-0"
+        class="flex max-h-[min(560px,var(--kb-popper-content-available-height))] w-[520px] max-w-[calc(100vw-16px)] flex-col p-0"
         onOpenAutoFocus={(e: Event) => e.preventDefault()}
       >
         <div class="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-2">
@@ -655,32 +763,57 @@ export default function Almacenamiento(props: {
                 ? t("shell.storage.emptying")
                 : midiendo()
                   ? t("shell.storage.measuring")
-                  : haceCuanto(datos()?.medido_en ?? Date.now())}
+                  : datos() ? haceCuanto(datos()!.medido_en) : ""}
             </span>
             <Accion
-              etiqueta={t("shell.storage.remeasure")}
-              disabled={midiendo() || clearing()}
-              onClick={() => void consultar(true)}
+              etiqueta={inventoryError() || readError() || summaries()[machine() ?? ""]?.error || summaries()[machine() ?? ""]?.resources?.error ? t("shell.storage.retry") : t("shell.storage.remeasure")}
+              disabled={midiendo() || clearing() || listing()}
+              onClick={() => void openInventory()}
             >
               <RefreshCw size={12} class={midiendo() ? "animate-spin-steps" : undefined} aria-hidden />
             </Accion>
           </span>
         </div>
 
-        <Show
-          when={!datos()?.aviso || clearing()}
-          fallback={
-            /* No se pudo medir. **Se dice, y no se enseña un panel vacío**: una
-               lista sin filas se lee como «no ocupa nada», que es otra cosa.
-               Mientras se borra no se dice: las rutas que faltan son las que se
-               están llevando, y el aviso acusaría al disco de lo que hizo la
-               persona. */
-            <p class="m-0 px-3 py-4 text-xs text-warning-strong">
-              {t("shell.storage.incomplete")}
-              <span class="block whitespace-pre-wrap font-mono">{datos()?.aviso}</span>
-            </p>
-          }
-        >
+        <div class="min-h-0 overflow-y-auto">
+          <Show when={inventoryError()}>
+            <p role="alert" class="m-0 px-3 py-2 text-xs text-error-strong">{inventoryError()}</p>
+          </Show>
+          <Show when={listing()}>
+            <p role="status" class="m-0 px-3 py-2 text-xs text-neutral-500">{t("shell.storage.measuring")}</p>
+          </Show>
+          <Show when={!listing() && !inventoryError() && inventory().length === 0}>
+            <p class="m-0 px-3 py-2 text-xs text-neutral-500">{t("shell.storage.no_machines")}</p>
+          </Show>
+          <For each={inventory()}>{(m) => <MachineRow machine={m} />}</For>
+          <Show when={selected()}>{(m) => (
+            <section class="border-b border-border px-3 py-3">
+              <h3 class="m-0 text-xs font-semibold text-neutral-950">{machineName(m().id, m().local)}</h3>
+              <MachineDisks machine={m()} />
+              <p class="m-0 mt-3 text-xs font-semibold text-neutral-950">
+                {t("shell.storage.workspace_scope", { workspace: props.workspace ?? "—" })}
+              </p>
+              <Show when={!m().on}>
+                <p role="status" class="m-0 mt-1 text-xs text-warning-strong">{t("shell.storage.offline")}</p>
+              </Show>
+              <Show when={m().hosts === false || !props.workspace}>
+                <p role="status" class="m-0 mt-1 text-xs text-neutral-500">{t("shell.storage.workspace_missing")}</p>
+              </Show>
+              <Show when={readError()}>
+                <p role="alert" class="m-0 mt-1 whitespace-pre-wrap text-xs text-error-strong">{readError()}</p>
+              </Show>
+              <Show when={midiendo()}>
+                <p role="status" class="m-0 mt-1 text-xs text-neutral-500">{t("shell.storage.measuring")}</p>
+              </Show>
+              <Show when={datos()?.aviso}>
+                <p role="status" class="m-0 mt-1 text-xs text-warning-strong">{t("shell.storage.incomplete")} {datos()?.aviso}</p>
+              </Show>
+              <Show when={datos()}>
+                <p class="m-0 mt-1 text-[0.6875rem] text-neutral-500">{t("shell.storage.measured", { when: haceCuanto(datos()!.medido_en) })}</p>
+              </Show>
+            </section>
+          )}</Show>
+        <Show when={datos()}>
           <div class="flex shrink-0 flex-col gap-2 border-b border-border px-3 py-3">
             <p class="m-0 flex items-baseline gap-2">
               <span class="font-mono text-lg font-semibold tabular-nums text-neutral-950">
@@ -732,7 +865,7 @@ export default function Almacenamiento(props: {
             </div>
           </div>
 
-          <div class="min-h-0 flex-1 overflow-y-auto px-1.5 pb-1.5 pt-1">
+          <div class="px-1.5 pb-1.5 pt-1">
             <Show
               when={tareas().length || (datos()?.archivadas?.cuantas ?? 0)}
               fallback={
@@ -800,12 +933,7 @@ export default function Almacenamiento(props: {
                 </span>
               </button>
               <Show when={compartidoAbierto()}>
-                {/* Casi todo aquí se enseña y no se toca: el material se
-                    gestiona en Contexto y las cuentas en Configuración, que es
-                    donde cada cosa tiene su gesto. La excepción es la que no
-                    tiene ninguno —la caché de compilación—, y por eso trae
-                    `rel`: enseñar siete gigas sin salida es peor que no
-                    enseñarlos. */}
+                {/* El motor limita esta caché al workspace capturado. */}
                 <ul
                   class="m-0 list-none px-1.5 pb-2.5"
                   title={t("shell.storage.shared.why")}
@@ -820,12 +948,8 @@ export default function Almacenamiento(props: {
                           {peso(s.bytes)}
                         </span>
                         <Show when={s.rel}>
-                          <Accion
-                            etiqueta={t("shell.storage.empty_cache")}
-                            tono="aviso"
-                            disabled={vaciandoCache()}
-                            onClick={vaciarCache}
-                          >
+                          <Accion etiqueta={t("shell.storage.empty_cache")} tono="aviso"
+                            disabled={!canClean()} onClick={() => void vaciarCache()}>
                             <Trash2 size={12} aria-hidden />
                           </Accion>
                         </Show>
@@ -834,18 +958,20 @@ export default function Almacenamiento(props: {
                   </For>
                 </ul>
                 <Show when={liberado().cache}>
-                  <p class="m-0 px-1.5 pb-2 text-[0.6875rem] text-neutral-500">
-                    {liberado().cache}
-                  </p>
+                  <p role="status" class="m-0 px-1.5 pb-2 text-xs text-neutral-500">{liberado().cache}</p>
                 </Show>
                 <Show when={fallo().cache}>
-                  <p class="m-0 px-1.5 pb-2 text-[0.6875rem] text-warning-strong">
-                    {fallo().cache}
-                  </p>
+                  <p role="alert" class="m-0 px-1.5 pb-2 text-xs text-error-strong">{fallo().cache}</p>
                 </Show>
               </Show>
             </section>
 
+            <Show when={fallo().orphans}>
+              <p role="alert" class="m-0 px-1.5 py-2 text-xs text-error-strong">{fallo().orphans}</p>
+            </Show>
+            <Show when={liberado().orphans}>
+              <p role="status" class="m-0 px-1.5 py-2 text-xs text-neutral-500">{liberado().orphans}</p>
+            </Show>
             {/* Lo que quedó de tareas borradas. Solo se pinta si hay: una
                 sección permanente que dice «nada» es alto robado. */}
             <Show when={datos()?.sueltos.length}>
@@ -862,7 +988,7 @@ export default function Almacenamiento(props: {
                   <Accion
                     etiqueta={t("shell.storage.collect")}
                     tono="aviso"
-                    disabled={recogiendo()}
+                    disabled={!canClean()}
                     onClick={() => void recoger()}
                   >
                     <Trash2 size={12} />
@@ -875,6 +1001,7 @@ export default function Almacenamiento(props: {
             </Show>
           </div>
         </Show>
+        </div>
       </PopoverContent>
     </Popover>
   );

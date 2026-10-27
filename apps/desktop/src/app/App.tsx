@@ -7630,6 +7630,7 @@ export default function App() {
           angosta. Lo que enseña es del workspace —las cuentas cuelgan de él—
           pero no del proyecto. */}
       <UsageBar
+        workspace={workspaceActivo()}
         agents={agents()}
         agent={agent()}
         busy={busy()}
