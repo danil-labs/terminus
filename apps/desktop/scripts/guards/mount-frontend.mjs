@@ -54,6 +54,7 @@ const RESPUESTAS = {
     { id: "codex", label: "Codex", available: true, driver: true },
   ],
   list_workspaces: { workspaces: [{ id: "w", name: "W", context_root: null }], active: "w" },
+  machine_list: [{ id: "local", local: true, active: true, on: true, hosts: true }],
   workspaces_startup: { workspaces: [{ id: "w", name: "W", context_root: null }], active: "w" },
   list_projects: [],
   list_sources: [],
@@ -201,30 +202,26 @@ const roto = normal.fallos.length > 0 || !normal.pintado.trim() || enElEsqueleto
 
 if (!roto) {
   await sleep(1600);
-  const storage = normal.w.document.querySelector('button[aria-label^="Archivos del espacio:"]');
-  if (normal.storageQueries.join(",") !== "false" || !storage) {
-    console.error("El arranque lee el almacenamiento guardado sin barrer el disco.");
+  const storage = normal.w.document.querySelector('button[aria-label="Almacenamiento"]');
+  if (normal.storageQueries.length || !storage) {
+    console.error("Almacenamiento debe estar disponible sin barrer el disco con el panel cerrado.");
     process.exit(1);
   }
-  // Y una sola vez. El barrido recorre `node_modules` y `target` de cada tarea:
-  // repetirlo con el panel cerrado costó 2 h 43 de disco en un log de 4 h 43.
   normal.emit("harness:turno-cerrado", {});
   normal.emit("harness:turn", 0);
   normal.w.dispatchEvent(new normal.w.Event("focus"));
   await sleep(1800);
-  if (normal.storageQueries.join(",") !== "false") {
+  if (normal.storageQueries.length) {
     console.error(
       `Con el panel cerrado no se vuelve a barrer el disco: ${normal.storageQueries.join(",")}.`,
     );
     process.exit(1);
   }
   storage.click();
-  await sleep(100);
-  if (normal.storageQueries.join(",") !== "false,true" || !storage.textContent?.includes("1.0 GB")) {
-    console.error("Abrir almacenamiento mide en el momento y actualiza el contador.");
-    process.exit(1);
-  }
-  normal.w.document.dispatchEvent(new normal.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  await sleep(200);
+  assert.deepEqual(normal.storageQueries, [true], "abrir almacenamiento mide sólo el detalle seleccionado");
+  assert.ok(normal.w.document.body.textContent.includes("1.0 GB"), "el panel muestra el tamaño lógico medido");
+  storage.click();
   await sleep(50);
   const placeholder = normal.w.document.querySelector("textarea")?.getAttribute("placeholder");
   if (!placeholder?.startsWith("Pregunta algo")) {

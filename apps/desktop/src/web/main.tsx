@@ -173,6 +173,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
     // La cola de aplazadas cambió (aquí, en el escritorio o en el teléfono): la lista se relee.
     onDeferred: (machine) => router?.deferredChanged(machine),
     onChange: (machine) => {
+      window.dispatchEvent(new CustomEvent("harness:machines"));
       bump((n) => n + 1);
       const now = fleet.power(machine);
       // Sin workspaces de nadie al abrir: la primera máquina que se enciende los trae.

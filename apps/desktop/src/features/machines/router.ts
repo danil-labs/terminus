@@ -28,6 +28,7 @@ type Failure = { what: unknown; detail: unknown };
  * no: son los procesos de esta computadora, los que cerrar la ventana detiene.
  */
 const FAN = new Set(["list_projects", "list_portfolios", "list_live_sessions", "list_active_turns", "list_spaces", "list_workspace_attention", "list_session_git", "list_task_mentions"]);
+const STORAGE = new Set(["list_storage", "reclaim_storage", "empty_build_cache", "collect_orphans"]);
 const LISTING = new Set(["list_workspaces", "workspaces_startup"]);
 /** Lo que crea algo nuevo: en un workspace que esa máquina no tiene, primero lo hace suyo. */
 const CREATE = new Set(["send_message", "run_shell_command", "create_project", "clone_project", "start_project_clone"]);
@@ -323,6 +324,11 @@ export function createRouter(config: RouterConfig) {
   /** Una llamada a otra máquina, con el workspace del sobre. Una lectura sale de su rebanada: apagada con copia, no se pregunta. */
   async function remote(machine: string, command: string, args: Args, workspace: string | null): Promise<unknown> {
     args = withoutChannel(command, args);
+    if (STORAGE.has(command) || command === "list_workspaces") {
+      if (fleet.power(machine) !== "on") throw new FleetError("machine_off", machine);
+      if (STORAGE.has(command) && !workspace) throw missing(machine);
+      return fleet.call({ machine, workspace: command === "list_workspaces" ? null : workspace, command, args });
+    }
     if (CREATE.has(command) && workspace && fleet.inRegistry(workspace) && !fleet.membersOf(workspace).includes(machine)) await materialize(machine, workspace);
     if (WITH_SPACE.has(command)) args = await withSharedSpace(machine, workspace, args);
     if (command === "load_history") {
@@ -517,12 +523,18 @@ export function createRouter(config: RouterConfig) {
       if (typeof id === "string" && (id === self || fleet.has(id))) return { runtime: null };
     }
     const machine = headerOf(options, "x-terminus-machine");
-    const workspace = headerOf(options, "x-terminus-workspace") ?? active;
+    const workspace = command === "list_workspaces" ? null : headerOf(options, "x-terminus-workspace") ?? active;
+    if (command === "list_workspaces") options = withoutHeader(options, "x-terminus-workspace");
+    if (STORAGE.has(command) && !workspace) throw { what: { clave: "shell.service.failed" }, detail: "workspace_missing" };
     if (local && ofThisMachine(command)) return native(command, args, options);
     if (!local && command in NO_SETUP) return NO_SETUP[command];
     if (FILES.test(command) && ((machine && machine !== self && fleet.has(machine)) || namesOther(args)))
       throw { what: t("shell.machines.local_only"), detail: "machine_files" };
     try {
+      if (machine && machine === self && (STORAGE.has(command) || command === "list_workspaces")) {
+        if (STORAGE.has(command) && !hasHere(workspace)) throw missing(machine);
+        return await native(command, fleet.argsFor(machine, args), withoutHeader(options, "x-terminus-machine"));
+      }
       if (machine && machine !== self && fleet.has(machine)) return await remote(machine, command, args, callWorkspace(workspace, args));
       // Una máquina que ya no es de la cuenta no se cambia por otra en silencio.
       if (machine && machine !== self) throw new FleetError("unknown_machine", machine);
