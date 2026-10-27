@@ -148,11 +148,11 @@ const key = (workspace: string, space: string | null) =>
   space ? `pestanas.${workspace}.${space}` : `pestanas.${workspace}`;
 
 const readStoredTabs = (k: string): StoredTabs => {
-  const g = leerPref<StoredTabs>(k, { abiertas: [], activa: null });
-  const openTabs = Array.isArray(g.abiertas)
+  const g = leerPref<StoredTabs | null>(k, null);
+  const openTabs = Array.isArray(g?.abiertas)
     ? g.abiertas.map(asTask).filter((p): p is TaskTab => p !== null)
     : [];
-  return { abiertas: openTabs, activa: openTabs.some((p) => p.id === g.activa) ? g.activa : null };
+  return { abiertas: openTabs, activa: g && openTabs.some((p) => p.id === g.activa) ? g.activa : null };
 };
 
 // La clave anterior se conserva para que un build anterior pueda restaurar su tira.

@@ -961,3 +961,19 @@ test("Git observations share one read per machine and keep routing explicit", as
     Object.defineProperty(globalThis, "document", { configurable: true, value: previousDocument, writable: true });
   }
 });
+
+
+test("un guardado inválido no impide entrar a otro espacio ni borra las pestañas sanas", () => {
+  for (const [index, raw] of ["null", "42", "true", "[]", '{"abiertas":null}', "{broken"].entries()) {
+    const ws = `invalid-space-strip-${index}`;
+    const tabs = createTabs();
+    tabs.load(ws, "healthy");
+    tabs.ensure(tarea("task"));
+    tabs.activate("task");
+    almacen.set(`harness.layout.pestanas.${ws}.broken`, raw);
+    assert.equal(tabs.load(ws, "broken"), null);
+    assert.deepEqual(tabs.open(), []);
+    assert.equal(tabs.load(ws, "healthy"), "task");
+    assert.deepEqual(tabs.open().map(tab => tab.id), ["task"]);
+  }
+});
