@@ -4440,7 +4440,8 @@ export default function App() {
       }
       const from = paneles.siteOf(id);
       const index = destino.indice;
-      const origin = paneles.tabsAt(destino.sitio).indexOf(id);
+      const strip = paneles.tabsAt(destino.sitio).filter(pestanas.isPinned);
+      const origin = strip.indexOf(id);
       const insertion = index !== undefined && sameSite(from, destino.sitio) && origin >= 0 && origin < index
         ? index - 1
         : index;
@@ -4494,7 +4495,10 @@ export default function App() {
   function soltarPestana(id: string, a: SitioDePanel, indice?: number) {
     if (!paneles.groupAt(a)) return;
     pestanas.pin(id);
-    paneles.move(id, a, indice);
+    const kept = paneles.tabsAt(a).filter((x) => x !== id && pestanas.isPinned(x));
+    const before = indice === undefined ? undefined : kept[indice];
+    const position = before === undefined ? undefined : paneles.tabsAt(a).filter((x) => x !== id).indexOf(before);
+    paneles.move(id, a, position);
     const p = pestanas.open().find((x) => x.id === id);
     if (p) void activarPestana(p);
   }

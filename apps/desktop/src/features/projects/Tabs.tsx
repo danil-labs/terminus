@@ -145,7 +145,7 @@ export default function TabStrip(props: {
         }
         if (!id) return;
         // Los ids contienen bytes nulos y no se pueden usar como valores de un selector CSS.
-        const n = props.tabs.findIndex((p) => p.id === id);
+        const n = orderedTabs().findIndex((p) => p.id === id);
         if (n >= 0) reveal(n);
       },
     ),
@@ -217,7 +217,7 @@ export default function TabStrip(props: {
     const offset = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
     if (!offset) return;
     e.preventDefault();
-    const list = props.tabs;
+    const list = keptTabs();
     if (list.length === 0) return;
     const i = list.findIndex((p) => p.id === props.activeId);
     const next = list[(i + offset + list.length) % list.length];
@@ -228,28 +228,10 @@ export default function TabStrip(props: {
     reveal(n);
   }
 
-  return (
-    <ContextMenu>
-    <ContextMenuTrigger
-      ref={strip}
-      role="tablist"
-      aria-label={t("projects.tabs.label")}
-      onKeyDown={move}
-      onWheel={wheel}
-      onScroll={scrolled}
-      onContextMenu={(e: MouseEvent) => {
-        const element = (e.target as HTMLElement).closest<HTMLElement>("[data-envoltorio]");
-        const p = element ? props.tabs[Number(element.dataset.envoltorio)] : undefined;
-        if (!p) e.preventDefault();
-        setSelectedTab(p?.id ?? null);
-      }}
-      // La pestaña activa toca el borde inferior para fundirse con su panel bajo el velo.
-      // flex-1 separaría el botón de añadir de la última pestaña.
-      // Con touchpad en Windows, el rebote elástico al tope desplaza el texto sin el fondo de la pestaña.
-      class="group/strip relative flex min-w-0 items-end gap-0.5 self-stretch overflow-x-auto overflow-y-hidden overscroll-x-none px-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-    >
-      <For each={props.tabs}>
-        {(p, i) => {
+  const keptTabs = () => props.tabs.filter((p) => !props.pinnedIds || props.pinnedIds.has(p.id));
+  const previewTabs = () => props.tabs.filter((p) => props.pinnedIds && !props.pinnedIds.has(p.id));
+  const orderedTabs = () => [...keptTabs(), ...previewTabs()];
+  const renderTab = (p: Tab, i: () => number) => {
           const active = () => p.id === props.activeId;
           const transient = () => props.pinnedIds !== undefined && !props.pinnedIds.has(p.id);
           const task = () => isTaskTab(p);
@@ -319,7 +301,7 @@ export default function TabStrip(props: {
                 class={cn(
                   "group flex h-7 shrink-0 touch-none items-center rounded-[var(--radius-sm)] pr-1 select-none",
                   task() ? "w-[220px] text-sm" : "w-[180px] text-[0.75rem]",
-                  active()
+                  active() && !transient()
                     ? "tab-active font-semibold text-neutral-950"
                     : "font-medium text-neutral-500 hover:bg-neutral-950/5 hover:text-neutral-950",
                 )}
@@ -329,7 +311,7 @@ export default function TabStrip(props: {
                   aria-selected={transient() ? undefined : active()}
                   onDblClick={() => props.onPin?.(p.id)}
                   tabindex={active() ? 0 : -1}
-                  data-pestana={i()}
+                  data-pestana={transient() ? undefined : i()}
                   title={statusDecorated(
                     dirty()
                       ? t("projects.tabs.unsaved.named", { title: detail() ?? text() })
@@ -477,13 +459,39 @@ export default function TabStrip(props: {
               </div>
             </>
           );
-        }}
-      </For>
-      <Show when={props.dropIndex === props.tabs.length}>
+  };
+
+  return (
+    <ContextMenu>
+    <ContextMenuTrigger
+      ref={strip}
+      onKeyDown={move}
+      onWheel={wheel}
+      onScroll={scrolled}
+      onContextMenu={(e: MouseEvent) => {
+        const element = (e.target as HTMLElement).closest<HTMLElement>("[data-envoltorio]");
+        const p = element ? orderedTabs()[Number(element.dataset.envoltorio)] : undefined;
+        if (!p) e.preventDefault();
+        setSelectedTab(p?.id ?? null);
+      }}
+      // La pestaña activa toca el borde inferior para fundirse con su panel bajo el velo.
+      // flex-1 separaría el botón de añadir de la última pestaña.
+      // Con touchpad en Windows, el rebote elástico al tope desplaza el texto sin el fondo de la pestaña.
+      class="group/strip relative flex min-w-0 items-end gap-0.5 self-stretch overflow-x-auto overflow-y-hidden overscroll-x-none px-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      <div role="tablist" aria-label={t("projects.tabs.label")} class="flex shrink-0 items-end gap-0.5 self-stretch">
+        <For each={keptTabs()}>{renderTab}</For>
+      <Show when={props.dropIndex === keptTabs().length}>
         <span
           aria-hidden="true"
           class="h-5 w-0.5 shrink-0 self-center rounded-full bg-primary"
         />
+      </Show>
+      </div>
+      <Show when={previewTabs().length > 0}>
+      <div data-preview-header="" class="ml-2 flex shrink-0 items-end self-stretch border-l border-border pl-2">
+        <For each={previewTabs()}>{(p, i) => renderTab(p, () => keptTabs().length + i())}</For>
+      </div>
       </Show>
       <Show when={thumb()}>
         {(bar) => (
