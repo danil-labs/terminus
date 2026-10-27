@@ -101,6 +101,7 @@ function queryNotice(q: Query | undefined): string {
 }
 
 export default function UsageBar(props: {
+  workspace: string | null;
   agents: AgentOpt[];
   agent: string;
   busy: boolean;
@@ -507,6 +508,7 @@ export default function UsageBar(props: {
           </PopoverContent>
         </Popover>
         <Almacenamiento
+          workspace={props.workspace}
           trabajando={props.trabajando}
           conPestana={props.conPestana}
           onAbrirTarea={props.onAbrirTarea}

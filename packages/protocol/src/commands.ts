@@ -13,6 +13,7 @@ export const APP_READS = [
   "read_activity",
   "read_activity_log",
   "list_workspaces",
+  "list_storage",
   "list_projects",
   "list_spaces",
   "list_live_sessions",

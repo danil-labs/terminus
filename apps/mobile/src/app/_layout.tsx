@@ -42,6 +42,7 @@ export default function RootLayout() {
   // En el navegador, una ruta del teléfono que abrió la web de escritorio llega como `?to=` (ver `toPhone` en `apps/desktop/src/web/main.tsx`).
   useEffect(() => {
     if (Platform.OS !== "web") return;
+    if (!window.location.pathname.endsWith("/signin")) window.sessionStorage.setItem("terminus.web.return", `${window.location.pathname}${window.location.search}`);
     const to = new URLSearchParams(window.location.search).get("to");
     if (to?.startsWith("/") && !to.startsWith("//")) router.replace(to as never);
   }, []);

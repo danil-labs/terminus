@@ -14,7 +14,17 @@ export type WorkspaceDanil = { user_id: string; email?: string | null; name?: st
  */
 export type Workspace = { id: string; name: string; provider?: string | null; remote?: string | null; danil?: WorkspaceDanil | null; default_permission_mode?: string | null };
 /** `list_workspaces`. */
-export type Startup = { workspaces: Workspace[]; active: string | null };
+export type MachineResources = {
+  measured_at: number;
+  error?: "measurement_failed" | "unsupported";
+  storage: { id: string; label: string; total_bytes: number; free_bytes: number; available_bytes: number; terminus_bytes: null; attribution: "unknown" }[];
+};
+export type WorkspaceStorage = {
+  bytes: number; recuperable: number; medido_en: number; aviso: string | null;
+  tareas: { session: string; project: string; tarea: string; proyecto: string | null; bytes: number }[];
+  compartido: { bytes: number }[]; sueltos: { bytes: number }[];
+};
+export type Startup = { workspaces: Workspace[]; active: string | null; machine_resources?: MachineResources };
 /** `list_projects`: una carpeta del workspace. */
 export type Project = { id: string; name: string; working_directory?: string | null; kind?: "git" | "folder"; remote_url?: string | null };
 /**

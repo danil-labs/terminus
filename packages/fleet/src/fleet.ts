@@ -425,6 +425,7 @@ export class Fleet {
     const kind = classOf(command);
     if (kind !== "read" && this.isOutdated(member)) throw new FleetError("version_mismatch", machine);
     const off = OFF.includes(member.link.state());
+    if (off && ["list_storage", "reclaim_storage", "empty_build_cache", "collect_orphans"].includes(command)) throw new FleetError("machine_off", machine);
     // Archivar, borrar, renombrar, fijar o mover de space: el relay la guarda sin encenderla.
     if (off && kind !== "read" && !this.defers(command, args)) {
       if (!member.info.wakes) throw new FleetError("machine_off", machine, null, false);
@@ -432,7 +433,7 @@ export class Fleet {
       if (kind === "action") await this.wakeMember(member);
     }
     const workspace = callWorkspace(envelope.workspace, args);
-    const timeout = this.deadlines[kind];
+    const timeout = envelope.command === "list_storage" ? this.deadlines.action : this.deadlines[kind];
     const id = requestId();
     const attempt = async (retried: boolean): Promise<CallResult> => {
       try {
@@ -443,7 +444,7 @@ export class Fleet {
         if (e.code === "version_mismatch") this.markOutdated(member);
         if (e.code === "not_remotely_startable") throw new FleetError("machine_off", machine, null, false);
         const again = kind === "read" ? RETRY_READ : RETRY_ACTION;
-        if (retried || !again.has(e.code)) throw e;
+        if (retried || command === "list_storage" || !again.has(e.code)) throw e;
         return attempt(true);
       }
     };

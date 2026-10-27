@@ -19,7 +19,7 @@ type Listener = (host: string, events: EngineEvent[], gap: boolean) => void;
  * (`license`: Terminus de pago; la lista ya no la pide). La licencia y el error no se
  * confunden con «no tienes máquinas».
  */
-export type Fleet = "loading" | "ok" | "license" | "error" | "signed_out";
+export type Fleet = "loading" | "ok" | "license" | "no_account" | "error" | "signed_out";
 
 type Machines = {
   ready: boolean;
@@ -130,7 +130,7 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
           old.every((c, i) => c.computer_id === answer.value[i].computer_id && c.provider === answer.value[i].provider && c.name === answer.value[i].name && linked(c) === linked(answer.value[i]));
         return same ? old : answer.value;
       });
-    } else if (answer.kind === "license") setFleet("license");
+    } else if (answer.kind === "license" || answer.kind === "no_account") setFleet(answer.kind);
     else if (answer.kind !== "unauthorized") setFleet("error");
   }, [signedIn, account.getToken, account.unauthorized]);
 
@@ -157,9 +157,9 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
         wake: async (computer) => (await startComputer(COMPUTERS, await account.getToken(), computer)).kind === "ok",
         beforeReconnect: (computer) => async () => {
           const answer = await computersOf(account.getToken, account.unauthorized);
-          if (answer.kind === "license") setFleet("license");
+          if (answer.kind === "license" || answer.kind === "no_account") setFleet(answer.kind);
           if (answer.kind === "ok" && !answer.value.some((c) => c.computer_id === computer)) return false;
-          return answer.kind !== "license" && answer.kind !== "unauthorized";
+          return answer.kind !== "license" && answer.kind !== "no_account" && answer.kind !== "unauthorized";
         },
         storage,
       });

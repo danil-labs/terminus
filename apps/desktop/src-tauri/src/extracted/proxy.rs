@@ -376,7 +376,9 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
         return;
     }
     let slot = Slot(state.clone());
-    let workspace = if matches!(name.as_str(), "tree_show" | "tree_open_external")
+    let workspace = if name == "list_workspaces" {
+        None
+    } else if matches!(name.as_str(), "tree_show" | "tree_open_external")
         && args["tree"] == "terminus-chat-visuals"
     {
         // El scope pertenece al sobre RPC1, no a los parámetros congelados del comando.
@@ -395,7 +397,14 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
         Some(workspace.to_owned())
     } else if matches!(
         name.as_str(),
-        "stop_turn" | "stop_shell_command" | "write_shell_input" | "pending_requests"
+        "stop_turn"
+            | "stop_shell_command"
+            | "write_shell_input"
+            | "pending_requests"
+            | "list_storage"
+            | "reclaim_storage"
+            | "empty_build_cache"
+            | "collect_orphans"
     ) {
         // Cerrar con tareas vivas detiene también las de otros workspaces.
         invoke

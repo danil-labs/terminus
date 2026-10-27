@@ -165,7 +165,10 @@ export function startAccountMachines(target: Target = window) {
       },
       wake: async (id) => (await startComputer(endpoint, (await getToken()).token, id)).kind === "ok",
       storage: localStorage,
-      onChange: () => bump((n) => n + 1),
+      onChange: () => {
+        bump((n) => n + 1);
+        window.dispatchEvent(new CustomEvent("harness:machines"));
+      },
       // La cola de aplazadas cambió (aquí, en la web o en el teléfono): la lista se relee.
       onDeferred: (machine) => router.deferredChanged(machine),
       onSlice: () => bump((n) => n + 1),

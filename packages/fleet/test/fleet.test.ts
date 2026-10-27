@@ -675,3 +675,28 @@ test("shared spaces order wins over machine slice order in desktop and web", () 
     fleet.close();
   }
 });
+
+test("storage never wakes a machine and a slow scan is not retried", async () => {
+  const off = setup({ cmp_vm: { state: "stopped" } }, [VM]);
+  for (const command of ["list_storage", "reclaim_storage", "empty_build_cache", "collect_orphans"]) {
+    await assert.rejects(off.fleet.call({ machine: "cmp_vm", workspace: "w", command }), (error: FleetError) => error.code === "machine_off");
+  }
+  assert.equal(off.link("cmp_vm").calls.length, 0);
+  const slow = setup({ cmp_vm: { error: "io" } }, [VM]);
+  await assert.rejects(slow.fleet.call({ machine: "cmp_vm", workspace: "w", command: "list_storage", args: { refrescar: true } }));
+  assert.equal(slow.link("cmp_vm").calls.length, 1, "the scan may still be running after the transport fails");
+});
+
+test("disk resources remain live but are excluded from persisted listings", async () => {
+  const storage = memoryStorage();
+  const resources = { measured_at: 123, storage: [] };
+  const { fleet } = setup({ cmp_vm: { answers: { list_workspaces: { workspaces: [], machine_resources: resources } } } }, [VM], { storage });
+  const envelope = { machine: "cmp_vm", workspace: null, command: "list_workspaces" };
+  const slice = await fleet.read(envelope);
+  assert.deepEqual((slice.value as Record<string, unknown>).machine_resources, resources);
+  fleet.flush();
+  const persisted = storage.items.get(SLICES_KEY);
+  assert.ok(persisted);
+  assert.ok(!persisted.includes("machine_resources"));
+  assert.ok(persisted.includes("workspaces"));
+});
