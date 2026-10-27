@@ -235,7 +235,7 @@ export default function Accounts(props: {
    * Dónde se consigue la API key de este agente, o `null` si se conecta
    * lanzando su CLI. La política compartida contempla OpenCode 2.
    */
-  const claveDe = () => accountKeyUrl(agentes().find((a) => a.id === agente()));
+  const claveDe = () => agentes().find((a) => a.id === agente())?.api_key;
 
   /** La cuenta cuya clave se está pidiendo, y lo escrito hasta ahora. */
   const [pidiendoClave, setPidiendoClave] = createSignal<string | null>(null);
@@ -637,7 +637,7 @@ export default function Accounts(props: {
     // Se bifurca aquí y no en `agregar`: el alta, el botón de reconectar y
     // el reintento entran por el mismo sitio, y tres caminos a la misma
     // pantalla es donde se olvida uno.
-    if (claveDe()) {
+    if (accountKeyUrl(agentes().find((a) => a.id === agente()))) {
       // Este camino también instala: sin esto, pegar la clave decía
       // «conectada» y dejaba la máquina sin su CLI, con el turno sin poder
       // arrancar.
