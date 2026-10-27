@@ -9,6 +9,9 @@
  * `apps/mobile/docs/mobile.md` («Lista cerrada»).
  */
 export const APP_READS = [
+  "list_activity",
+  "read_activity",
+  "read_activity_log",
   "list_workspaces",
   "list_projects",
   "list_spaces",

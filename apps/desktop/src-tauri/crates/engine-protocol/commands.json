@@ -723,6 +723,47 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "chat_visual_part",
+      "output": "-> Result < crate :: delivery :: chat_visuals :: VisualPart , Failure >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "session",
+          "name": "session",
+          "type": "String"
+        },
+        {
+          "key": "file",
+          "name": "file",
+          "type": "String"
+        },
+        {
+          "key": "offset",
+          "name": "offset",
+          "type": "u64"
+        },
+        {
+          "key": "size",
+          "name": "size",
+          "type": "u32"
+        },
+        {
+          "key": "revision",
+          "name": "revision",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "development::chat_visual_part",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "check_environment",
       "output": "-> EnvReport",
       "parameters": [
@@ -2774,6 +2815,22 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "list_activity",
+      "output": "-> Result < Vec < ActivityRow > , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "Option < String >"
+        }
+      ],
+      "path": "activity::list_activity",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "list_agent_profiles",
       "output": "-> Result < Wire < std :: collections :: HashMap < String , Profile > > , String >",
       "parameters": [
@@ -4165,6 +4222,48 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
+      "name": "read_activity",
+      "output": "-> Result < Activity , String >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "path": "activity::read_activity",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "read_activity_log",
+      "output": "-> Result < ActivityLog , String >",
+      "parameters": [
+        {
+          "key": "id",
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "key": "step",
+          "name": "step",
+          "type": "String"
+        },
+        {
+          "key": "offset",
+          "name": "offset",
+          "type": "Option < u64 >"
+        }
+      ],
+      "path": "activity::read_activity_log",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
       "name": "read_drawio_asset",
       "output": "-> Result < String , Failure >",
       "parameters": [
@@ -4797,6 +4896,37 @@
         }
       ],
       "path": "projects::reuse_project",
+      "scope": "workspace"
+    },
+    {
+      "async": false,
+      "channel": null,
+      "kind": "invoke",
+      "name": "run_activity_command",
+      "output": "-> Result < Activity , String >",
+      "parameters": [
+        {
+          "key": "project",
+          "name": "project",
+          "type": "String"
+        },
+        {
+          "key": "title",
+          "name": "title",
+          "type": "String"
+        },
+        {
+          "key": "activity",
+          "name": "activity",
+          "type": "Option < String >"
+        },
+        {
+          "key": "command",
+          "name": "command",
+          "type": "String"
+        }
+      ],
+      "path": "activity::run_activity_command",
       "scope": "workspace"
     },
     {
@@ -7364,47 +7494,6 @@
       "async": false,
       "channel": null,
       "kind": "invoke",
-      "name": "chat_visual_part",
-      "output": "-> Result < crate :: delivery :: chat_visuals :: VisualPart , Failure >",
-      "parameters": [
-        {
-          "key": "project",
-          "name": "project",
-          "type": "String"
-        },
-        {
-          "key": "session",
-          "name": "session",
-          "type": "String"
-        },
-        {
-          "key": "file",
-          "name": "file",
-          "type": "String"
-        },
-        {
-          "key": "offset",
-          "name": "offset",
-          "type": "u64"
-        },
-        {
-          "key": "size",
-          "name": "size",
-          "type": "u32"
-        },
-        {
-          "key": "revision",
-          "name": "revision",
-          "type": "Option < String >"
-        }
-      ],
-      "path": "development::chat_visual_part",
-      "scope": "workspace"
-    },
-    {
-      "async": false,
-      "channel": null,
-      "kind": "invoke",
       "name": "tree_show",
       "output": "-> Result < Contenido , Failure >",
       "parameters": [
@@ -8218,6 +8307,7 @@
   "events": [
     "account",
     "account-rejected",
+    "activity",
     "agentsview-changed",
     "attention",
     "bootstrap",

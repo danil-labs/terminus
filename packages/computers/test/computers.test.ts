@@ -183,7 +183,10 @@ test("el contrato: igual es ok, distinto es desactualizado, sin dato no se sabe"
   const credentials = "f33064bff6afb3708517c13a90f327af5333cbd82b15a589a2373c80d79e6d51";
   assert.equal(machineCompatibility(extended, base), "ok");
   assert.equal(machineCompatibility(base, credentials), "ok");
-  assert.deepEqual(machineContracts(base), [base, extended, credentials]);
+  const activity = "93b1c32f25c4fb5fd722079a5593f8316125d91e8ecf12e64c3d7e1f7aebae98";
+  assert.equal(machineCompatibility(activity, base), "ok");
+  assert.equal(machineCompatibility(base, activity), "ok");
+  assert.deepEqual(machineContracts(base), [base, extended, credentials, activity]);
   assert.deepEqual(machineContracts("unknown"), ["unknown"]);
   assert.deepEqual(machineContracts(null), []);
 });
