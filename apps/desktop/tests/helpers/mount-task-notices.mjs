@@ -37,7 +37,12 @@ export async function taskNoticeScenarios({ boot, sleep, responses }) {
     assert.equal(toast(), null, "opening the task from the rail dismisses its toast");
     const preview = doc.querySelector('[data-preview-header] [role="button"]');
     assert.ok(preview, "the opened task starts as a temporary view");
+    let reachedHeader = false;
+    const headerGesture = () => { reachedHeader = true; };
+    doc.addEventListener("dblclick", headerGesture);
     preview.dispatchEvent(new app.w.MouseEvent("dblclick", { bubbles: true }));
+    doc.removeEventListener("dblclick", headerGesture);
+    assert.equal(reachedHeader, false, "retaining a task does not trigger the window header gesture");
     await sleep(30);
     assert.ok(doc.querySelector('[role="tab"][data-pestana="0"]'), "the task is retained before opening a second view");
     await click("s2");
