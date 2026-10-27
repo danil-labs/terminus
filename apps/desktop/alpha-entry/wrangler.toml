@@ -1,0 +1,18 @@
+name = "terminus-entry-alfa"
+main = "worker.mjs"
+account_id = "e1f9a060a59fa8a648440321571892de"
+compatibility_date = "2026-10-01"
+workers_dev = false
+preview_urls = false
+
+[[routes]]
+pattern = "alfa-app.danil.ai/terminus/*"
+zone_id = "e14ef2690bfae6ea80d2b8fffbcfd708"
+
+[[services]]
+binding = "TERMINUS_WEB"
+service = "terminus-web-alfa"
+
+[[services]]
+binding = "APPV2_BFF"
+service = "appv2"
