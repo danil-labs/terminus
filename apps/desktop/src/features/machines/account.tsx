@@ -67,7 +67,7 @@ let syncing: Promise<void> | null = null;
 const [selfName, setSelfName] = createRoot(() => createSignal<string | null>(null));
 const homeName = () => selfName() ?? (isMac() ? t("shell.machines.this_mac") : t("shell.machines.this_computer"));
 
-/** El sistema de esta ventana. Solo el escritorio carga este módulo, así que el navegador no es el de la web. */
+/** Sistema de la ventana de escritorio. La web no carga este módulo. */
 function windowSystem(): SystemId {
   if (isMac()) return "macos";
   if (isWindows()) return "windows";
