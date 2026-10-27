@@ -721,7 +721,11 @@ export default function App() {
     paneles.sync(pestanas.open().map((x) => x.id));
     if (activaAntes === null || pestanas.open().some((x) => x.id === activaAntes)) return;
     if (vecina) void activarPestana(vecina);
-    else irAlBlanco(carpetaDelEscritorio(project()));
+    else {
+      const owner = cerradas.find((p) => isContentTab(p) && p.session !== "");
+      if (owner) void abrirSesion(owner.project, owner.session);
+      else irAlBlanco(carpetaDelEscritorio(project()));
+    }
   }
 
   /**
