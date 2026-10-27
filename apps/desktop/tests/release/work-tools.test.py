@@ -100,6 +100,9 @@ class WorkToolsTests(unittest.TestCase):
                               bytes=8, sha256=checksum, url="https://example.invalid/chrome", archive="chrome.zip", executable="chrome/browser"))
             (source / target / "browser-navigation.json").write_text(json.dumps(navigation))
             (source / target / "documents-requirements.txt").write_text(f'sample==1 --hash=sha256:{pin["sha256"]}\n')
+            manifest["documents"]["requirements_sha256"] = tools.digest(source / target / "documents-requirements.txt")
+            raw = json.dumps(manifest, indent=4).encode()
+            (source / target / "manifest.json").write_bytes(raw)
             args = argparse.Namespace(output=dest, command="prepare", cache=[cache], download=False)
             with patch.object(tools, "RESOURCES", source), patch.object(tools.urllib.request, "urlopen") as fetch:
                 first = tools.prepare(args, target, [0])

@@ -186,6 +186,7 @@
         "url": "https://files.pythonhosted.org/packages/ce/9d/3d30eaaa7e06bdb6172f938b2661d64f8d899bdca54120384ecf3759488a/xlsxwriter-3.3.0-py3-none-any.whl",
         "license": "BSD-2-Clause"
       }
-    ]
+    ],
+    "requirements_sha256": "48ce88315dd7930f44d889d5dc9926af4a87ab06d60ac3cd6a45dec4b07fc92d"
   }
 }

@@ -69,6 +69,8 @@ def load_manifest(directory, target):
     if {e["id"] for e in entries} != REQUIRED or len(entries) != len(REQUIRED):
         raise ValueError("Base must contain exactly the seven authorized tools")
     relative(data["documents"]["requirements"])
+    if not re.fullmatch(r"[0-9a-f]{64}", data["documents"]["requirements_sha256"]):
+        raise ValueError("Expected a pinned requirements SHA-256")
     for item in entries + data["documents"]["wheels"]:
         relative(item["archive"])
         if not re.fullmatch(r"[0-9a-f]{64}", item["sha256"]):
@@ -188,7 +190,10 @@ def obtain(item, destination, caches, download, budget):
 
 def verify_documents(directory, manifest):
     docs = manifest["documents"]
-    requirements = child(directory, docs["requirements"]).read_text()
+    requirements_path = child(directory, docs["requirements"])
+    if digest(requirements_path) != docs["requirements_sha256"]:
+        raise ValueError("Requirements checksum mismatch")
+    requirements = requirements_path.read_text()
     expected = "".join(f'{w["name"]}=={w["version"]} --hash=sha256:{w["sha256"]}\n' for w in docs["wheels"])
     if requirements != expected:
         raise ValueError("Requirements must pin every wheel and hash exactly")
