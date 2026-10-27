@@ -5,7 +5,7 @@ export function Spinner(props: { size?: number; class?: string; label?: string }
   const size = () => props.size ?? 16;
   return (
     <svg
-      class={cn("block shrink-0 animate-spin-fluido motion-reduce:animate-none", props.class)}
+      class={cn("block shrink-0 animate-spin-fluido motion-reduce:animate-spin-steps", props.class)}
       width={size()}
       height={size()}
       viewBox="0 0 24 24"

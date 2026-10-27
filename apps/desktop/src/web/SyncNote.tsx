@@ -2,7 +2,8 @@ import { type Accessor, createEffect, createSignal, For, on, onCleanup, Show } f
 import { df } from "../lib/format";
 import { t } from "../lib/i18n";
 import { Toast, ToastPortal } from "../ui/Toast";
-import type { MachineStatus } from "./fleet";
+/** On, off, starting or speaking another contract: what the page says of a machine. */
+export type MachineStatus = "online" | "offline" | "starting" | "outdated";
 
 export type MachineRow = { id: string; name: string; status: MachineStatus; at: number | null };
 

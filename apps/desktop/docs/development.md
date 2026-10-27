@@ -80,13 +80,16 @@ fails, goes to the login. It lists the person's computers (`GET
 /v1/computers`), opens the only one or the remembered one, or shows a picker
 that can also start a computer; `?computer=<id>` opens that one. Opening does
 not start a computer: an off one mounts as it is, with the machine-off notice.
-While the relay says it is off, a read still asks it: the relay may answer
-from its own copy with `cached: {updated_at}`, which the page passes through
-and shows as "last synced" next to the off notice. A miss answers from the
-page's last copy (`src/web/reads.ts`) or waits, and other commands wait; only the relay's
-intent commands (send a message, create a task, answer a permission…) wake it. The installer screen never shows: a managed computer is prepared at
-install, so `Setup` shows only the preparation's progress, or a support note
-if an essential stage failed (`localSetup` in `lib/platform.ts`). Before
+The page runs the desktop's router over `@terminus/fleet`
+(`src/features/machines/router.ts` with no engine of its own): workspaces and
+projects come from the account registry, and each machine's tasks, folders and
+spaces are its slice, the saved one first (the page's copy or the relay's,
+marked saved with its time) and the live one behind. An off machine with a copy
+is not asked; one that does not answer keeps its last slice; one of another
+contract shows outdated. Only an action waits: the relay's intent commands
+(send a message, create a task, answer a permission…) wake a managed VM, and an
+action to the person's own machine that is off says so by name. The installer
+screen never shows (`localSetup` in `lib/platform.ts`). Before
 reconnecting the socket it asks the API again, so a missing license or a
 computer that is not theirs shows a notice instead of a blind retry. A page
 that sets `window.terminusWeb` before the script loads can override any of the

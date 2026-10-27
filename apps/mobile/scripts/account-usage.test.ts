@@ -8,7 +8,7 @@ function host(id: string, on: boolean, authenticated: boolean, queries: string[]
     id,
     power: () => on ? "on" : "off",
     async call(command: string, _workspace: unknown, args: { id?: string }) {
-      if (command === "list_accounts") return { value: { accounts: [{ id: `${id}-account`, label: id, identity: "person@example.com", authenticated_at: authenticated ? 10 : null }] }, cachedAt: null };
+      if (command === "list_accounts") return { value: { accounts: [{ id: `${id}-account`, label: id, plan: "Max", identity: "person@example.com", authenticated_at: authenticated ? 10 : null }] }, cachedAt: null };
       assert.equal(command, "account_limits");
       queries.push(`${id}/${args.id}`);
       return { value: { mode: "read", windows: [{ label: "5h", used_pct: 38, resets_at: null }], plan: "Max", fetched_at: 10 }, cachedAt: null };

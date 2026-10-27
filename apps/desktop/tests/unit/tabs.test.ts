@@ -544,7 +544,7 @@ test("the shared remote queue starts active work before background projects", as
   } });
   Object.defineProperty(globalThis, "window", { configurable: true, value: fake, writable: true });
   Object.defineProperty(globalThis, "document", { configurable: true, value: Object.assign(new EventTarget(), { hidden: false }), writable: true });
-  const observers = ["background-1", "background-2", "selected"].map(watchSessionGit);
+  const observers = ["background-1", "background-2", "selected"].map(project => watchSessionGit(project));
   try {
     observers[2].prioritize(["active"]);
     await new Promise(resolve => setTimeout(resolve, 0));
@@ -561,6 +561,51 @@ test("the shared remote queue starts active work before background projects", as
   }
 });
 
+
+test("a Git read that never answers frees its turn: the PR of a newer task still arrives", async (t) => {
+  const { GIT_READ_DEADLINE, watchSessionGit } = await import("../../src/features/projects/taskGit.ts");
+  const previousWindow = globalThis.window;
+  const previousDocument = globalThis.document;
+  const row = { ...UNKNOWN_GIT, kind: "branch" as const, branch: "feature", head: "a", repository: "repo" };
+  const pull = { number: 317, state: "merged" as const, head_sha: "a" };
+  const calls: string[] = [];
+  let firstLocal = true;
+  const fake = Object.assign(new EventTarget(), { __TAURI_INTERNALS__: { transformCallback: () => 1,
+    invoke: async (_: string, args: { project: string; remote: boolean }) => {
+      calls.push(`${args.project}:${args.remote ? "remote" : "local"}`);
+      // Dos remotas colgadas ocupan los dos turnos de la cola compartida.
+      if (args.remote && args.project.startsWith("hung-")) return new Promise(() => {});
+      if (!args.remote && args.project === "hung-local" && firstLocal) { firstLocal = false; return new Promise(() => {}); }
+      return args.remote ? { s: { ...row, pull, pull_known: true, checked_at: 2 } } : { s: { ...row, checked_at: 1 } };
+    },
+  } });
+  Object.defineProperty(globalThis, "window", { configurable: true, value: fake, writable: true });
+  Object.defineProperty(globalThis, "document", { configurable: true, value: Object.assign(new EventTarget(), { hidden: false }), writable: true });
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const flush = async () => { for (let i = 0; i < 10; i++) await new Promise(resolve => setImmediate(resolve)); };
+  const watchers = [watchSessionGit("hung-a"), watchSessionGit("hung-b")];
+  try {
+    await flush();
+    watchers.push(watchSessionGit("newer"), watchSessionGit("hung-local"));
+    await flush();
+    assert.ok(!calls.includes("newer:remote"), "la cola tenía turno libre: la prueba no cuelga nada");
+    assert.equal(watchers[2].rows().s.pull, null);
+    assert.equal(watchers[3].rows().s, undefined);
+    // El barrido de cada 15 s pide otra lectura mientras la colgada sigue ocupada.
+    watchers[3].refresh();
+    await flush();
+    t.mock.timers.tick(GIT_READ_DEADLINE);
+    await flush();
+    assert.ok(calls.includes("newer:remote"), "las remotas colgadas siguen ocupando la cola");
+    assert.equal(watchers[2].rows().s.pull?.number, 317);
+    assert.equal(watchers[3].rows().s?.branch, "feature", "la lectura local colgada congeló su carpeta");
+  } finally {
+    for (const watcher of watchers) watcher.release();
+    t.mock.timers.reset();
+    Object.defineProperty(globalThis, "window", { configurable: true, value: previousWindow, writable: true });
+    Object.defineProperty(globalThis, "document", { configurable: true, value: previousDocument, writable: true });
+  }
+});
 
 test("local progress paints before completion and rejects superseded channels", async () => {
   const { watchSessionGit } = await import("../../src/features/projects/taskGit.ts");
@@ -842,4 +887,93 @@ test("una tarea que aún nace no se recuerda al cerrarla", () => {
   t.ensure({ id: idProvisional(), project: "p", titulo: "borrador" });
   t.closeMany(t.open().map((p) => p.id), { remember: true });
   assert.equal(t.canReopen(), false);
+});
+
+/**
+ * La pantalla es de la máquina, no de una tarea: una por máquina, y ni
+ * sincronizar con el historial ni reiniciar la tratan como tarea.
+ */
+test("la pantalla de una máquina es una sola pestaña que no se guarda", () => {
+  const t = tira("pantalla");
+  t.ensure(tarea("s1"));
+  t.openScreen("vm-1", "Pantalla de vm-1");
+  t.openScreen("vm-1", "Pantalla de vm-1");
+  t.openScreen("vm-2", "Pantalla de vm-2");
+  assert.deepEqual(
+    t.open().map((p) => p.id),
+    ["s1", "pantalla\u0000vm-1", "pantalla\u0000vm-2"],
+  );
+  assert.equal(t.active(), "pantalla\u0000vm-2");
+  t.sync((id) => (id === "s1" ? { project: "p", titulo: "uno" } : null));
+  assert.equal(t.open().length, 3);
+  assert.deepEqual(
+    tira("pantalla").open().map((p) => p.id),
+    ["s1"],
+  );
+});
+
+test("Git observations share one read per machine and keep routing explicit", async () => {
+  const { watchSessionGit } = await import("../../src/features/projects/taskGit.ts");
+  const previousWindow = globalThis.window;
+  const previousDocument = globalThis.document;
+  let failure: unknown = null;
+  const calls: { remote: boolean; machine?: string; workspace?: string }[] = [];
+  const fake = Object.assign(new EventTarget(), { __TAURI_INTERNALS__: {
+    transformCallback: () => 1,
+    invoke: async (_: string, args: { remote: boolean }, options?: { headers?: Record<string, string> }) => {
+      if (failure) throw failure;
+      const machine = options?.headers?.["x-terminus-machine"];
+      calls.push({ remote: args.remote, machine, workspace: options?.headers?.["x-terminus-workspace"] });
+      return { s: { ...UNKNOWN_GIT, kind: "branch", branch: "feature", head: "head", repository: machine, checked_at: args.remote ? 2 : 1 } };
+    },
+  } });
+  Object.defineProperty(globalThis, "window", { configurable: true, value: fake, writable: true });
+  Object.defineProperty(globalThis, "document", { configurable: true, value: Object.assign(new EventTarget(), { hidden: false }), writable: true });
+  const mac = watchSessionGit("machine-scope-test", { workspace: "w", machine: "mac" });
+  const again = watchSessionGit("machine-scope-test", { workspace: "w", machine: "mac" });
+  const vm = watchSessionGit("machine-scope-test", { workspace: "w", machine: "vm" });
+  const tick = () => new Promise(resolve => setTimeout(resolve, 0));
+  try {
+    mac.prioritize(["s"]);
+    vm.prioritize(["s"]);
+    await tick(); await tick();
+    assert.deepEqual(calls.filter(call => !call.remote).map(call => call.machine).sort(), ["mac", "vm"]);
+    assert.ok(calls.every(call => call.workspace === "w"));
+    assert.equal(mac.rows().s.repository, "mac");
+    assert.equal(vm.rows().s.repository, "vm");
+    const before = calls.length;
+    again.prioritize(["s"]);
+    await tick();
+    assert.equal(calls.length, before, "otra vista de la misma tarea no duplica el recorrido");
+    failure = { what: "Git unavailable", detail: "github_not_connected" };
+    mac.refresh();
+    await tick(); await tick();
+    assert.deepEqual(mac.error(), failure, "the chat can show the engine failure");
+    assert.equal(mac.rows().s.stale, true);
+    failure = null;
+    mac.refresh();
+    await tick(); await tick();
+    assert.equal(mac.error(), null, "a successful retry clears the failure");
+
+  } finally {
+    mac.release(); again.release(); vm.release();
+    Object.defineProperty(globalThis, "window", { configurable: true, value: previousWindow, writable: true });
+    Object.defineProperty(globalThis, "document", { configurable: true, value: previousDocument, writable: true });
+  }
+});
+
+
+test("un guardado inválido no impide entrar a otro espacio ni borra las pestañas sanas", () => {
+  for (const [index, raw] of ["null", "42", "true", "[]", '{"abiertas":null}', "{broken"].entries()) {
+    const ws = `invalid-space-strip-${index}`;
+    const tabs = createTabs();
+    tabs.load(ws, "healthy");
+    tabs.ensure(tarea("task"));
+    tabs.activate("task");
+    almacen.set(`harness.layout.pestanas.${ws}.broken`, raw);
+    assert.equal(tabs.load(ws, "broken"), null);
+    assert.deepEqual(tabs.open(), []);
+    assert.equal(tabs.load(ws, "healthy"), "task");
+    assert.deepEqual(tabs.open().map(tab => tab.id), ["task"]);
+  }
 });

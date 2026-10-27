@@ -10,6 +10,7 @@ import {
   saltillo,
   type Manifiesto,
 } from "../../src/lib/i18n.ts";
+import { SIN_ESPACIO } from "../../src/lib/no-space.ts";
 import { prosa } from "../../src/lib/prose.ts";
 
 // El control en español evita que un respaldo fijo en inglés pase como traducción.
@@ -48,6 +49,10 @@ const en = catalogo("en");
 registrarCatalogo(manifiesto("es"), es);
 registrarCatalogo(manifiesto("en"), en);
 
+// Sin cifras, la falta de espacio se dice con su frase sin números.
+const sinDatos = (cat: Record<string, string>, clave: string) =>
+  saltillo(cat[clave === SIN_ESPACIO ? "common.install.no_space_plain" : clave]);
+
 test("una frase del backend se pinta en la lengua de la ventana", () => {
   const claves = clavesDelBackend();
   assert.ok(claves.length > 0, "el backend no pide ninguna clave; el detector se rompió");
@@ -56,7 +61,7 @@ test("una frase del backend se pinta en la lengua de la ventana", () => {
   for (const clave of claves) {
     assert.equal(
       prosa({ clave }),
-      saltillo(en[clave]),
+      sinDatos(en, clave),
       `«${clave}» no se pintó en inglés con la app en inglés`,
     );
   }
@@ -64,7 +69,7 @@ test("una frase del backend se pinta en la lengua de la ventana", () => {
   // Control negativo: la misma clave, en español, tiene que dar el español.
   elegirLengua("es");
   for (const clave of claves) {
-    assert.equal(prosa({ clave }), saltillo(es[clave]), `«${clave}» no se pintó en español`);
+    assert.equal(prosa({ clave }), sinDatos(es, clave), `«${clave}» no se pintó en español`);
   }
 });
 

@@ -32,7 +32,12 @@ como la web.
   luego el proveedor (`aws-ec2`, o ninguno en filas viejas). Un motor que no
   habla el contrato (`outdated`) no recibe acciones. Con la VM apagada las
   lecturas vienen de la copia del relay (`cached: {updated_at}`) y la app dice
-  de qué hora es; sin copia, `machine_off` es una lista vacía.
+  de qué hora es; sin copia, `machine_off` es una lista vacía. Una VM que se
+  apaga mientras la app la ve se vuelve a leer una vez de esa copia, que trae
+  lo último que guardó al apagarse. El chat abierto se relee al volver a la
+  app o a la pantalla, cuando su máquina cambia (encendida, apagada, el enlace
+  que se reabre) y tras `segment_saved`; las lecturas se juntan y no borran lo
+  que se escribe en vivo.
 - **Lista cerrada de comandos en los dos caminos** (`APP_COMMANDS` en
   `packages/protocol`): son funciones de ventana con el contrato renombrado.
   El relay de Danil Computers solo bloquea las funciones de escritorio, así que
@@ -61,6 +66,17 @@ como la web.
   entera de la máquina, que reemplaza, o como una entrada suelta, que cambia solo
   su workspace (`mergeAttention`). Una fila sin el campo es de un plano de control
   anterior y no se filtra.
+- **La lista de workspaces es de la cuenta.** Además de lo que listan las
+  máquinas, el teléfono lee el registro de la cuenta (`GET /v1/workspaces`,
+  `listWorkspaces`) al listar las computadoras: un workspace cuyas máquinas
+  duermen y no tienen copia en el relay sigue en la lista, con sus carpetas del
+  registro en la máquina donde nacieron (`workspaceEntries`,
+  `withAccountFolders` en `engine.ts`). Lo que una máquina contesta manda; el
+  registro solo llena lo que falta. Las tareas siguen siendo de cada máquina:
+  las de una dormida salen de la copia del relay o no salen, y crear una ahí la
+  enciende. «Sin workspaces» solo se dice con el registro vacío y ninguna
+  máquina con un workspace ligado. Sin la ruta (un plano de control anterior o
+  sin red), lo de antes.
 - **El fondo de los chats es del workspace** (`chat_background`): la imagen
   propia se pinta detrás de la conversación con el velo del workspace
   (`chatBackgroundView` en `@terminus/protocol`). Los patrones del escritorio
@@ -90,8 +106,19 @@ workspaces, que va a la raíz que fijó la compilación,
 `EXPO_PUBLIC_TERMINUS_WEB_BASE`). Lo que cambia en el navegador va en archivos `.web.ts(x)`:
 
 - **Sesión:** la de la app de Danil en el mismo origen (`supabase.web.ts`),
-  como la web de escritorio; sin sesión se va a su inicio (`signin.web.tsx`).
-  No hay bridge.
+  como la web de escritorio; sin sesión se va a su inicio con
+  `?next=/terminus/m/` para volver aquí (`signin.web.tsx`). No hay bridge.
+- **Instalable (PWA):** `public/index.html` es la plantilla de Expo con las
+  etiquetas de iOS y Android y `viewport-fit=cover`; `public/icons/` sale de
+  `assets/icon.png` (192, 512, maskable 512 con el isotipo al 66 % y
+  `apple-touch-icon` de 180). El manifest y sus cabeceras los escribe
+  `apps/desktop/scripts/web-phone-pwa.mjs`: `id` y `start_url` `/terminus/m/`
+  (no se cambian: obligaría a reinstalar) y `scope: "/"`, porque el inicio de
+  sesión de Danil vive en `/` y en iOS fuera del scope abriría Safari aparte.
+  La app de Danil tiene su propio manifest con `id: "/"`; el `id` distinto deja
+  instalar las dos. Sin service worker: `index.html` y el manifest se revalidan
+  y solo `_expo/static/*` (con hash) se guarda largo. En iOS la app instalada no
+  comparte almacenamiento con Safari: se inicia sesión una vez dentro de ella.
 - **Lo que se recuerda:** `localStorage` en lugar del llavero (`store.web.ts`).
 - **Visualizaciones y archivos HTML:** el `iframe` de la ventana (`srcdoc`,
   `allow-scripts` sin `allow-same-origin`) en lugar del WebView. Un PDF no se
@@ -104,7 +131,7 @@ workspaces, que va a la raíz que fijó la compilación,
 
 | Escritorio (#151) | Teléfono | Por qué |
 |---|---|---|
-| Lista plana con secciones «Te necesitan» y «Tareas» | Igual, en una sola columna; «Te necesitan» solo aparece si tiene algo | En una pantalla chica una sección vacía empuja la lista sin decir nada |
+| Lista plana «Tareas»: cada tarea en su sitio, la que te necesita lo dice su marca | Igual, en una sola columna | La tarea no salta de lugar cuando cambia de estado |
 | Botón «Filtrar y agrupar» con popover (carpetas, agente, agrupar, densidad) | El mismo botón al lado de la línea de alcance; abre una hoja del sistema (`formSheet`) con las mismas opciones y palabras | Un popover no cabe ni se toca bien con el dedo; la hoja es el popover del teléfono y se cierra con el gesto |
 | Tarjeta de dos líneas: estado + título + chincheta; debajo, lo que pide o carpeta, agente, máquina y PR | Igual, sacado de `taskCard`; sin PR ni worktree (el teléfono no lee git); la máquina solo con más de una | Misma información en el mismo orden; lo que el teléfono no puede saber no se inventa |
 | Dock de agentes: una fila de caras al pie del sidebar; clic abre el chat, clic derecho «Ver sus tareas» | Una fila de caras **arriba de la lista**, del mismo orden y reparto (`planDock`, «+k»); tocar abre su chat, mantener pulsado filtra por sus tareas; «Ver todos» abre una hoja | Abajo le quita alto a la lista; arriba se ve al entrar y se va al hacer scroll, sin robar alto a la lista. Mantener pulsado es el clic derecho del teléfono |
@@ -112,6 +139,7 @@ workspaces, que va a la raíz que fijó la compilación,
 | Tarjeta flotante al pasar el mouse (`TaskHoverCard`): título, último mensaje, Carpeta, Agente, Proveedor; Abrir, Fijar, Archivar | **Mantener pulsada** la tarjeta abre una hoja del sistema (`preview`, `fitToContents`) con lo mismo, de `taskPreview` (`@terminus/tasks`), más Máquina si hay más de una; Abrir, Fijar/Desfijar y Archivar con los comandos de la ventana | El teléfono no tiene hover; mantener pulsado es su gesto de vista previa, y la hoja se cierra con el gesto |
 | Cuadro de escribir (`Chat.tsx`): adjuntar y permisos a la izquierda; modelo y razonamiento, y enviar/detener a la derecha; `/`, `@`, `!`; cola con «Mandar ahora» | El mismo cuadro y la misma fila (`apps/mobile/src/ui/Composer.tsx`), con el texto que crece hasta seis líneas; los selectores son hojas desde abajo; `/` y `@` abren la lista sobre el cuadro; `!` lo vuelve terminal («Ejecutar»). En una tarea nueva, encima del cuadro: «Ejecutar en» (más de una máquina), Carpeta, Rama base (con git) y Agente | Popovers y menús no se tocan con el dedo; una fila compacta y hojas sí |
 | Ajustes → Proveedores de IA en la web (#154): una tarjeta por proveedor y correo, consumo una vez, chapas de máquina, «Iniciar sesión en otra máquina» | La misma pantalla (`accounts`), desde la hoja de workspaces (sección Máquinas); el inicio sin pantalla de la máquina (enlace y código) va en una hoja; cerrar sesión pide confirmar | Es la misma regla (`groupAccounts` en `@terminus/computers`); el teléfono abre el enlace en el navegador del sistema y ahí mismo se copia el código |
+| Pestaña Memoria de la vista de proyecto: alcance Proyecto, Workspace o encargado; escribir a mano, editar, borrar; historial por entrada y copias `.conflicto-*` marcadas | Pantalla `memory/[workspace]` desde la hoja de workspaces (sección Memoria, un renglón por workspace de la cuenta): alcance Workspace o cada proyecto del registro; editar y escribir en una tarjeta en la misma pantalla; el historial se despliega bajo la entrada y tocar una versión muestra su texto. Habla **directo con el Worker** (`/v1/workspaces/:id/memory/*`, cliente de `@terminus/computers`, lógica en `apps/mobile/src/lib/memory.ts`), nunca con el relay: funciona con todas las máquinas apagadas y no enciende ninguna. Avisa la copia de un conflicto al guardar, un borrado que no pisó (409) y una memoria ocupada (503) sin perder lo escrito | La memoria vive en el repo de la cuenta (D8): el teléfono no tiene motor que la guarde; los encargados no están en el registro, así que su memoria todavía no se ofrece |
 | Íconos de Lucide | Los mismos trazos (`apps/mobile/src/ui/lucide.ts`, `apps/mobile/src/ui/Icon.tsx`) con react-native-svg; las marcas de proveedor de `apps/desktop/src/ui/icons.tsx` en `apps/mobile/src/ui/BrandMark.tsx` | Los SF Symbols no existen en Android: la chincheta y el filtro no se veían en el teléfono de prueba |
 
 ## Cómo está armado
@@ -124,9 +152,10 @@ workspaces, que va a la raíz que fijó la compilación,
 ```
 
 - `apps/mobile/src/lib/account.tsx` y `supabase.ts`: la sesión de la cuenta de Danil.
-- `apps/mobile/src/lib/machines.tsx`: `GET /v1/computers` y una sesión de relay por máquina
-  (`relayHost`), más el bridge si está emparejado (`bridgeHost`); la atención
-  de cada una y los avisos.
+- `apps/mobile/src/lib/machines.tsx`: `GET /v1/computers` y una sola flota para
+  todas (`accountFleet`, `@terminus/fleet`, una sesión de relay por máquina, lo
+  último de cada una guardado en `sliceStorage.ts`), más el bridge si está
+  emparejado (`bridgeHost`); la atención de cada una y los avisos.
 - `apps/mobile/src/lib/hosts.ts` y `engine.ts` (sin React Native): una máquina, la lista
   cerrada y lo que el teléfono hace con su motor. Las tareas de un workspace
   salen de `list_live_sessions` por carpeta y para `""`, como la ventana; una
@@ -150,7 +179,7 @@ Los avisos salen en la app, igual para los dos caminos: una tarea que entra en
 | `(home)/index` | Tareas: workspace, spaces, alcance y filtro, dock de agentes y la lista plana |
 | `(home)/notifications` | «Ahora» de todas las máquinas y «Antes», lo que llegó con la app abierta |
 | `(home)/new` | Nueva tarea: el cuadro de escribir con «Ejecutar en» (la última usada, si no la VM), carpeta, rama base y agente; `!` la crea con un comando. La hoja de Carpeta termina en «Nueva carpeta» y «Clonar repo» (ver «Carpetas nuevas») |
-| `preview` | Vista previa de una tarea (mantener pulsada su tarjeta): Abrir, Fijar, Archivar |
+| `preview` | Menú de una tarea (⋯ o pulsación larga): PR, Abrir, Fijar, Archivar, Eliminar y Finalizar con confirmación; el cohete de la lista abre directamente la confirmación |
 | `accounts` | Proveedores de IA: cuentas por proveedor y correo, consumo, máquinas, iniciar y cerrar sesión |
 | `filter` | Hoja «Filtrar y agrupar» |
 | `agents` | Hoja «Ver todos» del dock |
@@ -172,13 +201,16 @@ lleva su comentario allí:
 
 | Para qué | Lecturas | Acciones |
 |---|---|---|
-| Vista previa | `task_blockers` | `set_session_pinned`, `set_task_archived` |
+| Vista previa y finalizar | `task_blockers` | `set_session_pinned`, `set_task_archived`, `finish_task`, `delete_session` |
 | Cuadro de escribir | `list_models`, `list_permission_modes`, `list_slash_menu`, `list_mentions`, `project_base_branches` | `run_shell_command`, `stop_shell_command`, `guardar_imagen_pegada`, `prepare_attachments` |
 | Identidad de agentes | `list_agent_profiles`, `preview_file` | — |
 | Cuentas de IA | `list_accounts`, `account_status`, `account_limits` | `add_account`, `login_account`, `submit_login_code`, `cancel_login`, `discard_account`, `remove_account` |
 | Fondo del chat | `chat_background` | — |
-| Chat enriquecido | `tree_show` (solo el árbol `terminus-chat-visuals`), `preview_file`, `attachment_preview` | — |
+| Chat enriquecido | `tree_show` (solo el árbol `terminus-chat-visuals`), `chat_visual_part`, `preview_file`, `attachment_preview` | — |
 | Carpetas nuevas | `get_project_directory`, `project_clone_status` | `create_project`, `start_project_clone`, `cancel_project_clone` |
+| Registros de actividad por máquina | `list_activity`, `read_activity`, `read_activity_log` | — |
+| PR en la tarjeta | `list_session_git` (por carpeta, con las visibles en `priority`) | — |
+| Llevar trabajo | `work_status`, `work_key` | `work_export`, `work_read_part`, `work_write_part`, `work_import`, `work_cancel` |
 
 **Qué enciende la VM.** El relay solo enciende con su lista de intención
 (`INTENT_COMMANDS`: escribir, crear, aprobar, `!`, iniciar sesión…). Fijar,
@@ -201,6 +233,15 @@ por si se perdió un evento (`cloneRepo` en `apps/mobile/src/lib/engine.ts`).
 Cerrar la hoja no detiene el clon; «Cancelar clon» manda `cancel_project_clone`.
 Las dos son intenciones del relay: encienden la VM apagada. El space solo se
 manda a la primera máquina del workspace, como al crear una tarea.
+
+**Llevar trabajo.** En la tarea nueva, la hoja de Carpeta lista también las
+carpetas de git de otras máquinas del workspace. Elegir una para crear la tarea
+en otra máquina lleva su trabajo sin subir con `@terminus/carry`
+(`apps/mobile/src/lib/carry.ts`): siempre sellado con la llave del destino
+(`work_key`, fijada la primera vez en el llavero), partes de 512 KiB y los
+`.env` sugeridos; si la llave cambió no lleva nada. El teléfono nunca trae
+trabajo de vuelta. `work_import` y `work_cancel` son intenciones del relay; las
+partes no. Sin comprobar en el simulador.
 
 **Adjuntos.** El único camino del motor para un archivo que viene de otro
 cliente es el de pegar una imagen (`guardar_imagen_pegada`, en base64): solo
@@ -317,7 +358,6 @@ en una VM real.
    `terminus-mobile://` (también para la vuelta de Google y Microsoft).
 2. **Gateway de push.** Un servicio que guarda la llave de APNs y la cuenta de
    FCM; las máquinas le piden enviar. Los avisos ya se calculan en la app.
-3. **La web al paquete compartido.** `apps/desktop/src/web/relay.ts`,
-   `computers.ts` y las reglas de `fleet.ts` (`wakes`, el orden y el grupo de
-   workspaces) están en `@terminus/computers`; la web debería importarlo en
-   vez de su copia.
+3. **La web al paquete compartido.** Hecho: la web, el escritorio y el
+   teléfono usan `@terminus/computers` y una sola flota, `@terminus/fleet`
+   (`accountFleet` en `apps/mobile/src/lib/hosts.ts`).

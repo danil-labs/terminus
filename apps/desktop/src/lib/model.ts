@@ -22,7 +22,7 @@ export type Project = {
   // Se calcula al leer; crear o quitar .git puede cambiarlo sin modificar el proyecto guardado.
   kind: "git" | "folder";
   cloud?: "google_drive" | "one_drive" | "icloud" | "dropbox" | "box" | "other" | null;
-  // Las máquinas con su carpeta, cuando el panel junta varias (`web/fleet.ts`).
+  // Las máquinas con su carpeta, cuando el panel junta varias (`@terminus/fleet`).
   machines?: string[];
   // El remoto del que otra máquina lo clona; un motor anterior no lo dice.
   remote_url?: string | null;

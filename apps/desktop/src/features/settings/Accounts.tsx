@@ -1,14 +1,14 @@
-import { For, Show, createEffect, createSignal, createUniqueId, on, onCleanup, onMount, untrack, type JSX } from "solid-js";
+import { For, Show, Suspense, createEffect, createMemo, createSignal, createUniqueId, lazy, on, onCleanup, onMount, untrack, type JSX } from "solid-js";
+import { groupAccounts } from "@terminus/computers";
 import { enfocar } from "../../lib/focus";
 import { invoke } from "../../lib/invoke.ts";
+import { textoDeFalta } from "../../lib/no-space";
 import { listen } from "../../lib/serviceEvents";
-import { confirm } from "@tauri-apps/plugin-dialog";
 import AccountCard, { accountPresentation } from "./AccountCard";
 import { FailureNote, type Failure, detalleDe, prosaDe } from "../../ui/Failure";
 import { cn } from "../../lib/utils";
 import { capabilities } from "../../lib/platform";
 import { Skeleton } from "../../ui/Skeleton";
-import { ProgressBar } from "../../ui/ProgressBar";
 import { Badge } from "../../ui/Badge";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
@@ -23,8 +23,9 @@ import {
 } from "../../ui/DropdownMenu";
 import { MarcaAgente } from "../../ui/icons";
 import { SettingsBlock, SettingsRow, SettingsSection } from "./layout";
+import ListaDeModelosLocales from "./LocalModels";
+import { crearModelosLocales } from "./local-models-store";
 import { revocada } from "../../lib/limits";
-import { peso } from "../../lib/format";
 import { t } from "../../lib/i18n";
 import { type Frase, prosa } from "../../lib/prose";
 import { Terminal, TerminalBody } from "../../ui/Terminal";
@@ -46,6 +47,11 @@ import {
   type EnEspera,
   type LoginEvent,
 } from "./accounts-store";
+import { machineOf } from "../machines/store";
+
+// Las claves en la cuenta de Danil: un trozo aparte, solo para agentes con API key.
+const CredentialsInUse = lazy(() => import("./credentials/AccountCredentials").then((m) => ({ default: m.CredentialsInUse })));
+const LocalKeysBanner = lazy(() => import("./credentials/AccountCredentials").then((m) => ({ default: m.LocalKeysBanner })));
 
 /**
  * "Conectar", no "iniciar sesión": la app no inicia ninguna sesión —lo hace
@@ -98,7 +104,21 @@ export default function Accounts(props: {
   const [lista, setLista] = createSignal<AccountList | null>(null);
   const [cargando, setCargando] = createSignal(true);
   const [estados, setEstados] = createSignal<Record<string, AccountStatus>>({});
+  const tarjetas = createMemo<Account[]>(() => {
+    const accounts = lista()?.accounts ?? [];
+    if (!accounts.some((a) => a.machines?.length)) return accounts;
+    const groups = groupAccounts(agente(), accounts.flatMap((a) => (a.machines ?? []).map((m) => ({
+      machine: m.machine,
+      on: m.on,
+      accounts: [{ ...a, id: m.id, plan: accountPresentation(a, estados()[m.id]).plan }],
+    }))));
+    return groups.map((g) => ({ ...g.row, machines: g.members }));
+  });
   const [comprobando, setComprobando] = createSignal<Record<string, boolean>>({});
+  // Las que la última consulta de estado no pudo responder. No es «sin
+  // conectar» —nadie lo dijo— ni «conectada»: una cuenta cuyo `account_status`
+  // se corta por plazo cada vez se veía conectada con un error encima.
+  const [sinComprobar, setSinComprobar] = createSignal<Record<string, boolean>>({});
   const [fallo, setFallo] = createSignal<Failure | null>(null);
   // Quitar borra la credencial y no se puede deshacer: el primer clic pregunta.
   const [porQuitar, setPorQuitar] = createSignal<string | null>(null);
@@ -157,6 +177,7 @@ export default function Accounts(props: {
   }
 
   const proveedor = () => agentes().find((a) => a.id === agente());
+  const terminalLocal = (id: string) => capabilities().nativeWindow && !machineOf(id);
   const externalInstallUrl = () => proveedor()?.external_install_url;
   const faltaExterno = () => !proveedor() || Boolean(externalInstallUrl()) && !proveedor()?.available;
   const [revisandoCli, setRevisandoCli] = createSignal(false);
@@ -227,7 +248,7 @@ export default function Accounts(props: {
     if (!id) return;
     setGuardandoClaveGo(true);
     try {
-      await invoke("set_go_usage_key", { provider: agente(), id, key: claveGo() });
+      await invoke("set_go_usage_key", { provider: agente(), id, key: claveGo() }, machineOf(id));
       setPidiendoClaveGo(null);
       setClaveGo("");
       setConectadaVez((c) => ({ ...c, [id]: (c[id] ?? 0) + 1 }));
@@ -243,7 +264,7 @@ export default function Accounts(props: {
     if (!id || !clave().trim()) return;
     setGuardandoClave(true);
     try {
-      await invoke("set_api_key", { provider: agente(), id, key: clave() });
+      await invoke("set_api_key", { provider: agente(), id, key: clave() }, machineOf(id));
       setPidiendoClave(null);
       // No se conserva ni un instante más de lo necesario: ya está en el
       // llavero, y dejarla en una señal la mantendría en memoria sin uso.
@@ -296,7 +317,8 @@ export default function Accounts(props: {
       setAgentes(await invoke<AgentOpt[]>("list_providers"));
       setFallo(null);
     } catch (e) {
-      setFallo({ what: t("settings.accounts.error.install"), detail: detalleDe(e) });
+      const sinEspacio = await textoDeFalta(e, `provider:${agente()}`);
+      setFallo(sinEspacio ? { what: sinEspacio, detail: "" } : { what: t("settings.accounts.error.install"), detail: detalleDe(e) });
     } finally {
       setInstalando(null);
     }
@@ -323,6 +345,7 @@ export default function Accounts(props: {
   createEffect(
     on(agente, () => {
       setEstados({});
+      setSinComprobar({});
       comprobadas.clear();
       setPorQuitar(null);
       void refrescar();
@@ -452,6 +475,14 @@ export default function Accounts(props: {
         setConectadaVez((c) => ({ ...c, [account]: (c[account] ?? 0) + 1 }));
         return;
       }
+      // Codex abre el navegador él solo y su enlace llega como aviso, no
+      // como `url`. Ofrecerle la Terminal lanzaba un segundo `codex login`
+      // que cancela al primero por su puerto fijo: la pestaña ya abierta
+      // volvía a `127.0.0.1:1455` y fallaba.
+      if (/https:\/\//.test(text)) {
+        cancelarEspera();
+        setOfrecerTerminal(false);
+      }
       setSalida((s) => [...s, text].slice(-12));
     });
 
@@ -516,10 +547,12 @@ export default function Accounts(props: {
       const st = await invoke<AccountStatus>("account_status", {
         provider: agente(),
         id,
-      });
+      }, machineOf(id));
       setEstados((e) => ({ ...e, [id]: st }));
+      setSinComprobar((c) => ({ ...c, [id]: false }));
       return st;
     } catch (e) {
+      setSinComprobar((c) => ({ ...c, [id]: true }));
       setFallo({
         what: t("settings.accounts.error.status", { agent: etiqueta() }),
         detail: detalleDe(e),
@@ -551,7 +584,7 @@ export default function Accounts(props: {
     if (recienCreada !== id || !hubaFallo) return;
     recienCreada = null;
     try {
-      if (await invoke<boolean>("discard_account", { provider: agente(), id })) {
+      if (await invoke<boolean>("discard_account", { provider: agente(), id }, machineOf(id))) {
         await refrescar();
       }
     } catch {
@@ -637,7 +670,7 @@ export default function Accounts(props: {
       if (!agentes().find((a) => a.id === agente())?.available) {
         await instalarCli();
       }
-      await invoke("login_account", { provider: agente(), id, mode: modo });
+      await invoke("login_account", { provider: agente(), id, mode: modo }, machineOf(id));
       if (modo === "terminal") {
         // El login ocurre fuera de la app: no llega ningún evento aquí, y no
         // hay nada que esperar ni panel que sostener.
@@ -675,7 +708,7 @@ export default function Accounts(props: {
     const id = enCurso();
     if (!id || !codigo().trim()) return;
     try {
-      await invoke("submit_login_code", { id, code: codigo() });
+      await invoke("submit_login_code", { id, code: codigo() }, machineOf(id));
       setPideCodigo(false);
       setCodigo("");
     } catch (e) {
@@ -689,7 +722,7 @@ export default function Accounts(props: {
   async function usar(id: string) {
     try {
       setRepuestas(null);
-      await invoke("set_active_account", { provider: agente(), id });
+      await invoke("set_active_account", { provider: agente(), id }, machineOf(id));
       await refrescar();
     } catch (e) {
       setFallo({ what: t("settings.accounts.error.activate"), detail: detalleDe(e) });
@@ -720,7 +753,7 @@ export default function Accounts(props: {
   async function quitar(id: string) {
     setPorQuitar(null);
     try {
-      await invoke("remove_account", { provider: agente(), id });
+      await invoke("remove_account", { provider: agente(), id }, machineOf(id));
       await refrescar();
     } catch (e) {
       setFallo({ what: t("settings.accounts.error.remove"), detail: detalleDe(e) });
@@ -742,7 +775,7 @@ export default function Accounts(props: {
 
   function cancelarConexion() {
     const id = enCurso();
-    if (id) invoke("cancel_login", { id }).catch(() => {});
+    if (id) invoke("cancel_login", { id }, machineOf(id)).catch(() => {});
     cancelarEspera();
     setEnCurso(null);
     setPideCodigo(false);
@@ -794,7 +827,7 @@ export default function Accounts(props: {
                     {t("settings.account_card.active")}
                   </Badge>
                   <span class="shrink-0">
-                    {t("settings.accounts.count", { count: lista()?.accounts.length ?? 0 })}
+                    {t("settings.accounts.count", { count: tarjetas().length })}
                   </span>
                 </span>
               )}
@@ -1009,11 +1042,17 @@ export default function Accounts(props: {
         </SettingsRow>
       </Show>
 
+      <Show when={claveDe() && !props.enAlta}>
+        <Suspense fallback={null}>
+          <LocalKeysBanner kinds={["api_key"]} />
+        </Suspense>
+      </Show>
+
       <Show when={hayCuentas()}>
       <ul class="m-0 grid list-none gap-2 p-0">
-        <For each={lista()?.accounts ?? []}>
+        <For each={tarjetas()}>
           {(a, i) => {
-            const activa = () => a.id === lista()?.active;
+            const activa = () => a.id === lista()?.active || !!a.machines?.some((m) => m.id === lista()?.active);
             const estado = () => estados()[a.id];
 
             return (
@@ -1025,6 +1064,7 @@ export default function Accounts(props: {
                 active={activa()}
                 status={estado()}
                 checkingStatus={comprobando()[a.id]}
+                statusUnknown={sinComprobar()[a.id] && a.authenticated_at !== null}
                 onRecheckStatus={() => comprobar(a.id)}
                 supportsLimits={
                   agentes().find((x) => x.id === agente())?.limits ?? false
@@ -1033,6 +1073,9 @@ export default function Accounts(props: {
                 afterStatusChange={conectadaVez()[a.id] ?? 0}
                 actions={(info) => {
                   const caida = () => info.revocada || estado()?.authenticated === false;
+                  // Autenticada alguna vez y sin respuesta ahora: se ofrece
+                  // preguntar de nuevo, y reconectar por si no era el plazo.
+                  const dudosa = () => !caida() && info.sinComprobar;
                   return (
                     <>
                       <Show when={agente() === "opencode-zen"}>
@@ -1040,9 +1083,19 @@ export default function Accounts(props: {
                           {t("settings.accounts.go_key")}
                         </Button>
                       </Show>
-                      {/* Un solo botón visible: reconectar si se cayó, usarla si no es la activa. */}
+                      <Show when={dudosa()}>
+                        <Button
+                          variant="outline"
+                          size="compact"
+                          disabled={comprobando()[a.id]}
+                          onClick={() => void comprobar(a.id)}
+                        >
+                          {t("settings.accounts.retry")}
+                        </Button>
+                      </Show>
+                      {/* Un solo botón visible: reconectar si se cayó o no se pudo comprobar, usarla si no es la activa. */}
                       <Show
-                        when={caida()}
+                        when={caida() || dudosa()}
                         fallback={
                           <Show when={!activa()}>
                             <Button
@@ -1072,7 +1125,7 @@ export default function Accounts(props: {
                             : t("settings.accounts.connect")}
                         </Button>
                       </Show>
-                      <Show when={!caida() || !props.enAlta}>
+                      <Show when={!(caida() || dudosa()) || !props.enAlta}>
                         <DropdownMenu>
                           <DropdownMenuTrigger
                             aria-label={t("settings.accounts.more_actions", {
@@ -1088,7 +1141,7 @@ export default function Accounts(props: {
                           {/* Configuración es un Dialog en z-[80] que cierra con Esc salvo dentro de data-owns-escape. */}
                           <DropdownMenuContent class="z-[90]" data-owns-escape>
                             {/* Reconectar reescribe la credencial en su carpeta; quitar la borra. */}
-                            <Show when={!caida()}>
+                            <Show when={!caida() && !dudosa()}>
                               <DropdownMenuItem
                                 class="flex items-center gap-2"
                                 disabled={enCurso() !== null}
@@ -1098,7 +1151,7 @@ export default function Accounts(props: {
                                 {t("settings.accounts.reconnect")}
                               </DropdownMenuItem>
                             </Show>
-                            <Show when={!caida() && !props.enAlta}>
+                            <Show when={!caida() && !dudosa() && !props.enAlta}>
                               <DropdownMenuSeparator />
                             </Show>
                             <Show when={!props.enAlta && !a.machines}>
@@ -1137,6 +1190,11 @@ export default function Accounts(props: {
                 }
               />
               {capabilities().accountMachines?.({ account: a, provider: agente(), add: agregar, refresh: () => void refrescar() })}
+              <Show when={claveDe() && !props.enAlta}>
+                <Suspense fallback={null}>
+                  <CredentialsInUse match={(c) => c.kind === "api_key" && c.config.agent === agente() && c.config.account === a.id} />
+                </Suspense>
+              </Show>
               </>
             );
           }}
@@ -1306,7 +1364,7 @@ export default function Accounts(props: {
                 {/* El agente lleva un rato sin decir nada. Puede ser que esté
                     esperando algo que solo sabe pedir con una terminal de verdad, y
                     esto es lo único que lo destraba. */}
-                <Show when={ofrecerTerminal()}>
+                <Show when={ofrecerTerminal() && terminalLocal(id())}>
                   <div class="flex flex-wrap items-center gap-2 text-xs text-neutral-500">
                     <span>
                       {t("settings.accounts.no_response", { agent: etiqueta() })}
@@ -1315,7 +1373,7 @@ export default function Accounts(props: {
                       variant="outline"
                       size="compact"
                       onClick={() => {
-                        invoke("cancel_login", { id: id() }).catch(() => {});
+                        invoke("cancel_login", { id: id() }, machineOf(id())).catch(() => {});
                         void conectar(id(), "terminal");
                       }}
                     >
@@ -1374,7 +1432,7 @@ export default function Accounts(props: {
                 setClave("");
                 // El alta creó la cuenta antes de tener la clave, igual que con
                 // el login del CLI. Sin esto queda un objeto vacío en la lista.
-                if (id) void invoke("discard_account", { provider: agente(), id }).then(refrescar);
+                if (id) void invoke("discard_account", { provider: agente(), id }, machineOf(id)).then(refrescar);
               }}
             >
               {t("settings.accounts.cancel")}
@@ -1437,13 +1495,15 @@ export default function Accounts(props: {
               <Button size="sm" onClick={() => void conectar(f().id)}>
                 {t("settings.accounts.retry")}
               </Button>
-              <Button
-                variant="outline"
-                size="compact"
-                onClick={() => void conectar(f().id, "terminal")}
-              >
-                {t("settings.accounts.open_terminal")}
-              </Button>
+              <Show when={terminalLocal(f().id)}>
+                <Button
+                  variant="outline"
+                  size="compact"
+                  onClick={() => void conectar(f().id, "terminal")}
+                >
+                  {t("settings.accounts.open_terminal")}
+                </Button>
+              </Show>
             </div>
           </div>
           </SettingsBlock>
@@ -1517,275 +1577,13 @@ function Paso(props: { numero: number; titulo: string; children: JSX.Element }) 
  * columna que dice por qué hace falta consentimiento). Con el id escrito
  * dentro, este bloque solo serviría a una fila.
  */
-/** Preparación del único runtime que Terminus instala y de sus modelos. */
+/** El runtime que Terminus instala, el catálogo de modelos y cuál usan las tareas. */
 function MotoresLocales() {
-  return <ModelosLocales onReady={() => {}} />;
-}
-
-type ModeloLocal = { id: string; label: string; quant: string; bytes: number; state: "missing" | "partial" | "installed" | "blocked"; on_disk: number; path?: string; verified?: boolean; serving: boolean };
-type ProgresoModelo = { id: string; kind: string; on_disk: number; bytes: number; failure?: Failure };
-
-
-/** Pesos que Terminus posee: se descargan y se retiran aquí, nunca mediante el
- * runtime de otra aplicación. Un `.partial` no se ofrece como modelo. */
-function ModelosLocales(props: { onReady: () => void }) {
-  const [runtime, setRuntime] = createSignal<{ label: string; path?: string; remedy?: string; source?: string } | null>(null);
-  const [modelos, setModelos] = createSignal<ModeloLocal[]>([]);
-  const [progreso, setProgreso] = createSignal<Record<string, ProgresoModelo>>({});
-  const [quitando, setQuitando] = createSignal<string | null>(null);
-  const [cargando, setCargando] = createSignal<string | null>(null);
-  const [error, setError] = createSignal<string | null>(null);
-  const [instalandoMotor, setInstalandoMotor] = createSignal(false);
-  const cargar = () => invoke<ModeloLocal[]>("list_local_models").then(setModelos).catch(() => setModelos([]));
-  /**
-   * Lo que ya estaba pasando cuando esta pantalla se montó. El evento
-   * `local-model` solo llega a quien está escuchando en ese instante: sin
-   * esto, una descarga viva de 1,2 GB volvería a mostrar «Reanudar · 0,4 GB
-   * de 1,28 GB» y, al pulsarla, «ya hay una descarga en curso». El backend
-   * guarda el último aviso de cada una (`local_model::AVANCE`) y aquí se pide
-   * al montar: la barra sigue desde donde iba.
-   */
-  const sembrar = () => invoke<ProgresoModelo[]>("local_downloads")
-    .then((v) => setProgreso(Object.fromEntries(v.map((p) => [p.id, p]))))
-    .catch(() => {});
-  onMount(() => {
-    void invoke<{ label: string; path?: string; remedy?: string; source?: string }>("local_runtime").then(setRuntime).catch(() => setRuntime(null));
-    void cargar();
-    void sembrar();
-    const desuscribir = listen<ProgresoModelo>("local-model", (e) => {
-      setProgreso((prev) => ({ ...prev, [e.payload.id]: e.payload }));
-      if (["done", "cancelled", "error"].includes(e.payload.kind)) void cargar();
-    });
-    onCleanup(() => void desuscribir.then((f) => f()));
-  });
-
-  /**
-   * Deja el modelo cargado en memoria ya, sin esperar al primer mensaje. No
-   * hace falta para usarlo —el turno levanta lo que necesite por su cuenta—:
-   * adelanta la espera a cuando estás mirando la pantalla, en vez de a
-   * cuando mandas un mensaje. Son gigabytes subiendo del disco: la fila lo
-   * dice mientras dura, un botón que no cambia se lee como uno que no
-   * hizo nada.
-   */
-  const cargarEnMemoria = (id: string) => {
-    setError(null);
-    setCargando(id);
-    void invoke("start_local_model", { id })
-      .then(() => { props.onReady(); return cargar(); })
-      .catch((e) => setError(prosaDe(e)))
-      .finally(() => setCargando(null));
-  };
-
-  /** Son once megas en el hilo del comando: el botón dice que sigue, y lo que
-   * falle se ve aquí en vez de volver a «Instalar» como si nada. */
-  const instalarMotor = () => {
-    setError(null);
-    setInstalandoMotor(true);
-    void invoke("install_local_runtime")
-      .then(() => invoke<{ label: string; path?: string; remedy?: string; source?: string }>("local_runtime").then(setRuntime))
-      .catch((e) => setError(prosaDe(e)))
-      .finally(() => setInstalandoMotor(false));
-  };
-  const quitarMotor = (label: string) => {
-    setError(null);
-    void invoke("remove_local_runtime")
-      .then(() => setRuntime({ label, source: "missing" }))
-      .catch((e) => setError(prosaDe(e)));
-  };
-
+  const m = crearModelosLocales();
   return (
-    <>
-      <Show when={runtime()}>
-        {(r) => (
-          <SettingsRow
-            label={t("settings.accounts.local.runtime")}
-            description={
-              r().path
-                ? t("settings.accounts.local.runtime_installed", { label: r().label })
-                : t("settings.accounts.local.runtime_missing", { label: r().label })
-            }
-          >
-            <Show
-              when={r().path}
-              fallback={
-                <Button size="sm" disabled={instalandoMotor()} onClick={instalarMotor}>
-                  {instalandoMotor()
-                    ? t("settings.accounts.local.installing")
-                    : t("settings.accounts.local.install")}
-                </Button>
-              }
-            >
-              <Badge tone="success">
-                {r().source === "system"
-                  ? t("settings.accounts.local.from_system")
-                  : t("settings.accounts.local.from_terminus")}
-              </Badge>
-              <Show when={r().source === "managed"}>
-                <Button
-                  variant="outline"
-                  size="compact"
-                  onClick={() => quitarMotor(r().label)}
-                >
-                  {t("settings.accounts.local.remove")}
-                </Button>
-              </Show>
-            </Show>
-          </SettingsRow>
-        )}
-      </Show>
-    {/* Apagar es del motor, no de un modelo. Solo aparece cuando hay algo
-        cargado: un botón para apagar lo que no está encendido es ruido. Libera
-        los gigabytes de todos los modelos que tenga dentro: se dice cuántos
-        son. */}
-      <Show when={modelos().filter((m) => m.serving)}>
-        {(dentro) => (
-          <Show when={dentro().length > 0}>
-            <SettingsRow label={t("settings.accounts.local.in_memory", { count: dentro().length })}>
-              <Button
-                variant="outline"
-                size="compact"
-                onClick={() => void invoke("stop_local_model").then(cargar)}
-              >
-                {t("settings.accounts.local.stop_engine")}
-              </Button>
-            </SettingsRow>
-          </Show>
-        )}
-      </Show>
-      <Show when={error()}>
-        {(message) => (
-          <SettingsBlock>
-            <p class="m-0 text-xs text-error-strong">{message()}</p>
-          </SettingsBlock>
-        )}
-      </Show>
-      <For each={modelos()}>
-        {(m, i) => {
-      const p = () => progreso()[m.id];
-      const bajando = () => p()?.kind === "progress";
-      const comprobando = () => p()?.kind === "verifying";
-      const activo = () => bajando() || comprobando();
-      /**
-       * Qué está pasando con estos pesos, en una línea debajo del nombre.
-       *
-       * Sin ella, mientras bajan 2,7 GB la fila enseña el tamaño y un botón
-       * «Cancelar»: ni cuánto lleva, ni si sigue viva.
-       */
-      const estado = () => {
-        if (comprobando()) return t("settings.accounts.local.verifying");
-        if (bajando()) return t("settings.accounts.local.downloading", { done: peso(p()!.on_disk), total: peso(m.bytes) });
-        if (m.serving) return t("settings.accounts.local.serving");
-        if (cargando() === m.id) return t("settings.accounts.local.loading");
-        return null;
-      };
-          return (
-            <SettingsRow
-              label={
-                <>
-                  {m.label}
-                  {i() === 0
-                    ? t("settings.accounts.local.recommended")
-                    : t("settings.accounts.local.lightest")}
-                </>
-              }
-              description={
-                <>
-                  {m.quant} · {peso(m.bytes)}
-                  <Show when={estado()}>{(e) => <> · {e()}</>}</Show>
-          {/* Una barra determinada y no un giro: lo que hace tolerable una
-              espera de gigabytes es saber cuánto falta, no que algo se mueva. */}
-                <Show when={activo()}>
-                  <ProgressBar
-                    class="mt-1"
-                    value={comprobando() ? m.bytes : (p()?.on_disk ?? 0)}
-                    max={m.bytes}
-                    label={t("settings.accounts.local.download_of", { label: m.label })}
-                  />
-                </Show>
-                </>
-              }
-            >
-              <Show
-                when={m.state === "blocked"}
-                fallback={
-                  <Show
-                    when={m.state === "installed"}
-                    fallback={
-                      <Show
-                        when={activo()}
-                        fallback={
-                          <Button
-                            size="sm"
-                            onClick={() => void invoke("install_local_model", { id: m.id })}
-                          >
-                            {m.state === "partial"
-                              ? t("settings.accounts.local.resume", {
-                                  done: peso(m.on_disk),
-                                  total: peso(m.bytes),
-                                })
-                              : t("settings.accounts.local.download")}
-                          </Button>
-                        }
-                      >
-                        <Button
-                          variant="outline"
-                          size="compact"
-                          onClick={() => void invoke("cancel_local_model")}
-                        >
-                          {t("settings.accounts.local.cancel")}
-                        </Button>
-                      </Show>
-                    }
-                  >
-                    <div class="flex shrink-0 items-center gap-2">
-            {/* Un modelo cargado no ofrece nada: el motor es uno solo y puede
-                tener varios modelos dentro a la vez, y un «Detener» por fila
-                apagaría también el que estuviera usando la tarea de al lado.
-                Apagar es del motor, y su botón está arriba. */}
-                      <Show when={!m.serving}>
-                        <Button
-                          size="sm"
-                          disabled={cargando() !== null}
-                          onClick={() => cargarEnMemoria(m.id)}
-                        >
-                          {cargando() === m.id
-                            ? t("settings.accounts.local.loading")
-                            : t("settings.accounts.local.load")}
-                        </Button>
-                      </Show>
-                      <Button
-                        variant="outline"
-                        size="compact"
-                        disabled={quitando() === m.id}
-                        onClick={() => {
-                          void confirm(
-                            t("settings.accounts.local.remove_confirm", {
-                              label: m.label,
-                              size: peso(m.bytes),
-                            }),
-                            { kind: "warning" },
-                          ).then((si) => {
-                            if (!si) return;
-                            setQuitando(m.id);
-                            void invoke("remove_local_model", { id: m.id })
-                              .then(cargar)
-                              .finally(() => setQuitando(null));
-                          });
-                        }}
-                      >
-                        {t("settings.accounts.local.remove")}
-                      </Button>
-                    </div>
-                  </Show>
-                }
-              >
-                <Badge>{t("settings.accounts.local.blocked")}</Badge>
-              </Show>
-            </SettingsRow>
-          );
-        }}
-      </For>
-    </>
+    <SettingsBlock>
+      <ListaDeModelosLocales m={m} memoria />
+    </SettingsBlock>
   );
 }
 
@@ -2056,6 +1854,8 @@ function CuentaConfigurada(props: {
   active: boolean;
   status?: AccountStatus;
   checkingStatus?: boolean;
+  /** Autenticada, pero la última consulta de estado falló. */
+  statusUnknown?: boolean;
   onRecheckStatus?: () => void | Promise<unknown>;
   supportsLimits: boolean;
   order: number;
@@ -2072,7 +1872,7 @@ function CuentaConfigurada(props: {
    * colocaría una sola vez y no se recalcularía cuando la fila descubra
    * el 401.
    */
-  actions: (info: { revocada: boolean }) => JSX.Element;
+  actions: (info: { revocada: boolean; sinComprobar: boolean }) => JSX.Element;
   destructiveAction: JSX.Element;
 }) {
   const lectura = createAccountLimit({
@@ -2099,12 +1899,17 @@ function CuentaConfigurada(props: {
     },
   });
 
+  // Si el proveedor sí contestó con límites, la cuenta funciona aunque el CLI
+  // local no haya respondido a tiempo.
+  const sinComprobar = () => !!props.statusUnknown && lectura.limits?.mode !== "read";
+
   return (
     <AccountCard
       account={props.account}
       active={props.active}
       status={props.status}
       checkingStatus={props.checkingStatus}
+      statusUnknown={sinComprobar()}
       onRecheckStatus={props.onRecheckStatus}
       noLimitsLabel={props.agent === "opencode-zen" ? t("settings.accounts.go_key_required") : undefined}
       limits={lectura.limits}
@@ -2112,7 +1917,7 @@ function CuentaConfigurada(props: {
       loadingLimits={lectura.loading}
       refreshingLimits={lectura.refreshing}
       onRefreshLimits={props.supportsLimits ? lectura.refresh : undefined}
-      actions={props.actions({ revocada: revocada(lectura.limits) })}
+      actions={props.actions({ revocada: revocada(lectura.limits), sinComprobar: sinComprobar() })}
       destructiveAction={props.destructiveAction}
       variant="row"
     />

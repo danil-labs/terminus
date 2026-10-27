@@ -1,22 +1,27 @@
+import { AgentAvatar } from "../ui/AgentAvatar";
 import { dockStatusText, orderDockAgents } from "@terminus/tasks";
 import { router } from "expo-router";
+import { useState } from "react";
 import { Pressable, ScrollView, Text } from "react-native";
-import { AgentAvatar } from "../ui/AgentAvatar";
-import { lang, w } from "../lib/i18n";
+import { lang, t, w } from "../lib/i18n";
 import { useWorkspaces } from "../lib/workspaces";
 import { Row, SheetTitle } from "../ui/components";
+import { matches, NoMatch, SearchField } from "../ui/Search";
 import { useTheme } from "../ui/theme";
 
 /** «Ver todos» del dock: cada agente con su estado, su chat y sus tareas. */
 export default function Agents() {
   const theme = useTheme();
   const { current, snapshot, space, view, setView } = useWorkspaces();
+  const [query, setQuery] = useState("");
   const agents = orderDockAgents(
     (snapshot?.agents ?? []).filter((a) => !space || a.places.some((p) => space.folders.includes(`${p.host}/${p.folder}`))),
-  );
+  ).filter((a) => matches(query, a.name));
   return (
-    <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ paddingVertical: 8 }}>
+    <ScrollView contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingVertical: 8 }}>
       <SheetTitle>{w("shell.agent_dock.title")}</SheetTitle>
+      <SearchField testID="agents-search" value={query} onChange={setQuery} placeholder={t("search.agents")} />
+      {query.trim() && !agents.length ? <NoMatch /> : null}
       {agents.map((agent) => (
         <Row
           key={agent.name}

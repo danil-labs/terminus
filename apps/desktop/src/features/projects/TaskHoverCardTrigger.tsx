@@ -18,12 +18,15 @@ export function WithTaskHoverCard(props: TaskHoverCardProps & {
   children: JSX.Element;
   class?: string;
   disabled?: boolean;
+  placement?: "left-start" | "right-start";
 }) {
   let fila: HTMLDivElement | undefined;
   let tarjeta: HTMLDivElement | undefined;
   let abrir: ReturnType<typeof setTimeout> | undefined;
   let cerrar: ReturnType<typeof setTimeout> | undefined;
   let descrito: Element | null = null;
+  /** Qué apertura sigue en pie: la que encuentra otro número al bajar su cuerpo ya no abre. */
+  let vigente = 0;
   const id = createUniqueId();
   const [open, setOpen] = createSignal(false);
 
@@ -35,17 +38,26 @@ export function WithTaskHoverCard(props: TaskHoverCardProps & {
   const ocultar = () => {
     clearTimeout(abrir);
     clearTimeout(cerrar);
+    vigente++;
     describir(null);
     setOpen(false);
   };
+  // El cuerpo baja durante la pausa y la tarjeta solo se abre con él listo: un
+  // trozo que no llega (una pestaña de antes de un deploy, la red caída) no pinta
+  // una caja vacía, y la próxima pasada lo vuelve a pedir.
   const programar = (destino: Element | null) => {
     if (props.disabled) return;
     clearTimeout(cerrar);
     if (open()) return;
     clearTimeout(abrir);
+    const turno = ++vigente;
+    const cuerpo = TaskHoverCard.preload();
     abrir = setTimeout(() => {
-      describir(destino);
-      setOpen(true);
+      cuerpo.then(() => {
+        if (turno !== vigente) return;
+        describir(destino);
+        setOpen(true);
+      }, () => {});
     }, TASK_HOVER_CARD_DELAY);
   };
   const soltar = () => {
@@ -85,7 +97,7 @@ export function WithTaskHoverCard(props: TaskHoverCardProps & {
         open={open()}
         onOpenChange={(next) => { if (!next) ocultar(); }}
         anchorRef={() => fila}
-        placement="right-start"
+        placement={props.placement ?? "right-start"}
         gutter={8}
       >
         <PopoverContent

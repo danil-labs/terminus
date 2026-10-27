@@ -13,6 +13,28 @@ export function avisarDeLosArboles(session: string) {
   );
 }
 
+/** Rutas que el árbol listaba y ya no lista: la pestaña de cada una mira si se borró. */
+export const IDOS = "harness:archivos-idos";
+
+export type DetalleDeIdos = { session: string; arbol: string; rutas: string[] };
+
+export function avisarDeIdos(session: string, arbol: string, rutas: string[]) {
+  window.dispatchEvent(new CustomEvent<DetalleDeIdos>(IDOS, { detail: { session, arbol, rutas } }));
+}
+
+/** Lo que estaba en `antes` y no está en `ahora`. Solo vale entre dos listados enteros. */
+export function idos(antes: readonly string[], ahora: readonly string[]): string[] {
+  if (antes.length === 0) return [];
+  const siguen = new Set(ahora);
+  return antes.filter((ruta) => !siguen.has(ruta));
+}
+
+/** El fallo con que el motor dice que el archivo ya no está en el disco (`development::tree_show`). */
+export function esBorrado(e: unknown): boolean {
+  const what = e && typeof e === "object" && "what" in e ? (e as { what: unknown }).what : null;
+  return Boolean(what && typeof what === "object" && (what as { clave?: unknown }).clave === "development.error.open_gone");
+}
+
 /**
  * Qué hace un refresco con lo que hay escrito sin guardar.
  *

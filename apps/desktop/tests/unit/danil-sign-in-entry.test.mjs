@@ -1,7 +1,6 @@
 /**
  * Las entradas a la cuenta de Danil fuera de Configuración, contra un motor
- * simulado: la sección de «Personaliza» en el primer arranque y el pie de la barra
- * lateral. Monta `dist/`.
+ * simulado: el pie de la barra lateral, y que «Personaliza» ya no la ofrece. Monta `dist/`.
  */
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -92,61 +91,29 @@ async function personalize(name, table) {
   return app;
 }
 
-const step = (w) => w.document.querySelector("[data-danil-onboarding]");
-
-test("«Personaliza» ofrece iniciar sesión con Danil por el navegador, y se puede empezar sin ella", async () => {
+test("«Personaliza» no ofrece Danil: queda en Configuración, y «Empezar» entra directo a la app", async () => {
   const engine = danil({ state: "disconnected", name: "alberto-mbp" });
   const { w, fallos } = await personalize("danil-onboarding", engine.table);
   assert.equal(heading(w), "Personaliza Terminus.", w.document.body.textContent.slice(0, 600));
-  assert.equal(step(w)?.dataset.danilOnboarding, "disconnected");
-  assert.ok(step(w).textContent.includes("Inicia sesión con Danil."));
-  assert.ok(!w.document.body.textContent.includes("Continuar como"), "one-click sign-in stays off");
-  assert.ok(!engine.calls.some((c) => c.command === "danil_connect_options"));
-
-  button(w, "Iniciar sesión con Danil").click();
-  await sleep(300);
-  assert.equal(engine.calls.find((c) => c.command === "open_external")?.args?.target, PENDING.verification_uri_complete);
-  assert.equal(step(w)?.dataset.danilOnboarding, "pending");
-  assert.ok(step(w).textContent.includes("Confirma en el navegador · código WDJB-MJHT"), step(w).textContent);
-  assert.ok(button(w, "Abrir de nuevo", step(w)) && button(w, "Cancelar", step(w)));
+  assert.equal(w.document.querySelector("[data-danil-onboarding]"), null);
+  assert.ok(!button(w, "Iniciar sesión con Danil"));
 
   button(w, "Empezar").click();
   await sleep(300);
-  assert.ok(!w.document.body.textContent.includes("Personaliza Terminus."), "starting does not wait for Danil");
+  assert.ok(!w.document.body.textContent.includes("Personaliza Terminus."), "starting enters the app");
+  assert.ok(!engine.calls.some((c) => c.command === "danil_connect_start"));
   assert.deepEqual(fallos, []);
 });
 
-test("la sección de Danil se va sola cuando la persona confirma en el navegador", async () => {
-  const engine = danil({ state: "disconnected", name: "alberto-mbp" });
-  const app = await personalize("danil-onboarding-approved", engine.table);
-  button(app.w, "Iniciar sesión con Danil").click();
-  await sleep(300);
-  app.emit("danil-connect", { state: "connected", computer_id: "cmp_1", name: "alberto-mbp", email: "alberto@danil.ai", online: true });
-  await sleep(300);
-  assert.equal(step(app.w), null);
-  assert.equal(heading(app.w), "Personaliza Terminus.");
-});
-
-test("«Personaliza» no ofrece Danil con la sesión ya iniciada ni con un motor sin el flujo", async () => {
-  const connected = danil({ state: "connected", computer_id: "cmp_1", name: "Mac", email: "alberto@danil.ai", online: true });
-  const a = await personalize("danil-onboarding-connected", connected.table);
-  assert.equal(heading(a.w), "Personaliza Terminus.");
-  assert.equal(step(a.w), null);
-
-  const b = await personalize("danil-onboarding-old-engine", { danil_connect_status: unknown() });
-  assert.equal(heading(b.w), "Personaliza Terminus.");
-  assert.equal(step(b.w), null);
-});
-
-test("el pie de la barra lateral dice si hay sesión de Danil y abre su sección", async () => {
+test("el pie de la barra lateral solo aparece con sesión de Danil y abre su sección", async () => {
   const engine = danil({ state: "disconnected", name: "alberto-mbp" });
   const app = await boot("listo", "danil-footer", { ...WITH_SPACE, ...engine.table });
   const { w } = app;
   await sleep(800);
   const foot = () => w.document.querySelector("[data-danil-foot]");
-  assert.equal(foot()?.dataset.danilFoot, "disconnected", w.document.body.innerHTML.slice(0, 400));
-  assert.equal(foot().textContent.trim(), "Iniciar sesión");
-  assert.equal(foot().getAttribute("title"), "Iniciar sesión con Danil");
+  assert.equal(foot(), null, "without a session there is nothing: signing in is in Settings");
+  assert.ok(!w.document.body.textContent.includes("Iniciar sesión"), "no sign-in button in the sidebar");
+  assert.ok(w.document.querySelector('[aria-label="Configuración"]'), "the footer's other items stay");
 
   engine.become(app, { state: "connected", computer_id: "cmp_1", name: "Mac", email: "alberto@danil.ai", online: true });
   await sleep(300);
@@ -162,6 +129,10 @@ test("el pie de la barra lateral dice si hay sesión de Danil y abre su sección
   foot().click();
   await sleep(800);
   assert.equal(w.document.querySelector("[data-danil-account]")?.dataset.danilAccount, "connected", "the click opens Settings at the section");
+
+  engine.become(app, { state: "disconnected", name: "alberto-mbp" });
+  await sleep(300);
+  assert.equal(foot(), null, "signing out takes it away");
 });
 
 test("sin el flujo en el motor el pie no muestra la entrada", async () => {

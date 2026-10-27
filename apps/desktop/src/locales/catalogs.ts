@@ -21,8 +21,8 @@
 import { registrarCatalogo, type Manifiesto } from "../lib/i18n.ts";
 
 // `web.json` solo lo lleva la entrada del navegador (`src/web/phrases.ts`);
-// `danil.json`, los trozos perezosos de la cuenta de Danil (`danilPhrases.ts`).
-const EMPOTRADOS = import.meta.glob(["./*/*.json", "!./*/web.json", "!./*/danil.json"], {
+// `danil.json` y `work.json`, los trozos perezosos que los enseñan (`danilPhrases.ts`, `workPhrases.ts`).
+const EMPOTRADOS = import.meta.glob(["./*/*.json", "!./*/web.json", "!./*/danil.json", "!./*/work.json"], {
   eager: true,
   import: "default",
 }) as Record<string, Record<string, unknown>>;

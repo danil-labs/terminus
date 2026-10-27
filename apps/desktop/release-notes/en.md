@@ -1,8 +1,6 @@
-Terminus 0.2.84 syncs all your workspaces with your Danil account and lets you pick the machine each task runs on.
+Terminus 0.2.87 fixes updating on Linux and brings several fixes across machines.
 
-- **Your workspaces on all your machines.** While you are signed in to Danil, every workspace on this computer shows up on the web, on your phone and on your other machines, including the ones you create later. Signing out stops the sync. You no longer link each workspace by hand.
-- **"Run on" decides where the task runs.** Pick your VM and the task starts there: the workspace is the same on all your machines, and the project is cloned on the VM the first time it is needed.
-- **Clone and create folders on another machine** from the web, the desktop and your phone, with progress and a cancel option.
-- **New first launch.** Connect your AI and personalize Terminus from the start, with a clearer setup.
-- **Formulas in chat.** LaTeX formulas render with KaTeX.
-- **Fixes.** The chat background no longer gets erased or carried over to another workspace, you can see why another account can't be added, and on Windows you can remove an Antigravity account again.
+- **Updating on Linux.** If your Terminus folder came from an earlier version with group permissions (umask 002, the Ubuntu default), the new engine no longer refuses to start with "authority_incompatible": it removes that permission from its own folders and carries on, without touching your data. With that umask, a fresh install starts too.
+- **Tasks on another machine.** The file tree of a task running on another machine is read on that machine, and an image you attach on the Mac reaches the task's machine.
+- **Phone.** What an agent or another task writes to you shows on the left, with its name, and the message you send to a powered-off VM stays visible while it starts.
+- **Typst.** The live preview opens without choosing the main file first.

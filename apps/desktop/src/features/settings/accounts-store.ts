@@ -12,6 +12,7 @@ import { legible, type Query, type Read } from "../../lib/limits";
 import { t } from "../../lib/i18n";
 import type { Failure } from "../../ui/Failure";
 import { detalleDe } from "../../ui/Failure";
+import { machineOf } from "../machines/store";
 
 export type Account = {
   id: string;
@@ -86,6 +87,8 @@ export type AccountStatus = {
    * disco y no del llavero.
    */
   unreadable?: Failure;
+  /** La sesión quedó guardada pero el proveedor todavía no le dio de alta el servicio a la cuenta; `url` es la página que lo completa. */
+  signup?: { url: string | null };
 };
 
 /**
@@ -187,7 +190,7 @@ export function createAccountLimit(props: {
         provider: props.agent,
         id: props.id,
         force,
-      });
+      }, machineOf(props.id));
       setEstado(r);
       const buena = legible(r);
       if (buena) setUltimo(buena);
