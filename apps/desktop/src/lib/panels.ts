@@ -291,7 +291,7 @@ export function createPanels(restorable?: () => readonly string[]) {
     },
     activate(id: string) {
       const site = siteOf(id);
-      if (!site) return;
+      if (!site || (sameSite(site, activeSite()) && groupAt(site)?.activa === id)) return;
       batch(() => {
         updateGroup(site, (g) => ({ ...g, activa: id }));
         setActiveSite(site);

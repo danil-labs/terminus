@@ -1720,6 +1720,7 @@ if (!roto) {
   for (const modifier of ["metaKey", "ctrlKey", "native"]) {
     row("p").click();
     await sleep(100);
+    keepActiveView(sidebar);
     assert.equal(tab("p").getAttribute("aria-selected"), "true");
     const beforeClose = sidebar.comandos.length;
     if (modifier === "native") sidebar.emit("close-tab", null);

@@ -908,3 +908,24 @@ test("conservar un editor temporal conserva su tarea aunque ya se sustituyó su 
   assert.ok(t.isPinned(renamed));
   assert.equal(t.isPinned(a.id), false);
 });
+
+test("conservar una tarea provisional se propaga al id definitivo", () => {
+  const t = createTabs({ transient: true });
+  t.load("temporal-draft-id");
+  const draft = idProvisional();
+  t.ensure(tarea(draft));
+  t.pin(draft);
+  assert.deepEqual(t.restorable(), []);
+  t.commitDraft(draft, tarea("real"));
+  assert.equal(t.isPinned(draft), false);
+  assert.deepEqual(t.restorable(), ["real"]);
+});
+
+test("reabrir una vista cerrada a mano la conserva", () => {
+  const t = createTabs({ transient: true });
+  t.load("temporal-reopen");
+  t.ensure(tarea("s1"));
+  t.closeMany(["s1"], { remember: true });
+  t.reopen(() => true);
+  assert.deepEqual(t.restorable(), ["s1"]);
+});
