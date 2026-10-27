@@ -77,7 +77,7 @@ function siteIn(cols: PanelGroup[][], s: unknown): PanelSite | null {
 export const sameSite = (a: PanelSite | null, b: PanelSite | null) =>
   a !== null && b !== null && a.col === b.col && a.fila === b.fila;
 
-export function createPanels() {
+export function createPanels(restorable?: () => readonly string[]) {
   const [columns, setColumns] = createSignal<PanelGroup[][]>([[emptyGroup()]]);
   const [widths, setWidths] = createSignal<number[]>([1]);
   const [heights, setHeights] = createSignal<number[]>([1]);
@@ -93,7 +93,17 @@ export function createPanels() {
   });
 
   function persist() {
-    if (bound) saveLayout(bound.workspace, bound.space, layout());
+    if (!bound) return;
+    const current = layout();
+    if (!restorable) return saveLayout(bound.workspace, bound.space, current);
+    const alive = new Set(restorable());
+    saveLayout(bound.workspace, bound.space, {
+      ...current,
+      columnas: current.columnas.map((c) => c.map((g) => {
+        const tabs = g.pestanas.filter((id) => alive.has(id));
+        return { pestanas: tabs, activa: g.activa && alive.has(g.activa) ? g.activa : tabs.at(-1) ?? null };
+      })),
+    });
   }
 
   function oneWindow() {
@@ -205,7 +215,6 @@ export function createPanels() {
   function canSplitAt(id: string, reference: PanelSite, side: Side): boolean {
     const from = siteOf(id);
     if (!from || !groupAt(reference)) return false;
-    if ((groupAt(from)?.pestanas.length ?? 0) <= 1) return false;
     if (side === "left" || side === "right")
       return columns().length < MAX_COLUMNS;
     return columns()[reference.col].length < MAX_ROWS;
@@ -214,8 +223,11 @@ export function createPanels() {
   function splitAt(id: string, reference: PanelSite, side: Side): boolean {
     if (!canSplitAt(id, reference, side)) return false;
     batch(() => {
-      // La ventana de origen conserva pestañas; reference sigue siendo válido tras sacar.
-      removeTab(id);
+      // La celda de origen queda disponible para abrir otra vista.
+      updateGroup(siteOf(id)!, (g) => {
+        const tabs = g.pestanas.filter((x) => x !== id);
+        return { pestanas: tabs, activa: g.activa === id ? tabs.at(-1) ?? null : g.activa };
+      });
       let target: PanelSite;
       if (side === "left" || side === "right") {
         const at = reference.col + (side === "right" ? 1 : 0);
@@ -391,8 +403,7 @@ export function createPanels() {
     split(id: string): boolean {
       const from = siteOf(id);
       if (!from) return false;
-      if ((groupAt(from)?.pestanas.length ?? 0) <= 1) return false;
-      const position = vacancy();
+        const position = vacancy();
       if (!position) return false;
       batch(() => {
         if (position.col >= columns().length) {
@@ -411,7 +422,10 @@ export function createPanels() {
           // Solo la primera fila nueva debe dividir el alto; las siguientes comparten esa pista.
           setHeights((ts) => (ts.length === 1 ? [0.5, 0.5] : ts));
         }
-        removeTab(id);
+        updateGroup(from, (g) => {
+          const tabs = g.pestanas.filter((x) => x !== id);
+          return { pestanas: tabs, activa: g.activa === id ? tabs.at(-1) ?? null : g.activa };
+        });
         updateGroup(position, () => ({ pestanas: [id], activa: id }));
         setActiveSite(position);
       });
@@ -457,6 +471,7 @@ export function createPanels() {
       );
       persist();
     },
+    persist,
     layout,
     // Un reparto guardado puede apuntar a pestañas borradas o contener tamaños inválidos.
     restore(layout: Layout | null, live: readonly string[]) {

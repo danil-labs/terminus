@@ -395,7 +395,7 @@ export default function App() {
   // activa la guarda el módulo (`activarPestana`) y no `sessionId`: una
   // tarea, uno de sus archivos y uno de sus artefactos pueden estar
   // abiertos a la vez y los tres dirían "activo" si se derivara de ahí.
-  const pestanas = createTabs();
+  const pestanas = createTabs({ transient: true });
   const pestanaActiva = () => (proyectoAbierto() ? null : pestanas.active());
   // Los escritorios del workspace (`lib/spaces.ts`). Sin lista —un servicio
   // que no los conoce— la ventana se pinta como antes de los espacios.
@@ -453,7 +453,7 @@ export default function App() {
   // esto no existiera. La tira gobierna el panel principal y nada más:
   // lo separado no está en la tira, y no hay que preguntarse en cuál de
   // los dos panes cae lo que se pulsa.
-  const paneles = createPanels();
+  const paneles = createPanels(pestanas.restorable);
   // Cuánto de la cabecera ocupan de verdad los controles de cada
   // plataforma, sin poder expresarse con un padding fijo: el semáforo
   // está a la izquierda en macOS, los controles a la derecha en Windows,
@@ -608,8 +608,16 @@ export default function App() {
   createEffect(
     on(
       () => [pestanas.open().map((p) => p.id), pestanas.active()] as const,
-      ([ids, activa]) => {
-        paneles.sync(ids);
+      ([ids, activa], previous) => {
+        batch(() => {
+          paneles.sync(ids);
+          if (activa) paneles.activate(activa);
+          const site = activa ? paneles.siteOf(activa) : null;
+          if (activa && site && !pestanas.isPinned(activa) && activa !== previous?.[1]) {
+            pestanas.replacePreviews([paneles.tabsAt(site)], [activa]);
+          }
+          paneles.sync(pestanas.open().map((p) => p.id));
+        });
         // Y la activa se pone delante: abrir una conversación desde el
         // historial no pasa por `activarPestana`, llama a `abrirSesion`
         // directo. Sin esto la pestaña entra detrás de la que ya estaba
@@ -618,6 +626,7 @@ export default function App() {
       },
     ),
   );
+  createEffect(on(pestanas.pinned, () => paneles.persist()));
   /** El panel conserva workspace y conversación; el título pertenece a la tira. */
   const tareasEnVentanas = createMemo<(Pick<TaskTab, "id" | "session" | "project"> & { workspace: string | null })[]>((previous) =>
     conservar(previous ?? [], pestanas.open().filter(isTaskTab).map(({ id, session, project }) =>
@@ -3885,7 +3894,7 @@ export default function App() {
   // archivo que se acaba de pulsar. Juntas: entre una y otra la pestaña nueva
   // queda detrás de la que estaba, y `montadas` la desmontaría.
     batch(() => {
-      pestanas.ensure({ id, project: proyecto, titulo: filaDe(id)?.title ?? "" });
+      if (activar === id) pestanas.ensure({ id, project: proyecto, titulo: filaDe(id)?.title ?? "" });
       pestanas.activate(activar);
     });
     if (id === sessionId() && proyecto === project()) {
@@ -4326,12 +4335,7 @@ export default function App() {
     if (p) void activarPestana(p);
   }
 
-  /**
-   * Parte la ventana activa: su pestaña de delante se va a una ventana
-   * nueva. No parte si esa ventana se quedaría vacía: mover su única
-   * pestaña cerraría la de origen, el mismo resultado en otro sitio. Es
-   * lo que apaga el botón (`lib/panels.ts`).
-   */
+  // Separar conserva la vista y deja disponible su celda de origen.
   function partirLaActiva() {
     partirVentana(paneles.activeSite());
   }
@@ -4345,17 +4349,11 @@ export default function App() {
   function partirVentana(sitio: SitioDePanel) {
     const id = paneles.activeTabAt(sitio);
     if (!id) return;
-    paneles.split(id);
+    if (paneles.split(id)) pestanas.pin(id);
   }
 
-  /**
-   * Si esa ventana puede partirse ahora mismo. Con una sola pestaña
-   * dentro no se parte, y el botón lo dice: la de origen se cerraría al
-   * vaciarse, el mismo resultado en otro sitio. Partir es dejar algo a
-   * la vista mientras se trabaja en otra cosa; sin otra cosa no hay gesto.
-   */
   const puedeSepararseDe = (sitio: SitioDePanel) =>
-    !paginaDeAgente() && paneles.tabsAt(sitio).length > 1 && paneles.canSplit();
+    !paginaDeAgente() && paneles.activeTabAt(sitio) !== null && paneles.canSplit();
 
   /** Recoge la ventana activa en la de al lado. Es el atajo de deshacer. */
   function juntarLaActiva() {
@@ -4435,6 +4433,7 @@ export default function App() {
     },
     drop(id, destino) {
       if (destino.zone && destino.zone !== "center" && paneles.splitAt(id, destino.sitio, destino.zone)) {
+        pestanas.pin(id);
         const p = pestanas.open().find(tab => tab.id === id);
         if (p) void activarPestana(p);
         return;
@@ -4493,7 +4492,9 @@ export default function App() {
    * arrastrar un archivo con cambios sin guardar.
    */
   function soltarPestana(id: string, a: SitioDePanel, indice?: number) {
-    if (!paneles.move(id, a, indice)) return;
+    if (!paneles.groupAt(a)) return;
+    pestanas.pin(id);
+    paneles.move(id, a, indice);
     const p = pestanas.open().find((x) => x.id === id);
     if (p) void activarPestana(p);
   }
@@ -5960,7 +5961,7 @@ export default function App() {
   const nombreDeSeparar = (sitio: SitioDePanel) => {
     if (paginaDeAgente()) return t("projects.split.agent_page");
     if (!paneles.canSplit()) return t("projects.split.full");
-    if (paneles.tabsAt(sitio).length <= 1)
+    if (paneles.activeTabAt(sitio) === null)
       return t("projects.split.alone");
     return t("projects.split.detach", { key: atajoDePartir(false) });
   };
@@ -6634,6 +6635,8 @@ export default function App() {
                 <TabStrip
                   session={filaDe}
                   tabs={pestanasDe(sitio)}
+                  pinnedIds={pestanas.pinned()}
+                  onPin={pestanas.pin}
                   activeId={paneles.activeTabAt(sitio)}
                   liveIds={vivas()}
                   approvingIds={permissions().map((p) => p.session)}
@@ -6684,6 +6687,8 @@ export default function App() {
                   <TabStrip
                     session={filaDe}
                     tabs={pestanasDe(sitio)}
+                  pinnedIds={pestanas.pinned()}
+                  onPin={pestanas.pin}
                     activeId={paneles.activeTabAt(sitio)}
                     liveIds={vivas()}
                     approvingIds={permissions().map((p) => p.session)}
@@ -6853,6 +6858,8 @@ export default function App() {
               <TabStrip
                 session={filaDe}
                 tabs={pestanasDe(sitio)}
+                  pinnedIds={pestanas.pinned()}
+                  onPin={pestanas.pin}
                 activeId={paneles.activeTabAt(sitio)}
                 liveIds={vivas()}
                 approvingIds={permissions().map((p) => p.session)}

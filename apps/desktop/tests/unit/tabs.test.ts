@@ -843,3 +843,68 @@ test("una tarea que aún nace no se recuerda al cerrarla", () => {
   t.closeMany(t.open().map((p) => p.id), { remember: true });
   assert.equal(t.canReopen(), false);
 });
+
+test("las vistas temporales se sustituyen sin cerrar el bloque de su tarea", () => {
+  const t = createTabs({ transient: true });
+  t.load("temporal-reemplazo");
+  t.ensure(tarea("s1"));
+  const a = archivo("s1", "a.ts");
+  t.openContent(a);
+  t.pin(a.id);
+  t.ensure(tarea("s2"));
+  t.activate("s2");
+  t.replacePreviews([["s1", a.id, "s2"]], ["s2"]);
+  assert.ok(t.open().some(p => p.id === a.id));
+  assert.ok(t.isPinned("s1"), "el documento conservado protege su tarea");
+  t.ensure(tarea("s3"));
+  t.activate("s3");
+  t.replacePreviews([["s1", a.id, "s2", "s3"]], ["s3"]);
+  assert.equal(t.open().some(p => p.id === "s2"), false);
+  assert.equal(t.open().some(p => p.id === "s3"), true);
+});
+
+test("conservar no cambia la identidad y protege ediciones sin guardar", () => {
+  const t = createTabs({ transient: true });
+  t.load("temporal-editor");
+  const a = archivo("", "a.ts");
+  t.openContent(a);
+  const same = t.open()[0];
+  t.setDirty(a.id, true);
+  assert.equal(t.isPinned(a.id), true);
+  t.openContent(archivo("", "b.ts"));
+  t.replacePreviews([t.open().map(p => p.id)], [t.active()]);
+  assert.equal(t.open()[0], same);
+  assert.ok(t.dirty().has(a.id));
+});
+
+test("solo se restauran tareas conservadas y las anteriores siguen conservadas", () => {
+  const legacy = tira("temporal-legacy");
+  legacy.ensure(tarea("anterior"));
+  const t = createTabs({ transient: true });
+  t.load("temporal-legacy");
+  assert.equal(t.isPinned("anterior"), true);
+  t.ensure(tarea("temporal"));
+  t.activate("temporal");
+  const restored = createTabs({ transient: true });
+  restored.load("temporal-legacy");
+  assert.deepEqual(restored.open().map(p => p.id), ["anterior"]);
+  t.pin("temporal");
+  restored.load("temporal-legacy");
+  assert.deepEqual(restored.open().map(p => p.id), ["anterior", "temporal"]);
+});
+
+test("conservar un editor temporal conserva su tarea aunque ya se sustituyó su vista", () => {
+  const t = createTabs({ transient: true });
+  t.load("temporal-owner");
+  t.ensure(tarea("s1"));
+  const a = archivo("s1", "a.ts");
+  t.openContent(a);
+  t.replacePreviews([["s1", a.id]], [a.id]);
+  assert.equal(t.open().some(p => p.id === "s1"), false);
+  t.setDirty(a.id, true);
+  assert.deepEqual(t.restorable(), ["s1"]);
+  assert.ok(t.isPinned(a.id));
+  const renamed = t.renameFiles("s1", "declarada", "a.ts", "b.ts")[0][1];
+  assert.ok(t.isPinned(renamed));
+  assert.equal(t.isPinned(a.id), false);
+});

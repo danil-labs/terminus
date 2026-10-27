@@ -1,3 +1,4 @@
+import GripVertical from "lucide-solid/icons/grip-vertical";
 import Globe from "lucide-solid/icons/globe";
 import Plus from "lucide-solid/icons/plus";
 import SquarePen from "lucide-solid/icons/square-pen";
@@ -43,6 +44,8 @@ const scrollBySite = new Map<string, number>();
 // Cerrar una pestaña deja su tarea y su turno vivos.
 export default function TabStrip(props: {
   tabs: Tab[];
+  pinnedIds?: ReadonlySet<string>;
+  onPin?: (id: string) => void;
   session: (id: string) => SessionRow | undefined;
   activeId: string | null;
   liveIds: string[];
@@ -248,6 +251,7 @@ export default function TabStrip(props: {
       <For each={props.tabs}>
         {(p, i) => {
           const active = () => p.id === props.activeId;
+          const transient = () => props.pinnedIds !== undefined && !props.pinnedIds.has(p.id);
           const task = () => isTaskTab(p);
           const row = () => props.session(p.session);
           const agentProfile = () => {
@@ -307,6 +311,7 @@ export default function TabStrip(props: {
               {/* Un botón dentro de role=tab queda oculto en algunos árboles de accesibilidad. */}
               <div
                 data-envoltorio={i()}
+                data-preview={transient() ? "" : undefined}
                 onPointerDown={(e) => {
                   if ((e.target as HTMLElement).closest("button")) return;
                   props.onDrag?.(p.id, e);
@@ -320,8 +325,9 @@ export default function TabStrip(props: {
                 )}
               >
                 <div
-                  role="tab"
-                  aria-selected={active()}
+                  role={transient() ? "button" : "tab"}
+                  aria-selected={transient() ? undefined : active()}
+                  onDblClick={() => props.onPin?.(p.id)}
                   tabindex={active() ? 0 : -1}
                   data-pestana={i()}
                   title={statusDecorated(
@@ -358,8 +364,12 @@ export default function TabStrip(props: {
                   class={cn(
                     "flex h-full min-w-0 flex-1 cursor-default items-center gap-1.5 rounded-[var(--radius-sm)] outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
                     task() ? "pl-2" : "pl-1.5 font-mono",
+                    transient() && "font-normal italic",
                   )}
                 >
+                  <Show when={transient()}>
+                    <GripVertical size={12} class="shrink-0 text-neutral-500" aria-label={t("projects.tabs.preview_drag")} />
+                  </Show>
                   <Show
                     when={isTaskTab(p)}
                     fallback={
@@ -487,6 +497,11 @@ export default function TabStrip(props: {
       </Show>
     </ContextMenuTrigger>
     <ContextMenuContent>
+      <Show when={selected() && props.pinnedIds && !props.pinnedIds.has(selected()!)}>
+        <ContextMenuItem onSelect={() => selected() && props.onPin?.(selected()!)}>
+          {t("projects.tabs.keep")}
+        </ContextMenuItem>
+      </Show>
       <ContextMenuItem onSelect={() => closeBatch("esta")}>
         {t("projects.tabs.close")}
       </ContextMenuItem>
