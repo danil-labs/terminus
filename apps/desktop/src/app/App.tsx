@@ -4680,11 +4680,13 @@ export default function App() {
   };
 
   function taskMaterialOptions() {
+    if (capabilities().nativeWindow && !capabilities().remoteCreate) return { headers: {} };
     const sid = sessionId();
     const row = sid ? filaDe(sid) : null;
-    if (sid && !row) return undefined;
+    const named = sid ? machines().find((m) => sid.startsWith(`${m.id}~`))?.id : null;
+    if (sid && !row && !named) return undefined;
     const chosen = sid ? undefined : runOnOptions(workspaceActivo(), projectList().find((p) => p.id === project()));
-    const machine = row?.machine ?? machines().find((m) => m.local || m.active)?.id;
+    const machine = row?.machine ?? named ?? machines().find((m) => m.local || m.active)?.id;
     return chosen ?? (machine ? { headers: { "x-terminus-machine": machine } } : undefined);
   }
 
@@ -4694,12 +4696,19 @@ export default function App() {
     target: materialTarget(),
     workspace: workspaceActivo(),
     options: taskMaterialOptions(),
-    ready: !!taskMaterialOptions() && (!sessionId() || !!filaDe(sessionId()!)),
+    ready: !sessionId() || !!taskMaterialOptions(),
+    single: (!capabilities().remoteCreate && capabilities().nativeWindow) || machines().length === 1,
+    confirmed: contextConfirmed(),
     catalog: sources(),
-  }), ({ workspace, options, ready }) => {
+  }), ({ workspace, options, ready, single, confirmed, catalog }) => {
     const request = ++taskSourcesRequest;
     setTaskSources(null);
     if (!workspace || !ready) return;
+    if (single) {
+      if (confirmed) setTaskSources(catalog);
+      return;
+    }
+    if (!options) return;
     void invoke<Source[]>("list_sources", {}, options).then((listed) => {
       if (request === taskSourcesRequest) setTaskSources(listed);
     }).catch((e) => {
@@ -4716,7 +4725,7 @@ export default function App() {
   const cambiarRama = async (fuente: Source, rama: string) => {
     if (fuente.kind !== "git" || fuente.branch === rama) return;
     const target = materialTarget();
-    if (sessionId() && !filaDe(sessionId()!)) throw { what: t("projects.context.task_unavailable") };
+    if (sessionId() && !taskMaterialOptions()) throw { what: t("projects.context.task_unavailable") };
     const machine = sessionId() ? filaDe(sessionId()!)?.machine : null;
     const options = machine ? { headers: { "x-terminus-machine": machine } } : taskMaterialOptions();
     const nueva = await invoke<{ id: string }>("add_repo_url", {
@@ -6405,7 +6414,7 @@ export default function App() {
         )}
         material={materialPendiente()}
         materialTarget={materialTarget()}
-        materialAvailable={taskSources() !== null && (!pp.sesion || !!filaDe(pp.sesion))}
+        materialAvailable={taskSources() !== null && (!pp.sesion || !!taskMaterialOptions())}
         materialOptions={pp.sesion && filaDe(pp.sesion)?.machine
           ? { headers: { "x-terminus-machine": filaDe(pp.sesion)!.machine! } }
           : taskMaterialOptions()}

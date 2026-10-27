@@ -245,3 +245,29 @@ test("only a confirmed absence of a primary source shows the empty context actio
     assert.deepEqual(app.fallos, []);
   }
 });
+
+test("an existing local task can attach material without a machine list or an extra catalog read", async () => {
+  const calls = [];
+  const app = await boot("listo", "local-context-material", {
+    ...engine,
+    launcher_state: { phase: "ready", blank_0274: false },
+    window_ready: null,
+    window_vitals: null,
+    add_folder: (args) => { calls.push(args); return { id: "local-source" }; },
+    machine_list: [],
+  });
+  await sleep(700);
+  app.w.document.querySelector('[data-sesion="t1"]').click();
+  await sleep(400);
+  app.w.document.querySelector('[aria-label="Adjuntar una fuente"]').click();
+  await sleep(100);
+  [...app.w.document.querySelectorAll("button")].find((b) => b.textContent.includes("Pegar una dirección o ruta")).click();
+  await sleep(100);
+  const input = app.w.document.querySelector('input[placeholder="https://… o /ruta/a/carpeta"]');
+  input.value = "/local-folder";
+  input.dispatchEvent(new app.w.Event("input", { bubbles: true }));
+  input.closest("form").dispatchEvent(new app.w.Event("submit", { bubbles: true, cancelable: true }));
+  await sleep(300);
+  assert.deepEqual(calls, [{ locator: "/local-folder" }]);
+  assert.deepEqual(app.fallos, []);
+});
