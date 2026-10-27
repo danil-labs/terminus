@@ -1,0 +1,187 @@
+{
+  "schema": 1,
+  "target": "x86_64-pc-windows-msvc",
+  "entries": [
+    {
+      "id": "git",
+      "version": "2.53.0",
+      "archive": "payloads/dugite-native-v2.53.0-4098283-windows-x64.tar.gz",
+      "sha256": "7b76bc5c32c0d7c5984efdc2a8a32697cf1e8a43bc55176fbf9869c0ee995130",
+      "format": "tar.gz",
+      "executable": "cmd/git.exe",
+      "url": "https://github.com/desktop/dugite-native/releases/download/v2.53.0-4/dugite-native-v2.53.0-4098283-windows-x64.tar.gz",
+      "license": "GPL-2.0-only",
+      "source": "https://github.com/desktop/dugite-native/tree/v2.53.0-4",
+      "strip_components": 0
+    },
+    {
+      "id": "python",
+      "version": "3.13.17+20261021",
+      "archive": "payloads/cpython-3.13.17+20261021-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+      "sha256": "56cde3b1a1dcc36576753cb408ee0c3568d211baafa0eee40423adc147c480f2",
+      "format": "tar.gz",
+      "executable": "python.exe",
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261021/cpython-3.13.17%2B20261021-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+      "license": "PSF-2.0 AND LicenseRef-python-standalone-dependencies",
+      "source": "https://github.com/astral-sh/python-build-standalone/tree/20261021",
+      "strip_components": 1
+    },
+    {
+      "id": "uv",
+      "version": "0.13.4",
+      "archive": "payloads/uv-x86_64-pc-windows-msvc.zip",
+      "sha256": "ccec7508a07d9933d7cb1261880633efcf1f30d6e6eddab21823f1dae6f23225",
+      "format": "zip",
+      "executable": "uv.exe",
+      "url": "https://github.com/astral-sh/uv/releases/download/0.13.4/uv-x86_64-pc-windows-msvc.zip",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://github.com/astral-sh/uv/tree/0.13.4",
+      "strip_components": 0
+    },
+    {
+      "id": "ripgrep",
+      "version": "15.2.0",
+      "archive": "payloads/ripgrep-15.2.0-x86_64-pc-windows-msvc.zip",
+      "sha256": "71b2fef860abe467217a538ff31de02f5258807c0129f771846f87bd029aafc5",
+      "format": "zip",
+      "executable": "rg.exe",
+      "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-pc-windows-msvc.zip",
+      "license": "MIT OR Unlicense",
+      "source": "https://github.com/BurntSushi/ripgrep/tree/15.2.0",
+      "strip_components": 1
+    },
+    {
+      "id": "agent-browser",
+      "version": "0.39.4",
+      "archive": "payloads/agent-browser-win32-x64.exe",
+      "sha256": "be19a109a004f84c367d7913c22b8046390b3e0e5241f9f6c7e83c7bacd22aae",
+      "format": "raw",
+      "executable": "agent-browser.exe",
+      "url": "https://github.com/vercel-labs/agent-browser/releases/download/v0.39.4/agent-browser-win32-x64.exe",
+      "license": "Apache-2.0",
+      "source": "https://github.com/vercel-labs/agent-browser/tree/v0.39.4",
+      "strip_components": 0,
+      "unpacked_bytes": 18034688
+    },
+    {
+      "id": "drawio",
+      "version": "3.1.2",
+      "archive": "payloads/assets-drawing-3.1.2.tgz",
+      "sha256": "e3622cbeced385dbfa083a2db3df12d6fbd6992649878beabfb0c674dc722a1b",
+      "format": "tar.gz",
+      "executable": null,
+      "url": "https://registry.npmjs.org/@file-viewer/assets-drawing/-/assets-drawing-3.1.2.tgz",
+      "license": "Apache-2.0 AND LicenseRef-drawio-stencils",
+      "source": "https://registry.npmjs.org/@file-viewer/assets-drawing/3.1.2",
+      "strip_components": 0,
+      "unpacked_bytes": 62171315
+    },
+    {
+      "id": "computer-use",
+      "version": "0.32.0",
+      "archive": "payloads/cua-driver-rs-0.32.0-windows-x86_64.zip",
+      "sha256": "6d70b45c8c901db773010dd720c8bb9d58c59bb301e9891c58ca1d3860e75652",
+      "format": "zip",
+      "executable": null,
+      "url": "https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.32.0/cua-driver-rs-0.32.0-windows-x86_64.zip",
+      "license": "MIT AND LicenseRef-cua-third-party",
+      "source": "https://github.com/trycua/cua/tree/cua-driver-rs-v0.32.0",
+      "strip_components": 0,
+      "unpacked_bytes": 86256914
+    }
+  ],
+  "documents": {
+    "python": "3.13",
+    "requirements": "documents-requirements.txt",
+    "wheels": [
+      {
+        "archive": "documents/wheels/charset_normalizer-3.5.2-cp313-cp313-win_amd64.whl",
+        "sha256": "78456a747de8dc58360ffa581f30a002baf5aa28cb262536545e91f113ed7639",
+        "name": "charset-normalizer",
+        "version": "3.5.2",
+        "url": "https://files.pythonhosted.org/packages/9c/76/b8ec57f4e9ee3253541abf95e4a462c0175fe8032dcd070f1f2421240942/charset_normalizer-3.5.2-cp313-cp313-win_amd64.whl",
+        "license": "MIT"
+      },
+      {
+        "archive": "documents/wheels/et_xmlfile-2.0.0-py3-none-any.whl",
+        "sha256": "7a91720bc756843502c3b7504c77b8fe44217c85c537d85037f0f536151b2caa",
+        "name": "et_xmlfile",
+        "version": "2.0.0",
+        "url": "https://files.pythonhosted.org/packages/c1/8b/5fe2cc11fee489817272089c4203e679c63b570a5aaeb18d852ae3cbba6a/et_xmlfile-2.0.0-py3-none-any.whl",
+        "license": "MIT"
+      },
+      {
+        "archive": "documents/wheels/lxml-6.1.3-cp313-cp313-win_amd64.whl",
+        "sha256": "e477aca0bc0d19f3b4ae9e4f2a1cfd687c31bf772d78734910658186b40b2477",
+        "name": "lxml",
+        "version": "6.1.3",
+        "url": "https://files.pythonhosted.org/packages/c0/28/e46a7702bd95e9043291f7c3539b6184cba66f96cea9936f20939b284eeb/lxml-6.1.3-cp313-cp313-win_amd64.whl",
+        "license": "BSD-3-Clause"
+      },
+      {
+        "archive": "documents/wheels/openpyxl-3.1.5-py2.py3-none-any.whl",
+        "sha256": "5282c12b107bffeef825f4617dc029afaf41d0ea60823bbb665ef3079dc79de2",
+        "name": "openpyxl",
+        "version": "3.1.5",
+        "url": "https://files.pythonhosted.org/packages/c0/da/977ded879c29cbd04de313843e76868e6e13408a94ed6b987245dc7c8506/openpyxl-3.1.5-py2.py3-none-any.whl",
+        "license": "MIT"
+      },
+      {
+        "archive": "documents/wheels/pillow-13.0.0-cp313-cp313-win_amd64.whl",
+        "sha256": "9dda0788a9932776a75d8bcc020076edc308ce2508b51f6739a45e3158b3fc42",
+        "name": "pillow",
+        "version": "13.0.0",
+        "url": "https://files.pythonhosted.org/packages/d7/ed/1b16fb66a37e1b9e41370b93b2c614c7da761a5b2a41dc333f7af4639962/pillow-13.0.0-cp313-cp313-win_amd64.whl",
+        "license": "MIT-CMU"
+      },
+      {
+        "archive": "documents/wheels/pypdf-6.21.3-py3-none-any.whl",
+        "sha256": "c8ca4d9a360dbd5d4b9bb7a8389e2a9ae6a106bee722b496f918040ba2daa17e",
+        "name": "pypdf",
+        "version": "6.21.3",
+        "url": "https://files.pythonhosted.org/packages/50/e2/84ba4c41a3ceb69de4f4066a784eb34ecbf97e3a315152e17d7ea17ef499/pypdf-6.21.3-py3-none-any.whl",
+        "license": "BSD-3-Clause"
+      },
+      {
+        "archive": "documents/wheels/python_docx-1.2.0-py3-none-any.whl",
+        "sha256": "3fd478f3250fbbbfd3b94fe1e985955737c145627498896a8a6bf81f4baf66c7",
+        "name": "python-docx",
+        "version": "1.2.0",
+        "url": "https://files.pythonhosted.org/packages/d0/00/1e03a4989fa5795da308cd774f05b704ace555a70f9bf9d3be057b680bcf/python_docx-1.2.0-py3-none-any.whl",
+        "license": "MIT"
+      },
+      {
+        "archive": "documents/wheels/python_pptx-1.0.2-py3-none-any.whl",
+        "sha256": "160838e0b8565a8b1f67947675886e9fea18aa5e795db7ae531606d68e785cba",
+        "name": "python-pptx",
+        "version": "1.0.2",
+        "url": "https://files.pythonhosted.org/packages/d9/4f/00be2196329ebbff56ce564aa94efb0fbc828d00de250b1980de1a34ab49/python_pptx-1.0.2-py3-none-any.whl",
+        "license": "MIT"
+      },
+      {
+        "archive": "documents/wheels/reportlab-5.1.0-py3-none-any.whl",
+        "sha256": "59fdbaec5efe437095ad1d7292ec9a271c8ca2d3ec75e889c6e61400929b90df",
+        "name": "reportlab",
+        "version": "5.1.0",
+        "url": "https://files.pythonhosted.org/packages/4a/3c/bf68d44f160b44685fc714f746a954c71d0091b3dc4fd3c8670154b44841/reportlab-5.1.0-py3-none-any.whl",
+        "license": "BSD license (see license.txt for details), Copyright (c) 2000-2025, ReportLab Inc."
+      },
+      {
+        "archive": "documents/wheels/typing_extensions-4.16.0-py3-none-any.whl",
+        "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+        "name": "typing_extensions",
+        "version": "4.16.0",
+        "url": "https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl",
+        "license": "PSF-2.0"
+      },
+      {
+        "archive": "documents/wheels/xlsxwriter-3.3.0-py3-none-any.whl",
+        "sha256": "5f04772d43281da5109af66f39b65153359a203e896847c416476e709b024469",
+        "name": "xlsxwriter",
+        "version": "3.3.0",
+        "url": "https://files.pythonhosted.org/packages/ce/9d/3d30eaaa7e06bdb6172f938b2661d64f8d899bdca54120384ecf3759488a/xlsxwriter-3.3.0-py3-none-any.whl",
+        "license": "BSD-2-Clause"
+      }
+    ]
+  }
+}

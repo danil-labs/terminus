@@ -26,3 +26,10 @@ apps/desktop/src-tauri/crates/*/target/
 # Engine copied for bundle.externalBin (`pnpm engine:sidecar`)
 apps/desktop/src-tauri/binaries/
 apps/desktop/dist-web/
+
+# Pinned work-tools metadata is tracked; downloaded payloads are not.
+apps/desktop/resources/work-tools/*/payloads/
+apps/desktop/resources/work-tools/*/documents/
+apps/desktop/resources/work-tools/*/licenses/
+apps/desktop/resources/work-tools/*/build-report.json
+apps/desktop/resources/work-tools/tauri.work-tools.json

@@ -1,0 +1,191 @@
+{
+  "schema": 1,
+  "target": "x86_64-unknown-linux-gnu",
+  "entries": [
+    {
+      "id": "git",
+      "version": "2.53.0",
+      "archive": "payloads/dugite-native-v2.53.0-4098283-ubuntu-x64.tar.gz",
+      "sha256": "cca76aa31ad9e835e771ee7f55b73934777fbd8d16757a10d307ba06de860901",
+      "format": "tar.gz",
+      "executable": "bin/git",
+      "url": "https://github.com/desktop/dugite-native/releases/download/v2.53.0-4/dugite-native-v2.53.0-4098283-ubuntu-x64.tar.gz",
+      "license": "GPL-2.0-only",
+      "source": "https://github.com/desktop/dugite-native/tree/v2.53.0-4",
+      "strip_components": 0,
+      "unpacked_bytes": 152517020
+    },
+    {
+      "id": "python",
+      "version": "3.13.17+20261021",
+      "archive": "payloads/cpython-3.13.17+20261021-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+      "sha256": "f829adc9d888e76c8801b4799ed444188d35239fcae3a9808a99ec5cb0d8d92c",
+      "format": "tar.gz",
+      "executable": "bin/python3",
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261021/cpython-3.13.17%2B20261021-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+      "license": "PSF-2.0 AND LicenseRef-python-standalone-dependencies",
+      "source": "https://github.com/astral-sh/python-build-standalone/tree/20261021",
+      "strip_components": 1,
+      "unpacked_bytes": 99189121
+    },
+    {
+      "id": "uv",
+      "version": "0.13.4",
+      "archive": "payloads/uv-x86_64-unknown-linux-gnu.tar.gz",
+      "sha256": "2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f",
+      "format": "tar.gz",
+      "executable": "uv",
+      "url": "https://github.com/astral-sh/uv/releases/download/0.13.4/uv-x86_64-unknown-linux-gnu.tar.gz",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://github.com/astral-sh/uv/tree/0.13.4",
+      "strip_components": 1,
+      "unpacked_bytes": 37895824
+    },
+    {
+      "id": "ripgrep",
+      "version": "15.2.0",
+      "archive": "payloads/ripgrep-15.2.0-x86_64-unknown-linux-musl.tar.gz",
+      "sha256": "33e15bcf1624b25cdd2a55813a47a2f95dbe126268203e76aa6a585d1e7b149c",
+      "format": "tar.gz",
+      "executable": "rg",
+      "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-unknown-linux-musl.tar.gz",
+      "license": "MIT OR Unlicense",
+      "source": "https://github.com/BurntSushi/ripgrep/tree/15.2.0",
+      "strip_components": 1,
+      "unpacked_bytes": 5786018
+    },
+    {
+      "id": "agent-browser",
+      "version": "0.39.4",
+      "archive": "payloads/agent-browser-linux-x64",
+      "sha256": "aa82c8ee81a38b8ad9ba61af02ced6dcbbb8af36dd8b2b479384177f8aa077a6",
+      "format": "raw",
+      "executable": "agent-browser",
+      "url": "https://github.com/vercel-labs/agent-browser/releases/download/v0.39.4/agent-browser-linux-x64",
+      "license": "Apache-2.0",
+      "source": "https://github.com/vercel-labs/agent-browser/tree/v0.39.4",
+      "strip_components": 0,
+      "unpacked_bytes": 18407640
+    },
+    {
+      "id": "drawio",
+      "version": "3.1.2",
+      "archive": "payloads/assets-drawing-3.1.2.tgz",
+      "sha256": "e3622cbeced385dbfa083a2db3df12d6fbd6992649878beabfb0c674dc722a1b",
+      "format": "tar.gz",
+      "executable": null,
+      "url": "https://registry.npmjs.org/@file-viewer/assets-drawing/-/assets-drawing-3.1.2.tgz",
+      "license": "Apache-2.0 AND LicenseRef-drawio-stencils",
+      "source": "https://registry.npmjs.org/@file-viewer/assets-drawing/3.1.2",
+      "strip_components": 0,
+      "unpacked_bytes": 62171315
+    },
+    {
+      "id": "computer-use",
+      "version": "0.32.0",
+      "archive": "payloads/cua-driver-rs-0.32.0-linux-x86_64.tar.gz",
+      "sha256": "998e63452c38b76a682da2d07f4bb24f0c1663d76c861a5dc0c345a7ead1f889",
+      "format": "tar.gz",
+      "executable": null,
+      "url": "https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.32.0/cua-driver-rs-0.32.0-linux-x86_64.tar.gz",
+      "license": "MIT AND LicenseRef-cua-third-party",
+      "source": "https://github.com/trycua/cua/tree/cua-driver-rs-v0.32.0",
+      "strip_components": 0,
+      "unpacked_bytes": 109566649
+    }
+  ],
+  "documents": {
+    "python": "3.13",
+    "requirements": "documents-requirements.txt",
+    "wheels": [
+      {
+        "archive": "documents/wheels/charset_normalizer-3.5.2-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+        "sha256": "7218e8f32b0956cfcd048fd42d9d5779809745ca1d86113ca56f66e7ae1549c4",
+        "name": "charset-normalizer",
+        "version": "3.5.2",
+        "url": "https://files.pythonhosted.org/packages/4b/85/41d27f234b82e47c167a5f6c0f62501dc0c640585ff4aba79e08a390336a/charset_normalizer-3.5.2-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+        "license": "MIT"
+      },
+      {
+        "archive": "documents/wheels/et_xmlfile-2.0.0-py3-none-any.whl",
+        "sha256": "7a91720bc756843502c3b7504c77b8fe44217c85c537d85037f0f536151b2caa",
+        "name": "et_xmlfile",
+        "version": "2.0.0",
+        "url": "https://files.pythonhosted.org/packages/c1/8b/5fe2cc11fee489817272089c4203e679c63b570a5aaeb18d852ae3cbba6a/et_xmlfile-2.0.0-py3-none-any.whl",
+        "license": "MIT"
+      },
+      {
+        "archive": "documents/wheels/lxml-6.1.3-cp313-cp313-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl",
+        "sha256": "d85dfab42dd672f87a7f76e9de7172962aee69fa12044f0d6e1a23cbd53fb80e",
+        "name": "lxml",
+        "version": "6.1.3",
+        "url": "https://files.pythonhosted.org/packages/ac/7d/8bf1fd8bae8247743968bb76d027a1ac5bd2c4b44495fba6a71b30d10706/lxml-6.1.3-cp313-cp313-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl",
+        "license": "BSD-3-Clause"
+      },
+      {
+        "archive": "documents/wheels/openpyxl-3.1.5-py2.py3-none-any.whl",
+        "sha256": "5282c12b107bffeef825f4617dc029afaf41d0ea60823bbb665ef3079dc79de2",
+        "name": "openpyxl",
+        "version": "3.1.5",
+        "url": "https://files.pythonhosted.org/packages/c0/da/977ded879c29cbd04de313843e76868e6e13408a94ed6b987245dc7c8506/openpyxl-3.1.5-py2.py3-none-any.whl",
+        "license": "MIT"
+      },
+      {
+        "archive": "documents/wheels/pillow-13.0.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+        "sha256": "5f56499c1a74d2b862beb0c33b8016f99d095858455df9d21583bbbc1c15b582",
+        "name": "pillow",
+        "version": "13.0.0",
+        "url": "https://files.pythonhosted.org/packages/ef/fe/f5cdaa2d1c4086e757430f368c271a58ee29cfe7378e7ae7b9d964015c25/pillow-13.0.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+        "license": "MIT-CMU"
+      },
+      {
+        "archive": "documents/wheels/pypdf-6.21.3-py3-none-any.whl",
+        "sha256": "c8ca4d9a360dbd5d4b9bb7a8389e2a9ae6a106bee722b496f918040ba2daa17e",
+        "name": "pypdf",
+        "version": "6.21.3",
+        "url": "https://files.pythonhosted.org/packages/50/e2/84ba4c41a3ceb69de4f4066a784eb34ecbf97e3a315152e17d7ea17ef499/pypdf-6.21.3-py3-none-any.whl",
+        "license": "BSD-3-Clause"
+      },
+      {
+        "archive": "documents/wheels/python_docx-1.2.0-py3-none-any.whl",
+        "sha256": "3fd478f3250fbbbfd3b94fe1e985955737c145627498896a8a6bf81f4baf66c7",
+        "name": "python-docx",
+        "version": "1.2.0",
+        "url": "https://files.pythonhosted.org/packages/d0/00/1e03a4989fa5795da308cd774f05b704ace555a70f9bf9d3be057b680bcf/python_docx-1.2.0-py3-none-any.whl",
+        "license": "MIT"
+      },
+      {
+        "archive": "documents/wheels/python_pptx-1.0.2-py3-none-any.whl",
+        "sha256": "160838e0b8565a8b1f67947675886e9fea18aa5e795db7ae531606d68e785cba",
+        "name": "python-pptx",
+        "version": "1.0.2",
+        "url": "https://files.pythonhosted.org/packages/d9/4f/00be2196329ebbff56ce564aa94efb0fbc828d00de250b1980de1a34ab49/python_pptx-1.0.2-py3-none-any.whl",
+        "license": "MIT"
+      },
+      {
+        "archive": "documents/wheels/reportlab-5.1.0-py3-none-any.whl",
+        "sha256": "59fdbaec5efe437095ad1d7292ec9a271c8ca2d3ec75e889c6e61400929b90df",
+        "name": "reportlab",
+        "version": "5.1.0",
+        "url": "https://files.pythonhosted.org/packages/4a/3c/bf68d44f160b44685fc714f746a954c71d0091b3dc4fd3c8670154b44841/reportlab-5.1.0-py3-none-any.whl",
+        "license": "BSD license (see license.txt for details), Copyright (c) 2000-2025, ReportLab Inc."
+      },
+      {
+        "archive": "documents/wheels/typing_extensions-4.16.0-py3-none-any.whl",
+        "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+        "name": "typing_extensions",
+        "version": "4.16.0",
+        "url": "https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl",
+        "license": "PSF-2.0"
+      },
+      {
+        "archive": "documents/wheels/xlsxwriter-3.3.0-py3-none-any.whl",
+        "sha256": "5f04772d43281da5109af66f39b65153359a203e896847c416476e709b024469",
+        "name": "xlsxwriter",
+        "version": "3.3.0",
+        "url": "https://files.pythonhosted.org/packages/ce/9d/3d30eaaa7e06bdb6172f938b2661d64f8d899bdca54120384ecf3759488a/xlsxwriter-3.3.0-py3-none-any.whl",
+        "license": "BSD-2-Clause"
+      }
+    ]
+  }
+}

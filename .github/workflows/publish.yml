@@ -373,6 +373,22 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Preparar herramientas fijadas sin Chrome
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHON=python3
+          case "${{ runner.os }}" in
+            macOS) TARGETS=(--target aarch64-apple-darwin --target x86_64-apple-darwin) ;;
+            Windows) PYTHON=python; TARGETS=(--target x86_64-pc-windows-msvc) ;;
+            Linux) TARGETS=(--target x86_64-unknown-linux-gnu) ;;
+            *) exit 1 ;;
+          esac
+          "$PYTHON" tests/release/work-tools.test.py
+          "$PYTHON" scripts/work-tools.py prepare "${TARGETS[@]}" --download \
+            --max-download-bytes 1073741824 \
+            --tauri-config resources/work-tools/tauri.work-tools.json
+
       # El motor fijado en `seldon-runtime.lock`, verificado por su SHA-256 y
       # copiado a `src-tauri/binaries/` para `bundle.externalBin`, que lo declara
       # para las cuatro plataformas. En macOS también deja el universal (`lipo`
@@ -599,7 +615,7 @@ jobs:
             esac
           fi
 
-          pnpm desktop:build --bundles nsis "${SIGN_CONFIG[@]}"
+          pnpm desktop:build --bundles nsis --config resources/work-tools/tauri.work-tools.json "${SIGN_CONFIG[@]}"
 
           INSTALLER=$(find src-tauri/target/release/bundle -type f -name '*_x64-setup.exe' | head -1)
           [ -n "$INSTALLER" ] || { echo "::error::No se construyó ningún *_x64-setup.exe."; exit 1; }
@@ -733,7 +749,7 @@ jobs:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_KEY_PATH: ${{ env.APPLE_API_KEY_PATH }}
-        run: pnpm desktop:build --target universal-apple-darwin
+        run: pnpm desktop:build --target universal-apple-darwin --config resources/work-tools/tauri.work-tools.json
 
       # `tauri.linux.conf.json` vive en el repo del código y ajusta el bundle a
       # AppImage. Firma con la llave de minisign, como en las otras dos.
@@ -742,7 +758,7 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: pnpm exec tauri build --config src-tauri/tauri.linux.conf.json
+        run: pnpm exec tauri build --config src-tauri/tauri.linux.conf.json --config resources/work-tools/tauri.work-tools.json
 
       - name: Comprobar el bundle universal
         if: runner.os == 'macOS'
