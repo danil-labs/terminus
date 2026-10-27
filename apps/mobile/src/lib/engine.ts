@@ -54,15 +54,20 @@ export type Task = SessionRow & {
   machine_on?: boolean;
 };
 
+type AgentAppearance = { body?: string | null; avatar?: string | null };
+type AgentProfiles = Record<string, AgentAppearance>;
+
 /** Un agente con nombre, juntando sus carpetas y máquinas. */
 export type Agent = {
   name: string;
   description: string | null;
+  body?: string | null;
+  avatar?: string | null;
   status: "working" | "awake" | "asleep";
   liveTasks: number;
   minutesSinceLastTurn: number | null;
   /** `host/folder` donde está. */
-  places: { host: string; folder: string }[];
+  places: ({ host: string; folder: string } & AgentAppearance)[];
 };
 
 /** Lo que una máquina sabe de un workspace. */
@@ -219,14 +224,24 @@ export async function snapshotOf(host: Host, workspace: string): Promise<HostSna
     read<ProviderInfo[]>(host, "list_providers", workspace, {}, [], at).catch(() => []),
   ]);
   const projects = ["", ...folders.map((f) => f.id)];
+  const images = new Map<string, Promise<string | null>>();
   const perFolder = await Promise.all(
     projects.map(async (project) => {
-      const [rows, agents, status] = await Promise.all([
+      const [rows, agents, status, profiles] = await Promise.all([
         read<SessionRow[]>(host, "list_live_sessions", workspace, { project, open: [] }, [], at),
         project ? read<AgentList>(host, "list_agents", workspace, { project }, { agents: [] }, at).catch(() => ({ agents: [] })) : { agents: [] },
         project ? read<AgentStatusRow[]>(host, "list_agent_status", workspace, { project }, [], at).catch(() => []) : [],
+        project ? read<AgentProfiles>(host, "list_agent_profiles", workspace, { project }, {}, at).catch((): AgentProfiles => ({})) : {} as AgentProfiles,
       ]);
-      return { project, rows, agents: agents.agents ?? [], status };
+      const faces = await Promise.all((agents.agents ?? []).map(async (agent) => {
+        const profile = profiles[agent.name];
+        const path = profile?.avatar;
+        if (path && !images.has(path)) {
+          images.set(path, read<FilePreview | null>(host, "preview_file", workspace, { path, rel: path }, null, at).then((value) => value?.data_url ?? null).catch(() => null));
+        }
+        return { ...agent, body: profile?.body ?? null, avatar: path ? await images.get(path) : null };
+      }));
+      return { project, rows, agents: faces, status };
     }),
   );
   const byProject: Record<string, (SessionRow & FlatRow)[]> = {};
@@ -239,17 +254,19 @@ export async function snapshotOf(host: Host, workspace: string): Promise<HostSna
       const s = status.find((x) => x.name === a.name);
       const known = agents.get(a.name);
       if (known) {
-        known.places.push({ host: host.id, folder: project });
+        known.places.push({ host: host.id, folder: project, body: a.body, avatar: a.avatar });
         known.liveTasks += s?.live_tasks ?? 0;
         if (s && rank(s.status) < rank(known.status)) known.status = s.status;
       } else {
         agents.set(a.name, {
           name: a.name,
           description: a.description ?? null,
+          body: a.body,
+          avatar: a.avatar,
           status: s?.status ?? "asleep",
           liveTasks: s?.live_tasks ?? 0,
           minutesSinceLastTurn: s?.minutes_since_last_turn ?? null,
-          places: [{ host: host.id, folder: project }],
+          places: [{ host: host.id, folder: project, body: a.body, avatar: a.avatar }],
         });
       }
     }

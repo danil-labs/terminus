@@ -1,10 +1,11 @@
+import { AgentAvatar } from "../ui/AgentAvatar";
 import { dockStatusText, orderDockAgents } from "@terminus/tasks";
 import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, Text } from "react-native";
 import { lang, t, w } from "../lib/i18n";
 import { useWorkspaces } from "../lib/workspaces";
-import { Avatar, Row, SheetTitle } from "../ui/components";
+import { Row, SheetTitle } from "../ui/components";
 import { matches, NoMatch, SearchField } from "../ui/Search";
 import { useTheme } from "../ui/theme";
 
@@ -25,7 +26,7 @@ export default function Agents() {
         <Row
           key={agent.name}
           testID={`agents-${agent.name}`}
-          left={<Avatar name={agent.name} size={36} round />}
+          left={<AgentAvatar name={agent.name} size={36} />}
           title={agent.name}
           subtitle={dockStatusText(lang, agent)}
           onPress={() => {

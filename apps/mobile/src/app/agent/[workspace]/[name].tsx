@@ -1,3 +1,4 @@
+import { AgentAvatar } from "../../../ui/AgentAvatar";
 import { agentFolder, dockStatusText } from "@terminus/tasks";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useMemo, useRef, useState } from "react";
@@ -10,7 +11,7 @@ import { useMachines } from "../../../lib/machines";
 import { effectiveGit } from "../../../lib/taskGit";
 import { useTaskGit } from "../../../lib/useTaskGit";
 import { useWorkspaces } from "../../../lib/workspaces";
-import { Avatar, openPreview, openTask } from "../../../ui/components";
+import { openPreview, openTask } from "../../../ui/components";
 import { Composer, type Submission } from "../../../ui/Composer";
 import { TaskCard } from "../../../ui/TaskCard";
 import { useTheme } from "../../../ui/theme";
@@ -67,7 +68,7 @@ export default function AgentScreen() {
         onViewableItemsChanged={onSeen}
         ListHeaderComponent={
           <View style={[styles.profile, { borderColor: theme.border }]}>
-            <Avatar name={name} size={56} round />
+            <AgentAvatar name={name} size={56} />
             <View style={{ flex: 1, gap: 2 }}>
               <Text style={{ color: theme.text, fontSize: 18, fontWeight: "700" }}>{name}</Text>
               {agent ? <Text style={{ color: theme.textMuted }}>{dockStatusText(lang, agent)}</Text> : null}
