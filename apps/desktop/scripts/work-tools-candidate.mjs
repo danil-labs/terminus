@@ -48,6 +48,12 @@ verified({ archive: manifest.documents.requirements, sha256: manifest.documents.
 const lock = JSON.parse(readFileSync(join(root, "seldon-runtime.lock"), "utf8"));
 if (Object.values(lock.platforms ?? {}).some((pin) => pin.sha256 === expectedEngine)) throw new Error("Candidate engine is the published pin; a new local engine is required.");
 const contract = hash(join(root, "src-tauri/crates/engine-protocol/commands.json"));
+const bundleEnvironment = process.platform === "linux" ? {
+  NO_STRIP: "1",
+  PATCHELF: join(root, "scripts/work-tools-patchelf.py"),
+  TERMINUS_REAL_PATCHELF: resolve(required("patchelf")),
+  TERMINUS_WORK_TOOLS_ROOT: join(root, "src-tauri/target/release/bundle/appimage/Terminus.AppDir/usr/lib/Terminus/work-tools"),
+} : {};
 const output = join(root, ".engine", `work-tools-candidate-${version}-${target}`);
 if (existsSync(output)) throw new Error("Candidate directory already exists; use a new version or inspect it first.");
 mkdirSync(output, { recursive: true });
@@ -96,5 +102,5 @@ const config = {
 };
 const configPath = join(output, "tauri.candidate.json");
 writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
-writeFileSync(join(output, "candidate.json"), `${JSON.stringify({ schema: 1, version, target, engine_sha256: expectedEngine, resource_manifest_sha256: expectedManifest, contract, published_engine_lock: false, updater_signature: false, production_identity_changed: false, native_platforms_tested: [], source_engine: "local engine build; see SHA-256", resources: `resources/work-tools/${target}`, browser_catalog_sha256: hash(join(stagedResources, "browser-navigation.json")) }, null, 2)}\n`);
-console.log(JSON.stringify({ config: configPath, metadata: join(output, "candidate.json"), target, version, next: `pnpm tauri build --target ${target} --config ${configPath}` }, null, 2));
+writeFileSync(join(output, "candidate.json"), `${JSON.stringify({ schema: 1, version, target, engine_sha256: expectedEngine, resource_manifest_sha256: expectedManifest, contract, published_engine_lock: false, updater_signature: false, production_identity_changed: false, native_platforms_tested: [], source_engine: "local engine build; see SHA-256", resources: `resources/work-tools/${target}`, browser_catalog_sha256: hash(join(stagedResources, "browser-navigation.json")), bundle_environment: bundleEnvironment }, null, 2)}\n`);
+console.log(JSON.stringify({ config: configPath, metadata: join(output, "candidate.json"), target, version, bundle_environment: bundleEnvironment, next: `Apply bundle_environment to pnpm tauri build --config ${configPath}; then run work-tools-candidate-verify.py on the final AppImage.` }, null, 2));
