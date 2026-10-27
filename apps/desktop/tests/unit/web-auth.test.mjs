@@ -1,0 +1,94 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { boot, sleep } from "../helpers/jsdom-app.mjs";
+
+globalThis.BroadcastChannel = undefined;
+const SUPABASE = "https://supabase.test";
+let mounts = 0;
+
+async function page(path, handler) {
+  const requests = [];
+  const own = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const url = String(input?.url ?? input);
+    if (!url.startsWith(SUPABASE)) throw new Error(`unexpected request: ${url}`);
+    const request = { url, method: init?.method, body: init?.body ? JSON.parse(init.body) : null };
+    requests.push(request);
+    const answer = handler(request);
+    return new Response(JSON.stringify(answer.body), { status: answer.status, headers: { "content-type": "application/json", "x-supabase-api-version": "2024-01-01" } });
+  };
+  let w;
+  const app = await boot("listo", `web-auth-${++mounts}`, {}, undefined, {}, {
+    web: true,
+    antes: (win) => {
+      w = win;
+      win.history.replaceState(null, "", path);
+      win.terminusWeb = { supabaseUrl: SUPABASE, supabaseKey: "public-anon-key" };
+    },
+  });
+  await sleep(300);
+  return { app, w, requests, restore: () => { globalThis.fetch = own; } };
+}
+
+function fill(w, name, value) {
+  const input = w.document.querySelector(`[name="${name}"]`);
+  input.value = value;
+  input.dispatchEvent(new w.Event("input", { bubbles: true }));
+}
+const click = (w, text) => [...w.document.querySelectorAll("button")].find((button) => button.textContent.trim() === text).click();
+const submit = (w) => w.document.querySelector("form").dispatchEvent(new w.Event("submit", { bubbles: true, cancelable: true }));
+
+test("registration waits for email confirmation and resends with the device return inside the link", async () => {
+  const next = "/terminus/connect?code=ABCD-EFGH";
+  const { app, w, requests, restore } = await page(`/terminus/auth?next=${encodeURIComponent(next)}`, () => ({ status: 200, body: { user: { id: "new-user", identities: [] }, session: null } }));
+  try {
+    click(w, "¿No tienes cuenta? Crea una");
+    fill(w, "email", "persona@example.com");
+    fill(w, "password", "long-test-password");
+    submit(w);
+    await sleep(200);
+    assert.equal(w.document.querySelector("[data-web-auth]")?.dataset.webAuth, "confirmation");
+    const signup = requests[0];
+    assert.equal(new URL(signup.url).pathname, "/auth/v1/signup");
+    const callback = new URL(new URL(signup.url).searchParams.get("redirect_to"));
+    assert.equal(callback.pathname, "/terminus/auth");
+    assert.equal(callback.searchParams.get("next"), next);
+    assert.equal(signup.body.email, "persona@example.com");
+    assert.equal(signup.body.data?.account_name, undefined, "the client does not invent an organization");
+    assert.equal(w.localStorage.getItem("sb-supabase-auth-token"), null, "unconfirmed signup grants no session");
+    click(w, "Reenviar correo");
+    await sleep(200);
+    assert.equal(new URL(requests[1].url).pathname, "/auth/v1/resend");
+    assert.equal(new URL(requests[1].url).searchParams.get("redirect_to"), callback.toString());
+    assert.equal(requests[1].body.type, "signup");
+    assert.ok(!w.document.querySelector("[data-web-gate]"));
+    assert.deepEqual(app.fallos, []);
+  } finally { restore(); }
+});
+
+test("incorrect credentials keep the account and destination, then allow a retry", async () => {
+  const { app, w, requests, restore } = await page("/terminus/auth?next=%2Fterminus%2Fm%2F", () => ({ status: 400, body: { code: "invalid_credentials", msg: "Invalid login credentials" } }));
+  try {
+    fill(w, "email", "persona@example.com");
+    fill(w, "password", "incorrect");
+    submit(w);
+    await sleep(200);
+    assert.match(w.document.querySelector('[role="alert"]')?.textContent, /no son correctos/);
+    assert.equal(w.document.querySelector('[name="email"]').value, "persona@example.com");
+    assert.equal(w.document.querySelector('[name="password"]').value, "");
+    assert.equal(new URL(requests[0].url).searchParams.get("grant_type"), "password");
+    assert.equal(new URL(w.location.href).searchParams.get("next"), "/terminus/m/");
+    assert.deepEqual(app.fallos, []);
+  } finally { restore(); }
+});
+
+test("a rejected callback is explained and its credentials are removed without entering the gate", async () => {
+  const { app, w, requests, restore } = await page("/terminus/auth?next=%2Fterminus%2Fconnect%3Fcode%3DABCD-EFGH#error=access_denied&error_description=secret", () => ({ status: 500, body: {} }));
+  try {
+    assert.match(w.document.querySelector('[role="alert"]')?.textContent, /El enlace venció/);
+    assert.equal(w.location.hash, "");
+    assert.equal(new URL(w.location.href).searchParams.get("next"), "/terminus/connect?code=ABCD-EFGH");
+    assert.equal(requests.length, 0);
+    assert.deepEqual(app.fallos, []);
+  } finally { restore(); }
+});

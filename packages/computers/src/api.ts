@@ -32,6 +32,7 @@ export type Answer<T> =
   | { kind: "ok"; value: T }
   | { kind: "unauthorized" }
   | { kind: "license" }
+  | { kind: "no_account" }
   | { kind: "missing" }
   | { kind: "error"; status: number | null };
 
@@ -62,8 +63,11 @@ async function request<T>(url: string, token: string, method: string, read: (bod
   }
   if (response.status === 401) return { kind: "unauthorized" };
   if (response.status === 403) {
-    // `unknown_user` también es 403: la persona no existe en Danil, que para ella es lo mismo que no tener licencia.
-    return { kind: "license" };
+    const body = await response.json().catch(() => null) as { error?: string | { code?: string } } | null;
+    const code = typeof body?.error === "string" ? body.error : body?.error?.code;
+    if (code === "unknown_user") return { kind: "no_account" };
+    if (code === "license_required") return { kind: "license" };
+    return { kind: "error", status: response.status };
   }
   if (response.status === 404) return { kind: "missing" };
   if (!response.ok) return { kind: "error", status: response.status };

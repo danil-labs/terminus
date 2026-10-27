@@ -37,7 +37,7 @@ const expoEnv = {
   // La raíz de la web de escritorio, para «Ver la versión de escritorio» sin adivinarla de la ruta.
   EXPO_PUBLIC_TERMINUS_WEB_BASE: base,
   EXPO_PUBLIC_COMPUTERS_ENDPOINT: origin(env.TERMINUS_WEB_ENDPOINT || "https://computers.danil.ai"),
-  EXPO_PUBLIC_TERMINUS_WEB_LOGIN: env.TERMINUS_WEB_LOGIN || "/",
+  EXPO_PUBLIC_TERMINUS_WEB_LOGIN: env.TERMINUS_WEB_LOGIN || `${base}auth`,
   ...(env.TERMINUS_WEB_SUPABASE_URL ? { EXPO_PUBLIC_SUPABASE_URL: origin(env.TERMINUS_WEB_SUPABASE_URL) } : {}),
   ...(env.TERMINUS_WEB_SUPABASE_KEY ? { EXPO_PUBLIC_SUPABASE_KEY: env.TERMINUS_WEB_SUPABASE_KEY.trim() } : {}),
 };

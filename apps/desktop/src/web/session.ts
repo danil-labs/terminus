@@ -1,7 +1,6 @@
 /**
  * The person's Supabase session, the one the Danil app already stored on this
- * same origin. Terminus never signs in: without a session it sends the person
- * to the app's login.
+ * same origin. Without a session it opens the common browser sign-in entry.
  */
 import { createClient } from "@supabase/supabase-js";
 
@@ -10,6 +9,8 @@ export type Session = {
   getToken(): Promise<string>;
   /** The API or the relay refused the token: refresh once, else leave for the login. */
   unauthorized(): Promise<boolean>;
+  email?(): Promise<string | null>;
+  signOut?(): Promise<void>;
 };
 
 export function supabaseSession(url: string, key: string, leave: () => void): Session {
@@ -21,6 +22,14 @@ export function supabaseSession(url: string, key: string, leave: () => void): Se
     if (event === "SIGNED_OUT") leave();
   });
   return {
+    async email() {
+      const { data } = await client.auth.getSession();
+      return data.session?.user.email ?? null;
+    },
+    async signOut() {
+      const { error } = await client.auth.signOut({ scope: "local" });
+      if (error) throw error;
+    },
     async getToken() {
       const { data } = await client.auth.getSession();
       if (!data.session) {

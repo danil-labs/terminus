@@ -3,6 +3,8 @@ import { t } from "../../lib/i18n";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
 import type { Session } from "../session";
+import { BrowserAccount } from "../BrowserAccount";
+import "../phrases";
 import { approveDevice, denyDevice, type DeviceAnswer, type DeviceRequest, lookupDevice } from "./devices";
 
 export type ConnectView =
@@ -77,6 +79,7 @@ export function ConnectPage(props: { session: Session; endpoint: string; code: s
   return (
     <main class="flex h-full flex-col overflow-y-auto bg-bg px-10 py-10" data-web-connect={view().t}>
       <h1 class="m-0 mb-5 text-3xl leading-tight font-display font-bold tracking-[-0.03em] text-neutral-950">Terminus</h1>
+      <BrowserAccount session={props.session} disabled={view().t === "approving"} />
       <Switch>
         <Match when={view().t === "loading"}>
           <p class="m-0 text-sm text-neutral-500">{t("danil.connect.loading")}</p>

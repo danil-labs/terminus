@@ -70,11 +70,18 @@ Build-time settings (environment variables; all are public values):
 | `TERMINUS_WEB_ENDPOINT` | `https://computers.danil.ai` | Control plane and relay; added to `connect-src` as `https` and `wss` |
 | `TERMINUS_WEB_SUPABASE_URL` | none | The Danil app's Supabase project; added to `connect-src` |
 | `TERMINUS_WEB_SUPABASE_KEY` | none | Its publishable (anon) key |
-| `TERMINUS_WEB_LOGIN` | `/` | Where to go when there is no session |
+| `TERMINUS_WEB_LOGIN` | `<base>auth` | Browser sign-in entry when there is no session; an override must preserve `next` |
 | `TERMINUS_WEB_CONNECT` | empty | Extra `connect-src` sources |
 
-The page is served on the Danil app's origin, so it reads the Supabase session
-that app stored (`supabase.auth.getSession()`); it never signs in. After a 401
+The page shares the Danil app's origin and Supabase session storage. Without a
+session it opens `<base>auth`, shared with the phone browser and device approval.
+This entry supports email/password registration and sign-in, Google and Microsoft,
+email confirmation and resending confirmation. Authentication callbacks run here
+before the machine gate or phone redirect. `next` stays inside the configured
+Terminus base and travels in the callback URL, including a device code; it does
+not depend on the original tab's storage. Supabase must allow that callback URL
+and its email templates must preserve the supplied redirect. Registration does
+not grant a license or provision a machine. After a 401
 from the API or a relay close 4003 it calls `refreshSession()` and, if that
 fails, goes to the login. It lists the person's computers (`GET
 /v1/computers`), opens the only one or the remembered one, or shows a picker

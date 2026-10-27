@@ -16,6 +16,7 @@ export function MachineNote({ hosts, fleet, cachedAt }: { hosts: Host[]; fleet: 
   const { reloadComputers } = useMachines();
   const lines: string[] = [];
   if (fleet === "license") lines.push(w("web.computers.license"));
+  if (fleet === "no_account") lines.push(w("web.computers.no_account"));
   if (fleet === "error") lines.push(w("web.computers.error"));
   if (fleet === "ok" && !hosts.length) lines.push(w("web.computers.none"));
   for (const host of hosts) {
@@ -39,7 +40,7 @@ export function MachineNote({ hosts, fleet, cachedAt }: { hosts: Host[]; fleet: 
           {line}
         </Text>
       ))}
-      {fleet === "error" ? (
+      {fleet === "error" || fleet === "license" || fleet === "no_account" || (fleet === "ok" && !hosts.length) ? (
         <Pressable onPress={() => void reloadComputers()}>
           <Text style={{ color: theme.primary, fontWeight: "600" }}>{w("web.computers.retry")}</Text>
         </Pressable>

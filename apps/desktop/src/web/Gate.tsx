@@ -4,9 +4,10 @@ import { t } from "../lib/i18n";
 import { Button } from "../ui/Button";
 import { type Answer, type Computer, listComputers } from "./computers";
 import type { Session } from "./session";
+import { BrowserAccount } from "./BrowserAccount";
 
 /** What stands between the page and the app: the session, the license, having a computer and a workspace linked to the account. */
-export type GateView = { t: "waiting" } | { t: "license" } | { t: "not_yours" } | { t: "none" } | { t: "no_workspaces" } | { t: "error" };
+export type GateView = { t: "waiting" } | { t: "license" } | { t: "no_account" } | { t: "not_yours" } | { t: "none" } | { t: "no_workspaces" } | { t: "error" };
 
 /** The list with a token the API accepts: a refused token is refreshed once. */
 export async function computersOf(endpoint: string, session: Session): Promise<Answer<Computer[]>> {
@@ -26,7 +27,7 @@ export function Gate(props: { session: Session; endpoint: string; initial?: Gate
     setView({ t: "waiting" });
     const answer = await computersOf(props.endpoint, props.session).catch((): Answer<Computer[]> => ({ kind: "unauthorized" }));
     if (answer.kind === "unauthorized") return;
-    if (answer.kind === "license") return setView({ t: "license" });
+    if (answer.kind === "license" || answer.kind === "no_account") return setView({ t: answer.kind });
     if (answer.kind !== "ok") return setView({ t: "error" });
     const computers = answer.value;
     const asked = new URLSearchParams(window.location.search).get("computer");
@@ -62,11 +63,13 @@ export function Gate(props: { session: Session; endpoint: string; initial?: Gate
   return (
     <main class="flex h-full flex-col overflow-y-auto bg-bg px-10 py-10" data-web-gate={view().t}>
       <h1 class="m-0 mb-5 text-3xl leading-tight font-display font-bold tracking-[-0.03em] text-neutral-950">Terminus</h1>
+      <BrowserAccount session={props.session} />
       <Switch>
         <Match when={view().t === "waiting"}>
           <p class="m-0 text-sm text-neutral-500">{t("web.computers.waiting")}</p>
         </Match>
-        <Match when={view().t === "license"}>{message(t("web.computers.license"))}</Match>
+        <Match when={view().t === "license"}>{message(t("web.computers.license"), retry())}</Match>
+        <Match when={view().t === "no_account"}>{message(t("web.computers.no_account"), retry())}</Match>
         <Match when={view().t === "not_yours"}>{message(t("web.computers.not_yours"))}</Match>
         <Match when={view().t === "none"}>{message(t("web.computers.none"), retry())}</Match>
         <Match when={view().t === "no_workspaces"}>{message(t("web.computers.no_workspaces"), retry())}</Match>
