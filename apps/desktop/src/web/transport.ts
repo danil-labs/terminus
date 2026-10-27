@@ -81,7 +81,8 @@ export function failureOf(error: unknown): Failure {
 const desktopOnly = (command: string): Failure => ({ what: t("web.desktop_only"), detail: command });
 
 /** The workspace travels in a header for these, as in the window. */
-const HEADER_SCOPED = new Set(["stop_turn", "stop_shell_command", "write_shell_input", "pending_requests"]);
+const STORAGE = new Set(["list_storage", "reclaim_storage", "empty_build_cache", "collect_orphans"]);
+const HEADER_SCOPED = new Set(["stop_turn", "stop_shell_command", "write_shell_input", "pending_requests", ...STORAGE]);
 /** Stream commands lose their channel: the relay returns only the completion. */
 const CHANNELS: Record<string, string> = { clone_project: "progress", list_session_git: "progress", watch_task_tree: "changes" };
 const REFUSED = /^(site_|typst_live_)|^(open_file_external|tree_open_external)$/;
@@ -245,7 +246,12 @@ function createLink(relay: RelayLike, computerId: string, onSync: SyncListener, 
         if (cached) {
           const at = typeof cached.updated_at === "number" ? cached.updated_at : Date.parse(cached.updated_at);
           if (Number.isFinite(at)) copied(at < 1e12 ? at * 1000 : at);
-        } else if (key) reads.put(key, value);
+        } else if (key) {
+          if (command === "list_workspaces" && value && typeof value === "object") {
+            const { machine_resources: _resources, ...listing } = value as Args;
+            reads.put(key, listing);
+          } else reads.put(key, value);
+        }
         return value;
       } catch (error) {
         const failure = failureOf(error);
@@ -374,10 +380,11 @@ export function createWebTransport(
     if (fleet.isOutdated(machine)) throw outdated(machine);
     args = withoutChannel(command, args);
     const l = link(machine);
+    if (STORAGE.has(command) && l.relay.state() !== "online") throw off(machine);
     const asleep = !fleet.info(machine)?.wakes && OFF.includes(l.relay.state());
     if (asleep && !READ.test(command)) throw off(machine);
     try {
-      const value = await l.send(command, callWorkspace(workspace, args), args, !asleep);
+      const value = await l.send(command, callWorkspace(workspace, args), args, !asleep && !STORAGE.has(command) && command !== "list_workspaces");
       if (value === NONE) throw off(machine);
       return fleet.linkedOnly(machine, command, value);
     } catch (error) {
@@ -427,10 +434,15 @@ export function createWebTransport(
 
   async function send(command: string, workspace: string | null, args: Args, options: Options): Promise<unknown> {
     const chosen = headerOf(options, "x-terminus-machine") ?? (CREATE.has(command) ? picked(workspace, args.project) : null);
+    if (chosen && !fleet.info(chosen) && (STORAGE.has(command) || command === "list_workspaces")) throw failureOf({ code: "invalid_request" });
+    if (STORAGE.has(command) && !workspace) throw failureOf({ code: "workspace_missing" });
     let route: ReturnType<Fleet["route"]>;
     try {
       route = fleet.route(command, args, workspace, chosen && fleet.info(chosen) ? chosen : null, fallback(workspace, args.project));
     } catch {
+      throw { what: t("web.machines.cross_machine"), detail: "cross_machine" };
+    }
+    if (STORAGE.has(command) && chosen && "machine" in route && route.machine !== chosen) {
       throw { what: t("web.machines.cross_machine"), detail: "cross_machine" };
     }
     if ("fan" in route) return fan(command, route.fan, route.args, workspace);
@@ -477,7 +489,7 @@ export function createWebTransport(
 
   async function engine(command: string, args: Args, options: Options): Promise<unknown> {
     const header = headerOf(options);
-    let workspace = active;
+    let workspace = command === "list_workspaces" ? null : active;
     if (command === "tree_show" && args.tree === "terminus-chat-visuals") {
       if (!header) throw failureOf({ code: "invalid_request" });
       workspace = header;
@@ -498,7 +510,7 @@ export function createWebTransport(
     const value = await send(command, workspace, args, options);
     const startup = value as { active?: unknown } | null;
     // The desktop installs this after its first read: its next `list_workspaces` says which one is open.
-    if ((command === "workspaces_startup" || command === "list_workspaces") && active === null && typeof startup?.active === "string") active = startup.active;
+    if ((command === "workspaces_startup" || command === "list_workspaces") && !headerOf(options, "x-terminus-machine") && active === null && typeof startup?.active === "string") active = startup.active;
     if (command === "remove_workspace" && workspace !== null && workspace === args.id) active = null;
     return value;
   }

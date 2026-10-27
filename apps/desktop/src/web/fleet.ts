@@ -349,7 +349,9 @@ export class Fleet {
     const fileOf = (row: Row, owner: string) => (typeof row.logo === "string" && isPath(row.logo) ? { logo: this.wrap(owner, row.logo) } : {});
     const workspaces = [...rows].map(([id, { row, owner }]) => ({ ...row, ...fileOf(row, owner), id, machines: this.usable().filter((m) => this.hosts.get(id)?.has(m)) }));
     const active = lists.map((l) => (typeof l.value.active === "string" ? l.value.active : null)).find(Boolean) ?? null;
-    return { ...(this.encode(lead.machine, lead.value) as Row), workspaces, active };
+    const { machine_resources: _resources, ...startup } = this.encode(lead.machine, lead.value) as Row;
+    const resources = Object.fromEntries(lists.filter((l) => l.value.machine_resources != null).map((l) => [l.machine, l.value.machine_resources]));
+    return { ...startup, workspaces, active, machine_resources_by_machine: resources };
   }
 
   /**

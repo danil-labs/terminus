@@ -148,6 +148,7 @@
   "shell.storage.offline": "Offline",
   "shell.storage.removed_logical": "Removed {size} of logical data; physical disk space freed may differ.",
   "shell.storage.summary_error": "Read failed",
+  "shell.storage.stale": "Outdated measurement",
   "shell.storage.workspace_missing": "This workspace is unavailable on this machine.",
   "shell.storage.workspace_scope": "Workspace · {workspace}",
   "shell.storage.retry": "Retry",

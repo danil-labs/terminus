@@ -516,7 +516,9 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
         return;
     }
     let slot = Slot(state.clone());
-    let workspace = if name == "tree_show" && args["tree"] == "terminus-chat-visuals" {
+    let workspace = if name == "list_workspaces" {
+        None
+    } else if name == "tree_show" && args["tree"] == "terminus-chat-visuals" {
         // El scope pertenece al sobre RPC1, no a los parámetros congelados del comando.
         let Some(workspace) = invoke
             .message
@@ -533,9 +535,16 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
         Some(workspace.to_owned())
     } else if matches!(
         name.as_str(),
-        "stop_turn" | "stop_shell_command" | "write_shell_input" | "pending_requests"
+        "stop_turn"
+            | "stop_shell_command"
+            | "write_shell_input"
+            | "pending_requests"
+            | "list_storage"
+            | "reclaim_storage"
+            | "empty_build_cache"
+            | "collect_orphans"
     ) {
-        // Cerrar con tareas vivas detiene también las de otros workspaces.
+        // El destino capturado puede diferir del workspace que ahora muestra la ventana.
         invoke
             .message
             .headers()
@@ -574,6 +583,28 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
         .and_then(|value| value.to_str().ok())
         .filter(|value| !value.is_empty())
         .map(str::to_owned);
+    let storage = matches!(
+        name.as_str(),
+        "list_storage" | "reclaim_storage" | "empty_build_cache" | "collect_orphans"
+    );
+    if storage || name == "list_workspaces" {
+        let unknown = chosen
+            .as_deref()
+            .is_some_and(|id| state.index(id).is_none());
+        let conflicting = storage
+            && chosen.as_deref().is_some_and(|id| {
+                args["session"]
+                    .as_str()
+                    .and_then(|session| state.fleet.owner(workspace.as_deref(), session))
+                    .is_some_and(|owner| owner != id)
+            });
+        if unknown || conflicting || (storage && workspace.is_none()) {
+            invoke
+                .resolver
+                .reject(failure(&Error::new("invalid_request")));
+            return;
+        }
+    }
     let elsewhere = if state.machines.len() > 1 && name != "unwatch_task_tree" {
         state.elsewhere(
             state
@@ -739,6 +770,11 @@ fn routed(
     workspace: Option<&str>,
 ) -> Result<Routed, Value> {
     let name = spec["name"].as_str().unwrap_or_default();
+    if name == "list_workspaces" {
+        let there = state.reach(i).ok_or_else(machine_off)?;
+        let sent = there.invoke(name, None, args.clone());
+        return Ok(Routed::Done(sent.map_err(|e| failure(&e)).and_then(reply)));
+    }
     let local = workspace.ok_or_else(|| failure(&Error::new("invalid_request")))?;
     let home = state.client();
     let id = &state.machines[i].id;

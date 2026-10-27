@@ -82,7 +82,7 @@ type MachineResources = {
   }[];
 };
 
-type Summary = { resources?: MachineResources; loading: boolean; error?: string };
+type Summary = { resources?: MachineResources; workspaceName?: string; loading: boolean; error?: string };
 type Target = { machine: string; workspace: string; generation: number };
 
 type Liberado = {
@@ -203,11 +203,11 @@ export default function Almacenamiento(props: {
     setSummaries((prev) => ({ ...prev, [m.id]: { ...prev[m.id], loading: true, error: undefined } }));
     try {
       // Startup directo: el resumen de disco no requiere ni materializa un workspace.
-      const startup = await invoke<{ machine_resources?: MachineResources }>("list_workspaces", {}, {
+      const startup = await invoke<{ machine_resources?: MachineResources; workspaces?: { id: string; name: string }[] }>("list_workspaces", {}, {
         headers: { "x-terminus-machine": m.id },
       });
       if (valid()) setSummaries((prev) => ({ ...prev, [m.id]: {
-        resources: startup.machine_resources, loading: false,
+        resources: startup.machine_resources, workspaceName: startup.workspaces?.find((w) => w.id === workspace)?.name, loading: false,
       } }));
     } catch (error) {
       if (valid()) setSummaries((prev) => ({ ...prev, [m.id]: {
@@ -265,7 +265,7 @@ export default function Almacenamiento(props: {
     try {
       const list = await invoke<Machine[]>("machine_list", {}, workspace
         ? { headers: { "x-terminus-workspace": workspace } } : undefined);
-      if (disposed || context !== generation || request !== inventoryRequest) return;
+      if (disposed || context !== generation || workspace !== props.workspace || request !== inventoryRequest) return;
       setInventory(list);
       if (!list.some((m) => m.id === machine())) {
         setMachine((list.find((m) => m.active) ?? list[0])?.id ?? null);
@@ -650,8 +650,11 @@ export default function Almacenamiento(props: {
 
   function comparable(disk: MachineResources["storage"][number]) {
     return [disk.total_bytes, disk.free_bytes, disk.available_bytes].every((n) => Number.isFinite(n) && n >= 0)
-      && disk.total_bytes > 0 && disk.free_bytes <= disk.total_bytes && disk.available_bytes <= disk.free_bytes;
+      && (disk.total_bytes > 0) && disk.free_bytes <= disk.total_bytes && disk.available_bytes <= disk.free_bytes;
   }
+
+  const summaryStale = (m: Machine, summary: Summary | undefined) => !!summary?.resources
+    && (!m.on || !!summary.error || Date.now() - summary.resources.measured_at > 300_000);
 
   function Disk(props2: { disk: MachineResources["storage"][number] }) {
     const used = () => props2.disk.total_bytes - props2.disk.free_bytes;
@@ -681,6 +684,7 @@ export default function Almacenamiento(props: {
       <>
         <Show when={summary()?.loading}><p class="m-0 mt-1 text-xs text-neutral-500">{t("shell.storage.measuring")}</p></Show>
         <Show when={summary()?.error}><p role="alert" class="m-0 mt-1 whitespace-pre-wrap text-xs text-error-strong">{summary()?.error}</p></Show>
+        <Show when={summaryStale(props2.machine, summary())}><p role="status" class="m-0 mt-1 text-xs text-warning-strong">{t("shell.storage.stale")}</p></Show>
         <Show when={summary()?.resources} fallback={<Show when={!summary()?.loading}><p class="m-0 mt-1 text-xs text-neutral-500">{t("shell.storage.capacity_unavailable")}</p></Show>}>
           {(resources) => <>
             <Show when={resources().error}>
@@ -709,6 +713,7 @@ export default function Almacenamiento(props: {
         <Show when={summary()?.resources} fallback={<span class="block mt-1 text-[0.6875rem] text-neutral-500">{t("shell.storage.capacity_unavailable")}</span>}>
           {(resources) => <>
             <span class="block mt-1 text-[0.6875rem] text-neutral-500">{resources().error ? t("shell.storage.attempted", { when: haceCuanto(resources().measured_at) }) : t("shell.storage.measured", { when: haceCuanto(resources().measured_at) })}</span>
+            <Show when={summaryStale(props2.machine, summary())}><span class="block mt-1 text-[0.6875rem] text-warning-strong">{t("shell.storage.stale")}</span></Show>
             <For each={resources().storage}>{(disk) => <Disk disk={disk} />}</For>
           </>}
         </Show>
@@ -791,7 +796,7 @@ export default function Almacenamiento(props: {
               <h3 class="m-0 text-xs font-semibold text-neutral-950">{machineName(m().id, m().local)}</h3>
               <MachineDisks machine={m()} />
               <p class="m-0 mt-3 text-xs font-semibold text-neutral-950">
-                {t("shell.storage.workspace_scope", { workspace: props.workspace ?? "—" })}
+                {t("shell.storage.workspace_scope", { workspace: summaries()[m().id]?.workspaceName ?? props.workspace ?? "—" })}
               </p>
               <Show when={!m().on}>
                 <p role="status" class="m-0 mt-1 text-xs text-warning-strong">{t("shell.storage.offline")}</p>
@@ -810,6 +815,9 @@ export default function Almacenamiento(props: {
               </Show>
               <Show when={datos()}>
                 <p class="m-0 mt-1 text-[0.6875rem] text-neutral-500">{t("shell.storage.measured", { when: haceCuanto(datos()!.medido_en) })}</p>
+                <Show when={!m().on || !!readError() || Date.now() - datos()!.medido_en > 300_000}>
+                  <p role="status" class="m-0 mt-1 text-xs text-warning-strong">{t("shell.storage.stale")}</p>
+                </Show>
               </Show>
             </section>
           )}</Show>

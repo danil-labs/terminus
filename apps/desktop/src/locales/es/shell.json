@@ -148,6 +148,7 @@
   "shell.storage.offline": "Sin conexión",
   "shell.storage.removed_logical": "Se retiraron {size} lógicos; el espacio físico liberado puede ser distinto.",
   "shell.storage.summary_error": "Error de lectura",
+  "shell.storage.stale": "Medición desactualizada",
   "shell.storage.workspace_missing": "Este workspace no está disponible en esta máquina.",
   "shell.storage.workspace_scope": "Workspace · {workspace}",
   "shell.storage.retry": "Reintentar",
