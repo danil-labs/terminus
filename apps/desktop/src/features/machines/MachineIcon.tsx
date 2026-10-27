@@ -3,8 +3,7 @@ import Server from "lucide-solid/icons/server";
 
 /**
  * Una VM que Danil puede encender (`wakes`) frente a una máquina de la persona.
- * El sistema (macOS, Windows, Linux) no viene en la fila de la cuenta: el icono
- * no lo inventa.
+ * El sistema, cuando se sabe, se lee en la tarjeta de la tarea; el icono no lo dibuja.
  */
 export function MachineIcon(props: { wakes?: boolean; size?: number; class?: string }) {
   const size = () => props.size ?? 12;

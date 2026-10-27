@@ -22,6 +22,8 @@ import {
   screenUrl,
   sessionProbe,
   startComputer,
+  systemOf,
+  type SystemId,
   wakes,
 } from "@terminus/computers";
 import { Fleet, type MachineInfo, unwrap } from "@terminus/fleet";
@@ -33,7 +35,7 @@ import { whenConnected } from "../../lib/engineConnection";
 import { leerPref } from "../../lib/prefs";
 import { capabilities, setCapabilities, type Capabilities } from "../../lib/platform";
 import { deliver, listen } from "../../lib/serviceEvents";
-import { isMac } from "../../lib/window";
+import { isMac, isWindows } from "../../lib/window";
 import { Toast, ToastPortal } from "../../ui/Toast";
 import type { MachineStatus } from "../../web/SyncNote";
 import { type DanilSessionInfo, sessionForWorkspace, type WorkspaceAccount } from "../settings/danil-sessions";
@@ -65,6 +67,13 @@ let syncing: Promise<void> | null = null;
 const [selfName, setSelfName] = createRoot(() => createSignal<string | null>(null));
 const homeName = () => selfName() ?? (isMac() ? t("shell.machines.this_mac") : t("shell.machines.this_computer"));
 
+/** El sistema de esta ventana. Solo el escritorio carga este módulo, así que el navegador no es el de la web. */
+function windowSystem(): SystemId {
+  if (isMac()) return "macos";
+  if (isWindows()) return "windows";
+  return "linux";
+}
+
 /** Tell every list of the window to read again: the machines behind it changed. */
 function refresh() {
   for (const name of ["harness:workspace-name", "harness:sources", "harness:tasks-changed", "harness:service-resync"]) {
@@ -79,13 +88,17 @@ function slicesChanged(changes: SliceChange[]) {
   if (changes.includes("attention")) window.dispatchEvent(new CustomEvent("harness:service-resync"));
 }
 
-const infoOf = (c: Computer): MachineInfo => ({
-  id: c.computer_id,
-  name: c.name?.trim() || c.computer_id,
-  wakes: wakes(c),
-  outdated: machineCompatibility(c.contract, __TERMINUS_CONTRACT__) === "outdated",
-  linked: linkedWorkspaces(c),
-});
+const infoOf = (c: Computer): MachineInfo => {
+  const os = systemOf(c.os);
+  return {
+    id: c.computer_id,
+    name: c.name?.trim() || c.computer_id,
+    wakes: wakes(c),
+    outdated: machineCompatibility(c.contract, __TERMINUS_CONTRACT__) === "outdated",
+    linked: linkedWorkspaces(c),
+    ...(os ? { os } : {}),
+  };
+};
 
 /** The machine picked in «Ejecutar en» for `workspace` (`store.ts`), remembered per workspace. */
 const pickedFor = (workspace: string | null) => (workspace ? (leerPref<Record<string, string>>("machines.run_on", {})[workspace] ?? null) : null);
@@ -100,8 +113,9 @@ export function startAccountMachines(target: Target = window) {
   // The window's own IPC under its usual name: the command guards read these two literally.
   const invoke = native;
   let token: ClientToken | null = null;
-  /** Si esta computadora es una VM administrada. La lista la lee en cada `machine_list`. */
+  /** Si esta computadora es una VM administrada, y su sistema. La lista los lee en cada `machine_list`. */
   let homeWakes = false;
+  let homeOs: SystemId = windowSystem();
   /** The session the fan-out talks as: the open workspace's account; `null` is the default one. */
   let account: string | null = null;
 
@@ -165,7 +179,7 @@ export function startAccountMachines(target: Target = window) {
       onSlices: slicesChanged,
       deliver,
       pickedFor,
-      home: () => ({ wakes: homeWakes }),
+      home: () => ({ wakes: homeWakes, os: homeOs }),
     });
     fleet.setMachines(others.map(infoOf));
     fleet.subscribeEvents();
@@ -286,6 +300,7 @@ export function startAccountMachines(target: Target = window) {
     const mine = answer.value.find((c) => c.computer_id === self);
     setSelfName(mine?.name?.trim() || null);
     homeWakes = mine ? wakes(mine) : false;
+    homeOs = systemOf(mine?.os) ?? windowSystem();
     const others = orderComputers(answer.value.filter((c) => c.computer_id !== self));
     const key = JSON.stringify([self, account, client.endpoint]);
     if (!others.length) return uninstall();

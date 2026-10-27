@@ -1,3 +1,4 @@
+import { type SystemId } from "@terminus/computers";
 import { createRoot, createSignal } from "solid-js";
 import { invoke } from "../../lib/invoke";
 import { t } from "../../lib/i18n";
@@ -8,9 +9,9 @@ import { capabilities } from "../../lib/platform";
 /**
  * `machine_list`: `hosts` es si tiene el workspace abierto (`null`, que no se sabe
  * sin encenderla); `materializes`, si puede hacerlo suyo con el mismo id al crear ahí.
+ * `wakes`: VM administrada. `os` solo si se sabe; si falta, no se inventa.
  */
-/** `wakes`: VM administrada. Sin el campo, o en falso, es una máquina de la persona. */
-export type Machine = { id: string; local: boolean; active: boolean; on: boolean; hosts: boolean | null; materializes?: boolean; wakes?: boolean };
+export type Machine = { id: string; local: boolean; active: boolean; on: boolean; hosts: boolean | null; materializes?: boolean; wakes?: boolean; os?: SystemId };
 
 /** Lo que el picker sabe del proyecto de la tarea nueva: las máquinas con su carpeta y su remoto. */
 export type ProjectPlace = { name: string; machines?: string[]; remote_url?: string | null } | null | undefined;
@@ -121,6 +122,12 @@ export function rememberOrigin(session: string, origin: CarryOrigin) {
 /** VM administrada. Sin `wakes` (un motor anterior) vale lo de antes: lo que no es la máquina de la ventana. */
 export function wakesOf(m: { wakes?: boolean; local: boolean }): boolean {
   return m.wakes ?? !m.local;
+}
+
+/** El nombre del sistema, si la fila lo trae. La barra de la tarea no lo usa. */
+export function machineSystem(id: string): string | null {
+  const os = machines().find((m) => m.id === id)?.os;
+  return os ? t(`shell.machines.os.${os}`) : null;
 }
 
 /** Si esa máquina es una VM administrada. Una que no está en la lista y no es la de la ventana se queda como VM. */

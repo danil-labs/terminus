@@ -46,7 +46,7 @@ const row = (id: string, title = id) => ({ id, title, updated_at: 0 });
 const VM: MachineInfo = { id: "cmp_vm", name: "Danil VM", wakes: true };
 const MAC: MachineInfo = { id: "cmp_mac", name: "Mac de Ana", wakes: false };
 
-function setup(links: Record<string, ReturnType<typeof fakeLink>>, local: Record<string, unknown> = {}, picked: string | null = null) {
+function setup(links: Record<string, ReturnType<typeof fakeLink>>, local: Record<string, unknown> = {}, picked: string | null = null, home?: () => { wakes?: boolean; os?: "linux" | "macos" | "windows" }) {
   const native: { command: string; args: Args; options: unknown }[] = [];
   const changes: string[][] = [];
   const fleet = new Fleet({ self: "cmp_home", connect: (info) => links[info.id], deadlines: { read: 40, action: 200, intent: 400 } });
@@ -70,6 +70,7 @@ function setup(links: Record<string, ReturnType<typeof fakeLink>>, local: Record
     },
     onSlices: (c) => changes.push(c),
     pickedFor: () => picked,
+    home,
   });
   fleet.setMachines([VM, MAC].filter((m) => links[m.id]));
   return { router, fleet, native, changes };
@@ -206,6 +207,20 @@ test("without a pick something new is born on the window's machine; «Ejecutar e
   const picked = setup({ cmp_vm: fakeLink({}) }, {}, "cmp_vm");
   await picked.router.handle("list_workspaces");
   assert.deepEqual(picked.router.createsOn("w"), { machine: "cmp_vm", lead: false });
+});
+
+test("machine_list says which machines wake and names a system only when the row has one", async () => {
+  const { router, fleet } = setup({ cmp_vm: fakeLink({}), cmp_mac: fakeLink({}, "offline") }, {}, null, () => ({ wakes: true, os: "linux" }));
+  fleet.setMachines([{ ...VM, os: "linux" }, MAC]);
+  await router.handle("list_workspaces");
+  const list = (await router.handle("machine_list")) as { id: string; wakes?: boolean; os?: string }[];
+  const row = (id: string) => list.find((m) => m.id === id);
+  assert.equal(row("cmp_vm")?.wakes, true);
+  assert.equal(row("cmp_vm")?.os, "linux");
+  assert.equal(row("cmp_mac")?.wakes, false);
+  assert.equal(row("cmp_mac")?.os, undefined);
+  assert.equal(row("cmp_home")?.wakes, true, "this window can be the managed VM");
+  assert.equal(row("cmp_home")?.os, "linux");
 });
 
 test("an action to the person's own machine that is off says so plainly, without trying to start it", async () => {

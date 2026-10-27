@@ -25,12 +25,14 @@ export {
   MANAGED_PROVIDERS,
   MIRROR_COMMANDS,
   UNWAKEABLE_KINDS,
+  type SystemId,
   canAct,
   defaultComputer,
   isDeferrable,
   isManaged,
   orderComputers,
   powerOf,
+  systemOf,
   wakes,
 } from "./machine.ts";
 export { type WorkspaceGroup, type WorkspaceRow, groupWorkspaces, hasAccountWorkspaces, registryProjects, withRegistry } from "./fleet.ts";

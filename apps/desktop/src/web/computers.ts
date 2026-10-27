@@ -16,6 +16,8 @@ export type Computer = {
   host_version?: string | null;
   /** The engine contract of its last hello (`compatibility.ts`). */
   contract?: string | null;
+  /** `linux`, `macos` or `windows`, only when the control plane says so. */
+  os?: string | null;
   /** The workspaces of this computer linked to the account; absent from a control plane before links. */
   workspaces?: string[] | null;
 };
