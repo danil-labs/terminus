@@ -6,6 +6,10 @@ workers_dev = false
 preview_urls = false
 
 [[routes]]
+pattern = "alfa-app.danil.ai/terminus"
+zone_id = "e14ef2690bfae6ea80d2b8fffbcfd708"
+
+[[routes]]
 pattern = "alfa-app.danil.ai/terminus/*"
 zone_id = "e14ef2690bfae6ea80d2b8fffbcfd708"
 

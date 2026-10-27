@@ -90,3 +90,16 @@ test("assets preserve CSP and legacy paths are not handled", async () => {
   assert.equal((await worker.fetch(new Request("https://app.danil.ai/terminus/inbox"), h.env)).status, 404);
   assert.equal(h.calls.length, 0);
 });
+
+
+test("bare Terminus path redirects locally without hitting bindings", async () => {
+  const h = harness();
+  for (const method of ["GET", "HEAD"]) {
+    const response = await h.fetch("/terminus?next=https%3A%2F%2Fevil.example", { method });
+    assert.equal(response.status, 308);
+    assert.equal(response.headers.get("Location"), origin + "/terminus/?next=https%3A%2F%2Fevil.example");
+    assert.equal(response.headers.get("Cache-Control"), "no-store");
+  }
+  assert.equal((await h.fetch("/terminus", { method: "POST" })).status, 405);
+  assert.equal(h.calls.length, 0);
+});

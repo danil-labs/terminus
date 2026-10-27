@@ -27,6 +27,11 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.hostname !== HOST || url.protocol !== "https:") return json("not_found", 404);
+    if (url.pathname === "/terminus") {
+      if (request.method !== "GET" && request.method !== "HEAD") return json("method_not_allowed", 405);
+      url.pathname = "/terminus/";
+      return new Response(null, { status: 308, headers: { Location: url.href, "Cache-Control": "no-store" } });
+    }
     if (url.pathname === PREFIX || url.pathname.startsWith(`${PREFIX}/`)) {
       if (request.method !== "GET") return json("method_not_allowed", 405);
       const path = url.pathname.slice(PREFIX.length);
