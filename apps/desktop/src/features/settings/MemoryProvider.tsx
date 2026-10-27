@@ -30,7 +30,7 @@ export default function ProveedorDeMemoria() {
       if (activo.memoria.tipo === "mcp_externo") {
         setReadWrite(activo.memoria.lectura_escritura);
       }
-    });
+    }).catch(() => {});
   }
   onMount(cargar);
 

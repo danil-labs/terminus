@@ -1,4 +1,5 @@
 {
+  "spaces.order.error": "No se pudo guardar el orden de los espacios. Inténtalo de nuevo.",
   "spaces.archived.deleted": "eliminada",
   "spaces.archived.empty": "No hay tareas archivadas.",
   "spaces.archived.foot_title": "Todas las tareas archivadas del workspace, de todos los espacios",

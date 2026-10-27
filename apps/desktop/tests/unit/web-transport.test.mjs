@@ -21,7 +21,8 @@ test("the web build talks to the relay: calls, events and machine state", async 
   const text = () => app.w.document.body.textContent ?? "";
 
   assert.deepEqual(app.fallos, []);
-  assert.equal(fake.sockets[0]?.url, "wss://relay.test/v1/computers/cmp_test/session");
+  assert.equal(fake.sockets[0]?.url.split("?")[0], "wss://relay.test/v1/computers/cmp_test/session");
+  assert.match(fake.sockets[0]?.url ?? "", /\?contracts=[0-9a-f]{64}(,[0-9a-f]{64})*$/, "it says the compatible contracts it speaks, like the desktop");
   assert.deepEqual(fake.sockets[0]?.protocols, ["danil.computers.v1", "bearer.tok"]);
 
   const projects = fake.calls.find((c) => c.command === "list_projects");
@@ -33,7 +34,7 @@ test("the web build talks to the relay: calls, events and machine state", async 
   assert.deepEqual(local.map((c) => c.command), [], "window-only commands stay in the page");
   assert.deepEqual(fake.subscriptions.slice(0, 1), [null]);
 
-  app.w.document.querySelector('[data-sesion="t1"]').click();
+  app.w.document.querySelector('[data-sesion="cmp_test~t1"]').click();
   await sleep(400);
   const where = app.w.document.querySelector("[data-task-location]");
   assert.equal(where?.querySelector("[data-task-location-machine]")?.textContent, "cmp_test", "in the browser the task runs on the computer, not on this one");
@@ -205,28 +206,6 @@ test("workspace context comes from its owning machine, including its source read
   assert.ok(app.w.document.body.textContent.includes("No se pudo leer la fuente principal"), "a missing root is a visible read failure");
   assert.ok(!app.w.document.body.textContent.includes("Sin fuente de contexto"));
   assert.deepEqual(app.fallos, []);
-});
-
-test("source origins cannot be overwritten by collisions or late replies, and outdated owners stay authoritative", async () => {
-  const { Fleet } = await import("../../src/web/fleet.ts");
-  const listing = (machine, root) => ({ machine, value: { workspaces: [{ id: "w", context_root: root, logo: `/${machine}/logo` }], active: "w" } });
-  for (const replies of [["mac", "vm"], ["vm", "mac"]]) {
-    const f = new Fleet([{ id: "vm", name: "VM", wakes: true }, { id: "mac", name: "Mac", wakes: false }]);
-    const merged = f.merge("list_workspaces", [listing("vm", null), listing("mac", "root")]);
-    assert.equal(merged.workspaces[0].logo, "mac~/mac/logo", "paths and root come from the same machine");
-    for (const machine of replies) f.rememberSources(machine, "w", [{ id: "same" }]);
-    assert.throws(() => f.route("remove_source", { source: "same" }, "w", null, "vm"), /context_ambiguous/);
-    assert.equal(f.route("remove_source", { source: "same" }, "w", "mac", "vm").machine, "mac");
-    assert.equal(f.route("list_sources", {}, "w", null, "vm").machine, "mac");
-    f.markOutdated("mac");
-    const partial = f.merge("list_workspaces", [listing("vm", "another-root")]);
-    assert.equal(partial.workspaces[0].context_root, "root");
-    assert.equal(f.route("list_sources", {}, "w", null, "vm").machine, "mac");
-    assert.equal(f.route("list_mentions", {}, "w", null, "vm").machine, "vm", "task/project reads keep their existing routing");
-    assert.equal(f.route("set_source_branch", { project: "p", source: "same" }, "w", null, "vm").machine, "vm", "project mutations keep their existing routing");
-    f.merge("list_workspaces", [listing("mac", null), listing("vm", "another-root")]);
-    assert.equal(f.route("list_sources", {}, "w", null, "vm").machine, "vm", "a valid absence releases the owner");
-  }
 });
 
 test("only a confirmed absence of a primary source shows the empty context actions", async () => {

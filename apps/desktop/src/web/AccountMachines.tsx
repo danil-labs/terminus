@@ -18,10 +18,10 @@ export default function AccountMachines(props: AccountMachinesProps & { machines
   const others = () =>
     props.machines().filter((m) => m.status !== "outdated" && !(props.account.machines ?? []).some((x) => x.machine === m.id));
 
-  async function signOut(id: string) {
+  async function signOut(id: string, machine: string) {
     setAsking(null);
     try {
-      await invoke("remove_account", { provider: props.provider, id });
+      await invoke("remove_account", { provider: props.provider, id }, { headers: { "x-terminus-machine": machine } });
       setFailed(false);
     } catch {
       setFailed(true);
@@ -58,7 +58,7 @@ export default function AccountMachines(props: AccountMachinesProps & { machines
                   </button>
                 }
               >
-                <button type="button" class="px-1 text-error-strong" data-sign-out-yes="" onClick={() => void signOut(m.id)}>
+                <button type="button" class="px-1 text-error-strong" data-sign-out-yes="" onClick={() => void signOut(m.id, m.machine)}>
                   {t("web.accounts.sign_out_yes")}
                 </button>
                 <button type="button" class="px-1" onClick={() => setAsking(null)}>

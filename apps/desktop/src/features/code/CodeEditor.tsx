@@ -48,6 +48,7 @@ import { frasesDelEditor } from "./editorPhrases";
 import { sangriaDe } from "./indent";
 import { RESALTADO, TEMA } from "./editorTheme";
 import { MUESTRA, gramaticaDe, gramaticaLista } from "./languages";
+import { type DondeTypst, autocompletadoTypst } from "./typstComplete";
 
 /**
  * El archivo abierto para escribir, con CodeMirror 6 montado a mano. Entra con
@@ -265,6 +266,8 @@ export default function EditorDeCodigo(props: {
   /** Llevar el cursor a una línea; `n` distingue dos saltos al mismo sitio. */
   irA?: { linea: number; columna: number; n: number } | null;
   onIdoA?: (n: number) => void;
+  /** En un `.typ`, de dónde pide el panel de propuestas (`typstComplete.ts`); se lee al montar. */
+  typst?: () => DondeTypst;
 }) {
   let caja!: HTMLDivElement;
   const lenguaje = new Compartment();
@@ -324,6 +327,7 @@ export default function EditorDeCodigo(props: {
           keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, ...searchKeymap, ...foldKeymap, indentWithTab]),
           lenguaje.of((!grande && gramaticaLista(props.ruta)) || []),
           textos.of([]),
+          props.typst ? autocompletadoTypst(props.typst) : [],
           TEMA,
           EditorView.updateListener.of((u) => {
             if (u.selectionSet || u.docChanged) avisarCursor(u.state);

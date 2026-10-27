@@ -4251,10 +4251,11 @@ dependencies = [
 
 [[package]]
 name = "terminus"
-version = "0.2.84"
+version = "0.2.87"
 dependencies = [
  "core-foundation",
  "dirs",
+ "dunce",
  "gtk",
  "libc",
  "log",
@@ -4264,6 +4265,7 @@ dependencies = [
  "security-framework-sys",
  "serde",
  "serde_json",
+ "sha2",
  "tauri",
  "tauri-build",
  "tauri-plugin-clipboard-manager",

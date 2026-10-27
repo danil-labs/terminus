@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { useState } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { MOBILE_WEB_DIR, WEB_LAYOUT_KEY } from "@terminus/design";
 import type { AttentionState } from "@terminus/protocol";
@@ -11,6 +12,7 @@ import { useWorkspaces } from "../lib/workspaces";
 import { Avatar, Badge, Dot, Row, SectionTitle, SheetTitle } from "../ui/components";
 import { TaskMark, type TaskState, topState } from "../ui/TaskStatus";
 import { Icon } from "../ui/Icon";
+import { matches, NoMatch, SearchField } from "../ui/Search";
 import { useTheme } from "../ui/theme";
 
 const NEEDS_YOU = new Set<AttentionState>(["approving", "asked", "failed"]);
@@ -37,18 +39,24 @@ function desktopBase(): string {
 export default function WorkspaceSwitcher() {
   const theme = useTheme();
   const { email, signOut, session } = useAccount();
-  const { attention, hosts, pairing, pair } = useMachines();
+  const { attention, hosts, pairing, pair, registry } = useMachines();
   const { list, current, select } = useWorkspaces();
   const several = hosts.length > 1;
   const labelOf = (id: string) => hosts.find((h) => h.id === id)?.label ?? id;
   const power = (host: Host) =>
     host.power() === "on" ? w("web.computers.state.online") : host.power() === "starting" ? w("web.computers.state.starting") : host.power() === "outdated" ? w("web.computers.state.outdated") : w("web.computers.state.offline");
   const dot = (host: Host) => (host.power() === "on" ? theme.success : host.power() === "starting" ? theme.info : theme.border);
+  // Un workspace coincide por su nombre o por el de una de sus máquinas.
+  const [query, setQuery] = useState("");
+  const workspaces = list.filter((workspace) => matches(query, workspace.name, ...workspace.hosts.map(labelOf)));
+  const machines = hosts.filter((host) => matches(query, host.label));
 
   return (
-    <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ paddingVertical: 8 }}>
+    <ScrollView contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingVertical: 8 }}>
       <SheetTitle>{t("workspaces.title")}</SheetTitle>
-      {list.map((workspace) => {
+      <SearchField testID="workspaces-search" value={query} onChange={setQuery} placeholder={t("search.workspaces")} />
+      {query.trim() && !workspaces.length && !machines.length ? <NoMatch /> : null}
+      {workspaces.map((workspace) => {
         const tasks = Object.entries(attention).flatMap(([host, ws]) => ws.filter((x) => x.workspace === workspace.members.get(host)).flatMap((x) => x.tasks));
         const pending = tasks.filter((task) => NEEDS_YOU.has(task.state)).length;
         const folded = topState(tasks.map((task) => task.state as TaskState));
@@ -69,8 +77,28 @@ export default function WorkspaceSwitcher() {
         );
       })}
 
-      <SectionTitle>{t("machines.title")}</SectionTitle>
-      {hosts.map((host) => (
+      {session && registry?.length ? (
+        <>
+          <SectionTitle>{t("memory.title")}</SectionTitle>
+          {registry.map((workspace) => (
+            <Row
+              key={workspace.id}
+              testID={`memory-${workspace.id}`}
+              left={<Icon name="brain" size={20} color={theme.textMuted} />}
+              title={t("memory.open", { name: workspace.name })}
+              subtitle={t("memory.subtitle")}
+              right={<Icon name="chevron-right" size={16} color={theme.textMuted} />}
+              onPress={() => {
+                router.back();
+                router.push({ pathname: "/memory/[workspace]", params: { workspace: workspace.id } });
+              }}
+            />
+          ))}
+        </>
+      ) : null}
+
+      {machines.length ? <SectionTitle>{t("machines.title")}</SectionTitle> : null}
+      {machines.map((host) => (
         <Row
           key={host.id}
           testID={`machine-${host.id}`}
@@ -79,6 +107,7 @@ export default function WorkspaceSwitcher() {
           subtitle={`${power(host)} · ${host.kind === "bridge" ? t("signin.dev_bridge") : host.managed ? t("machines.managed") : t("machines.own")}`}
         />
       ))}
+      {hosts.length ? <Row testID="open-activity" left={<Icon name="terminal" size={20} color={theme.textMuted} />} title={t("activity.title")} subtitle={t("activity.description")} right={<Icon name="chevron-right" size={16} color={theme.textMuted} />} onPress={() => { router.back(); router.push("/activity"); }} /> : null}
       {hosts.length ? (
         <Row
           testID="open-accounts"

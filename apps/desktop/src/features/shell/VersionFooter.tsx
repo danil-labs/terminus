@@ -1,5 +1,6 @@
 import { Show, createSignal, onMount } from "solid-js";
 import { getVersion } from "@tauri-apps/api/app";
+import { capabilities } from "../../lib/platform";
 
 /**
  * La versión instalada, en el extremo derecho de la barra inferior.
@@ -25,6 +26,8 @@ import { getVersion } from "@tauri-apps/api/app";
  * de recargar, que acaba a dos palmos del número que recarga.
  */
 export default function PieVersion() {
+  if (!capabilities().nativeWindow) return null;
+
   const [version, setVersion] = createSignal<string | null>(null);
 
   onMount(() => {

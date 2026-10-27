@@ -137,11 +137,8 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
   const base = (s, prefs) => ({
     ...CON_TAREA,
     ...s.respuestas,
-    // Cada espacio guarda su vista del riel; aquí todas empiezan agrupadas por carpeta.
-    workspaces_startup: sembrar({
-      ...Object.fromEntries(s.spaces.map((i) => [`sidebar.view.w.${i.id}`, { group: "folder" }])),
-      ...prefs,
-    }),
+    // Cada espacio guarda su vista del riel; sin guardar, todas agrupan por carpeta, que es lo de omisión.
+    workspaces_startup: sembrar({ ...prefs }),
     list_workspaces: () => ({ workspaces: [{ id: "w", name: "Danil", context_root: null, lengua: "es" }], active: "w" }),
     load_session: ({ id }) => ({ ...CON_TAREA.load_session, id }),
     task_history: CON_TAREA.task_history,
@@ -155,7 +152,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
       tecla,
       pildoras: () => [...doc.querySelectorAll("[data-space-pill]")],
       pildora: (id) => doc.querySelector(`[data-space-pill="${id}"]`),
-      // Con el riel agrupado por carpeta: una cabecera por carpeta con tareas.
+      // Con el riel agrupado por carpeta: una cabecera por carpeta, tenga tareas o no.
       carpetasEnTareas: () =>
         [...doc.querySelectorAll("[data-folder-group]")].map((el) => el.dataset.folderGroup),
       pestanas: () => [...doc.querySelectorAll('[data-tira] [role="tab"]')].map((el) => el.textContent.trim()),
@@ -168,7 +165,8 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
         await sleep(80);
         const grupo = doc.querySelector('[role="menu"] [role="group"][aria-label="Agente"]');
         assert.ok(grupo, "el menú de filtro ofrece agentes");
-        [...grupo.querySelectorAll('[role="menuitemradio"]')].find((b) => b.textContent.trim() === (nombre ?? "Todos")).click();
+        // El nombre y no la nota de al lado («desinstalado»).
+        [...grupo.querySelectorAll('[role="menuitemradio"]')].find((b) => b.children[1].textContent.trim() === (nombre ?? "Todos")).click();
         await sleep(80);
         tecla(doc.activeElement ?? doc.body, "Escape");
         await sleep(80);
@@ -199,7 +197,8 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     assert.equal(u.pildora("i1").dataset.selected, "true");
     assert.equal(u.pildora("i1").querySelector("[data-attention-badge]"), null, "la elegida no lleva señal");
     assert.ok(u.doc.querySelector("[data-new-space]"), "el «+» sigue a las píldoras");
-    assert.deepEqual(u.carpetasEnTareas(), ["pa", "pb"], "las carpetas con tareas, en el orden de hoy: «pc» solo tiene una archivada");
+    assert.deepEqual(u.carpetasEnTareas(), ["pa", "pb", "pc"], "las carpetas del espacio, en el orden de hoy, también «pc», que solo tiene una archivada");
+    assert.ok(u.doc.querySelector('[data-sidebar-group="pc"] [data-folder-empty]'), "«pc» se ve vacía");
     assert.equal(u.doc.querySelector("[data-main-folder]"), null, "ninguna carpeta es la principal");
     assert.deepEqual(u.pestanas(), ["Tarea t1", "Tarea t2"], "la tira de antes sigue abierta");
     assert.deepEqual(u.pref("pestanas.w")?.abiertas.map((p) => p.id), ["t1", "t2"], "la clave vieja se queda para un build anterior");
@@ -357,11 +356,12 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     u.doc.querySelector('[data-space="i2"]').click();
     await sleep(400);
     assert.ok(u.doc.querySelector('[data-sesion="t3"]') && u.doc.querySelector('[data-sesion="t4"]'), "otro espacio no hereda el filtro");
-    assert.doesNotMatch(u.doc.querySelector("[data-sidebar-scope]").textContent, /ada/);
+    // Agrupar por carpeta es lo de omisión: no cuenta como cambio, el agente sí.
+    assert.equal(u.doc.querySelector('[data-sidebar-scope] button[aria-haspopup="menu"]').getAttribute("aria-label"), "Filtrar y agrupar");
     u.doc.querySelector('[data-space="i1"]').click();
     await sleep(400);
     assert.ok(u.doc.querySelector('[data-sesion="t1"]') && !u.doc.querySelector('[data-sesion="t2"]'), "volver al espacio recupera su filtro");
-    assert.match(u.doc.querySelector("[data-sidebar-scope]").textContent, /ada/);
+    assert.match(u.doc.querySelector('[data-sidebar-scope] button[aria-haspopup="menu"]').getAttribute("aria-label"), /\(1 cambiados\)/);
     assert.equal(u.pref("sidebar.view.w.i1").agent, "ada");
     assert.equal(u.pref("sidebar.view.w.i2")?.agent ?? null, null);
     await u.filtrarPorAgente(null);
@@ -722,7 +722,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
         { id: "i1", name: null, folders: ["pa", "pc"], created_at: 1, updated_at: 1 },
         { id: "i2", name: "Facturación", folders: ["pb", "pc"], created_at: 2, updated_at: 2 },
       ],
-      // El riel solo enseña carpetas con tareas: cada una lleva la suya.
+      // Cada carpeta lleva una tarea suya.
       filas: [fila("t1", "pa", "i1"), fila("t2", "pc", "i1"), fila("t3", "pb", "i2"), fila("t4", "pc", "i2")],
     });
     const app = await boot("listo", "spaces-folders", base(s, { "space.w": "i1" }));

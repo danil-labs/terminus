@@ -48,12 +48,20 @@ export type ObservabilityTab = CommonTab & {
   titulo: string;
 };
 
+// Una por máquina: la pantalla es de la computadora, no de una tarea.
+export type ScreenTab = CommonTab & {
+  clase: "pantalla";
+  machine: string;
+  titulo: string;
+};
+
 export type Tab =
   | TaskTab
   | FileTab
   | ArtifactTab
   | SiteTab
-  | ObservabilityTab;
+  | ObservabilityTab
+  | ScreenTab;
 export type ContentTab =
   | FileTab
   | ArtifactTab
@@ -81,6 +89,8 @@ let browserSequence = 0;
 export const browserTabId = () => `navegador\u0000${Date.now()}\u0000${browserSequence++}`;
 
 export const OBSERVABILITY_TAB_ID = "observabilidad";
+
+export const screenTabId = (machine: string) => `pantalla\u0000${machine}`;
 
 export const isTaskTab = (p: Tab): p is TaskTab => p.clase === "tarea";
 export const isContentTab = (p: Tab): p is ContentTab =>
@@ -138,11 +148,11 @@ const key = (workspace: string, space: string | null) =>
   space ? `pestanas.${workspace}.${space}` : `pestanas.${workspace}`;
 
 const readStoredTabs = (k: string): StoredTabs => {
-  const g = leerPref<StoredTabs>(k, { abiertas: [], activa: null });
-  const openTabs = Array.isArray(g.abiertas)
+  const g = leerPref<StoredTabs | null>(k, null);
+  const openTabs = Array.isArray(g?.abiertas)
     ? g.abiertas.map(asTask).filter((p): p is TaskTab => p !== null)
     : [];
-  return { abiertas: openTabs, activa: openTabs.some((p) => p.id === g.activa) ? g.activa : null };
+  return { abiertas: openTabs, activa: g && openTabs.some((p) => p.id === g.activa) ? g.activa : null };
 };
 
 // La clave anterior se conserva para que un build anterior pueda restaurar su tira.
@@ -365,6 +375,20 @@ export function createTabs(options: { transient?: boolean } = {}) {
       if (!options.transient) pin(next.id);
       activateAndPersist(next.id);
     },
+    openScreen(machine: string, title: string) {
+      const next: ScreenTab = {
+        clase: "pantalla",
+        id: screenTabId(machine),
+        project: "",
+        session: "",
+        machine,
+        titulo: title,
+      };
+      setOpenTabs((list) =>
+        list.some((p) => p.id === next.id) ? list : [...list, next],
+      );
+      activateAndPersist(next.id);
+    },
     openContent(p: ContentTab) {
       setOpenTabs((list) => {
         const i = list.findIndex((x) => x.id === p.id);
@@ -528,6 +552,7 @@ export function createTabs(options: { transient?: boolean } = {}) {
         // Validarlas contra él cerraría sus pestañas durante la sincronización.
         if (
           p.clase === "observabilidad" ||
+          p.clase === "pantalla" ||
           p.session === "" ||
           esProvisional(p.session)
         ) {

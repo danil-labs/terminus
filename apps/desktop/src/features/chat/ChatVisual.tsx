@@ -17,6 +17,8 @@ export default function ChatVisual(props: {
   owner: string;
   budget: VisualBudget;
   read: (file: string) => Promise<string>;
+  /** Abre el archivo fuera, cuando el chat no puede pintarlo. */
+  open?: (file: string) => Promise<void>;
 }) {
   let container!: HTMLDivElement;
   let panel!: HTMLDialogElement;
@@ -101,6 +103,15 @@ export default function ChatVisual(props: {
     mutate(undefined);
   };
   const title = () => props.visual.title || t("chat.visual.title");
+  const [openFailed, setOpenFailed] = createSignal(false);
+  const openOutside = async () => {
+    setOpenFailed(false);
+    try {
+      await props.open?.(props.visual.file);
+    } catch {
+      setOpenFailed(true);
+    }
+  };
   const failure = () => {
     const error = html.error;
     const cause = error instanceof Error && !("what" in error) ? error.cause : undefined;
@@ -165,11 +176,22 @@ export default function ChatVisual(props: {
           </span>
         </button>
       }>
+        {/* Ocupa el sitio del visual y nombra su archivo: el texto del mensaje
+            sigue alrededor, y lo que no se pinta aquí se puede abrir fuera. */}
         <Show when={html.error}>
-          <div>
+          <div data-chat-visual-failed="">
             <p class="text-sm font-semibold text-neutral-900">{title()}</p>
+            <p class="text-xs text-neutral-500"><code>{props.visual.file}</code></p>
             <FailureNote f={failure()} />
-            <Button variant="outline" size="compact" class="mb-3" onClick={() => void refetch()}>{t("chat.visual.retry")}</Button>
+            <Show when={openFailed()}>
+              <p class="text-xs text-neutral-500">{t("chat.visual.open_failed")}</p>
+            </Show>
+            <div class="mb-3 flex flex-wrap gap-2">
+              <Button variant="outline" size="compact" onClick={() => void refetch()}>{t("chat.visual.retry")}</Button>
+              <Show when={props.open}>
+                <Button variant="outline" size="compact" data-chat-visual-open="" onClick={() => void openOutside()}>{t("chat.visual.open_browser")}</Button>
+              </Show>
+            </div>
           </div>
         </Show>
         <Show when={!html.error && !html.loading && content()} fallback={!html.error && <p class="py-3 text-sm text-neutral-500">{t("chat.visual.loading")}</p>}>

@@ -1,5 +1,6 @@
 import GripVertical from "lucide-solid/icons/grip-vertical";
 import Globe from "lucide-solid/icons/globe";
+import Monitor from "lucide-solid/icons/monitor";
 import Plus from "lucide-solid/icons/plus";
 import SquarePen from "lucide-solid/icons/square-pen";
 import X from "lucide-solid/icons/x";
@@ -241,7 +242,12 @@ export default function TabStrip(props: {
       return s?.agent ?? null;
     };
     const legacyConversation = () => !!row()?.chat_de_agente;
+    const sinEmpezar = () => {
+      const s = row();
+      return isTaskTab(p) && s?.turns === 0 && !s.chat_de_agente && !s.subagent && !props.liveIds.includes(p.session);
+    };
     const fullTitle = () => {
+      if (sinEmpezar()) return t("projects.view.new_task");
       const agent = agentProfile();
       if (agent && isTaskTab(p)) {
         if (!legacyConversation()) return row()?.title ?? p.titulo;
@@ -249,7 +255,7 @@ export default function TabStrip(props: {
           ? t("projects.threads.heading", { name: displayName(agent, profiles()[agent]), title: threadTitle(row()) })
           : displayName(agent, profiles()[agent]);
       }
-      return isTaskTab(p) || p.clase === "observabilidad"
+      return isTaskTab(p) || p.clase === "observabilidad" || p.clase === "pantalla"
         ? (isTaskTab(p) && props.session(p.session)?.subagent ? readableSessionTitle(p.titulo) : p.titulo)
         : (labels().get(p.id) ?? "");
     };
@@ -310,7 +316,7 @@ export default function TabStrip(props: {
             role={transient() ? "button" : "tab"}
             aria-selected={transient() ? undefined : active()}
             onDblClick={() => props.onPin?.(p.id)}
-            tabindex={active() ? 0 : -1}
+            tabindex={active() || (i() === 0 && !props.tabs.some((x) => x.id === props.activeId)) ? 0 : -1}
             data-pestana={transient() ? undefined : i()}
             title={statusDecorated(
               dirty()
@@ -356,13 +362,11 @@ export default function TabStrip(props: {
               when={isTaskTab(p)}
               fallback={
               <Show
-                  when={p.clase !== "sitio" && p.clase !== "observabilidad"}
+                  when={p.clase !== "sitio" && p.clase !== "observabilidad" && p.clase !== "pantalla"}
                   fallback={
-                    <Globe
-                      size={12}
-                      class="shrink-0 text-neutral-500"
-                      aria-hidden={true}
-                    />
+                    <Show when={p.clase === "pantalla"} fallback={<Globe size={12} class="shrink-0 text-neutral-500" aria-hidden={true} />}>
+                      <Monitor size={12} class="shrink-0 text-neutral-500" aria-hidden={true} />
+                    </Show>
                   }
                 >
                   <IconoDeArchivo

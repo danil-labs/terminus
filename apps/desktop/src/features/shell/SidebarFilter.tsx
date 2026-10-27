@@ -9,6 +9,7 @@ import {
   DEFAULT_SIDEBAR_VIEW,
   groupingLabel,
   nonDefaultCount,
+  sameAgent,
   scopeLabel,
 } from "../../lib/sidebarView";
 import { cn } from "../../lib/utils";
@@ -18,7 +19,8 @@ import { AstroAvatar } from "../projects/AstroAvatar";
 import { FolderSquare } from "../projects/FolderChip";
 
 export type SidebarFilterFolder = { id: string; name: string; count: number };
-export type SidebarFilterAgent = { name: string; body?: string | null; avatar?: string | null };
+/** `installed` falso: ya no está instalado, pero tiene tareas. */
+export type SidebarFilterAgent = { name: string; installed: boolean; body?: string | null; avatar?: string | null };
 
 export type SidebarFilterProps = {
   view: SidebarView;
@@ -26,9 +28,11 @@ export type SidebarFilterProps = {
   /** Solo las carpetas que tienen tareas. */
   folders: SidebarFilterFolder[];
   agents: SidebarFilterAgent[];
+  /** Con una sola máquina, «Por máquina» haría un solo grupo: no se ofrece. */
+  machines?: boolean;
 };
 
-const GROUPINGS: SidebarGrouping[] = ["none", "folder", "status", "agent"];
+const GROUPINGS: SidebarGrouping[] = ["none", "folder", "status", "agent", "machine"];
 
 const renglon = cn(ITEM_DE_MENU, "grid grid-cols-[14px_minmax(0,1fr)_auto] items-center gap-2 py-1");
 const titulo = "flex items-center px-2 pt-1.5 pb-0.5 text-[0.6875rem] font-medium text-neutral-500";
@@ -154,7 +158,12 @@ export function SidebarFilter(props: SidebarFilterProps) {
             </Opcion>
             <For each={props.agents}>
               {(a) => (
-                <Opcion role="menuitemradio" on={props.view.agent === a.name} onSelect={() => set({ agent: a.name })}>
+                <Opcion
+                  role="menuitemradio"
+                  on={sameAgent(props.view.agent, a.name)}
+                  onSelect={() => set({ agent: a.name })}
+                  aside={a.installed ? undefined : t("shell.sidebar.view.agent_uninstalled")}
+                >
                   <AstroAvatar name={a.name} body={a.body} avatar={a.avatar} status="asleep" size={14} />
                   <span class="truncate">{a.name}</span>
                 </Opcion>
@@ -166,7 +175,7 @@ export function SidebarFilter(props: SidebarFilterProps) {
         <span class="my-1 h-px bg-border" />
         <div role="group" aria-label={t("shell.sidebar.view.group")} class="grid gap-0.5">
           <div class={titulo}>{t("shell.sidebar.view.group")}</div>
-          <For each={GROUPINGS}>
+          <For each={GROUPINGS.filter((g) => g !== "machine" || props.machines || props.view.group === "machine")}>
             {(g) => (
               <Opcion
                 role="menuitemradio"

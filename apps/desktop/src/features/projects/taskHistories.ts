@@ -1,3 +1,4 @@
+import { machineOf } from "../machines/store";
 import { createMemo, createResource, createSignal } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
 import { pooled, TASK_HISTORY_AT_ONCE } from "../../lib/pool";
@@ -27,7 +28,7 @@ export function createTaskHistories<T>(project: () => string, sessions: () => re
     const missing = current.filter((key) => !known.has(key) && !shared.has(key));
     const asked = pooled(missing, TASK_HISTORY_AT_ONCE, (key) => {
       const [, p, id] = JSON.parse(key) as [number, string, string, string];
-      return invoke<T>("task_history", { project: p, id });
+      return invoke<T>("task_history", { project: p, id }, machineOf(id));
     });
     const next = new Map<string, Promise<T | undefined>>();
     for (const key of current) {
