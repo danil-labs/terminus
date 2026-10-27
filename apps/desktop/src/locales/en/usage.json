@@ -4,7 +4,7 @@
   "usage.asking": "asking",
   "usage.in_use": "in use",
   "usage.not_connected": "not connected",
-  "usage.go_key_required": "no Go key",
+  "usage.go_key_required": "no usage",
   "usage.reconnect_needed": "reconnect needed",
   "usage.read_failed": "could not read",
   "usage.stale_title": "{detail} · this is from {when}",
