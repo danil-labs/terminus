@@ -208,6 +208,33 @@ def verify_documents(directory, manifest):
                 raise ValueError("Wheel identity mismatch")
 
 
+def verify_tree(source, destination, manifest):
+    metadata = ["manifest.json", manifest["documents"]["requirements"], "browser-navigation.json"]
+    for name in metadata:
+        if child(destination, name).read_bytes() != child(source, name).read_bytes():
+            raise ValueError(f"Output metadata differs from checked-in pin: {name}")
+    browser = json.loads((source / "browser-navigation.json").read_text())
+    entry = browser["entry"]
+    if (browser["schema"] != 1 or browser["target"] != manifest["target"]
+            or entry["id"] != "browser-navigation" or entry["format"] != "zip"
+            or entry["strip_components"] != 0 or type(entry["bytes"]) is not int or entry["bytes"] <= 0
+            or not re.fullmatch(r"[0-9a-f]{64}", entry["sha256"]) or not entry["url"].startswith("https://")):
+        raise ValueError("Invalid pinned Chrome navigation catalog")
+    relative(entry["archive"])
+    relative(entry["executable"])
+    licenses = [p for p in (RESOURCES / "licenses").iterdir() if p.is_file()]
+    allowed = set(metadata + ["build-report.json"])
+    allowed.update(item["archive"] for item in manifest["entries"] + manifest["documents"]["wheels"])
+    for license in licenses:
+        name = "licenses/" + license.name
+        allowed.add(name)
+        if child(destination, name).read_bytes() != license.read_bytes():
+            raise ValueError(f"Output license differs from source: {name}")
+    for path in destination.rglob("*"):
+        if path.is_symlink() or (path.is_file() and path.relative_to(destination).as_posix() not in allowed):
+            raise ValueError(f"Unexpected resource (base must not contain Chrome or extra tools): {path.name}")
+
+
 def prepare(args, target, budget):
     source = RESOURCES / target
     manifest = load_manifest(source, target)
@@ -220,8 +247,7 @@ def prepare(args, target, budget):
         shutil.copytree(RESOURCES / "licenses", dest / "licenses", dirs_exist_ok=True)
         for item in manifest["entries"] + manifest["documents"]["wheels"]:
             obtain(item, child(dest, item["archive"]), args.cache, args.download, budget)
-    if (dest / "manifest.json").read_bytes() != (source / "manifest.json").read_bytes():
-        raise ValueError("Output manifest differs from checked-in pin")
+    verify_tree(source, dest, manifest)
     report = {"target": target, "manifest_sha256": digest(source / "manifest.json"), "payloads": []}
     for item in manifest["entries"]:
         path = child(dest, item["archive"])

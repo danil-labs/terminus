@@ -1,8 +1,8 @@
 import argparse
-import hashlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import tarfile
 import tempfile
@@ -23,7 +23,12 @@ class WorkToolsTests(unittest.TestCase):
             for name in ["../tool", "/tmp/tool", "C:/tool", "dir\\tool", ".", "a/../../b"]:
                 with self.subTest(name=name), self.assertRaises(ValueError):
                     tools.child(root, name)
-            (root / "link").symlink_to(root.parent, target_is_directory=True)
+            try:
+                (root / "link").symlink_to(root.parent, target_is_directory=True)
+            except OSError:
+                if os.name == "nt":
+                    return
+                raise
             with self.assertRaises(ValueError):
                 tools.child(root, "link/escaped")
 
@@ -91,13 +96,20 @@ class WorkToolsTests(unittest.TestCase):
             manifest = dict(schema=1, target=target, entries=entries, documents=dict(python="3.13", requirements="documents-requirements.txt", wheels=[pin]))
             raw = json.dumps(manifest, indent=4).encode()
             (source / target / "manifest.json").write_bytes(raw)
-            (source / target / "browser-navigation.json").write_text('{"not_included":"Chrome"}')
+            navigation = dict(schema=1, target=target, entry=dict(id="browser-navigation", format="zip", strip_components=0,
+                              bytes=8, sha256=checksum, url="https://example.invalid/chrome", archive="chrome.zip", executable="chrome/browser"))
+            (source / target / "browser-navigation.json").write_text(json.dumps(navigation))
             (source / target / "documents-requirements.txt").write_text(f'sample==1 --hash=sha256:{pin["sha256"]}\n')
             args = argparse.Namespace(output=dest, command="prepare", cache=[cache], download=False)
             with patch.object(tools, "RESOURCES", source), patch.object(tools.urllib.request, "urlopen") as fetch:
                 first = tools.prepare(args, target, [0])
                 second = tools.prepare(args, target, [0])
                 fetch.assert_not_called()
+                (dest / target / "chrome.zip").write_bytes(b"forbidden")
+                args.command = "verify"
+                with self.assertRaisesRegex(ValueError, "Unexpected resource"):
+                    tools.prepare(args, target, [0])
+                (dest / target / "chrome.zip").unlink()
             self.assertTrue(first["complete"])
             self.assertEqual(first, second)
             self.assertEqual((dest / target / "manifest.json").read_bytes(), raw)
