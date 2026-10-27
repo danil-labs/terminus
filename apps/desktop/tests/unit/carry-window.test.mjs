@@ -264,3 +264,20 @@ test("una carpeta sin remoto se lleva desde su menú: viaja entera y la VM crea 
   assert.equal(log.filter((c) => c.name === "start_project_clone").length, 0, "intentó clonar sin remoto");
   assert.deepEqual(app.fallos, []);
 });
+
+
+test("a same-named destination folder with another id does not bypass repository resolution", async () => {
+  const log = [];
+  const { app, doc } = await start("carry-window-same-label", log, {
+    list_projects: (_args, options) => [{ id: machineOf(options) === "vm" ? "other" : "p1", name: "P1", working_directory: "/lab/repo", kind: "git", portfolio: null, sources: [] }],
+    work_status: () => ({ ...STATUS, ahead: 0, changed: 0, untracked: 0, ignored: [], largeUntracked: [] }),
+  });
+  try {
+    await write(app, "start on the VM");
+    assert.ok(await until(() => doc.querySelector("[data-carry-sheet]")), "same label skipped destination resolution");
+    assert.equal(doc.querySelector("[data-carry-target-project]").dataset.carryTargetProject, "clone");
+    assert.equal(log.filter((c) => c.name === "send_message").length, 0);
+  } finally {
+    app.w.close();
+  }
+});

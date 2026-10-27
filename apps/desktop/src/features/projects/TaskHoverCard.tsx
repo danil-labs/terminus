@@ -13,7 +13,7 @@ import { t } from "../../lib/i18n";
 import type { AgentModels, AgentProfile, HandlerStatus } from "../../lib/model";
 import { nombreDeModelo } from "../../lib/models";
 import { MarcaAgente } from "../../ui/icons";
-import { machineName, machines } from "../machines/store";
+import { machineName, machineSystem, machines } from "../machines/store";
 import { AstroAvatar } from "./AstroAvatar";
 import { workLabel } from "./branchLabel";
 import { displayName } from "./profiles";
@@ -136,7 +136,10 @@ export function TaskHoverCard(props: TaskHoverCardProps) {
               class={`inline-block size-1.5 shrink-0 rounded-full ${m().on ? "bg-success" : "bg-neutral-300"}`}
               aria-label={m().on ? t("shell.machines.on") : t("shell.machines.off")}
             />
-            <span class="truncate">{machineName(m().id, false)}</span>
+            <span class="truncate">
+              {machineName(m().id, false)}
+              <Show when={machineSystem(m().id)}>{(os) => <span class="text-neutral-500"> ({os()})</span>}</Show>
+            </span>
           </Fila>
         )}
       </Show>

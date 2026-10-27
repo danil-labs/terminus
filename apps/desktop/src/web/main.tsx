@@ -15,12 +15,14 @@ import {
   linkedWorkspaces,
   listComputers,
   listWorkspaces,
+  createSpaceOrderSource,
   orderComputers,
   renameComputer,
   screenProtocols,
   screenUrl,
   sessionProbe,
   startComputer,
+  systemOf,
   wakes,
 } from "@terminus/computers";
 import { chosenWebLayout, MOBILE_WEB_DIR } from "@terminus/design";
@@ -95,13 +97,17 @@ const pageStorage = () => {
 /** The machine picked in «Ejecutar en» for `workspace` (`features/machines/store.ts`), remembered per workspace. */
 const pickedFor = (workspace: string | null) => (workspace ? (leerPref<Record<string, string>>("machines.run_on", {})[workspace] ?? null) : null);
 
-const infoOf = (c: Computer): MachineInfo => ({
-  id: c.computer_id,
-  name: c.name?.trim() || c.computer_id,
-  wakes: wakes(c),
-  outdated: machineCompatibility(c.contract) === "outdated",
-  linked: linkedWorkspaces(c),
-});
+const infoOf = (c: Computer): MachineInfo => {
+  const os = systemOf(c.os);
+  return {
+    id: c.computer_id,
+    name: c.name?.trim() || c.computer_id,
+    wakes: wakes(c),
+    outdated: machineCompatibility(c.contract) === "outdated",
+    linked: linkedWorkspaces(c),
+    ...(os ? { os } : {}),
+  };
+};
 
 /**
  * A relay session whose state, until the relay says it, is the one of its row
@@ -207,6 +213,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
   // A file dropped outside the chat would replace the page with it.
   for (const type of ["dragover", "drop"]) window.addEventListener(type, (e) => e.preventDefault());
   setCapabilities({
+    spaceOrder: createSpaceOrderSource(base.endpoint, token),
     nativeWindow: false,
     updater: false,
     localSetup: false,

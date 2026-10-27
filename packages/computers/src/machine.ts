@@ -36,6 +36,18 @@ export const UNWAKEABLE_KINDS: ReadonlySet<string> = new Set(["physical", "compu
  * `kind`; si no, el proveedor (una fila sin proveedor es de antes de que
  * existiera y es una VM). La usan la web, el escritorio y el teléfono.
  */
+/** El sistema que se le puede decir a la persona. `darwin` y `win32` son los de Node. */
+export type SystemId = "linux" | "macos" | "windows";
+
+/** El sistema de una fila o de `status.os`. Cualquier otra cosa es que no se sabe. */
+export function systemOf(raw: unknown): SystemId | null {
+  const v = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  if (v === "linux") return "linux";
+  if (v === "macos" || v === "darwin") return "macos";
+  if (v === "windows" || v === "win32") return "windows";
+  return null;
+}
+
 export function wakes(c: Pick<Computer, "provider" | "kind" | "wakeable">): boolean {
   if (typeof c.wakeable === "boolean") return c.wakeable;
   if (c.kind && UNWAKEABLE_KINDS.has(c.kind)) return false;

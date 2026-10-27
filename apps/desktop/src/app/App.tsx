@@ -149,6 +149,7 @@ import { sidebarViewKey } from "../lib/sidebarView";
 import { recordarCarpetas } from "../lib/folderKinds";
 import { lista } from "../lib/format";
 import ColumnaLateral from "../features/shell/SideColumn";
+import { createSpaceNavigationOrder } from "../lib/space-navigation-order";
 import SpaceBar from "../features/shell/SpaceBar";
 import TitleBar from "../features/shell/TitleBar";
 import UsageBar from "../features/shell/UsageBar";
@@ -280,6 +281,7 @@ import { Button } from "../ui/Button";
 import { Dialog, DialogContent, DialogTitle } from "../ui/Dialog";
 import { asFailure, claveDe, prosaDe } from "../ui/Failure";
 import { BotonConAtajo } from "../ui/Shortcut";
+import type { ActivityEvent } from "@terminus/protocol";
 import { Toast, ToastStack } from "../ui/Toast";
 import { apagarVistasDe, hayVistasDe, soltarVistasHuerfanas } from "../features/code/typst";
 
@@ -429,7 +431,9 @@ export default function App() {
   const pestanaActiva = () => (proyectoAbierto() ? null : pestanas.active());
   // Los escritorios del workspace (`lib/spaces.ts`). Sin lista —un servicio
   // que no los conoce— la ventana se pinta como antes de los espacios.
-  const [spaces, setSpaces] = createSignal<Space[]>([]);
+  const [rawSpaces, setSpaces] = createSignal<Space[]>([]);
+  const spaceOrder = createSpaceNavigationOrder(() => workspaceActivo() ?? "", () => setError(t("spaces.order.error")));
+  const spaces = createMemo(() => spaceOrder.arrange(rawSpaces()));
   const [escritorio, setEscritorio] = createSignal<string | null>(null);
   const activeSpace = () => spaces().find((i) => i.id === escritorio()) ?? null;
   const multipleSpaces = () => spaces().length > 1;
@@ -1676,6 +1680,17 @@ export default function App() {
 
   // `null` = cerrada. Una cadena es además con qué destino abrirla.
   const [settings, setSettings] = createSignal<string | null>(null);
+  const [activityNotice, setActivityNotice] = createSignal<ActivityEvent | null>(null);
+  const [activityMachine, setActivityMachine] = createSignal<string | null>(null);
+  onMount(() => {
+    const events = listen<ActivityEvent>("activity", event => {
+      const row = event.payload;
+      if (row?.workspace === workspaceActivo() && typeof row.id === "string" && typeof row.title === "string" && ["running", "success", "failure", "interrupted"].includes(row.state)) setActivityNotice(row);
+    });
+    onCleanup(() => { void events.then(off => off()); });
+  });
+  createEffect(on(workspaceActivo, () => setActivityNotice(null)));
+
   const [anadiendoCarpeta, setAnadiendoCarpeta] = createSignal(false);
   const [inicioDeCarpeta, setInicioDeCarpeta] = createSignal<InicioDeCarpeta | null>(null);
   /** El clon en vuelo, que el riel enseña mientras no hay proyecto que listar. */
@@ -7765,6 +7780,13 @@ export default function App() {
         <AvisoDeMaterial />
         <AvisoDeCarpeta project={project()} session={sessionId()} />
         <McpSignInNotice session={sessionId()} />
+        <Show when={activityNotice()}>{notice => <Toast onDismiss={() => setActivityNotice(null)}>
+          <div class="grid min-w-0 flex-1 gap-2">
+          <p class="m-0 text-sm font-medium">{notice().title}</p>
+          <p class="m-0 text-xs text-neutral-500">{t(`activity.state.${notice().state}`)} · {notice().machine ? machineName(notice().machine!) : t("activity.this_machine")}</p>
+          <Button variant="ghost" size="compact" onClick={() => { setActivityMachine(notice().machine ?? null); setSettings("activity"); setActivityNotice(null); }}>{t("activity.view")}</Button>
+          </div>
+        </Toast>}</Show>
         <TaskNotifier
           attention={attention.list()}
           workspace={workspaceActivo()}
@@ -7920,6 +7942,8 @@ export default function App() {
             spaces().length > 0
               ? (nombre) => (
                   <SpaceBar
+                    onReorder={spaceOrder.save}
+                    reordering={spaceOrder.saving()}
                     workspace={nombre()}
                     workspaceId={workspaceActivo() ?? ""}
                     spaces={spaces()}
@@ -8197,6 +8221,8 @@ export default function App() {
       <Show when={settings() !== null}>
         <Suspense fallback={null}>
           <Settings
+            workspace={workspaceActivo()}
+            activityMachine={activityMachine()}
             panel={settings() || undefined}
             modelos={modelosParaAgentes()}
             proyecto={proyectoAbierto() ?? project()}

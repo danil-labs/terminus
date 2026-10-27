@@ -8,7 +8,7 @@
  * máquina (`ids.ts`). Las filas de otra máquina dicen cuál es y en qué estado
  * está su rebanada.
  */
-import { type AccountRowLike, type AccountWorkspace, groupAccounts, registryProjects } from "../../computers/src/index.ts";
+import { arrangeSpaces, spaceOrder, type AccountRowLike, type AccountWorkspace, groupAccounts, registryProjects } from "../../computers/src/index.ts";
 import { mergeAttention } from "../../protocol/src/index.ts";
 import { wrap } from "./ids.ts";
 import type { Slice } from "./slices.ts";
@@ -95,6 +95,7 @@ function mentionOf(machine: string, m: unknown): unknown {
 
 /** Un evento de `machine` para el panel: también el id suelto de `account-rejected`. */
 export function encodeEvent(ctx: MergeContext, machine: string, name: string, payload: unknown): unknown {
+  if (name === "activity" && isRow(payload)) return { ...payload, machine };
   if (name === "account-rejected" && typeof payload === "string" && machine !== ctx.self) return wrap(machine, payload);
   return encode(ctx, machine, payload);
 }
@@ -153,7 +154,8 @@ export function merge(ctx: MergeContext, command: string, slices: readonly Slice
  * registro conoce salen aunque ninguna máquina conteste.
  */
 function mergeSpaces(ctx: MergeContext, parts: Slice[], workspace: string | null): unknown {
-  const known = (workspace && ctx.registry?.find((w) => w.id === workspace)?.spaces) || [];
+  const account = workspace ? ctx.registry?.find((w) => w.id === workspace) : undefined;
+  const known = account?.spaces ?? [];
   const fromRegistry = ctx.self === null ? known : [];
   if (!parts.length && !fromRegistry.length) return undefined;
   const rows = new Map<string, Row>();
@@ -169,7 +171,8 @@ function mergeSpaces(ctx: MergeContext, parts: Slice[], workspace: string | null
   }
   for (const s of fromRegistry)
     if (!rows.has(s.id)) rows.set(s.id, { id: s.id, name: s.name, folders: s.folders, created_at: s.position, updated_at: s.changed_at, account: true });
-  return [...rows.values()];
+  const values = [...rows.values()] as (Row & { id: string })[];
+  return account ? arrangeSpaces(values, spaceOrder(account)) : values;
 }
 
 const inRegistry = (ctx: MergeContext, workspace: string | null) => !!workspace && !!ctx.registry?.some((w) => w.id === workspace);

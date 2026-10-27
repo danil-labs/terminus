@@ -363,6 +363,14 @@ test("events of another machine arrive with the panel's ids; a machine that come
   assert.deepEqual(seen, [["cmp_vm", [{ name: "turn", payload: { session: "cmp_vm~t1" } }], false], ["cmp_vm", [], true]]);
 });
 
+test("activity notices retain the originating machine without turning log ids into task ids", () => {
+  const seen: unknown[] = [];
+  const { fleet, link } = setup({ cmp_vm: {} }, [VM], { onEvents: (_machine, events) => seen.push(...events) });
+  fleet.subscribeEvents();
+  link("cmp_vm").push({ cursor: 1, events: [{ name: "activity", payload: { workspace: "w", id: "operation-1", title: "Actualizar herramientas", state: "success" } }] });
+  assert.deepEqual(seen, [{ name: "activity", payload: { workspace: "w", id: "operation-1", title: "Actualizar herramientas", state: "success", machine: "cmp_vm" } }]);
+});
+
 test("projects keep one row per id with the machines that have them, and the registry fills the rest", async () => {
   const { fleet } = setup({ cmp_vm: { answers: { list_projects: [{ id: "p1", name: "P1" }, { id: "p2", name: "P2", materialized: false, remote_url: "https://x/p2" }] } } }, [VM]);
   fleet.setRegistry([{ id: "w", name: "W", computers: ["cmp_vm"], projects: [{ id: "p3", name: "P3", remote_url: null, home_computer_id: "cmp_vm" }] } as never]);
@@ -651,5 +659,19 @@ test("workspace context survives when only a later machine has a primary source"
     const result = fleet.merge(command, slices) as { workspaces: { context_root: string | null }[] };
     assert.equal(result.workspaces[0].context_root, "/lab/context");
     assert.equal(first.context_root, null, "merging does not change a machine's saved slice");
+  }
+});
+
+test("shared spaces order wins over machine slice order in desktop and web", () => {
+  for (const self of [null, "cmp_mac"]) {
+    const { fleet } = setup({}, [VM, MAC], { self });
+    const spaces = [
+      { id: "a", name: "A", folders: [], position: 0, changed_at: 1 },
+      { id: "b", name: "B", folders: [], position: 1, changed_at: 1 },
+    ];
+    fleet.setRegistry([{ id: "w", name: "Workspace", projects: [], computers: ["cmp_mac"], spaces, settings: { space_order: '["b","a"]' } }]);
+    const value = fleet.merge("list_spaces", [{ ...local(spaces.map(s => ({ ...s, account: true }))), machine: "cmp_mac" }], "w") as { id: string }[];
+    assert.deepEqual(value.map(space => space.id), ["b", "a"]);
+    fleet.close();
   }
 });

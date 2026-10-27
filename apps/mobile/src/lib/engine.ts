@@ -35,7 +35,7 @@ import type {
   WorkspaceAttention,
 } from "@terminus/protocol";
 import { readVisualHtml, type VisualPart, type VisualWhole, VISUAL_FILE, VISUAL_TREE } from "@terminus/chat/visual";
-import { type AccountWorkspace, groupWorkspaces, linkedAttention, onlyLinked, registryProjects, withRegistry } from "@terminus/computers";
+import { arrangeSpaces, spaceOrder, type AccountWorkspace, groupWorkspaces, linkedAttention, onlyLinked, registryProjects, withRegistry } from "@terminus/computers";
 import { type ChatBackgroundView, chatBackgroundImageUrl, chatBackgroundView, isSingleAttention } from "@terminus/protocol";
 import { type FlatRow, flattenTasks, launcherOf } from "@terminus/tasks";
 import { type Host, HostError } from "./hosts.ts";
@@ -154,9 +154,11 @@ export function withAccountFolders<S extends { folders: Folder[]; spaces: Space[
     const host = p.home_computer_id && members.includes(p.home_computer_id) ? p.home_computer_id : members[0];
     return host ? [{ id: p.id, name: p.name, working_directory: null, key: `${host}/${p.id}`, host }] : [];
   });
-  if (!extra.length) return snapshot;
+  const account = registry?.find(row => row.id === workspace);
+  const spaces = account ? arrangeSpaces(snapshot.spaces, spaceOrder(account)) : snapshot.spaces;
+  if (!extra.length) return spaces.every((space, i) => space === snapshot.spaces[i]) ? snapshot : { ...snapshot, spaces };
   const keys = extra.map((f) => f.key);
-  return { ...snapshot, folders: [...snapshot.folders, ...extra], spaces: snapshot.spaces.map((s) => ({ ...s, folders: [...s.folders, ...keys] })) };
+  return { ...snapshot, folders: [...snapshot.folders, ...extra], spaces: spaces.map((s) => ({ ...s, folders: [...s.folders, ...keys] })) };
 }
 
 /** El fondo de los chats con `remote`: la imagen en la cuenta de Danil, que se pide con la sesión de la persona. */

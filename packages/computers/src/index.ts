@@ -25,12 +25,14 @@ export {
   MANAGED_PROVIDERS,
   MIRROR_COMMANDS,
   UNWAKEABLE_KINDS,
+  type SystemId,
   canAct,
   defaultComputer,
   isDeferrable,
   isManaged,
   orderComputers,
   powerOf,
+  systemOf,
   wakes,
 } from "./machine.ts";
 export { type WorkspaceGroup, type WorkspaceRow, groupWorkspaces, hasAccountWorkspaces, registryProjects, withRegistry } from "./fleet.ts";
@@ -153,3 +155,6 @@ export {
   restoreCredentialMachine,
 } from "./credentials.ts";
 export { type SealOptions, type SealRecipient, SEAL_MAX_BYTES, canSeal, fromBase64, sealCredential, sealForRecipients, toBase64 } from "./seal.ts";
+
+export { arrangeSpaces, spaceOrder, type SpaceOrderSource } from "./space-order.ts";
+export { createSpaceOrderSource } from "./space-order-source.ts";

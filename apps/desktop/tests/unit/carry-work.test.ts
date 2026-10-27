@@ -280,3 +280,15 @@ test("sellado: la llave del destino se fija la primera vez, un cambio se nota y 
   await carryWork(engine, job(), newState("op12"));
   assert.equal(exports.at(-1)?.recipientKey, undefined, "sin llave el export no lleva recipientKey");
 });
+
+
+test("ignored files are applied to the task even when the import has no snapshot commit", async () => {
+  const { engine } = fakeEngines(payload);
+  const importWork = engine.importWork;
+  engine.importWork = async (machine, args) => {
+    const result = await importWork(machine, args);
+    return args.probe ? result : { ...result, snapshot: false, files: [".env.local"] };
+  };
+  const result = await carryWork(engine, job(), newState("files-only"));
+  assert.equal(result.unwrapSnapshot, true);
+});

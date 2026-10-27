@@ -22,8 +22,8 @@ const LOCK = fileURLToPath(new URL("../../seldon-runtime.lock", import.meta.url)
 
 /** El contrato copiado cuyo motor aún no tiene release publicada, y qué falta. */
 const MOTOR_PENDIENTE = {
-  contract: "f33064bff6afb3708517c13a90f327af5333cbd82b15a589a2373c80d79e6d51",
-  why: "las credenciales de la cuenta de Danil (account_credentials_*, seldon-host #145), GitHub en la cuenta (github_account_*, seldon-host #144) y los visuales del chat por partes (chat_visual_part): falta publicar seldon-runtime con ellos y fijarlo en seldon-runtime.lock",
+  contract: "93b1c32f25c4fb5fd722079a5593f8316125d91e8ecf12e64c3d7e1f7aebae98",
+  why: "las credenciales de la cuenta de Danil (account_credentials_*, seldon-host #145), GitHub en la cuenta (github_account_*, seldon-host #144) los visuales del chat por partes (chat_visual_part) y los registros de actividad (run_activity_command, list_activity, read_activity, read_activity_log): falta publicar seldon-runtime con ellos y fijarlo en seldon-runtime.lock",
 };
 
 const vendored = createHash("sha256").update(readFileSync(CONTRACT)).digest("hex");

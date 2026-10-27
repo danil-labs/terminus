@@ -3,7 +3,7 @@
  * el valor por defecto; la entrada web (`src/web/main.tsx`) lo fija antes de
  * importar la app y no cambia después.
  */
-import type { Answer, Computer, CredentialSource, MemorySource } from "@terminus/computers";
+import type { Answer, Computer, CredentialSource, MemorySource, SpaceOrderSource } from "@terminus/computers";
 import type { JSX } from "solid-js";
 import type { AccountProfileSource } from "../features/settings/account-profile";
 import type { Account } from "../features/settings/accounts-store";
@@ -48,6 +48,7 @@ export type WebAccountsSource = {
 };
 
 export type Capabilities = {
+  spaceOrder?: SpaceOrderSource;
   /** Controles de ventana propios, semáforo de macOS y bandeja. */
   nativeWindow: boolean;
   /** El actualizador firmado de la app. */

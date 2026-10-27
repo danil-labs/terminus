@@ -1,4 +1,5 @@
 {
+  "spaces.order.error": "Could not save the spaces order. Try again.",
   "spaces.archived.deleted": "deleted",
   "spaces.archived.empty": "There are no archived tasks.",
   "spaces.archived.foot_title": "Every archived task in the workspace, from every space",

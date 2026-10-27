@@ -223,7 +223,7 @@ export async function carryWork(engine: CarryEngine, job: CarryJob, state: Carry
   }
   progress({ step: "ready" });
   const imported = state.imported as Imported;
-  return { baseRef: imported.base, unwrapSnapshot: imported.snapshot, exported: state.exported, imported };
+  return { baseRef: imported.base, unwrapSnapshot: imported.snapshot || imported.files.length > 0, exported: state.exported, imported };
 }
 
 /** Borra la transferencia en las dos máquinas. No lanza: lo que no se borre lo limpia el motor en una hora. */
