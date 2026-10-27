@@ -40,7 +40,7 @@ export default function RootLayout() {
   const theme = useTheme();
   const pathname = usePathname();
   const alphaInbox = process.env.EXPO_PUBLIC_TERMINUS_ALPHA === "1" && Platform.OS === "web" &&
-    (pathname.endsWith("/inbox") || (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("to")?.split("?")[0] === "/inbox"));
+    (pathname.endsWith("/inbox") || (typeof window !== "undefined" && (window.location.pathname.endsWith("/inbox") || new URLSearchParams(window.location.search).get("to")?.split("?")[0] === "/inbox")));
 
   // En el navegador, una ruta del teléfono que abrió la web de escritorio llega como `?to=` (ver `toPhone` en `apps/desktop/src/web/main.tsx`).
   useEffect(() => {
