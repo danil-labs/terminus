@@ -14,6 +14,7 @@ import {
   linkedWorkspaces,
   listComputers,
   listWorkspaces,
+  createSpaceOrderSource,
   machineCompatibility,
   machineContracts,
   orderComputers,
@@ -135,6 +136,12 @@ export function startAccountMachines(target: Target = window) {
     refresh();
   };
 
+  const disconnect = () => {
+    uninstall();
+    const { spaceOrder: _order, ...rest } = capabilities();
+    setCapabilities(rest);
+  };
+
   function install(self: string, endpoint: string, others: Computer[], key: string) {
     const [changed, bump] = createSignal(0);
     const fleet = new Fleet({
@@ -187,6 +194,7 @@ export function startAccountMachines(target: Target = window) {
     const previous: Capabilities = capabilities();
     setCapabilities({
       ...previous,
+      spaceOrder: createSpaceOrderSource(endpoint, async () => (await getToken()).token),
       machineName: (id) => (id === self ? homeName() : fleet.name(id)),
       taskMachine: (id) => unwrap(id, fleet.remotes())?.machine ?? null,
       windowMachine: () => ({ id: self, name: homeName(), local: true }),
@@ -282,19 +290,19 @@ export function startAccountMachines(target: Target = window) {
     }
     if (!self) {
       token = null;
-      return uninstall();
+      return disconnect();
     }
     let client: ClientToken;
     try {
       client = await getToken();
     } catch {
       // An engine without `danil_client_token`, or a control plane without client tokens.
-      return uninstall();
+      return disconnect();
     }
     const answer = await listComputers(client.endpoint, client.token);
     if (answer.kind === "unauthorized" || answer.kind === "license") {
       token = null;
-      return uninstall();
+      return disconnect();
     }
     if (answer.kind !== "ok") return;
     const mine = answer.value.find((c) => c.computer_id === self);
@@ -303,7 +311,12 @@ export function startAccountMachines(target: Target = window) {
     homeOs = systemOf(mine?.os) ?? windowSystem();
     const others = orderComputers(answer.value.filter((c) => c.computer_id !== self));
     const key = JSON.stringify([self, account, client.endpoint]);
-    if (!others.length) return uninstall();
+    if (!others.length) {
+      uninstall();
+      setCapabilities({ ...capabilities(), spaceOrder: createSpaceOrderSource(client.endpoint, async () => (await getToken()).token) });
+      window.dispatchEvent(new CustomEvent("harness:sources"));
+      return;
+    }
     // The same account: machines that came, left or changed name are applied live, without tearing the rest down.
     if (installed?.key === key) {
       installed.fleet.setMachines(others.map(infoOf));

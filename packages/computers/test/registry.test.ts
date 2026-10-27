@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { type AccountWorkspace, type Fetch, groupWorkspaces, hasAccountWorkspaces, listWorkspaces, registryProjects, withRegistry } from "../src/index.ts";
+import { createSpaceOrderSource, spaceOrder, type AccountWorkspace, type Fetch, groupWorkspaces, hasAccountWorkspaces, listWorkspaces, registryProjects, withRegistry } from "../src/index.ts";
 
 const answer = (status: number, body: unknown = null): Fetch => async () => ({ status, ok: status >= 200 && status < 300, json: async () => body });
 
@@ -65,4 +65,48 @@ test("los proyectos del registro que ninguna máquina listó, y si la cuenta tie
   assert.equal(hasAccountWorkspaces([ROW]), true);
   assert.equal(hasAccountWorkspaces([]), false);
   assert.equal(hasAccountWorkspaces(null), false);
+});
+
+
+test("spaces order is shared, ignores removed ids and appends new spaces by position", () => {
+  const workspace = { ...ROW, spaces: [
+    { id: "b", name: null, folders: [], position: 2, changed_at: 1 },
+    { id: "a", name: null, folders: [], position: 1, changed_at: 1 },
+    { id: "c", name: null, folders: [], position: 3, changed_at: 1 },
+  ], settings: { space_order: '["b","removed","a","b"]' } };
+  assert.deepEqual(spaceOrder(workspace), ["b", "a", "c"]);
+  assert.deepEqual(spaceOrder({ ...workspace, settings: { space_order: "null" } }), ["a", "b", "c"]);
+});
+
+test("two clients share order; conflict retries only order and preserves other settings", async () => {
+  let workspace = { ...ROW, settings: { ...ROW.settings, space_order: '["a","b"]' }, spaces: [
+    { id: "a", name: null, folders: [], position: 1, changed_at: 1 },
+    { id: "b", name: null, folders: [], position: 2, changed_at: 1 },
+  ] };
+  let conflict = true;
+  const remote: Fetch = async (_url, init) => {
+    if (init?.method === "GET") return { status: 200, ok: true, json: async () => ({ workspaces: [structuredClone(workspace)] }) };
+    const body = JSON.parse(init?.body ?? "{}");
+    assert.deepEqual(Object.keys(body.settings), ["space_order"]);
+    if (conflict) {
+      conflict = false;
+      workspace = { ...workspace, settings_version: 4, settings: { ...workspace.settings, lengua: "en" } };
+      return { status: 409, ok: false, json: async () => ({ error: { code: "settings_conflict" } }) };
+    }
+    assert.equal(body.settings_version, workspace.settings_version);
+    workspace = { ...workspace, settings_version: 5, settings: { ...workspace.settings, ...body.settings } };
+    return { status: 200, ok: true, json: async () => workspace };
+  };
+  const desktop = createSpaceOrderSource("https://computers.example", async () => "token", remote);
+  const web = createSpaceOrderSource("https://computers.example", async () => "token", remote);
+  assert.deepEqual(await web.read("w1"), ["a", "b"]);
+  assert.deepEqual(await desktop.save("w1", ["b", "removed", "b", "a"]), ["b", "a"]);
+  assert.deepEqual(await web.read("w1"), ["b", "a"]);
+  assert.equal(workspace.settings.lengua, "en");
+  assert.equal(await web.read("missing"), null);
+});
+
+test("an unavailable account cannot silently save an order locally", async () => {
+  const source = createSpaceOrderSource("https://computers.example", async () => "token", answer(503));
+  await assert.rejects(source.save("w1", ["b", "a"]), /space_order_unavailable/);
 });

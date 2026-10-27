@@ -661,3 +661,17 @@ test("workspace context survives when only a later machine has a primary source"
     assert.equal(first.context_root, null, "merging does not change a machine's saved slice");
   }
 });
+
+test("shared spaces order wins over machine slice order in desktop and web", () => {
+  for (const self of [null, "cmp_mac"]) {
+    const { fleet } = setup({}, [VM, MAC], { self });
+    const spaces = [
+      { id: "a", name: "A", folders: [], position: 0, changed_at: 1 },
+      { id: "b", name: "B", folders: [], position: 1, changed_at: 1 },
+    ];
+    fleet.setRegistry([{ id: "w", name: "Workspace", projects: [], computers: ["cmp_mac"], spaces, settings: { space_order: '["b","a"]' } }]);
+    const value = fleet.merge("list_spaces", [{ ...local(spaces.map(s => ({ ...s, account: true }))), machine: "cmp_mac" }], "w") as { id: string }[];
+    assert.deepEqual(value.map(space => space.id), ["b", "a"]);
+    fleet.close();
+  }
+});

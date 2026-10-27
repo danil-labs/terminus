@@ -1,11 +1,11 @@
 import Plus from "lucide-solid/icons/plus";
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import { enfocarYSeleccionar } from "../../lib/focus";
 import { t } from "../../lib/i18n";
 import { type Space, spaceName } from "../../lib/spaces";
 import type { Project } from "../../lib/model";
 import { cn } from "../../lib/utils";
-import { createNavigationOrder, createNavigationReorder } from "../../lib/navigation-order";
+import { createNavigationReorder } from "../../lib/navigation-order";
 import { Button } from "../../ui/Button";
 import {
   ContextMenu,
@@ -40,6 +40,8 @@ export default function SpaceBar(props: {
   activa: string | null;
   proyectos: Project[];
   senal: (id: string) => AttentionState | null;
+  onReorder: (ids: string[]) => void;
+  reordering: boolean;
   onElegir: (id: string) => void;
   onCrear: (name: string, folders: string[]) => Promise<void>;
   onRenombrar: (id: string, name: string) => Promise<void>;
@@ -50,15 +52,14 @@ export default function SpaceBar(props: {
   const [nombre, setNombre] = createSignal("");
   let lista: HTMLDivElement | undefined;
   let renombrarAlCerrar = false;
-  const order = createNavigationOrder(() => `spaces.order.${props.workspaceId}`);
-  const orderedSpaces = createMemo(() => order.arrange(props.spaces));
+  const orderedSpaces = () => props.spaces;
   const reorder = createNavigationReorder({
     scope: () => props.workspaceId,
     list: () => lista,
     attribute: "data-space-pill",
     axis: "x",
-    ids: () => orderedSpaces().map(space => space.id),
-    save: order.save,
+    ids: () => props.reordering ? [] : orderedSpaces().map(space => space.id),
+    save: props.onReorder,
   });
 
   const empezarARenombrar = (i: Space) => {

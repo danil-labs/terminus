@@ -145,7 +145,7 @@ export type AccountWorkspace = {
   id: string;
   name: string;
   radiant_workspace_id?: string | null;
-  settings?: Partial<Record<"lengua" | "lengua_de_salida" | "default_permission_mode" | "terminal_theme" | "chat_background", string | null>> | null;
+  settings?: Partial<Record<"lengua" | "lengua_de_salida" | "default_permission_mode" | "terminal_theme" | "chat_background" | "space_order", string | null>> | null;
   settings_version?: number;
   created_at?: string | null;
   updated_at?: string | null;

@@ -93,3 +93,15 @@ test("la lista del teléfono esconde las delegadas bajo su lanzador, como el esc
   assert.deepEqual(merged.delegated.map((t) => [t.id, t.machine, t.machine_on]), [["delegada", "Mac", false]], "con la máquina apagada siguen en el chat de su lanzador");
   assert.deepEqual(delegatedOf(merged.delegated, "lanzador").map((t) => t.id), ["delegada"]);
 });
+
+
+test("el teléfono usa el orden compartido aunque los motores listen en otro orden", () => {
+  const snapshot = { folders: [], tasks: [], spaces: [
+    { id: "a", name: "A", folders: [] }, { id: "b", name: "B", folders: [] },
+  ] };
+  const registry = [{ ...REGISTRY[0], spaces: [
+    { id: "a", name: "A", folders: [], position: 0, changed_at: 1 },
+    { id: "b", name: "B", folders: [], position: 1, changed_at: 1 },
+  ], settings: { space_order: '["b","a"]' } }];
+  assert.deepEqual(withAccountFolders(snapshot, registry, "w1", []).spaces.map(space => space.id), ["b", "a"]);
+});
