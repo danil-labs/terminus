@@ -11,6 +11,7 @@ import {
 import { invoke } from "../../lib/invoke.ts";
 import { t } from "../../lib/i18n";
 import { peso } from "../../lib/format";
+import { conservar } from "../../lib/sessionRefresh";
 import { haceCuanto } from "../../lib/limits";
 import { cn } from "../../lib/utils";
 import HardDrive from "lucide-solid/icons/hard-drive";
@@ -82,7 +83,7 @@ type MachineResources = {
   }[];
 };
 
-type Summary = { resources?: MachineResources; workspaceName?: string; loading: boolean; error?: string };
+type Summary = { resources?: MachineResources; workspaceName?: string; loading: boolean; stale?: boolean; error?: string };
 type Target = { machine: string; workspace: string; generation: number };
 
 type Liberado = {
@@ -190,7 +191,7 @@ export default function Almacenamiento(props: {
       ? { machine: m.id, workspace, generation } : null;
   };
   const canClean = () => !!dataTarget && current(dataTarget) && !!target()
-    && !clearing() && !listing() && !midiendo() && !readError() && !datos()?.aviso;
+    && !clearing() && !listing() && !midiendo() && !inventoryError() && !readError() && !datos()?.aviso;
 
   async function readSummary(m: Machine) {
     if (!m.on || disposed) return;
@@ -266,7 +267,7 @@ export default function Almacenamiento(props: {
       const list = await invoke<Machine[]>("machine_list", {}, workspace
         ? { headers: { "x-terminus-workspace": workspace } } : undefined);
       if (disposed || context !== generation || workspace !== props.workspace || request !== inventoryRequest) return;
-      setInventory(list);
+      setInventory((previous) => conservar(previous, list, (m) => m.id));
       if (!list.some((m) => m.id === machine())) {
         setMachine((list.find((m) => m.active) ?? list[0])?.id ?? null);
         resetDetail();
@@ -290,6 +291,52 @@ export default function Almacenamiento(props: {
     setListing(false);
     resetDetail();
     if (abierto() && !clearing()) void openInventory();
+  }));
+  createEffect(on(abierto, (open) => {
+    if (!open) return;
+    let running = false;
+    let alive = true;
+    const sync = async () => {
+      if (running || clearing() || listing() || document.visibilityState === "hidden") return;
+      running = true;
+      const context = generation;
+      const workspace = props.workspace;
+      const request = inventoryRequest;
+      try {
+        const list = await invoke<Machine[]>("machine_list");
+        if (!alive || disposed || context !== generation || workspace !== props.workspace || request !== inventoryRequest) return;
+        for (const m of list) {
+          if (m.on || (!inventory().find((old) => old.id === m.id)?.on && !summaries()[m.id]?.loading)) continue;
+          summaryRequests.set(m.id, (summaryRequests.get(m.id) ?? 0) + 1);
+          setSummaries((prev) => ({ ...prev, [m.id]: { ...prev[m.id], loading: false, stale: true } }));
+          if (m.id === machine()) {
+            detailRequest++;
+            setMidiendo(false);
+            setReadError(t("shell.storage.offline"));
+          }
+        }
+        if (!list.some((m) => m.id === machine())) {
+          setMachine(null);
+          resetDetail();
+        }
+        setInventoryError("");
+        setInventory((previous) => conservar(previous, list, (m) => m.id));
+      } catch (error) {
+        if (alive && !disposed && context === generation && request === inventoryRequest) setInventoryError(prosaDe(error));
+      } finally {
+        running = false;
+      }
+    };
+    const changed = () => { void sync(); };
+    const timer = setInterval(changed, 5000);
+    window.addEventListener("harness:machines", changed);
+    window.addEventListener("focus", changed);
+    onCleanup(() => {
+      alive = false;
+      clearInterval(timer);
+      window.removeEventListener("harness:machines", changed);
+      window.removeEventListener("focus", changed);
+    });
   }));
   onCleanup(() => { disposed = true; generation++; detailRequest++; inventoryRequest++; });
 
@@ -340,7 +387,7 @@ export default function Almacenamiento(props: {
         headers: { "x-terminus-workspace": captured.workspace },
       });
       if (!current(captured)) return;
-      setInventory(list);
+      setInventory((previous) => conservar(previous, list, (m) => m.id));
       const ready = list.find((m) => m.id === captured.machine);
       if (!ready?.on || ready.hosts === false) {
         setFallo((prev) => ({ ...prev, [key]: !ready?.on ? t("shell.storage.offline") : t("shell.storage.workspace_missing") }));
@@ -654,7 +701,7 @@ export default function Almacenamiento(props: {
   }
 
   const summaryStale = (m: Machine, summary: Summary | undefined) => !!summary?.resources
-    && (!m.on || !!summary.error || Date.now() - summary.resources.measured_at > 300_000);
+    && (!m.on || !!summary.stale || !!summary.error || Date.now() - summary.resources.measured_at > 300_000);
 
   function Disk(props2: { disk: MachineResources["storage"][number] }) {
     const used = () => props2.disk.total_bytes - props2.disk.free_bytes;
@@ -703,7 +750,7 @@ export default function Almacenamiento(props: {
   function MachineRow(props2: { machine: Machine }) {
     const summary = () => summaries()[props2.machine.id];
     return (
-      <button type="button" disabled={clearing()} aria-pressed={machine() === props2.machine.id}
+      <button type="button" data-storage-machine={props2.machine.id} disabled={clearing()} aria-pressed={machine() === props2.machine.id}
         class={cn("block w-full border-b border-border px-3 py-2 text-left outline-none hover:bg-surface-muted focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-60", machine() === props2.machine.id && "bg-surface-muted")}
         onClick={() => choose(props2.machine)}>
         <span class="flex items-center justify-between gap-2 text-xs">

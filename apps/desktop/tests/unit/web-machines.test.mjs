@@ -86,6 +86,16 @@ test("storage keeps its machine and workspace and never waits for an offline VM"
   f.relays.cmp_mac.setState("offline");
   await assert.rejects(invoke("collect_orphans", {}, target), (e) => e.detail === "machine_off");
   assert.equal(calls("cmp_mac", "collect_orphans").length, 1, "cleanup is never queued while off");
+  f.relays.cmp_mac.setState("online");
+  const trigger = app.w.document.querySelector('button[aria-label="Almacenamiento"]');
+  assert.ok(trigger);
+  trigger.click();
+  assert.ok(await until(() => app.w.document.querySelector('[data-storage-machine="cmp_mac"]')));
+  const measured = calls("cmp_mac", "list_storage").length;
+  f.relays.cmp_mac.setState("offline");
+  assert.ok(await until(() => app.w.document.querySelector('[data-storage-machine="cmp_mac"]')?.textContent.includes("Sin conexión")), "the open panel follows relay state without interaction");
+  assert.equal(calls("cmp_mac", "list_storage").length, measured, "a status transition does not scan storage");
+  trigger.click();
   assert.deepEqual(app.fallos, []);
 });
 

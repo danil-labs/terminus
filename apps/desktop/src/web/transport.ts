@@ -336,6 +336,7 @@ export function createWebTransport(
     };
     m.relay.onState((state) => {
       if (state === "version_mismatch" || state === "outdated") mark();
+      if (typeof window !== "undefined") window.dispatchEvent(new window.Event("harness:machines"));
     });
     links.set(m.info.id, createLink(m.relay, m.info.id, m.onSync ?? (() => {}), mark, (events) => fleet.linkedEvents(m.info.id, events)));
   }
