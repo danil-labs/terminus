@@ -90,7 +90,6 @@ const AgentProfile = lazy(() => import("../features/projects/AgentProfile"));
 // El alta solo se abre sin workspace o al agregar otro: no entra en la carga inicial.
 const Onboarding = lazy(() => import("../features/onboarding/Onboarding"));
 const TaskLocation = lazy(() => import("../features/chat/TaskLocation"));
-const TaskGitActions = lazy(() => import("../features/chat/TaskGitActions"));
 const Screen = lazy(() => import("../features/screen/Screen"));
 // El aviso de Terminus de pago solo se baja si la flota lo pide (trae los textos de Danil).
 const MachinesLicense = lazy(() =>
@@ -6719,18 +6718,6 @@ export default function App() {
             machine={filaDe(id())?.machine}
             on={!apagadas()[id()] && filaDe(id())?.machine_on !== false}
             onScreen={abrirPantalla}
-            actions={<TaskGitActions
-              workspace={workspaceActivo() ?? ""}
-              project={proyectoDeLaCelda()?.id ?? ""}
-              session={id()}
-              machine={filaDe(id())?.machine}
-              on={!apagadas()[id()] && filaDe(id())?.machine_on !== false}
-              busy={vivas().includes(id()) || (id() === sessionId() && busy())}
-              readOnly={!!pp.soloLectura || !!estadoDelTrabajo()?.history.archived}
-              title={filaDe(id())?.title ?? id()}
-              tasks={Object.values(sesiones()).flat()}
-              onFinished={() => { cerrarPestanasYa([id()]); void refreshSessions(grupos()); }}
-            />}
             project={proyectoDeLaCelda()?.name}
             path={estadoDelTrabajo()?.path || undefined}
             branch={workLabel(estadoDelTrabajo()?.branch, estadoDelTrabajo()?.alias) || undefined} /></Suspense>;
