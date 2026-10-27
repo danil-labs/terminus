@@ -52,8 +52,6 @@
   "onboarding.ai.key.help": "Créala en tu cuenta:",
   "onboarding.ai.key_invalid": "Esa clave no parece válida. Revísala y vuelve a pegarla completa.",
   "onboarding.ai.key_saved": "Clave guardada",
-  "onboarding.ai.code.label": "Código de autorización",
-  "onboarding.ai.code.send": "Enviar",
   "onboarding.ai.login_failed": "No se completó el inicio de sesión. Vuelve a intentarlo.",
   "onboarding.ai.external": "Instala {agent} desde su página oficial y vuelve a intentarlo.",
   "onboarding.ai.map.connecting": "Conectando {name}…",

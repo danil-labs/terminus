@@ -52,8 +52,6 @@
   "onboarding.ai.key.help": "Create it in your account:",
   "onboarding.ai.key_invalid": "That key doesn't look valid. Check it and paste it again in full.",
   "onboarding.ai.key_saved": "Key saved",
-  "onboarding.ai.code.label": "Authorization code",
-  "onboarding.ai.code.send": "Send",
   "onboarding.ai.login_failed": "Sign-in didn't finish. Try again.",
   "onboarding.ai.external": "Install {agent} from its official page and try again.",
   "onboarding.ai.map.connecting": "Connecting {name}…",

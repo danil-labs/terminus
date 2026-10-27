@@ -1,4 +1,6 @@
 import { For, Show, createEffect, createSignal, createUniqueId, on, onCleanup, onMount, untrack, type JSX } from "solid-js";
+import { accountKeyUrl } from "./account-auth";
+import { LoginCodeForm } from "./LoginCodeForm";
 import { enfocar } from "../../lib/focus";
 import { invoke } from "../../lib/invoke.ts";
 import { listen } from "../../lib/serviceEvents";
@@ -210,9 +212,9 @@ export default function Accounts(props: {
 
   /**
    * Dónde se consigue la API key de este agente, o `null` si se conecta
-   * lanzando su CLI. Lo contesta la tabla (`runtime/agents/`), no esta pantalla.
+   * lanzando su CLI. La política compartida contempla OpenCode 2.
    */
-  const claveDe = () => agentes().find((a) => a.id === agente())?.api_key ?? null;
+  const claveDe = () => accountKeyUrl(agentes().find((a) => a.id === agente()));
 
   /** La cuenta cuya clave se está pidiendo, y lo escrito hasta ahora. */
   const [pidiendoClave, setPidiendoClave] = createSignal<string | null>(null);
@@ -1271,20 +1273,7 @@ export default function Accounts(props: {
 
                 <Show when={pideCodigo()}>
                   <Paso numero={url() ? 2 : 1} titulo={t("settings.accounts.step_code")}>
-                    <div class="flex items-center gap-2">
-                      <Input
-                        class="min-w-0 flex-1 font-mono text-xs"
-                        type="text"
-                        ref={enfocar}
-                        value={codigo()}
-                        placeholder={t("settings.accounts.code_placeholder")}
-                        onInput={(e) => setCodigo(e.currentTarget.value)}
-                        onKeyDown={(e) => e.key === "Enter" && void enviarCodigo()}
-                      />
-                      <Button disabled={!codigo().trim()} onClick={() => void enviarCodigo()}>
-                        {t("settings.accounts.send_code")}
-                      </Button>
-                    </div>
+                    <LoginCodeForm value={codigo()} onInput={setCodigo} onSubmit={() => void enviarCodigo()} />
                   </Paso>
                 </Show>
 

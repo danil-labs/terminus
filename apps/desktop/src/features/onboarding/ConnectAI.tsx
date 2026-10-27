@@ -16,6 +16,7 @@ import { Input } from "../../ui/Input";
 import { MarcaAgente } from "../../ui/icons";
 import { TerminusMark } from "../../ui/toolMarks";
 import { Spinner } from "../../ui/Spinner";
+import { LoginCodeForm } from "../settings/LoginCodeForm";
 import { Consentir } from "../settings/Accounts";
 import { type Conexiones, type Fila, nombreDeFila, type Paso } from "./connect-store";
 
@@ -320,32 +321,9 @@ function PanelDeClave(props: { c: Conexiones; f: Fila }) {
 
 function PanelDeCodigo(props: { c: Conexiones; f: Fila }) {
   const [valor, setValor] = createSignal("");
-  const id = `codigo-${props.f.id}`;
-  const enviar = () => {
-    if (valor().trim()) void props.c.enviarCodigo(props.f.id, valor());
-  };
   return (
     <div class={PANEL}>
-      <label class="text-[13px] font-semibold" for={id}>
-        {t("onboarding.ai.code.label")}
-      </label>
-      <Input
-        id={id}
-        class="font-mono"
-        autocomplete="off"
-        spellcheck={false}
-        value={valor()}
-        ref={(el) => queueMicrotask(() => el.focus())}
-        onInput={(e) => setValor(e.currentTarget.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") enviar();
-        }}
-      />
-      <div class="mt-0.5 flex justify-end">
-        <Button size="sm" disabled={!valor().trim()} onClick={enviar}>
-          {t("onboarding.ai.code.send")}
-        </Button>
-      </div>
+      <LoginCodeForm value={valor()} onInput={setValor} onSubmit={() => void props.c.enviarCodigo(props.f.id, valor())} />
     </div>
   );
 }

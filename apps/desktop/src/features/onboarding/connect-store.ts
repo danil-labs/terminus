@@ -10,6 +10,7 @@ import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
 import type { Superficie } from "../../lib/surfaces.ts";
 import { prosaDe } from "../../ui/Failure";
+import { accountKeyUrl } from "../settings/account-auth";
 import { accountPresentation } from "../settings/AccountCard";
 import type { Consentimiento } from "../settings/Accounts";
 import type { AccountList, AccountStatus, AgentOpt, LoginEvent } from "../settings/accounts-store";
@@ -149,7 +150,7 @@ export function crearConexiones() {
           ? "local"
           : a.inferencia === "sin_pedir_nada" && gratuitas.length === 0
             ? "consentimiento"
-            : a.api_key
+            : accountKeyUrl(a)
               ? "clave"
               : "sesion";
       const previa = filas().find((f) => f.id === a.id);
@@ -160,7 +161,7 @@ export function crearConexiones() {
         modo,
         detectada: detectadas.has(a.id),
         bytes: previa?.bytes ?? null,
-        urlDeClave: a.api_key ?? null,
+        urlDeClave: accountKeyUrl(a),
       });
       for (const s of gratuitas) {
         nuevas.push({
