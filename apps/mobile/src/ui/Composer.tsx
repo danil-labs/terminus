@@ -1,3 +1,4 @@
+import { SendButton } from "./SendButton";
 import type { MentionList, PermissionModeOption, ProviderInfo, ProviderModels, SlashMenu } from "@terminus/protocol";
 import { modelName, previewLabel } from "@terminus/tasks";
 import * as DocumentPicker from "expo-document-picker";
@@ -466,15 +467,7 @@ export function Composer({
               <Text style={{ color: theme.bg, fontWeight: "700", fontSize: 13 }}>{sendLabel}</Text>
             </Pressable>
           ) : (
-            <Pressable
-              testID="send"
-              disabled={!ready || !hasText}
-              onPress={send}
-              accessibilityLabel={sendLabel}
-              style={[styles.send, { backgroundColor: theme.primary, opacity: ready && hasText ? 1 : 0.4 }]}
-            >
-              <Icon name="arrow-up" size={17} color={theme.onPrimary} strokeWidth={2.5} />
-            </Pressable>
+            <SendButton disabled={!ready || !hasText} onPress={send} label={sendLabel} />
           )}
         </View>
       </View>

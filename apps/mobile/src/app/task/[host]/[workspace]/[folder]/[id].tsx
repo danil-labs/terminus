@@ -1,3 +1,5 @@
+import { AgentAvatar } from "../../../../../ui/AgentAvatar";
+import { SendButton } from "../../../../../ui/SendButton";
 import { Stack, router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, FlatList, Image, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -491,7 +493,7 @@ function Bubble({ line, theme, streaming, onQuickReply }: { line: Extract<Line, 
     <View style={styles.incomingRow} testID="incoming-message">
       <View style={styles.incomingFace}>
         {from.agent ? (
-          <Avatar name={from.agent} size={28} round />
+          <AgentAvatar name={from.agent} size={28} />
         ) : (
           <View style={[styles.taskFace, { backgroundColor: theme.muted, borderColor: theme.border }]}>
             <BrandMark id={from.provider} size={16} color={theme.text} />
@@ -682,9 +684,9 @@ function QuestionCard({
           ) : null}
         </View>
       ))}
-      <Pressable disabled={disabled} style={[styles.action, { backgroundColor: theme.primary, alignSelf: "flex-end", opacity: disabled ? 0.5 : 1 }]} onPress={() => onAnswer(chosen, free)}>
-        <Text style={{ color: theme.onPrimary, fontWeight: "600" }}>{t("task.answer")}</Text>
-      </Pressable>
+      <View style={{ alignSelf: "flex-end" }}>
+        <SendButton testID="answer-question" disabled={disabled} label={t("task.answer")} onPress={() => onAnswer(chosen, free)} />
+      </View>
     </View>
   );
 }

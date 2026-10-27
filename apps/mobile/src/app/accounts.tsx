@@ -1,10 +1,11 @@
-import { type AccountGroup, groupAccounts, usageTone, windowLabel, windowLeft } from "@terminus/computers";
+import { providerUsage } from "../lib/accountUsage";
+import { type AccountGroup, usageTone, windowLabel, windowLeft } from "@terminus/computers";
 import type { AccountLimits, AiAccount, LoginEvent, ProviderInfo, UsageWindow } from "@terminus/protocol";
 import * as Clipboard from "expo-clipboard";
 import * as WebBrowser from "expo-web-browser";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { LOGIN_START, type LoginProgress, accountWorkspace, accountsOf, addAccount, beginLogin, cancelLogin, failureText, limitsOf, loginStep, signOutAccount, submitLoginCode } from "../lib/engine";
+import { LOGIN_START, type LoginProgress, accountWorkspace, addAccount, beginLogin, cancelLogin, failureText, loginStep, signOutAccount, submitLoginCode } from "../lib/engine";
 import { type Host, HostError } from "../lib/hosts";
 import { lang, t, w } from "../lib/i18n";
 import { useMachines } from "../lib/machines";
@@ -40,6 +41,7 @@ export default function Accounts() {
   const [data, setData] = useState<ProviderAccounts[] | null>(null);
   const [storageOpen, setStorageOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [pick, setPick] = useState<{ provider: ProviderInfo; exclude: string[] } | null>(null);
   const [login, setLogin] = useState<Login | null>(null);
   const [code, setCode] = useState("");
@@ -51,6 +53,7 @@ export default function Accounts() {
   const load = useCallback(async () => {
     const mine = ++asked.current;
     setLoading(true);
+    setFailed(false);
     try {
       // Los proveedores con los que se trabaja (Codex, Claude…), de cualquier máquina que conteste.
       const lists = await Promise.all(hosts.map((h) => h.call<ProviderInfo[]>("list_providers", null, {}).then((a) => a.value ?? []).catch(() => [] as ProviderInfo[])));
@@ -58,32 +61,16 @@ export default function Accounts() {
       for (const list of lists) for (const p of list) if (p.driver && !providers.has(p.id)) providers.set(p.id, p);
       const result = await Promise.all(
         [...providers.values()].map(async (provider) => {
-          const perHost = await Promise.all(
-            hosts.map(async (h) => {
-              const workspace = scopeOf(h);
-              const list = workspace || h.linked === null ? await accountsOf(h, workspace, provider.id).catch(() => null) : null;
-              return { machine: h.id, on: h.power() === "on", accounts: (list?.accounts ?? []) as AiAccount[] };
-            }),
-          );
-          const readings = new Map<string, AccountLimits | null>();
-          for (const list of perHost) {
-            const host = hosts.find((h) => h.id === list.machine);
-            for (const account of list.accounts) {
-              const reading = host && list.on && account.authenticated_at ? await limitsOf(host, scopeOf(host), provider.id, account.id) : null;
-              readings.set(JSON.stringify([list.machine, account.id]), reading);
-            }
-          }
-          const groups = groupAccounts(provider.id, perHost.map((list) => ({ ...list, accounts: list.accounts.map((a) => {
-            const reading = readings.get(JSON.stringify([list.machine, a.id]));
-            const plan = reading?.mode === "read" ? reading.plan : reading?.mode === "waiting" ? reading.last?.plan : null;
-            return { ...a, plan };
-          }) })));
-          const limits: Record<string, AccountLimits | null> = {};
-          for (const g of groups) limits[g.key] = readings.get(JSON.stringify([g.usageFrom.machine, g.usageFrom.id])) ?? null;
+          const { groups, limits } = await providerUsage(hosts, provider.id, scopeOf);
           return { provider, groups, limits };
         }),
       );
-      if (mine === asked.current) setData(result);
+      if (mine === asked.current) {
+        setData(result);
+        setFailed(!result.length && hosts.some((host) => host.power() === "on"));
+      }
+    } catch {
+      if (mine === asked.current) setFailed(true);
     } finally {
       if (mine === asked.current) setLoading(false);
     }
@@ -93,6 +80,14 @@ export default function Accounts() {
   useEffect(() => {
     void load();
   }, [load, tick]);
+
+  useEffect(() => {
+    const retries = (data ?? []).flatMap((entry) => Object.values(entry.limits)).flatMap((limit) => limit?.mode === "waiting" ? [limit.retry_at] : []);
+    if (!retries.length) return;
+    const delay = Math.max(5000, Math.min(...retries) - Date.now());
+    const timer = setTimeout(() => void load(), Math.min(delay, 2_147_483_647));
+    return () => clearTimeout(timer);
+  }, [data, load]);
 
   // Los eventos del inicio de sesión de la máquina elegida.
   useEffect(
@@ -169,6 +164,7 @@ export default function Accounts() {
         </Pressable>
         {storageOpen ? <MachineStorage hosts={hosts} workspace={currentId} theme={theme} /> : null}
         <Text style={{ color: theme.textMuted, paddingHorizontal: 4 }}>{t("accounts.subtitle")}</Text>
+        {failed ? <Text accessibilityRole="alert" style={{ color: theme.error }}>{t("accounts.load_failed")}</Text> : null}
         {offHosts.map((h) => (
           <Text key={h.id} style={[styles.note, { color: theme.textMuted, backgroundColor: theme.muted }]}>
             {t("accounts.machine_off", { name: h.label })}
@@ -351,6 +347,8 @@ function Usage({ limits, signedIn, theme }: { limits: AccountLimits | null | und
   if (!signedIn) return <Text style={{ color: theme.textMuted, fontSize: 13 }}>{w("settings.account_card.disconnected")}</Text>;
   if (limits?.mode === "in_use") return <Text style={{ color: theme.textMuted, fontSize: 13 }}>{w("settings.account_card.in_use")}</Text>;
   const windows = windowsOf(limits);
+  if (!windows.length && limits?.mode === "waiting") return <Text style={{ color: theme.textMuted, fontSize: 13 }}>{t("accounts.usage_waiting")}</Text>;
+  if (!windows.length && (limits?.mode === "failed" || limits?.mode === "revoked")) return <Text style={{ color: theme.error, fontSize: 13 }}>{t("accounts.usage_failed")}</Text>;
   if (!windows.length) return <Text style={{ color: theme.textMuted, fontSize: 13 }}>{limits ? w("settings.account_card.not_asked") : t("accounts.no_usage")}</Text>;
   return (
     <View style={{ gap: 8 }}>

@@ -204,6 +204,7 @@ lleva su comentario allí:
 | Vista previa y finalizar | `task_blockers` | `set_session_pinned`, `set_task_archived`, `finish_task`, `delete_session` |
 | Cuadro de escribir | `list_models`, `list_permission_modes`, `list_slash_menu`, `list_mentions`, `project_base_branches` | `run_shell_command`, `stop_shell_command`, `guardar_imagen_pegada`, `prepare_attachments` |
 | Almacenamiento por máquina (en Consumos) | `list_workspaces` sin workspace para capacidad; `list_storage` al abrir el detalle del workspace | — |
+| Identidad de agentes | `list_agent_profiles`, `preview_file` | — |
 | Cuentas de IA | `list_accounts`, `account_status`, `account_limits` | `add_account`, `login_account`, `submit_login_code`, `cancel_login`, `discard_account`, `remove_account` |
 | Fondo del chat | `chat_background` | — |
 | Chat enriquecido | `tree_show` (solo el árbol `terminus-chat-visuals`), `chat_visual_part`, `preview_file`, `attachment_preview` | — |
