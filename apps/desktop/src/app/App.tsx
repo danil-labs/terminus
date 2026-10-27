@@ -2176,7 +2176,7 @@ export default function App() {
       soltarTerminal(session);
     });
     const tab = pestanas.open().find((item) => item.id === session);
-    const projectId = session === sessionId() ? project() : tab?.project ?? savedQueues.get(session)?.project;
+    const projectId = session === sessionId() ? project() : tab?.project ?? savedQueues.get(session)?.project ?? tareaDelRiel(session)?.folder;
     try {
       if (projectId !== undefined) {
         const result = await leerTarea(projectId, session);
@@ -2227,7 +2227,7 @@ export default function App() {
   /** `session_resync`: el turno en curso no cupo en el reenvío; se relee lo guardado y se conserva lo vivo. */
   function releerUna(session: string) {
     const generation = sessionGeneration;
-    const projectId = esDeLaAbierta(session) ? project() : pestanas.open().find((p) => p.id === session)?.project;
+    const projectId = esDeLaAbierta(session) ? project() : pestanas.open().find((p) => p.id === session)?.project ?? tareaDelRiel(session)?.folder;
     if (projectId === undefined) return;
     void leerTarea(projectId, session)
       .then((s) => loadResult(session, s, false, generation))
