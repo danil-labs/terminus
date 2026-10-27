@@ -141,6 +141,7 @@ test("two machines show together and each command goes to the machine it names",
   await sleep(600);
   const where = doc.querySelector("[data-task-location]");
   assert.equal(where?.querySelector("[data-task-location-machine]")?.textContent, "Mac de Ana", "the task window names the machine that runs it");
+  assert.equal(where?.querySelector("[data-machine-form]")?.getAttribute("data-machine-form"), "computer", "a physical machine keeps the laptop");
   assert.equal(where?.querySelector("[data-task-location-project]")?.textContent, "Notas");
   assert.ok(calls("cmp_mac", "list_mentions").some((c) => c.args.session === "t1" && c.workspace === "w"), "opening the second machine’s task reads its mention files on that machine");
   assert.ok(!calls("cmp_vm", "list_mentions").some((c) => c.args.session === "t1"), "the first machine never receives the other machine’s task");
@@ -272,7 +273,7 @@ test("«Ejecutar en» disables, with the reason, a machine that cannot make the 
   });
   assert.equal(calls("cmp_old", "materialize_workspace").length, 1, "it was asked once");
   assert.equal(calls("cmp_old", "send_message").length, 0, "and never got the task");
-  assert.deepEqual((await invoke("machine_list")).find((m) => m.id === "cmp_old"), { id: "cmp_old", local: false, active: false, on: true, hosts: false, materializes: false });
+  assert.deepEqual((await invoke("machine_list")).find((m) => m.id === "cmp_old"), { id: "cmp_old", local: false, active: false, on: true, hosts: false, materializes: false, wakes: true });
 
   doc.querySelector('[aria-label="Proyecto"]').click();
   assert.ok(await until(() => [...doc.querySelectorAll("button")].some((b) => b.textContent.includes("Notas") && b.textContent.includes("tarea"))), "the project picker opens");
@@ -283,6 +284,8 @@ test("«Ejecutar en» disables, with the reason, a machine that cannot make the 
   const option = (id) => doc.querySelector(`[data-machine-option="${id}"]`);
   assert.ok(await until(() => option("cmp_old")?.getAttribute("title")?.includes("no tiene este workspace")), "it reads the machines again when it opens");
   assert.equal(option("cmp_mac").disabled, false, "the machine with the folder is offered");
+  assert.equal(option("cmp_vm").querySelector("[data-machine-form]")?.getAttribute("data-machine-form"), "vm");
+  assert.equal(option("cmp_mac").querySelector("[data-machine-form]")?.getAttribute("data-machine-form"), "computer", "a physical machine keeps the laptop");
   assert.equal(option("cmp_vm").disabled, false, "a folder without remote is carried from its machine while that one is on");
   assert.ok(!option("cmp_vm").textContent.includes("sin este proyecto"));
   assert.equal(option("cmp_old").disabled, true);

@@ -9,7 +9,8 @@ import { capabilities } from "../../lib/platform";
  * `machine_list`: `hosts` es si tiene el workspace abierto (`null`, que no se sabe
  * sin encenderla); `materializes`, si puede hacerlo suyo con el mismo id al crear ahí.
  */
-export type Machine = { id: string; local: boolean; active: boolean; on: boolean; hosts: boolean | null; materializes?: boolean };
+/** `wakes`: VM administrada. Sin el campo, o en falso, es una máquina de la persona. */
+export type Machine = { id: string; local: boolean; active: boolean; on: boolean; hosts: boolean | null; materializes?: boolean; wakes?: boolean };
 
 /** Lo que el picker sabe del proyecto de la tarea nueva: las máquinas con su carpeta y su remoto. */
 export type ProjectPlace = { name: string; machines?: string[]; remote_url?: string | null } | null | undefined;
@@ -115,4 +116,18 @@ export function rememberOrigin(session: string, origin: CarryOrigin) {
   // Solo las últimas: la etiqueta es de la tarea recién llevada, no un historial.
   const kept = Object.entries({ ...leerPref<Record<string, CarryOrigin>>(ORIGINS, {}), [session]: origin }).slice(-50);
   escribirPref(ORIGINS, Object.fromEntries(kept));
+}
+
+/** VM administrada. Sin `wakes` (un motor anterior) vale lo de antes: lo que no es la máquina de la ventana. */
+export function wakesOf(m: { wakes?: boolean; local: boolean }): boolean {
+  return m.wakes ?? !m.local;
+}
+
+/** Si esa máquina es una VM administrada. Una que no está en la lista y no es la de la ventana se queda como VM. */
+export function machineWakes(id: string): boolean {
+  const row = machines().find((m) => m.id === id);
+  if (row) return wakesOf(row);
+  const here = capabilities().windowMachine?.();
+  if (!id || id === "local" || (here && id === here.id)) return false;
+  return true;
 }

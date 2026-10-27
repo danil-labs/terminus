@@ -93,6 +93,8 @@ export type RouterConfig = {
   deliver?: (events: { name: string; payload: unknown }[]) => void;
   /** «Ejecutar en» para `workspace`, si la persona eligió una máquina. */
   pickedFor?: (workspace: string | null) => string | null;
+  /** La máquina de la ventana, si esta computadora es una VM. Sin esto, se pinta como laptop. */
+  home?: () => { wakes?: boolean };
 };
 
 function headerOf(options: Options, name: string): string | null {
@@ -447,7 +449,7 @@ export function createRouter(config: RouterConfig) {
     const lead = defaultMachine(workspace);
     const members = new Set(fleet.membersOf(workspace));
     return [
-      ...(self !== null ? [{ id: self, local: true, active: lead === self, on: true, hosts: hasHere(workspace), materializes: true }] : []),
+      ...(self !== null ? [{ id: self, local: true, active: lead === self, on: true, hosts: hasHere(workspace), materializes: true, wakes: config.home?.().wakes ?? false }] : []),
       // Una de otro contrato no corre tareas nuevas hasta actualizarse.
       ...fleet.machines().filter((m) => fleet.power(m.id) !== "outdated").map((m) => ({
         id: m.id,
@@ -456,6 +458,7 @@ export function createRouter(config: RouterConfig) {
         on: fleet.power(m.id) === "on",
         hosts: workspace ? members.has(m.id) : null,
         materializes: !stale.has(m.id),
+        wakes: m.wakes,
       })),
     ];
   }

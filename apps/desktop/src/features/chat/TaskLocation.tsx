@@ -1,14 +1,13 @@
 import Folder from "lucide-solid/icons/folder";
 import GitBranch from "lucide-solid/icons/git-branch";
-import Laptop from "lucide-solid/icons/laptop";
 import Monitor from "lucide-solid/icons/monitor";
-import Server from "lucide-solid/icons/server";
+import { MachineIcon } from "../machines/MachineIcon";
+import { machineName, machineWakes } from "../machines/store";
 import { createSignal, type JSX, onCleanup, Show } from "solid-js";
 import { copyText } from "../../lib/clipboard";
 import { t } from "../../lib/i18n";
 import { capabilities } from "../../lib/platform";
 import { cn } from "../../lib/utils";
-import { machineName } from "../machines/store";
 import { RETARDO_TOOLTIP, TooltipContent, TooltipRoot, TooltipTrigger } from "../../ui/Tooltip";
 
 export type TaskLocationProps = {
@@ -47,7 +46,9 @@ function Pista(props: { tip: JSX.Element; children: JSX.Element; class?: string;
 export default function TaskLocation(props: TaskLocationProps) {
   const here = () => capabilities().windowMachine?.();
   const nombre = () => (props.machine ? machineName(props.machine) : (here()?.name ?? machineName("local")));
-  // En la web ninguna máquina es la de la ventana: `here().local` es falso.
+  const id = () => props.machine ?? here()?.id ?? "local";
+  const wakes = () => machineWakes(id());
+  // En la web ninguna máquina es la de la ventana: `here().local` es falso. Solo decide el botón de pantalla.
   const local = () => (props.machine ? !!here()?.local && props.machine === here()?.id : (here()?.local ?? true));
   const [copiada, setCopiada] = createSignal(false);
   let espera: ReturnType<typeof setTimeout> | undefined;
@@ -76,11 +77,11 @@ export default function TaskLocation(props: TaskLocationProps) {
         class={cn("max-w-[40%] shrink", !props.on && "opacity-65")}
         tip={props.on ? t("shell.machines.task_on", { name: nombre() }) : t("shell.machines.task_off", { name: nombre() })}
       >
-        {local() ? <Laptop size={13} aria-hidden="true" class="shrink-0" /> : <Server size={13} aria-hidden="true" class="shrink-0" />}
+        <MachineIcon wakes={wakes()} size={13} class="shrink-0" />
         <span data-task-location-machine="" class="min-w-0 truncate">{nombre()}</span>
         <span
           aria-hidden="true"
-          class={cn("size-1.5 shrink-0 rounded-full", props.on ? "bg-success" : "bg-neutral-300")}
+          class={cn("size-1.5 shrink-0 rounded-full", !props.on ? "bg-neutral-300" : wakes() ? "bg-info" : "bg-success")}
         />
       </Pista>
       <Show when={props.project}>

@@ -100,6 +100,8 @@ export function startAccountMachines(target: Target = window) {
   // The window's own IPC under its usual name: the command guards read these two literally.
   const invoke = native;
   let token: ClientToken | null = null;
+  /** Si esta computadora es una VM administrada. La lista la lee en cada `machine_list`. */
+  let homeWakes = false;
   /** The session the fan-out talks as: the open workspace's account; `null` is the default one. */
   let account: string | null = null;
 
@@ -163,6 +165,7 @@ export function startAccountMachines(target: Target = window) {
       onSlices: slicesChanged,
       deliver,
       pickedFor,
+      home: () => ({ wakes: homeWakes }),
     });
     fleet.setMachines(others.map(infoOf));
     fleet.subscribeEvents();
@@ -280,7 +283,9 @@ export function startAccountMachines(target: Target = window) {
       return uninstall();
     }
     if (answer.kind !== "ok") return;
-    setSelfName(answer.value.find((c) => c.computer_id === self)?.name?.trim() || null);
+    const mine = answer.value.find((c) => c.computer_id === self);
+    setSelfName(mine?.name?.trim() || null);
+    homeWakes = mine ? wakes(mine) : false;
     const others = orderComputers(answer.value.filter((c) => c.computer_id !== self));
     const key = JSON.stringify([self, account, client.endpoint]);
     if (!others.length) return uninstall();
