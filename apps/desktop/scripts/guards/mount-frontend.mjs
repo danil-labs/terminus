@@ -475,7 +475,8 @@ if (!roto) {
   await sleep(100);
   const closeAllAction = [...closeAllDoc.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent.trim() === "Cerrar todas");
   assert.ok(closeAllAction);
-  closeAllAction.click();
+  closeAllAction.focus();
+  closeAllAction.dispatchEvent(new closeAllViews.w.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
   await sleep(150);
   assert.equal(closeAllDoc.querySelector('[data-tira] [role="tab"], [data-preview]'), null, "cerrar todas no reabre la tarea propietaria de un documento");
   assert.deepEqual(closeAllViews.fallos, []);
