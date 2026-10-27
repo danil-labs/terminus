@@ -120,7 +120,7 @@ const CarryOriginLabel = lazy(() =>
 type CarryModule = typeof import("../features/machines/carry");
 /** Lo que corta un envío cuya copia se detuvo: el fallo y su arreglo quedan en el encabezado. */
 const CARRY_STOPPED = Symbol("carry-stopped");
-import VistaDeProyecto from "../features/projects/ProjectView";
+const VistaDeProyecto = lazy(() => import("../features/projects/ProjectView"));
 import { DEFAULT_PROFILE, displayName, notifyProfiles, watchProfiles } from "../features/projects/profiles";
 import RecentAgentChats from "../features/projects/RecentAgentChats";
 import { type SessionRow, threadTitle } from "../features/projects/Sessions";
@@ -7577,6 +7577,7 @@ export default function App() {
             style={estiloDeLaCelda(paneles.activeSite())}
             data-ventana={`${paneles.activeSite().col},${paneles.activeSite().fila}`}
           >
+            <Suspense fallback={<div class="flex flex-1 items-center justify-center text-sm text-neutral-500" role="status">{t("projects.view.opening")}</div>}>
             <VistaDeProyecto
               proyecto={p()}
               workspace={workspaceActivo()}
@@ -7604,6 +7605,7 @@ export default function App() {
               onQuitar={(source) => quitarDelProyecto(p().id, source)}
               onCarpetaEditable={(dir) => carpetaEditable(p().id, dir)}
             />
+            </Suspense>
           </div>
         )}
       </Show>

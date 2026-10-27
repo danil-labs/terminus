@@ -395,5 +395,6 @@
   "projects.memory.history_error": "No pude leer el historial de la cuenta.",
   "projects.memory.history_loading": "Leyendo el historial…",
   "projects.memory.history_title": "Historial de {file}",
-  "projects.memory.history_view": "Ver esta versión"
+  "projects.memory.history_view": "Ver esta versión",
+  "projects.view.opening": "Abriendo carpeta…"
 }

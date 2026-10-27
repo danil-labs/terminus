@@ -395,5 +395,6 @@
   "projects.memory.history_error": "I could not read the account's history.",
   "projects.memory.history_loading": "Reading the history…",
   "projects.memory.history_title": "History of {file}",
-  "projects.memory.history_view": "See this version"
+  "projects.memory.history_view": "See this version",
+  "projects.view.opening": "Opening folder…"
 }
