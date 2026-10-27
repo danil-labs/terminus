@@ -113,3 +113,92 @@ test("the transport leaves out what the account may not see: workspaces, attenti
 
   assert.deepEqual(app.fallos, []);
 });
+
+test("workspace context comes from its owning machine, including its source reads", async () => {
+  const { fleet } = await import("../helpers/fake-relay.mjs");
+  const listing = (root) => ({ workspaces: [{ id: "w", name: "W", context_root: root }], active: "w" });
+  const source = { id: "context-mac", name: "Context", root: true, missing: false, projects: [] };
+  const vm = { ...engine, list_workspaces: listing(null), workspaces_startup: listing(null), source_detail: { machine: "vm" }, set_root: true };
+  const mac = { ...engine, list_workspaces: listing(source.id), workspaces_startup: listing(source.id), list_sources: [source], source_detail: { machine: "mac" } };
+  const f = fleet({ cmp_vm: { table: vm }, cmp_mac: { table: mac } });
+  const app = await boot("listo", "web-context-owner", {}, undefined, {}, {
+    web: true,
+    antes: (w) => {
+      globalThis.WebSocket = f.Socket;
+      w.terminusWeb = { endpoint: "https://relay.test", computers: [
+        { computer_id: "cmp_vm", name: "VM", state: "online", provider: "aws-ec2", workspaces: ["w"] },
+        { computer_id: "cmp_mac", name: "Mac", state: "online", kind: "physical", workspaces: ["w"] },
+      ], getToken: async () => "tok" };
+    },
+  });
+  await sleep(1800);
+  const invoke = (command, args, options) => app.w.__TAURI_INTERNALS__.invoke(command, args, options);
+  const list = await invoke("list_workspaces");
+  assert.equal(list.workspaces[0].context_root, source.id, "a materialized VM must not hide the Mac's context");
+  assert.deepEqual(await invoke("list_sources"), [source], "the source must actually be readable on its owner");
+  assert.deepEqual(await invoke("list_sources", {}, { headers: { "x-terminus-machine": "cmp_vm" } }), [], "an explicit machine wins");
+  f.relays.cmp_mac.setState("offline");
+  await sleep(100);
+  const partial = await invoke("list_workspaces");
+  assert.equal(partial.workspaces[0].context_root, source.id, "a partial listing retains the known owner");
+  assert.deepEqual(await invoke("list_sources"), [source], "offline reads retain the owner's cached sources, never the empty VM list");
+  await assert.rejects(invoke("source_detail", { id: "uncached" }), "an uncached read reports its unavailable owner");
+  f.relays.cmp_mac.setState("online");
+  await sleep(100);
+  vm.list_workspaces = listing("vm-root");
+  const both = await invoke("list_workspaces");
+  assert.equal(both.workspaces[0].context_root, "vm-root", "two roots use deterministic machine order");
+  assert.deepEqual(await invoke("source_detail", { id: source.id }), { machine: "mac" }, "an already listed source keeps its origin when the default changes");
+  await invoke("set_root", { source: source.id }, { headers: { "x-terminus-machine": "cmp_vm" } });
+  assert.ok(f.relays.cmp_vm.calls.some((c) => c.command === "set_root"), "configuration's explicit destination wins");
+  vm.list_workspaces = listing(null);
+  mac.list_workspaces = { workspaces: [{ id: "w", context_root: source.id }, { id: "other", context_root: null }], active: "other" };
+  app.w.dispatchEvent(new app.w.CustomEvent("harness:sources"));
+  await sleep(600);
+  assert.ok(!app.w.document.body.textContent.includes("Sin fuente de contexto"), "refresh uses the UI workspace, not the engine's active workspace");
+  mac.list_sources = [];
+  app.w.dispatchEvent(new app.w.CustomEvent("harness:sources"));
+  await sleep(600);
+  assert.ok(app.w.document.body.textContent.includes("No se pudo leer la fuente principal"), "a missing root is a visible read failure");
+  assert.ok(!app.w.document.body.textContent.includes("Sin fuente de contexto"));
+  assert.deepEqual(app.fallos, []);
+});
+
+test("source origins cannot be overwritten by collisions or late replies, and outdated owners stay authoritative", async () => {
+  const { Fleet } = await import("../../src/web/fleet.ts");
+  const listing = (machine, root) => ({ machine, value: { workspaces: [{ id: "w", context_root: root, logo: `/${machine}/logo` }], active: "w" } });
+  for (const replies of [["mac", "vm"], ["vm", "mac"]]) {
+    const f = new Fleet([{ id: "vm", name: "VM", wakes: true }, { id: "mac", name: "Mac", wakes: false }]);
+    const merged = f.merge("list_workspaces", [listing("vm", null), listing("mac", "root")]);
+    assert.equal(merged.workspaces[0].logo, "mac~/mac/logo", "paths and root come from the same machine");
+    for (const machine of replies) f.rememberSources(machine, "w", [{ id: "same" }]);
+    assert.throws(() => f.route("remove_source", { source: "same" }, "w", null, "vm"), /context_ambiguous/);
+    assert.equal(f.route("remove_source", { source: "same" }, "w", "mac", "vm").machine, "mac");
+    assert.equal(f.route("list_sources", {}, "w", null, "vm").machine, "mac");
+    f.markOutdated("mac");
+    const partial = f.merge("list_workspaces", [listing("vm", "another-root")]);
+    assert.equal(partial.workspaces[0].context_root, "root");
+    assert.equal(f.route("list_sources", {}, "w", null, "vm").machine, "mac");
+    assert.equal(f.route("list_mentions", {}, "w", null, "vm").machine, "vm", "task/project reads keep their existing routing");
+    assert.equal(f.route("set_source_branch", { project: "p", source: "same" }, "w", null, "vm").machine, "vm", "project mutations keep their existing routing");
+    f.merge("list_workspaces", [listing("mac", null), listing("vm", "another-root")]);
+    assert.equal(f.route("list_sources", {}, "w", null, "vm").machine, "vm", "a valid absence releases the owner");
+  }
+});
+
+test("only a confirmed absence of a primary source shows the empty context actions", async () => {
+  for (const primary of [false, true, "error"]) {
+    const source = { id: "s", name: "Source", root: primary, missing: false, projects: [] };
+    const fake = relay({ table: { ...engine, list_sources: primary === "error" ? undefined : [source] } });
+    const app = await boot("listo", `web-context-primary-${primary}`, {}, undefined, {}, {
+      web: true,
+      antes: (w) => {
+        globalThis.WebSocket = fake.Socket;
+        w.terminusWeb = { endpoint: "https://relay.test", computerId: "cmp_test", getToken: async () => "tok" };
+      },
+    });
+    await sleep(700);
+    assert.equal(app.w.document.body.textContent.includes("Sin fuente de contexto"), primary === false, "secondary material does not substitute for a primary source, and failed reads do not confirm an empty context");
+    assert.deepEqual(app.fallos, []);
+  }
+});

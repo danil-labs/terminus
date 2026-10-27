@@ -430,7 +430,8 @@ export function createWebTransport(
     let route: ReturnType<Fleet["route"]>;
     try {
       route = fleet.route(command, args, workspace, chosen && fleet.info(chosen) ? chosen : null, fallback(workspace, args.project));
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && error.message === "context_ambiguous") throw { what: t("projects.context.ambiguous"), detail: "context_ambiguous" };
       throw { what: t("web.machines.cross_machine"), detail: "cross_machine" };
     }
     if ("fan" in route) return fan(command, route.fan, route.args, workspace);
@@ -444,6 +445,7 @@ export function createWebTransport(
     const made = (value as { id?: unknown } | null)?.id;
     if (command === "add_workspace" && typeof made === "string") fleet.materialized(route.machine, made);
     if (fleet.multi && CREATE.has(command) && !route.named) rememberMachine(route.machine);
+    if (command === "list_sources") fleet.rememberSources(route.machine, workspace, value);
     return fleet.encode(route.machine, value, command);
   }
 

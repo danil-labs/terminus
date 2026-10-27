@@ -319,6 +319,16 @@ export default function App() {
   // `null` es «este workspace todavía no tiene contexto»; se enseña como un
   // renglón al lado del selector de proyecto, no como una pantalla que lo pida.
   const [contextRoot, setContextRoot] = createSignal<string | null>(null);
+  const [contextConfirmed, setContextConfirmed] = createSignal(false);
+  let materialRequest = 0;
+  function confirmContext(root: string | null, listed: Source[]) {
+    root ??= listed.find((source) => source.root)?.id ?? null;
+    if (root && !listed.some((source) => source.id === root && !source.missing)) {
+      throw { what: t("projects.context.unavailable"), detail: "context_unavailable" };
+    }
+    setContextRoot(root);
+    setContextConfirmed(true);
+  }
   /** Con qué modo arranca lo nuevo de este workspace. `null` es el último elegido a mano. */
   const [workspaceMode, setWorkspaceMode] = createSignal<string | null>(null);
   /** Cuál está abierto, para poder descartar lo que emite el turno de otro. */
@@ -1802,26 +1812,26 @@ export default function App() {
   // pantalla sería de otro cliente, aquí es de este.
   async function recargarMaterial() {
     const generation = sessionGeneration;
+    const request = ++materialRequest;
+    const workspace = workspaceActivo();
+    if (!workspace) return;
+    setContextConfirmed(false);
     try {
+      const arranque = await invoke<Startup>("list_workspaces");
+      if (generation !== sessionGeneration || request !== materialRequest) return;
+      const current = arranque.workspaces.find((w) => w.id === workspace);
+      if (!current) throw { what: t("projects.context.unavailable"), detail: "context_unavailable" };
+      const root = current.context_root;
       const [proyectos, fuentes] = await Promise.all([
         invoke<Project[]>("list_projects"),
         invoke<Source[]>("list_sources"),
       ]);
-      if (generation !== sessionGeneration) return;
+      if (generation !== sessionGeneration || request !== materialRequest) return;
       setProjectList(proyectos);
       setSources(fuentes);
-  // También la raíz, que es material de este workspace: `context_root` solo
-  // lo escribía `aplicar()` —arranque y cambio de workspace—. Elegir la
-  // fuente principal desde Configuración refrescaba la lista pero el renglón
-  // «Sin fuente de contexto» seguía ahí hasta reiniciar la app: la firma de
-  // un dato que nadie recarga.
-      const arranque = await invoke<Startup>("list_workspaces");
-      if (generation !== sessionGeneration) return;
-      setContextRoot(
-        arranque.workspaces.find((w) => w.id === arranque.active)?.context_root ??
-          null,
-      );
+      confirmContext(root, fuentes);
     } catch (e) {
+      if (generation !== sessionGeneration || request !== materialRequest) return;
       setError(prosaDe(e));
     }
   }
@@ -1859,6 +1869,8 @@ export default function App() {
   // acaba de crear uno, y volver a mirar aquí la cerraría a mitad.
     if (a.active === null) setAlta((x) => x ?? "primera");
     setContextRoot(activo?.context_root ?? null);
+    setContextConfirmed(false);
+    const material = ++materialRequest;
     setWorkspaceMode(activo?.default_permission_mode ?? null);
   // La lengua es del workspace, y cambia al cambiar de cliente: eso es lo que
   // se pidió, no un efecto secundario. `null` hereda la de la máquina.
@@ -1951,9 +1963,12 @@ export default function App() {
       ]);
       if (generation !== sessionGeneration) return;
       setProjectList(proyectos);
-      setSources(fuentes);
+      if (material === materialRequest) {
+        setSources(fuentes);
+        confirmContext(activo?.context_root ?? null, fuentes);
+      }
     } catch (e) {
-      if (generation !== sessionGeneration) return;
+      if (generation !== sessionGeneration || material !== materialRequest) return;
       setProjectList([]);
       setSources([]);
       setError(prosaDe(e));
@@ -5936,7 +5951,7 @@ export default function App() {
       {/* A General, no a GitHub: la fuente principal del workspace se elige
           en Configuración → General; mandar a GitHub lleva a conectar un
           proveedor, dejando a la persona en una pantalla sin lo que buscaba. */}
-      <Show when={!contextRoot()}>
+      <Show when={contextConfirmed() && !contextRoot()}>
         <div class="justify-self-center">
           <EmptyContext
             onPickFolder={() => void elegirCarpetaDelWorkspace()}

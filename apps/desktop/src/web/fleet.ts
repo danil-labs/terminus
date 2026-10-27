@@ -35,6 +35,8 @@ export const FAN = new Set(["list_projects", "list_portfolios", "list_live_sessi
 export const EVERYWHERE = new Set(["list_workspaces", "workspaces_startup", "list_accounts", "list_workspace_attention"]);
 /** What makes something new where the person chose, when no id says where. */
 export const CREATE = new Set(["send_message", "run_shell_command", "create_project", "clone_project", "start_project_clone"]);
+/** Workspace context commands share the origin of its source catalog. */
+const CONTEXT = new Set(["add_folder", "add_repo_url", "set_workspace_source", "set_root", "list_sources", "source_freshness", "source_detail", "update_source", "remove_source", "list_source_branches", "set_source_skill"]);
 /** Answers whose rows carry the id of what they list. */
 const ROW_IDS = new Set(["list_portfolios", "list_live_sessions"]);
 /** Answers keyed by the id of the task each value is about. */
@@ -82,6 +84,9 @@ export class Fleet {
   private hosts = new Map<string, Set<string>>();
   /** The machines whose workspaces were read: what one of them does not list, it does not have. */
   private listed = new Set<string>();
+  private contextRows = new Map<string, Map<string, Row>>();
+  private contextOwners = new Map<string, string>();
+  private sourceOwners = new Map<string, Map<string, Set<string>>>();
   /** Workspace → project → where it lives. */
   private projects = new Map<string, Map<string, ProjectPlace>>();
   /** Machines whose engine does not know `materialize_workspace` yet. */
@@ -90,12 +95,17 @@ export class Fleet {
   private attention = new Map<string, Entry[]>();
   private outdated = new Set<string>();
 
+  private readonly on: (machine: string) => boolean;
+  readonly home: string | null;
+
   /** `on`: whether a machine answers now; rows from one that does not are marked off. */
   constructor(
     machines: MachineInfo[],
-    private readonly on: (machine: string) => boolean = () => true,
-    readonly home: string | null = null,
+    on: (machine: string) => boolean = () => true,
+    home: string | null = null,
   ) {
+    this.on = on;
+    this.home = home;
     const rest = ordered(machines.filter((m) => m.id !== home));
     const own = machines.find((m) => m.id === home);
     this.machines = own ? [own, ...rest] : rest;
@@ -191,6 +201,11 @@ export class Fleet {
     const same = before === linked || (before !== null && linked !== null && before.size === linked.size && [...linked].every((id) => before.has(id)));
     if (same) return false;
     m.linked = linked;
+    if (linked) {
+      const rows = this.contextRows.get(machine);
+      for (const id of rows?.keys() ?? []) if (!linked.has(id)) rows?.delete(id);
+      for (const [id, owner] of this.contextOwners) if (owner === machine && !linked.has(id)) this.contextOwners.delete(id);
+    }
     return true;
   }
 
@@ -249,7 +264,13 @@ export class Fleet {
     if (!byName && FAN.has(command) && !chosen) return { fan: this.fanOf(workspace, args.project), args, workspace };
     const place = this.projectOf(workspace, args.project);
     const lead = CREATE.has(command) ? null : this.membersOf(workspace).find((m) => !place || place.machines.has(m));
-    const machine: string = byName ?? chosen ?? lead ?? fallback;
+    const source = typeof args.id === "string" ? args.id : typeof args.source === "string" ? args.source : null;
+    const origins = workspace && source && CONTEXT.has(command) ? this.sourceOwners.get(workspace)?.get(source) : null;
+    if (!byName && !chosen && origins && origins.size > 1) throw new Error("context_ambiguous");
+    const context = workspace && CONTEXT.has(command)
+      ? origins?.values().next().value ?? this.contextOwners.get(workspace)
+      : null;
+    const machine: string = byName ?? chosen ?? context ?? lead ?? fallback;
     return {
       machine,
       args: this.decode(args, machine, new Set()) as Row,
@@ -262,6 +283,17 @@ export class Fleet {
   /** `args` decoded for one machine of a fan-out. */
   argsFor(machine: string, args: Row): Row {
     return this.multi ? (this.decode(args, machine, new Set()) as Row) : args;
+  }
+
+  rememberSources(machine: string, workspace: string | null, value: unknown) {
+    if (!workspace || !Array.isArray(value)) return;
+    const owners = this.sourceOwners.get(workspace) ?? new Map<string, Set<string>>();
+    for (const row of value) {
+      if (!isRow(row) || typeof row.id !== "string") continue;
+      const origins = owners.get(row.id) ?? new Set<string>();
+      owners.set(row.id, origins.add(machine));
+    }
+    this.sourceOwners.set(workspace, owners);
   }
 
   /** An answer or event of `machine` with the panel's ids. */
@@ -337,6 +369,7 @@ export class Fleet {
     for (const { machine, rows: listed } of lists) {
       // What a machine that did not answer listed before still counts: a machine that turns off keeps its workspaces.
       this.listed.add(machine);
+      this.contextRows.set(machine, new Map(listed.map((w) => [w.id as string, w])));
       for (const set of this.hosts.values()) set.delete(machine);
       for (const w of listed) {
         const id = w.id as string;
@@ -347,7 +380,16 @@ export class Fleet {
     const lead = lists[0];
     if (!lead) return answers[0]?.value ?? null;
     const fileOf = (row: Row, owner: string) => (typeof row.logo === "string" && isPath(row.logo) ? { logo: this.wrap(owner, row.logo) } : {});
-    const workspaces = [...rows].map(([id, { row, owner }]) => ({ ...row, ...fileOf(row, owner), id, machines: this.usable().filter((m) => this.hosts.get(id)?.has(m)) }));
+    const workspaces = [...rows].map(([id, first]) => {
+      const previous = this.contextOwners.get(id);
+      const owner = previous && this.isOutdated(previous) && text(this.contextRows.get(previous)?.get(id)?.context_root)
+        ? previous
+        : this.machines.map((m) => m.id).find((m) => text(this.contextRows.get(m)?.get(id)?.context_root));
+      if (owner) this.contextOwners.set(id, owner);
+      else this.contextOwners.delete(id);
+      const row = owner ? this.contextRows.get(owner)!.get(id)! : first.row;
+      return { ...row, ...fileOf(row, owner ?? first.owner), id, machines: this.usable().filter((m) => this.hosts.get(id)?.has(m)) };
+    });
     const active = lists.map((l) => (typeof l.value.active === "string" ? l.value.active : null)).find(Boolean) ?? null;
     return { ...(this.encode(lead.machine, lead.value) as Row), workspaces, active };
   }
