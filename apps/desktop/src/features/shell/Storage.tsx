@@ -1,3 +1,4 @@
+import type { MachineResources } from "@terminus/protocol";
 import type { JSX } from "solid-js";
 import {
   For,
@@ -69,19 +70,6 @@ type Almacen = {
   aviso: string | null;
 };
 
-type MachineResources = {
-  measured_at: number;
-  error?: "measurement_failed" | "unsupported";
-  storage: {
-    id: string;
-    label: string;
-    total_bytes: number;
-    free_bytes: number;
-    available_bytes: number;
-    terminus_bytes: null;
-    attribution: "unknown";
-  }[];
-};
 
 type Summary = { resources?: MachineResources; workspaceName?: string; loading: boolean; stale?: boolean; error?: string };
 type Target = { machine: string; workspace: string; generation: number };
