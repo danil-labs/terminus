@@ -28,6 +28,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { boot as mount, cause, dist, sleep } from "../../tests/helpers/jsdom-app.mjs";
 import { spaceScenarios } from "../../tests/helpers/mount-spaces.mjs";
+import { taskNoticeScenarios } from "../../tests/helpers/mount-task-notices.mjs";
 
 /**
  * Lo que el arranque pregunta, contestado con lo mínimo creíble.
@@ -190,6 +191,8 @@ async function hablarDesdeLaCarpeta(app, carpeta, nombre) {
  * barras grises y ni un error.
  */
 const enElEsqueleto = (html) => html.includes("setup-card") && html.includes("aria-busy");
+
+await taskNoticeScenarios({ boot, sleep, responses: CON_TAREA });
 
 const t0 = Date.now();
 const normal = await boot("listo", 1);
