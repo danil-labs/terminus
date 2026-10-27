@@ -27,7 +27,12 @@ export function startAuth(settings: { supabaseUrl: string; supabaseKey: string }
     const [pending, setPending] = createSignal(false);
     const [resent, setResent] = createSignal(false);
     const [error, setError] = createSignal("");
-    const finish = () => window.location.replace(next);
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      window.location.replace(next);
+    };
     const clean = () => window.history.replaceState(null, "", `${callback.pathname}${callback.search}`);
     let unsubscribe: (() => void) | undefined;
     onCleanup(() => unsubscribe?.());
@@ -128,7 +133,7 @@ export function startAuth(settings: { supabaseUrl: string; supabaseKey: string }
     }
 
     return (
-      <main class="flex min-h-full flex-col items-center overflow-y-auto bg-bg px-6 py-10 text-neutral-950" data-web-auth={pending() ? "confirmation" : mode()} aria-busy={busy()}>
+      <main class="flex h-full flex-col items-center overflow-y-auto bg-bg px-6 py-10 text-neutral-950" data-web-auth={pending() ? "confirmation" : mode()} aria-busy={busy()}>
         <div class="grid w-full max-w-sm gap-6">
           <h1 class="m-0 text-3xl font-display font-bold tracking-[-0.03em]">Terminus</h1>
           <div class="grid gap-2">
