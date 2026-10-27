@@ -99,7 +99,7 @@ test("la hora de vuelta lleva fecha cuando no es hoy", () => {
 
 test("un mensaje que no se pudo mandar ofrece reintentarlo, solo el vigente", () => {
   // `enviar` anota el rechazo sin clase: el envío ni llegó al proveedor.
-  const rechazo = { role: "system", meta: "fallo", text: "No hay conexión con la máquina." };
+  const rechazo = { meta: "fallo", text: "No hay conexión con la máquina." };
   assert.equal(rowAction(rechazo, true)?.accion, "reintentar");
   assert.equal(rowAction({ ...rechazo, fallo: { clase: "desconocido", detail: "exit 1" } }, true)?.accion, "reintentar");
   // En una fila vieja mandaría el último texto, no el que falló.
@@ -112,7 +112,7 @@ test("un mensaje que no se pudo mandar ofrece reintentarlo, solo el vigente", ()
   // El turno corrió y no se guardó: repetirlo haría el trabajo dos veces.
   assert.equal(rowAction({ ...rechazo, text: "chat.turn.unsaved" }, true), null);
   // Un aviso no es un fallo.
-  assert.equal(rowAction({ role: "system", meta: "aviso", text: "Hola" }, true), null);
+  assert.equal(rowAction({ meta: "aviso", text: "Hola" }, true), null);
 });
 
 test("cada clase ofrece el gesto que sirve, o ninguno", () => {
