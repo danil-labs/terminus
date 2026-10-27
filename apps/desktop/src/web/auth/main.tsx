@@ -1,4 +1,4 @@
-import { createSignal, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { render } from "solid-js/web";
 import { aplicarLengua, t } from "../../lib/i18n";
 import { seguirElTema } from "../../lib/theme";
@@ -27,6 +27,10 @@ export function startAuth(settings: { supabaseUrl: string; supabaseKey: string }
     const [pending, setPending] = createSignal(false);
     const [resent, setResent] = createSignal(false);
     const [error, setError] = createSignal("");
+    let heading: HTMLHeadingElement | undefined;
+    createEffect(() => {
+      if (pending()) queueMicrotask(() => heading?.focus());
+    });
     let finished = false;
     const finish = () => {
       if (finished) return;
@@ -137,8 +141,8 @@ export function startAuth(settings: { supabaseUrl: string; supabaseKey: string }
         <div class="grid w-full max-w-sm gap-6">
           <h1 class="m-0 text-3xl font-display font-bold tracking-[-0.03em]">Terminus</h1>
           <div class="grid gap-2">
-            <h2 class="m-0 text-xl font-semibold">{pending() ? t("web.auth.check_email") : mode() === "signup" ? t("web.auth.signup_title") : t("web.auth.signin_title")}</h2>
-            <p class="m-0 text-sm text-neutral-500">{pending() ? t("web.auth.confirm_hint", { email: email().trim() }) : t("web.auth.identity_hint")}</p>
+            <h2 ref={heading} tabIndex={-1} class="m-0 text-xl font-semibold">{pending() ? t("web.auth.check_email") : mode() === "signup" ? t("web.auth.signup_title") : t("web.auth.signin_title")}</h2>
+            <p class="m-0 text-sm text-neutral-500" role="status">{pending() ? t("web.auth.confirm_hint", { email: email().trim() }) : t("web.auth.identity_hint")}</p>
           </div>
           <Show when={!pending()} fallback={
             <div class="grid gap-3">

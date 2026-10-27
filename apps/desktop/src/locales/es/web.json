@@ -71,7 +71,7 @@
   "web.auth.microsoft": "Continuar con Microsoft",
   "web.auth.or_email": "O continúa con tu correo",
   "web.auth.check_email": "Revisa tu correo",
-  "web.auth.confirm_hint": "Enviamos un enlace a {email}. Ábrelo para confirmar tu cuenta y volver a Terminus.",
+  "web.auth.confirm_hint": "Abre el enlace de confirmación que recibas en {email} para continuar. Si no lo tienes, pide otro.",
   "web.auth.resend": "Reenviar correo",
   "web.auth.other_email": "Volver al formulario",
   "web.auth.resent": "Si el correo necesita confirmación, recibirás un nuevo enlace.",

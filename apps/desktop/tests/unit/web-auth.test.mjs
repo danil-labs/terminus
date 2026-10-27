@@ -48,6 +48,7 @@ test("registration waits for email confirmation and resends with the device retu
     submit(w);
     await sleep(200);
     assert.equal(w.document.querySelector("[data-web-auth]")?.dataset.webAuth, "confirmation");
+    assert.equal(w.document.activeElement?.tagName, "H2", "confirmation takes keyboard focus");
     const signup = requests[0];
     assert.equal(new URL(signup.url).pathname, "/auth/v1/signup");
     const callback = new URL(new URL(signup.url).searchParams.get("redirect_to"));
@@ -90,5 +91,43 @@ test("a rejected callback is explained and its credentials are removed without e
     assert.equal(new URL(w.location.href).searchParams.get("next"), "/terminus/connect?code=ABCD-EFGH");
     assert.equal(requests.length, 0);
     assert.deepEqual(app.fallos, []);
+  } finally { restore(); }
+});
+
+test("email confirmation in a fresh tab stores the identity in the shared Danil session key", async () => {
+  const { app, w, requests, restore } = await page("/terminus/auth?next=%2Fterminus%2Fconnect%3Fcode%3DABCD-EFGH&token_hash=confirmation-token&type=signup", () => ({
+    status: 200,
+    body: {
+      access_token: "confirmed-token", refresh_token: "confirmed-refresh", token_type: "bearer", expires_in: 3600,
+      user: { id: "same-danil-person", email: "persona@example.com", email_confirmed_at: "2026-10-27T00:00:00Z", app_metadata: {}, user_metadata: {} },
+    },
+  }));
+  try {
+    assert.equal(new URL(requests[0].url).pathname, "/auth/v1/verify");
+    assert.equal(requests[0].body.token_hash, "confirmation-token");
+    const saved = JSON.parse(w.localStorage.getItem("sb-supabase-auth-token"));
+    assert.equal(saved.user.id, "same-danil-person");
+    assert.equal(saved.access_token, "confirmed-token");
+    assert.equal(w.location.search.includes("token_hash"), false);
+    assert.equal(new URL(w.location.href).searchParams.get("next"), "/terminus/connect?code=ABCD-EFGH");
+    assert.deepEqual(app.fallos.filter((error) => !error.includes("Not implemented: navigation")), []);
+  } finally { restore(); }
+});
+
+test("resending confirmation respects the server rate limit and keeps a retry available", async () => {
+  const { w, requests, restore } = await page("/terminus/auth", (request) => new URL(request.url).pathname.endsWith("/signup")
+    ? { status: 200, body: { user: { id: "new-user", identities: [] }, session: null } }
+    : { status: 429, body: { code: "over_email_send_rate_limit", msg: "Rate limit" } });
+  try {
+    click(w, "¿No tienes cuenta? Crea una");
+    fill(w, "email", "persona@example.com");
+    fill(w, "password", "long-test-password");
+    submit(w);
+    await sleep(200);
+    click(w, "Reenviar correo");
+    await sleep(200);
+    assert.match(w.document.querySelector('[role="alert"]')?.textContent, /demasiados intentos/);
+    assert.equal(requests.length, 2);
+    assert.equal([...w.document.querySelectorAll("button")].find((button) => button.textContent.trim() === "Reenviar correo").disabled, false);
   } finally { restore(); }
 });

@@ -113,14 +113,14 @@ export function ConnectPage(props: { session: Session; endpoint: string; code: s
               <p class="m-0 text-xs text-neutral-500">{t("danil.connect.code", { code: props.code })}</p>
               <label class="grid gap-1.5 text-[0.8125rem] text-neutral-500">
                 {t("danil.connect.name_label")}
-                <Input value={name()} onInput={(e) => setName(e.currentTarget.value)} disabled={view().t === "approving"} data-machine-name="" />
+                <Input class="min-h-11 border-neutral-500 text-base" value={name()} onInput={(e) => setName(e.currentTarget.value)} disabled={view().t === "approving"} data-machine-name="" />
                 <span class="text-xs">{t("danil.connect.name_hint")}</span>
               </label>
               <div class="flex flex-wrap gap-2">
-                <Button type="submit" size="sm" disabled={view().t === "approving"}>
+                <Button class="min-h-11" type="submit" size="sm" disabled={view().t === "approving"}>
                   {view().t === "approving" ? t("danil.connect.approving") : t("danil.connect.approve")}
                 </Button>
-                <Button type="button" size="sm" variant="ghost" disabled={view().t === "approving"} onClick={() => void deny(d())}>
+                <Button class="min-h-11" type="button" size="sm" variant="ghost" disabled={view().t === "approving"} onClick={() => void deny(d())}>
                   {t("danil.connect.deny")}
                 </Button>
               </div>
