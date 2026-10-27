@@ -107,8 +107,8 @@ test("bare Terminus path redirects locally without hitting bindings", async () =
 
 test("mobile inbox deep link serves the phone entry rather than global SPA fallback", async () => {
   const h = harness();
-  for (const method of ["GET", "HEAD"]) {
-    await h.fetch("/terminus/m/inbox?demo=1", { method });
+  for (const path of ["inbox", "inbox-thread", "inbox-detail"]) for (const method of ["GET", "HEAD"]) {
+    await h.fetch(`/terminus/m/${path}?demo=1`, { method });
     const forwarded = h.calls.at(-1);
     assert.equal(forwarded.url, origin + "/terminus/m/?demo=1");
     assert.equal(forwarded.method, method);

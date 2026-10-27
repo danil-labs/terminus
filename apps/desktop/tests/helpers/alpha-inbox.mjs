@@ -22,8 +22,6 @@ const fixtureFetch=async input=>{
 };
 fixtureFetch.__jsdomApp=true;
 const app=await boot('listo','alpha-real-shell',{},undefined,{}, {web:true,antes(w){
- const append=w.document.head.appendChild.bind(w.document.head);
- w.document.head.appendChild=node=>{const value=append(node);if(node.tagName==='LINK')setTimeout(()=>node.dispatchEvent(new w.Event('load')),0);return value;};
  w.history.replaceState({},'','/terminus/inbox?live=1');
  globalThis.WebSocket=fake.Socket;
  globalThis.fetch=fixtureFetch;
