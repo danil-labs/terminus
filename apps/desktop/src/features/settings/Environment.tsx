@@ -1,3 +1,4 @@
+import BrowserNavigation from "./BrowserNavigation";
 import Actualizacion from "./Update";
 import {
   For,
@@ -66,7 +67,7 @@ const COLUMNAS: { id: Columna; alinear?: "right"; ancho: string }[] = [
   { id: "source", ancho: "w-[20%]" },
 ];
 
-const BASE = ["git", "node", "npm", "pnpm", "bun", "agent-browser"];
+const BASE = ["git", "node", "npm", "pnpm", "agent-browser", "uv", "python", "ripgrep"];
 type Fila = Requirement & { dependency?: Dependency };
 
 export default function Environment() {
@@ -151,8 +152,9 @@ export default function Environment() {
     return t("settings.environment.origin.missing");
   }
 
-  const pending = (fila: Fila) => reporte()?.bootstrap.includes(fila.id) === true;
-  const canPrepare = (fila: Fila) => BASE.includes(fila.id) && pending(fila);
+  const pending = (fila: Fila) => reporte()?.bootstrap.includes(fila.id) === true
+    || (fila.id === "browser-navigation" && fila.ok && fila.installable);
+  const canPrepare = (fila: Fila) => BASE.includes(fila.id) && (pending(fila) || (!fila.ok && fila.installable));
   const status = (fila: Fila) => {
     if (fila.timed_out) return t("settings.environment.status.timed_out");
     if (!fila.ok) return t("settings.environment.status.missing");
@@ -161,13 +163,14 @@ export default function Environment() {
   };
 
   async function preparar(fila: Fila) {
+    const tool = fila.id === "npm" ? "node" : fila.id;
     setPreparando(fila.id);
     setFallo(null);
     try {
-      await invoke("install_base_tool", { tool: fila.id });
+      await invoke("install_base_tool", { tool });
       await cargar(true);
     } catch (e) {
-      const sinEspacio = await textoDeFalta(e, `tool:${fila.id}`);
+      const sinEspacio = await textoDeFalta(e, `tool:${tool}`);
       setFallo(sinEspacio ? { what: sinEspacio, detail: "" } : { ...asFailure(e), what: t("settings.environment.error_prepare") });
     } finally {
       setPreparando(null);
@@ -185,6 +188,8 @@ export default function Environment() {
       <Show when={reporte()?.engineBuild}>
         {(build) => <p class="text-sm text-neutral-500">{t("settings.environment.engine_build", { build: build() })}</p>}
       </Show>
+
+      <BrowserNavigation requirement={reporte()?.items.find((r) => r.id === "browser-navigation")} onPrepared={() => cargar(true)} />
 
       <SettingsSection
         title={t("settings.environment.title")}

@@ -90,7 +90,6 @@
   "setup.optional.skipped": "Omitido",
   "setup.optional.check_to_install": "Márcalo para instalar",
   "setup.optional.about.pnpm": "Gestor de paquetes de Node.js",
-  "setup.optional.about.bun": "Ejecuta scripts de JavaScript más rápido",
   "setup.optional.about.agent-browser": "Para agentes que usan el navegador",
   "setup.optional.about.uv": "Gestor de paquetes de Python",
   "setup.optional.about.python": "Para agentes que ejecutan scripts",

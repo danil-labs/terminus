@@ -60,7 +60,7 @@ const LINEAS_MAX = 400;
 const RANGO: Record<EstadoDeEtapa, number> = { waiting: 0, running: 1, succeeded: 2, failed: 2, skipped: 2 };
 const RITMO_CONSEJOS = 5000;
 const RITMO_FOTO = 5000;
-const CON_DESCRIPCION = new Set(["pnpm", "bun", "agent-browser", "uv", "python"]);
+const CON_DESCRIPCION = new Set(["pnpm", "agent-browser", "uv", "python"]);
 
 // Conectar la IA y personalizar solo se cargan en el primer arranque: la carga inicial está en su techo.
 const MapaDeConexiones = lazy(() => import("../onboarding/ConnectAI").then((m) => ({ default: m.MapaDeConexiones })));
@@ -291,7 +291,7 @@ export default function Setup(props: { children: JSX.Element }) {
     setParcial(e.payload.done / e.payload.bytes);
     setDescarga({ stage: name, file: nombre(name), done: e.payload.done, total: e.payload.bytes });
   });
-  // pnpm y Bun bajan por `toolchain::install_tool`, que ya reporta su avance por aquí.
+  // Las herramientas administradas bajan por `toolchain::install_tool`, que ya reporta su avance por aquí.
   const escuchaHerramientas = listen<Avance>("toolchain", (e) => {
     if (e.payload.id !== activa() || e.payload.bytes <= 0) return;
     setParcial(e.payload.done / e.payload.bytes);

@@ -90,7 +90,6 @@
   "setup.optional.skipped": "Skipped",
   "setup.optional.check_to_install": "Check it to install",
   "setup.optional.about.pnpm": "Node.js package manager",
-  "setup.optional.about.bun": "Runs JavaScript scripts faster",
   "setup.optional.about.agent-browser": "For agents that use the browser",
   "setup.optional.about.uv": "Python package manager",
   "setup.optional.about.python": "For agents that run scripts",
