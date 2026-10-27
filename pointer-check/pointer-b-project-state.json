@@ -1,0 +1,905 @@
+{
+  "pid": 83047,
+  "window_id": 21079,
+  "window_bounds": {
+    "height": 720,
+    "width": 1000,
+    "x": 235,
+    "y": 84
+  },
+  "elements": [
+    {
+      "label": "Terminus",
+      "role": "AXWebArea",
+      "selected": false,
+      "frame": {
+        "h": 720,
+        "w": 1000,
+        "x": 235,
+        "y": 84
+      }
+    },
+    {
+      "label": "Remote Visual QA",
+      "role": "AXPopUpButton",
+      "selected": false,
+      "frame": {
+        "h": 24,
+        "w": 133,
+        "x": 319,
+        "y": 86
+      }
+    },
+    {
+      "label": "Remote Visual QA spaces",
+      "role": "AXTabGroup",
+      "selected": false,
+      "frame": {
+        "h": 24,
+        "w": 94,
+        "x": 465,
+        "y": 86
+      }
+    },
+    {
+      "label": "QA A",
+      "role": "AXRadioButton",
+      "value": "0",
+      "selected": false,
+      "frame": {
+        "h": 22,
+        "w": 45,
+        "x": 466,
+        "y": 87
+      }
+    },
+    {
+      "label": "QA B",
+      "role": "AXRadioButton",
+      "value": "1",
+      "selected": true,
+      "frame": {
+        "h": 22,
+        "w": 45,
+        "x": 513,
+        "y": 87
+      }
+    },
+    {
+      "label": "New space",
+      "role": "AXPopUpButton",
+      "selected": false,
+      "frame": {
+        "h": 22,
+        "w": 23,
+        "x": 561,
+        "y": 87
+      }
+    },
+    {
+      "label": "Star on GitHub: support Terminus (opens in your browser)",
+      "role": "AXButton",
+      "selected": false,
+      "frame": {
+        "h": 24,
+        "w": 111,
+        "x": 1094,
+        "y": 86
+      }
+    },
+    {
+      "label": "Hide invitation",
+      "role": "AXButton",
+      "selected": false,
+      "frame": {
+        "h": 22,
+        "w": 22,
+        "x": 1206,
+        "y": 87
+      }
+    },
+    {
+      "label": "Hide the history",
+      "role": "AXCheckBox",
+      "value": "1",
+      "selected": false,
+      "frame": {
+        "h": 26,
+        "w": 26,
+        "x": 242,
+        "y": 119
+      }
+    },
+    {
+      "label": "New task",
+      "role": "AXButton",
+      "selected": false,
+      "frame": {
+        "h": 31,
+        "w": 245,
+        "x": 242,
+        "y": 152
+      }
+    },
+    {
+      "label": "Search folders and tasks",
+      "role": "AXTextField",
+      "value": "Search folders and tasks",
+      "selected": false,
+      "frame": {
+        "h": 24,
+        "w": 181,
+        "x": 269,
+        "y": 190
+      }
+    },
+    {
+      "label": "Search folders and tasks",
+      "role": "AXStaticText",
+      "value": "Search folders and tasks",
+      "selected": false,
+      "frame": {
+        "h": 15,
+        "w": 136,
+        "x": 269,
+        "y": 194
+      }
+    },
+    {
+      "label": "Filter and group",
+      "role": "AXPopUpButton",
+      "selected": false,
+      "frame": {
+        "h": 26,
+        "w": 26,
+        "x": 461,
+        "y": 189
+      }
+    },
+    {
+      "label": "Collapse “HTML B”",
+      "role": "AXButton",
+      "selected": false,
+      "frame": {
+        "h": 19,
+        "w": 19,
+        "x": 242,
+        "y": 225
+      }
+    },
+    {
+      "label": "HTML B",
+      "role": "AXButton",
+      "selected": false,
+      "frame": {
+        "h": 26,
+        "w": 175,
+        "x": 262,
+        "y": 221
+      }
+    },
+    {
+      "label": "Actions for the project “HTML B”",
+      "role": "AXPopUpButton",
+      "selected": false,
+      "frame": {
+        "h": 23,
+        "w": 22,
+        "x": 436,
+        "y": 223
+      }
+    },
+    {
+      "label": "New task in HTML B",
+      "role": "AXButton",
+      "selected": false,
+      "frame": {
+        "h": 23,
+        "w": 23,
+        "x": 461,
+        "y": 223
+      }
+    },
+    {
+      "label": "Finished and not opened yet Muestra la figura HTML de QA claude Runs on QA b Wasat · Oct 27 · No changes",
+      "role": "AXLink",
+      "selected": false,
+      "frame": {
+        "h": 41,
+        "w": 245,
+        "x": 242,
+        "y": 247
+      }
+    },
+    {
+      "label": "Muestra la figura HTML de QA",
+      "role": "AXStaticText",
+      "value": "Muestra la figura HTML de QA",
+      "selected": false,
+      "frame": {
+        "h": 15,
+        "w": 171,
+        "x": 269,
+        "y": 251
+      }
+    },
+    {
+      "label": "QA b",
+      "role": "AXStaticText",
+      "value": "QA b",
+      "selected": false,
+      "frame": {
+        "h": 12,
+        "w": 24,
+        "x": 300,
+        "y": 269
+      }
+    },
+    {
+      "label": "Actions for the task “Muestra la figura HTML de QA”",
+      "role": "AXPopUpButton",
+      "selected": false,
+      "frame": {
+        "h": 19,
+        "w": 23,
+        "x": 460,
+        "y": 248
+      }
+    },
+    {
+      "label": "Pin “Muestra la figura HTML de QA”",
+      "role": "AXCheckBox",
+      "value": "0",
+      "selected": false,
+      "frame": {
+        "h": 19,
+        "w": 22,
+        "x": 460,
+        "y": 268
+      }
+    },
+    {
+      "label": "No folder",
+      "role": "AXStaticText",
+      "value": "No folder",
+      "selected": false,
+      "frame": {
+        "h": 12,
+        "w": 44,
+        "x": 249,
+        "y": 299
+      }
+    },
+    {
+      "label": "New task without a folder",
+      "role": "AXButton",
+      "selected": false,
+      "frame": {
+        "h": 23,
+        "w": 23,
+        "x": 461,
+        "y": 294
+      }
+    },
+    {
+      "label": "Finished and not opened yet Figura remota B sin carpeta claude Runs on QA b",
+      "role": "AXLink",
+      "selected": false,
+      "frame": {
+        "h": 41,
+        "w": 245,
+        "x": 242,
+        "y": 316
+      }
+    },
+    {
+      "label": "Figura remota B sin carpeta",
+      "role": "AXStaticText",
+      "value": "Figura remota B sin carpeta",
+      "selected": false,
+      "frame": {
+        "h": 15,
+        "w": 151,
+        "x": 269,
+        "y": 320
+      }
+    },
+    {
+      "label": "QA b",
+      "role": "AXStaticText",
+      "value": "QA b",
+      "selected": false,
+      "frame": {
+        "h": 12,
+        "w": 24,
+        "x": 300,
+        "y": 338
+      }
+    },
+    {
+      "label": "Actions for the task “Figura remota B sin carpeta”",
+      "role": "AXPopUpButton",
+      "selected": false,
+      "frame": {
+        "h": 19,
+        "w": 23,
+        "x": 460,
+        "y": 317
+      }
+    },
+    {
+      "label": "Pin “Figura remota B sin carpeta”",
+      "role": "AXCheckBox",
+      "value": "0",
+      "selected": false,
+      "frame": {
+        "h": 19,
+        "w": 22,
+        "x": 460,
+        "y": 337
+      }
+    },
+    {
+      "label": "Persona QA · online with Danil",
+      "role": "AXButton",
+      "selected": false,
+      "frame": {
+        "h": 26,
+        "w": 159,
+        "x": 242,
+        "y": 746
+      }
+    },
+    {
+      "label": "Archived",
+      "role": "AXCheckBox",
+      "value": "0",
+      "selected": false,
+      "frame": {
+        "h": 26,
+        "w": 26,
+        "x": 404,
+        "y": 746
+      }
+    },
+    {
+      "label": "MCP tools",
+      "role": "AXPopUpButton",
+      "selected": false,
+      "frame": {
+        "h": 26,
+        "w": 26,
+        "x": 432,
+        "y": 746
+      }
+    },
+    {
+      "label": "Settings",
+      "role": "AXButton",
+      "selected": false,
+      "frame": {
+        "h": 26,
+        "w": 26,
+        "x": 461,
+        "y": 746
+      }
+    },
+    {
+      "label": "Sidebar width",
+      "role": "AXSplitter",
+      "selected": false,
+      "frame": {
+        "h": 667,
+        "w": 12,
+        "x": 489,
+        "y": 112
+      }
+    },
+    {
+      "label": "Open tasks",
+      "role": "AXTabGroup",
+      "selected": false,
+      "frame": {
+        "h": 10,
+        "w": 12,
+        "x": 520,
+        "y": 112
+      }
+    },
+    {
+      "label": "Open a tab",
+      "role": "AXPopUpButton",
+      "selected": false,
+      "frame": {
+        "h": 22,
+        "w": 23,
+        "x": 532,
+        "y": 116
+      }
+    },
+    {
+      "label": "See the work tree",
+      "role": "AXCheckBox",
+      "value": "0",
+      "selected": false,
+      "frame": {
+        "h": 26,
+        "w": 26,
+        "x": 1195,
+        "y": 114
+      }
+    },
+    {
+      "label": "What do you want to get done?",
+      "role": "AXHeading",
+      "value": "1",
+      "selected": false,
+      "frame": {
+        "h": 33,
+        "w": 433,
+        "x": 649,
+        "y": 340
+      }
+    },
+    {
+      "label": "What do you want to get done?",
+      "role": "AXStaticText",
+      "value": "What do you want to get done?",
+      "selected": false,
+      "frame": {
+        "h": 33,
+        "w": 390,
+        "x": 670,
+        "y": 340
+      }
+    },
+    {
+      "label": "Sources",
+      "role": "AXStaticText",
+      "value": "Sources",
+      "selected": false,
+      "frame": {
+        "h": 12,
+        "w": 39,
+        "x": 512,
+        "y": 408
+      }
+    },
+    {
+      "label": ":",
+      "role": "AXStaticText",
+      "value": ":",
+      "selected": false,
+      "frame": {
+        "h": 12,
+        "w": 4,
+        "x": 550,
+        "y": 408
+      }
+    },
+    {
+      "label": "Attach a source",
+      "role": "AXPopUpButton",
+      "selected": false,
+      "frame": {
+        "h": 19,
+        "w": 19,
+        "x": 558,
+        "y": 405
+      }
+    },
+    {
+      "label": "Ask something · @ handlers, tasks, projects, files · / commands",
+      "role": "AXTextArea",
+      "value": "Ask something · @ handlers, tasks, projects, files · / commands",
+      "selected": false,
+      "frame": {
+        "h": 37,
+        "w": 703,
+        "x": 513,
+        "y": 429
+      }
+    },
+    {
+      "label": "Ask something · @ handlers, tasks, projects, files · / commands",
+      "role": "AXStaticText",
+      "value": "Ask something · @ handlers, tasks, projects, files · / commands",
+      "selected": false,
+      "frame": {
+        "h": 15,
+        "w": 340,
+        "x": 522,
+        "y": 436
+      }
+    },
+    {
+      "label": "Attach a file",
+      "role": "AXButton",
+      "selected": false,
+      "frame": {
+        "h": 30,
+        "w": 30,
+        "x": 521,
+        "y": 470
+      }
+    },
+    {
+      "label": "Permissions: Automatic",
+      "role": "AXPopUpButton",
+      "selected": false,
+      "frame": {
+        "h": 30,
+        "w": 97,
+        "x": 553,
+        "y": 470
+      }
+    },
+    {
+      "label": "Model: Claude Sonnet 5. Reasoning: Auto",
+      "role": "AXPopUpButton",
+      "selected": false,
+      "frame": {
+        "h": 30,
+        "w": 175,
+        "x": 1002,
+        "y": 470
+      }
+    },
+    {
+      "label": "Run on",
+      "role": "AXPopUpButton",
+      "selected": false,
+      "frame": {
+        "h": 26,
+        "w": 98,
+        "x": 523,
+        "y": 511
+      }
+    },
+    {
+      "role": "AXImage",
+      "selected": false,
+      "frame": {
+        "h": 12,
+        "w": 14,
+        "x": 628,
+        "y": 518
+      }
+    },
+    {
+      "label": "Project",
+      "role": "AXPopUpButton",
+      "selected": false,
+      "frame": {
+        "h": 26,
+        "w": 62,
+        "x": 648,
+        "y": 511
+      }
+    },
+    {
+      "label": "No context source",
+      "role": "AXStaticText",
+      "value": "No context source",
+      "selected": false,
+      "frame": {
+        "h": 13,
+        "w": 93,
+        "x": 713,
+        "y": 548
+      }
+    },
+    {
+      "label": "Connect",
+      "role": "AXButton",
+      "selected": false,
+      "frame": {
+        "h": 30,
+        "w": 78,
+        "x": 812,
+        "y": 540
+      }
+    },
+    {
+      "label": "Select folder",
+      "role": "AXButton",
+      "selected": false,
+      "frame": {
+        "h": 30,
+        "w": 128,
+        "x": 892,
+        "y": 540
+      }
+    },
+    {
+      "label": "What is left on your active accounts",
+      "role": "AXPopUpButton",
+      "selected": false,
+      "frame": {
+        "h": 19,
+        "w": 196,
+        "x": 242,
+        "y": 782
+      }
+    },
+    {
+      "label": "Ask again how much you have left",
+      "role": "AXButton",
+      "selected": false,
+      "frame": {
+        "h": 19,
+        "w": 19,
+        "x": 444,
+        "y": 782
+      }
+    },
+    {
+      "label": "Report a Terminus bug",
+      "role": "AXPopUpButton",
+      "selected": false,
+      "frame": {
+        "h": 19,
+        "w": 19,
+        "x": 953,
+        "y": 782
+      }
+    },
+    {
+      "label": "Storage",
+      "role": "AXPopUpButton",
+      "selected": false,
+      "frame": {
+        "h": 18,
+        "w": 66,
+        "x": 975,
+        "y": 783
+      }
+    },
+    {
+      "label": "Ports: 0 from your tasks, 18 external · 0 processes from your tasks",
+      "role": "AXPopUpButton",
+      "selected": false,
+      "frame": {
+        "h": 18,
+        "w": 34,
+        "x": 1044,
+        "y": 783
+      }
+    },
+    {
+      "label": "Keep awake: Agent · Inactive",
+      "role": "AXPopUpButton",
+      "selected": false,
+      "frame": {
+        "h": 19,
+        "w": 19,
+        "x": 1081,
+        "y": 782
+      }
+    },
+    {
+      "label": "Theme: Dark · press for the system one",
+      "role": "AXButton",
+      "selected": false,
+      "frame": {
+        "h": 19,
+        "w": 19,
+        "x": 1102,
+        "y": 782
+      }
+    },
+    {
+      "label": "Terminus",
+      "role": "AXStaticText",
+      "value": "Terminus",
+      "selected": false,
+      "frame": {
+        "h": 12,
+        "w": 54,
+        "x": 1131,
+        "y": 786
+      }
+    },
+    {
+      "label": "0.2.87",
+      "role": "AXStaticText",
+      "value": "0.2.87",
+      "selected": false,
+      "frame": {
+        "h": 12,
+        "w": 37,
+        "x": 1184,
+        "y": 786
+      }
+    },
+    {
+      "label": "Muestra la figura HTML de QA",
+      "role": "AXStaticText",
+      "value": "Muestra la figura HTML de QA",
+      "selected": false,
+      "frame": {
+        "h": 14,
+        "w": 170,
+        "x": 505,
+        "y": 258
+      }
+    },
+    {
+      "label": "Figura de QA ::terminus-visual{file=\"qa-figure.html\" title=\"Figura QA\"}",
+      "role": "AXStaticText",
+      "value": "Figura de QA ::terminus-visual{file=\"qa-figure.html\" title=\"Figura QA\"}",
+      "selected": false,
+      "frame": {
+        "h": 25,
+        "w": 184,
+        "x": 514,
+        "y": 279
+      }
+    },
+    {
+      "label": "Folder",
+      "role": "AXStaticText",
+      "value": "Folder",
+      "selected": false,
+      "frame": {
+        "h": 12,
+        "w": 30,
+        "x": 505,
+        "y": 311
+      }
+    },
+    {
+      "label": "HTML B",
+      "role": "AXStaticText",
+      "value": "HTML B",
+      "selected": false,
+      "frame": {
+        "h": 13,
+        "w": 40,
+        "x": 585,
+        "y": 310
+      }
+    },
+    {
+      "label": "Machine",
+      "role": "AXStaticText",
+      "value": "Machine",
+      "selected": false,
+      "frame": {
+        "h": 12,
+        "w": 39,
+        "x": 505,
+        "y": 330
+      }
+    },
+    {
+      "label": "QA b",
+      "role": "AXStaticText",
+      "value": "QA b",
+      "selected": false,
+      "frame": {
+        "h": 13,
+        "w": 25,
+        "x": 578,
+        "y": 330
+      }
+    },
+    {
+      "label": "(",
+      "role": "AXStaticText",
+      "value": "(",
+      "selected": false,
+      "frame": {
+        "h": 13,
+        "w": 7,
+        "x": 602,
+        "y": 330
+      }
+    },
+    {
+      "label": "macOS",
+      "role": "AXStaticText",
+      "value": "macOS",
+      "selected": false,
+      "frame": {
+        "h": 13,
+        "w": 38,
+        "x": 608,
+        "y": 330
+      }
+    },
+    {
+      "label": ")",
+      "role": "AXStaticText",
+      "value": ")",
+      "selected": false,
+      "frame": {
+        "h": 13,
+        "w": 4,
+        "x": 645,
+        "y": 330
+      }
+    },
+    {
+      "label": "Provider",
+      "role": "AXStaticText",
+      "value": "Provider",
+      "selected": false,
+      "frame": {
+        "h": 12,
+        "w": 39,
+        "x": 505,
+        "y": 350
+      }
+    },
+    {
+      "label": "sonnet",
+      "role": "AXStaticText",
+      "value": "sonnet",
+      "selected": false,
+      "frame": {
+        "h": 13,
+        "w": 35,
+        "x": 585,
+        "y": 349
+      }
+    },
+    {
+      "label": "Branch",
+      "role": "AXStaticText",
+      "value": "Branch",
+      "selected": false,
+      "frame": {
+        "h": 12,
+        "w": 33,
+        "x": 505,
+        "y": 369
+      }
+    },
+    {
+      "label": "Wasat · Oct 27",
+      "role": "AXStaticText",
+      "value": "Wasat · Oct 27",
+      "selected": false,
+      "frame": {
+        "h": 13,
+        "w": 73,
+        "x": 584,
+        "y": 368
+      }
+    },
+    {
+      "label": "Open",
+      "role": "AXButton",
+      "selected": false,
+      "frame": {
+        "h": 19,
+        "w": 41,
+        "x": 505,
+        "y": 389
+      }
+    },
+    {
+      "label": "Pin",
+      "role": "AXButton",
+      "selected": false,
+      "frame": {
+        "h": 19,
+        "w": 32,
+        "x": 551,
+        "y": 389
+      }
+    },
+    {
+      "label": "Archive",
+      "role": "AXButton",
+      "selected": false,
+      "frame": {
+        "h": 19,
+        "w": 51,
+        "x": 587,
+        "y": 389
+      }
+    }
+  ]
+}
