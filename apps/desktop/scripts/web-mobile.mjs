@@ -44,7 +44,7 @@ const expoEnv = {
   ...(env.TERMINUS_WEB_SUPABASE_KEY ? { EXPO_PUBLIC_SUPABASE_KEY: env.TERMINUS_WEB_SUPABASE_KEY.trim() } : {}),
 };
 const npx = process.platform === "win32" ? "npx.cmd" : "npx";
-const run = spawnSync(npx, ["expo", "export", "--platform", "web", "--output-dir", out], {
+const run = spawnSync(npx, ["expo", "export", "--platform", "web", ...(env.TERMINUS_WEB_ALPHA === "1" ? ["--clear"] : []), "--output-dir", out], {
   cwd: mobile,
   env: expoEnv,
   stdio: "inherit",
