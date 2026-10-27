@@ -28,6 +28,7 @@ type Failure = { what: unknown; detail: unknown };
  * no: son los procesos de esta computadora, los que cerrar la ventana detiene.
  */
 const FAN = new Set(["list_projects", "list_portfolios", "list_live_sessions", "list_active_turns", "list_spaces", "list_workspace_attention", "list_session_git", "list_task_mentions"]);
+const CONTEXT = new Set(["add_folder", "add_repo_url", "set_workspace_source", "set_root", "list_sources", "source_freshness", "source_detail", "update_source", "remove_source", "list_source_branches", "set_source_skill"]);
 const STORAGE = new Set(["list_storage", "reclaim_storage", "empty_build_cache", "collect_orphans"]);
 const LISTING = new Set(["list_workspaces", "workspaces_startup"]);
 /** Lo que crea algo nuevo: en un workspace que esa máquina no tiene, primero lo hace suyo. */
@@ -132,6 +133,30 @@ export function createRouter(config: RouterConfig) {
   const native: Invoke = config.native ?? (() => Promise.reject(new FleetError("unknown_machine", null)));
   /** Con motor propio (el escritorio); sin él, la web. */
   const local = config.native !== null;
+  const contextOwners = new Map<string, string>();
+  const sourceCatalogs = new Map<string, Map<string, Set<string>>>();
+  function rememberContexts(value: unknown) {
+    const rows = (value as { workspaces?: { id?: unknown; context_root?: unknown; context_machine?: unknown }[] } | null)?.workspaces;
+    for (const row of rows ?? []) {
+      if (typeof row.id !== "string") continue;
+      if (row.context_root && typeof row.context_machine === "string") contextOwners.set(row.id, row.context_machine);
+      else contextOwners.delete(row.id);
+    }
+  }
+  function rememberSources(command: string, machine: string, workspace: string | null, value: unknown) {
+    if (command !== "list_sources" || !workspace || !Array.isArray(value)) return;
+    const catalogs = sourceCatalogs.get(workspace) ?? new Map<string, Set<string>>();
+    catalogs.set(machine, new Set(value.map((row) => row?.id).filter((id): id is string => typeof id === "string")));
+    sourceCatalogs.set(workspace, catalogs);
+  }
+  function contextOwner(command: string, args: Args, workspace: string | null): string | null {
+    if (!workspace || !CONTEXT.has(command)) return null;
+    const source = typeof args.id === "string" ? args.id : typeof args.source === "string" ? args.source : null;
+    const origins = source ? [...(sourceCatalogs.get(workspace) ?? [])].filter(([, ids]) => ids.has(source)).map(([machine]) => machine) : [];
+    if (origins.length > 1) throw { what: t("projects.context.ambiguous"), detail: "context_ambiguous" };
+    return origins[0] ?? contextOwners.get(workspace) ?? null;
+  }
+
   const attention = new AttentionBook();
   /** Los workspaces que esta computadora tiene, según su última lista; `null` antes de leerla. */
   let listed: Set<string> | null = null;
@@ -348,6 +373,7 @@ export function createRouter(config: RouterConfig) {
     }
     const slice = await fleet.read(envelope);
     if (!slice.has) throw noAnswer([slice], workspace);
+    rememberSources(command, machine, workspace, slice.value);
     return fleet.encode(machine, command === "list_session_git" ? gitSlice(slice).value : slice.value, command);
   }
 
@@ -420,6 +446,7 @@ export function createRouter(config: RouterConfig) {
     const ids = (merged.workspaces ?? []).map((w) => w?.id).filter((id): id is string => typeof id === "string");
     // Una máquina sin workspaces no deja la página sin ninguno abierto: el primero de la cuenta.
     if (!active || !ids.includes(active)) active = typeof merged.active === "string" && ids.includes(merged.active) ? merged.active : (ids[0] ?? null);
+    rememberContexts(merged);
     return { ...merged, active };
   }
 
@@ -558,12 +585,15 @@ export function createRouter(config: RouterConfig) {
       if (LISTING.has(command)) return await listing(command, args, opts);
       if (command === "service_poll") return await poll(args, opts);
       if (FAN.has(command)) return await fanRead(command, args, workspace, opts);
+      const context = !local ? contextOwner(command, args, workspace) : null;
+      if (context) return await remote(context, command, args, callWorkspace(workspace, args));
       if (elsewhere(workspace)) {
         const lead = leadOf(workspace);
         if (lead) return await remote(lead, command, args, callWorkspace(workspace, args));
         if (!local) throw { what: t("web.machines.none_for_workspace"), detail: "no_machine" };
       }
       const value = await native(command, fleet.argsFor(self as string, args), opts);
+      rememberSources(command, self as string, workspace, value);
       if (command === "remove_workspace" && args.id === active) active = null;
       return value;
     } catch (error) {

@@ -176,7 +176,15 @@ export type TaskBlockers = { unsaved: { session: string; title: string; files: s
 // --- Cuentas de IA ---------------------------------------------------------------
 
 /** Una cuenta de `list_accounts`; `identity` es el correo, si el CLI lo dice. */
-export type AiAccount = { id: string; label: string; created_at?: number | null; identity: string | null; authenticated_at: number | null };
+export type AiAccount = {
+  id: string;
+  label: string;
+  created_at?: number | null;
+  identity: string | null;
+  authenticated_at: number | null;
+  /** Identidad estable de la suscripción o workspace; no se muestra. */
+  credential_group?: string | null;
+};
 /** `list_accounts(provider)`. */
 export type AccountList = { provider: string; active: string | null; accounts: AiAccount[] };
 /** `account_status`. */

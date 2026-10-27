@@ -1,4 +1,6 @@
 {
+  "projects.tabs.preview_drag": "Arrastra a la barra o a una sección para conservar",
+  "projects.tabs.keep": "Conservar pestaña",
   "projects.agent_tasks.search": "Buscar tareas…",
   "projects.agent_tasks.no_results": "No hay tareas que coincidan.",
   "projects.agent_tasks.open": "Ver tareas",
@@ -131,6 +133,10 @@
   "projects.agents.telegram_token_how": "Se obtiene en Telegram: háblale a @BotFather, mándale /newbot y pega aquí el token que te da. Cada agente usa su propio bot. Se guarda cifrado y no se vuelve a mostrar.",
   "projects.agents.telegram_token_save": "Guardar",
   "projects.context.connect": "Conectar",
+  "projects.context.target_changed": "Cambió la tarea o el workspace. Vuelve a adjuntar la fuente en el destino actual.",
+  "projects.context.task_unavailable": "Todavía no se puede resolver la máquina de esta tarea. Vuelve a intentarlo cuando termine de cargar.",
+  "projects.context.ambiguous": "Esta fuente existe en varias máquinas. Elige la máquina para continuar.",
+  "projects.context.unavailable": "No se pudo leer la fuente principal de contexto. Revisa su conexión en Configuración.",
   "projects.context.empty": "Sin fuente de contexto",
   "projects.context.pick_folder": "Seleccionar carpeta",
   "projects.error.clone_cancelled": "Clonado cancelado.",
@@ -389,5 +395,6 @@
   "projects.memory.history_error": "No pude leer el historial de la cuenta.",
   "projects.memory.history_loading": "Leyendo el historial…",
   "projects.memory.history_title": "Historial de {file}",
-  "projects.memory.history_view": "Ver esta versión"
+  "projects.memory.history_view": "Ver esta versión",
+  "projects.view.opening": "Abriendo carpeta…"
 }

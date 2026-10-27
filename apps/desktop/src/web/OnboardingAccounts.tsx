@@ -1,15 +1,17 @@
 import { createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { nombreDeAgente } from "../features/onboarding/onboarding-store";
 import { Pantalla } from "../features/onboarding/Screen";
+import { accountKeyUrl } from "../features/settings/account-auth";
 import type { AccountList, AgentOpt, LoginEvent } from "../features/settings/accounts-store";
-import { invoke } from "../lib/invoke.ts";
+import { LoginCodeForm } from "../features/settings/LoginCodeForm";
 import { t } from "../lib/i18n";
+import { invoke } from "../lib/invoke.ts";
 import { listen } from "../lib/serviceEvents";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { asFailure, FailureNote } from "../ui/Failure";
-import { MarcaAgente } from "../ui/icons";
 import { Input } from "../ui/Input";
+import { MarcaAgente } from "../ui/icons";
 
 /** Local models and providers with an app of their own are never offered on a managed computer. */
 export const offered = (a: AgentOpt) => a.available && !a.sin_cuenta && !a.external_install_url && a.id !== "opencode-local";
@@ -115,7 +117,7 @@ function ProviderCard(props: { provider: AgentOpt; onConnected: (yes: boolean) =
     let id: string | null = null;
     try {
       id = await accountToUse();
-      if (props.provider.api_key) return setPhase({ t: "key", id });
+      if (accountKeyUrl(props.provider)) return setPhase({ t: "key", id });
       setRunning(id);
       await invoke("login_account", { provider, id, mode: "tuberia" });
     } catch (e) {
@@ -245,25 +247,7 @@ function ProviderCard(props: { provider: AgentOpt; onConnected: (yes: boolean) =
                 )}
               </Show>
               <Show when={p().asks}>
-                <form
-                  class="flex gap-2"
-                  onSubmit={(ev) => {
-                    ev.preventDefault();
-                    void sendCode();
-                  }}
-                >
-                  <Input
-                    class="flex-1"
-                    placeholder={t("web.onboarding.accounts.paste_code")}
-                    aria-label={t("web.onboarding.accounts.paste_code")}
-                    value={typed()}
-                    onInput={(ev) => setTyped(ev.currentTarget.value)}
-                    data-login-code-input=""
-                  />
-                  <Button size="sm" type="submit" disabled={!typed().trim()}>
-                    {t("web.onboarding.accounts.send_code")}
-                  </Button>
-                </form>
+                <LoginCodeForm value={typed()} onInput={setTyped} onSubmit={() => void sendCode()} />
               </Show>
             </div>
           )}
@@ -291,7 +275,7 @@ function ProviderCard(props: { provider: AgentOpt; onConnected: (yes: boolean) =
                   {t("web.onboarding.accounts.save_key")}
                 </Button>
               </div>
-              <Show when={props.provider.api_key}>
+              <Show when={accountKeyUrl(props.provider)}>
                 {(where) => (
                   <a class="text-xs text-primary underline" href={where()} target="_blank" rel="noopener noreferrer">
                     {t("web.onboarding.accounts.get_key")}

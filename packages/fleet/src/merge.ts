@@ -27,6 +27,7 @@ export type MergeContext = {
   registry: readonly AccountWorkspace[] | null;
   /** Si `space` es un space compartido con la cuenta: el mismo id en todas, sin prefijo. */
   shared?: (space: string) => boolean;
+  workspaceContext?(workspace: string): { machine: string; row: Row } | null;
   /** El nombre de una máquina, para lo que solo se distingue por ella. */
   name?(machine: string): string;
 };
@@ -211,12 +212,22 @@ function mergeWorkspaces(ctx: MergeContext, parts: Slice[]): unknown {
   for (const s of lists)
     for (const w of (s.value as Row).workspaces as Row[]) {
       if (typeof w?.id !== "string") continue;
-      const seen = rows.get(w.id) ?? { row: { ...w }, owner: s.machine, machines: new Set<string>() };
+      const seen = rows.get(w.id) ?? { row: { ...w, context_machine: text(w.context_root) ? s.machine : null }, owner: s.machine, machines: new Set<string>() };
       // La raíz es local a cada máquina; basta que una tenga contexto para el aviso del workspace.
-      if (!text(seen.row.context_root) && text(w.context_root)) seen.row.context_root = w.context_root;
+      if (!text(seen.row.context_root) && text(w.context_root)) {
+        seen.row = { ...w, context_machine: s.machine };
+        seen.owner = s.machine;
+      }
       seen.machines.add(s.machine);
       rows.set(w.id, seen);
     }
+  for (const [id, seen] of rows) {
+    const context = ctx.workspaceContext?.(id);
+    if (context) {
+      seen.row = { ...context.row, context_machine: context.machine };
+      seen.owner = context.machine;
+    }
+  }
   const known = new Set(ctx.order);
   for (const w of ctx.registry ?? []) {
     const seen = rows.get(w.id) ?? { row: registryRow(w), owner: null, machines: new Set<string>() };

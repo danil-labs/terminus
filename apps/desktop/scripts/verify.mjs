@@ -605,6 +605,7 @@ const steps = [
   ["En la web caben varias cuentas de Danil: cada una con su sesión, sin repetirse, y la página abre la dueña del workspace", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/web-accounts.test.ts")], root],
   ["Con la cuenta de Danil el escritorio junta las tareas de todas sus computadoras", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/desktop-account-machines.test.mjs")], root],
   ["Sin el stream empujado la ventana sondea como siempre", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/push-fallback.test.mjs")], root],
+  ["El mantenimiento exitoso no avisa y los fallos descartados no se repiten", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/activity-notice.test.mjs")], root],
   ["Una respuesta con visual no desaparece del chat aunque el turno no se guarde o el visual no se lea", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/chat-turn-unsaved.test.mjs")], root],
   ["Abrir una tarea larga no cuesta más que su techo", process.execPath, [join(root, "tests/perf/open-task-cost.mjs")], root],
   ["Releer una tarea abierta no remonta su hilo", process.execPath, [join(root, "tests/perf/reread-thread.mjs")], root],
