@@ -80,7 +80,7 @@ const HOME = { computer_id: "cmp_home", name: "Mi Mac", state: "online", provide
 const VM = { computer_id: "cmp_vm", name: "Danil VM", state: "stopped", provider: "aws-ec2" };
 const MAC = { computer_id: "cmp_mac", name: "Mac de Ana", state: "offline", provider: "self", kind: "physical" };
 
-async function open(name, { status = SIGNED_IN, token = TOKEN, computers = [HOME, VM, MAC], relays = {}, extra = {}, registry = null, onRename = null } = {}) {
+async function open(name, { status = SIGNED_IN, token = TOKEN, computers = [HOME, VM, MAC], relays = {}, extra = {}, registry = null, onRename = null, storage = {} } = {}) {
   const f = fleet(relays);
   const calls = [];
   const listed = [];
@@ -91,7 +91,7 @@ async function open(name, { status = SIGNED_IN, token = TOKEN, computers = [HOME
     ...(token ? { account_relay_token: token } : {}),
     ...extra,
   });
-  const app = await boot("listo", name, responses, undefined, {}, {
+  const app = await boot("listo", name, responses, undefined, storage, {
     antes: () => {
       globalThis.WebSocket = f.Socket;
       const previous = globalThis.fetch;
@@ -681,5 +681,26 @@ test("el composer ofrece los modelos autenticados de la máquina seleccionada", 
   doc.querySelector('[data-machine-option="cmp_home"]').click();
   await sleep(600);
   assert.equal(doc.querySelector('[aria-label*="Sonnet del Mac"]'), null, "el modelo remoto sigue al volver a esta máquina");
+  assert.deepEqual(app.fallos, []);
+});
+
+
+test("one desktop uses the shared spaces order instead of an old local preference and refreshes on focus", async () => {
+  const spaces = [
+    { id: "a", name: "Alpha", folders: ["p1"], created_at: 1, updated_at: 1, account: true },
+    { id: "b", name: "Beta", folders: ["p1"], created_at: 2, updated_at: 2, account: true },
+  ];
+  const registry = [{ id: "w", name: "W", projects: [], computers: ["cmp_home"], settings_version: 1,
+    settings: { space_order: '["a","b"]' }, spaces: spaces.map((space, position) => ({ ...space, position, changed_at: 1 })) }];
+  const { app, doc } = await open("desktop-account-space-order", {
+    computers: [HOME], registry, extra: { list_spaces: spaces },
+    storage: { "harness.layout.spaces.order.w": '["b","a"]' },
+  });
+  const ids = () => [...doc.querySelectorAll("[data-space]")].map(node => node.getAttribute("data-space"));
+  assert.ok(await until(() => ids().join(",") === "a,b"), "the account wins over an old local order with only this machine");
+  assert.equal(app.w.localStorage.getItem("harness.layout.spaces.order.w"), '["a","b"]');
+  registry[0].settings.space_order = '["b","a"]';
+  app.w.dispatchEvent(new app.w.Event("focus"));
+  assert.ok(await until(() => ids().join(",") === "b,a"), "an order changed on another client reaches the open window");
   assert.deepEqual(app.fallos, []);
 });
