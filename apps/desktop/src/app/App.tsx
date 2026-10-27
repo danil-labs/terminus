@@ -4252,7 +4252,7 @@ export default function App() {
     if (pestanas.open().some((x) => x.id === activaAntes)) return;
     if (vecina) void activarPestana(vecina);
     else {
-      const owner = cerradas.find((p) => isContentTab(p) && p.session !== "");
+      const owner = cerradas.find((p) => isContentTab(p) && p.session !== "" && !cerradas.some((x) => isTaskTab(x) && x.id === p.session));
       if (owner) void abrirSesion(owner.project, owner.session);
       else irAlBlanco(carpetaDelEscritorio(project()));
     }

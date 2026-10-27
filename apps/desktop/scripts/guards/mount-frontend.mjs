@@ -463,6 +463,24 @@ if (!roto) {
   assert.equal(treeApp.fallos.length, 0);
   treeApp.w.close();
 
+  const closeAllViews = await boot("listo", "close-all-retained-views", CON_TAREA);
+  const closeAllDoc = closeAllViews.w.document;
+  closeAllDoc.querySelector('[data-sesion="s1"]').click();
+  await sleep(150);
+  keepActiveView(closeAllViews);
+  closeAllDoc.querySelector('button[title="informe.md"]').click();
+  await sleep(150);
+  keepActiveView(closeAllViews);
+  closeAllDoc.querySelector('[role="tab"]').dispatchEvent(new closeAllViews.w.MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+  await sleep(100);
+  const closeAllAction = [...closeAllDoc.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent.trim() === "Cerrar todas");
+  assert.ok(closeAllAction);
+  closeAllAction.click();
+  await sleep(150);
+  assert.equal(closeAllDoc.querySelector('[data-tira] [role="tab"], [data-preview]'), null, "cerrar todas no reabre la tarea propietaria de un documento");
+  assert.deepEqual(closeAllViews.fallos, []);
+  closeAllViews.w.close();
+
   const filaDeAgente = {
     provider: "codex", model: "gpt-5.6", refs: [], created_at: 0, updated_at: 0, turns: 1,
     parent: null, subagent: null, esperando: false, stage: null,
