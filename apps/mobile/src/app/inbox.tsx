@@ -7,7 +7,7 @@ import { AlphaInboxLive } from "../ui/AlphaInboxLive";
 import { Avatar, Row, SectionTitle } from "../ui/components";
 import { useTheme } from "../ui/theme";
 
-type Page = "list" | "conversation" | "details" | "agent" | "spaces";
+type Page = "list" | "conversation" | "details" | "agent" | "spaces" | "settings" | "integrations";
 
 /** Alfa explícita: la demo no importa transportes ni conserva datos fuera de esta pantalla. */
 export default function AlphaInbox() {
@@ -36,18 +36,26 @@ export default function AlphaInbox() {
         <Text style={[text, styles.heading]}>{t("alpha.title")}</Text>
         <Text style={text}>{t("alpha.intro")}</Text>
         <Text style={{ color: theme.textMuted }}>{t("alpha.unavailable")}</Text>
+        <Text style={{ color: theme.textMuted }}>{t("alpha.real_notice")}</Text>
         {action(t("alpha.real"), () => setLive(true))}
         {action(t("alpha.demo"), () => setDemo(true))}
       </> : <>
         <View style={[styles.notice, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <Text style={{ color: theme.textMuted, lineHeight: 20 }}>{t("alpha.demo_notice")}</Text>
         </View>
-        {page !== "list" && action(t("alpha.back"), () => setPage(page === "conversation" || page === "spaces" ? "list" : "conversation"))}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <Avatar name={t("alpha.workspace_demo")} />
+          <View style={{ flex: 1 }}><Text style={[text, { fontWeight: "600" }]}>{t("alpha.workspace_demo")}</Text><Text style={{ color: theme.textMuted }}>{t("alpha.space_demo")}</Text></View>
+        </View>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+          {action(t("alpha.settings"), () => setPage("settings"))}
+          {action(t("alpha.space_menu"), () => setPage("spaces"))}
+        </View>
+        {page !== "list" && action(t("alpha.back"), () => setPage(page === "agent" || page === "integrations" ? "settings" : page === "details" ? "conversation" : "list"))}
         {page === "list" && <>
           <SectionTitle>{t("alpha.list")}</SectionTitle>
           <Row left={<Avatar name={t("alpha.customer")} />} title={t("alpha.customer")} subtitle={t("alpha.preview")} onPress={() => setPage("conversation")} />
-          <Row left={<Avatar name={t("alpha.agent")} />} title={t("alpha.agent")} subtitle={t("alpha.configuration")} onPress={() => setPage("agent")} />
-          {action(t("alpha.spaces"), () => setPage("spaces"))}
+
         </>}
         {page === "conversation" && <>
           <Text style={[text, styles.heading]}>{t("alpha.customer")}</Text>
@@ -60,9 +68,15 @@ export default function AlphaInbox() {
         </>}
         {page === "details" && <>
           {section(t("alpha.details"), t("alpha.channel"))}
-          <Row title={t("alpha.agent")} subtitle={t("alpha.configuration")} onPress={() => setPage("agent")} />
+          <Row left={<Avatar name={t("alpha.agent")} />} title={t("alpha.agent")} subtitle={t("alpha.status")} />
           {section(t("alpha.crm"), t("alpha.reports"))}
         </>}
+        {page === "settings" && <>
+          <SectionTitle>{t("alpha.settings")}</SectionTitle>
+          <Row left={<Avatar name={t("alpha.agent")} />} title={t("alpha.agents_settings")} subtitle={t("alpha.local_changes")} onPress={() => setPage("agent")} />
+          <Row title={t("alpha.integrations")} subtitle={t("alpha.integrations_value")} onPress={() => setPage("integrations")} />
+        </>}
+        {page === "integrations" && section(t("alpha.integrations"), t("alpha.integrations_value"))}
         {page === "agent" && <>
           <Text style={[text, styles.heading]}>{t("alpha.agent")}</Text>
           <Text style={{ color: theme.textMuted }}>{t("alpha.local_changes")}</Text>
@@ -70,7 +84,7 @@ export default function AlphaInbox() {
           <TextInput multiline accessibilityLabel={t("alpha.knowledge")} value={knowledge} onChangeText={setKnowledge} style={[styles.input, text, { borderColor: theme.border, backgroundColor: theme.surface }]} />
           <Row title={t("alpha.catalog_tool")} right={<Switch accessibilityLabel={t("alpha.catalog_tool")} value={tool} onValueChange={setTool} trackColor={{ true: theme.primary, false: theme.border }} />} />
           {section(t("alpha.tools"), t("alpha.tools_value"))}
-          {section(t("alpha.integrations"), t("alpha.integrations_value"))}
+          <Text style={{ color: theme.textMuted }}>{t("alpha.channels_settings")}</Text>
         </>}
         {page === "spaces" && <>
           {section(t("alpha.spaces"), t("alpha.spaces_value"))}

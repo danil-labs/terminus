@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
 import { createInbox, type Account, type Conversation, type Message } from "../../../../packages/attention/src/inbox.ts";
@@ -12,7 +13,7 @@ export function AlphaInboxLive({ exit }: { exit(): void }) {
   const theme = useTheme();
   const api = useMemo(() => createInbox(session), [session.getToken, session.unauthorized]);
   const generation = useRef(0);
-  const [panel, setPanel] = useState<"inbox" | "agent" | "spaces">("inbox");
+  const [panel, setPanel] = useState<"inbox" | "settings">("inbox");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [account, setAccount] = useState<Account | null>(null);
   const [conversation, setConversation] = useState<Conversation | null>(null);
@@ -58,12 +59,13 @@ export function AlphaInboxLive({ exit }: { exit(): void }) {
     login.searchParams.set("next", "/terminus/m/inbox");
     window.location.assign(login.toString());
   }
-  if (panel !== "inbox") return <View style={{ gap: 18 }}><SectionTitle>{t(panel === "agent" ? "alpha.agent" : "alpha.spaces")}</SectionTitle><Text style={{ color: theme.text }}>{t("alpha.config_unavailable")}</Text>{button(t("alpha.back"), () => setPanel("inbox"))}</View>;
+  if (panel !== "inbox") return <View style={{ gap: 18 }}><SectionTitle>{t("alpha.settings")}</SectionTitle><Text style={{ color: theme.text }}>{t("alpha.config_unavailable")}</Text>{button(t("alpha.back"), () => setPanel("inbox"))}</View>;
   if (Platform.OS !== "web" || !session.session) return <View style={{ gap: 14 }}><Text style={{ color: theme.text }}>{t("alpha.signin")}</Text>{Platform.OS === "web" && button(t("alpha.login"), signIn)}{error && <Text style={{ color: theme.text }}>{t("alpha.login_error")}</Text>}{button(t("alpha.back"), exit)}</View>;
   return <View style={{ gap: 18 }}>
     <Text style={{ color: theme.textMuted }}>{t("alpha.real_notice")}</Text>
-    {button(t("alpha.agent"), () => setPanel("agent"))}
-    {button(t("alpha.spaces"), () => setPanel("spaces"))}
+    <Text style={{ color: theme.textMuted }}>{t("alpha.engine_context")}</Text>
+    {button(t("alpha.home"), () => router.push("/"))}
+    {button(t("alpha.settings"), () => setPanel("settings"))}
     {account && <SectionTitle>{account.name}</SectionTitle>}
     {conversation && <SectionTitle>{conversation.contact_name}</SectionTitle>}
     {button(t("alpha.refresh"), () => void load(account, conversation))}

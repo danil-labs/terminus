@@ -2,6 +2,15 @@ import { type WordKey, WORDS, word } from "@terminus/design";
 import { getLocales } from "expo-localization";
 
 const es = {
+  "alpha.settings": "Ajustes",
+  "alpha.engine_context": "Inbox operativo sin workspace de motor seleccionado.",
+  "alpha.home": "Volver a las tareas de Terminus",
+  "alpha.workspace_demo": "Workspace de muestra · demo",
+  "alpha.space_demo": "Atención · space demo",
+  "alpha.space_menu": "Menú del space · demo",
+  "alpha.agents_settings": "Agentes · demo",
+  "alpha.channels_settings": "Los canales se consultan en Ajustes > Integraciones.",
+
   "alpha.login": "Iniciar sesión",
   "alpha.login_error": "La dirección de inicio de sesión debe pertenecer a este sitio alfa.",
   "alpha.config_unavailable": "La configuración conectada no está disponible: no existe un contrato validado para leerla o guardarla desde este alfa. Puedes explorar controles ficticios entrando explícitamente a la demo.",
@@ -12,7 +21,7 @@ const es = {
 
   "alpha.forbidden": "No tienes permiso para leer este recurso. Elige otra cuenta operativa.",
   "alpha.real": "Abrir Inbox conectado · solo lectura",
-  "alpha.real_notice": "Lectura de datos reales autorizados. El hostname alfa no aísla los datos. La cuenta operativa se elige aquí y no se asocia a un workspace de Terminus.",
+  "alpha.real_notice": "Lectura de datos reales. Integración alfa pendiente de validación autenticada. Lectura de datos reales autorizados. El hostname alfa no aísla los datos. La cuenta operativa se elige aquí y no se asocia a un workspace de Terminus.",
   "alpha.signin": "Inicia sesión en la web para leer el Inbox conectado.",
   "alpha.refresh": "Actualizar",
   "alpha.select_account": "Elegir esta cuenta operativa",
@@ -319,6 +328,15 @@ const es = {
 type Key = keyof typeof es;
 
 const en: Record<Key, string> = {
+  "alpha.settings": "Settings",
+  "alpha.engine_context": "Operational Inbox with no engine workspace selected.",
+  "alpha.home": "Return to Terminus tasks",
+  "alpha.workspace_demo": "Sample workspace · demo",
+  "alpha.space_demo": "Support · demo space",
+  "alpha.space_menu": "Space menu · demo",
+  "alpha.agents_settings": "Agents · demo",
+  "alpha.channels_settings": "View channels in Settings > Integrations.",
+
   "alpha.login": "Sign in",
   "alpha.login_error": "The sign-in address must belong to this alpha site.",
   "alpha.config_unavailable": "Connected configuration is unavailable: this alpha has no validated contract to read or save it. You can explore fictional controls by explicitly entering the demo.",

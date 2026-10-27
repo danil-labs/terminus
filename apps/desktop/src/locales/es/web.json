@@ -143,5 +143,18 @@
   "web.alpha.signin_hint": "Usa tu cuenta de Danil existente. La sesión pertenece a este dominio alfa.",
   "web.alpha.email": "Correo",
   "web.alpha.password": "Contraseña",
-  "web.alpha.signin_error": "No se pudo iniciar sesión. Revisa tus datos o vuelve a intentar."
+  "web.alpha.signin_error": "No se pudo iniciar sesión. Revisa tus datos o vuelve a intentar.",
+  "web.alpha.settings": "Configuración",
+  "web.alpha.agents": "Agentes",
+  "web.alpha.workspace_navigation": "Workspace y vistas",
+  "web.alpha.demo_workspace": "Workspace · demostración",
+  "web.alpha.demo_space": "Atención · demostración",
+  "web.alpha.no_workspace": "Sin workspace seleccionado",
+  "web.alpha.engine_context": "Inbox usa una cuenta operativa. Selecciona un workspace desde Terminus para ver tus espacios y tareas.",
+  "web.alpha.private_context": "Tus tareas privadas se abren en el workspace de Terminus.",
+  "web.alpha.demo_dock": "Agente de demostración",
+  "web.alpha.public_human": "Equipo · respuesta pública",
+  "web.alpha.public_agent": "Agente · respuesta pública",
+  "web.alpha.validation_warning": "Lectura de datos reales. Integración alfa pendiente de validación autenticada.",
+  "web.alpha.signout": "Cerrar sesión"
 }

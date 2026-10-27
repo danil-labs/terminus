@@ -143,5 +143,18 @@
   "web.alpha.signin_hint": "Use your existing Danil account. This session belongs to the alpha domain.",
   "web.alpha.email": "Email",
   "web.alpha.password": "Password",
-  "web.alpha.signin_error": "Sign-in failed. Check your details or try again."
+  "web.alpha.signin_error": "Sign-in failed. Check your details or try again.",
+  "web.alpha.settings": "Settings",
+  "web.alpha.agents": "Agents",
+  "web.alpha.workspace_navigation": "Workspace and views",
+  "web.alpha.demo_workspace": "Workspace · demonstration",
+  "web.alpha.demo_space": "Attention · demonstration",
+  "web.alpha.no_workspace": "No workspace selected",
+  "web.alpha.engine_context": "Inbox uses an operational account. Select a workspace in Terminus to see your spaces and tasks.",
+  "web.alpha.private_context": "Private tasks open in your Terminus workspace.",
+  "web.alpha.demo_dock": "Demonstration agent",
+  "web.alpha.public_human": "Team · public reply",
+  "web.alpha.public_agent": "Agent · public reply",
+  "web.alpha.validation_warning": "Reading real data. Alpha integration pending authenticated validation.",
+  "web.alpha.signout": "Sign out"
 }

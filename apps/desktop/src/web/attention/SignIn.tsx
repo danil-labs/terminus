@@ -1,6 +1,6 @@
+import { createClient } from '@supabase/supabase-js';
 import { createSignal, onMount, Show } from 'solid-js';
 import { render } from 'solid-js/web';
-import { createClient } from '@supabase/supabase-js';
 import { aplicarLengua, t } from '../../lib/i18n';
 import { seguirElTema } from '../../lib/theme';
 import { Button } from '../../ui/Button';
