@@ -42,12 +42,28 @@ La ventana transmite el workspace capturado mediante el header IPC local
 RPC1; no agrega un parámetro al comando. Exige el header para este selector.
 `commands.json` y su hash permanecen byte-exactos.
 
-La respuesta usa el `Contenido` existente: `kind="text"`, `text`, `bytes`,
+La lectura va primero por `chat_visual_part(project, session, file, offset,
+size, revision?)`, en partes de 512 KiB en base64, como `carry`: cada parte es
+una llamada corta también por el relay. El motor arma la página una vez con sus
+imágenes: cada `src`, `href` o `url()` relativo con extensión de imagen que esté
+dentro de `exchange/visuals/` se incrusta como `data:`, como el `html_render` de
+t3code. Fuera de esa carpeta, ocultos, enlaces y remotos quedan como están. Los
+topes son los de t3code: 10 MiB por imagen y 25 MiB la página armada. Las
+partes siguientes mandan la `revision` de la primera y salen de la misma página
+armada; si ya no está, el motor contesta `visual_changed` y el lector
+(`readVisualHtml` de `@terminus/chat/visual`, el mismo en la ventana y el
+teléfono) empieza otra vez una sola vez.
+
+Con un motor sin `chat_visual_part` —el proxy de la ventana lo niega mientras
+el contrato copiado no lo tenga, un motor viejo contesta `service.error.command`
+y el relay o la lista del teléfono `command_not_allowed`— el lector cae a
+`tree_show`, que entrega la página armada de una vez si cabe en 512 KiB. Esa
+respuesta usa el `Contenido` existente: `kind="text"`, `text`, `bytes`,
 `truncated=false` y sin PDF ni imagen. La lectura del motor conserva handles,
-rechaza symlinks, reparse points y archivos especiales, limita a 512 KiB antes
-de decodificar y exige UTF-8 estricto. El front comprueba tipo, tamaño y la
-coincidencia entre bytes y texto; traduce los detalles `invalid_visual_file`,
-`visual_too_large` y `visual_read_failed` con su catálogo.
+rechaza symlinks, reparse points y archivos especiales y exige UTF-8 estricto.
+El front comprueba tipo, tamaño y la coincidencia entre bytes y texto; traduce
+los detalles `invalid_visual_file`, `visual_too_large` y `visual_read_failed`
+con su catálogo.
 
 La capacidad requiere un motor que atienda el selector reservado. El pin
 `4b8714c` anterior no lo incluye. El laboratorio puede probar un binario local
@@ -58,7 +74,7 @@ los commits de ventana y motor, su hash y la identidad de datos aislados.
 ## Altura, estado y recursos
 
 El bloque empieza a leer al entrar en vista o quedar a 200 píxeles. Cada chat
-reserva hasta 16 visualizaciones cargadas, con archivos de hasta 512 KiB.
+reserva hasta 16 visualizaciones cargadas, con páginas de hasta 25 MiB.
 Cerrar, fallar o desmontar libera la reserva; una lectura pendiente conserva
 la suya hasta terminar y descarta resultados anteriores.
 
@@ -77,6 +93,19 @@ La ampliación reserva la capa modal en `lib/sites.ts`, ocultando los sitios
 nativos aunque el diálogo siga bajo `#root`. Reducir, cerrar o desmontar libera
 esa reserva; los menús y portales conservan su propia suspensión.
 
+Si la lectura falla, el bloque conserva su lugar entre los párrafos: título,
+nombre del archivo, el error, Reintentar y Abrir en el navegador. Abrir usa
+`tree_open_external` con el mismo selector, header y comprobaciones de ruta,
+sin el tope de tamaño ni UTF-8.
+
+En Windows, la lectura comparte lectura y escritura en las carpetas y también
+el borrado en los archivos, y suelta `session.json` antes de leer el visual.
+La ventana suele pedir el visual cuando el turno que lo publicó está cerrando;
+un handle sin compartir hacía fallar con os error 32 el rename que guarda la
+transcripción. Si el motor no logra guardar un turno, su `done` lleva
+`text="unsaved"`: la ventana conserva lo que pintó en vivo, avisa y no relee
+el disco hasta otra apertura.
+
 El historial conserva la directiva original. Reabrir carga el mismo archivo;
 el estado JavaScript se reinicia tras cerrar o desmontar el iframe.
 El sandbox no limita CPU ni memoria de los scripts del agente.
@@ -92,7 +121,9 @@ El sandbox no limita CPU ni memoria de los scripts del agente.
 | Contenido que crece y se reduce; márgenes; ancho estrecho | Ajusta altura y permite seguir por el chat |
 | Altura no finita o mensaje de otro marco | Rechaza; las alturas válidas se acotan |
 | Ocho directivas y una novena; 17 marcos en el hilo | Respeta límites y permite cerrar para cargar otro |
-| Archivo faltante y reintento | Error localizado; recupera tras crear el archivo |
+| Archivo faltante y reintento | Error localizado con el nombre del archivo; recupera tras crearlo |
+| Lectura fallida y Abrir en el navegador | El texto sigue; abre el HTML con su app |
+| Turno con visual cuyo guardado falla | El mensaje sigue en el chat, con aviso |
 | Tamaño, UTF-8, symlink, reparse, reservado y archivo especial | Rechazo por el motor antes de cargar HTML |
 | Sesión ajena y cambio de workspace durante la lectura | Mantiene el ámbito capturado |
 | Red, DOM padre, API, popups y navegación | Bloqueados por el sandbox y la CSP |

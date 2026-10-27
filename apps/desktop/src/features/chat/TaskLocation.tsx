@@ -1,13 +1,13 @@
 import Folder from "lucide-solid/icons/folder";
 import GitBranch from "lucide-solid/icons/git-branch";
-import Laptop from "lucide-solid/icons/laptop";
-import Server from "lucide-solid/icons/server";
+import Monitor from "lucide-solid/icons/monitor";
+import { MachineIcon } from "../machines/MachineIcon";
+import { machineName, machineWakes } from "../machines/store";
 import { createSignal, type JSX, onCleanup, Show } from "solid-js";
 import { copyText } from "../../lib/clipboard";
 import { t } from "../../lib/i18n";
 import { capabilities } from "../../lib/platform";
 import { cn } from "../../lib/utils";
-import { machineName } from "../machines/store";
 import { RETARDO_TOOLTIP, TooltipContent, TooltipRoot, TooltipTrigger } from "../../ui/Tooltip";
 
 export type TaskLocationProps = {
@@ -18,6 +18,8 @@ export type TaskLocationProps = {
   /** La carpeta de trabajo de la tarea (su worktree). */
   path?: string;
   branch?: string;
+  /** Abre la pantalla de esa máquina; el botón solo sale en una VM administrada encendida. */
+  onScreen?: (machine: string) => void;
 };
 
 const PARTE = "flex h-5.5 min-w-0 items-center gap-1.25 rounded-sm px-1.25 whitespace-nowrap";
@@ -43,7 +45,9 @@ function Pista(props: { tip: JSX.Element; children: JSX.Element; class?: string;
 export default function TaskLocation(props: TaskLocationProps) {
   const here = () => capabilities().windowMachine?.();
   const nombre = () => (props.machine ? machineName(props.machine) : (here()?.name ?? machineName("local")));
-  // En la web ninguna máquina es la de la ventana: `here().local` es falso.
+  const id = () => props.machine ?? here()?.id ?? "local";
+  const wakes = () => machineWakes(id());
+  // En la web ninguna máquina es la de la ventana: `here().local` es falso. Solo decide el botón de pantalla.
   const local = () => (props.machine ? !!here()?.local && props.machine === here()?.id : (here()?.local ?? true));
   const [copiada, setCopiada] = createSignal(false);
   let espera: ReturnType<typeof setTimeout> | undefined;
@@ -55,6 +59,10 @@ export default function TaskLocation(props: TaskLocationProps) {
       espera = setTimeout(() => setCopiada(false), 1500);
     }).catch(() => {});
   };
+  const pantalla = () => {
+    const m = props.machine;
+    return m && props.on && !local() && props.onScreen && capabilities().machineScreen?.(m) ? m : null;
+  };
   const Sep = () => <span aria-hidden="true" class="shrink-0 px-px text-neutral-500/60">/</span>;
 
   return (
@@ -62,17 +70,17 @@ export default function TaskLocation(props: TaskLocationProps) {
       data-task-location=""
       data-task-location-on={props.on ? "true" : "false"}
       aria-label={t("chat.location.label")}
-      class="relative z-10 flex min-w-0 shrink-0 items-center gap-px px-3.5 pt-2 text-xs text-neutral-500"
+      class="relative z-10 flex min-w-0 shrink-0 items-center gap-px px-3.5 pt-1 text-xs text-neutral-500"
     >
       <Pista
         class={cn("max-w-[40%] shrink", !props.on && "opacity-65")}
         tip={props.on ? t("shell.machines.task_on", { name: nombre() }) : t("shell.machines.task_off", { name: nombre() })}
       >
-        {local() ? <Laptop size={13} aria-hidden="true" class="shrink-0" /> : <Server size={13} aria-hidden="true" class="shrink-0" />}
+        <MachineIcon wakes={wakes()} size={13} class="shrink-0" />
         <span data-task-location-machine="" class="min-w-0 truncate">{nombre()}</span>
         <span
           aria-hidden="true"
-          class={cn("size-1.5 shrink-0 rounded-full", !props.on ? "bg-neutral-300" : local() ? "bg-success" : "bg-info")}
+          class={cn("size-1.5 shrink-0 rounded-full", !props.on ? "bg-neutral-300" : wakes() ? "bg-info" : "bg-success")}
         />
       </Pista>
       <Show when={props.project}>
@@ -103,6 +111,19 @@ export default function TaskLocation(props: TaskLocationProps) {
               <span data-task-location-branch="" class="min-w-0 truncate font-mono text-[0.71875rem]">{rama()}</span>
             </Pista>
           </>
+        )}
+      </Show>
+      <Show when={pantalla()}>
+        {(m) => (
+          <Pista
+            class="ml-1 shrink-0 text-neutral-500"
+            label={t("screen.open_tip", { name: nombre() })}
+            tip={t("screen.open_tip", { name: nombre() })}
+            onClick={() => props.onScreen?.(m())}
+          >
+            <Monitor size={13} aria-hidden="true" class="shrink-0" />
+            <span data-task-location-screen="">{t("screen.open")}</span>
+          </Pista>
         )}
       </Show>
     </nav>

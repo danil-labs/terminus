@@ -37,9 +37,9 @@ export function storageRefresh<T>(options: {
 
   return {
     refresh,
-    reset() {
+    reset(fresh = true) {
       generation++;
-      return refresh();
+      return refresh(fresh);
     },
     dispose() {
       disposed = true;

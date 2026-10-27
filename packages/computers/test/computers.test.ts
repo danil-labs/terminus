@@ -10,10 +10,17 @@ import {
   defaultComputer,
   groupWorkspaces,
   machineCompatibility,
+  machineContracts,
   isManaged,
+  systemOf,
   wakes,
   listComputers,
+  listWorkspacesWithDeleted,
   powerOf,
+  purgeWorkspace,
+  renameComputer,
+  restoreWorkspace,
+  sessionProbe,
   sessionUrl,
   startComputer,
 } from "../src/index.ts";
@@ -43,9 +50,9 @@ class FakeSocket implements SocketLike {
   receive(message: object) {
     this.onmessage?.({ data: JSON.stringify(message) });
   }
-  close(code = 1000) {
+  close(code = 1000, reason = "") {
     this.readyState = 3;
-    this.onclose?.({ code });
+    this.onclose?.({ code, reason });
   }
 }
 
@@ -140,6 +147,11 @@ test("solo una VM administrada se despierta; apagado es neutro", () => {
   const vm = { computer_id: "cmp_vm", provider: "aws-ec2" };
   assert.equal(defaultComputer([mac, vm]), vm);
   assert.equal(defaultComputer([mac]), mac);
+  assert.equal(systemOf("linux"), "linux");
+  assert.equal(systemOf(" Darwin "), "macos");
+  assert.equal(systemOf("win32"), "windows");
+  assert.equal(systemOf("freebsd"), null);
+  assert.equal(systemOf(null), null);
 });
 
 test("la API dice licencia, no tuya y error sin confundirlos", async () => {
@@ -175,4 +187,166 @@ test("el contrato: igual es ok, distinto es desactualizado, sin dato no se sabe"
   assert.equal(machineCompatibility("ABC", "abc"), "ok");
   assert.equal(machineCompatibility("abc", "def"), "outdated");
   assert.equal(machineCompatibility(null, "abc"), "unknown");
+  const base = "d4541d178c64a065c1a4a0c693817eb84ad17052fd605815295fa1696955ef8f";
+  const extended = "3972c281dba1b61f9ad06fc82fbf059af3dbc55770b0a1bcb59ce786ec0a56f1";
+  const credentials = "f33064bff6afb3708517c13a90f327af5333cbd82b15a589a2373c80d79e6d51";
+  assert.equal(machineCompatibility(extended, base), "ok");
+  assert.equal(machineCompatibility(base, credentials), "ok");
+  const activity = "93b1c32f25c4fb5fd722079a5593f8316125d91e8ecf12e64c3d7e1f7aebae98";
+  assert.equal(machineCompatibility(activity, base), "ok");
+  assert.equal(machineCompatibility(base, activity), "ok");
+  assert.deepEqual(machineContracts(base), [base, extended, credentials, activity]);
+  assert.deepEqual(machineContracts("unknown"), ["unknown"]);
+  assert.deepEqual(machineContracts(null), []);
+});
+
+test("llevar trabajo: exportar, importar y cancelar despiertan; las partes, la llave y el estado ni esperan en pending; nada se copia al espejo", async () => {
+  const { INTENT_COMMANDS, MIRROR_COMMANDS } = await import("../src/index.ts");
+  assert.ok(INTENT_COMMANDS.has("work_import"));
+  assert.ok(INTENT_COMMANDS.has("work_cancel"));
+  // computers#16: armar el bundle pasa de los 60 s de una lectura; sus argumentos son metadatos.
+  assert.ok(INTENT_COMMANDS.has("work_export"));
+  for (const command of ["work_read_part", "work_write_part", "work_key", "work_status"]) {
+    assert.ok(!INTENT_COMMANDS.has(command), `${command} no puede guardarse en pending:`);
+  }
+  for (const command of ["work_read_part", "work_write_part", "work_export", "work_key"]) {
+    assert.ok(!MIRROR_COMMANDS.has(command), `${command} no puede quedar en el espejo`);
+  }
+});
+
+const jwt = (exp: number, n = 1) => `h.${Buffer.from(JSON.stringify({ exp: Math.floor(exp / 1000), n })).toString("base64url")}.s`;
+
+test("la sesión manda los contratos que habla en la URL, y solo los bien formados", () => {
+  assert.equal(sessionUrl("https://c.example", "cmp_x", ["abc123", "mal formado", "abc123", "def.4"]), "wss://c.example/v1/computers/cmp_x/session?contracts=abc123,def.4");
+  assert.equal(sessionUrl("https://c.example", "cmp_x", []), "wss://c.example/v1/computers/cmp_x/session");
+});
+
+test("antes de que venza el token se renueva con `auth` sin reconectar; 4005 reabre con uno nuevo", async () => {
+  FakeSocket.all = [];
+  let n = 0;
+  const tokens: string[] = [];
+  const relay = new RelaySession(
+    {
+      endpoint: "https://c.example",
+      computerId: "cmp_a",
+      contracts: ["abc123"],
+      getToken: () => {
+        const t = jwt(Date.now() + 46_000, ++n);
+        tokens.push(t);
+        return t;
+      },
+    },
+    (url, protocols) => new FakeSocket(url, protocols),
+  );
+  relay.start();
+  await tick();
+  const socket = FakeSocket.all[0];
+  assert.ok(socket.url.endsWith("?contracts=abc123"));
+  socket.open();
+  await new Promise((r) => setTimeout(r, 1_100));
+  const auth = socket.sent.filter((m) => m.type === "auth");
+  assert.equal(auth.length, 1, "a fresh token goes over the open socket");
+  assert.equal(auth[0].token, tokens[1]);
+  assert.equal(FakeSocket.all.length, 1, "without reconnecting");
+  socket.receive({ type: "auth", expires_at: new Date(Date.now() + 600_000).toISOString() });
+  socket.close(4005);
+  await new Promise((r) => setTimeout(r, 600));
+  assert.equal(FakeSocket.all.length, 2, "an expired session opens again");
+  assert.deepEqual(FakeSocket.all[1].protocols, [SUBPROTOCOL, `bearer.${tokens.at(-1)}`], "with a new token");
+  relay.close();
+});
+
+test("cada `hello` del motor llega como `engine` con su contrato", async () => {
+  const relay = session();
+  await tick();
+  const socket = FakeSocket.all[0];
+  const seen: (string | null)[] = [];
+  relay.onEngine((e) => seen.push(e.contract));
+  socket.open();
+  socket.receive({ type: "engine", contract: "old", host_version: "0.2.82" });
+  socket.receive({ type: "engine", contract: "new", host_version: "0.2.86" });
+  assert.deepEqual(seen, ["old", "new"]);
+  assert.deepEqual(relay.engine(), { contract: "new", host_version: "0.2.86" });
+  relay.close();
+});
+
+test("lápidas: la lista con borrados, restaurar, purgar y el 409 con su código", async () => {
+  const asked: [string, string | undefined][] = [];
+  const reply = (status: number, body: unknown) => async (url: string, init?: { method?: string }) => {
+    asked.push([url, init?.method]);
+    return { status, ok: status < 300, json: async () => body };
+  };
+  const both = await listWorkspacesWithDeleted("https://c.example", "t", reply(200, { workspaces: [{ id: "w", name: "W", projects: [], computers: ["c"] }], deleted: [{ id: "w9", name: "Viejo", projects: [], computers: [], deleted_at: "2026-10-22T10:00:00Z" }] }));
+  assert.equal(both.kind, "ok");
+  if (both.kind === "ok") assert.deepEqual([both.value.workspaces.map((w) => w.id), both.value.deleted.map((w) => [w.id, w.deleted_at])], [["w"], [["w9", "2026-10-22T10:00:00Z"]]]);
+  assert.equal(asked[0][0], "https://c.example/v1/workspaces?include_deleted=1");
+  const restored = await restoreWorkspace("https://c.example", "t", "w9", reply(200, { id: "w9", name: "Viejo", projects: [], computers: [] }));
+  assert.equal(restored.kind === "ok" && restored.value?.id, "w9");
+  assert.equal((await purgeWorkspace("https://c.example", "t", "w9", reply(204, null))).kind, "ok");
+  assert.deepEqual(asked.slice(1), [["https://c.example/v1/workspaces/w9/restore", "POST"], ["https://c.example/v1/workspaces/w9/purge", "POST"]]);
+  assert.deepEqual(await purgeWorkspace("https://c.example", "t", "w", reply(409, { error: "workspace_not_deleted" })), { kind: "error", status: 409, code: "workspace_not_deleted" });
+});
+
+test("sin licencia la sesión se detiene con nombre, sin reintentar en bucle, hasta «Reintentar»", async () => {
+  const relay = session();
+  await tick();
+  const socket = FakeSocket.all[0];
+  const seen: (string | null)[] = [];
+  relay.onBlocked((b) => seen.push(b));
+  socket.open();
+  const pending = relay.call("id-l", "list_projects", "w", null, {});
+  socket.close(4003, "license_required");
+  await assert.rejects(pending, (e: { code: string }) => e.code === "license_required", "what was in flight says why");
+  await new Promise((r) => setTimeout(r, 700));
+  assert.equal(FakeSocket.all.length, 1, "it does not reconnect on its own");
+  assert.equal(relay.blocked(), "license_required");
+  await assert.rejects(relay.call("id-m", "list_projects", "w", null, {}), (e: { code: string }) => e.code === "license_required", "a new call fails at once");
+  relay.retry();
+  await tick();
+  assert.equal(FakeSocket.all.length, 2, "«Reintentar» opens it again");
+  assert.equal(relay.blocked(), null);
+  assert.deepEqual(seen, ["license_required", null]);
+  relay.close();
+});
+
+test("un upgrade que no abre pregunta por qué: con licencia faltante se detiene; si no lo sabe, reintenta", async () => {
+  FakeSocket.all = [];
+  let answer: "license_required" | null = "license_required";
+  const relay = new RelaySession(
+    { endpoint: "https://c.example", computerId: "cmp_a", getToken: () => "jwt", probe: async () => answer },
+    (url, protocols) => new FakeSocket(url, protocols),
+  );
+  relay.start();
+  await tick();
+  FakeSocket.all[0].close(1006);
+  await new Promise((r) => setTimeout(r, 700));
+  assert.equal(relay.blocked(), "license_required");
+  assert.equal(FakeSocket.all.length, 1);
+  answer = null;
+  relay.retry();
+  await tick();
+  FakeSocket.all[1].close(1006);
+  await new Promise((r) => setTimeout(r, 700));
+  assert.equal(relay.blocked(), null);
+  assert.equal(FakeSocket.all.length, 3, "an unknown failure reconnects as before");
+  relay.close();
+});
+
+test("la sonda de la sesión dice license_required con el 403 del relay", async () => {
+  const reply = (status: number) => async () => ({ status, ok: false, json: async () => ({ error: status === 403 ? "license_required" : "websocket_required" }) });
+  assert.equal(await sessionProbe("https://c.example", "t", "cmp_a", reply(403)), "license_required");
+  assert.equal(await sessionProbe("https://c.example", "t", "cmp_a", reply(426)), null);
+});
+
+test("renombrar una computadora: PATCH con el nombre, y el error con su código", async () => {
+  const asked: Array<{ url: string; method?: string; body?: string; type?: string }> = [];
+  const reply = (status: number, body: unknown) => async (url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }) => {
+    asked.push({ url, method: init?.method, body: init?.body, type: init?.headers?.["content-type"] });
+    return { status, ok: status < 300, json: async () => body };
+  };
+  const ok = await renameComputer("https://c.example", "t", "cmp_a", "Mac del estudio", reply(200, { computer_id: "cmp_a", name: "Mac del estudio" }));
+  assert.deepEqual(ok, { kind: "ok", value: { computer_id: "cmp_a", name: "Mac del estudio" } });
+  assert.deepEqual(asked[0], { url: "https://c.example/v1/computers/cmp_a", method: "PATCH", body: JSON.stringify({ name: "Mac del estudio" }), type: "application/json" });
+  assert.deepEqual(await renameComputer("https://c.example", "t", "cmp_a", "", reply(400, { error: { code: "invalid_name" } })), { kind: "error", status: 400, code: "invalid_name" });
+  assert.deepEqual(await renameComputer("https://c.example", "t", "cmp_b", "X", reply(404, { error: { code: "not_found" } })), { kind: "missing" });
 });

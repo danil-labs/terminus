@@ -181,7 +181,7 @@ function WorkspaceMenu(props: {
                             actualEs() ? "border-neutral-500 text-neutral-950" : "border-border-strong text-neutral-700",
                           )}
                         >
-                          <MarcaDeWorkspace name={w.name} logo={w.logo} />
+                          <MarcaDeWorkspace id={w.id} name={w.name} logo={w.logo} />
                         </span>
                         <span class="min-w-0 flex-1 truncate">{w.name}</span>
                         <Show when={estado()}>{(s) => <AttentionBadge state={s()} />}</Show>

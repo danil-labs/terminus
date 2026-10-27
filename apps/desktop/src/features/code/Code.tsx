@@ -6,6 +6,7 @@ import { precargarEditor } from "./editorLoad";
 import { Skeleton } from "../../ui/Skeleton";
 import { Channel } from "@tauri-apps/api/core";
 import { invoke } from "../../lib/invoke.ts";
+import { machineOf } from "../machines/store";
 import GitBranch from "lucide-solid/icons/git-branch";
 import { FailureNote, asFailure, type Failure } from "../../ui/Failure";
 import type { ArbolEnTarea } from "../../lib/model";
@@ -64,7 +65,7 @@ export default function Codigo(props: {
       const as = await invoke<ArbolEnTarea[]>("list_task_trees", {
         project: props.project,
         session: sid,
-      });
+      }, machineOf(sid));
       recordarArboles(sid, as);
       if (!mia()) return;
       setArboles(siguienteLista(arboles(), { ok: true, lista: as }));
@@ -94,7 +95,8 @@ export default function Codigo(props: {
 
   createEffect(on(() => arboles().filter((tree) => !tree.missing).map((tree) => tree.path).join("\n"), (path) => {
     setWatchFailure(null);
-    if (!path) return;
+    // El canal no cruza el relay (`router.ts` · `CHANNELS`): el árbol de otra máquina se relee al cerrar cada turno.
+    if (!path || machineOf(props.session)) return;
     let disposed = false;
     let scheduled: ReturnType<typeof setTimeout> | undefined;
     const changes = new Channel<void>();

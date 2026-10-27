@@ -10,6 +10,8 @@ export type DanilConnectState = "disconnected" | "pending" | "connected" | "erro
 export type DanilConnectStatus = {
   state: DanilConnectState;
   computer_id?: string | null;
+  /** El id de la persona en Danil; un motor anterior no lo manda. */
+  account?: string | null;
   /** Conectada: el nombre de esta computadora. Desconectada: el sugerido (su hostname). */
   name?: string | null;
   email?: string | null;

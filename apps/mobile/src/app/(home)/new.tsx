@@ -1,8 +1,11 @@
+import * as Crypto from "expo-crypto";
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import type { BaseBranches } from "@terminus/protocol";
-import { baseBranchesOf, createTask, runShell, suggestedDefaults } from "../../lib/engine";
+import { carryForNewTask } from "../../lib/carry";
+import { baseBranchesOf, createTask, runShell, shareSpace, suggestedDefaults } from "../../lib/engine";
+import { store } from "../../lib/store";
 import { HostError } from "../../lib/hosts";
 import { t, w } from "../../lib/i18n";
 import { useMachines } from "../../lib/machines";
@@ -12,6 +15,7 @@ import { Avatar, openTask } from "../../ui/components";
 import { Composer, SelectorChip, type Submission } from "../../ui/Composer";
 import { Icon } from "../../ui/Icon";
 import { KeyboardScreen } from "../../ui/KeyboardScreen";
+import { matches, NoMatch } from "../../ui/Search";
 import { Sheet, SheetOption } from "../../ui/Sheet";
 import { FolderSquare } from "../../ui/TaskCard";
 import { useTheme } from "../../ui/theme";
@@ -37,6 +41,8 @@ export default function NewTask() {
   const [picker, setPicker] = useState<"machine" | "folder" | "branch" | "agent" | AddFolderMode | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [waking, setWaking] = useState(false);
+  // Lo que se mandó mientras la VM enciende: sin él, el mensaje desaparece el minuto o dos que tarda.
+  const [pending, setPending] = useState<string | null>(null);
 
   useEffect(() => {
     if (params.folder) setFolder(params.folder);
@@ -45,7 +51,11 @@ export default function NewTask() {
   }, [params.folder, params.agent, params.host]);
 
   const host = hostsOfCurrent.find((h) => h.id === hostId) ?? preferred(hostsOfCurrent);
-  const folders = (snapshot?.folders ?? []).filter((f) => (!space || space.folders.includes(f.key)) && f.host === host?.id);
+  const visible = (snapshot?.folders ?? []).filter((f) => !space || space.folders.includes(f.key));
+  const here = visible.filter((f) => f.host === host?.id);
+  // Una carpeta de git de otra máquina del workspace también vale: su trabajo se lleva al crear la tarea.
+  const elsewhere = visible.filter((f) => f.host !== host?.id && f.kind !== "folder" && !here.some((h) => h.id === f.id));
+  const folders = [...here, ...elsewhere.filter((f, i) => elsewhere.findIndex((x) => x.id === f.id) === i)];
   const target = folders.find((f) => f.id === folder) ?? folders[0] ?? null;
   // El id del workspace en esa máquina: cada motor tiene el suyo.
   const workspace = host ? (current?.members.get(host.id) ?? null) : null;
@@ -70,30 +80,58 @@ export default function NewTask() {
   const selectedBranch = branch ?? branches?.selected ?? null;
   const branchLabel = branches?.branches.find((b) => b.reference === selectedBranch)?.name ?? selectedBranch;
 
-  // Los spaces son de la primera máquina: en otra, el id no significaría nada.
-  const spaceOn = (id: string | undefined) => (id && id === hostsOfCurrent[0]?.id ? (space?.id ?? null) : null);
+  // Cada máquina tiene sus ids de space; una que no tiene este, ninguno.
+  const spaceOn = (id: string | undefined) => (id ? (space?.on[id] ?? null) : null);
 
   async function start(s: Submission) {
     if (!host || !workspace || !target) return false;
     setNote(null);
-    setWaking(act === "wakes" && power !== "on");
+    const wakes = act === "wakes" && power !== "on";
+    setWaking(wakes);
+    if (wakes) setPending(s.shell ? `!${s.command}` : s.prompt);
     try {
-      const spaceId = spaceOn(host.id);
-      const baseRef = branch;
+      // Un space que la máquina de destino no tiene se comparte antes desde la que lo guarda, con el mismo id.
+      let spaceId = spaceOn(host.id);
+      const owner = !spaceId && space ? Object.entries(space.on)[0] : undefined;
+      const keeper = owner ? hostsOfCurrent.find((h) => h.id === owner[0]) : undefined;
+      const keeperWs = keeper ? current?.members.get(keeper.id) : undefined;
+      if (owner && keeper && keeperWs) spaceId = await shareSpace(keeper, keeperWs, owner[1]).then(() => owner[1], () => null);
+      let baseRef = branch;
+      let unwrapSnapshot = false;
+      const from = target.host !== host.id ? hostsOfCurrent.find((h) => h.id === target.host) : undefined;
+      const fromWorkspace = from ? (current?.members.get(from.id) ?? null) : null;
+      if (from && fromWorkspace && from.power() === "on" && !s.shell) {
+        setNote(t("new.carrying", { from: from.label, to: host.label }));
+        const carried = await carryForNewTask({
+          source: { host: from, workspace: fromWorkspace },
+          target: { host, workspace },
+          folder: target,
+          targetHasFolder: false,
+          pins: { get: (m) => store.get(`carry.key.${m}`), set: (m, key) => store.set(`carry.key.${m}`, key) },
+          newId: () => Crypto.randomUUID(),
+        });
+        if (carried) {
+          baseRef = carried.baseRef;
+          unwrapSnapshot = carried.unwrapSnapshot;
+        }
+        setNote(null);
+      }
       const id = s.shell
         ? (await runShell(host, workspace, { folder: target.id, session: null, command: s.command, provider: s.provider, model: s.model, effort: s.effort, permissionMode: s.permissionMode, space: spaceId, agent: chosenAgent, baseRef })).session
-        : await createTask(host, workspace, { folder: target.id, prompt: s.prompt, provider: s.provider, model: s.model, effort: s.effort, permissionMode: s.permissionMode, attachments: s.attachments, agent: chosenAgent, space: spaceId, baseRef });
+        : await createTask(host, workspace, { folder: target.id, prompt: s.prompt, provider: s.provider, model: s.model, effort: s.effort, permissionMode: s.permissionMode, attachments: s.attachments, agent: chosenAgent, space: spaceId, baseRef, unwrapSnapshot });
       rememberMachine(host.id);
       openTask(host.id, workspace, target.id, id);
       return true;
     } catch (error) {
-      if (error instanceof HostError && error.code === "machine_asleep") setNote(w("web.machines.off_action", { name: host.label }));
+      if (error instanceof HostError && error.code === "key_changed") setNote(t("new.carry_key_changed", { name: host.label }));
+      else if (error instanceof HostError && error.code === "machine_asleep") setNote(w("web.machines.off_action", { name: host.label }));
       else if (error instanceof HostError && error.code === "machine_outdated") setNote(w("web.machines.outdated_action", { name: host.label }));
       else if (error instanceof HostError && (error.code === "start_failed" || error.code === "start_timeout")) setNote(t("machines.start_failed", { name: host.label }));
       else setNote(t("task.error", { detail: error instanceof Error ? error.message : String(error) }));
       return false;
     } finally {
       setWaking(false);
+      setPending(null);
     }
   }
 
@@ -150,6 +188,11 @@ export default function NewTask() {
         </Text>
       </View>
       <View style={{ flex: 1 }} />
+      {pending && waking ? (
+        <View style={[styles.pending, { backgroundColor: theme.userBubble, borderColor: theme.border }]}>
+          <Text style={{ color: theme.text, fontSize: 15, lineHeight: 21 }}>{pending}</Text>
+        </View>
+      ) : null}
       {notice || note ? (
         <View style={styles.notes}>
           {notice ? <Text style={{ color: theme.textMuted }}>{notice}</Text> : null}
@@ -165,38 +208,50 @@ export default function NewTask() {
         providers={host ? (snapshot?.providers[host.id] ?? []) : []}
         provider={defaults.provider}
         model={defaults.model}
+        permissionMode={current?.defaultPermissionMode ?? null}
         disabled={!host || !target || act === "asleep" || act === "outdated" || waking}
         placeholder={t("new.placeholder")}
         header={header}
         onSubmit={start}
       />
 
-      <Sheet visible={picker === "machine"} title={w("shell.machines.label")} onClose={() => setPicker(null)}>
-        {hostsOfCurrent.map((h) => (
-          <SheetOption
-            key={h.id}
-            testID={`machine-${h.id}`}
-            icon="server"
-            label={h.label}
-            detail={`${stateOf(h)} · ${h.managed ? t("machines.managed") : t("machines.own")}`}
-            selected={h.id === host?.id}
-            onPress={() => {
-              setHostId(h.id);
-              setFolder(null);
-              setPicker(null);
-            }}
-          />
-        ))}
+      <Sheet visible={picker === "machine"} title={w("shell.machines.label")} search={t("search.machines")} onClose={() => setPicker(null)}>
+        {(query) => {
+          const shown = hostsOfCurrent.filter((h) => matches(query, h.label));
+          return shown.length ? shown.map((h) => (
+            <SheetOption
+              key={h.id}
+              testID={`machine-${h.id}`}
+              icon="server"
+              label={h.label}
+              detail={`${stateOf(h)} · ${h.managed ? t("machines.managed") : t("machines.own")}`}
+              selected={h.id === host?.id}
+              onPress={() => {
+                setHostId(h.id);
+                setFolder(null);
+                setPicker(null);
+              }}
+            />
+          )) : <NoMatch />;
+        }}
       </Sheet>
-      <Sheet visible={picker === "folder"} title={t("new.folder")} onClose={() => setPicker(null)}>
-        {folders.map((f) => (
-          <SheetOption key={f.key} testID={`folder-${f.id}`} left={<FolderSquare id={f.key} size={10} />} label={f.name} detail={f.working_directory ?? null} selected={f.id === target?.id} onPress={() => {
-            setFolder(f.id);
-            setPicker(null);
-          }} />
-        ))}
-        <SheetOption testID="add-folder" icon="plus" label={t("folder.new")} disabled={act === "asleep" || act === "outdated"} onPress={() => setPicker("new-folder")} />
-        <SheetOption testID="add-clone" icon="git-branch" label={t("clone.title")} disabled={act === "asleep" || act === "outdated"} onPress={() => setPicker("clone")} />
+      <Sheet visible={picker === "folder"} title={t("new.folder")} search={t("search.folders")} onClose={() => setPicker(null)}>
+        {(query) => {
+          const shown = folders.filter((f) => matches(query, f.name, f.working_directory));
+          return (
+            <>
+              {shown.length ? shown.map((f) => (
+                <SheetOption key={f.key} testID={`folder-${f.id}`} left={<FolderSquare id={f.key} size={10} />} label={f.name}
+                  detail={f.host === host?.id ? (f.working_directory ?? null) : t("new.carry_from", { name: hostsOfCurrent.find((h) => h.id === f.host)?.label ?? f.host })} selected={f.id === target?.id} onPress={() => {
+                  setFolder(f.id);
+                  setPicker(null);
+                }} />
+              )) : <NoMatch />}
+              <SheetOption testID="add-folder" icon="plus" label={t("folder.new")} disabled={act === "asleep" || act === "outdated"} onPress={() => setPicker("new-folder")} />
+              <SheetOption testID="add-clone" icon="git-branch" label={t("clone.title")} disabled={act === "asleep" || act === "outdated"} onPress={() => setPicker("clone")} />
+            </>
+          );
+        }}
       </Sheet>
       <AddFolderSheets
         mode={picker === "clone" || picker === "new-folder" ? picker : null}
@@ -210,25 +265,37 @@ export default function NewTask() {
           void reload();
         }}
       />
-      <Sheet visible={picker === "branch"} title={w("worktrees.base.from")} onClose={() => setPicker(null)}>
-        {branches?.branches.map((b) => (
-          <SheetOption key={b.reference} icon="git-branch" label={b.name} detail={b.remote ?? null} selected={b.reference === selectedBranch} onPress={() => {
-            setBranch(b.reference === branches.selected ? null : b.reference);
-            setPicker(null);
-          }} />
-        ))}
+      <Sheet visible={picker === "branch"} title={w("worktrees.base.from")} search={t("search.branches")} onClose={() => setPicker(null)}>
+        {(query) => {
+          const shown = (branches?.branches ?? []).filter((b) => matches(query, b.name, b.remote));
+          return shown.length ? shown.map((b) => (
+            <SheetOption key={b.reference} icon="git-branch" label={b.name} detail={b.remote ?? null} selected={b.reference === selectedBranch} onPress={() => {
+              setBranch(b.reference === branches?.selected ? null : b.reference);
+              setPicker(null);
+            }} />
+          )) : <NoMatch />;
+        }}
       </Sheet>
-      <Sheet visible={picker === "agent"} title={t("new.agent")} onClose={() => setPicker(null)}>
-        <SheetOption icon="user-round" label={t("new.no_agent")} selected={!chosenAgent} onPress={() => {
-          setAgent(null);
-          setPicker(null);
-        }} />
-        {agents.map((a) => (
-          <SheetOption key={a.name} testID={`agent-${a.name}`} left={<Avatar name={a.name} size={22} round />} label={a.name} detail={a.description} selected={chosenAgent === a.name} onPress={() => {
-            setAgent(a.name);
-            setPicker(null);
-          }} />
-        ))}
+      <Sheet visible={picker === "agent"} title={t("new.agent")} search={t("search.agents")} onClose={() => setPicker(null)}>
+        {(query) => {
+          const shown = agents.filter((a) => matches(query, a.name, a.description));
+          return (
+            <>
+              {query.trim() ? null : (
+                <SheetOption icon="user-round" label={t("new.no_agent")} selected={!chosenAgent} onPress={() => {
+                  setAgent(null);
+                  setPicker(null);
+                }} />
+              )}
+              {shown.length ? shown.map((a) => (
+                <SheetOption key={a.name} testID={`agent-${a.name}`} left={<Avatar name={a.name} size={22} round />} label={a.name} detail={a.description} selected={chosenAgent === a.name} onPress={() => {
+                  setAgent(a.name);
+                  setPicker(null);
+                }} />
+              )) : <NoMatch />}
+            </>
+          );
+        }}
       </Sheet>
     </KeyboardScreen>
   );
@@ -237,5 +304,6 @@ export default function NewTask() {
 const styles = StyleSheet.create({
   top: { paddingHorizontal: 16, paddingTop: 12, gap: 4 },
   notes: { paddingHorizontal: 16, paddingBottom: 6, gap: 4 },
+  pending: { alignSelf: "flex-end", maxWidth: "92%", marginHorizontal: 12, marginBottom: 8, borderRadius: 14, padding: 10, borderWidth: StyleSheet.hairlineWidth },
   selectors: { flexDirection: "row", flexWrap: "wrap", gap: 6, paddingHorizontal: 2 },
 });

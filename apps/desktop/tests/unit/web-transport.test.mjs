@@ -21,7 +21,8 @@ test("the web build talks to the relay: calls, events and machine state", async 
   const text = () => app.w.document.body.textContent ?? "";
 
   assert.deepEqual(app.fallos, []);
-  assert.equal(fake.sockets[0]?.url, "wss://relay.test/v1/computers/cmp_test/session");
+  assert.equal(fake.sockets[0]?.url.split("?")[0], "wss://relay.test/v1/computers/cmp_test/session");
+  assert.match(fake.sockets[0]?.url ?? "", /\?contracts=[0-9a-f]{64}(,[0-9a-f]{64})*$/, "it says the compatible contracts it speaks, like the desktop");
   assert.deepEqual(fake.sockets[0]?.protocols, ["danil.computers.v1", "bearer.tok"]);
 
   const projects = fake.calls.find((c) => c.command === "list_projects");
@@ -33,7 +34,7 @@ test("the web build talks to the relay: calls, events and machine state", async 
   assert.deepEqual(local.map((c) => c.command), [], "window-only commands stay in the page");
   assert.deepEqual(fake.subscriptions.slice(0, 1), [null]);
 
-  app.w.document.querySelector('[data-sesion="t1"]').click();
+  app.w.document.querySelector('[data-sesion="cmp_test~t1"]').click();
   await sleep(400);
   const where = app.w.document.querySelector("[data-task-location]");
   assert.equal(where?.querySelector("[data-task-location-machine]")?.textContent, "cmp_test", "in the browser the task runs on the computer, not on this one");

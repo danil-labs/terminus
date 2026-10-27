@@ -1,5 +1,11 @@
 # Máquina por tarea
 
+> **Retirado (fase 4 del plan multimáquina, 2026-10-23).** El reparto entre
+> máquinas por túnel SSH que describe este documento (`fleet.rs` y la parte de
+> `proxy.rs` que lo usaba) ya no existe: la ventana, la web y el teléfono usan
+> una sola flota, `packages/fleet`, por el relay de la cuenta
+> (`src/features/machines/router.ts`). Se conserva como historia del diseño.
+
 Hasta ahora, elegir otra máquina en «Ejecutar en» cambiaba el motor de la
 ventana entera (`machine_select`) y recargaba la página: otros workspaces,
 otras tareas, otro diario de eventos. Este documento recoge lo que se
@@ -75,8 +81,8 @@ La ventana conserva **una** máquina, la suya (la primera de la lista, `HOME` en
 corren las tareas que se crearon en ellas.
 
 1. **Enlace de workspaces.** Todo pasa por una sola función,
-   `Fleet::counterpart_workspace(machine, workspace)` en
-   `src-tauri/src/extracted/fleet.rs`. Devuelve el workspace de esa máquina que
+   `Fleet::counterpart_workspace(machine, workspace)` en el `fleet.rs` de la
+   ventana (retirado en la fase 4). Devolvía el workspace de esa máquina que
    corresponde al de la ventana:
    - el mismo id, si esa máquina lo lista: un workspace de la cuenta tiene el
      mismo id en todas ([`account-workspace.md`](account-workspace.md));
@@ -145,7 +151,7 @@ corren las tareas que se crearon en ellas.
 
 ## Lo implementado
 
-- `src-tauri/src/extracted/fleet.rs`:
+- `fleet.rs` de la ventana (retirado en la fase 4):
   - enlaces: `counterpart_workspace` y proyectos;
   - dueños de tareas;
   - enrutado: `target`, `forward`, `deliver`;
@@ -186,6 +192,51 @@ corren las tareas que se crearon en ellas.
   Chip en fila y cabecera, la copia y el aviso al abrir, «Encendiendo vm…» al
   mandar, un solo `send_message`, relectura y ningún fallo.
 
+## Llevar el trabajo
+
+Elegir otra máquina en «Ejecutar en» para una carpeta de esta ventana lleva
+también lo que no está en el remoto: commits sin push, cambios sin commit y,
+si se eligen, archivos que git ignora. La ventana hace de puente entre los dos
+motores con los comandos `work_*`; la orquestación es de `packages/carry`,
+la comparten la web y el teléfono.
+
+- Al enviar el primer mensaje, `features/machines/carry.ts` pregunta
+  `work_status` al origen y si el destino tiene el proyecto. Sin nada que
+  llevar y con el proyecto allá, se manda como siempre.
+- Si no, `CarrySheet.tsx` deja elegir qué viaja; mientras tanto el origen ya
+  exporta para decir el tamaño. El mensaje espera en la caja.
+- Al enviar: `work_import {probe: true}` despierta el destino (está en `WAKES`
+  de `proxy.rs`), se clona con `start_project_clone` si falta, se copian partes
+  de 4 MiB y `send_message` crea la tarea con `baseRef` y `unwrapSnapshot`.
+  `CarryProgress.tsx` pinta los pasos y, si se detiene, el arreglo; el mensaje
+  vuelve a la caja y reintentar sigue desde la parte que faltaba.
+- «Traer a esta Mac» (solo en el escritorio, que tiene motor local), en el
+  encabezado de una tarea de otra máquina y en su menú: la misma hoja en modo
+  traer. El origen es el worktree de la tarea (`work_status {task}`), nada
+  ignorado sale marcado y `work_import {branchAs}` deja el trabajo en una rama
+  de aquí sin tocar la carpeta. «Seguir en una tarea nueva aquí» abre un
+  borrador sobre esa base con un resumen corto (título, último mensaje del
+  agente y commits) y la tarea que nace enlaza a la original.
+- Una carpeta sin remoto ya no deja fuera a las demás máquinas mientras la
+  suya esté encendida: viaja entera (`full`) y `work_import {create}` crea allá
+  el proyecto con el mismo id; `fleet.rs` deja pasar ese `project` sin
+  traducir. El menú de la carpeta ofrece «Llevar a otra máquina…»: abre su
+  tarea nueva en la máquina elegida y la hoja aunque no haya nada sin subir.
+- Sellado: la web y el teléfono piden `work_key` al destino y mandan
+  `recipientKey` en `work_export`; el archivo viaja cifrado para ese motor.
+  La primera llave de cada máquina se fija en las preferencias
+  (`machines.carry_keys`, TOFU); si cambia, la hoja lo avisa y no deja llevar
+  hasta «Confiar en la nueva llave». El escritorio también sella: con
+  `@terminus/fleet` todo cliente va por el relay, `.env` incluidos.
+- Web: la misma ventana por el relay, con partes de 512 KiB; los archivos que
+  git ignora solo viajan sellados. Si la máquina de la carpeta está apagada,
+  se avisa y se puede seguir sin el trabajo sin subir. `work_export`,
+  `work_import` y `work_cancel` están en `INTENT_COMMANDS` (`packages/computers`):
+  despiertan la máquina y tienen 330 s; las partes no, son llamadas de 60 s.
+- Pruebas: `tests/unit/carry-work.test.ts` (orquestación contra dos motores
+  falsos), `tests/unit/carry-window.test.mjs` (`dist/` en jsdom) y
+  `tests/unit/web-carry.test.mjs` (`dist-web/` contra el relay falso).
+
 ## Lo que queda
 
 - **El workspace de la cuenta**: `counterpart_workspace` y `project_on` ya
@@ -222,7 +273,7 @@ corren las tareas que se crearon en ellas.
 
 Con la sesión de Danil abierta (`danil_connect_status` = `connected`), la
 ventana junta las tareas de todas las computadoras de la persona con las reglas
-de la web (`src/web/fleet.ts` y `src/web/transport.ts`), en un trozo perezoso
+de `packages/fleet` y del router `src/features/machines/router.ts`, el mismo de la web, en un trozo perezoso
 (`src/features/machines/account.tsx`):
 
 - El motor local sigue por el IPC nativo, con sus ids tal cual: eventos de
@@ -250,3 +301,31 @@ de la web (`src/web/fleet.ts` y `src/web/transport.ts`), en un trozo perezoso
   una carpeta sin remoto (`remote_url`) que vive en otra máquina.
 - `attention` junta por workspace lo que dice cada máquina y llega a la ventana
   como una sola lista.
+
+## Acciones aplazadas con la máquina apagada
+
+Desde el 2026-10-23, archivar, desarchivar, borrar, renombrar, fijar o desfijar
+y mover de space una tarea de otra máquina apagada (VM o propia) **no la
+enciende ni da error**. El relay de computers la guarda en la cola de esa
+máquina y contesta enseguida; el motor la aplica, en orden, la siguiente vez
+que la máquina se conecta (el protocolo de danil-labs/computers y el
+conector de danil-labs/seldon-host, sección «Acciones aplazadas» en ambos).
+
+- La lista (`DEFERRED_COMMANDS` de `packages/computers`) coincide con la del
+  relay y con los `deferrable: true` de `commands.json`.
+- `packages/fleet` no enciende ni falla con esas acciones (`Fleet.defers`).
+  Mover a un space **de la cuenta** no se aplaza: ese space es de la cuenta y
+  sigue el camino de cualquier acción (enciende la VM; con la Mac apagada,
+  `machine_off`).
+- Cada cambio de la cola llega como frame `deferred` (`RelaySession.onDeferred`);
+  el router borra el respiro de esa máquina y la ventana relee la lista. La
+  copia del relay ya trae la cola aplicada: la fila archivada o borrada no
+  sale y las demás tocadas traen `deferred: true`, que `Sessions.tsx` pinta con
+  una marca discreta («Se aplica cuando su máquina se encienda»).
+- Archivar con la máquina apagada no pregunta `task_blockers`: no hay turnos
+  vivos ni se enciende solo para mirar el árbol. Si al aplicarse el motor lo
+  rechaza (por ejemplo, trabajo sin guardar en el árbol), el relay la descarta
+  y la tarea vuelve a verse en la lista, sin aviso.
+- La web (`web/transport.ts`) aplaza las mismas salvo mover de space, porque
+  aún no sabe qué spaces son de la cuenta; el teléfono (`apps/mobile`), fijar y
+  archivar.

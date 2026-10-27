@@ -1,10 +1,12 @@
 import Plus from "lucide-solid/icons/plus";
-import { createEffect, createSignal, onCleanup, Show } from "solid-js";
+import UserPlus from "lucide-solid/icons/user-plus";
+import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { t } from "../../lib/i18n";
 import { createNavigationReorder } from "../../lib/navigation-order";
 import { KeyedList } from "../../ui/KeyedList";
 import { cn } from "../../lib/utils";
+import { capabilities, type OtherAccount, type OtherWorkspace } from "../../lib/platform";
 import { generacionDeLogo, urlDeLogo } from "./logo-src";
 import { ITEM_DE_MENU, Popover, PopoverAnchor, PopoverContent } from "../../ui/Popover";
 import { RETARDO_TOOLTIP, TooltipContent, TooltipRoot, TooltipTrigger } from "../../ui/Tooltip";
@@ -19,12 +21,25 @@ export function monogram(name: string) {
 }
 
 /** El logo del workspace, o sus iniciales si no hay imagen o todavía no carga. */
-export function MarcaDeWorkspace(props: { name: string; logo?: string | null }) {
+/** `id`: en la web, el logo de un workspace de la cuenta sale de la cuenta (`urlDeLogo`). */
+export function MarcaDeWorkspace(props: { id?: string; name: string; logo?: string | null; load?: () => Promise<string | null> }) {
   const [url, setUrl] = createSignal<string | null>(null);
   createEffect(() => {
+    // Un workspace de otra cuenta trae su propio lector, con el token de su cuenta.
+    if (props.load) {
+      let vivo = true;
+      onCleanup(() => {
+        vivo = false;
+      });
+      void props.load().then((siguiente) => {
+        if (vivo) setUrl(siguiente);
+      }, () => undefined);
+      return;
+    }
     const path = props.logo ?? null;
+    const workspace = props.id ?? null;
     const gen = generacionDeLogo();
-    if (!path) {
+    if (!path && !workspace) {
       setUrl(null);
       return;
     }
@@ -32,7 +47,7 @@ export function MarcaDeWorkspace(props: { name: string; logo?: string | null }) 
     onCleanup(() => {
       vivo = false;
     });
-    void urlDeLogo(path).then((siguiente) => {
+    void urlDeLogo(path, workspace).then((siguiente) => {
       if (vivo && generacionDeLogo() === gen) setUrl(siguiente);
     });
   });
@@ -141,7 +156,7 @@ export default function WorkspaceColumn(props: {
             >
               <span class="absolute inset-0 overflow-hidden rounded-[inherit]">
                 <span class="relative grid size-full place-items-center">
-                  <MarcaDeWorkspace name={p.w.name} logo={p.w.logo} />
+                  <MarcaDeWorkspace id={p.w.id} name={p.w.name} logo={p.w.logo} />
                 </span>
               </span>
               <Show when={state()}>
@@ -179,15 +194,107 @@ export default function WorkspaceColumn(props: {
     );
   };
 
+  // Las otras cuentas de Danil de este navegador (solo la web): sus workspaces van debajo, por cuenta.
+  const accounts = capabilities().webAccounts;
+  const others = () => accounts?.others() ?? [];
+  const [accountMenu, setAccountMenu] = createSignal<string | null>(null);
+  cerrarConEscape(() => accountMenu() !== null, () => setAccountMenu(null));
+
+  /** La cuenta de un grupo: la inicial de su correo; su menú la quita o vuelve a entrar. */
+  const AccountHeader = (p: { id: string; email: string | null; extra: boolean; signedIn: boolean; stale?: boolean }) => {
+    const label = () => t("shell.workspaces.account", { email: p.email ?? "" });
+    return (
+      <Popover open={accountMenu() === p.id} onOpenChange={(open) => setAccountMenu(open ? p.id : null)} placement="right-start" gutter={4}>
+        <PopoverAnchor class="w-full">
+          <TooltipRoot openDelay={RETARDO_TOOLTIP} placement="right" gutter={6} disabled={accountMenu() === p.id}>
+            <TooltipTrigger
+              as="button"
+              type="button"
+              data-account-header={p.id}
+              class="mt-2 mb-0.5 flex w-full items-center gap-1 px-3 text-left outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary"
+              aria-label={label()}
+              onClick={() => setAccountMenu(p.id)}
+            >
+              <span aria-hidden="true" class="grid size-4 shrink-0 place-items-center rounded-full bg-neutral-200 text-[0.5625rem] font-semibold text-neutral-700">
+                {monogram(p.email ?? "?").slice(0, 1)}
+              </span>
+              <span aria-hidden="true" class="h-px flex-1 bg-border" />
+            </TooltipTrigger>
+            <TooltipContent>{p.email}</TooltipContent>
+          </TooltipRoot>
+        </PopoverAnchor>
+        <PopoverContent role="menu" class="w-64 p-1">
+          <p class="m-0 truncate px-2 pt-1 pb-1 text-[0.6875rem] font-medium text-neutral-500">{p.email}</p>
+          <Show when={p.stale && p.signedIn}>
+            <p class="m-0 px-2 pb-1 text-[0.6875rem] text-neutral-500">{t("shell.workspaces.stale")}</p>
+          </Show>
+          <Show when={!p.signedIn}>
+            <button role="menuitem" class={ITEM_DE_MENU} onClick={() => (setAccountMenu(null), accounts?.add(p.email))}>
+              {t("shell.workspaces.sign_in_again")}
+            </button>
+          </Show>
+          <Show when={p.extra}>
+            <button
+              role="menuitem"
+              class={ITEM_DE_MENU}
+              onClick={() => {
+                setAccountMenu(null);
+                if (window.confirm(t("shell.workspaces.remove_confirm", { email: p.email ?? "" }))) void accounts?.remove(p.id);
+              }}
+            >
+              {t("shell.workspaces.remove_account")}
+            </button>
+          </Show>
+        </PopoverContent>
+      </Popover>
+    );
+  };
+
+  /** Un workspace de otra cuenta: abrirlo recarga la página con esa cuenta; con la sesión caducada, pide volver a entrar. */
+  const OtherTile = (p: { w: OtherWorkspace; account: OtherAccount }) => {
+    const label = () => {
+      const values = { name: p.w.name, email: p.account.email ?? "" };
+      return p.account.signedIn ? t("shell.workspaces.other_tile", values) : t("shell.workspaces.expired_tile", values);
+    };
+    return (
+      <TooltipRoot openDelay={RETARDO_TOOLTIP} placement="right" gutter={6}>
+        <TooltipTrigger
+          as="button"
+          type="button"
+          data-other-workspace-tile={p.w.id}
+          class={cn("group relative grid h-12 w-full shrink-0 place-items-center outline-none select-none", !p.account.signedIn && "opacity-50")}
+          aria-label={label()}
+          onClick={() => (p.account.signedIn ? accounts?.open(p.w.id) : accounts?.add(p.account.email))}
+        >
+          <span
+            aria-hidden="true"
+            class="relative grid size-10 place-items-center rounded-lg border border-border bg-surface text-[0.875rem] font-semibold text-neutral-700 group-hover:bg-neutral-200 group-hover:text-neutral-950 group-focus-visible:outline-solid group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-primary"
+          >
+            <span class="absolute inset-0 overflow-hidden rounded-[inherit]">
+              <span class="relative grid size-full place-items-center">
+                <MarcaDeWorkspace name={p.w.name} load={p.w.logo} />
+              </span>
+            </span>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{label()}</TooltipContent>
+      </TooltipRoot>
+    );
+  };
+
   // Con uno solo no hay a dónde cambiar: crear el segundo vive en el menú del nombre (`TitleBar.tsx`).
+  // En la web siempre: es donde se agregan y se ven las otras cuentas de Danil.
   return (
-    <Show when={(ws.lista()?.length ?? 0) > 1}>
+    <Show when={(ws.lista()?.length ?? 0) > 1 || !!accounts}>
     <nav
       aria-label={t("shell.workspaces.label")}
       data-workspace-column=""
       class="glass-panel flex h-full w-16 shrink-0 flex-col border-r border-border"
     >
       <div ref={list} class="flex min-h-0 flex-1 flex-col items-center gap-1 overflow-x-hidden overflow-y-auto pt-2 pb-2">
+        <Show when={accounts && others().length > 0}>
+          <AccountHeader id={accounts!.current.user_id} email={accounts!.current.email} extra={accounts!.current.extra} signedIn />
+        </Show>
         <KeyedList each={ws.lista() ?? []} by={w => w.id}>{w => <Tile w={w()} />}</KeyedList>
         <button
           type="button"
@@ -198,6 +305,26 @@ export default function WorkspaceColumn(props: {
         >
           <Plus size={16} aria-hidden="true" />
         </button>
+        <For each={others()}>
+          {(account) => (
+            <>
+              <AccountHeader id={account.user_id} email={account.email} extra={account.extra} signedIn={account.signedIn} stale={account.stale} />
+              <For each={account.workspaces}>{(w) => <OtherTile w={w} account={account} />}</For>
+            </>
+          )}
+        </For>
+        <Show when={accounts}>
+          <button
+            type="button"
+            data-add-account=""
+            class="mt-2 grid size-10 shrink-0 place-items-center rounded-lg text-neutral-500 outline-none hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            aria-label={t("shell.workspaces.add_account")}
+            title={t("shell.workspaces.add_account")}
+            onClick={() => accounts?.add()}
+          >
+            <UserPlus size={16} aria-hidden="true" />
+          </button>
+        </Show>
       </div>
     </nav>
     </Show>

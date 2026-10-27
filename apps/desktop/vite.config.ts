@@ -122,6 +122,9 @@ const desktop: UserConfig = {
   // el `@theme` de `src/styles/global.css` y este plugin es todo el cableado.
   plugins: [solid(), tailwindcss(), excalidrawFonts()],
   define: { __TERMINUS_CONTRACT__: CONTRACT },
+  // noVNC (la pantalla de una VM) usa `await` de nivel superior. Solo lo carga
+  // su trozo perezoso: un webview sin soporte falla al abrir esa pestaña, no la app.
+  esbuild: { supported: { "top-level-await": true } },
   clearScreen: false,
   // **Sin esto la ventana sale en blanco en desarrollo, y sin un solo error.**
   //

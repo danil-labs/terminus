@@ -35,13 +35,30 @@ function stored(): Stored | null {
   }
 }
 
+/**
+ * En la web con varias cuentas de Danil (`web/accounts.ts`) la página es de una
+ * sola: solo enseña la foto de un workspace suyo, y la del pedido en `?w=` antes
+ * que la última. `null` (el escritorio): la última, sin filtro.
+ */
+let scope: { mine: (workspace: string) => boolean; prefer: string | null } | null = null;
+
+export function setShellCacheScope(next: typeof scope) {
+  scope = next;
+}
+
 export function readShellCache(): ShellSnapshot | null {
   const value = stored();
-  const entry = value?.workspaces[value.last];
+  const wanted = scope?.prefer && value?.workspaces[scope.prefer] ? scope.prefer : value?.last;
+  if (!value || !wanted || (scope && !scope.mine(wanted))) return null;
+  const entry = value.workspaces[wanted];
   if (!entry) return null;
   try {
     const snapshot = JSON.parse(entry.snapshot) as ShellSnapshot;
-    return snapshot.workspace === value.last && Array.isArray(snapshot.projects) ? snapshot : null;
+    if (snapshot.workspace !== wanted || !Array.isArray(snapshot.projects)) return null;
+    // Una foto no es una respuesta: lo que otra máquina dijo vuelve como copia de esa hora.
+    const copy = (row: SessionRow): SessionRow => (row.machine && row.machine_status === "ok" ? { ...row, machine_status: "cached" } : row);
+    const sessions = Object.fromEntries(Object.entries(snapshot.sessions).map(([folder, rows]) => [folder, rows.map(copy)]));
+    return { ...snapshot, sessions };
   } catch {
     return null;
   }
@@ -73,6 +90,8 @@ export function encodeSnapshot(snapshot: ShellSnapshot, rows: number): string {
 export function writeShellCache(snapshot: ShellSnapshot, now = Date.now()) {
   const text = ROWS.map((rows) => encodeSnapshot(snapshot, rows)).find((t) => t.length <= BYTES);
   const value = stored() ?? { version: 2 as const, last: snapshot.workspace, workspaces: {} };
+  // La misma foto ya guardada no se reescribe: cada escritura rehace todo el valor.
+  if (value.last === snapshot.workspace && value.workspaces[snapshot.workspace]?.snapshot === text) return;
   if (text === undefined) {
     delete value.workspaces[snapshot.workspace];
   } else {
@@ -92,6 +111,18 @@ export function writeShellCache(snapshot: ShellSnapshot, now = Date.now()) {
     } catch {
       // Sin almacenamiento no hay nada que borrar.
     }
+  }
+}
+
+/** Olvida las fotos de estos workspaces (una cuenta quitada de este navegador). */
+export function forgetShellCache(workspaces: readonly string[]) {
+  const value = stored();
+  if (!value || !workspaces.some((w) => w in value.workspaces)) return;
+  for (const w of workspaces) delete value.workspaces[w];
+  try {
+    localStorage.setItem(KEY, JSON.stringify(value));
+  } catch {
+    // Sin almacenamiento no hay nada que borrar.
   }
 }
 

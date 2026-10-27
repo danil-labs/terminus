@@ -1,29 +1,24 @@
 /**
- * Una máquina a la que el teléfono le habla: una computadora de Danil Computers
- * (por el relay) o un Terminus de la red local (por el bridge de desarrollo).
- * Las dos hablan el mismo idioma, los comandos de `APP_COMMANDS`, y las dos se
- * niegan a mandar otro. Sin React Native: se prueba en Node.
+ * Una máquina a la que el teléfono le habla: una computadora de la cuenta (por
+ * la flota compartida, `@terminus/fleet`, con una sesión de relay cada una) o
+ * un Terminus de la red local (por el bridge de desarrollo). Las dos hablan el
+ * mismo idioma, los comandos de `APP_COMMANDS`, y las dos se niegan a mandar
+ * otro. Sin React Native: se prueba en Node.
  */
 import {
   type Computer,
-  type EventsPage,
+  type MachineState,
   type Power,
   RelaySession,
-  type RelayConfig,
   type SocketFactory,
-  CALL_TIMEOUT,
   INTENT_COMMANDS,
-  WAKE_TIMEOUT,
-  cachedAt,
-  callWorkspace,
-  canAct,
-  isManaged,
-  linkedEvents,
+  isDeferrable,
   linkedWorkspaces,
-  powerOf,
-  requestId,
+  orderComputers,
+  wakes,
 } from "@terminus/computers";
-import { type AppCommand, type EngineError, type EngineEvent, isAppAction, isAppCommand } from "@terminus/protocol";
+import { Fleet, type FleetEvent, type Link, type Slice, type StorageLike, isFleetError, isRead } from "@terminus/fleet";
+import { type AppCommand, type EngineError, type EngineEvent, isAppCommand } from "@terminus/protocol";
 
 export class HostError extends Error {
   code: string;
@@ -69,13 +64,14 @@ function allowed(command: string) {
 
 /**
  * Acciones de la persona que el relay no toma por intención (no encienden la
- * VM por sí solas): antes de mandarlas se enciende la VM administrada por el
- * plano de control. Marcar vista, detener o cancelar no están: no tienen
- * sentido con la máquina apagada y abrir una tarea nunca la enciende.
+ * VM por sí solas): la flota enciende antes la VM administrada por el plano de
+ * control. Las demás acciones (marcar vista, detener, cancelar) no se mandan a
+ * una máquina apagada: abrir una tarea nunca la enciende.
  */
 export const WAKES_FIRST: ReadonlySet<string> = new Set([
   "set_session_pinned",
   "set_task_archived",
+  "finish_task",
   "guardar_imagen_pegada",
   "prepare_attachments",
   "add_account",
@@ -83,85 +79,196 @@ export const WAKES_FIRST: ReadonlySet<string> = new Set([
 ]);
 
 /** Pide al plano de control que encienda la computadora (`POST /v1/computers/:id/start`). */
-export type Waker = () => Promise<boolean>;
+export type Waker = (computer: string) => Promise<boolean>;
 
-/** Una computadora a través del relay. Abrirla no la enciende: solo una acción lo hace. */
-export function relayHost(computer: Computer, config: Omit<RelayConfig, "computerId"> & { wake?: Waker }, factory?: SocketFactory): Host {
-  const relay = new RelaySession({ ...config, computerId: computer.computer_id }, factory);
-  const listeners = new Set<() => void>();
-  const changed = () => {
-    for (const listener of listeners) listener();
+export type AccountFleetConfig = {
+  endpoint: string;
+  getToken: () => string | Promise<string>;
+  onUnauthorized?: () => void;
+  /** Antes de reconectar la sesión de `computer`: `false` la deja parada. */
+  beforeReconnect?: (computer: string) => () => Promise<boolean>;
+  wake?: Waker;
+  /** Donde se guarda la última rebanada de cada máquina (`SliceBook`). */
+  storage?: StorageLike | null;
+};
+
+/** Lo que la flota sabe de las máquinas de la cuenta, como `Host` para las pantallas. */
+export type AccountFleet = {
+  /** Las máquinas como las dice ahora `/v1/computers`: las nuevas se conectan y las que ya no están se cierran, sin tocar las demás. */
+  set(computers: readonly Computer[]): Host[];
+  /** Lo que se guardó de cada máquina, al cerrar o al irse la app al fondo. */
+  flush(): void;
+  /** `license_required` si el relay detuvo alguna sesión por falta de Terminus de pago; `null` si no. */
+  license(): "license_required" | null;
+  /** «Reintentar» del aviso de licencia: reabre las sesiones detenidas. */
+  retry(): void;
+  close(): void;
+};
+
+/** El nombre que dan las pantallas a cada fallo de la flota (`HostError.code`). */
+function hostError(error: unknown, label: string): HostError {
+  if (error instanceof HostError) return error;
+  if (!isFleetError(error)) {
+    const failure = (error ?? {}) as { code?: string; detail?: unknown; what?: unknown };
+    return new HostError(failure.code ?? "io", failure.detail ?? failure.what);
+  }
+  if (error.code === "machine_off") return new HostError(error.canWake ? "start_failed" : "machine_asleep", label);
+  if (error.code === "version_mismatch") return new HostError("machine_outdated", label);
+  if (error.code === "machine_timeout" && error.detail === "start") return new HostError("start_timeout", label);
+  return new HostError(error.code, error.detail ?? label);
+}
+
+/** Una lectura sin nada guardado: por qué no hay respuesta. */
+function sliceError(slice: Slice, label: string): HostError {
+  if (slice.status === "outdated") return new HostError("machine_outdated", label);
+  if (slice.status === "off") return new HostError("machine_off", label);
+  return new HostError(slice.error ?? "machine_timeout", label);
+}
+
+/**
+ * Las computadoras de la cuenta sobre una sola flota (`@terminus/fleet`), con
+ * las reglas del escritorio y la web: la máquina sale del sobre, toda espera
+ * tiene tope, una que no contesta conserva su última rebanada y una apagada con
+ * copia no se pregunta. Abrir no enciende nada; solo una acción.
+ */
+export function accountFleet(config: AccountFleetConfig, factory?: SocketFactory): AccountFleet {
+  let rows = new Map<string, Computer>();
+  const hosts = new Map<string, Host>();
+  const changes = new Map<string, Set<() => void>>();
+  const feeds = new Map<string, Set<(events: EngineEvent[], gap: boolean) => void>>();
+  const fleet = new Fleet({
+    self: null,
+    panelIds: false,
+    connect: (info) => {
+      const relay = new RelaySession(
+        { endpoint: config.endpoint, computerId: info.id, getToken: config.getToken, onUnauthorized: config.onUnauthorized, beforeReconnect: config.beforeReconnect?.(info.id) },
+        factory,
+      );
+      // Hasta que el relay diga su estado, vale el de la fila de `/v1/computers`.
+      const state = (): MachineState => (relay.state() === "unknown" ? ((rows.get(info.id)?.state as MachineState | undefined) ?? "unknown") : relay.state());
+      const link: Link = {
+        state,
+        call: (id, command, workspace, folder, args, timeout) => relay.call(id, command, workspace, folder, args, timeout),
+        onState: (listener) => relay.onState(listener),
+        onEvents: (listener) => relay.onEvents(listener),
+        onEngine: (listener) => relay.onEngine(listener),
+        blocked: () => relay.blocked(),
+        onBlocked: (listener) => relay.onBlocked(listener),
+        retry: () => relay.retry(),
+        onDeferred: (listener) => relay.onDeferred(listener),
+        deferred: () => relay.deferred(),
+        subscribe: (after) => relay.subscribe(after),
+        start: () => relay.start(),
+        close: () => relay.close(),
+      };
+      // Un cambio de enlace (socket abierto o cerrado) también repinta.
+      relay.onLink(() => changed(info.id));
+      return link;
+    },
+    wake: config.wake,
+    storage: config.storage ?? null,
+    onChange: (machine) => changed(machine),
+    // La cola de aplazadas cambió (aquí o en otro dispositivo): la lista se relee.
+    onDeferred: (machine) => changed(machine),
+    onEvents: (machine, events: FleetEvent[], gap) => {
+      for (const listener of feeds.get(machine) ?? []) listener(events as EngineEvent[], gap);
+    },
+  });
+  fleet.subscribeEvents();
+  const changed = (machine: string) => {
+    for (const listener of changes.get(machine) ?? []) listener();
   };
-  relay.onState(changed);
-  relay.onLink(changed);
-  // Hasta que el relay diga su estado, vale el de la fila de `/v1/computers`.
-  const state = () => (relay.state() === "unknown" ? computer.state : relay.state());
-  const linked = linkedWorkspaces(computer);
-  const host: Host = {
-    id: computer.computer_id,
-    label: computer.name?.trim() || computer.computer_id,
-    kind: "computer",
-    managed: isManaged(computer),
-    linked,
-    power: () => powerOf(state()),
-    canAct: () => canAct(computer, state()),
-    onChange(listener) {
-      listeners.add(listener);
-      return () => void listeners.delete(listener);
-    },
-    onEvents(listener) {
-      // El relay ya no manda eventos de un workspace sin vincular; esto es la segunda red, también por `payload.workspace`.
-      return relay.onEvents((page: EventsPage) => listener(linkedEvents(page.events ?? [], linked), page.gap === true));
-    },
-    async call<T>(command: AppCommand, workspace: string | null, args: object = {}) {
-      allowed(command);
-      const intent = INTENT_COMMANDS.has(command);
-      const action = isAppAction(command);
-      // Una máquina propia apagada no se puede despertar: ni se intenta, el relay contestaría `start_failed`.
-      if ((intent || WAKES_FIRST.has(command)) && host.canAct() === "asleep") throw new HostError("machine_asleep", host.label);
-      // Un motor que no habla este contrato no recibe acciones, como en la web.
-      if (action && host.canAct() === "outdated") throw new HostError("machine_outdated", host.label);
-      // Una acción que el relay no enciende por su cuenta: la VM se enciende antes por el plano de control.
-      if (WAKES_FIRST.has(command)) await host.wake();
-      try {
-        // Con el workspace que nombran los argumentos: el relay rechaza (`workspace_mismatch`) uno distinto.
-        const { value, cached } = await relay.call(requestId(), command, callWorkspace(workspace, args as Record<string, unknown>), null, args, intent ? WAKE_TIMEOUT : CALL_TIMEOUT);
-        return { value: value as T, cachedAt: cachedAt(cached) };
-      } catch (error) {
-        if (error instanceof HostError) throw error;
-        const failure = (error ?? {}) as { code?: string; detail?: unknown; what?: unknown };
-        throw new HostError(failure.code ?? "io", failure.detail ?? failure.what);
-      }
-    },
-    async wake() {
-      if (host.power() === "on") return;
-      const act = host.canAct();
-      if (act === "asleep") throw new HostError("machine_asleep", host.label);
-      if (act === "outdated") throw new HostError("machine_outdated", host.label);
-      if (host.power() !== "starting" && config.wake && !(await config.wake().catch(() => false))) throw new HostError("start_failed", host.label);
-      await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(() => {
-          off();
-          reject(new HostError("start_timeout", host.label));
-        }, WAKE_TIMEOUT);
-        const off = relay.onState(() => {
-          if (host.power() !== "on") return;
-          clearTimeout(timer);
-          off();
-          resolve();
-        });
-        if (host.power() === "on") {
-          clearTimeout(timer);
-          off();
-          resolve();
+  const listen = <T,>(book: Map<string, Set<T>>, machine: string, listener: T) => {
+    const set = book.get(machine) ?? new Set<T>();
+    set.add(listener);
+    book.set(machine, set);
+    return () => void set.delete(listener);
+  };
+
+  function hostOf(computer: Computer): Host {
+    const id = computer.computer_id;
+    const label = () => fleet.name(id);
+    const power = (): Power => fleet.power(id);
+    const canAct = (): ReturnType<Host["canAct"]> => {
+      const now = power();
+      if (now === "on") return "now";
+      if (now === "outdated") return "outdated";
+      return fleet.info(id)?.wakes || now === "starting" ? "wakes" : "asleep";
+    };
+    const host: Host = {
+      id,
+      get label() {
+        return label();
+      },
+      kind: "computer",
+      get managed() {
+        return fleet.info(id)?.wakes ?? false;
+      },
+      get linked() {
+        return fleet.info(id)?.linked ?? null;
+      },
+      power,
+      canAct,
+      onChange: (listener) => listen(changes, id, listener),
+      onEvents: (listener) => listen(feeds, id, listener),
+      async call<T>(command: AppCommand, workspace: string | null, args: object = {}) {
+        allowed(command);
+        const envelope = { machine: id, workspace, command, args: args as Record<string, unknown> };
+        if (isRead(command)) {
+          // Una lectura es una rebanada: apagada con copia no se pregunta, y sin respuesta se queda la anterior.
+          const slice = await fleet.read(envelope).catch((error: unknown) => {
+            throw hostError(error, label());
+          });
+          if (!slice.has) throw sliceError(slice, label());
+          return { value: slice.value as T, cachedAt: slice.status === "ok" ? null : slice.at };
         }
+        // Fijar, archivar, renombrar o mover con la máquina apagada (VM o propia): el relay lo guarda sin encenderla.
+        const deferred = isDeferrable(command) && power() === "off";
+        // Lo que no es intención ni enciende antes la VM no se le manda apagada.
+        if (!deferred && !INTENT_COMMANDS.has(command) && !WAKES_FIRST.has(command) && power() !== "on" && power() !== "starting") {
+          throw new HostError(canAct() === "outdated" ? "machine_outdated" : canAct() === "asleep" ? "machine_asleep" : "machine_off", label());
+        }
+        try {
+          const { value, at } = await fleet.raw(envelope);
+          return { value: value as T, cachedAt: at };
+        } catch (error) {
+          throw hostError(error, label());
+        }
+      },
+      async wake() {
+        if (power() === "on") return;
+        if (canAct() === "outdated") throw new HostError("machine_outdated", label());
+        try {
+          await fleet.wake(id);
+        } catch (error) {
+          throw hostError(error, label());
+        }
+      },
+      // La sesión la cierra la flota cuando la máquina deja la cuenta.
+      close: () => {},
+    };
+    return host;
+  }
+
+  return {
+    set(computers) {
+      const ordered = orderComputers(computers);
+      rows = new Map(ordered.map((c) => [c.computer_id, c]));
+      fleet.setMachines(
+        ordered.map((c) => ({ id: c.computer_id, name: c.name?.trim() || c.computer_id, wakes: wakes(c), outdated: c.state === "outdated", linked: linkedWorkspaces(c) })),
+      );
+      for (const id of [...hosts.keys()]) if (!rows.has(id)) hosts.delete(id);
+      return ordered.map((c) => {
+        const known = hosts.get(c.computer_id) ?? hostOf(c);
+        hosts.set(c.computer_id, known);
+        return known;
       });
     },
-    close: () => relay.close(),
+    flush: () => fleet.flush(),
+    license: () => fleet.license(),
+    retry: () => fleet.retry(),
+    close: () => fleet.close(),
   };
-  relay.start();
-  relay.subscribe(null);
-  return host;
 }
 
 /** Dirección y token que imprime el bridge de desarrollo. */

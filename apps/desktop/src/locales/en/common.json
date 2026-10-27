@@ -1,6 +1,8 @@
 {
   "common.failure.generic": "Something broke in here. Try again.",
   "common.failure.detail": "Detail for reporting it",
+  "common.install.no_space": "You need {needed} free and have {free}. Free up some space and try again.",
+  "common.install.no_space_plain": "There isn't enough disk space. Free up some space and try again.",
   "common.clipboard.write_failed": "Could not copy to the clipboard. Try again.",
   "common.toast.dismiss": "Dismiss the notice",
   "common.ago.just_now": "a moment ago",
