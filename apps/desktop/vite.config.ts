@@ -103,6 +103,7 @@ function webBuild(serve: boolean): UserConfig {
     define: {
       __TERMINUS_VERSION__: JSON.stringify(version),
       __TERMINUS_WEB__: JSON.stringify({ endpoint, supabaseUrl, supabaseKey, login }),
+      "import.meta.env.TERMINUS_ALPHA": JSON.stringify(env.TERMINUS_WEB_ALPHA === "1"),
     },
     plugins: [page],
     build: {

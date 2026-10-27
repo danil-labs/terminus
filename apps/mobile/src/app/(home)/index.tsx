@@ -102,6 +102,11 @@ export default function Tasks() {
           </Pressable>
         </View>
         </View>
+        {process.env.EXPO_PUBLIC_TERMINUS_ALPHA === "1" ? (
+          <Pressable accessibilityRole="link" onPress={() => router.push("/inbox")} style={styles.workspace}>
+            <Text style={{ color: theme.primary, fontWeight: "600" }}>{t("alpha.title")}</Text>
+          </Pressable>
+        ) : null}
         {spaces.length > 1 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.spaces}>
             {spaces.map((s) => {

@@ -517,7 +517,11 @@ function toPhone(): boolean {
   return true;
 }
 
-if (toPhone()) {
+if (import.meta.env.TERMINUS_ALPHA && window.location.pathname.replace(/\/+$/, "") === `${import.meta.env.BASE_URL}sign-in`) {
+  void import("./attention/SignIn").then((m) => m.startSignIn(__TERMINUS_WEB__));
+} else if (import.meta.env.TERMINUS_ALPHA && window.location.pathname.replace(/\/+$/, "") === `${import.meta.env.BASE_URL}inbox`) {
+  void import("./attention/main").then((m) => m.startAttention(__TERMINUS_WEB__));
+} else if (toPhone()) {
   // Se va al del teléfono: no se monta nada aquí.
 } else if (connecting) void import("./connect/main").then((m) => m.startConnect({ ...__TERMINUS_WEB__, ...given } as WebSettings, document.getElementById("root") as HTMLElement));
 else if (given.addAccount) {
