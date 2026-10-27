@@ -1,0 +1,11 @@
+ok   Logical A real pinned engine connected and linked
+ok   Logical B real pinned engine connected and linked
+ok   pinned engine issues loopback client endpoint {"endpoint": "http://127.0.0.1:49948"}
+ok   task folder located a
+Traceback (most recent call last):
+  File "[QA-LAB]/dual-fixture.py", line 442, in <module>
+    task=invoke(ep,'create_empty_session',{'provider':'claude','project':project,'title':'Figura '+key.upper(),'space':spaces(ep_a)[0]['id']},WS)['session']
+         ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "[QA-LAB]/dual-fixture.py", line 392, in invoke
+    raise RuntimeError(command + ': ' + json.dumps(result['error']))
+RuntimeError: create_empty_session: "spaces.error.missing"

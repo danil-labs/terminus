@@ -1,0 +1,5 @@
+bbd92b9f2eebe195cca60b5011153b46741ceb8eaa0e2d4dd2222048c90f352f  [QA-LAB]/e2e-account-spaces.py
+05db91bccd4effb91765fc0f56605fc3597efc94fc9566fb6e1f62c0f4e4cce9  [QA-LAB]/empty-task-cli.py
+1dc3f71ed99a74127ee5b10ccf06d6fb220a265b6b82887ad99b8606ebfeb913  [QA-LAB]/connector.md
+93888be4ac193142e5506346151f8dd2f7ac1ac6c2361a29f53b2e58d01916dc  [QA-LAB]/dual-fixture.py
+345727506aea41842a8180c99079b6719383ef649b1370e743eb0a8deea60812  [QA-LAB]/tauri-loopback-harness.json

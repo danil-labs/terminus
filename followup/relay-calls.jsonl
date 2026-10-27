@@ -1,0 +1,174 @@
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_workspace_attention", "workspace": null, "args": {}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_workspace_attention", "workspace": "keep0001", "args": {}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_projects", "workspace": "keep0001", "args": {}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "s7rmd159", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "task_history", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "id": "zbbfa3xh"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "s7rmd159", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "s7rmd159", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "remote": false, "priority": ["zbbfa3xh"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "remote": true, "priority": ["zbbfa3xh"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "s7rmd159", "remote": false, "priority": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "s7rmd159", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "remote": false, "priority": ["zbbfa3xh"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "remote": true, "priority": ["zbbfa3xh"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "s7rmd159", "remote": false, "priority": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "task_history", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "id": "zbbfa3xh"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_permission_modes", "workspace": "keep0001", "args": {"provider": "claude"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_surfaces", "workspace": "keep0001", "args": {}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_slash_menu", "workspace": "keep0001", "args": {"provider": "claude"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_mentions", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "sources": [], "excludedSources": [], "session": "zbbfa3xh"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "mark_task_seen", "workspace": "keep0001", "args": {"workspace": "keep0001", "session": "zbbfa3xh"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "session_folder", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "id": "zbbfa3xh"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "session_usage", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "session": "zbbfa3xh"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_sources", "workspace": "keep0001", "args": {}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "load_session", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "id": "zbbfa3xh"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "open": ["zbbfa3xh"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "s7rmd159", "open": ["zbbfa3xh"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "", "open": ["zbbfa3xh"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "task_history", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "id": "zbbfa3xh"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_permission_modes", "workspace": "keep0001", "args": {"provider": "claude"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_surfaces", "workspace": "keep0001", "args": {}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_slash_menu", "workspace": "keep0001", "args": {"provider": "claude"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_mentions", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "sources": [], "excludedSources": [], "session": "zbbfa3xh"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "session_folder", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "id": "zbbfa3xh"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "session_usage", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "session": "zbbfa3xh"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_sources", "workspace": "keep0001", "args": {}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "load_session", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "id": "zbbfa3xh"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "open": ["zbbfa3xh"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "", "open": ["zbbfa3xh"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "s7rmd159", "open": ["zbbfa3xh"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "kn_pending", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "session": "zbbfa3xh"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "s7rmd159", "remote": true, "priority": ["zbbfa3xh"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "s7rmd159", "remote": false, "priority": ["zbbfa3xh"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "s7rmd159", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "load_queue", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "session": "zbbfa3xh"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_sources", "workspace": "keep0001", "args": {}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_workspace_attention", "workspace": null, "args": {}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_workspace_attention", "workspace": "keep0001", "args": {}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_projects", "workspace": "keep0001", "args": {}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "gfvrjmwp", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "gfvrjmwp", "remote": true, "priority": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "8q89bz54", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_workspace_attention", "workspace": null, "args": {}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_workspace_attention", "workspace": "keep0001", "args": {}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_projects", "workspace": "keep0001", "args": {}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "gfvrjmwp", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "gfvrjmwp", "remote": true, "priority": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "8q89bz54", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "gfvrjmwp", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "task_history", "workspace": "keep0001", "args": {"project": "8q89bz54", "id": "0a8bhpwb"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "8q89bz54", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "gfvrjmwp", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_workspace_attention", "workspace": null, "args": {}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_workspace_attention", "workspace": "keep0001", "args": {}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_projects", "workspace": "keep0001", "args": {}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "gfvrjmwp", "remote": true, "priority": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "gfvrjmwp", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "qdt1bd6e", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "8q89bz54", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "gfvrjmwp", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "8q89bz54", "remote": false, "priority": ["0a8bhpwb"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "8q89bz54", "remote": true, "priority": ["0a8bhpwb"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "8q89bz54", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "gfvrjmwp", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "8q89bz54", "remote": false, "priority": ["0a8bhpwb"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "8q89bz54", "remote": true, "priority": ["0a8bhpwb"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "gfvrjmwp", "remote": false, "priority": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "gfvrjmwp", "remote": true, "priority": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "task_history", "workspace": "keep0001", "args": {"project": "8q89bz54", "id": "0a8bhpwb"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_sources", "workspace": "keep0001", "args": {}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "mark_task_seen", "workspace": "keep0001", "args": {"workspace": "keep0001", "session": "0a8bhpwb"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_mentions", "workspace": "keep0001", "args": {"project": "8q89bz54", "sources": [], "excludedSources": [], "session": "0a8bhpwb"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_permission_modes", "workspace": "keep0001", "args": {"provider": "claude"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "session_folder", "workspace": "keep0001", "args": {"project": "8q89bz54", "id": "0a8bhpwb"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_surfaces", "workspace": "keep0001", "args": {}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_slash_menu", "workspace": "keep0001", "args": {"provider": "claude"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "session_usage", "workspace": "keep0001", "args": {"project": "8q89bz54", "session": "0a8bhpwb"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "load_session", "workspace": "keep0001", "args": {"project": "8q89bz54", "id": "0a8bhpwb"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "8q89bz54", "open": ["0a8bhpwb"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "", "open": ["0a8bhpwb"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "gfvrjmwp", "open": ["0a8bhpwb"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_models", "workspace": "keep0001", "args": {"provider": "claude"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "session_folder", "workspace": "keep0001", "args": {"project": "8q89bz54", "id": "0a8bhpwb"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "load_queue", "workspace": "keep0001", "args": {"project": "8q89bz54", "session": "0a8bhpwb"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "8q89bz54", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_live_sessions", "workspace": "keep0001", "args": {"project": "gfvrjmwp", "open": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_sources", "workspace": "keep0001", "args": {}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "save_queue", "workspace": "keep0001", "args": {"project": "8q89bz54", "session": "0a8bhpwb", "queued": []}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "kn_pending", "workspace": "keep0001", "args": {"project": "8q89bz54", "session": "0a8bhpwb"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "8q89bz54", "remote": false, "priority": ["0a8bhpwb"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "8q89bz54", "remote": true, "priority": ["0a8bhpwb"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "gfvrjmwp", "remote": false, "priority": ["0a8bhpwb"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "gfvrjmwp", "remote": true, "priority": ["0a8bhpwb"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "gfvrjmwp", "remote": false, "priority": ["0a8bhpwb"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "kn_pending", "workspace": "keep0001", "args": {"project": "8q89bz54", "session": "0a8bhpwb"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "8q89bz54", "remote": false, "priority": ["0a8bhpwb"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "8q89bz54", "remote": true, "priority": ["0a8bhpwb"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "gfvrjmwp", "remote": true, "priority": ["0a8bhpwb"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "gfvrjmwp", "remote": false, "priority": ["0a8bhpwb"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "kn_pending", "workspace": "keep0001", "args": {"project": "8q89bz54", "session": "0a8bhpwb"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "gfvrjmwp", "remote": true, "priority": ["0a8bhpwb"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "8q89bz54", "remote": false, "priority": ["0a8bhpwb"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "8q89bz54", "remote": true, "priority": ["0a8bhpwb"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_session_git", "workspace": "keep0001", "args": {"project": "gfvrjmwp", "remote": false, "priority": ["0a8bhpwb"]}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}
+{"target": "cmp_bbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "list_active_turns", "workspace": "keep0001", "args": {"workspace": "keep0001"}}

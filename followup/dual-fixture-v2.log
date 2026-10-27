@@ -1,0 +1,4 @@
+ok   Logical A real pinned engine connected and linked
+ok   Logical B real pinned engine connected and linked
+ok   pinned engine issues loopback client endpoint {"endpoint": "http://127.0.0.1:65289"}
+READY

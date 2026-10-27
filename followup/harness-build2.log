@@ -1,0 +1,5 @@
+$ tauri build --debug --no-bundle --config [QA-LAB]/tauri-loopback-harness.json
+        Info Looking up installed tauri packages to check mismatched versions...
+   Compiling terminus v0.2.87 ([REPOSITORY]/apps/desktop/src-tauri)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.92s
+       Built application at: [REPOSITORY]/apps/desktop/src-tauri/target/debug/terminus
