@@ -1,0 +1,127 @@
+(node:61647) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  "pass": true,
+  "checks": [
+    {
+      "id": "probe-0",
+      "command": "load_session",
+      "pass": true,
+      "session": "qbrs5py8"
+    },
+    {
+      "id": "probe-1",
+      "command": "list_live_sessions",
+      "pass": true,
+      "session": null
+    },
+    {
+      "id": "probe-2",
+      "command": "list_projects",
+      "pass": true,
+      "session": null
+    },
+    {
+      "id": "probe-3",
+      "command": "list_active_turns",
+      "pass": true,
+      "session": null
+    },
+    {
+      "id": "probe-4",
+      "command": "load_session",
+      "pass": true,
+      "session": "qbrs5py8"
+    },
+    {
+      "id": "probe-5",
+      "command": "list_live_sessions",
+      "pass": true,
+      "session": null
+    },
+    {
+      "id": "probe-6",
+      "command": "list_projects",
+      "pass": true,
+      "session": null
+    },
+    {
+      "id": "probe-7",
+      "command": "list_active_turns",
+      "pass": true,
+      "session": null
+    },
+    {
+      "id": "probe-8",
+      "command": "load_session",
+      "pass": true,
+      "session": "qbrs5py8"
+    },
+    {
+      "id": "probe-9",
+      "command": "list_live_sessions",
+      "pass": true,
+      "session": null
+    },
+    {
+      "id": "probe-10",
+      "command": "list_projects",
+      "pass": true,
+      "session": null
+    },
+    {
+      "id": "probe-11",
+      "command": "list_active_turns",
+      "pass": true,
+      "session": null
+    },
+    {
+      "id": "probe-12",
+      "command": "load_session",
+      "pass": true,
+      "session": "qbrs5py8"
+    },
+    {
+      "id": "probe-13",
+      "command": "list_live_sessions",
+      "pass": true,
+      "session": null
+    },
+    {
+      "id": "probe-14",
+      "command": "list_projects",
+      "pass": true,
+      "session": null
+    },
+    {
+      "id": "probe-15",
+      "command": "list_active_turns",
+      "pass": true,
+      "session": null
+    },
+    {
+      "id": "probe-16",
+      "command": "load_session",
+      "pass": true,
+      "session": "qbrs5py8"
+    },
+    {
+      "id": "probe-17",
+      "command": "list_live_sessions",
+      "pass": true,
+      "session": null
+    },
+    {
+      "id": "probe-18",
+      "command": "list_projects",
+      "pass": true,
+      "session": null
+    },
+    {
+      "id": "probe-19",
+      "command": "list_active_turns",
+      "pass": true,
+      "session": null
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "b_exists": true,
+  "a_same_session_visual_exists": false,
+  "b_html_sha256": "13827097cc41e8dd1ea959f1f13a4f211e0bd972b7f692ac07263d53a27642c0",
+  "b_html": "<!doctype html><meta name=\"harness-artefacto\" content=\"web\"><h1>HTML REAL ENGINE B</h1><p>Archivo exclusivo de B, tarea sin carpeta</p>",
+  "session": "6wbq59m2",
+  "engine_a": 64631,
+  "engine_b": 64632
+}

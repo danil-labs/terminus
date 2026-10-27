@@ -1,0 +1,46 @@
+(node:61564) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  "pass": false,
+  "checks": [
+    {
+      "id": "probe-0",
+      "command": "load_session",
+      "pass": true,
+      "session": "qbrs5py8"
+    },
+    {
+      "id": "probe-1",
+      "command": "list_live_sessions",
+      "pass": true,
+      "session": null
+    },
+    {
+      "id": "probe-2",
+      "command": "list_projects",
+      "pass": true,
+      "session": null
+    },
+    {
+      "id": "probe-3",
+      "command": "list_active_turns",
+      "pass": false,
+      "error": "[object Object]",
+      "detail": {
+        "code": "command_failed",
+        "message_key": "cli.error.command_failed",
+        "detail": "invalid type: null, expected a string"
+      }
+    }
+  ],
+  "error": "[object Object]"
+}
+file://[QA-LAB]/relay-probe.mjs:12
+} catch(error){console.log(JSON.stringify({pass:false,checks,error:String(error)},null,2));process.exitCode=1;} finally{relay.stop();}
+                                                                                                                              ^
+
+TypeError: relay.stop is not a function
+    at file://[QA-LAB]/relay-probe.mjs:12:127
+[90m    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)[39m
+
+Node.js v24.22.1
