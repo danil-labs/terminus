@@ -50,6 +50,7 @@ export function installDemo(labels: { workspace: string; space: string; folder: 
   const agent = { name: 'atencion-demo', description: labels.answer, instructions: '', tools: [], model: null, origin: '', folder: null, providers: ['codex'], own: true, own_scope: { kind: 'workspace' } };
   const profile = {display_name:null,body:null,background:null,avatar:null,veil:0.82,provider:null,model:null,effort:null,hidden:false};
   const replies: Record<string, unknown> = {
+    get_project_directory: "/demo", get_profile: {name: labels.workspace, account_name: null}, source_freshness: [],
     launcher_state: { phase: 'ready', blank_0274: false }, setup_required: false,
     workspaces_startup: { workspaces: [workspace], active: workspace.id, migrations: [] }, list_workspaces: { workspaces: [workspace], active: workspace.id, migrations: [] },
     list_projects: [project], list_spaces: [{ id: 'demo-space', name: labels.space, folders: [project.id], created_at: 0, updated_at: 0 }, { id: 'demo-space-alt', name: labels.folder, folders: [], created_at: 0, updated_at: 0 }],
