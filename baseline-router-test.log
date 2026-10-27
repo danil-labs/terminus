@@ -1,0 +1,43 @@
+(node:1847447) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+TAP version 13
+# (node:1847453) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: desktop keeps a machine's known task rows while a new open list is pending, then accepts an empty answer
+not ok 1 - desktop keeps a machine's known task rows while a new open list is pending, then accepts an empty answer
+  ---
+  duration_ms: 19.432931
+  type: 'test'
+  location: '<worktree>/apps/desktop/tests/unit/web-router.test.ts:303:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    a missing slice is not an empty task list
+    + actual - expected
+    
+      [
+        'local',
+    -   'cmp_vm~t1'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'local'
+    1: 'cmp_vm~t1'
+  actual:
+    0: 'local'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file://<worktree>/apps/desktop/tests/unit/web-router.test.ts:321:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 164.098757

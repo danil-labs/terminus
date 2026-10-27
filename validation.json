@@ -1,0 +1,24 @@
+{
+  "candidate": "23d93884bd2c842e92d61e24467c7f704b967333",
+  "baseline": "ec3d3703813d4ec92d94730ae215d5555f3bfd69",
+  "platform": "Linux x86_64",
+  "node": "22.23.3",
+  "verify": {
+    "command": "pnpm verify",
+    "exit_code": 0,
+    "passed_steps": 189,
+    "skipped_steps": 0,
+    "seconds": 1205,
+    "includes_rust": true
+  },
+  "regressions": {
+    "baseline_router": "fails as expected: missing remote row",
+    "candidate_router_tests": 13,
+    "candidate_compiled_tests": 2,
+    "compiled_test_environment": "production desktop bundle mounted in jsdom with simulated native IPC and relay"
+  },
+  "architect_review": "https://github.com/danil-labs/terminus/pull/415#issuecomment-6452518216",
+  "native_qa": "https://github.com/danil-labs/terminus/pull/415#issuecomment-6452598497",
+  "native_limits": "Two real engines on the same Mac; synthetic control plane/relay; existing temporary loopback CSP overlay. Not a physical VM or production relay. No WebKit transition trace.",
+  "ci_candidate_success": "https://github.com/danil-labs/terminus/actions/runs/40575259506"
+}

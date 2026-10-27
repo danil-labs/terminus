@@ -1,0 +1,26 @@
+(node:1844608) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+TAP version 13
+# (node:1844651) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: remote row in folder "" stays open across a delayed load in another machine's space
+ok 1 - remote row in folder "" stays open across a delayed load in another machine's space
+  ---
+  duration_ms: 3819.246082
+  type: 'test'
+  ...
+# Subtest: remote row in folder "p1" stays open across a delayed load in another machine's space
+ok 2 - remote row in folder "p1" stays open across a delayed load in another machine's space
+  ---
+  duration_ms: 3627.771641
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7985.466465
