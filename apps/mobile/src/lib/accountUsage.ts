@@ -10,7 +10,7 @@ export async function providerUsage(hosts: Host[], provider: string, scopeOf: (h
   const lists = await Promise.all(hosts.map(async (host) => ({
     machine: host.id,
     on: host.power() === "on",
-    accounts: (await accountsOf(host, scopeOf(host), provider).catch(() => null))?.accounts ?? [],
+    accounts: scopeOf(host) || host.linked == null ? (await accountsOf(host, scopeOf(host), provider).catch(() => null))?.accounts ?? [] : [],
   })));
   const readings = new Map<string, AccountLimits | null>();
   for (const list of lists) {
