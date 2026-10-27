@@ -12,6 +12,7 @@ import {
   machineCompatibility,
   machineContracts,
   isManaged,
+  systemOf,
   wakes,
   listComputers,
   listWorkspacesWithDeleted,
@@ -146,6 +147,11 @@ test("solo una VM administrada se despierta; apagado es neutro", () => {
   const vm = { computer_id: "cmp_vm", provider: "aws-ec2" };
   assert.equal(defaultComputer([mac, vm]), vm);
   assert.equal(defaultComputer([mac]), mac);
+  assert.equal(systemOf("linux"), "linux");
+  assert.equal(systemOf(" Darwin "), "macos");
+  assert.equal(systemOf("win32"), "windows");
+  assert.equal(systemOf("freebsd"), null);
+  assert.equal(systemOf(null), null);
 });
 
 test("la API dice licencia, no tuya y error sin confundirlos", async () => {

@@ -1,14 +1,13 @@
 import { For, Show, createSignal } from "solid-js";
 import Check from "lucide-solid/icons/check";
 import ChevronDown from "lucide-solid/icons/chevron-down";
-import Server from "lucide-solid/icons/server";
-import Laptop from "lucide-solid/icons/laptop";
 import Plus from "lucide-solid/icons/plus";
 import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
 import { ITEM_DE_MENU, Popover, PopoverContent, PopoverTrigger } from "../../ui/Popover";
 import { t } from "../../lib/i18n";
 import { ConnectMachine, connectSource } from "./ConnectMachine";
-import { type Machine, type ProjectPlace, machineName, machines, refetchMachines, runOn, setRunOn, unavailable } from "./store";
+import { MachineIcon } from "./MachineIcon";
+import { type Machine, type ProjectPlace, machineName, machines, refetchMachines, runOn, setRunOn, unavailable, wakesOf } from "./store";
 
 let pedida = false;
 
@@ -56,9 +55,7 @@ export function MachinePicker(props: { workspace: string | null; project?: Proje
           class="flex min-h-7 max-w-[260px] items-center gap-1.5 rounded-sm px-1 text-left text-xs text-neutral-500 hover:text-neutral-950"
           aria-label={t("shell.machines.label")}
         >
-          <Show when={elegida()?.local} fallback={<Server size={12} aria-hidden="true" />}>
-            <Laptop size={12} aria-hidden="true" />
-          </Show>
+          <MachineIcon wakes={elegida() ? wakesOf(elegida() as Machine) : false} size={12} />
           <span class="truncate">{elegida() ? nombre(elegida() as Machine) : t("shell.machines.label")}</span>
           <Show when={elegida()}>
             <span class={punto(elegida() as Machine)} aria-hidden="true" />
@@ -77,6 +74,7 @@ export function MachinePicker(props: { workspace: string | null; project?: Proje
                   title={razon(m)?.hint}
                   onClick={() => elegir(m)}
                 >
+                  <MachineIcon wakes={wakesOf(m)} size={12} />
                   <span class={punto(m)} aria-hidden="true" />
                   <span class="flex-1 truncate">{nombre(m)}</span>
                   <span class="text-[0.625rem]" data-machine-reason={razon(m) ? "" : undefined}>

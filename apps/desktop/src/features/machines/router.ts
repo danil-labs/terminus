@@ -14,7 +14,7 @@
  * y `danil_*` van siempre aquí. Un workspace de la cuenta que esta computadora
  * no tiene se lee de sus miembros y actúa en el primero.
  */
-import { type AccountWorkspace, callWorkspace, isDeferrable } from "@terminus/computers";
+import { type AccountWorkspace, type SystemId, callWorkspace, isDeferrable, systemOf } from "@terminus/computers";
 import { AttentionBook, type Envelope, type Fleet, FleetError, type Slice, classOf, unwrap } from "@terminus/fleet";
 import { t } from "../../lib/i18n.ts";
 
@@ -93,6 +93,8 @@ export type RouterConfig = {
   deliver?: (events: { name: string; payload: unknown }[]) => void;
   /** «Ejecutar en» para `workspace`, si la persona eligió una máquina. */
   pickedFor?: (workspace: string | null) => string | null;
+  /** La máquina de la ventana. `os` solo si se sabe; sin `wakes`, se pinta como laptop. */
+  home?: () => { wakes?: boolean; os?: SystemId | null };
 };
 
 function headerOf(options: Options, name: string): string | null {
@@ -446,17 +448,24 @@ export function createRouter(config: RouterConfig) {
     const workspace = active;
     const lead = defaultMachine(workspace);
     const members = new Set(fleet.membersOf(workspace));
+    const home = config.home?.();
+    const selfOs = systemOf(home?.os);
     return [
-      ...(self !== null ? [{ id: self, local: true, active: lead === self, on: true, hosts: hasHere(workspace), materializes: true }] : []),
+      ...(self !== null ? [{ id: self, local: true, active: lead === self, on: true, hosts: hasHere(workspace), materializes: true, wakes: home?.wakes ?? false, ...(selfOs ? { os: selfOs } : {}) }] : []),
       // Una de otro contrato no corre tareas nuevas hasta actualizarse.
-      ...fleet.machines().filter((m) => fleet.power(m.id) !== "outdated").map((m) => ({
-        id: m.id,
-        local: false,
-        active: lead === m.id,
-        on: fleet.power(m.id) === "on",
-        hosts: workspace ? members.has(m.id) : null,
-        materializes: !stale.has(m.id),
-      })),
+      ...fleet.machines().filter((m) => fleet.power(m.id) !== "outdated").map((m) => {
+        const os = systemOf(m.os);
+        return {
+          id: m.id,
+          local: false,
+          active: lead === m.id,
+          on: fleet.power(m.id) === "on",
+          hosts: workspace ? members.has(m.id) : null,
+          materializes: !stale.has(m.id),
+          wakes: m.wakes,
+          ...(os ? { os } : {}),
+        };
+      }),
     ];
   }
 
