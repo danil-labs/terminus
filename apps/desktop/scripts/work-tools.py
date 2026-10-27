@@ -228,7 +228,7 @@ def verify_tree(source, destination, manifest):
     relative(entry["archive"])
     relative(entry["executable"])
     licenses = [p for p in (RESOURCES / "licenses").iterdir() if p.is_file()]
-    allowed = set(metadata + ["build-report.json"])
+    allowed = set(metadata)
     allowed.update(item["archive"] for item in manifest["entries"] + manifest["documents"]["wheels"])
     for license in licenses:
         name = "licenses/" + license.name
@@ -264,10 +264,8 @@ def prepare(args, target, budget):
             row["signature"] = verify_cua(path, target)
         report["payloads"].append(row)
     verify_documents(dest, manifest)
-    report["staged_bytes"] = sum(p.stat().st_size for p in dest.rglob("*") if p.is_file() and p.name != "build-report.json")
+    report["staged_bytes"] = sum(p.stat().st_size for p in dest.rglob("*") if p.is_file())
     report["complete"] = True
-    if args.command == "prepare":
-        (dest / "build-report.json").write_text(json.dumps(report, indent=2) + "\n")
     return report
 
 

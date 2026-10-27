@@ -31,5 +31,4 @@ apps/desktop/dist-web/
 apps/desktop/resources/work-tools/*/payloads/
 apps/desktop/resources/work-tools/*/documents/
 apps/desktop/resources/work-tools/*/licenses/
-apps/desktop/resources/work-tools/*/build-report.json
 apps/desktop/resources/work-tools/tauri.work-tools.json

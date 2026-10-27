@@ -113,6 +113,11 @@ class WorkToolsTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "Unexpected resource"):
                     tools.prepare(args, target, [0])
                 (dest / target / "chrome.zip").unlink()
+                self.assertFalse((dest / target / "build-report.json").exists())
+                (dest / target / "build-report.json").write_text("{}")
+                with self.assertRaisesRegex(ValueError, "Unexpected resource"):
+                    tools.prepare(args, target, [0])
+                (dest / target / "build-report.json").unlink()
             self.assertTrue(first["complete"])
             self.assertEqual(first, second)
             self.assertEqual((dest / target / "manifest.json").read_bytes(), raw)
