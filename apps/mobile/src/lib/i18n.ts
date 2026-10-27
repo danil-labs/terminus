@@ -347,7 +347,7 @@ const en: Record<Key, string> = {
 
   "alpha.forbidden": "You do not have permission to read this resource. Choose another operational account.",
   "alpha.real": "Open connected Inbox · read only",
-  "alpha.real_notice": "Reading authorized real data. The alpha hostname does not isolate data. Choose an operational account here; it is not mapped to a Terminus workspace.",
+  "alpha.real_notice": "Reading real data. Alpha integration pending authenticated validation. Reading authorized real data. The alpha hostname does not isolate data. Choose an operational account here; it is not mapped to a Terminus workspace.",
   "alpha.signin": "Sign in on the web to read the connected Inbox.",
   "alpha.refresh": "Refresh",
   "alpha.select_account": "Choose this operational account",
