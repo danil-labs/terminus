@@ -1,5 +1,9 @@
-Terminus 0.2.87 fixes updating on Linux and brings several fixes across machines.
+Terminus 0.2.88 restores figures from tasks on other machines and improves temporary views and notifications.
 
+- **Figures from other machines.** Chat visualizations from tasks running on a VM now load in the desktop app.
+- **Temporary views.** Keep the views you need; replacing a view or closing a document protects unsaved work and your chosen layout.
+- **Context on the web.** Context files are read and saved on the machine that owns them.
+- **Maintenance notifications.** Routine checks stay in Logs. Only failures and interruptions show notifications, and repeated events do not reopen a dismissed notice.
 - **Enterprise usage.** Organizations that enable reporting can recover historical usage from the workspace linked to their account, with automatic delivery and no double counting of records already received.
 - **Storage by machine.** View disk usage for each machine and direct cleanup to the selected machine and workspace. Capacity and free space refer to the volume hosting the engine. On mobile web, open Storage within usage to see each machine’s disk and measure the workspace.
 - **Updating on Linux.** If your Terminus folder came from an earlier version with group permissions (umask 002, the Ubuntu default), the new engine no longer refuses to start with "authority_incompatible": it removes that permission from its own folders and carries on, without touching your data. With that umask, a fresh install starts too.
