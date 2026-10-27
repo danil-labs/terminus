@@ -1,6 +1,6 @@
 Terminus 0.2.88 restores figures from tasks on other machines and improves temporary views and notifications.
 
-- **Figures from other machines.** Chat visualizations from tasks running on a VM now load in the desktop app.
+- **Figures from other machines.** Chat visualizations from tasks running on a VM now load in the desktop app. When you open a remote task, its view stays open while the conversation loads.
 - **Temporary views.** Keep the views you need; replacing a view or closing a document protects unsaved work and your chosen layout.
 - **Context on the web.** Context files are read and saved on the machine that owns them.
 - **Maintenance notifications.** Routine checks stay in Logs. Only failures and interruptions show notifications, and repeated events do not reopen a dismissed notice.

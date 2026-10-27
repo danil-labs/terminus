@@ -1,6 +1,6 @@
 Terminus 0.2.88 vuelve a mostrar las figuras de tareas en otras máquinas y mejora las vistas temporales y los avisos.
 
-- **Figuras de otras máquinas.** Las visualizaciones del chat de tareas que corren en una VM vuelven a mostrarse en la app de escritorio.
+- **Figuras de otras máquinas.** Las visualizaciones del chat de tareas que corren en una VM vuelven a mostrarse en la app de escritorio. Al abrir una tarea remota, su vista permanece abierta mientras carga la conversación.
 - **Vistas temporales.** Conserva las vistas que necesitas; al sustituir una vista o cerrar un documento, la app protege el trabajo sin guardar y la distribución elegida.
 - **Contexto en la web.** Los archivos de contexto se leen y se guardan en la máquina que los contiene.
 - **Avisos de mantenimiento.** Las comprobaciones habituales quedan en Registros. Sólo las fallas e interrupciones muestran avisos, y los eventos repetidos no vuelven a abrir un aviso descartado.
