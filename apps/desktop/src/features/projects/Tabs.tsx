@@ -315,7 +315,10 @@ export default function TabStrip(props: {
           <div
             role={transient() ? "button" : "tab"}
             aria-selected={transient() ? undefined : active()}
-            onDblClick={() => props.onPin?.(p.id)}
+            onDblClick={(event) => {
+              event.stopPropagation();
+              props.onPin?.(p.id);
+            }}
             tabindex={active() || (i() === 0 && !props.tabs.some((x) => x.id === props.activeId)) ? 0 : -1}
             data-pestana={transient() ? undefined : i()}
             title={statusDecorated(
