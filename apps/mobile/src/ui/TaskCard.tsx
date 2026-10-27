@@ -1,3 +1,4 @@
+import { AgentAvatar } from "./AgentAvatar";
 import { folderColor } from "@terminus/design";
 import { type CardPull, type SidebarDensity, type TaskCard as Card, type PullTone, cardPull, canFinishTask, type TaskGit, taskTitle } from "@terminus/tasks";
 import * as Haptics from "expo-haptics";
@@ -8,7 +9,6 @@ import { sameCard } from "../lib/reconcile";
 import type { Task } from "../lib/engine";
 import { lang, t, w } from "../lib/i18n";
 import { BrandMark } from "./BrandMark";
-import { Avatar } from "./components";
 import { Icon, type IconName } from "./Icon";
 import { TaskMark } from "./TaskStatus";
 import { type Theme, useTheme } from "./theme";
@@ -177,7 +177,7 @@ function TaskCardView({
               case "machine":
                 return card.machine ? <MachineChip key={chip} name={card.machine.id} on={card.machine.on} /> : null;
               case "agent":
-                return card.agent ? <Avatar key={chip} name={card.agent} size={14} round /> : null;
+                return card.agent ? <AgentAvatar key={chip} name={card.agent} size={14} host={task.host} folder={task.folder} /> : null;
               case "pull":
                 return pull ? <PullChip key={chip} pull={pull} git={git} /> : null;
             }

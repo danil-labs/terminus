@@ -1,8 +1,9 @@
 import { type DockAgent, dockCapacity, dockStatusText, orderDockAgents, planDock } from "@terminus/tasks";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { AgentAvatar } from "./AgentAvatar";
 import { lang, t, w } from "../lib/i18n";
-import { Avatar, Dot } from "./components";
+import { Dot } from "./components";
 import { useTheme } from "./theme";
 
 const SLOT = 40;
@@ -51,7 +52,7 @@ export function AgentDock({
             onLongPress={() => onShowTasks(agent.name)}
             style={[styles.slot, selected === agent.name ? { borderColor: theme.primary } : null]}
           >
-            <Avatar name={agent.name} size={32} round />
+            <AgentAvatar name={agent.name} size={32} />
             <View style={[styles.presence, { borderColor: theme.bg }]}>
               <Dot color={presence(agent.status)} />
             </View>

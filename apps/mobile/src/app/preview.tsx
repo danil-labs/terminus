@@ -1,3 +1,4 @@
+import { AgentAvatar } from "../ui/AgentAvatar";
 import { folderColor } from "@terminus/design";
 import { canFinishTask, cardPull, previewLabel, taskPreview } from "@terminus/tasks";
 import { router, useLocalSearchParams } from "expo-router";
@@ -15,7 +16,7 @@ import { lang, t, w } from "../lib/i18n";
 import { useMachines } from "../lib/machines";
 import { useWorkspaces } from "../lib/workspaces";
 import { BrandMark } from "../ui/BrandMark";
-import { Avatar, openTask } from "../ui/components";
+import { openTask } from "../ui/components";
 import { Icon } from "../ui/Icon";
 import { useTheme } from "../ui/theme";
 
@@ -79,7 +80,7 @@ export default function Preview() {
         ) : null}
         {preview.agent ? (
           <Field label={previewLabel(lang, "agent")}>
-            <Avatar name={preview.agent} size={16} round />
+            <AgentAvatar name={preview.agent} size={16} host={task.host} folder={task.folder} />
             <Text numberOfLines={1} style={[styles.value, { color: theme.text }]}>{preview.agent}</Text>
           </Field>
         ) : null}
