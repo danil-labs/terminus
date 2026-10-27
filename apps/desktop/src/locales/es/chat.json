@@ -1,10 +1,4 @@
 {
-  "chat.task.details": "Detalles de la tarea",
-  "chat.task.refresh": "Actualizar estado",
-  "chat.task.finish_confirm": "Se archivará esta conversación y se eliminarán su carpeta de trabajo y su rama local. El PR y el historial se conservan.",
-  "chat.task.finish_shared": "Se archivará esta subtarea. La carpeta de trabajo y la rama compartidas se conservan.",
-  "chat.task.finish_unavailable": "La tarea debe estar integrada y sin un turno en curso. Conecta la máquina y actualiza su estado para comprobarlo.",
-  "chat.task.finish_blocked": "Hay cambios sin guardar o trabajo sin integrar. No se eliminó nada.",
   "chat.search.split_hint": "Dividir vista ({key}). Requiere otra pestaña abierta en esta vista.",
   "chat.search.split": "Dividir vista",
   "chat.search.join": "Unir vistas",
