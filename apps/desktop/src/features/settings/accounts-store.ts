@@ -30,6 +30,12 @@ export type Account = {
    * consultar tampoco la tiene. Ahí la etiqueta es lo único que queda.
    */
   identity: string | null;
+  /**
+   * Identidad estable del workspace o la suscripción, cuando el motor la conoce.
+   * OpenCode publica el id de su organización: dos cuentas con el mismo correo
+   * y plan siguen separadas si pertenecen a organizaciones distintas.
+   */
+  credential_group?: string | null;
   /** Si alguna vez terminó bien una conexión. No se borra al perder la credencial. */
   authenticated_at: number | null;
   /** En la web con varias máquinas: dónde tiene sesión esta misma cuenta. */
