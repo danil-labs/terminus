@@ -465,6 +465,7 @@ export default function TabStrip(props: {
     <ContextMenu>
     <ContextMenuTrigger
       ref={strip}
+      data-tab-scroll=""
       onKeyDown={move}
       onWheel={wheel}
       onScroll={scrolled}

@@ -4428,7 +4428,7 @@ export default function App() {
     locate: point => ventanaBajo(point.x, point.y),
     scroll(point) {
       const element = document.elementFromPoint(point.x, point.y)
-        ?.closest("[data-tira]")?.querySelector<HTMLElement>('[role="tablist"]');
+        ?.closest("[data-tira]")?.querySelector<HTMLElement>("[data-tab-scroll]");
       return element ? { element, axis: "x" } : null;
     },
     drop(id, destino) {
