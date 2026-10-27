@@ -1,0 +1,16 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "✅ Posted click at screen-point (351,259) for pid 93988 (foreground: exact window activated, hardware pointer moved to the target, HID event tap; not driver-verified — confirm via screenshot)."
+    }
+  ],
+  "structuredContent": {
+    "delivery": {
+      "mode": "foreground"
+    },
+    "effect": "unverifiable",
+    "route": "global_input",
+    "summary": "✅ Posted click at screen-point (351,259) for pid 93988 (foreground: exact window activated, hardware pointer moved to the target, HID event tap; not driver-verified — confirm via screenshot)."
+  }
+}
