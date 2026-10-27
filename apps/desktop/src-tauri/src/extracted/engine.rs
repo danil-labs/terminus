@@ -382,8 +382,16 @@ fn bundled_engine() -> Result<PathBuf> {
 }
 
 /// El binario que arranca la ventana: en un AppImage, la copia estable que deja `stable_engine`.
+fn engine_root(paths: &Paths) -> PathBuf {
+    if paths.data == paths.root.join("engine") {
+        paths.root.join("sidecar")
+    } else {
+        paths.root.clone()
+    }
+}
+
 fn installed_engine(paths: &Paths, bundled: PathBuf) -> PathBuf {
-    let copy = paths.root.join("engine").join("seldon-runtime");
+    let copy = engine_root(paths).join("engine").join("seldon-runtime");
     if cfg!(target_os = "linux") && std::env::var_os("APPIMAGE").is_some() && copy.is_file() {
         return copy;
     }
@@ -391,7 +399,7 @@ fn installed_engine(paths: &Paths, bundled: PathBuf) -> PathBuf {
 }
 
 fn spawn(paths: &Paths, adopt: bool) -> Result<Child> {
-    let exe = super::legacy::stable_engine(&bundled_engine()?, &paths.root)?;
+    let exe = super::legacy::stable_engine(&bundled_engine()?, &engine_root(paths))?;
     let mut log = OpenOptions::new()
         .create(true)
         .append(true)
