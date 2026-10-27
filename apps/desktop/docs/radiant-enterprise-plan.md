@@ -14,8 +14,8 @@ reportes nuevos. Solo lee el registro de consumo del workspace autenticado;
 excluye otros workspaces, transcripciones y costos schema 1 acumulados.
 
 Esta entrega fija el motor 3ecb9a7 en las cuatro plataformas sin modificar el
-contrato del cliente. Sus pruebas generales pasan en Linux (379), macOS ARM e
-Intel (404 en cada una) y Windows (531). La prueba central usa el motor y el
+contrato del cliente. Sus pruebas generales pasan en Linux (379), macOS ARM (384),
+macOS Intel (404) y Windows (531). La prueba central usa el motor y el
 receptor reales, incluye un registro de 40 días, fallos de red y reinicio sin
 duplicar. Radiant conserva su retención de 13 meses; los endpoints ordinarios
 siguen limitando los reportes atrasados a 30 días.
