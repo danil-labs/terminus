@@ -164,6 +164,8 @@ export function createRouter(config: RouterConfig) {
   /** Máquinas cuyo motor no sabe hacer suyo un workspace de la cuenta. */
   const stale = new Set<string>();
   const lastRead = new Map<string, number>();
+  // Cambiar `open` no borra las filas ya vistas mientras llega la nueva lectura.
+  const sessionReads = new Map<string, Envelope>();
   let pending = new Set<SliceChange>();
   let notifyTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -321,6 +323,19 @@ export function createRouter(config: RouterConfig) {
     return named(new FleetError(code, failed?.machine ?? leadOf(workspace)));
   }
 
+  function previousSlice(envelope: Envelope): Slice | null {
+    const slice = fleet.peek(envelope);
+    if (envelope.command !== "list_live_sessions") return slice;
+    const key = JSON.stringify([envelope.machine, envelope.workspace, envelope.args?.project]);
+    if (slice?.has) {
+      sessionReads.set(key, envelope);
+      return slice;
+    }
+    const previous = sessionReads.get(key);
+    const kept = previous ? fleet.peek(previous) : null;
+    return kept?.has ? { ...kept, status: "cached" } : slice;
+  }
+
   /** Una lectura de la barra: lo de aquí ya, más lo último de cada otra máquina del workspace. */
   async function fanRead(command: string, args: Args, workspace: string | null, options: Options): Promise<unknown> {
     const members = command === "list_workspace_attention" ? fleet.machines().map((m) => m.id) : fleet.membersOf(workspace);
@@ -331,7 +346,7 @@ export function createRouter(config: RouterConfig) {
       const value = await native(command, fleet.argsFor(self as string, args), options);
       slices.push({ machine: self as string, status: "ok", has: true, value, at: Date.now() });
       for (const envelope of envelopes) {
-        const before = fleet.peek(envelope);
+        const before = previousSlice(envelope);
         if (before) slices.push(before);
         refresh(envelope, before);
       }
@@ -644,8 +659,10 @@ export function createRouter(config: RouterConfig) {
     unlisted: () => unlisted,
     forget(machine: string) {
       attention.forget(machine);
+      for (const [key, envelope] of sessionReads) if (envelope.machine === machine) sessionReads.delete(key);
     },
     close() {
+      sessionReads.clear();
       clearTimeout(notifyTimer);
       for (const finish of [...pollers]) finish();
       fleet.close();
