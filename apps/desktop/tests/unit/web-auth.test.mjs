@@ -11,7 +11,7 @@ async function page(path, handler) {
   const own = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
     const url = String(input?.url ?? input);
-    if (!url.startsWith(SUPABASE)) throw new Error(`unexpected request: ${url}`);
+    if (new URL(url).origin !== SUPABASE) throw new Error(`unexpected request: ${url}`);
     const request = { url, method: init?.method, body: init?.body ? JSON.parse(init.body) : null };
     requests.push(request);
     const answer = handler(request);
