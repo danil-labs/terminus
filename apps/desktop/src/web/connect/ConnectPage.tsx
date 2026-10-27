@@ -1,8 +1,11 @@
 import { createSignal, Match, onMount, Switch } from "solid-js";
 import { t } from "../../lib/i18n";
+import { startTrialInPage, TerminusLicense } from "../../features/settings/TerminusLicense";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
 import type { Session } from "../session";
+import { BrowserAccount } from "../BrowserAccount";
+import "../phrases";
 import { approveDevice, denyDevice, type DeviceAnswer, type DeviceRequest, lookupDevice } from "./devices";
 
 export type ConnectView =
@@ -77,13 +80,16 @@ export function ConnectPage(props: { session: Session; endpoint: string; code: s
   return (
     <main class="flex h-full flex-col overflow-y-auto bg-bg px-10 py-10" data-web-connect={view().t}>
       <h1 class="m-0 mb-5 text-3xl leading-tight font-display font-bold tracking-[-0.03em] text-neutral-950">Terminus</h1>
+      <BrowserAccount session={props.session} disabled={view().t === "approving"} />
       <Switch>
         <Match when={view().t === "loading"}>
           <p class="m-0 text-sm text-neutral-500">{t("danil.connect.loading")}</p>
         </Match>
         <Match when={view().t === "missing"}>{note(t("danil.connect.missing_code"))}</Match>
         <Match when={view().t === "invalid"}>{note(t("danil.connect.invalid"))}</Match>
-        <Match when={view().t === "license"}>{note(t("danil.connect.license"))}</Match>
+        <Match when={view().t === "license"}>
+          <TerminusLicense onStart={startTrialInPage} onRetry={() => void load()} />
+        </Match>
         <Match when={view().t === "no_account"}>{note(t("danil.connect.no_account"))}</Match>
         <Match when={view().t === "used"}>{note(t("danil.connect.used"))}</Match>
         <Match when={view().t === "ambiguous"}>{note(t("danil.connect.ambiguous"))}</Match>
@@ -110,14 +116,14 @@ export function ConnectPage(props: { session: Session; endpoint: string; code: s
               <p class="m-0 text-xs text-neutral-500">{t("danil.connect.code", { code: props.code })}</p>
               <label class="grid gap-1.5 text-[0.8125rem] text-neutral-500">
                 {t("danil.connect.name_label")}
-                <Input value={name()} onInput={(e) => setName(e.currentTarget.value)} disabled={view().t === "approving"} data-machine-name="" />
+                <Input class="min-h-11 border-neutral-500 text-base" value={name()} onInput={(e) => setName(e.currentTarget.value)} disabled={view().t === "approving"} data-machine-name="" />
                 <span class="text-xs">{t("danil.connect.name_hint")}</span>
               </label>
               <div class="flex flex-wrap gap-2">
-                <Button type="submit" size="sm" disabled={view().t === "approving"}>
+                <Button class="min-h-11" type="submit" size="sm" disabled={view().t === "approving"}>
                   {view().t === "approving" ? t("danil.connect.approving") : t("danil.connect.approve")}
                 </Button>
-                <Button type="button" size="sm" variant="ghost" disabled={view().t === "approving"} onClick={() => void deny(d())}>
+                <Button class="min-h-11" type="button" size="sm" variant="ghost" disabled={view().t === "approving"} onClick={() => void deny(d())}>
                   {t("danil.connect.deny")}
                 </Button>
               </div>

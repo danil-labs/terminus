@@ -1,10 +1,11 @@
-import { DEFAULT_SIDEBAR_VIEW, DENSITIES, GROUPINGS, type SidebarView, folderCounts, groupingLabel } from "@terminus/tasks";
+import { DEFAULT_SIDEBAR_VIEW, DENSITIES, GROUPINGS, type SidebarView, agentOptions, folderCounts, groupingLabel, sameAgent } from "@terminus/tasks";
 import type { ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AgentAvatar } from "../ui/AgentAvatar";
 import { lang, w } from "../lib/i18n";
 import { useMachines } from "../lib/machines";
 import { useWorkspaces } from "../lib/workspaces";
-import { Avatar, SheetTitle } from "../ui/components";
+import { SheetTitle } from "../ui/components";
 import { FolderSquare } from "../ui/TaskCard";
 import { useTheme } from "../ui/theme";
 
@@ -24,7 +25,9 @@ export default function Filter() {
   const folders = (snapshot?.folders ?? []).filter((f) => (counts.get(f.key) ?? 0) > 0);
   const several = new Set(folders.map((f) => f.host)).size > 1;
   const hostLabel = (id: string) => hostOf(id)?.label ?? id;
-  const agents = (snapshot?.agents ?? []).filter((a) => !space || a.places.some((p) => space.folders.includes(`${p.host}/${p.folder}`)));
+  const installed = (snapshot?.agents ?? []).filter((a) => !space || a.places.some((p) => space.folders.includes(`${p.host}/${p.folder}`)));
+  // Los instalados y, de los desinstalados, los que aún tienen tareas; sin repetir por mayúsculas.
+  const agents = agentOptions(installed.map((a) => a.name), tasks);
   const toggleFolder = (id: string) =>
     set({ folders: view.folders.includes(id) ? view.folders.filter((f) => f !== id) : [...view.folders, id] });
 
@@ -78,8 +81,8 @@ export default function Filter() {
             {text(w("shell.sidebar.view.all_agents"))}
           </Option>
           {agents.map((a) => (
-            <Option key={a.name} testID={`filter-agent-${a.name}`} on={view.agent === a.name} onPress={() => set({ agent: a.name })}>
-              <Avatar name={a.name} size={18} round />
+            <Option key={a.name} testID={`filter-agent-${a.name}`} on={sameAgent(view.agent, a.name)} onPress={() => set({ agent: a.name })} aside={a.installed ? undefined : w("shell.sidebar.view.agent_uninstalled")}>
+              <AgentAvatar name={a.name} size={18} />
               {text(a.name)}
             </Option>
           ))}
@@ -88,7 +91,7 @@ export default function Filter() {
 
       <View style={[styles.rule, { backgroundColor: theme.border }]} />
       <Title>{w("shell.sidebar.view.group")}</Title>
-      {GROUPINGS.map((g) => (
+      {GROUPINGS.filter((g) => g !== "machine" || view.group === g || tasks.some((task) => !!task.machine)).map((g) => (
         <Option key={g} testID={`filter-group-${g}`} on={view.group === g} onPress={() => set({ group: g })} aside={g === DEFAULT_SIDEBAR_VIEW.group ? w("shell.sidebar.view.default") : undefined}>
           {text(groupingLabel(lang, g))}
         </Option>

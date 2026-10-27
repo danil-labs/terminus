@@ -1,8 +1,7 @@
-Terminus 0.2.84 sincroniza todos tus workspaces con tu cuenta de Danil y te deja elegir en qué máquina corre cada tarea.
+Terminus 0.2.87 arregla la actualización en Linux y trae varios arreglos entre máquinas.
 
-- **Tus workspaces en todas tus máquinas.** Con la sesión de Danil iniciada, todos los workspaces de esta computadora se ven en la web, en el teléfono y en tus otras máquinas, también los que crees después. Al cerrar sesión deja de sincronizarse. Ya no hay que vincular cada workspace a mano.
-- **«Ejecutar en» decide dónde corre la tarea.** Si eliges tu VM, la tarea nace ahí: el workspace es el mismo en todas tus máquinas y el proyecto se clona en la VM la primera vez que hace falta.
-- **Clonar y crear carpetas en otra máquina** desde la web, el escritorio y el teléfono, con su avance y la opción de cancelar.
-- **Nuevo arranque.** Conecta tu IA y personaliza Terminus desde el primer inicio, con una preparación más clara.
-- **Fórmulas en el chat.** Las fórmulas LaTeX se pintan con KaTeX.
-- **Arreglos.** El fondo del chat ya no se borra ni pasa de un workspace a otro, se ve por qué no se puede agregar otra cuenta, y en Windows ya se puede quitar una cuenta de Antigravity.
+- **Almacenamiento por máquina.** Consulta el uso de disco de cada máquina y dirige la limpieza a la máquina y al workspace seleccionados. La capacidad y el espacio libre corresponden al volumen donde reside el motor. En la web móvil, abre Almacenamiento dentro de Consumos para ver el disco por máquina y medir el workspace.
+- **Actualizar en Linux.** Si tu carpeta de Terminus venía de una versión anterior con permisos de grupo (umask 002, lo normal en Ubuntu), el motor nuevo ya no se niega a arrancar con «authority_incompatible»: quita ese permiso a sus propias carpetas y sigue, sin tocar tus datos. Con ese umask, una instalación nueva también arranca.
+- **Tareas en otra máquina.** El árbol de archivos de una tarea que corre en otra máquina se lee en esa máquina, y una imagen que adjuntas desde la Mac llega a la máquina de la tarea.
+- **Teléfono.** Lo que te escribe un agente u otra tarea sale a la izquierda, con su nombre, y el mensaje que mandas a una VM apagada se queda visible mientras enciende.
+- **Typst.** La vista en vivo se abre sin tener que elegir antes el archivo principal.

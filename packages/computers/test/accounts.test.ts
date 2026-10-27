@@ -2,17 +2,73 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { groupAccounts, resetLabel, usageTone, windowLabel, windowLeft } from "../src/index.ts";
 
-test("una tarjeta por correo con sus máquinas; el consumo se lee de una encendida", () => {
+test("cada credencial conserva su tarjeta y su máquina aunque comparta correo", () => {
   const groups = groupAccounts("claude", [
     { machine: "vm", on: false, accounts: [{ id: "a1", label: "Trabajo", identity: "Ana@Example.com" }, { id: "a2", label: "Sin correo", identity: null }] },
     { machine: "mac", on: true, accounts: [{ id: "m1", label: "", identity: "ana@example.com" }] },
   ]);
-  assert.equal(groups.length, 2);
+  assert.equal(groups.length, 3);
   assert.equal(groups[0].email, "ana@example.com");
-  assert.deepEqual(groups[0].members, [{ machine: "vm", id: "a1", on: false }, { machine: "mac", id: "m1", on: true }]);
-  assert.deepEqual(groups[0].usageFrom, { machine: "mac", id: "m1", on: true });
+  assert.deepEqual(groups[0].members, [{ machine: "vm", id: "a1", on: false }]);
+  assert.deepEqual(groups[0].usageFrom, { machine: "vm", id: "a1", on: false });
+  assert.deepEqual(groups[2].usageFrom, { machine: "mac", id: "m1", on: true });
   assert.equal(groups[1].email, null);
   assert.equal(groups[1].key, "claude:vm~a2");
+});
+
+test("Claude Personal y Team del mismo correo conservan consumo y cierre de sesión independientes", () => {
+  const groups = groupAccounts("claude", [
+    { machine: "vm", on: true, accounts: [{ id: "personal", label: "Personal", identity: "ana@example.com" }, { id: "team", label: "Team", identity: "ana@example.com" }] },
+    { machine: "mac", on: true, accounts: [{ id: "personal", label: "Otra credencial", identity: "ana@example.com" }] },
+  ]);
+  assert.equal(new Set(groups.map((g) => g.key)).size, 3);
+  assert.deepEqual(groups.map((g) => [g.row.label, g.usageFrom.machine, g.usageFrom.id]), [
+    ["Personal", "vm", "personal"], ["Team", "vm", "team"], ["Otra credencial", "mac", "personal"],
+  ]);
+  assert.ok(groups.every((g) => g.members.length === 1));
+});
+
+test("la misma suscripción une máquinas, elige una encendida y conserva el id de cada chip", () => {
+  const groups = groupAccounts("claude", [
+    { machine: "vm", on: false, accounts: [{ id: "personal", identity: "Ana@Example.com", plan: " Pro " }, { id: "team", identity: "ana@example.com", plan: "Team" }] },
+    { machine: "mac", on: true, accounts: [{ id: "copy", identity: "ana@example.com", plan: "pro" }] },
+  ]);
+  assert.equal(groups.length, 2);
+  assert.deepEqual(groups[0].members, [{ machine: "vm", id: "personal", on: false }, { machine: "mac", id: "copy", on: true }]);
+  assert.equal(groups[0].row.id, "copy");
+  assert.deepEqual(groups[0].usageFrom, { machine: "mac", id: "copy", on: true });
+  assert.deepEqual(groups[1].members, [{ machine: "vm", id: "team", on: false }]);
+});
+
+test("OpenCode une el mismo correo y orgID aunque el plan visible cambie", () => {
+  const groups = groupAccounts("opencode-zen", [
+    { machine: "vm", on: false, accounts: [{ id: "oauth", identity: "Ana@Example.com", credential_group: "org-1", plan: "Go" }] },
+    { machine: "mac", on: true, accounts: [{ id: "copy", identity: "ana@example.com", credential_group: "org-1" }] },
+  ]);
+  assert.equal(groups.length, 1);
+  assert.deepEqual(groups[0].members, [
+    { machine: "vm", id: "oauth", on: false },
+    { machine: "mac", id: "copy", on: true },
+  ]);
+  assert.deepEqual(groups[0].usageFrom, { machine: "mac", id: "copy", on: true });
+});
+
+test("OpenCode no une el mismo correo en organizaciones distintas", () => {
+  const groups = groupAccounts("opencode-zen", [
+    { machine: "vm", on: true, accounts: [{ id: "org-1", identity: "ana@example.com", credential_group: "org-1", plan: "Go" }] },
+    { machine: "mac", on: true, accounts: [{ id: "org-2", identity: "ana@example.com", credential_group: "org-2", plan: "Go" }] },
+  ]);
+  assert.equal(groups.length, 2);
+  assert.ok(groups.every((group) => group.members.length === 1));
+});
+
+test("el tipo desconocido y dos cuentas del mismo tipo en una máquina no se atribuyen por correo", () => {
+  const groups = groupAccounts("claude", [
+    { machine: "vm", on: true, accounts: [{ id: "a", identity: "ana@example.com", plan: "team" }, { id: "b", identity: "ana@example.com", plan: "team" }] },
+    { machine: "mac", on: true, accounts: [{ id: "c", identity: "ana@example.com", plan: "team" }, { id: "unknown", identity: "ana@example.com", plan: null }] },
+  ]);
+  assert.equal(groups.length, 4);
+  assert.ok(groups.every((g) => g.members.length === 1));
 });
 
 test("lo que queda, su tono y cuándo vuelve, con las palabras del escritorio", () => {

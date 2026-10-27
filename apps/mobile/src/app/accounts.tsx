@@ -1,36 +1,47 @@
-import { type AccountGroup, groupAccounts, usageTone, windowLabel, windowLeft } from "@terminus/computers";
+import { providerUsage } from "../lib/accountUsage";
+import { type AccountGroup, usageTone, windowLabel, windowLeft } from "@terminus/computers";
 import type { AccountLimits, AiAccount, LoginEvent, ProviderInfo, UsageWindow } from "@terminus/protocol";
 import * as Clipboard from "expo-clipboard";
 import * as WebBrowser from "expo-web-browser";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { accountsOf, addAccount, beginLogin, cancelLogin, limitsOf, signOutAccount, submitLoginCode } from "../lib/engine";
+import { LOGIN_START, type LoginProgress, accountWorkspace, addAccount, beginLogin, cancelLogin, failureText, loginStep, signOutAccount, submitLoginCode } from "../lib/engine";
 import { type Host, HostError } from "../lib/hosts";
 import { lang, t, w } from "../lib/i18n";
 import { useMachines } from "../lib/machines";
+import { useWorkspaces } from "../lib/workspaces";
 import { BrandMark } from "../ui/BrandMark";
 import { Dot } from "../ui/components";
 import { Icon } from "../ui/Icon";
+import { MachineStorage } from "../ui/MachineStorage";
 import { Sheet, SheetOption } from "../ui/Sheet";
 import { type Theme, useTheme } from "../ui/theme";
 
 type ProviderAccounts = { provider: ProviderInfo; groups: AccountGroup<AiAccount>[]; limits: Record<string, AccountLimits | null> };
-type Login = { host: Host; provider: ProviderInfo; id: string | null; url: string | null; confirm: string | null; askCode: boolean; notice: string | null; error: string | null; done: boolean };
+/** `workspace`: el de las llamadas de cuentas a esa máquina (`accountWorkspace`). */
+type Login = LoginProgress & { host: Host; workspace: string | null; provider: ProviderInfo; id: string | null };
 
 /**
  * Proveedores de IA: las cuentas de la persona en todas sus máquinas, como el
- * panel de la web (#154). Una tarjeta por proveedor y correo con su consumo
+ * panel de la web (#154). Una tarjeta por proveedor, correo y tipo con su consumo
  * (leído una vez, de una máquina encendida) y una chapa por máquina donde
  * tiene la sesión iniciada: encendida o apagada (neutra), con su ✕ para
  * cerrarla. «Iniciar sesión en otra máquina» corre el inicio sin pantalla de
  * esa máquina: enlace y código, por eventos `account`. Abrir esta pantalla no
  * enciende nada; iniciar o cerrar sesión encienden la VM si está apagada.
+ * Las cuentas del motor son de un workspace: cada llamada lleva el abierto en
+ * el teléfono, o el de esa máquina si no lo tiene (`accountWorkspace`).
  */
 export default function Accounts() {
   const theme = useTheme();
   const { hosts, subscribe, tick } = useMachines();
+  const { current } = useWorkspaces();
+  const currentId = current?.id ?? null;
+  const scopeOf = useCallback((host: Host) => accountWorkspace(host, currentId), [currentId]);
   const [data, setData] = useState<ProviderAccounts[] | null>(null);
+  const [storageOpen, setStorageOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [pick, setPick] = useState<{ provider: ProviderInfo; exclude: string[] } | null>(null);
   const [login, setLogin] = useState<Login | null>(null);
   const [code, setCode] = useState("");
@@ -42,6 +53,7 @@ export default function Accounts() {
   const load = useCallback(async () => {
     const mine = ++asked.current;
     setLoading(true);
+    setFailed(false);
     try {
       // Los proveedores con los que se trabaja (Codex, Claude…), de cualquier máquina que conteste.
       const lists = await Promise.all(hosts.map((h) => h.call<ProviderInfo[]>("list_providers", null, {}).then((a) => a.value ?? []).catch(() => [] as ProviderInfo[])));
@@ -49,30 +61,33 @@ export default function Accounts() {
       for (const list of lists) for (const p of list) if (p.driver && !providers.has(p.id)) providers.set(p.id, p);
       const result = await Promise.all(
         [...providers.values()].map(async (provider) => {
-          const perHost = await Promise.all(
-            hosts.map(async (h) => ({ machine: h.id, on: h.power() === "on", accounts: ((await accountsOf(h, provider.id).catch(() => null))?.accounts ?? []) as AiAccount[] })),
-          );
-          const groups = groupAccounts(provider.id, perHost);
-          const limits: Record<string, AccountLimits | null> = {};
-          await Promise.all(
-            groups.map(async (g) => {
-              const host = hosts.find((h) => h.id === g.usageFrom.machine);
-              limits[g.key] = host && g.usageFrom.on && g.row.authenticated_at ? await limitsOf(host, provider.id, g.usageFrom.id) : null;
-            }),
-          );
+          const { groups, limits } = await providerUsage(hosts, provider.id, scopeOf);
           return { provider, groups, limits };
         }),
       );
-      if (mine === asked.current) setData(result);
+      if (mine === asked.current) {
+        setData(result);
+        setFailed(!result.length && hosts.some((host) => host.power() === "on"));
+      }
+    } catch {
+      if (mine === asked.current) setFailed(true);
     } finally {
       if (mine === asked.current) setLoading(false);
     }
-  }, [hosts]);
+  }, [hosts, scopeOf]);
 
   // Al entrar y cuando una máquina cambia de estado (se encendió para iniciar sesión, se apagó).
   useEffect(() => {
     void load();
   }, [load, tick]);
+
+  useEffect(() => {
+    const retries = (data ?? []).flatMap((entry) => Object.values(entry.limits)).flatMap((limit) => limit?.mode === "waiting" ? [limit.retry_at] : []);
+    if (!retries.length) return;
+    const delay = Math.max(5000, Math.min(...retries) - Date.now());
+    const timer = setTimeout(() => void load(), Math.min(delay, 2_147_483_647));
+    return () => clearTimeout(timer);
+  }, [data, load]);
 
   // Los eventos del inicio de sesión de la máquina elegida.
   useEffect(
@@ -84,14 +99,7 @@ export default function Accounts() {
           if (event.name !== "account") continue;
           const e = event.payload as LoginEvent;
           if (e.account !== current.id) continue;
-          setLogin((old) => {
-            if (!old) return old;
-            if (e.kind === "url") return { ...old, url: e.text };
-            if (e.kind === "confirm") return { ...old, confirm: e.text };
-            if (e.kind === "code") return { ...old, askCode: true };
-            if (e.kind === "notice") return { ...old, notice: e.text };
-            return e.text ? { ...old, error: e.text, done: true } : { ...old, done: true };
-          });
+          setLogin((old) => (old ? loginStep(old, e) : old));
           if (e.kind === "url" && e.text) void WebBrowser.openBrowserAsync(e.text).catch(() => {});
           if (e.kind === "done" && !e.text) void load();
         }
@@ -103,13 +111,18 @@ export default function Accounts() {
     setPick(null);
     setCode("");
     setCopied(false);
-    const next: Login = { host, provider, id: null, url: null, confirm: null, askCode: false, notice: null, error: null, done: false };
+    const workspace = scopeOf(host);
+    const next: Login = { ...LOGIN_START, host, workspace, provider, id: null };
     setLogin(next);
+    if (!workspace && host.linked !== null) {
+      setLogin((old) => (old ? { ...old, error: t("accounts.no_workspace", { name: host.label }), done: true } : old));
+      return;
+    }
     try {
-      const id = await addAccount(host, provider.id);
+      const id = await addAccount(host, workspace, provider.id);
       setLogin((old) => (old ? { ...old, id } : old));
       loginRef.current = { ...next, id };
-      await beginLogin(host, provider.id, id);
+      await beginLogin(host, workspace, provider.id, id);
     } catch (error) {
       setLogin((old) => (old ? { ...old, error: failure(error, host), done: true } : old));
     }
@@ -119,7 +132,7 @@ export default function Accounts() {
     const current = login;
     setLogin(null);
     // A medias o fallido: se corta el CLI y la cuenta vacía no se queda (`discard_account` no borra una autenticada).
-    if (current?.id && (!current.done || current.error)) await cancelLogin(current.host, current.provider.id, current.id);
+    if (current?.id && (!current.done || current.error)) await cancelLogin(current.host, current.workspace, current.provider.id, current.id);
   }
 
   function signOut(group: AccountGroup<AiAccount>, provider: ProviderInfo, member: { machine: string; id: string }) {
@@ -132,7 +145,7 @@ export default function Accounts() {
         text: w("web.accounts.sign_out_yes"),
         style: "destructive",
         onPress: () =>
-          void signOutAccount(host, provider.id, member.id)
+          void signOutAccount(host, scopeOf(host), provider.id, member.id)
             .then(load)
             .catch(() => Alert.alert(w("web.accounts.sign_out_failed"))),
       },
@@ -145,7 +158,13 @@ export default function Accounts() {
   return (
     <>
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.page} refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}>
+        <Pressable accessibilityRole="button" accessibilityState={{ expanded: storageOpen }} onPress={() => setStorageOpen((open) => !open)} style={{ minHeight: 48, justifyContent: "center" }} testID="storage-toggle">
+          <Text style={{ color: theme.text, fontSize: 18, fontWeight: "600" }}>{t("storage.title")}</Text>
+          <Text style={{ color: theme.textMuted }}>{t("storage.subtitle")}</Text>
+        </Pressable>
+        {storageOpen ? <MachineStorage hosts={hosts} workspace={currentId} theme={theme} /> : null}
         <Text style={{ color: theme.textMuted, paddingHorizontal: 4 }}>{t("accounts.subtitle")}</Text>
+        {failed ? <Text accessibilityRole="alert" style={{ color: theme.error }}>{t("accounts.load_failed")}</Text> : null}
         {offHosts.map((h) => (
           <Text key={h.id} style={[styles.note, { color: theme.textMuted, backgroundColor: theme.muted }]}>
             {t("accounts.machine_off", { name: h.label })}
@@ -223,21 +242,21 @@ export default function Accounts() {
         {login ? (
           <View style={styles.login} testID="login-flow">
             {login.error ? (
-              <Text style={{ color: theme.text }}>{t("accounts.failed", { detail: login.error })}</Text>
+              <Text style={{ color: theme.text }} testID="login-error">{t("accounts.failed", { detail: login.error })}</Text>
             ) : login.done ? (
               <Text style={{ color: theme.text }}>{t("accounts.connected", { name: login.host.label })}</Text>
             ) : !login.url && !login.confirm && !login.askCode ? (
               <Text style={{ color: theme.textMuted }}>
-                {login.host.power() !== "on" ? w("shell.machines.waking", { name: login.host.label }) : w("settings.accounts.connecting")}
+                {login.host.power() !== "on" ? w("shell.machines.waking", { name: login.host.label }) : t("accounts.opening", { provider: login.provider.label })}
               </Text>
             ) : null}
             {!login.done && login.url ? (
               <>
-                <Text style={[styles.step, { color: theme.text }]}>{w("settings.accounts.step_browser")}</Text>
+                <Text style={[styles.step, { color: theme.text }]} testID="login-open">{t("accounts.open_login", { provider: login.provider.label })}</Text>
                 <View style={styles.row}>
-                  <Pressable style={[styles.button, { backgroundColor: theme.primary }]} onPress={() => void WebBrowser.openBrowserAsync(login.url!)}>
+                  <Pressable testID="login-reopen" style={[styles.button, { backgroundColor: theme.primary }]} onPress={() => void WebBrowser.openBrowserAsync(login.url!)}>
                     <Icon name="external-link" size={15} color={theme.onPrimary} />
-                    <Text style={{ color: theme.onPrimary, fontWeight: "600" }}>{w("settings.accounts.open_browser")}</Text>
+                    <Text style={{ color: theme.onPrimary, fontWeight: "600" }}>{t("accounts.reopen")}</Text>
                   </Pressable>
                   <Pressable
                     style={[styles.button, { borderColor: theme.border, borderWidth: 1 }]}
@@ -275,7 +294,7 @@ export default function Accounts() {
                   disabled={!code.trim() || !login.id}
                   onPress={() =>
                     login.id &&
-                    void submitLoginCode(login.host, login.id, code.trim())
+                    void submitLoginCode(login.host, login.workspace, login.id, code.trim())
                       .then(() => setLogin((old) => (old ? { ...old, askCode: false, notice: null } : old)))
                       .catch(() => setLogin((old) => (old ? { ...old, error: w("settings.accounts.error.code"), done: true } : old)))
                   }
@@ -302,7 +321,12 @@ function failure(error: unknown, host: Host) {
   if (error instanceof HostError && error.code === "machine_asleep") return w("web.machines.off_action", { name: host.label });
   if (error instanceof HostError && error.code === "machine_outdated") return w("web.machines.outdated_action", { name: host.label });
   if (error instanceof HostError && (error.code === "start_failed" || error.code === "start_timeout")) return t("machines.start_failed", { name: host.label });
-  return error instanceof Error ? error.message : String(error);
+  if (error instanceof HostError && error.code === "workspace_mismatch") return t("accounts.workspace_mismatch", { name: host.label });
+  if (error instanceof HostError && error.code === "workspace_not_linked") return t("accounts.not_linked", { name: host.label });
+  if (error instanceof HostError && (error.code === "machine_timeout" || error.code === "machine_lost")) return t("accounts.no_answer", { name: host.label });
+  // La frase del motor (`command_failed` trae la suya); sin frase, el código, nunca el nombre de la máquina.
+  const text = failureText(error);
+  return error instanceof HostError && text === host.label ? error.code : text;
 }
 
 function windowsOf(limits: AccountLimits | null | undefined): UsageWindow[] {
@@ -323,6 +347,8 @@ function Usage({ limits, signedIn, theme }: { limits: AccountLimits | null | und
   if (!signedIn) return <Text style={{ color: theme.textMuted, fontSize: 13 }}>{w("settings.account_card.disconnected")}</Text>;
   if (limits?.mode === "in_use") return <Text style={{ color: theme.textMuted, fontSize: 13 }}>{w("settings.account_card.in_use")}</Text>;
   const windows = windowsOf(limits);
+  if (!windows.length && limits?.mode === "waiting") return <Text style={{ color: theme.textMuted, fontSize: 13 }}>{t("accounts.usage_waiting")}</Text>;
+  if (!windows.length && (limits?.mode === "failed" || limits?.mode === "revoked")) return <Text style={{ color: theme.error, fontSize: 13 }}>{t("accounts.usage_failed")}</Text>;
   if (!windows.length) return <Text style={{ color: theme.textMuted, fontSize: 13 }}>{limits ? w("settings.account_card.not_asked") : t("accounts.no_usage")}</Text>;
   return (
     <View style={{ gap: 8 }}>

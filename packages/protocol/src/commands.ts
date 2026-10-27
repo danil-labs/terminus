@@ -9,11 +9,16 @@
  * `apps/mobile/docs/mobile.md` («Lista cerrada»).
  */
 export const APP_READS = [
+  "list_activity",
+  "read_activity",
+  "read_activity_log",
   "list_workspaces",
+  "list_storage",
   "list_projects",
   "list_spaces",
   "list_live_sessions",
   "list_agents",
+  "list_agent_profiles",
   "list_agent_status",
   "list_providers",
   "load_session",
@@ -39,11 +44,18 @@ export const APP_READS = [
   // (su árbol `terminus-chat-visuals`), y las imágenes, archivos y adjuntos que
   // el mensaje nombra por su ruta en la máquina.
   "tree_show",
+  // Un visual que no cabe de una vez: por partes de 512 KiB, con sus imágenes incrustadas.
+  "chat_visual_part",
   "preview_file",
   "attachment_preview",
   // Carpeta nueva y clonar en la máquina: dónde quedan y cómo va un clon.
   "get_project_directory",
   "project_clone_status",
+  // Llevar el trabajo de una carpeta a la máquina donde nace la tarea: qué hay sin subir y la llave para sellar.
+  "work_status",
+  "work_key",
+  // El PR de cada tarea en su tarjeta: git por carpeta, primero las tareas visibles.
+  "list_session_git",
 ] as const;
 
 export const APP_ACTIONS = [
@@ -56,6 +68,8 @@ export const APP_ACTIONS = [
   // La tarjeta de vista previa: Fijar y Archivar.
   "set_session_pinned",
   "set_task_archived",
+  "finish_task",
+  "delete_session",
   // `!` en el cuadro: un comando de terminal en la carpeta de la tarea.
   "run_shell_command",
   "stop_shell_command",
@@ -74,6 +88,14 @@ export const APP_ACTIONS = [
   "create_project",
   "start_project_clone",
   "cancel_project_clone",
+  // Llevar trabajo (`@terminus/carry`): exportar en el origen, copiar por partes, importar y cancelar.
+  "work_export",
+  "work_read_part",
+  "work_write_part",
+  "work_import",
+  "work_cancel",
+  // Una tarea nueva en otra máquina dentro del space de esta: el space se comparte antes con la cuenta.
+  "share_space",
 ] as const;
 
 export const APP_COMMANDS: readonly AppCommand[] = [...APP_READS, ...APP_ACTIONS];

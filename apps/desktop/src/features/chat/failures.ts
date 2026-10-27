@@ -96,12 +96,19 @@ export function gestoDelFallo(clase?: string) {
   }
 }
 
+/** Los fallos que la línea del cupo deja resueltos: la tarea ya siguió. */
+export function cupoResuelveElFallo(clase?: string) {
+  return clase === "sin_cupo" || clase === "sin_saldo";
+}
+
 /** Qué dice la línea de una tarea que siguió tras quedarse sin cupo. */
 export function prosaDelCambioPorCupo(c: CambioPorCupo) {
   if (c.to && c.from) {
-    return c.until
-      ? t("chat.quota.switched_until", { to: c.to, from: c.from, time: horaDeVuelta(c.until) })
-      : t("chat.quota.switched", { to: c.to, from: c.from });
+    if (!c.until) return t("chat.quota.switched", { to: c.to, from: c.from });
+    const datos = { to: c.to, from: c.from, time: horaDeVuelta(c.until) };
+    return new Date(c.until).toDateString() === new Date().toDateString()
+      ? t("chat.quota.switched_until", datos)
+      : t("chat.quota.switched_until_day", datos);
   }
   return c.from ? t("chat.quota.resumed_account", { account: c.from }) : t("chat.quota.resumed");
 }

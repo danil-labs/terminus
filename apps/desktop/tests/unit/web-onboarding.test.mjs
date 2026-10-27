@@ -94,6 +94,7 @@ test("a managed computer skips the install step and connects its cloud accounts 
     assert.ok(!text().includes("Instalar asistentes") && !text().includes("Preparar Terminus"), "no install or prepare phase");
     assert.ok(!text().includes("Elige tus proveedores"), "never the provider picker");
     assert.equal(w.document.querySelector("[data-web-onboarding-machine]"), null, "one computer needs no name");
+    assert.ok(!text().includes("De mi organización") && !text().includes("Radiant"), "the web offers no organization nor Radiant");
 
     button("Crear workspace").click();
     await sleep(800);

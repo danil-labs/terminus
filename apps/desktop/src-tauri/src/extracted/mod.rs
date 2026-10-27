@@ -4,8 +4,8 @@
 mod appearance;
 mod desktop;
 mod engine;
+mod engine_profile;
 pub mod env;
-mod fleet;
 mod instance;
 mod launcher;
 mod legacy;
@@ -14,8 +14,11 @@ mod linux_engine;
 mod local_image;
 #[cfg(target_os = "macos")]
 mod master_handoff;
+mod page_preview;
 mod placement;
 mod proxy;
+#[cfg(target_os = "macos")]
+mod relocate;
 mod sites;
 mod startup;
 mod tray;
@@ -49,6 +52,10 @@ fn open() -> Result<()> {
     let selection = match args.as_slice() {
         // La ventana abre ya; el motor se busca o se lanza detrás (`launcher::connect`).
         [_] => {
+            #[cfg(target_os = "macos")]
+            if relocate::offer() {
+                return Ok(());
+            }
             let found = engine::paths()?;
             engine::prepare(&found)?;
             let launcher = match launcher::reason(&found) {
@@ -179,6 +186,9 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
                     if url.scheme() == "tauri"
                         || url.host_str() == Some("tauri.localhost")
                         || url.as_str() == "about:srcdoc"
+                        // El marco de la vista previa de un `.html`: en macOS y Linux esto también filtra marcos.
+                        || url.scheme() == page_preview::SCHEME
+                        || url.host_str() == Some("terminus-page.localhost")
                     {
                         return true;
                     }
@@ -206,6 +216,12 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
         .register_asynchronous_uri_scheme_protocol(
             local_image::SCHEME,
             |_ctx, request, responder| local_image::atender(request, responder),
+        )
+        .register_asynchronous_uri_scheme_protocol(
+            page_preview::SCHEME,
+            |ctx, request, responder| {
+                page_preview::atender(ctx.app_handle().clone(), request, responder)
+            },
         )
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -249,6 +265,7 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
             typst_live::typst_live_change,
             typst_live::typst_live_close_doc,
             typst_live::typst_live_reveal,
+            typst_live::typst_live_complete,
             typst_live::typst_live_stop,
             update::update_install,
             update::update_pending

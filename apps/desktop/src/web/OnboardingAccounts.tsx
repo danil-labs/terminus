@@ -1,17 +1,17 @@
 import { createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
-import { accountKeyUrl } from "../features/settings/account-auth";
-import { LoginCodeForm } from "../features/settings/LoginCodeForm";
 import { nombreDeAgente } from "../features/onboarding/onboarding-store";
 import { Pantalla } from "../features/onboarding/Screen";
+import { accountKeyUrl } from "../features/settings/account-auth";
 import type { AccountList, AgentOpt, LoginEvent } from "../features/settings/accounts-store";
-import { invoke } from "../lib/invoke.ts";
+import { LoginCodeForm } from "../features/settings/LoginCodeForm";
 import { t } from "../lib/i18n";
+import { invoke } from "../lib/invoke.ts";
 import { listen } from "../lib/serviceEvents";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { asFailure, FailureNote } from "../ui/Failure";
-import { MarcaAgente } from "../ui/icons";
 import { Input } from "../ui/Input";
+import { MarcaAgente } from "../ui/icons";
 
 /** Local models and providers with an app of their own are never offered on a managed computer. */
 export const offered = (a: AgentOpt) => a.available && !a.sin_cuenta && !a.external_install_url && a.id !== "opencode-local";
@@ -42,7 +42,7 @@ export function OnboardingAccounts(props: { workspace: string; onDone: () => voi
       atrasRotulo={t("web.onboarding.accounts.later")}
       primario={{ rotulo: t("web.onboarding.accounts.finish"), onClick: leave, disabled: !Object.values(connected()).some(Boolean) }}
     >
-      <Show when={providers()} fallback={<p role="status" class="m-0 text-sm text-neutral-500">{t("web.setup.connecting")}</p>}>
+      <Show when={providers()} fallback={<p role="status" class="m-0 text-sm text-neutral-500">{t("web.onboarding.providers_loading")}</p>}>
         {(list) => (
           <div class="grid gap-2.5">
             <For each={list()} fallback={<p class="m-0 text-sm text-neutral-500">{t("web.onboarding.accounts.none")}</p>}>

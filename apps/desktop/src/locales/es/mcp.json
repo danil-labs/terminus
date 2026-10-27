@@ -3,12 +3,14 @@
   "mcp.error.app_call": "La vista de MCP App no pudo usar esa herramienta. Revisa la conexión del servidor en Herramientas.",
   "mcp.known.figma.via": "En la nube",
   "mcp.known.figma.requires": "Una cuenta de Figma con asiento Dev o Full. Con plan Starter el tope son unas pocas llamadas al mes.",
-  "mcp.known.figma.after": "La primera vez que el agente lo use, Figma te pedirá iniciar sesión en el navegador.",
+  "mcp.known.figma.after": "Terminus abre tu navegador para que autorices Figma una sola vez; sirve para todos tus agentes.",
   "mcp.known.figma_desktop.via": "App de escritorio",
   "mcp.known.figma_desktop.requires": "Tener abierta la aplicación de escritorio de Figma, con su servidor activado en las preferencias.",
   "mcp.known.figma_desktop.after": "No pide iniciar sesión: usa la sesión de la aplicación que ya tienes abierta.",
   "mcp.known.atlassian.requires": "Incluye Jira y Confluence con la misma conexión. Bitbucket no: por este camino pide un token de API en vez de la sesión del navegador.",
-  "mcp.known.atlassian.after": "La primera vez que el agente lo use, Atlassian te pedirá iniciar sesión. Verás y podrás hacer exactamente lo que tu cuenta ya permite, ni más ni menos.",
+  "mcp.known.atlassian.after": "Terminus abre tu navegador para que autorices Atlassian una sola vez; sirve para todos tus agentes. Verán y podrán hacer exactamente lo que tu cuenta ya permite, ni más ni menos.",
+  "mcp.known.notion.requires": "Ser miembro del espacio de Notion; las personas invitadas no pueden conectarlo.",
+  "mcp.known.notion.after": "Terminus abre tu navegador para que autorices Notion y elijas el espacio una sola vez; sirve para todos tus agentes. Verán lo mismo que tú ves en ese espacio.",
   "mcp.known.excalidraw.requires": "Tus dibujos se guardan en el servidor de Excalidraw, sin cuenta: quien tenga el identificador de un dibujo puede abrirlo. Necesita conexión a internet.",
   "mcp.known.excalidraw.after": "Listo al conectar, sin iniciar sesión. Cuando el agente dibuje, el diagrama se abre en el chat y puedes editarlo ahí.",
   "mcp.login.opened_browser": "Se abrió tu navegador para autorizar {service}. Vuelve aquí cuando termines.",
@@ -34,5 +36,7 @@
   "mcp.session.cli_has_none": "su CLI no la ofrece",
   "mcp.task.sign_in": "Iniciar sesión",
   "mcp.task.sign_in_again": "Volver a intentar",
-  "mcp.error.login_not_needed": "Ese servidor no tiene inicio de sesión por OAuth."
+  "mcp.error.login_not_needed": "Ese servidor no tiene inicio de sesión por OAuth.",
+  "mcp.error.oauth_discovery": "No pude averiguar cómo autorizar {service}.",
+  "mcp.error.oauth_register": "{service} no aceptó a Terminus como aplicación para autorizar."
 }

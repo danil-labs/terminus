@@ -69,7 +69,9 @@ const PERMITIDO = {
   "connect-src": ["'self'", "ipc:", "http://ipc.localhost", "https://computers.danil.ai", "wss://computers.danil.ai"],
   // El tercer candado del contenedor: a dónde puede navegar un marco hijo. Sin
   // esto el HTML del agente hace `location.href = "http://…/?" + contenido`.
-  "frame-src": ["'self'"],
+  // `terminus-page` es la vista previa de un `.html` de la tarea (`page_preview.rs`):
+  // sirve solo archivos de su carpeta: navegar ahí no saca nada.
+  "frame-src": ["'self'", "terminus-page:", "http://terminus-page.localhost"],
   "object-src": ["'none'"],
   // Las dos que NO heredan de `default-src`: sin escribirlas quedan abiertas.
   "base-uri": ["'none'"],

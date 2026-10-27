@@ -1,0 +1,13 @@
+{
+  "name": "@terminus/fleet",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Several machines behind one panel: the call envelope, a slice with its status per machine, bounded waits and the merge every client shares.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --test 'test/*.test.ts'"
+  }
+}

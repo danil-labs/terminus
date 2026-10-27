@@ -1,0 +1,249 @@
+import {
+  type Answer,
+  type Computer,
+  COMPUTER_NAME_MAX,
+  listComputers,
+  machineCompatibility,
+  orderComputers,
+  renameComputer,
+  wakes,
+} from "@terminus/computers";
+import Pencil from "lucide-solid/icons/pencil";
+import { createSignal, For, onMount, Show } from "solid-js";
+import { df } from "../../lib/format";
+import { t } from "../../lib/i18n";
+import { invoke } from "../../lib/invoke";
+import { capabilities, type AccountComputersSource } from "../../lib/platform";
+import { isMac } from "../../lib/window";
+import { Input } from "../../ui/Input";
+import { SettingsBlock, SettingsRow, SettingsSection } from "../settings/layout";
+import { machineNamesChanged } from "./store";
+
+declare const __TERMINUS_CONTRACT__: string;
+
+/**
+ * Dónde se leen y renombran las computadoras: lo que da la plataforma (la web)
+ * o, en el escritorio, el token de cliente de esa cuenta.
+ */
+export function accountComputersSource(account: string | null = null): AccountComputersSource | null {
+  const given = capabilities().accountComputers;
+  if (given) return given;
+  if (!capabilities().danilAccount) return null;
+  const client = () => invoke<{ token: string; endpoint: string }>("account_relay_token", account ? { account } : {}).catch(() => null);
+  return {
+    list: async () => {
+      const c = await client();
+      return c ? listComputers(c.endpoint, c.token) : { kind: "error", status: null };
+    },
+    rename: async (id, name) => {
+      const c = await client();
+      return c ? renameComputer(c.endpoint, c.token, id, name) : { kind: "error", status: null };
+    },
+    outdated: (c) => machineCompatibility(c.contract, __TERMINUS_CONTRACT__) === "outdated",
+    // La flota del escritorio vuelve a leer la cuenta (`account.tsx`) y toma el nombre nuevo.
+    onRenamed: () => window.dispatchEvent(new CustomEvent("harness:account-computers")),
+  };
+}
+
+const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+
+function seenAt(iso: string | null | undefined): string | null {
+  const at = iso ? new Date(iso) : null;
+  if (!at || Number.isNaN(at.getTime())) return null;
+  return sameDay(at, new Date()) ? df({ timeStyle: "short" }).format(at) : df({ dateStyle: "short", timeStyle: "short" }).format(at);
+}
+
+/** Por qué no se guardó el nombre, en palabras de la persona. */
+function renameFailure(answer: Exclude<Answer<unknown>, { kind: "ok" }>): string {
+  if (answer.kind === "missing") return t("danil.computers.rename_failed.not_found");
+  if (answer.kind === "unauthorized") return t("danil.computers.rename_failed.unauthorized");
+  if (answer.kind === "error" && answer.code === "invalid_name") return t("danil.computers.rename_failed.invalid_name", { max: COMPUTER_NAME_MAX });
+  if (answer.kind === "error" && answer.status === null) return t("danil.computers.rename_failed.offline");
+  return t("danil.computers.rename_failed.other");
+}
+
+export type AccountComputersProps = {
+  source: AccountComputersSource;
+  /** La computadora de esta ventana, si es una de la cuenta. */
+  self?: string | null;
+  /** El nombre de la de esta ventana cambió aquí. */
+  onSelfName?: (name: string) => void;
+};
+
+/** Las computadoras de la cuenta: tipo, estado y el nombre, que se edita en su sitio. */
+export function AccountComputers(props: AccountComputersProps) {
+  const [list, setList] = createSignal<Computer[] | null>(null);
+  const [failed, setFailed] = createSignal(false);
+  const [editing, setEditing] = createSignal<string | null>(null);
+  const [draft, setDraft] = createSignal("");
+  const [saving, setSaving] = createSignal(false);
+  const [problem, setProblem] = createSignal<{ id: string; text: string } | null>(null);
+
+  async function load() {
+    const answer = await props.source.list().catch(() => null);
+    if (answer?.kind === "ok") {
+      setList(orderComputers(answer.value));
+      setFailed(false);
+    } else if (list() === null) setFailed(true);
+  }
+  onMount(() => void load());
+
+  const nameOf = (c: Computer) => c.name?.trim() || c.computer_id;
+  const isSelf = (c: Computer) => !!props.self && c.computer_id === props.self;
+
+  const kind = (c: Computer) =>
+    isSelf(c)
+      ? isMac()
+        ? t("danil.computers.kind.this_mac")
+        : t("danil.computers.kind.this_pc")
+      : wakes(c)
+        ? t("danil.computers.kind.managed")
+        : t("danil.computers.kind.own");
+
+  const status = (c: Computer) => {
+    if (props.source.outdated?.(c)) return t("danil.computers.state.outdated");
+    if (c.state === "online") return t("danil.computers.state.online");
+    if (c.state === "starting") return t("danil.computers.state.starting");
+    const seen = seenAt(c.last_seen);
+    return seen ? t("danil.computers.state.off_seen", { time: seen }) : t("danil.computers.state.off");
+  };
+
+  function edit(c: Computer) {
+    setProblem(null);
+    setDraft(nameOf(c));
+    setEditing(c.computer_id);
+  }
+
+  async function save(c: Computer) {
+    const name = draft().trim();
+    if (saving()) return;
+    if (name === nameOf(c)) return setEditing(null);
+    if (!name || name.length > COMPUTER_NAME_MAX) {
+      setProblem({ id: c.computer_id, text: t("danil.computers.rename_failed.invalid_name", { max: COMPUTER_NAME_MAX }) });
+      return;
+    }
+    setSaving(true);
+    const answer = await props.source.rename(c.computer_id, name).catch(() => ({ kind: "error", status: null }) as const);
+    setSaving(false);
+    if (answer.kind !== "ok") {
+      setProblem({ id: c.computer_id, text: renameFailure(answer) });
+      return;
+    }
+    setList((rows) => rows?.map((r) => (r.computer_id === c.computer_id ? { ...r, name: answer.value.name } : r)) ?? rows);
+    setEditing(null);
+    setProblem(null);
+    if (isSelf(c)) props.onSelfName?.(answer.value.name);
+    props.source.onRenamed(c.computer_id, answer.value.name);
+    machineNamesChanged();
+  }
+
+  return (
+    <div class="grid min-w-0" data-account-computers={list() === null ? (failed() ? "failed" : "loading") : list()?.length}>
+      <Show when={list() === null}>
+        <SettingsBlock>
+          <p class="m-0 text-sm text-neutral-500">{failed() ? t("danil.computers.load_failed") : t("danil.computers.loading")}</p>
+        </SettingsBlock>
+      </Show>
+      <Show when={list()?.length === 0}>
+        <SettingsBlock>
+          <p class="m-0 text-sm text-neutral-500">{t("danil.computers.empty")}</p>
+        </SettingsBlock>
+      </Show>
+      <For each={list() ?? []}>
+        {(c) => (
+          <SettingsRow
+            data-account-computer={c.computer_id}
+            data-self={isSelf(c) ? "" : undefined}
+            label={
+              <Show
+                when={editing() === c.computer_id}
+                fallback={
+                  <button
+                    type="button"
+                    class="group flex max-w-full min-w-0 items-center gap-1.5 rounded-sm text-left hover:text-neutral-950"
+                    title={t("danil.computers.rename")}
+                    aria-label={t("danil.computers.rename_label", { name: nameOf(c) })}
+                    onClick={() => edit(c)}
+                    data-computer-name=""
+                  >
+                    <span class="truncate">{nameOf(c)}</span>
+                    <Show when={isSelf(c)}>
+                      <span class="shrink-0 text-neutral-500">{t("danil.computers.this_one")}</span>
+                    </Show>
+                    <Pencil size={12} class="shrink-0 text-neutral-500 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100" aria-hidden="true" />
+                  </button>
+                }
+              >
+                <form
+                  class="max-w-sm"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void save(c);
+                  }}
+                >
+                  <Input
+                    ref={(el) => {
+                      // En el elemento y no delegado: el Dialog de Configuración escucha Esc en `document` y se cerraría antes.
+                      el.addEventListener("keydown", (e) => {
+                        if (e.key !== "Escape") return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setEditing(null);
+                        setProblem(null);
+                      });
+                      queueMicrotask(() => (el.focus(), el.select()));
+                    }}
+                    class="h-7 min-h-7 px-1.5 text-[0.8125rem]"
+                    maxlength={COMPUTER_NAME_MAX}
+                    value={draft()}
+                    disabled={saving()}
+                    data-owns-escape
+                    data-computer-name-input=""
+                    aria-label={t("danil.computers.rename_label", { name: nameOf(c) })}
+                    aria-invalid={problem()?.id === c.computer_id ? "true" : undefined}
+                    onInput={(e) => setDraft(e.currentTarget.value)}
+                  />
+                </form>
+              </Show>
+            }
+            description={
+              <>
+                <span data-computer-kind="">{kind(c)}</span>
+                {" · "}
+                <span data-computer-state="">{status(c)}</span>
+                <Show when={problem()?.id === c.computer_id}>
+                  <span class="block text-error-strong" role="alert" data-rename-error="">
+                    {problem()?.text}
+                  </span>
+                </Show>
+              </>
+            }
+          />
+        )}
+      </For>
+    </div>
+  );
+}
+
+/** Configuración → Cuenta de Danil: las computadoras de la cuenta, con su propia sección. */
+export function AccountComputersSection(props: {
+  account?: string | null;
+  /** Con varias cuentas, de quién son. */
+  owner?: string | null;
+  self?: string | null;
+  onSelfName?: (name: string) => void;
+}) {
+  const source = accountComputersSource(props.account ?? null);
+  return (
+    <Show when={source}>
+      {(s) => (
+        <SettingsSection
+          title={props.owner ? t("danil.computers.title_of", { account: props.owner }) : t("danil.computers.title")}
+          description={t("danil.computers.description")}
+        >
+          <AccountComputers source={s()} self={props.self} onSelfName={props.onSelfName} />
+        </SettingsSection>
+      )}
+    </Show>
+  );
+}

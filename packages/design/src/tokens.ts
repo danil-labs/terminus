@@ -14,6 +14,8 @@ export type ThemeTokens = {
   primary: string;
   onPrimary: string;
   userBubble: string;
+  /** The input of a handler or another task: neutral, so it doesn't compete with the person's. */
+  incomingBubble: string;
   success: string;
   error: string;
   info: string;
@@ -22,6 +24,8 @@ export type ThemeTokens = {
   failedMark: string;
   unseenMark: string;
   delivered: string;
+  /** A merged PR, like the desktop's git icon. */
+  merged: string;
 };
 
 export const CSS_SOURCE: Partial<Record<keyof ThemeTokens, string>> = {
@@ -32,11 +36,13 @@ export const CSS_SOURCE: Partial<Record<keyof ThemeTokens, string>> = {
   text: "--color-neutral-950",
   textMuted: "--color-neutral-500",
   primary: "--color-primary",
+  incomingBubble: "--color-chat-incoming",
   approving: "--color-warning",
   asked: "--color-brand-yellow",
   failedMark: "--color-error-strong",
   unseenMark: "--color-success-strong",
   delivered: "--color-neutral-500",
+  merged: "--color-brand-purple",
 };
 
 export const THEMES: { light: ThemeTokens; dark: ThemeTokens } = {
@@ -50,6 +56,7 @@ export const THEMES: { light: ThemeTokens; dark: ThemeTokens } = {
     primary: "#6539f5",
     onPrimary: "#ffffff",
     userBubble: "#efeafe",
+    incomingBubble: "#f3f4f8",
     success: "#15803d",
     error: "#dc2626",
     info: "#2563eb",
@@ -58,6 +65,7 @@ export const THEMES: { light: ThemeTokens; dark: ThemeTokens } = {
     failedMark: "#dc2626",
     unseenMark: "#166534",
     delivered: "#62647a",
+    merged: "#6539f5",
   },
   dark: {
     bg: "#111113",
@@ -70,6 +78,7 @@ export const THEMES: { light: ThemeTokens; dark: ThemeTokens } = {
     onPrimary: "#111113",
     // `--color-chat-user`: brand yellow at 8% over `surface-raised`.
     userBubble: "#3c3b36",
+    incomingBubble: "#2c2c30",
     success: "#4ade80",
     error: "#f87171",
     info: "#60a5fa",
@@ -78,6 +87,7 @@ export const THEMES: { light: ThemeTokens; dark: ThemeTokens } = {
     failedMark: "#f87171",
     unseenMark: "#4ade80",
     delivered: "#9a9aa3",
+    merged: "#6539f5",
   },
 };
 

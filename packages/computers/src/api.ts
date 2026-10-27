@@ -24,6 +24,8 @@ export type Computer = {
   host_version?: string | null;
   /** El contrato del motor en su último `hello` (hash de `commands.json`), si lo dijo. */
   contract?: string | null;
+  /** `linux`, `macos` o `windows`, si el plano de control lo dice. Sin el campo, no se sabe. */
+  os?: string | null;
   /** Los workspaces de esta computadora vinculados a la cuenta. Sin el campo, un plano de control de antes. */
   workspaces?: string[] | null;
 };
@@ -32,11 +34,12 @@ export type Answer<T> =
   | { kind: "ok"; value: T }
   | { kind: "unauthorized" }
   | { kind: "license" }
+  | { kind: "no_account" }
   | { kind: "missing" }
-  | { kind: "error"; status: number | null };
+  | { kind: "error"; status: number | null; code?: string };
 
 /** Lo mínimo de `fetch` que usa el cliente. */
-export type Fetch = (input: string, init?: { method?: string; headers?: Record<string, string> }) => Promise<{
+export type Fetch = (input: string, init?: { method?: string; headers?: Record<string, string>; body?: string }) => Promise<{
   status: number;
   ok: boolean;
   json(): Promise<unknown>;
@@ -53,22 +56,38 @@ export function apiUrl(endpoint: string, path: string): string {
 
 const globalFetch: Fetch = (input, init) => (globalThis.fetch as unknown as Fetch)(input, init);
 
-async function request<T>(url: string, token: string, method: string, read: (body: unknown) => T, f: Fetch): Promise<Answer<T>> {
+async function request<T>(url: string, token: string, method: string, read: (body: unknown) => T, f: Fetch, payload?: unknown): Promise<Answer<T>> {
   let response: Awaited<ReturnType<Fetch>>;
   try {
-    response = await f(url, { method, headers: { authorization: `Bearer ${token}` } });
+    const headers: Record<string, string> = { authorization: `Bearer ${token}` };
+    if (payload === undefined) response = await f(url, { method, headers });
+    else response = await f(url, { method, headers: { ...headers, "content-type": "application/json" }, body: JSON.stringify(payload) });
   } catch {
     return { kind: "error", status: null };
   }
   if (response.status === 401) return { kind: "unauthorized" };
   if (response.status === 403) {
-    // `unknown_user` también es 403: la persona no existe en Danil, que para ella es lo mismo que no tener licencia.
-    return { kind: "license" };
+    const body = await response.json().catch(() => null) as { error?: string | { code?: string } } | null;
+    const code = typeof body?.error === "string" ? body.error : body?.error?.code;
+    if (code === "unknown_user") return { kind: "no_account" };
+    if (code === "license_required") return { kind: "license" };
+    return { kind: "error", status: response.status };
   }
   if (response.status === 404) return { kind: "missing" };
-  if (!response.ok) return { kind: "error", status: response.status };
+  if (!response.ok) {
+    // `409 workspace_deleted` y compañía: el código del cuerpo dice qué pasó.
+    // El plano de control dice `{ error: { code } }`; uno anterior, `{ error: "<code>" }`.
+    const said = ((await response.json().catch(() => null)) as { error?: unknown } | null)?.error;
+    const code = typeof said === "string" ? said : (said as { code?: unknown } | null | undefined)?.code;
+    return typeof code === "string" ? { kind: "error", status: response.status, code } : { kind: "error", status: response.status };
+  }
+  if (response.status === 204) return { kind: "ok", value: read(null) };
   const body = await response.json().catch(() => null);
-  return { kind: "ok", value: read(body) };
+  try {
+    return { kind: "ok", value: read(body) };
+  } catch {
+    return { kind: "error", status: response.status };
+  }
 }
 
 export function listComputers(endpoint: string, token: string, f: Fetch = globalFetch): Promise<Answer<Computer[]>> {
@@ -82,6 +101,156 @@ export function listComputers(endpoint: string, token: string, f: Fetch = global
     },
     f,
   );
+}
+
+/**
+ * Le pone otro nombre a una computadora de la cuenta (`PATCH /v1/computers/:id`).
+ * Un nombre que no cabe contesta `error` con `invalid_name`; una que ya no está, `missing`.
+ */
+export function renameComputer(endpoint: string, token: string, id: string, name: string, f: Fetch = globalFetch): Promise<Answer<{ computer_id: string; name: string }>> {
+  return request(
+    apiUrl(endpoint, `/v1/computers/${encodeURIComponent(id)}`),
+    token,
+    "PATCH",
+    (body) => {
+      const b = body as { computer_id?: unknown; name?: unknown } | null;
+      return { computer_id: typeof b?.computer_id === "string" ? b.computer_id : id, name: typeof b?.name === "string" ? b.name : name };
+    },
+    f,
+    { name },
+  );
+}
+
+/** El largo máximo del nombre de una computadora, el mismo que valida el plano de control. */
+export const COMPUTER_NAME_MAX = 60;
+
+/** Un proyecto del registro de la cuenta (`Project` de `GET /v1/workspaces`): el mismo id en cada máquina. */
+export type AccountProject = {
+  id: string;
+  name: string;
+  remote_url?: string | null;
+  default_branch?: string | null;
+  /** La computadora donde nació, si el plano de control la sabe. */
+  home_computer_id?: string | null;
+};
+
+/**
+ * Un space compartido del workspace (`Space` de `GET /v1/workspaces`): el mismo id
+ * en todas las máquinas. `name: null` es el nombre por omisión; `changed_at`, los
+ * milisegundos del motor que lo cambió por última vez.
+ */
+export type AccountSpace = { id: string; name: string | null; folders: string[]; position: number; changed_at: number };
+
+/**
+ * Un workspace del registro de la cuenta de Danil (`GET /v1/workspaces`): existe
+ * aunque sus computadoras estén apagadas. `computers`, en cuáles está ligado.
+ */
+export type AccountWorkspace = {
+  id: string;
+  name: string;
+  radiant_workspace_id?: string | null;
+  settings?: Partial<Record<"lengua" | "lengua_de_salida" | "default_permission_mode" | "terminal_theme" | "chat_background" | "space_order", string | null>> | null;
+  settings_version?: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+  projects: AccountProject[];
+  computers: string[];
+  /** El logo y el fondo de los chats en la cuenta (`GET …/logo|background`, con la sesión); `null` sin imagen. Un plano de control anterior no los manda. */
+  logo_url?: string | null;
+  background_url?: string | null;
+  /** Sus spaces compartidos, en orden (vacío con un plano de control anterior). */
+  spaces?: AccountSpace[];
+  /** Ids de spaces compartidos con lápida. */
+  deleted_spaces?: string[];
+  /** Con lápida (`include_deleted=1`): cuándo se borró. Un borrado no revive al volver a atarlo; solo con `restore`. */
+  deleted_at?: string | null;
+};
+
+const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x !== "") : []);
+
+function accountWorkspace(raw: unknown): AccountWorkspace | null {
+  const w = raw as Record<string, unknown> | null;
+  if (!w || typeof w !== "object" || typeof w.id !== "string" || !w.id) return null;
+  const projects = (Array.isArray(w.projects) ? w.projects : []).filter(
+    (p): p is AccountProject => !!p && typeof (p as AccountProject).id === "string" && typeof (p as AccountProject).name === "string",
+  );
+  const spaces = (Array.isArray(w.spaces) ? w.spaces : []).flatMap((raw): AccountSpace[] => {
+    const s = raw as Record<string, unknown> | null;
+    if (!s || typeof s.id !== "string" || !s.id) return [];
+    return [
+      {
+        id: s.id,
+        name: typeof s.name === "string" && s.name ? s.name : null,
+        folders: strings(s.folders),
+        position: typeof s.position === "number" ? s.position : 0,
+        changed_at: typeof s.changed_at === "number" ? s.changed_at : 0,
+      },
+    ];
+  });
+  return {
+    ...(w as AccountWorkspace),
+    name: typeof w.name === "string" && w.name.trim() ? w.name : w.id,
+    projects,
+    computers: strings(w.computers),
+    spaces,
+    deleted_spaces: strings(w.deleted_spaces),
+  };
+}
+
+/**
+ * Los workspaces de la cuenta, con sus proyectos y computadoras. Acepta el JWT de
+ * la persona o el token de cliente del escritorio. Un plano de control anterior
+ * al registro contesta `missing` (404): quien llama sigue sin él.
+ */
+export function listWorkspaces(endpoint: string, token: string, f: Fetch = globalFetch): Promise<Answer<AccountWorkspace[]>> {
+  return request(
+    apiUrl(endpoint, "/v1/workspaces"),
+    token,
+    "GET",
+    (body) => {
+      const list = (body as { workspaces?: unknown } | null)?.workspaces;
+      if (!Array.isArray(list)) throw new Error("bad_registry");
+      return list.map(accountWorkspace).filter((w): w is AccountWorkspace => w !== null);
+    },
+    f,
+  );
+}
+
+const registryList = (list: unknown): AccountWorkspace[] => (Array.isArray(list) ? list.map(accountWorkspace).filter((w): w is AccountWorkspace => w !== null) : []);
+
+/** Los vivos y, aparte, los que tienen lápida (`GET /v1/workspaces?include_deleted=1`), para ofrecer restaurarlos. */
+export function listWorkspacesWithDeleted(endpoint: string, token: string, f: Fetch = globalFetch): Promise<Answer<{ workspaces: AccountWorkspace[]; deleted: AccountWorkspace[] }>> {
+  return request(
+    apiUrl(endpoint, "/v1/workspaces?include_deleted=1"),
+    token,
+    "GET",
+    (body) => {
+      const b = body as { workspaces?: unknown; deleted?: unknown } | null;
+      if (!Array.isArray(b?.workspaces)) throw new Error("bad_registry");
+      return { workspaces: registryList(b.workspaces), deleted: registryList(b.deleted) };
+    },
+    f,
+  );
+}
+
+/** Saca un workspace de la lápida con sus proyectos y su memoria. */
+export function restoreWorkspace(endpoint: string, token: string, id: string, f: Fetch = globalFetch): Promise<Answer<AccountWorkspace | null>> {
+  return request(apiUrl(endpoint, `/v1/workspaces/${encodeURIComponent(id)}/restore`), token, "POST", accountWorkspace, f);
+}
+
+/** Borra para siempre uno con lápida (su repo de memoria y sus respaldos); uno vivo contesta `409 workspace_not_deleted`. */
+export function purgeWorkspace(endpoint: string, token: string, id: string, f: Fetch = globalFetch): Promise<Answer<null>> {
+  return request(apiUrl(endpoint, `/v1/workspaces/${encodeURIComponent(id)}/purge`), token, "POST", () => null, f);
+}
+
+/**
+ * Por qué no abrió la sesión de una computadora: un upgrade fallido no trae
+ * cuerpo en el navegador, así que se pregunta por HTTP. `license_required`
+ * (`403`, computers#22) o `null` si no lo dice.
+ */
+export async function sessionProbe(endpoint: string, token: string, id: string, f: Fetch = globalFetch): Promise<"license_required" | null> {
+  const answer = await request(apiUrl(endpoint, `/v1/computers/${encodeURIComponent(id)}/session`), token, "GET", () => null, f);
+  return answer.kind === "license" ? "license_required" : null;
 }
 
 /** Encendido explícito. La app no lo usa al abrir: una acción enciende la VM por el relay. */

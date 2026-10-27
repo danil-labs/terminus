@@ -7,12 +7,26 @@ export type EngineError = { code: string; message_key?: string; detail?: unknown
 
 /** La cuenta de Danil vinculada a un workspace (`danil` de `list_workspaces`). */
 export type WorkspaceDanil = { user_id: string; email?: string | null; name?: string | null };
-/** Un workspace tiene el mismo id en cada máquina que lo tiene (`groupWorkspaces`). */
-export type Workspace = { id: string; name: string; provider?: string | null; remote?: string | null; danil?: WorkspaceDanil | null };
+/**
+ * Un workspace tiene el mismo id en cada máquina que lo tiene (`groupWorkspaces`).
+ * `default_permission_mode`, el modo con que arranca una tarea nueva si la
+ * persona eligió uno (`workspaces::Workspace::default_permission_mode`).
+ */
+export type Workspace = { id: string; name: string; provider?: string | null; remote?: string | null; danil?: WorkspaceDanil | null; default_permission_mode?: string | null };
 /** `list_workspaces`. */
-export type Startup = { workspaces: Workspace[]; active: string | null };
+export type MachineResources = {
+  measured_at: number;
+  error?: "measurement_failed" | "unsupported";
+  storage: { id: string; label: string; total_bytes: number; free_bytes: number; available_bytes: number; terminus_bytes: null; attribution: "unknown" }[];
+};
+export type WorkspaceStorage = {
+  bytes: number; recuperable: number; medido_en: number; aviso: string | null;
+  tareas: { session: string; project: string; tarea: string; proyecto: string | null; bytes: number }[];
+  compartido: { bytes: number }[]; sueltos: { bytes: number }[];
+};
+export type Startup = { workspaces: Workspace[]; active: string | null; machine_resources?: MachineResources };
 /** `list_projects`: una carpeta del workspace. */
-export type Project = { id: string; name: string; working_directory?: string | null };
+export type Project = { id: string; name: string; working_directory?: string | null; kind?: "git" | "folder"; remote_url?: string | null };
 /**
  * Evento `project_clone` y respuesta de `project_clone_status`: el clon que pidió
  * `start_project_clone`. Termina con `done` y `project`, o con `error` (un
@@ -28,7 +42,7 @@ export type ProjectCloneEvent = {
   error?: { what?: Frase; detail?: string } | string;
 };
 /** `list_spaces`. */
-export type Space = { id: string; name: string | null; folders: string[] };
+export type Space = { id: string; name: string | null; folders: string[]; account?: boolean };
 
 /** `list_live_sessions`: una tarea abierta de una carpeta. */
 export type SessionRow = {
@@ -80,11 +94,24 @@ export type Turn = {
   model?: string | null;
   tools?: TurnTool[];
   questions?: Question[] | null;
+  answers?: Answer[] | null;
   /** Rutas en la máquina de lo que la persona adjuntó (las viejas, `entradas/…`). */
   attachments?: string[] | null;
+  /** El turno en su orden: lo que el agente dijo, con las herramientas (`tool` indexa `tools`) donde las usó. */
+  pieces?: TurnPiece[] | null;
+  /** Un `!`: el comando va en `text`. */
+  shell?: { cwd: string; output: string; exit_code: number | null; duration_ms: number; truncated: boolean } | null;
+  /** El encargado que escribió este input, si no fue la persona (`Turn::agent`). */
+  agent?: string | null;
+  /** La tarea que lo escribió por el CLI (`Turn::from_task`). */
+  from_task?: SenderTask | null;
 };
-/** Un paso del turno; `images` son data URLs que produjo la herramienta. */
-export type TurnTool = { name?: string; target?: string | null; images?: string[] };
+/** La tarea que escribió un input, como era al escribirlo (`sessions::SenderTask`). */
+export type SenderTask = { folder: string; task: string; title: string; provider: string; model?: string | null };
+/** Un paso del turno; `images` son data URLs que produjo la herramienta. `ok: false` si falló. */
+export type TurnTool = { name?: string; target?: string | null; images?: string[]; ok?: boolean | null };
+/** Un trozo de `Turn.pieces`. */
+export type TurnPiece = { text: string } | { tool: number };
 /** `preview_file` y `attachment_preview`. */
 export type FilePreview = {
   rel: string;
@@ -99,7 +126,7 @@ export type FilePreview = {
 /** `tree_show`: un archivo de un árbol de la tarea. */
 export type TreeContent = { kind: string; text: string; bytes: number; truncated: boolean };
 /** `load_session`. */
-export type OpenedSession = { id: string; provider: string; model: string | null; agent?: string | null; turns: Turn[] };
+export type OpenedSession = { id: string; provider: string; model: string | null; agent?: string | null; permission_mode?: string | null; turns: Turn[] };
 
 /** `pending_requests`. */
 export type PendingRequests = {
@@ -149,7 +176,15 @@ export type TaskBlockers = { unsaved: { session: string; title: string; files: s
 // --- Cuentas de IA ---------------------------------------------------------------
 
 /** Una cuenta de `list_accounts`; `identity` es el correo, si el CLI lo dice. */
-export type AiAccount = { id: string; label: string; created_at?: number | null; identity: string | null; authenticated_at: number | null };
+export type AiAccount = {
+  id: string;
+  label: string;
+  created_at?: number | null;
+  identity: string | null;
+  authenticated_at: number | null;
+  /** Identidad estable de la suscripción o workspace; no se muestra. */
+  credential_group?: string | null;
+};
 /** `list_accounts(provider)`. */
 export type AccountList = { provider: string; active: string | null; accounts: AiAccount[] };
 /** `account_status`. */

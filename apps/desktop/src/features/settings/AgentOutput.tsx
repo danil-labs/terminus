@@ -68,7 +68,7 @@ export function SalidaDelAgente() {
       setValor(activo.lengua_de_salida ?? "");
       setLenguaDelEspacio(activo.lengua ?? null);
       cargarInstalados();
-    });
+    }).catch(() => {});
   }
 
   onMount(() => {

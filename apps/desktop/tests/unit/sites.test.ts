@@ -32,7 +32,7 @@ g.window = dom.window;
 g.document = dom.window.document;
 g.MutationObserver = dom.window.MutationObserver;
 
-const { hayCapaEncima, corta, suspendSiteLayers } = await import("../../src/lib/sites.ts");
+const { hayCapaEncima, huecoLibre, corta, suspendSiteLayers } = await import("../../src/lib/sites.ts");
 
 const body = dom.window.document.body;
 
@@ -148,6 +148,35 @@ test("la capa modal nativa de un visual del chat esconde todas las capas", async
   assert.equal(hayCapaEncima(HUECO), true, "el visual ampliado vive bajo #root, sin portal que medir");
   soltar();
   assert.equal(hayCapaEncima(HUECO), false);
+});
+
+test("un globo que asoma por el borde encoge la capa en vez de esconderla", async () => {
+  comoIndexHtml();
+  await asentar();
+  // La tarjeta de una tarea del sidebar entra 120 px por la izquierda del PDF.
+  const globo = abrirPortal(HUECO.x - 260, 200, 380, 280);
+  await asentar();
+  assert.deepEqual(
+    huecoLibre(HUECO),
+    { x: HUECO.x + 120, y: HUECO.y, width: HUECO.width - 120, height: HUECO.height },
+    "con la tarjeta abierta la vista previa de Typst desaparecía entera",
+  );
+  globo.remove();
+  await asentar();
+  assert.deepEqual(huecoLibre(HUECO), HUECO, "al cerrarse, la capa recupera su hueco");
+});
+
+test("lo que tapa más de la mitad sí esconde la capa", async () => {
+  comoIndexHtml();
+  await asentar();
+  abrirPortal(HUECO.x + 100, HUECO.y + 100, 200, 500);
+  await asentar();
+  assert.equal(huecoLibre(HUECO), null);
+  const soltar = suspendSiteLayers();
+  comoIndexHtml();
+  await asentar();
+  assert.equal(huecoLibre(HUECO), null, "la capa modal nativa tapa la ventana entera");
+  soltar();
 });
 
 test("la dirección se lee igual en la pestaña y en la vista", () => {

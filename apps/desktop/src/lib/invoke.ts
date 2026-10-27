@@ -1,5 +1,6 @@
 import { invoke as tauri, type InvokeArgs, type InvokeOptions } from "@tauri-apps/api/core";
 import { connected, whenConnected } from "./engineConnection.ts";
+import { withoutAbout } from "./taskMentions.ts";
 
 /**
  * El único `invoke` de la ventana: el de Tauri, que espera al servicio en vez
@@ -34,8 +35,15 @@ export function neverRan(e: unknown): boolean {
  */
 const READ = /^(list_|load_|read_|get_)|_status$/;
 
+/**
+ * Lecturas que tras `io` siguen corriendo en el motor: el barrido de disco pasa
+ * de los 30 s del transporte, y repetirlo lo forma detrás de sí mismo.
+ */
+const SLOW_READS = new Set(["list_storage"]);
+
 export function canRepeat(command: string, e: unknown): boolean {
-  return neverRan(e) || (READ.test(command) && detailOf(e) === "io");
+  if (neverRan(e)) return true;
+  return READ.test(command) && !SLOW_READS.has(command) && detailOf(e) === "io";
 }
 
 const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms));
@@ -75,5 +83,20 @@ export async function untilConnected<T>(
   }
 }
 
+type Route = (command: string, args?: InvokeArgs, options?: InvokeOptions) => Promise<unknown>;
+let route: Route | null = null;
+
+/**
+ * Con la cuenta de Danil, quien reparte entre las máquinas de la cuenta
+ * (`features/machines/router.ts`); `null` deja solo el motor de la ventana. El
+ * IPC global de Tauri no se toca: lo de esta computadora sigue siendo nativo.
+ */
+export function setMachineRoute(next: Route | null) {
+  route = next;
+}
+
+const call = <T>(command: string, args?: InvokeArgs, options?: InvokeOptions): Promise<T> =>
+  (route ? route(command, args, options) : tauri<T>(command, withoutAbout(args as Record<string, unknown> | undefined) as InvokeArgs | undefined, options)) as Promise<T>;
+
 export const invoke = <T>(command: string, args?: InvokeArgs, options?: InvokeOptions): Promise<T> =>
-  untilConnected(() => retrying(() => tauri<T>(command, args, options), sleep, (e) => canRepeat(command, e)));
+  untilConnected(() => retrying(() => call<T>(command, args, options), sleep, (e) => canRepeat(command, e)));
