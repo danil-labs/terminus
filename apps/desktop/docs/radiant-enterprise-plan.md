@@ -4,6 +4,31 @@ Fecha: 2026-10-27. Encargo: implementar la integración y decidir el diseño sin
 interrumpir a la persona. Revisión: `/plan-eng-review` de garrytan/gstack,
 instrucciones oficiales recuperadas porque no estaban instaladas en este host.
 
+## Estado de entrega
+
+La integración está desplegada en Computers y Radiant. Los cinco integrantes
+de Danil tienen una vinculación explícita de identidad y workspace corporativo;
+el inventario se consulta en producción. La recuperación histórica requiere
+habilitación por workspace, conserva el avance y usa las mismas claves que los
+reportes nuevos. Solo lee el registro de consumo del workspace autenticado;
+excluye otros workspaces, transcripciones y costos schema 1 acumulados.
+
+Esta entrega fija el motor 3ecb9a7 en las cuatro plataformas sin modificar el
+contrato del cliente. Sus pruebas generales pasan en Linux (379), macOS ARM e
+Intel (404 en cada una) y Windows (531). La prueba central usa el motor y el
+receptor reales, incluye un registro de 40 días, fallos de red y reinicio sin
+duplicar. Radiant conserva su retención de 13 meses; los endpoints ordinarios
+siguen limitando los reportes atrasados a 30 días.
+
+Las VM actualizadas de Alejandro y Mauricio completaron el recorrido de sus
+archivos históricos en producción sin aumentar los totales ya importados. La
+VM de Alberto conserva su escritor activo y tiene la actualización preparada
+para el cambio cuando quede libre. Los equipos personales necesitan recibir
+el cliente con este motor para iniciar su recuperación automática.
+
+Las secciones siguientes conservan el plan y las comprobaciones de la primera
+implementación local, anteriores a la activación en producción.
+
 ## Plan original
 
 Vincular identidades Danil y WorkOS, mostrar consumo por empleado, modelo y
@@ -52,7 +77,7 @@ empresarial y consola. No existe una fuente verificada de facturación de VM.
 |---|---|---|
 | Motor tiene consumo y herramientas | `usage_report.rs`, `closing.rs` | comprobado y E2E |
 | Danil web implica sesión Radiant | decisión guardada y autoridades distintas | falso; vía central necesaria |
-| Computers puede atestar máquina/dueña | auth existente, `src/usage.ts`, workerd | comprobado |
+| Computers puede atestar máquina/dueña | auth existente, [control de consumo de Computers](https://github.com/danil-labs/computers/blob/main/src/usage.ts), workerd | comprobado |
 | WorkOS mantiene autoridad | `admit`/`effective_access`, pruebas de baja | comprobado con proveedor simulado |
 | Hay costo completo de VM | ningún contrato revisado lo suministra | falso; fuera de alcance |
 | Configuración y login de producción funcionan | no se desplegó | unverified=1 |
@@ -172,8 +197,8 @@ Approval readiness: PASS — R1–R6 autorizadas por delegación del turno.
 | Reporte directo/central | 12 + 7 comprobaciones pasan con motor y receptor reales |
 
 Commits DCO locales: Radiant `74613e3`, Computers `663a50e`, seldon-host
-`c5fd333`. Sus guías de configuración están en `docs/terminus-enterprise.md`
-(Radiant) y `docs/radiant-usage.md` (Computers y host). Este repositorio solo
+`c5fd333`. Sus guías de configuración están en [integración empresarial de Radiant](https://github.com/danil-labs/Radiant/blob/main/docs/terminus-enterprise.md)
+(Radiant) y [reporte de Computers](https://github.com/danil-labs/computers/blob/main/docs/radiant-usage.md) (Computers y host). Este repositorio solo
 agrega el plan; no necesita recompilar clientes por un cambio documental.
 Las pruebas usan identidades y CLI sintéticos; no hubo despliegue ni cambios
 a proveedores reales. La captura del panel también usa datos sintéticos.
