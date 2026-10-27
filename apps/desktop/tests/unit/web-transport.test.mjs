@@ -118,8 +118,8 @@ test("workspace context comes from its owning machine, including its source read
   const { fleet } = await import("../helpers/fake-relay.mjs");
   const listing = (root) => ({ workspaces: [{ id: "w", name: "W", context_root: root }], active: "w" });
   const source = { id: "context-mac", name: "Context", root: true, missing: false, projects: [] };
-  const vm = { ...engine, list_workspaces: listing(null), workspaces_startup: listing(null), source_detail: { machine: "vm" }, set_root: true };
-  const mac = { ...engine, list_workspaces: listing(source.id), workspaces_startup: listing(source.id), list_sources: [source], source_detail: { machine: "mac" } };
+  const vm = { ...engine, list_workspaces: listing(null), workspaces_startup: listing(null), source_detail: { machine: "vm" }, set_root: true, add_folder: { id: "task-folder" }, add_repo_url: { id: "task-repo" } };
+  const mac = { ...engine, list_workspaces: listing(source.id), workspaces_startup: listing(source.id), list_sources: [source], source_detail: { machine: "mac" }, add_folder: { id: "context-folder" }, add_repo_url: { id: "context-repo" } };
   const f = fleet({ cmp_vm: { table: vm }, cmp_mac: { table: mac } });
   const app = await boot("listo", "web-context-owner", {}, undefined, {}, {
     web: true,
@@ -137,6 +137,23 @@ test("workspace context comes from its owning machine, including its source read
   assert.equal(list.workspaces[0].context_root, source.id, "a materialized VM must not hide the Mac's context");
   assert.deepEqual(await invoke("list_sources"), [source], "the source must actually be readable on its owner");
   assert.deepEqual(await invoke("list_sources", {}, { headers: { "x-terminus-machine": "cmp_vm" } }), [], "an explicit machine wins");
+  assert.deepEqual(await invoke("add_folder", { locator: "/context" }), { id: "context-folder" }, "settings retain the context default");
+  app.w.document.querySelector('[data-sesion="cmp_vm~t1"]').click();
+  await sleep(400);
+  for (const [locator, command] of [["/task-folder", "add_folder"], ["https://example.test/task.git", "add_repo_url"]]) {
+    app.w.document.querySelector('[aria-label="Adjuntar una fuente"]').click();
+    await sleep(100);
+    [...app.w.document.querySelectorAll("button")].find((b) => b.textContent.includes("Pegar una dirección o ruta")).click();
+    await sleep(100);
+    const input = app.w.document.querySelector('input[placeholder="https://… o /ruta/a/carpeta"]');
+    input.value = locator;
+    input.dispatchEvent(new app.w.Event("input", { bubbles: true }));
+    input.closest("form").dispatchEvent(new app.w.Event("submit", { bubbles: true, cancelable: true }));
+    await sleep(250);
+    assert.ok(f.relays.cmp_vm.calls.some((c) => c.command === command && Object.values(c.args).includes(locator)), "task material is created on the task's VM, despite context on Mac");
+    assert.ok(!f.relays.cmp_mac.calls.some((c) => c.command === command && Object.values(c.args).includes(locator)), "the context owner does not receive task material");
+  }
+
   f.relays.cmp_mac.setState("offline");
   await sleep(100);
   const partial = await invoke("list_workspaces");

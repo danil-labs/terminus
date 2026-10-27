@@ -92,7 +92,7 @@ import ArchivedTasks from "../features/projects/ArchivedTasks";
 import BaseBranchPicker from "../features/projects/BaseBranchPicker";
 import { watchHandlerStatus, watchHandlerStatuses } from "../features/projects/handlerPresence";
 import { EmptyContext, ProjectPicker } from "../features/projects/Projects";
-import { machineName, runOnOptions } from "../features/machines/store";
+import { machineName, machines, runOnOptions } from "../features/machines/store";
 // Chunk aparte: solo lo carga quien crea una tarea, no la carga inicial.
 const MachinePicker = lazy(() =>
   import("../features/machines/MachinePicker").then((m) => ({ default: m.MachinePicker })),
@@ -4678,6 +4678,12 @@ export default function App() {
     }
   };
 
+  function taskMaterialOptions() {
+    const chosen = sessionId() ? undefined : runOnOptions(workspaceActivo(), projectList().find((p) => p.id === project()));
+    const machine = machines().find((m) => sessionId() ? m.local : m.active)?.id;
+    return chosen ?? (machine ? { headers: { "x-terminus-machine": machine } } : undefined);
+  }
+
   /**
    * Cambiar la rama de una fuente sustituyéndola: su identidad incluye la
    * rama (`context::repo_identity`), otra rama es otra fuente. La nueva entra
@@ -4686,10 +4692,12 @@ export default function App() {
    */
   const cambiarRama = async (fuente: Source, rama: string) => {
     if (fuente.kind !== "git" || fuente.branch === rama) return;
+    const machine = sessionId() ? filaDe(sessionId()!)?.machine : null;
+    const options = machine ? { headers: { "x-terminus-machine": machine } } : taskMaterialOptions();
     const nueva = await invoke<{ id: string }>("add_repo_url", {
       cloneUrl: fuente.location,
       branch: rama,
-    });
+    }, options);
     await adjuntarFuente(nueva.id);
     await quitarFuente(fuente.id);
     window.dispatchEvent(new CustomEvent("harness:sources"));
@@ -6365,6 +6373,9 @@ export default function App() {
           </Show>
         )}
         material={materialPendiente()}
+        materialOptions={pp.sesion && filaDe(pp.sesion)?.machine
+          ? { headers: { "x-terminus-machine": filaDe(pp.sesion)!.machine! } }
+          : taskMaterialOptions()}
         contexto={contexto()}
         catalogo={sources()}
         onAdjuntarFuente={adjuntarFuente}

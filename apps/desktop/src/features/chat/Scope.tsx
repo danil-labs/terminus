@@ -6,6 +6,7 @@ import {
   createSignal,
   type JSX,
 } from "solid-js";
+import type { InvokeOptions } from "@tauri-apps/api/core";
 import { invoke } from "../../lib/invoke.ts";
 import { t } from "../../lib/i18n";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -115,6 +116,7 @@ export default function Alcance(props: {
   /** Lo que se lee en el botón de añadir, después del `+`. */
   agregar: string;
   items: Source[];
+  materialOptions?: InvokeOptions;
   /**
    * Le llega el id de la fuente que quedó en el workspace. **Rechaza si el
    * material entró pero no se pudo traer a la tarea**, y entonces este panel se
@@ -274,7 +276,7 @@ export default function Alcance(props: {
         // chip; preguntarla aquí sería decidir dos veces lo mismo.
         branch: r.branch || undefined,
         name: r.name,
-      }),
+      }, props.materialOptions),
     );
 
   /**
@@ -291,20 +293,22 @@ export default function Alcance(props: {
   const traerEscrito = () => {
     const t = url().trim();
     if (!t) return;
+    const options = props.materialOptions;
     if (esDireccionWeb(t)) {
       return void traer(() =>
-        invoke<{ id: string }>("add_repo_url", { cloneUrl: t }),
+        invoke<{ id: string }>("add_repo_url", { cloneUrl: t }, options),
       );
     }
-    void traer(() => invoke<{ id: string }>("add_folder", { locator: t }));
+    void traer(() => invoke<{ id: string }>("add_folder", { locator: t }, options));
   };
 
   async function traerCarpeta() {
+    const options = props.materialOptions;
     setFallo(null);
     try {
       const ruta = await open({ directory: true, multiple: false });
       if (typeof ruta !== "string") return;
-      await traer(() => invoke<{ id: string }>("add_folder", { locator: ruta }));
+      await traer(() => invoke<{ id: string }>("add_folder", { locator: ruta }, options));
     } catch (e) {
       decir(e);
     }
