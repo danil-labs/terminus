@@ -2660,7 +2660,7 @@ export default function App() {
         return;
       }
 
-      const esGate = kind === "permission";
+      const esGate = kind === "permission" || kind === "permission_resolved";
       const retainedStream = Boolean(workspace && liveThreads.has(liveThreadKey(workspace, session))) &&
         ["delta", "image", "tool", "tool_done", "notice", "task_launched", "segment_saved", "command_output", "command_running"].includes(kind);
       if (!esGate && !esDelWorkspaceAbierto(workspace) && !retainedStream) return;
@@ -2786,6 +2786,34 @@ export default function App() {
 
       if (kind === "done") {
         void settleTurn(session, ok, text === "unsaved");
+        return;
+      }
+
+      // El pedido ya tiene decisión, tomada aquí o en otra ventana sobre la
+      // misma tarea. Sin esto el gate se quedaba hasta que el turno cerrara,
+      // y pulsarlo solo devolvía «ya se contestó». La fila de la decisión se
+      // pinta con lo que trae el evento; la relectura del cierre la reemplaza.
+      if (kind === "permission_resolved") {
+        if (!request_id) return;
+        const gate = permissions().find((p) => p.requestId === request_id);
+        setPermissions((ps) => ps.filter((p) => p.requestId !== request_id));
+        if (gate && id && esDelWorkspaceAbierto(workspace)) {
+          asentar(session, (ms) => ms.some((m) => m.turno === id) ? ms : [
+            ...ms,
+            {
+              role: "user",
+              text: "",
+              turno: id,
+              permission: {
+                request_id,
+                tool: text || gate.tool,
+                target: target ?? gate.target,
+                allow: ok === true,
+                when: Date.now(),
+              },
+            },
+          ]);
+        }
         return;
       }
 
@@ -3136,18 +3164,26 @@ export default function App() {
         requestId: p.requestId,
         allow,
       }, deLaTarea(p.session));
-      asentar(p.session, (ms) => [
-        ...ms,
-        {
-          role: "user",
-          text: guardado.text,
-          turno: guardado.id ?? undefined,
-          permission: guardado.permission ?? undefined,
-          author: guardado.author ?? undefined,
-        },
-      ]);
+      // El `permission_resolved` de esta misma decisión puede haber llegado
+      // antes que la respuesta: ese turno ya está pintado.
+      const fila: Msg = {
+        role: "user",
+        text: guardado.text,
+        turno: guardado.id ?? undefined,
+        permission: guardado.permission ?? undefined,
+        author: guardado.author ?? undefined,
+      };
+      asentar(p.session, (ms) => [...ms.filter((m) => !fila.turno || m.turno !== fila.turno), fila]);
       setPermissions((ps) => ps.filter((x) => x.requestId !== p.requestId));
     } catch (e) {
+      // Si el pedido ya no está pendiente —lo decidió otra ventana o su turno
+      // cerró— no hay nada que contestar: se quita el gate en vez de dejarlo
+      // con un error que ningún botón resuelve.
+      const pendientes = await pendientesDe(p.session);
+      if (pendientes && !pendientes.permissions.some((x) => x.request_id === p.requestId)) {
+        setPermissions((ps) => ps.filter((x) => x.requestId !== p.requestId));
+        return;
+      }
       setPermissionError(prosaDe(e));
     } finally {
       setRespondiendoPermiso(false);
