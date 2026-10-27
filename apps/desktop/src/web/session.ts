@@ -67,6 +67,7 @@ export function supabaseSession(url: string, key: string, options: Options = {})
     return data.session;
   };
   const signOutLocal = async () => {
+    await checkedSession();
     const { error } = await client.auth.signOut({ scope: "local" });
     if (error) throw error;
   };
