@@ -92,9 +92,9 @@ if (hash(sidecar) !== expectedEngine) throw new Error("Candidate sidecar copy fa
 const config = {
   version,
   build: { beforeBuildCommand: "pnpm build" },
-  bundle: { externalBin: [join(binaries, "seldon-runtime")], resources: { [stagedResources]: `work-tools/${target}` } },
+  bundle: { createUpdaterArtifacts: false, externalBin: [join(binaries, "seldon-runtime")], resources: { [stagedResources]: `work-tools/${target}` } },
 };
 const configPath = join(output, "tauri.candidate.json");
 writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
-writeFileSync(join(output, "candidate.json"), `${JSON.stringify({ schema: 1, version, target, engine_sha256: expectedEngine, resource_manifest_sha256: expectedManifest, contract, published_engine_lock: false, production_identity_changed: false, native_platforms_tested: [], source_engine: "local engine build; see SHA-256", resources: `resources/work-tools/${target}`, browser_catalog_sha256: hash(join(stagedResources, "browser-navigation.json")) }, null, 2)}\n`);
+writeFileSync(join(output, "candidate.json"), `${JSON.stringify({ schema: 1, version, target, engine_sha256: expectedEngine, resource_manifest_sha256: expectedManifest, contract, published_engine_lock: false, updater_signature: false, production_identity_changed: false, native_platforms_tested: [], source_engine: "local engine build; see SHA-256", resources: `resources/work-tools/${target}`, browser_catalog_sha256: hash(join(stagedResources, "browser-navigation.json")) }, null, 2)}\n`);
 console.log(JSON.stringify({ config: configPath, metadata: join(output, "candidate.json"), target, version, next: `pnpm tauri build --target ${target} --config ${configPath}` }, null, 2));

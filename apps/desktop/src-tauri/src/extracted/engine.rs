@@ -88,6 +88,9 @@ fn installed_resources(root: &Path) -> Result<PathBuf> {
     {
         // productName de tauri.conf.json: el bundle de Linux pone ahí los recursos.
         let mounted = PathBuf::from(appdir).join("usr/lib/Terminus");
+        if mounted.join("work-tools").is_dir() {
+            return Ok(super::resources::materialize(&mounted, root)?);
+        }
         let copy = root.join("resources");
         super::legacy::mirror(&mounted, &copy)?;
         return Ok(copy);
