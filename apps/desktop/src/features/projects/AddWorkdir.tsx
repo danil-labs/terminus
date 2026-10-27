@@ -38,6 +38,9 @@ export type ClonEnCurso = {
 export type RemoteClone = { operation: string; machine: string; workspace: string; name: string };
 export const REMOTE_CLONES = "projects.remote_clones";
 
+/** Por dónde abre el diálogo cuando se pide desde el menú «Nueva carpeta» del riel. */
+export type InicioDeCarpeta = "carpeta" | "vacia" | "clonar";
+
 /** Cómo se lee la fase que git reporta. La comparten el diálogo y el riel. */
 export function faseDeClon(phase: string | null | undefined) {
   switch (phase) {
@@ -70,6 +73,8 @@ export default function AnadirCarpeta(props: {
   /** El escritorio activo: la carpeta nueva queda fijada en él. */
   space?: string | null;
   onCerrar: () => void;
+  /** El camino ya elegido; sin él, el diálogo ofrece los tres. */
+  inicio?: InicioDeCarpeta | null;
   /** Recarga la lista. Rechaza si el backend no aceptó, con su motivo. */
   onHecho: (p: Project, activate: boolean) => Promise<void> | void;
   /** Lo que el riel enseña del clon. `null` es que no hay ninguno. */
@@ -79,6 +84,8 @@ export default function AnadirCarpeta(props: {
   const [directorio, setDirectorio] = createSignal<string | null>(null);
   const [destino, setDestino] = createSignal<string | null>(null);
   const [eligiendo, setEligiendo] = createSignal(false);
+  // Abrir una carpeta desde el menú no enseña el diálogo detrás del selector del sistema.
+  const [escondido, setEscondido] = createSignal(false);
   const [url, setUrl] = createSignal("");
   const [provider, setProvider] = createSignal<string | null>(null);
   const [repositoryName, setRepositoryName] = createSignal("");
@@ -137,6 +144,12 @@ export default function AnadirCarpeta(props: {
     const pendiente = leerPref<RemoteClone[]>(REMOTE_CLONES, []).find((c) => c.workspace === props.workspace);
     if (pendiente) void seguirEnOtra(pendiente, null);
   }));
+
+  createEffect(on(() => props.abierto, (abierto) => {
+    if (!abierto || operation() || trabajando()) return;
+    if (props.inicio === "vacia") void elegirCamino("vacia");
+    else if (props.inicio === "carpeta" && !remota()) void abrirCarpetaSola();
+  }, { defer: true }));
 
   async function seguirEnOtra(clon: RemoteClone, start: Record<string, unknown> | null) {
     setOperation(clon.operation);
@@ -240,11 +253,23 @@ export default function AnadirCarpeta(props: {
       multiple: false,
       title: t("projects.add.browse"),
     });
-    if (typeof dir !== "string" || workspace !== props.workspace) return;
+    if (typeof dir !== "string" || workspace !== props.workspace) return false;
     // Sin nombre, Rust usa el de la carpeta y lo recorta al tope (`projects::crear`).
     await terminar(
       invoke<Project>("create_project", { name: "", workingDirectory: dir, space: props.space ?? undefined }),
     );
+    return true;
+  }
+
+  async function abrirCarpetaSola() {
+    setEscondido(true);
+    try {
+      if (!(await explorar())) props.onCerrar();
+    } catch (e) {
+      setFallo(asFailure(e));
+    } finally {
+      setEscondido(false);
+    }
   }
 
   async function elegirCamino(value: "clonar" | "vacia") {
@@ -297,7 +322,7 @@ export default function AnadirCarpeta(props: {
   }
 
   return (
-    <Dialog open={props.abierto} onOpenChange={alCambiar}>
+    <Dialog open={props.abierto && !escondido()} onOpenChange={alCambiar}>
       <DialogContent class="max-w-[560px]">
         <DialogTitle class="m-0 text-[0.9375rem] font-semibold">
           {t("projects.add.title")}
@@ -399,7 +424,9 @@ export default function AnadirCarpeta(props: {
               onSubmit={(e) => {
                 e.preventDefault();
                 void terminar(
-                  invoke<Project>("create_project", { name: nombre(), space: spaceAlli() }, enRemota()),
+                  invoke<Project>("create_project", {
+                    name: nombre(), space: spaceAlli(), directory: remota() ? undefined : (destino() ?? undefined),
+                  }, enRemota()),
                 );
               }}
             >
@@ -415,6 +442,21 @@ export default function AnadirCarpeta(props: {
                   onInput={(e) => setNombre(e.currentTarget.value)}
                 />
               </label>
+              <div class="grid gap-1">
+                <span class="text-[0.8125rem] text-neutral-500">{t("projects.add.clone_directory")}</span>
+                <p class="m-0 break-all font-mono text-xs">{destino() ?? directorio()}</p>
+                <Show when={remota()}>{(m) => <p class="m-0 text-xs text-neutral-500">{t("projects.add.remote_directory", { name: machineName(m().machine) })}</p>}</Show>
+                <Show when={!remota()}><Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  class="justify-self-start"
+                  disabled={trabajando() || eligiendo()}
+                  onClick={() => void elegirDestino()}
+                >
+                  {t("projects.add.change_directory")}
+                </Button></Show>
+              </div>
               <Show when={fallo()}>{(f) => <FailureNote f={f()} />}</Show>
               <div class="flex items-center justify-end gap-2">
                 <Button

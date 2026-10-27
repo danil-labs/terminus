@@ -241,7 +241,9 @@ async function startEngine() {
     if (existsSync(join(DATA, "seldon-endpoint.json")) && endpoint().pid === child.pid) {
       const ep = endpoint();
       console.log(JSON.stringify({ pid: child.pid, runtime: ep.runtime, contract: ep.contract }));
-      if (ep.contract !== LOCK.contract) console.warn(`Warning: the engine speaks contract ${ep.contract}; this window expects ${LOCK.contract}.`);
+      // The window speaks the vendored commands.json, which may be ahead of the lock (MOTOR_PENDIENTE).
+      const vendored = sha256(join(ROOT, "src-tauri", "crates", "engine-protocol", "commands.json"));
+      if (ep.contract !== vendored) console.warn(`Warning: the engine speaks contract ${ep.contract}; this window expects ${vendored}.`);
       return;
     }
     await new Promise((r) => setTimeout(r, 100));

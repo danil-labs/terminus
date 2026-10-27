@@ -1,6 +1,7 @@
+import { machineOf } from "../machines/store";
 import { mergeAttention } from "@terminus/protocol";
 import { listen } from "../../lib/serviceEvents";
-import { createSignal, onCleanup, onMount } from "solid-js";
+import { createSignal, onCleanup, onMount, untrack } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
 
 /** Espejo de `workspace/attention.rs`. El orden es la prioridad. */
@@ -58,7 +59,7 @@ export function createAttention() {
     unseen: (workspace: string | null) =>
       new Set(of(workspace).filter((task) => task.state === "unseen" || task.state === "failed").map((task) => task.session)),
     markSeen(workspace: string, session: string) {
-      void invoke("mark_task_seen", { workspace, session }).catch(() => {});
+      void invoke("mark_task_seen", { workspace, session }, untrack(() => machineOf(session))).catch(() => {});
     },
   };
 }

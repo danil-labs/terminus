@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Danil Computers from any client: the control-plane API, the relay session and the rules for waking a machine.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./space-order": "./src/space-order.ts"
   },
   "scripts": {
     "test": "node --test 'test/*.test.ts'"

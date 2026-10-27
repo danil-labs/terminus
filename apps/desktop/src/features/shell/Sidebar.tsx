@@ -10,12 +10,13 @@ import TriangleAlert from "lucide-solid/icons/triangle-alert";
 import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createResource, createSignal, type JSX, lazy, mapArray, on, onCleanup, Show, Suspense } from "solid-js";
 import { destinoEnVuelo, puntoDelArrastre, tareaEnVuelo } from "../../lib/drag";
-import { enfocarYSeleccionar } from "../../lib/focus";
+import { recordarCarpetas } from "../../lib/folderKinds";
 import { t } from "../../lib/i18n";
 import { lastRoster, rememberRoster } from "../../lib/handlerRoster";
 import { invoke } from "../../lib/invoke.ts";
 import type { AgentProfile, HandlerList, HandlerStatus, Project } from "../../lib/model";
 import { createPref } from "../../lib/prefs";
+import { sharedLazy } from "../../lib/sharedLazy";
 import { ariaDeAtajo } from "../../lib/shortcuts";
 import { capabilities } from "../../lib/platform";
 import { cn } from "../../lib/utils";
@@ -41,21 +42,23 @@ import Sessions, { type SessionRow } from "../projects/Sessions";
 import type { Etapa } from "../projects/TaskStage";
 import { ConexionesMenu } from "../settings/Tools";
 import {
+  agentOptions,
   applySidebarView,
+  groupKey,
   groupLabel,
   loadSidebarView,
   saveSidebarView,
-  scopeLabel,
   type SidebarGroup,
   type SidebarView,
 } from "../../lib/sidebarView";
 import type { DockAgent } from "./dockLayout";
 import { flattenTasks, folderCounts } from "./sidebarTasks";
+import { machineName, machines } from "../machines/store";
 
 // Fuera de la carga inicial: el botón y el dock llegan un instante después de la lista.
 const SidebarFilter = lazy(() => import("./SidebarFilter").then((m) => ({ default: m.SidebarFilter })));
 const AgentDock = lazy(() => import("./AgentDock"));
-const FolderGroupHeader = lazy(() => import("./FolderGroupHeader"));
+const FolderGroupHeader = sharedLazy(() => import("./FolderGroupHeader"));
 const DanilFooterEntry = lazy(() => import("./DanilFooterEntry"));
 
 /* El ancho vive en `ColumnaLateral`, que es la columna que envuelve a esta
@@ -91,10 +94,9 @@ export function createSidebar() {
 /**
  * La columna izquierda, montada sobre el shell de `ui/sidebar.tsx`.
  *
- * **Solo tareas, en una lista plana de todas las carpetas.** La carpeta es un
- * dato de cada fila y no un nivel de la lista: una carpeta sin tareas no
- * aparece nunca. Arriba lo que te necesita, en medio lo demás y lo asentado
- * plegado al final.
+ * **Las tareas de todas las carpetas, por carpeta salvo que se elija otra
+ * agrupación.** Por carpeta, una sin tareas también tiene su cabecera: la
+ * recién agregada se ve. Sin agrupar, la carpeta es un dato de cada fila.
  */
 export default function Sidebar(props: {
   projects: Project[];
@@ -113,19 +115,27 @@ export default function Sidebar(props: {
   onBorrarProyecto: (id: string) => Promise<void> | void;
   /** With more than one space, the folder leaves the active one instead of being deleted. */
   onRemoveFromSpace?: (id: string) => void;
-  onAnadirCarpeta: () => void;
+  /** Abre «Añadir un proyecto»; `inicio` salta a uno de sus caminos. */
   /** El clon que corre ahora mismo, si lo hay. Ver `projects/AddWorkdir.tsx`. */
   clon: ClonEnCurso | null;
   /** Devuelve el diálogo del clon, con su progreso y su cancelación. */
   onAbrirClon: () => void;
   /** Qué proyecto se está mirando en el panel principal, si alguno. */
   proyectoAbierto: string | null;
-  /** Abre el proyecto en el panel principal: sus tareas y su contexto fijo. */
-  onAbrirProyecto: (id: string) => void;
+  /** La carpeta de «Nueva tarea» cuando eso es lo que se mira: su cabecera va marcada. */
+  carpetaDelBorrador?: string | null;
+  /**
+   * Abre el proyecto en el panel principal: sus tareas y su contexto fijo.
+   * `machine`, la del grupo partido por máquina (`""` es esta): lo que se empiece ahí corre en ella.
+   */
+  onAbrirProyecto: (id: string, machine?: string) => void;
   /** Lo que se ofrece como modelo por defecto al crear un agente. */
   modelos: ModelChoices;
-  /** Empezar una tarea dentro de ese proyecto, sin pasar por su vista. */
-  onNuevaTareaEn: (id: string) => void;
+  /**
+   * Empezar una tarea dentro de ese proyecto, sin pasar por su vista. `""` es sin carpeta.
+   * `machine`, la del grupo partido por máquina (`""` es esta): la tarea se lanza en ella.
+   */
+  onNuevaTareaEn: (id: string, machine?: string) => void;
   onDelete: (project: string, id: string) => Promise<boolean | void> | boolean | void;
   onMove: (project: string, id: string, to: string) => void;
   onEtapa: (project: string, id: string, etapa: Etapa | null) => void;
@@ -143,6 +153,10 @@ export default function Sidebar(props: {
   onArchivadas?: () => void;
   spaces?: { id: string; name: string }[];
   onMoveToSpace?: (project: string, id: string, space: string) => void;
+  /** «Traer a esta Mac» en el menú de una tarea de otra máquina; solo en el escritorio. */
+  onBringHere?: (project: string, id: string) => void;
+  /** «Llevar a otra máquina…» en el menú de una carpeta de git. */
+  onCarryFolder?: (project: string) => void;
 }) {
   const [creatingAgentIn, setCreatingAgentIn] = createSignal<{ id: string; name: string } | null>(null);
   let listViewport: HTMLDivElement | undefined;
@@ -182,7 +196,8 @@ export default function Sidebar(props: {
   );
 
   // Los grupos por carpeta plegados; la clave es la de siempre para no perder
-  // lo que alguien ya había plegado.
+  // lo que alguien ya había plegado. El de otra máquina, partido, lleva la suya
+  // (`id@máquina`): plegar «Terminus · vm-principal» no pliega el de esta.
   const [cerrados, setCerrados] = createPref<string[]>("historial.cerrados", []);
   const alternarGrupo = (p: string) =>
     setCerrados(
@@ -198,13 +213,13 @@ export default function Sidebar(props: {
     saveSidebarView(props.viewKey, siguiente);
   };
 
-  const [searchOpen, setSearchOpen] = createSignal(false);
   const [searchText, setSearchText] = createSignal("");
   const query = () => searchText().trim();
   const [searchCounts, setSearchCounts] = createSignal<Record<string, number>>({});
   const reportResults = (key: string, count: number) => setSearchCounts(previous => previous[key] === count ? previous : { ...previous, [key]: count });
-  const closeSearch = () => { setSearchText(""); setSearchOpen(false); };
-  createEffect(() => { if (props.collapsed) closeSearch(); });
+  const clearSearch = () => setSearchText("");
+  createEffect(() => { if (props.collapsed) clearSearch(); });
+  createEffect(() => recordarCarpetas(props.projects));
 
   /** De qué carpeta es cada tarea, por id: las acciones de la fila llegan con el id. */
   const carpetaDeTarea = createMemo(() => {
@@ -218,6 +233,12 @@ export default function Sidebar(props: {
 
   const todas = createMemo(() => flattenTasks(props.sessions, !!query()));
   const cuentas = createMemo(() => folderCounts(todas()));
+  // La de esta computadora, con el nombre que le da la cuenta, como su tarjeta flotante.
+  const nombreDeMaquina = (id: string) => {
+    const aqui = id ? undefined : machines().find((m) => m.local);
+    return id ? machineName(id) : aqui ? machineName(aqui.id) : "";
+  };
+  const variasMaquinas = () => machines().length > 1 || todas().some((x) => !!x.row.machine);
   /**
    * La vista que se aplica: de las carpetas elegidas, las que siguen teniendo
    * tareas. Si ninguna sigue, son todas: un filtro que deja la lista vacía sin
@@ -240,10 +261,15 @@ export default function Sidebar(props: {
       const i = props.projects.findIndex((p) => p.id === g.key);
       return i === -1 ? props.projects.length : i;
     };
-    return vistaEfectiva().group === "folder"
-      ? todosLosGrupos.map((g, i) => ({ g, i })).sort((a, b) => orden(a.g) - orden(b.g) || a.i - b.i).map(({ g }) => g)
-      : todosLosGrupos;
+    if (vistaEfectiva().group !== "folder") return todosLosGrupos;
+    // Por carpeta, una sin tareas también es grupo, con su «+»: la recién agregada no puede faltar.
+    const elegidas = vista().folders;
+    const vacias = props.projects
+      .filter((p) => (cuentas().get(p.id) ?? 0) === 0 && (elegidas.length === 0 || elegidas.includes(p.id)))
+      .map((p): SidebarGroup<SessionRow> => ({ kind: "folder", key: p.id, tasks: [] }));
+    return [...todosLosGrupos, ...vacias].map((g, i) => ({ g, i })).sort((a, b) => orden(a.g) - orden(b.g) || a.i - b.i).map(({ g }) => g);
   });
+  const hayCarpetasVacias = () => grupos().some((g) => g.kind === "folder" && g.key && g.tasks.length === 0);
   const carpetasDelFiltro = createMemo(() => props.projects
     .filter((p) => (cuentas().get(p.id) ?? 0) > 0)
     .map((p) => ({ id: p.id, name: p.name, count: cuentas().get(p.id) ?? 0 })));
@@ -313,11 +339,9 @@ export default function Sidebar(props: {
       .map((c) => ({ id: c.project, name: nombreDe(c.project) ?? c.project }))
       .sort((a, b) => orden(a.id) - orden(b.id));
   };
-  const agentesDelFiltro = createMemo(() => {
-    const nombres = new Set([...agentesDelDock().map((a) => a.name), ...todas().flatMap((x) => x.row.agent ? [x.row.agent] : [])]);
-    return [...nombres].sort().map((name) => ({ name, body: perfilDe(name)?.body, avatar: perfilDe(name)?.avatar }));
-  });
-  const alcance = () => scopeLabel(vistaEfectiva(), (id) => nombreDe(id) ?? id);
+  const agentesDelFiltro = createMemo(() =>
+    agentOptions(agentesDelDock().map((a) => a.name), todas().map((x) => x.row))
+      .map((a) => ({ ...a, body: perfilDe(a.name)?.body, avatar: perfilDe(a.name)?.avatar })));
   const conResultados = (clave: string) => (searchCounts()[clave] ?? 0) > 0;
 
   /**
@@ -366,6 +390,7 @@ export default function Sidebar(props: {
       onPin={props.onPin ? (s, pinned) => props.onPin?.(carpetaDe(s), s, pinned) : undefined}
       spaces={props.spaces}
       onMoveToSpace={(s, space) => props.onMoveToSpace?.(carpetaDe(s), s, space)}
+      onBringHere={props.onBringHere ? (s) => props.onBringHere?.(carpetaDe(s), s) : undefined}
       onMove={(s, to) => {
         // El grupo de destino se abre: una tarea que se mueve a una carpeta
         // plegada desaparece de la pantalla, y eso se lee como que se borró.
@@ -375,19 +400,23 @@ export default function Sidebar(props: {
     />
   );
 
-  /** El rótulo de un tramo, con su cuenta a la derecha. */
-  const Rotulo = (p: { children: JSX.Element; cuenta: number; tono?: "need" }) => (
-    <div class={cn(
-      "flex h-7 min-w-0 items-center gap-1.5 px-2 pt-1 text-[0.6875rem] font-medium",
+  /** El rótulo de un tramo. */
+  const Rotulo = (p: { children: JSX.Element; tono?: "need"; accion?: JSX.Element }) => {
+    // En un memo: con `class` como único atributo vivo, Solid lo reescribe en cada
+    // cambio del grupo aunque valga lo mismo (`tests/perf/open-task-cost.mjs`).
+    const clase = createMemo(() => cn(
+      "group flex h-7 min-w-0 items-center gap-1.5 px-2 pt-1 text-[0.6875rem] font-medium",
+      p.accion && "pr-0",
       p.tono === "need" ? "text-warning" : "text-neutral-500",
-    )}>
-      {p.children}
-      <span class={cn("ml-auto shrink-0 tabular-nums", p.tono !== "need" && "text-neutral-700")}>{p.cuenta}</span>
-    </div>
-  );
-
-  /** Cuántas filas enseña un tramo: buscando, las que encontró. */
-  const cuentaDe = (clave: string, filas: SessionRow[]) => query() ? (searchCounts()[clave] ?? 0) : filas.length;
+    ));
+    return (
+      <div class={clase()}>
+        {p.children}
+        <span class="ml-auto" />
+        {p.accion}
+      </div>
+    );
+  };
 
   /**
    * La carpeta que se está clonando, encima de la lista.
@@ -437,14 +466,14 @@ export default function Sidebar(props: {
 
   const Grupo = (p: { grupo: SidebarGroup<SessionRow> }) => {
     const g = () => p.grupo;
-    const clave = () => g().kind === "section" ? g().key : `${g().kind}:${g().key}`;
-    const titulo = () => groupLabel(g(), (id) => nombreDe(id) ?? id);
+    const clave = () => g().kind === "section" ? g().key : groupKey(g());
+    const plegado = () => g().machine ? `${g().key}@${g().machine}` : g().key;
+    const titulo = () => groupLabel(g(), (id) => nombreDe(id) ?? id, nombreDeMaquina);
     const proyecto = () => g().kind === "folder" ? props.projects.find((x) => x.id === g().key) : undefined;
-    const abierto = () => !!query() || g().kind !== "folder" || !cerrados().includes(g().key);
-    const necesita = () => (g().kind === "section" && g().key === "needs_you")
-      || (g().kind === "status" && ["approving", "asked", "failed"].includes(g().key));
+    const abierto = () => !!query() || g().kind !== "folder" || !cerrados().includes(plegado());
+    const necesita = () => g().kind === "status" && ["approving", "asked", "failed"].includes(g().key);
     return (
-      <Show when={g().tasks.length > 0}>
+      <Show when={g().tasks.length > 0 || proyecto()}>
         <section
           data-sidebar-section={g().kind === "section" ? g().key : undefined}
           data-sidebar-group={g().kind === "section" ? undefined : g().key}
@@ -458,7 +487,20 @@ export default function Sidebar(props: {
                 data-destino={g().kind === "folder" ? "" : undefined}
                 class={cn("rounded-[var(--radius-sm)]", g().kind === "folder" && destinoEnVuelo() === "" && RECIBE_LA_TAREA)}
               >
-                <Rotulo cuenta={cuentaDe(clave(), g().tasks)} tono={necesita() ? "need" : undefined}>
+                <Rotulo
+                  tono={necesita() ? "need" : undefined}
+                  accion={g().kind === "folder" && !g().key ? (
+                    <button
+                      class="mr-1 grid size-6 shrink-0 place-items-center rounded-sm text-neutral-500 opacity-0 outline-none hover:bg-surface-muted hover:text-neutral-950 focus-visible:opacity-100 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary group-hover:opacity-100 group-focus-within:opacity-100"
+                      data-loose-task=""
+                      aria-label={t("shell.sidebar.new_loose_task")}
+                      title={t("shell.sidebar.new_loose_task")}
+                      onClick={() => { props.onNuevaTareaEn(""); setDesplegado(false); }}
+                    >
+                      <Plus size={15} aria-hidden="true" />
+                    </button>
+                  ) : undefined}
+                >
                   <Show when={g().kind === "agent" && g().key}>
                     <AstroAvatar name={g().key} status="asleep" size={14} />
                   </Show>
@@ -471,25 +513,32 @@ export default function Sidebar(props: {
               <Suspense>
                 <FolderGroupHeader
                   p={proj()}
+                  rotulo={g().machine === undefined ? undefined : titulo()}
+                  maquina={g().machine}
                   abierto={abierto()}
-                  cuenta={cuentaDe(clave(), g().tasks)}
                   tareas={g().tasks}
                   vivas={props.vivas}
                   aprobando={props.aprobando}
-                  proyectoAbierto={props.proyectoAbierto}
-                  onToggle={() => alternarGrupo(proj().id)}
-                  onAbrir={() => { props.onAbrirProyecto(proj().id); setDesplegado(false); }}
+                  proyectoAbierto={props.proyectoAbierto ?? props.carpetaDelBorrador ?? null}
+                  onToggle={() => alternarGrupo(plegado())}
+                  onAbrir={() => { props.onAbrirProyecto(proj().id, g().machine); setDesplegado(false); }}
                   onRenombrar={(name) => props.onRenombrarProyecto(proj().id, name)}
                   onBorrar={() => props.onBorrarProyecto(proj().id)}
                   onQuitarDelEspacio={props.onRemoveFromSpace ? () => props.onRemoveFromSpace?.(proj().id) : undefined}
-                  onNuevaTarea={() => props.onNuevaTareaEn(proj().id)}
+                  onNuevaTarea={() => props.onNuevaTareaEn(proj().id, g().machine)}
                   onNuevoAgente={() => setCreatingAgentIn({ id: proj().id, name: proj().name })}
+                  onLlevar={props.onCarryFolder && proj().kind === "git" && !g().machine ? () => props.onCarryFolder?.(proj().id) : undefined}
                 />
               </Suspense>
             )}
           </Show>
           <Show when={abierto()}>
-            <Historial filas={g().tasks} clave={clave()} sinCarpeta={g().kind === "folder" && !!g().key} />
+            <Show
+              when={g().tasks.length > 0}
+              fallback={<p class="m-0 py-0.5 pl-7 text-[0.6875rem] text-neutral-500" data-folder-empty="">{t("shell.sidebar.folder_empty")}</p>}
+            >
+              <Historial filas={g().tasks} clave={clave()} sinCarpeta={g().kind === "folder" && !!g().key} />
+            </Show>
           </Show>
         </section>
       </Show>
@@ -503,7 +552,7 @@ export default function Sidebar(props: {
     <div data-sidebar-tasks class="grid min-w-0 gap-1">
       <Show when={props.clon}>{(c) => <FilaDeClon clon={c()} />}</Show>
 
-      <Show when={todas().length === 0 && !query()}>
+      <Show when={todas().length === 0 && !query() && !hayCarpetasVacias()}>
         <Show
           when={props.projects.length === 0}
           fallback={<p class="m-0 px-2 pt-1 text-xs text-neutral-500" data-sidebar-empty="">{t("shell.sidebar.empty")}</p>}
@@ -513,7 +562,6 @@ export default function Sidebar(props: {
               {t("spaces.rail.empty", { name: props.escritorio ?? "" })}
             </p>
           </Show>
-          <Button variant="ghost" size="compact" class="w-full justify-start text-neutral-500" onClick={props.onAnadirCarpeta}><Plus size={14} />{t("shell.sidebar.new_folder")}</Button>
         </Show>
       </Show>
 
@@ -521,7 +569,7 @@ export default function Sidebar(props: {
         <p class="m-0 px-2 pt-1 text-xs text-neutral-500" data-sidebar-filtered-empty="">{t("shell.sidebar.filter_empty")}</p>
       </Show>
 
-      <KeyedList each={grupos()} by={(g) => `${g.kind}:${g.key}`}>{(g) => <Grupo grupo={g()} />}</KeyedList>
+      <KeyedList each={grupos()} by={groupKey}>{(g) => <Grupo grupo={g()} />}</KeyedList>
     </div>
   );
 
@@ -568,25 +616,14 @@ export default function Sidebar(props: {
           >
             <PanelLeftClose size={16} />
           </BotonConAtajo>
-          <Show when={!props.collapsed && !searchOpen()}>
-            <Button variant="chrome" size="iconCompact" class="size-7 shrink-0 text-neutral-500" aria-label={t("shell.sidebar.search")} title={t("shell.sidebar.search")} aria-expanded={searchOpen()} onClick={() => setSearchOpen(true)}>
-              <Search size={16} />
-            </Button>
+          <Show when={!props.collapsed}>
             {capabilities().sidebarExtra?.()}
-          </Show>
-          <Show when={!props.collapsed && searchOpen()}>
-            <div data-sidebar-search class="flex h-7 min-w-0 flex-1 items-center gap-1 rounded-md border border-border-strong bg-surface-raised px-1 focus-within:outline-solid focus-within:outline-2 focus-within:outline-primary">
-              <Input ref={enfocarYSeleccionar} type="text" role="searchbox" variant="ghost" class="h-full min-h-0 min-w-0 flex-1 border-0 px-0 py-0" placeholder={t("shell.sidebar.search")} aria-label={t("shell.sidebar.search")} value={searchText()} onInput={event => setSearchText(event.currentTarget.value)} onKeyDown={event => {
-                if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); closeSearch(); }
-              }} />
-              <Button variant="chrome" size="iconCompact" class="size-6 shrink-0 text-neutral-500" aria-label={t("shell.sidebar.close_search")} title={t("shell.sidebar.close_search")} onClick={closeSearch}><X size={14} /></Button>
-            </div>
           </Show>
           </div>
         </SidebarHeader>
 
         <SidebarContent class="gap-2 px-2 pb-0">
-          <SidebarMenu>
+          <SidebarMenu class="gap-1.5">
             <SidebarMenuItem>
               {/* Nueva tarea es la acción principal, negra y sólida.
                   `primary` queda reservado para las acciones del agente. */}
@@ -628,15 +665,23 @@ export default function Sidebar(props: {
           </SidebarMenu>
 
           <Show when={!props.collapsed}>
-            {/* Qué se enseña, y el único botón que lo cambia. */}
-            <div data-sidebar-scope class="-mt-1 flex min-w-0 items-center gap-1 pl-2">
-              <span class="min-w-0 flex-1 truncate text-[0.6875rem] text-neutral-500" title={alcance()}>{alcance()}</span>
+            <div data-sidebar-scope class="flex min-w-0 items-center gap-1">
+              <div data-sidebar-search class="flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-md border border-border-strong bg-surface-raised px-2 focus-within:outline-solid focus-within:outline-2 focus-within:outline-primary">
+                <Search size={14} class="shrink-0 text-neutral-500" aria-hidden="true" />
+                <Input type="text" role="searchbox" variant="ghost" class="h-full min-h-0 min-w-0 flex-1 border-0 px-0 py-0" placeholder={t("shell.sidebar.search")} aria-label={t("shell.sidebar.search")} value={searchText()} onInput={event => setSearchText(event.currentTarget.value)} onKeyDown={event => {
+                  if (event.key === "Escape" && searchText()) { event.preventDefault(); event.stopPropagation(); clearSearch(); }
+                }} />
+                <Show when={searchText()}>
+                  <Button variant="chrome" size="iconCompact" class="-mr-1 size-6 shrink-0 text-neutral-500" aria-label={t("shell.sidebar.clear_search")} title={t("shell.sidebar.clear_search")} onClick={clearSearch}><X size={14} /></Button>
+                </Show>
+              </div>
               <Suspense>
                 <SidebarFilter
                   view={vistaEfectiva()}
                   onChange={cambiarVista}
                   folders={carpetasDelFiltro()}
                   agents={agentesDelFiltro()}
+                  machines={variasMaquinas()}
                 />
               </Suspense>
             </div>

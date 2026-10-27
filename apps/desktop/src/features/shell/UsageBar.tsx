@@ -1,3 +1,4 @@
+import { machineOf } from "../machines/store";
 import { listen } from "../../lib/serviceEvents";
 import Bug from "lucide-solid/icons/bug";
 import ChartNoAxesCombined from "lucide-solid/icons/chart-no-axes-combined";
@@ -31,13 +32,15 @@ import {
   PopoverTrigger,
 } from "../../ui/Popover";
 import { ProgressBar } from "../../ui/ProgressBar";
-import AccountCard from "../settings/AccountCard";
+import { sharedLazy } from "../../lib/sharedLazy";
 import type { Account, AccountList, AccountStatus } from "../settings/accounts-store";
 import KeepAwake from "./KeepAwake";
 import PuertosAbiertos from "./OpenPorts";
-import Almacenamiento from "./Storage";
 import BotonDeTema from "./ThemeButton";
 import PieVersion from "./VersionFooter";
+
+const AccountCard = sharedLazy(() => import("../settings/AccountCard"));
+const Almacenamiento = sharedLazy(() => import("./Storage"));
 
 // Consumo de las cuentas activas; las lecturas fallidas conservan el último dato marcado como antiguo.
 // El refresco automático debe respetar el caché y evitar cuentas sin consumo disponible.
@@ -156,7 +159,7 @@ export default function UsageBar(props: {
         id,
         // force es el nombre del parámetro del puente; otro nombre no forzaría la consulta.
         force: force,
-      });
+      }, machineOf(id));
       setReads((p) => ({ ...p, [k]: r }));
       const lastGood = legible(r);
       if (lastGood) setLastGoodReads((p) => ({ ...p, [k]: lastGood }));
@@ -251,7 +254,7 @@ export default function UsageBar(props: {
             const status = await invoke<AccountStatus>("account_status", {
               provider: p.agent,
               id: p.cuenta.id,
-            });
+            }, machineOf(p.cuenta.id));
             if (!alive) return;
             setStatuses((previous) => ({
               ...previous,

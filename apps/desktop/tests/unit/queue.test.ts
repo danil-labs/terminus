@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { agruparCola as groupQueue, contestaALaTerminal as answersTerminal, despachable as isDispatchable, esDeLaTerminal as isTerminalMessage, guardable as isSaveable, inyectable as isInjectable, retencionAlCargar as retentionOnLoad, seMandaSinSuperficie as sendsWithoutSurface, siguienteLote as nextBatch, sueltaElBorrador as releasesDraft } from "../../src/features/chat/queue.ts";
+import { agruparCola as groupQueue, deOtraTarea as fromAnotherTask, contestaALaTerminal as answersTerminal, despachable as isDispatchable, esDeLaTerminal as isTerminalMessage, guardable as isSaveable, inyectable as isInjectable, retencionAlCargar as retentionOnLoad, seMandaSinSuperficie as sendsWithoutSurface, siguienteLote as nextBatch, sueltaElBorrador as releasesDraft } from "../../src/features/chat/queue.ts";
 import type { Encolado as Queued } from "../../src/features/chat/MessageQueue.tsx";
 
 const idle = {
@@ -217,6 +217,27 @@ test("al turno vivo solo entra lo que es un mensaje, nunca un comando", () => {
   assert.equal(isInjectable({ ...written, id: "a", text: "  !ls" }), false);
   // Un signo en medio no es un comando.
   assert.equal(isInjectable({ ...written, id: "a", text: "¿por qué falla /tmp!?" }), true);
+});
+
+// Lo que mandó otra tarea no entra en el turno vivo desde la ventana:
+// `inject_message` no lleva sobre y saldría firmado por la persona. Se ve con
+// su remitente y no se edita ni se quita como si fuera suyo.
+test("una entrega de otra tarea no se inyecta ni se toma por de la persona", () => {
+  const reply = {
+    ...written,
+    id: "r1",
+    text: "Ya subí el arreglo",
+    from_task: { folder: "p", task: "2jcp4typ", title: "Arreglo", provider: "claude" },
+    hops: 0,
+  };
+  assert.equal(isInjectable(reply), false);
+  assert.equal(fromAnotherTask(reply), true);
+  assert.equal(isInjectable(delivery), false);
+  assert.equal(fromAnotherTask(delivery), true);
+  const telegram = { ...written, id: "c1", text: "hola", channel: "telegram", hops: 1 };
+  assert.equal(isInjectable(telegram), false);
+  assert.equal(fromAnotherTask(telegram), false, "lo de un canal lo escribió la persona");
+  assert.equal(fromAnotherTask({ ...written, id: "a", text: "y revisa esto" }), false);
 });
 
 // Un `!` que llegó de otra tarea, de un encargado o de un canal no es de la

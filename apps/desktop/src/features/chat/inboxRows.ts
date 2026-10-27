@@ -10,11 +10,19 @@ export const TOPE_DE_SALTOS = 3;
  * respuesta entregada a quien la pidió. Rust las guarda con el informe de la
  * hija como texto, o sin texto, y la frase se compone aquí.
  */
-const FILAS = new Set(["task_finished", "task_finished_read", "task_chain_limit", "woke_by_tasks", "respondido"]);
+const FILAS = new Set([
+  "task_finished",
+  "task_finished_read",
+  "task_chain_limit",
+  "woke_by_tasks",
+  "respondido",
+  // Una entrega que espera a que el turno termine (`chat::delivery`).
+  "delivery_pending",
+]);
 
 /** Las filas cuyo texto guardado no es un informe que citar debajo. */
 export function citaInforme(meta: string | undefined): boolean {
-  return meta !== "woke_by_tasks" && meta !== "respondido";
+  return meta !== "woke_by_tasks" && meta !== "respondido" && meta !== "delivery_pending";
 }
 
 /** La tarea que nombra una entrega guardada sin `from_task`, cuya prosa española lleva su id. */
@@ -34,6 +42,9 @@ export function prosaDeLaFila(meta: string, titulo: string | null, cuantas: numb
   // Las guardadas antes llevan prosa española con el id: se compone igual y sin él.
   if (meta === "respondido") {
     return titulo ? t("chat.inbox.replied", { title: titulo }) : t("chat.inbox.replied_someone");
+  }
+  if (meta === "delivery_pending") {
+    return titulo ? t("chat.inbox.delivery_pending", { title: titulo }) : t("chat.inbox.delivery_pending_someone");
   }
   if (meta === "woke_by_tasks") {
     return cuantas > 0 ? t("chat.inbox.woke", { count: cuantas }) : t("chat.inbox.woke_some");

@@ -1,29 +1,27 @@
 /**
  * Las cuentas de IA de la persona en todas sus máquinas, como el panel de la
- * web (#154): una tarjeta por proveedor y correo, con su consumo leído una
- * vez (de la primera máquina encendida donde está) y una chapa por máquina
- * donde tiene la sesión iniciada. Sin correo, la cuenta queda sola y se nombra
- * con su máquina. Es la regla de `mergeAccounts` en `apps/desktop/src/web/fleet.ts`.
+ * web: una tarjeta por correo y tipo de suscripción confirmado, con las
+ * máquinas donde tiene sesión. Sin tipo conocido no se unen credenciales.
  */
 import { word } from "../../design/src/index.ts";
 
 type Lang = "es" | "en";
 
-export type AccountRowLike = { id: string; label?: string | null; identity?: string | null };
+export type AccountRowLike = { id: string; label?: string | null; identity?: string | null; plan?: string | null };
 
 /** Una máquina donde la cuenta tiene sesión: su id local allí y si está encendida. */
 export type AccountMember = { machine: string; id: string; on: boolean };
 
 export type AccountGroup<R extends AccountRowLike = AccountRowLike> = {
-  /** `provider:correo`, o `provider:máquina~id` sin correo. */
+  /** Proveedor, correo y tipo conocido; sin tipo, máquina e id local. */
   key: string;
   provider: string;
-  /** La fila de la primera máquina que la tiene. */
+  /** La credencial de la máquina elegida para leer consumo. */
   row: R;
   /** El correo en minúsculas; `null` si el CLI no lo dice. */
   email: string | null;
   members: AccountMember[];
-  /** De qué máquina se lee el consumo: la primera encendida, si no la primera. */
+  /** De qué credencial y máquina se lee el consumo. */
   usageFrom: AccountMember;
 };
 
@@ -35,21 +33,38 @@ export function groupAccounts<R extends AccountRowLike>(
   lists: readonly { machine: string; on: boolean; accounts: readonly R[] }[],
 ): AccountGroup<R>[] {
   const groups: AccountGroup<R>[] = [];
+  const candidates = new Map<string, { row: R; member: AccountMember; email: string }[]>();
   for (const { machine, on, accounts } of lists) {
     for (const row of accounts) {
       if (typeof row?.id !== "string") continue;
       const member = { machine, id: row.id, on };
       const email = text(row.identity).toLowerCase() || null;
-      const known = email ? groups.find((g) => g.email === email) : undefined;
-      if (known) {
-        known.members.push(member);
-        if (!known.usageFrom.on && on) known.usageFrom = member;
-      } else {
-        groups.push({ key: `${provider}:${email ?? `${machine}~${row.id}`}`, provider, row, email, members: [member], usageFrom: member });
+      const plan = text(row.plan).toLowerCase();
+      if (email && plan) {
+        const key = JSON.stringify([provider, email, plan]);
+        const entries = candidates.get(key) ?? [];
+        entries.push({ row, member, email });
+        candidates.set(key, entries);
       }
+      groups.push({ key: `${provider}:${machine}~${row.id}`, provider, row, email, members: [member], usageFrom: member });
     }
   }
-  return groups;
+  const joined = new Map<string, AccountGroup<R>>();
+  for (const [key, entries] of candidates) {
+    // Dos registros del mismo tipo en una máquina son ambiguos: no atribuir
+    // la copia de otra máquina a uno de ellos por su orden en la lista.
+    if (new Set(entries.map((e) => e.member.machine)).size !== entries.length) continue;
+    const source = entries.find((e) => e.member.on) ?? entries[0];
+    const group = { key, provider, row: source.row, email: source.email, members: entries.map((e) => e.member), usageFrom: source.member };
+    for (const e of entries) joined.set(`${e.member.machine}~${e.member.id}`, group);
+  }
+  const seen = new Set<AccountGroup<R>>();
+  return groups.flatMap((g) => {
+    const group = joined.get(`${g.usageFrom.machine}~${g.usageFrom.id}`) ?? g;
+    if (seen.has(group)) return [];
+    seen.add(group);
+    return [group];
+  });
 }
 
 /** Lo que queda de una ventana, de 0 a 100: el motor da lo usado. */

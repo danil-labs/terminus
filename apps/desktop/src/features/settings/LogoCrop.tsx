@@ -3,8 +3,10 @@ import { Button } from "../../ui/Button";
 import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
 import { t } from "../../lib/i18n";
 import {
+  LOGO_MAX,
   MARCO,
-  SALIDA,
+  SALIDAS,
+  bytesDeBase64,
   centrar,
   limitar,
   medidas,
@@ -76,17 +78,20 @@ export function LogoCrop(props: {
   function usar() {
     const img = imagen;
     if (!img) return;
-    const canvas = document.createElement("canvas");
-    canvas.width = SALIDA;
-    canvas.height = SALIDA;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
     const o = origenDelCanvas(ancho(), alto(), zoom(), ox(), oy());
-    ctx.drawImage(img, o.sx, o.sy, o.sw, o.sh, 0, 0, SALIDA, SALIDA);
-    const url = canvas.toDataURL("image/png");
-    const coma = url.indexOf(",");
-    if (coma < 0) return;
-    props.onUse(url.slice(coma + 1));
+    for (const lado of SALIDAS) {
+      const canvas = document.createElement("canvas");
+      canvas.width = lado;
+      canvas.height = lado;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.drawImage(img, o.sx, o.sy, o.sw, o.sh, 0, 0, lado, lado);
+      const url = canvas.toDataURL("image/png");
+      const coma = url.indexOf(",");
+      if (coma < 0) return;
+      const png = url.slice(coma + 1);
+      if (bytesDeBase64(png) <= LOGO_MAX || lado === SALIDAS[SALIDAS.length - 1]) return props.onUse(png);
+    }
   }
 
   const vista = () => medidas(ancho(), alto(), zoom());

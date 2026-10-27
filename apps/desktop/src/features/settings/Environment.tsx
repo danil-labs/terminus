@@ -8,6 +8,7 @@ import {
   onMount,
 } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
+import { textoDeFalta } from "../../lib/no-space";
 import { listen } from "../../lib/serviceEvents";
 import RefreshCw from "lucide-solid/icons/refresh-cw";
 import SquareArrowOutUpRight from "lucide-solid/icons/square-arrow-out-up-right";
@@ -166,7 +167,8 @@ export default function Environment() {
       await invoke("install_base_tool", { tool: fila.id });
       await cargar(true);
     } catch (e) {
-      setFallo({ ...asFailure(e), what: t("settings.environment.error_prepare") });
+      const sinEspacio = await textoDeFalta(e, `tool:${fila.id}`);
+      setFallo(sinEspacio ? { what: sinEspacio, detail: "" } : { ...asFailure(e), what: t("settings.environment.error_prepare") });
     } finally {
       setPreparando(null);
     }

@@ -35,12 +35,13 @@ export function AccountAvatar(props: { profile: AccountProfile | null; class?: s
 /**
  * La persona y sus acciones. Con `status` (escritorio) sigue al motor por
  * `danil-connect`; sin él (web) la lee una vez de `source`. `refresh: false`
- * no la pide al montar (el pie: el motor ya la pide al arrancar).
+ * no la pide al montar (el pie: el motor ya la pide al arrancar). `watch` la
+ * vuelve a pedir cuando cambia (una sesión de la lista con otra foto).
  */
 export function createAccountIdentity(
   source: AccountProfileSource,
   status?: () => DanilConnectStatus | null,
-  { refresh = true } = {},
+  { refresh = true, watch }: { refresh?: boolean; watch?: () => unknown } = {},
 ) {
   const [profile, setProfile] = createSignal<AccountProfile | null>(null);
   const [busy, setBusy] = createSignal(false);
@@ -54,6 +55,7 @@ export function createAccountIdentity(
   };
 
   if (status) createEffect(on(status, (s) => void show(profileFromStatus(s)).catch(() => {})));
+  if (watch) createEffect(on(watch, () => void show(source.read()).catch(() => {}), { defer: true }));
   onMount(() => {
     if (!refresh) return;
     // En el escritorio esto pide el perfil otra vez: una foto cambiada en la web entra aquí.

@@ -14,10 +14,11 @@ export type Resumen = {
 };
 
 /**
- * Una carpeta que el backend nombra aparte de sus archivos: una vacía, o un
- * repositorio anidado, que lleva su icono. `development::CarpetaDelArbol`.
+ * Una carpeta que el backend nombra aparte de sus archivos: una vacía, un
+ * repositorio anidado, que lleva su icono, o una plegada (`lazy`): lo de
+ * dentro se pide al abrirla con `tree_folder`. `development::CarpetaDelArbol`.
  */
-export type Carpeta = { path: string; repo: boolean };
+export type Carpeta = { path: string; repo: boolean; lazy?: boolean; ignored?: boolean };
 
 export type Nodo =
   | {
@@ -31,6 +32,10 @@ export type Nodo =
       cambiados: number;
       /** Es un repositorio git anidado: se pinta con su icono y no se compacta. */
       repo: boolean;
+      /** Dependencias o lo que git ignora: lo de dentro llega al abrirla, por páginas. */
+      plegada: boolean;
+      /** Git la ignora, a ella o a una de arriba. */
+      ignorada: boolean;
     }
   | {
       tipo: "archivo";
@@ -47,10 +52,12 @@ type Rama = {
   hijas: Map<string, Rama>;
   archivos: { nombre: string; ruta: string; nube?: true }[];
   repo: boolean;
+  plegada: boolean;
+  ignorada: boolean;
 };
 
 function rama(): Rama {
-  return { hijas: new Map(), archivos: [], repo: false };
+  return { hijas: new Map(), archivos: [], repo: false, plegada: false, ignorada: false };
 }
 
 /**
@@ -74,11 +81,14 @@ function compactar(nodo: Nodo): Nodo {
   const nombres = [nodo.nombre];
   // Un repositorio anidado se queda en su propia fila, con su icono: fundido
   // en `carpeta/repo` el icono diría que la carpeta de fuera es el repositorio.
+  // Una plegada tampoco: cada una carga lo suyo al abrirse.
   while (
     !actual.repo &&
+    !actual.plegada &&
     actual.hijos.length === 1 &&
     actual.hijos[0].tipo === "carpeta" &&
-    !actual.hijos[0].repo
+    !actual.hijos[0].repo &&
+    !actual.hijos[0].plegada
   ) {
     actual = actual.hijos[0];
     nombres.push(actual.nombre);
@@ -115,7 +125,10 @@ export function construir(
   for (const carpeta of carpetas) {
     const partes = carpeta.path.split("/").filter(Boolean);
     if (partes.length === 0) continue;
-    bajar(partes).repo = carpeta.repo;
+    const r = bajar(partes);
+    r.repo = carpeta.repo;
+    r.plegada ||= Boolean(carpeta.lazy);
+    r.ignorada ||= Boolean(carpeta.ignored);
   }
   const conocidas = new Set([...paths, ...locales.keys()]);
   for (const ruta of conocidas) {
@@ -132,12 +145,13 @@ export function construir(
     bajar(partes).archivos.push({ nombre, ruta, nube: true });
   }
 
-  const armar = (r: Rama, prefijo: string): Nodo[] => {
+  const armar = (r: Rama, prefijo: string, ignorada: boolean): Nodo[] => {
     const carpetas: Nodo[] = [...r.hijas.entries()]
       .sort(([a], [b]) => porNombre(a, b))
       .map(([nombre, hija]) => {
         const ruta = prefijo ? `${prefijo}/${nombre}` : nombre;
-        const hijos = armar(hija, ruta);
+        const ignoradaAqui = ignorada || hija.ignorada;
+        const hijos = armar(hija, ruta, ignoradaAqui);
         return {
           tipo: "carpeta" as const,
           nombre,
@@ -149,6 +163,8 @@ export function construir(
             0,
           ),
           repo: hija.repo,
+          plegada: hija.plegada,
+          ignorada: ignoradaAqui,
         };
       });
     const archivos: Nodo[] = r.archivos
@@ -164,7 +180,7 @@ export function construir(
     return [...carpetas, ...archivos];
   };
 
-  return armar(raiz, "").map(compactar);
+  return armar(raiz, "", false).map(compactar);
 }
 
 function plano(s: string) {

@@ -755,6 +755,51 @@ jobs:
             lipo "$f" -verify_arch arm64 x86_64
           done < <(find "$APP" -type f)
 
+      # Con `CI=true` Tauri arma el `.dmg` sin acomodar la ventana (`--skip-jenkins`)
+      # y le pone al disco el ícono de la app: la gente abría Terminus desde el
+      # disco en vez de copiarlo. dmgbuild escribe la ventana sin Finder, con el
+      # ícono de instalador. Se firma aquí porque el llavero de Tauri ya no existe.
+      - name: Armar el .dmg con su ventana
+        if: runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          set -euo pipefail
+          B=src-tauri/target/universal-apple-darwin/release/bundle
+          APP="$B/macos/Terminus.app"
+          DMG=$(find "$B" -type f -name '*.dmg' | head -1)
+          [ -n "$DMG" ] || { echo "::error::No se construyó el .dmg."; exit 1; }
+
+          python3 -m venv "$RUNNER_TEMP/dmgbuild"
+          "$RUNNER_TEMP/dmgbuild/bin/pip" install --quiet 'dmgbuild==1.6.7'
+          rm "$DMG"
+          "$RUNNER_TEMP/dmgbuild/bin/dmgbuild" -s src-tauri/macos/dmg-settings.py \
+            -D "app=$APP" -D "assets=$PWD/src-tauri/macos" "Instalar Terminus" "$DMG"
+
+          KC="$RUNNER_TEMP/dmg-signing.keychain-db"
+          KC_PASSWORD=$(openssl rand -hex 24)
+          security create-keychain -p "$KC_PASSWORD" "$KC"
+          security set-keychain-settings -lut 900 "$KC"
+          security unlock-keychain -p "$KC_PASSWORD" "$KC"
+          umask 077
+          printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/dmg-signing.p12"
+          security import "$RUNNER_TEMP/dmg-signing.p12" -k "$KC" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/dmg-signing.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KC_PASSWORD" "$KC" >/dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          codesign --force --timestamp --keychain "$KC" --sign "$APPLE_SIGNING_IDENTITY" "$DMG"
+          security delete-keychain "$KC"
+          codesign --verify --verbose=2 "$DMG"
+
+          MNT=$(mktemp -d)
+          hdiutil attach -nobrowse -readonly -mountpoint "$MNT" "$DMG" >/dev/null
+          for f in .DS_Store .VolumeIcon.icns .background.tiff Terminus.app Applications; do
+            [ -e "$MNT/$f" ] || { hdiutil detach "$MNT" >/dev/null; echo "::error::Al .dmg le falta $f."; exit 1; }
+          done
+          hdiutil detach "$MNT" >/dev/null
+
       # El código de salida de `tauri build` tampoco basta: un .app ad-hoc o sin
       # ticket grapado llega a `release-assets/` igual. `stapler validate` es lo que
       # Gatekeeper mira en un Mac sin red; si falla, no se publica.

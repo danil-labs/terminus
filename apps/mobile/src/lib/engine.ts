@@ -6,6 +6,7 @@
 import type {
   AccountLimits,
   AccountList,
+  LoginEvent,
   AgentList,
   AgentStatusRow,
   Answer,
@@ -29,15 +30,14 @@ import type {
   Space,
   TaskBlockers,
   Startup,
-  TreeContent,
   Turn,
   Workspace,
   WorkspaceAttention,
 } from "@terminus/protocol";
-import { MAX_VISUAL_BYTES, VISUAL_FILE, VISUAL_TREE } from "@terminus/chat/visual";
-import { linkedAttention, onlyLinked } from "@terminus/computers";
-import { type ChatBackgroundView, chatBackgroundView, isSingleAttention } from "@terminus/protocol";
-import { type FlatRow, flattenTasks } from "@terminus/tasks";
+import { readVisualHtml, type VisualPart, type VisualWhole, VISUAL_FILE, VISUAL_TREE } from "@terminus/chat/visual";
+import { arrangeSpaces, spaceOrder, type AccountWorkspace, groupWorkspaces, linkedAttention, onlyLinked, registryProjects, withRegistry } from "@terminus/computers";
+import { type ChatBackgroundView, chatBackgroundImageUrl, chatBackgroundView, isSingleAttention } from "@terminus/protocol";
+import { type FlatRow, flattenTasks, launcherOf } from "@terminus/tasks";
 import { type Host, HostError } from "./hosts.ts";
 
 /** Una tarea de la lista, con la máquina y la carpeta de donde viene. */
@@ -73,6 +73,8 @@ export type HostSnapshot = {
   folders: Folder[];
   spaces: Space[];
   tasks: Task[];
+  /** Las que la lista esconde bajo su lanzador: salen en el chat de este («N tareas delegadas»). */
+  delegated: Task[];
   agents: Agent[];
   /** Tareas con un turno en marcha. */
   live: string[];
@@ -96,17 +98,111 @@ async function read<T>(host: Host, command: Parameters<Host["call"]>[0], workspa
   }
 }
 
-/** Los workspaces de una máquina; apagada y sin copia, ninguno. */
-export async function workspacesOf(host: Host): Promise<{ list: Workspace[]; cachedAt: number | null }> {
+/** Los workspaces de una máquina; apagada y sin copia, `null`: no dijo cuáles tiene. */
+export async function workspacesOf(host: Host): Promise<{ list: Workspace[] | null; cachedAt: number | null }> {
   const at = { cachedAt: null as number | null };
   const startup = await read<Startup | null>(host, "list_workspaces", null, {}, null, at);
-  return { list: onlyLinked(startup?.workspaces ?? [], host.linked), cachedAt: at.cachedAt };
+  return { list: startup ? onlyLinked(startup.workspaces ?? [], host.linked) : null, cachedAt: at.cachedAt };
 }
 
-/** El fondo de los chats del workspace en esa máquina; sin respuesta, ninguno. */
-export async function chatBackgroundOf(host: Host, workspace: string): Promise<ChatBackgroundView> {
+/**
+ * Un workspace, quizá en varias máquinas: el mismo si su id es igual
+ * (`groupWorkspaces`, la regla de la web). `members`, su id en cada máquina,
+ * que es el mismo.
+ */
+export type WorkspaceEntry = {
+  id: string;
+  name: string;
+  members: Map<string, string>;
+  hosts: string[];
+  /** El modo de permisos que eligió el workspace para las tareas nuevas; `null`, ninguno. */
+  defaultPermissionMode: string | null;
+};
+
+/**
+ * Los workspaces de la persona: lo que listan sus máquinas más el registro de
+ * la cuenta (`GET /v1/workspaces`), que trae los de máquinas dormidas. Una
+ * máquina que contestó manda sobre el registro; sin registro, lo de antes.
+ */
+export function workspaceEntries(hosts: readonly { id: string }[], perHost: Record<string, Workspace[] | null>, registry: readonly AccountWorkspace[] | null): WorkspaceEntry[] {
+  const order = hosts.map((h) => h.id);
+  const answered = new Set(order.filter((id) => perHost[id] != null));
+  const groups = groupWorkspaces(hosts.map((h) => ({ machine: h.id, rows: perHost[h.id] ?? [] })));
+  return withRegistry(groups, registry, order, answered, (w): Workspace => ({ id: w.id, name: w.name })).map((g) => ({
+    id: g.key,
+    name: g.row.name ?? g.key,
+    members: g.members,
+    hosts: [...g.members.keys()],
+    // La máquina que contestó manda; si no lo dice, el ajuste del registro de la cuenta.
+    defaultPermissionMode: g.row.default_permission_mode || registry?.find((w) => w.id === g.key)?.settings?.default_permission_mode || null,
+  }));
+}
+
+/**
+ * Las carpetas del registro que ninguna máquina listó (sus máquinas duermen y
+ * el relay no tiene copia): en la máquina donde nació, si es del workspace, o
+ * en la primera que lo tiene. Una tarea nueva ahí enciende esa máquina.
+ */
+export function withAccountFolders<S extends { folders: Folder[]; spaces: Space[] }>(
+  snapshot: S,
+  registry: readonly AccountWorkspace[] | null,
+  workspace: string,
+  members: readonly string[],
+): S {
+  const known = new Set(snapshot.folders.map((f) => f.id));
+  const extra = registryProjects(registry, workspace, known).flatMap((p): Folder[] => {
+    const host = p.home_computer_id && members.includes(p.home_computer_id) ? p.home_computer_id : members[0];
+    return host ? [{ id: p.id, name: p.name, working_directory: null, key: `${host}/${p.id}`, host }] : [];
+  });
+  const account = registry?.find(row => row.id === workspace);
+  const spaces = account ? arrangeSpaces(snapshot.spaces, spaceOrder(account)) : snapshot.spaces;
+  if (!extra.length) return spaces.every((space, i) => space === snapshot.spaces[i]) ? snapshot : { ...snapshot, spaces };
+  const keys = extra.map((f) => f.key);
+  return { ...snapshot, folders: [...snapshot.folders, ...extra], spaces: spaces.map((s) => ({ ...s, folders: [...s.folders, ...keys] })) };
+}
+
+/** El fondo de los chats con `remote`: la imagen en la cuenta de Danil, que se pide con la sesión de la persona. */
+export type ChatBackdropView = ChatBackgroundView & { remote: string | null };
+
+const sameOrigin = (url: string, endpoint: string) => {
+  try {
+    return new URL(url).origin === new URL(endpoint).origin;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Sin patrón elegido, la imagen de la cuenta (`background_url` del registro o
+ * `image_url` del motor) manda sobre la copia en línea. Solo del plano de
+ * control: la sesión no va a otro origen.
+ */
+export function withAccountBackground(answer: unknown, accountUrl: string | null, endpoint: string): ChatBackdropView {
+  const view = chatBackgroundView(answer);
+  if (view.preset) return { ...view, remote: null };
+  const remote = [accountUrl, chatBackgroundImageUrl(answer)].find((u): u is string => !!u && sameOrigin(u, endpoint)) ?? null;
+  return { ...view, remote };
+}
+
+/** El fondo de los chats del workspace en esa máquina y en la cuenta; sin ninguno, ninguno. */
+export async function chatBackgroundOf(host: Host, workspace: string, accountUrl: string | null = null, endpoint = ""): Promise<ChatBackdropView> {
   const at = { cachedAt: null as number | null };
-  return chatBackgroundView(await read<unknown>(host, "chat_background", workspace, {}, null, at).catch(() => null));
+  const answer = await read<unknown>(host, "chat_background", workspace, {}, null, at).catch(() => null);
+  return withAccountBackground(answer, accountUrl, endpoint);
+}
+
+/**
+ * Las tareas vivas de una máquina con la regla del riel del escritorio
+ * (`flattenTasks`): las que cuelgan de su lanzador no van en `tasks` sino en
+ * `delegated`, para el chat de este.
+ */
+export function tasksOf(byProject: Record<string, (SessionRow & FlatRow)[]>, host: string, workspace: string): { tasks: Task[]; delegated: Task[] } {
+  const asTask = (project: string, row: SessionRow): Task => ({ ...row, host, workspace, folder: project, folderKey: `${host}/${project}` });
+  const tasks = flattenTasks(byProject).map(({ project, row }) => asTask(project, row));
+  const shown = new Set(tasks.map((task) => task.id));
+  const delegated = Object.entries(byProject).flatMap(([project, rows]) =>
+    rows.filter((row) => !row.archived && !shown.has(row.id) && launcherOf(row)).map((row) => asTask(project, row)));
+  return { tasks, delegated };
 }
 
 /**
@@ -135,7 +231,7 @@ export async function snapshotOf(host: Host, workspace: string): Promise<HostSna
   );
   const byProject: Record<string, (SessionRow & FlatRow)[]> = {};
   for (const { project, rows } of perFolder) byProject[project] = rows;
-  const tasks: Task[] = flattenTasks(byProject).map(({ project, row }) => ({ ...row, host: host.id, workspace, folder: project, folderKey: `${host.id}/${project}` }));
+  const { tasks, delegated } = tasksOf(byProject, host.id, workspace);
 
   const agents = new Map<string, Agent>();
   for (const { project, agents: list, status } of perFolder) {
@@ -163,6 +259,7 @@ export async function snapshotOf(host: Host, workspace: string): Promise<HostSna
     folders: folders.map((f) => ({ ...f, key: `${host.id}/${f.id}`, host: host.id })),
     spaces,
     tasks,
+    delegated,
     agents: [...agents.values()],
     live,
     providers: Array.isArray(providers) ? providers : [],
@@ -174,16 +271,27 @@ const rank = (s: Agent["status"]) => (s === "working" ? 0 : s === "awake" ? 1 : 
 
 /**
  * Junta lo que cada máquina sabe de un mismo workspace, como el panel de la
- * web: las carpetas y tareas de cada una, marcadas con su máquina (sus ids no
- * se parecen entre motores). Los spaces son los de la primera máquina; las
- * carpetas de las demás se ven en todos.
+ * web: las carpetas y tareas de cada una, marcadas con su máquina. Los spaces
+ * son los de todas las máquinas (una VM dormida no tiene por qué tenerlos), uno
+ * por id o, si los ids difieren, por nombre; una carpeta lleva el mismo id en
+ * cada máquina, así que el space la nombra en todas.
  */
 export function mergeSnapshots(parts: HostSnapshot[], tagMachines: (host: string) => { machine: string; on: boolean } | null) {
-  const lead = parts[0];
-  const others = parts.slice(1).flatMap((p) => p.folders.map((f) => f.key));
-  const spaces: Space[] = (lead?.spaces ?? []).map((s) => ({ ...s, folders: [...s.folders.map((f) => `${lead.host}/${f}`), ...others] }));
+  const spaces: MergedSpace[] = [];
+  for (const part of parts) {
+    for (const s of part.spaces) {
+      const folders = s.folders.flatMap((f) => parts.map((p) => `${p.host}/${f}`));
+      const same = spaces.find((m) => Object.values(m.on).includes(s.id) || (!(part.host in m.on) && (m.name ?? "") === (s.name ?? "")));
+      if (!same) spaces.push({ ...s, folders, on: { [part.host]: s.id } });
+      else {
+        same.on[part.host] ??= s.id;
+        same.folders = [...new Set([...same.folders, ...folders])];
+      }
+    }
+  }
   const agents = new Map<string, Agent>();
   const tasks: Task[] = [];
+  const delegated: Task[] = [];
   const live = new Set<string>();
   let cached: number | null = null;
   for (const part of parts) {
@@ -197,13 +305,23 @@ export function mergeSnapshots(parts: HostSnapshot[], tagMachines: (host: string
     }
     const tag = tagMachines(part.host);
     for (const task of part.tasks) tasks.push(tag ? { ...task, machine: tag.machine, machine_on: tag.on } : task);
+    for (const task of part.delegated) delegated.push(tag ? { ...task, machine: tag.machine, machine_on: tag.on } : task);
     for (const id of part.live) live.add(`${part.host}/${id}`);
     if (part.cachedAt !== null) cached = Math.max(cached ?? 0, part.cachedAt);
   }
   tasks.sort((a, b) => b.created_at - a.created_at);
   const providers = Object.fromEntries(parts.map((p) => [p.host, p.providers]));
-  return { folders: parts.flatMap((p) => p.folders), spaces, agents: [...agents.values()], tasks, live, providers, cachedAt: cached };
+  return { folders: parts.flatMap((p) => p.folders), spaces, agents: [...agents.values()], tasks, delegated, live, providers, cachedAt: cached };
 }
+
+/**
+ * Un space del workspace en todas sus máquinas: `id` es el de la primera que lo
+ * tiene y `on`, su id en cada una (el que se le manda a esa máquina).
+ */
+export type MergedSpace = Space & { on: Record<string, string> };
+
+/** Si la tarea va en el space, como `enEscritorio` del escritorio: una sin space resuelto va en todos. */
+export const taskInSpace = (task: { space?: string | null }, space: MergedSpace | null) => !space || !task.space || Object.values(space.on).includes(task.space);
 
 /** La clave de una tarea entre máquinas: el mismo id puede repetirse en dos. */
 export const taskKey = (task: { host: string; id: string }) => `${task.host}/${task.id}`;
@@ -211,7 +329,7 @@ export const taskKey = (task: { host: string; id: string }) => `${task.host}/${t
 // --- Una tarea ---------------------------------------------------------------
 
 export type Permission = { request_id: string; tool: string; target: string | null };
-export type PendingQuestion = { request_id: string; turn: string; questions: Question[] };
+export type PendingQuestion = { request_id: string | null; turn: string; questions: Question[] };
 
 export type TaskView = {
   session: OpenedSession;
@@ -230,12 +348,51 @@ export async function loadTask(host: Host, workspace: string, folder: string, id
   ]);
   if (!session) throw new HostError("machine_off", host.label);
   const turns = session.turns ?? [];
-  // `pending_requests` solo da el turno de la pregunta; el contenido está en ese turno.
-  const questions = (pending?.questions ?? []).map((q) => ({
-    ...q,
-    questions: [...turns].reverse().find((t: Turn) => t.id === q.turn && t.questions?.length)?.questions ?? [],
-  }));
+  // Las preguntas por archivo sobreviven al proceso; las respuestas guardadas
+  // son la fuente de verdad, igual que en escritorio.
+  const answered = new Set(turns.flatMap((t) => t.answers ?? []).map((a) => JSON.stringify([a.turn, a.question])));
+  const questions: PendingQuestion[] = turns.flatMap((t) => {
+    if (!t.id) return [];
+    const remaining = (t.questions ?? []).filter((q) => !answered.has(JSON.stringify([t.id, q.id])));
+    return remaining.length ? [{
+      turn: t.id,
+      request_id: pending?.questions.find((q) => q.turn === t.id)?.request_id ?? null,
+      questions: remaining,
+    }] : [];
+  });
   return { session, permissions: pending?.permissions ?? [], questions, running: live.includes(id), cachedAt: at.cachedAt };
+}
+
+/**
+ * Una lectura que se pide desde muchos lados (volver al frente, el foco, un evento, la
+ * máquina que cambia) sin pisarse: con una en marcha, las que se piden mientras tanto se
+ * juntan (`merge`) en una sola que corre al terminar, y todas esperan a esa. Así nunca
+ * hay dos a la vez y la última petición siempre ve una lectura que empezó después de ella.
+ */
+export function coalesced<T>(run: (arg: T) => Promise<void>, merge: (a: T, b: T) => T): (arg: T) => Promise<void> {
+  let running: Promise<void> | null = null;
+  let queued: { arg: T } | null = null;
+  return (arg) => {
+    if (running) {
+      queued = { arg: queued ? merge(queued.arg, arg) : arg };
+      return running;
+    }
+    running = (async () => {
+      try {
+        let current = arg;
+        for (;;) {
+          await run(current);
+          if (!queued) return;
+          current = queued.arg;
+          queued = null;
+        }
+      } finally {
+        running = null;
+        queued = null;
+      }
+    })();
+    return running;
+  };
 }
 
 /** Lo que el cuadro de escribir elige para un mensaje, como la ventana. */
@@ -320,7 +477,7 @@ export function suggestedDefaults(tasks: Task[], host: string, workspace: string
 export async function createTask(
   host: Host,
   workspace: string,
-  args: { folder: string; prompt: string; provider: string; model: string | null; agent: string | null; space: string | null } & Partial<Pick<Draft, "effort" | "permissionMode" | "attachments">> & { baseRef?: string | null },
+  args: { folder: string; prompt: string; provider: string; model: string | null; agent: string | null; space: string | null } & Partial<Pick<Draft, "effort" | "permissionMode" | "attachments">> & { baseRef?: string | null; unwrapSnapshot?: boolean },
 ) {
   const { value } = await host.call<string>("send_message", workspace, {
     ...MESSAGE_DEFAULTS,
@@ -333,12 +490,21 @@ export async function createTask(
     permissionMode: args.permissionMode ?? null,
     attachments: args.attachments ?? [],
     baseRef: args.baseRef ?? null,
+    ...(args.unwrapSnapshot ? { unwrapSnapshot: true } : {}),
     agent: args.agent,
     taskFromAgent: Boolean(args.agent),
     space: args.space,
   });
   if (typeof value !== "string" || !value) throw new HostError("operation_failed");
   return value;
+}
+
+/**
+ * Comparte con la cuenta un space de esa máquina (`share_space`): desde ahí tiene
+ * el mismo id en todas, y una tarea nueva en otra máquina puede nacer en él.
+ */
+export async function shareSpace(host: Host, workspace: string, id: string) {
+  await host.call("share_space", workspace, { id });
 }
 
 export function stopTask(host: Host, workspace: string, folder: string, id: string) {
@@ -349,14 +515,30 @@ export function respondPermission(host: Host, workspace: string, id: string, req
   return host.call("respond_permission", workspace, { session: id, requestId, allow });
 }
 
-export function answerQuestion(host: Host, workspace: string, id: string, pending: PendingQuestion, chosen: Record<string, string[]>, free: Record<string, string>) {
+export async function answerQuestion(host: Host, workspace: string, folder: string, id: string, pending: PendingQuestion, chosen: Record<string, string[]>, free: Record<string, string>) {
   const respuestas: Answer[] = pending.questions.map((q) => ({
     turn: pending.turn,
     question: q.id,
     chosen: chosen[q.id] ?? [],
     free_text: free[q.id]?.trim() || null,
   }));
-  return host.call("answer_question", workspace, { session: id, requestId: pending.request_id, respuestas });
+  // El proceso puede haber terminado o la pregunta haberse respondido en otro cliente.
+  const current = await loadTask(host, workspace, folder, id);
+  const question = current.questions.find((q) => q.turn === pending.turn);
+  if (!question) return;
+  const remaining = respuestas.filter((a) => question.questions.some((q) => q.id === a.question));
+  if (question.request_id) {
+    return host.call("answer_question", workspace, { session: id, requestId: question.request_id, respuestas: remaining });
+  }
+  return host.call("send_message", workspace, {
+    ...MESSAGE_DEFAULTS,
+    project: folder,
+    session: id,
+    provider: current.session.provider,
+    model: taskDefaults(current).model,
+    prompt: "",
+    respuestas: remaining,
+  });
 }
 
 export function markSeen(host: Host, workspace: string, id: string) {
@@ -372,7 +554,7 @@ export async function attentionOf(host: Host): Promise<WorkspaceAttention[]> {
 
 // --- Fijar y archivar (la vista previa) -----------------------------------------
 
-/** Fijar o desfijar, como la ventana (`set_session_pinned`). Enciende la VM si está apagada. */
+/** Fijar o desfijar, como la ventana (`set_session_pinned`). Con la máquina apagada, el relay lo aplaza. */
 export async function setPinned(host: Host, workspace: string, folder: string, id: string, pinned: boolean) {
   await host.call("set_session_pinned", workspace, { project: folder, id, pinned });
 }
@@ -380,12 +562,17 @@ export async function setPinned(host: Host, workspace: string, folder: string, i
 /**
  * Archivar, como «Archivar» de la tarjeta del escritorio: primero pregunta qué
  * lo impide (`task_blockers`); con cambios sin guardar no archiva y lo dice,
- * para decidir desde la ventana. Enciende la VM si está apagada.
+ * para decidir desde la ventana. Con la máquina apagada no la enciende: el
+ * relay guarda el archivado y lo aplica al conectarse.
  */
 export async function archiveTask(host: Host, workspace: string, folder: string, id: string): Promise<{ archived: true } | { blocked: TaskBlockers["unsaved"] }> {
-  await host.wake();
-  const { value } = await host.call<TaskBlockers | null>("task_blockers", workspace, { project: folder, id, finish: false });
-  const unsaved = value?.unsaved ?? [];
+  if (host.power() === "off") {
+    await host.call("set_task_archived", workspace, { project: folder, id, archived: true, space: null });
+    return { archived: true };
+  }
+  const { value, cachedAt } = await host.call<TaskBlockers | null>("task_blockers", workspace, { project: folder, id, finish: false });
+  if (!value || cachedAt !== null || !Array.isArray(value.unsaved)) throw new HostError("task_status_unavailable");
+  const unsaved = value.unsaved;
   if (unsaved.length) return { blocked: unsaved };
   await host.call("set_task_archived", workspace, { project: folder, id, archived: true, space: null });
   return { archived: true };
@@ -497,30 +684,52 @@ export async function previewFile(host: Host, workspace: string, path: string, t
   return answer.value;
 }
 
-/** El HTML de una visualización del chat, del árbol de la tarea; las mismas comprobaciones que la ventana. */
+/** El HTML de una visualización del chat, por partes o de una vez; el mismo lector que la ventana. */
 export async function readVisual(host: Host, workspace: string, folder: string, session: string, file: string): Promise<string> {
   if (file.length > 128 || !VISUAL_FILE.test(file)) throw new HostError("invalid_visual_file");
-  const { value } = await host.call<TreeContent>("tree_show", workspace, { project: folder, session, tree: VISUAL_TREE, path: file });
-  if (!value || value.truncated || value.bytes > MAX_VISUAL_BYTES) throw new HostError("visual_too_large");
-  if (value.kind !== "text" || typeof value.text !== "string") throw new HostError("invalid_visual_file");
-  return value.text;
+  try {
+    return await readVisualHtml({
+      part: async (offset, size, revision) =>
+        (await host.call<VisualPart>("chat_visual_part", workspace, { project: folder, session, file, offset, size, revision: revision ?? null })).value,
+      whole: async () =>
+        (await host.call<VisualWhole>("tree_show", workspace, { project: folder, session, tree: VISUAL_TREE, path: file })).value,
+    });
+  } catch (error) {
+    const detail = error && typeof error === "object" && "detail" in error ? error.detail : null;
+    if (detail === "invalid_visual_file" || detail === "visual_too_large" || detail === "visual_read_failed") throw new HostError(detail);
+    throw error;
+  }
 }
 
 // --- Cuentas de IA ---------------------------------------------------------------
 
-export async function accountsOf(host: Host, provider: string): Promise<AccountList | null> {
-  const at = { cachedAt: null as number | null };
-  return read<AccountList | null>(host, "list_accounts", null, { provider }, null, at);
+/**
+ * El workspace con que van las llamadas de cuentas a una máquina. En el motor
+ * las cuentas son de un workspace, y por el relay toda llamada tiene que decir
+ * el suyo: sin él, `add_account` contesta «Por el relay, la llamada tiene que
+ * decir de qué workspace es.» y `list_accounts` una lista vacía (medido en
+ * vm-alberto, motor 1198b04). Es el abierto en el teléfono si la máquina lo
+ * tiene; si no, el primero suyo vinculado a la cuenta; `null` si no tiene ninguno.
+ */
+export function accountWorkspace(host: Pick<Host, "linked">, current: string | null): string | null {
+  if (!host.linked) return current;
+  if (current && host.linked.has(current)) return current;
+  return [...host.linked][0] ?? null;
 }
 
-export async function limitsOf(host: Host, provider: string, id: string): Promise<AccountLimits | null> {
+export async function accountsOf(host: Host, workspace: string | null, provider: string): Promise<AccountList | null> {
   const at = { cachedAt: null as number | null };
-  return read<AccountLimits | null>(host, "account_limits", null, { provider, id, force: false }, null, at).catch(() => null);
+  return read<AccountList | null>(host, "list_accounts", workspace, { provider }, null, at);
+}
+
+export async function limitsOf(host: Host, workspace: string | null, provider: string, id: string): Promise<AccountLimits | null> {
+  const at = { cachedAt: null as number | null };
+  return read<AccountLimits | null>(host, "account_limits", workspace, { provider, id, force: false }, null, at).catch(() => null);
 }
 
 /** Cerrar la sesión de una cuenta en una máquina (`remove_account`), como la ✕ de la chapa en la web. */
-export async function signOutAccount(host: Host, provider: string, id: string) {
-  await host.call("remove_account", null, { provider, id });
+export async function signOutAccount(host: Host, workspace: string | null, provider: string, id: string) {
+  await host.call("remove_account", workspace, { provider, id });
 }
 
 /**
@@ -530,24 +739,58 @@ export async function signOutAccount(host: Host, provider: string, id: string) {
  * llega en eventos `account` de esa máquina: el enlace (`url`), el código a
  * comparar (`confirm`) o a pegar (`code`) y el final (`done`, con texto si falló).
  */
-export async function addAccount(host: Host, provider: string): Promise<string> {
-  const { value } = await host.call<{ id: string } | null>("add_account", null, { provider, label: "" });
+export async function addAccount(host: Host, workspace: string | null, provider: string): Promise<string> {
+  const { value } = await host.call<{ id: string } | null>("add_account", workspace, { provider, label: "" });
   if (!value?.id) throw new HostError("operation_failed");
   return value.id;
 }
 
-export async function beginLogin(host: Host, provider: string, id: string) {
-  await host.call("login_account", null, { provider, id, mode: "tuberia" });
+export async function beginLogin(host: Host, workspace: string | null, provider: string, id: string) {
+  await host.call("login_account", workspace, { provider, id, mode: "tuberia" });
 }
 
-export async function submitLoginCode(host: Host, id: string, code: string) {
-  await host.call("submit_login_code", null, { id, code });
+export async function submitLoginCode(host: Host, workspace: string | null, id: string, code: string) {
+  await host.call("submit_login_code", workspace, { id, code });
 }
 
 /** Cancelar un inicio de sesión a medias y no dejar la cuenta vacía. */
-export async function cancelLogin(host: Host, provider: string, id: string) {
-  await host.call("cancel_login", null, { id }).catch(() => {});
-  await host.call("discard_account", null, { provider, id }).catch(() => {});
+export async function cancelLogin(host: Host, workspace: string | null, provider: string, id: string) {
+  await host.call("cancel_login", workspace, { id }).catch(() => {});
+  await host.call("discard_account", workspace, { provider, id }).catch(() => {});
+}
+
+/** Lo que el teléfono sabe de un inicio de sesión en curso, de los eventos `account`. */
+export type LoginProgress = { url: string | null; confirm: string | null; askCode: boolean; notice: string | null; error: string | null; done: boolean };
+
+export const LOGIN_START: LoginProgress = { url: null, confirm: null, askCode: false, notice: null, error: null, done: false };
+
+/** Un evento `account` sobre el inicio de sesión: el enlace, el código, un aviso o el final (con texto si falló). */
+export function loginStep<T extends LoginProgress>(login: T, event: LoginEvent): T {
+  if (event.kind === "url") return { ...login, url: event.text };
+  if (event.kind === "confirm") return { ...login, confirm: event.text };
+  if (event.kind === "code") return { ...login, askCode: true };
+  if (event.kind === "notice") return { ...login, notice: event.text };
+  return event.text ? { ...login, error: event.text, done: true } : { ...login, done: true };
+}
+
+/**
+ * Lo que dice un fallo de la máquina, sin el código genérico delante: el motor
+ * contesta frases (`command_failed` con la frase en `detail`) o un `Failure`
+ * (`what`, `detail`). Solo sin frase queda el código.
+ */
+export function failureText(error: unknown): string {
+  if (error instanceof HostError) {
+    const detail = error.detail as Record<string, unknown> | string | null | undefined;
+    if (typeof detail === "string" && detail.trim()) return detail;
+    if (detail && typeof detail === "object") {
+      for (const key of ["what", "message", "detail"]) {
+        const text = detail[key];
+        if (typeof text === "string" && text.trim()) return text;
+      }
+    }
+    return error.code;
+  }
+  return error instanceof Error ? error.message : String(error);
 }
 
 // --- Avisos ------------------------------------------------------------------
@@ -634,7 +877,7 @@ export const CLONE_STATUS_EVERY = 5_000;
 export async function cloneRepo(
   host: Host,
   workspace: string,
-  args: { operation: string; url: string; name: string; space: string | null },
+  args: { operation: string; url: string; name: string; space: string | null; id?: string | null },
   onProgress: (event: ProjectCloneEvent) => void,
   every = CLONE_STATUS_EVERY,
 ): Promise<Project> {
@@ -656,7 +899,7 @@ export async function cloneRepo(
   });
   let timer: ReturnType<typeof setInterval> | undefined;
   try {
-    await host.call("start_project_clone", workspace, { ...args, workspace, directory: null, portfolio: null, gitHost: null, id: null });
+    await host.call("start_project_clone", workspace, { ...args, workspace, directory: null, portfolio: null, gitHost: null, id: args.id ?? null });
     const ask = async () => {
       const answer = await host.call<ProjectCloneEvent | null>("project_clone_status", workspace, { operation: args.operation, workspace }).catch(() => null);
       if (answer && answer.value === null && !ended) finish({ operation: args.operation, phase: "done", percent: null, done: true, error: "clone_lost" });
@@ -675,4 +918,20 @@ export async function cloneRepo(
 
 export function cancelClone(host: Host, workspace: string, operation: string) {
   return host.call("cancel_project_clone", workspace, { operation, workspace });
+}
+
+/** Finalizar siempre comprueba los bloqueos en la máquina; leer o fallar no la enciende. */
+export async function finishTask(host: Host, workspace: string, folder: string, id: string): Promise<{ finished: true } | { blocked: TaskBlockers }> {
+  if (host.power() !== "on") throw new HostError("machine_asleep", host.label);
+  const { value, cachedAt } = await host.call<TaskBlockers>("task_blockers", workspace, { project: folder, id, finish: true });
+  if (!value || cachedAt !== null || !Array.isArray(value.unsaved)) throw new HostError("task_status_unavailable");
+  if (value.not_finished || value.unsaved.length) return { blocked: value };
+  await host.call("finish_task", workspace, { project: folder, id });
+  return { finished: true };
+}
+
+/** El borrado es explícito, en línea y sin forzar el descarte de archivos. */
+export async function deleteTask(host: Host, workspace: string, folder: string, id: string) {
+  if (host.power() !== "on") throw new HostError("machine_asleep", host.label);
+  await host.call("delete_session", workspace, { project: folder, id, force: false });
 }

@@ -1,7 +1,7 @@
-import Server from "lucide-solid/icons/server";
 import { t } from "../../lib/i18n";
 import { cn } from "../../lib/utils";
-import { machineName } from "./store";
+import { MachineIcon } from "./MachineIcon";
+import { machineName, machineWakes } from "./store";
 
 /** La máquina que corre una tarea que no es de la máquina de la ventana; atenuada si está apagada. */
 export function MachineChip(props: { machine: string; on: boolean; class?: string }) {
@@ -17,7 +17,7 @@ export function MachineChip(props: { machine: string; on: boolean; class?: strin
       title={label()}
       aria-label={label()}
     >
-      <Server size={11} aria-hidden="true" />
+      <MachineIcon wakes={machineWakes(props.machine)} size={11} />
       <span class="truncate">{machineName(props.machine)}</span>
     </span>
   );

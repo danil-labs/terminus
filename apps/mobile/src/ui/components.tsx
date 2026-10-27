@@ -87,8 +87,8 @@ export function openTask(host: string, workspace: string, folder: string, id: st
 }
 
 /** La vista previa de una tarea (mantener pulsada su tarjeta). */
-export function openPreview(host: string, id: string) {
-  router.push({ pathname: "/preview", params: { host, id } });
+export function openPreview(host: string, id: string, intent?: "finish") {
+  router.push({ pathname: "/preview", params: { host, id, ...(intent ? { intent } : {}) } });
 }
 
 const styles = StyleSheet.create({
