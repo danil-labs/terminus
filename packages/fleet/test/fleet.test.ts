@@ -653,11 +653,12 @@ test("workspace context survives when only a later machine has a primary source"
   const first = { id: "w", context_root: null };
   const slices: Slice[] = [
     { ...local({ active: "w", workspaces: [first] }), machine: "cmp_vm" },
-    { ...local({ active: "w", workspaces: [{ id: "w", context_root: "/lab/context" }] }), machine: "cmp_mac" },
+    { ...local({ active: "w", workspaces: [{ id: "w", context_root: "/lab/context", context_machine: "cmp_vm" }] }), machine: "cmp_mac" },
   ];
   for (const command of ["list_workspaces", "workspaces_startup"]) {
-    const result = fleet.merge(command, slices) as { workspaces: { context_root: string | null }[] };
+    const result = fleet.merge(command, slices) as { workspaces: { context_root: string | null; context_machine: string }[] };
     assert.equal(result.workspaces[0].context_root, "/lab/context");
+    assert.equal(result.workspaces[0].context_machine, "cmp_mac", "the envelope owns the source, regardless of row metadata");
     assert.equal(first.context_root, null, "merging does not change a machine's saved slice");
   }
 });

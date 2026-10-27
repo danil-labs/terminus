@@ -120,7 +120,7 @@ const CarryOriginLabel = lazy(() =>
 type CarryModule = typeof import("../features/machines/carry");
 /** Lo que corta un envío cuya copia se detuvo: el fallo y su arreglo quedan en el encabezado. */
 const CARRY_STOPPED = Symbol("carry-stopped");
-import VistaDeProyecto from "../features/projects/ProjectView";
+const VistaDeProyecto = lazy(() => import("../features/projects/ProjectView"));
 import { DEFAULT_PROFILE, displayName, notifyProfiles, watchProfiles } from "../features/projects/profiles";
 import RecentAgentChats from "../features/projects/RecentAgentChats";
 import { type SessionRow, threadTitle } from "../features/projects/Sessions";
@@ -350,6 +350,16 @@ export default function App() {
   // `null` es «este workspace todavía no tiene contexto»; se enseña como un
   // renglón al lado del selector de proyecto, no como una pantalla que lo pida.
   const [contextRoot, setContextRoot] = createSignal<string | null>(null);
+  const [contextConfirmed, setContextConfirmed] = createSignal(false);
+  let materialRequest = 0;
+  function confirmContext(root: string | null, listed: Source[]) {
+    root ??= listed.find((source) => source.root)?.id ?? null;
+    if (root && !listed.some((source) => source.id === root && !source.missing)) {
+      throw { what: t("projects.context.unavailable"), detail: "context_unavailable" };
+    }
+    setContextRoot(root);
+    setContextConfirmed(true);
+  }
   /** Con qué modo arranca lo nuevo de este workspace. `null` es el último elegido a mano. */
   const [workspaceMode, setWorkspaceMode] = createSignal<string | null>(null);
   /** Cuál está abierto, para poder descartar lo que emite el turno de otro. */
@@ -364,6 +374,7 @@ export default function App() {
   const setProjectList = (next: Project[]) => setProjectRows((previous) => conservar(previous, next, (p) => p.id));
   createEffect(() => recordarCarpetas(projectList()));
   const [sources, setSources] = createSignal<Source[]>([]);
+  const [taskSources, setTaskSources] = createSignal<Source[] | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   // Por qué esta ventana no puede abrir estos datos, si es que no puede: una
   // instalación con una forma que este binario ya no sabe convertir
@@ -427,7 +438,7 @@ export default function App() {
   // activa la guarda el módulo (`activarPestana`) y no `sessionId`: una
   // tarea, uno de sus archivos y uno de sus artefactos pueden estar
   // abiertos a la vez y los tres dirían "activo" si se derivara de ahí.
-  const pestanas = createTabs();
+  const pestanas = createTabs({ transient: true });
   const pestanaActiva = () => (proyectoAbierto() ? null : pestanas.active());
   // Los escritorios del workspace (`lib/spaces.ts`). Sin lista —un servicio
   // que no los conoce— la ventana se pinta como antes de los espacios.
@@ -487,7 +498,7 @@ export default function App() {
   // esto no existiera. La tira gobierna el panel principal y nada más:
   // lo separado no está en la tira, y no hay que preguntarse en cuál de
   // los dos panes cae lo que se pulsa.
-  const paneles = createPanels();
+  const paneles = createPanels(pestanas.restorable);
   // Cuánto de la cabecera ocupan de verdad los controles de cada
   // plataforma, sin poder expresarse con un padding fijo: el semáforo
   // está a la izquierda en macOS, los controles a la derecha en Windows,
@@ -669,16 +680,20 @@ export default function App() {
   createEffect(
     on(
       () => [pestanas.open().map((p) => p.id), pestanas.active()] as const,
-      ([ids, activa]) => {
-        paneles.sync(ids);
-        // Y la activa se pone delante: abrir una conversación desde el
-        // historial no pasa por `activarPestana`, llama a `abrirSesion`
-        // directo. Sin esto la pestaña entra detrás de la que ya estaba
-        // —la fila del historial se marca y la pantalla no cambia.
-        if (activa) paneles.activate(activa);
+      ([ids, activa], previous) => {
+        batch(() => {
+          paneles.sync(ids);
+          if (activa) paneles.activate(activa);
+          const site = activa ? paneles.siteOf(activa) : null;
+          if (activa && site && !pestanas.isPinned(activa) && activa !== previous?.[1]) {
+            pestanas.replacePreviews([paneles.tabsAt(site)], [activa]);
+          }
+          paneles.sync(pestanas.open().map((p) => p.id));
+        });
       },
     ),
   );
+  createEffect(on(pestanas.pinned, () => paneles.persist()));
   /** El panel conserva workspace y conversación; el título pertenece a la tira. */
   const tareasEnVentanas = createMemo<(Pick<TaskTab, "id" | "session" | "project"> & { workspace: string | null })[]>((previous) =>
     conservar(previous ?? [], pestanas.open().filter(isTaskTab).map(({ id, session, project }) =>
@@ -1064,7 +1079,7 @@ export default function App() {
   const [adjuntas, setAdjuntas] = createSignal<string[]>([]);
   const conFuente = (ids: string[]) =>
     ids
-      .map((id) => sources().find((s) => s.id === id))
+      .map((id) => taskSources()?.find((s) => s.id === id))
       .filter((s): s is Source => !!s);
   const idsDelProyecto = createMemo(
     () => projectList().find((p) => p.id === project())?.sources ?? [],
@@ -1930,26 +1945,26 @@ export default function App() {
   // pantalla sería de otro cliente, aquí es de este.
   async function recargarMaterial() {
     const generation = sessionGeneration;
+    const request = ++materialRequest;
+    const workspace = workspaceActivo();
+    if (!workspace) return;
+    setContextConfirmed(false);
     try {
+      const arranque = await invoke<Startup>("list_workspaces");
+      if (generation !== sessionGeneration || request !== materialRequest) return;
+      const current = arranque.workspaces.find((w) => w.id === workspace);
+      if (!current) throw { what: t("projects.context.unavailable"), detail: "context_unavailable" };
+      const root = current.context_root;
       const [proyectos, fuentes] = await Promise.all([
         invoke<Project[]>("list_projects"),
         invoke<Source[]>("list_sources"),
       ]);
-      if (generation !== sessionGeneration) return;
+      if (generation !== sessionGeneration || request !== materialRequest) return;
       setProjectList(proyectos);
       setSources(fuentes);
-  // También la raíz, que es material de este workspace: `context_root` solo
-  // lo escribía `aplicar()` —arranque y cambio de workspace—. Elegir la
-  // fuente principal desde Configuración refrescaba la lista pero el renglón
-  // «Sin fuente de contexto» seguía ahí hasta reiniciar la app: la firma de
-  // un dato que nadie recarga.
-      const arranque = await invoke<Startup>("list_workspaces");
-      if (generation !== sessionGeneration) return;
-      setContextRoot(
-        arranque.workspaces.find((w) => w.id === arranque.active)?.context_root ??
-          null,
-      );
+      confirmContext(root, fuentes);
     } catch (e) {
+      if (generation !== sessionGeneration || request !== materialRequest) return;
       setError(prosaDe(e));
     }
   }
@@ -1990,6 +2005,8 @@ export default function App() {
   // acaba de crear uno, y volver a mirar aquí la cerraría a mitad.
     if (a.active === null) setAlta((x) => x ?? "primera");
     setContextRoot(activo?.context_root ?? null);
+    setContextConfirmed(false);
+    const material = ++materialRequest;
     setWorkspaceMode(activo?.default_permission_mode ?? null);
   // La lengua es del workspace, y cambia al cambiar de cliente: eso es lo que
   // se pidió, no un efecto secundario. `null` hereda la de la máquina.
@@ -2083,9 +2100,14 @@ export default function App() {
       ]);
       if (generation !== sessionGeneration) return;
       setProjectList(proyectos);
-      if (fuentes) setSources(fuentes);
+      if (material === materialRequest) {
+        if (fuentes) {
+          setSources(fuentes);
+          confirmContext(activo?.context_root ?? null, fuentes);
+        } else setError(t("projects.context.unavailable"));
+      }
     } catch (e) {
-      if (generation !== sessionGeneration) return;
+      if (generation !== sessionGeneration || material !== materialRequest) return;
       setProjectList([]);
       setSources([]);
       if (!apagadaEnLaWeb(e)) setError(prosaDe(e));
@@ -2308,7 +2330,7 @@ export default function App() {
       if (unsaved) anexar(session, (messages) => [...messages, { role: "system", text: t("chat.turn.unsaved"), meta: "fallo" }]);
     });
     const tab = pestanas.open().find((item) => item.id === session);
-    const projectId = session === sessionId() ? project() : tab?.project ?? savedQueues.get(session)?.project;
+    const projectId = session === sessionId() ? project() : tab?.project ?? savedQueues.get(session)?.project ?? tareaDelRiel(session)?.folder;
     try {
       // El motor no pudo escribir el turno: el disco no lo tiene, y releerlo
       // borraría del chat la respuesta que la persona acaba de ver llegar.
@@ -2362,7 +2384,7 @@ export default function App() {
   /** `session_resync`: el turno en curso no cupo en el reenvío; se relee lo guardado y se conserva lo vivo. */
   function releerUna(session: string) {
     const generation = sessionGeneration;
-    const projectId = esDeLaAbierta(session) ? project() : pestanas.open().find((p) => p.id === session)?.project;
+    const projectId = esDeLaAbierta(session) ? project() : pestanas.open().find((p) => p.id === session)?.project ?? tareaDelRiel(session)?.folder;
     if (projectId === undefined) return;
     void leerTarea(projectId, session)
       .then((s) => loadResult(session, s, false, generation))
@@ -4105,7 +4127,7 @@ export default function App() {
   // archivo que se acaba de pulsar. Juntas: entre una y otra la pestaña nueva
   // queda detrás de la que estaba, y `montadas` la desmontaría.
     batch(() => {
-      pestanas.ensure({ id, project: proyecto, titulo: filaDe(id)?.title ?? "" });
+      if (activar === id) pestanas.ensure({ id, project: proyecto, titulo: filaDe(id)?.title ?? "" });
       pestanas.activate(activar);
     });
     if (id === sessionId() && proyecto === project()) {
@@ -4459,7 +4481,11 @@ export default function App() {
     if (activaAntes === null) return;
     if (pestanas.open().some((x) => x.id === activaAntes)) return;
     if (vecina) void activarPestana(vecina);
-    else irAlBlanco(carpetaDelEscritorio(project()));
+    else {
+      const owner = cerradas.find((p) => isContentTab(p) && p.session !== "" && !cerradas.some((x) => isTaskTab(x) && x.id === p.session));
+      if (owner) void abrirSesion(owner.project, owner.session);
+      else irAlBlanco(carpetaDelEscritorio(project()));
+    }
   }
 
   /**
@@ -4565,12 +4591,7 @@ export default function App() {
     if (p) void activarPestana(p);
   }
 
-  /**
-   * Parte la ventana activa: su pestaña de delante se va a una ventana
-   * nueva. No parte si esa ventana se quedaría vacía: mover su única
-   * pestaña cerraría la de origen, el mismo resultado en otro sitio. Es
-   * lo que apaga el botón (`lib/panels.ts`).
-   */
+  // Separar conserva la vista y deja disponible su celda de origen.
   function partirLaActiva() {
     partirVentana(paneles.activeSite());
   }
@@ -4584,17 +4605,11 @@ export default function App() {
   function partirVentana(sitio: SitioDePanel) {
     const id = paneles.activeTabAt(sitio);
     if (!id) return;
-    paneles.split(id);
+    if (paneles.split(id)) pestanas.pin(id);
   }
 
-  /**
-   * Si esa ventana puede partirse ahora mismo. Con una sola pestaña
-   * dentro no se parte, y el botón lo dice: la de origen se cerraría al
-   * vaciarse, el mismo resultado en otro sitio. Partir es dejar algo a
-   * la vista mientras se trabaja en otra cosa; sin otra cosa no hay gesto.
-   */
   const puedeSepararseDe = (sitio: SitioDePanel) =>
-    !paginaDeAgente() && paneles.tabsAt(sitio).length > 1 && paneles.canSplit();
+    !paginaDeAgente() && paneles.activeTabAt(sitio) !== null && paneles.canSplit();
 
   /** Recoge la ventana activa en la de al lado. Es el atajo de deshacer. */
   function juntarLaActiva() {
@@ -4669,18 +4684,20 @@ export default function App() {
     locate: point => ventanaBajo(point.x, point.y),
     scroll(point) {
       const element = document.elementFromPoint(point.x, point.y)
-        ?.closest("[data-tira]")?.querySelector<HTMLElement>('[role="tablist"]');
+        ?.closest("[data-tira]")?.querySelector<HTMLElement>("[data-tab-scroll]");
       return element ? { element, axis: "x" } : null;
     },
     drop(id, destino) {
       if (destino.zone && destino.zone !== "center" && paneles.splitAt(id, destino.sitio, destino.zone)) {
+        pestanas.pin(id);
         const p = pestanas.open().find(tab => tab.id === id);
         if (p) void activarPestana(p);
         return;
       }
       const from = paneles.siteOf(id);
       const index = destino.indice;
-      const origin = paneles.tabsAt(destino.sitio).indexOf(id);
+      const strip = paneles.tabsAt(destino.sitio).filter(pestanas.isPinned);
+      const origin = strip.indexOf(id);
       const insertion = index !== undefined && sameSite(from, destino.sitio) && origin >= 0 && origin < index
         ? index - 1
         : index;
@@ -4732,7 +4749,12 @@ export default function App() {
    * arrastrar un archivo con cambios sin guardar.
    */
   function soltarPestana(id: string, a: SitioDePanel, indice?: number) {
-    if (!paneles.move(id, a, indice)) return;
+    if (!paneles.groupAt(a)) return;
+    pestanas.pin(id);
+    const kept = paneles.tabsAt(a).filter((x) => x !== id && pestanas.isPinned(x));
+    const before = indice === undefined ? undefined : kept[indice];
+    const position = before === undefined ? undefined : paneles.tabsAt(a).filter((x) => x !== id).indexOf(before);
+    paneles.move(id, a, position);
     const p = pestanas.open().find((x) => x.id === id);
     if (p) void activarPestana(p);
   }
@@ -4898,6 +4920,43 @@ export default function App() {
     }
   };
 
+  function taskMaterialOptions() {
+    if (capabilities().nativeWindow && !capabilities().remoteCreate) return { headers: {} };
+    const sid = sessionId();
+    const row = sid ? filaDe(sid) : null;
+    const named = sid ? machines().find((m) => sid.startsWith(`${m.id}~`))?.id : null;
+    if (sid && !row && !named) return undefined;
+    const chosen = sid ? undefined : runOnOptions(workspaceActivo(), projectList().find((p) => p.id === project()));
+    const machine = row?.machine ?? named ?? machines().find((m) => m.local || m.active)?.id;
+    return chosen ?? (machine ? { headers: { "x-terminus-machine": machine } } : undefined);
+  }
+
+  const materialTarget = () => `${workspaceActivo()}:${sessionGeneration}:${sessionId()}:${claveAbierta()}:${JSON.stringify(taskMaterialOptions())}`;
+  let taskSourcesRequest = 0;
+  createEffect(on(() => ({
+    target: materialTarget(),
+    workspace: workspaceActivo(),
+    options: taskMaterialOptions(),
+    ready: !sessionId() || !!taskMaterialOptions(),
+    single: (!capabilities().remoteCreate && capabilities().nativeWindow) || machines().length === 1,
+    confirmed: contextConfirmed(),
+    catalog: sources(),
+  }), ({ workspace, options, ready, single, confirmed, catalog }) => {
+    const request = ++taskSourcesRequest;
+    setTaskSources(null);
+    if (!workspace || !ready) return;
+    if (single) {
+      if (confirmed) setTaskSources(catalog);
+      return;
+    }
+    if (!options) return;
+    void invoke<Source[]>("list_sources", {}, options).then((listed) => {
+      if (request === taskSourcesRequest) setTaskSources(listed);
+    }).catch((e) => {
+      if (request === taskSourcesRequest) setError(prosaDe(e));
+    });
+  }));
+
   /**
    * Cambiar la rama de una fuente sustituyéndola: su identidad incluye la
    * rama (`context::repo_identity`), otra rama es otra fuente. La nueva entra
@@ -4906,11 +4965,17 @@ export default function App() {
    */
   const cambiarRama = async (fuente: Source, rama: string) => {
     if (fuente.kind !== "git" || fuente.branch === rama) return;
+    const target = materialTarget();
+    if (sessionId() && !taskMaterialOptions()) throw { what: t("projects.context.task_unavailable") };
+    const machine = sessionId() ? filaDe(sessionId()!)?.machine : null;
+    const options = machine ? { headers: { "x-terminus-machine": machine } } : taskMaterialOptions();
     const nueva = await invoke<{ id: string }>("add_repo_url", {
       cloneUrl: fuente.location,
       branch: rama,
-    });
+    }, options);
+    if (target !== materialTarget()) throw { what: t("projects.context.target_changed") };
     await adjuntarFuente(nueva.id);
+    if (target !== materialTarget()) throw { what: t("projects.context.target_changed") };
     await quitarFuente(fuente.id);
     window.dispatchEvent(new CustomEvent("harness:sources"));
   };
@@ -5459,6 +5524,10 @@ export default function App() {
     /** La copia del trabajo a la otra máquina, antes de crear la tarea allá. */
     llevar?: (claveBorrador: string) => Promise<CarriedBase | null>,
   ): Promise<boolean> {
+    if (!destination && sourceIds().some((id) => !taskSources()?.some((source) => source.id === id))) {
+      setError(t("projects.context.task_unavailable"));
+      return false;
+    }
     // Antes de cualquier `await`: es lo que impide que el despacho de
     // la cola saque dos mensajes en el mismo respiro.
 
@@ -6385,7 +6454,7 @@ export default function App() {
       {/* A General, no a GitHub: la fuente principal del workspace se elige
           en Configuración → General; mandar a GitHub lleva a conectar un
           proveedor, dejando a la persona en una pantalla sin lo que buscaba. */}
-      <Show when={!contextRoot()}>
+      <Show when={contextConfirmed() && !contextRoot()}>
         <div class="justify-self-center">
           <EmptyContext
             onPickFolder={() => void elegirCarpetaDelWorkspace()}
@@ -6413,7 +6482,7 @@ export default function App() {
   const nombreDeSeparar = (sitio: SitioDePanel) => {
     if (paginaDeAgente()) return t("projects.split.agent_page");
     if (!paneles.canSplit()) return t("projects.split.full");
-    if (paneles.tabsAt(sitio).length <= 1)
+    if (paneles.activeTabAt(sitio) === null)
       return t("projects.split.alone");
     return t("projects.split.detach", { key: atajoDePartir(false) });
   };
@@ -6829,8 +6898,13 @@ export default function App() {
           </Show>
         )}
         material={materialPendiente()}
+        materialTarget={materialTarget()}
+        materialAvailable={taskSources() !== null && (!pp.sesion || !!taskMaterialOptions())}
+        materialOptions={pp.sesion && filaDe(pp.sesion)?.machine
+          ? { headers: { "x-terminus-machine": filaDe(pp.sesion)!.machine! } }
+          : taskMaterialOptions()}
         contexto={contexto()}
-        catalogo={sources()}
+        catalogo={taskSources() ?? []}
         onAdjuntarFuente={adjuntarFuente}
         onQuitarFuente={quitarFuente}
         onCambiarRama={cambiarRama}
@@ -7120,6 +7194,8 @@ export default function App() {
                 <TabStrip
                   session={filaDe}
                   tabs={pestanasDe(sitio)}
+                  pinnedIds={pestanas.pinned()}
+                  onPin={pestanas.pin}
                   activeId={pestanaDelanteEn(sitio)}
                   liveIds={vivas()}
                   approvingIds={permissions().map((p) => p.session)}
@@ -7170,6 +7246,8 @@ export default function App() {
                   <TabStrip
                     session={filaDe}
                     tabs={pestanasDe(sitio)}
+                  pinnedIds={pestanas.pinned()}
+                  onPin={pestanas.pin}
                     activeId={pestanaDelanteEn(sitio)}
                     liveIds={vivas()}
                     approvingIds={permissions().map((p) => p.session)}
@@ -7339,6 +7417,8 @@ export default function App() {
               <TabStrip
                 session={filaDe}
                 tabs={pestanasDe(sitio)}
+                  pinnedIds={pestanas.pinned()}
+                  onPin={pestanas.pin}
                 activeId={pestanaDelanteEn(sitio)}
                 liveIds={vivas()}
                 approvingIds={permissions().map((p) => p.session)}
@@ -7497,6 +7577,7 @@ export default function App() {
             style={estiloDeLaCelda(paneles.activeSite())}
             data-ventana={`${paneles.activeSite().col},${paneles.activeSite().fila}`}
           >
+            <Suspense fallback={<div class="flex flex-1 items-center justify-center text-sm text-neutral-500" role="status">{t("projects.view.opening")}</div>}>
             <VistaDeProyecto
               proyecto={p()}
               workspace={workspaceActivo()}
@@ -7524,6 +7605,7 @@ export default function App() {
               onQuitar={(source) => quitarDelProyecto(p().id, source)}
               onCarpetaEditable={(dir) => carpetaEditable(p().id, dir)}
             />
+            </Suspense>
           </div>
         )}
       </Show>
