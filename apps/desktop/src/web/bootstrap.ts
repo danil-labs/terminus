@@ -9,11 +9,12 @@ async function bootstrap() {
   await import('./main');
 }
 
-void bootstrap().catch(error => {
+void bootstrap().catch(async error => {
   console.error(error);
   const root = document.getElementById('root');
   if (root) {
     root.setAttribute('role', 'alert');
-    root.textContent = error instanceof Error ? error.message : String(error);
+    const { prosaDe } = await import("../ui/Failure");
+    root.textContent = prosaDe(error);
   }
 });
