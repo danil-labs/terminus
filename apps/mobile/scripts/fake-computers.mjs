@@ -203,6 +203,9 @@ function startClone(m, args) {
 function invoke(m, command, args) {
   const e = m.engine;
   switch (command) {
+    case "list_activity": return [{ id: "maintenance-qa", project: e.projects[0].id, title: `Actualizar herramientas en ${e.name}`, state: "success", created_at: Date.now() - 60000, updated_at: Date.now() - 30000, steps: 1 }];
+    case "read_activity": return { ...invoke(m, "list_activity", {})[0], steps: [{ id: "step-qa", command: "terminus --version", cwd: "/lab/tools", state: "success", started_at: Date.now() - 60000, ended_at: Date.now() - 30000, exit_code: 0, error: null }] };
+    case "read_activity_log": return { text: "Terminus QA\nComprobación completada.\n", next_offset: 40, bytes: 40, has_more: false };
     case "get_project_directory": return "/home/danil/code";
     case "create_project": {
       const project = { id: `p-${randomUUID().slice(0, 8)}`, name: args.name };
@@ -612,6 +615,12 @@ const server = createServer((request, response) => {
   if (url.pathname === "/auth/v1/token" && request.method === "POST") return json(response, 200, session());
   if (url.pathname === "/auth/v1/user") return json(response, 200, user);
   if (url.pathname === "/auth/v1/logout") return json(response, 204, {});
+  if (url.pathname === "/__fake/activity" && request.method === "POST") {
+    const m = machines[url.searchParams.get("computer") ?? "cmp_mac"];
+    if (!m) return json(response, 404, { error: { code: "not_found" } });
+    emit(m, "activity", { workspace: m.engine.ws, id: "maintenance-qa", title: `Actualizar herramientas en ${m.engine.name}`, state: "success" });
+    return json(response, 200, {});
+  }
   if (url.pathname === "/__fake/send" && request.method === "POST") {
     const m = machines[url.searchParams.get("computer") ?? "cmp_mac"];
     if (!m) return json(response, 404, { error: { code: "not_found" } });
