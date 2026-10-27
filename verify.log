@@ -1,0 +1,205 @@
+Scope: all 9 workspace projects
+✓ Lockfile passes supply-chain policies (verified 1d ago)
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 149, reused 149, downloaded 0, added 134
+Packages are cloned from the content-addressable store to the virtual store.
+  Content-addressable store is at: [HOME]/Library/pnpm/store/v11
+  Virtual store is at:             node_modules/.pnpm
+Packages: +558
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 558, reused 558, downloaded 0, added 558, done
+Done in 1.8s using pnpm v12.9.1
+$ pnpm -C apps/desktop verify
+$ node scripts/verify.mjs
+  El motor empaquetado está en su sitio             ok   150.6s
+  La CLI reenvía al motor sin abrir ventana         ok   2.0s
+  El buscador de proyectos combina repositorios sin duplicarlosok   0.1s
+  Todo el código es revisable                       ok   0.1s
+  Un guarda sin git lo dice, y no mata la cadena    ok   0.4s
+  Ningún proceso abre una consola en Windows        ok   0.0s
+  Ningún proceso se espera sin plazo                ok   0.0s
+  La ventana no se construye dos veces              ok   0.0s
+  Los docs no mandan a un archivo que no está       ok   0.1s
+  Alguien emite lo que la interfaz escucha          ok   0.1s
+  Ningún error del backend se aplana                ok   0.0s
+  Alguien invoca lo que el backend registra         ok   0.1s
+  El motor fijado habla el contrato copiado         ok   0.0s
+  El runtime del artefacto no se rompe en silencio  ok   0.0s
+  Llevar trabajo a otra máquina copia por partes, sigue desde la que falló y limpia al cancelarok   0.1s
+  Los visuales del chat llegan por partes y caen a tree_show con un motor anteriorok   0.1s
+  La foto del sidebar se guarda acotada y con esperaok   0.1s
+  La nota de la versión sale en el idioma de la app ok   0.1s
+  Las tareas de la página de un agente se paginan sin separar subtareas de su padreok   0.1s
+  El riel de subtareas lanzadas suelta las que ya se terminaronok   0.1s
+  La búsqueda de tareas ignora acentos y encuentra varias palabrasok   0.1s
+  La vista de Typst solo acompaña a un .typ, no al archivo que se abre despuésok   0.1s
+  El dock de agentes ordena por estado y cabe en una filaok   0.1s
+  El sidebar junta las tareas de todas las carpetas sin repetirlasok   0.1s
+  El sidebar filtra por carpeta y agente y reparte en secciones o gruposok   0.1s
+  El visor conserva navegación y rechaza los canales retiradosok   0.5s
+  La ventana no deja salir material                 ok   0.0s
+  El tema de terminal no repinta el chrome          ok   0.0s
+  El catálogo define lo que el código pide          ok   0.1s
+  El paquete de diseño dice lo mismo que el escritoriook   0.1s
+  Lo ya traducido no se vuelve a soldar             ok   0.0s
+  Los comentarios no crecen ni argumentan           ok   0.1s
+  Las lecturas de fuente en pruebas respetan el cupo revisadook   0.0s
+  Los iconos del árbol son los del paquete          ok   0.1s
+  Soltar un archivo no depende de la pantalla       ok   0.0s
+  Ninguna animación infinita repinta a 60 cuadros   ok   0.0s
+  El disparador conserva el clic que lo abre        ok   0.1s
+  Un abanico de peticiones respeta su tope          ok   0.1s
+  Un fondo de chat guardado que ya no existe no pinta nadaok   0.1s
+  El fondo del chat no se borra con un motor anterior ni pasa de un workspace a otrook   0.1s
+  El nombre de un agente da un identificador que el backend aceptaok   0.1s
+  Un formateador se reusa y sigue a la lengua       ok   0.1s
+  Los indicadores leen las dos formas de una medida ok   0.1s
+  El hilo sigue al agente y se deja soltar          ok   1.4s
+  Las respuestas rápidas se leen igual en la ventana y en lo que sale del chatok   0.1s
+  La barra elige la fila, y el comando exacto encabezaok   0.1s
+  /btw va al margen solo con el agente que lo declara, y «Pasar al hilo» no manda nadaok   0.1s
+  Los comandos `!` quedan alineados en la caja y se corren sin la sangríaok   0.1s
+  El menú de la arroba propone encargados por nombre, sin chocar con el materialok   0.1s
+  Un destinatario se pinta aparte del material y se mueve con élok   0.1s
+  Pegar una imagen la adjunta y pegar texto no      ok   0.1s
+  La actividad de una tarea no le roba el foco a quien escribeok   0.3s
+  El turno reabierto conserva su orden              ok   0.1s
+  La respuesta dice con qué modelo contestó         ok   0.1s
+  El medidor de contexto sale con lo que el agente publicaok   0.1s
+  La salida de un comando de barra se pinta con su comandook   0.1s
+  Lo que se le teclea a un `!` oculta las claves    ok   0.1s
+  El fragmento tardío de un mensaje vuelve a su globook   0.1s
+  Un turno con varias subtareas y un mensaje para una de ellas no se pinta dos vecesok   0.1s
+  El servicio que vuelve no se pinta en la pantalla ok   0.1s
+  Guardar el token de Telegram espera a una ventana saturadaok   1.0s
+  Nueva tarea abre su borrador con las fuentes heredadasok   0.1s
+  Arrastrar una tarea la mueve, y no la abre        ok   0.3s
+  Una tarea archivada sale de la lista y no de su árbolok   0.1s
+  El historial mantiene el orden de sus grupos de autorok   0.1s
+  La rama se enseña en la fila que tiene el árbol   ok   0.1s
+  La tarjeta de una tarea colorea su carpeta y afirma solo el PR confirmadook   0.1s
+  La fila enseña el comando, no cómo se lanzó       ok   0.1s
+  Una fuente se nombra por su proveedor, no por la copia en AppDataok   0.1s
+  El fondo del chat se reduce por pasos de calidad y tamaño hasta 1,5 MBok   0.1s
+  En el navegador el logo y el fondo de un workspace se leen y se cambian en la cuentaok   0.1s
+  El recorte del logo conserva el cuadrado elegido  ok   0.1s
+  El chat no pinta un destino que ejecute           ok   0.1s
+  Una vista de draw.io no rompe la etiqueta que la contieneok   0.1s
+  Ctrl+clic o ⌘+clic en un enlace del chat lo abre fuera sin preguntarok   0.3s
+  El backend se pinta en la lengua de la ventana    ok   0.1s
+  El selector conserva el proveedor                 ok   0.1s
+  La franja ordena las ventanas y cede por etapas   ok   0.1s
+  El markdown se parte sin cambiar lo que se ve     ok   0.1s
+  Lo que se calcula por partes en streaming da lo mismo que de una vezok   0.1s
+  Las columnas de una tabla se reparten según su textook   0.1s
+  Las fórmulas se pintan y el dinero queda como textook   0.4s
+  El diff numera las líneas donde están             ok   0.1s
+  El diff marca la palabra que cambió y alinea los dos panelesok   0.1s
+  El atajo de permisos no cicla lo que no se puede  ok   0.1s
+  El árbol no esconde lo que cambió                 ok   0.1s
+  Un archivo tabular se lee como tabla y no como textook   0.1s
+  La imagen se acerca sin salirse de sus topes      ok   0.1s
+  Cada archivo lleva el icono de su formato         ok   0.1s
+  Un repositorio en la nube se pinta como repositoriook   0.1s
+  Un proyecto tiene color estable y una ubicación legibleok   0.1s
+  Una pestaña no se pierde al cerrar otra           ok   3.2s
+  El atajo de pestaña lee la tecla física y no choca con otrook   0.1s
+  La rejilla de ventanas no se descuadra            ok   0.1s
+  Las páginas del historial se juntan sin mezclar transcripciones distintasok   0.1s
+  Abrir un hilo largo monta su final y lo de arriba llega al subirok   0.1s
+  El archivo abierto se entera del turno            ok   0.1s
+  Un fallo al leer no vacía el panel de código      ok   0.1s
+  La lista de tareas se recupera sola de un fallo   ok   20.1s
+  El almacenamiento refresca sin mezclar workspaces ok   0.1s
+  La capa de un sitio se enseña cuando toca         ok   0.3s
+  Un fallo del proveedor dice cuál y qué hacer      ok   0.1s
+  El reintento de entregas no reenvía a la persona  ok   0.1s
+  Los adjuntos salen de la caja al mandar y vuelven si fallaok   0.1s
+  Una imagen adjunta en esta Mac viaja como bytes a la máquina de la tareaok   0.1s
+  La cola sale en la tarea en la que se escribió    ok   0.1s
+  La tarea viva lo dice sin parar                   ok   0.1s
+  El clic derecho no ofrece recargar la ventana     ok   0.3s
+  El riel conserva sus agentes al refrescar         ok   0.1s
+  Una web se pinta como una web                     ok   0.4s
+  El front pasa el linter                           ok   1.2s
+  Compila el frontend                               ok   4.7s
+  Los tests TypeScript compilan de tipos            ok   2.2s
+  Empaqueta el frontend                             ok   20.9s
+  La carga inicial no pesa más que su techo         ok   0.1s
+  El front monta                                    ok   159.1s
+  Empaqueta la entrada del navegador                ok   20.3s
+  La versión del teléfono se instala como app y siempre carga lo últimook   0.1s
+  En el navegador la interfaz habla con el relay    ok   13.5s
+  En el navegador la sesión de Danil elige la computadora y explica por qué no entraok   6.5s
+  En el navegador la app abre enseguida, sin instalador ni pantalla de preparaciónok   1.8s
+  En el navegador, un trozo que borró un despliegue recarga la página una vezok   2.4s
+  En el navegador una computadora apagada monta sin encenderse y despierta al mandarle algook   13.2s
+  En el navegador lo que el relay guardó se ve con su hora mientras la computadora está apagadaok   3.2s
+  En el navegador un panel junta todas las computadoras y cada orden va a su máquinaok   88.1s
+  En el navegador los workspaces de la cuenta se ven con sus máquinas dormidasok   7.9s
+  En el navegador la memoria de la cuenta se ve, se edita y tiene historial con las máquinas apagadasok   12.7s
+  En el navegador los spaces salen de la máquina que los guarda aunque otra duermaok   4.1s
+  En el navegador con todo apagado la página abre en menos de 2 s con lo guardado de cada máquina, y una de otro contrato no la tumbaok   1.5s
+  En el navegador las imágenes y los visuales del chat se leen de la computadora remotaok   10.5s
+  En el navegador llevar trabajo entre computadoras va sellado y en partes de 512 KiBok   4.4s
+  En el navegador clonar en la computadora sigue su avance, se cancela y se recupera al recargarok   17.7s
+  En el navegador el alta de una computadora gestionada no instala y conecta las cuentas de nubeok   16.2s
+  La preparación en curso deja seguir a quien llega tardeok   1.9s
+  La preparación no se abre con la app pintada ni se queda ciegaok   29.2s
+  La franja de consumo sigue a la cuenta activa cuando cambia por cupook   1.9s
+  Con una cuenta que comparte credencial, el motivo de no poder agregar otra se veok   2.4s
+  Las cuentas de Danil entran con el navegador, se agregan y cierran sesiónok   15.5s
+  El alta y el pie de la barra lateral ofrecen la cuenta de Danilok   9.3s
+  Google Drive del alta vuelve a conectar después de desconectarok   2.7s
+  Google Drive con la app oficial se instala, espera la sesión y se deja de usar sin desinstalarlaok   11.9s
+  Cada workspace elige su cuenta de Danil y el pie sigue a la del abiertook   27.6s
+  La memoria del workspace se escribe y se edita como la del proyectook   5.2s
+  La ventana muestra el historial de la memoria de la cuenta y marca las copias de conflictook   9.3s
+  La cuenta de Danil habla con el motor por danil_connect_*ok   0.1s
+  Cada workspace habla con su cuenta de Danil, y un motor anterior deja la cuenta únicaok   0.1s
+  En el navegador la página de aprobación conecta una computadora a la cuentaok   6.9s
+  Una aprobación invalida su identidad sin tocar otros slotsok   0.1s
+  El retorno de autenticación permanece dentro de Terminusok   0.1s
+  El registro web confirma correo y conserva el destinook   5.6s
+  En el navegador se ve la persona de la cuenta de Danil y cambia su fotook   5.2s
+  En el navegador se listan las computadoras de la cuenta y se renombran en su sitiook   4.1s
+  En el navegador la columna junta los workspaces de otras cuentas de Danil y abre cada uno con la suyaok   0.9s
+  En el navegador «Agregar cuenta» ofrece primero las cuentas que ya tienen sesión, como Googleok   1.4s
+  En el navegador cada clave de la cuenta dice en qué máquinas está, se quita con aviso y se cambia sellada aquíok   3.7s
+  En el escritorio las claves de la cuenta pasan por el motor y el aviso sube solo las elegidasok   3.4s
+  La página de aprobación y la compatibilidad de contrato hablan con el plano de controlok   0.1s
+  Con el stream empujado los lotes llegan a los oyentes y el historial se paginaok   5.5s
+  Al enviar a otra máquina la hoja lleva el trabajo sin subir, y traerlo de vuelta lo deja en una rama de aquíok   11.1s
+  Una tarea de una máquina apagada abre y se enciende al mandarle algook   8.6s
+  Por carpeta, una carpeta en dos máquinas es un grupo por máquina y su «+» lanza en la suyaok   2.4s
+  El árbol de una tarea de otra máquina se lee en esa máquinaok   2.4s
+  La flota: la máquina sale del sobre, toda espera tiene tope y nadie contestando no es una lista vacíaok   0.5s
+  Danil Computers: sesión con contratos, renovación del token, motor y lápidasok   5.2s
+  Danil Computers: GitHub de la cuenta por el Worker, con sus rutas y sus códigosok   0.1s
+  En la web GitHub de la cuenta lo contesta el Worker, no una máquinaok   0.1s
+  Con sesión de Danil la tarjeta de GitHub es la de la cuenta; sin ella, la local de siempreok   18.4s
+  Las credenciales de la cuenta: el cliente del Worker y el sellado TERMINUS-SECRET/1 con los vectores del motorok   0.1s
+  Con la cuenta de Danil lo de esta computadora va nativo y primero; las otras suman su rebanadaok   3.9s
+  Una tarea de otra máquina en un space de la cuenta se ve en ese mismo spaceok   0.1s
+  En la web todo es de otras máquinas: lo guardado abre ya, actuar enciende la VM y la Mac apagada lo diceok   30.2s
+  En la web caben varias cuentas de Danil: cada una con su sesión, sin repetirse, y la página abre la dueña del workspaceok   0.1s
+  Con la cuenta de Danil el escritorio junta las tareas de todas sus computadorasok   90.4s
+  Sin el stream empujado la ventana sondea como siempreok   3.4s
+  Una respuesta con visual no desaparece del chat aunque el turno no se guarde o el visual no se leaok   11.6s
+  Abrir una tarea larga no cuesta más que su techo  ok   7.0s
+  Releer una tarea abierta no remonta su hilo       ok   5.5s
+  Una sesión larga no deja memoria detrás           ok   60.4s
+  Un turno no vuelve a pedir cada historial         ok   10.9s
+  Una respuesta larga no cuesta más que su techo por deltaok   3.8s
+  El sidebar en caliente no espera al motor         ok   9.5s
+  Toda clase escrita pinta algo                     ok   0.2s
+  Todo color se invierte con el tema                ok   0.0s
+  cargo fmt                                         ok   0.3s
+  cargo check                                       ok   30.0s
+  cargo clippy                                      ok   5.5s
+  La ventana tiene permiso para lo que se le pide   ok   0.1s
+  cargo test                                        ok   38.1s
+
+  Verificado en macOS, 1116s.
+  Windows y Linux NO se comprobó — quien revise desde ahí lo compila.
+

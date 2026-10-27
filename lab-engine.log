@@ -1,0 +1,2 @@
+Copied [REPOSITORY]/apps/desktop/src-tauri/binaries/seldon-runtime-aarch64-apple-darwin (sha256 6ecba03431f3ebb396f6d4a101c1b5e26fb041740d73f11b709978da3aba6f1d). This is a local build, not the one pinned in seldon-runtime.lock.
+{"pid":31943,"runtime":"6471d293-ec18-4ca6-8c16-fe7d31771274","contract":"93b1c32f25c4fb5fd722079a5593f8316125d91e8ecf12e64c3d7e1f7aebae98"}
