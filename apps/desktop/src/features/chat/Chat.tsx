@@ -657,6 +657,8 @@ export type ChatProps = {
   /** El material adjunto a ESTA tarea. */
   material: Source[];
   materialOptions?: InvokeOptions;
+  materialTarget: string;
+  materialAvailable: boolean;
   /** Lo que la tarea YA lee. No son pendientes: están guardados en ella. */
   contexto: Source[];
   /** Todo el material del workspace, para poner nombre a los ids que la
@@ -2097,6 +2099,8 @@ export default function Chat(props: ChatProps) {
         agregar={t("chat.scope.sources_add")}
         items={fuentes()}
         materialOptions={props.materialOptions}
+        materialTarget={props.materialTarget}
+        materialAvailable={props.materialAvailable}
         bloqueado={props.busy}
         onTraer={props.onAdjuntarFuente}
         onQuitar={props.onQuitarFuente}

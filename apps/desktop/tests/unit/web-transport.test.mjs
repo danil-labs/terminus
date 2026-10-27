@@ -117,9 +117,10 @@ test("the transport leaves out what the account may not see: workspaces, attenti
 test("workspace context comes from its owning machine, including its source reads", async () => {
   const { fleet } = await import("../helpers/fake-relay.mjs");
   const listing = (root) => ({ workspaces: [{ id: "w", name: "W", context_root: root }], active: "w" });
-  const source = { id: "context-mac", name: "Context", root: true, missing: false, projects: [] };
-  const vm = { ...engine, list_workspaces: listing(null), workspaces_startup: listing(null), source_detail: { machine: "vm" }, set_root: true, add_folder: { id: "task-folder" }, add_repo_url: { id: "task-repo" } };
-  const mac = { ...engine, list_workspaces: listing(source.id), workspaces_startup: listing(source.id), list_sources: [source], source_detail: { machine: "mac" }, add_folder: { id: "context-folder" }, add_repo_url: { id: "context-repo" } };
+  const source = { id: "context-mac", name: "Context", etiqueta: "Context", kind: "folder", location: "/context", path: "/context", root: true, missing: false, projects: [] };
+  const taskSource = { ...source, id: "vm-only", name: "VM-only material", etiqueta: "VM-only material", root: false, kind: "folder" };
+  const vm = { ...engine, list_live_sessions: ({ project }) => project === "p1" ? engine.list_live_sessions({ project }) : [], list_sources: [taskSource], load_session: ({ id }) => ({ id, provider: "codex", sources: [taskSource.id], model: "gpt-5.6", turns: [] }), list_workspaces: listing(null), workspaces_startup: listing(null), source_detail: { machine: "vm" }, set_root: true, add_folder: { id: "task-folder" }, add_repo_url: { id: "task-repo" } };
+  const mac = { ...engine, list_projects: [{ ...engine.list_projects[0], id: "pm", name: "Mac project" }], list_live_sessions: ({ project }) => project === "pm" ? engine.list_live_sessions({ project: "p1" }) : [], list_workspaces: listing(source.id), workspaces_startup: listing(source.id), list_sources: [source], source_detail: { machine: "mac" }, add_folder: { id: "context-folder" }, add_repo_url: { id: "context-repo" } };
   const f = fleet({ cmp_vm: { table: vm }, cmp_mac: { table: mac } });
   const app = await boot("listo", "web-context-owner", {}, undefined, {}, {
     web: true,
@@ -136,10 +137,11 @@ test("workspace context comes from its owning machine, including its source read
   const list = await invoke("list_workspaces");
   assert.equal(list.workspaces[0].context_root, source.id, "a materialized VM must not hide the Mac's context");
   assert.deepEqual(await invoke("list_sources"), [source], "the source must actually be readable on its owner");
-  assert.deepEqual(await invoke("list_sources", {}, { headers: { "x-terminus-machine": "cmp_vm" } }), [], "an explicit machine wins");
+  assert.deepEqual(await invoke("list_sources", {}, { headers: { "x-terminus-machine": "cmp_vm" } }), [taskSource], "an explicit machine wins");
   assert.deepEqual(await invoke("add_folder", { locator: "/context" }), { id: "context-folder" }, "settings retain the context default");
   app.w.document.querySelector('[data-sesion="cmp_vm~t1"]').click();
   await sleep(400);
+  assert.ok(app.w.document.body.textContent.includes(taskSource.etiqueta), "the attachment catalog is read on the task VM, not the context Mac");
   for (const [locator, command] of [["/task-folder", "add_folder"], ["https://example.test/task.git", "add_repo_url"]]) {
     app.w.document.querySelector('[aria-label="Adjuntar una fuente"]').click();
     await sleep(100);
@@ -154,6 +156,30 @@ test("workspace context comes from its owning machine, including its source read
     assert.ok(!f.relays.cmp_mac.calls.some((c) => c.command === command && Object.values(c.args).includes(locator)), "the context owner does not receive task material");
   }
 
+  let finishSource;
+  vm.add_folder = () => new Promise((resolve) => { finishSource = resolve; });
+  app.w.document.querySelector('[aria-label="Adjuntar una fuente"]').click();
+  await sleep(100);
+  [...app.w.document.querySelectorAll("button")].find((b) => b.textContent.includes("Pegar una dirección o ruta")).click();
+  await sleep(100);
+  const delayedInput = app.w.document.querySelector('input[placeholder="https://… o /ruta/a/carpeta"]');
+  delayedInput.value = "/delayed";
+  delayedInput.dispatchEvent(new app.w.Event("input", { bubbles: true }));
+  delayedInput.closest("form").dispatchEvent(new app.w.Event("submit", { bubbles: true, cancelable: true }));
+  await sleep(100);
+  assert.ok(finishSource, "the source creation is pending");
+  const lateSource = { ...source, id: "late-source", name: "Late-source-wrong-task", root: false, etiqueta: "Late-source-wrong-task" };
+  mac.list_sources = [source, lateSource];
+  const macSourceReads = f.relays.cmp_mac.calls.filter((c) => c.command === "list_sources").length;
+  app.w.dispatchEvent(new app.w.CustomEvent("harness:open-task-link", { detail: { workspace: "w", folder: "pm", task: "cmp_mac~t1" } }));
+  await sleep(400);
+  assert.ok(f.relays.cmp_mac.calls.some((c) => c.command === "load_session" && c.args.id === "t1"), "the Mac task was opened before resolving the VM request");
+  assert.ok(f.relays.cmp_mac.calls.filter((c) => c.command === "list_sources").length > macSourceReads, "the new task catalog on Mac loaded before the late VM result");
+  finishSource({ id: lateSource.id });
+  await sleep(300);
+  assert.ok(!app.w.document.body.textContent.includes(lateSource.etiqueta), "a late source result must not enter the newly active task's draft");
+  mac.list_sources = [source];
+  await invoke("list_sources");
   f.relays.cmp_mac.setState("offline");
   await sleep(100);
   const partial = await invoke("list_workspaces");

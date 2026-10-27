@@ -342,6 +342,7 @@ export default function App() {
   // El riel pinta carpetas con `For`: una nueva en cada relectura remonta sus tareas, y cada una vuelve a pedir su `task_history`.
   const setProjectList = (next: Project[]) => setProjectRows((previous) => conservar(previous, next, (p) => p.id));
   const [sources, setSources] = createSignal<Source[]>([]);
+  const [taskSources, setTaskSources] = createSignal<Source[] | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   // Por qué esta ventana no puede abrir estos datos, si es que no puede: una
   // instalación con una forma que este binario ya no sabe convertir
@@ -1009,7 +1010,7 @@ export default function App() {
   const [adjuntas, setAdjuntas] = createSignal<string[]>([]);
   const conFuente = (ids: string[]) =>
     ids
-      .map((id) => sources().find((s) => s.id === id))
+      .map((id) => taskSources()?.find((s) => s.id === id))
       .filter((s): s is Source => !!s);
   const idsDelProyecto = createMemo(
     () => projectList().find((p) => p.id === project())?.sources ?? [],
@@ -4679,10 +4680,32 @@ export default function App() {
   };
 
   function taskMaterialOptions() {
-    const chosen = sessionId() ? undefined : runOnOptions(workspaceActivo(), projectList().find((p) => p.id === project()));
-    const machine = machines().find((m) => sessionId() ? m.local : m.active)?.id;
+    const sid = sessionId();
+    const row = sid ? filaDe(sid) : null;
+    if (sid && !row) return undefined;
+    const chosen = sid ? undefined : runOnOptions(workspaceActivo(), projectList().find((p) => p.id === project()));
+    const machine = row?.machine ?? machines().find((m) => m.local || m.active)?.id;
     return chosen ?? (machine ? { headers: { "x-terminus-machine": machine } } : undefined);
   }
+
+  const materialTarget = () => `${workspaceActivo()}:${sessionGeneration}:${sessionId()}:${claveAbierta()}:${JSON.stringify(taskMaterialOptions())}`;
+  let taskSourcesRequest = 0;
+  createEffect(on(() => ({
+    target: materialTarget(),
+    workspace: workspaceActivo(),
+    options: taskMaterialOptions(),
+    ready: !!taskMaterialOptions() && (!sessionId() || !!filaDe(sessionId()!)),
+    catalog: sources(),
+  }), ({ workspace, options, ready }) => {
+    const request = ++taskSourcesRequest;
+    setTaskSources(null);
+    if (!workspace || !ready) return;
+    void invoke<Source[]>("list_sources", {}, options).then((listed) => {
+      if (request === taskSourcesRequest) setTaskSources(listed);
+    }).catch((e) => {
+      if (request === taskSourcesRequest) setError(prosaDe(e));
+    });
+  }));
 
   /**
    * Cambiar la rama de una fuente sustituyéndola: su identidad incluye la
@@ -4692,13 +4715,17 @@ export default function App() {
    */
   const cambiarRama = async (fuente: Source, rama: string) => {
     if (fuente.kind !== "git" || fuente.branch === rama) return;
+    const target = materialTarget();
+    if (sessionId() && !filaDe(sessionId()!)) throw { what: t("projects.context.task_unavailable") };
     const machine = sessionId() ? filaDe(sessionId()!)?.machine : null;
     const options = machine ? { headers: { "x-terminus-machine": machine } } : taskMaterialOptions();
     const nueva = await invoke<{ id: string }>("add_repo_url", {
       cloneUrl: fuente.location,
       branch: rama,
     }, options);
+    if (target !== materialTarget()) throw { what: t("projects.context.target_changed") };
     await adjuntarFuente(nueva.id);
+    if (target !== materialTarget()) throw { what: t("projects.context.target_changed") };
     await quitarFuente(fuente.id);
     window.dispatchEvent(new CustomEvent("harness:sources"));
   };
@@ -5205,6 +5232,10 @@ export default function App() {
     respuestas?: { manda: RespuestaEnviada[]; pinta: Respuesta[] },
     destination?: { project: string; session: string },
   ): Promise<boolean> {
+    if (!destination && sourceIds().some((id) => !taskSources()?.some((source) => source.id === id))) {
+      setError(t("projects.context.task_unavailable"));
+      return false;
+    }
     // Antes de cualquier `await`: es lo que impide que el despacho de
     // la cola saque dos mensajes en el mismo respiro.
 
@@ -6373,11 +6404,13 @@ export default function App() {
           </Show>
         )}
         material={materialPendiente()}
+        materialTarget={materialTarget()}
+        materialAvailable={taskSources() !== null && (!pp.sesion || !!filaDe(pp.sesion))}
         materialOptions={pp.sesion && filaDe(pp.sesion)?.machine
           ? { headers: { "x-terminus-machine": filaDe(pp.sesion)!.machine! } }
           : taskMaterialOptions()}
         contexto={contexto()}
-        catalogo={sources()}
+        catalogo={taskSources() ?? []}
         onAdjuntarFuente={adjuntarFuente}
         onQuitarFuente={quitarFuente}
         onCambiarRama={cambiarRama}

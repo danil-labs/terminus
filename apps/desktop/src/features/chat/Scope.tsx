@@ -117,6 +117,8 @@ export default function Alcance(props: {
   agregar: string;
   items: Source[];
   materialOptions?: InvokeOptions;
+  materialTarget: string;
+  materialAvailable: boolean;
   /**
    * Le llega el id de la fuente que quedó en el workspace. **Rechaza si el
    * material entró pero no se pudo traer a la tarea**, y entonces este panel se
@@ -252,11 +254,13 @@ export default function Alcance(props: {
    * repositorio ya no está en el disco, si la copia no se pudo clonar. Cerrando
    * a ciegas, ese fallo se leía como que había funcionado.
    */
-  async function traer(fn: () => Promise<{ id: string }>) {
+  async function traer(fn: () => Promise<{ id: string }>, target = props.materialTarget) {
     setOcupado(true);
     setFallo(null);
     try {
+      if (!props.materialAvailable) throw { what: t("projects.context.task_unavailable") };
       const s = await fn();
+      if (target !== props.materialTarget) throw { what: t("projects.context.target_changed") };
       await props.onTraer(s.id);
       cerrar();
     } catch (e) {
@@ -303,12 +307,15 @@ export default function Alcance(props: {
   };
 
   async function traerCarpeta() {
+    const target = props.materialTarget;
     const options = props.materialOptions;
     setFallo(null);
     try {
+      if (!props.materialAvailable) throw { what: t("projects.context.task_unavailable") };
       const ruta = await open({ directory: true, multiple: false });
       if (typeof ruta !== "string") return;
-      await traer(() => invoke<{ id: string }>("add_folder", { locator: ruta }, options));
+      if (target !== props.materialTarget) throw { what: t("projects.context.target_changed") };
+      await traer(() => invoke<{ id: string }>("add_folder", { locator: ruta }, options), target);
     } catch (e) {
       decir(e);
     }
