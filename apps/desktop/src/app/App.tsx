@@ -1683,9 +1683,15 @@ export default function App() {
   const [activityNotice, setActivityNotice] = createSignal<ActivityEvent | null>(null);
   const [activityMachine, setActivityMachine] = createSignal<string | null>(null);
   onMount(() => {
+    const states = new Map<string, ActivityEvent["state"]>();
     const events = listen<ActivityEvent>("activity", event => {
       const row = event.payload;
-      if (row?.workspace === workspaceActivo() && typeof row.id === "string" && typeof row.title === "string" && ["running", "success", "failure", "interrupted"].includes(row.state)) setActivityNotice(row);
+      if (row?.workspace !== workspaceActivo() || typeof row.id !== "string" || typeof row.title !== "string" || !["running", "success", "failure", "interrupted"].includes(row.state)) return;
+      const key = JSON.stringify([row.workspace, row.machine, row.id]);
+      if (states.get(key) === row.state) return;
+      states.set(key, row.state);
+      if (states.size > 256) states.delete(states.keys().next().value!);
+      if (row.state === "failure" || row.state === "interrupted") setActivityNotice(row);
     });
     onCleanup(() => { void events.then(off => off()); });
   });
