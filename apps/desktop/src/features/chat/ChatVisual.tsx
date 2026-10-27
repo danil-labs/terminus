@@ -8,6 +8,7 @@ import geist from "../../styles/fonts/Geist-Variable.woff2?inline";
 import { t } from "../../lib/i18n";
 import { suspendSiteLayers } from "../../lib/sites";
 import { Button } from "../../ui/Button";
+import { Spinner } from "../../ui/Spinner";
 import { asFailure, FailureNote } from "../../ui/Failure";
 import type { VisualBudget } from "./visualBudget";
 import type { ChatVisual as Visual } from "./visualDirective";
@@ -29,6 +30,11 @@ export default function ChatVisual(props: {
   const [opened, setOpened] = createSignal(true);
   const [expanded, setExpanded] = createSignal(false);
   const [height, setHeight] = createSignal(320);
+  // La tarjeta se queda hasta que el marco ya midió su alto: así no se cambia
+  // por un hueco a medio pintar ni salta el texto que la rodea.
+  const [painted, setPainted] = createSignal(false);
+  let paintTimer: ReturnType<typeof setTimeout> | undefined;
+  const paint = () => { clearTimeout(paintTimer); setPainted(true); };
   const readTheme = (): VisualTheme => {
     const root = document.documentElement;
     const tokens = getComputedStyle(root);
@@ -67,7 +73,7 @@ export default function ChatVisual(props: {
     if (!current.pending) current.release();
     current = undefined;
   };
-  onCleanup(() => { disposed = true; retire(); restoreSites?.(); });
+  onCleanup(() => { disposed = true; clearTimeout(paintTimer); retire(); restoreSites?.(); });
   const identity = createMemo(() => `${props.owner}:${props.visual.id}`);
   const [html, { refetch, mutate }] = createResource(
     () => visible() && opened() ? identity() : false,
@@ -98,6 +104,7 @@ export default function ChatVisual(props: {
   });
   const close = () => {
     setOpened(false);
+    setPainted(false);
     resize(false);
     retire();
     mutate(undefined);
@@ -124,6 +131,7 @@ export default function ChatVisual(props: {
       if (!message || typeof message !== "object") return;
       if (message.type === "terminus:visual-height" && typeof message.height === "number" && Number.isFinite(message.height)) {
         if (!expanded()) setHeight(Math.max(48, Math.min(4096, Math.ceil(message.height))));
+        paint();
       }
       if (message.type === "terminus:visual-escape" && expanded()) resize(false);
     };
@@ -146,8 +154,13 @@ export default function ChatVisual(props: {
     observer.observe(container);
     onCleanup(() => observer.disconnect());
   });
+  createEffect(on(content, (value) => {
+    clearTimeout(paintTimer);
+    if (!value) setPainted(false);
+  }));
   createEffect(on(identity, () => {
     setOpened(true);
+    setPainted(false);
     if (panel) resize(false);
     setHeight(320);
   }));
@@ -156,7 +169,7 @@ export default function ChatVisual(props: {
       <dialog ref={panel} open aria-label={title()} data-expanded={expanded() ? "" : undefined}
         class="relative m-0 block w-full max-w-none border-0 bg-transparent p-0 text-inherit data-[expanded]:fixed data-[expanded]:inset-6 data-[expanded]:m-auto data-[expanded]:flex data-[expanded]:max-h-[calc(100dvh-3rem)] data-[expanded]:w-[calc(100vw-3rem)] data-[expanded]:max-w-[1100px] data-[expanded]:flex-col data-[expanded]:rounded-lg data-[expanded]:bg-surface data-[expanded]:p-5 data-[expanded]:shadow-lg backdrop:bg-black/40"
         onCancel={(event) => { event.preventDefault(); resize(false); }}>
-      <Show when={opened()}>
+      <Show when={opened() && painted() && !html.error}>
         <div class="absolute top-0 right-0 z-10 flex gap-1 rounded-md bg-surface opacity-0 group-hover/visual:opacity-100 group-focus-within/visual:opacity-100 [@media(pointer:coarse)]:opacity-100" classList={{ "opacity-100": expanded() }}>
           <Button ref={expandButton} variant="ghost" size="iconCompact" disabled={!content()} onClick={() => resize(!expanded())} aria-expanded={expanded()} aria-label={expanded() ? t("chat.visual.collapse") : t("chat.visual.expand")} title={expanded() ? t("chat.visual.collapse") : t("chat.visual.expand")}>
             <Show when={expanded()} fallback={<Maximize2 class="size-3.5" />}><Minimize2 class="size-3.5" /></Show>
@@ -164,18 +177,23 @@ export default function ChatVisual(props: {
           <Button variant="ghost" size="iconCompact" onClick={close} aria-label={t("chat.visual.unload")} title={t("chat.visual.unload")}><X class="size-3.5" /></Button>
         </div>
       </Show>
-      {/* Cerrada se lee como tarjeta y no como texto suelto: una línea gris
-          en medio de la respuesta no parecía algo que se pudiera abrir. */}
-      <Show when={opened()} fallback={
-        <button type="button" onClick={() => setOpened(true)} data-chat-visual-closed=""
-          class="flex w-full items-center gap-3 rounded-lg border border-border bg-surface-raised px-3 py-2.5 text-left outline-none hover:border-primary focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary">
-          <span class="grid size-8 shrink-0 place-items-center rounded-md bg-primary/15 text-primary"><Maximize2 class="size-4" /></span>
+      {/* Cerrada o cargando se lee como tarjeta y no como texto suelto: una
+          línea gris en medio de la respuesta no parecía algo que se pudiera
+          abrir, y cambiarla por «Cargando…» hacía saltar el mensaje. */}
+      <Show when={!opened() || (!html.error && !painted())}>
+        <button type="button" onClick={() => setOpened(true)} aria-busy={opened()} data-chat-visual-closed={opened() ? undefined : ""} data-chat-visual-loading={opened() ? "" : undefined}
+          class="flex w-full items-center gap-3 rounded-lg border border-border bg-surface-raised px-3 py-2.5 text-left outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary"
+          classList={{ "cursor-default": opened(), "hover:border-primary": !opened() }}>
           <span class="min-w-0 flex-1">
             <span class="block truncate text-sm font-semibold text-neutral-950">{title()}</span>
-            <span class="block text-xs text-neutral-500">{t("chat.visual.load")}</span>
+            <Show when={!opened()}><span class="block text-xs text-neutral-500">{t("chat.visual.load")}</span></Show>
+          </span>
+          <span class="grid size-8 shrink-0 place-items-center text-neutral-500">
+            <Show when={opened()} fallback={<Maximize2 class="size-4" />}><Spinner size={16} label={t("chat.visual.loading")} /></Show>
           </span>
         </button>
-      }>
+      </Show>
+      <Show when={opened()}>
         {/* Ocupa el sitio del visual y nombra su archivo: el texto del mensaje
             sigue alrededor, y lo que no se pinta aquí se puede abrir fuera. */}
         <Show when={html.error}>
@@ -194,8 +212,12 @@ export default function ChatVisual(props: {
             </div>
           </div>
         </Show>
-        <Show when={!html.error && !html.loading && content()} fallback={!html.error && <p class="py-3 text-sm text-neutral-500">{t("chat.visual.loading")}</p>}>
-          <iframe ref={frame} title={title()} class="block w-full shrink-0 border-0 bg-transparent" style={{ height: expanded() ? "75dvh" : `${height()}px` }} sandbox={SANDBOX_ARTEFACTO} srcdoc={content()} onLoad={syncTheme} />
+        <Show when={!html.error && !html.loading && content()}>
+          {/* Se pinta oculto detrás de la tarjeta y aparece ya a su alto. */}
+          <iframe ref={frame} title={title()} class="block w-full shrink-0 border-0 bg-transparent transition-opacity duration-200"
+            classList={{ "pointer-events-none invisible absolute inset-x-0 top-0 opacity-0": !painted() }}
+            style={{ height: expanded() ? "75dvh" : `${height()}px` }} sandbox={SANDBOX_ARTEFACTO} srcdoc={content()}
+            onLoad={() => { syncTheme(); if (!painted()) paintTimer = setTimeout(paint, 600); }} />
         </Show>
       </Show>
       </dialog>
