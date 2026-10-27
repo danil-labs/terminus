@@ -3,7 +3,7 @@
 
 Uso desde un worktree desechable:
   python3 apply-remote-row-diagnostics.py --root . --apply
-  pnpm build && pnpm window:build
+  pnpm window:build
   python3 apply-remote-row-diagnostics.py --root . --revert
 
 Sin --apply imprime el diff. --ref permite inspeccionar cualquiera de las dos
