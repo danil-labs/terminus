@@ -1,4 +1,4 @@
-import { ALPHA_DEMO } from "../lib/alpha-mode";
+import { ALPHA_DEMO, ALPHA_ORDINARY } from "../lib/alpha-mode";
 import { InboxProvider } from "../lib/inbox";
 import type { NotificationResponse } from "expo-notifications";
 import { Stack, router, usePathname } from "expo-router";
@@ -43,6 +43,15 @@ export default function RootLayout() {
   const pathname = usePathname();
   const alphaInbox = process.env.EXPO_PUBLIC_TERMINUS_ALPHA === "1" && Platform.OS === "web" &&
     (pathname.endsWith("/inbox") || (typeof window !== "undefined" && (window.location.pathname.endsWith("/inbox") || new URLSearchParams(window.location.search).get("to")?.split("?")[0] === "/inbox")));
+
+  // El stack real conserva el modo explícito también al recargar sus rutas.
+  useEffect(() => {
+    if (!ALPHA_DEMO || Platform.OS !== "web") return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("demo", "1");
+    if (ALPHA_ORDINARY) url.searchParams.set("ordinary", "1");
+    window.history.replaceState(window.history.state, "", url);
+  }, [pathname]);
 
   // En el navegador, una ruta del teléfono que abrió la web de escritorio llega como `?to=` (ver `toPhone` en `apps/desktop/src/web/main.tsx`).
   useEffect(() => {
