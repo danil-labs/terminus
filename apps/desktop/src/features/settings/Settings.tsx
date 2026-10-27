@@ -8,6 +8,7 @@ import Puzzle from "lucide-solid/icons/puzzle";
 import Radar from "lucide-solid/icons/radar";
 import GitBranch from "lucide-solid/icons/git-branch";
 import Monitor from "lucide-solid/icons/monitor";
+import ScrollText from "lucide-solid/icons/scroll-text";
 import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
 import Sparkles from "lucide-solid/icons/sparkles";
 import { listen } from "../../lib/serviceEvents";
@@ -38,6 +39,7 @@ import Skills from "./Skills";
 import Workspaces from "./Workspaces";
 // Chunks aparte: solo los carga quien abre la sección.
 const DanilAccount = lazy(() => import("./DanilAccount"));
+const ActivityLogs = lazy(() => import("./ActivityLogs"));
 const Appearance = lazy(() => import("./Appearance"));
 
 /**
@@ -112,6 +114,8 @@ const destinosDe = (
   superficies: () => Superficie[],
   agentes: ContextoDeAgentes,
   proyectos: ContextoDeProyectos | undefined,
+  workspace: () => string | null,
+  activityMachine: () => string | null,
 ): Destino[] => [
   {
     id: "general",
@@ -141,6 +145,7 @@ const destinosDe = (
     icono: () => <Monitor size={15} />,
     panel: () => <Environment />,
   },
+  { id: "activity", get name() { return t("activity.title"); }, icono: () => <ScrollText size={15} />, panel: () => <Suspense fallback={null}><ActivityLogs workspace={workspace()} machine={activityMachine()} /></Suspense> },
   // Skills y servidores MCP juntos: los dos los añade la persona y ninguno
   // lleva credencial de cliente. Separados, «Conexiones» nombraba servidores
   // MCP sin decirlo y las skills quedaban escondidas dentro de General.
@@ -239,7 +244,7 @@ const destinosDe = (
 
 const GRUPOS: { nombre: () => string; ids: string[] }[] = [
   // Las sesiones de Danil son de la computadora, no del workspace abierto.
-  { nombre: () => t("settings.nav.group_app"), ids: ["general", "appearance", "entorno", "cuenta-danil"] },
+  { nombre: () => t("settings.nav.group_app"), ids: ["general", "appearance", "entorno", "activity", "cuenta-danil"] },
   { nombre: () => t("settings.nav.group_custom"), ids: ["skills", "agentes", "proyectos", "plugins"] },
   {
     nombre: () => t("settings.nav.group_connections"),
@@ -250,6 +255,8 @@ const GRUPOS: { nombre: () => string; ids: string[] }[] = [
 const idTab = (id: string) => `cfg-tab-${id}`;
 
 export default function Settings(props: {
+  workspace?: string | null;
+  activityMachine?: string | null;
   onClose: () => void;
   /** Con qué destino abrir. El menú del riel entra directo a administrar. */
   panel?: string;
@@ -343,7 +350,7 @@ export default function Settings(props: {
         return props.agentesEnUso ?? [];
       },
       onAgentProfile: (project, name) => props.onAgentProfile?.(project, name),
-    }, props.proyectos);
+    }, props.proyectos, () => props.workspace ?? null, () => props.activityMachine ?? null);
 
   const [activo, setActivo] = createSignal(props.panel ?? "general");
   let hoja: HTMLDivElement | undefined;

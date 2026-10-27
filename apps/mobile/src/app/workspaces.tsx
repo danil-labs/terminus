@@ -107,6 +107,7 @@ export default function WorkspaceSwitcher() {
           subtitle={`${power(host)} · ${host.kind === "bridge" ? t("signin.dev_bridge") : host.managed ? t("machines.managed") : t("machines.own")}`}
         />
       ))}
+      {hosts.length ? <Row testID="open-activity" left={<Icon name="terminal" size={20} color={theme.textMuted} />} title={t("activity.title")} subtitle={t("activity.description")} right={<Icon name="chevron-right" size={16} color={theme.textMuted} />} onPress={() => { router.back(); router.push("/activity"); }} /> : null}
       {hosts.length ? (
         <Row
           testID="open-accounts"

@@ -95,6 +95,7 @@ function mentionOf(machine: string, m: unknown): unknown {
 
 /** Un evento de `machine` para el panel: también el id suelto de `account-rejected`. */
 export function encodeEvent(ctx: MergeContext, machine: string, name: string, payload: unknown): unknown {
+  if (name === "activity" && isRow(payload)) return { ...payload, machine };
   if (name === "account-rejected" && typeof payload === "string" && machine !== ctx.self) return wrap(machine, payload);
   return encode(ctx, machine, payload);
 }

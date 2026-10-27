@@ -10,6 +10,7 @@ import { Notifications } from "../lib/notifications";
 import { t, w } from "../lib/i18n";
 import { pinToVisibleArea } from "../lib/viewport";
 import { WorkspacesProvider } from "../lib/workspaces";
+import { ActivityNotice } from "../ui/ActivityNotice";
 import { useTheme } from "../ui/theme";
 
 Notifications?.setNotificationHandler({
@@ -86,10 +87,12 @@ export default function RootLayout() {
             name="preview"
             options={Platform.OS === "web" ? { presentation: "transparentModal", headerShown: false, contentStyle: { backgroundColor: "transparent" }, animation: "none" } : { presentation: "formSheet", sheetAllowedDetents: "fitToContents", sheetGrabberVisible: true, headerShown: false, sheetCornerRadius: 18 }}
           />
+          <Stack.Screen name="activity" options={{ title: t("activity.title") }} />
           <Stack.Screen name="accounts" options={{ title: w("settings.nav.ai_providers") }} />
           <Stack.Screen name="signin" options={{ headerShown: false }} />
           <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
         </Stack>
+        <ActivityNotice />
       </WorkspacesProvider>
     </MachinesProvider>
     </AccountProvider>

@@ -363,6 +363,14 @@ test("events of another machine arrive with the panel's ids; a machine that come
   assert.deepEqual(seen, [["cmp_vm", [{ name: "turn", payload: { session: "cmp_vm~t1" } }], false], ["cmp_vm", [], true]]);
 });
 
+test("activity notices retain the originating machine without turning log ids into task ids", () => {
+  const seen: unknown[] = [];
+  const { fleet, link } = setup({ cmp_vm: {} }, [VM], { onEvents: (_machine, events) => seen.push(...events) });
+  fleet.subscribeEvents();
+  link("cmp_vm").push({ cursor: 1, events: [{ name: "activity", payload: { workspace: "w", id: "operation-1", title: "Actualizar herramientas", state: "success" } }] });
+  assert.deepEqual(seen, [{ name: "activity", payload: { workspace: "w", id: "operation-1", title: "Actualizar herramientas", state: "success", machine: "cmp_vm" } }]);
+});
+
 test("projects keep one row per id with the machines that have them, and the registry fills the rest", async () => {
   const { fleet } = setup({ cmp_vm: { answers: { list_projects: [{ id: "p1", name: "P1" }, { id: "p2", name: "P2", materialized: false, remote_url: "https://x/p2" }] } } }, [VM]);
   fleet.setRegistry([{ id: "w", name: "W", computers: ["cmp_vm"], projects: [{ id: "p3", name: "P3", remote_url: null, home_computer_id: "cmp_vm" }] } as never]);
