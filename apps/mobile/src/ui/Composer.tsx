@@ -5,6 +5,7 @@ import { File } from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { SendButton } from "./SendButton";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ATTACHMENT_MIMES,
@@ -421,15 +422,7 @@ export function Composer({
               <Text style={{ color: theme.bg, fontWeight: "700", fontSize: 13 }}>{sendLabel}</Text>
             </Pressable>
           ) : (
-            <Pressable
-              testID="send"
-              disabled={!ready || !hasText}
-              onPress={send}
-              accessibilityLabel={sendLabel}
-              style={[styles.send, { backgroundColor: theme.primary, opacity: ready && hasText ? 1 : 0.4 }]}
-            >
-              <Icon name="arrow-up" size={17} color={theme.onPrimary} strokeWidth={2.5} />
-            </Pressable>
+            <SendButton disabled={!ready || !hasText} onPress={send} label={sendLabel} />
           )}
         </View>
       </View>

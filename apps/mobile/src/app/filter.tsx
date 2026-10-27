@@ -1,10 +1,11 @@
 import { DEFAULT_SIDEBAR_VIEW, DENSITIES, GROUPINGS, type SidebarView, folderCounts, groupingLabel } from "@terminus/tasks";
 import type { ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AgentAvatar } from "../ui/AgentAvatar";
 import { lang, w } from "../lib/i18n";
 import { useMachines } from "../lib/machines";
 import { useWorkspaces } from "../lib/workspaces";
-import { Avatar, SheetTitle } from "../ui/components";
+import { SheetTitle } from "../ui/components";
 import { FolderSquare } from "../ui/TaskCard";
 import { useTheme } from "../ui/theme";
 
@@ -79,7 +80,7 @@ export default function Filter() {
           </Option>
           {agents.map((a) => (
             <Option key={a.name} testID={`filter-agent-${a.name}`} on={view.agent === a.name} onPress={() => set({ agent: a.name })}>
-              <Avatar name={a.name} size={18} round />
+              <AgentAvatar name={a.name} size={18} />
               {text(a.name)}
             </Option>
           ))}

@@ -1,6 +1,7 @@
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { AgentAvatar } from "../../ui/AgentAvatar";
 import type { BaseBranches } from "@terminus/protocol";
 import { baseBranchesOf, createTask, runShell, suggestedDefaults } from "../../lib/engine";
 import { HostError } from "../../lib/hosts";
@@ -8,7 +9,7 @@ import { t, w } from "../../lib/i18n";
 import { useMachines } from "../../lib/machines";
 import { spaceName, useWorkspaces } from "../../lib/workspaces";
 import { AddFolderSheets, type AddFolderMode } from "../../ui/AddFolder";
-import { Avatar, openTask } from "../../ui/components";
+import { openTask } from "../../ui/components";
 import { Composer, SelectorChip, type Submission } from "../../ui/Composer";
 import { Icon } from "../../ui/Icon";
 import { KeyboardScreen } from "../../ui/KeyboardScreen";
@@ -132,7 +133,7 @@ export default function NewTask() {
       {agents.length ? (
         <SelectorChip
           testID="pick-agent"
-          left={chosenAgent ? <Avatar name={chosenAgent} size={15} round /> : <Icon name="user-round" size={13} color={theme.textMuted} />}
+          left={chosenAgent ? <AgentAvatar name={chosenAgent} size={15} host={host?.id} folder={target?.id} /> : <Icon name="user-round" size={13} color={theme.textMuted} />}
           value={chosenAgent ?? t("new.agent")}
           muted={!chosenAgent}
           onPress={() => setPicker("agent")}
@@ -224,7 +225,7 @@ export default function NewTask() {
           setPicker(null);
         }} />
         {agents.map((a) => (
-          <SheetOption key={a.name} testID={`agent-${a.name}`} left={<Avatar name={a.name} size={22} round />} label={a.name} detail={a.description} selected={chosenAgent === a.name} onPress={() => {
+          <SheetOption key={a.name} testID={`agent-${a.name}`} left={<AgentAvatar name={a.name} size={22} host={host?.id} folder={target?.id} />} label={a.name} detail={a.description} selected={chosenAgent === a.name} onPress={() => {
             setAgent(a.name);
             setPicker(null);
           }} />

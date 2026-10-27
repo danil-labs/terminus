@@ -14,6 +14,7 @@ export type LucideShape =
   | { kind: "ellipse"; cx: number; cy: number; rx: number; ry: number };
 
 export const ICONS = {
+  "gauge": [{ kind: "path", d: "m12 14 4-4" }, { kind: "path", d: "M3.34 19a10 10 0 1 1 17.32 0" }],
   "archive": [{"kind": "rect", "width": 20.0, "height": 5.0, "x": 2.0, "y": 3.0, "rx": 1.0}, {"kind": "path", "d": "M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"}, {"kind": "path", "d": "M10 12h4"}],
   "arrow-left": [{"kind": "path", "d": "m12 19-7-7 7-7"}, {"kind": "path", "d": "M19 12H5"}],
   "arrow-up": [{"kind": "path", "d": "m5 12 7-7 7 7"}, {"kind": "path", "d": "M12 19V5"}],

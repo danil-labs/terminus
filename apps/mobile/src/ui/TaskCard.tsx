@@ -2,9 +2,9 @@ import { folderColor } from "@terminus/design";
 import { type SidebarDensity, type TaskCard as Card, taskTitle } from "@terminus/tasks";
 import * as Haptics from "expo-haptics";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { AgentAvatar } from "./AgentAvatar";
 import type { Task } from "../lib/engine";
 import { lang, w } from "../lib/i18n";
-import { Avatar } from "./components";
 import { Icon } from "./Icon";
 import { TaskMark } from "./TaskStatus";
 import { useTheme } from "./theme";
@@ -108,7 +108,7 @@ export function TaskCard({
                   </Text>
                 </View>
               ) : null}
-              {card.agent ? <Avatar name={card.agent} size={14} round /> : null}
+              {card.agent ? <AgentAvatar name={card.agent} size={14} host={task.host} folder={task.folder} /> : null}
               {card.machine ? <MachineChip name={card.machine.id} on={card.machine.on} /> : null}
             </>
           )}

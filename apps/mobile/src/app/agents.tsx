@@ -1,9 +1,10 @@
 import { dockStatusText, orderDockAgents } from "@terminus/tasks";
 import { router } from "expo-router";
 import { Pressable, ScrollView, Text } from "react-native";
+import { AgentAvatar } from "../ui/AgentAvatar";
 import { lang, w } from "../lib/i18n";
 import { useWorkspaces } from "../lib/workspaces";
-import { Avatar, Row, SheetTitle } from "../ui/components";
+import { Row, SheetTitle } from "../ui/components";
 import { useTheme } from "../ui/theme";
 
 /** «Ver todos» del dock: cada agente con su estado, su chat y sus tareas. */
@@ -20,7 +21,7 @@ export default function Agents() {
         <Row
           key={agent.name}
           testID={`agents-${agent.name}`}
-          left={<Avatar name={agent.name} size={36} round />}
+          left={<AgentAvatar name={agent.name} size={36} />}
           title={agent.name}
           subtitle={dockStatusText(lang, agent)}
           onPress={() => {

@@ -14,6 +14,7 @@ export const APP_READS = [
   "list_spaces",
   "list_live_sessions",
   "list_agents",
+  "list_agent_profiles",
   "list_agent_status",
   "list_providers",
   "load_session",

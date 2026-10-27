@@ -1,6 +1,7 @@
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { SendButton } from "../../../../../ui/SendButton";
 import { type ChatBackgroundView, type ChatEvent, type Question, type Turn, DEFAULT_CHAT_VEIL } from "@terminus/protocol";
 import {
   type PendingQuestion,
@@ -399,9 +400,9 @@ function QuestionCard({
           ) : null}
         </View>
       ))}
-      <Pressable disabled={disabled} style={[styles.action, { backgroundColor: theme.primary, alignSelf: "flex-end", opacity: disabled ? 0.5 : 1 }]} onPress={() => onAnswer(chosen, free)}>
-        <Text style={{ color: theme.onPrimary, fontWeight: "600" }}>{t("task.answer")}</Text>
-      </Pressable>
+      <View style={{ alignSelf: "flex-end" }}>
+        <SendButton testID="answer-question" disabled={disabled} label={t("task.answer")} onPress={() => onAnswer(chosen, free)} />
+      </View>
     </View>
   );
 }

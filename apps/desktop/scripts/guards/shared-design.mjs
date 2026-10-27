@@ -18,7 +18,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const { CSS_SOURCE, CSS_THEME_BLOCKS, STATUS_ICONS, STATUS_LABELS, THEMES, WORDS } = await import(
+const { ASTRO_BODIES, astroColors, CSS_SOURCE, CSS_THEME_BLOCKS, STATUS_ICONS, STATUS_LABELS, THEMES, WORDS } = await import(
   pathToFileURL(join(ROOT, "..", "..", "packages/design/src/index.ts")).href
 );
 
@@ -71,6 +71,15 @@ for (const [mode, selectors] of Object.entries(CSS_THEME_BLOCKS)) {
     const ref = value.match(/^var\((--[\w-]+)\)$/);
     return ref && seen < 8 ? resolve(vars.get(ref[1]) ?? value, seen + 1) : value;
   };
+  for (const body of ASTRO_BODIES) {
+    const astroVars = new Map(css.get(":root"));
+    for (const selector of selectors) for (const [key, value] of css.get(selector) ?? []) astroVars.set(key, value);
+    const colors = astroColors(body, mode === "dark");
+    colors.forEach((actual, index) => {
+      const variable = `--astro-${body}-${index + 1}`;
+      if (actual !== astroVars.get(variable)) failures.push(`${mode}.${variable}: ${actual} != ${astroVars.get(variable)}`);
+    });
+  }
   for (const [key, variable] of Object.entries(CSS_SOURCE)) {
     const expected = vars.get(variable);
     const actual = THEMES[mode][key];

@@ -5,3 +5,4 @@ export { type ThemeTokens, CSS_SOURCE, CSS_THEME_BLOCKS, THEMES } from "./tokens
 export { FOLDER_PALETTE, folderColor } from "./folderColor.ts";
 export { type Plural, type Word, type WordKey, WORDS, word } from "./words.ts";
 export { type WebLayout, MOBILE_WEB_DIR, PHONE_QUERY, WEB_LAYOUT_KEY, chosenWebLayout } from "./webLayout.ts";
+export { ASTRO_BODIES, ASTRO_COLORS, ASTRO_SHAPES, astroBody, astroColors, isAstroBody, type AstroBody, type AstroNode } from "./astro.ts";

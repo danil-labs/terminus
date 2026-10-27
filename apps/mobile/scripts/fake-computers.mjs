@@ -32,7 +32,7 @@ const LICENSE = !process.argv.includes("--license");
 const WAKE_MS = Number(option("wake-ms", "800"));
 const TOKEN = "fake-jwt";
 const INTENT = new Set(["send_message", "inject_message", "create_project", "start_project_clone", "create_agent", "create_agent_thread", "login_account", "submit_login_code", "respond_permission", "answer_question", "answer_shell_output", "run_shell_command", "queue_ready", "resume_awaiting_quota", "recreate_task_work"]);
-const MIRROR = new Set(["workspaces_startup", "list_workspaces", "list_projects", "list_spaces", "list_live_sessions", "list_agent_status", "list_providers", "load_session", "pending_requests", "list_active_turns", "list_workspace_attention", "list_agents"]);
+const MIRROR = new Set(["workspaces_startup", "list_workspaces", "list_projects", "list_spaces", "list_live_sessions", "list_agent_status", "list_providers", "load_session", "pending_requests", "list_active_turns", "list_workspace_attention", "list_agents", "list_agent_profiles"]);
 
 // --- Motores --------------------------------------------------------------------
 
@@ -129,6 +129,14 @@ function turn(m, s, prompt, extra = {}) {
   emit(m, "chat", { workspace: m.engine.ws, session: s.id, kind: "started", text: "", meta: null, ok: null, request_id: null });
   setTimeout(() => {
     emit(m, "chat", { workspace: m.engine.ws, session: s.id, kind: "delta", text: "Trabajando en ello", meta: null, ok: null, request_id: null });
+    if (/pregunta/i.test(prompt)) {
+      const turn = randomUUID();
+      const questions = [{ id: "choice", question: "¿Qué opción prefieres?", options: [{ value: "one", label: "Primera" }, { value: "two", label: "Segunda" }], multiple: false, free_text: true }];
+      s.question = { request_id: randomUUID(), turn };
+      s.turns.push({ id: turn, role: "agent", text: "Elige una opción.", questions });
+      emit(m, "question", { workspace: e.ws, session: s.id });
+      return;
+    }
     if (/permiso/i.test(prompt)) {
       s.pending = { request_id: randomUUID(), tool: "Bash", target: "rm -rf build" };
       emit(m, "chat", { workspace: m.engine.ws, session: s.id, kind: "permission", text: "Bash", meta: null, ok: null, request_id: s.pending.request_id, target: "rm -rf build" });
@@ -198,6 +206,12 @@ function invoke(m, command, args) {
     case "list_spaces": return [{ id: "s1", name: null, folders: e.projects.map((p) => p.id) }];
     case "list_live_sessions": return [...e.sessions.values()].filter((s) => s.project === args.project && !s.archived).map(row);
     case "list_agents": return { agents: args.project === "p-vm-web" ? [{ name: "Ada", description: "Revisa PRs" }] : [] };
+    case "list_agent_profiles": return args.project === "p-vm-web" ? { Ada: { body: "catplanet", avatar: process.argv.includes("--custom-avatar") ? "/lab/avatar.svg" : null } } : {};
+    case "preview_file": {
+      if (args.path !== "/lab/avatar.svg") throw { code: "command_failed", detail: "no fixture image" };
+      const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="#ffd98a"/><path d="m32 8 7 16 18 2-14 12 4 18-15-9-15 9 4-18L7 26l18-2z" fill="#7140ff"/></svg>';
+      return { rel: "avatar.svg", kind: "image", data_url: `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`, bytes: Buffer.byteLength(svg), truncated: false };
+    }
     case "list_agent_status": return args.project === "p-vm-web" ? [{ name: "Ada", status: "awake", minutes_since_last_turn: 3, live_tasks: 0 }] : [];
     case "list_providers": return [{ id: "codex", label: "Codex", available: true, driver: true }, { id: "claude", label: "Claude", available: true, driver: true }];
     case "list_active_turns": return [...e.live];
@@ -209,7 +223,7 @@ function invoke(m, command, args) {
     }
     case "pending_requests": {
       const s = e.sessions.get(args.session);
-      return { questions: [], permissions: s?.pending ? [{ request_id: s.pending.request_id, tool: s.pending.tool, target: s.pending.target }] : [] };
+      return { questions: s?.question ? [{ request_id: s.question.request_id, turn: s.question.turn }] : [], permissions: s?.pending ? [{ request_id: s.pending.request_id, tool: s.pending.tool, target: s.pending.target }] : [] };
     }
     case "send_message": {
       let s = args.session ? e.sessions.get(args.session) : null;
@@ -232,7 +246,13 @@ function invoke(m, command, args) {
       setTimeout(() => finish(m, s), 100);
       return { role: "user", text: args.allow ? "Aprobado" : "Rechazado" };
     }
-    case "answer_question": return null;
+    case "answer_question": {
+      const s = e.sessions.get(args.session);
+      if (!s?.question || s.question.request_id !== args.requestId) throw { code: "command_failed", detail: "no pending question" };
+      s.question = null;
+      finish(m, s);
+      return null;
+    }
     case "mark_task_seen": return null;
     case "set_session_pinned": {
       const s = e.sessions.get(args.id);
@@ -355,7 +375,7 @@ function seedMirror(m) {
   const reads = [
     ["list_workspaces", null, {}], ["list_projects", W, {}], ["list_spaces", W, {}], ["list_active_turns", W, { workspace: W }],
     ["list_workspace_attention", null, {}], ["list_providers", W, {}],
-    ...["", ...m.engine.projects.map((p) => p.id)].flatMap((project) => [["list_live_sessions", W, { project, open: [] }], ...(project ? [["list_agents", W, { project }], ["list_agent_status", W, { project }]] : [])]),
+    ...["", ...m.engine.projects.map((p) => p.id)].flatMap((project) => [["list_live_sessions", W, { project, open: [] }], ...(project ? [["list_agents", W, { project }], ["list_agent_status", W, { project }], ["list_agent_profiles", W, { project }]] : [])]),
     ...[...m.engine.sessions.values()].flatMap((s) => [["load_session", W, { project: s.project, id: s.id }], ["pending_requests", W, { session: s.id }]]),
   ];
   for (const [command, workspace, args] of reads) m.mirror.set(keyOf({ command, workspace, folder: null, args }), { value: invoke(m, command, args), at: new Date(Date.now() - 3_600_000).toISOString() });

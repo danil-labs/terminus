@@ -77,6 +77,9 @@ export default function Tasks() {
           <Badge count={otherPending} />
         </Pressable>
         <View style={styles.actions}>
+          <Pressable testID="usage" hitSlop={8} onPress={() => router.push("/accounts")} accessibilityLabel={w("settings.nav.ai_providers")} style={styles.action}>
+            <Icon name="gauge" size={22} color={theme.text} />
+          </Pressable>
           <Pressable testID="new-task" hitSlop={8} onPress={() => router.push("/new")} accessibilityLabel={t("new.title")} style={styles.action}>
             <Icon name="square-pen" size={22} color={theme.text} />
           </Pressable>
