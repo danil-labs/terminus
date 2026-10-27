@@ -256,7 +256,7 @@ export default function Almacenamiento(props: {
     void openInventory();
   }
 
-  async function openInventory(expected?: Target) {
+  async function openInventory(expected?: Target, refreshDetail = true) {
     if (clearing() || (expected && !current(expected))) return;
     const context = expected?.generation ?? generation;
     const workspace = expected?.workspace ?? props.workspace;
@@ -273,7 +273,7 @@ export default function Almacenamiento(props: {
         resetDetail();
       }
       for (const m of list) if (m.on) void readSummary(m);
-      void consultar();
+      void consultar(refreshDetail);
     } catch (error) {
       if (!disposed && context === generation && request === inventoryRequest) setInventoryError(prosaDe(error));
     } finally {
@@ -403,7 +403,7 @@ export default function Almacenamiento(props: {
     } finally {
       setOperationPending(false);
       if (current(captured)) {
-        await openInventory(captured);
+        await openInventory(captured, false);
       } else if (abierto()) {
         void openInventory();
       }
