@@ -726,3 +726,15 @@ test("el layout solo guarda la misma proyección de tareas restaurables", () => 
   assert.deepEqual(stored.columnas, [[{ pestanas: ["saved"], activa: "saved" }]]);
   assert.deepEqual(p.tabsAt({ col: 0, fila: 0 }), ["saved", "preview", "file"]);
 });
+
+test("la tarea conservada vuelve al cuadrante elegido aunque el origen esté vacío", () => {
+  const p = createPanels(() => ["saved"]);
+  p.sync(["saved"]);
+  p.split("saved");
+  p.bindTo("empty-origin", "space");
+  const restored = createPanels(() => ["saved"]);
+  restored.restore(readLayout("empty-origin", "space"), ["saved"]);
+  assert.deepEqual(restored.siteOf("saved"), { col: 1, fila: 0 });
+  assert.equal(restored.activeTabAt({ col: 0, fila: 0 }), null);
+  sano(restored);
+});

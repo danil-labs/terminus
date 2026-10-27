@@ -489,16 +489,16 @@ export function createPanels(restorable?: () => readonly string[]) {
             seen.add(id);
             tabs.push(id);
           }
-          if (tabs.length === 0) continue;
+          if (tabs.length === 0 && g.pestanas.length > 0) continue;
           const active =
             typeof g.activa === "string" && tabs.includes(g.activa)
               ? g.activa
-              : tabs[tabs.length - 1];
+              : tabs[tabs.length - 1] ?? null;
           groups.push({ pestanas: tabs, activa: active });
         }
         if (groups.length > 0) cols.push(groups);
       }
-      if (cols.length === 0) {
+      if (cols.length === 0 || seen.size === 0) {
         oneWindow();
         persist();
         return;
