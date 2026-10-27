@@ -96,6 +96,25 @@ export function gestoDelFallo(clase?: string) {
   }
 }
 
+/** Lo que la fila necesita para elegir su gesto. Ver `Msg`. */
+type FilaDeFallo = { meta?: string; text: string; fallo?: FalloDelTurno };
+
+/**
+ * Sin clase (envío rechazado o fallo sin clasificar) ofrece reintentar. Solo la
+ * fila vigente: reintentar manda el último texto, no el de una fila vieja.
+ */
+export function gestoDeLaFila(msg: FilaDeFallo, vigente: boolean) {
+  if (msg.meta !== "fallo") return null;
+  if (msg.text === "chat.turn.unsaved" || msg.text === t("chat.turn.unsaved")) return null;
+  const clase = msg.fallo?.clase;
+  const gesto =
+    clase && clase !== "desconocido"
+      ? gestoDelFallo(clase)
+      : { accion: "reintentar" as const, clave: "chat.failure.retry" };
+  if (gesto?.accion === "reintentar" && !vigente) return null;
+  return gesto;
+}
+
 /** Los fallos que la línea del cupo deja resueltos: la tarea ya siguió. */
 export function cupoResuelveElFallo(clase?: string) {
   return clase === "sin_cupo" || clase === "sin_saldo";
