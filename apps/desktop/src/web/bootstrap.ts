@@ -1,3 +1,5 @@
+import "../styles/global.css";
+
 async function bootstrap() {
   const parameters = new URLSearchParams(window.location.search);
   if (import.meta.env.TERMINUS_ALPHA && parameters.get('demo') === '1') {
