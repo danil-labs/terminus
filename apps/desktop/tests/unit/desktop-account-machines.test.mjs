@@ -704,3 +704,34 @@ test("one desktop uses the shared spaces order instead of an old local preferenc
   assert.ok(await until(() => ids().join(",") === "b,a"), "an order changed on another client reaches the open window");
   assert.deepEqual(app.fallos, []);
 });
+
+for (const folder of ["", "p1"]) test(`remote row in folder ${JSON.stringify(folder)} stays open across a delayed load in another machine's space`, async () => {
+  const a = { account: true, id: "sa", name: "QA A", folders: ["p1"], created_at: 1, updated_at: 1 };
+  const b = { account: true, id: "sb", name: "QA B", folders: ["p1"], created_at: 2, updated_at: 2 };
+  const { app, doc, relayCalls } = await open(`remote-row-spaces-${folder || "root"}`, {
+    computers: [HOME, { ...VM, state: "online" }],
+    registry: [{ id: "w", name: "W", projects: [], spaces: [a, b], computers: ["cmp_home", "cmp_vm"], settings_version: 1, settings: {} }],
+    extra: { list_spaces: [a, b], list_live_sessions: ({ project: p }) => p === "p1" ? [{ ...row("local", "Local A"), space: "sa" }] : [] },
+    relays: { cmp_vm: { state: "online", table: remote("Remote", "Remote B", {
+      list_spaces: [b],
+      list_live_sessions: ({ project: p }) => p === folder ? [{ ...row("t1", "Remote B"), turns: 1, space: "sb" }] : [],
+      load_session: async ({ id }) => {
+        await sleep(150);
+        return { ...engine.load_session({ id }), turns: [{ role: "assistant", text: "Remote transcript B" }] };
+      },
+    }) } },
+  });
+  doc.querySelector('[data-space="sb"]').click();
+  await sleep(200);
+  const target = doc.querySelector('[data-sesion="cmp_vm~t1"]');
+  assert.ok(target);
+  target.dispatchEvent(new app.w.PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse", clientX: 100, clientY: 100 }));
+  target.dispatchEvent(new app.w.PointerEvent("pointerup", { bubbles: true, button: 0, pointerType: "mouse", clientX: 100, clientY: 100 }));
+  target.click();
+  await sleep(800);
+  assert.equal(relayCalls("cmp_vm", "load_session").length, 1);
+  assert.ok(doc.querySelector('[data-preview-header]'), "the temporary tab remains");
+  assert.ok(doc.body.textContent.includes("Remote transcript B"), "the loaded conversation remains visible");
+  assert.deepEqual(app.fallos, []);
+  app.w.close();
+});
