@@ -1,3 +1,4 @@
+import { capabilities } from "../../lib/platform";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import ArrowLeft from "lucide-solid/icons/arrow-left";
@@ -479,6 +480,7 @@ export default function AgentProfile(props: {
             </Show>
           </section>
 
+          {capabilities().inbox?.agentSettings(props.agent.name)}
           <TelegramSection project={props.project} name={props.agent.name} />
 
           <section class={SECTION}>

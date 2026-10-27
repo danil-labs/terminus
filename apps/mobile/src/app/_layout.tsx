@@ -1,3 +1,5 @@
+import { ALPHA_DEMO } from "../lib/alpha-mode";
+import { InboxProvider } from "../lib/inbox";
 import type { NotificationResponse } from "expo-notifications";
 import { Stack, router, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -23,7 +25,7 @@ Notifications?.setNotificationHandler({
 });
 
 // Cierra la ventana del navegador del inicio de sesión si vuelve aquí (solo hace algo en web).
-WebBrowser.maybeCompleteAuthSession();
+if (!ALPHA_DEMO) WebBrowser.maybeCompleteAuthSession();
 
 type Target = { host?: string; workspace?: string; folder?: string | null; task?: string };
 
@@ -62,6 +64,7 @@ export default function RootLayout() {
 
   return (
     <AccountProvider>
+    <InboxProvider>
     <MachinesProvider active={!alphaInbox}>
       <WorkspacesProvider>
         <StatusBar style="auto" />
@@ -98,6 +101,7 @@ export default function RootLayout() {
         <ActivityNotice />
       </WorkspacesProvider>
     </MachinesProvider>
+    </InboxProvider>
     </AccountProvider>
   );
 }

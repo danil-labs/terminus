@@ -48,6 +48,7 @@ export type WebAccountsSource = {
 };
 
 export type Capabilities = {
+  inbox?: { initial: boolean; render: () => JSX.Element; agentSettings: (name: string) => JSX.Element; integrations: () => JSX.Element };
   spaceOrder?: SpaceOrderSource;
   /** Controles de ventana propios, semáforo de macOS y bandeja. */
   nativeWindow: boolean;

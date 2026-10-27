@@ -5,7 +5,8 @@
  * almacenamiento y misma clave. No inicia sesión por su cuenta; sin sesión
  * manda al inicio de la app (`WEB_LOGIN`).
  */
-import { createClient } from "@supabase/supabase-js";
+import { ALPHA_DEMO, demoDenied } from "./alpha-mode";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { COMPUTERS_ENDPOINT } from "@terminus/computers";
 
 export const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || "https://api.danil.ai";
@@ -13,6 +14,12 @@ export const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_KEY || "sb_publisha
 export const COMPUTERS = process.env.EXPO_PUBLIC_COMPUTERS_ENDPOINT || COMPUTERS_ENDPOINT;
 export const WEB_LOGIN = process.env.EXPO_PUBLIC_TERMINUS_WEB_LOGIN || "/";
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
-  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+let client: SupabaseClient | undefined;
+export const supabase = new Proxy({} as SupabaseClient, {
+  get(_target, key) {
+    if (ALPHA_DEMO) throw demoDenied();
+    client ??= createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
+    const value = Reflect.get(client, key);
+    return typeof value === "function" ? value.bind(client) : value;
+  },
 });

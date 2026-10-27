@@ -977,3 +977,25 @@ test("un guardado inválido no impide entrar a otro espacio ni borra las pestañ
     assert.deepEqual(tabs.open().map(tab => tab.id), ["task"]);
   }
 });
+
+test("Inbox es único por tira y efímero: cerrar y restaurar no modifica tareas", () => {
+  const tabs = createTabs();
+  tabs.load("inbox-ephemeral", "first");
+  tabs.ensure(tarea("task"));
+  tabs.openInbox("Inbox");
+  tabs.openInbox("Inbox");
+  assert.equal(tabs.open().filter(tab => tab.clase === "inbox").length, 1);
+  const stored = JSON.parse(almacen.get("harness.layout.pestanas.inbox-ephemeral.first")!);
+  assert.deepEqual(stored.abiertas.map((tab: { id: string }) => tab.id), ["task"]);
+  assert.equal(stored.activa, null);
+  assert.equal(tabs.open().find(tab => tab.clase === "inbox")?.session, "");
+  tabs.load("inbox-ephemeral", "second");
+  assert.deepEqual(tabs.open(), []);
+  tabs.openInbox("Inbox");
+  tabs.close("inbox");
+  assert.deepEqual(tabs.open(), []);
+  const restored = createTabs();
+  restored.load("inbox-ephemeral", "first");
+  assert.deepEqual(restored.open().map(tab => tab.id), ["task"]);
+  assert.equal(restored.active(), null);
+});

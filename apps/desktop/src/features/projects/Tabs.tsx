@@ -1,3 +1,4 @@
+import Inbox from "lucide-solid/icons/inbox";
 import Globe from "lucide-solid/icons/globe";
 import Monitor from "lucide-solid/icons/monitor";
 import Plus from "lucide-solid/icons/plus";
@@ -270,7 +271,7 @@ export default function TabStrip(props: {
                 ? t("projects.threads.heading", { name: displayName(agent, profiles()[agent]), title: threadTitle(row()) })
                 : displayName(agent, profiles()[agent]);
             }
-            return isTaskTab(p) || p.clase === "observabilidad" || p.clase === "pantalla"
+            return isTaskTab(p) || p.clase === "inbox" || p.clase === "observabilidad" || p.clase === "pantalla"
               ? (isTaskTab(p) && props.session(p.session)?.subagent ? readableSessionTitle(p.titulo) : p.titulo)
               : (labels().get(p.id) ?? "");
           };
@@ -372,11 +373,11 @@ export default function TabStrip(props: {
                     when={isTaskTab(p)}
                     fallback={
                     <Show
-                        when={p.clase !== "sitio" && p.clase !== "observabilidad" && p.clase !== "pantalla"}
+                        when={p.clase !== "sitio" && p.clase !== "inbox" && p.clase !== "observabilidad" && p.clase !== "pantalla"}
                         fallback={
                           <Show
                             when={p.clase === "pantalla"}
-                            fallback={<Globe size={12} class="shrink-0 text-neutral-500" aria-hidden={true} />}
+                            fallback={<Show when={p.clase === "inbox"} fallback={<Globe size={12} class="shrink-0 text-neutral-500" aria-hidden={true} />}><Inbox size={12} class="shrink-0 text-neutral-500" aria-hidden={true}/></Show>}
                           >
                             <Monitor size={12} class="shrink-0 text-neutral-500" aria-hidden={true} />
                           </Show>

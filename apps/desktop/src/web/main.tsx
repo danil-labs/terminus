@@ -30,6 +30,7 @@ import { Fleet, type Link, type MachineInfo, unwrap } from "@terminus/fleet";
 import { type Accessor, createSignal, lazy, Suspense } from "solid-js";
 import { createRouter, type Router, type SliceChange } from "../features/machines/router";
 import { t } from "../lib/i18n";
+import { attentionCapability } from "./attention/capability";
 import { leerPref } from "../lib/prefs";
 import { type OtherAccount, setCapabilities, type WebAccountsSource } from "../lib/platform";
 import { deliver } from "../lib/serviceEvents";
@@ -52,7 +53,7 @@ declare const __TERMINUS_WEB__: WebSettings;
 
 type WebSettings = { endpoint: string; supabaseUrl: string; supabaseKey: string; login: string };
 
-type Base = { endpoint: string; getToken: () => string | Promise<string>; onUnauthorized?: () => void };
+type Base = { refresh?: () => Promise<boolean>; subscribe?: (clear: () => void) => () => void; endpoint: string; getToken: () => string | Promise<string>; onUnauthorized?: () => void };
 export type TerminusWebConfig = Partial<
   WebSettings & Base & { computerId: string; computers: Computer[]; webAccounts: WebAccountsSource; addAccount: import("./AddAccount").AddAccountOptions }
 >;
@@ -213,6 +214,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
   // A file dropped outside the chat would replace the page with it.
   for (const type of ["dragover", "drop"]) window.addEventListener(type, (e) => e.preventDefault());
   setCapabilities({
+    inbox: import.meta.env.TERMINUS_ALPHA ? attentionCapability(false, window.location.pathname.replace(/\/+$/, "").endsWith("/inbox"), { subscribe: base.subscribe, getToken: async () => await base.getToken(), unauthorized: async () => base.refresh ? await base.refresh() : false }) : undefined,
     spaceOrder: createSpaceOrderSource(base.endpoint, token),
     nativeWindow: false,
     updater: false,
@@ -434,7 +436,7 @@ async function start(settings: WebSettings) {
       else await reread();
     },
   };
-  const session = current.client;
+  const session = current.slot === null ? primary : clientFor(current.slot);
 
   /** A refusal found after mounting covers the app: retrying the socket would not change it. */
   let blocked = false;
@@ -458,7 +460,7 @@ async function start(settings: WebSettings) {
           const several = computers.length > 1;
           const relink = mountApp(
             computers,
-            { endpoint, getToken: () => session.getToken(), onUnauthorized: () => void session.unauthorized() },
+            { endpoint, refresh: () => session.unauthorized(), getToken: () => session.getToken(), onUnauthorized: () => void session.unauthorized(), subscribe: clear => { const { data } = session.client.auth.onAuthStateChange((event, value) => { if (event === "SIGNED_OUT" || (value && value.user.id !== current.user_id)) clear(); }); return () => data.subscription.unsubscribe(); } },
             (computerId) => async () => {
               const answer = await computersOf(endpoint, session);
               if (answer.kind === "license") block({ t: "license" });
@@ -519,7 +521,7 @@ function toPhone(): boolean {
 
 if (import.meta.env.TERMINUS_ALPHA && window.location.pathname.replace(/\/+$/, "") === `${import.meta.env.BASE_URL}sign-in`) {
   void import("./attention/SignIn").then((m) => m.startSignIn(__TERMINUS_WEB__));
-} else if (import.meta.env.TERMINUS_ALPHA && window.location.pathname.replace(/\/+$/, "") === `${import.meta.env.BASE_URL}inbox`) {
+} else if (import.meta.env.TERMINUS_ALPHA && (new URLSearchParams(window.location.search).get("demo") === "1" || (window.location.pathname.replace(/\/+$/, "") === `${import.meta.env.BASE_URL}inbox` && !new URLSearchParams(window.location.search).has("live")))) {
   void import("./attention/main").then((m) => m.startAttention(__TERMINUS_WEB__));
 } else if (toPhone()) {
   // Se va al del teléfono: no se monta nada aquí.

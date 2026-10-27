@@ -157,5 +157,9 @@
   "web.alpha.public_agent": "Agent · public reply",
   "web.alpha.validation_warning": "Reading real data. Alpha integration pending authenticated validation.",
   "web.alpha.signout": "Sign out",
-  "web.alpha.session_required": "Sign in to connect live reading. The offline demo remains available."
+  "web.alpha.session_required": "Sign in to connect live reading. The offline demo remains available.",
+  "web.alpha.demo_folder": "Examples · demonstration",
+  "web.alpha.demo_task": "Review proposal · demonstration",
+  "web.alpha.demo_answer": "Sample private content. This task does not execute an agent.",
+  "web.alpha.demo_denied": "Unavailable in demonstration: no operation is sent to an engine."
 }

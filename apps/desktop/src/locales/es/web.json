@@ -157,5 +157,9 @@
   "web.alpha.public_agent": "Agente · respuesta pública",
   "web.alpha.validation_warning": "Lectura de datos reales. Integración alfa pendiente de validación autenticada.",
   "web.alpha.signout": "Cerrar sesión",
-  "web.alpha.session_required": "Inicia sesión para conectar la lectura real. Tu demo sigue disponible sin conexión."
+  "web.alpha.session_required": "Inicia sesión para conectar la lectura real. Tu demo sigue disponible sin conexión.",
+  "web.alpha.demo_folder": "Ejemplos · demostración",
+  "web.alpha.demo_task": "Revisar propuesta · demostración",
+  "web.alpha.demo_answer": "Contenido privado de ejemplo. Esta tarea no ejecuta un agente.",
+  "web.alpha.demo_denied": "No disponible en demostración: ninguna operación se envía al motor."
 }

@@ -39,6 +39,7 @@ import Skills from "./Skills";
 import Workspaces from "./Workspaces";
 // Chunks aparte: solo los carga quien abre la sección.
 const DanilAccount = lazy(() => import("./DanilAccount"));
+const Integrations = lazy(() => import("./Integrations"));
 const ActivityLogs = lazy(() => import("./ActivityLogs"));
 const Appearance = lazy(() => import("./Appearance"));
 
@@ -117,6 +118,7 @@ const destinosDe = (
   workspace: () => string | null,
   activityMachine: () => string | null,
 ): Destino[] => [
+  ...(capabilities().inbox ? [{ id: "integrations", name: t("alpha.integrations"), icono: () => <Blocks size={15}/>, panel: () => <Suspense fallback={null}><Integrations/></Suspense> }] : []),
   {
     id: "general",
     get name() {
@@ -248,7 +250,7 @@ const GRUPOS: { nombre: () => string; ids: string[] }[] = [
   { nombre: () => t("settings.nav.group_custom"), ids: ["skills", "agentes", "proyectos", "plugins"] },
   {
     nombre: () => t("settings.nav.group_connections"),
-    ids: ["proveedores-ia", "fuentes", "radiant"],
+    ids: ["proveedores-ia", "fuentes", "integrations", "radiant"],
   },
 ];
 

@@ -2,6 +2,7 @@ import { type Session, isAuthRetryableFetchError } from "@supabase/supabase-js";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { ALPHA_DEMO, demoDenied } from "./alpha-mode";
 import { supabase } from "./supabase";
 
 export type OAuthProvider = "google" | "azure";
@@ -42,6 +43,11 @@ export async function finishOAuth(url: string): Promise<string | null> {
 }
 
 export function AccountProvider({ children }: { children: ReactNode }) {
+  if (ALPHA_DEMO) return <Context.Provider value={{ ready: true, session: null, email: null, signInWithPassword: async () => "demo_read_only", signInWithProvider: async () => "demo_read_only", signOut: async () => { throw demoDenied(); }, getToken: async () => { throw demoDenied(); }, unauthorized: async () => false }}>{children}</Context.Provider>;
+  return <LiveAccountProvider>{children}</LiveAccountProvider>;
+}
+
+function LiveAccountProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
 

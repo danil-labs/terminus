@@ -1,3 +1,4 @@
+import { ALPHA_DEMO, ALPHA_ORDINARY } from "../../lib/alpha-mode";
 import { applySidebarView, folderCounts, groupKey, groupLabel, nonDefaultCount, scopeLabel, type SidebarView } from "@terminus/tasks";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
@@ -102,8 +103,8 @@ export default function Tasks() {
           </Pressable>
         </View>
         </View>
-        {process.env.EXPO_PUBLIC_TERMINUS_ALPHA === "1" ? (
-          <Pressable accessibilityRole="link" onPress={() => router.push("/inbox")} style={styles.workspace}>
+        {process.env.EXPO_PUBLIC_TERMINUS_ALPHA === "1" && !ALPHA_ORDINARY ? (
+          <Pressable accessibilityRole="link" onPress={() => router.push(ALPHA_DEMO ? "/inbox?demo=1" : "/inbox")} style={styles.workspace}>
             <Text style={{ color: theme.primary, fontWeight: "600" }}>{t("alpha.title")}</Text>
           </Pressable>
         ) : null}

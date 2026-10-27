@@ -2,6 +2,10 @@ import { type WordKey, WORDS, word } from "@terminus/design";
 import { getLocales } from "expo-localization";
 
 const es = {
+  "alpha.machine_demo": "Computadora · demostración",
+  "alpha.folder_demo": "Ejemplos · demostración",
+  "alpha.task_demo": "Revisar propuesta · demostración",
+  "alpha.answer_demo": "Contenido privado de ejemplo. Esta tarea no ejecuta un agente.",
   "alpha.settings": "Ajustes",
   "alpha.engine_context": "Inbox operativo sin workspace de motor seleccionado.",
   "alpha.home": "Volver a las tareas de Terminus",
@@ -329,6 +333,10 @@ const es = {
 type Key = keyof typeof es;
 
 const en: Record<Key, string> = {
+  "alpha.machine_demo": "Computer · demonstration",
+  "alpha.folder_demo": "Examples · demonstration",
+  "alpha.task_demo": "Review proposal · demonstration",
+  "alpha.answer_demo": "Sample private content. This task does not execute an agent.",
   "alpha.settings": "Settings",
   "alpha.engine_context": "Operational Inbox with no engine workspace selected.",
   "alpha.home": "Return to Terminus tasks",

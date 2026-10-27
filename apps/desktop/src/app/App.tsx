@@ -240,6 +240,7 @@ import {
   isContentTab,
   isTaskTab,
   migrateLegacyStrip,
+  INBOX_TAB_ID,
   OBSERVABILITY_TAB_ID,
   type ScreenTab,
   screenTabId,
@@ -4491,7 +4492,7 @@ export default function App() {
     setProyectoAbierto(null);
     // El navegador del «+» tampoco cuelga de ninguna tarea: detrás no se
     // abre nada.
-    if (p.clase === "observabilidad" || p.clase === "pantalla" || (p.clase === "sitio" && p.navegador)) {
+    if (p.clase === "inbox" || p.clase === "observabilidad" || p.clase === "pantalla" || (p.clase === "sitio" && p.navegador)) {
       pestanas.activate(p.id);
       return;
     }
@@ -4534,6 +4535,22 @@ export default function App() {
     const i = recorrido.findIndex((s) => sameSite(s, paneles.activeSite()));
     mandarVentana(recorrido[(i + salto + recorrido.length) % recorrido.length]);
   }
+
+  function abrirInbox() {
+    setProyectoAbierto(null);
+    pestanas.openInbox(t("alpha.inbox"));
+  }
+  let initialInboxOpened = false;
+  createEffect(() => {
+    const ws = workspaceActivo();
+    const space = escritorio();
+    if (!ws || !space || initialInboxOpened || !capabilities().inbox?.initial) return;
+    queueMicrotask(() => {
+      if (workspaceActivo() !== ws || escritorio() !== space || initialInboxOpened) return;
+      initialInboxOpened = true;
+      abrirInbox();
+    });
+  });
 
   function abrirObservabilidad() {
     setProyectoAbierto(null);
@@ -4701,7 +4718,7 @@ export default function App() {
     const p = pestanasEnPantalla().find((x) => x.id === id);
     if (!p) return "";
     if (isTaskTab(p)) return p.titulo;
-    if (p.clase === "observabilidad" || p.clase === "pantalla") return p.titulo;
+    if (p.clase === "inbox" || p.clase === "observabilidad" || p.clase === "pantalla") return p.titulo;
     if (p.clase === "sitio" && !p.url) return t("sites.new_tab");
     const r = p.clase === "archivo" ? p.ruta : p.clase === "artefacto" ? p.rel : p.url;
     return r.slice(r.lastIndexOf("/") + 1);
@@ -7695,6 +7712,12 @@ export default function App() {
         }}
       </For>
 
+      <Show when={pestanas.open().some(p => p.id === INBOX_TAB_ID) ? `${workspaceActivo()}\u0000${escritorio()}` : undefined} keyed>
+        <div class="min-h-0 min-w-0" classList={{ hidden: celdaDe(INBOX_TAB_ID) === undefined || tapadoPorElProyecto(paneles.siteOf(INBOX_TAB_ID)), "pt-8": llevaTiraInterior(paneles.siteOf(INBOX_TAB_ID)) }} style={celdaDe(INBOX_TAB_ID)}>
+          {capabilities().inbox?.render()}
+        </div>
+      </Show>
+
       <Show when={pestanas.open().some((p) => p.id === OBSERVABILITY_TAB_ID)}>
         <div
           class="min-h-0 min-w-0"
@@ -7990,6 +8013,8 @@ export default function App() {
               data-shell-cache={enCache() ? "" : undefined}
             >
             <Sidebar
+              onInbox={capabilities().inbox ? abrirInbox : undefined}
+              inboxActive={pestanas.active() === INBOX_TAB_ID}
               projects={proyectosDelRiel()}
               modelos={modelosParaAgentes()}
               sessions={sesionesDelRiel()}

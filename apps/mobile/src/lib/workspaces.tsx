@@ -1,3 +1,5 @@
+import { ALPHA_DEMO } from "./alpha-mode";
+import { t } from "./i18n";
 import type { ProviderInfo, Workspace } from "@terminus/protocol";
 import { DEFAULT_SIDEBAR_VIEW, type SidebarView, sanitizeSidebarView } from "@terminus/tasks";
 import { store } from "./store";
@@ -59,6 +61,22 @@ export function useWorkspaces() {
 const viewKey = (workspace: string, space: string | null) => `terminus.view.${workspace}${space ? `.${space}` : ""}`.replace(/[^\w.-]/g, "_");
 
 export function WorkspacesProvider({ children }: { children: ReactNode }) {
+  return ALPHA_DEMO ? <DemoWorkspacesProvider>{children}</DemoWorkspacesProvider> : <LiveWorkspacesProvider>{children}</LiveWorkspacesProvider>;
+}
+
+function DemoWorkspacesProvider({ children }: { children: ReactNode }) {
+  const { hosts } = useMachines();
+  const [view, setView] = useState<SidebarView>({ ...DEFAULT_SIDEBAR_VIEW, group: "none" });
+  const entry: WorkspaceEntry = { id: "demo-workspace", name: t("alpha.workspace_demo"), members: new Map([["demo-host", "demo-workspace"]]), hosts: ["demo-host"], defaultPermissionMode: null };
+  const [spaceId, setSpaceId] = useState("demo-space");
+  const firstSpace: MergedSpace = { id: "demo-space", name: t("alpha.space_demo"), folders: ["demo-host/demo-folder"], on: { "demo-host": "demo-space" } };
+  const alternate: MergedSpace = { id: "demo-space-alt", name: t("alpha.folder_demo"), folders: [], on: {"demo-host":"demo-space-alt"} };
+  const space = spaceId === firstSpace.id ? firstSpace : alternate;
+  const snapshot: Snapshot = { folders: [{id:"demo-folder",name:t("alpha.folder_demo"),key:"demo-host/demo-folder",host:"demo-host",kind:"folder"}], spaces:[firstSpace,alternate], tasks:[{id:"demo-task",title:t("alpha.task_demo"),last_message:t("alpha.answer_demo"),provider:"codex",model:"gpt-5.6",created_at:0,updated_at:0,esperando:false,agent:null,space:firstSpace.id,host:"demo-host",workspace:entry.id,folder:"demo-folder",folderKey:"demo-host/demo-folder"}], delegated:[], agents:[{name:"atencion-demo",description:t("alpha.agent"),status:"asleep",liveTasks:0,minutesSinceLastTurn:null,places:[{host:"demo-host",folder:"demo-folder"}]}], live:new Set(), providers:{}, cachedAt:null };
+  return <Context.Provider value={{list:[entry],current:entry,snapshot,loading:false,select:()=>{},space,selectSpace:setSpaceId,view,setView,hostsOfCurrent:hosts,reload:async()=>{}}}>{children}</Context.Provider>;
+}
+
+function LiveWorkspacesProvider({ children }: { children: ReactNode }) {
   const { hosts, registry, subscribe, rememberTitles, tick } = useMachines();
   const [perHost, setPerHost] = useState<Record<string, Workspace[] | null>>({});
   const [currentId, setCurrentId] = useState<string | null>(null);

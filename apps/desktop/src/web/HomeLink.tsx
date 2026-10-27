@@ -8,9 +8,7 @@ import { t } from "../lib/i18n";
 export function HomeLink() {
   return (
     <>
-    <Show when={import.meta.env.TERMINUS_ALPHA}>
-      <a href={`${import.meta.env.BASE_URL}inbox`} class="rounded-md px-2 py-1 text-xs text-primary">{t("web.alpha.inbox")}</a>
-    </Show>
+
     <Show when={window.matchMedia(PHONE_QUERY).matches}>
       <a
         href={`${import.meta.env.BASE_URL}${MOBILE_WEB_DIR}/`}

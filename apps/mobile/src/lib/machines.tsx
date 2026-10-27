@@ -1,3 +1,4 @@
+import { ALPHA_DEMO, demoDenied } from "./alpha-mode";
 import { type AccountWorkspace, type Answer, type Computer, listComputers, listWorkspaces, startComputer } from "@terminus/computers";
 import { type EngineEvent, type WorkspaceAttention, mergeAttention } from "@terminus/protocol";
 import { store } from "./store";
@@ -79,7 +80,19 @@ async function computersOf(getToken: () => Promise<string>, unauthorized: () => 
   return listComputers(COMPUTERS, await getToken());
 }
 
+const demoHost: Host = {
+  id: "demo-host", label: t("alpha.machine_demo"), kind: "computer", managed: false,
+  linked: new Set(["demo-workspace"]), power: () => "off", canAct: () => "asleep",
+  onChange: () => () => {}, onEvents: () => () => {},
+  call: async () => { throw demoDenied(); }, wake: async () => { throw demoDenied(); }, close: () => {},
+};
+
 export function MachinesProvider({ children, active = true }: { children: ReactNode; active?: boolean }) {
+  if (ALPHA_DEMO) return <Context.Provider value={{ ready: true, fleet: "ok", hosts: [demoHost], hostOf: id => id === demoHost.id ? demoHost : undefined, registry: null, preferred: () => demoHost, rememberMachine: () => {}, pairing: null, pair: async () => { throw demoDenied(); }, reloadComputers: async () => {}, retryLicense: () => {}, attention: {}, activity: [], titleOf: () => undefined, rememberTitles: () => {}, setOpenTask: () => {}, subscribe: () => () => {}, tick: 0 }}>{children}</Context.Provider>;
+  return <LiveMachinesProvider active={active}>{children}</LiveMachinesProvider>;
+}
+
+function LiveMachinesProvider({ children, active }: { children: ReactNode; active: boolean }) {
   const account = useAccount();
   const signedIn = active && Boolean(account.session);
   const [computers, setComputers] = useState<Computer[]>([]);

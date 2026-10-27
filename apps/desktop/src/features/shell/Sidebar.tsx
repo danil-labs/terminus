@@ -4,6 +4,7 @@ import Loader2 from "lucide-solid/icons/loader-2";
 import PanelLeftClose from "lucide-solid/icons/panel-left-close";
 import Plus from "lucide-solid/icons/plus";
 import Search from "lucide-solid/icons/search";
+import Inbox from "lucide-solid/icons/inbox";
 import SettingsIcon from "lucide-solid/icons/settings";
 import SquarePen from "lucide-solid/icons/square-pen";
 import TriangleAlert from "lucide-solid/icons/triangle-alert";
@@ -142,6 +143,8 @@ export default function Sidebar(props: {
   onRenombrar: (project: string, id: string, title: string) => Promise<boolean | void> | boolean | void;
   onPin?: (project: string, id: string, pinned: boolean) => void | Promise<void>;
   onSettings: (panel?: string) => void;
+  onInbox?: () => void;
+  inboxActive?: boolean;
   /** Abre el chat con un agente de esa carpeta, como su fila de antes. */
   onHablarCon: (project: string, name: string) => void;
   onAgentProfile: (project: string, name: string) => void;
@@ -624,6 +627,7 @@ export default function Sidebar(props: {
 
         <SidebarContent class="gap-2 px-2 pb-0">
           <SidebarMenu class="gap-1.5">
+
             <SidebarMenuItem>
               {/* Nueva tarea es la acción principal, negra y sólida.
                   `primary` queda reservado para las acciones del agente. */}
@@ -643,6 +647,7 @@ export default function Sidebar(props: {
                 </Show>
               </SidebarMenuButton>
             </SidebarMenuItem>
+            <Show when={props.onInbox}><SidebarMenuItem><SidebarMenuButton isActive={props.inboxActive} aria-label={t("alpha.inbox")} onClick={() => props.onInbox?.()}><Inbox size={14}/><Show when={!props.collapsed}><span>{t("alpha.inbox")}</span></Show></SidebarMenuButton></SidebarMenuItem></Show>
             <Show when={props.collapsed}>
               <SidebarMenuItem>
                 <SidebarMenuButton

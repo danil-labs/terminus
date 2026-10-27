@@ -43,6 +43,11 @@ export type SiteTab = CommonTab & {
   navegador?: true;
 };
 
+export type InboxTab = CommonTab & {
+  clase: "inbox";
+  titulo: string;
+};
+
 export type ObservabilityTab = CommonTab & {
   clase: "observabilidad";
   titulo: string;
@@ -61,6 +66,7 @@ export type Tab =
   | ArtifactTab
   | SiteTab
   | ObservabilityTab
+  | InboxTab
   | ScreenTab;
 export type ContentTab =
   | FileTab
@@ -87,6 +93,8 @@ export const siteTabId = (a: { session: string; url: string }) =>
 
 let browserSequence = 0;
 export const browserTabId = () => `navegador\u0000${Date.now()}\u0000${browserSequence++}`;
+
+export const INBOX_TAB_ID = "inbox";
 
 export const OBSERVABILITY_TAB_ID = "observabilidad";
 
@@ -214,7 +222,7 @@ export function createTabs() {
   const save = () => {
     if (!workspace) return;
     // Los ids provisionales no existen en disco y no pueden restaurarse al arrancar.
-    const activeTask = taskOf(active());
+    const activeTask = taskOf(active()) || null;
     const g: StoredTabs = {
       abiertas: openTabs().filter(isTaskTab).filter((p) => !esProvisional(p.session)),
       activa: esProvisional(activeTask) ? null : activeTask,
@@ -315,6 +323,11 @@ export function createTabs() {
       });
       if (active() === draft) setActive(p.id);
       save();
+    },
+    openInbox(title: string) {
+      const next: InboxTab = { clase: "inbox", id: INBOX_TAB_ID, project: "", session: "", titulo: title };
+      setOpenTabs(list => list.some(tab => tab.id === next.id) ? list : [...list, next]);
+      activateAndPersist(next.id);
     },
     openObservability(title: string) {
       const next: ObservabilityTab = {
