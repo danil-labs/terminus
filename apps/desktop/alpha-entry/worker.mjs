@@ -74,6 +74,10 @@ export default {
     if (!url.pathname.startsWith("/terminus/")) return json("not_found", 404);
     if (request.method !== "GET" && request.method !== "HEAD") return json("method_not_allowed", 405);
     if (!env.TERMINUS_WEB) return json("assets_unavailable", 503);
+    if (url.pathname === "/terminus/m/inbox") {
+      url.pathname = "/terminus/m/";
+      return env.TERMINUS_WEB.fetch(new Request(url, request));
+    }
     return env.TERMINUS_WEB.fetch(request);
   },
 };
