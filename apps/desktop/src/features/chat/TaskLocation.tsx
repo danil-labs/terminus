@@ -14,7 +14,6 @@ export type TaskLocationProps = {
   /** El `machine` de la fila; sin él, la máquina de la ventana. */
   machine?: string;
   on: boolean;
-  actions?: JSX.Element;
   project?: string;
   /** La carpeta de trabajo de la tarea (su worktree). */
   path?: string;
@@ -127,7 +126,6 @@ export default function TaskLocation(props: TaskLocationProps) {
           </Pista>
         )}
       </Show>
-      {props.actions}
     </nav>
   );
 }
