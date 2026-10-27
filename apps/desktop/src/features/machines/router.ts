@@ -645,6 +645,10 @@ export function createRouter(config: RouterConfig) {
     forget(machine: string) {
       attention.forget(machine);
     },
+    /** El registro de la cuenta cambió (un workspace recién vinculado): la próxima lista lo vuelve a leer. */
+    registryChanged() {
+      registryAt = 0;
+    },
     close() {
       clearTimeout(notifyTimer);
       for (const finish of [...pollers]) finish();
