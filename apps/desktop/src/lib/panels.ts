@@ -403,7 +403,7 @@ export function createPanels(restorable?: () => readonly string[]) {
     split(id: string): boolean {
       const from = siteOf(id);
       if (!from) return false;
-        const position = vacancy();
+      const position = vacancy();
       if (!position) return false;
       batch(() => {
         if (position.col >= columns().length) {

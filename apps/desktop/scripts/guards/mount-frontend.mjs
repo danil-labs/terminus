@@ -401,9 +401,9 @@ if (!roto) {
   };
   clickTree('[data-sesion="s1"]');
   await sleep(150);
-  const draftField = treeDocument.querySelector("textarea");
-  draftField.value = "borrador de la vista temporal";
-  draftField.dispatchEvent(new treeApp.w.Event("input", { bubbles: true }));
+  const previewDraftField = treeDocument.querySelector("textarea");
+  previewDraftField.value = "borrador de la vista temporal";
+  previewDraftField.dispatchEvent(new treeApp.w.Event("input", { bubbles: true }));
   clickTree('[data-sesion="s2"]');
   await sleep(150);
   assert.equal(treeDocument.querySelectorAll("[data-preview]").length, 1, "abrir otra tarea sustituye la temporal");
