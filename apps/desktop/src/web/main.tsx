@@ -39,6 +39,7 @@ import { machineCompatibility, machineContracts } from "./compatibility";
 import { HomeLink } from "./HomeLink";
 import { installIpc } from "./ipc";
 import { webAccountProfile } from "./account";
+import { authLocation } from "./auth/return";
 import { webGithubAccount } from "./github-account";
 import { type Account, type Listing, SLOT_PREFIX, loadAccounts, ownerOf, pickAccount, readListings, rememberLast, removeExtra, savedListings } from "./accounts";
 import { forgetShellCache, setShellCacheScope } from "../lib/shellCache";
@@ -350,7 +351,7 @@ async function start(settings: WebSettings) {
   ]);
   aplicarLengua();
   const { endpoint } = settings;
-  const leave = () => window.location.assign(settings.login);
+  const leave = () => window.location.assign(authLocation(settings.login, window.location.origin, `${window.location.pathname}${window.location.search}`));
   if (!settings.supabaseUrl || !settings.supabaseKey) {
     console.error("terminus web: built without TERMINUS_WEB_SUPABASE_URL and TERMINUS_WEB_SUPABASE_KEY");
     return;
@@ -439,7 +440,7 @@ async function start(settings: WebSettings) {
 
   /** A refusal found after mounting covers the app: retrying the socket would not change it. */
   let blocked = false;
-  const block = (initial: { t: "license" } | { t: "not_yours" }) => {
+  const block = (initial: { t: "license" } | { t: "no_account" } | { t: "not_yours" }) => {
     if (blocked) return;
     blocked = true;
     const layer = document.createElement("div");
@@ -462,7 +463,7 @@ async function start(settings: WebSettings) {
             { endpoint, getToken: () => session.getToken(), onUnauthorized: () => void session.unauthorized() },
             (computerId) => async () => {
               const answer = await computersOf(endpoint, session);
-              if (answer.kind === "license") block({ t: "license" });
+              if (answer.kind === "license" || answer.kind === "no_account") block({ t: answer.kind });
               // One computer gone from several only stops its own session.
               else if (answer.kind === "ok" && !answer.value.some((c) => c.computer_id === computerId)) {
                 if (!several) block({ t: "not_yours" });
@@ -498,6 +499,7 @@ let relisting = false;
 const given = (window as Window & { terminusWeb?: TerminusWebConfig }).terminusWeb ?? {};
 const preset = given.computers ?? (given.computerId ? [{ computer_id: given.computerId, state: "unknown" }] : null);
 const connecting = window.location.pathname.replace(/\/+$/, "") === `${import.meta.env.BASE_URL}connect`;
+const authenticating = window.location.pathname.replace(/\/+$/, "") === `${import.meta.env.BASE_URL}auth`;
 
 /**
  * Un teléfono abre el Terminus del teléfono (`<base>m/`, la app de Expo para
@@ -513,14 +515,15 @@ function toPhone(): boolean {
     window.location.replace(`${phone}?to=${encodeURIComponent(path.slice(phone.length - 1) + window.location.search)}`);
     return true;
   }
-  if (path.startsWith(phone) || connecting || preset || given.addAccount || chosenWebLayout(window) !== "mobile") return false;
-  window.location.replace(phone);
+  if (path.startsWith(phone) || connecting || authenticating || preset || given.addAccount || chosenWebLayout(window) !== "mobile") return false;
+  window.location.replace(`${phone}${window.location.search}`);
   return true;
 }
 
 if (toPhone()) {
   // Se va al del teléfono: no se monta nada aquí.
-} else if (connecting) void import("./connect/main").then((m) => m.startConnect({ ...__TERMINUS_WEB__, ...given } as WebSettings, document.getElementById("root") as HTMLElement));
+} else if (authenticating) void import("./auth/main").then((m) => m.startAuth({ ...__TERMINUS_WEB__, ...given } as WebSettings, document.getElementById("root") as HTMLElement));
+else if (connecting) void import("./connect/main").then((m) => m.startConnect({ ...__TERMINUS_WEB__, ...given } as WebSettings, document.getElementById("root") as HTMLElement));
 else if (given.addAccount) {
   const options = given.addAccount;
   void import("./AddAccount").then((m) => m.startAddAccount(document.getElementById("root") as HTMLElement, options));

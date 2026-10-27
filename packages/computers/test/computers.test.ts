@@ -156,7 +156,10 @@ test("solo una VM administrada se despierta; apagado es neutro", () => {
 
 test("la API dice licencia, no tuya y error sin confundirlos", async () => {
   const answer = (status: number, body: unknown = null) => async () => ({ status, ok: status < 300, json: async () => body });
-  assert.equal((await listComputers("x.example", "t", answer(403))).kind, "license");
+  assert.equal((await listComputers("x.example", "t", answer(403, { error: "license_required" }))).kind, "license");
+  assert.equal((await listComputers("x.example", "t", answer(403, { error: { code: "unknown_user" } }))).kind, "no_account");
+  assert.equal((await listComputers("x.example", "t", answer(403, { error: "unknown_user" }))).kind, "no_account");
+  assert.equal((await listComputers("x.example", "t", answer(403))).kind, "error");
   assert.equal((await listComputers("x.example", "t", answer(401))).kind, "unauthorized");
   assert.equal((await startComputer("x.example", "t", "cmp", answer(404))).kind, "missing");
   const ok = await listComputers("x.example", "t", answer(200, [{ computer_id: "cmp_a", state: "online" }, { bad: 1 }]));
