@@ -153,7 +153,7 @@ test("a message to a task of the VM that is off wakes it and is delivered; to th
   assert.equal(seen.id, "cmp_mac~t2", "the last it said is still visible");
   await assert.rejects(router.handle("send_message", { project: "p1", session: "cmp_mac~t2", prompt: "hola" }, on("cmp_mac")), (e: { detail: string; what: string }) => {
     assert.equal(e.detail, "machine_off");
-    assert.match(e.what, /Mac de Ana está apagada/);
+    assert.match(e.what, /Mac de Ana está sin conexión/);
     return true;
   });
   assert.equal(mac.calls.filter((c) => c.command === "send_message").length, 0, "nothing was sent to it");
