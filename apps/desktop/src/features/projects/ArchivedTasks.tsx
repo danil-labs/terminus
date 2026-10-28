@@ -4,6 +4,7 @@ import { df } from "../../lib/format";
 import { t } from "../../lib/i18n";
 import { type Space, type SpaceRef, spaceName } from "../../lib/spaces";
 import { invoke } from "../../lib/invoke.ts";
+import { listen } from "../../lib/serviceEvents";
 import type { Project } from "../../lib/model";
 import { EmptyState } from "../../ui/EmptyState";
 import { asFailure, FailureNote } from "../../ui/Failure";
@@ -30,6 +31,17 @@ export default function ArchivedTasks(props: {
     const alCambiar = () => void refetch();
     window.addEventListener("harness:tasks-changed", alCambiar);
     onCleanup(() => window.removeEventListener("harness:tasks-changed", alCambiar));
+    // Lo que archiva, desarchiva o borra otra ventana (la web, el CLI) llega
+    // como `session`. Un borrado de varias manda una ráfaga: se lee una vez.
+    let espera: ReturnType<typeof setTimeout> | undefined;
+    const deOtra = listen("session", () => {
+      clearTimeout(espera);
+      espera = setTimeout(alCambiar, 300);
+    });
+    onCleanup(() => {
+      clearTimeout(espera);
+      void deOtra.then((stop) => stop());
+    });
   });
 
   const viva = (id: string | null | undefined) => props.spaces.find((i) => i.id === id) ?? null;
