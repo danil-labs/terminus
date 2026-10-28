@@ -2,18 +2,9 @@ import { type ComponentProps, createEffect, createSignal, on, Show } from "solid
 import RightPanelHeader from "../shell/RightPanelHeader";
 import { t } from "../../lib/i18n";
 import { Input } from "../../ui/Input";
-import { taskDescendants, taskIdentity } from "@terminus/tasks";
 import Sessions, { type SessionRow } from "./Sessions";
 
-export function createdTasks(rows: SessionRow[], agent: string, thread: string | null, folder?: string): SessionRow[] {
-  const scoped = folder === undefined ? rows : rows.filter(row => (row.folder ?? "") === folder);
-  const conversations = new Set(scoped.filter(row => row.chat_de_agente && row.agent === agent).map(row => row.id));
-  const seeds = scoped.filter(row => !row.chat_de_agente && (thread
-    ? row.launched_by === thread
-    : !!row.launched_by && (conversations.has(row.launched_by) || row.launcher_name === agent)));
-  const ids = new Set([...seeds, ...taskDescendants(rows, seeds)].map(taskIdentity));
-  return rows.filter(row => ids.has(taskIdentity(row)));
-}
+export { createdTasks } from "./agentPageFilters";
 
 export default function AgentTasks(props: {
   context: string;
