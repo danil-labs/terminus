@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 // abajo son identificadores en vez de frases.
 import "../helpers/catalog.ts";
 import {
+  mensajeDeFallo,
   cupoResuelveElFallo as quotaResolves,
   gestoDelFallo as failureAction,
   prosaDelCambioPorCupo as quotaChangeText,
@@ -240,4 +241,22 @@ test("la entrega guardada antes nombra su tarea por el id de su prosa", () => {
   assert.equal(oldDeliveryId("Respuesta entregada a la tarea «mfpbwsj1». Salto 2."), "mfpbwsj1");
   assert.equal(oldDeliveryId("Respuesta entregada."), null);
   assert.equal(oldDeliveryId(""), null);
+});
+
+
+test("un fallo antes de arrancar conserva el diagnóstico y ofrece instrucciones", () => {
+  const message = mensajeDeFallo({ code: "launch_failed", message: "spawn failed" });
+  assert.match(failureText(message), /No se pudo completar la acción/);
+  assert.match(failureText(message), /soporte/);
+  assert.match(message.fallo.detail, /launch_failed/);
+  assert.match(message.fallo.detail, /spawn failed/);
+  assert.doesNotMatch(failureText(message), /object Object/);
+});
+
+test("el historial con object Object ofrece una salida al volver a abrirlo", () => {
+  for (const fallo of [undefined, { clase: "desconocido", detail: "" }, { clase: "future_class", detail: "" }]) {
+    const text = failureText({ text: "[object Object]", fallo });
+    assert.match(text, /soporte/);
+    assert.doesNotMatch(text, /object Object/);
+  }
 });
