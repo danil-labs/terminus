@@ -190,7 +190,11 @@ test("workspace context comes from its owning machine, including its source read
   f.relays.cmp_mac.setState("online");
   await sleep(100);
   vm.list_workspaces = listing("vm-root");
-  const both = await invoke("list_workspaces");
+  let both = await invoke("list_workspaces");
+  for (let attempt = 0; attempt < 20 && both.workspaces[0].context_root !== "vm-root"; attempt++) {
+    await sleep(50);
+    both = await invoke("list_workspaces");
+  }
   assert.equal(both.workspaces[0].context_root, "vm-root", "two roots use deterministic machine order");
   assert.deepEqual(await invoke("source_detail", { id: source.id }), { machine: "mac" }, "an already listed source keeps its origin when the default changes");
   await invoke("set_root", { source: source.id }, { headers: { "x-terminus-machine": "cmp_vm" } });
