@@ -11,6 +11,7 @@ import {
   mensajeDeFallo,
   cupoResuelveElFallo as quotaResolves,
   gestoDelFallo as failureAction,
+  gestoDeLaFila as rowAction,
   prosaDelCambioPorCupo as quotaChangeText,
   prosaDelFallo as failureText,
 } from "../../src/features/chat/failures.ts";
@@ -95,6 +96,24 @@ test("la hora de vuelta lleva fecha cuando no es hoy", () => {
   todayEnd.setHours(23, 59, 59, 0);
   const sameDay = prose(todayEnd.getTime());
   assert.ok(!/\d{4}/.test(sameDay), `sobra la fecha: ${sameDay}`);
+});
+
+test("un mensaje que no se pudo mandar ofrece reintentarlo, solo el vigente", () => {
+  // `enviar` anota el rechazo sin clase: el envío ni llegó al proveedor.
+  const rechazo = { meta: "fallo", text: "No hay conexión con la máquina." };
+  assert.equal(rowAction(rechazo, true)?.accion, "reintentar");
+  assert.equal(rowAction({ ...rechazo, fallo: { clase: "desconocido", detail: "exit 1" } }, true)?.accion, "reintentar");
+  // En una fila vieja mandaría el último texto, no el que falló.
+  assert.equal(rowAction(rechazo, false), null);
+  assert.equal(rowAction({ ...rechazo, fallo: { clase: "proveedor_caido", detail: "503" } }, false), null);
+  // Cambiar de cuenta sirve en cualquier fila.
+  assert.equal(rowAction({ ...rechazo, fallo: { clase: "sin_cupo", detail: "429" } }, false)?.accion, "cuentas");
+  // Las clases sin gesto siguen sin fingirlo.
+  assert.equal(rowAction({ ...rechazo, fallo: { clase: "contexto_lleno", detail: "" } }, true), null);
+  // El turno corrió y no se guardó: repetirlo haría el trabajo dos veces.
+  assert.equal(rowAction({ ...rechazo, text: "chat.turn.unsaved" }, true), null);
+  // Un aviso no es un fallo.
+  assert.equal(rowAction({ meta: "aviso", text: "Hola" }, true), null);
 });
 
 test("cada clase ofrece el gesto que sirve, o ninguno", () => {
