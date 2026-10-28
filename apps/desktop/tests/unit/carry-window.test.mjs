@@ -84,7 +84,7 @@ const until = async (check, ms = 4000) => {
 };
 
 async function start(name, log, overrides) {
-  const app = await boot("listo", name, responses(log, overrides), undefined, { "harness.layout.machines.run_on": JSON.stringify({ w: "vm" }) });
+  const app = await boot("listo", name, responses(log, overrides));
   await sleep(600);
   const doc = app.w.document;
   const button = (label) => [...doc.querySelectorAll("button")].find((b) => b.textContent?.trim().startsWith(label));
@@ -93,6 +93,10 @@ async function start(name, log, overrides) {
   const opcion = () => [...doc.querySelectorAll("[role=dialog] button")].find((b) => b.textContent?.trim().startsWith("P1"));
   assert.ok(await until(() => opcion()), "no se abre el selector de proyecto");
   opcion().click();
+  await sleep(300);
+  doc.querySelector('[aria-label="Ejecutar en"]').click();
+  assert.ok(await until(() => doc.querySelector('[data-machine-option="vm"]')));
+  doc.querySelector('[data-machine-option="vm"]').click();
   await sleep(300);
   return { app, doc, button };
 }
