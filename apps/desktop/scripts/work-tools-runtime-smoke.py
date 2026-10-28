@@ -18,6 +18,7 @@ def main():
     parser.add_argument("--engine", type=Path, required=True)
     parser.add_argument("--resources", type=Path, required=True)
     parser.add_argument("--browser", action="store_true")
+    parser.add_argument("--clone", action="store_true")
     args = parser.parse_args()
     engine, resources = args.engine.resolve(strict=True), args.resources.resolve(strict=True)
     spec = importlib.util.spec_from_file_location("smoke", Path(__file__).with_name("work-tools-smoke.py"))
@@ -93,10 +94,25 @@ def main():
                                env=document_env, check=True, timeout=60)
             if (store / "browser-navigation/active.json").exists():
                 raise RuntimeError("Core preparation must not activate Chrome")
+            if args.clone:
+                operation = str(uuid.uuid4())
+                (lab / "clones").mkdir()
+                invoke("start_project_clone", {"url": "https://github.com/octocat/Hello-World.git", "name": "Public clone",
+                       "directory": str(lab / "clones"), "operation": operation, "workspace": workspace}, workspace)
+                deadline = time.monotonic() + 120
+                cloned = None
+                while time.monotonic() < deadline:
+                    cloned = invoke("project_clone_status", {"operation": operation}, workspace)
+                    if cloned and cloned.get("done"):
+                        break
+                    time.sleep(.2)
+                if not cloned or not cloned.get("project") or cloned.get("error"):
+                    raise RuntimeError(f"Packaged Git could not clone over HTTPS: {cloned}")
             if args.browser:
                 invoke("install_tool", {"tool": "browser-navigation"}, workspace)
             print(json.dumps({"packaged_engine": str(engine), "documents": "round trips passed with both aliases",
                               "cua": "installed, inactive", "drawio": "installed, enabled",
+                              "public_clone": "passed" if args.clone else "not requested",
                               "browser": "explicit activation and sandboxed launch passed" if args.browser else "not activated"}))
         finally:
             process.terminate()

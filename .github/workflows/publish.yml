@@ -774,7 +774,7 @@ jobs:
               ;;
           esac
           python3 scripts/work-tools-release.py verify --directory "$resources"
-          python3 scripts/work-tools-runtime-smoke.py --engine "$engine" --resources "$(dirname "$resources")" --browser
+          python3 scripts/work-tools-runtime-smoke.py --engine "$engine" --resources "$(dirname "$resources")" --browser --clone
 
       - name: Comprobar el bundle universal
         if: runner.os == 'macOS'
