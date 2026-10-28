@@ -387,6 +387,8 @@ export function createTabs(options: { transient?: boolean } = {}) {
       setOpenTabs((list) =>
         list.some((p) => p.id === next.id) ? list : [...list, next],
       );
+      // Provisional, sustituiría a la tarea provisional de su ventana antes de abrirse al lado.
+      pin(next.id);
       activateAndPersist(next.id);
     },
     openContent(p: ContentTab) {
