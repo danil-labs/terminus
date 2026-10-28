@@ -760,3 +760,124 @@ test("el composer pide proyectos y ramas a la máquina elegida", async () => {
   assert.ok(doc.body.textContent.includes("vm-dev"), "el selector muestra la rama de esa máquina");
   assert.deepEqual(app.fallos, []);
 });
+
+for (const [name, x, y, cells] of [["center", 500, 400, 1], ["right", 950, 400, 2], ["down", 500, 750, 2]]) {
+  test(`rail task drops into ${name} without opening on pointerdown and keeps remote identity`, async () => {
+    const { app, doc, relayCalls } = await open(`rail-drop-${name}`, {
+      computers: [HOME, { ...VM, state: "online" }],
+      relays: { cmp_vm: { state: "online", table: remote("Remote", "Remote drag") } },
+    });
+    try {
+      const target = doc.querySelector('[data-sesion="cmp_vm~t1"]');
+      assert.ok(target);
+      const panel = doc.querySelector('[data-ventana]:not([data-tira])');
+      assert.ok(panel);
+      panel.getBoundingClientRect = () => ({ left: 0, top: 0, right: 1000, bottom: 800, width: 1000, height: 800 });
+      doc.elementFromPoint = () => panel;
+      const pointer = (type, px, py, buttons = 1) => new app.w.PointerEvent(type, {
+        bubbles: true, button: 0, buttons, pointerId: 1, isPrimary: true, clientX: px, clientY: py,
+      });
+      target.dispatchEvent(pointer("pointerdown", 100, 100));
+      assert.equal(relayCalls("cmp_vm", "load_session").length, 0);
+      app.w.dispatchEvent(pointer("pointermove", x, y));
+      app.w.dispatchEvent(pointer("pointerup", x, y, 0));
+      await sleep(700);
+      assert.equal(relayCalls("cmp_vm", "load_session").length, 1);
+      assert.equal(doc.querySelectorAll('[data-preview-header]').length, 0, "the dropped task is retained");
+      const sites = new Set([...doc.querySelectorAll('[data-tira]')].map(el => el.dataset.ventana));
+      assert.equal(sites.size, cells);
+      assert.deepEqual(app.fallos, []);
+    } finally {
+      app.w.close();
+    }
+  });
+}
+
+test("rail drag cancels with Escape and preserves a subsequent normal click", async () => {
+  const { app, doc, relayCalls } = await open("rail-drag-cancel", {
+    computers: [HOME, { ...VM, state: "online" }],
+    relays: { cmp_vm: { state: "online", table: remote("Remote", "Remote cancel") } },
+  });
+  try {
+    const target = doc.querySelector('[data-sesion="cmp_vm~t1"]');
+    const panel = doc.querySelector('[data-ventana]:not([data-tira])');
+    doc.elementFromPoint = () => panel;
+    const pointer = (type, x, buttons = 1) => new app.w.PointerEvent(type, {
+      bubbles: true, button: 0, buttons, pointerId: 7, isPrimary: true, clientX: x, clientY: 100,
+    });
+    target.dispatchEvent(pointer("pointerdown", 100));
+    app.w.dispatchEvent(pointer("pointermove", 500));
+    app.w.dispatchEvent(new app.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    app.w.dispatchEvent(pointer("pointerup", 500, 0));
+    await sleep(100);
+    assert.equal(relayCalls("cmp_vm", "load_session").length, 0);
+    assert.equal(doc.querySelectorAll('[role="tab"]').length, 0);
+    target.dispatchEvent(pointer("pointerdown", 100));
+    app.w.dispatchEvent(pointer("pointerup", 100, 0));
+    target.click();
+    await sleep(700);
+    assert.equal(relayCalls("cmp_vm", "load_session").length, 1);
+    assert.ok(doc.querySelector('[data-preview-header]'), "normal click still opens a preview");
+    assert.deepEqual(app.fallos, []);
+  } finally {
+    app.w.close();
+  }
+});
+
+test("rail folder drops still move the task on its own machine without opening a tab", async () => {
+  const { app, doc, relayCalls } = await open("rail-folder-drop", {
+    computers: [HOME, { ...VM, state: "online" }],
+    relays: { cmp_vm: { state: "online", table: remote("Remote", "Remote move", { move_session: null }) } },
+  });
+  try {
+    const target = doc.querySelector('[data-sesion="cmp_vm~t1"]');
+    const folder = doc.createElement("div");
+    folder.dataset.destino = "p2";
+    doc.body.append(folder);
+    doc.elementFromPoint = () => folder;
+    const pointer = (type, x, buttons = 1) => new app.w.PointerEvent(type, {
+      bubbles: true, button: 0, buttons, pointerId: 2, isPrimary: true, clientX: x, clientY: 100,
+    });
+    target.dispatchEvent(pointer("pointerdown", 100));
+    app.w.dispatchEvent(pointer("pointermove", 500));
+    app.w.dispatchEvent(pointer("pointerup", 500, 0));
+    await sleep(200);
+    const moves = relayCalls("cmp_vm", "move_session");
+    assert.equal(moves.length, 1);
+    assert.equal(moves[0].args.id, "t1");
+    assert.equal(moves[0].args.to, "p2");
+    assert.equal(relayCalls("cmp_vm", "load_session").length, 0);
+    assert.equal(doc.querySelectorAll('[role="tab"]').length, 0);
+    assert.deepEqual(app.fallos, []);
+  } finally {
+    app.w.close();
+  }
+});
+
+test("dragging an existing task preview retains that same tab", async () => {
+  const { app, doc, relayCalls } = await open("rail-preview-drop", {
+    computers: [HOME, { ...VM, state: "online" }],
+    relays: { cmp_vm: { state: "online", table: remote("Remote", "Remote preview") } },
+  });
+  try {
+    doc.querySelector('[data-sesion="cmp_vm~t1"]').click();
+    await sleep(700);
+    assert.ok(doc.querySelector('[data-preview-header]'));
+    const target = doc.querySelector('[data-sesion="cmp_vm~t1"]');
+    const panel = doc.querySelector('[data-ventana]:not([data-tira])');
+    doc.elementFromPoint = () => panel;
+    const pointer = (type, x, buttons = 1) => new app.w.PointerEvent(type, {
+      bubbles: true, button: 0, buttons, pointerId: 3, isPrimary: true, clientX: x, clientY: 100,
+    });
+    target.dispatchEvent(pointer("pointerdown", 100));
+    app.w.dispatchEvent(pointer("pointermove", 500));
+    app.w.dispatchEvent(pointer("pointerup", 500, 0));
+    await sleep(100);
+    assert.equal(doc.querySelectorAll('[data-preview-header]').length, 0);
+    assert.equal(doc.querySelectorAll('[role="tab"]').length, 1);
+    assert.ok(relayCalls("cmp_vm", "load_session").every(call => call.args.id === "t1"));
+    assert.deepEqual(app.fallos, []);
+  } finally {
+    app.w.close();
+  }
+});
