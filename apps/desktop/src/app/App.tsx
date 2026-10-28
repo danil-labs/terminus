@@ -4669,6 +4669,7 @@ export default function App() {
   function abrirPantalla(machine: string) {
     const id = screenTabId(machine);
     const nueva = !pestanas.open().some((p) => p.id === id);
+    const conversacion = pestanas.active();
     // Sin batch la pantalla pasa un instante delante de la conversación: esta se
     // desmonta, vuelve al dividir y su barra de ubicación parpadea mientras relee.
     batch(() => {
@@ -4677,6 +4678,14 @@ export default function App() {
       paneles.sync(pestanas.open().map((x) => x.id));
       paneles.activate(id);
       if (nueva && !paneles.isSplit()) paneles.split(id);
+      // La pantalla se mira al lado; el mando sigue en la conversación, que
+      // sin él queda de solo lectura y sin caja de escritura.
+      const suya = conversacion ? paneles.siteOf(conversacion) : null;
+      const pantalla = paneles.siteOf(id);
+      if (conversacion && suya && pantalla && !sameSite(suya, pantalla)) {
+        pestanas.activate(conversacion);
+        paneles.activate(conversacion);
+      }
     });
   }
 
