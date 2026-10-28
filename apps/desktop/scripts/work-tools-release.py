@@ -39,7 +39,7 @@ def main():
             environment = {"WORK_TOOLS_CONFIG": str(config.resolve())}
             if platform.system() == "Linux":
                 import shutil
-                environment.update(NO_STRIP="1", PATCHELF=str(ROOT / "scripts/work-tools-patchelf.py"),
+                environment.update(PATCHELF=str(ROOT / "scripts/work-tools-patchelf.py"),
                     TERMINUS_REAL_PATCHELF=shutil.which("patchelf"),
                     TERMINUS_WORK_TOOLS_ROOT=str(ROOT / "src-tauri/target/release/bundle/appimage/Terminus.AppDir/usr/lib/Terminus/work-tools"))
             with open(os.environ["GITHUB_ENV"], "a") as stream:
