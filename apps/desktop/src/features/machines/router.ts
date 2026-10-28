@@ -329,7 +329,7 @@ export function createRouter(config: RouterConfig) {
     const available = new Promise<void>(resolve => { finish = resolve; });
     let timer: ReturnType<typeof setTimeout> | undefined;
     const soon = () => { timer ??= setTimeout(finish, FIRST_ANSWER_GRACE); };
-    if (settles || slices.some(slice => slice?.has)) soon();
+    if (settles || slices.some(slice => slice?.has)) timer = setTimeout(finish, 0);
     const live = envelopes.map(async (envelope, i) => {
       const before = slices[i];
       const slice = await fleet.read(envelope);

@@ -30,7 +30,7 @@ function fakeLink(answers: Record<string, unknown>, state: "online" | "offline" 
         if (silent) return void setTimeout(() => reject({ code: "io", detail: "timeout" }), timeout ?? 50);
         const answer = answers[command];
         if (answer === undefined) return reject({ code: "command" });
-        resolve({ value: typeof answer === "function" ? (answer as (a: Args) => unknown)(args as Args) : answer, cached: null });
+        Promise.resolve(typeof answer === "function" ? (answer as (a: Args) => unknown)(args as Args) : answer).then(value => resolve({ value, cached: null }), reject);
       });
     },
     onState: () => () => {},
