@@ -533,7 +533,11 @@ export default function Sessions(props: {
   const matchIds = createMemo(() => new Set(matchedSessions().map(taskIdentity)));
   const contextual = (row: SessionRow) => !matchIds().has(taskIdentity(row));
   const [expansionOverrides, setExpansionOverrides] = createSignal<Record<string, boolean>>({});
-  createEffect(on(() => JSON.stringify([query(), props.matchingIds, props.current, enBarra().filter(row => row.pinned).map(row => row.id)]), () => setExpansionOverrides({})));
+  const expansionContext = createMemo(() => JSON.stringify([
+    query(), props.matchingIds ? [...props.matchingIds].sort() : null, props.current,
+    enBarra().filter(row => row.pinned).map(taskIdentity).sort(),
+  ]));
+  createEffect(on(expansionContext, () => setExpansionOverrides({})));
   const temporaryExpansion = createMemo(() => {
     const targets = query() || props.matchingIds ? matchedSessions() : enBarra().filter(row => row.pinned || row.id === props.current);
     const ancestors = new Set<string>();

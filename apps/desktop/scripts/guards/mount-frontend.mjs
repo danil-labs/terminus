@@ -1594,6 +1594,21 @@ if (!roto) {
   assert.ok(row("p").querySelector('[aria-label="Resultado entregado"]'));
   await searchTasks("a");
   assert.ok(row("own"), "la búsqueda conserva acceso a las subtareas");
+  const expandDelegations = () => row("p").closest("li").querySelector(':scope > button[aria-expanded]');
+  expandDelegations().click();
+  await sleep(40);
+  assert.equal(row("own"), null, "el cierre manual vence a la búsqueda");
+  for (const active of [true, false]) {
+    sidebarResponses.list_live_sessions = sidebarResponses.list_live_sessions.map(s => ({ ...s, updated_at: active ? 3 : 4 }));
+    sidebar.emit("chat", { kind: active ? "started" : "done", project: "", session: "own", workspace: "w", ok: true });
+    sidebar.emit("session", { project: "", session: "own", workspace: "w" });
+    await sleep(350);
+    assert.equal(expandDelegations().getAttribute("aria-expanded"), "false", "la actividad no deshace el cierre manual");
+    assert.equal(row("own"), null, "la actualización de filas conserva la rama cerrada");
+  }
+  expandDelegations().click();
+  await sleep(40);
+  assert.ok(row("own"));
   blockRemote = false; releaseRemote(gitRows); await sleep(100);
   gitRows.shared = gitRow("feature/parent", { shared_with: "p", pull_known: true });
   gitRows.p = gitRow("renamed", { pull: { number: 12, state: "merged", head_sha: "abc" }, pull_known: true });
