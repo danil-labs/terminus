@@ -14,6 +14,6 @@ export function AttentionMenu(props: AttentionMenuProps) {
  <Show when={!props.collapsed}><span>{feature.title}</span></Show>
  </SidebarMenuButton></SidebarMenuItem>}</For>;
 }
-export function PersonalizeMenu(props:{collapsed:boolean;onOpen():void}) {
- return <SidebarMenu><SidebarMenuItem><SidebarMenuButton aria-label={t("attention.personalize")} onClick={props.onOpen}><SlidersHorizontal size={14}/><Show when={!props.collapsed}><span>{t("attention.personalize")}</span></Show></SidebarMenuButton></SidebarMenuItem></SidebarMenu>;
+export function PersonalizeMenu(props:{collapsed:boolean;onOpen():void;onTrigger?(trigger:HTMLButtonElement):void}) {
+ return <SidebarMenu><SidebarMenuItem><SidebarMenuButton aria-label={t("attention.personalize")} onClick={event=>{props.onTrigger?.(event.currentTarget);props.onOpen();}}><SlidersHorizontal size={14}/><Show when={!props.collapsed}><span>{t("attention.personalize")}</span></Show></SidebarMenuButton></SidebarMenuItem></SidebarMenu>;
 }

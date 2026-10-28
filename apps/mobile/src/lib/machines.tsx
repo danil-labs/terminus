@@ -280,7 +280,7 @@ function LiveMachinesProvider({ children, active }: { children: ReactNode; activ
   const value = useMemo<Machines>(
     () => ({
       ready: account.ready && pairingLoaded,
-      contextReady: !signedIn || (fleet !== "loading" && computers.every(computer => hosts.some(host => host.id === computer.computer_id))),
+      contextReady: !signedIn || (fleet !== "loading" && fleet !== "signed_out" && computers.every(computer => hosts.some(host => host.id === computer.computer_id))),
       fleet: fleetState,
       hosts,
       hostOf,

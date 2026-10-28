@@ -83,6 +83,7 @@ function LiveWorkspacesProvider({ children }: { children: ReactNode }) {
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [snapshotScope, setSnapshotScope] = useState("");
+  const [enumeratedScope, setEnumeratedScope] = useState("");
   const [loading, setLoading] = useState(false);
   const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
   const asked = useRef(0);
@@ -165,7 +166,10 @@ function LiveWorkspacesProvider({ children }: { children: ReactNode }) {
       }
       await (sameEntry(early, entry) && first ? first : loadEntry(entry));
     } finally {
-      if (mine === asked.current) setLoading(false);
+      if (mine === asked.current) {
+        setLoading(false);
+        setEnumeratedScope(JSON.stringify(hosts.map(host=>host.id).sort()));
+      }
     }
   }, [hosts, registry, rememberTitles, machineCount]);
   const reload = useCallback(() => load(false), [load]);
@@ -242,7 +246,7 @@ function LiveWorkspacesProvider({ children }: { children: ReactNode }) {
   const current = list.find((w) => w.id === currentId) ?? null;
   const hostsOfCurrent = useMemo(() => hosts.filter((h) => current?.members.has(h.id)), [hosts, current]);
 
-  const selectionReady=spacePreferenceReady && (!current || snapshotScope===JSON.stringify([current.id,[...current.hosts].sort()]));
+  const selectionReady=spacePreferenceReady && enumeratedScope===JSON.stringify(hosts.map(host=>host.id).sort()) && (!current || snapshotScope===JSON.stringify([current.id,[...current.hosts].sort()]));
   const value = useMemo<Workspaces>(
     () => ({ list, current, snapshot, loading, selectionReady, select, space, selectSpace, view, setView, hostsOfCurrent, reload }),
     [list, current, snapshot, loading, selectionReady, select, space, selectSpace, view, setView, hostsOfCurrent, reload],

@@ -12,11 +12,12 @@ const CustomizationDialog = lazy(() => import('./CustomizationDialog').then(modu
 const Broadcasts = lazy(() => import('./Broadcasts').then(module => ({default:module.Broadcasts})));
 
 export function attentionCapability(demo: boolean, initial: boolean, session?: InboxSession & { subscribe?: (clear: () => void) => () => void; userId?: string | null }) {
+  let personalizeTrigger: HTMLButtonElement | undefined;
   return {
     customization: createCustomization, entries: featureEntries,
     demo, userId: demo ? 'demo' : session?.userId, subscribe: session?.subscribe,
-    sidebarMenu: AttentionMenu, personalizeMenu: PersonalizeMenu,
-    dialog: (props: import("./CustomizationDialog").CustomizationDialogProps) => <Suspense fallback={null}><CustomizationDialog {...props}/></Suspense>,
+    sidebarMenu: AttentionMenu, personalizeMenu: (props: {collapsed:boolean;onOpen():void}) => <PersonalizeMenu {...props} onTrigger={trigger=>{personalizeTrigger=trigger;}}/>,
+    dialog: (props: import("./CustomizationDialog").CustomizationDialogProps) => <Suspense fallback={null}><CustomizationDialog {...props} restoreFocus={()=>personalizeTrigger?.isConnected && personalizeTrigger.focus()}/></Suspense>,
     broadcasts: () => <Suspense fallback={null}><Broadcasts/></Suspense>,
     initial,
     render: () => <Attention demo={demo} session={session}/>,
