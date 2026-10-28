@@ -227,7 +227,7 @@ test("an action to the person's own machine that is off says so plainly, without
   const mac = fakeLink({ send_message: "x" }, "offline");
   const { router } = setup({ cmp_mac: mac });
   await assert.rejects(router.handle("send_message", { project: "p1", session: "cmp_mac~t1", prompt: "hola" }, on("cmp_mac")), (e: { what: string; detail: string }) => {
-    assert.equal(e.what, "Mac de Ana está apagada. Enciéndela para seguir.");
+    assert.equal(e.what, "Mac de Ana está sin conexión. Verifica que Terminus esté abierto y tenga acceso a internet.");
     assert.equal(e.detail, "machine_off");
     return true;
   });
