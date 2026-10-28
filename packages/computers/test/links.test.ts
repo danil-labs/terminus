@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { callWorkspace, hasLinkedWorkspaces, linkedAttention, linkedEvent, linkedEvents, linkedListing, linkedWorkspaces, onlyLinked } from "../src/index.ts";
+import { callWorkspace, hasLinkedWorkspaces, linkedAttention, linkedEvent, linkedEvents, linkedListing, linkedWorkspaces, onlyLinked, unlinkedWorkspaces } from "../src/index.ts";
 
 test("los vínculos salen de `workspaces`; sin el campo no se filtra", () => {
   assert.deepEqual([...(linkedWorkspaces({ workspaces: ["w1", "w2"] }) ?? [])], ["w1", "w2"]);
@@ -54,6 +54,18 @@ test("una página del relay pierde los eventos de un workspace sin vincular, por
     { name: "attention", payload: [{ workspace: "w1", tasks: [] }] },
   ]);
   assert.deepEqual(linkedEvents(events, null), events);
+});
+
+test("los workspaces que nombra una página y la lista de aquí no tiene, una vez cada uno", () => {
+  const events = [
+    { name: "chat", payload: { workspace: "w1", session: "a" } },
+    { name: "workspace.changed", workspace: "w2", payload: { workspace: "w2", settings_version: 1 } },
+    { name: "attention", payload: [{ workspace: "w1", tasks: [] }, { workspace: "w3", tasks: [] }] },
+    { name: "account", payload: { provider: "codex" } },
+  ];
+  assert.deepEqual(unlinkedWorkspaces(events, new Set(["w1"])), ["w2", "w3"]);
+  assert.deepEqual(unlinkedWorkspaces(events, new Set(["w1", "w2", "w3"])), []);
+  assert.deepEqual(unlinkedWorkspaces(events, null), []);
 });
 
 test("una llamada va con el workspace que nombran sus argumentos", () => {

@@ -735,3 +735,27 @@ for (const folder of ["", "p1"]) test(`remote row in folder ${JSON.stringify(fol
   assert.deepEqual(app.fallos, []);
   app.w.close();
 });
+
+test("el composer pide proyectos y ramas a la máquina elegida", async () => {
+  const branches = { branches: [{ reference: "refs/heads/vm-dev", name: "vm-dev", remote: false, commit: "abc", ahead: null, behind: null }], selected: "refs/heads/vm-dev", fetched_at: null };
+  const { app, doc, relayCalls, native } = await open("desktop-composer-target", {
+    computers: [HOME, { ...VM, state: "online" }],
+    relays: { cmp_vm: { table: remote("Proyecto de la VM", "Tarea VM", { project_base_branches: branches }) } },
+    extra: { project_base_branches: { branches: [], selected: null, fetched_at: null } },
+  });
+  doc.querySelector('button[aria-label="Ejecutar en"]').click();
+  await sleep(100);
+  doc.querySelector('[data-machine-option="cmp_vm"]').click();
+  await sleep(300);
+  doc.querySelector('button[aria-label="Proyecto"]').click();
+  await sleep(100);
+  const option = [...doc.querySelectorAll("button")].find(b => b.textContent.includes("Proyecto de la VM") && b.closest('[role="dialog"]'))
+    ?? [...doc.querySelectorAll("button")].find(b => b.textContent.includes("Proyecto de la VM") && b.textContent.includes("tarea"));
+  assert.ok(option, "el selector ofrece el proyecto de la VM");
+  option.click();
+  await sleep(400);
+  assert.ok(relayCalls("cmp_vm", "project_base_branches").some(c => c.args.project === "p1"));
+  assert.equal(native("project_base_branches").length, 0, "la rama local no se consulta");
+  assert.ok(doc.body.textContent.includes("vm-dev"), "el selector muestra la rama de esa máquina");
+  assert.deepEqual(app.fallos, []);
+});

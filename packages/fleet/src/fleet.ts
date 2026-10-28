@@ -14,7 +14,7 @@
  * La máquina de la ventana no pasa por aquí: quien la tiene la lee nativa y
  * suma su rebanada con `merge`.
  */
-import { type AccountWorkspace, type Blocked, type CallResult, type DeferredFrame, type EngineInfo, type EventsPage, type MachineState, type SystemId, cachedAt, callWorkspace, isDeferrable, linkedAttention, linkedEvents, linkedListing, requestId } from "../../computers/src/index.ts";
+import { type AccountWorkspace, type Blocked, type CallResult, type DeferredFrame, type EngineInfo, type EventsPage, type MachineState, type SystemId, cachedAt, callWorkspace, isDeferrable, linkedAttention, linkedEvents, linkedListing, requestId, unlinkedWorkspaces } from "../../computers/src/index.ts";
 import { DEADLINES, type Deadlines, classOf } from "./deadlines.ts";
 import { FleetError, fromRelay } from "./errors.ts";
 import { argsFor } from "./ids.ts";
@@ -70,6 +70,12 @@ export type FleetConfig = {
   onEvents?(machine: string, events: FleetEvent[], gap: boolean): void;
   /** Cambió la cola de acciones aplazadas de `machine` (se encoló o se aplicó una): la lista se relee. */
   onDeferred?(machine: string, frame: DeferredFrame): void;
+  /**
+   * Llegaron eventos de `workspaces` que ninguna máquina tiene vinculados según
+   * su fila (`MachineInfo.linked`). El relay ya los dejó pasar: se vincularon
+   * después de listar las computadoras, y la lista se relee para verlos.
+   */
+  onUnlinked?(machine: string, workspaces: string[]): void;
   /** `false`: los eventos llegan con los ids de su máquina (el teléfono nombra cada tarea con su máquina aparte). */
   panelIds?: boolean;
 };
@@ -229,6 +235,14 @@ export class Fleet {
     }
     return order.filter((id) => {
       const linked = this.info(id)?.linked ?? null;
+      return linked === null || linked.has(workspace);
+    });
+  }
+
+  /** Si alguna máquina tiene `workspace` vinculado según su fila (o no dice cuáles tiene). */
+  private linkedAnywhere(workspace: string): boolean {
+    return [...this.members.values()].some((m) => {
+      const linked = m.info.linked ?? null;
       return linked === null || linked.has(workspace);
     });
   }
@@ -555,6 +569,9 @@ export class Fleet {
       }) ?? (() => {}),
       link.onEvents((page) => {
         if (!this.listening || this.isOutdated(member)) return;
+        // Uno vinculado en otra máquina de la cuenta también llega por esta (el `account` del relay): eso no es una lista vieja.
+        const unknown = unlinkedWorkspaces(page.events ?? [], member.info.linked ?? null).filter((w) => !this.linkedAnywhere(w));
+        if (unknown.length) this.config.onUnlinked?.(info.id, unknown);
         const linked = linkedEvents(page.events ?? [], member.info.linked ?? null);
         const events = this.config.panelIds === false ? linked.map((e) => ({ name: e.name, payload: e.payload })) : linked.map((e) => ({ name: e.name, payload: encodeEvent(this.context(), info.id, e.name, e.payload) }));
         this.config.onEvents?.(info.id, events, page.gap === true);

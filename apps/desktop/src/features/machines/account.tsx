@@ -85,6 +85,7 @@ function refresh() {
 
 /** Another machine's slice changed: the window rereads just that. */
 function slicesChanged(changes: SliceChange[]) {
+  if (changes.includes("workspaces")) window.dispatchEvent(new CustomEvent("harness:workspace-name"));
   window.dispatchEvent(new CustomEvent("harness:machine-slices", { detail: { changes } }));
   if (changes.includes("attention")) window.dispatchEvent(new CustomEvent("harness:service-resync"));
 }

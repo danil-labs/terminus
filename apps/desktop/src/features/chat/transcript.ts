@@ -38,6 +38,11 @@ export type ChatEvent = {
     | "tool"
     | "tool_done"
     | "permission"
+    /**
+     * Alguien —esta ventana u otra— ya decidió el pedido `request_id`: `ok` es
+     * lo decidido, `id` el turno que lo guarda y `text`/`target`, sobre qué.
+     */
+    | "permission_resolved"
     | "notice"
     | "task_launched"
     /** El motor guardó lo dicho hasta aquí en el turno `id` (un tramo); ver `tramoGuardado`. */
