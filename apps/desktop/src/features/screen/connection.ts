@@ -16,6 +16,7 @@ export function screenConnection(options: {
   load: () => Promise<{ default: ViewerClass }>;
   open: () => Promise<WebSocket>;
   phase: (phase: Phase) => void;
+  configure?: (view: Viewer) => (() => void);
 }) {
   let attempt = 0;
   let release: (() => void) | undefined;
@@ -37,11 +38,14 @@ export function screenConnection(options: {
       const socket = await options.open();
       if (mine !== attempt) return socket.close();
       let view: Viewer | undefined;
+      let dispose: (() => void) | undefined;
       let live = false;
       let code = 1000;
       const closed = (e: CloseEvent) => { code = e.code; };
       socket.addEventListener("close", closed);
       release = () => {
+        dispose?.();
+        dispose = undefined;
         socket.removeEventListener("close", closed);
         view?.disconnect();
         socket.close();
@@ -50,12 +54,16 @@ export function screenConnection(options: {
       view.viewOnly = true;
       view.scaleViewport = true;
       view.background = "transparent";
+      dispose = options.configure?.(view);
       view.addEventListener("connect", () => {
         live = true;
         if (mine === attempt) options.phase("live");
       });
       view.addEventListener("disconnect", () => {
-        if (mine === attempt) options.phase(live ? "ended" : screenEnd(code));
+        if (mine !== attempt) return;
+        dispose?.();
+        dispose = undefined;
+        options.phase(live ? "ended" : screenEnd(code));
       });
     } catch {
       if (mine !== attempt) return;

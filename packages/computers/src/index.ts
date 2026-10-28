@@ -70,7 +70,7 @@ export {
   sessionUrl,
   tokenExpiry,
 } from "./relay.ts";
-export { type ScreenEnd, SCREEN_SUBPROTOCOL, createScreenAccess, screenEnd, screenProtocols, screenUrl } from "./screen.ts";
+export { type ScreenEnd, SCREEN_CONTROL_DESKTOP, SCREEN_SUBPROTOCOL, createScreenAccess, screenEnd, screenProtocols, screenUrl } from "./screen.ts";
 export {
   type AccountGroup,
   type AccountMember,
