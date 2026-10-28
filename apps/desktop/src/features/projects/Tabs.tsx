@@ -1,4 +1,3 @@
-import GripVertical from "lucide-solid/icons/grip-vertical";
 import Globe from "lucide-solid/icons/globe";
 import Monitor from "lucide-solid/icons/monitor";
 import Plus from "lucide-solid/icons/plus";
@@ -358,9 +357,6 @@ export default function TabStrip(props: {
               transient() && "font-normal italic",
             )}
           >
-            <Show when={transient()}>
-              <GripVertical size={12} class="shrink-0 text-neutral-500" aria-label={t("projects.tabs.preview_drag")} />
-            </Show>
             <Show
               when={isTaskTab(p)}
               fallback={
