@@ -269,7 +269,7 @@ export default function TaskScreen() {
       .catch(() => stopTask(host, workspace, folder, id))
       .catch(fail);
 
-  const running = view?.running ?? false;
+  const running = host?.power() === "on" && (view?.running ?? false);
   const permissions = view?.permissions ?? [];
   const questions = view?.questions ?? [];
   const asleep = host?.canAct() === "asleep" || host?.canAct() === "outdated";
