@@ -517,7 +517,17 @@ if (!roto) {
     parent: null, subagent: null, esperando: false, stage: null,
     agent: "Holmes", parent_agent: null, last_message: "Listo.",
   };
+  const policyCalls = [];
   const bubbleResponses = {
+    handler_action: ({ input }) => {
+      policyCalls.push(input);
+      const action = input.request.action;
+      if (action === "list") return { handlers: [{ name: "Watson", memory: { store: { slot: "notes" }, status: "unavailable", reason: "UNAPPROVED_SENTINEL", identity: "watson", entries: 0, synced: false } }] };
+      if (action === "requests") return { handler: "Watson", source: "project", key: "watson", digest: "digest", dirty: false, approval: null, stale: null, requests: [{ kind: "memory", slot: "notes", state: "approved", server: "notes-server", granted_access: "read" }] };
+      if (action === "release") throw { what: "Pending", detail: { code: "wait_timed_out", detail: { operation: "handler-op" } } };
+      if (action === "resume") return { handler: "Watson", identity: "watson", released: true, quarantine: null, digest: "digest" };
+      throw new Error("Unexpected handler action");
+    },
     ...CON_TAREA,
     list_projects: [{ id: "p", name: "Proyecto", node: null, sources: [] }],
     list_live_sessions: [
@@ -724,6 +734,28 @@ if (!roto) {
   assert.ok([...perfilCompleto.querySelectorAll("button")].some(button => button.textContent.includes("Elegir imagen")), "el perfil conserva la edición del fondo");
   assert.ok(perfilCompleto.querySelector("textarea"), "las instrucciones del agente propio siguen editables");
   assert.ok(perfilCompleto.querySelector('input[aria-label="Token del bot"]'), "Telegram conserva la configuración del bot");
+  const policyButton = text => [...bubbleDocument.querySelectorAll("button")].find(b => b.textContent.trim() === text);
+  for (let i = 0; i < 80 && !policyButton("Liberar cuarentena"); i++) await sleep(25);
+  assert.ok(perfilCompleto.textContent.includes("notes"));
+  assert.ok(perfilCompleto.textContent.includes("notes-server"));
+  assert.ok(!perfilCompleto.textContent.includes("UNAPPROVED_SENTINEL"), "list's unapproved slot reason is not effective availability");
+  policyButton("Liberar cuarentena").click();
+  await sleep(50);
+  policyButton("Confirmar").click();
+  await sleep(100);
+  assert.equal(policyButton("Confirmar").disabled, true, "uncertain release cannot be repeated");
+  policyButton("Cancelar").click();
+  await sleep(50);
+  assert.equal(policyButton("Liberar cuarentena").disabled, true, "closing the dialog keeps the pending receipt");
+  policyButton("Consultar resultado").click();
+  await sleep(150);
+  assert.equal(policyCalls.filter(c => c.request.action === "release").length, 1);
+  const resumed = policyCalls.find(c => c.request.action === "resume");
+  const released = policyCalls.find(c => c.request.action === "release");
+  assert.deepEqual(resumed.request, { action: "resume", operation: "handler-op" });
+  assert.equal(resumed.workspace, released.workspace);
+  assert.equal(resumed.project, released.project);
+  assert.equal(policyButton("Liberar cuarentena").disabled, false);
   assert.deepEqual(bubbleApp.fallos, []);
   bubbleApp.w.close();
 

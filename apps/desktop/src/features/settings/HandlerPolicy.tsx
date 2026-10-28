@@ -1,3 +1,4 @@
+import { handlerMutation, handlerOperationRunning, pendingHandlerOperation, resumeHandlerOperation } from "./handlerOperations";
 import "../../locales/handlerPhrases";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { t } from "../../lib/i18n";
@@ -9,6 +10,8 @@ import { prosaDe } from "../../ui/Failure";
 import { Input } from "../../ui/Input";
 
 export type HandlerPolicyActions = {
+  scope: string;
+  resume: (operation: string) => Promise<HandlerRequests | HandlerRelease>;
   requests: () => Promise<HandlerRequests>;
   memory: () => Promise<HandlerMemory | null>;
   approve: (args: HandlerApproval) => Promise<HandlerRequests>;
@@ -23,6 +26,8 @@ const failureText = (error: unknown) => {
 };
 
 export default function HandlerPolicy(props: { name: string; actions: HandlerPolicyActions }) {
+  const pending = () => pendingHandlerOperation(props.actions.scope);
+  const locked = () => busy() || !!pending() || handlerOperationRunning(props.actions.scope);
   const [report, setReport] = createSignal<HandlerRequests>();
   const [memory, setMemory] = createSignal<HandlerMemory | null>(null);
   const [busy, setBusy] = createSignal(false);
@@ -61,7 +66,7 @@ export default function HandlerPolicy(props: { name: string; actions: HandlerPol
   });
 
   async function act(action: "approve" | "revoke" | "release") {
-    if (busy()) return;
+    if (locked()) return;
     const current = generation;
     const actions = props.actions;
     setBusy(true);
@@ -69,13 +74,13 @@ export default function HandlerPolicy(props: { name: string; actions: HandlerPol
     setResult(null);
     try {
       if (action === "release") {
-        const released = await actions.release();
+        const released = await handlerMutation(actions.scope, action, actions.release);
         if (current !== generation) return;
         setResult(released.released ? t("settings.handler.released") : t("settings.handler.not_quarantined"));
       } else {
         const updated = action === "approve"
-          ? await actions.approve({ mcp: mcp().trim(), tool: tools().trim(), "accept-hints": hints().trim() })
-          : await actions.revoke();
+          ? await handlerMutation(actions.scope, action, () => actions.approve({ mcp: mcp().trim(), tool: tools().trim(), "accept-hints": hints().trim() }))
+          : await handlerMutation(actions.scope, action, actions.revoke);
         if (current !== generation) return;
         setReport(updated);
         setResult(action === "approve" ? t("settings.handler.approved") : t("settings.handler.revoked"));
@@ -83,10 +88,25 @@ export default function HandlerPolicy(props: { name: string; actions: HandlerPol
       setDialog(null);
       await refresh(actions);
     } catch (e) {
-      if (current === generation) setFailure(failureText(e));
+      if (current === generation) { setFailure(failureText(e)); }
     } finally {
       if (current === generation) setBusy(false);
     }
+  }
+
+  async function resume() {
+    if (busy()) return;
+    const actions = props.actions;
+    const current = generation;
+    setBusy(true);
+    try {
+      await resumeHandlerOperation(actions.scope, actions.resume);
+      if (current !== generation) return;
+      setDialog(null);
+      await refresh(actions);
+    } catch (e) {
+      if (current === generation) { setFailure(failureText(e)); }
+    } finally { if (current === generation) setBusy(false); }
   }
 
   function openDialog(kind: "approve" | "release") {
@@ -99,13 +119,17 @@ export default function HandlerPolicy(props: { name: string; actions: HandlerPol
       <h3 class="m-0 text-sm font-semibold">{t("settings.handler.title")}</h3>
       <Button size="compact" variant="ghost" disabled={busy()} onClick={() => void refresh()}>{t("settings.handler.refresh")}</Button>
     </div>
+    <Show when={pending()}><p role="status" class="m-0 text-xs">{t("settings.handler.pending")}</p><Button disabled={busy()} onClick={() => void resume()}>{t("settings.handler.resume")}</Button></Show>
     <Show when={memory()}>{m => <div class="grid gap-1 text-xs text-neutral-700">
+      <p class="m-0 text-xs">{t("settings.handler.memory_declared")}</p>
+      <Show when={typeof m().store === "string"} fallback={<p class="m-0">{t("settings.handler.memory_slot", { slot: (m().store as { slot: string }).slot })}</p>}>
       <p class="m-0 font-semibold">{t("settings.handler.memory")}: {t(`settings.handler.memory.${m().status}`)}</p>
       <p class="m-0">{m().synced ? t("settings.handler.synced", { count: m().entries }) : t("settings.handler.not_synced", { count: m().entries })}</p>
       <p class="m-0 break-all">{m().identity}</p>
       <Show when={m().server}><p class="m-0">{t("settings.handler.server", { server: m().server! })}</p></Show>
       <Show when={m().reason}><p class="m-0">{m().reason}</p></Show>
       <Show when={m().legacy_entries}><p class="m-0">{t("settings.handler.legacy", { count: m().legacy_entries! })}</p></Show>
+      </Show>
     </div>}</Show>
     <Show when={report()}>{r => <>
       <p class="m-0 break-all text-xs text-neutral-500">{t("settings.handler.source", { source: r().source })}</p>
@@ -122,12 +146,12 @@ export default function HandlerPolicy(props: { name: string; actions: HandlerPol
       </div>}</For>
       <Show when={!r().requests.length}><p class="m-0 text-xs text-neutral-500">{t("settings.handler.empty")}</p></Show>
       <div class="flex flex-wrap gap-2">
-        <Button size="sm" variant="secondary" disabled={busy() || r().dirty || !r().digest || !r().requests.some(q => q.kind !== "network")} onClick={() => openDialog("approve")}>{t("settings.handler.approve")}</Button>
-        <Button size="sm" variant="ghost" disabled={busy() || !r().approval || !!r().approval?.revoked_at} onClick={() => void act("revoke")}>{t("settings.handler.revoke")}</Button>
+        <Button size="sm" variant="secondary" disabled={locked() || r().dirty || !r().digest || !r().requests.some(q => q.kind !== "network")} onClick={() => openDialog("approve")}>{t("settings.handler.approve")}</Button>
+        <Button size="sm" variant="ghost" disabled={locked() || !r().approval || !!r().approval?.revoked_at} onClick={() => void act("revoke")}>{t("settings.handler.revoke")}</Button>
       </div>
     </>}</Show>
     <p class="m-0 text-xs text-neutral-500">{t("settings.handler.release_hint")}</p>
-    <div><Button size="sm" variant="ghost" disabled={busy()} onClick={() => openDialog("release")}>{t("settings.handler.release")}</Button></div>
+    <div><Button size="sm" variant="ghost" disabled={locked()} onClick={() => openDialog("release")}>{t("settings.handler.release")}</Button></div>
     <Show when={!dialog() && failure()}><p role="alert" class="m-0 text-xs text-error-strong">{failure()}</p></Show>
     <Show when={result()}><p role="status" class="m-0 text-xs text-neutral-700">{result()}</p></Show>
     <Dialog open={!!dialog()} onOpenChange={open => { if (!open && !busy()) { setDialog(null); setFailure(null); } }}>
@@ -136,16 +160,17 @@ export default function HandlerPolicy(props: { name: string; actions: HandlerPol
         <p class="text-sm text-neutral-700">{dialog() === "approve" ? t("settings.handler.approve_hint") : t("settings.handler.release_confirm", { name: props.name })}</p>
         <Show when={dialog() === "approve"}>
           <div class="grid gap-3">
-            <label class="grid gap-1 text-xs">{t("settings.handler.bindings")}<Input value={mcp()} onInput={e => setMcp(e.currentTarget.value)} disabled={busy()} /></label>
-            <label class="grid gap-1 text-xs">{t("settings.handler.tools")}<Input value={tools()} onInput={e => setTools(e.currentTarget.value)} disabled={busy()} /></label>
-            <label class="grid gap-1 text-xs">{t("settings.handler.hints")}<Input value={hints()} onInput={e => setHints(e.currentTarget.value)} disabled={busy()} /></label>
+            <label class="grid gap-1 text-xs">{t("settings.handler.bindings")}<Input value={mcp()} onInput={e => setMcp(e.currentTarget.value)} disabled={locked()} /></label>
+            <label class="grid gap-1 text-xs">{t("settings.handler.tools")}<Input value={tools()} onInput={e => setTools(e.currentTarget.value)} disabled={locked()} /></label>
+            <label class="grid gap-1 text-xs">{t("settings.handler.hints")}<Input value={hints()} onInput={e => setHints(e.currentTarget.value)} disabled={locked()} /></label>
             <p class="m-0 text-xs text-neutral-500">{t("settings.handler.hints_help")}</p>
           </div>
         </Show>
+        <Show when={pending()}><p class="text-xs">{t("settings.handler.pending")}</p><Button disabled={busy()} onClick={() => void resume()}>{t("settings.handler.resume")}</Button></Show>
         <Show when={failure()}><p role="alert" class="whitespace-pre-wrap break-words text-xs text-error-strong">{failure()}</p></Show>
         <div class="mt-4 flex justify-end gap-2">
           <Button size="sm" variant="secondary" disabled={busy()} onClick={() => { setDialog(null); setFailure(null); }}>{t("settings.handler.cancel")}</Button>
-          <Button size="sm" disabled={busy() || (dialog() === "approve" && !mcp().trim() && !tools().trim())} onClick={() => void act(dialog() === "approve" ? "approve" : "release")}>{t("settings.handler.confirm")}</Button>
+          <Button size="sm" disabled={locked() || (dialog() === "approve" && !mcp().trim() && !tools().trim())} onClick={() => void act(dialog() === "approve" ? "approve" : "release")}>{t("settings.handler.confirm")}</Button>
         </div>
       </DialogContent>
     </Dialog>

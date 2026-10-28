@@ -3245,12 +3245,14 @@ export default function App() {
       asentar(p.session, (ms) => [...ms.filter((m) => !fila.turno || m.turno !== fila.turno), fila]);
       setPermissions((ps) => ps.filter((x) => x.session !== p.session || x.requestId !== p.requestId));
     } catch (e) {
-      // Si el pedido ya no está pendiente —lo decidió otra ventana o su turno
-      // cerró— no hay nada que contestar: se quita el gate en vez de dejarlo
-      // con un error que ningún botón resuelve.
       const pendientes = await pendientesDe(p.session, workspace);
-      if (pendientes && !pendientes.permissions.some((x) => (x.request_id === p.requestId || x.id === p.requestId))) {
-        setPermissions((ps) => ps.filter((x) => x.session !== p.session || x.requestId !== p.requestId));
+      if (pendientes && !pendientes.permissions.some((x) => x.id === p.durableId || x.request_id === p.requestId)) {
+        const record = pendientes.records?.permissions.find(x => p.durableId ? x.id === p.durableId : x.request_id === p.requestId);
+        setPermissions(ps => ps.filter(x => x.session !== p.session || x.requestId !== p.requestId));
+        asentar(p.session, ms => [...ms, { role: "system", ...mensajeDeFallo({
+          what: { clave: record?.closed === "owner_lost" ? "cli.error.pending_owner_lost" : "shell.turn.permission_no_reply" },
+          detail: { error: e, record: record ?? null },
+        }), meta: "fallo" }]);
         return;
       }
       await reponerGates(p.session, workspace);
@@ -5898,6 +5900,7 @@ export default function App() {
   }
 
   type Pendientes = {
+    records?: { permissions: { id: string; request_id: string; state: string; [key: string]: unknown }[] };
     questions: { id: string; request_id: string; revision: number; turn: string }[];
     permissions: { id: string; request_id: string; revision: number; tool: string; target: string | null }[];
   };
@@ -6841,6 +6844,8 @@ export default function App() {
         input: { workspace, project, request },
       }, options);
       return {
+        scope: JSON.stringify([workspace, project, name, options.headers]),
+        resume: (operation: string) => call<HandlerRequests | HandlerRelease>({ action: "resume", operation }),
         requests: () => call<HandlerRequests>({ action: "requests", name }),
         memory: async () => (await call<{ handlers: { name: string; memory: HandlerMemory }[] }>({ action: "list" })).handlers.find(row => row.name === name)?.memory ?? null,
         approve: args => call<HandlerRequests>({ action: "approve", name, mcp: args.mcp, tool: args.tool, acceptHints: args["accept-hints"] }),

@@ -11,6 +11,9 @@ use terminus_engine_protocol::Error;
 #[serde(tag = "action", rename_all = "lowercase", deny_unknown_fields)]
 pub(super) enum Action {
     List,
+    Resume {
+        operation: String,
+    },
     Requests {
         name: String,
     },
@@ -43,6 +46,7 @@ fn arguments(input: &Input) -> Result<(&'static str, Value), Error> {
         return Err(Error::new("invalid_request"));
     }
     let (command, args) = match &input.request {
+        Action::Resume { operation } => ("operation show", json!({"operation":operation})),
         Action::List => ("handler list", json!({})),
         Action::Requests { name } => ("handler requests", json!({"name":name})),
         Action::Revoke { name } => ("handler revoke", json!({"name":name})),
@@ -77,6 +81,18 @@ fn arguments(input: &Input) -> Result<(&'static str, Value), Error> {
     Ok((command, args))
 }
 
+fn validate_receipt(input: &Input, receipt: &Value) -> Result<(), Error> {
+    if !matches!(
+        receipt["command"].as_str(),
+        Some("handler approve" | "handler revoke" | "handler release")
+    ) || receipt["workspace"] != input.workspace
+        || receipt["folder"] != input.project
+    {
+        return Err(Error::new("invalid_request"));
+    }
+    Ok(())
+}
+
 #[tauri::command(async)]
 pub(super) fn handler_action(app: tauri::AppHandle, input: Input) -> Result<Value, Value> {
     let run = || -> Result<Value, Error> {
@@ -102,6 +118,7 @@ pub(super) fn handler_action(app: tauri::AppHandle, input: Input) -> Result<Valu
         if matches!(input.request, Action::List | Action::Requests { .. }) {
             return Ok(result);
         }
+        validate_receipt(&input, &result)?;
         let operation = result["id"]
             .as_str()
             .ok_or_else(|| Error::new("invalid_request"))?
@@ -111,8 +128,11 @@ pub(super) fn handler_action(app: tauri::AppHandle, input: Input) -> Result<Valu
             match result["status"].as_str() {
                 Some("completed") => return Ok(result["result"].clone()),
                 Some("failed" | "interrupted") => {
-                    return Err(serde_json::from_value(result["error"].clone())
-                        .unwrap_or_else(|_| Error::new("operation_failed")))
+                    let mut error: Error = serde_json::from_value(result["error"].clone())
+                        .unwrap_or_else(|_| Error::new("operation_failed"));
+                    error.detail =
+                        json!({"operation":operation,"settled":true,"detail":error.detail});
+                    return Err(error);
                 }
                 _ => {}
             }
@@ -142,6 +162,28 @@ pub(super) fn handler_action(app: tauri::AppHandle, input: Input) -> Result<Valu
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn resume_only_accepts_handler_receipts_in_the_captured_scope() {
+        let input: Input = serde_json::from_value(
+            json!({"workspace":"w","project":"","request":{"action":"resume","operation":"op"}}),
+        )
+        .unwrap();
+        assert_eq!(
+            arguments(&input).unwrap(),
+            ("operation show", json!({"operation":"op"}))
+        );
+        let receipt = json!({"command":"handler approve","workspace":"w","folder":""});
+        assert!(validate_receipt(&input, &receipt).is_ok());
+        for (key, value) in [
+            ("workspace", "other"),
+            ("folder", "other"),
+            ("command", "task create"),
+        ] {
+            let mut foreign = receipt.clone();
+            foreign[key] = json!(value);
+            assert!(validate_receipt(&input, &foreign).is_err());
+        }
+    }
     #[test]
     fn only_declared_actions_and_arguments_cross_the_bridge() {
         let input: Input = serde_json::from_value(json!({"workspace":"w","project":"p","request":{"action":"approve","name":"reviewer","mcp":"notes=server","acceptHints":"network"}})).unwrap();

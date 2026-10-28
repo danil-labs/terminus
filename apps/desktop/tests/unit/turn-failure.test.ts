@@ -300,3 +300,25 @@ test("handler notices remain translated when history is reloaded", () => {
     assert.ok(text.length > 20);
   }
 });
+
+
+import { handlerMutation, pendingHandlerOperation, resumeHandlerOperation } from "../../src/features/settings/handlerOperations.ts";
+test("an uncertain handler mutation survives scope switches and resumes without repeating", async () => {
+  let mutations = 0;
+  const unknown = { detail: { detail: { operation: "op-7" } } };
+  await assert.rejects(handlerMutation("workspace-a/folder/handler", "approve", async () => { mutations++; throw unknown; }));
+  await handlerMutation("workspace-b/folder/handler", "revoke", async () => true);
+  assert.equal(pendingHandlerOperation("workspace-a/folder/handler")?.operation, "op-7");
+  await assert.rejects(handlerMutation("workspace-a/folder/handler", "release", async () => { mutations++; }));
+  await assert.rejects(resumeHandlerOperation("workspace-a/folder/handler", async id => { assert.equal(id, "op-7"); throw new Error("offline"); }));
+  assert.ok(pendingHandlerOperation("workspace-a/folder/handler"));
+  await resumeHandlerOperation("workspace-a/folder/handler", async id => { assert.equal(id, "op-7"); return {}; });
+  assert.equal(pendingHandlerOperation("workspace-a/folder/handler"), undefined);
+  assert.equal(mutations, 1);
+});
+test("a terminal handler receipt releases the mutation lock and retains its error", async () => {
+  await assert.rejects(handlerMutation("terminal-scope", "approve", async () => { throw { detail: { detail: { operation: "op-8" } } }; }));
+  const terminal = { detail: { detail: { operation: "op-8", settled: true, detail: { read_tools: ["read"] } } } };
+  await assert.rejects(resumeHandlerOperation("terminal-scope", async () => { throw terminal; }), e => e === terminal);
+  assert.equal(pendingHandlerOperation("terminal-scope"), undefined);
+});

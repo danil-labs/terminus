@@ -1,12 +1,12 @@
 {
   "settings.handler.title": "Recursos y aprobaciones",
   "settings.handler.refresh": "Actualizar",
-  "settings.handler.memory": "Memoria",
+  "settings.handler.memory": "Configuración de memoria",
   "settings.handler.memory.ok": "Por identidad",
   "settings.handler.memory.synced-by-name": "Sincronizada por nombre",
   "settings.handler.memory.legacy-by-name": "Memoria anterior sin cargar",
   "settings.handler.memory.in-doubt": "Identidad por resolver",
-  "settings.handler.memory.unavailable": "No disponible",
+  "settings.handler.memory.unavailable": "Sin memoria local declarada",
   "settings.handler.synced": "{count} notas · sincronizadas con la cuenta",
   "settings.handler.not_synced": "{count} notas · sin sincronización con la cuenta",
   "settings.handler.server": "Servidor: {server}",
@@ -36,5 +36,9 @@
   "settings.handler.revoked": "Aprobación revocada.",
   "settings.handler.released": "Cuarentena liberada.",
   "settings.handler.not_quarantined": "No había una cuarentena que liberar.",
-  "settings.handler.memory.external": "Memoria en un servidor aprobado"
+  "settings.handler.memory.external": "Memoria en un servidor aprobado",
+  "settings.handler.pending": "Resultado pendiente. Consulta la misma operación antes de cambiar recursos.",
+  "settings.handler.resume": "Consultar resultado",
+  "settings.handler.memory_declared": "Configuración declarada. Las aprobaciones se muestran aparte; la disponibilidad durante un turno la determina el motor.",
+  "settings.handler.memory_slot": "Almacén externo solicitado: {slot}"
 }

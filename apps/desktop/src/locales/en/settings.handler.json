@@ -1,12 +1,12 @@
 {
   "settings.handler.title": "Resources and approvals",
   "settings.handler.refresh": "Refresh",
-  "settings.handler.memory": "Memory",
+  "settings.handler.memory": "Memory configuration",
   "settings.handler.memory.ok": "By identity",
   "settings.handler.memory.synced-by-name": "Synced by name",
   "settings.handler.memory.legacy-by-name": "Legacy memory not loaded",
   "settings.handler.memory.in-doubt": "Identity unresolved",
-  "settings.handler.memory.unavailable": "Unavailable",
+  "settings.handler.memory.unavailable": "No declared local memory",
   "settings.handler.synced": "{count} notes · synced with the account",
   "settings.handler.not_synced": "{count} notes · not synced with the account",
   "settings.handler.server": "Server: {server}",
@@ -36,5 +36,9 @@
   "settings.handler.revoked": "Approval revoked.",
   "settings.handler.released": "Quarantine released.",
   "settings.handler.not_quarantined": "There was no quarantine to release.",
-  "settings.handler.memory.external": "Memory on an approved server"
+  "settings.handler.memory.external": "Memory on an approved server",
+  "settings.handler.pending": "Outcome pending. Check the same operation before changing resources.",
+  "settings.handler.resume": "Check outcome",
+  "settings.handler.memory_declared": "Declared configuration. Approvals are shown separately; the engine determines availability during a turn.",
+  "settings.handler.memory_slot": "Requested external store: {slot}"
 }
