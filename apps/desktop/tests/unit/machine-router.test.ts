@@ -534,3 +534,17 @@ test("web source origins survive collisions and outdated owners without falling 
     fleet.close();
   }
 });
+
+test("handler approvals never fall back from a remote destination to the native engine", async () => {
+  const vm = fakeLink({});
+  const { router, native } = setup({ cmp_vm: vm }, { handler_action: { released: true } });
+  await router.handle("list_workspaces");
+  native.length = 0;
+  const args = { input: { workspace: "w", project: "p1", request: { action: "release", name: "reviewer" } } };
+  await assert.rejects(router.handle("handler_action", args, on("cmp_vm")));
+  assert.equal(native.length, 0);
+  assert.equal(vm.calls.length, 0);
+  assert.deepEqual(await router.handle("handler_action", args), { released: true });
+  assert.equal(native[0].command, "handler_action");
+  assert.equal((native[0].args.input as Args).workspace, "w");
+});

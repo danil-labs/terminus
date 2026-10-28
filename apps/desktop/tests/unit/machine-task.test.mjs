@@ -210,3 +210,29 @@ test("el composer consulta la máquina elegida y descarta respuestas tardías", 
   assert.ok(doc.querySelector('[aria-label*="VM model"]'), "la tarea remota conserva los modelos locales");
   assert.deepEqual(app.fallos, []);
 });
+
+test("reopening a live permission sends the observed durable id and revision", async () => {
+  let waiting = true;
+  const decisions = [];
+  const pending = { id: "durable-7", request_id: "provider-1", revision: 7, tool: "Bash", target: "echo permission-proof" };
+  const app = await boot("listo", "durable-permission", responses({
+    list_live_sessions: () => [row("t1")],
+    list_active_turns: ["t1"],
+    load_session: ({ id }) => session(id, [turn(0, "Waiting for approval")]),
+    pending_requests: () => ({ permissions: waiting ? [pending] : [], questions: [], records: { permissions: [{ ...pending, id: "old-delivery", state: "delivery_unknown" }] } }),
+    respond_permission: args => {
+      decisions.push(args);
+      waiting = false;
+      return { id: "decision", role: "user", text: "", permission: { request_id: "provider-1", tool: "Bash", target: pending.target, allow: args.allow, when: 1 } };
+    },
+  }));
+  await sleep(600);
+  await openTask(app, "t1");
+  const approve = [...app.w.document.querySelectorAll("button")].find(button => button.textContent?.trim() === "Aprobar y ejecutar");
+  assert.ok(approve, "pending permission must be restored without a live event");
+  approve.click();
+  await sleep(200);
+  assert.deepEqual(decisions, [{ session: "t1", requestId: "durable-7", revision: 7, allow: true }]);
+  assert.equal([...app.w.document.querySelectorAll("button")].some(button => button.textContent?.trim() === "Aprobar y ejecutar"), false);
+  assert.deepEqual(app.fallos, []);
+});

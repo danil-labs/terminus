@@ -140,8 +140,7 @@ impl Feed {
     pub fn next(&self, wait: Duration) -> Page {
         let deadline = Instant::now() + wait;
         let mut state = self.shared.lock();
-        while state.batches.is_empty() && !state.gap && state.failure.is_none() && !state.stopped
-        {
+        while state.batches.is_empty() && !state.gap && state.failure.is_none() && !state.stopped {
             let left = deadline.saturating_duration_since(Instant::now());
             if left.is_zero() {
                 break;

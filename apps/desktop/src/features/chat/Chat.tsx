@@ -336,7 +336,10 @@ export type PermissionOrigin = {
 
 export type PermissionRequest = {
   session: string;
+  workspace?: string;
   requestId: string;
+  revision?: number;
+  durableId?: string;
   tool: string;
   target: string | null;
   origin: PermissionOrigin | null;

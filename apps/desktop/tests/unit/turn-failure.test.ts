@@ -279,3 +279,24 @@ test("el historial con object Object ofrece una salida al volver a abrirlo", () 
     assert.doesNotMatch(text, /object Object/);
   }
 });
+
+test("a handler limit preserves its explanation and structured diagnostic", () => {
+  const error = {
+    code: "handler_limit_unenforceable",
+    message_key: "cli.error.handler_limit_unenforceable",
+    detail: { provider: "codex", reason: "permissions_ceiling", alternatives: ["claude"] },
+  };
+  const message = mensajeDeFallo(error);
+  assert.match(message.text, /l\u00edmites del encargado/);
+  assert.match(message.fallo.detail, /permissions_ceiling/);
+  assert.match(message.fallo.detail, /claude/);
+  assert.doesNotMatch(message.text, /object Object|cli\.error/);
+});
+
+test("handler notices remain translated when history is reloaded", () => {
+  for (const meta of ["handler_definition_modified", "handler_memory_in_doubt", "handler_memory_unavailable", "handler_memory_legacy", "handler_requires_tool_missing"]) {
+    const text = failureText({ text: meta, meta });
+    assert.doesNotMatch(text, /handler_|chat\.notice/);
+    assert.ok(text.length > 20);
+  }
+});

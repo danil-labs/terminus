@@ -1,3 +1,4 @@
+import "../../locales/handlerPhrases";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { t } from "../../lib/i18n";
 import { detalleDe } from "../../lib/failure";

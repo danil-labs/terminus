@@ -543,14 +543,14 @@ test("provider login from settings receives its link and code", async () => {
   assert.deepEqual(app.fallos, []);
 });
 
-test("the audited additive engine works in the panel and through the relay contract gate", async () => {
+test("the previous additive engine family needs an update for the durable decision contract", async () => {
   const contract = "3972c281dba1b61f9ad06fc82fbf059af3dbc55770b0a1bcb59ce786ec0a56f1";
   const { app, calls, doc, text } = await open("web-machines-additive-contract", [{ ...VM, contract }], {
     cmp_vm: { table: table("Panel actualizado", "Tarea de la VM"), contract },
   });
-  assert.equal(doc.querySelector('[data-machine-row="cmp_vm"]')?.dataset.state, "online");
-  assert.ok(calls("cmp_vm", "list_projects").length > 0);
-  assert.ok(text().includes("Panel actualizado"));
+  assert.equal(doc.querySelector('[data-machine-row="cmp_vm"]')?.dataset.state, "outdated");
+  assert.equal(calls("cmp_vm", "list_projects").length, 0);
+  assert.ok(!text().includes("Panel actualizado"));
   assert.deepEqual(app.fallos, []);
 });
 

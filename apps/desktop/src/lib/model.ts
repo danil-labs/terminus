@@ -242,7 +242,7 @@ export type HandlerMemory = {
   identity_dir?: string;
   synced: boolean;
   across_projects: boolean;
-  status: "ok" | "synced-by-name" | "legacy-by-name" | "in-doubt" | "unavailable";
+  status: "ok" | "external" | "synced-by-name" | "legacy-by-name" | "in-doubt" | "unavailable";
   reason?: string;
   entries: number;
   legacy?: string;

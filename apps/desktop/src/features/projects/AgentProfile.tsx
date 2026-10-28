@@ -5,7 +5,7 @@ import EyeOff from "lucide-solid/icons/eye-off";
 import FolderOpen from "lucide-solid/icons/folder-open";
 import ImagePlus from "lucide-solid/icons/image-plus";
 import Trash2 from "lucide-solid/icons/trash-2";
-import { createEffect, createMemo, createSignal, on, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, lazy, on, onCleanup, Show } from "solid-js";
 import SelectorDeModelo from "../chat/ModelPicker";
 import { t } from "../../lib/i18n";
 import type { AgentProfile as Profile, HandlerDefinition, HandlerStatus } from "../../lib/model";
@@ -20,7 +20,8 @@ import { AstroAvatar } from "./AstroAvatar";
 import { BodyPicker } from "./BodyPicker";
 import { DEFAULT_PROFILE, notifyProfiles } from "./profiles";
 import { TelegramSection } from "./TelegramSection";
-import HandlerPolicy, { type HandlerPolicyActions } from "../settings/HandlerPolicy";
+import type { HandlerPolicyActions } from "../settings/HandlerPolicy";
+const HandlerPolicy = lazy(() => import("../settings/HandlerPolicy"));
 
 /** Las extensiones que el webview pinta como `data:` URI (`preview::data_url`). */
 const IMAGES = ["png", "jpg", "jpeg", "webp", "gif"];

@@ -1797,7 +1797,7 @@ if (!roto) {
     const cierre = await boot("listo", "cierre-con-vivos", {
       ...CON_TAREA,
       list_live_turns: () => listError ? Promise.reject(new Error("list failed")) : vivos,
-      pending_requests: () => ({ questions: [], permissions: [{ request_id: "r", tool: "Write", target: "hola.txt" }] }),
+      pending_requests: () => ({ questions: [], permissions: [{ id: "durable-r", revision: 1, request_id: "r", tool: "Write", target: "hola.txt" }] }),
       stop_turn: (_args, options) => {
         stopScope = options?.headers?.["x-terminus-workspace"];
         return stopError ? Promise.reject(new Error("stop failed")) : null;
@@ -4261,7 +4261,7 @@ if (!roto) {
     load_session: ({ id }) => ({ ...CON_TAREA.load_session, id, turns: hilos[id] }),
     pending_requests: ({ session }) =>
       session === "s1"
-        ? { questions: [{ request_id: "req-1", turn: "t-preg" }], permissions: [] }
+        ? { questions: [{ id: "durable-req-1", revision: 3, request_id: "req-1", turn: "t-preg" }, { id: "durable-req-dos", revision: 1, request_id: "req-dos", turn: "t-dos" }], permissions: [] }
         : { questions: [], permissions: [] },
     answer_question: (args) => {
       contestadas.push(args);
@@ -4335,7 +4335,8 @@ if (!roto) {
     );
     process.exit(1);
   }
-  assert.equal(contestadas[0].requestId, "req-1");
+  assert.equal(contestadas[0].requestId, "durable-req-1");
+  assert.equal(contestadas[0].revision, 3);
 
   // Esc cierra la pregunta sin contestarla y devuelve la caja de escribir.
   // Mientras el agente espere, esa caja no existe.
@@ -4459,7 +4460,7 @@ if (!roto) {
     { role: "agent", id: "t-tres", text: "Antes de seguir", questions: TRES },
   ];
   const hilosTres = { p1: conTres("p1"), p2: conTres("p2"), p3: [{ role: "user", id: "u3", text: "Tres" }], p4: [{ role: "user", id: "u4", text: "Cuatro" }] };
-  const atadurasTres = { p1: [{ request_id: "req-p1", turn: "t-tres" }], p2: [{ request_id: "req-p2", turn: "t-tres" }] };
+  const atadurasTres = { p1: [{ id: "durable-req-p1", revision: 2, request_id: "req-p1", turn: "t-tres" }], p2: [{ id: "durable-req-p2", revision: 2, request_id: "req-p2", turn: "t-tres" }] };
   const contestadasTres = [];
   const titulos = { p1: "Pregunta uno", p2: "Pregunta dos", p3: "Tres", p4: "Cuatro" };
   const A_MEDIAS = {
@@ -4578,13 +4579,14 @@ if (!roto) {
   await teclaEnLaTarjeta("Enter", { metaKey: true });
   await sleep(200);
   assert.equal(contestadasTres.length, 1, "⌘↵ en la última no mandó las respuestas");
-  assert.equal(contestadasTres[0].requestId, "req-p1");
+  assert.equal(contestadasTres[0].requestId, "durable-req-p1");
+  assert.equal(contestadasTres[0].revision, 2);
   assert.deepEqual(contestadasTres[0].respuestas, [
     { turn: "t-tres", question: "q1", chosen: ["o1"], free_text: null },
     { turn: "t-tres", question: "q2", chosen: ["a", "r"], free_text: null },
     { turn: "t-tres", question: "q3", chosen: [], free_text: "Morado" },
   ]);
-  hilosTres.p1 = [...hilosTres.p1, { role: "user", id: "resp-req-p1", text: "Hecho", answers: contestadasTres[0].respuestas.map((r) => ({ ...r, question_text: "", text: "Hecho", source: "persona", when: 0 })) }];
+  hilosTres.p1 = [...hilosTres.p1, { role: "user", id: "resp-durable-req-p1", text: "Hecho", answers: contestadasTres[0].respuestas.map((r) => ({ ...r, question_text: "", text: "Hecho", source: "persona", when: 0 })) }];
   // El registro de lo contestado se pliega y sigue plegado al volver.
   const registro = () => celdaM().querySelector('section[aria-label="Preguntas"] button[aria-expanded]');
   assert.equal(registro()?.getAttribute("aria-expanded"), "true", "el registro de preguntas no nace abierto");
@@ -4600,7 +4602,7 @@ if (!roto) {
   aMedias.emit("question", { workspace: "w", session: "p1", turno: "t-otra", preguntas: TRES, request_id: "req-p1b" });
   await sleep(150);
   hilosTres.p1 = [...hilosTres.p1, OTRA_VEZ];
-  atadurasTres.p1 = [{ request_id: "req-p1b", turn: "t-otra" }];
+  atadurasTres.p1 = [{ id: "durable-req-p1b", revision: 1, request_id: "req-p1b", turn: "t-otra" }];
   assert.deepEqual(
     foto("p1, turno nuevo"),
     { paso: "p1, turno nuevo", tramo: "true", plegada: false, pagina: "1 de 3", respondidas: "Respondidas 0/3", elegidas: [], otra: null },
@@ -4711,7 +4713,7 @@ if (!roto) {
     list_active_turns: ["s1"],
     pending_requests: ({ session }) =>
       session === "s1"
-        ? { questions: [], permissions: [{ request_id: "perm-1", tool: "Bash", target: "rm -rf" }] }
+        ? { questions: [], permissions: [{ id: "durable-perm-1", revision: 4, request_id: "perm-1", tool: "Bash", target: "rm -rf" }] }
         : { questions: [], permissions: [] },
   };
   const ventana = await boot("listo", "estado-de-ventana", VENTANA);
@@ -4775,8 +4777,8 @@ if (!roto) {
     await sleep(300);
     if (cambio === "acepta") {
       assert.deepEqual(
-        respuestas.map(({ session, requestId, allow }) => ({ session, requestId, allow })),
-        [{ session: "s1", requestId: "perm-1", allow: true }],
+        respuestas.map(({ session, requestId, revision, allow }) => ({ session, requestId, revision, allow })),
+        [{ session: "s1", requestId: "durable-perm-1", revision: 4, allow: true }],
         "elegir automático con el turno vivo aprueba el permiso que esperaba",
       );
       assert.ok(!docA.body.textContent.includes("Aprobar acción"), "el gate aprobado deja de pedir respuesta");
