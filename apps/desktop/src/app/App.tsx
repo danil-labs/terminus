@@ -1,3 +1,5 @@
+import { createCustomization } from "../lib/customization";
+import { featureEntries } from "../lib/attention-labels";
 import { deliver, type JournalEvent, listen } from "../lib/serviceEvents";
 import { open } from "@tauri-apps/plugin-dialog";
 import Archive from "lucide-solid/icons/archive";
@@ -241,6 +243,7 @@ import {
   isTaskTab,
   migrateLegacyStrip,
   INBOX_TAB_ID,
+  BROADCASTS_TAB_ID,
   OBSERVABILITY_TAB_ID,
   type ScreenTab,
   screenTabId,
@@ -436,6 +439,10 @@ export default function App() {
   const spaceOrder = createSpaceNavigationOrder(() => workspaceActivo() ?? "", () => setError(t("spaces.order.error")));
   const spaces = createMemo(() => spaceOrder.arrange(rawSpaces()));
   const [escritorio, setEscritorio] = createSignal<string | null>(null);
+  const [spacesContext, setSpacesContext] = createSignal<string | null>(null);
+  const customization = createCustomization(() => ({ user: capabilities().inbox?.userId, workspace: workspaceActivo(), space: spacesContext() === workspaceActivo() ? escritorio() : null }), capabilities().inbox?.subscribe);
+  const [personalizing, setPersonalizing] = createSignal(false);
+  const attentionEntries = () => featureEntries(customization.selection().enabled);
   const activeSpace = () => spaces().find((i) => i.id === escritorio()) ?? null;
   const multipleSpaces = () => spaces().length > 1;
   // El sidebar de la vez anterior, pintado antes del primer IPC e inerte hasta que el motor lo confirma.
@@ -846,6 +853,7 @@ export default function App() {
 
   /** Qué escritorio abre este workspace: el último que se usó si sigue vivo, o la primera. */
   function asentarEscritorio(ws: string, lista: Space[] | null): string | null {
+    setSpacesContext(ws);
     if (!lista || lista.length === 0) {
       batch(() => {
         setSpaces([]);
@@ -2011,6 +2019,7 @@ export default function App() {
     ));
     savedQueues.clear();
     drainingQueues.clear();
+    setSpacesContext(null);
     setWorkspaceActivo(a.active);
     setDraftBases({});
     // Sale la tira del anterior antes que `setSessionId(null)`, que apuntaría
@@ -4492,7 +4501,7 @@ export default function App() {
     setProyectoAbierto(null);
     // El navegador del «+» tampoco cuelga de ninguna tarea: detrás no se
     // abre nada.
-    if (p.clase === "inbox" || p.clase === "observabilidad" || p.clase === "pantalla" || (p.clase === "sitio" && p.navegador)) {
+    if ((p.clase === "inbox" || p.clase === "broadcasts") || p.clase === "observabilidad" || p.clase === "pantalla" || (p.clase === "sitio" && p.navegador)) {
       pestanas.activate(p.id);
       return;
     }
@@ -4537,6 +4546,7 @@ export default function App() {
   }
 
   function abrirInbox() {
+    if (!customization.enabled("inbox")) return;
     setProyectoAbierto(null);
     pestanas.openInbox(t("alpha.inbox"));
   }
@@ -4544,13 +4554,29 @@ export default function App() {
   createEffect(() => {
     const ws = workspaceActivo();
     const space = escritorio();
-    if (!ws || !space || initialInboxOpened || !capabilities().inbox?.initial) return;
+    if (!ws || !space || !customization.ready() || initialInboxOpened || !capabilities().inbox?.initial) return;
     queueMicrotask(() => {
-      if (workspaceActivo() !== ws || escritorio() !== space || initialInboxOpened) return;
+      if (workspaceActivo() !== ws || escritorio() !== space || !customization.ready() || initialInboxOpened) return;
       initialInboxOpened = true;
-      abrirInbox();
+      if (customization.enabled("inbox")) abrirInbox();
     });
   });
+
+  let attentionScope = customization.scope();
+  createEffect(() => {
+    const scope = customization.scope();
+    const changed = scope !== attentionScope;
+    attentionScope = scope;
+    const remove = pestanas.open().filter(tab => (tab.clase === "inbox" || tab.clase === "broadcasts") && (changed || !customization.enabled(tab.clase))).map(tab => tab.id);
+    if (remove.length) untrack(() => cerrarPestanasYa(remove));
+  });
+  function openAttentionFeature(id: string) {
+    if (!customization.enabled(id)) return;
+    if (id === "inbox") abrirInbox();
+    else if (id === "broadcasts") { setProyectoAbierto(null); pestanas.openBroadcasts(t("attention.broadcasts")); }
+    else if (id === "agents") setSettings("agentes");
+    else if (id === "channels") setSettings("integrations");
+  }
 
   function abrirObservabilidad() {
     setProyectoAbierto(null);
@@ -4718,7 +4744,7 @@ export default function App() {
     const p = pestanasEnPantalla().find((x) => x.id === id);
     if (!p) return "";
     if (isTaskTab(p)) return p.titulo;
-    if (p.clase === "inbox" || p.clase === "observabilidad" || p.clase === "pantalla") return p.titulo;
+    if ((p.clase === "inbox" || p.clase === "broadcasts") || p.clase === "observabilidad" || p.clase === "pantalla") return p.titulo;
     if (p.clase === "sitio" && !p.url) return t("sites.new_tab");
     const r = p.clase === "archivo" ? p.ruta : p.clase === "artefacto" ? p.rel : p.url;
     return r.slice(r.lastIndexOf("/") + 1);
@@ -7712,9 +7738,15 @@ export default function App() {
         }}
       </For>
 
-      <Show when={pestanas.open().some(p => p.id === INBOX_TAB_ID) ? `${workspaceActivo()}\u0000${escritorio()}` : undefined} keyed>
+      <Show when={pestanas.open().some(p => p.id === INBOX_TAB_ID) && customization.enabled("inbox") ? customization.scope() : undefined} keyed>
         <div class="min-h-0 min-w-0" classList={{ hidden: celdaDe(INBOX_TAB_ID) === undefined || tapadoPorElProyecto(paneles.siteOf(INBOX_TAB_ID)), "pt-8": llevaTiraInterior(paneles.siteOf(INBOX_TAB_ID)) }} style={celdaDe(INBOX_TAB_ID)}>
           {capabilities().inbox?.render()}
+        </div>
+      </Show>
+
+      <Show when={pestanas.open().some(p => p.id === BROADCASTS_TAB_ID) && customization.enabled("broadcasts") ? customization.scope() : undefined} keyed>
+        <div class="min-h-0 min-w-0" classList={{ hidden: celdaDe(BROADCASTS_TAB_ID) === undefined || tapadoPorElProyecto(paneles.siteOf(BROADCASTS_TAB_ID)), "pt-8": llevaTiraInterior(paneles.siteOf(BROADCASTS_TAB_ID)) }} style={celdaDe(BROADCASTS_TAB_ID)}>
+          {capabilities().inbox?.broadcasts()}
         </div>
       </Show>
 
@@ -8013,8 +8045,10 @@ export default function App() {
               data-shell-cache={enCache() ? "" : undefined}
             >
             <Sidebar
-              onInbox={capabilities().inbox ? abrirInbox : undefined}
-              inboxActive={pestanas.active() === INBOX_TAB_ID}
+              attentionFeatures={capabilities().inbox ? attentionEntries().filter(entry => entry.selected) : undefined}
+              onAttentionFeature={openAttentionFeature}
+              attentionActive={pestanas.active()}
+              onPersonalize={capabilities().inbox ? () => setPersonalizing(true) : undefined}
               projects={proyectosDelRiel()}
               modelos={modelosParaAgentes()}
               sessions={sesionesDelRiel()}
@@ -8243,6 +8277,19 @@ export default function App() {
 
       {/* El nombre del workspace ya no se deduce de la ruta: lo lee el propio
           menú de la cabecera, que es quien sabe cuál está activo. */}
+      <Show when={personalizing() && capabilities().inbox}>
+        <Dialog open={personalizing()} onOpenChange={setPersonalizing}>
+          <DialogContent class="flex max-h-[80dvh] max-w-2xl flex-col gap-3 overflow-y-auto">
+            <DialogTitle class="text-base font-semibold">{t("attention.personalize")}</DialogTitle>
+            <p class="m-0 text-xs text-neutral-500">{(customization.temporary() ? t("attention.memory") : t("attention.local"))}</p>
+            <Button as="a" variant="ghost" class="self-start" href={`${import.meta.env.BASE_URL}inbox${capabilities().inbox?.demo ? '' : '?demo=1'}`}>{(capabilities().inbox?.demo ? t("attention.leave_demo") : t("attention.demo_mode"))}</Button>
+            <Show when={!customization.selection().writable}><p role="alert" class="text-sm text-warning-strong">{t("attention.future")}</p></Show>
+            {capabilities().inbox?.catalog({ get entries() { return attentionEntries().map(entry => ({...entry,available:entry.available && customization.selection().writable})); }, onToggle: customization.toggle })}
+            <Button variant="secondary" class="self-end" onClick={() => setPersonalizing(false)}>{t("attention.close")}</Button>
+          </DialogContent>
+        </Dialog>
+      </Show>
+
       <Show when={settings() !== null}>
         <Suspense fallback={null}>
           <Settings

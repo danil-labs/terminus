@@ -53,7 +53,7 @@ declare const __TERMINUS_WEB__: WebSettings;
 
 type WebSettings = { endpoint: string; supabaseUrl: string; supabaseKey: string; login: string };
 
-type Base = { refresh?: () => Promise<boolean>; subscribe?: (clear: () => void) => () => void; endpoint: string; getToken: () => string | Promise<string>; onUnauthorized?: () => void };
+type Base = { userId?: string | null; refresh?: () => Promise<boolean>; subscribe?: (clear: () => void) => () => void; endpoint: string; getToken: () => string | Promise<string>; onUnauthorized?: () => void };
 export type TerminusWebConfig = Partial<
   WebSettings & Base & { computerId: string; computers: Computer[]; webAccounts: WebAccountsSource; addAccount: import("./AddAccount").AddAccountOptions }
 >;
@@ -214,7 +214,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
   // A file dropped outside the chat would replace the page with it.
   for (const type of ["dragover", "drop"]) window.addEventListener(type, (e) => e.preventDefault());
   setCapabilities({
-    inbox: import.meta.env.TERMINUS_ALPHA ? attentionCapability(false, window.location.pathname.replace(/\/+$/, "").endsWith("/inbox"), { subscribe: base.subscribe, getToken: async () => await base.getToken(), unauthorized: async () => base.refresh ? await base.refresh() : false }) : undefined,
+    inbox: import.meta.env.TERMINUS_ALPHA ? attentionCapability(false, window.location.pathname.replace(/\/+$/, "").endsWith("/inbox"), { userId: base.userId ?? mounted.webAccounts?.current.user_id, subscribe: base.subscribe, getToken: async () => await base.getToken(), unauthorized: async () => base.refresh ? await base.refresh() : false }) : undefined,
     spaceOrder: createSpaceOrderSource(base.endpoint, token),
     nativeWindow: false,
     updater: false,
@@ -460,7 +460,7 @@ async function start(settings: WebSettings) {
           const several = computers.length > 1;
           const relink = mountApp(
             computers,
-            { endpoint, refresh: () => session.unauthorized(), getToken: () => session.getToken(), onUnauthorized: () => void session.unauthorized(), subscribe: clear => { const { data } = session.client.auth.onAuthStateChange((event, value) => { if (event === "SIGNED_OUT" || (value && value.user.id !== current.user_id)) clear(); }); return () => data.subscription.unsubscribe(); } },
+            { endpoint, userId: current.user_id, refresh: () => session.unauthorized(), getToken: () => session.getToken(), onUnauthorized: () => void session.unauthorized(), subscribe: clear => { const { data } = session.client.auth.onAuthStateChange((event, value) => { if (event === "SIGNED_OUT" || (value && value.user.id !== current.user_id)) clear(); }); return () => data.subscription.unsubscribe(); } },
             (computerId) => async () => {
               const answer = await computersOf(endpoint, session);
               if (answer.kind === "license") block({ t: "license" });

@@ -1,3 +1,4 @@
+import { useCustomization } from "../../lib/customization";
 import { ALPHA_DEMO, ALPHA_ORDINARY } from "../../lib/alpha-mode";
 import { applySidebarView, folderCounts, groupKey, groupLabel, nonDefaultCount, scopeLabel, type SidebarView } from "@terminus/tasks";
 import { router } from "expo-router";
@@ -29,6 +30,7 @@ const NEEDS_YOU = new Set(["approving", "asked", "failed"]);
  * líneas, en una sola lista «Tareas» o en los grupos del filtro.
  */
 export default function Tasks() {
+  const customization=useCustomization();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { attention, hosts, hostOf, fleet } = useMachines();
@@ -104,9 +106,15 @@ export default function Tasks() {
         </View>
         </View>
         {process.env.EXPO_PUBLIC_TERMINUS_ALPHA === "1" && !ALPHA_ORDINARY ? (
-          <Pressable accessibilityRole="link" onPress={() => router.push(ALPHA_DEMO ? "/inbox?demo=1" : "/inbox")} style={styles.workspace}>
-            <Text style={{ color: theme.primary, fontWeight: "600" }}>{t("alpha.title")}</Text>
-          </Pressable>
+          <View style={{gap:8}}>
+            <Pressable accessibilityRole="button" onPress={() => router.push("/personalize")} style={[styles.workspace,{minHeight:44}]}><Icon name="sliders-horizontal" size={16} color={theme.text}/><Text style={{color:theme.text,fontWeight:"600"}}>{t("attention.personalize")}</Text></Pressable>
+            {customization.entries.filter(entry=>entry.selected).map(entry=><Pressable key={entry.id} accessibilityRole="link" accessibilityLabel={entry.title} style={[styles.workspace,{minHeight:44}]} onPress={()=>{
+              if(entry.id==='inbox')router.push(ALPHA_DEMO?'/inbox?demo=1':'/inbox');
+              else if(entry.id==='broadcasts')router.push(ALPHA_DEMO?'/broadcasts?demo=1':'/broadcasts');
+              else if(entry.id==='agents')router.push('/agents');
+              else if(entry.id==='channels')router.push('/channels');
+            }}><Text style={{color:theme.primary,fontWeight:"600"}}>{entry.title}</Text></Pressable>)}
+          </View>
         ) : null}
         {spaces.length > 1 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.spaces}>

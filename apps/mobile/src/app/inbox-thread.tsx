@@ -1,16 +1,20 @@
-import { Stack, router } from 'expo-router';
+import { usePathname, Redirect, Stack, router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { ALPHA_DEMO } from '../lib/alpha-mode';
 import { useAccount } from '../lib/account';
+import { useCustomization } from '../lib/customization';
 import { useInbox } from '../lib/inbox';
 import { t } from '../lib/i18n';
 import { useTheme } from '../ui/theme';
 import { KeyboardScreen } from '../ui/KeyboardScreen';
 
 export default function InboxThread(){
+ const pathname=usePathname();const customization=useCustomization();
  const theme=useTheme();const inbox=useInbox();const [draft,setDraft]=useState('');const session=useAccount();
  useEffect(()=>setDraft(''),[inbox.account?.id,inbox.selected?.id,session.session?.user.id]);
+ if(!customization.ready)return null;
+ if(!customization.enabled('inbox'))return pathname.endsWith('/inbox-thread')?<Redirect href={ALPHA_DEMO?'/?demo=1':'/'}/>:null;
  return <KeyboardScreen><Stack.Screen options={{title:inbox.selected?.contact_name||t('alpha.title')}}/>
  <ScrollView contentContainerStyle={{padding:16,gap:16}}>
   <Text style={{color:theme.textMuted}}>{t(ALPHA_DEMO?'alpha.demo_notice':'alpha.real_notice')}</Text>

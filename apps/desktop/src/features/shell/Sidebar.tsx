@@ -1,3 +1,7 @@
+import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
+import Megaphone from "lucide-solid/icons/megaphone";
+import Bot from "lucide-solid/icons/bot";
+import Plug from "lucide-solid/icons/plug";
 import Archive from "lucide-solid/icons/archive";
 import History from "lucide-solid/icons/history";
 import Loader2 from "lucide-solid/icons/loader-2";
@@ -9,7 +13,7 @@ import SettingsIcon from "lucide-solid/icons/settings";
 import SquarePen from "lucide-solid/icons/square-pen";
 import TriangleAlert from "lucide-solid/icons/triangle-alert";
 import X from "lucide-solid/icons/x";
-import { createEffect, createMemo, createResource, createSignal, type JSX, lazy, mapArray, on, onCleanup, Show, Suspense } from "solid-js";
+import { createEffect, createMemo, createResource, createSignal, type JSX, lazy, mapArray, on, onCleanup, For, Show, Suspense } from "solid-js";
 import { destinoEnVuelo, puntoDelArrastre, tareaEnVuelo } from "../../lib/drag";
 import { recordarCarpetas } from "../../lib/folderKinds";
 import { t } from "../../lib/i18n";
@@ -143,8 +147,10 @@ export default function Sidebar(props: {
   onRenombrar: (project: string, id: string, title: string) => Promise<boolean | void> | boolean | void;
   onPin?: (project: string, id: string, pinned: boolean) => void | Promise<void>;
   onSettings: (panel?: string) => void;
-  onInbox?: () => void;
-  inboxActive?: boolean;
+  attentionFeatures?: readonly { id: string; title: string }[];
+  onAttentionFeature?: (id: string) => void;
+  attentionActive?: string | null;
+  onPersonalize?: () => void;
   /** Abre el chat con un agente de esa carpeta, como su fila de antes. */
   onHablarCon: (project: string, name: string) => void;
   onAgentProfile: (project: string, name: string) => void;
@@ -647,7 +653,10 @@ export default function Sidebar(props: {
                 </Show>
               </SidebarMenuButton>
             </SidebarMenuItem>
-            <Show when={props.onInbox}><SidebarMenuItem><SidebarMenuButton isActive={props.inboxActive} aria-label={t("alpha.inbox")} onClick={() => props.onInbox?.()}><Inbox size={14}/><Show when={!props.collapsed}><span>{t("alpha.inbox")}</span></Show></SidebarMenuButton></SidebarMenuItem></Show>
+            <For each={props.attentionFeatures}>{feature => <SidebarMenuItem><SidebarMenuButton data-attention-feature={feature.id} isActive={props.attentionActive === feature.id} aria-label={feature.title} onClick={() => props.onAttentionFeature?.(feature.id)}>
+              {feature.id === "inbox" ? <Inbox size={14}/> : feature.id === "broadcasts" ? <Megaphone size={14}/> : feature.id === "agents" ? <Bot size={14}/> : <Plug size={14}/>}
+              <Show when={!props.collapsed}><span>{feature.title}</span></Show>
+            </SidebarMenuButton></SidebarMenuItem>}</For>
             <Show when={props.collapsed}>
               <SidebarMenuItem>
                 <SidebarMenuButton
@@ -731,6 +740,7 @@ export default function Sidebar(props: {
           </Suspense>
         </Show>
         <SidebarFooter class="border-t border-border p-2">
+          <Show when={props.onPersonalize}><SidebarMenu><SidebarMenuItem><SidebarMenuButton aria-label={t("attention.personalize")} onClick={() => props.onPersonalize?.()}><SlidersHorizontal size={14}/><Show when={!props.collapsed}><span>{t("attention.personalize")}</span></Show></SidebarMenuButton></SidebarMenuItem></SidebarMenu></Show>
           <div class={cn("flex items-center justify-end gap-1", props.collapsed && "flex-col")}>
             <Show when={capabilities().danilAccount || capabilities().accountProfile}>
               <Suspense>

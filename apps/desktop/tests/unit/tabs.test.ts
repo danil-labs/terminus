@@ -999,3 +999,20 @@ test("Inbox es único por tira y efímero: cerrar y restaurar no modifica tareas
   assert.deepEqual(restored.open().map(tab => tab.id), ["task"]);
   assert.equal(restored.active(), null);
 });
+
+
+test("Difusiones es efímera y cerrar la vista conserva la tarea", () => {
+  const tabs = tira("broadcasts-ephemeral");
+  tabs.ensure(tarea("task"));
+  tabs.openBroadcasts("Difusiones");
+  tabs.openBroadcasts("Difusiones");
+  assert.equal(tabs.open().filter(tab => tab.clase === "broadcasts").length, 1);
+  const stored = JSON.parse(almacen.get("harness.layout.pestanas.broadcasts-ephemeral")!);
+  assert.deepEqual(stored.abiertas.map((tab: { id: string }) => tab.id), ["task"]);
+  assert.equal(stored.activa, null);
+  tabs.close("broadcasts");
+  assert.deepEqual(tabs.open().map(tab => tab.id), ["task"]);
+  assert.equal(tabs.active(), "task");
+  const restored = tira("broadcasts-ephemeral");
+  assert.deepEqual(restored.open().map(tab => tab.id), ["task"]);
+});

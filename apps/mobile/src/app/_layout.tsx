@@ -1,4 +1,5 @@
 import { ALPHA_DEMO, ALPHA_ORDINARY } from "../lib/alpha-mode";
+import { CustomizationProvider } from "../lib/customization";
 import { InboxProvider } from "../lib/inbox";
 import type { NotificationResponse } from "expo-notifications";
 import { Stack, router, usePathname } from "expo-router";
@@ -41,8 +42,7 @@ function openTarget(response: NotificationResponse | null) {
 export default function RootLayout() {
   const theme = useTheme();
   const pathname = usePathname();
-  const alphaInbox = process.env.EXPO_PUBLIC_TERMINUS_ALPHA === "1" && Platform.OS === "web" &&
-    (pathname.endsWith("/inbox") || (typeof window !== "undefined" && (window.location.pathname.endsWith("/inbox") || new URLSearchParams(window.location.search).get("to")?.split("?")[0] === "/inbox")));
+
 
   // El stack real conserva el modo explícito también al recargar sus rutas.
   useEffect(() => {
@@ -73,9 +73,10 @@ export default function RootLayout() {
 
   return (
     <AccountProvider>
-    <InboxProvider>
-    <MachinesProvider active={!alphaInbox}>
+    <MachinesProvider>
       <WorkspacesProvider>
+      <CustomizationProvider>
+      <InboxProvider>
         <StatusBar style="auto" />
         <Stack
           screenOptions={{
@@ -102,15 +103,17 @@ export default function RootLayout() {
             name="preview"
             options={Platform.OS === "web" ? { presentation: "transparentModal", headerShown: false, contentStyle: { backgroundColor: "transparent" }, animation: "none" } : { presentation: "formSheet", sheetAllowedDetents: "fitToContents", sheetGrabberVisible: true, headerShown: false, sheetCornerRadius: 18 }}
           />
+          <Stack.Screen name="personalize" options={{ presentation: "formSheet", title: t("attention.personalize") }} />
           <Stack.Screen name="activity" options={{ title: t("activity.title") }} />
           <Stack.Screen name="accounts" options={{ title: w("settings.nav.ai_providers") }} />
           <Stack.Screen name="signin" options={{ headerShown: false }} />
           <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
         </Stack>
         <ActivityNotice />
+      </InboxProvider>
+      </CustomizationProvider>
       </WorkspacesProvider>
     </MachinesProvider>
-    </InboxProvider>
     </AccountProvider>
   );
 }

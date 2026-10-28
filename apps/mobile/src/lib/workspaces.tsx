@@ -33,6 +33,7 @@ type Workspaces = {
   current: WorkspaceEntry | null;
   snapshot: Snapshot | null;
   loading: boolean;
+  selectionReady: boolean;
   select: (id: string) => void;
   /** El space activo, como la SpaceBar del escritorio; el primero si no se eligió ninguno. */
   space: MergedSpace | null;
@@ -73,7 +74,7 @@ function DemoWorkspacesProvider({ children }: { children: ReactNode }) {
   const alternate: MergedSpace = { id: "demo-space-alt", name: t("alpha.folder_demo"), folders: [], on: {"demo-host":"demo-space-alt"} };
   const space = spaceId === firstSpace.id ? firstSpace : alternate;
   const snapshot: Snapshot = { folders: [{id:"demo-folder",name:t("alpha.folder_demo"),key:"demo-host/demo-folder",host:"demo-host",kind:"folder"}], spaces:[firstSpace,alternate], tasks:[{id:"demo-task",title:t("alpha.task_demo"),last_message:t("alpha.answer_demo"),provider:"codex",model:"gpt-5.6",created_at:0,updated_at:0,esperando:false,agent:null,space:firstSpace.id,host:"demo-host",workspace:entry.id,folder:"demo-folder",folderKey:"demo-host/demo-folder"}], delegated:[], agents:[{name:"atencion-demo",description:t("alpha.agent"),status:"asleep",liveTasks:0,minutesSinceLastTurn:null,places:[{host:"demo-host",folder:"demo-folder"}]}], live:new Set(), providers:{}, cachedAt:null };
-  return <Context.Provider value={{list:[entry],current:entry,snapshot,loading:false,select:()=>{},space,selectSpace:setSpaceId,view,setView,hostsOfCurrent:hosts,reload:async()=>{}}}>{children}</Context.Provider>;
+  return <Context.Provider value={{list:[entry],current:entry,snapshot,loading:false,selectionReady:true,select:()=>{},space,selectSpace:setSpaceId,view,setView,hostsOfCurrent:hosts,reload:async()=>{}}}>{children}</Context.Provider>;
 }
 
 function LiveWorkspacesProvider({ children }: { children: ReactNode }) {
@@ -201,8 +202,9 @@ function LiveWorkspacesProvider({ children }: { children: ReactNode }) {
   }, [reload]);
 
   const [spaceIds, setSpaceIds] = useState<Record<string, string>>({});
+  const [selectionReady, setSelectionReady] = useState(false);
   useEffect(() => {
-    void store.get(SPACES_KEY).then((saved) => saved && setSpaceIds(JSON.parse(saved)));
+    void store.get(SPACES_KEY).then((saved) => saved && setSpaceIds(JSON.parse(saved))).catch(() => {}).finally(() => setSelectionReady(true));
   }, []);
   const selectSpace = useCallback(
     (id: string) => {
@@ -239,8 +241,8 @@ function LiveWorkspacesProvider({ children }: { children: ReactNode }) {
   const hostsOfCurrent = useMemo(() => hosts.filter((h) => current?.members.has(h.id)), [hosts, current]);
 
   const value = useMemo<Workspaces>(
-    () => ({ list, current, snapshot, loading, select, space, selectSpace, view, setView, hostsOfCurrent, reload }),
-    [list, current, snapshot, loading, select, space, selectSpace, view, setView, hostsOfCurrent, reload],
+    () => ({ list, current, snapshot, loading, selectionReady, select, space, selectSpace, view, setView, hostsOfCurrent, reload }),
+    [list, current, snapshot, loading, selectionReady, select, space, selectSpace, view, setView, hostsOfCurrent, reload],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
