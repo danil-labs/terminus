@@ -9,5 +9,9 @@
   "screen.busy": "Ya hay dos pantallas abiertas de esta computadora. Cierra una para ver esta.",
   "screen.ended": "Se cerró la pantalla.",
   "screen.failed": "No se pudo conectar con la pantalla.",
-  "screen.retry": "Reconectar"
+  "screen.retry": "Reconectar",
+  "screen.control_active": "Control activo · haz clic en la pantalla para escribir",
+  "screen.control_unavailable": "El motor de esta computadora permite solo ver.",
+  "screen.start_control": "Controlar",
+  "screen.stop_control": "Solo ver"
 }

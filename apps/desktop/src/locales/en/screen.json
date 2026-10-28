@@ -9,5 +9,9 @@
   "screen.busy": "Two screens of this computer are already open. Close one to see this one.",
   "screen.ended": "The screen closed.",
   "screen.failed": "Couldn't connect to the screen.",
-  "screen.retry": "Reconnect"
+  "screen.retry": "Reconnect",
+  "screen.control_active": "Control active · click the screen to type",
+  "screen.control_unavailable": "This computer’s engine only supports viewing.",
+  "screen.start_control": "Control",
+  "screen.stop_control": "View only"
 }
