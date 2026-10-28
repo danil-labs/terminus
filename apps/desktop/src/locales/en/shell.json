@@ -123,7 +123,6 @@
   "shell.workspaces.label": "Workspaces",
   "shell.workspaces.new": "New workspace",
   "shell.workspaces.tile_with_state": "{name}: {state}",
-  "shell.workspaces.add_account": "Add account",
   "shell.workspaces.account": "Account {email}",
   "shell.workspaces.other_tile": "{name} · {email}",
   "shell.workspaces.expired_tile": "{name} · {email}: session expired",
@@ -230,14 +229,13 @@
   "shell.update.background": "It downloads in the background. You can keep working.",
   "shell.update.downloading": "Downloading it…",
   "shell.close.title": {
-    "one": "{count} task is working",
-    "other": "{count} tasks are working"
+    "one": "Quit Terminus · {count} task working",
+    "other": "Quit Terminus · {count} tasks working"
   },
-  "shell.close.body": "If you keep them in the background, they finish even after you close the window. If you stop them, they are marked as interrupted and you can resume them later.",
+  "shell.close.body": "Closing the window keeps work running in the background. To quit now you can stop these tasks; you can resume them later.",
   "shell.close.working": "working",
   "shell.close.waiting": "waiting for your answer",
   "shell.close.untitled": "Untitled task",
-  "shell.close.remember": "Remember my choice",
   "shell.close.cancel": "Cancel",
   "shell.close.stop": "Stop them and quit",
   "shell.close.stopping": "Stopping…",
@@ -249,7 +247,7 @@
   "shell.tray.idle": "Terminus · no tasks working",
   "shell.tray.open": "Open Terminus",
   "shell.tray.stop_all": "Stop all tasks",
-  "shell.tray.quit": "Quit completely",
+  "shell.tray.quit": "Quit Terminus",
   "shell.update.waiting_tasks": {
     "one": "The new engine takes over when {count} working task finishes.",
     "other": "The new engine takes over when {count} working tasks finish."
@@ -279,6 +277,7 @@
   "shell.work_tree.no_session": "No task is open yet",
   "shell.work_tree.open": "See the work tree",
   "shell.folder.open": "Open folder",
+  "shell.folder.view_on": "View files on {name}",
   "shell.folder.copy": "Copy path",
   "shell.folder.copied": "Path copied",
   "shell.engine.connecting": "Connecting to the engine…",
@@ -310,5 +309,8 @@
   "shell.relocate.body": "Move it to Applications so it can update and stays there after you eject the disk.",
   "shell.relocate.move": "Move to Applications",
   "shell.relocate.later": "Not now",
-  "shell.relocate.failed": "Terminus could not be copied to Applications: {error}\n\nDrag it from the disk window to Applications."
+  "shell.relocate.failed": "Terminus could not be copied to Applications: {error}\n\nDrag it from the disk window to Applications.",
+  "shell.close.error": "Could not complete the exit. The client is still open. Check the error and try again.",
+  "shell.tray.unknown": "Terminus · task status unavailable",
+  "shell.service.managed": "An external service manages the engine. Check its configuration and status; Terminus will reconnect when it is available."
 }

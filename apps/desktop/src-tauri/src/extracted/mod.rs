@@ -2,6 +2,7 @@
 //! Sin argumentos usa el motor empaquetado, que se resuelve con la ventana ya abierta;
 //! una raíz de 0.2.74 pasa antes por el traspaso.
 mod appearance;
+mod background_service;
 mod desktop;
 mod engine;
 mod engine_profile;
@@ -19,6 +20,8 @@ mod placement;
 mod proxy;
 #[cfg(target_os = "macos")]
 mod relocate;
+#[cfg(any(target_os = "macos", test))]
+mod service_plan;
 mod sites;
 mod startup;
 mod tray;
@@ -29,6 +32,8 @@ use std::{path::PathBuf, sync::Arc};
 use tauri::{Emitter, Manager};
 use terminus_engine_client::Client;
 use terminus_engine_protocol::{Error, Result};
+
+pub use background_service::dispatch as background_dispatch;
 
 pub fn launch() -> Result<()> {
     let result = open();
@@ -201,6 +206,9 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
             }
             #[cfg(windows)]
             tray::register_notice_scheme();
+            if let Err(error) = tray::initialize(app.handle()) {
+                log::warn!("[tray] not initialized: {error}");
+            }
             launcher::start(app.handle().clone(), starting.clone());
             if let Some(listener) = listener {
                 let handle = app.handle().clone();
@@ -231,7 +239,6 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
         .plugin(log)
         .invoke_handler(proxy::with_desktop(tauri::generate_handler![
             desktop::request_close,
-            desktop::close_confirmed,
             tray::window_to_background,
             tray::tray_update,
             tray::quit_completely,
@@ -273,6 +280,19 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
         .build(context)
         .expect("tauri extracted client")
         .run(move |app, event| {
+            if let tauri::RunEvent::ExitRequested {
+                code: None,
+                ref api,
+                ..
+            } = event
+            {
+                api.prevent_exit();
+                desktop::request_quit(app);
+            }
+            #[cfg(target_os = "macos")]
+            if matches!(event, tauri::RunEvent::Reopen { .. }) {
+                tray::show_window(app);
+            }
             if matches!(event, tauri::RunEvent::Exit) {
                 instance::exiting();
                 placement::write(&placed_on_exit);

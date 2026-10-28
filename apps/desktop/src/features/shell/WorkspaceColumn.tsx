@@ -1,5 +1,4 @@
 import Plus from "lucide-solid/icons/plus";
-import UserPlus from "lucide-solid/icons/user-plus";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { t } from "../../lib/i18n";
@@ -283,9 +282,9 @@ export default function WorkspaceColumn(props: {
   };
 
   // Con uno solo no hay a dónde cambiar: crear el segundo vive en el menú del nombre (`TitleBar.tsx`).
-  // En la web siempre: es donde se agregan y se ven las otras cuentas de Danil.
+  // Cuenta también los de otras cuentas: una cuenta vacía no necesita columna.
   return (
-    <Show when={(ws.lista()?.length ?? 0) > 1 || !!accounts}>
+    <Show when={(ws.lista()?.length ?? 0) + others().reduce((total, account) => total + account.workspaces.length, 0) > 1}>
     <nav
       aria-label={t("shell.workspaces.label")}
       data-workspace-column=""
@@ -313,18 +312,6 @@ export default function WorkspaceColumn(props: {
             </>
           )}
         </For>
-        <Show when={accounts}>
-          <button
-            type="button"
-            data-add-account=""
-            class="mt-2 grid size-10 shrink-0 place-items-center rounded-lg text-neutral-500 outline-none hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            aria-label={t("shell.workspaces.add_account")}
-            title={t("shell.workspaces.add_account")}
-            onClick={() => accounts?.add()}
-          >
-            <UserPlus size={16} aria-hidden="true" />
-          </button>
-        </Show>
       </div>
     </nav>
     </Show>

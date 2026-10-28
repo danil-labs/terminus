@@ -8,6 +8,7 @@ import { boot, sleep } from "../helpers/jsdom-app.mjs";
 
 const SPACE = { id: "w", name: "W", context_root: null };
 const BASE = {
+  danil_sessions: Object.assign(new Error("command"), { detail: "command" }),
   window_ready: null,
   window_vitals: null,
   setup_required: false,

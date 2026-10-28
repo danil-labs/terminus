@@ -159,3 +159,35 @@ for (const machine of [null, "vm"]) {
     assert.equal(opened[0].machine, machine);
   });
 }
+
+test("un rechazo al enviar explica cómo seguir y conserva el error desplegable", async () => {
+  const app = await boot("listo", "chat-send-failure", responses({
+    load_session: ({ id }) => session(id, [USER]),
+    send_message: () => { throw { code: "worker_unavailable", message: "launch failed" }; },
+  }));
+  try {
+    await openTask(app, "t1");
+    const field = app.w.document.querySelector("textarea");
+    assert.ok(field);
+    field.value = "Continúa con el encargo";
+    field.dispatchEvent(new app.w.Event("input", { bubbles: true }));
+    field.closest("form").dispatchEvent(new app.w.Event("submit", { bubbles: true, cancelable: true }));
+    let alert;
+    for (let i = 0; i < 20; i++) {
+      await sleep(50);
+      alert = app.w.document.querySelector('[data-sender="system"][role="alert"]');
+      if (alert) break;
+    }
+    assert.ok(alert, "el rechazo debe mostrarse en el chat");
+    assert.match(alert.textContent, /launch failed/);
+    assert.match(alert.textContent, /soporte/);
+    assert.doesNotMatch(alert.textContent, /\[object Object\]/);
+    const detail = alert.querySelector("details");
+    assert.ok(detail, "el diagnóstico debe poder desplegarse");
+    assert.equal(detail.open, false);
+    assert.match(detail.textContent, /worker_unavailable/);
+    assert.deepEqual(app.fallos, []);
+  } finally {
+    app.w.close();
+  }
+});

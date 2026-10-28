@@ -18,8 +18,7 @@ import {
   createSpaceOrderSource,
   orderComputers,
   renameComputer,
-  screenProtocols,
-  screenUrl,
+  createScreenAccess,
   sessionProbe,
   startComputer,
   systemOf,
@@ -138,6 +137,7 @@ function rowLink(relay: RelaySession, row: () => string | undefined): Link {
 
 /** Another machine's slice changed: the window rereads just that. */
 function slicesChanged(changes: SliceChange[]) {
+  if (changes.includes("workspaces")) window.dispatchEvent(new CustomEvent("harness:workspace-name"));
   window.dispatchEvent(new CustomEvent("harness:machine-slices", { detail: { changes } }));
   if (changes.includes("attention")) window.dispatchEvent(new CustomEvent("harness:service-resync"));
 }
@@ -194,7 +194,10 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
     },
     onEvents: (machine, events, gap) => {
       if (events.length) router?.events(machine, events);
-      if (gap) window.dispatchEvent(new CustomEvent("harness:service-resync"));
+      if (gap) {
+        window.dispatchEvent(new CustomEvent("harness:service-resync"));
+        window.dispatchEvent(new CustomEvent("harness:service-gap"));
+      }
       // Renamed, linked or unlinked in the account's registry: the links of each machine may have changed too.
       if (events.some((e) => e.name === "workspace.changed")) relistSoon();
     },
@@ -234,6 +237,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
   };
   // A file dropped outside the chat would replace the page with it.
   for (const type of ["dragover", "drop"]) window.addEventListener(type, (e) => e.preventDefault());
+  const screens = createScreenAccess({ endpoint: base.endpoint, getToken: token, knows: (id) => !!fleet.info(id) });
   setCapabilities({
     spaceOrder: createSpaceOrderSource(base.endpoint, token),
     nativeWindow: false,
@@ -253,7 +257,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
       return id ? { id, name: fleet.name(id), local: false } : undefined;
     },
     remoteCreate: (workspace) => active.createsOn(workspace),
-    machineScreen: (id) => (fleet.info(id)?.wakes ? async () => new WebSocket(screenUrl(base.endpoint, id), screenProtocols(await token())) : null),
+    machineScreen: (id) => screens.opener(id),
     machineOnCreate: (workspace) =>
       several() ? (
         <Suspense fallback={null}>
@@ -264,6 +268,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
         </Suspense>
       ) : null,
     accountComputers: {
+      workspaces: async () => listWorkspaces(base.endpoint, await token()),
       list: async () => listComputers(base.endpoint, await token()),
       rename: async (id, name) => renameComputer(base.endpoint, await token(), id, name),
       outdated: (c) => machineCompatibility(c.contract) === "outdated",
