@@ -18,8 +18,7 @@ import {
   createSpaceOrderSource,
   orderComputers,
   renameComputer,
-  screenProtocols,
-  screenUrl,
+  createScreenAccess,
   sessionProbe,
   startComputer,
   systemOf,
@@ -234,6 +233,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
   };
   // A file dropped outside the chat would replace the page with it.
   for (const type of ["dragover", "drop"]) window.addEventListener(type, (e) => e.preventDefault());
+  const screens = createScreenAccess({ endpoint: base.endpoint, getToken: token, knows: (id) => !!fleet.info(id) });
   setCapabilities({
     spaceOrder: createSpaceOrderSource(base.endpoint, token),
     nativeWindow: false,
@@ -253,7 +253,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
       return id ? { id, name: fleet.name(id), local: false } : undefined;
     },
     remoteCreate: (workspace) => active.createsOn(workspace),
-    machineScreen: (id) => (fleet.info(id)?.wakes ? async () => new WebSocket(screenUrl(base.endpoint, id), screenProtocols(await token())) : null),
+    machineScreen: (id) => screens.opener(id),
     machineOnCreate: (workspace) =>
       several() ? (
         <Suspense fallback={null}>
@@ -264,6 +264,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
         </Suspense>
       ) : null,
     accountComputers: {
+      workspaces: async () => listWorkspaces(base.endpoint, await token()),
       list: async () => listComputers(base.endpoint, await token()),
       rename: async (id, name) => renameComputer(base.endpoint, await token(), id, name),
       outdated: (c) => machineCompatibility(c.contract) === "outdated",

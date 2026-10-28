@@ -1788,44 +1788,80 @@ if (!roto) {
     assert.ok(row("p"));
     assert.equal(sidebar.comandos.slice(beforeClose).some(c => ["request_close", "stop_turn", "delete_session"].includes(c)), false);
   }
-  // Cerrar la ventana pasa por CloseGuard: sin agentes cierra en el acto; con
-  // agentes pregunta, y «Detenerlas y salir» detiene cada turno antes de cerrar.
+  // Cerrar nunca cancela; salir usa el motor conectado y conserva el cliente ante errores.
   {
     let vivos = [];
+    let listError = false;
+    let stopError = false;
+    let stopScope;
     const cierre = await boot("listo", "cierre-con-vivos", {
       ...CON_TAREA,
-      list_live_turns: () => vivos,
+      list_live_turns: () => listError ? Promise.reject(new Error("list failed")) : vivos,
       pending_requests: () => ({ questions: [], permissions: [{ request_id: "r", tool: "Write", target: "hola.txt" }] }),
-      close_confirmed: null,
-      stop_turn: null,
+      stop_turn: (_args, options) => {
+        stopScope = options?.headers?.["x-terminus-workspace"];
+        return stopError ? Promise.reject(new Error("stop failed")) : null;
+      },
+      quit_completely: null,
       window_to_background: null,
       tray_update: null,
       tray_notify: null,
     });
+    cierre.w.localStorage.setItem("harness.layout.close.live_turns", JSON.stringify("stop"));
     cierre.emit("close-requested", null);
     await sleep(100);
-    assert.ok(cierre.comandos.includes("close_confirmed"), "sin agentes trabajando, cerrar no pregunta");
-    const antes = cierre.comandos.length;
+    assert.ok(cierre.comandos.includes("window_to_background"), "cerrar sin agentes conserva el cliente");
+    assert.equal(cierre.comandos.includes("quit_completely"), false);
     vivos = [{ session: "p", workspace: "otro", project: "q", started_at: Date.now() }];
+    const antes = cierre.comandos.length;
     cierre.emit("close-requested", null);
     await sleep(150);
-    const dialogo = cierre.w.document.querySelector("[data-close-guard]");
-    assert.ok(dialogo, "con agentes trabajando, cerrar pregunta");
-    assert.match(dialogo.textContent, /espera tu respuesta/);
-    assert.equal(cierre.comandos.slice(antes).includes("close_confirmed"), false);
-    [...dialogo.querySelectorAll("button")].find(b => b.textContent.includes("Detenerlas y salir")).click();
+    assert.equal(cierre.w.document.querySelector("[data-close-guard]"), null);
+    assert.ok(cierre.comandos.slice(antes).includes("window_to_background"));
+    assert.equal(cierre.comandos.slice(antes).includes("stop_turn"), false, "la preferencia antigua no cancela al cerrar");
+    cierre.emit("tray-quit", null);
+    cierre.emit("tray-quit", null);
     await sleep(150);
-    assert.ok(cierre.comandos.slice(antes).includes("stop_turn"));
-    assert.ok(cierre.comandos.slice(antes).includes("close_confirmed"));
-    // «Seguir en segundo plano» oculta la ventana con el icono; no la cierra.
-    const antesFondo = cierre.comandos.length;
-    cierre.emit("close-requested", null);
+    const dialogo = () => cierre.w.document.querySelector("[data-close-guard]");
+    const button = (text) => [...dialogo().querySelectorAll("button")].find(b => b.textContent.includes(text));
+    assert.ok(dialogo(), "salir explícitamente pregunta por las tareas del cliente");
+    assert.match(dialogo().textContent, /espera tu respuesta/);
+    assert.equal(cierre.comandos.includes("quit_completely"), false);
+    stopError = true;
+    button("Detenerlas y salir").click();
     await sleep(150);
-    [...cierre.w.document.querySelector("[data-close-guard]").querySelectorAll("button")].find(b => b.textContent.includes("Seguir en segundo plano")).click();
+    assert.equal(stopScope, "otro", "la parada conserva el workspace del turno");
+    assert.ok(dialogo());
+    assert.match(dialogo().textContent, /No se pudo completar la salida/);
+    assert.equal(cierre.comandos.includes("quit_completely"), false, "una parada fallida no cierra el cliente");
+    button("Cancelar").click();
+    listError = true;
+    const antesFallo = cierre.comandos.length;
+    cierre.emit("tray-quit", null);
     await sleep(150);
-    assert.ok(cierre.comandos.slice(antesFondo).includes("window_to_background"));
-    assert.equal(cierre.comandos.slice(antesFondo).includes("close_confirmed"), false);
+    assert.ok(dialogo(), "una consulta fallida se muestra dentro del diálogo");
+    assert.equal(cierre.comandos.slice(antesFallo).includes("quit_completely"), false);
+    button("Seguir en segundo plano").click();
+    await sleep(150);
+    assert.equal(dialogo(), null);
+    assert.ok(cierre.comandos.slice(antesFallo).includes("window_to_background"));
+    listError = false;
+    stopError = false;
+    cierre.emit("tray-quit", null);
+    await sleep(150);
+    button("Detenerlas y salir").click();
+    await sleep(150);
+    assert.equal(cierre.comandos.filter(c => c === "quit_completely").length, 1);
     assert.deepEqual(cierre.fallos, []);
+    cierre.w.close();
+    const idle = await boot("listo", "salir-sin-turnos", { ...CON_TAREA, tray_update: null, quit_completely: null });
+    idle.emit("tray-quit", null);
+    idle.emit("tray-quit", null);
+    await sleep(150);
+    assert.equal(idle.comandos.filter(c => c === "quit_completely").length, 1);
+    assert.equal(idle.comandos.includes("stop_turn"), false);
+    assert.deepEqual(idle.fallos, []);
+    idle.w.close();
   }
   // Abrir una tarea que ya contestaba con una herramienta en curso lanzaba
   // «Stale read from <Match>» en el hilo; Solid abortaba esa actualización

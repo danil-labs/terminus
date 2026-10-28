@@ -6,7 +6,7 @@ import { machineName, machineWakes } from "../machines/store";
 import { createSignal, type JSX, onCleanup, Show } from "solid-js";
 import { copyText } from "../../lib/clipboard";
 import { t } from "../../lib/i18n";
-import { capabilities } from "../../lib/platform";
+import { capabilities, machineScreen } from "../../lib/platform";
 import { cn } from "../../lib/utils";
 import { RETARDO_TOOLTIP, TooltipContent, TooltipRoot, TooltipTrigger } from "../../ui/Tooltip";
 
@@ -18,8 +18,9 @@ export type TaskLocationProps = {
   /** La carpeta de trabajo de la tarea (su worktree). */
   path?: string;
   branch?: string;
-  /** Abre la pantalla de esa máquina; el botón solo sale en una VM administrada encendida. */
+  /** Intenta abrir la pantalla de esa máquina cuando está encendida. */
   onScreen?: (machine: string) => void;
+  onFiles?: () => void;
 };
 
 const PARTE = "flex h-5.5 min-w-0 items-center gap-1.25 rounded-sm px-1.25 whitespace-nowrap";
@@ -47,8 +48,6 @@ export default function TaskLocation(props: TaskLocationProps) {
   const nombre = () => (props.machine ? machineName(props.machine) : (here()?.name ?? machineName("local")));
   const id = () => props.machine ?? here()?.id ?? "local";
   const wakes = () => machineWakes(id());
-  // En la web ninguna máquina es la de la ventana: `here().local` es falso. Solo decide el botón de pantalla.
-  const local = () => (props.machine ? !!here()?.local && props.machine === here()?.id : (here()?.local ?? true));
   const [copiada, setCopiada] = createSignal(false);
   let espera: ReturnType<typeof setTimeout> | undefined;
   onCleanup(() => clearTimeout(espera));
@@ -60,8 +59,9 @@ export default function TaskLocation(props: TaskLocationProps) {
     }).catch(() => {});
   };
   const pantalla = () => {
-    const m = props.machine;
-    return m && props.on && !local() && props.onScreen && capabilities().machineScreen?.(m) ? m : null;
+    const m = props.machine ?? here()?.id;
+    const open = machineScreen(m ?? "");
+    return m && props.on && props.onScreen && open ? m : null;
   };
   const Sep = () => <span aria-hidden="true" class="shrink-0 px-px text-neutral-500/60">/</span>;
 
@@ -89,7 +89,9 @@ export default function TaskLocation(props: TaskLocationProps) {
             <Sep />
             <Pista
               class="max-w-[35%] shrink font-medium text-neutral-700"
-              tip={<>{t("chat.location.project")}<Show when={props.path}>{(ruta) => <span class="block font-mono text-[0.6875rem] font-normal opacity-80">{ruta()}</span>}</Show></>}
+              onClick={props.onFiles}
+              label={props.onFiles ? t("shell.folder.view_on", { name: nombre() }) : undefined}
+              tip={<>{props.onFiles ? t("shell.folder.view_on", { name: nombre() }) : t("chat.location.project")}<Show when={props.path}>{(ruta) => <span class="block font-mono text-[0.6875rem] font-normal opacity-80">{ruta()}</span>}</Show></>}
             >
               <Folder size={13} aria-hidden="true" class="shrink-0" />
               <span data-task-location-project="" class="min-w-0 truncate">{proyecto()}</span>

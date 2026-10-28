@@ -117,10 +117,16 @@ impl State {
     /// Relanza el motor empaquetado tras un corte, o adopta el que otra ventana relanzó;
     /// como mucho tres veces en diez minutos.
     fn restart(&self) -> Result<(), Error> {
+        let mut restarts = self.restarts.lock().unwrap_or_else(|p| p.into_inner());
+        let current = self.client();
+        if super::engine_profile::managed(&current.selection().data_directory)? {
+            let client = super::engine::reconnect_managed(&current)?;
+            *self.client.write().unwrap_or_else(|p| p.into_inner()) = Arc::new(client);
+            return Ok(());
+        }
         if !self.autostart || !self.machine().local {
             return Err(Error::new("app_unavailable"));
         }
-        let mut restarts = self.restarts.lock().unwrap_or_else(|p| p.into_inner());
         restarts.retain(|at| at.elapsed() < Duration::from_secs(600));
         let mut last_failure = self
             .restart_failure
@@ -257,7 +263,6 @@ pub(super) fn desktop_command(name: &str) -> bool {
                 | "window_background"
                 | "update_install"
                 | "update_pending"
-                | "close_confirmed"
                 | "window_to_background"
                 | "tray_update"
                 | "quit_completely"
@@ -295,6 +300,9 @@ fn failure(error: &Error) -> Value {
         return json!({"what":{"clave":"shell.service.engine_missing"},"detail":error.detail});
     }
     let key = match error.code.as_str() {
+        "managed_service_unavailable" | "managed_profile_invalid" => {
+            super::util::Frase::new("shell.service.managed").0
+        }
         "service_busy" | "task_busy" => "shell.service.busy",
         "invalid_token" | "io" => "shell.service.unreachable",
         "version_mismatch" | "service_version" => "shell.service.version",
@@ -763,7 +771,14 @@ fn restarted(app: &tauri::AppHandle, state: &State, error: Error) -> Result<Valu
     }
     // Sin motor que relanzar (un antivirus puede apartarlo), el aviso dice eso y no «no responde».
     if let Err(restart) = state.restart() {
-        let shown = if restart.code == "engine_missing" {
+        let shown = if matches!(
+            restart.code.as_str(),
+            "engine_missing"
+                | "managed_service_unavailable"
+                | "managed_profile_invalid"
+                | "version_mismatch"
+                | "invalid_token"
+        ) {
             restart
         } else {
             error

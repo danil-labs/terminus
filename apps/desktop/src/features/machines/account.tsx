@@ -5,12 +5,13 @@
  * relay session that only adds its slice. With one session per account, it is
  * the account of the open workspace: its client token, its computers and its
  * registry; switching to a workspace of another account installs that one.
- * Without an account, or with no other computer, nothing is installed and the
- * window is exactly the local one. Loaded lazily from `app/main.tsx`.
+ * Without an account nothing is installed. With only this computer, its screen
+ * still opens through the relay. Loaded lazily from `app/main.tsx`.
  */
 import "../../web/phrases";
 import {
   type Computer,
+  createScreenAccess,
   linkedWorkspaces,
   listComputers,
   listWorkspaces,
@@ -19,8 +20,6 @@ import {
   machineContracts,
   orderComputers,
   RelaySession,
-  screenProtocols,
-  screenUrl,
   sessionProbe,
   startComputer,
   systemOf,
@@ -193,6 +192,11 @@ export function startAccountMachines(target: Target = window) {
     });
     fleet.setMachines(others.map(infoOf));
     fleet.subscribeEvents();
+    const screens = createScreenAccess({
+      endpoint,
+      getToken: async () => (await getToken()).token,
+      knows: (id) => id === self || !!fleet.info(id),
+    });
 
     const previous: Capabilities = capabilities();
     setCapabilities({
@@ -201,8 +205,7 @@ export function startAccountMachines(target: Target = window) {
       machineName: (id) => (id === self ? homeName() : fleet.name(id)),
       taskMachine: (id) => unwrap(id, fleet.remotes())?.machine ?? null,
       windowMachine: () => ({ id: self, name: homeName(), local: true }),
-      machineScreen: (id) =>
-        fleet.info(id)?.wakes ? async () => new WebSocket(screenUrl(endpoint, id), screenProtocols((await getToken()).token)) : null,
+      machineScreen: (id) => screens.opener(id),
       remoteCreate: (workspace) => {
         const target = router.createsOn(workspace);
         return target && target.machine !== self ? target : null;
@@ -248,6 +251,7 @@ export function startAccountMachines(target: Target = window) {
       fleet,
       router,
       restore: () => {
+        screens.close();
         setMachineRoute(null);
         window.removeEventListener("pagehide", onPageHide);
         setCapabilities(previous);
@@ -288,6 +292,7 @@ export function startAccountMachines(target: Target = window) {
     const who = await whoAmI();
     const self = who.self;
     if (who.account !== account) {
+      uninstall();
       account = who.account;
       token = null;
     }
@@ -314,12 +319,7 @@ export function startAccountMachines(target: Target = window) {
     homeOs = systemOf(mine?.os) ?? windowSystem();
     const others = orderComputers(answer.value.filter((c) => c.computer_id !== self));
     const key = JSON.stringify([self, account, client.endpoint]);
-    if (!others.length) {
-      uninstall();
-      setCapabilities({ ...capabilities(), spaceOrder: createSpaceOrderSource(client.endpoint, async () => (await getToken()).token) });
-      window.dispatchEvent(new CustomEvent("harness:sources"));
-      return;
-    }
+
     // The same account: machines that came, left or changed name are applied live, without tearing the rest down.
     if (installed?.key === key) {
       installed.fleet.setMachines(others.map(infoOf));

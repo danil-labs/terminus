@@ -160,7 +160,7 @@ import Sitio from "../features/sites/Site";
 import { claseDeFondo, VELO_DE_FONDO } from "../lib/chat-background";
 import { fondoDeChat, fondoPropio, imagenDelWorkspace, veloDeFondo } from "../lib/chat-background-store";
 import { copyText } from "../lib/clipboard";
-import { capabilities } from "../lib/platform";
+import { capabilities, openMachineScreen } from "../lib/platform";
 import { pedirElCampo } from "../lib/focus";
 import { lastRoster, rememberRoster } from "../lib/handlerRoster";
 import { aplicarLenguaDeWorkspace, clavesConocidas, t } from "../lib/i18n";
@@ -1924,7 +1924,23 @@ export default function App() {
   // Sin tarea abierta, el panel enseña la carpeta de trabajo del proyecto.
   const rutaDelPanel = () => folder() ?? carpetaDelProyecto() ?? null;
 
+  const maquinaDeLaCarpeta = () => {
+    const id = sessionId();
+    const lugar = projectList().find((p) => p.id === project());
+    return id
+      ? deLaTarea(id)?.headers["x-terminus-machine"] ?? maquinaDeLaVentana()
+      : runOn(workspaceActivo(), lugar) ?? (lugar?.machines?.includes(maquinaDeLaVentana()) ? maquinaDeLaVentana() : lugar?.machines?.[0] ?? maquinaDeLaVentana());
+  };
+  const carpetaLocal = () => capabilities().nativeWindow && maquinaDeLaCarpeta() === maquinaDeLaVentana();
+  const nombreDeAbrirCarpeta = () => carpetaLocal()
+    ? t("shell.folder.open")
+    : t("shell.folder.view_on", { name: machineName(maquinaDeLaCarpeta()) });
+
   function abrirCarpeta() {
+    if (!carpetaLocal()) {
+      setArtOpen(true);
+      return;
+    }
     const f = rutaDelPanel();
     if (f) void invoke("open_external", { target: f }).catch((e) => setError(prosaDe(e)));
   }
@@ -2467,7 +2483,7 @@ export default function App() {
         if (page.gap && vivas().length > 0) setError(t("chat.error.service_gap"));
         if (failingSince !== null) {
           failingSince = null;
-          if (error() === t("chat.error.service_unavailable") || error() === t("shell.service.engine_down") || error() === t("shell.service.engine_missing") || error() === t("shell.service.machine_off") || error() === t("shell.service.machine_starting")) setError(null);
+          if (error() === t("chat.error.service_unavailable") || error() === t("shell.service.engine_down") || error() === t("shell.service.engine_missing") || error() === t("shell.service.managed") || error() === t("shell.service.machine_off") || error() === t("shell.service.machine_starting")) setError(null);
         }
       } catch (e) {
         // Un sondeo suelto falla al empezar un turno y el siguiente ya contesta.
@@ -2476,11 +2492,12 @@ export default function App() {
         // Una máquina remota apagada no es un fallo: se enciende al enviar algo.
         const apagada = claveDe(e) === "shell.service.machine_off";
         const encendiendo = claveDe(e) === "shell.service.machine_starting";
-        const caido = sinMotor || apagada || encendiendo || claveDe(e) === "shell.service.engine_down";
+        const managed = claveDe(e) === "shell.service.managed";
+        const caido = sinMotor || managed || apagada || encendiendo || claveDe(e) === "shell.service.engine_down";
         // En la web la computadora en reposo tiene su indicador: no es un error.
         if ((apagada || encendiendo) && capabilities().computerStatus) return;
         if (!disposed && Date.now() - failingSince > (caido ? 2_000 : 10_000)) {
-          setError(sinMotor ? t("shell.service.engine_missing") : apagada ? t("shell.service.machine_off") : encendiendo ? t("shell.service.machine_starting") : t(caido ? "shell.service.engine_down" : "chat.error.service_unavailable"));
+          setError(sinMotor ? t("shell.service.engine_missing") : managed ? t("shell.service.managed") : apagada ? t("shell.service.machine_off") : encendiendo ? t("shell.service.machine_starting") : t(caido ? "shell.service.engine_down" : "chat.error.service_unavailable"));
         }
       } finally {
         if (!disposed) timer = setTimeout(() => void poll(), pushed ? 0 : 250);
@@ -4608,7 +4625,7 @@ export default function App() {
     pestanas.openObservability(t("observability.tab"));
   }
 
-  /** La pantalla de una VM, en una ventana al lado de la conversación: se mira mientras se trabaja. */
+  /** La pantalla de una computadora, en una ventana al lado de la conversación. */
   function abrirPantalla(machine: string) {
     const id = screenTabId(machine);
     const nueva = !pestanas.open().some((p) => p.id === id);
@@ -6832,6 +6849,10 @@ export default function App() {
             machine={filaDe(id())?.machine}
             on={!apagadas()[id()] && filaDe(id())?.machine_on !== false}
             onScreen={abrirPantalla}
+            onFiles={() => {
+              const folder = proyectoDeLaCelda()?.id;
+              if (folder) void abrirSesion(folder, id()).then(() => setArtOpen(true));
+            }}
             project={proyectoDeLaCelda()?.name}
             path={estadoDelTrabajo()?.path || undefined}
             branch={workLabel(estadoDelTrabajo()?.branch, estadoDelTrabajo()?.alias) || undefined} /></Suspense>;
@@ -7831,14 +7852,13 @@ export default function App() {
 
       <For each={pestanas.open().filter((p): p is ScreenTab => p.clase === "pantalla")}>
         {(p) => {
-          const open = capabilities().machineScreen?.(p.machine);
           return (
             <div
               class="min-h-0 min-w-0"
               classList={{ hidden: celdaDe(p.id) === undefined || tapadoPorElProyecto(paneles.siteOf(p.id)), "pt-8": llevaTiraInterior(paneles.siteOf(p.id)) }}
               style={celdaDe(p.id)}
             >
-              <Show when={open}>{(abrir) => <Suspense fallback={null}><Screen open={abrir()} /></Suspense>}</Show>
+              <Suspense fallback={null}><Screen open={() => openMachineScreen(p.machine)} /></Suspense>
             </div>
           );
         }}
@@ -8214,10 +8234,10 @@ export default function App() {
                     variant="ghost"
                     size="icon"
                     class="size-7 shrink-0 text-neutral-500"
-                    disabled={!rutaDelPanel()}
+                    disabled={carpetaLocal() ? !rutaDelPanel() : !columnaConContenido()}
                     onClick={abrirCarpeta}
-                    aria-label={t("shell.folder.open")}
-                    title={t("shell.folder.open")}
+                    aria-label={nombreDeAbrirCarpeta()}
+                    title={nombreDeAbrirCarpeta()}
                   >
                     <FolderOpen size={16} />
                   </Button>
