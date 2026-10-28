@@ -328,8 +328,12 @@ test("«Ejecutar en» disables, with the reason, a machine that cannot make the 
   assert.equal(calls("cmp_old", "send_message").length, 0, "and never got the task");
   assert.deepEqual((await invoke("machine_list")).find((m) => m.id === "cmp_old"), { id: "cmp_old", local: false, active: false, on: true, hosts: false, materializes: false, wakes: true });
 
+  doc.querySelector('[aria-label="Ejecutar en"]').click();
+  assert.ok(await until(() => doc.querySelector('[data-machine-option="cmp_mac"]')), "the machine picker opens");
+  doc.querySelector('[data-machine-option="cmp_mac"]').click();
+  await sleep(300);
   doc.querySelector('[aria-label="Proyecto"]').click();
-  assert.ok(await until(() => [...doc.querySelectorAll("button")].some((b) => b.textContent.includes("Notas") && b.textContent.includes("tarea"))), "the project picker opens");
+  assert.ok(await until(() => [...doc.querySelectorAll("button")].some((b) => b.textContent.includes("Notas") && b.textContent.includes("tarea"))), "the project picker opens with that machine's folders");
   [...doc.querySelectorAll("button")].find((b) => b.textContent.includes("Notas") && b.textContent.includes("tarea")).click();
   await sleep(300);
   doc.querySelector('[aria-label="Ejecutar en"]').click();

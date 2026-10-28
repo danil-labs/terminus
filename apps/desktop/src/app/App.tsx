@@ -105,7 +105,7 @@ import ArchivedTasks from "../features/projects/ArchivedTasks";
 import BaseBranchPicker from "../features/projects/BaseBranchPicker";
 import { watchHandlerStatus, watchHandlerStatuses } from "../features/projects/handlerPresence";
 import { EmptyContext, ProjectPicker } from "../features/projects/Projects";
-import { bringHereLabel, canBringHere, carryOrigin, machineName, machineOf, machines, refetchMachines, runOn, runOnOptions, setRunOn, setTaskRowMachine } from "../features/machines/store";
+import { bringHereLabel, canBringHere, carryOrigin, machineName, machineOf, machines, refetchMachines, runOn, setRunOn, setTaskRowMachine } from "../features/machines/store";
 import type { CarriedBase, CarryCheck } from "../features/machines/carry";
 // Chunk aparte: solo lo carga quien crea una tarea, no la carga inicial.
 const MachinePicker = lazy(() =>
@@ -374,6 +374,34 @@ export default function App() {
   const setProjectList = (next: Project[]) => setProjectRows((previous) => conservar(previous, next, (p) => p.id));
   createEffect(() => recordarCarpetas(projectList()));
   const [sources, setSources] = createSignal<Source[]>([]);
+  const [draftProjects, setDraftProjects] = createSignal<{ workspace: string; machine: string; rows: Project[] } | null>(null);
+  const draftMachine = () => runOn(workspaceActivo()) ?? machines().find(m => m.active)?.id ?? null;
+  const draftOptions = () => {
+    const machine = draftMachine();
+    return machine ? { headers: { "x-terminus-machine": machine } } : undefined;
+  };
+  const composerProjects = createMemo(() => {
+    const machine = draftMachine();
+    if (!machine) return projectList();
+    if (machines().find(m => m.id === machine)?.local) return projectList().filter(p => !p.machines || p.machines.includes(machine));
+    const found = draftProjects();
+    return found?.machine === machine && found.workspace === workspaceActivo() ? found.rows : [];
+  });
+  createEffect(on([workspaceActivo, draftMachine, projectList], ([workspace, machine]) => {
+    setDraftProjects(previous => previous?.workspace === workspace && previous.machine === machine ? previous : null);
+    if (!workspace || !machine || machines().find(m => m.id === machine)?.local) return;
+    let current = true;
+    onCleanup(() => { current = false; });
+    void invoke<Project[]>("list_projects", {}, { headers: { "x-terminus-machine": machine } }).then(rows => {
+      if (current) setDraftProjects({ workspace, machine, rows: rows.map(row => ({
+        ...row, machines: projectList().find(p => p.id === row.id)?.machines ?? [machine],
+      })) });
+    }).catch(e => { if (current) setError(prosaDe(e)); });
+  }));
+  createEffect(on(draftMachine, (machine, before) => {
+    if (before !== undefined && machine !== before) setDraftBases({});
+  }));
+
   const [taskSources, setTaskSources] = createSignal<Source[] | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   // Por qué esta ventana no puede abrir estos datos, si es que no puede: una
@@ -1903,7 +1931,7 @@ export default function App() {
   /** Los bytes ya están en la ventana: van directo a la máquina del turno, sin pasar por la miniatura de 4 MB. */
   async function pegarImagen(mime: string, datos: string): Promise<string> {
     const abierta = sessionId();
-    const opciones = abierta ? deLaTarea(abierta) : runOnOptions(workspaceActivo(), projectList().find((p) => p.id === project()));
+    const opciones = abierta ? deLaTarea(abierta) : draftOptions();
     const ruta = await invoke<string>("guardar_imagen_pegada", { mime, datos }, opciones);
     const machine = opciones?.headers["x-terminus-machine"];
     if (machine) pegadasEn.set(ruta, machine);
@@ -3410,7 +3438,7 @@ export default function App() {
       ponerTerminal("", { id: "", command: command.trim(), cwd: null, output: "", truncated: false, desde: Date.now() });
     });
     try {
-      const enOtra = runOnOptions(workspaceActivo(), projectList().find((p) => p.id === proyecto));
+      const enOtra = draftOptions();
       const corrida = await invoke<Corrida>("run_shell_command", {
         project: proyecto,
         session: null,
@@ -3723,7 +3751,7 @@ export default function App() {
     const active = machines().find((m) => m.active)?.id ?? null;
     return id
       ? machineOf(id)?.headers["x-terminus-machine"] ?? active
-      : runOn(workspaceActivo(), projectList().find((p) => p.id === project())) ?? active;
+      : draftMachine();
   });
   const composerOptions = () => {
     const machine = composerMachine();
@@ -4974,7 +5002,7 @@ export default function App() {
     const row = sid ? filaDe(sid) : null;
     const named = sid ? machines().find((m) => sid.startsWith(`${m.id}~`))?.id : null;
     if (sid && !row && !named) return undefined;
-    const chosen = sid ? undefined : runOnOptions(workspaceActivo(), projectList().find((p) => p.id === project()));
+    const chosen = sid ? undefined : draftOptions();
     const machine = row?.machine ?? named ?? machines().find((m) => m.local || m.active)?.id;
     return chosen ?? (machine ? { headers: { "x-terminus-machine": machine } } : undefined);
   }
@@ -5150,9 +5178,8 @@ export default function App() {
   async function crearEnTareaVacia(tipo: Tipo, ruta: string) {
     const proyecto = project();
     const claveBorrador = claveAbierta();
-    const lugar = projectList().find((p) => p.id === proyecto);
     // La tarea nace en la máquina elegida, y lo que se crea dentro va a la misma.
-    const enSuMaquina = runOnOptions(workspaceActivo(), lugar);
+    const enSuMaquina = draftOptions();
     const { session } = await invoke<{ session: string; folder: string }>("create_empty_session", {
       provider: agent(),
       project: proyecto,
@@ -5584,6 +5611,7 @@ export default function App() {
     // una tarea nueva lo recibe al volver de Rust, más abajo.
     const generation = sessionGeneration;
     const abierta = destination?.session ?? sessionId();
+    const creationOptions = abierta ? undefined : draftOptions();
     if (abierta) advanceTurn(abierta);
     else lifecycleRevision++;
     const start = Symbol();
@@ -5654,8 +5682,7 @@ export default function App() {
     const dormida = abierta ? apagadas()[abierta] ?? null : null;
     if (abierta && dormida) anotar(setEncendiendo, abierta, dormida);
     // Y crear en la elegida en «Ejecutar en» si está apagada: el aviso cuelga de la pestaña que nace.
-    const lugar = projectList().find((p) => p.id === proyecto);
-    const destino = abierta ? null : runOn(workspaceActivo(), lugar);
+    const destino = creationOptions?.headers["x-terminus-machine"] ?? null;
     const naceDormida = destino && machines().find((x) => x.id === destino)?.on === false ? destino : null;
     if (provisional && naceDormida) anotar(setEncendiendo, provisional, naceDormida);
     try {
@@ -5663,7 +5690,7 @@ export default function App() {
       if (llevar && !llevado) throw CARRY_STOPPED;
       // La respuesta de una persona no existe en la interfaz hasta que Rust la
       // validó y la escribió: primero persistir, y solo entonces pintarla.
-      const opciones = abierta ? deLaTarea(abierta) : llevado ? { headers: { "x-terminus-machine": llevado.target } } : runOnOptions(workspaceActivo(), lugar);
+      const opciones = abierta ? deLaTarea(abierta) : llevado ? { headers: { "x-terminus-machine": llevado.target } } : creationOptions;
       const attachments = await attachmentsFor(m.attachments, opciones, proyecto);
       const id = await invoke<string>("send_message", {
         provider: m.provider,
@@ -6096,9 +6123,9 @@ export default function App() {
     if (carryModule()?.carries()[draftKey]) return "plan";
     if (sinTrabajo.delete(draftKey)) return "none";
     const workspace = workspaceActivo();
-    const proyecto = projectList().find((p) => p.id === project());
+    const proyecto = composerProjects().find((p) => p.id === project());
     // En la web la máquina de la tarea nueva puede ser la que lleva el workspace, sin elegir ninguna.
-    const target = runOn(workspace, proyecto) ?? capabilities().remoteCreate?.(workspace)?.machine ?? null;
+    const target = draftMachine();
     if (!workspace || !proyecto || !target || proyecto.kind !== "git") return "none";
     if (decidiendoLlevar) return "busy";
     decidiendoLlevar = true;
@@ -6483,7 +6510,7 @@ export default function App() {
         <ProjectPicker
           branch={props.branch}
           locked={props.locked}
-          projects={projectList()}
+          projects={props.nueva ? composerProjects() : projectList()}
           project={project()}
           sources={sources()}
           onPick={elegirProyecto}
@@ -6494,7 +6521,7 @@ export default function App() {
             <Show when={props.nueva && !props.locked}>
               {/* Su propio límite: mientras carga, el resto de la vista sigue. */}
               <Suspense fallback={null}>
-                <MachinePicker workspace={workspaceActivo()} project={projectList().find((p) => p.id === project())} />
+                <MachinePicker workspace={workspaceActivo()} project={composerProjects().find((p) => p.id === project())} />
               </Suspense>
             </Show>
           }
@@ -6564,7 +6591,7 @@ export default function App() {
     // Un ternario en la prop crea un memo en cada lectura, y la que llega fuera de un dueño no se suelta nunca.
     const esperandoAqui = () => !pp.soloLectura && esperando();
     const proyectoDeLaCelda = () =>
-      projectList().find((p) => p.id === (pp.proyecto ?? project()));
+      (pp.sesion ? projectList() : composerProjects()).find((p) => p.id === (pp.proyecto ?? project()));
     const [estadoDelTrabajo, { refetch: refreshWork }] = createTaskWork(() => pp.sesion
       ? { project: proyectoDeLaCelda()?.id ?? "", id: pp.sesion }
       : undefined);
@@ -6910,6 +6937,7 @@ export default function App() {
             <Show when={!pp.sesion && esRepositorio()}>
               <BaseBranchPicker
                 project={project()}
+                machine={draftMachine()}
                 directory={carpetaDeTrabajo(proyectoDeLaCelda() ?? {})}
                 value={draftBases()[claveAbierta()]}
                 disabled={busy()}
