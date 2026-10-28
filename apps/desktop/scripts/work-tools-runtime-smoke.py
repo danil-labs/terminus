@@ -53,13 +53,14 @@ def main():
 
             def invoke(command, arguments=None, workspace=None):
                 key = str(uuid.uuid4())
-                deadline = time.monotonic() + 600
+                timeout = 900 if command == "install_tool" and (arguments or {}).get("tool") == "browser-navigation" else 180
+                deadline = time.monotonic() + max(600, timeout)
                 while time.monotonic() < deadline:
                     request = {"version": 1, "token": Path(endpoint["token_file"]).read_text(),
                                "command": "service invoke", "args": {"command": command, "arguments": arguments or {}},
                                "workspace": workspace, "folder": None, "request_id": key}
                     address, port = endpoint["address"].rsplit(":", 1)
-                    with socket.create_connection((address, int(port)), timeout=180) as connection:
+                    with socket.create_connection((address, int(port)), timeout=timeout) as connection:
                         connection.sendall(json.dumps(request).encode() + b"\n")
                         reply = json.loads(connection.makefile("rb").readline(16 * 1024 * 1024))
                     if reply.get("error"):
