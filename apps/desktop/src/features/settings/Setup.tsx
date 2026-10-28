@@ -539,7 +539,7 @@ export default function Setup(props: { children: JSX.Element }) {
     quiere: quiereEsta(s.name),
     detalle: detalle(s),
     version: version(s.name),
-    removable: reporte()?.items.find((r) => r.id === s.name)?.source !== ORIGEN_BUNDLE,
+    removable: reporte()?.items.find((r) => r.id === s.name)?.manager === "tool",
     descripcion: CON_DESCRIPCION.has(s.name) ? t(`setup.optional.about.${s.name}`) : "",
   });
 
@@ -644,7 +644,7 @@ export default function Setup(props: { children: JSX.Element }) {
 
   /** La basura quita la copia que instaló Terminus; la del sistema no se toca. */
   async function desinstalar(name: string) {
-    if (reporte()?.items.find((r) => r.id === name)?.source === ORIGEN_BUNDLE) return;
+    if (reporte()?.items.find((r) => r.id === name)?.manager !== "tool") return;
     ponerSuelto(name, "bye");
     try {
       await invoke("remove_tool", { tool: name });
