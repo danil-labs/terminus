@@ -40,6 +40,7 @@ function local(calls, extra = {}) {
     window_ready: null,
     window_vitals: null,
     setup_required: false,
+    danil_sessions: () => Promise.reject(Object.assign(new Error("command"), { detail: "command" })),
     list_providers: [{ id: "codex", label: "Codex", available: true, driver: true }],
     list_workspaces: { workspaces: [SAME], active: "w" },
     workspaces_startup: { workspaces: [SAME], active: "w" },

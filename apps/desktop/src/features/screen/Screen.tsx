@@ -1,10 +1,11 @@
-import { SCREEN_CONTROL_DESKTOP, screenEnd, type ScreenEnd } from "@terminus/computers";
+import { SCREEN_CONTROL_DESKTOP } from "@terminus/computers";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { t } from "../../lib/i18n";
 import { Button } from "../../ui/Button";
+import { screenConnection, type Phase } from "./connection";
 import { screenInput } from "./input";
 
-type Phase = "connecting" | "live" | ScreenEnd | "failed";
+type InputViewer = { viewOnly: boolean };
 
 const MESSAGE: Record<Exclude<Phase, "connecting" | "live">, () => string> = {
   offline: () => t("screen.offline"),
@@ -20,70 +21,38 @@ export default function Screen(props: { open: () => Promise<WebSocket> }) {
   const [controllable, setControllable] = createSignal(false);
   const [controlling, setControlling] = createSignal(false);
   let target!: HTMLDivElement;
-  let input: ReturnType<typeof screenInput> | null = null;
-  let rfb: { viewOnly: boolean; disconnect(): void } | null = null;
-  let attempt = 0;
-
-  const stop = () => {
-    input?.dispose();
-    input = null;
-    const current = rfb;
-    rfb = null;
-    current?.disconnect();
-    target?.replaceChildren();
-  };
-
-  const connect = async () => {
-    const mine = ++attempt;
-    stop();
-    setPhase("connecting");
-    setControllable(false);
-    setControlling(false);
-    try {
-      const [{ default: RFB }, socket] = await Promise.all([import("@novnc/novnc"), props.open()]);
-      if (mine !== attempt) return socket.close();
-      let live = false;
-      let code = 1000;
-      socket.addEventListener("close", (e) => {
-        code = e.code;
-      });
-      const view = new RFB(target, socket, { shared: true });
-      view.viewOnly = true;
-      view.scaleViewport = true;
-      view.background = "transparent";
-      input = screenInput(target);
-      view.addEventListener("desktopname", (event) => {
-        if (mine !== attempt) return;
-        // Los motores anteriores mantienen su visor de solo lectura.
-        const supported = (event as CustomEvent<{ name: string }>).detail.name === SCREEN_CONTROL_DESKTOP;
-        input?.release();
-        view.viewOnly = !supported;
-        setControllable(supported);
-        setControlling(supported);
-      });
-      view.addEventListener("connect", () => {
-        live = true;
-        if (mine === attempt) setPhase("live");
-      });
-      view.addEventListener("disconnect", () => {
-        if (mine !== attempt) return;
-        input?.dispose();
-        input = null;
-        rfb = null;
-        setControlling(false);
-        setPhase(live ? "ended" : screenEnd(code));
-      });
-      rfb = view;
-    } catch {
-      if (mine === attempt) setPhase("failed");
-    }
-  };
-
-  onMount(() => void connect());
-  onCleanup(() => {
-    attempt++;
-    stop();
+  let rfb: InputViewer | undefined;
+  let input: ReturnType<typeof screenInput> | undefined;
+  let connection: ReturnType<typeof screenConnection> | undefined;
+  onMount(() => {
+    connection = screenConnection({
+      target, open: () => props.open(), load: () => import("@novnc/novnc"), phase: setPhase,
+      configure(view) {
+        rfb = view;
+        const controls = screenInput(target);
+        input = controls;
+        const named = (event: Event) => {
+          // Los motores anteriores mantienen su visor de solo lectura.
+          const supported = (event as CustomEvent<{ name: string }>).detail.name === SCREEN_CONTROL_DESKTOP;
+          controls.release();
+          view.viewOnly = !supported;
+          setControllable(supported);
+          setControlling(supported);
+        };
+        view.addEventListener("desktopname", named);
+        return () => {
+          view.removeEventListener("desktopname", named);
+          controls.dispose();
+          rfb = undefined;
+          input = undefined;
+          setControllable(false);
+          setControlling(false);
+        };
+      },
+    });
+    void connection.connect();
   });
+  onCleanup(() => connection?.disconnect());
 
   const toggleControl = () => {
     if (!rfb || !controllable() || phase() !== "live") return;
@@ -106,7 +75,7 @@ export default function Screen(props: { open: () => Promise<WebSocket> }) {
             {controlling() ? t("screen.control_active") : t("screen.view_only")}
           </span>
           <Show when={controllable()} fallback={<span class="text-xs text-neutral-500">{t("screen.control_unavailable")}</span>}>
-            <Button size="compact" variant="outline" aria-pressed={controlling()} onClick={toggleControl}>
+            <Button size="compact" variant="outline" onClick={toggleControl}>
               {controlling() ? t("screen.stop_control") : t("screen.start_control")}
             </Button>
           </Show>
@@ -119,7 +88,7 @@ export default function Screen(props: { open: () => Promise<WebSocket> }) {
             {(key) => (
               <>
                 <p role="alert" class="max-w-sm text-sm text-neutral-700">{key()()}</p>
-                <Button size="sm" variant="outline" onClick={() => void connect()}>{t("screen.retry")}</Button>
+                <Button size="sm" variant="outline" onClick={() => void connection?.connect()}>{t("screen.retry")}</Button>
               </>
             )}
           </Show>

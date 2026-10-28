@@ -26,25 +26,59 @@ import {
  */
 export function createDanilAccounts(options: { workspace?: (() => string | null | undefined) | "active" } = {}) {
   const [sessions, setSessions] = createSignal<DanilSessionInfo[] | null | undefined>(undefined);
+  const [loadFailed, setLoadFailed] = createSignal(false);
+  const [workspaceOf, setWorkspaceOf] = createSignal<string | null | undefined>();
+  const [loadingOf, setLoadingOf] = createSignal(true);
   const [of, setOf] = createSignal<WorkspaceAccount | null>(null);
   const [busy, setBusy] = createSignal(false);
   /** El código del último fallo; quien pinta lo traduce. */
   const [problem, setProblem] = createSignal<string | null>(null);
   const reading = options.workspace;
   let turn = 0;
+  let previous: string | null | undefined;
 
   async function readOf() {
     if (!reading || sessions() === null) return;
     const mine = ++turn;
     const workspace = reading === "active" ? undefined : reading();
-    if (reading !== "active" && !workspace) return setOf(null);
-    const next = await readWorkspaceAccount(workspace);
-    if (mine === turn) setOf(next);
+    if (previous !== workspace) setProblem(null);
+    if (previous !== workspace || of() === null) {
+      setLoadingOf(true);
+      setOf(null);
+    }
+    previous = workspace;
+    if (reading !== "active" && !workspace) {
+      setWorkspaceOf(workspace);
+      setLoadingOf(false);
+      return;
+    }
+    try {
+      const next = await readWorkspaceAccount(workspace);
+      if (mine === turn) setOf(next);
+    } catch (e) {
+      if (mine === turn) {
+        setOf(null);
+        setProblem(failureCode(e) ?? "failed");
+      }
+    } finally {
+      if (mine === turn) {
+        setWorkspaceOf(workspace);
+        setLoadingOf(false);
+      }
+    }
   }
 
   async function reload() {
-    setSessions(await readSessions());
-    await readOf();
+    setLoadFailed(false);
+    try {
+      setSessions(await readSessions());
+      await readOf();
+    } catch (e) {
+      setSessions(undefined);
+      setOf(null);
+      setLoadFailed(true);
+      setProblem(failureCode(e) ?? "failed");
+    }
   }
 
   onMount(() => {
@@ -83,6 +117,9 @@ export function createDanilAccounts(options: { workspace?: (() => string | null 
 
   return {
     sessions,
+    loadingOf,
+    workspaceOf,
+    loadFailed,
     connected: () => connectedSessions(sessions()),
     pending: () => pendingSession(sessions()),
     of,

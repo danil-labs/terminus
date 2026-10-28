@@ -194,7 +194,13 @@ which root to use without a window:
 - Other profiles (`host` from `install.sh`, `vm` from `remote-host`) and
   unknown fields are kept. Only `desktop` takes `default`, and only when it is
   missing or names a profile that does not exist.
-- A file of another `version` or that is not JSON is left as it is.
+- A file of another `version` or that is not JSON is left as it is. Connecting
+  fails closed while its service authority cannot be resolved.
+- Any profile with `managed: true` or a service command string and the same canonical data root gives
+  process ownership to its supervisor, even when it is not `default`. The
+  window preserves that profile and does not overwrite an alias of its root.
+  Missing/null/false means unmanaged, as in the CLI; malformed profiles block
+  connection and publication while their authority cannot be resolved.
 - The write is atomic (temporary file and rename) under
   `locks/engine.json.lock`, and only when the profile changed.
 
@@ -308,14 +314,93 @@ failed poll. `service stream start/read/cancel`
 carries `clone_project`, `list_session_git` and `watch_task_tree`; the window
 rebuilds only the Tauri `Channel`.
 
-Closing the window leaves the engine running; it stops after five minutes
-without clients or turns. Restarting the engine requires a new selection. A
-window that started without arguments does that on its own: when `service_poll`
-finds no engine, it runs the same search-or-start as at startup (at most three
-times in ten minutes), swaps the client and answers `reset: true` so the front
-resynchronizes. A window whose selection changed under it, because another
-window already restarted the engine, takes the same path and adopts that engine.
-Reusing an engine leaves `selection.json` untouched when its content is the same. Otherwise it shows `shell.service.engine_down`.
+Closing the window hides it and keeps the client running in the background,
+including before the front mounts. A persistent tray icon opens the window,
+shows live tasks or an unknown status when the read fails, and offers explicit
+exit. macOS also handles Dock/Reopen. Repeated close requests never stop tasks;
+the saved `close.live_turns` preference is retained and ignored.
+
+Explicit exit uses the connected client's native transport, independently of
+the visible workspace or machine. With live turns it offers cancel, background,
+or stop and quit. Failed listing or cancellation leaves the client open and
+shows the error inside the dialog. Exit closes the client without stopping its
+engine. Before the front is ready, explicit exit only detaches the client.
+
+The engine retains its own lifecycle. A normal engine can stop after five
+minutes without clients or work; that timeout never cancels active turns. The
+resident mode implemented separately in seldon-host is opt-in and observable
+as `status.resident`; an absent field does not establish residency. A hidden
+window is not an installed or supervised service.
+
+For a root declared `managed`, the window waits up to five minutes for a
+compatible private descriptor. It never launches, stops, retires, force-updates
+or adopts that engine. Incompatibility and invalid service configuration are
+errors. After an external restart it validates the new descriptor, credential,
+contract and runtime, rebuilds its client selection and returns `reset: true`
+to resynchronize. It does not replay uncertain mutations. Reconnection does not
+consume the launch retry budget.
+
+For an unmanaged root, a window started without arguments uses the same
+search-or-start after engine loss, at most three times in ten minutes. Reusing
+an engine leaves `selection.json` untouched when its content is the same.
+External selections reconnect only when their exact data root is explicitly
+managed; otherwise their existing external lifecycle remains in charge.
+
+## Preparación del servicio de macOS sin ventana
+
+El mismo ejecutable firmado admite `--background-host` antes de inicializar
+Tauri o reenviar comandos al CLI. Es un wrapper en primer plano para launchd:
+lanza un solo hijo sin detach, entrega la maestra existente mediante un pipe
+privado y permanece hasta recogerlo. No consulta ni crea otra identidad.
+
+Este recorrido exige la instalación firmada en `/Applications` o
+`~/Applications`, la identidad `ai.danil.terminus` y su raíz de datos ya
+existente y privada. Resuelve el home por UID, sin usar `HOME`, `XDG_CONFIG_HOME`
+ni variables de laboratorio heredadas para elegir la raíz. La configuración
+activa `~/.config/terminus/engine.json` debe declarar `managed` para esa raíz y
+coincidir en identidad, binario, SHA-256 y recursos. Un motor ya vivo conserva
+su autoridad: el wrapper no lo detiene, adopta ni reemplaza.
+
+Antes de leer la maestra del llavero, verifica su propia firma, la firma del
+motor instalado, los metadatos estáticos de `agent-context --json` y la firma
+dinámica del PID realmente lanzado con el requisito completo del motor. El
+llavero se consulta sin interacción y solo para una maestra existente. El hijo
+exige `--resident --require-master-fd --expected-contract <hash>` y rechaza
+contratos distintos antes de leer el pipe o escribir datos. No hay fallback al
+llavero ni adopción en ese modo. El descriptor y `status` deben acreditar al
+hijo propio y la residencia dentro de cinco minutos; si no, el wrapper termina
+y recoge únicamente ese hijo. Las señales se reenvían al hijo, con plazo de
+cierre de treinta segundos antes de terminarlo.
+
+`--prepare-background-host <directorio-absoluto-nuevo>` valida estos requisitos
+y escribe **solo en ese directorio** un `engine.json` propuesto y
+`ai.danil.terminus.background-host.plist`. Conserva los otros perfiles y campos
+desconocidos; rechaza autoridades administradas en conflicto. No escribe la
+configuración real, no copia nada a `Library/LaunchAgents`, no cambia bundles y
+no ejecuta `launchctl`. Tampoco obtiene la maestra durante la preparación.
+
+El plist propuesto es un LaunchAgent de la sesión Aqua del usuario:
+`RunAtLoad=true`, `KeepAlive.SuccessfulExit=false`, `ThrottleInterval=30`,
+`ExitTimeOut=45` y `AbandonProcessGroup=false`. Una parada normal conserva
+salida cero; un fallo permite relanzamiento. El motor estricto anuncia
+`safe_maintenance_restart_v1`; `service stop` con `restart:true` solo se acepta
+sin trabajo activo y devuelve 75 después de la limpieza. El wrapper propaga ese
+código. No solicita mantenimiento automáticamente ni modifica el updater.
+
+La instalación y activación siguen fuera de este incremento. Requieren una
+composición con contratos compatibles, QA firmado nativo de llavero, pipes,
+launchd y continuidad sin ventana, y coordinación de actualización del bundle,
+su huella y supervisor. Este LaunchAgent no promete servicio antes de iniciar
+sesión ni después de cerrarla. La integración permanente mediante
+[SMAppService](https://developer.apple.com/documentation/servicemanagement/smappservice)
+queda pendiente; la semántica del plist sigue el
+[manual de launchd](https://github.com/apple-oss-distributions/launchd/blob/main/man/launchd.plist.5).
+
+This change does not install or activate services. Production macOS activation
+still requires the same existing root, identity, authority and vault; a signed
+launcher must deliver the master through a private pipe on every independent
+restart, without a new master or interactive fallback. Native signatures,
+keychain access, menu-bar status, CmdQ and reopen require macOS QA.
 
 ## Stream empujado
 

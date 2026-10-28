@@ -123,6 +123,12 @@ export function Composer({
   const [sheet, setSheet] = useState<"model" | "mode" | "attach" | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const draining = useRef(false);
+  const claimedQueue = useRef(new Set<string>());
+  const [injecting, setInjecting] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    const ids = new Set(queue.map((item) => item.id));
+    for (const id of claimedQueue.current) if (!ids.has(id)) claimedQueue.current.delete(id);
+  }, [queue]);
   // Dos retornos seguidos llegan antes de que el cuadro se vacíe: el segundo no manda ni encola el mismo texto.
   const sending = useRef(false);
   const taken = useRef<string | null>(null);
@@ -182,14 +188,15 @@ export function Composer({
 
   // Termina el turno: sale el primero de la cola, como la ventana.
   useEffect(() => {
-    if (running || !queue.length || draining.current) return;
-    const [next, ...rest] = queue;
+    if (running || !queue.length || draining.current || claimedQueue.current.has(queue[0].id)) return;
+    const [next] = queue;
     draining.current = true;
+    claimedQueue.current.add(next.id);
     void submit(next.text, next.attachments).then((ok) => {
-      if (ok) setQueue(rest);
-      draining.current = false;
-    });
-  }, [running, queue]);
+      if (ok) setQueue((old) => old.filter((item) => item.id !== next.id));
+      else claimedQueue.current.delete(next.id);
+    }).finally(() => { draining.current = false; });
+  }, [running, queue, injecting]);
 
   const chosen = models?.models.find((m) => m.id === model) ?? null;
   const modelText = model ? modelName(model, models) : previewLabel(lang, "default_model");
@@ -207,6 +214,21 @@ export function Composer({
       return onSubmit({ shell: true, command: body.slice(1).trim(), provider: current, model, effort, permissionMode: sentMode });
     }
     return onSubmit({ shell: false, prompt: body, provider: current, model, effort, permissionMode: sentMode, attachments: paths });
+  }
+
+  async function injectQueued(item: Queued) {
+    if (!onInject || claimedQueue.current.has(item.id)) return;
+    // El ref cierra el paso antes del siguiente render, también entre toques rápidos.
+    claimedQueue.current.add(item.id);
+    setInjecting((old) => new Set(old).add(item.id));
+    let ok = false;
+    try {
+      ok = await onInject(item.text, item.attachments);
+      if (ok) setQueue((old) => old.filter((entry) => entry.id !== item.id));
+    } finally {
+      if (!ok) claimedQueue.current.delete(item.id);
+      setInjecting((old) => new Set([...old].filter((id) => id !== item.id)));
+    }
   }
 
   async function send() {
@@ -364,7 +386,10 @@ export function Composer({
               {onInject ? (
                 <Pressable
                   hitSlop={6}
-                  onPress={() => void onInject(q.text, q.attachments).then((ok) => ok && setQueue((old) => old.filter((x) => x.id !== q.id)))}
+                  disabled={injecting.has(q.id)}
+                  accessibilityState={{ disabled: injecting.has(q.id), busy: injecting.has(q.id) }}
+                  style={{ opacity: injecting.has(q.id) ? 0.5 : 1 }}
+                  onPress={() => void injectQueued(q)}
                 >
                   <Text style={{ color: theme.primary, fontWeight: "600", fontSize: 13 }}>{w("chat.queue.send_now")}</Text>
                 </Pressable>

@@ -158,6 +158,9 @@ pub(super) fn launcher_continue(launcher: tauri::State<'_, Arc<Launcher>>) {
 
 /// Por qué una raíz necesita el traspaso antes de arrancar el motor, si lo necesita.
 pub fn reason(paths: &engine::Paths) -> Option<&'static str> {
+    if !matches!(super::engine_profile::managed(&paths.data), Ok(false)) {
+        return None;
+    }
     let root = legacy::classify(&paths.data);
     if root == legacy::Root::Legacy {
         return Some("first");
@@ -270,6 +273,9 @@ fn handoff(
     paths: &engine::Paths,
     reason: &'static str,
 ) -> Result<Client, String> {
+    if !matches!(super::engine_profile::managed(&paths.data), Ok(false)) {
+        return Err("managed_service_unavailable".into());
+    }
     let mut steps = Handoff {
         reason,
         started: false,

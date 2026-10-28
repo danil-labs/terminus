@@ -132,7 +132,7 @@ import {
   type CambioPorCupo,
   type FalloDelTurno,
   cupoResuelveElFallo,
-  gestoDelFallo,
+  gestoDeLaFila,
   prosaDelCambioPorCupo,
   prosaDelFallo,
 } from "./failures";
@@ -1521,6 +1521,11 @@ export default function Chat(props: ChatProps) {
    * el agente para responder esto", que es lo que se quiere leer.
    */
 
+  /** Dónde está el último mensaje escrito: lo que `onReintentar` vuelve a mandar. */
+  const ultimoEscrito = createMemo(() => {
+    for (let i = props.msgs.length - 1; i >= 0; i--) if (props.msgs[i].role === "user") return i;
+    return -1;
+  });
   /**
    * El turno que no cerró se queda fuera: un fallo es lo único de esa
    * tira que cambia lo que hay que hacer después, no entra en nada plegable.
@@ -3037,6 +3042,7 @@ export default function Chat(props: ChatProps) {
                   {(m) => (
                     <HitoDelHilo
                       msg={m()}
+                      vigente={(mensaje()?.i ?? -1) > ultimoEscrito()}
                       onReintentar={props.onReintentar}
                       onCuentas={props.onConectar}
                       onOpenTask={props.onOpenTask}
@@ -3857,6 +3863,8 @@ function FilaDeLaBandeja(props: {
  * `failures::Fallo`, traducido; con un gesto que sirva son dos botones. */
 function HitoDelHilo(props: {
   msg: Msg;
+  /** Si es el fallo de lo último que se escribió: solo ése ofrece reintentar. */
+  vigente: boolean;
   /** Volver a mandar lo último que se escribió. */
   onReintentar: () => void;
   /** Llevar a donde se conectan y se cambian las cuentas. */
@@ -3879,7 +3887,7 @@ function HitoDelHilo(props: {
       <span class="flex min-w-0 flex-col items-start gap-0.5">
         <span class="break-words">
           {prosaDelFallo(props.msg)}
-          <Show when={gestoDelFallo(props.msg.fallo?.clase)}>
+          <Show when={gestoDeLaFila(props.msg, props.vigente)}>
             {(g) => (
               <>
                 {" — "}
