@@ -151,6 +151,11 @@ const SIN_USABLE = {
 const boot = (entorno, version, respuestas = RESPUESTAS, userAgent) =>
   mount(entorno, version, respuestas, userAgent);
 
+const keepActiveView = (app) => {
+  const header = app.w.document.querySelector('[data-preview-header] [role="button"]');
+  header?.dispatchEvent(new app.w.MouseEvent("dblclick", { bubbles: true }));
+};
+
 /** El riel agrupado por carpeta, que es su vista por omisión: una carpeta tiene cabecera y se abre su vista. */
 const SIN_AGRUPAR = { "harness.layout.sidebar.view.w": JSON.stringify({ group: "none" }) };
 const bootPorCarpeta = async (entorno, version, respuestas = RESPUESTAS) => {
@@ -410,6 +415,25 @@ if (!roto) {
   };
   clickTree('[data-sesion="s1"]');
   await sleep(150);
+  const previewDraftField = treeDocument.querySelector("textarea");
+  previewDraftField.value = "borrador de la vista temporal";
+  previewDraftField.dispatchEvent(new treeApp.w.Event("input", { bubbles: true }));
+  clickTree('[data-sesion="s2"]');
+  await sleep(150);
+  assert.equal(treeDocument.querySelectorAll("[data-preview]").length, 1, "abrir otra tarea sustituye la temporal");
+  assert.equal(treeDocument.querySelector('[role="tab"]'), null, "las aperturas sucesivas no acumulan pestañas");
+  clickTree('[data-sesion="s1"]');
+  await sleep(150);
+  assert.equal(treeDocument.querySelector("textarea").value, "borrador de la vista temporal", "sustituir conserva el borrador de la tarea");
+  const keepPreview = () => {
+    const header = treeDocument.querySelector('[data-preview-header] [role="button"]');
+    assert.ok(header, "una vista nueva tiene cabecera temporal fuera de la tira");
+    header.dispatchEvent(new treeApp.w.MouseEvent("dblclick", { bubbles: true }));
+  };
+  assert.equal(treeDocument.querySelector('[role="tablist"] [data-preview]'), null);
+  assert.equal(treeDocument.querySelector('[role="tab"]'), null, "abrir no conserva una pestaña");
+  keepPreview();
+
   clickTree('[aria-label="Ver el árbol de trabajo"]');
   await sleep(150);
   const venv = () => [...treeDocument.querySelectorAll('button[aria-expanded]')].find((button) => button.textContent.trim() === ".venv");
@@ -434,6 +458,7 @@ if (!roto) {
   assert.deepEqual(treeReads, ["s1"]);
   clickTree('[data-sesion="s2"]');
   await sleep(150);
+  keepPreview();
   clickTree('[role="tab"][data-pestana="0"]');
   await sleep(150);
   assert.deepEqual(treeReads, ["s1", "s2"], "switching tabs must reuse the loaded tree");
@@ -467,6 +492,25 @@ if (!roto) {
 
   assert.equal(treeApp.fallos.length, 0);
   treeApp.w.close();
+
+  const closeAllViews = await boot("listo", "close-all-retained-views", CON_TAREA);
+  const closeAllDoc = closeAllViews.w.document;
+  closeAllDoc.querySelector('[data-sesion="s1"]').click();
+  await sleep(150);
+  keepActiveView(closeAllViews);
+  closeAllDoc.querySelector('button[title="informe.md"]').click();
+  await sleep(150);
+  keepActiveView(closeAllViews);
+  closeAllDoc.querySelector('[role="tab"]').dispatchEvent(new closeAllViews.w.MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+  await sleep(100);
+  const closeAllAction = [...closeAllDoc.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent.trim() === "Cerrar todas");
+  assert.ok(closeAllAction);
+  closeAllAction.focus();
+  closeAllAction.dispatchEvent(new closeAllViews.w.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+  await sleep(150);
+  assert.equal(closeAllDoc.querySelector('[data-tira] [role="tab"], [data-preview]'), null, "cerrar todas no reabre la tarea propietaria de un documento");
+  assert.deepEqual(closeAllViews.fallos, []);
+  closeAllViews.w.close();
 
   const filaDeAgente = {
     provider: "codex", model: "gpt-5.6", refs: [], created_at: 0, updated_at: 0, turns: 1,
@@ -630,6 +674,7 @@ if (!roto) {
   assert.equal(queueEditor?.value, "Mensaje pendiente", "editar conserva el texto completo");
   queueEditor.dispatchEvent(new bubbleApp.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   await sleep(50);
+  keepActiveView(bubbleApp);
   bubbleDocument
     .querySelector('[role="tab"][data-pestana="0"]')
     .dispatchEvent(new bubbleApp.w.KeyboardEvent("keydown", { key: "Delete", bubbles: true }));
@@ -645,7 +690,7 @@ if (!roto) {
     "el nombre del agente ya no firma la respuesta por encima",
   );
   assert.ok(bubbleDocument.querySelector(".bg-chat-user"), "el input de la persona lleva el tinte de marca en la tarea");
-  const tabDeLaTarea = [...bubbleDocument.querySelectorAll('[role="tab"]')].find(tab => tab.textContent.includes("Una tarea"));
+  const tabDeLaTarea = [...bubbleDocument.querySelectorAll(':is([role="tab"], [data-preview-header] [role="button"])')].find(tab => tab.textContent.includes("Una tarea"));
   assert.ok(tabDeLaTarea, "el título de la tarea distingue sus pestañas");
   assert.match(tabDeLaTarea.title, /^Una tarea(?: ·|$)/, "el título de la tarea manda también en la descripción de la pestaña");
   const avatarDelTab = tabDeLaTarea.querySelector(".astro-face");
@@ -661,7 +706,7 @@ if (!roto) {
   assert.ok(bubbleDocument.querySelector(".bg-chat-user"), "la tarea sin arquetipo pinta igual el input de la persona");
   bubbleDocument.querySelector('[data-sesion="s-transfer"]').click();
   await sleep(300);
-  const tabTransferida = [...bubbleDocument.querySelectorAll('[role="tab"]')].find(tab => tab.textContent.includes("Revisar entrega"));
+  const tabTransferida = [...bubbleDocument.querySelectorAll(':is([role="tab"], [data-preview-header] [role="button"])')].find(tab => tab.textContent.includes("Revisar entrega"));
   assert.ok(tabTransferida, "la tarea recibida conserva su título al cambiar de responsable");
   assert.match(tabTransferida.title, /^Revisar entrega(?: ·|$)/);
   assert.equal(tabTransferida.querySelector(".astro-face")?.getAttribute("data-astro-working"), null);
@@ -839,11 +884,12 @@ if (!roto) {
   await sleep(200);
   assert.equal(threadLoads.at(-1), "dm");
   assert.equal(threadDoc.querySelector("textarea"), null, "el chat anterior solo permite leer el historial");
+  keepActiveView(threadApp);
   sidebarTask("topic").click();
   await sleep(200);
   assert.equal(threadLoads.at(-1), "topic");
   const tabText = tab => tab.querySelector(".truncate").textContent;
-  const tabOf = text => [...threadDoc.querySelectorAll('[role="tab"]')].find(tab => tabText(tab) === text);
+  const tabOf = text => [...threadDoc.querySelectorAll(':is([role="tab"], [data-preview-header] [role="button"])')].find(tab => tabText(tab) === text);
   assert.ok(tabOf("Release planning"), "el tema histórico conserva su título");
   assert.match(tabOf("Release planning").title, /^Holmes · Release planning/);
   assert.ok(tabOf("Holmes"), "el chat directo antiguo sigue accesible");
@@ -933,7 +979,7 @@ if (!roto) {
   assert.equal(inboxLoads.at(-1), "inbox");
   assert.equal(inboxDoc.querySelector("textarea"), null, "la Bandeja anterior no inicia turnos nuevos");
   assert.equal(inboxDoc.querySelector('[data-agent-thread]'), null, "no quedan temas anidados bajo los agentes");
-  assert.ok([...inboxDoc.querySelectorAll('[role="tab"] .truncate')].some(label => label.textContent === "Holmes · Bandeja anterior"), "la Bandeja conserva el agente en su pestaña");
+  assert.ok([...inboxDoc.querySelectorAll(':is([role="tab"], [data-preview-header] [role="button"]) .truncate')].some(label => label.textContent === "Holmes · Bandeja anterior"), "la Bandeja conserva el agente en su pestaña");
   const agentSigned = inboxDoc.querySelector('[data-sender="agent"]');
   assert.ok(agentSigned, "un mensaje de agente lleva su firma");
   assert.match(agentSigned.textContent, /Watson/);
@@ -1246,7 +1292,7 @@ if (!roto) {
   const fila = conTarea.w.document.querySelector('button[title="informe.md"]');
   fila?.click();
   await sleep(150);
-  const enLaTira = [...conTarea.w.document.querySelectorAll('[role="tab"]')].some(
+  const enLaTira = [...conTarea.w.document.querySelectorAll(':is([role="tab"], [data-preview-header] [role="button"])')].some(
     (t) => t.textContent?.trim() === "informe.md",
   );
   // Y que además **se pinte**: una pestaña sin visor detrás deja el centro en
@@ -1271,9 +1317,9 @@ if (!roto) {
   CON_TAREA.list_live_sessions[0].result_revision = createHash("sha256").update("1:second:Otra respuesta").digest("hex");
   conTarea.emit("session", { project: "", session: "s1", workspace: "w" });
   await sleep(350);
-  const chatTab = [...conTarea.w.document.querySelectorAll('[role="tab"]')].find(el => el.getAttribute("aria-label")?.includes("sin leer"));
+  const chatTab = [...conTarea.w.document.querySelectorAll(':is([role="tab"], [data-preview-header] [role="button"])')].find(el => el.getAttribute("aria-label")?.includes("sin leer"));
   assert.equal(chatTab, undefined);
-  const fileTab = [...conTarea.w.document.querySelectorAll('[role="tab"]')].find(el => el.textContent.includes("informe.md"));
+  const fileTab = [...conTarea.w.document.querySelectorAll(':is([role="tab"], [data-preview-header] [role="button"])')].find(el => el.textContent.includes("informe.md"));
   assert.equal(fileTab.querySelector("svg.lucide-mail"), null);
   assert.equal(fileTab.querySelector("svg.lucide-git-branch"), null);
   conTarea.w.document
@@ -1577,7 +1623,7 @@ if (!roto) {
   assert.equal(row("p").querySelector('svg.lucide-mail'), null);
   row("p").click();
   await sleep(160);
-  const tab = id => [...sidebar.w.document.querySelectorAll('[role="tab"]')].find(el => el.textContent.includes(id === "native" ? "prueba sidebar" : `Tarea ${id}`));
+  const tab = id => [...sidebar.w.document.querySelectorAll(':is([role="tab"], [data-preview-header] [role="button"])')].find(el => el.textContent.includes(id === "native" ? "prueba sidebar" : `Tarea ${id}`));
   assert.doesNotMatch(tab("p").getAttribute("aria-label"), /sin leer/);
   assert.equal(tab("p").querySelector("svg.lucide-git-branch"), null);
   focused = true;
@@ -1591,6 +1637,7 @@ if (!roto) {
   sidebar.emit("chat", { kind: "done", project: "", session: "p", workspace: "w", ok: true });
   await sleep(150);
   assert.doesNotMatch(tab("p").getAttribute("aria-label"), /sin leer/);
+  keepActiveView(sidebar);
   row("own").click();
   await sleep(160);
   assert.ok(tab("own").querySelector('[aria-label="Fallo o interrupción"].text-error-strong svg.lucide-circle-alert'));
@@ -1727,6 +1774,7 @@ if (!roto) {
   for (const modifier of ["metaKey", "ctrlKey", "native"]) {
     row("p").click();
     await sleep(100);
+    keepActiveView(sidebar);
     assert.equal(tab("p").getAttribute("aria-selected"), "true");
     const beforeClose = sidebar.comandos.length;
     if (modifier === "native") sidebar.emit("close-tab", null);
@@ -1838,6 +1886,7 @@ if (!roto) {
   newTaskClick.w.addEventListener("harness:tarea-nueva", () => newTaskRequests++);
   newTaskClick.w.document.querySelector('[data-sesion="s1"]').click();
   await sleep(100);
+  keepActiveView(newTaskClick);
   for (const collapsed of [false, true]) {
     const taskTab = newTaskClick.w.document.querySelector('[role="tab"]');
     taskTab.click();
@@ -2544,7 +2593,7 @@ if (!roto) {
   assert.equal(historia.comandos.includes("list_archived"), false, "la ventana no pide las archivadas por proyecto");
   assert.equal(historia.comandos.includes("list_sessions"), false, "la ventana no pide la lista completa");
   assert.deepEqual(historia.fallos, []);
-  const pestanaDe = (app, titulo) => [...app.w.document.querySelectorAll('[role="tab"]')].find((tab) => tab.textContent?.includes(titulo));
+  const pestanaDe = (app, titulo) => [...app.w.document.querySelectorAll(':is([role="tab"], [data-preview-header] [role="button"])')].find((tab) => tab.textContent?.includes(titulo));
 
   let archivadaEnDisco = false;
   const viva = { ...CON_TAREA.list_live_sessions[0], archived: false };
@@ -2557,6 +2606,7 @@ if (!roto) {
   });
   archivar.w.document.querySelector('[data-sesion="s1"]').click();
   await sleep(150);
+  keepActiveView(archivar);
   archivar.w.document.querySelector('[data-sesion="s2"]').click();
   await sleep(150);
   assert.ok(pestanaDe(archivar, "Una tarea"));
@@ -4013,7 +4063,7 @@ if (!roto) {
   localButton.click();
   await sleep(150);
   assert.deepEqual(localPreviews, [{ path: localPath, rel: localPath }]);
-  assert.ok([...localLinks.w.document.querySelectorAll('[role="tab"]')]
+  assert.ok([...localLinks.w.document.querySelectorAll(':is([role="tab"], [data-preview-header] [role="button"])')]
     .some(el => el.textContent.trim() === "finalizar-tarea.html"));
   assert.ok(localLinks.w.document.querySelector(".preview-path"));
   assert.ok(!localLinks.comandos.includes("open_external"));
@@ -4038,13 +4088,14 @@ if (!roto) {
   codeLinks.w.document.querySelector('[data-sesion="s1"]')?.click();
   await sleep(150);
   const boton = (texto) => [...codeLinks.w.document.querySelectorAll("button")].find(el => el.textContent.trim() === texto);
+  keepActiveView(codeLinks);
   boton("Afuera").click();
   await sleep(200);
   const vistaDeCodigo = () => codeLinks.w.document.querySelector('[role="group"][aria-label="Cómo se ve el archivo"]');
   assert.ok(vistaDeCodigo(), "en una tarea de código, un archivo de fuera abre en la vista de código");
   assert.equal(codeLinks.w.document.querySelector(".preview-path"), null);
   // La conversación solo está montada mientras se ve. Se vuelve a su pestaña para pulsar el otro enlace.
-  [...codeLinks.w.document.querySelectorAll('[role="tab"]')].find((el) => el.textContent.includes("Una tarea"))?.click();
+  [...codeLinks.w.document.querySelectorAll(':is([role="tab"], [data-preview-header] [role="button"])')].find((el) => el.textContent.includes("Una tarea"))?.click();
   await sleep(150);
   boton("Adentro").click();
   await sleep(200);

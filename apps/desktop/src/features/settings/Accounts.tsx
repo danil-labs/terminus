@@ -1,35 +1,4 @@
-import { For, Show, Suspense, createEffect, createMemo, createSignal, createUniqueId, lazy, on, onCleanup, onMount, untrack, type JSX } from "solid-js";
 import { groupAccounts } from "@terminus/computers";
-import { enfocar } from "../../lib/focus";
-import { invoke } from "../../lib/invoke.ts";
-import { textoDeFalta } from "../../lib/no-space";
-import { listen } from "../../lib/serviceEvents";
-import AccountCard, { accountPresentation } from "./AccountCard";
-import { FailureNote, type Failure, detalleDe, prosaDe } from "../../ui/Failure";
-import { cn } from "../../lib/utils";
-import { capabilities } from "../../lib/platform";
-import { Skeleton } from "../../ui/Skeleton";
-import { Badge } from "../../ui/Badge";
-import { Button } from "../../ui/Button";
-import { Input } from "../../ui/Input";
-import { Select } from "../../ui/Select";
-import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "../../ui/DropdownMenu";
-import { MarcaAgente } from "../../ui/icons";
-import { SettingsBlock, SettingsRow, SettingsSection } from "./layout";
-import ListaDeModelosLocales from "./LocalModels";
-import { crearModelosLocales } from "./local-models-store";
-import { revocada } from "../../lib/limits";
-import { t } from "../../lib/i18n";
-import { type Frase, prosa } from "../../lib/prose";
-import { Terminal, TerminalBody } from "../../ui/Terminal";
-import { copyText } from "../../lib/clipboard";
 import Check from "lucide-solid/icons/check";
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import Copy from "lucide-solid/icons/copy";
@@ -38,16 +7,49 @@ import ExternalLink from "lucide-solid/icons/external-link";
 import Loader2 from "lucide-solid/icons/loader-circle";
 import RefreshCw from "lucide-solid/icons/refresh-cw";
 import Trash2 from "lucide-solid/icons/trash-2";
+import { createEffect, createMemo, createSignal, createUniqueId, For, type JSX, lazy, on, onCleanup, onMount, Show, Suspense, untrack } from "solid-js";
+import { copyText } from "../../lib/clipboard";
+import { enfocar } from "../../lib/focus";
+import { t } from "../../lib/i18n";
+import { invoke } from "../../lib/invoke.ts";
+import { revocada } from "../../lib/limits";
+import { textoDeFalta } from "../../lib/no-space";
+import { capabilities } from "../../lib/platform";
+import { type Frase, prosa } from "../../lib/prose";
+import { listen } from "../../lib/serviceEvents";
+import { cn } from "../../lib/utils";
+import { Badge } from "../../ui/Badge";
+import { Button } from "../../ui/Button";
+import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
 import {
-  createAccountLimit,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../../ui/DropdownMenu";
+import { detalleDe, type Failure, FailureNote, prosaDe } from "../../ui/Failure";
+import { Input } from "../../ui/Input";
+import { MarcaAgente } from "../../ui/icons";
+import { Select } from "../../ui/Select";
+import { Skeleton } from "../../ui/Skeleton";
+import { Terminal, TerminalBody } from "../../ui/Terminal";
+import { machineOf } from "../machines/store";
+import AccountCard, { accountPresentation } from "./AccountCard";
+import { accountKeyUrl } from "./account-auth";
+import {
   type Account,
   type AccountList,
   type AccountStatus,
   type AgentOpt,
+  createAccountLimit,
   type EnEspera,
   type LoginEvent,
 } from "./accounts-store";
-import { machineOf } from "../machines/store";
+import ListaDeModelosLocales from "./LocalModels";
+import { LoginCodeForm } from "./LoginCodeForm";
+import { SettingsBlock, SettingsRow, SettingsSection } from "./layout";
+import { crearModelosLocales } from "./local-models-store";
 
 // Las claves en la cuenta de Danil: un trozo aparte, solo para agentes con API key.
 const CredentialsInUse = lazy(() => import("./credentials/AccountCredentials").then((m) => ({ default: m.CredentialsInUse })));
@@ -231,9 +233,9 @@ export default function Accounts(props: {
 
   /**
    * Dónde se consigue la API key de este agente, o `null` si se conecta
-   * lanzando su CLI. Lo contesta la tabla (`runtime/agents/`), no esta pantalla.
+   * lanzando su CLI. La política compartida contempla OpenCode 2.
    */
-  const claveDe = () => agentes().find((a) => a.id === agente())?.api_key ?? null;
+  const claveDe = () => agentes().find((a) => a.id === agente())?.api_key;
 
   /** La cuenta cuya clave se está pidiendo, y lo escrito hasta ahora. */
   const [pidiendoClave, setPidiendoClave] = createSignal<string | null>(null);
@@ -635,7 +637,7 @@ export default function Accounts(props: {
     // Se bifurca aquí y no en `agregar`: el alta, el botón de reconectar y
     // el reintento entran por el mismo sitio, y tres caminos a la misma
     // pantalla es donde se olvida uno.
-    if (claveDe()) {
+    if (accountKeyUrl(agentes().find((a) => a.id === agente()))) {
       // Este camino también instala: sin esto, pegar la clave decía
       // «conectada» y dejaba la máquina sin su CLI, con el turno sin poder
       // arrancar.
@@ -1329,20 +1331,7 @@ export default function Accounts(props: {
 
                 <Show when={pideCodigo()}>
                   <Paso numero={url() ? 2 : 1} titulo={t("settings.accounts.step_code")}>
-                    <div class="flex items-center gap-2">
-                      <Input
-                        class="min-w-0 flex-1 font-mono text-xs"
-                        type="text"
-                        ref={enfocar}
-                        value={codigo()}
-                        placeholder={t("settings.accounts.code_placeholder")}
-                        onInput={(e) => setCodigo(e.currentTarget.value)}
-                        onKeyDown={(e) => e.key === "Enter" && void enviarCodigo()}
-                      />
-                      <Button disabled={!codigo().trim()} onClick={() => void enviarCodigo()}>
-                        {t("settings.accounts.send_code")}
-                      </Button>
-                    </div>
+                    <LoginCodeForm value={codigo()} onInput={setCodigo} onSubmit={() => void enviarCodigo()} />
                   </Paso>
                 </Show>
 

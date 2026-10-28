@@ -14,7 +14,7 @@
  * La máquina de la ventana no pasa por aquí: quien la tiene la lee nativa y
  * suma su rebanada con `merge`.
  */
-import { type AccountWorkspace, type Blocked, type CallResult, type DeferredFrame, type EngineInfo, type EventsPage, type MachineState, type SystemId, cachedAt, callWorkspace, isDeferrable, linkedAttention, linkedEvents, linkedListing, requestId } from "../../computers/src/index.ts";
+import { type AccountWorkspace, type Blocked, type CallResult, type DeferredFrame, type EngineInfo, type EventsPage, type MachineState, type SystemId, cachedAt, callWorkspace, isDeferrable, linkedAttention, linkedEvents, linkedListing, requestId, unlinkedWorkspaces } from "../../computers/src/index.ts";
 import { DEADLINES, type Deadlines, classOf } from "./deadlines.ts";
 import { FleetError, fromRelay } from "./errors.ts";
 import { argsFor } from "./ids.ts";
@@ -70,6 +70,12 @@ export type FleetConfig = {
   onEvents?(machine: string, events: FleetEvent[], gap: boolean): void;
   /** Cambió la cola de acciones aplazadas de `machine` (se encoló o se aplicó una): la lista se relee. */
   onDeferred?(machine: string, frame: DeferredFrame): void;
+  /**
+   * Llegaron eventos de `workspaces` que ninguna máquina tiene vinculados según
+   * su fila (`MachineInfo.linked`). El relay ya los dejó pasar: se vincularon
+   * después de listar las computadoras, y la lista se relee para verlos.
+   */
+  onUnlinked?(machine: string, workspaces: string[]): void;
   /** `false`: los eventos llegan con los ids de su máquina (el teléfono nombra cada tarea con su máquina aparte). */
   panelIds?: boolean;
 };
@@ -99,6 +105,8 @@ export class Fleet {
   private readonly book: SliceBook;
   private readonly deadlines: Deadlines;
   private readonly inflight = new Map<string, Promise<Slice>>();
+  private readonly contextRows = new Map<string, Map<string, Row>>();
+  private readonly contextOwners = new Map<string, string>();
   private listening = false;
   private closed = false;
   private readonly config: FleetConfig;
@@ -123,6 +131,7 @@ export class Fleet {
         this.drop(member);
         this.members.delete(id);
         this.book.forget(id);
+        this.contextRows.delete(id);
         this.config.onChange?.(id);
       }
     for (const info of next.values()) {
@@ -230,6 +239,14 @@ export class Fleet {
     });
   }
 
+  /** Si alguna máquina tiene `workspace` vinculado según su fila (o no dice cuáles tiene). */
+  private linkedAnywhere(workspace: string): boolean {
+    return [...this.members.values()].some((m) => {
+      const linked = m.info.linked ?? null;
+      return linked === null || linked.has(workspace);
+    });
+  }
+
   inRegistry(workspace: string | null): boolean {
     return !!workspace && !!this.registry?.some((w) => w.id === workspace);
   }
@@ -252,6 +269,7 @@ export class Fleet {
       registry: this.registry,
       shared: (s) => this.shared.has(s),
       name: (m) => this.name(m),
+      workspaceContext: (workspace) => this.workspaceContext(workspace),
     };
   }
 
@@ -260,9 +278,33 @@ export class Fleet {
     return encode(this.context(), machine, value, command);
   }
 
+  private workspaceContext(workspace: string): { machine: string; row: Row } | null {
+    const members = new Set([...(this.self ? [this.self] : []), ...this.membersOf(workspace)]);
+    const primary = (machine: string) => {
+      const row = this.contextRows.get(machine)?.get(workspace);
+      return row && typeof row.context_root === "string" && row.context_root.trim() ? row : null;
+    };
+    const previous = this.contextOwners.get(workspace);
+    const machine = previous && members.has(previous) && this.power(previous) === "outdated" && primary(previous)
+      ? previous
+      : [...members].find((id) => primary(id));
+    if (!machine) {
+      this.contextOwners.delete(workspace);
+      return null;
+    }
+    this.contextOwners.set(workspace, machine);
+    return { machine, row: primary(machine)! };
+  }
+
   /** Las rebanadas juntas; `undefined` si ninguna trae valor (`merge.ts`). */
   merge(command: string, slices: readonly Slice[], workspace: string | null = null): unknown {
-    for (const s of slices) if (s.has) this.learn(command, s.value);
+    for (const s of slices) if (s.has) {
+      this.learn(command, s.value);
+      if (command === "list_workspaces" || command === "workspaces_startup") {
+        const rows = (s.value as { workspaces?: Row[] } | null)?.workspaces;
+        if (Array.isArray(rows)) this.contextRows.set(s.machine, new Map(rows.filter((row) => typeof row?.id === "string").map((row) => [row.id as string, row])));
+      }
+    }
     return merge(this.context(), command, slices, workspace);
   }
 
@@ -527,6 +569,9 @@ export class Fleet {
       }) ?? (() => {}),
       link.onEvents((page) => {
         if (!this.listening || this.isOutdated(member)) return;
+        // Uno vinculado en otra máquina de la cuenta también llega por esta (el `account` del relay): eso no es una lista vieja.
+        const unknown = unlinkedWorkspaces(page.events ?? [], member.info.linked ?? null).filter((w) => !this.linkedAnywhere(w));
+        if (unknown.length) this.config.onUnlinked?.(info.id, unknown);
         const linked = linkedEvents(page.events ?? [], member.info.linked ?? null);
         const events = this.config.panelIds === false ? linked.map((e) => ({ name: e.name, payload: e.payload })) : linked.map((e) => ({ name: e.name, payload: encodeEvent(this.context(), info.id, e.name, e.payload) }));
         this.config.onEvents?.(info.id, events, page.gap === true);

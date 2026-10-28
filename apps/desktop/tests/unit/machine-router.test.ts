@@ -501,3 +501,36 @@ test("explicit local storage never falls back and its disk listing stays direct"
   assert.equal(new Headers((native.at(-1)?.options as { headers?: HeadersInit })?.headers).get("x-terminus-workspace"), null);
   router.close();
 });
+
+
+test("web source origins survive collisions and outdated owners without falling back to task routing", async () => {
+  for (const replies of [["cmp_mac", "cmp_vm"], ["cmp_vm", "cmp_mac"]]) {
+    const listing = (root: string | null, machine: string) => ({ workspaces: [{ id: "w", context_root: root, logo: `/${machine}/logo` }], active: "w" });
+    const vmAnswers: Record<string, unknown> = { list_workspaces: listing(null, "vm"), list_sources: [{ id: "same" }], remove_source: "vm", list_mentions: "vm", set_source_branch: "vm" };
+    const macAnswers: Record<string, unknown> = { list_workspaces: listing("root", "mac"), list_sources: [{ id: "same" }], remove_source: "mac" };
+    const links = { cmp_vm: fakeLink(vmAnswers), cmp_mac: fakeLink(macAnswers) };
+    const fleet = new Fleet({ self: null, connect: (info) => links[info.id as keyof typeof links], deadlines: { read: 40, action: 200, intent: 400 } });
+    fleet.setMachines([VM, MAC]);
+    const router = createRouter({ self: null, fleet, native: null });
+    const first = await router.handle("list_workspaces") as { workspaces: { logo: string }[] };
+    assert.equal(first.workspaces[0].logo, "cmp_mac~/mac/logo", "root and local metadata use the same envelope");
+    for (const machine of replies) await router.handle("list_sources", {}, on(machine));
+    await assert.rejects(router.handle("remove_source", { source: "same" }), (error: { detail: string }) => error.detail === "context_ambiguous");
+    assert.equal(await router.handle("remove_source", { source: "same" }, on("cmp_mac")), "mac", "the explicit envelope resolves a collision");
+    vmAnswers.list_workspaces = listing("another-root", "vm");
+    fleet.setMachines([VM, { ...MAC, outdated: true }]);
+    const partial = await router.handle("list_workspaces") as { workspaces: { context_root: string }[] };
+    assert.equal(partial.workspaces[0].context_root, "root", "an outdated owner is not replaced by an unrelated catalog");
+    assert.deepEqual(await router.handle("list_sources"), [{ id: "same" }], "the cached owner remains authoritative");
+    assert.equal(await router.handle("list_mentions"), "vm");
+    assert.equal(await router.handle("set_source_branch", { project: "p", source: "same" }), "vm", "project mutations retain their existing routing");
+    macAnswers.list_workspaces = listing(null, "mac");
+    fleet.setMachines([VM, MAC]);
+    const refreshed = await router.handle("list_workspaces") as { workspaces: { context_root: string }[] };
+    assert.equal(refreshed.workspaces[0].context_root, "another-root", "a confirmed absence releases the previous owner");
+    macAnswers.list_sources = [];
+    await router.handle("list_sources", {}, on("cmp_mac"));
+    assert.equal(await router.handle("remove_source", { source: "same" }), "vm", "a refreshed catalog removes obsolete collisions");
+    fleet.close();
+  }
+});

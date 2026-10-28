@@ -44,7 +44,7 @@ import { BrandMark } from "../../../../../ui/BrandMark";
 import { Avatar } from "../../../../../ui/components";
 
 /** Kinds that change what the task reports: pending requests or whether it runs. */
-const REFRESH = new Set(["permission", "started", "done", "presence", "segment_saved"]);
+const REFRESH = new Set(["permission", "permission_resolved", "started", "done", "presence", "segment_saved"]);
 /** Tras estos, lo que llegó en vivo ya está guardado: la lectura lo reemplaza (`liveAfterRead`). */
 const SAVED = new Set(["done", "segment_saved"]);
 

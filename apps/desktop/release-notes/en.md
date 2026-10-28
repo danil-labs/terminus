@@ -1,4 +1,4 @@
-Terminus 0.2.88 is a local installer candidate with bundled work tools. It has not been published.
+Terminus 0.2.89 is a local installer candidate with bundled work tools. It has not been published.
 
 - **Bundled tools.** Portable Git, private Python with uv and libraries for spreadsheets, documents, presentations, PDF and images; ripgrep, native agent-browser, the draw.io viewer and Cua Driver.
 - **Explicit browsing activation.** Chrome for Testing downloads when browsing is enabled, with progress, cancellation and retry. It is excluded from the base resources.

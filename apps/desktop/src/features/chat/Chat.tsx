@@ -1,3 +1,4 @@
+import type { InvokeOptions } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -670,6 +671,9 @@ export type ChatProps = {
   onPermission: (permission: PermissionRequest, allow: boolean) => void;
   /** El material adjunto a ESTA tarea. */
   material: Source[];
+  materialOptions?: InvokeOptions;
+  materialTarget: string;
+  materialAvailable: boolean;
   /** Lo que la tarea YA lee. No son pendientes: están guardados en ella. */
   contexto: Source[];
   /** Todo el material del workspace, para poner nombre a los ids que la
@@ -2128,6 +2132,9 @@ export default function Chat(props: ChatProps) {
         rotulo={t("chat.scope.sources")}
         agregar={t("chat.scope.sources_add")}
         items={fuentes()}
+        materialOptions={props.materialOptions}
+        materialTarget={props.materialTarget}
+        materialAvailable={props.materialAvailable}
         bloqueado={props.busy}
         onTraer={props.onAdjuntarFuente}
         onQuitar={props.onQuitarFuente}
