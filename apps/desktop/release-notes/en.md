@@ -1,12 +1,6 @@
-Terminus 0.2.88 restores figures from tasks on other machines and improves temporary views and notifications.
+Terminus 0.2.89 loads available work without waiting for an unresponsive VM and directs the composer to your chosen machine.
 
-- **Figures from other machines.** Chat visualizations from tasks running on a VM now load in the desktop app. When you open a remote task, its view stays open while the conversation loads.
-- **Temporary views.** Keep the views you need; replacing a view or closing a document protects unsaved work and your chosen layout.
-- **Context on the web.** Context files are read and saved on the machine that owns them.
-- **Maintenance notifications.** Routine checks stay in Logs. Only failures and interruptions show notifications, and repeated events do not reopen a dismissed notice.
-- **Enterprise usage.** Organizations that enable reporting can recover historical usage from the workspace linked to their account, with automatic delivery and no double counting of records already received.
-- **Storage by machine.** View disk usage for each machine and direct cleanup to the selected machine and workspace. Capacity and free space refer to the volume hosting the engine. On mobile web, open Storage within usage to see each machine’s disk and measure the workspace.
-- **Updating on Linux.** If your Terminus folder came from an earlier version with group permissions (umask 002, the Ubuntu default), the new engine no longer refuses to start with "authority_incompatible": it removes that permission from its own folders and carries on, without touching your data. With that umask, a fresh install starts too.
-- **Tasks on another machine.** The file tree of a task running on another machine is read on that machine, and an image you attach on the Mac reaches the task's machine.
-- **Phone.** What an agent or another task writes to you shows on the left, with its name, and the message you send to a powered-off VM stays visible while it starts.
-- **Typst.** The live preview opens without choosing the main file first.
+- **Loading by machine.** The web shows available tasks and saved copies while it checks other machines. Late responses update the list without duplicates, and opening a task keeps the existing rows visible.
+- **Create and attach on your chosen machine.** The composer reads projects and branches from the selected machine and creates or attaches work there. Carrying work from another machine keeps its explicit workflow.
+- **Sleeping VMs on your phone.** Sending a message wakes the VM even when its saved copy contains a turn that appeared active. Usage shows the saved copy and its date without waking the machine.
+- **Permissions across windows.** A decision dismisses the permission notice in other windows. Linking a workspace from desktop updates the web context without reloading the page.
