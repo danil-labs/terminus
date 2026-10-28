@@ -4669,11 +4669,15 @@ export default function App() {
   function abrirPantalla(machine: string) {
     const id = screenTabId(machine);
     const nueva = !pestanas.open().some((p) => p.id === id);
-    setProyectoAbierto(null);
-    pestanas.openScreen(machine, t("screen.tab", { name: machineName(machine) }));
-    paneles.sync(pestanas.open().map((x) => x.id));
-    paneles.activate(id);
-    if (nueva && !paneles.isSplit()) paneles.split(id);
+    // Sin batch la pantalla pasa un instante delante de la conversación: esta se
+    // desmonta, vuelve al dividir y su barra de ubicación parpadea mientras relee.
+    batch(() => {
+      setProyectoAbierto(null);
+      pestanas.openScreen(machine, t("screen.tab", { name: machineName(machine) }));
+      paneles.sync(pestanas.open().map((x) => x.id));
+      paneles.activate(id);
+      if (nueva && !paneles.isSplit()) paneles.split(id);
+    });
   }
 
   /**
