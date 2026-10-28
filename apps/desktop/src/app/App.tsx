@@ -6123,7 +6123,7 @@ export default function App() {
     if (carryModule()?.carries()[draftKey]) return "plan";
     if (sinTrabajo.delete(draftKey)) return "none";
     const workspace = workspaceActivo();
-    const proyecto = composerProjects().find((p) => p.id === project());
+    const proyecto = projectList().find((p) => p.id === project());
     // En la web la máquina de la tarea nueva puede ser la que lleva el workspace, sin elegir ninguna.
     const target = draftMachine();
     if (!workspace || !proyecto || !target || proyecto.kind !== "git") return "none";
@@ -6521,7 +6521,7 @@ export default function App() {
             <Show when={props.nueva && !props.locked}>
               {/* Su propio límite: mientras carga, el resto de la vista sigue. */}
               <Suspense fallback={null}>
-                <MachinePicker workspace={workspaceActivo()} project={composerProjects().find((p) => p.id === project())} />
+                <MachinePicker workspace={workspaceActivo()} project={projectList().find((p) => p.id === project())} />
               </Suspense>
             </Show>
           }
