@@ -127,6 +127,7 @@ import { type SessionRow, threadTitle } from "../features/projects/Sessions";
 import TabStrip, { NewTabButton } from "../features/projects/Tabs";
 import { createTaskWork, ResumeTask } from "../features/projects/TaskHistory";
 import { workLabel } from "../features/projects/branchLabel";
+import { mensajeDeFallo } from "../features/chat/failures";
 import type { Etapa } from "../features/projects/TaskStage";
 import { esChatDeAgente } from "../features/projects/taskTree";
 import {
@@ -139,7 +140,7 @@ const Settings = lazy(() => import("../features/settings/Settings"));
 import type { Startup } from "../features/settings/workspaces-store";
 import { createAttention, topState } from "../features/shell/attention";
 import TaskNotifier from "../features/shell/TaskNotifier";
-import DeleteSpace from "../features/shell/DeleteSpace";
+const DeleteSpace = lazy(() => import("../features/shell/DeleteSpace"));
 import AvisoDeCarpeta from "../features/shell/FolderNotice";
 import PantallaDeBloqueo from "../features/shell/LockScreen";
 import AvisoDeMaterial from "../features/shell/MaterialNotice";
@@ -160,7 +161,7 @@ import Sitio from "../features/sites/Site";
 import { claseDeFondo, VELO_DE_FONDO } from "../lib/chat-background";
 import { fondoDeChat, fondoPropio, imagenDelWorkspace, veloDeFondo } from "../lib/chat-background-store";
 import { copyText } from "../lib/clipboard";
-import { capabilities } from "../lib/platform";
+import { capabilities, openMachineScreen } from "../lib/platform";
 import { pedirElCampo } from "../lib/focus";
 import { lastRoster, rememberRoster } from "../lib/handlerRoster";
 import { aplicarLenguaDeWorkspace, clavesConocidas, t } from "../lib/i18n";
@@ -1952,7 +1953,23 @@ export default function App() {
   // Sin tarea abierta, el panel enseña la carpeta de trabajo del proyecto.
   const rutaDelPanel = () => folder() ?? carpetaDelProyecto() ?? null;
 
+  const maquinaDeLaCarpeta = () => {
+    const id = sessionId();
+    const lugar = projectList().find((p) => p.id === project());
+    return id
+      ? deLaTarea(id)?.headers["x-terminus-machine"] ?? maquinaDeLaVentana()
+      : runOn(workspaceActivo(), lugar) ?? (lugar?.machines?.includes(maquinaDeLaVentana()) ? maquinaDeLaVentana() : lugar?.machines?.[0] ?? maquinaDeLaVentana());
+  };
+  const carpetaLocal = () => capabilities().nativeWindow && maquinaDeLaCarpeta() === maquinaDeLaVentana();
+  const nombreDeAbrirCarpeta = () => carpetaLocal()
+    ? t("shell.folder.open")
+    : t("shell.folder.view_on", { name: machineName(maquinaDeLaCarpeta()) });
+
   function abrirCarpeta() {
+    if (!carpetaLocal()) {
+      setArtOpen(true);
+      return;
+    }
     const f = rutaDelPanel();
     if (f) void invoke("open_external", { target: f }).catch((e) => setError(prosaDe(e)));
   }
@@ -2501,7 +2518,7 @@ export default function App() {
         if (page.gap && vivas().length > 0) setError(t("chat.error.service_gap"));
         if (failingSince !== null) {
           failingSince = null;
-          if (error() === t("chat.error.service_unavailable") || error() === t("shell.service.engine_down") || error() === t("shell.service.engine_missing") || error() === t("shell.service.machine_off") || error() === t("shell.service.machine_starting")) setError(null);
+          if (error() === t("chat.error.service_unavailable") || error() === t("shell.service.engine_down") || error() === t("shell.service.engine_missing") || error() === t("shell.service.managed") || error() === t("shell.service.machine_off") || error() === t("shell.service.machine_starting")) setError(null);
         }
       } catch (e) {
         // Un sondeo suelto falla al empezar un turno y el siguiente ya contesta.
@@ -2510,11 +2527,12 @@ export default function App() {
         // Una máquina remota apagada no es un fallo: se enciende al enviar algo.
         const apagada = claveDe(e) === "shell.service.machine_off";
         const encendiendo = claveDe(e) === "shell.service.machine_starting";
-        const caido = sinMotor || apagada || encendiendo || claveDe(e) === "shell.service.engine_down";
+        const managed = claveDe(e) === "shell.service.managed";
+        const caido = sinMotor || managed || apagada || encendiendo || claveDe(e) === "shell.service.engine_down";
         // En la web la computadora en reposo tiene su indicador: no es un error.
         if ((apagada || encendiendo) && capabilities().computerStatus) return;
         if (!disposed && Date.now() - failingSince > (caido ? 2_000 : 10_000)) {
-          setError(sinMotor ? t("shell.service.engine_missing") : apagada ? t("shell.service.machine_off") : encendiendo ? t("shell.service.machine_starting") : t(caido ? "shell.service.engine_down" : "chat.error.service_unavailable"));
+          setError(sinMotor ? t("shell.service.engine_missing") : managed ? t("shell.service.managed") : apagada ? t("shell.service.machine_off") : encendiendo ? t("shell.service.machine_starting") : t(caido ? "shell.service.engine_down" : "chat.error.service_unavailable"));
         }
       } finally {
         if (!disposed) timer = setTimeout(() => void poll(), pushed ? 0 : 250);
@@ -3356,7 +3374,7 @@ export default function App() {
         return;
       }
     } catch (error) {
-      anexar(session, (ms) => [...ms, { role: "system", text: prosaDe(error), meta: "fallo" }]);
+      anexar(session, (ms) => [...ms, { role: "system", ...mensajeDeFallo(error), meta: "fallo" }]);
     }
     pendingStarts.delete(session);
     marcarQuieta(session);
@@ -3390,7 +3408,7 @@ export default function App() {
           marcarQuieta(session);
         }
       }
-      anexar(session, (ms) => [...ms, { role: "system", text: prosaDe(error), meta: "fallo" }]);
+      anexar(session, (ms) => [...ms, { role: "system", ...mensajeDeFallo(error), meta: "fallo" }]);
       return error;
     }
   }
@@ -3470,7 +3488,7 @@ export default function App() {
       if (nace.generation !== sessionGeneration) return false;
       // La frase de un modo que el agente no sostiene nombra al agente.
       const label = agents().find((a) => a.id === lanzado.provider)?.label ?? lanzado.provider;
-      anexar("", (ms) => [...ms, { role: "system", text: prosaDe(error, { agent: label }), meta: "fallo" }]);
+      anexar("", (ms) => [...ms, { role: "system", ...mensajeDeFallo(error, { agent: label }), meta: "fallo" }]);
       return false;
     }
   }
@@ -3505,7 +3523,7 @@ export default function App() {
     try {
       if (!(await invoke<boolean>("write_shell_input", { session: id, input: texto }, deLaTarea(id)))) return false;
     } catch (e) {
-      anexar(id, (m) => [...m, { role: "system", text: prosaDe(e), meta: "fallo" }]);
+      anexar(id, (m) => [...m, { role: "system", ...mensajeDeFallo(e), meta: "fallo" }]);
       return false;
     }
     // Una tecla suelta (flecha, Enter de menú) no se pinta: la dibuja el propio programa.
@@ -4642,7 +4660,7 @@ export default function App() {
     pestanas.openObservability(t("observability.tab"));
   }
 
-  /** La pantalla de una VM, en una ventana al lado de la conversación: se mira mientras se trabaja. */
+  /** La pantalla de una computadora, en una ventana al lado de la conversación. */
   function abrirPantalla(machine: string) {
     const id = screenTabId(machine);
     const nueva = !pestanas.open().some((p) => p.id === id);
@@ -5846,7 +5864,7 @@ export default function App() {
         {
           role: "system",
           // Una negativa de comando llega como clave: la frase nombra lo escrito.
-          text: prosaDe(e, {
+          ...mensajeDeFallo(e, {
             command: comandoEscrito(m.text),
             agent: agents().find((a) => a.id === m.provider)?.label ?? m.provider,
           }),
@@ -5931,7 +5949,7 @@ export default function App() {
     } catch (error) {
       anexar(sid, (ms) => [
         ...ms,
-        { role: "system", text: prosaDe(error), meta: "fallo" },
+        { role: "system", ...mensajeDeFallo(error), meta: "fallo" },
       ]);
       throw error;
     }
@@ -5985,7 +6003,7 @@ export default function App() {
       } catch (error) {
         anexar(sid, (ms) => [
           ...ms,
-          { role: "system", text: prosaDe(error), meta: "fallo" },
+          { role: "system", ...mensajeDeFallo(error), meta: "fallo" },
         ]);
         throw error;
       }
@@ -6378,7 +6396,8 @@ export default function App() {
     setInjecting((items) => [...items, { session: abierta, id }]);
     try {
       const attachments = await attachmentsFor(m.attachments, deLaTarea(abierta), sourceProject);
-      await invoke("inject_message", {
+      // El turno tal como queda en la transcripción; `null` en un motor que todavía no lo devuelve.
+      const guardado = await invoke<Turn | null>("inject_message", {
         project: sourceProject,
         session: abierta,
         prompt: m.text,
@@ -6395,7 +6414,15 @@ export default function App() {
       const saved = savedQueues.get(abierta);
       if (saved) savedQueues.set(abierta, { ...saved, items: saved.items.filter((item) => item.id !== id) });
       if (sessionId() === abierta && project() === sourceProject) setCola((c) => c.filter((q) => q.id !== id));
-      anexar(abierta, (ms) => [...ms, { role: "user", text: m.text, task_mentions: m.task_mentions, attachments: attachments.length ? attachments : undefined }]);
+      // Con su `turno`: la relectura de la tarea a mitad del turno ya lo trae de disco, y sin id salía dos veces.
+      anexar(abierta, (ms) => [...ms, {
+        role: "user",
+        text: m.text,
+        task_mentions: m.task_mentions,
+        attachments: attachments.length ? attachments : undefined,
+        turno: guardado?.id ?? undefined,
+        author: guardado?.author ?? undefined,
+      }]);
     } catch (e) {
       const clave = claveDe(e);
       // El turno acaba de cerrar: el mensaje sigue en la cola y sale como el siguiente.
@@ -6415,7 +6442,7 @@ export default function App() {
       }
       anexar(abierta, (ms) => [
         ...ms,
-        { role: "system", text: prosaDe(e), meta: clave === "chat.steer.unsupported" ? "aviso" : "fallo" },
+        { role: "system", ...mensajeDeFallo(e), meta: clave === "chat.steer.unsupported" ? "aviso" : "fallo" },
       ]);
     } finally {
       setInjecting((items) => items.filter((item) => item.id !== id));
@@ -6865,6 +6892,10 @@ export default function App() {
             machine={filaDe(id())?.machine}
             on={!apagadas()[id()] && filaDe(id())?.machine_on !== false}
             onScreen={abrirPantalla}
+            onFiles={() => {
+              const folder = proyectoDeLaCelda()?.id;
+              if (folder) void abrirSesion(folder, id()).then(() => setArtOpen(true));
+            }}
             project={proyectoDeLaCelda()?.name}
             path={estadoDelTrabajo()?.path || undefined}
             branch={workLabel(estadoDelTrabajo()?.branch, estadoDelTrabajo()?.alias) || undefined} /></Suspense>;
@@ -7865,14 +7896,13 @@ export default function App() {
 
       <For each={pestanas.open().filter((p): p is ScreenTab => p.clase === "pantalla")}>
         {(p) => {
-          const open = capabilities().machineScreen?.(p.machine);
           return (
             <div
               class="min-h-0 min-w-0"
               classList={{ hidden: celdaDe(p.id) === undefined || tapadoPorElProyecto(paneles.siteOf(p.id)), "pt-8": llevaTiraInterior(paneles.siteOf(p.id)) }}
               style={celdaDe(p.id)}
             >
-              <Show when={open}>{(abrir) => <Suspense fallback={null}><Screen open={abrir()} /></Suspense>}</Show>
+              <Suspense fallback={null}><Screen open={() => openMachineScreen(p.machine)} /></Suspense>
             </div>
           );
         }}
@@ -8248,10 +8278,10 @@ export default function App() {
                     variant="ghost"
                     size="icon"
                     class="size-7 shrink-0 text-neutral-500"
-                    disabled={!rutaDelPanel()}
+                    disabled={carpetaLocal() ? !rutaDelPanel() : !columnaConContenido()}
                     onClick={abrirCarpeta}
-                    aria-label={t("shell.folder.open")}
-                    title={t("shell.folder.open")}
+                    aria-label={nombreDeAbrirCarpeta()}
+                    title={nombreDeAbrirCarpeta()}
                   >
                     <FolderOpen size={16} />
                   </Button>

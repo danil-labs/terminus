@@ -181,3 +181,67 @@ test("the account that just signed in is the first connected one that was not th
   assert.equal(newSessionKey([], [s(null, "connected", "cmp_x")]), "cmp_x", "without a person id, its computer names it");
   assert.equal(newSessionKey([], null), null);
 });
+
+test("a read failure never selects the legacy account model", async () => {
+  const failure = { detail: "unauthorized" };
+  engine({ danil_sessions: () => { throw failure; }, danil_workspace_account: () => { throw failure; } });
+  const { readSessions, readWorkspaceAccount } = await sessions();
+  await assert.rejects(readSessions(), (error) => error === failure);
+  await assert.rejects(readWorkspaceAccount("w1"), (error) => error === failure);
+  engine({ danil_sessions: () => ({}), danil_workspace_account: () => ({}) });
+  await assert.rejects(readSessions(), { detail: "invalid_response" });
+  await assert.rejects(readWorkspaceAccount("w1"), { detail: "invalid_response" });
+});
+
+test("workspace machines come from that account's registry and refuse actions outside its membership", async () => {
+  const { workspaceComputersSource } = await import("../../src/features/machines/workspace-computers.ts");
+  const renamed: string[] = [];
+  let fail = false;
+  const source = {
+    workspaces: async () => fail ? { kind: "unauthorized" as const } : { kind: "ok" as const, value: [
+      { id: "w1", name: "One", projects: [], computers: ["cmp_a"] },
+      { id: "w2", name: "Two", projects: [], computers: ["cmp_b"] },
+    ] },
+    list: async () => ({ kind: "ok" as const, value: [
+      { computer_id: "cmp_a", state: "online", workspaces: ["w2"] },
+      { computer_id: "cmp_b", state: "offline", workspaces: ["w1"] },
+      { computer_id: "foreign", state: "online" },
+    ] }),
+    rename: async (id: string, name: string) => { renamed.push(id); return { kind: "ok" as const, value: { computer_id: id, name } }; },
+    onRenamed: () => {},
+  };
+  const first = workspaceComputersSource(source, "w1");
+  const second = workspaceComputersSource(source, "w2");
+  assert.deepEqual(await first.list(), { kind: "ok", value: [{ computer_id: "cmp_a", state: "online", workspaces: ["w2"] }] });
+  assert.deepEqual(await second.list(), { kind: "ok", value: [{ computer_id: "cmp_b", state: "offline", workspaces: ["w1"] }] });
+  assert.equal((await first.rename("cmp_b", "No")).kind, "missing");
+  await first.rename("cmp_a", "Yes");
+  assert.deepEqual(renamed, ["cmp_a"]);
+  fail = true;
+  assert.deepEqual(await first.list(), { kind: "unauthorized" });
+  assert.equal((await first.rename("cmp_a", "No")).kind, "missing", "a failed authority read revokes stale actions");
+  fail = false;
+  assert.equal((await workspaceComputersSource(source, "absent").list()).kind, "missing");
+});
+
+test("a stale machine read cannot restore permissions after a newer authority failure", async () => {
+  const { workspaceComputersSource } = await import("../../src/features/machines/workspace-computers.ts");
+  let release!: () => void;
+  const old = new Promise<void>((resolve) => { release = resolve; });
+  let reads = 0;
+  const source = workspaceComputersSource({
+    workspaces: async () => {
+      if (++reads > 1) return { kind: "unauthorized" };
+      await old;
+      return { kind: "ok", value: [{ id: "w", name: "W", projects: [], computers: ["cmp"] }] };
+    },
+    list: async () => ({ kind: "ok", value: [{ computer_id: "cmp", state: "online" }] }),
+    rename: async () => { throw new Error("stale permission"); },
+    onRenamed: () => {},
+  }, "w");
+  const first = source.list();
+  assert.equal((await source.list()).kind, "unauthorized");
+  release();
+  assert.equal((await first).kind, "error");
+  assert.equal((await source.rename("cmp", "No")).kind, "missing");
+});

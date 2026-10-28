@@ -955,10 +955,10 @@ export default function Sessions(props: {
             <FilaDelRiel s={f.s} actividad={activity()} titulo={<Titulo />} />
           </Show>
 
-          {/* 24 px en la línea del título se salen por arriba. Al centro y fuera de
-              flujo: en columna se corren la rama y el PR. `right-8` deja el menú. */}
+          {/* Fuera del flujo y junto al título para no tapar el PR de la segunda línea.
+              `right-8` deja libre el menú de acciones. */}
           <Show when={puedeFinalizar() && renombrando() !== f.s.id}>
-            <span data-session-actions data-finish-slot class="absolute top-1/2 right-8 z-10 flex -translate-y-1/2">
+            <span data-session-actions data-finish-slot class="absolute top-0 right-8 z-10 flex">
               <FinishTaskButton
                 label={t("projects.sessions.finish")}
                 description={f.s.subagent || gitRows()[f.s.id]?.shared_with

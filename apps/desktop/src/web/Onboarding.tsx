@@ -8,6 +8,7 @@ import { capabilities } from "../lib/platform";
 import { cn } from "../lib/utils";
 import { HEADER_HEIGHT } from "../lib/window";
 import { Input } from "../ui/Input";
+import { Button } from "../ui/Button";
 import { OnboardingAccounts } from "./OnboardingAccounts";
 import "./phrases";
 
@@ -132,6 +133,11 @@ function Space(props: { nuevo: boolean; onCancelar?: () => void; onCreated: (nam
           <span class="text-[0.8125rem] font-semibold">{t("onboarding.workspace.name")}</span>
           <Input value={name()} onInput={(ev) => setName(ev.currentTarget.value)} />
         </label>
+        <Show when={props.nuevo && capabilities().webAccounts}>
+          <Button type="button" variant="ghost" class="justify-self-start" onClick={() => capabilities().webAccounts?.add()}>
+            {t("web.add_account.use_another")}
+          </Button>
+        </Show>
       </form>
     </Pantalla>
   );

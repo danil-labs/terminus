@@ -5,13 +5,13 @@
  * pinta nada: la cuenta única ya lo dice todo.
  */
 import "../../locales/danilPhrases";
-import { createEffect, createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, on, onCleanup, Show } from "solid-js";
 import { t } from "../../lib/i18n";
 import { Button } from "../../ui/Button";
 import { Select } from "../../ui/Select";
 import { cn } from "../../lib/utils";
 import { claimNextSession } from "./danil-claim";
-import { createDanilAccounts } from "./danil-accounts";
+import { createDanilAccounts, type DanilAccounts } from "./danil-accounts";
 import { said } from "./danil-session";
 import { accountChoices, changeProblem, setWorkspaceAccount, syncLine } from "./danil-sessions";
 import { LICENSE_REQUIRED, startTrialInBrowser, TerminusLicense } from "./TerminusLicense";
@@ -22,11 +22,13 @@ const OTHER = "+other";
 const NONE = "";
 
 /**
- * `placement`: `card` en su tarjeta de Workspaces; `section` arriba de Cuentas
- * de Danil, donde el inicio de sesión sin ninguna cuenta ya está más abajo.
+ * `placement`: `card` en Workspaces; `section` dentro de Cuenta de Danil.
  */
-export default function WorkspaceAccount(props: { workspace: string; name: string; placement?: "card" | "section" }) {
-  const accounts = createDanilAccounts({ workspace: () => props.workspace });
+export default function WorkspaceAccount(props: { workspace: string; name: string; placement?: "card" | "section"; onChanged?: (problem: string | null) => void; state?: DanilAccounts }) {
+  const accounts = props.state ?? createDanilAccounts({ workspace: () => props.workspace });
+  let generation = 0;
+  createEffect(on(() => props.workspace, () => { generation++; }));
+  onCleanup(() => { generation++; });
   const [saving, setSaving] = createSignal(false);
   const [problem, setProblem] = createSignal<string | null>(null);
   /** Quitarlo de su cuenta lo saca de su web y su teléfono: se confirma antes. */
@@ -83,17 +85,22 @@ export default function WorkspaceAccount(props: { workspace: string; name: strin
   }
 
   async function change(value: string | null, select?: HTMLSelectElement) {
+    const workspace = props.workspace;
+    const mine = ++generation;
     setSaving(true);
     setProblem(null);
     try {
-      const result = await setWorkspaceAccount(props.workspace, value);
+      const result = await setWorkspaceAccount(workspace, value);
+      if (mine !== generation || workspace !== props.workspace) return;
       accounts.setOf(result);
+      props.onChanged?.(changeProblem(result));
       setProblem(changeProblem(result));
     } catch (e) {
+      if (mine !== generation || workspace !== props.workspace) return;
       if (select) select.value = current();
       setProblem(changeProblem(null, e));
     } finally {
-      setSaving(false);
+      if (mine === generation) setSaving(false);
     }
   }
 
@@ -118,13 +125,11 @@ export default function WorkspaceAccount(props: { workspace: string; name: strin
         <Show
           when={choices().length}
           fallback={
-            <Show when={props.placement !== "section"}>
-              <div class="flex items-center gap-2">
-                <Button size="sm" variant="outline" disabled={accounts.busy() || adding()} onClick={() => void signIn()}>
-                  {t("danil.account.sign_in")}
-                </Button>
-              </div>
-            </Show>
+            <div class="flex items-center gap-2">
+              <Button size="sm" variant="outline" disabled={accounts.busy() || adding()} onClick={() => void signIn()}>
+                {t("danil.account.sign_in")}
+              </Button>
+            </div>
           }
         >
           <Select

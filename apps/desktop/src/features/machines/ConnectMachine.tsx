@@ -11,6 +11,7 @@ import Check from "lucide-solid/icons/check";
 import Copy from "lucide-solid/icons/copy";
 import { createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { t } from "../../lib/i18n";
+import { copyText } from "../../lib/clipboard";
 import { invoke } from "../../lib/invoke";
 import { capabilities } from "../../lib/platform";
 import { Button } from "../../ui/Button";
@@ -58,7 +59,7 @@ export function ConnectMachine(props: ConnectMachineProps) {
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText(command());
+      await copyText(command());
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -174,13 +175,13 @@ export function ConnectMachine(props: ConnectMachineProps) {
 }
 
 /** Dónde se lee la lista para conectar: lo que da la plataforma (la web) o, en el escritorio con cuenta, su token de cliente. */
-export function connectSource(): ConnectMachineProps | null {
+export function connectSource(account?: string | null): ConnectMachineProps | null {
   const given = capabilities().connectMachine;
   if (given) return given;
   if (!capabilities().danilAccount) return null;
   return {
     list: async () => {
-      const client = await invoke<{ token: string; endpoint: string }>("account_relay_token", {}).catch(() => null);
+      const client = await invoke<{ token: string; endpoint: string }>("account_relay_token", account ? { account } : {}).catch(() => null);
       return client ? listComputers(client.endpoint, client.token) : { kind: "error", status: null };
     },
     outdated: (c) => machineCompatibility(c.contract, __TERMINUS_CONTRACT__) === "outdated",
@@ -190,8 +191,8 @@ export function connectSource(): ConnectMachineProps | null {
 }
 
 /** Configuración → Cuenta de Danil: el botón y, abierto, el comando y la espera. */
-export function ConnectMachineSection() {
-  const source = connectSource();
+export function ConnectMachineSection(props: { account?: string | null } = {}) {
+  const source = connectSource(props.account);
   const [open, setOpen] = createSignal(false);
   return (
     <Show when={source}>
@@ -206,7 +207,10 @@ export function ConnectMachineSection() {
                 </Button>
               }
             >
-              <ConnectMachine {...s()} onReady={(c) => { s().onReady(c); setOpen(false); }} />
+              <div class="grid gap-3">
+                <p class="m-0 text-xs text-neutral-500">{t("danil.connect_machine.workspace_hint")}</p>
+                <ConnectMachine {...s()} onReady={(c) => { s().onReady(c); setOpen(false); }} />
+              </div>
             </Show>
           </SettingsBlock>
         </SettingsSection>

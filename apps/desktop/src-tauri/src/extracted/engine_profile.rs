@@ -79,6 +79,75 @@ fn lock(folder: &Path, name: &str, within: Duration) -> Option<File> {
     }
 }
 
+/// Cualquier perfil de la misma raíz conserva la autoridad del supervisor.
+pub fn managed(data: &Path) -> terminus_engine_protocol::Result<bool> {
+    let read = || -> std::io::Result<bool> {
+        let Some(folder) = dir() else {
+            return Err(std::io::ErrorKind::NotFound.into());
+        };
+        let bytes = match std::fs::read(folder.join("engine.json")) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(error) => return Err(error),
+        };
+        let root: Value = serde_json::from_slice(&bytes)?;
+        managed_in(&root, data)
+    };
+    read().map_err(|_| terminus_engine_protocol::Error::new("managed_profile_invalid"))
+}
+
+fn supervised(profile: &Value) -> std::io::Result<bool> {
+    let object = profile.as_object().ok_or(std::io::ErrorKind::InvalidData)?;
+    for field in ["engine", "sha256", "data_dir", "resource_dir", "identity"] {
+        if object
+            .get(field)
+            .is_some_and(|value| !value.is_null() && !value.is_string())
+        {
+            return Err(std::io::ErrorKind::InvalidData.into());
+        }
+    }
+    if object
+        .get("production")
+        .is_some_and(|value| !value.is_boolean())
+    {
+        return Err(std::io::ErrorKind::InvalidData.into());
+    }
+    match object.get("managed") {
+        None | Some(Value::Null) | Some(Value::Bool(false)) => Ok(false),
+        Some(Value::Bool(true) | Value::String(_)) => Ok(true),
+        _ => Err(std::io::ErrorKind::InvalidData.into()),
+    }
+}
+
+pub(super) fn managed_in(root: &Value, data: &Path) -> std::io::Result<bool> {
+    if root["version"] != VERSION
+        || root
+            .get("default")
+            .is_some_and(|value| !value.is_null() && !value.is_string())
+    {
+        return Err(std::io::ErrorKind::InvalidData.into());
+    }
+    let profiles = root["profiles"]
+        .as_object()
+        .ok_or(std::io::ErrorKind::InvalidData)?;
+    let data = canonical(data);
+    let mut protected = false;
+    for profile in profiles.values() {
+        let managed = supervised(profile)?;
+        let Some(path) = profile["data_dir"].as_str() else {
+            if managed {
+                return Err(std::io::ErrorKind::InvalidData.into());
+            }
+            continue;
+        };
+        if managed && !Path::new(path).is_absolute() {
+            return Err(std::io::ErrorKind::InvalidData.into());
+        }
+        protected |= managed && canonical(Path::new(path)) == data;
+    }
+    Ok(protected)
+}
+
 pub struct Profile<'a> {
     pub name: &'static str,
     pub engine: &'a Path,
@@ -93,6 +162,9 @@ pub fn publish(profile: &Profile, mark: &Path) -> std::io::Result<bool> {
     let Some(folder) = dir() else {
         return Ok(false);
     };
+    if managed(profile.data).map_err(|error| std::io::Error::other(error.code))? {
+        return Ok(false);
+    }
     let sha256 = fingerprint(profile.engine, mark)?;
     let value = json!({
         "engine": canonical(profile.engine),
@@ -145,6 +217,20 @@ fn merge(
     };
     if root["profiles"].is_null() {
         root["profiles"] = json!({});
+    }
+    let data = profile["data_dir"]
+        .as_str()
+        .map(Path::new)
+        .unwrap_or(Path::new("."));
+    let protected = managed_in(&root, data).ok()?
+        || root["profiles"]
+            .get(name)
+            .map(supervised)
+            .transpose()
+            .ok()?
+            .unwrap_or(false);
+    if protected {
+        return Some(root);
     }
     let profiles = root["profiles"].as_object_mut()?;
     profiles.insert(name.to_owned(), profile);
@@ -208,8 +294,8 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{canonical, merge};
-    use serde_json::json;
+    use super::{canonical, managed_in, merge};
+    use serde_json::{json, Value};
 
     #[test]
     fn a_root_that_does_not_exist_yet_hashes_like_the_cli() {
@@ -228,10 +314,79 @@ mod tests {
     }
 
     #[test]
+    fn a_managed_alias_protects_the_root_and_the_published_profile() {
+        let folder = tempfile::tempdir().unwrap();
+        let data = folder.path().join("engine");
+        std::fs::create_dir(&data).unwrap();
+        let root = json!({"version":1,"default":"other","profiles": {
+            "other": {"data_dir": folder.path().join("other"), "managed": null},
+            "service": {"data_dir": data.join("."), "managed": "supervisor start", "future": 42},
+            "desktop": {"data_dir": data, "managed": null}
+        }});
+        assert!(managed_in(&root, &data).unwrap());
+        assert!(!managed_in(&root, &folder.path().join("other")).unwrap());
+        let bytes = serde_json::to_vec(&root).unwrap();
+        assert_eq!(
+            merge(Some(&bytes), "desktop", json!({"data_dir":data}), true),
+            Some(root)
+        );
+        assert!(managed_in(&json!({"version":2,"profiles":{}}), &data).is_err());
+        assert!(managed_in(&json!({"version":1,"profiles":null}), &data).is_err());
+        assert!(managed_in(
+            &json!({"version":1,"profiles":{"host":{"managed":"service start"}}}),
+            &data
+        )
+        .is_err());
+        assert!(managed_in(&json!({"version":1,"profiles":{"host":{"data_dir":"relative","managed":"service start"}}}), &data).is_err());
+    }
+
+    #[test]
+    fn malformed_profiles_fail_closed_and_false_matches_the_cli() {
+        let folder = tempfile::tempdir().unwrap();
+        let data = folder.path();
+        for invalid in [
+            json!([]),
+            json!(null),
+            json!({"managed": []}),
+            json!({"data_dir": 42}),
+            json!({"production": null}),
+        ] {
+            let root = json!({"version":1,"profiles":{"bad":invalid,"service":{"data_dir":data,"managed":true}}});
+            assert!(managed_in(&root, data).is_err());
+            assert!(merge(
+                Some(&serde_json::to_vec(&root).unwrap()),
+                "desktop",
+                json!({"data_dir":data}),
+                true
+            )
+            .is_none());
+        }
+        for policy in [Value::Null, json!(false)] {
+            let root = json!({"version":1,"profiles":{"desktop":{"data_dir":data,"managed":policy,"future":42}}});
+            assert!(!managed_in(&root, data).unwrap());
+            let merged = merge(
+                Some(&serde_json::to_vec(&root).unwrap()),
+                "desktop",
+                json!({"data_dir":data,"managed":null}),
+                true,
+            )
+            .unwrap();
+            assert_eq!(merged["profiles"]["desktop"]["managed"], Value::Null);
+        }
+        for policy in [json!(true), json!("service start")] {
+            assert!(managed_in(
+                &json!({"version":1,"profiles":{"host":{"data_dir":data,"managed":policy}}}),
+                data
+            )
+            .unwrap());
+        }
+    }
+
+    #[test]
     fn the_window_keeps_other_profiles_and_only_production_takes_default() {
-        let host = br#"{"version":1,"default":"host","profiles":{"host":{"managed":"systemctl --user start seldon-host"}},"extra":true}"#;
+        let host = serde_json::to_vec(&json!({"version":1,"default":"host","profiles":{"host":{"data_dir": std::env::temp_dir().join("seldon-host"),"managed":"systemctl --user start seldon-host"}},"extra":true})).unwrap();
         let merged = merge(
-            Some(host),
+            Some(&host),
             "desktop",
             json!({"identity": "ai.danil.terminus"}),
             true,

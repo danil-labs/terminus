@@ -3,5 +3,6 @@
 
 mod console;
 mod extracted;
+pub use extracted::background_dispatch;
 pub use extracted::{env, run, util};
 pub use extracted::{launch, stop_engine};
