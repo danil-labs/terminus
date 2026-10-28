@@ -421,5 +421,11 @@
   "chat.greeting.7": "¿Qué resolvemos?",
   "chat.greeting.8": "¿Qué sigue en tu lista?",
   "chat.greeting.9": "Aquí estoy. ¿Qué hacemos?",
-  "chat.greeting.10": "¿Qué quieres sacar adelante?"
+  "chat.greeting.10": "¿Qué quieres sacar adelante?",
+  "chat.notice.handler_definition_modified": "La definición del encargado cambió durante el turno. Revisa los cambios y restaura la definición o libera su cuarentena antes de continuar.",
+  "chat.notice.handler_memory_in_doubt": "La identidad de la memoria no está resuelta. El encargado contin?a sin memoria propia.",
+  "chat.notice.handler_memory_unavailable": "El almac?n de memoria del encargado no está disponible. Contin?a sin memoria propia.",
+  "chat.notice.handler_memory_legacy": "Hay notas de memoria guardadas por nombre que no se cargan para esta identidad.",
+  "chat.notice.handler_requires_tool_missing": "Una herramienta pedida por el encargado no está en el PATH del turno.",
+  "chat.mentions.in_code": "Las menciones dentro de código no pueden ser destinatarios. Escribe la menci?n fuera del código."
 }

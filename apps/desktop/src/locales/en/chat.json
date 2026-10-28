@@ -421,5 +421,11 @@
   "chat.greeting.7": "What are we solving?",
   "chat.greeting.8": "What's next on your list?",
   "chat.greeting.9": "I'm here. What should we do?",
-  "chat.greeting.10": "What do you want to get done?"
+  "chat.greeting.10": "What do you want to get done?",
+  "chat.notice.handler_definition_modified": "The handler definition changed during the turn. Review the changes and restore the definition or release its quarantine before continuing.",
+  "chat.notice.handler_memory_in_doubt": "The memory identity is unresolved. The handler continues without its own memory.",
+  "chat.notice.handler_memory_unavailable": "The handler memory store is unavailable. It continues without its own memory.",
+  "chat.notice.handler_memory_legacy": "Some memory notes saved by name are not loaded for this identity.",
+  "chat.notice.handler_requires_tool_missing": "A tool requested by the handler is not on this turn’s PATH.",
+  "chat.mentions.in_code": "Mentions inside code cannot be recipients. Write the mention outside the code."
 }

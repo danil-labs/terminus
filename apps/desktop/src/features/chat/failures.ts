@@ -49,7 +49,12 @@ export function horaDeVuelta(ms: number) {
 }
 
 /** Lo mínimo que hace falta para pintar la fila. Ver `Msg`. */
-type ConFallo = { text: string; fallo?: FalloDelTurno };
+type ConFallo = { text: string; meta?: string; fallo?: FalloDelTurno };
+
+const HANDLER_NOTICES = new Set([
+  "handler_definition_modified", "handler_memory_in_doubt", "handler_memory_unavailable",
+  "handler_memory_legacy", "handler_requires_tool_missing",
+]);
 
 /** Conserva el diagnóstico también cuando el fallo ocurre antes de abrir el turno. */
 export function mensajeDeFallo(error: unknown, datos?: Record<string, string | number>) {
@@ -62,6 +67,12 @@ export function mensajeDeFallo(error: unknown, datos?: Record<string, string | n
 
 /** Los mensajes antiguos pasan por el mismo respaldo que los fallos nuevos. */
 export function prosaDelFallo(msg: ConFallo) {
+  if (msg.text === "chat.mentions.in_code") return t("chat.mentions.in_code");
+  if (msg.meta && HANDLER_NOTICES.has(msg.meta)) {
+    const notice = t(`chat.notice.${msg.meta}`);
+    const tool = msg.meta === "handler_requires_tool_missing" ? /`([^`]+)`/.exec(msg.text)?.[1] : null;
+    return tool ? `${notice} (${tool})` : notice;
+  }
   const f = msg.fallo;
   if (!f || !clavesConocidas().has(`chat.failure.${f.clase}`)) return prosaDe(msg.text);
   const partes = [t(`chat.failure.${f.clase}`)];
