@@ -741,3 +741,18 @@ test("branches and usage reopen from their saved slices without waking an off VM
     } finally { reopened.fleet.close(); }
   }
 });
+
+test("the in-memory slice cache evicts old pages and keeps the recently used one", async () => {
+  const { SliceBook } = await import("../src/slices.ts");
+  const book = new SliceBook();
+  for (let i = 0; i < 40; i++) {
+    book.put({ machine: "mac", status: "ok", has: true, at: i, value: "x".repeat(300_000) }, String(i));
+    if (i > 0) book.get("mac", "0");
+  }
+  assert.ok(book.get("mac", "0"));
+  assert.equal(book.get("mac", "1"), null);
+  assert.ok(book.get("mac", "39"));
+  book.forget("mac");
+  assert.equal(book.get("mac", "0"), null);
+  assert.equal(book.get("mac", "39"), null);
+});
