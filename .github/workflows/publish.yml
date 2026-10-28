@@ -739,7 +739,9 @@ jobs:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_KEY_PATH: ${{ env.APPLE_API_KEY_PATH }}
-        run: pnpm desktop:build --target universal-apple-darwin --config "$WORK_TOOLS_CONFIG"
+        run: |
+          python3 scripts/work-tools-macos.py --directory "$RUNNER_TEMP/work-tools-release/work-tools"
+          pnpm desktop:build --target universal-apple-darwin --config "$WORK_TOOLS_CONFIG"
 
       # `tauri.linux.conf.json` vive en el repo del código y ajusta el bundle a
       # AppImage. Firma con la llave de minisign, como en las otras dos.
@@ -752,6 +754,8 @@ jobs:
 
       - name: Verificar los recursos después del empaquetado
         shell: bash
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
           case "$RUNNER_OS" in
@@ -775,6 +779,9 @@ jobs:
           esac
           python3 scripts/work-tools-release.py verify --directory "$resources"
           python3 scripts/work-tools-runtime-smoke.py --engine "$engine" --resources "$(dirname "$resources")" --browser --clone
+          if [ "$RUNNER_OS" = macOS ]; then
+            python3 scripts/work-tools-runtime-smoke.py --engine "$engine" --resources "$(dirname "$resources")" --architecture x86_64 --browser --clone
+          fi
 
       - name: Comprobar el bundle universal
         if: runner.os == 'macOS'
@@ -947,6 +954,83 @@ jobs:
           if-no-files-found: error
           path: apps/desktop/release-assets/*
 
+      - name: Dividir el instalador para revisión del ensayo
+        if: inputs.dry_run
+        shell: bash
+        run: |
+          node scripts/work-tools-qa-artifacts.mjs release-assets "$RUNNER_TEMP/qa-installer" "${{ matrix.name }}"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: inputs.dry_run
+        with:
+          name: qa-${{ matrix.name }}-installer-1
+          path: ${{ runner.temp }}/qa-installer/*.part-01
+          if-no-files-found: ignore
+          compression-level: 0
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: inputs.dry_run
+        with:
+          name: qa-${{ matrix.name }}-installer-2
+          path: ${{ runner.temp }}/qa-installer/*.part-02
+          if-no-files-found: ignore
+          compression-level: 0
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: inputs.dry_run
+        with:
+          name: qa-${{ matrix.name }}-installer-3
+          path: ${{ runner.temp }}/qa-installer/*.part-03
+          if-no-files-found: ignore
+          compression-level: 0
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: inputs.dry_run
+        with:
+          name: qa-${{ matrix.name }}-installer-4
+          path: ${{ runner.temp }}/qa-installer/*.part-04
+          if-no-files-found: ignore
+          compression-level: 0
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: inputs.dry_run
+        with:
+          name: qa-${{ matrix.name }}-installer-5
+          path: ${{ runner.temp }}/qa-installer/*.part-05
+          if-no-files-found: ignore
+          compression-level: 0
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: inputs.dry_run
+        with:
+          name: qa-${{ matrix.name }}-installer-6
+          path: ${{ runner.temp }}/qa-installer/*.part-06
+          if-no-files-found: ignore
+          compression-level: 0
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: inputs.dry_run
+        with:
+          name: qa-${{ matrix.name }}-installer-7
+          path: ${{ runner.temp }}/qa-installer/*.part-07
+          if-no-files-found: ignore
+          compression-level: 0
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: inputs.dry_run
+        with:
+          name: qa-${{ matrix.name }}-installer-8
+          path: ${{ runner.temp }}/qa-installer/*.part-08
+          if-no-files-found: ignore
+          compression-level: 0
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: inputs.dry_run
+        with:
+          name: qa-${{ matrix.name }}-installer-metadata
+          path: ${{ runner.temp }}/qa-installer/*.json
+          if-no-files-found: error
+
   # ─────────────────────────────────────────────────────────────────────────────
   # Una sola release con Windows, macOS universal y Linux dentro, y el
   # `latest.json` que la app consulta. Va en un job aparte porque **publicar
@@ -1042,6 +1126,7 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: release-assets
+          pattern: dist-*
           merge-multiple: true
 
       # La firma no cubre solo los bytes: su comentario de confianza lleva el

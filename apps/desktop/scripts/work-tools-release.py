@@ -51,7 +51,14 @@ def main():
             source = ROOT / "resources/work-tools" / target
             manifest = tools.load_manifest(source, target)
             directory = args.directory / target
-            tools.verify_tree(source, directory, manifest)
+            if platform.system() == "Darwin":
+                native_spec = importlib.util.spec_from_file_location("work_tools_macos", ROOT / "scripts/work-tools-macos.py")
+                native = importlib.util.module_from_spec(native_spec)
+                native_spec.loader.exec_module(native)
+                native.verify_tree(source, directory, target, os.environ.get("APPLE_TEAM_ID"))
+                manifest = tools.load_manifest(directory, target)
+            else:
+                tools.verify_tree(source, directory, manifest)
             for item in manifest["entries"]:
                 archive = tools.child(directory, item["archive"])
                 if tools.digest(archive) != item["sha256"]:
