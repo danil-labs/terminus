@@ -123,6 +123,8 @@
   "settings.environment.browser.title": "Agent browsing",
   "settings.environment.browser.description": "Prepare Chrome only for agent browsing.",
   "settings.environment.browser.install": "Prepare browsing",
+  "settings.environment.browser.sandbox_allow": "Allow Chrome sandbox",
+  "settings.environment.browser.sandbox_description": "Ubuntu needs to allow this Chrome to create its sandbox. Administrator permission is required to add a rule specific to Terminus; system protection stays enabled.",
   "settings.environment.column.location": "Location",
   "settings.environment.column.name": "Name",
   "settings.environment.column.action": "Action",

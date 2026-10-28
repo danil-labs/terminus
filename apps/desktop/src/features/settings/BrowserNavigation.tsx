@@ -1,13 +1,13 @@
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
-import { invoke } from "../../lib/invoke.ts";
-import { listen } from "../../lib/serviceEvents";
 import { peso } from "../../lib/format";
 import { t } from "../../lib/i18n";
+import { invoke } from "../../lib/invoke.ts";
 import { capabilities } from "../../lib/platform";
+import { listen } from "../../lib/serviceEvents";
 import { Button } from "../../ui/Button";
-import { asFailure, FailureNote, prosaDe, type Failure } from "../../ui/Failure";
-import { SettingsBlock, SettingsSection } from "./layout";
+import { asFailure, detalleDe, type Failure, FailureNote, prosaDe } from "../../ui/Failure";
 import type { Requirement } from "./environment-store";
+import { SettingsBlock, SettingsSection } from "./layout";
 
 export default function BrowserNavigation(props: { requirement?: Requirement; onPrepared: () => Promise<void> }) {
   if (!capabilities().localSetup) return null;
@@ -27,14 +27,14 @@ export default function BrowserNavigation(props: { requirement?: Requirement; on
     onCleanup(() => void events.then((stop) => stop()));
   });
 
-  async function install() {
+  async function install(allowSandbox = false) {
     if (running()) return;
     setRunning(true);
     setCancelling(false);
     setFailure(null);
     setProgress((p) => ({ ...p, done: 0 }));
     try {
-      await invoke("install_tool", { tool: "browser-navigation" });
+      await invoke("install_tool", { tool: allowSandbox ? "browser-navigation-sandbox" : "browser-navigation" });
       setReady(true);
       await props.onPrepared();
     } catch (e) {
@@ -73,6 +73,12 @@ export default function BrowserNavigation(props: { requirement?: Requirement; on
             </span>
           </Show>
         </div>
+        <Show when={failure() && detalleDe(failure()).includes("browser_navigation_sandbox_required")}>
+          <p class="text-sm text-neutral-500">{t("settings.environment.browser.sandbox_description")}</p>
+          <Button variant="secondary" size="compact" disabled={running()} onClick={() => void install(true)}>
+            {t("settings.environment.browser.sandbox_allow")}
+          </Button>
+        </Show>
         <Show when={failure()}>{(f) => <FailureNote f={f()} />}</Show>
       </SettingsBlock>
     </SettingsSection>

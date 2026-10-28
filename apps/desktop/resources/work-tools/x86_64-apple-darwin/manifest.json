@@ -53,15 +53,16 @@
     {
       "id": "agent-browser",
       "version": "0.39.4",
-      "archive": "payloads/agent-browser-darwin-x64",
-      "sha256": "21522a8ec34063fa294b0c928ad03d3485f1821ebe22f9da2b47b89963f731af",
-      "format": "raw",
+      "archive": "payloads/agent-browser-darwin-x64.zip",
+      "sha256": "58bd5a1af40ec0846961ebc5679e64f12f88cda18315f37265948951603a1b7b",
+      "format": "zip",
       "executable": "agent-browser",
       "url": "https://github.com/vercel-labs/agent-browser/releases/download/v0.39.4/agent-browser-darwin-x64",
       "license": "Apache-2.0",
       "source": "https://github.com/vercel-labs/agent-browser/tree/v0.39.4",
       "strip_components": 0,
-      "unpacked_bytes": 17544264
+      "unpacked_bytes": 17544264,
+      "download_sha256": "21522a8ec34063fa294b0c928ad03d3485f1821ebe22f9da2b47b89963f731af"
     },
     {
       "id": "drawio",

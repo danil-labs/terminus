@@ -77,6 +77,8 @@ def load_manifest(directory, target):
             raise ValueError("Expected a pinned SHA-256")
         if not item["url"].startswith("https://") or not item["license"]:
             raise ValueError("Expected HTTPS provenance and license")
+        if item.get("download_sha256") and not re.fullmatch(r"[0-9a-f]{64}", item["download_sha256"]):
+            raise ValueError("Expected a pinned native source SHA-256")
     for item in entries:
         if item["format"] not in {"tar.gz", "zip", "raw"}:
             raise ValueError("Unsupported payload format")
@@ -154,6 +156,21 @@ def obtain(item, destination, caches, download, budget):
     if destination.exists():
         if digest(destination) != item["sha256"]:
             raise ValueError(f"Existing payload checksum mismatch: {destination.name}")
+        return
+    if item.get("download_sha256"):
+        with tempfile.TemporaryDirectory(prefix=".work-tools-native-", dir=destination.parent) as temporary:
+            original = Path(temporary) / Path(item["url"]).name
+            obtain({**item, "archive": original.name, "sha256": item["download_sha256"],
+                    "download_sha256": None}, original, caches, download, budget)
+            envelope = Path(temporary) / "envelope.zip"
+            with zipfile.ZipFile(envelope, "w", compression=zipfile.ZIP_STORED) as archive:
+                info = zipfile.ZipInfo(item["executable"], date_time=(1980, 1, 1, 0, 0, 0))
+                info.create_system = 3
+                info.external_attr = (stat.S_IFREG | 0o755) << 16
+                archive.writestr(info, original.read_bytes())
+            if digest(envelope) != item["sha256"]:
+                raise ValueError("Native payload envelope checksum mismatch")
+            os.replace(envelope, destination)
         return
     name = Path(item["archive"]).name
     candidates = [cache / name for cache in caches]

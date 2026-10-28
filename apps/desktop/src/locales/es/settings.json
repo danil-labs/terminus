@@ -123,6 +123,8 @@
   "settings.environment.browser.title": "Navegación de agentes",
   "settings.environment.browser.description": "Prepara Chrome sólo para que tus agentes naveguen.",
   "settings.environment.browser.install": "Preparar navegación",
+  "settings.environment.browser.sandbox_allow": "Permitir aislamiento de Chrome",
+  "settings.environment.browser.sandbox_description": "Ubuntu necesita autorizar el aislamiento de este Chrome. Se pedirá permiso de administrador para añadir una regla específica de Terminus; no se desactiva la protección del sistema.",
   "settings.environment.column.location": "Ubicación",
   "settings.environment.column.name": "Nombre",
   "settings.environment.column.action": "Acción",
