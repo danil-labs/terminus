@@ -4720,16 +4720,37 @@ export default function App() {
     return sitio ? { sitio, zone: edgeZone(panel, x, y) } : null;
   }
 
+  let railDrag: { project: string; row: SessionRow } | null = null;
   const tabDrag = createPointerDrag({
     scope: () => `${workspaceActivo()}\u0000${escritorio()}`,
-    canStart: id => pestanas.open().some(tab => tab.id === id),
-    locate: point => ventanaBajo(point.x, point.y),
+    canStart: id => pestanas.open().some(tab => tab.id === id) || (railDrag?.row.id === id && !!filaDe(id)),
+    locate: point => {
+      const panel = ventanaBajo(point.x, point.y);
+      if (panel) return { ...panel, folder: undefined as string | undefined };
+      const folder = railDrag && !railDrag.row.parent && !railDrag.row.chat_de_agente
+        ? document.elementFromPoint(point.x, point.y)?.closest<HTMLElement>("[data-destino]")?.dataset.destino
+        : undefined;
+      return folder !== undefined && folder !== railDrag?.project
+        ? { sitio: paneles.activeSite(), indice: undefined, zone: undefined, folder }
+        : null;
+    },
     scroll(point) {
       const element = document.elementFromPoint(point.x, point.y)
         ?.closest("[data-tira]")?.querySelector<HTMLElement>("[data-tab-scroll]");
-      return element ? { element, axis: "x" } : null;
+      if (element) return { element, axis: "x" };
+      const rail = railDrag ? document.elementFromPoint(point.x, point.y)
+        ?.closest<HTMLElement>("[data-arrastre-scroll]") : null;
+      return rail ? { element: rail, axis: "y" } : null;
     },
     drop(id, destino) {
+      if (destino.folder !== undefined && railDrag) {
+        void moverSesion(railDrag.project, id, destino.folder);
+        return;
+      }
+      if (railDrag && !pestanas.open().some(tab => tab.id === id)) {
+        pestanas.ensure({ id, project: railDrag.project, titulo: railDrag.row.title });
+        paneles.sync(pestanas.open().map(tab => tab.id));
+      }
       if (destino.zone && destino.zone !== "center" && paneles.splitAt(id, destino.sitio, destino.zone)) {
         pestanas.pin(id);
         const p = pestanas.open().find(tab => tab.id === id);
@@ -4748,8 +4769,21 @@ export default function App() {
   });
   const arrastrando = tabDrag.source;
   const cursor = tabDrag.cursor;
-  const donde = tabDrag.destination;
-  const arrastrarPestana = tabDrag.start;
+  const donde = () => {
+    const destination = tabDrag.destination();
+    return destination?.folder === undefined ? destination : null;
+  };
+  const arrastrarPestana = (id: string, event: PointerEvent) => {
+    if (event.button !== 0 || event.isPrimary === false) return;
+    railDrag = null;
+    tabDrag.start(id, event);
+  };
+  const arrastrarTarea = (project: string, row: SessionRow, event: PointerEvent) => {
+    if (event.button !== 0 || event.isPrimary === false) return;
+    if (esProvisional(row.id) || (row.workspace && row.workspace !== workspaceActivo())) return;
+    railDrag = { project, row };
+    tabDrag.start(row.id, event);
+  };
 
   /**
    * Cómo se llama una pestaña, para el fantasma del arrastre. La tira
@@ -4758,7 +4792,7 @@ export default function App() {
    */
   const tituloDePestana = (id: string) => {
     const p = pestanasEnPantalla().find((x) => x.id === id);
-    if (!p) return "";
+    if (!p) return railDrag?.row.id === id ? railDrag.row.title : "";
     if (isTaskTab(p)) return p.titulo;
     if (p.clase === "observabilidad" || p.clase === "pantalla") return p.titulo;
     if (p.clase === "sitio" && !p.url) return t("sites.new_tab");
@@ -4781,7 +4815,7 @@ export default function App() {
     const d = donde();
     const id = arrastrando();
     if (!d?.zone || d.zone === "center" || !id) return null;
-    return paneles.canSplitAt(id, d.sitio, d.zone) ? d.zone : null;
+    return paneles.canSplitAt(id, d.sitio, d.zone, railDrag?.row.id === id) ? d.zone : null;
   };
 
   /**
@@ -8135,6 +8169,9 @@ export default function App() {
         aprobando={permissions().map((p) => p.session)}
               collapsed={sidebar.colapsado()}
               onToggle={sidebar.alternar}
+              draggedTask={arrastrando()}
+              dragFolder={tabDrag.destination()?.folder}
+              onDrag={arrastrarTarea}
               onPick={(p, id) => {
                 // Abrir una tarea suelta la marca del agente: su fila no
                 // puede seguir señalada cuando ya se mira otra cosa.

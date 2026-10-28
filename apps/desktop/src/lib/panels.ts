@@ -212,9 +212,9 @@ export function createPanels(restorable?: () => readonly string[]) {
     return site;
   }
 
-  function canSplitAt(id: string, reference: PanelSite, side: Side): boolean {
+  function canSplitAt(id: string, reference: PanelSite, side: Side, unplaced = false): boolean {
     const from = siteOf(id);
-    if (!from || !groupAt(reference)) return false;
+    if ((!from && !unplaced) || !groupAt(reference)) return false;
     if (side === "left" || side === "right")
       return columns().length < MAX_COLUMNS;
     return columns()[reference.col].length < MAX_ROWS;

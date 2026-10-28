@@ -26,6 +26,7 @@ const RECIBE_LA_TAREA = ["ring-2", "ring-primary"];
  */
 export default function FolderGroupHeader(pp: {
   p: Project;
+  dragFolder?: string | null;
   /**
    * El rótulo cuando la carpeta se parte por máquina («Terminus · vm-principal»);
    * sin él, el nombre de la carpeta. Renombrar y borrar siguen nombrando la carpeta.
@@ -52,7 +53,7 @@ export default function FolderGroupHeader(pp: {
 }) {
   const p = () => pp.p;
   const rotulo = () => pp.rotulo ?? p().name;
-  const recibiendo = () => destinoEnVuelo() === p().id;
+  const recibiendo = () => (pp.dragFolder ?? destinoEnVuelo()) === p().id;
   const [nombre, setNombre] = createSignal("");
   // El menú tiene dos vistas, las acciones o la confirmación de borrado, en
   // un solo Popover: uno anidado se cerraría con el primero.
