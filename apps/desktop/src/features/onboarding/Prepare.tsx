@@ -27,6 +27,7 @@ export type FilaDeEtapa = {
   detalle: string;
   version: string;
   descripcion: string;
+  removable?: boolean;
 };
 
 export type Instalacion = {
@@ -220,11 +221,13 @@ export function VistaSencilla(props: { i: Instalacion } & AccionesDeOpcional) {
                     </Match>
                     <Match when={f.paso === "ok"}>
                       <span class="truncate text-right text-[11px] text-neutral-500">{f.version}</span>
-                      <RemoveButton
-                        icon="trash"
-                        label={t("setup.optional.uninstall", { name: f.label })}
-                        onClick={() => props.onDesinstalar(f.name)}
-                      />
+                      <Show when={f.removable !== false}>
+                        <RemoveButton
+                          icon="trash"
+                          label={t("setup.optional.uninstall", { name: f.label })}
+                          onClick={() => props.onDesinstalar(f.name)}
+                        />
+                      </Show>
                     </Match>
                     <Match when={f.paso === "fail"}>
                       <span class="truncate text-right text-[11px] text-warning-strong">{t("setup.optional.not_installed")}</span>
@@ -340,7 +343,7 @@ export function VistaTerminal(props: { i: Instalacion; ref?: (el: HTMLPreElement
                     {t("setup.optional.t.cancel")}
                   </button>
                 </Show>
-                <Show when={f.paso === "ok"}>
+                <Show when={f.paso === "ok" && f.removable !== false}>
                   {" "}
                   <span class="text-terminal-muted">·</span>{" "}
                   <button
