@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { contextKey, decodeSelection, emptySelection, encodeSelection, toggleFeature } from '../src/customization.ts';
 
-test('preferences start empty, opt in explicitly and retain only eligible IDs in canonical order', () => {
+test('preferences start empty, opt in explicitly and retain only unique eligible IDs in canonical order', () => {
   let state = emptySelection();
   assert.deepEqual(state.enabled, []);
   state = toggleFeature(toggleFeature(state, 'broadcasts'), 'inbox');
@@ -11,7 +11,7 @@ test('preferences start empty, opt in explicitly and retain only eligible IDs in
   assert.equal(toggleFeature(state, '__proto__'), state);
   assert.deepEqual(decodeSelection(encodeSelection(state)).enabled, state.enabled);
   assert.deepEqual(toggleFeature(state, 'inbox').enabled, ['broadcasts']);
-  assert.deepEqual(decodeSelection('{"version":1,"enabled":["inbox","inbox"]}').enabled, ['inbox']);
+  assert.deepEqual(decodeSelection('{"version":1,"enabled":["inbox","inbox"]}').enabled, []);
 });
 
 test('future preferences never enable features or get rewritten by this version', () => {

@@ -18,7 +18,7 @@ export function createCustomization(context: Accessor<Context>, subscribe?: (cle
     const value = context();
     const current = { ...value, user: validIdentity() ? value.user : null };
     const scope = JSON.stringify([current.user, current.workspace, current.space]);
-    persistent = contextKey(current);
+    persistent = current.user === 'demo' ? null : contextKey(current);
     setScope(scope);
     setTemporary(!persistent || current.user === 'demo');
     let state = memory.get(scope);

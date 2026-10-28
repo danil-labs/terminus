@@ -111,7 +111,7 @@ export default function Tasks() {
             {customization.entries.filter(entry=>entry.selected).map(entry=><Pressable key={entry.id} accessibilityRole="link" accessibilityLabel={entry.title} style={[styles.workspace,{minHeight:44}]} onPress={()=>{
               if(entry.id==='inbox')router.push(ALPHA_DEMO?'/inbox?demo=1':'/inbox');
               else if(entry.id==='broadcasts')router.push(ALPHA_DEMO?'/broadcasts?demo=1':'/broadcasts');
-              else if(entry.id==='agents')router.push('/agents');
+              else if(entry.id==='agents')router.push('/attention-agents');
               else if(entry.id==='channels')router.push('/channels');
             }}><Text style={{color:theme.primary,fontWeight:"600"}}>{entry.title}</Text></Pressable>)}
           </View>

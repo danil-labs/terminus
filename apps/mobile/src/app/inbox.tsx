@@ -19,6 +19,8 @@ export default function Inbox(){
   {!ALPHA_DEMO&&inbox.consent&&<View style={{gap:8}}>{button(t('alpha.refresh'),()=>void inbox.connect())}{inbox.accounts.map(row=><Row key={row.id} title={row.name} subtitle={t('alpha.select_account')} onPress={()=>void inbox.selectAccount(row)}/>)}</View>}
   {inbox.busy&&<Text accessibilityLiveRegion="polite" style={text}>{t('alpha.loading')}</Text>}
   {!!inbox.error&&<Text accessibilityRole="alert" style={text}>{t(inbox.error==='HTTP 403'?'alpha.forbidden':'alpha.load_error')}</Text>}
+  {!inbox.busy&&!inbox.error&&inbox.account&&inbox.rows.length===0&&<Text accessibilityRole="text" style={text}>{t('customize.page_empty')}</Text>}
+  {!inbox.busy&&!inbox.error&&!ALPHA_DEMO&&inbox.consent&&inbox.accounts.length===0&&<Text style={text}>{t('customize.no_accounts')}</Text>}
   {inbox.rows.map(row=><Row key={row.id} left={<Avatar name={row.contact_name}/>} title={row.contact_name} subtitle={<View style={{gap:4}}><Text style={{color:theme.textMuted,fontSize:12}}>{row.channel_name||t('customize.unknown')} · {t(typeof row.ai_assistance==='boolean'?(row.ai_assistance?'customize.ai_enabled':'customize.ai_paused'):'customize.unknown')}{row.unread_count>0?` · ${t('customize.unread')}: ${row.unread_count}`:''}</Text><Text style={text}>{row.last_message}</Text></View>} onPress={()=>{void inbox.open(row);router.push(ALPHA_DEMO?'/inbox-thread?demo=1':'/inbox-thread');}}/>)}
   {inbox.more&&inbox.account&&button(t('alpha.more'),()=>void inbox.selectAccount(inbox.account!,true))}
   {button(t('alpha.home'),()=>router.replace(ALPHA_DEMO?'/?demo=1':'/'))}

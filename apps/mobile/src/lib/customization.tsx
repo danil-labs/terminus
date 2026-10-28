@@ -14,7 +14,7 @@ function useModel() {
   const resolving=!selectionReady || Boolean(current && !snapshot) || !account.ready || !machines.ready || Boolean(account.session && machines.fleet==='loading') || loading || (list.length>0&&!current);
   const scope = JSON.stringify([ALPHA_DEMO ? 'demo' : account.session?.user.id ?? null, current?.id ?? null, space?.id ?? null]);
   const key = process.env.EXPO_PUBLIC_TERMINUS_ALPHA === '1' ? contextKey({user:ALPHA_DEMO?'demo':account.session?.user.id,workspace:current?.id,space:space?.id}) : null;
-  const storageKey = key ? `harness.layout.${key}` : null;
+  const storageKey = !ALPHA_DEMO && key ? `harness.layout.${key}` : null;
   const active = useRef(scope); active.current = scope;
   const memory = useRef(new Map<string, Selection>());
   const latest = useRef({scope,selection:emptySelection()});

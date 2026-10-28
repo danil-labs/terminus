@@ -25,7 +25,7 @@ export function decodeSelection(raw: string | null): Selection {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return emptySelection();
     const data = value as Record<string, unknown>;
     if (data.version !== 1) return { enabled: [], writable: false };
-    if (!Array.isArray(data.enabled) || data.enabled.length > FEATURES.length || data.enabled.some(id => typeof id !== 'string' || !isEnabledFeature(id))) return emptySelection();
+    if (!Array.isArray(data.enabled) || data.enabled.length > FEATURES.length || new Set(data.enabled).size !== data.enabled.length || data.enabled.some(id => typeof id !== 'string' || !isEnabledFeature(id))) return emptySelection();
     const enabled = data.enabled as string[];
     return { enabled: FEATURES.flatMap(row => row.available && enabled.includes(row.id) ? [row.id] : []), writable: true };
   } catch { return emptySelection(); }

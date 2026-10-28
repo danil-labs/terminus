@@ -8,5 +8,5 @@ export default function Channels(){
   const model=useCustomization();const pathname=usePathname();const theme=useTheme();
   if(!model.ready)return null;
   if(!model.enabled('channels'))return pathname.endsWith('/channels')?<Redirect href={ALPHA_DEMO?'/?demo=1':'/'}/>:null;
-  return <><Stack.Screen options={{title:t('attention.channels')}}/><ScrollView contentContainerStyle={{padding:16,gap:16}}><Text style={{color:theme.text}}>{t('attention.desktop_channels')}</Text><Text style={{color:theme.textMuted}}>{t('attention.channels_unavailable')}</Text></ScrollView></>;
+  return <><Stack.Screen options={{title:t('attention.channels')}}/><ScrollView contentContainerStyle={{padding:16,gap:16}}>{ALPHA_DEMO&&<Text style={{color:theme.textMuted}}>{t('alpha.demo_notice')}</Text>}<Text style={{color:theme.text}}>{t('attention.desktop_channels')}</Text><Text style={{color:theme.textMuted}}>{t('attention.channels_unavailable')}</Text></ScrollView></>;
 }

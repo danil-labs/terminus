@@ -4,8 +4,8 @@ import { createCustomization } from '../../src/lib/customization.ts';
 import { contextKey } from '../../../../packages/attention/src/customization.ts';
 
 const values=new Map([['unrelated','sentinel']]);
-let blocked=false;
-globalThis.localStorage={getItem:key=>{if(blocked)throw Error('blocked');return values.get(key)??null;},setItem:(key,value)=>{if(blocked)throw Error('blocked');values.set(key,value);}};
+let blocked=false, accesses=0;
+globalThis.localStorage={getItem:key=>{accesses++;if(blocked)throw Error('blocked');return values.get(key)??null;},setItem:(key,value)=>{accesses++;if(blocked)throw Error('blocked');values.set(key,value);}};
 const key=context=>`harness.layout.${contextKey(context)}`;
 const first={user:'user-1',workspace:'workspace-1',space:'space-1'};
 const tick=()=>new Promise(resolve=>setTimeout(resolve,0));
@@ -27,3 +27,14 @@ blocked=true;setContext({...first,space:'blocked'});await tick();model.toggle('i
 setContext(first);await tick();model.toggle('inbox');clearSession();await tick();assert.deepEqual(model.selection().enabled,[]);assert.equal(model.temporary(),true);
 assert.equal(values.get('unrelated'),'sentinel');dispose();
 console.log('production desktop preferences: contexts, identity, remove, future, corruption, blocked storage and session invalidation passed');
+
+const demo={user:'demo',workspace:'w',space:'s'};
+values.set(key(demo),'{"version":1,"enabled":["inbox"]}');
+let demoModel,disposeDemo;
+blocked=true;const beforeDemo=accesses;
+createRoot(stop=>{disposeDemo=stop;demoModel=createCustomization(()=>demo);});await tick();
+assert.deepEqual(demoModel.selection().enabled,[]);demoModel.toggle('broadcasts');assert.equal(demoModel.enabled('broadcasts'),true);disposeDemo();
+createRoot(stop=>{disposeDemo=stop;demoModel=createCustomization(()=>demo);});await tick();
+assert.deepEqual(demoModel.selection().enabled,[]);disposeDemo();blocked=false;
+assert.equal(accesses,beforeDemo);assert.equal(values.get(key(demo)),'{"version":1,"enabled":["inbox"]}');
+console.log('demo recreation starts empty and never accesses storage');
