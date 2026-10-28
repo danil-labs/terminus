@@ -1,7 +1,11 @@
+import { SCREEN_CONTROL_DESKTOP } from "@terminus/computers";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { t } from "../../lib/i18n";
 import { Button } from "../../ui/Button";
 import { screenConnection, type Phase } from "./connection";
+import { screenInput } from "./input";
+
+type InputViewer = { viewOnly: boolean };
 
 const MESSAGE: Record<Exclude<Phase, "connecting" | "live">, () => string> = {
   offline: () => t("screen.offline"),
@@ -11,16 +15,52 @@ const MESSAGE: Record<Exclude<Phase, "connecting" | "live">, () => string> = {
   failed: () => t("screen.failed"),
 };
 
-/** La pantalla de una computadora, de solo ver: VNC sobre el WebSocket que abre `open`. */
+/** VNC sobre el WebSocket autenticado que abre `open`. */
 export default function Screen(props: { open: () => Promise<WebSocket> }) {
   const [phase, setPhase] = createSignal<Phase>("connecting");
+  const [controllable, setControllable] = createSignal(false);
+  const [controlling, setControlling] = createSignal(false);
   let target!: HTMLDivElement;
+  let rfb: InputViewer | undefined;
+  let input: ReturnType<typeof screenInput> | undefined;
   let connection: ReturnType<typeof screenConnection> | undefined;
   onMount(() => {
-    connection = screenConnection({ target, open: () => props.open(), load: () => import("@novnc/novnc"), phase: setPhase });
+    connection = screenConnection({
+      target, open: () => props.open(), load: () => import("@novnc/novnc"), phase: setPhase,
+      configure(view) {
+        rfb = view;
+        const controls = screenInput(target);
+        input = controls;
+        const named = (event: Event) => {
+          // Los motores anteriores mantienen su visor de solo lectura.
+          const supported = (event as CustomEvent<{ name: string }>).detail.name === SCREEN_CONTROL_DESKTOP;
+          controls.release();
+          view.viewOnly = !supported;
+          setControllable(supported);
+          setControlling(supported);
+        };
+        view.addEventListener("desktopname", named);
+        return () => {
+          view.removeEventListener("desktopname", named);
+          controls.dispose();
+          rfb = undefined;
+          input = undefined;
+          setControllable(false);
+          setControlling(false);
+        };
+      },
+    });
     void connection.connect();
   });
   onCleanup(() => connection?.disconnect());
+
+  const toggleControl = () => {
+    if (!rfb || !controllable() || phase() !== "live") return;
+    input?.release();
+    const next = !controlling();
+    rfb.viewOnly = !next;
+    setControlling(next);
+  };
 
   const ended = () => {
     const p = phase();
@@ -28,13 +68,20 @@ export default function Screen(props: { open: () => Promise<WebSocket> }) {
   };
 
   return (
-    <main data-screen="" data-screen-phase={phase()} class="relative h-full min-h-0 w-full overflow-hidden bg-surface">
-      <div ref={target} class="absolute inset-0" classList={{ invisible: phase() !== "live" }} />
+    <main data-screen="" data-screen-phase={phase()} class="relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-surface">
       <Show when={phase() === "live"}>
-        <span class="pointer-events-none absolute top-2 right-2 rounded-sm bg-neutral-900/70 px-1.5 py-0.5 text-[0.6875rem] font-medium text-white">
-          {t("screen.view_only")}
-        </span>
+        <div class="flex shrink-0 items-center justify-between gap-3 border-b border-border px-3 py-1.5">
+          <span role="status" class="text-xs text-neutral-500">
+            {controlling() ? t("screen.control_active") : t("screen.view_only")}
+          </span>
+          <Show when={controllable()} fallback={<span class="text-xs text-neutral-500">{t("screen.control_unavailable")}</span>}>
+            <Button size="compact" variant="outline" onClick={toggleControl}>
+              {controlling() ? t("screen.stop_control") : t("screen.start_control")}
+            </Button>
+          </Show>
+        </div>
       </Show>
+      <div ref={target} class="min-h-0 flex-1" classList={{ invisible: phase() !== "live" }} />
       <Show when={phase() !== "live"}>
         <div class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-8 text-center">
           <Show when={ended()} fallback={<p role="status" class="text-sm text-neutral-500">{t("screen.connecting")}</p>}>
