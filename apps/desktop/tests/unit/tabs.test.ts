@@ -998,6 +998,21 @@ test("la pantalla de una máquina es una sola pestaña que no se guarda", () => 
   );
 });
 
+/**
+ * Una tarea abierta desde la barra lateral es provisional; si la pantalla
+ * también lo fuera, al activarse en la misma ventana la sustituiría y la
+ * conversación quedaría vacía al dividir.
+ */
+test("la pantalla nunca es provisional y no sustituye a la tarea", () => {
+  const t = createTabs({ transient: true });
+  t.load("pantalla-provisional");
+  t.ensure(tarea("s1"));
+  assert.equal(t.isPinned("s1"), false);
+  t.openScreen("vm-1", "Pantalla de vm-1");
+  assert.equal(t.isPinned("pantalla\u0000vm-1"), true);
+  assert.deepEqual(t.open().map((p) => p.id), ["s1", "pantalla\u0000vm-1"]);
+});
+
 test("Git observations share one read per machine and keep routing explicit", async () => {
   const { watchSessionGit } = await import("../../src/features/projects/taskGit.ts");
   const previousWindow = globalThis.window;

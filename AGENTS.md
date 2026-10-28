@@ -39,6 +39,14 @@ the pnpm workspace: it installs with npm from its own folder.
 
 ## Working rules
 
+- Desplegar Terminus web es independiente de publicar desktop. Una petición de
+  «desplegar» o «merge and deploy» se refiere a web; no autoriza publicar desktop.
+- Toda publicación de desktop, tanto pre-release como release, requiere
+  confirmación explícita del desarrollador para esa publicación antes de
+  disparar builds de distribución o flujos de publicación. Preparar cambios,
+  validarlos o hacer merge no concede esa autorización. Desktop consume más
+  tiempo y dinero que el despliegue web; si falta la confirmación, solicítala
+  indicando la versión y si será pre-release o release.
 - Work goes to `dev` first, then to `main`. Commits are signed off (DCO,
   `git commit -s`) and follow Conventional Commits; see
   [CONTRIBUTING.md](CONTRIBUTING.md).

@@ -287,6 +287,8 @@ export default function Sessions(props: {
    */
   de: string;
   onPick: (id: string) => void;
+  draggedTask?: string | null;
+  onDrag?: (row: SessionRow, event: PointerEvent) => void;
   onDelete: (id: string) => void;
   onMove: (id: string, to: string) => void;
   /**
@@ -785,7 +787,7 @@ export default function Sessions(props: {
             // Con el menú abierto el puntero puede irse de la fila, y el velo
             // del menú se vería recortado sobre otro fondo.
             menu() === f.s.id && "bg-neutral-100",
-            tareaEnVuelo()?.id === f.s.id &&
+            (props.draggedTask ?? tareaEnVuelo()?.id) === f.s.id &&
               "border-border bg-transparent opacity-40 [border-style:dashed]",
           )}
           aria-current={f.s.id === props.current ? "true" : undefined}
@@ -809,12 +811,11 @@ export default function Sessions(props: {
           //  intacta y el arrastre parece no mover nada. Es la
           //  retroalimentación que da por hecha cualquier arrastre del
           //  sistema: lo que se levanta deja su hueco marcado.
-          data-en-vuelo={tareaEnVuelo()?.id === f.s.id ? "true" : undefined}
-          // Arrastrar la fila hasta un proyecto la mueve. El umbral y
-          // por qué no es el arrastre de HTML5 están en `lib/drag.ts`.
-          // Una hija no se arrastra: ver la cabecera del módulo.
+          data-en-vuelo={(props.draggedTask ?? tareaEnVuelo()?.id) === f.s.id ? "true" : undefined}
+          // El shell puede abrir la vista en un panel; el gesto de mover
+          // entre carpetas conserva sus restricciones para tareas hijas.
           onPointerDown={(e) => {
-            if (props.readOnly || f.hija || f.s.parent || f.s.chat_de_agente) return;
+            if (props.readOnly) return;
             const en = e.target as HTMLElement;
             if (en.closest("[data-session-actions]")) return;
             // Tampoco desde la confirmación de borrado: ahí lo que hay
@@ -824,6 +825,11 @@ export default function Sessions(props: {
             // seleccionar texto, y sin esta línea seleccionar media palabra
             // levantaría la tarea y la movería de proyecto al soltar.
             if (en.closest("[data-session-rename]")) return;
+            if (props.onDrag) {
+              props.onDrag(f.s, e);
+              return;
+            }
+            if (f.hija || f.s.parent || f.s.chat_de_agente) return;
             arrastrar(e, { id: f.s.id, de: projectOf(f.s), titulo: f.s.title }, (a) =>
               props.onMove(f.s.id, a),
             );

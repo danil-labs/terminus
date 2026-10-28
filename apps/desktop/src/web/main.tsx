@@ -194,7 +194,10 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
     },
     onEvents: (machine, events, gap) => {
       if (events.length) router?.events(machine, events);
-      if (gap) window.dispatchEvent(new CustomEvent("harness:service-resync"));
+      if (gap) {
+        window.dispatchEvent(new CustomEvent("harness:service-resync"));
+        window.dispatchEvent(new CustomEvent("harness:service-gap"));
+      }
       // Renamed, linked or unlinked in the account's registry: the links of each machine may have changed too.
       if (events.some((e) => e.name === "workspace.changed")) relistSoon();
     },
