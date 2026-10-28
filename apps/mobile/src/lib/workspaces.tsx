@@ -82,6 +82,7 @@ function LiveWorkspacesProvider({ children }: { children: ReactNode }) {
   const [perHost, setPerHost] = useState<Record<string, Workspace[] | null>>({});
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [snapshotScope, setSnapshotScope] = useState("");
   const [loading, setLoading] = useState(false);
   const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
   const asked = useRef(0);
@@ -131,6 +132,7 @@ function LiveWorkspacesProvider({ children }: { children: ReactNode }) {
         rememberTitles(merged.tasks.map((task) => [taskKey(task), task.title]));
         // Solo cambia lo que cambió: las filas iguales conservan su objeto y sus tarjetas no se repintan.
         setSnapshot((old) => (old ? keepSame<Snapshot>(old, merged) : merged));
+        setSnapshotScope(JSON.stringify([entry.id,having.map(host=>host.id).sort()]));
       };
       await Promise.all(
         having.map(async (host, i) => {
@@ -202,9 +204,9 @@ function LiveWorkspacesProvider({ children }: { children: ReactNode }) {
   }, [reload]);
 
   const [spaceIds, setSpaceIds] = useState<Record<string, string>>({});
-  const [selectionReady, setSelectionReady] = useState(false);
+  const [spacePreferenceReady, setSpacePreferenceReady] = useState(false);
   useEffect(() => {
-    void store.get(SPACES_KEY).then((saved) => saved && setSpaceIds(JSON.parse(saved))).catch(() => {}).finally(() => setSelectionReady(true));
+    void store.get(SPACES_KEY).then((saved) => saved && setSpaceIds(JSON.parse(saved))).catch(() => {}).finally(() => setSpacePreferenceReady(true));
   }, []);
   const selectSpace = useCallback(
     (id: string) => {
@@ -240,6 +242,7 @@ function LiveWorkspacesProvider({ children }: { children: ReactNode }) {
   const current = list.find((w) => w.id === currentId) ?? null;
   const hostsOfCurrent = useMemo(() => hosts.filter((h) => current?.members.has(h.id)), [hosts, current]);
 
+  const selectionReady=spacePreferenceReady && (!current || snapshotScope===JSON.stringify([current.id,[...current.hosts].sort()]));
   const value = useMemo<Workspaces>(
     () => ({ list, current, snapshot, loading, selectionReady, select, space, selectSpace, view, setView, hostsOfCurrent, reload }),
     [list, current, snapshot, loading, selectionReady, select, space, selectSpace, view, setView, hostsOfCurrent, reload],

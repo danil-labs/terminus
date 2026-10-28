@@ -8043,10 +8043,8 @@ export default function App() {
               data-shell-cache={enCache() ? "" : undefined}
             >
             <Sidebar
-              attentionFeatures={capabilities().inbox ? attentionEntries().filter(entry => entry.selected) : undefined}
-              onAttentionFeature={openAttentionFeature}
-              attentionActive={pestanas.active()}
-              onPersonalize={capabilities().inbox ? () => setPersonalizing(true) : undefined}
+              attentionMenu={capabilities().inbox ? collapsed => capabilities().inbox!.sidebarMenu({get entries(){return attentionEntries().filter(entry=>entry.selected);},get active(){return pestanas.active();},collapsed,onOpen:openAttentionFeature}) : undefined}
+              personalizeMenu={capabilities().inbox ? collapsed => capabilities().inbox!.personalizeMenu({collapsed,onOpen:()=>setPersonalizing(true)}) : undefined}
               projects={proyectosDelRiel()}
               modelos={modelosParaAgentes()}
               sessions={sesionesDelRiel()}
@@ -8276,16 +8274,7 @@ export default function App() {
       {/* El nombre del workspace ya no se deduce de la ruta: lo lee el propio
           menú de la cabecera, que es quien sabe cuál está activo. */}
       <Show when={personalizing() && capabilities().inbox}>
-        <Dialog open={personalizing()} onOpenChange={setPersonalizing}>
-          <DialogContent class="flex max-h-[80dvh] max-w-2xl flex-col gap-3 overflow-y-auto">
-            <DialogTitle class="text-base font-semibold">{t("attention.personalize")}</DialogTitle>
-            <p class="m-0 text-xs text-neutral-500">{(customization.temporary() ? t("attention.memory") : t("attention.local"))}</p>
-            <Button as="a" variant="ghost" class="self-start" href={`${import.meta.env.BASE_URL}inbox${capabilities().inbox?.demo ? '' : '?demo=1'}`}>{(capabilities().inbox?.demo ? t("attention.leave_demo") : t("attention.demo_mode"))}</Button>
-            <Show when={!customization.selection().writable}><p role="alert" class="text-sm text-warning-strong">{t("attention.future")}</p></Show>
-            {capabilities().inbox?.catalog({ get entries() { return attentionEntries().map(entry => ({...entry,available:entry.available && customization.selection().writable})); }, onToggle: customization.toggle })}
-            <Button variant="secondary" class="self-end" onClick={() => setPersonalizing(false)}>{t("attention.close")}</Button>
-          </DialogContent>
-        </Dialog>
+        {capabilities().inbox?.dialog({get open(){return personalizing();},onOpenChange:setPersonalizing,get temporary(){return customization.temporary();},get writable(){return customization.selection().writable;},demo:Boolean(capabilities().inbox?.demo),get entries(){return attentionEntries().map(entry=>({...entry,available:entry.available&&customization.selection().writable}));},onToggle:customization.toggle})}
       </Show>
 
       <Show when={settings() !== null}>

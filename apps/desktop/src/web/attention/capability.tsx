@@ -6,15 +6,17 @@ import { Button } from '../../ui/Button';
 import { Attention } from './Attention';
 import { createCustomization } from '../../lib/customization';
 import { featureEntries } from '../../lib/attention-labels';
+import { AttentionMenu, PersonalizeMenu } from './SidebarEntries';
 
-const FeatureCatalog = lazy(() => import('./FeatureCatalog').then(module => ({default:module.FeatureCatalog})));
+const CustomizationDialog = lazy(() => import('./CustomizationDialog').then(module => ({default:module.CustomizationDialog})));
 const Broadcasts = lazy(() => import('./Broadcasts').then(module => ({default:module.Broadcasts})));
 
 export function attentionCapability(demo: boolean, initial: boolean, session?: InboxSession & { subscribe?: (clear: () => void) => () => void; userId?: string | null }) {
   return {
     customization: createCustomization, entries: featureEntries,
     demo, userId: demo ? 'demo' : session?.userId, subscribe: session?.subscribe,
-    catalog: (props: Parameters<typeof import("./FeatureCatalog").FeatureCatalog>[0]) => <Suspense fallback={null}><FeatureCatalog {...props}/></Suspense>,
+    sidebarMenu: AttentionMenu, personalizeMenu: PersonalizeMenu,
+    dialog: (props: import("./CustomizationDialog").CustomizationDialogProps) => <Suspense fallback={null}><CustomizationDialog {...props}/></Suspense>,
     broadcasts: () => <Suspense fallback={null}><Broadcasts/></Suspense>,
     initial,
     render: () => <Attention demo={demo} session={session}/>,

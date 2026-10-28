@@ -24,6 +24,7 @@ export type Fleet = "loading" | "ok" | "license" | "error" | "signed_out";
 
 type Machines = {
   ready: boolean;
+  contextReady: boolean;
   fleet: Fleet;
   /** Las máquinas de la persona y, si está emparejado, el Terminus de la red. */
   hosts: Host[];
@@ -88,7 +89,7 @@ const demoHost: Host = {
 };
 
 export function MachinesProvider({ children, active = true }: { children: ReactNode; active?: boolean }) {
-  if (ALPHA_DEMO) return <Context.Provider value={{ ready: true, fleet: "ok", hosts: [demoHost], hostOf: id => id === demoHost.id ? demoHost : undefined, registry: null, preferred: () => demoHost, rememberMachine: () => {}, pairing: null, pair: async () => { throw demoDenied(); }, reloadComputers: async () => {}, retryLicense: () => {}, attention: {}, activity: [], titleOf: () => undefined, rememberTitles: () => {}, setOpenTask: () => {}, subscribe: () => () => {}, tick: 0 }}>{children}</Context.Provider>;
+  if (ALPHA_DEMO) return <Context.Provider value={{ ready: true, contextReady: true, fleet: "ok", hosts: [demoHost], hostOf: id => id === demoHost.id ? demoHost : undefined, registry: null, preferred: () => demoHost, rememberMachine: () => {}, pairing: null, pair: async () => { throw demoDenied(); }, reloadComputers: async () => {}, retryLicense: () => {}, attention: {}, activity: [], titleOf: () => undefined, rememberTitles: () => {}, setOpenTask: () => {}, subscribe: () => () => {}, tick: 0 }}>{children}</Context.Provider>;
   return <LiveMachinesProvider active={active}>{children}</LiveMachinesProvider>;
 }
 
@@ -279,6 +280,7 @@ function LiveMachinesProvider({ children, active }: { children: ReactNode; activ
   const value = useMemo<Machines>(
     () => ({
       ready: account.ready && pairingLoaded,
+      contextReady: !signedIn || (fleet !== "loading" && computers.every(computer => hosts.some(host => host.id === computer.computer_id))),
       fleet: fleetState,
       hosts,
       hostOf,
@@ -297,7 +299,7 @@ function LiveMachinesProvider({ children, active }: { children: ReactNode; activ
       subscribe,
       tick,
     }),
-    [account.ready, pairingLoaded, fleetState, retryLicense, hosts, hostOf, registry, preferred, rememberMachine, pairing, pair, reloadComputers, attention, activity, titleOf, rememberTitles, setOpenTask, subscribe, tick],
+    [account.ready, pairingLoaded, signedIn, fleet, computers, fleetState, retryLicense, hosts, hostOf, registry, preferred, rememberMachine, pairing, pair, reloadComputers, attention, activity, titleOf, rememberTitles, setOpenTask, subscribe, tick],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
