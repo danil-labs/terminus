@@ -76,7 +76,7 @@ export default function Screen(props: { open: () => Promise<WebSocket> }) {
               {controlling() ? t("screen.control_active") : t("screen.view_only")}
             </span>
             {/* La pantalla virtual no tiene escritorio: vacía se ve negra y parece rota. */}
-            <span class="block truncate text-xs text-neutral-400">{t("screen.empty_hint")}</span>
+            <span class="block truncate text-xs text-neutral-500">{t("screen.empty_hint")}</span>
           </div>
           <Show when={controllable()} fallback={<span class="text-xs text-neutral-500">{t("screen.control_unavailable")}</span>}>
             <Button size="compact" variant="outline" onClick={toggleControl}>
