@@ -1961,12 +1961,15 @@ export default function App() {
       const current = arranque.workspaces.find((w) => w.id === workspace);
       if (!current) throw { what: t("projects.context.unavailable"), detail: "context_unavailable" };
       const root = current.context_root;
-      const [proyectos, fuentes] = await Promise.all([
-        invoke<Project[]>("list_projects"),
+      const [, fuentes] = await Promise.all([
+        invoke<Project[]>("list_projects").then(rows => {
+          if (generation === sessionGeneration && request === materialRequest) setProjectList(rows);
+          return rows;
+        }),
         invoke<Source[]>("list_sources"),
       ]);
       if (generation !== sessionGeneration || request !== materialRequest) return;
-      setProjectList(proyectos);
+
       setSources(fuentes);
       confirmContext(root, fuentes);
     } catch (e) {
@@ -2100,12 +2103,15 @@ export default function App() {
       // esperaba a que volviera `list_projects` para preguntar algo que
       // no usa su respuesta.
       // Las fuentes que no llegan (su máquina apagada, sin copia) dejan las de antes y no tumban las carpetas.
-      const [proyectos, fuentes] = await Promise.all([
-        invoke<Project[]>("list_projects"),
+      const [, fuentes] = await Promise.all([
+        invoke<Project[]>("list_projects").then(rows => {
+          if (generation === sessionGeneration) setProjectList(rows);
+          return rows;
+        }),
         invoke<Source[]>("list_sources").catch(() => null),
       ]);
       if (generation !== sessionGeneration) return;
-      setProjectList(proyectos);
+
       if (material === materialRequest) {
         if (fuentes) {
           setSources(fuentes);

@@ -250,3 +250,86 @@ test("an existing local task can attach material without a machine list or an ex
   assert.deepEqual(calls, [{ locator: "/local-folder" }]);
   assert.deepEqual(app.fallos, []);
 });
+
+test("la web muestra las tareas disponibles sin esperar a una máquina que no contesta", async (t) => {
+  const started = Date.now();
+  const { fleet } = await import("../helpers/fake-relay.mjs");
+  const f = fleet({ cmp_fast: { table: { ...engine, setup_required: true, prepare_runtime: { running: false, stages: [{ name: "ready", essential: true, state: "succeeded" }] } } }, cmp_slow: { table: engine } });
+  const SlowSocket = f.relays.cmp_slow.Socket;
+  f.relays.cmp_slow.Socket = class extends SlowSocket {
+    send(data) {
+      if (JSON.parse(data).type === "call") return;
+      super.send(data);
+    }
+  };
+  const app = await boot("listo", "web-slow-machine", {}, undefined, {}, {
+    web: true,
+    antes: w => {
+      globalThis.WebSocket = f.Socket;
+      w.terminusWeb = {
+        endpoint: "https://relay.test", getToken: async () => "tok",
+        computers: ["cmp_fast", "cmp_slow"].map(computer_id => ({ computer_id, name: computer_id === "cmp_slow" ? "A VM lenta" : "B Mac disponible", state: "online", provider: computer_id === "cmp_slow" ? "aws-ec2" : "self", workspaces: ["w"] })),
+      };
+    },
+  });
+  const deadline = Date.now() + 4_000;
+  while (!app.w.document.querySelector('[data-sesion="cmp_fast~t1"]') && Date.now() < deadline) await sleep(100);
+  assert.ok(app.w.document.querySelector('[data-sesion="cmp_fast~t1"]'), "la máquina disponible aporta sus tareas dentro del plazo");
+  t.diagnostic(`Primera lista visible: ${Date.now() - started} ms`);
+  assert.deepEqual(app.fallos, []);
+});
+
+
+test("una respuesta tardía agrega proyectos y tareas sin recargar ni duplicar lecturas pendientes", async () => {
+  const { fleet } = await import("../helpers/fake-relay.mjs");
+  const f = fleet({ cmp_fast: { table: engine }, cmp_slow: { table: engine } });
+  const SlowSocket = f.relays.cmp_slow.Socket;
+  const waiting = [];
+  let held = true;
+  f.relays.cmp_slow.Socket = class extends SlowSocket {
+    send(data) {
+      if (held && JSON.parse(data).type === "call") return void waiting.push([this, data]);
+      super.send(data);
+    }
+  };
+  const app = await boot("listo", "web-late-machine", {}, undefined, {}, {
+    web: true,
+    antes: w => {
+      globalThis.WebSocket = f.Socket;
+      w.terminusWeb = {
+        endpoint: "https://relay.test", getToken: async () => "tok",
+        computers: ["cmp_fast", "cmp_slow"].map(computer_id => ({ computer_id, name: computer_id === "cmp_slow" ? "A VM lenta" : "B Mac disponible", state: "online", provider: computer_id === "cmp_slow" ? "aws-ec2" : "self", workspaces: ["w"] })),
+      };
+    },
+  });
+  async function row(id, present = true) {
+    const deadline = Date.now() + 4000;
+    while (Boolean(app.w.document.querySelector(`[data-sesion="${id}"]`)) !== present && Date.now() < deadline) await sleep(50);
+    assert.equal(Boolean(app.w.document.querySelector(`[data-sesion="${id}"]`)), present, id);
+  }
+  await row("cmp_fast~t1");
+  const invoke = (command, args) => app.w.__TAURI_INTERNALS__.invoke(command, args);
+  const signature = ([, data]) => {
+    const call = JSON.parse(data);
+    return JSON.stringify([call.command, call.workspace, call.args]);
+  };
+  await Promise.all([invoke("list_projects"), invoke("list_projects")]);
+  assert.equal(new Set(waiting.map(signature)).size, waiting.length, "las relecturas comparten la petición en vuelo");
+  await sleep(10_500);
+  held = false;
+  for (const [socket, data] of waiting.splice(0)) SlowSocket.prototype.send.call(socket, data);
+  await row("cmp_slow~t1");
+  await row("cmp_fast~t1");
+
+  held = true;
+  const previous = await invoke("list_live_sessions", { project: "p1", open: ["cmp_slow~t1"] });
+  assert.ok(previous.some(task => task.id === "cmp_slow~t1"), "cambiar open conserva la última fila de la máquina pendiente");
+  for (const [socket, data] of waiting.splice(0)) {
+    const call = JSON.parse(data);
+    if (call.command === "list_live_sessions") socket.onmessage?.({ data: JSON.stringify({ type: "result", id: call.id, value: [] }) });
+    else SlowSocket.prototype.send.call(socket, data);
+  }
+  const updated = await invoke("list_live_sessions", { project: "p1", open: ["cmp_slow~t1"] });
+  assert.ok(!updated.some(task => task.id === "cmp_slow~t1"), "una respuesta vacía confirmada sí retira la fila");
+  assert.deepEqual(app.fallos, []);
+});
