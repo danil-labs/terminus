@@ -11,6 +11,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Computer, SocketLike } from "@terminus/computers";
 import type { EngineEvent } from "@terminus/protocol";
+import { loadTask } from "../src/lib/engine.ts";
+import type { Host } from "../src/lib/hosts.ts";
 import { HostError, accountFleet } from "../src/lib/hosts.ts";
 
 type Reply = (call: { id: string; command: string; args: Record<string, unknown> }) => unknown;
@@ -163,4 +165,19 @@ test("sin Terminus de pago el relay detiene la sesión: la flota lo dice y «Rei
   assert.equal(machines.license(), null);
   assert.equal(FakeSocket.all.filter((s) => s.computer === "cmp_vm").length, before + 1);
   machines.close();
+});
+
+test("una lista de turnos guardada no deja en cola los mensajes a una VM apagada", async () => {
+  let on = false;
+  const host = {
+    power: () => on ? "on" : "off",
+    async call(command: string) {
+      const value = command === "list_active_turns" ? ["task"] : command === "load_session" ? { id: "task", turns: [] } : null;
+      return { value, cachedAt: on ? null : 1234567890000 };
+    },
+  } as unknown as Host;
+  const cached = await loadTask(host, "w", "p", "task");
+  assert.equal(cached.running, false, "el mensaje debe enviarse al relay para encender la VM");
+  on = true;
+  assert.equal((await loadTask(host, "w", "p", "task")).running, true);
 });

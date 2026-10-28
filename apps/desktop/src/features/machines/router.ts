@@ -64,14 +64,18 @@ const REGISTRY_FOR = 30_000;
 const REGISTRY_WAIT = 4_000;
 /** Cuánto espera lo que la ventana no relee sola (workspaces, cuentas) a lo vivo antes de contestar con lo guardado. */
 const FRESH_WAIT = 1_500;
+const FIRST_ANSWER_GRACE = 100;
+const PROGRESSIVE = new Set([...LISTING, "list_projects", "list_portfolios", "list_live_sessions", "list_spaces", "list_workspace_attention", "list_task_mentions"]);
 /** Lo que espera `service_poll` en la web: los eventos ya llegan solos (`events`). */
 const POLL_WAIT = 20_000;
 /** En la web no hay instalador: lo que la ventana pregunta de él se contesta aquí. */
 const NO_SETUP: Record<string, unknown> = { setup_required: false, prepare_runtime: { stages: [], running: false }, list_live_turns: [] };
 
 /** Qué vuelve a leer la ventana cuando cambia la rebanada de una lectura. */
-export type SliceChange = "sessions" | "projects" | "spaces" | "attention" | "mentions";
+export type SliceChange = "sessions" | "projects" | "spaces" | "attention" | "mentions" | "workspaces";
 const CHANGES: Record<string, SliceChange> = {
+  list_workspaces: "workspaces",
+  workspaces_startup: "workspaces",
   list_live_sessions: "sessions",
   list_active_turns: "sessions",
   list_projects: "projects",
@@ -291,6 +295,7 @@ export function createRouter(config: RouterConfig) {
    * espera a que contesten, con su tope. Una apagada con copia contesta de su copia sin preguntar.
    */
   async function gather(envelopes: Envelope[], { settles = false, fresh = false } = {}): Promise<Slice[]> {
+    if (PROGRESSIVE.has(envelopes[0]?.command)) return gatherAvailable(envelopes, settles);
     const before = envelopes.map((envelope) => fleet.peek(envelope));
     if (!settles && !before.some((b) => b?.has)) return Promise.all(envelopes.map((e) => fleet.read(e)));
     if (!fresh) {
@@ -314,6 +319,30 @@ export function createRouter(config: RouterConfig) {
       () => {},
     );
     return before.filter((b): b is Slice => !!b);
+  }
+
+  /** La primera máquina con datos libera la lista; las pendientes conservan su última rebanada y avisan al contestar. */
+  async function gatherAvailable(envelopes: Envelope[], settles: boolean): Promise<Slice[]> {
+    const slices = envelopes.map(previousSlice);
+    let returned = false;
+    let finish!: () => void;
+    const available = new Promise<void>(resolve => { finish = resolve; });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const soon = () => { timer ??= setTimeout(finish, FIRST_ANSWER_GRACE); };
+    if (settles || slices.some(slice => slice?.has)) timer = setTimeout(finish, 0);
+    const live = envelopes.map(async (envelope, i) => {
+      const before = slices[i];
+      const slice = await fleet.read(envelope);
+      slices[i] = slice;
+      if (envelope.command === "list_live_sessions" && slice.has) sessionReads.set(JSON.stringify([envelope.machine, envelope.workspace, envelope.args?.project]), envelope);
+      if (returned) {
+        if (differs(before, slice)) notify(envelope.command);
+      } else if (slice.has) soon();
+    });
+    await Promise.race([Promise.all(live), available]);
+    returned = true;
+    clearTimeout(timer);
+    return slices.filter((slice): slice is Slice => !!slice);
   }
 
   /** Nadie trajo nada: se dice por qué, y la ventana se queda con lo que tenía. */

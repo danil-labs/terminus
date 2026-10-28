@@ -720,3 +720,24 @@ test("disk resources remain live but are excluded from persisted listings", asyn
   assert.ok(!persisted.includes("machine_resources"));
   assert.ok(persisted.includes("workspaces"));
 });
+
+test("branches and usage reopen from their saved slices without waking an off VM", async () => {
+  for (const command of ["project_base_branches", "account_limits"]) {
+    const storage = memoryStorage();
+    const value = command === "project_base_branches" ? { branches: [], selected: "refs/heads/dev" } : { mode: "read", windows: [], fetched_at: 10 };
+    const args = command === "project_base_branches" ? { project: "p1" } : { provider: "claude", id: "a1", force: false };
+    const envelope = { machine: VM.id, workspace: "w", command, args };
+    const first = setup({ cmp_vm: { answers: { [command]: value } } }, [VM], { storage });
+    await first.fleet.read(envelope);
+    first.fleet.close();
+    let wakes = 0;
+    const reopened = setup({ cmp_vm: { state: "stopped" } }, [VM], { storage, wake: async () => { wakes++; return true; } });
+    try {
+      const kept = await reopened.fleet.read(envelope);
+      assert.equal(kept.status, "cached");
+      assert.deepEqual(kept.value, value);
+      assert.equal(wakes, 0);
+      assert.equal(reopened.link(VM.id).calls.length, 0);
+    } finally { reopened.fleet.close(); }
+  }
+});
