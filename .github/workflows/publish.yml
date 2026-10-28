@@ -779,9 +779,6 @@ jobs:
           esac
           python3 scripts/work-tools-release.py verify --directory "$resources"
           python3 scripts/work-tools-runtime-smoke.py --engine "$engine" --resources "$(dirname "$resources")" --browser --clone
-          if [ "$RUNNER_OS" = macOS ]; then
-            python3 scripts/work-tools-runtime-smoke.py --engine "$engine" --resources "$(dirname "$resources")" --architecture x86_64 --browser --clone
-          fi
 
       - name: Comprobar el bundle universal
         if: runner.os == 'macOS'
@@ -1056,6 +1053,8 @@ jobs:
           name: dist-macos
           path: release-assets
       - name: Ejecutar el mismo universal en ambas arquitecturas
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
           tar xzf release-assets/Terminus.app.tar.gz
@@ -1066,6 +1065,8 @@ jobs:
           # sale con `cli.error.invalid_request`: el ejecutable carga; la interfaz no se prueba.
           out=$(Terminus.app/Contents/MacOS/terminus --external-host 2>&1) && { echo "::error::Arrancó con un argumento inválido"; exit 1; }
           echo "$out" | grep -q invalid_request
+          python3 apps/desktop/scripts/work-tools-release.py verify --directory Terminus.app/Contents/Resources/work-tools
+          python3 apps/desktop/scripts/work-tools-runtime-smoke.py --engine Terminus.app/Contents/MacOS/seldon-runtime --resources Terminus.app/Contents/Resources --browser --clone
 
   # El AppImage que se va a publicar, en un Ubuntu limpio: la firma minisign
   # con el mismo verificador que usa `npx`, que lleve el motor, y que el binario

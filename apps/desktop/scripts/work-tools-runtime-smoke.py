@@ -9,6 +9,7 @@ from pathlib import Path
 import platform
 import socket
 import subprocess
+import sys
 import tempfile
 import time
 import uuid
@@ -115,11 +116,16 @@ def main():
                 if not cloned or not cloned.get("project") or cloned.get("error"):
                     raise RuntimeError(f"Packaged Git could not clone over HTTPS: {cloned}")
             if args.browser:
+                print(json.dumps({"phase": "activate sandboxed browser", "architecture": args.architecture or platform.machine()}), flush=True)
                 invoke("install_tool", {"tool": "browser-navigation"}, workspace)
             print(json.dumps({"packaged_engine": str(engine), "documents": "round trips passed with both aliases",
                               "cua": "installed, inactive", "drawio": "installed, enabled",
                               "public_clone": "passed" if args.clone else "not requested",
                               "browser": "explicit activation and sandboxed launch passed" if args.browser else "not activated"}))
+        except Exception:
+            log.flush()
+            print((lab / "engine.log").read_text(errors="replace")[-6000:], file=sys.stderr)
+            raise
         finally:
             process.terminate()
             try:
