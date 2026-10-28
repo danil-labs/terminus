@@ -3204,6 +3204,11 @@ export default function App() {
           .catch(() => {});
     });
     onCleanup(() => void sesionEv.then((f) => f()));
+    // Los eventos de otra máquina llegan por el relay, no por `service_poll`:
+    // un hueco ahí se llevó sus `session` y el sondeo de esta ventana no lo ve.
+    const trasHueco = () => releerTrasHueco();
+    window.addEventListener("harness:service-gap", trasHueco);
+    onCleanup(() => window.removeEventListener("harness:service-gap", trasHueco));
     serviceListenersReady = Promise.all([chat, question, usageEv, agentsEv, cuentaEv, cliChanged, cliOpen, sesionEv]);
   });
 

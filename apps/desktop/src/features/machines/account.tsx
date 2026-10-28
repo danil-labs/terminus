@@ -174,7 +174,10 @@ export function startAccountMachines(target: Target = window) {
       onSlice: () => bump((n) => n + 1),
       onEvents: (machine, events, gap) => {
         if (events.length) router.events(machine, events);
-        if (gap) window.dispatchEvent(new CustomEvent("harness:service-resync"));
+        if (gap) {
+          window.dispatchEvent(new CustomEvent("harness:service-resync"));
+          window.dispatchEvent(new CustomEvent("harness:service-gap"));
+        }
       },
     });
     const router = createRouter({
