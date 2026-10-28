@@ -6379,7 +6379,8 @@ export default function App() {
     setInjecting((items) => [...items, { session: abierta, id }]);
     try {
       const attachments = await attachmentsFor(m.attachments, deLaTarea(abierta), sourceProject);
-      await invoke("inject_message", {
+      // El turno tal como queda en la transcripción; `null` en un motor que todavía no lo devuelve.
+      const guardado = await invoke<Turn | null>("inject_message", {
         project: sourceProject,
         session: abierta,
         prompt: m.text,
@@ -6396,7 +6397,15 @@ export default function App() {
       const saved = savedQueues.get(abierta);
       if (saved) savedQueues.set(abierta, { ...saved, items: saved.items.filter((item) => item.id !== id) });
       if (sessionId() === abierta && project() === sourceProject) setCola((c) => c.filter((q) => q.id !== id));
-      anexar(abierta, (ms) => [...ms, { role: "user", text: m.text, task_mentions: m.task_mentions, attachments: attachments.length ? attachments : undefined }]);
+      // Con su `turno`: la relectura de la tarea a mitad del turno ya lo trae de disco, y sin id salía dos veces.
+      anexar(abierta, (ms) => [...ms, {
+        role: "user",
+        text: m.text,
+        task_mentions: m.task_mentions,
+        attachments: attachments.length ? attachments : undefined,
+        turno: guardado?.id ?? undefined,
+        author: guardado?.author ?? undefined,
+      }]);
     } catch (e) {
       const clave = claveDe(e);
       // El turno acaba de cerrar: el mensaje sigue en la cola y sale como el siguiente.
