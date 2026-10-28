@@ -305,7 +305,11 @@ test("a new task is born on the machine chosen, with the same project id, and ma
   assert.equal(await invoke("send_message", { project: "p1", session: null, prompt: "otra" }, vm), "cmp_vm~r1");
   assert.deepEqual(calls("cmp_vm", "materialize_workspace").map((c) => [c.args.id, c.workspace]), [["w2", "w2"]], "the VM makes the workspace its own with the same id, said in the envelope");
   assert.deepEqual(calls("cmp_vm", "send_message").at(-1).workspace, "w2", "and then gets the task in it");
-  const after = await invoke("list_workspaces");
+  let after = await invoke("list_workspaces");
+  for (let attempt = 0; attempt < 20 && !after.workspaces.find(w => w.id === "w2")?.machines.includes("cmp_vm"); attempt++) {
+    await sleep(50);
+    after = await invoke("list_workspaces");
+  }
   assert.deepEqual(after.workspaces.find((w) => w.id === "w2").machines, ["cmp_vm", "cmp_mac"]);
   assert.deepEqual(app.fallos, []);
 });
