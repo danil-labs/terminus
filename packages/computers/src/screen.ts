@@ -1,9 +1,12 @@
 /**
  * La pantalla de una computadora (protocolo v1, «Pantalla»): un WebSocket aparte
- * del de sesión que lleva RFB (VNC) en frames binarios, de solo ver. Abrirlo no
+ * del de sesión que lleva RFB (VNC) en frames binarios. Abrirlo no
  * enciende la computadora: con ella apagada el relay lo cierra con 4010.
  */
 import { sessionUrl } from "./relay.ts";
+
+/** Nombre RFB anunciado por los motores que admiten entrada sin compartir el portapapeles. */
+export const SCREEN_CONTROL_DESKTOP = "Terminus VM control v1";
 
 export const SCREEN_SUBPROTOCOL = "danil.screen.v1";
 
