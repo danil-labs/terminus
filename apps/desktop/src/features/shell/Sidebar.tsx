@@ -110,6 +110,9 @@ export default function Sidebar(props: {
   collapsed: boolean;
   onToggle: () => void;
   onPick: (project: string, id: string) => void;
+  draggedTask?: string | null;
+  dragFolder?: string | null;
+  onDrag?: (project: string, row: SessionRow, event: PointerEvent) => void;
   onNew: () => void;
   onRenombrarProyecto: (id: string, name: string) => Promise<void> | void;
   onBorrarProyecto: (id: string) => Promise<void> | void;
@@ -365,6 +368,7 @@ export default function Sidebar(props: {
    */
   const Historial = (p: { filas: SessionRow[]; clave: string; sinCarpeta?: boolean }) => (
     <Sessions sidebar
+      draggedTask={props.draggedTask}
       density={vista().density}
       hideFolder={p.sinCarpeta}
       sessions={p.filas}
@@ -380,6 +384,7 @@ export default function Sidebar(props: {
       destinos={[]}
       destinosDe={(row) => destinos(carpetaDe(row.id))}
       carpetaDe={(row) => nombreDe(carpetaDe(row.id))}
+      onDrag={props.onDrag ? (row, event) => props.onDrag?.(carpetaDe(row.id), row, event) : undefined}
       onPick={(s) => {
         props.onPick(carpetaDe(s), s);
         setDesplegado(false);
@@ -485,7 +490,7 @@ export default function Sidebar(props: {
             fallback={
               <div
                 data-destino={g().kind === "folder" ? "" : undefined}
-                class={cn("rounded-[var(--radius-sm)]", g().kind === "folder" && destinoEnVuelo() === "" && RECIBE_LA_TAREA)}
+                class={cn("rounded-[var(--radius-sm)]", g().kind === "folder" && (props.dragFolder ?? destinoEnVuelo()) === "" && RECIBE_LA_TAREA)}
               >
                 <Rotulo
                   tono={necesita() ? "need" : undefined}
@@ -512,6 +517,7 @@ export default function Sidebar(props: {
             {(proj) => (
               <Suspense>
                 <FolderGroupHeader
+                  dragFolder={props.dragFolder}
                   p={proj()}
                   rotulo={g().machine === undefined ? undefined : titulo()}
                   maquina={g().machine}
