@@ -132,7 +132,7 @@ import {
   type CambioPorCupo,
   type FalloDelTurno,
   cupoResuelveElFallo,
-  gestoDelFallo,
+  gestoDeLaFila,
   prosaDelCambioPorCupo,
   prosaDelFallo,
 } from "./failures";
@@ -1521,6 +1521,11 @@ export default function Chat(props: ChatProps) {
    * el agente para responder esto", que es lo que se quiere leer.
    */
 
+  /** Dónde está el último mensaje escrito: lo que `onReintentar` vuelve a mandar. */
+  const ultimoEscrito = createMemo(() => {
+    for (let i = props.msgs.length - 1; i >= 0; i--) if (props.msgs[i].role === "user") return i;
+    return -1;
+  });
   /**
    * El turno que no cerró se queda fuera: un fallo es lo único de esa
    * tira que cambia lo que hay que hacer después, no entra en nada plegable.
@@ -3037,6 +3042,7 @@ export default function Chat(props: ChatProps) {
                   {(m) => (
                     <HitoDelHilo
                       msg={m()}
+                      vigente={(mensaje()?.i ?? -1) > ultimoEscrito()}
                       onReintentar={props.onReintentar}
                       onCuentas={props.onConectar}
                       onOpenTask={props.onOpenTask}
@@ -3857,6 +3863,8 @@ function FilaDeLaBandeja(props: {
  * `failures::Fallo`, traducido; con un gesto que sirva son dos botones. */
 function HitoDelHilo(props: {
   msg: Msg;
+  /** Si es el fallo de lo último que se escribió: solo ése ofrece reintentar. */
+  vigente: boolean;
   /** Volver a mandar lo último que se escribió. */
   onReintentar: () => void;
   /** Llevar a donde se conectan y se cambian las cuentas. */
@@ -3879,7 +3887,7 @@ function HitoDelHilo(props: {
       <span class="flex min-w-0 flex-col items-start gap-0.5">
         <span class="break-words">
           {prosaDelFallo(props.msg)}
-          <Show when={gestoDelFallo(props.msg.fallo?.clase)}>
+          <Show when={gestoDeLaFila(props.msg, props.vigente)}>
             {(g) => (
               <>
                 {" — "}
@@ -3913,23 +3921,15 @@ function HitoDelHilo(props: {
             )}
           </Show>
         </span>
-        {/* El renglón de máquina, debajo y en `mono`, como en el resto de
-            la app (`ui/Failure.tsx`): arriba la frase con acción, la
-            única parte que le sirve a quien opera el negocio; abajo lo
-            que hace falta para reportarlo. Solo cuando hay clase: sin
-            ella la frase de arriba ya es el crudo, y repetirlo debajo
-            sería decir dos veces lo mismo. */}
         <Show
-          when={
-            props.msg.fallo?.clase && props.msg.fallo.clase !== "desconocido"
-              ? props.msg.fallo
-              : null
-          }
+          when={props.msg.fallo?.detail && props.msg.fallo.detail !== prosaDelFallo(props.msg)
+            ? props.msg.fallo : null}
         >
           {(f) => (
-            <span class="font-mono text-[0.7rem] break-all text-neutral-500">
-              {f().detail}
-            </span>
+            <details class="text-neutral-500">
+              <summary class="cursor-pointer text-[0.6875rem]">{t("common.failure.detail")}</summary>
+              <p class="m-0 font-mono text-[0.7rem] break-all whitespace-pre-wrap">{f().detail}</p>
+            </details>
           )}
         </Show>
       </span>

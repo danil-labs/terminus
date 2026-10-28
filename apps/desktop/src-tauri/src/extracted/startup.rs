@@ -11,17 +11,20 @@ const EN: &str = include_str!("../../../src/locales/en/shell.json");
 /// La última versión con el motor dentro de la app; sus datos no se tocan.
 const PREVIOUS_RELEASE: &str = "https://github.com/danil-labs/terminus/releases/tag/v0.2.74";
 
-pub fn show(error: &Error) {
-    if !nobody_reads_stderr() {
-        return;
-    }
+pub(super) fn phrase(frase: Frase) -> String {
     let catalog: Value = serde_json::from_str(if system_language().starts_with("es") {
         ES
     } else {
         EN
     })
     .unwrap_or_default();
-    let phrase = |frase: Frase| catalog[frase.0].as_str().unwrap_or(frase.0).to_owned();
+    catalog[frase.0].as_str().unwrap_or(frase.0).to_owned()
+}
+
+pub fn show(error: &Error) {
+    if !nobody_reads_stderr() {
+        return;
+    }
     let key = match error.code.as_str() {
         "engine_missing" => Frase::new("shell.startup.engine_missing"),
         "engine_start_failed" | "service_busy" | "authority_incompatible" => {

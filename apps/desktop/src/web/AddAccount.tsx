@@ -7,6 +7,7 @@
  */
 import { render } from "solid-js/web";
 import { createSignal, For, Show } from "solid-js";
+import { prosaDe } from "../lib/failure";
 import { t } from "../lib/i18n";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
@@ -108,7 +109,7 @@ function AddAccount(props: AddAccountOptions) {
           }
           await finish(slot);
         })
-        .catch((e: unknown) => setFailure(String(e)))
+        .catch((e: unknown) => setFailure(prosaDe(e)))
         .finally(() => setBusy(false));
     }
   }

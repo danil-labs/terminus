@@ -47,6 +47,9 @@ const TEXTOS = {
   readopt: () => [t("launcher.handoff.readopt.title"), t("launcher.handoff.readopt.body")],
 };
 const MOTIVOS: Record<string, () => string> = {
+  version_mismatch: () => t("launcher.failed.reason.version_mismatch"),
+  managed_service_unavailable: () => t("shell.service.managed"),
+  managed_profile_invalid: () => t("shell.service.managed"),
   engine_missing: () => t("launcher.failed.reason.engine_missing"),
   invalid_token: () => t("launcher.failed.reason.not_private"),
   service_busy: () => t("launcher.failed.reason.service_busy"),
@@ -237,7 +240,7 @@ export default function Lanzador(props: { children: JSX.Element }) {
               {(f) => (
                 <>
                   <h1 class="m-0 mb-5 max-w-[22ch] text-3xl leading-tight font-display font-bold tracking-[-0.03em] text-neutral-950">
-                    {t("launcher.failed.title")}
+                    {f().code === "version_mismatch" ? t("launcher.failed.incompatible.title") : t("launcher.failed.title")}
                   </h1>
                   <p class="m-0 max-w-[60ch] text-sm text-neutral-950">
                     {(MOTIVOS[f().code] ?? (() => t("launcher.failed.reason.other")))()}

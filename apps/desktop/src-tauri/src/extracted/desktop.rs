@@ -5,40 +5,30 @@ pub(super) fn request_close(window: tauri::Window) -> Result<(), String> {
     window.close().map_err(|error| error.to_string())
 }
 
-static CLOSE_CONFIRMED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-static CLOSE_ASKED: std::sync::Mutex<Option<std::time::Instant>> = std::sync::Mutex::new(None);
-
-/// El front ya decidió qué hacer con los turnos vivos; ahora sí se cierra.
-#[tauri::command]
-pub(super) fn close_confirmed(window: tauri::Window) -> Result<(), String> {
-    CLOSE_CONFIRMED.store(true, std::sync::atomic::Ordering::SeqCst);
-    window.close().map_err(|error| error.to_string())
+/// Cerrar conserva el cliente y sus turnos, incluso durante el arranque.
+pub(super) fn on_close_requested(window: &tauri::Window, api: &tauri::CloseRequestApi) {
+    if window.label() != "main" {
+        return;
+    }
+    api.prevent_close();
+    if let Err(error) = super::tray::hide_window(window.app_handle()) {
+        log::warn!("[tray] close kept visible: {error}");
+        let _ = window.emit("close-requested", ());
+    }
 }
 
-/// Todo cierre de la ventana (X, Alt+F4, barra de tareas, menú) pregunta antes
-/// al front si hay agentes trabajando. Un segundo intento seguido cierra igual:
-/// un front colgado no puede dejar la ventana imposible de cerrar.
-pub(super) fn on_close_requested(window: &tauri::Window, api: &tauri::CloseRequestApi) {
-    use std::sync::atomic::Ordering;
-    if CLOSE_CONFIRMED.load(Ordering::SeqCst) {
-        return;
-    }
-    // Sin motor (traspaso o arranque fallido) no hay turnos que cuidar.
-    if window
-        .app_handle()
-        .try_state::<std::sync::Arc<super::proxy::State>>()
-        .is_none()
+/// La salida nativa y la del icono pasan por la misma confirmación.
+pub(super) fn request_quit(app: &tauri::AppHandle) {
+    if !super::tray::FRONT_READY.load(std::sync::atomic::Ordering::SeqCst)
+        || app
+            .try_state::<std::sync::Arc<super::proxy::State>>()
+            .is_none()
     {
+        app.exit(0);
         return;
     }
-    let now = std::time::Instant::now();
-    let mut asked = CLOSE_ASKED.lock().unwrap_or_else(|p| p.into_inner());
-    if asked.is_some_and(|at| now.duration_since(at) < std::time::Duration::from_secs(4)) {
-        return;
-    }
-    *asked = Some(now);
-    api.prevent_close();
-    let _ = window.emit("close-requested", ());
+    super::tray::show_window(app);
+    let _ = app.emit("tray-quit", ());
 }
 
 pub(super) static STARTED: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();

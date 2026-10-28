@@ -9,6 +9,8 @@ use tauri::{
 };
 
 const ID: &str = "terminus-background";
+pub(super) static FRONT_READY: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
 
 #[derive(Deserialize)]
 pub(super) struct Labels {
@@ -32,7 +34,6 @@ pub(super) fn show_window(app: &AppHandle) {
         let _ = window.unminimize();
         let _ = window.set_focus();
     }
-    let _ = app.remove_tray_by_id(ID);
 }
 
 fn menu(app: &AppHandle, labels: &Labels, items: &[Item]) -> tauri::Result<Menu<tauri::Wry>> {
@@ -79,16 +80,38 @@ fn menu(app: &AppHandle, labels: &Labels, items: &[Item]) -> tauri::Result<Menu<
     Ok(menu)
 }
 
-/// Oculta la ventana y pone el icono; el front sigue vivo y lo mantiene al día.
-#[tauri::command]
-pub(super) fn window_to_background(
-    app: AppHandle,
-    labels: Labels,
-    items: Vec<Item>,
-) -> Result<(), String> {
-    let menu = menu(&app, &labels, &items).map_err(|error| error.to_string())?;
+/// El icono existe antes del webview; el front después actualiza su idioma y estado.
+pub(super) fn initialize(app: &AppHandle) -> Result<(), String> {
+    use super::{startup::phrase, util::Frase};
+    update(
+        app,
+        &Labels {
+            tooltip: phrase(Frase::new("shell.tray.unknown")),
+            header: phrase(Frase::new("shell.tray.unknown")),
+            open: phrase(Frase::new("shell.tray.open")),
+            stop_all: phrase(Frase::new("shell.tray.stop_all")),
+            quit: phrase(Frase::new("shell.tray.quit")),
+        },
+        &[],
+    )
+}
+
+pub(super) fn hide_window(app: &AppHandle) -> Result<(), String> {
+    if app.tray_by_id(ID).is_none() {
+        initialize(app)?;
+    }
+    if let Some(window) = app.get_window("main") {
+        window.hide().map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+fn update(app: &AppHandle, labels: &Labels, items: &[Item]) -> Result<(), String> {
+    let menu = menu(app, labels, items).map_err(|error| error.to_string())?;
     if let Some(tray) = app.tray_by_id(ID) {
         tray.set_menu(Some(menu))
+            .map_err(|error| error.to_string())?;
+        tray.set_tooltip(Some(&labels.tooltip))
             .map_err(|error| error.to_string())?;
     } else {
         let mut builder = TrayIconBuilder::with_id(ID)
@@ -98,44 +121,41 @@ pub(super) fn window_to_background(
             .on_menu_event(|app, event| match event.id().as_ref() {
                 "tray-open" => show_window(app),
                 "tray-stop-all" => {
+                    show_window(app);
                     let _ = app.emit("tray-stop-all", ());
                 }
-                "tray-quit" => {
-                    let _ = app.emit("tray-quit", ());
-                }
+                "tray-quit" => super::desktop::request_quit(app),
                 _ => {}
             });
         if let Some(icon) = app.default_window_icon() {
             builder = builder.icon(icon.clone());
         }
-        builder.build(&app).map_err(|error| error.to_string())?;
-    }
-    if let Some(window) = app.get_window("main") {
-        window.hide().map_err(|error| error.to_string())?;
+        builder.build(app).map_err(|error| error.to_string())?;
     }
     Ok(())
 }
 
-/// Lo que dice el icono mientras la ventana está oculta; sin icono no hace nada.
+#[tauri::command]
+pub(super) fn window_to_background(
+    app: AppHandle,
+    labels: Labels,
+    items: Vec<Item>,
+) -> Result<(), String> {
+    update(&app, &labels, &items)?;
+    hide_window(&app)
+}
+
 #[tauri::command]
 pub(super) fn tray_update(app: AppHandle, labels: Labels, items: Vec<Item>) -> Result<(), String> {
-    let Some(tray) = app.tray_by_id(ID) else {
-        return Ok(());
-    };
-    let menu = menu(&app, &labels, &items).map_err(|error| error.to_string())?;
-    tray.set_menu(Some(menu))
-        .map_err(|error| error.to_string())?;
-    tray.set_tooltip(Some(&labels.tooltip))
-        .map_err(|error| error.to_string())
+    FRONT_READY.store(true, std::sync::atomic::Ordering::SeqCst);
+    update(&app, &labels, &items)
 }
 
-/// «Salir por completo»: el front ya detuvo los turnos; se para el motor y se sale.
+/// Sale el cliente; el motor conserva su propia política de cierre y su trabajo.
 #[tauri::command]
-pub(super) async fn quit_completely(app: AppHandle) -> Result<(), String> {
+pub(super) fn quit_completely(app: AppHandle) {
     super::instance::exiting();
-    let _ = tauri::async_runtime::spawn_blocking(super::engine::stop).await;
     app.exit(0);
-    Ok(())
 }
 
 /// Reinicio de la app: la ventana que sale deja de contestar a la que la reemplaza.
