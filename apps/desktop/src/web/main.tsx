@@ -60,6 +60,10 @@ export type TerminusWebConfig = Partial<
 
 /** How often the page lists the computers again to pick up machines and links changed since it loaded; the desktop's cadence. */
 const RELIST = 10 * 60_000;
+/** A link seen in the events lists again after this pause, so the copies from every machine of the account make one read. */
+const RELIST_SOON = 1_000;
+/** The same unknown workspace asks for another list at most this often: one the control plane does not list does not loop. */
+const UNLINKED_AGAIN = 60_000;
 
 /**
  * A tab opened before a deploy asks for chunks the new build no longer has, and
@@ -134,6 +138,7 @@ function rowLink(relay: RelaySession, row: () => string | undefined): Link {
 
 /** Another machine's slice changed: the window rereads just that. */
 function slicesChanged(changes: SliceChange[]) {
+  if (changes.includes("workspaces")) window.dispatchEvent(new CustomEvent("harness:workspace-name"));
   window.dispatchEvent(new CustomEvent("harness:machine-slices", { detail: { changes } }));
   if (changes.includes("attention")) window.dispatchEvent(new CustomEvent("harness:service-resync"));
 }
@@ -145,6 +150,13 @@ type Mounted = { storage: ReturnType<typeof pageStorage>; webAccounts?: WebAccou
 function mountApp(computers: Computer[], base: Base, before?: (id: string) => () => Promise<boolean>, mounted: Mounted = { storage: pageStorage() }): (computers: Computer[]) => void {
   const [changed, bump] = createSignal(0);
   let rows = new Map(computers.map((c) => [c.computer_id, c]));
+  // A workspace linked from the desktop after the page loaded: its events arrive before its row says it.
+  const unlinkedAt = new Map<string, number>();
+  let soon: ReturnType<typeof setTimeout> | undefined;
+  const relistSoon = () => {
+    clearTimeout(soon);
+    soon = setTimeout(() => void relistNow?.(), RELIST_SOON);
+  };
   const token = async () => base.getToken();
   let router: Router | null = null;
   const powers = new Map<string, string>();
@@ -184,6 +196,15 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
     onEvents: (machine, events, gap) => {
       if (events.length) router?.events(machine, events);
       if (gap) window.dispatchEvent(new CustomEvent("harness:service-resync"));
+      // Renamed, linked or unlinked in the account's registry: the links of each machine may have changed too.
+      if (events.some((e) => e.name === "workspace.changed")) relistSoon();
+    },
+    onUnlinked: (_machine, workspaces) => {
+      const now = Date.now();
+      const fresh = workspaces.filter((w) => now - (unlinkedAt.get(w) ?? 0) >= UNLINKED_AGAIN);
+      if (!fresh.length) return;
+      for (const w of fresh) unlinkedAt.set(w, now);
+      relistSoon();
     },
   });
   // The account's workspaces list even with every machine of theirs asleep; an older control plane answers none.
@@ -295,6 +316,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
   });
   return (fresh) => {
     rows = new Map(fresh.map((c) => [c.computer_id, c]));
+    active.registryChanged();
     const before = fleet.machines().map((m) => `${m.id}\u0000${m.name}`).join("\n");
     fleet.setMachines(orderComputers(fresh).map(infoOf));
     // Renamed from another window or the phone.

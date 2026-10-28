@@ -305,7 +305,11 @@ test("a new task is born on the machine chosen, with the same project id, and ma
   assert.equal(await invoke("send_message", { project: "p1", session: null, prompt: "otra" }, vm), "cmp_vm~r1");
   assert.deepEqual(calls("cmp_vm", "materialize_workspace").map((c) => [c.args.id, c.workspace]), [["w2", "w2"]], "the VM makes the workspace its own with the same id, said in the envelope");
   assert.deepEqual(calls("cmp_vm", "send_message").at(-1).workspace, "w2", "and then gets the task in it");
-  const after = await invoke("list_workspaces");
+  let after = await invoke("list_workspaces");
+  for (let attempt = 0; attempt < 20 && !after.workspaces.find(w => w.id === "w2")?.machines.includes("cmp_vm"); attempt++) {
+    await sleep(50);
+    after = await invoke("list_workspaces");
+  }
   assert.deepEqual(after.workspaces.find((w) => w.id === "w2").machines, ["cmp_vm", "cmp_mac"]);
   assert.deepEqual(app.fallos, []);
 });
@@ -328,8 +332,12 @@ test("«Ejecutar en» disables, with the reason, a machine that cannot make the 
   assert.equal(calls("cmp_old", "send_message").length, 0, "and never got the task");
   assert.deepEqual((await invoke("machine_list")).find((m) => m.id === "cmp_old"), { id: "cmp_old", local: false, active: false, on: true, hosts: false, materializes: false, wakes: true });
 
+  doc.querySelector('[aria-label="Ejecutar en"]').click();
+  assert.ok(await until(() => doc.querySelector('[data-machine-option="cmp_mac"]')), "the machine picker opens");
+  doc.querySelector('[data-machine-option="cmp_mac"]').click();
+  await sleep(300);
   doc.querySelector('[aria-label="Proyecto"]').click();
-  assert.ok(await until(() => [...doc.querySelectorAll("button")].some((b) => b.textContent.includes("Notas") && b.textContent.includes("tarea"))), "the project picker opens");
+  assert.ok(await until(() => [...doc.querySelectorAll("button")].some((b) => b.textContent.includes("Notas") && b.textContent.includes("tarea"))), "the project picker opens with that machine's folders");
   [...doc.querySelectorAll("button")].find((b) => b.textContent.includes("Notas") && b.textContent.includes("tarea")).click();
   await sleep(300);
   doc.querySelector('[aria-label="Ejecutar en"]').click();
