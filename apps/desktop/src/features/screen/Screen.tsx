@@ -1,9 +1,7 @@
-import { screenEnd, type ScreenEnd } from "@terminus/computers";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { t } from "../../lib/i18n";
 import { Button } from "../../ui/Button";
-
-type Phase = "connecting" | "live" | ScreenEnd | "failed";
+import { screenConnection, type Phase } from "./connection";
 
 const MESSAGE: Record<Exclude<Phase, "connecting" | "live">, () => string> = {
   offline: () => t("screen.offline"),
@@ -13,56 +11,16 @@ const MESSAGE: Record<Exclude<Phase, "connecting" | "live">, () => string> = {
   failed: () => t("screen.failed"),
 };
 
-/** La pantalla de una VM administrada, de solo ver: VNC sobre el WebSocket que abre `open`. */
+/** La pantalla de una computadora, de solo ver: VNC sobre el WebSocket que abre `open`. */
 export default function Screen(props: { open: () => Promise<WebSocket> }) {
   const [phase, setPhase] = createSignal<Phase>("connecting");
   let target!: HTMLDivElement;
-  let rfb: { disconnect(): void } | null = null;
-  let attempt = 0;
-
-  const stop = () => {
-    const current = rfb;
-    rfb = null;
-    current?.disconnect();
-    target?.replaceChildren();
-  };
-
-  const connect = async () => {
-    const mine = ++attempt;
-    stop();
-    setPhase("connecting");
-    try {
-      const [{ default: RFB }, socket] = await Promise.all([import("@novnc/novnc"), props.open()]);
-      if (mine !== attempt) return socket.close();
-      let live = false;
-      let code = 1000;
-      socket.addEventListener("close", (e) => {
-        code = e.code;
-      });
-      const view = new RFB(target, socket, { shared: true });
-      view.viewOnly = true;
-      view.scaleViewport = true;
-      view.background = "transparent";
-      view.addEventListener("connect", () => {
-        live = true;
-        if (mine === attempt) setPhase("live");
-      });
-      view.addEventListener("disconnect", () => {
-        if (mine !== attempt) return;
-        rfb = null;
-        setPhase(live ? "ended" : screenEnd(code));
-      });
-      rfb = view;
-    } catch {
-      if (mine === attempt) setPhase("failed");
-    }
-  };
-
-  onMount(() => void connect());
-  onCleanup(() => {
-    attempt++;
-    stop();
+  let connection: ReturnType<typeof screenConnection> | undefined;
+  onMount(() => {
+    connection = screenConnection({ target, open: () => props.open(), load: () => import("@novnc/novnc"), phase: setPhase });
+    void connection.connect();
   });
+  onCleanup(() => connection?.disconnect());
 
   const ended = () => {
     const p = phase();
@@ -83,7 +41,7 @@ export default function Screen(props: { open: () => Promise<WebSocket> }) {
             {(key) => (
               <>
                 <p role="alert" class="max-w-sm text-sm text-neutral-700">{key()()}</p>
-                <Button size="sm" variant="outline" onClick={() => void connect()}>{t("screen.retry")}</Button>
+                <Button size="sm" variant="outline" onClick={() => void connection?.connect()}>{t("screen.retry")}</Button>
               </>
             )}
           </Show>

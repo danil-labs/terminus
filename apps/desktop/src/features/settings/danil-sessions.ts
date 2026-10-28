@@ -41,22 +41,27 @@ export type WorkspaceAccount = {
   error?: string | null;
 };
 
-/** `null`: el motor no trae sesiones por cuenta (o no contestó), y vale la cuenta única. */
+/** `null`: el motor no conoce el comando; cualquier otro fallo se conserva. */
 export async function readSessions(): Promise<DanilSessionInfo[] | null> {
   try {
     const list = await invoke<DanilSessionInfo[]>("danil_sessions");
-    return Array.isArray(list) ? list : null;
-  } catch {
-    return null;
+    if (!Array.isArray(list)) throw { detail: "invalid_response" };
+    return list;
+  } catch (e) {
+    if (failureCode(e) === "command") return null;
+    throw e;
   }
 }
 
 /** `null` con un motor anterior; la cuenta de `workspace` (sin él, el abierto). */
 export async function readWorkspaceAccount(workspace?: string | null): Promise<WorkspaceAccount | null> {
   try {
-    return await invoke<WorkspaceAccount>("danil_workspace_account", workspace ? { workspace } : {});
-  } catch {
-    return null;
+    const result = await invoke<WorkspaceAccount>("danil_workspace_account", workspace ? { workspace } : {});
+    if (!result || !(result.account === null || typeof result.account === "string") || typeof result.signed_in !== "boolean" || typeof result.linked !== "boolean") throw { detail: "invalid_response" };
+    return result;
+  } catch (e) {
+    if (failureCode(e) === "command") return null;
+    throw e;
   }
 }
 

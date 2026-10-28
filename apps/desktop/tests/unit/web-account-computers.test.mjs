@@ -29,6 +29,7 @@ test("the web lists the account's computers and renames one in place", async () 
     const url = String(input);
     const method = init.method ?? "GET";
     if (url === `${API}/v1/me`) return Response.json({ name: "Ana Pérez", email: "ana@danil.ai", avatar_url: null });
+    if (url === `${API}/v1/workspaces`) return Response.json({ workspaces: [{ id: "w", name: "W", computers: ["cmp_vm", "cmp_mac"] }] });
     if (url === `${API}/v1/computers` && method === "GET") return Response.json(computers);
     const one = /\/v1\/computers\/([^/]+)$/.exec(url);
     if (one && method === "PATCH") {
@@ -42,6 +43,7 @@ test("the web lists the account's computers and renames one in place", async () 
     }
     return new Response("{}", { status: 404 });
   };
+  globalThis.fetch.__jsdomApp = true;
   try {
     const f = fleet({ cmp_vm: { table: engine, state: "online" }, cmp_mac: { table: engine, state: "online" } });
     const app = await boot("listo", "web-account-computers", {}, undefined, {}, {
@@ -55,7 +57,7 @@ test("the web lists the account's computers and renames one in place", async () 
     const doc = w.document;
     await sleep(2500);
     w.dispatchEvent(new w.CustomEvent("harness:open-settings", { detail: "cuenta-danil" }));
-    assert.ok(await until(() => doc.querySelectorAll("[data-account-computer]").length === 2), "both computers of the account");
+    assert.ok(await until(() => doc.querySelectorAll("[data-account-computer]").length === 2), "both computers linked to this workspace");
     const rowOf = (id) => doc.querySelector(`[data-account-computer="${id}"]`);
     assert.equal(doc.querySelector("[data-self]"), null, "the browser is none of the computers");
     assert.equal(rowOf("cmp_vm").querySelector("[data-computer-kind]").textContent, "VM de Danil");

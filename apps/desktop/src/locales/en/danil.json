@@ -73,12 +73,6 @@
   "danil.error.workspace_not_found": "That workspace is not in your Danil account.",
   "danil.error.account_not_found": "That account is no longer signed in on this computer. Sign in with it again.",
   "danil.error.workspace_id_taken": "This workspace still belongs to the other account. Sign in to that account on this computer to move it.",
-  "danil.accounts.title": "Danil accounts",
-  "danil.accounts.description": "This computer's Danil sessions, for the whole app. Signing in puts no workspace in the account: each one chooses its own, above or in Workspaces, and only then shows on that account's web and phone.",
-  "danil.accounts.default": "Default",
-  "danil.accounts.make_default": "Make default",
-  "danil.accounts.add": "Add another account",
-  "danil.accounts.adding_hint": "The Danil page opened. Sign in there with the other account and confirm.",
   "danil.accounts.online": "Online",
   "danil.accounts.offline": "Not connected right now",
   "danil.accounts.row": "{status} · {workspaces}",
@@ -200,5 +194,15 @@
     "other": "Upload {count}"
   },
   "danil.credentials.failed.recipient": "One of the machines is no longer linked to this workspace. Reopen Settings and try again.",
-  "danil.credentials.provider_opencode_go": "OpenCode Go"
+  "danil.credentials.provider_opencode_go": "OpenCode Go",
+  "danil.workspace.manage": "Change account…",
+  "danil.workspace.connect": "Link account…",
+  "danil.workspace.done": "Done",
+  "danil.workspace.read_failed": "Could not verify this workspace’s account.",
+  "danil.workspace.retry": "Retry",
+  "danil.computers.workspace_title": "This workspace’s machines",
+  "danil.computers.workspace_description": "Machines linked to this workspace in its Danil account. Click a name to change it in the account.",
+  "danil.computers.workspace_empty": "This workspace has no linked machines yet.",
+  "danil.connect_machine.workspace_hint": "Approve the connection with this workspace’s account. This registers the machine in the account; the workspace is linked when you use it there.",
+  "danil.computers.workspace_missing": "This workspace is not linked to this account. Verify its account again."
 }

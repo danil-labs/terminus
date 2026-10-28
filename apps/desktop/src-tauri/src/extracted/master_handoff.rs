@@ -1,6 +1,6 @@
 use core_foundation::{base::TCFType, string::CFString, url::CFURL};
 use security_framework::os::macos::{
-    code_signing::{Flags, SecCode, SecRequirement, SecStaticCode},
+    code_signing::{Flags, GuestAttributes, SecCode, SecRequirement, SecStaticCode},
     keychain::SecKeychain,
 };
 use std::{
@@ -43,7 +43,7 @@ pub fn prepare(exe: &Path, identity: &str, command: &mut Command) -> Option<File
     Some(read)
 }
 
-fn signed_window() -> bool {
+pub(super) fn signed_window() -> bool {
     let Ok(requirement) = WINDOW_REQUIREMENT.parse::<SecRequirement>() else {
         return false;
     };
@@ -52,7 +52,7 @@ fn signed_window() -> bool {
         .is_ok()
 }
 
-fn trusted(exe: &Path) -> bool {
+pub(super) fn trusted(exe: &Path) -> bool {
     let Some(url) = CFURL::from_path(exe, false) else {
         return false;
     };
@@ -79,6 +79,42 @@ fn read_master(identity: &str) -> Option<Zeroizing<Vec<u8>>> {
         master.make_ascii_lowercase();
         master
     })
+}
+
+/// El padre no entrega nada hasta validar la firma del PID realmente lanzado.
+pub(super) fn waiting_pipe(command: &mut Command) -> std::io::Result<(File, File)> {
+    let (read, write) = pipe()?;
+    let fd = read.as_raw_fd();
+    command.arg("--master-fd").arg(fd.to_string());
+    unsafe {
+        command.pre_exec(move || {
+            if libc::fcntl(fd, libc::F_SETFD, 0) == -1 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+    Ok((read, write))
+}
+
+pub(super) fn deliver(mut write: File, pid: u32, identity: &str) -> std::io::Result<()> {
+    let requirement = REQUIREMENT
+        .parse::<SecRequirement>()
+        .map_err(|_| std::io::Error::other("background_signature_invalid"))?;
+    let mut attributes = GuestAttributes::new();
+    attributes.set_pid(
+        i32::try_from(pid).map_err(|_| std::io::Error::other("background_signature_invalid"))?,
+    );
+    SecCode::copy_guest_with_attribues(None, &attributes, Flags::NONE)
+        .and_then(|code| code.check_validity(Flags::NONE, &requirement))
+        .map_err(|_| std::io::Error::other("background_signature_invalid"))?;
+    let master = read_master(identity)
+        .ok_or_else(|| std::io::Error::other("background_existing_master_unavailable"))?;
+    // 64 bytes caben en el pipe vacío; nonblock convierte cualquier anomalía en fallo sin espera.
+    if unsafe { libc::fcntl(write.as_raw_fd(), libc::F_SETFL, libc::O_NONBLOCK) } == -1 {
+        return Err(std::io::Error::last_os_error());
+    }
+    write.write_all(&master)
 }
 
 fn noninteractive_options(identity: &str) -> security_framework::passwords::PasswordOptions {
