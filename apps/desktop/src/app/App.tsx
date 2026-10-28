@@ -127,6 +127,7 @@ import { type SessionRow, threadTitle } from "../features/projects/Sessions";
 import TabStrip, { NewTabButton } from "../features/projects/Tabs";
 import { createTaskWork, ResumeTask } from "../features/projects/TaskHistory";
 import { workLabel } from "../features/projects/branchLabel";
+import { mensajeDeFallo } from "../features/chat/failures";
 import type { Etapa } from "../features/projects/TaskStage";
 import { esChatDeAgente } from "../features/projects/taskTree";
 import {
@@ -139,7 +140,7 @@ const Settings = lazy(() => import("../features/settings/Settings"));
 import type { Startup } from "../features/settings/workspaces-store";
 import { createAttention, topState } from "../features/shell/attention";
 import TaskNotifier from "../features/shell/TaskNotifier";
-import DeleteSpace from "../features/shell/DeleteSpace";
+const DeleteSpace = lazy(() => import("../features/shell/DeleteSpace"));
 import AvisoDeCarpeta from "../features/shell/FolderNotice";
 import PantallaDeBloqueo from "../features/shell/LockScreen";
 import AvisoDeMaterial from "../features/shell/MaterialNotice";
@@ -3258,7 +3259,7 @@ export default function App() {
         return;
       }
     } catch (error) {
-      anexar(session, (ms) => [...ms, { role: "system", text: prosaDe(error), meta: "fallo" }]);
+      anexar(session, (ms) => [...ms, { role: "system", ...mensajeDeFallo(error), meta: "fallo" }]);
     }
     pendingStarts.delete(session);
     marcarQuieta(session);
@@ -3292,7 +3293,7 @@ export default function App() {
           marcarQuieta(session);
         }
       }
-      anexar(session, (ms) => [...ms, { role: "system", text: prosaDe(error), meta: "fallo" }]);
+      anexar(session, (ms) => [...ms, { role: "system", ...mensajeDeFallo(error), meta: "fallo" }]);
       return error;
     }
   }
@@ -3372,7 +3373,7 @@ export default function App() {
       if (nace.generation !== sessionGeneration) return false;
       // La frase de un modo que el agente no sostiene nombra al agente.
       const label = agents().find((a) => a.id === lanzado.provider)?.label ?? lanzado.provider;
-      anexar("", (ms) => [...ms, { role: "system", text: prosaDe(error, { agent: label }), meta: "fallo" }]);
+      anexar("", (ms) => [...ms, { role: "system", ...mensajeDeFallo(error, { agent: label }), meta: "fallo" }]);
       return false;
     }
   }
@@ -3407,7 +3408,7 @@ export default function App() {
     try {
       if (!(await invoke<boolean>("write_shell_input", { session: id, input: texto }, deLaTarea(id)))) return false;
     } catch (e) {
-      anexar(id, (m) => [...m, { role: "system", text: prosaDe(e), meta: "fallo" }]);
+      anexar(id, (m) => [...m, { role: "system", ...mensajeDeFallo(e), meta: "fallo" }]);
       return false;
     }
     // Una tecla suelta (flecha, Enter de menú) no se pinta: la dibuja el propio programa.
@@ -5702,7 +5703,7 @@ export default function App() {
         {
           role: "system",
           // Una negativa de comando llega como clave: la frase nombra lo escrito.
-          text: prosaDe(e, {
+          ...mensajeDeFallo(e, {
             command: comandoEscrito(m.text),
             agent: agents().find((a) => a.id === m.provider)?.label ?? m.provider,
           }),
@@ -5787,7 +5788,7 @@ export default function App() {
     } catch (error) {
       anexar(sid, (ms) => [
         ...ms,
-        { role: "system", text: prosaDe(error), meta: "fallo" },
+        { role: "system", ...mensajeDeFallo(error), meta: "fallo" },
       ]);
       throw error;
     }
@@ -5841,7 +5842,7 @@ export default function App() {
       } catch (error) {
         anexar(sid, (ms) => [
           ...ms,
-          { role: "system", text: prosaDe(error), meta: "fallo" },
+          { role: "system", ...mensajeDeFallo(error), meta: "fallo" },
         ]);
         throw error;
       }
@@ -6271,7 +6272,7 @@ export default function App() {
       }
       anexar(abierta, (ms) => [
         ...ms,
-        { role: "system", text: prosaDe(e), meta: clave === "chat.steer.unsupported" ? "aviso" : "fallo" },
+        { role: "system", ...mensajeDeFallo(e), meta: clave === "chat.steer.unsupported" ? "aviso" : "fallo" },
       ]);
     } finally {
       setInjecting((items) => items.filter((item) => item.id !== id));

@@ -5,6 +5,8 @@
  */
 // Con extensión: este módulo se carga también desde `node --test`, que no tiene
 // el resolvedor de Vite. Es el mismo motivo escrito en `lib/prose.ts`.
+import { asFailure, prosaDe } from "../../lib/failure.ts";
+import { prosa } from "../../lib/prose.ts";
 import { df } from "../../lib/format.ts";
 import { clavesConocidas, t } from "../../lib/i18n.ts";
 
@@ -49,15 +51,19 @@ export function horaDeVuelta(ms: number) {
 /** Lo mínimo que hace falta para pintar la fila. Ver `Msg`. */
 type ConFallo = { text: string; fallo?: FalloDelTurno };
 
-/**
- * Qué dice la fila de un fallo. Sin clase se devuelve el texto tal cual: un
- * fallo sin clasificar tiene que seguir enseñando lo que dijo el proceso, y
- * una frase genérica perdería el único dato que hay.
- */
+/** Conserva el diagnóstico también cuando el fallo ocurre antes de abrir el turno. */
+export function mensajeDeFallo(error: unknown, datos?: Record<string, string | number>) {
+  const failure = asFailure(error, datos);
+  return {
+    text: prosa(failure.what),
+    fallo: { clase: "desconocido", detail: failure.detail },
+  };
+}
+
+/** Los mensajes antiguos pasan por el mismo respaldo que los fallos nuevos. */
 export function prosaDelFallo(msg: ConFallo) {
   const f = msg.fallo;
-  if (!f) return clavesConocidas().has(msg.text) ? t(msg.text) : msg.text;
-  if (f.clase === "desconocido") return msg.text;
+  if (!f || !clavesConocidas().has(`chat.failure.${f.clase}`)) return prosaDe(msg.text);
   const partes = [t(`chat.failure.${f.clase}`)];
   // Cuándo sigue sola gana a cuándo vuelve: puede volver antes otra cuenta.
   if (f.resumes_at) partes.push(t("chat.failure.resumes_at", { time: horaDeVuelta(f.resumes_at) }));

@@ -3906,23 +3906,15 @@ function HitoDelHilo(props: {
             )}
           </Show>
         </span>
-        {/* El renglón de máquina, debajo y en `mono`, como en el resto de
-            la app (`ui/Failure.tsx`): arriba la frase con acción, la
-            única parte que le sirve a quien opera el negocio; abajo lo
-            que hace falta para reportarlo. Solo cuando hay clase: sin
-            ella la frase de arriba ya es el crudo, y repetirlo debajo
-            sería decir dos veces lo mismo. */}
         <Show
-          when={
-            props.msg.fallo?.clase && props.msg.fallo.clase !== "desconocido"
-              ? props.msg.fallo
-              : null
-          }
+          when={props.msg.fallo?.detail && props.msg.fallo.detail !== prosaDelFallo(props.msg)
+            ? props.msg.fallo : null}
         >
           {(f) => (
-            <span class="font-mono text-[0.7rem] break-all text-neutral-500">
-              {f().detail}
-            </span>
+            <details class="text-neutral-500">
+              <summary class="cursor-pointer text-[0.6875rem]">{t("common.failure.detail")}</summary>
+              <p class="m-0 font-mono text-[0.7rem] break-all whitespace-pre-wrap">{f().detail}</p>
+            </details>
           )}
         </Show>
       </span>
