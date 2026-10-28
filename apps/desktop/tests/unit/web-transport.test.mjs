@@ -18,7 +18,7 @@ test("the web build talks to the relay: calls, events and machine state", async 
       w.terminusWeb = { endpoint: "https://relay.test", computerId: "cmp_test", getToken: async () => "tok" };
     },
   });
-  await waitFor(() => app.w.document.querySelector('[data-sesion="t1"]'), "the task did not reach the sidebar");
+  await waitFor(() => app.w.document.querySelector('[data-sesion="cmp_test~t1"]'), "the task did not reach the sidebar");
   const text = () => app.w.document.body.textContent ?? "";
 
   assert.deepEqual(app.fallos, []);
