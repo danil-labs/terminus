@@ -53,7 +53,7 @@ export function readableSessionTitle(title: string): string {
 
 /** Lo que devuelve `task_blockers`: qué estorba para terminar o archivar. */
 export type Blockers = {
-  unsaved: { session: string; title: string; files: string[] }[];
+  unsaved: { project?: string; session: string; title: string; files: string[] }[];
   not_finished: boolean;
 };
 
@@ -429,7 +429,7 @@ export default function Sessions(props: {
     marcar(ids => [...ids, a.id]);
     try {
       for (const work of a.blockers.unsaved) {
-        await invoke("discard_task_changes", { project: projectOfId(a.id), id: work.session, files: work.files }, enSuMaquina(a.id));
+        await invoke("discard_task_changes", { project: work.project ?? projectOfId(a.id), id: work.session, files: work.files }, enSuMaquina(a.id));
       }
     } catch (error) {
       setActionFailure(asFailure(error));
