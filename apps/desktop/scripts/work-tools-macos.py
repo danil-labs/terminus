@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import platform
 import plistlib
+import re
 import secrets
 import stat
 import subprocess
@@ -147,6 +148,20 @@ class Signer:
                 time.sleep(2)
 
 
+def signing_identity(keychain, configured, team):
+    listing = execute(["/usr/bin/security", "find-identity", "-v", "-p", "codesigning", keychain],
+                      "resolve imported signing identity")
+    candidates = []
+    for fingerprint, name in re.findall(r'\d+\)\s+([0-9A-Fa-f]{40})\s+"([^"]+)"', listing):
+        if (name.startswith("Developer ID Application: Software y Servicios Danil")
+                and name.endswith(f"({team})")
+                and (configured in name or configured.lower() == fingerprint.lower())):
+            candidates.append(fingerprint)
+    if len(candidates) != 1:
+        raise ValueError("Expected one valid imported Danil Developer ID matching the configured identity and team")
+    return candidates[0]
+
+
 def transform(path, kind, signer, python=False, wheel=False):
     with tempfile.TemporaryDirectory(prefix="terminus-native-signing-") as temporary:
         root = Path(temporary)
@@ -275,23 +290,33 @@ def main():
         certificate.chmod(0o600)
         entitlements = root / "python.plist"
         entitlements.write_bytes(plistlib.dumps({"com.apple.security.cs.disable-library-validation": True}))
+        keychains = execute(["/usr/bin/security", "list-keychains", "-d", "user"], "read signing keychain search list")
+        previous = re.findall(r'"([^"]+)"', keychains)
         created = False
         try:
             execute(["/usr/bin/security", "create-keychain", "-p", password, keychain], "create signing keychain")
             created = True
             execute(["/usr/bin/security", "set-keychain-settings", "-lut", "21600", keychain], "configure signing keychain")
             execute(["/usr/bin/security", "unlock-keychain", "-p", password, keychain], "unlock signing keychain")
-            execute(["/usr/bin/security", "import", certificate, "-k", keychain, "-P", os.environ["APPLE_CERTIFICATE_PASSWORD"],
+            certificate_format = "pemseq" if certificate.read_bytes().lstrip().startswith(b"-----BEGIN ") else "pkcs12"
+            execute(["/usr/bin/security", "import", certificate, "-f", certificate_format, "-t", "agg", "-k", keychain,
+                     "-P", os.environ["APPLE_CERTIFICATE_PASSWORD"],
                      "-T", "/usr/bin/codesign"], "import signing identity")
             execute(["/usr/bin/security", "set-key-partition-list", "-S", "apple-tool:,apple:,codesign:", "-s", "-k", password,
                      keychain], "authorize native signing")
-            signer = Signer(identity, team, keychain, entitlements)
+            execute(["/usr/bin/security", "list-keychains", "-d", "user", "-s", *previous, keychain],
+                    "make imported signing identity available")
+            signer = Signer(signing_identity(keychain, identity, team), team, keychain, entitlements)
             for target in ("aarch64-apple-darwin", "x86_64-apple-darwin"):
                 sign_tree(args.directory / target, target, signer)
                 print(json.dumps({"target": target, "signed_manifest_sha256": tools.digest(args.directory / target / "manifest.json")}))
         finally:
             if created:
-                execute(["/usr/bin/security", "delete-keychain", keychain], "remove temporary signing keychain")
+                try:
+                    execute(["/usr/bin/security", "list-keychains", "-d", "user", "-s", *previous],
+                            "restore signing keychain search list")
+                finally:
+                    execute(["/usr/bin/security", "delete-keychain", keychain], "remove temporary signing keychain")
 
 
 if __name__ == "__main__":
