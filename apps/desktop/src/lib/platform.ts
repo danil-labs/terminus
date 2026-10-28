@@ -48,7 +48,7 @@ export type WebAccountsSource = {
 };
 
 export type Capabilities = {
-  inbox?: { demo: boolean; userId?: string | null; subscribe?: (clear: () => void) => () => void; catalog: (props: { entries: readonly { id: string; title: string; description: string; available: boolean; selected: boolean }[]; onToggle(id: string): void }) => JSX.Element; broadcasts: () => JSX.Element; initial: boolean; render: () => JSX.Element; agentSettings: (name: string) => JSX.Element; integrations: () => JSX.Element };
+  inbox?: { customization: typeof import("./customization").createCustomization; entries: typeof import("./attention-labels").featureEntries; demo: boolean; userId?: string | null; subscribe?: (clear: () => void) => () => void; catalog: (props: { entries: readonly { id: string; title: string; description: string; available: boolean; selected: boolean }[]; onToggle(id: string): void }) => JSX.Element; broadcasts: () => JSX.Element; initial: boolean; render: () => JSX.Element; agentSettings: (name: string) => JSX.Element; integrations: () => JSX.Element };
   spaceOrder?: SpaceOrderSource;
   /** Controles de ventana propios, semáforo de macOS y bandeja. */
   nativeWindow: boolean;

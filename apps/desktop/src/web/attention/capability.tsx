@@ -1,17 +1,21 @@
 import { type InboxSession } from '../../../../../packages/attention/src/inbox.ts';
-import { For } from 'solid-js';
+import { For, lazy, Suspense } from 'solid-js';
 import { t } from '../../lib/i18n';
 import { SettingsRow, SettingsSection } from '../../features/settings/layout';
 import { Button } from '../../ui/Button';
-import { FeatureCatalog } from './FeatureCatalog';
-import { Broadcasts } from './Broadcasts';
 import { Attention } from './Attention';
+import { createCustomization } from '../../lib/customization';
+import { featureEntries } from '../../lib/attention-labels';
+
+const FeatureCatalog = lazy(() => import('./FeatureCatalog').then(module => ({default:module.FeatureCatalog})));
+const Broadcasts = lazy(() => import('./Broadcasts').then(module => ({default:module.Broadcasts})));
 
 export function attentionCapability(demo: boolean, initial: boolean, session?: InboxSession & { subscribe?: (clear: () => void) => () => void; userId?: string | null }) {
   return {
+    customization: createCustomization, entries: featureEntries,
     demo, userId: demo ? 'demo' : session?.userId, subscribe: session?.subscribe,
-    catalog: (props: Parameters<typeof FeatureCatalog>[0]) => <FeatureCatalog {...props}/>,
-    broadcasts: () => <Broadcasts/>,
+    catalog: (props: Parameters<typeof import("./FeatureCatalog").FeatureCatalog>[0]) => <Suspense fallback={null}><FeatureCatalog {...props}/></Suspense>,
+    broadcasts: () => <Suspense fallback={null}><Broadcasts/></Suspense>,
     initial,
     render: () => <Attention demo={demo} session={session}/>,
     agentSettings: (name: string) => <SettingsSection title={`${t("web.alpha.service_agent")} · ${name}`} description={t("web.alpha.configuration_unavailable")}><For each={['scope','knowledge','tools','schedule','host']}>{field=><SettingsRow label={t(`web.alpha.${field}`)} description={t(`web.alpha.${field}_hint`)}><input class="w-48 max-w-full rounded-md border border-border bg-surface p-2 text-sm" disabled={!demo} aria-label={t(`web.alpha.${field}`)}/></SettingsRow>}</For><Button class="mt-3 justify-self-start" disabled>{t("web.alpha.publish")}</Button></SettingsSection>,

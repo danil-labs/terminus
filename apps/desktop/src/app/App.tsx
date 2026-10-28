@@ -1,5 +1,3 @@
-import { createCustomization } from "../lib/customization";
-import { featureEntries } from "../lib/attention-labels";
 import { deliver, type JournalEvent, listen } from "../lib/serviceEvents";
 import { open } from "@tauri-apps/plugin-dialog";
 import Archive from "lucide-solid/icons/archive";
@@ -440,9 +438,9 @@ export default function App() {
   const spaces = createMemo(() => spaceOrder.arrange(rawSpaces()));
   const [escritorio, setEscritorio] = createSignal<string | null>(null);
   const [spacesContext, setSpacesContext] = createSignal<string | null>(null);
-  const customization = createCustomization(() => ({ user: capabilities().inbox?.userId, workspace: workspaceActivo(), space: spacesContext() === workspaceActivo() ? escritorio() : null }), capabilities().inbox?.subscribe);
+  const customization = capabilities().inbox?.customization(() => ({ user: capabilities().inbox?.userId, workspace: workspaceActivo(), space: spacesContext() === workspaceActivo() ? escritorio() : null }), capabilities().inbox?.subscribe) ?? {ready:()=>false,scope:()=>"",selection:()=>({enabled:[],writable:false}),temporary:()=>true,toggle:(_id:string)=>{},enabled:(_id:string)=>false};
   const [personalizing, setPersonalizing] = createSignal(false);
-  const attentionEntries = () => featureEntries(customization.selection().enabled);
+  const attentionEntries = () => capabilities().inbox?.entries(customization.selection().enabled) ?? [];
   const activeSpace = () => spaces().find((i) => i.id === escritorio()) ?? null;
   const multipleSpaces = () => spaces().length > 1;
   // El sidebar de la vez anterior, pintado antes del primer IPC e inerte hasta que el motor lo confirma.

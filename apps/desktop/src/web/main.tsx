@@ -287,7 +287,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
   const github = webGithubAccount({ endpoint: base.endpoint, getToken: base.getToken, onUnauthorized: base.onUnauthorized, href: () => window.location.href });
   installIpc(window, createWebTransport(active, __TERMINUS_VERSION__, browser, github));
   window.addEventListener("pagehide", () => fleet.flush());
-  void import("../app/main");
+  void import("./phrases").then(() => import("../app/main"));
   void Promise.all([import("solid-js/web"), import("./SyncNote"), import("./phrases")]).then(([{ render }, { SyncNote }]) => {
     const layer = document.createElement("div");
     document.body.append(layer);
