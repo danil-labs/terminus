@@ -13,6 +13,7 @@ export default function BrowserNavigation(props: { requirement?: Requirement; on
   if (!capabilities().localSetup) return null;
   const [running, setRunning] = createSignal(false);
   const [cancelling, setCancelling] = createSignal(false);
+  const [authorizing, setAuthorizing] = createSignal(false);
   const [prepared, setReady] = createSignal(false);
   const ready = () => prepared() || (props.requirement?.ok && !props.requirement.installable);
   const [failure, setFailure] = createSignal<Failure | null>(null);
@@ -22,7 +23,10 @@ export default function BrowserNavigation(props: { requirement?: Requirement; on
       .then((bytes) => { if (!running()) setProgress((p) => ({ ...p, bytes })); })
       .catch(() => {});
     const events = listen<{ operation: string; done: number; bytes: number }>("install", (e) => {
-      if (e.payload.operation === "tool:browser-navigation" && running()) setProgress(e.payload);
+      if (e.payload.operation === "tool:browser-navigation" && running()) {
+        setAuthorizing(false);
+        setProgress(e.payload);
+      }
     });
     onCleanup(() => void events.then((stop) => stop()));
   });
@@ -31,6 +35,7 @@ export default function BrowserNavigation(props: { requirement?: Requirement; on
     if (running()) return;
     setRunning(true);
     setCancelling(false);
+    setAuthorizing(allowSandbox);
     setFailure(null);
     setProgress((p) => ({ ...p, done: 0 }));
     try {
@@ -42,6 +47,7 @@ export default function BrowserNavigation(props: { requirement?: Requirement; on
     } finally {
       setRunning(false);
       setCancelling(false);
+      setAuthorizing(false);
     }
   }
 
@@ -62,7 +68,7 @@ export default function BrowserNavigation(props: { requirement?: Requirement; on
           <Button variant="secondary" size="compact" disabled={running() || ready()} onClick={() => void install()}>
             {running() ? t("settings.environment.preparing") : ready() ? t("setup.row.ready") : failure() ? t("setup.retry") : props.requirement?.ok ? t("settings.environment.update") : t("settings.environment.browser.install")}
           </Button>
-          <Show when={running()}>
+          <Show when={running() && !authorizing()}>
             <Button variant="ghost" size="compact" disabled={cancelling()} onClick={() => void cancel()}>
               {t("settings.integrations.cancel")}
             </Button>

@@ -15,6 +15,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import zipfile
 
 
 spec = importlib.util.spec_from_file_location("work_tools", Path(__file__).with_name("work-tools.py"))
@@ -69,8 +70,12 @@ def main():
                 paths[id].write_bytes(archive.read_bytes())
                 paths[id].chmod(0o755)
             else:
-                with tarfile.open(archive) as tar:
-                    tar.extractall(destination, filter="data")
+                if entry["format"] == "zip":
+                    with zipfile.ZipFile(archive) as package:
+                        package.extractall(destination)
+                else:
+                    with tarfile.open(archive) as tar:
+                        tar.extractall(destination, filter="data")
                 strip = entry.get("strip_components", 0)
                 prefix = destination
                 for _ in range(strip):
@@ -79,6 +84,7 @@ def main():
                         raise ValueError(f"Expected a single archive root: {id}")
                     prefix = children[0]
                 paths[id] = prefix / entry["executable"]
+                paths[id].chmod(0o755)
         env = {"HOME": str(root), "PATH": "", "LANG": "C.UTF-8", "UV_CACHE_DIR": str(root / "uv-cache"),
                "UV_PYTHON_DOWNLOADS": "never", "UV_OFFLINE": "1", "GIT_CONFIG_NOSYSTEM": "1",
                "GIT_CONFIG_GLOBAL": os.devnull}

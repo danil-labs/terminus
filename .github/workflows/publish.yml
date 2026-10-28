@@ -755,17 +755,26 @@ jobs:
         run: |
           set -euo pipefail
           case "$RUNNER_OS" in
-            macOS) resources=src-tauri/target/universal-apple-darwin/release/bundle/macos/Terminus.app/Contents/Resources/work-tools ;;
-            Windows) resources="$(cygpath -u "$LOCALAPPDATA")/Terminus/work-tools" ;;
+            macOS)
+              app=src-tauri/target/universal-apple-darwin/release/bundle/macos/Terminus.app
+              resources="$app/Contents/Resources/work-tools"
+              engine="$app/Contents/MacOS/seldon-runtime"
+              ;;
+            Windows)
+              resources="$(cygpath -u "$LOCALAPPDATA")/Terminus/work-tools"
+              engine="$(cygpath -u "$LOCALAPPDATA")/Terminus/seldon-runtime.exe"
+              ;;
             Linux)
               image=$(find src-tauri/target/release/bundle -name '*.AppImage' -type f | head -1)
               image=$(realpath "$image")
               mkdir -p "$RUNNER_TEMP/work-tools-final"
               (cd "$RUNNER_TEMP/work-tools-final" && "$image" --appimage-extract >/dev/null)
               resources="$RUNNER_TEMP/work-tools-final/squashfs-root/usr/lib/Terminus/work-tools"
+              engine="$RUNNER_TEMP/work-tools-final/squashfs-root/usr/bin/seldon-runtime"
               ;;
           esac
           python3 scripts/work-tools-release.py verify --directory "$resources"
+          python3 scripts/work-tools-runtime-smoke.py --engine "$engine" --resources "$(dirname "$resources")" --browser
 
       - name: Comprobar el bundle universal
         if: runner.os == 'macOS'
