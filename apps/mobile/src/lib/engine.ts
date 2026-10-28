@@ -377,7 +377,7 @@ export async function loadTask(host: Host, workspace: string, folder: string, id
       questions: remaining,
     }] : [];
   });
-  return { session, permissions: pending?.permissions ?? [], questions, running: live.includes(id), cachedAt: at.cachedAt };
+  return { session, permissions: pending?.permissions ?? [], questions, running: live.includes(id) && host.power() === "on", cachedAt: at.cachedAt };
 }
 
 /**
@@ -739,9 +739,12 @@ export async function accountsOf(host: Host, workspace: string | null, provider:
   return read<AccountList | null>(host, "list_accounts", workspace, { provider }, null, at);
 }
 
+export async function limitsSnapshotOf(host: Host, workspace: string | null, provider: string, id: string) {
+  return host.call<AccountLimits | null>("account_limits", workspace, { provider, id, force: false }).catch(() => ({ value: null, cachedAt: null }));
+}
+
 export async function limitsOf(host: Host, workspace: string | null, provider: string, id: string): Promise<AccountLimits | null> {
-  const at = { cachedAt: null as number | null };
-  return read<AccountLimits | null>(host, "account_limits", workspace, { provider, id, force: false }, null, at).catch(() => null);
+  return (await limitsSnapshotOf(host, workspace, provider, id)).value;
 }
 
 /** Cerrar la sesión de una cuenta en una máquina (`remove_account`), como la ✕ de la chapa en la web. */

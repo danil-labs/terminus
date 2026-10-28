@@ -114,3 +114,226 @@ test("the transport leaves out what the account may not see: workspaces, attenti
 
   assert.deepEqual(app.fallos, []);
 });
+
+test("workspace context comes from its owning machine, including its source reads", async () => {
+  const { fleet } = await import("../helpers/fake-relay.mjs");
+  const listing = (root) => ({ workspaces: [{ id: "w", name: "W", context_root: root }], active: "w" });
+  const source = { id: "context-mac", name: "Context", etiqueta: "Context", kind: "folder", location: "/context", path: "/context", root: true, missing: false, projects: [] };
+  const taskSource = { ...source, id: "vm-only", name: "VM-only material", etiqueta: "VM-only material", root: false, kind: "folder" };
+  const vm = { ...engine, list_live_sessions: ({ project }) => project === "p1" ? engine.list_live_sessions({ project }) : [], list_sources: [taskSource], load_session: ({ id }) => ({ id, provider: "codex", sources: [taskSource.id], model: "gpt-5.6", turns: [] }), list_workspaces: listing(null), workspaces_startup: listing(null), source_detail: { machine: "vm" }, set_root: true, add_folder: { id: "task-folder" }, add_repo_url: { id: "task-repo" } };
+  const mac = { ...engine, list_projects: [{ ...engine.list_projects[0], id: "pm", name: "Mac project" }], list_live_sessions: ({ project }) => project === "pm" ? engine.list_live_sessions({ project: "p1" }) : [], list_workspaces: listing(source.id), workspaces_startup: listing(source.id), list_sources: [source], source_detail: { machine: "mac" }, add_folder: { id: "context-folder" }, add_repo_url: { id: "context-repo" } };
+  const f = fleet({ cmp_vm: { table: vm }, cmp_mac: { table: mac } });
+  const app = await boot("listo", "web-context-owner", {}, undefined, {}, {
+    web: true,
+    antes: (w) => {
+      globalThis.WebSocket = f.Socket;
+      w.terminusWeb = { endpoint: "https://relay.test", computers: [
+        { computer_id: "cmp_vm", name: "VM", state: "online", provider: "aws-ec2", workspaces: ["w"] },
+        { computer_id: "cmp_mac", name: "Mac", state: "online", kind: "physical", workspaces: ["w"] },
+      ], getToken: async () => "tok" };
+    },
+  });
+  await sleep(1800);
+  const invoke = (command, args, options) => app.w.__TAURI_INTERNALS__.invoke(command, args, options);
+  const list = await invoke("list_workspaces");
+  assert.equal(list.workspaces[0].context_root, source.id, "a materialized VM must not hide the Mac's context");
+  assert.deepEqual(await invoke("list_sources"), [source], "the source must actually be readable on its owner");
+  assert.deepEqual(await invoke("list_sources", {}, { headers: { "x-terminus-machine": "cmp_vm" } }), [taskSource], "an explicit machine wins");
+  assert.deepEqual(await invoke("add_folder", { locator: "/context" }), { id: "context-folder" }, "settings retain the context default");
+  app.w.document.querySelector('[data-sesion="cmp_vm~t1"]').click();
+  await sleep(400);
+  assert.ok(app.w.document.body.textContent.includes(taskSource.etiqueta), "the attachment catalog is read on the task VM, not the context Mac");
+  for (const [locator, command] of [["/task-folder", "add_folder"], ["https://example.test/task.git", "add_repo_url"]]) {
+    app.w.document.querySelector('[aria-label="Adjuntar una fuente"]').click();
+    await sleep(100);
+    [...app.w.document.querySelectorAll("button")].find((b) => b.textContent.includes("Pegar una dirección o ruta")).click();
+    await sleep(100);
+    const input = app.w.document.querySelector('input[placeholder="https://… o /ruta/a/carpeta"]');
+    input.value = locator;
+    input.dispatchEvent(new app.w.Event("input", { bubbles: true }));
+    input.closest("form").dispatchEvent(new app.w.Event("submit", { bubbles: true, cancelable: true }));
+    await sleep(250);
+    assert.ok(f.relays.cmp_vm.calls.some((c) => c.command === command && Object.values(c.args).includes(locator)), "task material is created on the task's VM, despite context on Mac");
+    assert.ok(!f.relays.cmp_mac.calls.some((c) => c.command === command && Object.values(c.args).includes(locator)), "the context owner does not receive task material");
+  }
+
+  let finishSource;
+  vm.add_folder = () => new Promise((resolve) => { finishSource = resolve; });
+  app.w.document.querySelector('[aria-label="Adjuntar una fuente"]').click();
+  await sleep(100);
+  [...app.w.document.querySelectorAll("button")].find((b) => b.textContent.includes("Pegar una dirección o ruta")).click();
+  await sleep(100);
+  const delayedInput = app.w.document.querySelector('input[placeholder="https://… o /ruta/a/carpeta"]');
+  delayedInput.value = "/delayed";
+  delayedInput.dispatchEvent(new app.w.Event("input", { bubbles: true }));
+  delayedInput.closest("form").dispatchEvent(new app.w.Event("submit", { bubbles: true, cancelable: true }));
+  await sleep(100);
+  assert.ok(finishSource, "the source creation is pending");
+  const lateSource = { ...source, id: "late-source", name: "Late-source-wrong-task", root: false, etiqueta: "Late-source-wrong-task" };
+  mac.list_sources = [source, lateSource];
+  const macSourceReads = f.relays.cmp_mac.calls.filter((c) => c.command === "list_sources").length;
+  app.w.dispatchEvent(new app.w.CustomEvent("harness:open-task-link", { detail: { workspace: "w", folder: "pm", task: "cmp_mac~t1" } }));
+  await sleep(400);
+  assert.ok(f.relays.cmp_mac.calls.some((c) => c.command === "load_session" && c.args.id === "t1"), "the Mac task was opened before resolving the VM request");
+  assert.ok(f.relays.cmp_mac.calls.filter((c) => c.command === "list_sources").length > macSourceReads, "the new task catalog on Mac loaded before the late VM result");
+  finishSource({ id: lateSource.id });
+  await sleep(300);
+  assert.ok(!app.w.document.body.textContent.includes(lateSource.etiqueta), "a late source result must not enter the newly active task's draft");
+  mac.list_sources = [source];
+  await invoke("list_sources");
+  f.relays.cmp_mac.setState("offline");
+  await sleep(100);
+  const partial = await invoke("list_workspaces");
+  assert.equal(partial.workspaces[0].context_root, source.id, "a partial listing retains the known owner");
+  assert.deepEqual(await invoke("list_sources"), [source], "offline reads retain the owner's cached sources, never the empty VM list");
+  await assert.rejects(invoke("source_detail", { id: "uncached" }), "an uncached read reports its unavailable owner");
+  f.relays.cmp_mac.setState("online");
+  await sleep(100);
+  vm.list_workspaces = listing("vm-root");
+  let both = await invoke("list_workspaces");
+  for (let attempt = 0; attempt < 20 && both.workspaces[0].context_root !== "vm-root"; attempt++) {
+    await sleep(50);
+    both = await invoke("list_workspaces");
+  }
+  assert.equal(both.workspaces[0].context_root, "vm-root", "two roots use deterministic machine order");
+  assert.deepEqual(await invoke("source_detail", { id: source.id }), { machine: "mac" }, "an already listed source keeps its origin when the default changes");
+  await invoke("set_root", { source: source.id }, { headers: { "x-terminus-machine": "cmp_vm" } });
+  assert.ok(f.relays.cmp_vm.calls.some((c) => c.command === "set_root"), "configuration's explicit destination wins");
+  vm.list_workspaces = listing(null);
+  mac.list_workspaces = { workspaces: [{ id: "w", context_root: source.id }, { id: "other", context_root: null }], active: "other" };
+  app.w.dispatchEvent(new app.w.CustomEvent("harness:sources"));
+  await sleep(600);
+  assert.ok(!app.w.document.body.textContent.includes("Sin fuente de contexto"), "refresh uses the UI workspace, not the engine's active workspace");
+  mac.list_sources = [];
+  app.w.dispatchEvent(new app.w.CustomEvent("harness:sources"));
+  await sleep(600);
+  assert.ok(app.w.document.body.textContent.includes("No se pudo leer la fuente principal"), "a missing root is a visible read failure");
+  assert.ok(!app.w.document.body.textContent.includes("Sin fuente de contexto"));
+  assert.deepEqual(app.fallos, []);
+});
+
+test("only a confirmed absence of a primary source shows the empty context actions", async () => {
+  for (const primary of [false, true, "error"]) {
+    const source = { id: "s", name: "Source", root: primary, missing: false, projects: [] };
+    const fake = relay({ table: { ...engine, list_sources: primary === "error" ? undefined : [source] } });
+    const app = await boot("listo", `web-context-primary-${primary}`, {}, undefined, {}, {
+      web: true,
+      antes: (w) => {
+        globalThis.WebSocket = fake.Socket;
+        w.terminusWeb = { endpoint: "https://relay.test", computerId: "cmp_test", getToken: async () => "tok" };
+      },
+    });
+    await sleep(700);
+    assert.equal(app.w.document.body.textContent.includes("Sin fuente de contexto"), primary === false, "secondary material does not substitute for a primary source, and failed reads do not confirm an empty context");
+    assert.deepEqual(app.fallos, []);
+  }
+});
+
+test("an existing local task can attach material without a machine list or an extra catalog read", async () => {
+  const calls = [];
+  const app = await boot("listo", "local-context-material", {
+    ...engine,
+    launcher_state: { phase: "ready", blank_0274: false },
+    window_ready: null,
+    window_vitals: null,
+    add_folder: (args) => { calls.push(args); return { id: "local-source" }; },
+    machine_list: [],
+  });
+  await sleep(700);
+  app.w.document.querySelector('[data-sesion="t1"]').click();
+  await sleep(400);
+  app.w.document.querySelector('[aria-label="Adjuntar una fuente"]').click();
+  await sleep(100);
+  [...app.w.document.querySelectorAll("button")].find((b) => b.textContent.includes("Pegar una dirección o ruta")).click();
+  await sleep(100);
+  const input = app.w.document.querySelector('input[placeholder="https://… o /ruta/a/carpeta"]');
+  input.value = "/local-folder";
+  input.dispatchEvent(new app.w.Event("input", { bubbles: true }));
+  input.closest("form").dispatchEvent(new app.w.Event("submit", { bubbles: true, cancelable: true }));
+  await sleep(300);
+  assert.deepEqual(calls, [{ locator: "/local-folder" }]);
+  assert.deepEqual(app.fallos, []);
+});
+
+test("la web muestra las tareas disponibles sin esperar a una máquina que no contesta", async (t) => {
+  const started = Date.now();
+  const { fleet } = await import("../helpers/fake-relay.mjs");
+  const f = fleet({ cmp_fast: { table: { ...engine, setup_required: true, prepare_runtime: { running: false, stages: [{ name: "ready", essential: true, state: "succeeded" }] } } }, cmp_slow: { table: engine } });
+  const SlowSocket = f.relays.cmp_slow.Socket;
+  f.relays.cmp_slow.Socket = class extends SlowSocket {
+    send(data) {
+      if (JSON.parse(data).type === "call") return;
+      super.send(data);
+    }
+  };
+  const app = await boot("listo", "web-slow-machine", {}, undefined, {}, {
+    web: true,
+    antes: w => {
+      globalThis.WebSocket = f.Socket;
+      w.terminusWeb = {
+        endpoint: "https://relay.test", getToken: async () => "tok",
+        computers: ["cmp_fast", "cmp_slow"].map(computer_id => ({ computer_id, name: computer_id === "cmp_slow" ? "A VM lenta" : "B Mac disponible", state: "online", provider: computer_id === "cmp_slow" ? "aws-ec2" : "self", workspaces: ["w"] })),
+      };
+    },
+  });
+  const deadline = Date.now() + 4_000;
+  while (!app.w.document.querySelector('[data-sesion="cmp_fast~t1"]') && Date.now() < deadline) await sleep(100);
+  assert.ok(app.w.document.querySelector('[data-sesion="cmp_fast~t1"]'), "la máquina disponible aporta sus tareas dentro del plazo");
+  t.diagnostic(`Primera lista visible: ${Date.now() - started} ms`);
+  assert.deepEqual(app.fallos, []);
+});
+
+
+test("una respuesta tardía agrega proyectos y tareas sin recargar ni duplicar lecturas pendientes", async () => {
+  const { fleet } = await import("../helpers/fake-relay.mjs");
+  const f = fleet({ cmp_fast: { table: engine }, cmp_slow: { table: engine } });
+  const SlowSocket = f.relays.cmp_slow.Socket;
+  const waiting = [];
+  let held = true;
+  f.relays.cmp_slow.Socket = class extends SlowSocket {
+    send(data) {
+      if (held && JSON.parse(data).type === "call") return void waiting.push([this, data]);
+      super.send(data);
+    }
+  };
+  const app = await boot("listo", "web-late-machine", {}, undefined, {}, {
+    web: true,
+    antes: w => {
+      globalThis.WebSocket = f.Socket;
+      w.terminusWeb = {
+        endpoint: "https://relay.test", getToken: async () => "tok",
+        computers: ["cmp_fast", "cmp_slow"].map(computer_id => ({ computer_id, name: computer_id === "cmp_slow" ? "A VM lenta" : "B Mac disponible", state: "online", provider: computer_id === "cmp_slow" ? "aws-ec2" : "self", workspaces: ["w"] })),
+      };
+    },
+  });
+  async function row(id, present = true) {
+    const deadline = Date.now() + 4000;
+    while (Boolean(app.w.document.querySelector(`[data-sesion="${id}"]`)) !== present && Date.now() < deadline) await sleep(50);
+    assert.equal(Boolean(app.w.document.querySelector(`[data-sesion="${id}"]`)), present, id);
+  }
+  await row("cmp_fast~t1");
+  const invoke = (command, args) => app.w.__TAURI_INTERNALS__.invoke(command, args);
+  const signature = ([, data]) => {
+    const call = JSON.parse(data);
+    return JSON.stringify([call.command, call.workspace, call.args]);
+  };
+  await Promise.all([invoke("list_projects"), invoke("list_projects")]);
+  assert.equal(new Set(waiting.map(signature)).size, waiting.length, "las relecturas comparten la petición en vuelo");
+  await sleep(10_500);
+  held = false;
+  for (const [socket, data] of waiting.splice(0)) SlowSocket.prototype.send.call(socket, data);
+  await row("cmp_slow~t1");
+  await row("cmp_fast~t1");
+
+  held = true;
+  const previous = await invoke("list_live_sessions", { project: "p1", open: ["cmp_slow~t1"] });
+  assert.ok(previous.some(task => task.id === "cmp_slow~t1"), "cambiar open conserva la última fila de la máquina pendiente");
+  for (const [socket, data] of waiting.splice(0)) {
+    const call = JSON.parse(data);
+    if (call.command === "list_live_sessions") socket.onmessage?.({ data: JSON.stringify({ type: "result", id: call.id, value: [] }) });
+    else SlowSocket.prototype.send.call(socket, data);
+  }
+  const updated = await invoke("list_live_sessions", { project: "p1", open: ["cmp_slow~t1"] });
+  assert.ok(!updated.some(task => task.id === "cmp_slow~t1"), "una respuesta vacía confirmada sí retira la fila");
+  assert.deepEqual(app.fallos, []);
+});

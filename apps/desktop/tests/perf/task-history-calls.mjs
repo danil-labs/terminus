@@ -112,6 +112,9 @@ for (const id of TABS) {
   if (!el) throw new Error(`No está la fila de ${id}.`);
   el.click();
   await sleep(150);
+  doc.querySelector('[data-preview-header] [role="button"]')
+    ?.dispatchEvent(new app.w.MouseEvent("dblclick", { bubbles: true }));
+
 }
 await sleep(500);
 

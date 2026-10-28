@@ -71,6 +71,38 @@ async function openTask(app, id) {
   await sleep(400);
 }
 
+for (const legacy of [false, true]) {
+  test(`el visual de una VM se lee en su máquina y workspace${legacy ? " con un motor anterior" : " por partes"}`, async () => {
+    const html = '<!doctype html><p>Figura de la VM</p>';
+    const asked = [];
+    const remote = (command, value) => (args, options) => {
+      asked.push({ command, args, headers: options?.headers });
+      if (options?.headers?.["x-terminus-machine"] !== "vm") throw { detail: "cross_machine" };
+      if (command === "chat_visual_part" && legacy) throw { detail: "command" };
+      return value;
+    };
+    const app = await boot("listo", `chat-visual-vm-${legacy}`, responses({
+      machine_list: [{ id: "local", local: true, active: true, on: true, hosts: true }, { id: "vm", local: false, active: false, on: true, hosts: true }],
+      list_live_sessions: () => [{ ...row("vm~t1"), machine: "vm", machine_on: true }],
+      load_session: ({ id }) => session(id, [USER, { role: "agent", id: "a1", at: 1, text: ANSWER }]),
+      chat_visual_part: remote("chat_visual_part", { data: Buffer.from(html).toString("base64"), eof: true, total: Buffer.byteLength(html), revision: "r1" }),
+      tree_show: remote("tree_show", { kind: "text", text: html, bytes: Buffer.byteLength(html), truncated: false }),
+    }), undefined, {}, visible);
+    await sleep(600);
+    await openTask(app, "vm~t1");
+    await sleep(400);
+    const frame = app.w.document.querySelector(`[data-chat-visual="${FILE}"] iframe`);
+    assert.ok(frame, "la figura de la VM no se mostró");
+    assert.ok(frame.getAttribute("srcdoc").includes("Figura de la VM"));
+    assert.deepEqual(asked.map((c) => c.command), legacy ? ["chat_visual_part", "tree_show"] : ["chat_visual_part"]);
+    for (const call of asked) {
+      assert.equal(call.headers["x-terminus-machine"], "vm");
+      assert.equal(call.headers["x-terminus-workspace"], "w");
+      assert.equal(call.args.session, "vm~t1");
+    }
+  });
+}
+
 test("la respuesta que el motor no pudo guardar sigue en el chat, con su aviso", async () => {
   const visual = "<!doctype html><meta name=\"harness-artefacto\" content=\"web\"><p>simulación</p>";
   const app = await boot("listo", "chat-turn-unsaved", responses({
@@ -92,34 +124,41 @@ test("la respuesta que el motor no pudo guardar sigue en el chat, con su aviso",
   assert.ok(text(app).includes("no se pudo guardar en disco"), "no avisó que el turno no quedó guardado");
 });
 
-test("un visual que no se puede leer deja el texto, el archivo y el botón para abrirlo", async () => {
-  const opened = [];
-  const app = await boot("listo", "chat-visual-failed", responses({
-    load_session: ({ id }) => session(id, [USER, { role: "agent", id: "a1", at: 1, text: ANSWER }]),
-    tree_show: () => Promise.reject({ detail: "visual_read_failed" }),
-    tree_open_external: (args, options) => {
-      opened.push({ args, workspace: options?.headers?.["x-terminus-workspace"] });
-      return null;
-    },
-  }), undefined, {}, visible);
-  await sleep(600);
-  await openTask(app, "t1");
-  await sleep(400);
-  const doc = app.w.document;
-  assert.ok(text(app).includes("Aquí está otra vez") && text(app).includes("Arriba puedes cambiar"), "el texto del mensaje no se ve");
-  const failed = doc.querySelector("[data-chat-visual-failed]");
-  assert.ok(failed, "no hay aviso en el lugar del visual");
-  assert.ok(failed.textContent.includes(FILE), "el aviso no nombra el archivo");
-  const button = failed.querySelector("[data-chat-visual-open]");
-  assert.ok(button, "no hay botón para abrirlo en el navegador");
-  button.click();
-  await sleep(200);
-  assert.equal(opened.length, 1, "no pidió abrir el visual");
-  assert.equal(opened[0].args.tree, "terminus-chat-visuals");
-  assert.equal(opened[0].args.path, FILE);
-  assert.equal(opened[0].args.session, "t1");
-  assert.equal(opened[0].workspace, "w");
-});
+for (const machine of [null, "vm"]) {
+  test(`un visual que no se puede leer deja el texto, el archivo y el botón para abrirlo (${machine ?? "local"})`, async () => {
+    const opened = [];
+    const app = await boot("listo", `chat-visual-failed-${machine}`, responses({
+      ...(machine ? {
+        machine_list: [{ id: "local", local: true, active: true, on: true, hosts: true }, { id: machine, local: false, active: false, on: true, hosts: true }],
+        list_live_sessions: () => [{ ...row("t1"), machine, machine_on: true }],
+      } : {}),
+      load_session: ({ id }) => session(id, [USER, { role: "agent", id: "a1", at: 1, text: ANSWER }]),
+      tree_show: () => Promise.reject({ detail: "visual_read_failed" }),
+      tree_open_external: (args, options) => {
+        opened.push({ args, workspace: options?.headers?.["x-terminus-workspace"], machine: options?.headers?.["x-terminus-machine"] ?? null });
+        return null;
+      },
+    }), undefined, {}, visible);
+    await sleep(600);
+    await openTask(app, "t1");
+    await sleep(400);
+    const doc = app.w.document;
+    assert.ok(text(app).includes("Aquí está otra vez") && text(app).includes("Arriba puedes cambiar"), "el texto del mensaje no se ve");
+    const failed = doc.querySelector("[data-chat-visual-failed]");
+    assert.ok(failed, "no hay aviso en el lugar del visual");
+    assert.ok(failed.textContent.includes(FILE), "el aviso no nombra el archivo");
+    const button = failed.querySelector("[data-chat-visual-open]");
+    assert.ok(button, "no hay botón para abrirlo en el navegador");
+    button.click();
+    await sleep(200);
+    assert.equal(opened.length, 1, "no pidió abrir el visual");
+    assert.equal(opened[0].args.tree, "terminus-chat-visuals");
+    assert.equal(opened[0].args.path, FILE);
+    assert.equal(opened[0].args.session, "t1");
+    assert.equal(opened[0].workspace, "w");
+    assert.equal(opened[0].machine, machine);
+  });
+}
 
 test("un rechazo al enviar explica cómo seguir y conserva el error desplegable", async () => {
   const app = await boot("listo", "chat-send-failure", responses({

@@ -299,3 +299,68 @@ test("web Git from an offline machine stays stale for fan and scoped reads", asy
     }
   } finally { router.close(); }
 });
+
+test("desktop keeps a machine's known task rows while a new open list is pending, then accepts an empty answer", async () => {
+  const vm = fakeLink({ list_live_sessions: [row("t1", "Remote B")] });
+  const fleet = new Fleet({ self: "cmp_home", connect: () => vm, deadlines: { read: 200, action: 200, intent: 400 } });
+  fleet.setMachines([VM]);
+  const router = createRouter({ self: "cmp_home", fleet, native: async (command) =>
+    command === "list_workspaces" ? { workspaces: [{ id: "w" }], active: "w" } : [row("local")] });
+  await router.handle("list_workspaces");
+  const envelope = { machine: "cmp_vm", workspace: "w", command: "list_live_sessions", args: { project: "p1", open: [] } };
+  await fleet.read(envelope);
+  const ids = (rows: unknown) => (rows as { id: string }[]).map((r) => r.id);
+  assert.deepEqual(ids(await router.handle("list_live_sessions", envelope.args)), ["local", "cmp_vm~t1"]);
+
+  const pending = new Map<string, (value: { value: unknown; cached: null }) => void>();
+  vm.call = (_id, _command, workspace, _folder, args) => new Promise((resolve) => {
+    pending.set(JSON.stringify([workspace, (args as Args).project]), resolve);
+  });
+  const opened = { project: "p1", open: ["cmp_vm~t1"] };
+  const listed = (await router.handle("list_live_sessions", opened)) as { id: string; machine_status?: string }[];
+  assert.deepEqual(ids(listed), ["local", "cmp_vm~t1"], "a missing slice is not an empty task list");
+  assert.equal(listed[1].machine_status, "cached", "the previous observation is marked saved");
+  assert.deepEqual(ids(await router.handle("list_live_sessions", { ...opened, project: "p2" })), ["local"], "another folder cannot inherit these rows");
+  assert.deepEqual(ids(await router.handle("list_live_sessions", opened, { headers: { "x-terminus-workspace": "w2" } })), ["local"], "another workspace cannot inherit these rows");
+  const completed = fleet.read({ ...envelope, args: opened });
+  pending.get(JSON.stringify(["w", "p1"]))!({ value: [], cached: null });
+  await completed;
+  assert.deepEqual(ids(await router.handle("list_live_sessions", opened)), ["local"], "a successful empty response removes the old rows");
+  for (const finish of pending.values()) finish({ value: [], cached: null });
+  router.close();
+});
+
+test("web publishes available slices while a cold machine is still pending, then announces late data", async () => {
+  const slow = fakeLink({});
+  const pending: { command: string; resolve: (answer: { value: unknown; cached: null }) => void }[] = [];
+  slow.call = (_id, command) => new Promise(resolve => { pending.push({ command, resolve }); });
+  const fast = fakeLink({ list_workspaces: { workspaces: [{ id: "w" }], active: "w" }, list_live_sessions: [row("fast")], list_projects: [] });
+  const fleet = new Fleet({ self: null, connect: info => info.id === VM.id ? slow : fast, deadlines: { read: 2000 } });
+  fleet.setMachines([VM, MAC]);
+  const changes: string[] = [];
+  const router = createRouter({ self: null, fleet, native: null, registry: async () => REGISTRY as never, onSlices: batch => changes.push(...batch) });
+  try {
+    const started = Date.now();
+    await router.handle("list_workspaces");
+    const initial = await router.handle("list_live_sessions", { project: "p1", open: [] }) as { id: string }[];
+    assert.ok(Date.now() - started < 800, "the slow machine's deadline is outside the initial render");
+    assert.deepEqual(initial.map(r => r.id), ["cmp_mac~fast"]);
+    const listing = pending.find(read => read.command === "list_workspaces")!;
+    const tasks = pending.find(read => read.command === "list_live_sessions")!;
+    listing.resolve({ value: { workspaces: [{ id: "w" }], active: "w" }, cached: null });
+    tasks.resolve({ value: [row("late")], cached: null });
+    await new Promise(resolve => setTimeout(resolve, 250));
+    assert.ok(changes.includes("workspaces"));
+    assert.ok(changes.includes("sessions"));
+    const retained = await router.handle("list_live_sessions", { project: "p1", open: ["cmp_vm~late"] }) as { id: string }[];
+    assert.ok(retained.some(r => r.id === "cmp_vm~late"), "a pending open slice retains the machine's last rows");
+    const latest = pending.filter(read => read.command === "list_live_sessions").at(-1)!;
+    latest.resolve({ value: [], cached: null });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const empty = await router.handle("list_live_sessions", { project: "p1", open: ["cmp_vm~late"] }) as { id: string }[];
+    assert.ok(!empty.some(r => r.id === "cmp_vm~late"), "a confirmed empty response clears the old slice");
+  } finally {
+    for (const read of pending) read.resolve({ value: [], cached: null });
+    router.close();
+  }
+});

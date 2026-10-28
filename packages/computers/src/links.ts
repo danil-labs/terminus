@@ -67,6 +67,27 @@ export function linkedEvent(event: { workspace?: unknown }, linked: ReadonlySet<
 }
 
 /**
+ * Los workspaces que nombra una página del relay (en el sobre, en el `payload`
+ * o en las entradas de `attention`) y que `linked` no tiene. El relay ya filtró
+ * la página con la lista vigente: si nombra uno que aquí no está, la lista de
+ * aquí es vieja (se vinculó después de leer `GET /v1/computers`).
+ */
+export function unlinkedWorkspaces(events: readonly { name: string; payload?: unknown; workspace?: unknown }[], linked: ReadonlySet<string> | null): string[] {
+  if (!linked) return [];
+  const named = new Set<string>();
+  const add = (value: unknown) => {
+    const id = value && typeof value === "object" && !Array.isArray(value) ? (value as { workspace?: unknown }).workspace : undefined;
+    if (typeof id === "string" && id && !linked.has(id)) named.add(id);
+  };
+  for (const e of events) {
+    add(e);
+    add(e.payload);
+    if (e.name === "attention" && Array.isArray(e.payload)) for (const entry of e.payload) add(entry);
+  }
+  return [...named];
+}
+
+/**
  * Los eventos de una página del relay que la persona puede ver: ninguno de un
  * workspace sin vincular, diga su workspace el sobre o el `payload`, y el de
  * `attention` sin las entradas de esos workspaces.

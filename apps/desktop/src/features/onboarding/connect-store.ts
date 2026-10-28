@@ -3,19 +3,21 @@
  * conectado en el workspace activo y en qué paso va cada conexión. El mapa y el
  * panel leen el mismo estado; las cuentas cuelgan del workspace activo.
  */
-import { listen } from "../../lib/serviceEvents";
+
 import { batch, createEffect, createSignal, onCleanup, untrack } from "solid-js";
 import { createStore } from "solid-js/store";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
-import type { Superficie } from "../../lib/surfaces.ts";
 import { textoDeFalta } from "../../lib/no-space";
+import type { Frase } from "../../lib/prose";
+import { listen } from "../../lib/serviceEvents";
+import type { Superficie } from "../../lib/surfaces.ts";
 import { detalleDe, prosaDe } from "../../ui/Failure";
 import { accountPresentation } from "../settings/AccountCard";
+import { accountKeyUrl } from "../settings/account-auth";
 import type { AccountList, AccountStatus, AgentOpt, LoginEvent } from "../settings/accounts-store";
 import { ORIGEN_SISTEMA } from "../settings/environment-store";
 import { crearModelosLocales } from "../settings/local-models-store";
-import type { Frase } from "../../lib/prose";
 
 type Agente = AgentOpt & { source: string | null; system_broken: boolean };
 type Avance = { id: string; done: number; bytes: number };
@@ -26,7 +28,6 @@ type SesionDelSistema = { provider: string; identity: string | null; plan: strin
 /** Los que se conectan con una clave pegada en su panel, como en el diseño: dónde se crea y cómo se ve. */
 const CLAVES: Record<string, { url: string; placeholder: string }> = {
   grok: { url: "https://console.x.ai", placeholder: "xai-…" },
-  "opencode-zen": { url: "https://opencode.ai/auth", placeholder: "sk-…" },
 };
 const CANCELADA = "install.cancelled";
 const fueCancelada = (e: unknown) => `${prosaDe(e)} ${detalleDe(e)} ${String((e as { code?: string })?.code ?? "")}`.includes(CANCELADA);
@@ -222,7 +223,7 @@ export function crearConexiones() {
           ? "local"
           : a.inferencia === "sin_pedir_nada" && gratuitas.length === 0
             ? "consentimiento"
-            : a.api_key || CLAVES[a.id]
+            : accountKeyUrl(a) || CLAVES[a.id]
               ? "clave"
               : "sesion";
       const previa = filas().find((f) => f.id === a.id);
@@ -233,7 +234,7 @@ export function crearConexiones() {
         modo,
         detectada: detectadas.has(a.id),
         bytes: previa?.bytes ?? null,
-        urlDeClave: CLAVES[a.id]?.url ?? a.api_key ?? null,
+        urlDeClave: CLAVES[a.id]?.url ?? accountKeyUrl(a),
         placeholder: CLAVES[a.id]?.placeholder ?? "",
       });
       for (const s of gratuitas) {

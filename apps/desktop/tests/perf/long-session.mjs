@@ -262,6 +262,10 @@ const open = async (id) => {
   if (!rowEl) throw new Error(`No está la fila de ${id}.`);
   rowEl.click();
   await settle();
+  // Este escenario mide pestañas conservadas, incluidas las que reciben turnos de fondo.
+  doc.querySelector('[data-preview-header] [role="button"]')
+    ?.dispatchEvent(new w.MouseEvent("dblclick", { bubbles: true }));
+  await settle();
 };
 const chat = (session, kind, extra = {}) => app.emit("chat", { kind, session, workspace: "w", ...extra });
 

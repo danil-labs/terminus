@@ -36,7 +36,7 @@ export {
   wakes,
 } from "./machine.ts";
 export { type WorkspaceGroup, type WorkspaceRow, groupWorkspaces, hasAccountWorkspaces, registryProjects, withRegistry } from "./fleet.ts";
-export { callWorkspace, hasLinkedWorkspaces, linkedAttention, linkedEvent, linkedEvents, linkedListing, linkedWorkspaces, onlyLinked } from "./links.ts";
+export { callWorkspace, hasLinkedWorkspaces, linkedAttention, linkedEvent, linkedEvents, linkedListing, linkedWorkspaces, onlyLinked, unlinkedWorkspaces } from "./links.ts";
 export { type Compatibility, machineCompatibility, machineContracts } from "./compatibility.ts";
 export {
   type ConnectHop,

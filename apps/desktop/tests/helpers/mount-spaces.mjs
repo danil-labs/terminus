@@ -267,7 +267,8 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     link("Otra tarea").click();
     await sleep(350);
     assert.equal(u.pildora("i2").dataset.selected, "true", "abrir la tarea cambia a su espacio");
-    assert.deepEqual(u.pestanas(), ["Tarea t2"], "la tarea se abre en la tira de su espacio");
+    assert.deepEqual(u.pestanas(), [], "abrir por enlace no conserva una pestaña");
+    assert.equal(u.doc.querySelector('[data-preview-header] [role="button"] .truncate')?.textContent, "Tarea t2", "la tarea se abre como vista temporal en su espacio");
     assert.equal(loaded.filter((id) => id === "t2").length, 2, "se comprueba que existe antes de abrirla");
     assert.deepEqual(app.fallos, []);
     app.w.close();

@@ -85,6 +85,12 @@ export function relay({ state: initial = "online", wakeAfter = 300, cachedAt = n
           : answer === undefined
           ? { type: "result", id: m.id, error: { code: "command" } }
           : { type: "result", id: m.id, value: typeof answer === "function" ? answer(m.args, m) : answer };
+        if (reply.value instanceof Promise) {
+          void reply.value.then((value) => {
+            if (this.readyState === 1) this.onmessage?.({ data: JSON.stringify({ ...reply, value }) });
+          });
+          return;
+        }
         if (this.readyState === 1) this.onmessage?.({ data: JSON.stringify(reply) });
       };
       if (state === "online") return void setTimeout(respond, delay);
