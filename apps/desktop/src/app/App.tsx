@@ -6650,10 +6650,10 @@ export default function App() {
       return value?.workspace === workspaceActivo() && value?.id === pp.sesion ? value : undefined;
     };
     const delegatedRows = createMemo<SessionRow[]>((previous) => {
-      const all = Object.values(sesionesConEstado()).flat();
+      const all = Object.entries(sesionesConEstado()).flatMap(([folder, rows]) => rows.map(row => ({ ...row, folder })));
       const known = new Map(all.map(row => [row.id, row]));
       const rows = new Map((delegationData()?.rows ?? []).map(row => [row.id, row]));
-      for (const row of delegatedDescendants(all, pp.sesion ?? "")) rows.set(row.id, row);
+      for (const row of delegatedDescendants(all, filaDe(pp.sesion ?? "") ?? { id: pp.sesion ?? "" })) rows.set(row.id, row);
       const unseen = attention.unseen(workspaceActivo());
       const waiting = new Set(preguntadas());
       return conservar(previous ?? [], [...rows.values()].map(row => ({
@@ -6662,7 +6662,7 @@ export default function App() {
       })), row => row.id);
     }, []);
     const delegatedList = (folder: string): DelegatedListProps => ({
-      relatedSessions: [...Object.values(sesionesConEstado()).flat(), ...delegatedRows()],
+      relatedSessions: [...Object.entries(sesionesConEstado()).flatMap(([folder, rows]) => rows.map(row => ({ ...row, folder }))), ...delegatedRows()],
       de: folder, current: pp.sesion ?? null, vivas: vivas(), aprobando: permissions().map(item => item.session),
       carpetaDe: () => projectList().find(item => item.id === folder)?.name,
       destinos: projectList().filter(item => item.id !== folder).map(item => ({ id: item.id, name: item.name })),
@@ -6926,18 +6926,21 @@ export default function App() {
         }</Show>}
         agentTasks={<Show when={!pp.sesion && encargadoDeLaCelda()}>{agent => {
           const de = () => proyectoDeLaCelda()?.id ?? "";
+          const folderOf = (id: string) => Object.entries(sesionesConEstado()).find(([, rows]) => rows.some(row => row.id === id))?.[0] ?? de();
           return <AgentPageTasks
             context={`${de()}/${agent()}`}
-            tasks={createdTasks(sesionesConEstado()[de()] ?? [], agent(), null)}
+            tasks={createdTasks(Object.entries(sesionesConEstado()).flatMap(([folder, rows]) => rows.map(row => ({ ...row, folder }))), agent(), null, de())}
             list={{
+              carpetaDe: row => projectList().find(item => item.id === folderOf(row.id))?.name,
+              projectOf: row => folderOf(row.id), destinosDe: row => projectList().filter(item => item.id !== folderOf(row.id)).map(item => ({ id: item.id, name: item.name })),
               de: de(), current: null, vivas: vivas(), aprobando: permissions().map(item => item.session),
               destinos: projectList().filter(item => item.id !== de()).map(item => ({ id: item.id, name: item.name })),
-              onDelete: id => void borrarSesion(de(), id),
-              onMove: (id, destination) => void moverSesion(de(), id, destination),
-              onEtapa: (id, stage) => void etaparSesion(de(), id, stage),
-              onRenombrar: (id, title) => void renombrarSesion(de(), id, title),
+              onDelete: id => void borrarSesion(folderOf(id), id),
+              onMove: (id, destination) => void moverSesion(folderOf(id), id, destination),
+              onEtapa: (id, stage) => void etaparSesion(folderOf(id), id, stage),
+              onRenombrar: (id, title) => void renombrarSesion(folderOf(id), id, title),
             }}
-            onPick={id => { setHablandoCon(null); void abrirSesion(de(), id); }} />;
+            onPick={id => { setHablandoCon(null); void abrirSesion(folderOf(id), id); }} />;
         }}</Show>}
         chatEstado={!pp.sesion && encargadoDeLaCelda() ? "awake" : estadoDelEncargado()}
         chatName={filaDe(pp.sesion ?? "")?.agent_thread
@@ -8317,24 +8320,29 @@ export default function App() {
               onArchivoBorrado={archivoBorrado}
               onClose={() => setArtOpen(false)}
             />}>
-              {owner => <AgentTasks
+              {owner => {
+                const folderOf = (id: string) => Object.entries(sesionesConEstado()).find(([, rows]) => rows.some(row => row.id === id))?.[0] ?? owner().project;
+                return <AgentTasks
                 context={`${owner().project}/${sessionId() ?? owner().name}`}
-                tasks={createdTasks(sesionesConEstado()[owner().project] ?? [], owner().name, filaDe(sessionId() ?? "")?.agent_thread ? sessionId() : null)}
+                tasks={createdTasks(Object.entries(sesionesConEstado()).flatMap(([folder, rows]) => rows.map(row => ({ ...row, folder }))), owner().name, filaDe(sessionId() ?? "")?.agent_thread ? sessionId() : null, owner().project)}
                 list={{
+                  carpetaDe: row => projectList().find(item => item.id === folderOf(row.id))?.name,
+                  projectOf: row => folderOf(row.id), destinosDe: row => projectList().filter(item => item.id !== folderOf(row.id)).map(item => ({ id: item.id, name: item.name })),
                   de: owner().project, current: sessionId(), vivas: vivas(), aprobando: permissions().map(item => item.session),
                   destinos: projectList().filter(item => item.id !== owner().project).map(item => ({ id: item.id, name: item.name })),
-                  onDelete: id => void borrarSesion(owner().project, id),
-                  onMove: (id, destination) => void moverSesion(owner().project, id, destination),
-                  onEtapa: (id, stage) => void etaparSesion(owner().project, id, stage),
-                  onRenombrar: (id, title) => void renombrarSesion(owner().project, id, title),
+                  onDelete: id => void borrarSesion(folderOf(id), id),
+                  onMove: (id, destination) => void moverSesion(folderOf(id), id, destination),
+                  onEtapa: (id, stage) => void etaparSesion(folderOf(id), id, stage),
+                  onRenombrar: (id, title) => void renombrarSesion(folderOf(id), id, title),
                 }}
                 onClose={() => setArtOpen(false)}
                 onPick={id => {
-                  const destination = { project: owner().project, id };
+                  const destination = { project: folderOf(id), id };
                   setHablandoCon(null);
                   void abrirSesion(destination.project, id);
                 }}
-              />}
+              />;
+              }}
             </Show>
           </ColumnaLateral>
         </div>

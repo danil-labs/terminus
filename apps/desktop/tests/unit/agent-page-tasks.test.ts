@@ -33,3 +33,20 @@ test("esperan incluye la que espera una aprobación aunque no haya preguntado", 
   const rows = [fila("pregunta", 1, null, { esperando: true }), fila("aprobar", 2), fila("nada", 3)];
   assert.deepEqual(filtrarTareas(rows, "waiting", [], ["aprobar"]).map(row => row.id), ["pregunta", "aprobar"]);
 });
+
+test("paginar una delegación independiente conserva sus encargos transitivos", () => {
+  const rows = [
+    fila("root", 40),
+    fila("child", 30, null, { launched_by: "root", pinned: true }),
+    fila("grandchild", 20, "child"),
+    fila("other", 10),
+  ];
+  const page = primerasRaices(rows, 1);
+  assert.deepEqual(page.rows.map(row => row.id), ["root", "child", "grandchild"]);
+  assert.equal(page.quedan, true);
+});
+
+test("un ciclo de delegaciones permanece accesible al paginar", () => {
+  const rows = [fila("a", 20, null, { launched_by: "b" }), fila("b", 10, "a")];
+  assert.deepEqual(primerasRaices(rows, 1).rows.map(row => row.id), ["a", "b"]);
+});

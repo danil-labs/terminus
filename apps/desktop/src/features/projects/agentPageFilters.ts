@@ -1,3 +1,4 @@
+import { buildTaskTree, taskIdentity } from "@terminus/tasks";
 import type { SessionRow } from "./Sessions";
 
 export type FiltroDeTareas = "all" | "running" | "waiting" | "done";
@@ -11,19 +12,14 @@ export function filtrarTareas(rows: SessionRow[], filtro: FiltroDeTareas, vivas:
 
 /** Las `n` raíces más nuevas con todas sus descendientes: cortar por fila dejaría hijas sin su padre. */
 export function primerasRaices(rows: SessionRow[], n: number): { rows: SessionRow[]; quedan: boolean } {
-  const ids = new Set(rows.map(row => row.id));
-  const raices = rows.filter(row => !row.parent || !ids.has(row.parent))
-    .sort((a, b) => b.created_at - a.created_at);
-  const dentro = new Set(raices.slice(0, n).map(row => row.id));
-  let crecio = true;
-  while (crecio) {
-    crecio = false;
-    for (const row of rows) {
-      if (!dentro.has(row.id) && row.parent && dentro.has(row.parent)) {
-        dentro.add(row.id);
-        crecio = true;
-      }
+  const roots = buildTaskTree(rows).sort((a, b) => b.tarea.created_at - a.tarea.created_at);
+  const included = new Set<string>();
+  const visit = (branches: typeof roots) => {
+    for (const branch of branches) {
+      included.add(taskIdentity(branch.tarea));
+      visit(branch.hijas);
     }
-  }
-  return { rows: rows.filter(row => dentro.has(row.id)), quedan: raices.length > n };
+  };
+  visit(roots.slice(0, n));
+  return { rows: rows.filter(row => included.has(taskIdentity(row))), quedan: roots.length > n };
 }
