@@ -44,7 +44,7 @@ export default function TitleBar(props: {
     <div
       data-title-bar=""
       class={cn(
-        "glass-panel flex shrink-0 items-center gap-2",
+        "tab-veil flex shrink-0 items-center gap-2",
         HEADER_HEIGHT,
         apartarSemaforo() ? TRAFFIC_LIGHT_PADDING : "pl-2",
       )}

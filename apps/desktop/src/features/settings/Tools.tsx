@@ -1,12 +1,11 @@
 import { For, Show, Suspense, createSignal, lazy, onCleanup, onMount } from "solid-js";
 import { listen } from "../../lib/serviceEvents";
 import { invoke } from "../../lib/invoke.ts";
-import Plug from "lucide-solid/icons/plug";
 import { Button } from "../../ui/Button";
 import { Textarea } from "../../ui/Textarea";
 import { FailureNote, asFailure, type Failure } from "../../ui/Failure";
 import { cn } from "../../lib/utils";
-import { MarcaProveedor } from "../../ui/icons";
+import { MarcaProveedor, McpMark } from "../../ui/icons";
 import { t } from "../../lib/i18n";
 import { prosa, type Frase } from "../../lib/prose";
 import { ITEM_DE_MENU, Popover, PopoverContent, PopoverTrigger } from "../../ui/Popover";
@@ -1068,7 +1067,7 @@ export function ConexionesMenu(props: {
             aria-label={t("shell.sidebar.mcp.trigger")}
             title={t("shell.sidebar.mcp.trigger")}
           >
-            <Plug size={props.triggerClass ? 17 : 15} />
+            <McpMark size={props.triggerClass ? 16 : 14} />
             <Show when={pendientes().size > 0}>
               <span class="absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full bg-error-strong" />
             </Show>
