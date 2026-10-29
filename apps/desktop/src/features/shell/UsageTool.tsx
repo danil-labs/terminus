@@ -83,7 +83,7 @@ export default function UsageTool(props: {
               {...p}
               variant="chrome"
               size="iconCompact"
-              class="size-auto h-7 shrink-0 gap-1.5 px-1.5 text-neutral-500"
+              class="size-auto h-7 shrink-0 gap-1.5 px-1.5 text-neutral-500 focus-visible:outline-none"
               aria-label={title()}
               onPointerEnter={entrar}
               onPointerLeave={salir}
@@ -118,6 +118,8 @@ export default function UsageTool(props: {
           class="flex max-h-[var(--kb-popper-content-available-height)] w-[380px] flex-col p-0"
           // Enfocar el primer control al abrir movería el foco a Gestionar cuentas al consultar consumo.
           onOpenAutoFocus={(e: Event) => e.preventDefault()}
+          // Abierto con el puntero, devolver el foco al cerrar dejaría el botón marcado como si se llegara con el teclado.
+          onCloseAutoFocus={(e: Event) => e.preventDefault()}
           onPointerEnter={entrar}
           onPointerLeave={salir}
         >
