@@ -3264,11 +3264,13 @@ export default function App() {
       const current = p.revision === undefined
         ? (await pendientesDe(p.session, workspace))?.permissions.find((x) => (x.request_id === p.requestId || x.id === p.requestId))
         : { revision: p.revision, id: p.durableId };
-      if (!current || current.revision === undefined) throw new Error(t("shell.turn.permission_no_reply"));
+      // Un motor anterior a los pendientes durables los lista sin `id` ni
+      // `revision` y contesta por `request_id`; exigir la revisión dejaba el
+      // gate sin forma de aprobarse. El motor nuevo acepta la misma forma.
       const guardado = await invoke<Turn>("respond_permission", {
         session: p.session,
-        requestId: current.id ?? p.requestId,
-        revision: current.revision,
+        requestId: current?.id ?? p.requestId,
+        revision: current?.revision,
         allow,
       }, opcionesDeLaTarea(p.session, workspace));
       // El `permission_resolved` de esta misma decisión puede haber llegado
@@ -5998,8 +6000,9 @@ export default function App() {
 
   type Pendientes = {
     records?: { permissions: { id: string; request_id: string; state: string; [key: string]: unknown }[] };
-    questions: { id: string; request_id: string; revision: number; turn: string }[];
-    permissions: { id: string; request_id: string; revision: number; tool: string; target: string | null }[];
+    // `id` y `revision` faltan en un motor anterior a los pendientes durables.
+    questions: { id?: string; request_id: string; revision?: number; turn: string }[];
+    permissions: { id?: string; request_id: string; revision?: number; tool: string; target: string | null }[];
   };
   /** Lo que esa tarea tiene esperando. No lanza: sin respuesta, no hay nada. */
   const pendientesDe = (session: string, workspace = workspaceActivo()) =>
@@ -6102,7 +6105,7 @@ export default function App() {
         if (!pending) throw new Error(t("shell.answer.question_missing"));
         const guardado = await invoke<Turn>("answer_question", {
           session: sid,
-          requestId: pending.id,
+          requestId: pending.id ?? pending.request_id,
           revision: pending.revision,
           respuestas: manda,
         }, opcionesDeLaTarea(questionSession, questionWorkspace));
