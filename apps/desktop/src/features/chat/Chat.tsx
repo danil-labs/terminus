@@ -1,3 +1,5 @@
+import type { HistoryRef } from "@terminus/protocol";
+import { HistoryDetails } from "./HistoryDetails";
 import type { InvokeOptions } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -182,6 +184,7 @@ export type Author = {
 export type { CambioPorCupo, FalloDelTurno };
 
 export type Msg = {
+  historyRefs?: HistoryRef[];
   role: "user" | "agent" | "system";
   text: string;
   task_mentions?: TaskMention[];
@@ -457,6 +460,8 @@ export type ChatProps = {
   cargando?: boolean;
   /** Si hay turnos anteriores a lo cargado que el motor puede dar por páginas. */
   masAntiguos?: boolean;
+  masRecientes?: boolean;
+  onRecientes?: () => void;
   /** Pide la página anterior; resuelve con lo que la pone en el hilo, o `null`. */
   onAntiguos?: () => Promise<(() => void) | null>;
   busy: boolean;
@@ -2792,6 +2797,7 @@ export default function Chat(props: ChatProps) {
           scrollea, el de dentro es lo único medible —tiene el alto de su
           hueco y no cambia—. `lib/paste.ts`. */}
       <div class="relative flex min-h-0 flex-1 flex-col">
+      <Show when={props.masRecientes}><button type="button" class="shrink-0 py-2 text-xs text-primary underline" onClick={() => props.onRecientes?.()}>{t("chat.history.latest")}</button></Show>
       {props.location}
       {props.coordinator}
       <Show when={!props.agentDraft ? props.chatEncargado : null}>
@@ -3090,6 +3096,7 @@ export default function Chat(props: ChatProps) {
                         entrante() ? presentation().incomingMessage : presentation().userMessage,
                       )}
                     >
+                      <Show when={m().historyRefs?.length}><HistoryDetails refs={m().historyRefs!} /></Show>
                       <Show when={entrante()}>
                         <div class="mb-1 flex justify-start gap-1 text-[0.72rem] text-neutral-500" data-sender={m().encargado ? "agent" : "task"}>
                           <Show when={m().encargado}>
@@ -3579,6 +3586,7 @@ function TrabajoDeAgente(props: {
         )}
       </Show>
 
+      <Show when={props.msg.historyRefs?.length}><HistoryDetails refs={props.msg.historyRefs!} /></Show>
       <Show when={props.msg.images?.length ? props.msg.images : null}>
         {(images) => <ImagenesEntregadas items={images()} />}
       </Show>

@@ -1258,13 +1258,24 @@ export default function App() {
   // Los turnos de cada tarea que trajo `service history`, desde `start`; lo anterior se pide al subir.
   const historias = new Map<string, LoadedHistory<Session["turns"][number]>>();
   const [conAntiguos, setConAntiguos] = createSignal<Readonly<Record<string, boolean>>>({});
-  const marcarAntiguos = (id: string, loaded: LoadedHistory<unknown>) =>
+  const [conRecientes, setConRecientes] = createSignal<Readonly<Record<string, boolean>>>({});
+  const marcarAntiguos = (id: string, loaded: LoadedHistory<unknown>) => {
     setConAntiguos((all) => (!!all[id] === loaded.start > 0 ? all : { ...all, [id]: loaded.start > 0 }));
+    const recent = loaded.start + loaded.turns.length < loaded.total;
+    setConRecientes(all => !!all[id] === recent ? all : { ...all, [id]: recent });
+  };
   // Con el stream empujado el motor sabe paginar: abrir trae los últimos turnos y no la transcripción entera.
   let historialPaginado = false;
-  const leerTarea = (project: string, id: string, before: number | null = null) => {
-    if (historialPaginado) return invoke<Session>("load_history", { project, id, before }, deLaTarea(id));
-    return invoke<Session>("load_session", { project, id }, deLaTarea(id));
+  const leerTarea = async (project: string, id: string, before: number | null = null) => {
+    const result = historialPaginado
+      ? await invoke<Session>("load_history", { project, id, before }, deLaTarea(id))
+      : await invoke<Session>("load_session", { project, id, history_request: { version: 1, before } }, deLaTarea(id));
+    if (result.history?.version === 1) {
+      result.turns = result.turns.map(turn => ({ ...turn,
+        history_refs: turn.history_refs?.map(ref => ({ ...ref, project, session: id })),
+      }));
+    }
+    return result;
   };
   /**
    * La página anterior a lo cargado de `id`, lista para anteponerse: devuelve con qué
@@ -1273,7 +1284,7 @@ export default function App() {
   const pidiendoAntiguos = new Set<string>();
   async function cargarAntiguos(project: string, id: string): Promise<(() => void) | null> {
     const loaded = historias.get(id);
-    if (!historialPaginado || !loaded || loaded.start === 0 || pidiendoAntiguos.has(id)) return null;
+    if (!loaded || loaded.start === 0 || pidiendoAntiguos.has(id)) return null;
     pidiendoAntiguos.add(id);
     const generation = sessionGeneration;
     try {
@@ -4294,6 +4305,21 @@ export default function App() {
       loadResult(id, s, false, generation);
       void refreshFolder(proyecto, id);
     } catch (e) {
+      if (!current()) return;
+      try {
+        const state = await invoke<Session>("load_session", {
+          project: proyecto, id, history_request: { version: 1, kind: "state" },
+        }, deLaTarea(id));
+        if (!current()) return;
+        setAgent(state.provider);
+        setModel(modeloDeSubtarea(state) ?? "");
+        setEffort(state.effort ?? "");
+        setModo(state.permission_mode ?? "");
+        setAdjuntas(state.sources ?? []);
+        restoreSessionConfiguration();
+        void refreshFolder(proyecto, id);
+      } catch { /* Sin estado autoritativo se conserva el error de la lectura original. */ }
+      if (!current()) return;
       releer(id, [{ role: "system", text: prosaDe(e) }], false);
       if (propagateError) throw e;
     } finally {
@@ -6994,6 +7020,13 @@ export default function App() {
            abierta—: una celda separada tiene su propia lectura en vuelo. Es
            opcional: `tsc` no avisa si se pierde. */
         cargando={cargandoHilo() !== null && cargandoHilo() === pp.sesion}
+        masRecientes={!!conRecientes()[pp.sesion ?? ""]}
+        onRecientes={() => {
+          if (!pp.sesion) return;
+          const id = pp.sesion, generation = sessionGeneration;
+          historias.delete(id);
+          void leerTarea(proyectoDeLaCelda()?.id ?? "", id).then(s => loadResult(id, s, false, generation)).catch(setError);
+        }}
         masAntiguos={!!conAntiguos()[pp.sesion ?? ""]}
         onAntiguos={() => cargarAntiguos(proyectoDeLaCelda()?.id ?? "", pp.sesion ?? "")}
         /* El medidor de memoria es de la sesión abierta —`ventana` se

@@ -421,5 +421,16 @@
   "chat.greeting.7": "¿Qué resolvemos?",
   "chat.greeting.8": "¿Qué sigue en tu lista?",
   "chat.greeting.9": "Aquí estoy. ¿Qué hacemos?",
-  "chat.greeting.10": "¿Qué quieres sacar adelante?"
+  "chat.greeting.10": "¿Qué quieres sacar adelante?",
+  "chat.history.open": "Ver contenido completo",
+  "chat.history.next": "Siguiente fragmento",
+  "chat.history.previous": "Fragmento anterior",
+  "chat.history.close": "Cerrar contenido",
+  "chat.history.error": "No se pudo leer este fragmento. Vuelve a abrir la tarea si cambió el historial.",
+  "chat.history.latest": "Volver a los mensajes recientes",
+  "chat.history.loading": "Cargando contenido…",
+  "chat.history.tools": "Resultados de herramientas",
+  "chat.history.text": "Texto del mensaje",
+  "chat.history.pieces": "Registro completo",
+  "chat.history.content": "Contenido guardado"
 }

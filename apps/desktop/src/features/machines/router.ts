@@ -404,8 +404,11 @@ export function createRouter(config: RouterConfig) {
     if (CREATE.has(command) && workspace && fleet.inRegistry(workspace) && !fleet.membersOf(workspace).includes(machine)) await materialize(machine, workspace);
     if (WITH_SPACE.has(command)) args = await withSharedSpace(machine, workspace, args);
     if (command === "load_history") {
-      // El relay no pagina: la tarea entera, con la forma de la página.
-      const session = (await remote(machine, "load_session", { project: args.project, id: args.id }, workspace)) as { turns?: unknown[] } | null;
+      const session = await remote(machine, "load_session", {
+        project: args.project, id: args.id,
+        history_request: { version: 1, before: args.before ?? null, revision: args.revision ?? null },
+      }, workspace) as { turns?: unknown[]; history?: unknown } | null;
+      if (session?.history) return session;
       const total = Array.isArray(session?.turns) ? session.turns.length : 0;
       return { ...session, history: { total, start: 0, end: total, limit: total, has_more: false } };
     }
