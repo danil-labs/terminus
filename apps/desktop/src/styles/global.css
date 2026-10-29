@@ -223,6 +223,13 @@
   --color-side: var(--color-primary);
   /* El globo de un agente u otra tarea. En claro `surface-raised` es blanco como el chat (1,00:1). */
   --color-chat-incoming: var(--color-surface-muted);
+  /* Los globos del Inbox alfa repiten los de Danil Agents (Appv2): blanco el del
+     contacto y verde WhatsApp el saliente. En oscuro el saliente es claro y lleva tinta oscura. */
+  --color-inbox-bubble-in: #ffffff;
+  --color-inbox-bubble-out: #d9fdd3;
+  --color-inbox-bubble-out-text: var(--color-neutral-950);
+  --color-inbox-bubble-out-muted: var(--color-neutral-500);
+  --color-inbox-bubble-out-label: var(--color-neutral-700);
   --color-surface-muted: #f3f4f8;
   /* El riel de Configuración. Un escalón por debajo de `surface-muted` para que la
      pestaña abierta, que se funde con el contenido en `surface`, se separe del riel:
@@ -436,6 +443,11 @@
    mirando la app, no despejando una tabla. */
 [data-theme="dark"] {
   color-scheme: dark;
+  --color-inbox-bubble-in: #1b1b1e;
+  --color-inbox-bubble-out: #ececef;
+  --color-inbox-bubble-out-text: #08080a;
+  --color-inbox-bubble-out-muted: #52525b;
+  --color-inbox-bubble-out-label: #52525b;
   --tab-veil-rgb: 0 0 0;
   --tab-veil-scale: 1;
 

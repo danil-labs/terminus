@@ -16,11 +16,9 @@
   "customize.draft": "Draft",
   "customize.ai_enabled": "AI assistance enabled",
   "customize.ai_paused": "AI assistance disabled",
-  "customize.unread": "Unread",
   "customize.conversations": "Conversations",
   "customize.page_empty": "No conversations on this page.",
   "customize.no_accounts": "No operational accounts available.",
   "customize.retry": "Retry",
-  "customize.read_only": "Read only",
-  "customize.unknown": "Status unavailable"
+  "customize.read_only": "Read only"
 }
