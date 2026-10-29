@@ -98,6 +98,8 @@
     "other": "Show more ({count} left)"
   },
   "code.tree.folded.failed": "This folder could not be opened.",
+  "code.tree.failed.slow": "Couldn't read the folder: the engine took too long to answer.",
+  "code.tree.retry": "Retry",
   "code.editor.fold_line": "Fold line",
   "code.editor.unfold_line": "Unfold line",
   "code.editor.folded_code": "folded code",
