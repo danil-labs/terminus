@@ -690,8 +690,6 @@ if (failure) {
     if (!text) continue;
     const lines = text.split("\n");
     console.error(`      ${stream}:`);
-    const fallida = lines.findIndex((l) => /^\s*not ok/.test(l));
-    if (fallida >= 0) for (const line of lines.slice(Math.max(0, fallida - 5), fallida + 60)) console.error(`  DEBUG ${line}`);
     for (const line of lines.slice(-40)) console.error(`      ${line}`);
     if (lines.length > 40) console.error(`\n  (${lines.length - 40} líneas anteriores de ${stream} — vuelve a correr ese comando solo)`);
   }
