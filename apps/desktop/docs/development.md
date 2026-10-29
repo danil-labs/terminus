@@ -28,6 +28,11 @@ window` to open another window against the running engine.
 All commands accept `--lab <dir>` to use another lab folder. The engine's log is
 `engine.log` in the lab, the window's stderr is `window.err`.
 
+The lab drops every `SELDON_*`, `TERMINUS_*` and `DANIL_*` variable of the calling
+shell, so it never signs in with the machine's real Danil credential. The one
+exception is a `DANIL_COMPUTERS_URL` pointing at `localhost`, `127.0.0.1` or `[::1]`,
+for a local fake control plane.
+
 On a machine with little memory, limit Rust parallelism:
 `CARGO_BUILD_JOBS=2 pnpm window:build`.
 
