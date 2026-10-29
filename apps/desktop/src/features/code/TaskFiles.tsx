@@ -1,8 +1,9 @@
-import { For, Show, createResource, createSignal } from "solid-js";
+import { For, Show, createEffect, createResource, createSignal, on, onCleanup, onMount } from "solid-js";
 import Ellipsis from "lucide-solid/icons/ellipsis";
 import GitCompare from "lucide-solid/icons/git-compare";
 import ListTree from "lucide-solid/icons/list-tree";
 import Maximize2 from "lucide-solid/icons/maximize-2";
+import MessageSquare from "lucide-solid/icons/message-square";
 import Minimize2 from "lucide-solid/icons/minimize-2";
 import X from "lucide-solid/icons/x";
 import { capabilities } from "../../lib/platform";
@@ -40,11 +41,24 @@ export default function TaskFilesCard(props: {
   const panel = () => props.files.panel(props.session);
   const hasTabs = () => panel().tabs.length > 0;
   const expanded = () => panel().expanded || (props.expandedOnly && hasTabs());
+  // Narrow, the card shows the tree or the viewer, never both side by side.
+  let root: HTMLElement | undefined;
+  const [narrow, setNarrow] = createSignal(false);
+  onMount(() => {
+    if (!root || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) => setNarrow(entry.contentRect.width < 720));
+    observer.observe(root);
+    onCleanup(() => observer.disconnect());
+  });
+  createEffect(on(narrow, (isNarrow) => { if (isNarrow && hasTabs()) props.files.setTree(props.session, false); }, { defer: true }));
   const showTree = () => panel().tree || !hasTabs();
+  const showViewer = () => hasTabs() && !(narrow() && panel().tree);
   const [menu, setMenu] = createSignal(false);
 
-  const open = (tree: string, path: string, changes: boolean, pinned = false, changed = changes) =>
+  const open = (tree: string, path: string, changes: boolean, pinned = false, changed = changes) => {
     props.files.open(props.session, { tree, path, changes, changed, pinned });
+    if (narrow()) props.files.setTree(props.session, false);
+  };
 
   // The file is on this computer: it can be opened or shown here, and downloading it makes no sense.
   const here = () => capabilities().nativeWindow && !machineOf(props.session);
@@ -115,17 +129,16 @@ export default function TaskFilesCard(props: {
           <Show when={expanded()} fallback={<Maximize2 size={15} />}><Minimize2 size={15} /></Show>
         </Button>
       </Show>
-      <Show when={props.expandedOnly && hasTabs()}>
-        <Button variant="ghost" size="compact" class="shrink-0 text-neutral-500" onClick={() => props.files.setOpen(props.session, false)}>
-          {t("code.panel.collapse")}
-        </Button>
+      <Show when={props.expandedOnly}>
+        <Button variant="ghost" size="iconCompact" class={tool} title={t("code.panel.collapse")} aria-label={t("code.panel.collapse")}
+          onClick={() => props.files.setOpen(props.session, false)}><MessageSquare size={15} /></Button>
       </Show>
     </div>
   );
 
   return (
-    <section class="relative flex h-full min-w-0 flex-1 overflow-hidden rounded-lg border border-border bg-surface shadow-md" data-task-files>
-      <Show when={hasTabs()}>
+    <section ref={root} class="relative flex h-full min-w-0 flex-1 overflow-hidden rounded-lg border border-border bg-surface shadow-md" data-task-files>
+      <Show when={showViewer()}>
         <div class="flex min-w-0 flex-1 flex-col">
           <div class="flex h-9 shrink-0 items-center gap-1 border-b border-border pl-1.5">
             <div class="flex min-w-0 gap-0.5 overflow-x-auto [scrollbar-width:none]" role="tablist">
@@ -180,7 +193,7 @@ export default function TaskFilesCard(props: {
       </Show>
 
       <Show when={showTree()}>
-        <aside class={cn("flex min-h-0 flex-col", hasTabs() ? "w-64 shrink-0 border-l border-border" : "flex-1")}>
+        <aside class={cn("flex min-h-0 flex-col", showViewer() ? "w-64 shrink-0 border-l border-border" : "flex-1")}>
           <div class="flex h-9 shrink-0 items-center gap-0.5 border-b border-border pl-1.5">
             <For each={["files", "changes"] as const}>{(side) => (
               <button type="button" onClick={() => props.files.setSide(props.session, side)}
@@ -189,7 +202,7 @@ export default function TaskFilesCard(props: {
                 {side === "files" ? t("code.panel.side.files") : t("code.panel.side.changes")}
               </button>
             )}</For>
-            <Show when={!hasTabs()}>{tools()}</Show>
+            <Show when={!showViewer()}>{tools()}</Show>
           </div>
           <div class="min-h-0 flex-1" classList={{ hidden: panel().side !== "files" }}>
             <Codigo project={props.project} session={props.session} visible={props.visible && panel().side === "files"}
