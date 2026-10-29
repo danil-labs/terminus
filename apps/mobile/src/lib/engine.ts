@@ -38,6 +38,7 @@ import { readVisualHtml, type VisualPart, type VisualWhole, VISUAL_FILE, VISUAL_
 import { arrangeSpaces, spaceOrder, type AccountWorkspace, groupWorkspaces, linkedAttention, onlyLinked, registryProjects, withRegistry } from "@terminus/computers";
 import { type ChatBackgroundView, chatBackgroundImageUrl, chatBackgroundView, isSingleAttention } from "@terminus/protocol";
 import { type FlatRow, flattenTasks, launcherOf } from "@terminus/tasks";
+import { AUTO_MODE } from "./composer.ts";
 import { type Host, HostError } from "./hosts.ts";
 
 /** Una tarea de la lista, con la máquina y la carpeta de donde viene. */
@@ -530,6 +531,22 @@ export function stopTask(host: Host, workspace: string, folder: string, id: stri
 
 export function respondPermission(host: Host, workspace: string, id: string, requestId: string, allow: boolean) {
   return host.call("respond_permission", workspace, { session: id, requestId, allow });
+}
+
+/**
+ * Elegir modo con el turno en marcha, como `elegirModo` del escritorio: el
+ * turno vivo arrancó con el modo de entonces y no lo relee, así que se le pide
+ * al motor. Pasar a automático además contesta lo que el turno ya pidió, como
+ * el botón «Aprobar»; si mientras tanto se eligió otro modo (`still` en falso), ya no.
+ */
+export async function switchLiveMode(host: Host, workspace: string, folder: string, id: string, mode: string, still: () => boolean = () => true) {
+  await host.call("set_permission_mode", workspace, { project: folder, session: id, mode });
+  if (mode !== AUTO_MODE) return;
+  const now = await loadTask(host, workspace, folder, id);
+  for (const p of now.permissions) {
+    if (!still()) return;
+    await respondPermission(host, workspace, id, p.request_id, true);
+  }
 }
 
 export async function answerQuestion(host: Host, workspace: string, folder: string, id: string, pending: PendingQuestion, chosen: Record<string, string[]>, free: Record<string, string>) {
