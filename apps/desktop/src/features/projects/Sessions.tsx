@@ -703,7 +703,8 @@ export default function Sessions(props: {
     });
     // Con un motor que no manda `last_turn_at`, la última vez que se movió.
     const cuando = () => r.s.last_turn_at ?? r.s.updated_at;
-    const abierto = () => menu() === r.s.id;
+    // Memo: al hacer clic el menú se reinicia y, sin él, la ranura reescribe su clase.
+    const abierto = createMemo(() => menu() === r.s.id);
     return (
       <>
         <div class="flex h-[18px] min-w-0 items-center gap-1.5">
@@ -854,7 +855,11 @@ export default function Sessions(props: {
      * —el título al 62 % y la segunda línea al 80 %— y recupera su color al
      * pasar el puntero.
      */
-    const apagada = () => tarjetaDelRiel() && !taskPriority(activity()) && !esProvisional(f.s.id);
+    // Memos: al hacer clic la tarea pasa un instante por «en vuelo» y la
+    // actividad se recalcula; sin memo, cada vuelta reescribe las clases de la
+    // tarjeta con el mismo valor (tests/perf/open-task-cost.mjs lo cuenta).
+    const apagada = createMemo(() => tarjetaDelRiel() && !taskPriority(activity()) && !esProvisional(f.s.id));
+    const conMenu = createMemo(() => !props.readOnly && renombrando() !== f.s.id && (props.draggedTask ?? tareaEnVuelo()?.id) !== f.s.id);
     /** El título, o el campo que lo renombra en su sitio y con su misma medida. */
     const Titulo = () => (
       <>
@@ -1407,7 +1412,7 @@ export default function Sessions(props: {
               actividad={activity()}
               titulo={<Titulo />}
               apagada={apagada()}
-              conMenu={!props.readOnly && renombrando() !== f.s.id && (props.draggedTask ?? tareaEnVuelo()?.id) !== f.s.id}
+              conMenu={conMenu()}
               menu={() => <Menu riel />}
               cohete={() => (
                 <Show when={puedeFinalizar() && renombrando() !== f.s.id}>
