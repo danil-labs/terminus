@@ -9,7 +9,6 @@ import Copy from "lucide-solid/icons/copy";
 import FolderOpen from "lucide-solid/icons/folder-open";
 import PanelLeftClose from "lucide-solid/icons/panel-left-close";
 import PanelLeftOpen from "lucide-solid/icons/panel-left-open";
-import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
 import PanelRightOpen from "lucide-solid/icons/panel-right-open";
 import {
   batch,
@@ -93,6 +92,7 @@ const AgentProfile = retryableLazy(() => import("../features/projects/AgentProfi
 // El alta solo se abre sin workspace o al agregar otro: no entra en la carga inicial.
 const Onboarding = lazy(() => import("../features/onboarding/Onboarding"));
 const TaskLocation = lazy(() => import("../features/chat/TaskLocation"));
+const CustomizeMenu = lazy(() => import("../features/shell/SidebarFilter").then((m) => ({ default: m.CustomizeMenu })));
 const Screen = lazy(() => import("../features/screen/Screen"));
 // El aviso de Terminus de pago solo se baja si la flota lo pide (trae los textos de Danil).
 const MachinesLicense = lazy(() =>
@@ -151,6 +151,7 @@ import PantallaDeBloqueo from "../features/shell/LockScreen";
 import AvisoDeMaterial from "../features/shell/MaterialNotice";
 import Paneles from "../features/shell/Panels";
 import Sidebar, { createSidebar } from "../features/shell/Sidebar";
+import type { SidebarFilterProps } from "../features/shell/SidebarFilter";
 import { sidebarViewKey } from "../lib/sidebarView";
 import { recordarCarpetas } from "../lib/folderKinds";
 import { lista } from "../lib/format";
@@ -490,7 +491,7 @@ export default function App() {
   const [escritorio, setEscritorio] = createSignal<string | null>(null);
   const [spacesContext, setSpacesContext] = createSignal<string | null>(null);
   const customization = capabilities().inbox?.customization(() => ({ user: capabilities().inbox?.userId, workspace: workspaceActivo(), space: spacesContext() === workspaceActivo() ? escritorio() : null }), capabilities().inbox?.subscribe) ?? {ready:()=>false,scope:()=>"",selection:()=>({enabled:[],writable:false}),temporary:()=>true,toggle:(_id:string)=>{},enabled:(_id:string)=>false};
-  const [personalizing, setPersonalizing] = createSignal(false);
+  const [sidebarFilter, setSidebarFilter] = createSignal<SidebarFilterProps | null>(null);
   // El nombre del workspace abierto rotula el menú de espacios de la franja.
   const workspacesDeLaFranja = createWorkspaces();
   const workspaceActual = () => workspacesDeLaFranja.actual();
@@ -8364,18 +8365,13 @@ export default function App() {
             </Show>
             {capabilities().sidebarExtra?.()}
           </>}
-          finDeIzquierda={<Show when={capabilities().inbox}>
-            <Button
-              variant="ghost"
-              size="icon"
-              class="size-7 shrink-0 text-neutral-500"
-              aria-label={t("attention.personalize")}
-              title={t("attention.personalize")}
-              data-personalize=""
-              onClick={() => setPersonalizing(true)}
-            >
-              <SlidersHorizontal size={15} />
-            </Button>
+          finDeIzquierda={<Show when={sidebarFilter() || capabilities().inbox}>
+            <Suspense>
+              <CustomizeMenu
+                filter={sidebarFilter()}
+                catalog={capabilities().inbox ? () => capabilities().inbox!.catalog({get temporary(){return customization.temporary();},get writable(){return customization.selection().writable;},demo:Boolean(capabilities().inbox?.demo),get entries(){return attentionEntries().map(entry=>({...entry,available:entry.available&&customization.selection().writable}));},onToggle:customization.toggle}) : undefined}
+              />
+            </Suspense>
           </Show>}
           centro={tiraDeLaVentana()}
           derecha={<>
@@ -8450,6 +8446,7 @@ export default function App() {
               modelos={modelosParaAgentes()}
               sessions={sesionesDelRiel()}
               viewKey={sidebarViewKey(workspaceActivo(), escritorio())}
+              filterRef={setSidebarFilter}
               onHablarCon={hablarConEncargado}
               onAgentProfile={openAgentProfile}
               escritorio={activeSpace() ? spaceName(activeSpace()) : null}
@@ -8657,9 +8654,6 @@ export default function App() {
 
       {/* El nombre del workspace ya no se deduce de la ruta: lo lee el propio
           menú de la cabecera, que es quien sabe cuál está activo. */}
-      <Show when={personalizing() && capabilities().inbox}>
-        {capabilities().inbox?.dialog({get open(){return personalizing();},onOpenChange:setPersonalizing,get temporary(){return customization.temporary();},get writable(){return customization.selection().writable;},demo:Boolean(capabilities().inbox?.demo),get entries(){return attentionEntries().map(entry=>({...entry,available:entry.available&&customization.selection().writable}));},onToggle:customization.toggle})}
-      </Show>
 
       <Show when={settings() !== null}>
         <Suspense fallback={null}>

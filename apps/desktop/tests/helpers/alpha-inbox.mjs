@@ -36,8 +36,11 @@ try{
  await sleep(900);
  assert.equal(w.document.querySelector('[data-alpha-inbox]'),null,'deep link never opts in');
  await click('Personalizar');
- const add=[...w.document.querySelectorAll('button')].find(node=>node.getAttribute('aria-label')==='Agregar Inbox');assert.ok(add);add.click();await sleep(100);
- await click('Listo');await click('Inbox');
+ const add=w.document.querySelector('[role="switch"][aria-label="Inbox"]');assert.ok(add);assert.equal(add.getAttribute('aria-checked'),'false');add.click();await sleep(100);
+ assert.equal(add.getAttribute('aria-checked'),'true','the switch turns Inbox on');
+ add.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await sleep(150);
+ assert.equal(w.document.querySelector('[role="switch"][aria-label="Inbox"]'),null,'Escape closes Customize');
+ await click('Inbox');
  assert.ok(w.document.querySelector('[data-alpha-inbox]'),'enabled Inbox mounts inside App Paneles');
  assert.ok(w.document.querySelector('[data-sesion]'),'real Sidebar still mounts');
  await sleep(150);

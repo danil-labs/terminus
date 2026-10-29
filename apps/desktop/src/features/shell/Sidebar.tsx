@@ -45,6 +45,7 @@ import {
   type SidebarView,
 } from "../../lib/sidebarView";
 import type { DockAgent } from "./dockLayout";
+import type { SidebarFilterProps } from "./SidebarFilter";
 import { flattenTasks, folderCounts } from "./sidebarTasks";
 import { machineName, machines } from "../machines/store";
 // Solo al crear un encargado: fuera de la carga inicial.
@@ -52,7 +53,6 @@ import { LazyPart, retryableLazy } from "../../ui/LazyPart";
 const NewAgent = retryableLazy(() => import("../projects/NewAgent"));
 
 // Fuera de la carga inicial: el botón y el dock llegan un instante después de la lista.
-const SidebarFilter = lazy(() => import("./SidebarFilter").then((m) => ({ default: m.SidebarFilter })));
 const AgentDock = lazy(() => import("./AgentDock"));
 const FolderGroupHeader = sharedLazy(() => import("./FolderGroupHeader"));
 
@@ -146,6 +146,8 @@ export default function Sidebar(props: {
   onAgentProfile: (project: string, name: string) => void;
   /** Dónde se guarda la vista del riel: una por workspace y espacio (`sidebarViewKey`). */
   viewKey: string;
+  /** Entrega el filtro del riel al botón Personalizar de la franja; `null` al desmontar. */
+  filterRef?: (filter: SidebarFilterProps | null) => void;
   /** El nombre del escritorio activo, para su riel vacío. */
   escritorio?: string | null;
   viendoArchivadas?: boolean;
@@ -342,6 +344,14 @@ export default function Sidebar(props: {
     agentOptions(agentesDelDock().map((a) => a.name), todas().map((x) => x.row))
       .map((a) => ({ ...a, body: perfilDe(a.name)?.body, avatar: perfilDe(a.name)?.avatar })));
   const conResultados = (clave: string) => (searchCounts()[clave] ?? 0) > 0;
+  props.filterRef?.({
+    get view() { return vistaEfectiva(); },
+    onChange: cambiarVista,
+    get folders() { return carpetasDelFiltro(); },
+    get agents() { return agentesDelFiltro(); },
+    get machines() { return variasMaquinas(); },
+  });
+  onCleanup(() => props.filterRef?.(null));
 
   /**
    * A qué proyectos puede irse una tarea que hoy está en `de`.
@@ -661,15 +671,6 @@ export default function Sidebar(props: {
                   <Button variant="chrome" size="iconCompact" class="-mr-1 size-6 shrink-0 text-neutral-500" aria-label={t("shell.sidebar.clear_search")} title={t("shell.sidebar.clear_search")} onClick={clearSearch}><X size={14} /></Button>
                 </Show>
               </div>
-              <Suspense>
-                <SidebarFilter
-                  view={vistaEfectiva()}
-                  onChange={cambiarVista}
-                  folders={carpetasDelFiltro()}
-                  agents={agentesDelFiltro()}
-                  machines={variasMaquinas()}
-                />
-              </Suspense>
             </div>
           </Show>
 
