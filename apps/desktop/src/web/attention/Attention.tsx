@@ -3,7 +3,7 @@ import { createInbox, type Account, type Conversation, type InboxSession, type M
 import { t } from '../../lib/i18n';
 import { Button } from '../../ui/Button';
 import { Skeleton } from '../../ui/Skeleton';
-import { ContactDetails, ConversationHeader, ConversationRow, InboxComposer, MessageBubble, senderLabel, SelectConversation } from './inbox-view';
+import { ChannelFilter, ContactDetails, ConversationHeader, ConversationRow, ConversationSearch, InboxComposer, MessageBubble, senderLabel, SelectConversation } from './inbox-view';
 
 export function Attention(props: { demo: boolean; session?: InboxSession & { subscribe?: (clear: () => void) => () => void } }) {
   const [accounts, setAccounts] = createSignal<Account[]>([]);
@@ -18,10 +18,12 @@ export function Attention(props: { demo: boolean; session?: InboxSession & { sub
   const [error, setError] = createSignal('');
   const [consent, setConsent] = createSignal(false);
   const [detail, setDetail] = createSignal(false);
+  const [query, setQuery] = createSignal('');
+  const [channel, setChannel] = createSignal<string | null>(null);
   const api = props.session ? createInbox(props.session) : null;
   let epoch = 0;
   let thread = 0;
-  const clear = () => { epoch++; thread++; setRows([]); setSelected(undefined); setMessages([]); setMore(false); setOlder(false); setError(''); setDetail(false); setLoadingThread(false); };
+  const clear = () => { epoch++; thread++; setRows([]); setSelected(undefined); setMessages([]); setMore(false); setOlder(false); setError(''); setDetail(false); setLoadingThread(false); setQuery(''); setChannel(null); };
   onCleanup(() => { epoch++; thread++; });
   onMount(() => {
     const stop = props.session?.subscribe?.(() => { clear(); setAccounts([]); setAccount(undefined); setConsent(false); setBusy(false); });
@@ -59,6 +61,14 @@ export function Attention(props: { demo: boolean; session?: InboxSession & { sub
     const next = same(list[index + 1], list[index]);
     return prev && next ? 'middle' : prev ? 'last' : next ? 'first' : 'single';
   };
+  // La lista de alfa no admite `q` ni `channel_id`: se filtra lo ya cargado, páginas extra incluidas.
+  const fold = (value: string) => value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+  const channels = () => [...new Set(rows().map(row => row.channel_name.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const visible = () => {
+    const needle = fold(query().trim());
+    return rows().filter(row => (!channel() || row.channel_name.trim() === channel()) && (!needle || fold(`${row.contact_name} ${row.last_message} ${row.channel_name}`).includes(needle)));
+  };
+  const filtering = () => !!query().trim() || !!channel();
   const listLoading = () => busy() && rows().length === 0 && !selected();
   return <section class="@container flex h-full min-h-0 min-w-0 flex-col overflow-hidden" data-alpha-inbox="">
     <Show when={props.demo}><p class="m-0 border-b border-border px-4 py-2 text-xs text-neutral-500">{t("web.alpha.demo_badge")} · {t("web.alpha.external_only")} <a class="ml-2 underline" href={`${import.meta.env.BASE_URL}inbox`}>{t("web.alpha.change_mode")}</a></p></Show>
@@ -69,14 +79,18 @@ export function Attention(props: { demo: boolean; session?: InboxSession & { sub
         <header class="flex min-h-11 w-full min-w-0 shrink-0 items-center gap-2 border-b border-border px-3 py-1">
           <span class="min-w-0 flex-1 truncate text-[0.85rem] font-semibold text-neutral-950">{t("web.alpha.inbox")}</span>
           <span class="shrink-0 rounded-full border border-border px-2 py-[3px] text-[0.68rem] font-medium text-neutral-500">{t("customize.read_only")}</span>
+          <Show when={channels().length > 1}><ChannelFilter channels={channels()} value={channel()} onChange={setChannel}/></Show>
         </header>
+        <div class="grid w-full min-w-0 shrink-0 gap-2 border-b border-border px-3 py-2"><ConversationSearch value={query()} onChange={setQuery}/></div>
         <div class="min-h-0 flex-1 overflow-y-auto">
           <Show when={!props.demo && consent() && !busy() && !error() && accounts().length === 0}><p role="status" class="p-4 text-center text-[0.85rem] text-neutral-500">{t("customize.no_accounts")}</p></Show>
           <Show when={listLoading()}><div class="p-3"><Skeleton class="h-14 rounded-md" filas={6}/></div></Show>
           <Show when={!busy() && !error() && (props.demo || account()) && rows().length === 0}><p role="status" class="p-4 text-center text-[0.85rem] text-neutral-500">{t("customize.page_empty")}</p></Show>
+          <Show when={rows().length > 0 && visible().length === 0}><p role="status" class="p-4 text-center text-[0.85rem] text-neutral-500">{query().trim() ? t("web.alpha.search_empty", { query: query().trim() }) : t("web.alpha.channel_empty", { channel: channel() ?? '' })}</p></Show>
           <ul class="m-2 grid min-w-0 list-none gap-0.5 p-0">
-            <For each={rows()}>{row => <li class="min-w-0"><ConversationRow conversation={row} active={selected()?.id === row.id} onSelect={() => void open(row)}/></li>}</For>
+            <For each={visible()}>{row => <li class="min-w-0"><ConversationRow conversation={row} active={selected()?.id === row.id} onSelect={() => void open(row)}/></li>}</For>
           </ul>
+          <Show when={more() && filtering()}><p class="m-0 px-4 pb-2 text-center text-[0.72rem] text-neutral-500">{t("web.alpha.filter_loaded_only")}</p></Show>
           <Show when={more()}><div class="flex justify-center pb-3"><Button size="sm" variant="secondary" disabled={busy()} onClick={() => void load(account()!, true)}>{t("web.alpha.more")}</Button></div></Show>
         </div>
       </section>

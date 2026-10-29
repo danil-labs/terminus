@@ -34,29 +34,30 @@ export default function TitleBar(props: {
     window.addEventListener("resize", medir);
     onCleanup(() => window.removeEventListener("resize", medir));
   });
-  // El grupo se estira hasta el borde de la barra para que Personalizar quede encima de ella.
+  // El grupo llega justo al borde de la barra: Personalizar queda encima de ella y la primera pestaña nace en esa línea.
   const ancho = () => {
     const borde = props.bordeDeLaBarra;
-    return borde === null ? undefined : `${Math.max(0, borde - inicio() - 8)}px`;
+    return borde === null ? undefined : `${Math.max(0, borde - inicio())}px`;
   };
 
   return (
     <div
       data-title-bar=""
       class={cn(
-        "tab-veil flex shrink-0 items-center gap-2",
+        "tab-veil flex shrink-0 items-center",
         HEADER_HEIGHT,
         apartarSemaforo() ? TRAFFIC_LIGHT_PADDING : "pl-2",
       )}
       data-tauri-drag-region=""
       onDblClick={toggleMaximizeFromHeader}
     >
-      <div ref={grupo} class="flex min-w-0 shrink-0 items-center gap-1" style={{ width: ancho() }}>
+      <div ref={grupo} class="flex min-w-0 shrink-0 items-center gap-1 pr-2" style={{ width: ancho() }}>
         {props.izquierda}
         <span class="min-w-0 flex-1" data-tauri-drag-region="" />
         {props.finDeIzquierda}
       </div>
-      <div class="flex min-w-0 flex-1 items-center self-stretch">{props.centro}</div>
+      {/* La tira de pestañas trae su propio margen; se compensa para que la primera nazca en la línea. */}
+      <div class="-ml-1.5 flex min-w-0 flex-1 items-center self-stretch">{props.centro}</div>
       <div class="flex shrink-0 items-center gap-1 pr-2">
         {props.derecha}
         <WindowControls />
