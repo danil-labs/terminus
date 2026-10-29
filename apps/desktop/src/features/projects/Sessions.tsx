@@ -3,7 +3,6 @@ import ArrowLeftRight from "lucide-solid/icons/arrow-left-right";
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import CornerDownRight from "lucide-solid/icons/corner-down-right";
 import FilePenLine from "lucide-solid/icons/file-pen-line";
-import ListTree from "lucide-solid/icons/list-tree";
 import MoreVertical from "lucide-solid/icons/more-vertical";
 import Pin from "lucide-solid/icons/pin";
 import PinOff from "lucide-solid/icons/pin-off";
@@ -617,25 +616,6 @@ export default function Sessions(props: {
    */
   const gitDe = (row: SessionRow) => effectiveTaskGit(row, gitRows(), props.relatedSessions ?? props.sessions);
 
-  /**
-   * Las subtareas vivas de cada tarea, por id de quien las lanzó: el chip de
-   * subtareas de la tarjeta. No es un dato del motor; sale de las filas que la
-   * lista ya tiene (`launcherOf`, la misma relación que esconde la subtarea
-   * bajo su lanzador en el riel).
-   */
-  const hijasPorLanzador = createMemo(() => {
-    const porLanzador = new Map<string, SessionRow[]>();
-    for (const row of props.relatedSessions ?? props.sessions) {
-      const lanzador = launcherOf(row);
-      if (!lanzador || row.archived || lanzador === row.id) continue;
-      const hijas = porLanzador.get(lanzador);
-      // Una subtarea que llega por dos listas cuenta una vez.
-      if (hijas) { if (!hijas.some((h) => h.id === row.id)) hijas.push(row); }
-      else porLanzador.set(lanzador, [row]);
-    }
-    return porLanzador;
-  });
-
   /** Una cara de 13 px con el nombre solo en el tooltip; antes de ella, su flecha si la lleva. */
   const ChipDeCara = (c: {
     name: string;
@@ -696,15 +676,6 @@ export default function Sessions(props: {
       return quien && !sameAgent(quien, r.s.agent) ? quien : null;
     };
     const anterior = () => r.s.previous_agent && !sameAgent(r.s.previous_agent, r.s.agent) ? r.s.previous_agent : null;
-    const hijas = () => hijasPorLanzador().get(r.s.id) ?? [];
-    const actividadDeHijas = (): TaskActivity => ({
-      aprobando: hijas().some((h) => props.aprobando.includes(h.id)),
-      viva: hijas().some((h) => props.vivas.includes(h.id)),
-      esperando: hijas().some((h) => h.esperando),
-      outcome: hijas().some((h) => h.outcome === "failed") ? "failed"
-        : hijas().some((h) => h.outcome === "interrupted") ? "interrupted" : null,
-      sinVer: hijas().some((h) => h.sin_ver),
-    });
     // Con un motor que no manda `last_turn_at`, la última vez que se movió.
     const cuando = () => r.s.last_turn_at ?? r.s.updated_at;
     // Memo: al hacer clic el menú se reinicia y, sin él, la ranura reescribe su clase.
@@ -773,17 +744,6 @@ export default function Sessions(props: {
                 </span>
               </Show>
             </Show>
-          </Show>
-          <Show when={hijas().length > 0}>
-            <span
-              data-session-subtasks={hijas().length}
-              class="inline-flex shrink-0 items-center gap-1 tabular-nums"
-              title={t("projects.sessions.subtasks_count", { count: hijas().length })}
-            >
-              <ListTree size={12} aria-hidden="true" />
-              <span aria-hidden="true">{hijas().length}</span>
-              <EstadoDeTarea riel ambito="plegadas" {...actividadDeHijas()} size={10} />
-            </span>
           </Show>
           <Show when={abridor()}>
             {(quien) => <ChipDeCara kind="opener" icon={CornerDownRight} name={quien()} tip={t("projects.sessions.opened_by", { name: nombre(quien()) })} />}
