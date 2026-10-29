@@ -106,7 +106,8 @@ import ArchivedTasks from "../features/projects/ArchivedTasks";
 import BaseBranchPicker from "../features/projects/BaseBranchPicker";
 import { watchHandlerStatus, watchHandlerStatuses } from "../features/projects/handlerPresence";
 import { EmptyContext, ProjectPicker } from "../features/projects/Projects";
-import { bringHereLabel, canBringHere, carryOrigin, machineName, machineOf, machines, refetchMachines, runOn, setRunOn, setTaskRowMachine } from "../features/machines/store";
+import { bringHereLabel, canBringHere, carryOrigin, machineName, machineOf, machines, refetchMachines, remoteChildScope, runOn, setRunOn, setTaskRowMachine } from "../features/machines/store";
+import { withRemoteLaunchers } from "@terminus/tasks";
 import type { CarriedBase, CarryCheck } from "../features/machines/carry";
 // Chunk aparte: solo lo carga quien crea una tarea, no la carga inicial.
 const MachinePicker = lazy(() =>
@@ -1827,8 +1828,10 @@ export default function App() {
     const listas = sesiones();
     const nuevas = naciendo();
     const proyectos = new Set([...Object.keys(listas), ...nuevas.map((n) => n.project)]);
+    // Una hija remota cuelga de su coordinador como una delegada más (`remote_parent`).
+    const remotas = remoteChildScope();
     return Object.fromEntries([...proyectos].map((project) => {
-      const rows = listas[project] ?? [];
+      const rows = withRemoteLaunchers(listas[project] ?? [], remotas);
       // Delante: `list_live_sessions` ordena por cuándo nacieron, y estas acaban de
       // nacer. La misma fila dos veces mientras el refresco llega se evita
       // mirando lo que ya trajo el disco.
@@ -8055,7 +8058,7 @@ export default function App() {
 
   // El riel del escritorio activo. Sin escritorio es el de siempre.
   const proyectosDelRiel = createMemo(() => carpetasDelEscritorio(projectList(), activeSpace(), sesiones()));
-  const delegationFamilies = createMemo(() => delegatedFamilies(Object.values(sesiones()).flat()));
+  const delegationFamilies = createMemo(() => delegatedFamilies(withRemoteLaunchers(Object.values(sesiones()).flat(), remoteChildScope())));
   const sesionesDelRiel = () => {
     const current = sesionesConEstado();
     const all = Object.values(current).flat();

@@ -13,6 +13,7 @@ import {
   type Computer,
   createScreenAccess,
   linkedWorkspaces,
+  serviceFeatures,
   listComputers,
   listWorkspaces,
   createSpaceOrderSource,
@@ -93,6 +94,7 @@ const infoOf = (c: Computer): MachineInfo => {
     name: c.name?.trim() || c.computer_id,
     wakes: wakes(c),
     linked: linkedWorkspaces(c),
+    features: serviceFeatures(c),
     ...(os ? { os } : {}),
   };
 };
@@ -113,6 +115,7 @@ export function startAccountMachines(target: Target = window) {
   /** Si esta computadora es una VM administrada, y su sistema. La lista los lee en cada `machine_list`. */
   let homeWakes = false;
   let homeOs: SystemId = windowSystem();
+  let homeFeatures: string[] = [];
   /** The session the fan-out talks as: the open workspace's account; `null` is the default one. */
   let account: string | null = null;
 
@@ -185,7 +188,7 @@ export function startAccountMachines(target: Target = window) {
       onSlices: slicesChanged,
       deliver,
       pickedFor,
-      home: () => ({ wakes: homeWakes, os: homeOs }),
+      home: () => ({ wakes: homeWakes, os: homeOs, features: homeFeatures }),
     });
     fleet.setMachines(others.map(infoOf));
     fleet.subscribeEvents();
@@ -331,6 +334,7 @@ export function startAccountMachines(target: Target = window) {
     setSelfName(mine?.name?.trim() || null);
     homeWakes = mine ? wakes(mine) : false;
     homeOs = systemOf(mine?.os) ?? windowSystem();
+    homeFeatures = mine ? serviceFeatures(mine) : [];
     const others = orderComputers(answer.value.filter((c) => c.computer_id !== self));
     const key = JSON.stringify([self, account, client.endpoint]);
 

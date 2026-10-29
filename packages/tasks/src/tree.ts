@@ -5,12 +5,18 @@ export type TaskTreeRow = {
   launcher_available?: boolean;
   machine?: string | null;
   workspace?: string | null;
+  /** El coordinador en otra máquina, ya con el id de la lista (`withRemoteLaunchers`). */
+  remote_launcher?: string | null;
 };
 
 export type TaskBranch<T> = { tarea: T; hijas: TaskBranch<T>[] };
 
-export function taskParent(row: TaskTreeRow): string | null {
+function localParent(row: TaskTreeRow): string | null {
   return row.parent ?? (row.launcher_available === false ? null : row.launched_by ?? null);
+}
+
+export function taskParent(row: TaskTreeRow): string | null {
+  return row.parent || row.launched_by ? localParent(row) : row.remote_launcher ?? null;
 }
 
 export const taskIdentity = (row: TaskTreeRow): string => JSON.stringify([row.workspace ?? null, row.machine ?? null, row.id]);
@@ -29,7 +35,9 @@ function relationships<T extends TaskTreeRow>(rows: readonly T[]) {
   for (const row of unique.values()) {
     const id = taskParent(row);
     const candidates = id === null ? [] : byId.get(id) ?? [];
-    const compatible = candidates.filter((candidate) =>
+    // Un coordinador remoto vive en otra máquina: su id de lista ya la nombra.
+    const remote = !row.parent && !row.launched_by;
+    const compatible = remote ? candidates : candidates.filter((candidate) =>
       (!row.machine || !candidate.machine || row.machine === candidate.machine)
       && (!row.workspace || !candidate.workspace || row.workspace === candidate.workspace));
     const exact = compatible.find((candidate) =>

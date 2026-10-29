@@ -13,6 +13,7 @@ import {
   type MachineState,
   RelaySession,
   linkedWorkspaces,
+  serviceFeatures,
   listComputers,
   listWorkspaces,
   createSpaceOrderSource,
@@ -107,6 +108,7 @@ const infoOf = (c: Computer): MachineInfo => {
     name: c.name?.trim() || c.computer_id,
     wakes: wakes(c),
     linked: linkedWorkspaces(c),
+    features: serviceFeatures(c),
     ...(os ? { os } : {}),
   };
 };

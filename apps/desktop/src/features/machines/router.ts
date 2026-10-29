@@ -103,7 +103,7 @@ export type RouterConfig = {
   /** «Ejecutar en» para `workspace`, si la persona eligió una máquina. */
   pickedFor?: (workspace: string | null) => string | null;
   /** La máquina de la ventana. `os` solo si se sabe; sin `wakes`, se pinta como laptop. */
-  home?: () => { wakes?: boolean; os?: SystemId | null };
+  home?: () => { wakes?: boolean; os?: SystemId | null; features?: readonly string[] };
 };
 
 function headerOf(options: Options, name: string): string | null {
@@ -534,7 +534,7 @@ export function createRouter(config: RouterConfig) {
     const home = config.home?.();
     const selfOs = systemOf(home?.os);
     return [
-      ...(self !== null ? [{ id: self, local: true, active: lead === self, on: true, hosts: hasHere(workspace), materializes: true, wakes: home?.wakes ?? false, ...(selfOs ? { os: selfOs } : {}) }] : []),
+      ...(self !== null ? [{ id: self, local: true, active: lead === self, on: true, hosts: hasHere(workspace), materializes: true, wakes: home?.wakes ?? false, ...(home?.features?.length ? { features: [...home.features] } : {}), ...(selfOs ? { os: selfOs } : {}) }] : []),
       // Una de otro contrato no corre tareas nuevas hasta actualizarse.
       ...fleet.machines().filter((m) => fleet.power(m.id) !== "outdated").map((m) => {
         const os = systemOf(m.os);
@@ -546,6 +546,7 @@ export function createRouter(config: RouterConfig) {
           hosts: workspace ? members.has(m.id) : null,
           materializes: !stale.has(m.id),
           wakes: m.wakes,
+          ...(m.features?.length ? { features: [...m.features] } : {}),
           ...(os ? { os } : {}),
         };
       }),
