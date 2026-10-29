@@ -543,27 +543,29 @@ test("provider login from settings receives its link and code", async () => {
   assert.deepEqual(app.fallos, []);
 });
 
-test("the previous additive engine family needs an update for the durable decision contract", async () => {
+// Un cambio de contrato nunca deja sin uso máquinas enteras: como el teléfono,
+// solo `version_mismatch` del relay o del motor la marca desactualizada.
+test("an engine of the previous additive family stays in service", async () => {
   const contract = "3972c281dba1b61f9ad06fc82fbf059af3dbc55770b0a1bcb59ce786ec0a56f1";
   const { app, calls, doc, text } = await open("web-machines-additive-contract", [{ ...VM, contract }], {
     cmp_vm: { table: table("Panel actualizado", "Tarea de la VM"), contract },
   });
-  assert.equal(doc.querySelector('[data-machine-row="cmp_vm"]')?.dataset.state, "outdated");
-  assert.equal(calls("cmp_vm", "list_projects").length, 0);
-  assert.ok(!text().includes("Panel actualizado"));
+  assert.ok(await until(() => text().includes("Panel actualizado")), "its panel is read as usual");
+  assert.equal(doc.querySelector('[data-machine-row="cmp_vm"]')?.dataset.state, "online");
+  assert.ok(calls("cmp_vm", "list_projects").length > 0);
   assert.deepEqual(app.fallos, []);
 });
 
-test("the computer list says which engine needs an update before anything is asked", async () => {
+test("a machine on another contract is not marked outdated by its hash", async () => {
   const own = createHash("sha256").update(readFileSync(new URL("../../src-tauri/crates/engine-protocol/commands.json", import.meta.url))).digest("hex");
   const { app, calls, doc, text } = await open("web-machines-contract", [{ ...VM, contract: own }, { ...MAC, contract: "0".repeat(64) }], {
-    cmp_vm: { table: table("Panel", "Tarea de la VM") },
-    cmp_mac: { table: table("Notas", "Tarea del Mac") },
+    cmp_vm: { table: table("Panel", "Tarea de la VM", {}, "pv") },
+    cmp_mac: { table: table("Notas", "Tarea del Mac", {}, "pm") },
   });
-  assert.equal(doc.querySelector('[data-machine-row="cmp_vm"]')?.dataset.state, "online", "the same contract works as usual");
-  assert.equal(doc.querySelector('[data-machine-row="cmp_mac"]')?.dataset.state, "outdated", "another contract needs an update");
-  assert.equal(calls("cmp_mac", "list_projects").length, 0, "it is never asked for panel reads");
-  assert.ok(text().includes("Panel") && !text().includes("Notas"));
+  assert.ok(await until(() => text().includes("Panel") && text().includes("Notas")), "both panels are read");
+  assert.equal(doc.querySelector('[data-machine-row="cmp_vm"]')?.dataset.state, "online");
+  assert.equal(doc.querySelector('[data-machine-row="cmp_mac"]')?.dataset.state, "online", "another contract keeps working");
+  assert.ok(calls("cmp_mac", "list_projects").length > 0);
   assert.deepEqual(app.fallos, []);
 });
 

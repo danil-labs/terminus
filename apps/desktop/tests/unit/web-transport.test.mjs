@@ -22,8 +22,7 @@ test("the web build talks to the relay: calls, events and machine state", async 
   const text = () => app.w.document.body.textContent ?? "";
 
   assert.deepEqual(app.fallos, []);
-  assert.equal(fake.sockets[0]?.url.split("?")[0], "wss://relay.test/v1/computers/cmp_test/session");
-  assert.match(fake.sockets[0]?.url ?? "", /\?contracts=[0-9a-f]{64}(,[0-9a-f]{64})*$/, "it says the compatible contracts it speaks, like the desktop");
+  assert.equal(fake.sockets[0]?.url, "wss://relay.test/v1/computers/cmp_test/session", "like the phone, no ?contracts=: an engine on another contract stays in service");
   assert.deepEqual(fake.sockets[0]?.protocols, ["danil.computers.v1", "bearer.tok"]);
 
   const projects = fake.calls.find((c) => c.command === "list_projects");
