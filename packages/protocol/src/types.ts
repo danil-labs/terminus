@@ -53,10 +53,18 @@ export type SessionRow = {
   last_message?: string | null;
   created_at: number;
   updated_at: number;
+  /**
+   * Cuándo cerró el último turno, o cuándo empezó el que corre. Mismas unidades
+   * que `updated_at`; un motor viejo no lo manda y la tarjeta usa `updated_at`.
+   */
+  last_turn_at?: number | null;
   esperando: boolean;
-  outcome?: "delivered" | "failed" | null;
+  /** `interrupted`: la persona detuvo el turno, distinto de `failed`. */
+  outcome?: "delivered" | "failed" | "interrupted" | null;
   /** El agente con nombre que la lleva. */
   agent: string | null;
+  /** El agente que la llevaba antes del último traspaso; `null` si nunca pasó de mano. */
+  previous_agent?: string | null;
   space?: string | null;
   pinned?: boolean | null;
   archived?: boolean | null;

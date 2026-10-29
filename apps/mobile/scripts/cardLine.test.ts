@@ -22,32 +22,28 @@ const git = (extra: Partial<TaskGit> = {}, checks?: "failure"): TaskGit => ({
 });
 
 test("proveedor · carpeta · máquina · agente · PR, en ese orden", () => {
-  assert.deepEqual(secondLine(card(), cardPull(git()), false), ["provider", "folder", "machine", "agent", "pull"]);
+  assert.deepEqual(secondLine(card(), cardPull(git())), ["provider", "folder", "machine", "agent", "pull"]);
 });
 
 test("sin proveedor, o con uno sin marca, la línea empieza en la carpeta", () => {
-  assert.deepEqual(secondLine(card({ provider: null }), null, false), ["folder", "machine", "agent"]);
-  assert.deepEqual(secondLine(card({ provider: "desconocido" }), null, false), ["folder", "machine", "agent"]);
-  assert.equal(secondLine(card({ provider: "antigravity" }), null, false)[0], "provider");
-  assert.equal(secondLine(card({ provider: "opencode-zen" }), null, false)[0], "provider");
-});
-
-test("compacta no lleva línea 2, ni proveedor ni PR", () => {
-  assert.deepEqual(secondLine(card(), cardPull(git()), true), []);
+  assert.deepEqual(secondLine(card({ provider: null }), null), ["folder", "machine", "agent"]);
+  assert.deepEqual(secondLine(card({ provider: "desconocido" }), null), ["folder", "machine", "agent"]);
+  assert.equal(secondLine(card({ provider: "antigravity" }), null)[0], "provider");
+  assert.equal(secondLine(card({ provider: "opencode-zen" }), null)[0], "provider");
 });
 
 test("si te necesita conserva metadatos, sin mostrar el último mensaje", () => {
-  assert.deepEqual(secondLine(card({ esperando: true }), cardPull(git()), false), ["provider", "folder", "machine", "agent", "pull"]);
+  assert.deepEqual(secondLine(card({ esperando: true }), cardPull(git())), ["provider", "folder", "machine", "agent", "pull"]);
 });
 
 test("si falló, la línea normal: no el último mensaje", () => {
-  assert.deepEqual(secondLine(card({ outcome: "failed" }), null, false), ["provider", "folder", "machine", "agent"]);
+  assert.deepEqual(secondLine(card({ outcome: "failed" }), null), ["provider", "folder", "machine", "agent"]);
 });
 
 test("PR con checks fallidos: número en rojo; con git viejo, gris", () => {
   const failing = cardPull(git({}, "failure"));
   assert.equal(failing?.numberTone, "failure");
-  assert.deepEqual(secondLine(card(), failing, false).at(-1), "pull");
+  assert.deepEqual(secondLine(card(), failing).at(-1), "pull");
   const stale = cardPull(git({ stale: true }, "failure"));
   assert.equal(stale?.numberTone, "muted");
   assert.equal(stale?.tone, "muted");

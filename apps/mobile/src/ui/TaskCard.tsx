@@ -1,6 +1,6 @@
 import { AgentAvatar } from "./AgentAvatar";
 import { folderColor } from "@terminus/design";
-import { type CardPull, type SidebarDensity, type TaskCard as Card, type PullTone, cardPull, canFinishTask, type TaskGit, taskTitle } from "@terminus/tasks";
+import { type CardPull, type TaskCard as Card, type PullTone, cardPull, canFinishTask, type TaskGit, taskTitle } from "@terminus/tasks";
 import * as Haptics from "expo-haptics";
 import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -65,7 +65,6 @@ type TaskCardProps = {
   card: Card;
   git?: TaskGit | null;
   folderName: (id: string) => string | undefined;
-  density: SidebarDensity;
   onPress: () => void;
   onLongPress?: () => void;
   onFinish?: () => void;
@@ -74,13 +73,12 @@ type TaskCardProps = {
 
 /**
  * Una tarjeta solo se repinta si cambia lo que enseña: su tarea (el mismo
- * objeto mientras no cambie, `keepSame`), su tarjeta, su git, el nombre de su
- * carpeta o la densidad. `onPress` y `onLongPress` llegan nuevas en cada render
+ * objeto mientras no cambie, `keepSame`), su tarjeta, su git o el nombre de su
+ * carpeta. `onPress` y `onLongPress` llegan nuevas en cada render
  * pero solo abren la tarea, que es la misma: no cuentan.
  */
 const sameProps = (a: TaskCardProps, b: TaskCardProps) =>
   a.task === b.task &&
-  a.density === b.density &&
   a.git === b.git &&
   a.online === b.online &&
   !a.onFinish === !b.onFinish &&
@@ -90,9 +88,8 @@ const sameProps = (a: TaskCardProps, b: TaskCardProps) =>
 
 /**
  * La lista del teléfono: título, marca y acciones en la primera línea;
- * proveedor, carpeta, máquina, agente y PR o rama en la segunda. Compacta
- * conserva las señales de Git y el cohete en una sola línea. La lista lee el
- * Git por carpeta; pulsar el cohete confirma sin abrir la conversación.
+ * proveedor, carpeta, máquina, agente y PR o rama en la segunda. La lista lee
+ * el Git por carpeta; pulsar el cohete confirma sin abrir la conversación.
  */
 export const TaskCard = memo(TaskCardView, sameProps);
 
@@ -101,7 +98,6 @@ function TaskCardView({
   card,
   git: observed,
   folderName,
-  density,
   onPress,
   onLongPress,
   onFinish,
@@ -109,10 +105,9 @@ function TaskCardView({
 }: TaskCardProps) {
   const theme = useTheme();
   const git = observed && !online ? { ...observed, stale: true } : observed;
-  const compact = density === "compact";
   const folder = card.folder ? { id: card.folder, name: folderName(card.folder) } : null;
   const pull = cardPull(git);
-  const chips = secondLine(card, pull, compact);
+  const chips = secondLine(card, pull);
   const ready = online && canFinishTask(task, git, card.activity.viva || card.activity.aprobando);
   const branch = !git?.shared_with ? git?.branch : null;
   return (
@@ -146,8 +141,6 @@ function TaskCardView({
             <Icon name="pin" size={13} color={theme.textMuted} />
           </View>
         ) : null}
-        {compact && folder ? <FolderSquare id={folder.id} /> : null}
-        {compact && pull ? <PullChip pull={pull} git={git} /> : compact && branch ? <Icon name="git-branch" size={12} color={theme.textMuted} /> : null}
         {onFinish && pull?.state === "merged" && !git?.stale ? <Pressable testID={`finish-${task.host}-${task.id}`} accessibilityRole="button" accessibilityLabel={`${t("task.header.finish")}: ${taskTitle(lang, task)}`} accessibilityState={{ disabled: !ready }} disabled={!ready} hitSlop={8} onPress={(event) => { event.stopPropagation(); onFinish(); }} style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", marginVertical: -8, opacity: ready ? 1 : 0.3 }}>
           <Icon name="rocket" size={18} color={theme.merged} />
         </Pressable> : null}
@@ -155,39 +148,37 @@ function TaskCardView({
           <Icon name="ellipsis" size={17} color={theme.textMuted} />
         </Pressable> : null}
       </View>
-      {compact ? null : (
-        <View style={[styles.line, styles.second]}>
-          {chips.map((chip) => {
-            switch (chip) {
-              case "provider":
-                return (
-                  <View key={chip} testID="task-provider" accessibilityRole="image" accessibilityLabel={card.provider ?? ""}>
-                    <BrandMark id={card.provider} size={13} color={theme.text} />
-                  </View>
-                );
-              case "folder":
-                return folder ? (
-                  <View key={chip} style={styles.chip}>
-                    <FolderSquare id={folder.id} />
-                    <Text numberOfLines={1} style={[styles.meta, { color: theme.textMuted, maxWidth: 130 }]}>
-                      {folder.name ?? folder.id}
-                    </Text>
-                  </View>
-                ) : null;
-              case "machine":
-                return card.machine ? <MachineChip key={chip} name={card.machine.id} on={card.machine.on} /> : null;
-              case "agent":
-                return card.agent ? <AgentAvatar key={chip} name={card.agent} size={14} host={task.host} folder={task.folder} /> : null;
-              case "pull":
-                return pull ? <PullChip key={chip} pull={pull} git={git} /> : null;
-            }
-          })}
-          {!pull && branch ? <View style={styles.chip} accessibilityLabel={branch}>
-            <Icon name="git-branch" size={11} color={theme.textMuted} />
-            <Text numberOfLines={1} style={[styles.meta, { color: theme.textMuted, maxWidth: 160 }]}>{branch}</Text>
-          </View> : null}
-        </View>
-      )}
+      <View style={[styles.line, styles.second]}>
+        {chips.map((chip) => {
+          switch (chip) {
+            case "provider":
+              return (
+                <View key={chip} testID="task-provider" accessibilityRole="image" accessibilityLabel={card.provider ?? ""}>
+                  <BrandMark id={card.provider} size={13} color={theme.text} />
+                </View>
+              );
+            case "folder":
+              return folder ? (
+                <View key={chip} style={styles.chip}>
+                  <FolderSquare id={folder.id} />
+                  <Text numberOfLines={1} style={[styles.meta, { color: theme.textMuted, maxWidth: 130 }]}>
+                    {folder.name ?? folder.id}
+                  </Text>
+                </View>
+              ) : null;
+            case "machine":
+              return card.machine ? <MachineChip key={chip} name={card.machine.id} on={card.machine.on} /> : null;
+            case "agent":
+              return card.agent ? <AgentAvatar key={chip} name={card.agent} size={14} host={task.host} folder={task.folder} /> : null;
+            case "pull":
+              return pull ? <PullChip key={chip} pull={pull} git={git} /> : null;
+          }
+        })}
+        {!pull && branch ? <View style={styles.chip} accessibilityLabel={branch}>
+          <Icon name="git-branch" size={11} color={theme.textMuted} />
+          <Text numberOfLines={1} style={[styles.meta, { color: theme.textMuted, maxWidth: 160 }]}>{branch}</Text>
+        </View> : null}
+      </View>
     </Pressable>
   );
 }
@@ -199,7 +190,6 @@ const styles = StyleSheet.create({
   mark: { width: 18, alignItems: "center" },
   hollow: { width: 9, height: 9, borderRadius: 5, borderWidth: 1.5 },
   title: { flex: 1, fontSize: 15, fontWeight: "500" },
-  request: { flex: 1, fontSize: 13 },
   chip: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1 },
   meta: { fontSize: 12 },
 });

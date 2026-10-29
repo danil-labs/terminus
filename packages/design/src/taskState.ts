@@ -3,21 +3,23 @@ export type TaskActivity = {
   aprobando: boolean;
   esperando: boolean;
   viva: boolean;
-  outcome?: "delivered" | "failed" | null;
+  /** `interrupted`: la persona detuvo el turno; no es un fallo. */
+  outcome?: "delivered" | "failed" | "interrupted" | null;
   /** Un turno cerró después de la última vez que se abrió (`workspace/attention.rs`). */
   sinVer?: boolean;
 };
 
-export type TaskState = "approving" | "asked" | "working" | "failed" | "unseen";
+export type TaskState = "approving" | "asked" | "working" | "failed" | "interrupted" | "unseen";
 
 /** The order is the priority: a folded row shows the first one any task has. */
-export const TASK_STATES: readonly TaskState[] = ["approving", "asked", "working", "failed", "unseen"];
+export const TASK_STATES: readonly TaskState[] = ["approving", "asked", "working", "failed", "interrupted", "unseen"];
 
 export function taskPriority(s: TaskActivity): TaskState | null {
   if (s.aprobando) return "approving";
   if (s.esperando) return "asked";
   if (s.viva) return "working";
   if (s.outcome === "failed") return "failed";
+  if (s.outcome === "interrupted") return "interrupted";
   if (s.sinVer) return "unseen";
   return null;
 }

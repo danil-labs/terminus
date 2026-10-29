@@ -1,4 +1,5 @@
 import CircleCheck from "lucide-solid/icons/circle-check";
+import Clock from "lucide-solid/icons/clock";
 import CircleDashed from "lucide-solid/icons/circle-dashed";
 import CircleX from "lucide-solid/icons/circle-x";
 import FileIcon from "lucide-solid/icons/file";
@@ -12,11 +13,13 @@ import GitPullRequestClosed from "lucide-solid/icons/git-pull-request-closed";
 import GitPullRequestDraft from "lucide-solid/icons/git-pull-request-draft";
 import MessageSquareWarning from "lucide-solid/icons/message-square-warning";
 import UserCheck from "lucide-solid/icons/user-check";
-import { type JSX, Show } from "solid-js";
+import { type JSX, Match, Show, Switch } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { t } from "../../lib/i18n";
+import { cn } from "../../lib/utils";
 import { changeNumber, changeShort, checksName } from "../../lib/gitHosts";
 import { workLabel } from "./branchLabel";
+import { RailSpinner } from "./TaskStatus";
 import { type CheckState, compactGitKind, type GitStatus, gitReviewSignals, type KnState, type ReviewState } from "./taskGit";
 
 function knLabel(state: KnState) {
@@ -129,6 +132,85 @@ export function gitAppearance(status?: GitStatus) {
     }
   }
   return { icon: GitBranch, color: "text-neutral-500" };
+}
+
+/** La única señal del PR en la tarjeta del riel. */
+export type RailPullSignal = "changes_requested" | "failure" | "pending" | "approved" | "success" | "stale";
+
+/**
+ * Qué señal lleva el PR en la tarjeta del riel: una sola, por orden de lo que
+ * pide hacer algo — cambios pedidos, checks que fallan, checks en curso,
+ * aprobado, checks en verde—. Fusionado, cerrado y borrador no llevan ninguna:
+ * su ícono ya lo dice. Con git desactualizado la señal es solo el reloj, y solo
+ * en un PR que todavía puede cambiar.
+ */
+export function railPullSignal(status?: GitStatus): RailPullSignal | null {
+  const pull = status?.pull;
+  if (!status || !pull || !status.pull_known) return null;
+  if (status.stale) return pull.state === "open" || pull.state === "draft" ? "stale" : null;
+  if (pull.state !== "open") return null;
+  const signals = gitReviewSignals(status);
+  if (!signals) return null;
+  if (signals.review === "changes_requested") return "changes_requested";
+  if (signals.checks === "failure") return "failure";
+  if (signals.checks === "pending") return "pending";
+  if (signals.review === "approved") return "approved";
+  if (signals.checks === "success") return "success";
+  return null;
+}
+
+/**
+ * El PR de la tarjeta del riel: su ícono de estado, el número y una sola señal
+ * (`railPullSignal`). El número va en rojo si los checks fallan; con git
+ * desactualizado el chip entero va en gris. La rama y el resto, en el `title`
+ * y en la tarjeta flotante.
+ */
+export function RailPull(props: { status: GitStatus }) {
+  const pull = () => props.status.pull;
+  const stale = () => !!props.status.stale;
+  const appearance = () => gitAppearance(props.status);
+  const signal = () => railPullSignal(props.status);
+  const failing = () => !stale() && gitReviewSignals(props.status)?.checks === "failure";
+  const host = () => pull()?.git_host;
+  const signalLabel = () => {
+    const s = signal();
+    switch (s) {
+      case "stale": return t("projects.git.stale");
+      case "changes_requested":
+      case "approved": return reviewLabel(s);
+      case "failure":
+      case "pending":
+      case "success": return checkLabel(s, host());
+      default: return "";
+    }
+  };
+  // Un PR sin confirmar no se afirma en la tarjeta, como en la flotante.
+  return (
+    <Show when={props.status.pull_known ? pull() : undefined}>
+      {(pr) => (
+        <span data-session-pr class={cn("inline-flex shrink-0 items-center gap-1", stale() && "text-neutral-500")} title={sessionGitDescription(props.status)}>
+          <span class={cn("inline-flex", stale() ? "text-neutral-500" : appearance().color)}>
+            <Dynamic component={appearance().icon} size={12} aria-hidden="true" />
+          </span>
+          <span data-pr-number class={cn("tabular-nums", failing() && "text-error-strong")}>{changeNumber(pr().git_host, pr().number)}</span>
+          <Show when={signal()}>
+            {(s) => (
+              <span data-git-signal={s()} data-git-stale={stale() || undefined} class="inline-flex shrink-0" aria-label={signalLabel()}>
+                <Switch>
+                  <Match when={s() === "pending"}><RailSpinner size={11} /></Match>
+                  <Match when={s() === "stale"}><Clock size={12} class="text-neutral-500" aria-hidden="true" /></Match>
+                  <Match when={s() === "failure"}><CircleX size={12} class="text-error-strong" aria-hidden="true" /></Match>
+                  <Match when={s() === "changes_requested"}><MessageSquareWarning size={12} class="text-warning-strong" aria-hidden="true" /></Match>
+                  <Match when={s() === "approved"}><UserCheck size={12} class="text-success-strong" aria-hidden="true" /></Match>
+                  <Match when={s() === "success"}><CircleCheck size={12} class="text-success-strong" aria-hidden="true" /></Match>
+                </Switch>
+              </span>
+            )}
+          </Show>
+        </span>
+      )}
+    </Show>
+  );
 }
 
 export function sessionGitDescription(status?: GitStatus) {

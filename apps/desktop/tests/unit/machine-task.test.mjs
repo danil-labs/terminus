@@ -92,8 +92,8 @@ test("una tarea de una máquina apagada abre sin fallo y mandarle algo la encien
   await sleep(600);
   const doc = app.w.document;
   assert.ok(doc.querySelector('[data-sesion="r1"]'), "la tarea de la máquina apagada no sale en el sidebar");
-  // Desde #294 la fila dice su máquina cuando la tarea corre en otra.
-  assert.equal(doc.querySelector('[data-sesion="r1"] [data-machine]')?.getAttribute("data-machine"), "vm", "la fila del sidebar dice en qué máquina está");
+  // La tarjeta del riel ya no lleva la máquina: la dice su tarjeta flotante.
+  assert.equal(doc.querySelector('[data-sesion="r1"] [data-machine]'), null, "la tarjeta del sidebar no lleva chip de máquina");
 
   await openTask(app, "r1");
   assert.ok(text(app).includes("Respuesta guardada"), "no enseña la copia guardada");

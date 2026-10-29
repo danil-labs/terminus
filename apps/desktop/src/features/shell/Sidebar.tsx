@@ -372,7 +372,6 @@ export default function Sidebar(props: {
   const Historial = (p: { filas: SessionRow[]; clave: string; sinCarpeta?: boolean }) => (
     <Sessions sidebar
       draggedTask={props.draggedTask}
-      density={vista().density}
       hideFolder={p.sinCarpeta}
       sessions={p.filas}
       relatedSessions={relacionadas()}
@@ -558,7 +557,7 @@ export default function Sidebar(props: {
 
   /** La misma lista, montada en dos sitios: expandida y en el desplegable. */
   const Lista = () => (
-    <div data-sidebar-tasks class="grid min-w-0 gap-1">
+    <div data-sidebar-tasks class="grid min-w-0 gap-1 rounded-[14px]">
       <Show when={props.clon}>{(c) => <FilaDeClon clon={c()} />}</Show>
 
       <Show when={todas().length === 0 && !query() && !hayCarpetasVacias()}>
