@@ -730,7 +730,6 @@ export default function App() {
       },
     ),
   );
-  createEffect(on(pestanas.pinned, () => paneles.persist()));
   /** El panel conserva workspace y conversación; el título pertenece a la tira. */
   const tareasEnVentanas = createMemo<(Pick<TaskTab, "id" | "session" | "project"> & { workspace: string | null })[]>((previous) =>
     conservar(previous ?? [], pestanas.open().filter(isTaskTab).map(({ id, session, project }) =>
