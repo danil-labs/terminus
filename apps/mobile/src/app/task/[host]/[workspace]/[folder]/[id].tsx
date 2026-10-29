@@ -20,6 +20,7 @@ import {
   respondPermission,
   runShell,
   sendToTask,
+  switchLiveMode,
   stopShell,
   stopTask,
   taskDefaults,
@@ -271,6 +272,16 @@ export default function TaskScreen() {
 
   const running = host?.power() === "on" && (view?.running ?? false);
   const permissions = view?.permissions ?? [];
+
+  /** Elegir modo con el turno en marcha: el motor lo aplica al turno vivo (`switchLiveMode`). */
+  const chosenMode = useRef<string | null>(null);
+  const changeMode = (mode: string) => {
+    if (!host) return;
+    chosenMode.current = mode;
+    void switchLiveMode(host, workspace, folder, id, mode, () => chosenMode.current === mode)
+      .then(() => refresh())
+      .catch(fail);
+  };
   const questions = view?.questions ?? [];
   const asleep = host?.canAct() === "asleep" || host?.canAct() === "outdated";
   const turns = view?.session.turns;
@@ -409,6 +420,7 @@ export default function TaskScreen() {
         onSubmit={submit}
         onInject={inject}
         onStop={stop}
+        onModeChange={changeMode}
       />
       </ChatScopeContext.Provider>
     </KeyboardScreen>

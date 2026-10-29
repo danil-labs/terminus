@@ -269,6 +269,13 @@ function invoke(m, command, args) {
       return s.id;
     }
     case "inject_message": return null;
+    case "set_permission_mode": {
+      const s = e.sessions.get(args.session);
+      if (!s) throw { code: "command_failed", detail: "no such task" };
+      s.permission_mode = args.mode;
+      console.log(`set_permission_mode ${JSON.stringify({ session: args.session, mode: args.mode })}`);
+      return null;
+    }
     case "stop_turn": e.live.delete(args.session); return null;
     case "respond_permission": {
       const s = e.sessions.get(args.session);

@@ -44,6 +44,7 @@ import {
   modelsOf,
   noticer,
   permissionModesOf,
+  switchLiveMode,
   projectDirectoryOf,
   respondPermission,
   runShell,
@@ -171,6 +172,15 @@ const ok = (step: string) => {
     assert.ok(after.some((n) => n.state === "finished" && n.session === pid));
     assert.equal((await loadTask(mac, "w-prod", "p-mac-api", pid)).permissions.length, 0);
     ok("en la Mac: la tarea pide permiso, se aprueba desde el teléfono y termina; avisos de aprobación y de terminada");
+
+    const aid = await createTask(mac, "w-prod", { folder: "p-mac-api", prompt: "Pide permiso para borrar build", provider: "claude", model: null, agent: null, space: null, permissionMode: "manual" });
+    const asking = () => (events.get("cmp_mac") ?? []).some((e) => e.name === "chat" && (e.payload as { kind: string; session: string }).kind === "permission" && (e.payload as { session: string }).session === aid);
+    await until("pide permiso en manual", asking);
+    assert.equal((await loadTask(mac, "w-prod", "p-mac-api", aid)).permissions.length, 1);
+    await switchLiveMode(mac, "w-prod", "p-mac-api", aid, "auto");
+    await until("termina al pasar a automático", () => (events.get("cmp_mac") ?? []).some((e) => e.name === "chat" && (e.payload as { kind: string; session: string }).kind === "done" && (e.payload as { session: string }).session === aid));
+    assert.equal((await loadTask(mac, "w-prod", "p-mac-api", aid)).permissions.length, 0);
+    ok("con el turno en marcha, pasar a automático lo cambia en el turno vivo y aprueba lo que ya pidió");
 
     close();
   } finally {
