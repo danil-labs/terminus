@@ -899,7 +899,7 @@ export default function ArbolDeArchivos(props: {
 
       <Show when={fallo()}>
         {(f) => (
-          <div class="px-3 pb-3" role="alert">
+          <div class="px-3 pb-3">
             {/* Un plazo vencido no es «reinicia la app»: se dice qué pasó y se ofrece otra vez. */}
             <Show when={falloTransitorio()} fallback={<FailureNote f={f()} />}>
               <p class="m-0 py-3 text-[0.8125rem] text-error-strong">{t("code.tree.failed.slow")}</p>
