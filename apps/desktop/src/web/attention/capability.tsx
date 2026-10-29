@@ -9,6 +9,7 @@ import { featureEntries } from '../../lib/attention-labels';
 import { AttentionMenu, PersonalizeMenu } from './SidebarEntries';
 
 const CustomizationDialog = lazy(() => import('./CustomizationDialog').then(module => ({default:module.CustomizationDialog})));
+const Channels = lazy(() => import('./Channels').then(module => ({default:module.Channels})));
 const Broadcasts = lazy(() => import('./Broadcasts').then(module => ({default:module.Broadcasts})));
 
 export function attentionCapability(demo: boolean, initial: boolean, session?: InboxSession & { subscribe?: (clear: () => void) => () => void; userId?: string | null }) {
@@ -22,6 +23,6 @@ export function attentionCapability(demo: boolean, initial: boolean, session?: I
     initial,
     render: () => <Attention demo={demo} session={session}/>,
     agentSettings: (name: string) => <SettingsSection title={`${t("web.alpha.service_agent")} · ${name}`} description={t("web.alpha.configuration_unavailable")}><For each={['scope','knowledge','tools','schedule','host']}>{field=><SettingsRow label={t(`web.alpha.${field}`)} description={t(`web.alpha.${field}_hint`)}><input class="w-48 max-w-full rounded-md border border-border bg-surface p-2 text-sm" disabled={!demo} aria-label={t(`web.alpha.${field}`)}/></SettingsRow>}</For><Button class="mt-3 justify-self-start" disabled>{t("web.alpha.publish")}</Button></SettingsSection>,
-    integrations: () => <SettingsSection title={t("web.alpha.channel")} description={t("web.alpha.channels_description")}><For each={['WhatsApp','Web','Instagram']}>{channel=><SettingsRow label={channel} description={t("web.alpha.not_connected")}><Button size="sm" disabled>{t("web.alpha.not_connected")}</Button></SettingsRow>}</For></SettingsSection>,
+    integrations: () => <Suspense fallback={null}><Channels demo={demo} session={session}/></Suspense>,
   };
 }

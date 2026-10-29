@@ -21,7 +21,7 @@ function harness() {
 }
 
 test("exact reads preserve identity headers and query, never cookies or cache headers", async () => {
-  for (const path of ["/auth/profile", "/api/inbox/conversations?account_id=7&limit=30&offset=0", "/api/inbox/conversations/12/messages?account_id=7&limit=50&before_id=100"]) {
+  for (const path of ["/auth/profile", "/api/inbox/conversations?account_id=7&limit=30&offset=0", "/api/inbox/conversations/12/messages?account_id=7&limit=50&before_id=100", "/api/channels"]) {
     const h = harness();
     const response = await h.fetch(prefix + path, { headers: { ...auth, Origin: origin, Referer: origin + "/terminus/inbox", Cookie: "legacy=1", "X-Account-Id": "99" } });
     assert.equal(response.status, 200);
@@ -113,4 +113,15 @@ test("mobile inbox deep link serves the phone entry rather than global SPA fallb
     assert.equal(forwarded.url, origin + "/terminus/m/?demo=1");
     assert.equal(forwarded.method, method);
   }
+});
+
+
+test("channels list is read-only and takes no query", async () => {
+  const h = harness();
+  for (const path of ["/api/channels?include_archived=true", "/api/channels?account_id=7", "/api/channels/5", "/api/channels/whatsapp/connect", "/api/channels/identities"]) {
+    assert.ok([400, 404].includes((await h.fetch(prefix + path, { headers: auth })).status), path);
+  }
+  for (const method of ["POST", "PATCH", "DELETE"]) assert.equal((await h.fetch(prefix + "/api/channels", { method, headers: auth })).status, 405);
+  assert.equal((await h.fetch(prefix + "/api/channels")).status, 401);
+  assert.equal(h.calls.length, 0);
 });

@@ -118,7 +118,7 @@ const destinosDe = (
   workspace: () => string | null,
   activityMachine: () => string | null,
 ): Destino[] => [
-  ...(capabilities().inbox ? [{ id: "integrations", name: t("alpha.integrations"), icono: () => <Blocks size={15}/>, panel: () => <Suspense fallback={null}><Integrations/></Suspense> }] : []),
+  ...(capabilities().inbox ? [{ id: "integrations", name: t("alpha.integrations"), icono: () => <Blocks size={15}/>, panel: () => <>{capabilities().inbox!.integrations()}<Suspense fallback={null}><Integrations/></Suspense></> }] : []),
   {
     id: "general",
     get name() {

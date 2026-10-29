@@ -6,7 +6,7 @@ const json = (error, status) => Response.json({ error }, {
 });
 
 function queryFor(url, kind) {
-  const fields = kind === "profile" ? {} : {
+  const fields = kind === "profile" || kind === "channels" ? {} : {
     account_id: [1, Number.MAX_SAFE_INTEGER],
     limit: [1, 100],
     ...(kind === "list" ? { offset: [0, 100_000] } : { before_id: [1, Number.MAX_SAFE_INTEGER] }),
@@ -19,7 +19,7 @@ function queryFor(url, kind) {
         !Number.isSafeInteger(number) || number < bounds[0] || number > bounds[1]) return null;
     query.set(key, String(number));
   }
-  if (kind !== "profile" && !query.has("account_id")) return null;
+  if (kind !== "profile" && kind !== "channels" && !query.has("account_id")) return null;
   return query;
 }
 
@@ -37,6 +37,7 @@ export default {
       const path = url.pathname.slice(PREFIX.length);
       const kind = path === "/auth/profile" ? "profile" :
         path === "/api/inbox/conversations" ? "list" :
+        path === "/api/channels" ? "channels" :
         /^\/api\/inbox\/conversations\/[1-9]\d*\/messages$/.test(path) ? "messages" : null;
       if (!kind) return json("not_found", 404);
       if (kind === "messages" && !Number.isSafeInteger(Number(path.split("/")[4]))) return json("invalid_query", 400);
