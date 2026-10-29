@@ -90,8 +90,12 @@ export default function TaskScreen() {
   const [background, setBackground] = useState<Backdrop | null>(null);
   const list = useRef<FlatList<Line>>(null);
   const key = `${params.host}/${id}`;
-  // Las que esta tarea lanzó: la lista las esconde bajo ella, como el riel del escritorio.
-  const delegated = useMemo(() => delegatedOf((snapshot?.delegated ?? []).filter((task) => task.host === params.host), id), [snapshot, params.host, id]);
+  // Las que esta tarea lanzó: la lista las esconde bajo ella, como el riel del escritorio. Las hijas
+  // remotas viven en otra máquina y nombran a esta por su `taskKey`.
+  const delegated = useMemo(() => [
+    ...delegatedOf((snapshot?.delegated ?? []).filter((task) => task.host === params.host && !task.remote_launcher), id),
+    ...(snapshot?.delegated ?? []).filter((task) => !task.archived && task.remote_launcher === key),
+  ].sort((a, b) => b.created_at - a.created_at), [snapshot, params.host, id, key]);
   // Si el chat sigue el final, como el hilo del escritorio (ver `lib/follow.ts`). Ref y no estado:
   // cambia con cada evento de scroll; solo el botón, que se ve, va en estado.
   const follow = useRef<Follow>(OPENED);

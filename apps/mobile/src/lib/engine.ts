@@ -37,7 +37,7 @@ import type {
 import { readVisualHtml, type VisualPart, type VisualWhole, VISUAL_FILE, VISUAL_TREE } from "@terminus/chat/visual";
 import { arrangeSpaces, spaceOrder, type AccountWorkspace, groupWorkspaces, linkedAttention, onlyLinked, registryProjects, withRegistry } from "@terminus/computers";
 import { type ChatBackgroundView, chatBackgroundImageUrl, chatBackgroundView, isSingleAttention } from "@terminus/protocol";
-import { type FlatRow, flattenTasks, launcherOf } from "@terminus/tasks";
+import { type FlatRow, flattenTasks, launcherOf, REMOTE_CHILD_FEATURE, type RemoteScope, remoteLauncherOf } from "@terminus/tasks";
 import { AUTO_MODE } from "./composer.ts";
 import { type Host, HostError } from "./hosts.ts";
 
@@ -45,6 +45,8 @@ import { type Host, HostError } from "./hosts.ts";
 export type Task = SessionRow & {
   /** `computer_id` o `bridge`. */
   host: string;
+  /** Hija remota: la `taskKey` de su coordinador en otra máquina (`mergeSnapshots`). */
+  remote_launcher?: string | null;
   workspace: string;
   /** Id de la carpeta en su máquina; `""` es sin carpeta. */
   folder: string;
@@ -88,6 +90,8 @@ export type HostSnapshot = {
   providers: ProviderInfo[];
   /** Si salió de la copia del relay (máquina apagada): cuándo. */
   cachedAt: number | null;
+  /** Lo que el motor de la máquina anuncia (`status.service_features`). */
+  features?: readonly string[];
 };
 
 const off = (error: unknown) => error instanceof HostError && (error.code === "machine_off" || error.code === "machine_asleep");
@@ -282,6 +286,7 @@ export async function snapshotOf(host: Host, workspace: string): Promise<HostSna
     live,
     providers: Array.isArray(providers) ? providers : [],
     cachedAt: at.cachedAt,
+    features: host.features?.() ?? [],
   };
 }
 
@@ -326,6 +331,16 @@ export function mergeSnapshots(parts: HostSnapshot[], tagMachines: (host: string
     for (const task of part.delegated) delegated.push(tag ? { ...task, machine: tag.machine, machine_on: tag.on } : task);
     for (const id of part.live) live.add(`${part.host}/${id}`);
     if (part.cachedAt !== null) cached = Math.max(cached ?? 0, part.cachedAt);
+  }
+  // Una hija remota (otra máquina la mandó crear) va con su coordinador si está a la vista, como en el riel.
+  const remote: RemoteScope = {
+    announces: (machine) => !!parts.find((p) => p.host === machine)?.features?.includes(REMOTE_CHILD_FEATURE),
+    idOf: (machine, task) => taskKey({ host: machine, id: task }),
+  };
+  const keys = new Set(tasks.map(taskKey));
+  for (const task of tasks.splice(0)) {
+    const launcher = remoteLauncherOf({ ...task, machine: task.host }, remote);
+    (launcher && !task.pinned && keys.has(launcher) ? delegated : tasks).push(launcher ? { ...task, remote_launcher: launcher } : task);
   }
   tasks.sort((a, b) => b.created_at - a.created_at);
   const providers = Object.fromEntries(parts.map((p) => [p.host, p.providers]));

@@ -67,6 +67,8 @@ export type SessionRow = {
   parent?: string | null;
   launched_by?: string | null;
   launcher_available?: boolean;
+  /** Hija de una delegación entre máquinas; un motor viejo no lo manda (`@terminus/tasks` `remote.ts`). */
+  remote_parent?: { machine: string; workspace?: string | null; task: string; request_id?: string | null } | null;
   stage?: "in_progress" | "review" | "done" | null;
 };
 

@@ -12,6 +12,16 @@ export function linkedWorkspaces(computer: Pick<Computer, "workspaces">): Readon
   return Array.isArray(list) ? new Set(list.filter((id): id is string => typeof id === "string")) : null;
 }
 
+/**
+ * Las funciones que el motor de `computer` anuncia (`status.service_features`
+ * de su último `hello`). Un plano de control que no las dice da ninguna: la
+ * función se apaga, la máquina no se marca desactualizada.
+ */
+export function serviceFeatures(computer: { service_features?: unknown }): string[] {
+  const list = computer.service_features;
+  return Array.isArray(list) ? list.filter((f): f is string => typeof f === "string" && !!f) : [];
+}
+
 /** Si la cuenta tiene al menos un workspace a la vista en alguna de sus computadoras. */
 export function hasLinkedWorkspaces(computers: readonly Pick<Computer, "workspaces">[]): boolean {
   return computers.some((c) => {

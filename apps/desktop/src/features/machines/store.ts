@@ -1,4 +1,6 @@
 import { type SystemId } from "@terminus/computers";
+import { SEP } from "@terminus/fleet";
+import { REMOTE_CHILD_FEATURE, type RemoteScope } from "@terminus/tasks";
 import { createRoot, createSignal } from "solid-js";
 import { invoke } from "../../lib/invoke";
 import { t } from "../../lib/i18n";
@@ -10,8 +12,9 @@ import { capabilities } from "../../lib/platform";
  * `machine_list`: `hosts` es si tiene el workspace abierto (`null`, que no se sabe
  * sin encenderla); `materializes`, si puede hacerlo suyo con el mismo id al crear ahí.
  * `wakes`: VM administrada. `os` solo si se sabe; si falta, no se inventa.
+ * `features`: lo que su motor anuncia (`status.service_features`).
  */
-export type Machine = { id: string; local: boolean; active: boolean; on: boolean; hosts: boolean | null; materializes?: boolean; wakes?: boolean; os?: SystemId };
+export type Machine = { id: string; local: boolean; active: boolean; on: boolean; hosts: boolean | null; materializes?: boolean; wakes?: boolean; os?: SystemId; features?: readonly string[] };
 
 /** Lo que el picker sabe del proyecto de la tarea nueva: las máquinas con su carpeta y su remoto. */
 export type ProjectPlace = { name: string; machines?: string[]; remote_url?: string | null } | null | undefined;
@@ -66,6 +69,20 @@ export function setRunOn(workspace: string | null, id: string | null) {
 export function runOnOptions(workspace: string | null, project?: ProjectPlace) {
   const id = runOn(workspace, project);
   return id ? { headers: { "x-terminus-machine": id } } : undefined;
+}
+
+/**
+ * Cómo lee la ventana las hijas remotas (`@terminus/tasks`): solo si la máquina
+ * de la fila anuncia `remote_child_v1`; la de la ventana es la de las filas sin
+ * `machine`. El coordinador va con el id de panel: suelto si es de esta máquina.
+ */
+export function remoteChildScope(): RemoteScope {
+  const list = machines();
+  const self = list.find((m) => m.local)?.id ?? null;
+  return {
+    announces: (machine) => !!list.find((m) => (machine ? m.id === machine : m.local))?.features?.includes(REMOTE_CHILD_FEATURE),
+    idOf: (machine, task) => (machine === self ? task : `${machine}${SEP}${task}`),
+  };
 }
 
 /** La máquina de la fila de una tarea del riel; la registra `App.tsx`, que es quien tiene las filas. */
