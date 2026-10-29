@@ -237,5 +237,8 @@
   "danil.secrets.exists": "Ya tienes {name} aquí ({hint}, actualizado el {date}). Guardar reemplaza su valor.",
   "danil.secrets.name_empty": "Escribe un nombre.",
   "danil.secrets.name_grammar": "Solo letras A–Z, números y _, y sin empezar por número.",
-  "danil.secrets.name_reserved": "Ese nombre lo usa Terminus o la cuenta del agente. Para la clave del agente, ve a Proveedores de IA."
+  "danil.secrets.name_reserved": "Ese nombre lo usa Terminus o la cuenta del agente. Para la clave del agente, ve a Proveedores de IA.",
+  "danil.secrets.scope": "Alcance",
+  "danil.secrets.scope_help": "Una carpeta gana sobre el workspace.",
+  "danil.secrets.sign_in": "Iniciar sesión"
 }

@@ -2,7 +2,8 @@
  * Terminus in the browser, Settings → Secrets: lists only the account's
  * `env_secret` credentials grouped by scope, shows a machine whose engine lacks
  * `secrets_v1` as "no compatible" (never active, no actions), rejects a reserved
- * name, and seals a new secret here only for machines that announce `secrets_v1`.
+ * name, and seals a new secret here, for the chosen folder, only for machines
+ * that announce `secrets_v1`.
  * Talks to the control plane with the person's session; mounts `dist-web/`.
  */
 import assert from "node:assert/strict";
@@ -129,16 +130,22 @@ test("the web lists secrets by scope, marks an old engine as not compatible, and
     assert.ok(await until(() => form().querySelector("[data-secret-exists]")), "an existing secret is replaced only on purpose");
     assert.ok(button(form(), "Reemplazar"));
     type("secret-name", "DATABASE_URL");
+    assert.ok(await until(() => form().querySelector('#secret-scope option[value="p1"]')), "the workspace folders are offered as scope");
+    const scope = form().querySelector("#secret-scope");
+    scope.value = "p1";
+    scope.dispatchEvent(new w.Event("change", { bubbles: true }));
     assert.ok(await until(() => button(form(), "Guardar") && !button(form(), "Guardar").disabled));
     form().requestSubmit();
     assert.ok(await until(() => calls.some((c) => c.method === "PUT")), "the secret goes up sealed");
     const put = calls.find((c) => c.method === "PUT").body;
     assert.equal(put.kind, "env_secret");
-    assert.equal(put.slot, "env/*/DATABASE_URL");
+    assert.equal(put.slot, "env/p1/DATABASE_URL");
+    assert.deepEqual(put.config, { name: "DATABASE_URL", folder: "p1" });
     assert.equal(put.hint, null, "a value under 16 characters gives no hint");
     assert.deepEqual(put.copies.map((c) => c.computer_id), ["cmp_mac"], "the machine without secrets_v1 gets no copy");
     assert.ok(!JSON.stringify(put).includes("short-value"), "the value never travels in clear");
-    assert.ok(await until(() => !form() && panel().querySelector('[data-secret="env/*/DATABASE_URL"]')), "the dialog closes and the new row appears");
+    assert.ok(await until(() => !form() && panel().querySelector('[data-secret="env/p1/DATABASE_URL"]')), "the dialog closes and the new row appears");
+    assert.match(panel().querySelector('[data-secrets-group="p1"]').textContent, /^Carpeta P1/, "a folder group is named, not shown by id");
     assert.deepEqual(app.fallos, []);
   } finally {
     globalThis.fetch = own;

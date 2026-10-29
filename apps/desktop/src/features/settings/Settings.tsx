@@ -406,6 +406,16 @@ export default function Settings(props: {
     window.addEventListener("keydown", alTeclear, true);
     onCleanup(() => window.removeEventListener("keydown", alTeclear, true));
   });
+  // Con la hoja ya abierta, `panel` no vuelve a leerse: un enlace interno («Iniciar sesión» en Secretos) cambia de destino por aquí.
+  onMount(() => {
+    const alPedir = (e: Event) => {
+      const id = (e as CustomEvent<unknown>).detail;
+      const d = TODOS().find((x) => x.id === id);
+      if (d) abrir(d);
+    };
+    window.addEventListener("harness:open-settings", alPedir);
+    onCleanup(() => window.removeEventListener("harness:open-settings", alPedir));
+  });
 
   function mover(paso: number | "inicio" | "fin") {
     const destinos = TODOS();

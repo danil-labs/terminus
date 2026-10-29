@@ -7,8 +7,10 @@
  */
 import "../../locales/danilPhrases";
 import { type Credential, type CredentialMachine, credentialMachines, credentialSlot, envSecretNameProblem, envSecretOf } from "@terminus/computers";
-import { createMemo, createSignal, For, Match, onMount, Show, Switch } from "solid-js";
+import { createMemo, createResource, createSignal, For, Match, onMount, Show, Switch } from "solid-js";
 import { df } from "../../lib/format";
+import { invoke } from "../../lib/invoke.ts";
+import type { Project } from "../../lib/model";
 import { t } from "../../lib/i18n";
 import { capabilities } from "../../lib/platform";
 import { Badge } from "../../ui/Badge";
@@ -17,6 +19,7 @@ import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
 import { EmptyState } from "../../ui/EmptyState";
 import { type Failure, FailureNote } from "../../ui/Failure";
 import { Input } from "../../ui/Input";
+import { Select } from "../../ui/Select";
 import { Skeleton } from "../../ui/Skeleton";
 import { Spinner } from "../../ui/Spinner";
 import { CredentialMachines, LocalKeysBanner, Rotate } from "./credentials/AccountCredentials";
@@ -124,13 +127,14 @@ function SecretItem(props: { credential: Credential; overrides: boolean }) {
 }
 
 /** Alta sellada en este cliente para cada máquina con `secrets_v1`; el valor no viaja en claro. */
-function AddSecretDialog(props: { secrets: Credential[]; onClose: () => void }) {
+function AddSecretDialog(props: { secrets: Credential[]; folders: Project[]; onClose: () => void }) {
   const [name, setName] = createSignal("");
   const [value, setValue] = createSignal("");
   const [busy, setBusy] = createSignal(false);
   const [failure, setFailure] = createSignal<Failure | null>(null);
   const problem = () => (name() ? envSecretNameProblem(name()) : null);
-  const slot = () => credentialSlot.envSecret(null, name());
+  const [folder, setFolder] = createSignal<string | null>(null);
+  const slot = () => credentialSlot.envSecret(folder(), name());
   const existing = () => props.secrets.find((c) => c.slot === slot());
   const valid = () => !!value() && !envSecretNameProblem(name());
   async function save(e: Event) {
@@ -142,7 +146,7 @@ function AddSecretDialog(props: { secrets: Credential[]; onClose: () => void }) 
     const f = await act(async (b, ws) => {
       const now = credentialsView();
       if (now.kind !== "ready" || !b.create) return;
-      await b.create(ws, { kind: "env_secret", provider: "env", slot: slot(), label: name(), config: { name: name(), folder: null } }, v, now.listing);
+      await b.create(ws, { kind: "env_secret", provider: "env", slot: slot(), label: name(), config: { name: name(), folder: folder() } }, v, now.listing);
     });
     setBusy(false);
     setFailure(f);
@@ -199,6 +203,16 @@ function AddSecretDialog(props: { secrets: Credential[]; onClose: () => void }) 
               onInput={(e) => setValue(e.currentTarget.value)}
             />
           </div>
+          <div class="grid gap-1">
+            <label for="secret-scope" class="text-xs font-semibold">
+              {t("danil.secrets.scope")}
+            </label>
+            <Select id="secret-scope" disabled={busy()} value={folder() ?? "*"} onChange={(e) => setFolder(e.currentTarget.value === "*" ? null : e.currentTarget.value)}>
+              <option value="*">{t("danil.secrets.scope_workspace")}</option>
+              <For each={props.folders}>{(p) => <option value={p.id}>{t("danil.secrets.scope_folder", { folder: p.name })}</option>}</For>
+            </Select>
+            <p class="m-0 text-xs text-neutral-500">{t("danil.secrets.scope_help")}</p>
+          </div>
           <p class="m-0 border-t border-border pt-3 text-xs text-neutral-500">{t("danil.secrets.add_help")}</p>
           <Show when={failure()}>{(f) => <FailureNote f={f()} />}</Show>
           <div class="flex justify-end gap-2">
@@ -223,7 +237,12 @@ function ModeLine() {
   return (
     <div class="flex items-center gap-2 py-2" data-secrets-mode="no_session">
       <Badge>{t("danil.secrets.mode_local")}</Badge>
-      <p class="m-0 text-xs text-neutral-500">{t("danil.secrets.mode_no_session")}</p>
+      <p class="m-0 min-w-0 flex-1 text-xs text-neutral-500">{t("danil.secrets.mode_no_session")}</p>
+      <Show when={capabilities().danilAccount || capabilities().accountProfile}>
+        <Button variant="ghost" size="compact" onClick={() => window.dispatchEvent(new CustomEvent("harness:open-settings", { detail: "cuenta-danil" }))}>
+          {t("danil.secrets.sign_in")}
+        </Button>
+      </Show>
     </div>
   );
 }
@@ -231,6 +250,9 @@ function ModeLine() {
 export default function Secrets() {
   onMount(() => void reloadCredentials(false));
   const [adding, setAdding] = createSignal(false);
+  // Las carpetas del workspace, para elegir alcance y nombrar los grupos; sin lista se ve el id.
+  const [folders] = createResource(() => invoke<Project[]>("list_projects").catch(() => [] as Project[]), { initialValue: [] });
+  const folderName = (id: string) => folders().find((p) => p.id === id)?.name ?? id;
   let addButton: HTMLButtonElement | undefined;
   const secrets = createMemo(() => {
     const v = credentialsView();
@@ -297,7 +319,7 @@ export default function Secrets() {
                   {(g) => (
                     <div class="grid min-w-0" data-secrets-group={g.folder ?? "*"}>
                       <p class="m-0 pt-3 text-[0.8125rem] font-semibold">
-                        {g.folder === null ? t("danil.secrets.scope_workspace") : t("danil.secrets.scope_folder", { folder: g.folder })}
+                        {g.folder === null ? t("danil.secrets.scope_workspace") : t("danil.secrets.scope_folder", { folder: folderName(g.folder) })}
                       </p>
                       <For each={g.items}>{(c) => <SecretItem credential={c} overrides={g.folder !== null && workspaceNames().has(nameOf(c))} />}</For>
                     </div>
@@ -311,6 +333,7 @@ export default function Secrets() {
       <Show when={adding()}>
         <AddSecretDialog
           secrets={secrets()}
+          folders={folders()}
           onClose={() => {
             setAdding(false);
             addButton?.focus();
