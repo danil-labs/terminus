@@ -111,3 +111,32 @@ test("sin rastro delante, los pasos de en medio van delante del grupo", () => {
   ponerLanzamiento(out, { tipo: "msg", nombre: "L2" }, esLanzada);
   assert.deepEqual(out.map((b) => b.nombre), ["persona", "p2", "L1", "L2"]);
 });
+
+// Un motor que no devuelve el turno metido (`inject_message` → `null`): el globo
+// vivo no tiene id, y releer a mitad del turno lo traía también del disco.
+const metido = (text: string, tras: string | null): Msg => ({ role: "user", text, inyectado: { tras } });
+
+test("lo metido sin id no sale dos veces cuando el disco ya lo trae", () => {
+  const disco = [...enDisco, { role: "user", text: "Cambia de rumbo.", id: "u3" }] as Turn[];
+  const pintado = mensajesDelHilo({ base: transcripcion(disco), vivo: [metido("Cambia de rumbo.", "u2")], guardados: ids(disco) });
+  assert.equal(veces(pintado, "Cambia de rumbo."), 1);
+  assert.equal(pintado.at(-1)?.turno, "u3");
+});
+
+test("lo metido sin id sigue viéndose mientras el disco no lo trae", () => {
+  const pintado = mensajesDelHilo({ base: transcripcion(enDisco), vivo: [metido("Cambia de rumbo.", "u2")], guardados: ids(enDisco) });
+  assert.equal(veces(pintado, "Cambia de rumbo."), 1);
+  assert.equal(pintado.at(-1)?.inyectado?.tras, "u2");
+});
+
+test("lo metido sin id no se confunde con un mensaje igual de antes ni cuenta un guardado dos veces", () => {
+  const disco = [
+    { role: "user", text: "sí", id: "u1" },
+    { role: "agent", text: "Sigo.", id: "a1" },
+    { role: "user", text: "sí", id: "u2" },
+  ] as Turn[];
+  const vivo = [metido("sí", "a1"), metido("sí", "a1")];
+  const pintado = mensajesDelHilo({ base: transcripcion(disco), vivo, guardados: ids(disco) });
+  assert.equal(veces(pintado, "sí"), 3);
+  assert.equal(pintado.filter((m) => m.inyectado).length, 1);
+});
