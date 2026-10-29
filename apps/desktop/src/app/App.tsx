@@ -166,7 +166,7 @@ import AvisoDeVersion from "../features/shell/VersionNotice";
 import CloseGuard from "../features/shell/CloseGuard";
 import WorkspaceColumn from "../features/shell/WorkspaceColumn";
 import Sitio from "../features/sites/Site";
-import { claseDeFondo, VELO_DE_FONDO } from "../lib/chat-background";
+import { claseDeFondo, SIN_FONDO_DE_CHAT, VELO_DE_FONDO } from "../lib/chat-background";
 import { fondoDeChat, fondoPropio, imagenDelWorkspace, veloDeFondo } from "../lib/chat-background-store";
 import { copyText } from "../lib/clipboard";
 import { capabilities, openMachineScreen } from "../lib/platform";
@@ -7201,7 +7201,7 @@ export default function App() {
         chatAvatar={cellProfile().avatar}
         bodyOf={(name) => profiles()[name]?.body ?? null}
         avatarOf={(name) => profiles()[name]?.avatar ?? null}
-        chatBackground={celdaActiva() ? null : chatBackground() ?? null}
+        chatBackground={SIN_FONDO_DE_CHAT || celdaActiva() ? null : chatBackground() ?? null}
         chatVeil={cellProfile().veil}
         onOpenProfile={() => setViewingProfile(true)}
         /* Que el hilo viene, no que no hay: sin esto el chat lee el vacío en
@@ -7466,10 +7466,10 @@ export default function App() {
      vidrio (`.glass-panel`): así se ve también tras el historial, el árbol y
      las barras. Cada chat solo pinta encima el fondo propio de su agente. */
   const imagenDeVentana = () =>
-    fondoDelAgente()?.url ?? (fondoDeChat() === "propia" ? (imagenDelWorkspace() ?? fondoPropioUrl()) : null) ?? null;
+    SIN_FONDO_DE_CHAT ? null : fondoDelAgente()?.url ?? (fondoDeChat() === "propia" ? (imagenDelWorkspace() ?? fondoPropioUrl()) : null) ?? null;
   const veloDeVentana = () => (fondoDelAgente() ? (fondoDelAgente()?.veil ?? VELO_DE_FONDO) : veloDeFondo());
   // Neutro: sin imagen ni velo, solo el `bg-surface` de la raíz.
-  const sinFondo = () => !fondoDelAgente() && fondoDeChat() === "neutro";
+  const sinFondo = () => SIN_FONDO_DE_CHAT || (!fondoDelAgente() && fondoDeChat() === "neutro");
   const FondoDeVentana = () => (
     <Show
       when={imagenDeVentana()}

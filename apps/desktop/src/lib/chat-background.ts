@@ -4,6 +4,9 @@
  * cae al atardecer: ningún fondo anterior deja de pintarse al actualizar.
  */
 export const FONDOS = ["dusk", "neutro", "propia"] as const;
+
+/** El marco nuevo de la ventana no lleva fondo de chat: se pinta la superficie del tema y nada más. */
+export const SIN_FONDO_DE_CHAT = true;
 export type FondoDeChat = (typeof FONDOS)[number];
 
 /** El mismo velo que el fondo de un agente, para que el texto siga leyéndose. */

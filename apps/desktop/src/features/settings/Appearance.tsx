@@ -12,6 +12,7 @@ import { elegirArchivoDeImagen } from "../../lib/pick-image";
 import type { AgentProfile, AgenteDeMaquina, CatalogoDeAgentes } from "../../lib/model";
 import {
   FONDOS,
+  SIN_FONDO_DE_CHAT,
   claseDeFondo,
   type FondoDeChat,
 } from "../../lib/chat-background";
@@ -276,6 +277,7 @@ export default function Appearance(props: { proyecto: string }) {
           onPick={(id) => setEstiloClaro(chooseLightStyle(id as LightStyle))}
         />
 
+        <Show when={!SIN_FONDO_DE_CHAT}>
         <SettingsRow
           label={t("settings.appearance.background.title")}
           description={t("settings.appearance.background.description")}
@@ -378,6 +380,7 @@ export default function Appearance(props: { proyecto: string }) {
             }}
           />
         </SettingsRow>
+        </Show>
         <SettingsRow
           label={
             <label for={TABS_VEIL_ID}>
