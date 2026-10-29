@@ -1,33 +1,21 @@
 import { listen } from "../../lib/serviceEvents";
-import Bug from "lucide-solid/icons/bug";
 import ChartNoAxesCombined from "lucide-solid/icons/chart-no-axes-combined";
 import { createSignal, onCleanup, Show } from "solid-js";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
 import { sharedLazy } from "../../lib/sharedLazy";
-import {
-  ITEM_DE_MENU,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "../../ui/Popover";
-import KeepAwake from "./KeepAwake";
 import PuertosAbiertos from "./OpenPorts";
-import BotonDeTema from "./ThemeButton";
 
 const Almacenamiento = sharedLazy(() => import("./Storage"));
 
-// Los controles de la app, al final de la franja de la ventana; el consumo vive en cada ventana (`UsageTool`).
+// Lo de la app que avisa de algo, al pie de la columna de organizaciones; tema, mantener despierta y bug viven en el perfil (`ProfileMenu`).
 
 type AgentsViewStatus = { installed: boolean; enabled: boolean };
-
-const BUG_REPORT_URL = "https://github.com/danil-labs/terminus/issues/new?template=bug_report.yml";
 
 export default function AppTools(props: {
   busy: boolean;
   onAbrirSitio: (url: string, project: string, session: string) => void;
   onObservability: () => void;
-  onReportarBug: () => void;
   /** Para el panel de archivos: tareas con turno vivo y con pestaña. */
   trabajando: string[];
   conPestana: string[];
@@ -55,62 +43,24 @@ export default function AppTools(props: {
   });
 
   return (
-    <div class="flex shrink-0 items-center gap-1 text-xs" data-app-tools="">
-      <div class="ml-auto flex min-w-0 shrink-0 items-center gap-1">
-        <Show when={observability()}>
-          <button
-            class="flex size-5 shrink-0 items-center justify-center rounded-sm text-neutral-500 outline-none hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
-            aria-label={t("observability.tab")}
-            title={t("observability.tab")}
-            onClick={props.onObservability}
-          >
-            <ChartNoAxesCombined size={13} />
-          </button>
-        </Show>
-        <Popover placement="bottom-end" gutter={6}>
-          <PopoverTrigger
-            as={(p: object) => (
-              <button
-                {...p}
-                type="button"
-                class="grid size-5 shrink-0 place-items-center rounded-sm text-error-strong outline-none hover:bg-surface-muted focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
-                aria-label={t("usage.bug_report")}
-                title={t("usage.bug_report")}
-              >
-                <Bug size={13} />
-              </button>
-            )}
-          />
-          <PopoverContent class="w-max min-w-0 p-1">
-            <div class="flex flex-col">
-              <button
-                type="button"
-                class={ITEM_DE_MENU}
-                onClick={props.onReportarBug}
-              >
-                {t("usage.bug_report.ask_agent")}
-              </button>
-              <button
-                type="button"
-                class={ITEM_DE_MENU}
-                onClick={() =>
-                  void invoke("site_open_external", { url: BUG_REPORT_URL }).catch(() => {})
-                }
-              >
-                {t("usage.bug_report.open_web")}
-              </button>
-            </div>
-          </PopoverContent>
-        </Popover>
-        <Almacenamiento
-          trabajando={props.trabajando}
-          conPestana={props.conPestana}
-          onAbrirTarea={props.onAbrirTarea}
-        />
-        <PuertosAbiertos busy={props.busy} onAbrirSitio={props.onAbrirSitio} />
-        <KeepAwake />
-        <BotonDeTema />
-      </div>
+    <div class="flex shrink-0 flex-col items-center gap-1 text-xs" data-app-tools="">
+      <Show when={observability()}>
+        <button
+          class="grid size-9 shrink-0 place-items-center rounded-lg text-neutral-500 outline-none hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          aria-label={t("observability.tab")}
+          title={t("observability.tab")}
+          onClick={props.onObservability}
+        >
+          <ChartNoAxesCombined size={16} />
+        </button>
+      </Show>
+      <PuertosAbiertos vertical busy={props.busy} onAbrirSitio={props.onAbrirSitio} />
+      <Almacenamiento
+        vertical
+        trabajando={props.trabajando}
+        conPestana={props.conPestana}
+        onAbrirTarea={props.onAbrirTarea}
+      />
     </div>
   );
 }

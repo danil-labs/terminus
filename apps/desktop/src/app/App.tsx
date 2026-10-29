@@ -6498,6 +6498,41 @@ export default function App() {
     return !!sitio && !tapadoPorElProyecto(sitio) &&
       pestanas.open().find(p => p.id === paneles.activeTabAt(sitio))?.clase === "tarea";
   };
+  // Una sola ventana: sus pestañas van en la franja de la ventana, entre la navegación y los controles.
+  const tiraDeLaVentana = () => (
+          <div
+            class="flex min-w-0 flex-1 items-center self-stretch"
+            data-tauri-drag-region=""
+            data-tira=""
+            data-ventana="0,0"
+            onPointerDown={() => mandarVentana({ col: 0, fila: 0 })}
+          >
+            <For each={paneles.columns().map((_, col) => ({ col, fila: 0 }))}>
+              {(sitio) => (
+                <TabStrip
+                  session={filaDe}
+                  tabs={pestanasDe(sitio)}
+                  activeId={pestanaDelanteEn(sitio)}
+                  liveIds={vivas()}
+                  approvingIds={permissions().map((p) => p.session)}
+                  waitingIds={preguntadas()}
+                  onPick={(id) => {
+                    const p = pestanas.open().find((x) => x.id === id);
+                    if (p) void activarPestana(p);
+                  }}
+                  onClose={cerrarPestana}
+                  dirtyIds={pestanas.dirty()}
+                  onCloseMany={cerrarPestanas}
+                  canReopen={pestanas.canReopen()}
+                  onReopen={reabrirPestana}
+                  onDrag={arrastrarPestana}
+                  dropIndex={marcaDe(sitio)}
+                />
+              )}
+            </For>
+            {botonDeNuevaPestana()}
+          </div>
+  );
   const botonDelArbol = () => (
     <BotonConAtajo
       variant="ghost"
@@ -7142,6 +7177,7 @@ export default function App() {
           izquierda es suya: al colapsar el historial a ancho cero, esta
           fila lleva el conmutador para traerlo de vuelta. Antes flotaba
           con `position: absolute`, sin compartir eje con nada. */}
+      <Show when={paneles.isSplit()}>
       <div
         ref={cabeceraDeConversacion}
         class={cn("tab-veil flex shrink-0 items-center gap-3 pr-4",
@@ -7163,39 +7199,6 @@ export default function App() {
         {/* Sin partir hay una sola ventana y una sola tira. Su envoltorio y
             el «+» quedan fuera del `For`, que vuelve a montar la tira al
             abrir una tarea: así el «+» no cuesta nodos en cada apertura. */}
-        <Show when={!paneles.isSplit()}>
-          <div
-            class="flex min-w-0 flex-1 items-center self-stretch"
-            data-tira=""
-            data-ventana="0,0"
-            onPointerDown={() => mandarVentana({ col: 0, fila: 0 })}
-          >
-            <For each={paneles.columns().map((_, col) => ({ col, fila: 0 }))}>
-              {(sitio) => (
-                <TabStrip
-                  session={filaDe}
-                  tabs={pestanasDe(sitio)}
-                  activeId={pestanaDelanteEn(sitio)}
-                  liveIds={vivas()}
-                  approvingIds={permissions().map((p) => p.session)}
-                  waitingIds={preguntadas()}
-                  onPick={(id) => {
-                    const p = pestanas.open().find((x) => x.id === id);
-                    if (p) void activarPestana(p);
-                  }}
-                  onClose={cerrarPestana}
-                  dirtyIds={pestanas.dirty()}
-                  onCloseMany={cerrarPestanas}
-                  canReopen={pestanas.canReopen()}
-                  onReopen={reabrirPestana}
-                  onDrag={arrastrarPestana}
-                  dropIndex={marcaDe(sitio)}
-                />
-              )}
-            </For>
-            {botonDeNuevaPestana()}
-          </div>
-        </Show>
         {/* Partida, las tiras se alinean por las pistas reales de las
             ventanas: `pistas(anchosEnPantalla())`, igual que `Paneles`. */}
         <Show when={paneles.isSplit()}>
@@ -7269,6 +7272,7 @@ export default function App() {
         </Show>
         </div>
       </div>
+      </Show>
       <Show when={avisoDeMaquina()}>
         {(aviso) => (
           <p role="status" data-machine-notice="" class="mx-4 mb-2 shrink-0 rounded-[var(--radius-sm)] bg-surface px-3 py-2 text-xs text-neutral-500 shadow-sm">
@@ -7313,14 +7317,6 @@ export default function App() {
         const herramientas = () => <ThreadSearch conversation={task()?.session ?? ""} active={sameSite(site(), paneles.activeSite()) && settings() === null && alta() === null}
               messages={target()?.messages() ?? []} thread={() => target()?.thread()}
               onJump={block => target()?.jump(block)}
-              leadingTools={<Button variant="chrome" size="iconCompact" class="size-7 text-neutral-500"
-                disabled={!paneles.isSplit() && !puedeSepararseDe(site())}
-                title={paneles.isSplit() ? t("chat.search.join") : t("chat.search.split_hint", { key: atajoDePartir(false) })}
-                aria-label={paneles.isSplit() ? t("chat.search.join") : t("chat.search.split")}
-                onClick={() => {
-                  if (paneles.isSplit()) { mandarVentana(site()); juntarLaActiva(); }
-                  else partirVentana(site());
-                }}><Columns2 size={14} /></Button>}
               tools={<>
                 <Show keyed when={delegatedToolbarTargets().get(`${workspaceActivo()}/${task()?.session ?? ""}`)}>{render => render()}</Show>
                 <UsageTool usage={consumo} agent={agenteDeLaVentana()} onGestionarCuentas={() => setSettings("proveedores-ia")} />
@@ -8043,36 +8039,45 @@ export default function App() {
               <SlidersHorizontal size={15} />
             </Button>
           </Show>}
+          centro={tiraDeLaVentana()}
           derecha={<>
+            <Show when={!artOpen() && !paginaDeAgente() && !esquinaConTarea()}>
+              {botonDelArbol()}
+            </Show>
+          </>}
+        />
+        <div class="relative flex min-h-0 flex-1 overflow-visible">
+          <WorkspaceColumn
+            attention={attention.list()}
+            onManage={() => setSettings("workspaces")}
+            onSettings={(panel) => setSettings(panel ?? "")}
+            onReportarBug={() => setInput(t("chat.composer.bug_report_starter"))}
+            tools={<>
             <Show when={spaces().length > 0}>
               <Button
                 variant={viendoArchivadas() ? "secondary" : "ghost"}
                 size="icon"
-                class="size-7 shrink-0 text-neutral-500"
+                class="size-9 shrink-0 rounded-lg text-neutral-500"
                 data-archived-foot=""
                 aria-pressed={viendoArchivadas()}
                 aria-label={t("spaces.archived.title")}
                 title={t("spaces.archived.foot_title")}
                 onClick={alternarArchivadas}
               >
-                <Archive size={15} aria-hidden="true" />
+                <Archive size={17} aria-hidden="true" />
               </Button>
             </Show>
-            <ConexionesMenu onManage={() => setSettings("skills")} />
-            <span aria-hidden="true" class="mx-1 h-4 w-px shrink-0 bg-border-strong" />
+            <ConexionesMenu triggerClass="size-9 rounded-lg" onManage={() => setSettings("skills")} />
             <AppTools
               busy={busy()}
               onAbrirSitio={(url, proyecto, session) => void abrirSitio(url, proyecto, session)}
               onObservability={abrirObservabilidad}
-              onReportarBug={() => setInput(t("chat.composer.bug_report_starter"))}
               trabajando={vivas()}
               conPestana={sesionesConPestana()}
               onAbrirTarea={(proyecto, session) => void abrirSesion(proyecto, session)}
             />
-          </>}
-        />
-        <div class="relative flex min-h-0 flex-1 overflow-visible">
-          <WorkspaceColumn attention={attention.list()} onManage={() => setSettings("workspaces")} onSettings={(panel) => setSettings(panel ?? "")} />
+            </>}
+          />
           {/* La superficie: barra, ventanas y panel derecho, con la esquina redondeada sobre el marco. */}
           <div class="relative flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-tl-[10px] border-t border-l border-border-strong shadow-sm" data-surface="">
           {/* Los topes los pone quien monta: el ancho por debajo del

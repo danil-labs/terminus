@@ -1,7 +1,7 @@
 import Plus from "lucide-solid/icons/plus";
 import SettingsIcon from "lucide-solid/icons/settings";
 import UserPlus from "lucide-solid/icons/user-plus";
-import { createEffect, createSignal, For, lazy, onCleanup, Show, Suspense } from "solid-js";
+import { children, createEffect, createSignal, For, type JSX, onCleanup, Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { t } from "../../lib/i18n";
 import { createNavigationReorder } from "../../lib/navigation-order";
@@ -14,6 +14,7 @@ import { RETARDO_TOOLTIP, TooltipContent, TooltipRoot, TooltipTrigger } from "..
 import { stateColor, stateIcon, taskLabel } from "../projects/TaskStatus";
 import { cerrarConEscape, createWorkspaces, type Workspace } from "../settings/workspaces-store";
 import { topState, type AttentionState, type WorkspaceAttention } from "./attention";
+import ProfileMenu from "./ProfileMenu";
 
 /** Las iniciales de las dos primeras palabras; una sola palabra da una letra. */
 export function monogram(name: string) {
@@ -81,13 +82,15 @@ export function AttentionBadge(props: { state: AttentionState; class?: string })
 }
 
 /** Cambiar de workspace con un clic y ver, sin entrar, qué espera en cada uno. */
-const DanilFooterEntry = lazy(() => import("./DanilFooterEntry"));
 
 export default function WorkspaceColumn(props: {
   attention: WorkspaceAttention[];
   onManage: () => void;
   /** Ajustes, en su sección si se da. */
   onSettings: (panel?: string) => void;
+  onReportarBug: () => void;
+  /** Archivadas, Conexiones, Puertos y Almacenamiento: lo que avisa de algo. */
+  tools?: JSX.Element;
 }) {
   const ws = createWorkspaces();
   let list: HTMLDivElement | undefined;
@@ -329,24 +332,30 @@ export default function WorkspaceColumn(props: {
           </button>
         </Show>
       </div>
-      <ColumnFoot onSettings={props.onSettings} />
+      <ColumnFoot tools={props.tools} onSettings={props.onSettings} onReportarBug={props.onReportarBug} />
     </nav>
   );
 }
 
-/** Ajustes y la cuenta de Danil, al pie de la columna. */
-function ColumnFoot(props: { onSettings: (panel?: string) => void }) {
+/** Lo que avisa de algo, Configuración y el perfil, al pie de la columna. */
+function ColumnFoot(props: {
+  tools?: JSX.Element;
+  onSettings: (panel?: string) => void;
+  onReportarBug: () => void;
+}) {
   const boton = "grid size-9 shrink-0 place-items-center rounded-lg text-neutral-500 outline-none hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+  // Leer `props.tools` dos veces montaría dos copias, y cada una consulta por su cuenta.
+  const tools = children(() => props.tools);
   return (
     <div class="flex shrink-0 flex-col items-center gap-1 pt-1 pb-2" data-workspace-column-foot="">
+      <Show when={tools.toArray().length > 0}>
+        {tools()}
+        <span aria-hidden="true" class="my-1 h-px w-6 shrink-0 bg-border-strong" />
+      </Show>
       <button type="button" class={boton} aria-label={t("settings.title")} title={t("settings.title")} onClick={() => props.onSettings()}>
         <SettingsIcon size={17} aria-hidden="true" />
       </button>
-      <Show when={capabilities().danilAccount || capabilities().accountProfile}>
-        <Suspense>
-          <DanilFooterEntry collapsed onOpen={() => props.onSettings("cuenta-danil")} />
-        </Suspense>
-      </Show>
+      <ProfileMenu onAccount={() => props.onSettings("cuenta-danil")} onReportarBug={props.onReportarBug} />
     </div>
   );
 }

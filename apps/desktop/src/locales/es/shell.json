@@ -72,6 +72,8 @@
   "shell.startup.invalid": "La selección del motor o la carpeta de la ventana no son válidas. Revísalas y vuelve a abrir la ventana.",
   "shell.startup.not_private": "La selección del motor no es privada: otra cuenta del equipo puede leerla, o es un enlace. Créala de nuevo solo para tu usuario.",
   "shell.startup.title": "Terminus no pudo abrir",
+  "shell.profile.menu": "Tu cuenta y preferencias",
+  "shell.profile.theme": "Tema",
   "shell.sidebar.actions": "Acciones",
   "shell.sidebar.clone_unnamed": "Proyecto sin nombre",
   "shell.sidebar.search": "Buscar carpetas y tareas",

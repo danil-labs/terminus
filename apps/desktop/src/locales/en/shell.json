@@ -72,6 +72,8 @@
   "shell.startup.invalid": "The engine selection or the window folder is not valid. Check them and open the window again.",
   "shell.startup.not_private": "The engine selection is not private: another account on this computer can read it, or it is a link. Create it again for your user only.",
   "shell.startup.title": "Terminus could not open",
+  "shell.profile.menu": "Your account and preferences",
+  "shell.profile.theme": "Theme",
   "shell.sidebar.actions": "Actions",
   "shell.sidebar.clone_unnamed": "Unnamed project",
   "shell.sidebar.search": "Search folders and tasks",

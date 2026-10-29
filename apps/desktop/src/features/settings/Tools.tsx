@@ -950,6 +950,8 @@ export default function Herramientas(props: { solo?: string | string[] }) {
 export function ConexionesMenu(props: {
   /** Abre Configuración en el panel de Conexiones. */
   onManage: () => void;
+  /** El tamaño del disparador donde lo monten. */
+  triggerClass?: string;
 }) {
   const [conocidos, setConocidos] = createSignal<Conocido[]>([]);
   const [puestos, setPuestos] = createSignal<Puesto[]>([]);
@@ -1052,7 +1054,7 @@ export function ConexionesMenu(props: {
         setAbierto(v);
         if (v) void cargar();
       }}
-      placement="bottom-end"
+      placement="right-end"
       gutter={4}
     >
       <PopoverTrigger
@@ -1061,12 +1063,12 @@ export function ConexionesMenu(props: {
             {...p}
             variant="ghost"
             size="icon"
-            class="relative size-7 shrink-0 text-neutral-500"
+            class={cn("relative size-7 shrink-0 text-neutral-500", props.triggerClass)}
             aria-haspopup="menu"
             aria-label={t("shell.sidebar.mcp.trigger")}
             title={t("shell.sidebar.mcp.trigger")}
           >
-            <Plug size={15} />
+            <Plug size={props.triggerClass ? 17 : 15} />
             <Show when={pendientes().size > 0}>
               <span class="absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full bg-error-strong" />
             </Show>

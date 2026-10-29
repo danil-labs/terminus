@@ -10,9 +10,9 @@ import {
 import WindowControls from "./WindowControls";
 
 /**
- * La franja de la ventana, a todo lo ancho: navegación a la izquierda y
- * controles de la app a la derecha. Sin pestañas: cada ventana lleva las suyas.
- * Lo que queda libre es donde se arrastra la ventana.
+ * La franja de la ventana, a todo lo ancho: navegación a la izquierda, las
+ * pestañas en medio y los controles de la app a la derecha. Lo que queda libre
+ * es donde se arrastra la ventana.
  */
 export default function TitleBar(props: {
   /** Ocultar la barra, el espacio y Personalizar. */
@@ -21,6 +21,8 @@ export default function TitleBar(props: {
   finDeIzquierda?: JSX.Element;
   /** Dónde termina la barra lateral, en px de ventana; `null` si está oculta. */
   bordeDeLaBarra: number | null;
+  /** Las pestañas de la ventana. */
+  centro?: JSX.Element;
   derecha: JSX.Element;
 }) {
   const apartarSemaforo = needsTrafficLightPadding(() => true, createFullscreen());
@@ -54,7 +56,8 @@ export default function TitleBar(props: {
         <span class="min-w-0 flex-1" data-tauri-drag-region="" />
         {props.finDeIzquierda}
       </div>
-      <div class="ml-auto flex min-w-0 items-center gap-1 pr-2">
+      <div class="flex min-w-0 flex-1 items-center self-stretch">{props.centro}</div>
+      <div class="flex shrink-0 items-center gap-1 pr-2">
         {props.derecha}
         <WindowControls />
       </div>

@@ -115,6 +115,8 @@ export default function PuertosAbiertos(props: {
   busy: boolean;
   /** Abrirlo como pestaña del espacio principal. Solo lo de una tarea. */
   onAbrirSitio: (url: string, project: string, session: string) => void;
+  /** En la columna de organizaciones: icono sobre la cifra y el panel a la derecha. */
+  vertical?: boolean;
 }) {
   const [datos, setDatos] = createSignal<Puertos | null>(null);
   const [abierto, setAbierto] = createSignal(false);
@@ -356,7 +358,7 @@ export default function PuertosAbiertos(props: {
         setAbierto(v);
         if (v) void consultar();
       }}
-      placement="bottom-end"
+      placement={props.vertical ? "right-end" : "bottom-end"}
       gutter={6}
     >
       {/* El disparador **no lleva `onClick` propio**: Kobalte no compone
@@ -367,10 +369,13 @@ export default function PuertosAbiertos(props: {
         as={(p: object) => (
           <button
             {...p}
-            class="flex shrink-0 items-center gap-1 rounded-sm px-1.5 py-0.5 text-neutral-500 outline-none transition-colors hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary data-[expanded]:bg-surface-muted"
+            class={cn(
+              "flex shrink-0 items-center text-neutral-500 outline-none transition-colors hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary data-[expanded]:bg-surface-muted",
+              props.vertical ? "w-12 flex-col gap-0.5 rounded-lg py-1.5 text-[0.625rem]" : "gap-1 rounded-sm px-1.5 py-0.5",
+            )}
             aria-label={`${t("shell.ports.aria", { mine: mios(), external: externos() })} · ${t("shell.ports.aria_processes", { processes: processes() })}`}
           >
-            <Plug size={12} class={hot() ? "text-warning-strong" : ""} aria-hidden />
+            <Plug size={props.vertical ? 16 : 12} class={hot() ? "text-warning-strong" : ""} aria-hidden />
             <span class={cn("font-mono tabular-nums", hot() && "text-warning-strong")}>
               {mios() + processes()}
             </span>
