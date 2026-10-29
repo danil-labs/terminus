@@ -557,7 +557,7 @@ export default function Sidebar(props: {
 
   /** La misma lista, montada en dos sitios: expandida y en el desplegable. */
   const Lista = () => (
-    <div data-sidebar-tasks class="grid min-w-0 gap-1 rounded-[14px]">
+    <div data-sidebar-tasks class="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-1 rounded-[14px]">
       <Show when={props.clon}>{(c) => <FilaDeClon clon={c()} />}</Show>
 
       <Show when={todas().length === 0 && !query() && !hayCarpetasVacias()}>
