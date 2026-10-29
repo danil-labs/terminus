@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { type Fetch, listConnections, mcpUrl, revokeConnection, updateConnection } from "../src/index.ts";
+import { type Fetch, listConnections, mcpUrl, revokeConnection, updateConnection, webhookUrlOk } from "../src/index.ts";
 
 function fake(status: number, body: unknown) {
   const calls: Array<{ url: string; method?: string; headers?: Record<string, string>; body?: string }> = [];
@@ -39,4 +39,19 @@ test("revocar es DELETE; una sesión vencida es unauthorized", async () => {
 
 test("la URL del MCP sale del mismo origen", () => {
   assert.equal(mcpUrl("computers.danil.ai"), "https://computers.danil.ai/mcp");
+});
+
+test("el secreto del webhook llega en la respuesta del cambio", async () => {
+  const { f, calls } = fake(200, { id: "conn-1", state: "active", webhook: { url: "https://hooks.example.com/danil", secret_set: true }, webhook_secret: "whsec_x" });
+  const answer = await updateConnection("computers.test", "tok", "conn-1", { webhook: { url: "https://hooks.example.com/danil" } }, f);
+  assert.equal(answer.kind, "ok");
+  assert.equal(answer.kind === "ok" ? answer.value?.webhook_secret : null, "whsec_x");
+  assert.deepEqual(JSON.parse(calls[0].body ?? ""), { webhook: { url: "https://hooks.example.com/danil" } });
+});
+
+test("solo destinos HTTPS públicos, como el servidor", () => {
+  assert.equal(webhookUrlOk("https://hooks.example.com/danil"), true);
+  for (const url of ["http://hooks.example.com/x", "https://localhost/x", "https://10.0.0.1/x", "https://u:p@hooks.example.com/x", "https://hooks.example.com:8443/x", "https://intranet/x", "no es url"]) {
+    assert.equal(webhookUrlOk(url), false, url);
+  }
 });

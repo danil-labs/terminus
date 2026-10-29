@@ -7,6 +7,7 @@ import {
   mcpUrl,
   revokeConnection,
   updateConnection,
+  webhookUrlOk,
 } from "@terminus/computers";
 import { createResource, createSignal, For, Show } from "solid-js";
 import { t } from "../../lib/i18n";
@@ -221,7 +222,7 @@ export default function Connections(props: { workspace?: string | null }) {
     return d && !("failed" in d) ? d : null;
   };
 
-  async function act(id: string, run: (endpoint: string, tok: string) => Promise<{ kind: string }>) {
+  async function act<A extends { kind: string }>(id: string, run: (endpoint: string, tok: string) => Promise<A>): Promise<A | null> {
     setBusy(id);
     setFailure(null);
     try {
@@ -229,8 +230,10 @@ export default function Connections(props: { workspace?: string | null }) {
       const answer = await run(endpoint, tok);
       if (answer.kind !== "ok") setFailure(answer.kind);
       await refetch();
+      return answer;
     } catch {
       setFailure("error");
+      return null;
     } finally {
       setBusy(null);
     }
@@ -296,6 +299,10 @@ export default function Connections(props: { workspace?: string | null }) {
                     onPause={() => act(c.id, (e, tok) => updateConnection(e, tok, c.id, { state: "paused" }))}
                     onResume={() => act(c.id, (e, tok) => updateConnection(e, tok, c.id, { state: "active" }))}
                     onRevoke={() => setRevoking(c)}
+                    onWebhook={async (webhook) => {
+                      const answer = await act(c.id, (e, tok) => updateConnection(e, tok, c.id, { webhook }));
+                      return answer?.kind === "ok" ? (answer.value?.webhook_secret ?? null) : null;
+                    }}
                   />
                 )}
               </For>
@@ -331,6 +338,102 @@ export default function Connections(props: { workspace?: string | null }) {
   );
 }
 
+/** El aviso firmado de respuestas de una conexión (`task.replied`); el secreto se ve una vez. */
+function WebhookBlock(props: {
+  connection: Connection;
+  busy: boolean;
+  onChange: (webhook: { url: string; rotate?: boolean } | null) => Promise<string | null>;
+}) {
+  const current = () => props.connection.webhook;
+  const [editing, setEditing] = createSignal(false);
+  const [url, setUrl] = createSignal("");
+  const [secret, setSecret] = createSignal<string | null>(null);
+  const [copied, setCopied] = createSignal(false);
+  const valid = () => webhookUrlOk(url().trim());
+
+  async function save(webhook: { url: string; rotate?: boolean } | null) {
+    const made = await props.onChange(webhook);
+    if (made) setSecret(made);
+    setEditing(false);
+    setUrl("");
+  }
+
+  return (
+    <div class="grid gap-2 pb-4">
+      <div class="flex min-w-0 items-center gap-3">
+        <span class="text-xs font-semibold text-neutral-700">{t("settings.connections.webhook.title")}</span>
+        <span class="min-w-0 flex-1 truncate font-mono text-xs text-neutral-500">
+          {current()?.url ?? t("settings.connections.webhook.none")}
+        </span>
+        <Show when={!editing()}>
+          <Button variant="ghost" size="compact" disabled={props.busy} onClick={() => (setUrl(current()?.url ?? ""), setEditing(true))}>
+            {current() ? t("settings.connections.webhook.change") : t("settings.connections.webhook.add")}
+          </Button>
+          <Show when={current()}>
+            {(hook) => (
+              <>
+                <Button variant="ghost" size="compact" disabled={props.busy} onClick={() => save({ url: hook().url, rotate: true })}>
+                  {t("settings.connections.webhook.rotate")}
+                </Button>
+                <Button variant="ghost" size="compact" disabled={props.busy} onClick={() => save(null)}>
+                  {t("settings.connections.webhook.remove")}
+                </Button>
+              </>
+            )}
+          </Show>
+        </Show>
+      </div>
+      <Show when={editing()}>
+        <div class="grid gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-start">
+          <div class="grid gap-1">
+            <Input
+              value={url()}
+              placeholder="https://"
+              aria-label={t("settings.connections.webhook.title")}
+              onInput={(e) => setUrl(e.currentTarget.value)}
+            />
+            <Show when={url().trim() && !valid()}>
+              <span class="text-xs text-error-strong">{t("settings.connections.webhook.invalid")}</span>
+            </Show>
+          </div>
+          <Button size="sm" disabled={props.busy || !valid()} onClick={() => save({ url: url().trim() })}>
+            {t("settings.connections.webhook.save")}
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => setEditing(false)}>
+            {t("settings.connections.cancel")}
+          </Button>
+        </div>
+        <p class="m-0 text-xs text-neutral-500">{t("settings.connections.webhook.hint")}</p>
+      </Show>
+      <Show when={secret()}>
+        {(value) => (
+          <div class="grid gap-1 rounded-md border border-border bg-surface-muted px-3 py-2" role="status">
+            <span class="text-xs font-semibold text-neutral-950">{t("settings.connections.webhook.secret_title")}</span>
+            <div class="flex items-center gap-2">
+              <code class="min-w-0 flex-1 truncate font-mono text-xs text-neutral-950">{value()}</code>
+              <Button
+                variant="ghost"
+                size="compact"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(value());
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2_000);
+                }}
+              >
+                {copied() ? t("settings.connections.copied") : t("settings.connections.local.copy")}
+              </Button>
+              <Button variant="ghost" size="compact" onClick={() => setSecret(null)}>
+                {t("settings.connections.webhook.done")}
+              </Button>
+            </div>
+            <span class="text-xs text-neutral-500">{t("settings.connections.webhook.secret_hint")}</span>
+          </div>
+        )}
+      </Show>
+    </div>
+  );
+}
+
 function ConnectionRow(props: {
   connection: Connection;
   computers: Computer[];
@@ -340,6 +443,8 @@ function ConnectionRow(props: {
   onPause: () => void;
   onResume: () => void;
   onRevoke: () => void;
+  /** Cambia el webhook; devuelve el secreto si se creó o se rotó. */
+  onWebhook: (webhook: { url: string; rotate?: boolean } | null) => Promise<string | null>;
 }) {
   const c = () => props.connection;
   // Solo las máquinas con un workspace atado a la cuenta: el relay no llega a otro.
@@ -387,6 +492,9 @@ function ConnectionRow(props: {
           </Button>
         </div>
       </SettingsRow>
+      <Show when={c().state === "active" || c().state === "paused"}>
+        <WebhookBlock connection={c()} busy={props.busy} onChange={props.onWebhook} />
+      </Show>
       <Show when={c().state === "pending"}>
         <div class="grid gap-3 pb-4 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
           <label class="grid gap-1 text-xs text-neutral-500">

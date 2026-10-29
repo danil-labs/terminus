@@ -739,5 +739,17 @@
   "settings.connections.local.connect": "Connect",
   "settings.connections.local.disconnect": "Disconnect",
   "settings.connections.local.disconnect_title": "Disconnect {name}?",
-  "settings.connections.local.disconnect_body": "Its credential stops working right away. What it already did stays in its tasks."
+  "settings.connections.local.disconnect_body": "Its credential stops working right away. What it already did stays in its tasks.",
+  "settings.connections.webhook.title": "Webhook",
+  "settings.connections.webhook.none": "No webhook: the orchestrator asks with inbox_take",
+  "settings.connections.webhook.add": "Add",
+  "settings.connections.webhook.change": "Change",
+  "settings.connections.webhook.rotate": "Rotate secret",
+  "settings.connections.webhook.remove": "Remove",
+  "settings.connections.webhook.save": "Save",
+  "settings.connections.webhook.invalid": "Use a public https address (no localhost, IPs or a port other than 443).",
+  "settings.connections.webhook.hint": "When a task of this orchestrator replies, Danil sends a signed notice to this address. The reply text does not travel.",
+  "settings.connections.webhook.secret_title": "Webhook secret",
+  "settings.connections.webhook.secret_hint": "Copy it now: it is not shown again. Use it to verify the X-Danil-Signature header.",
+  "settings.connections.webhook.done": "Done"
 }

@@ -18,6 +18,8 @@ export type Connection = {
   permission_mode: string | null;
   machines: ConnectionMachine[];
   limits: { tasks_per_day: number; concurrent_calls: number };
+  /** Aviso firmado de respuestas (`task.replied`); el secreto solo se ve al crearlo. */
+  webhook: { url: string; secret_set: boolean } | null;
   created_at: number;
   updated_at: number;
   last_used_at: number | null;
@@ -40,7 +42,31 @@ export type ConnectionPatch = {
   machines?: Array<{ computer_id: string; workspace: string; folder?: string }>;
   limits?: Partial<Connection["limits"]>;
   client_name?: string;
+  /** `null` lo quita; `rotate` cambia el secreto aunque la URL no cambie. */
+  webhook?: { url: string; rotate?: boolean } | null;
 };
+
+/** Lo que devuelve un cambio: con un webhook nuevo o rotado trae su secreto, una sola vez. */
+export type UpdatedConnection = Connection & { webhook_secret?: string };
+
+/**
+ * La misma regla que el servidor (`computers` `webhookUrlOk`), para avisar antes
+ * de mandar: HTTPS en el 443, sin credenciales ni hosts locales o de red privada.
+ */
+export function webhookUrlOk(raw: string): boolean {
+  if (raw.length > 512) return false;
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443")) return false;
+  const host = url.hostname.toLowerCase();
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) return false;
+  if (/^\[|^\d+\.\d+\.\d+\.\d+$/.test(host)) return false;
+  return host.includes(".");
+}
 
 /** Los modos del motor, del más estricto al más permisivo; el de la conexión es su techo. */
 export const PERMISSION_MODES = ["lectura", "manual", "ediciones", "auto"] as const;
@@ -63,12 +89,12 @@ export function updateConnection(
   id: string,
   patch: ConnectionPatch,
   f: Fetch = globalFetch,
-): Promise<Answer<Connection | null>> {
+): Promise<Answer<UpdatedConnection | null>> {
   return request(
     apiUrl(endpoint, `/v1/connections/${encodeURIComponent(id)}`),
     token,
     "PATCH",
-    (body) => (body && typeof (body as Connection).id === "string" ? (body as Connection) : null),
+    (body) => (body && typeof (body as Connection).id === "string" ? (body as UpdatedConnection) : null),
     f,
     patch,
   );

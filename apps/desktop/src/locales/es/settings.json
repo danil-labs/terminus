@@ -739,5 +739,17 @@
   "settings.connections.local.connect": "Conectar",
   "settings.connections.local.disconnect": "Desconectar",
   "settings.connections.local.disconnect_title": "¿Desconectar {name}?",
-  "settings.connections.local.disconnect_body": "Su credencial deja de servir en ese momento. Lo que ya hizo se queda en sus tareas."
+  "settings.connections.local.disconnect_body": "Su credencial deja de servir en ese momento. Lo que ya hizo se queda en sus tareas.",
+  "settings.connections.webhook.title": "Webhook",
+  "settings.connections.webhook.none": "Sin webhook: el orquestador pregunta con inbox_take",
+  "settings.connections.webhook.add": "Agregar",
+  "settings.connections.webhook.change": "Cambiar",
+  "settings.connections.webhook.rotate": "Rotar secreto",
+  "settings.connections.webhook.remove": "Quitar",
+  "settings.connections.webhook.save": "Guardar",
+  "settings.connections.webhook.invalid": "Usa una dirección https pública (sin localhost, IPs ni puerto distinto del 443).",
+  "settings.connections.webhook.hint": "Cuando una tarea de este orquestador responde, Danil manda un aviso firmado a esta dirección. El texto de la respuesta no viaja.",
+  "settings.connections.webhook.secret_title": "Secreto del webhook",
+  "settings.connections.webhook.secret_hint": "Cópialo ahora: no se vuelve a mostrar. Sirve para verificar la firma X-Danil-Signature.",
+  "settings.connections.webhook.done": "Listo"
 }
