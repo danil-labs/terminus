@@ -1,4 +1,4 @@
-import { handlerMutation, handlerOperationRunning, pendingHandlerOperation, resumeHandlerOperation } from "./handlerOperations";
+import { handlerMutation, handlerOperationRunning, pendingHandlerOperation, resumeHandlerOperation, staleReason } from "./handlerOperations";
 import "../../locales/handlerPhrases";
 import "../../locales/failurePhrases";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
@@ -155,7 +155,7 @@ export default function HandlerPolicy(props: { name: string; target: HandlerTarg
       <p class="m-0 break-all text-xs text-neutral-500">{t("settings.handler.source", { source: r().source })}</p>
       <Show when={r().digest}><p class="m-0 break-all font-mono text-xs">{r().digest}</p></Show>
       <Show when={r().dirty}><p class="m-0 text-xs text-warning-strong">{t("settings.handler.dirty")}</p></Show>
-      <Show when={r().stale}><p class="m-0 text-xs text-warning-strong">{t("settings.handler.stale")} {r().stale}</p></Show>
+      <Show when={r().stale}><p class="m-0 text-xs text-warning-strong">{t("settings.handler.stale")} {staleReason(r())}</p></Show>
       <For each={r().requests}>{request => <div class="grid gap-1 border-l border-border pl-3 text-xs">
         <span class="font-semibold">{request.slot ?? request.name ?? request.host} · {t(`settings.handler.state.${request.state}`)}</span>
         <Show when={request.access}><span>{t("settings.handler.access", { access: request.access! })}</span></Show>

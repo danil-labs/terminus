@@ -316,7 +316,7 @@ test("a notice the engine saves as a catalog key reads as its phrase", () => {
   assert.match(failureText({ text: "chat.mentions.in_code" }), /código/);
 });
 
-import { handlerMutation, pendingHandlerOperation, resumeHandlerOperation } from "../../src/features/settings/handlerOperations.ts";
+import { handlerMutation, pendingHandlerOperation, resumeHandlerOperation, staleReason } from "../../src/features/settings/handlerOperations.ts";
 test("an uncertain handler mutation survives scope switches and resumes without repeating", async () => {
   let mutations = 0;
   const unknown = { detail: { detail: { operation: "op-7" } } };
@@ -335,4 +335,13 @@ test("a terminal handler receipt releases the mutation lock and retains its erro
   const terminal = { detail: { detail: { operation: "op-8", settled: true, detail: { read_tools: ["read"] } } } };
   await assert.rejects(resumeHandlerOperation("terminal-scope", async () => { throw terminal; }), e => e === terminal);
   assert.equal(pendingHandlerOperation("terminal-scope"), undefined);
+});
+
+test("a stale approval reads its reason as a phrase, never the engine code", () => {
+  const approval = { digest: "sha256:a", at: 1, by: "person", revoked_at: null };
+  const revoked = staleReason({ approval: { ...approval, revoked_at: 2 }, dirty: false });
+  const changed = staleReason({ approval, dirty: false });
+  assert.ok(revoked.length > 5 && changed.length > 5 && revoked !== changed);
+  assert.doesNotMatch(revoked + changed, /revoked|settings\.handler|sha256/);
+  assert.equal(staleReason({ approval, dirty: true }), "");
 });

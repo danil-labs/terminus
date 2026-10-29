@@ -1,4 +1,6 @@
 import { createSignal } from "solid-js";
+import { t } from "../../lib/i18n.ts";
+import type { HandlerRequests } from "../../lib/model.ts";
 const [version, setVersion] = createSignal(0);
 const changed = () => setVersion(v => v + 1);
 type Pending = { operation: string; action: "approve" | "revoke" | "release" };
@@ -36,3 +38,7 @@ export async function resumeHandlerOperation<T>(scope: string, poll: (operation:
     throw error;
   } finally { running.delete(scope); changed(); }
 }
+
+/** `stale` llega como prosa del motor en inglés; el motivo sale de los campos. Sin commit ya tiene su línea. */
+export const staleReason = (r: Pick<HandlerRequests, "approval" | "dirty">) =>
+  r.approval?.revoked_at ? t("settings.handler.stale_revoked") : r.dirty ? "" : t("settings.handler.stale_changed");

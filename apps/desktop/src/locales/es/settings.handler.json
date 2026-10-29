@@ -14,6 +14,8 @@
   "settings.handler.source": "Fuente: {source}",
   "settings.handler.dirty": "La definición tiene cambios sin commit y no se puede aprobar.",
   "settings.handler.stale": "La aprobación anterior ya no está vigente.",
+  "settings.handler.stale_revoked": "Se revocó.",
+  "settings.handler.stale_changed": "La definición cambió desde que se aprobó.",
   "settings.handler.state.approved": "Aprobado",
   "settings.handler.state.requested_not_granted": "Pedido, no concedido",
   "settings.handler.state.requested_not_managed": "Pedido, no gestionado",

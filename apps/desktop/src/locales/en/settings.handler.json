@@ -14,6 +14,8 @@
   "settings.handler.source": "Source: {source}",
   "settings.handler.dirty": "The definition has uncommitted changes and cannot be approved.",
   "settings.handler.stale": "The previous approval is no longer valid.",
+  "settings.handler.stale_revoked": "It was revoked.",
+  "settings.handler.stale_changed": "The definition changed since it was approved.",
   "settings.handler.state.approved": "Approved",
   "settings.handler.state.requested_not_granted": "Requested, not granted",
   "settings.handler.state.requested_not_managed": "Requested, not managed",
