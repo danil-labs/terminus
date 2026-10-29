@@ -18,6 +18,19 @@ export {
   startComputer,
 } from "./api.ts";
 export {
+  type AuditEntry,
+  type Connection,
+  type ConnectionMachine,
+  type ConnectionPatch,
+  type ConnectionState,
+  PERMISSION_MODES,
+  connectionAudit,
+  listConnections,
+  mcpUrl,
+  revokeConnection,
+  updateConnection,
+} from "./connections.ts";
+export {
   type MachineState,
   type Power,
   DEFERRED_COMMANDS,

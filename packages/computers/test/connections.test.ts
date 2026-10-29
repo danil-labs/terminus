@@ -1,0 +1,42 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { type Fetch, listConnections, mcpUrl, revokeConnection, updateConnection } from "../src/index.ts";
+
+function fake(status: number, body: unknown) {
+  const calls: Array<{ url: string; method?: string; headers?: Record<string, string>; body?: string }> = [];
+  const f: Fetch = async (url, init) => {
+    calls.push({ url, ...init });
+    return { status, ok: status >= 200 && status < 300, json: async () => body };
+  };
+  return { f, calls };
+}
+
+test("lista solo filas de conexión y manda el token", async () => {
+  const { f, calls } = fake(200, [{ id: "conn-1", state: "pending" }, { nope: true }]);
+  const answer = await listConnections("computers.test", "tok", f);
+  assert.deepEqual(answer, { kind: "ok", value: [{ id: "conn-1", state: "pending" }] });
+  assert.equal(calls[0].url, "https://computers.test/v1/connections");
+  assert.equal(calls[0].headers?.authorization, "Bearer tok");
+});
+
+test("activar manda el parche como JSON por PATCH", async () => {
+  const { f, calls } = fake(200, { id: "conn-1", state: "active" });
+  const patch = { state: "active" as const, permission_mode: "manual", machines: [{ computer_id: "cmp_x", workspace: "abcd1234" }] };
+  const answer = await updateConnection("https://computers.test", "tok", "conn-1", patch, f);
+  assert.equal(answer.kind, "ok");
+  assert.equal(calls[0].method, "PATCH");
+  assert.equal(calls[0].headers?.["content-type"], "application/json");
+  assert.deepEqual(JSON.parse(calls[0].body ?? ""), patch);
+});
+
+test("revocar es DELETE; una sesión vencida es unauthorized", async () => {
+  const ok = fake(200, { id: "conn-1", state: "revoked" });
+  assert.deepEqual(await revokeConnection("computers.test", "tok", "conn-1", ok.f), { kind: "ok", value: null });
+  assert.equal(ok.calls[0].method, "DELETE");
+  const expired = fake(401, null);
+  assert.deepEqual(await listConnections("computers.test", "tok", expired.f), { kind: "unauthorized" });
+});
+
+test("la URL del MCP sale del mismo origen", () => {
+  assert.equal(mcpUrl("computers.danil.ai"), "https://computers.danil.ai/mcp");
+});

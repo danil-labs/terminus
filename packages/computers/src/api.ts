@@ -56,9 +56,9 @@ export function apiUrl(endpoint: string, path: string): string {
   return `${url.origin}${url.pathname.replace(/\/+$/, "")}${path}`;
 }
 
-const globalFetch: Fetch = (input, init) => (globalThis.fetch as unknown as Fetch)(input, init);
+export const globalFetch: Fetch = (input, init) => (globalThis.fetch as unknown as Fetch)(input, init);
 
-async function request<T>(url: string, token: string, method: string, read: (body: unknown) => T, f: Fetch, payload?: unknown): Promise<Answer<T>> {
+export async function request<T>(url: string, token: string, method: string, read: (body: unknown) => T, f: Fetch, payload?: unknown): Promise<Answer<T>> {
   let response: Awaited<ReturnType<Fetch>>;
   try {
     const headers: Record<string, string> = { authorization: `Bearer ${token}` };
