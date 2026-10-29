@@ -41,7 +41,7 @@ RESOURCES = ROOT / "resources" / "work-tools"
 LANGUAGES = ROOT / "plugins" / "languages"
 OUTPUT = ROOT / "build" / "work-tools"
 REQUIRED = {"git", "python", "uv", "ripgrep", "agent-browser", "computer-use"}
-IMPORTS = ["openpyxl", "docx", "pptx", "pypdf", "pdfplumber", "PIL", "reportlab", "matplotlib", "pandas"]
+IMPORTS = ["openpyxl", "docx", "pptx", "pypdf", "pdfplumber", "PIL", "reportlab"]
 PLATFORMS = {"x86_64-unknown-linux-gnu": "x86_64-manylinux_2_28", "aarch64-apple-darwin": "aarch64-apple-darwin",
              "x86_64-apple-darwin": "x86_64-apple-darwin", "x86_64-pc-windows-msvc": "x86_64-pc-windows-msvc"}
 # NSIS installs per user in %LOCALAPPDATA%\Terminus; the guard assumes a long profile name.

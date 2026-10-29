@@ -99,28 +99,12 @@
         "license": "MIT"
       },
       {
-        "archive": "documents/wheels/contourpy-1.4.0-cp313-cp313-macosx_10_13_x86_64.whl",
-        "sha256": "e21d1d4a9db5b3a793649c7ab0ddb4697f2818929eec871a7b9c45fce7b2a1ea",
-        "name": "contourpy",
-        "version": "1.4.0",
-        "url": "https://files.pythonhosted.org/packages/b7/8b/62a6eacea08ea0b6ab0159a7783df7ed421ff9c1ff58fef7c31f58fa5e52/contourpy-1.4.0-cp313-cp313-macosx_10_13_x86_64.whl",
-        "license": "BSD-3-Clause"
-      },
-      {
         "archive": "documents/wheels/cryptography-48.0.1-cp311-abi3-macosx_10_9_universal2.whl",
         "sha256": "3e4a1a3232eef2e6c732827d5722db29a0cc8b27af2a4d865b094cf954be9ca1",
         "name": "cryptography",
         "version": "48.0.1",
         "url": "https://files.pythonhosted.org/packages/1b/bc/ee4137cbbe105652c0ee4252792b78fc8e7afa4b8e61d9d5dc05a7f45731/cryptography-48.0.1-cp311-abi3-macosx_10_9_universal2.whl",
         "license": "Apache-2.0 OR BSD-3-Clause"
-      },
-      {
-        "archive": "documents/wheels/cycler-0.12.1-py3-none-any.whl",
-        "sha256": "85cef7cff222d8644161529808465972e51340599459b8ac3ccbac5a854e0d30",
-        "name": "cycler",
-        "version": "0.12.1",
-        "url": "https://files.pythonhosted.org/packages/e7/05/c19819d5e3d95294a6f5947fb9b9629efb316b96de511b418c53d245aae6/cycler-0.12.1-py3-none-any.whl",
-        "license": "BSD-3-Clause"
       },
       {
         "archive": "documents/wheels/et_xmlfile-2.0.0-py3-none-any.whl",
@@ -131,22 +115,6 @@
         "license": "MIT"
       },
       {
-        "archive": "documents/wheels/fonttools-4.68.0-cp313-cp313-macosx_10_13_x86_64.whl",
-        "sha256": "86d319a1feedfc75c8ff582d947b21fa1854e2829cb8cf9428784d750a05f1d9",
-        "name": "fonttools",
-        "version": "4.68.0",
-        "url": "https://files.pythonhosted.org/packages/fe/80/73d5297441b42d42b64d91cd4fffdff1541fac6171b0aca0a167c26d1c33/fonttools-4.68.0-cp313-cp313-macosx_10_13_x86_64.whl",
-        "license": "MIT"
-      },
-      {
-        "archive": "documents/wheels/kiwisolver-1.5.1-cp313-cp313-macosx_10_13_x86_64.whl",
-        "sha256": "1ed0f5e49d0ceff8b72190824d9e59c062fbbc02c231b853112c78474b3f5ec2",
-        "name": "kiwisolver",
-        "version": "1.5.1",
-        "url": "https://files.pythonhosted.org/packages/5c/4b/9f385087ca09ee5ab9c09c6832561a7d2f7c78d3e5661d511e669f70e439/kiwisolver-1.5.1-cp313-cp313-macosx_10_13_x86_64.whl",
-        "license": "BSD-3-Clause"
-      },
-      {
         "archive": "documents/wheels/lxml-6.1.3-cp313-cp313-macosx_10_13_x86_64.whl",
         "sha256": "887c021d9a977cff89cb273047c1352997b772a8908a25c21836861f69b92be1",
         "name": "lxml",
@@ -155,44 +123,12 @@
         "license": "BSD-3-Clause"
       },
       {
-        "archive": "documents/wheels/matplotlib-3.11.2-cp313-cp313-macosx_10_13_x86_64.whl",
-        "sha256": "7d43ff8cebb50840648cb6429b2228621dbd709010f3117b3740abb20abf21c0",
-        "name": "matplotlib",
-        "version": "3.11.2",
-        "url": "https://files.pythonhosted.org/packages/bf/ce/fc58855a3d17f6cb8a87b6f9ccd100f65432a3a7ffed57309cbf14c78987/matplotlib-3.11.2-cp313-cp313-macosx_10_13_x86_64.whl",
-        "license": "LicenseRef-matplotlib"
-      },
-      {
-        "archive": "documents/wheels/numpy-2.5.4-cp313-cp313-macosx_10_13_x86_64.whl",
-        "sha256": "2377da2dd3ba2c1200956acbab2a358c83b8e1f8531191672d1cd6ad83250d53",
-        "name": "numpy",
-        "version": "2.5.4",
-        "url": "https://files.pythonhosted.org/packages/67/14/1c3ee0118a8fce08565a5d8482631608426a33af10a01077fada5dc7c119/numpy-2.5.4-cp313-cp313-macosx_10_13_x86_64.whl",
-        "license": "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0"
-      },
-      {
         "archive": "documents/wheels/openpyxl-3.1.5-py2.py3-none-any.whl",
         "sha256": "5282c12b107bffeef825f4617dc029afaf41d0ea60823bbb665ef3079dc79de2",
         "name": "openpyxl",
         "version": "3.1.5",
         "url": "https://files.pythonhosted.org/packages/c0/da/977ded879c29cbd04de313843e76868e6e13408a94ed6b987245dc7c8506/openpyxl-3.1.5-py2.py3-none-any.whl",
         "license": "MIT"
-      },
-      {
-        "archive": "documents/wheels/packaging-26.3-py3-none-any.whl",
-        "sha256": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
-        "name": "packaging",
-        "version": "26.3",
-        "url": "https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl",
-        "license": "Apache-2.0 OR BSD-2-Clause"
-      },
-      {
-        "archive": "documents/wheels/pandas-3.1.0-cp313-cp313-macosx_10_13_x86_64.whl",
-        "sha256": "849d5019dead65944875ce21fbf71a2ca18e982164cd7367623cbda8567c3122",
-        "name": "pandas",
-        "version": "3.1.0",
-        "url": "https://files.pythonhosted.org/packages/01/54/eb85f8b2ce121c21286842cf81abaa670ec3570173c512298f91128927a5/pandas-3.1.0-cp313-cp313-macosx_10_13_x86_64.whl",
-        "license": "BSD-3-Clause"
       },
       {
         "archive": "documents/wheels/pdfminer_six-20251230-py3-none-any.whl",
@@ -227,14 +163,6 @@
         "license": "BSD-3-Clause"
       },
       {
-        "archive": "documents/wheels/pyparsing-3.3.3-py3-none-any.whl",
-        "sha256": "ece8c00a69cf01b45d0b1dedabb469c90d8caf996d4fda40f147627a122849a4",
-        "name": "pyparsing",
-        "version": "3.3.3",
-        "url": "https://files.pythonhosted.org/packages/38/bb/d215ee7c73b61497b28a5503f9f53523f294fcc936762b7caf90e0c1c2b5/pyparsing-3.3.3-py3-none-any.whl",
-        "license": "MIT"
-      },
-      {
         "archive": "documents/wheels/pypdf-6.21.3-py3-none-any.whl",
         "sha256": "c8ca4d9a360dbd5d4b9bb7a8389e2a9ae6a106bee722b496f918040ba2daa17e",
         "name": "pypdf",
@@ -249,14 +177,6 @@
         "version": "4.30.0",
         "url": "https://files.pythonhosted.org/packages/c7/9a/c8ff5cc352c1b60b0b97642ae734f51edbab6e28b45b4fcdfe5306ee3c83/pypdfium2-4.30.0-py3-none-macosx_10_13_x86_64.whl",
         "license": "(Apache-2.0 OR BSD-3-Clause) AND LicenseRef-PDFium-third-party"
-      },
-      {
-        "archive": "documents/wheels/python_dateutil-3.0.0-py2.py3-none-any.whl",
-        "sha256": "3c79630202e4152c6add678446984236efe4f57e84d8e892aab0637bab82e9fd",
-        "name": "python-dateutil",
-        "version": "3.0.0",
-        "url": "https://files.pythonhosted.org/packages/5a/17/cebee01d1c0c1441174cf0456ddc91b280d79acb65340c05e41d77866ee8/python_dateutil-3.0.0-py2.py3-none-any.whl",
-        "license": "Apache-2.0 AND BSD-3-Clause"
       },
       {
         "archive": "documents/wheels/python_docx-1.2.0-py3-none-any.whl",
@@ -283,28 +203,12 @@
         "license": "BSD license (see license.txt for details), Copyright (c) 2000-2025, ReportLab Inc."
       },
       {
-        "archive": "documents/wheels/six-1.17.0-py2.py3-none-any.whl",
-        "sha256": "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274",
-        "name": "six",
-        "version": "1.17.0",
-        "url": "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl",
-        "license": "MIT"
-      },
-      {
         "archive": "documents/wheels/typing_extensions-4.16.0-py3-none-any.whl",
         "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
         "name": "typing_extensions",
         "version": "4.16.0",
         "url": "https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl",
         "license": "PSF-2.0"
-      },
-      {
-        "archive": "documents/wheels/tzdata-2026.6-py2.py3-none-any.whl",
-        "sha256": "0a10eec6e13ef16b627fabed9a5f2ba61a62b1c67f327305f4e7e412a70b4aec",
-        "name": "tzdata",
-        "version": "2026.6",
-        "url": "https://files.pythonhosted.org/packages/0a/66/9a06c2227fedfd4919f0eaaa8b94377d9730882a7e4f95823c9a331ab5e1/tzdata-2026.6-py2.py3-none-any.whl",
-        "license": "Apache-2.0"
       },
       {
         "archive": "documents/wheels/xlsxwriter-3.3.0-py3-none-any.whl",
@@ -315,6 +219,6 @@
         "license": "BSD-2-Clause"
       }
     ],
-    "requirements_sha256": "44ce083ea4000b65a181416da2cc157759c3fcd7a12213680f83a95e97ab8087"
+    "requirements_sha256": "2947264e023522ec3605836316caab101f74c64d7147a786edbc8058288bff93"
   }
 }

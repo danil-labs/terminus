@@ -147,6 +147,8 @@ class WorkToolsTests(unittest.TestCase):
             self.assertIn({"path": "python/bin/python", "target": "python3.13"}, inventory["symlinks"])
             self.assertEqual({row["mode"] for row in inventory["files"]}, {0o644})
             self.assertEqual(manifest["documents"]["imports"], tools.IMPORTS)
+            # Decidido el 2026-10-29: pandas y matplotlib no van en la base.
+            self.assertTrue({"pandas", "matplotlib", "numpy"}.isdisjoint(tools.IMPORTS))
             with patch.object(tools, "RESOURCES", source):
                 self.assertEqual(tools.verify_output(out, target)["tree"], manifest["tree"])
                 tree = out / manifest["tree"]

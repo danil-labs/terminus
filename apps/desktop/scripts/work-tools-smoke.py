@@ -34,14 +34,9 @@ from pypdf import PdfReader
 import pdfplumber
 from PIL import Image
 from reportlab.pdfgen.canvas import Canvas
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import pandas as pd
 root=Path(sys.argv[1])
 book=Workbook();book.active['A1']='Terminus';book.save(root/'sample.xlsx')
 assert load_workbook(root/'sample.xlsx').active['A1'].value=='Terminus'
-assert pd.read_excel(root/'sample.xlsx',header=None).iloc[0,0]=='Terminus'
 doc=Document();doc.add_paragraph('Terminus');doc.save(root/'sample.docx')
 assert Document(root/'sample.docx').paragraphs[0].text=='Terminus'
 slides=Presentation();slide=slides.slides.add_slide(slides.slide_layouts[0]);slide.shapes.title.text='Terminus';slides.save(root/'sample.pptx')
@@ -49,8 +44,8 @@ assert Presentation(root/'sample.pptx').slides[0].shapes.title.text=='Terminus'
 pdf=Canvas(str(root/'sample.pdf'));pdf.drawString(72,720,'Terminus');pdf.save()
 assert 'Terminus' in PdfReader(root/'sample.pdf').pages[0].extract_text()
 with pdfplumber.open(root/'sample.pdf') as opened: assert 'Terminus' in opened.pages[0].extract_text()
-figure=plt.figure();plt.plot([1,2,3]);figure.savefig(root/'chart.png')
-with Image.open(root/'chart.png') as image: assert image.size[0]>0
+Image.new('RGB',(16,16),'red').save(root/'sample.png')
+with Image.open(root/'sample.png') as image: assert image.size==(16,16)
 print(json.dumps({'python':sys.version.split()[0],'round_trips':['xlsx','docx','pptx','pdf','png'],'distributions':{d.metadata['Name']:d.version for d in importlib.metadata.distributions()}}))
 """
 
@@ -89,7 +84,7 @@ def exercise(directory, target, lab, bare):
     env = {key: os.environ[key] for key in ("SystemRoot", "COMSPEC", "PATHEXT") if key in os.environ}
     env.update(HOME=str(home), USERPROFILE=str(home), PATH=bare, LANG="C.UTF-8", TMPDIR=str(lab), TMP=str(lab),
                TEMP=str(lab), UV_CACHE_DIR=str(lab / "uv-cache"), UV_PYTHON_DOWNLOADS="never", UV_OFFLINE="1",
-               GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull, MPLCONFIGDIR=str(lab / "matplotlib"))
+               GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull)
 
     def run(command, cwd=lab, extra=None):
         result = subprocess.run([str(arg) for arg in command], cwd=cwd, env=dict(env, **(extra or {})), text=True,
@@ -143,7 +138,7 @@ def exercise(directory, target, lab, bare):
     run([entries["agent-browser"], "--help"])
     report = tools.verify_output(directory, target)
     return {"target": target, "tree": manifest["tree"], "versions": versions, "git": "commit and file:// clone",
-            "ripgrep": "search", "documents": reports[0]["round_trips"] + ["pdfplumber", "matplotlib", "pandas"],
+            "ripgrep": "search", "documents": reports[0]["round_trips"] + ["pdfplumber"],
             "python_aliases": [a.name for a in aliases], "pep668": "blocked", "uv": "venv from the bundled Python",
             "inventory_after_use": "identical", "files": report["files"]}
 
