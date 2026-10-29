@@ -3,6 +3,7 @@
 
 import argparse
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 import shutil
@@ -14,12 +15,17 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+spec = importlib.util.spec_from_file_location('work_tools', Path(__file__).with_name('work-tools.py'))
+tools = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(tools)
+
+
 def tree(root):
     files = {}
     for path in root.rglob('*'):
         if path.is_symlink():
-            raise ValueError(f'Unexpected resource symlink: {path}')
-        if path.is_file():
+            files[path.relative_to(root).as_posix()] = '-> ' + str(path.readlink())
+        elif path.is_file():
             files[path.relative_to(root).as_posix()] = digest(path)
     return files
 
@@ -53,18 +59,13 @@ with tempfile.TemporaryDirectory(prefix='candidate-appimage-') as temporary:
     subprocess.run([str(patchelf), '--set-rpath', '$ORIGIN/../lib', str(expected)], check=True)
     if digest(engine) != digest(expected):
         raise ValueError('Packaged engine differs beyond the expected linuxdeploy RUNPATH transformation')
-    resources = unpacked / 'usr/lib/Terminus/work-tools' / target
+    resources = unpacked / 'usr/share/Terminus/work-tools' / target
     if tree(resources) != tree(base / metadata['resources']):
         raise ValueError('Packaged work tools differ from the verified overlay')
     if digest(resources / 'manifest.json') != metadata['resource_manifest_sha256']:
         raise ValueError('Packaged resource manifest SHA-256 mismatch')
-    manifest = json.loads((resources / 'manifest.json').read_text())
-    documents = manifest['documents']
-    entries = manifest['entries'] + documents['wheels'] + [{'archive': documents['requirements'], 'sha256': documents['requirements_sha256']}]
-    for entry in entries:
-        path = resources / entry['archive']
-        if not path.resolve().is_relative_to(resources.resolve()) or digest(path) != entry['sha256']:
-            raise ValueError(f'Packaged payload SHA-256 mismatch: {entry["archive"]}')
+    tools.verify_output(resources, target)
+    tools.verify_resources_inventory(unpacked / 'usr/share/Terminus')
     if digest(resources / 'browser-navigation.json') != metadata['browser_catalog_sha256']:
         raise ValueError('Packaged browser catalog SHA-256 mismatch')
     metadata['appimage'] = {'file': str(appimage), 'bytes': appimage.stat().st_size, 'sha256': digest(appimage)}

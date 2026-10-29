@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import shutil
 import subprocess
 import sys
 
@@ -25,12 +26,13 @@ def targets():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=["prepare", "verify"])
-    parser.add_argument("--directory", type=Path, required=True)
+    parser.add_argument("--directory", type=Path, required=True,
+                        help="prepare: staging root; verify: the packaged work-tools directory")
     args = parser.parse_args()
     if args.command == "prepare":
         config = args.directory / "tauri.work-tools.json"
         command = [sys.executable, str(ROOT / "scripts/work-tools.py"), "prepare", "--download",
-                   "--max-download-bytes", str(1024 ** 3), "--output", str(args.directory / "work-tools"),
+                   "--max-download-bytes", str(2 * 1024 ** 3), "--output", str(args.directory / "work-tools"),
                    "--tauri-config", str(config)]
         for target in targets():
             command += ["--target", target]
@@ -38,37 +40,26 @@ def main():
         if os.environ.get("GITHUB_ENV"):
             environment = {"WORK_TOOLS_CONFIG": str(config.resolve())}
             if platform.system() == "Linux":
-                import shutil
-                environment.update(PATCHELF=str(ROOT / "scripts/work-tools-patchelf.py"),
+                # El árbol va en usr/share, fuera de linuxdeploy; esto lo protege si cambia.
+                environment.update(NO_STRIP="1", PATCHELF=str(ROOT / "scripts/work-tools-patchelf.py"),
                     TERMINUS_REAL_PATCHELF=shutil.which("patchelf"),
-                    TERMINUS_WORK_TOOLS_ROOT=str(ROOT / "src-tauri/target/release/bundle/appimage/Terminus.AppDir/usr/lib/Terminus/work-tools"))
+                    TERMINUS_WORK_TOOLS_ROOT=str(ROOT / "src-tauri/target/release/bundle/appimage/Terminus.AppDir/usr/share/Terminus/work-tools"))
             with open(os.environ["GITHUB_ENV"], "a") as stream:
                 for key, value in environment.items():
                     stream.write(f"{key}={value}\n")
     else:
         reports = []
         for target in targets():
-            source = ROOT / "resources/work-tools" / target
-            manifest = tools.load_manifest(source, target)
             directory = args.directory / target
             if platform.system() == "Darwin":
                 native_spec = importlib.util.spec_from_file_location("work_tools_macos", ROOT / "scripts/work-tools-macos.py")
                 native = importlib.util.module_from_spec(native_spec)
                 native_spec.loader.exec_module(native)
-                native.verify_tree(source, directory, target, os.environ.get("APPLE_TEAM_ID"))
-                manifest = tools.load_manifest(directory, target)
+                reports.append(native.verify_signed(directory, target, os.environ.get("APPLE_TEAM_ID")))
             else:
-                tools.verify_tree(source, directory, manifest)
-            for item in manifest["entries"]:
-                archive = tools.child(directory, item["archive"])
-                if tools.digest(archive) != item["sha256"]:
-                    raise ValueError(f"Packaged tool checksum mismatch: {item['id']}")
-                tools.inspect_archive(archive, item)
-                if item["id"] == "computer-use":
-                    tools.verify_cua(archive, target)
-            tools.verify_documents(directory, manifest)
-            reports.append({"target": target, "manifest_sha256": tools.digest(directory / "manifest.json"),
-                            "bytes": sum(p.stat().st_size for p in directory.rglob("*") if p.is_file())})
+                reports.append(tools.verify_output(directory, target))
+        if platform.system() == "Linux":
+            reports.append(tools.verify_resources_inventory(args.directory.parent))
         print(json.dumps(reports, indent=2))
 
 

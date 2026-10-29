@@ -516,6 +516,13 @@ jobs:
           original=$(cygpath -u "$1")
           name=$(basename "$original")
 
+          # Tauri también pasa cada .exe y .dll de los recursos. Las herramientas
+          # incluidas conservan su firma de origen: firmarlas aquí cambiaría bytes
+          # ya inventariados y gastaría cientos de firmas.
+          case "$original" in
+            */work-tools-release/work-tools/*)
+              exit 0 ;;
+          esac
           case "$name" in
             NSISdl.dll|StartMenu.dll|System.dll|nsDialogs.dll|nsis_tauri_utils.dll)
               echo "Authenticode: $name no se firma (plugin de NSIS, no se instala)."
@@ -773,12 +780,14 @@ jobs:
               image=$(realpath "$image")
               mkdir -p "$RUNNER_TEMP/work-tools-final"
               (cd "$RUNNER_TEMP/work-tools-final" && "$image" --appimage-extract >/dev/null)
-              resources="$RUNNER_TEMP/work-tools-final/squashfs-root/usr/lib/Terminus/work-tools"
+              resources="$RUNNER_TEMP/work-tools-final/squashfs-root/usr/share/Terminus/work-tools"
               engine="$RUNNER_TEMP/work-tools-final/squashfs-root/usr/bin/seldon-runtime"
               ;;
           esac
           python3 scripts/work-tools-release.py verify --directory "$resources"
-          python3 scripts/work-tools-runtime-smoke.py --engine "$engine" --resources "$(dirname "$resources")" --browser --clone
+          app_args=()
+          [ "$RUNNER_OS" != macOS ] || app_args=(--app "$app")
+          python3 scripts/work-tools-runtime-smoke.py --engine "$engine" --resources "$(dirname "$resources")" --browser --clone "${app_args[@]}"
 
       - name: Comprobar el bundle universal
         if: runner.os == 'macOS'
@@ -786,10 +795,18 @@ jobs:
           set -euo pipefail
           APP=src-tauri/target/universal-apple-darwin/release/bundle/macos/Terminus.app
           lipo "$APP/Contents/MacOS/terminus" -verify_arch arm64 x86_64
+          # Las herramientas van en un árbol por arquitectura: cada uno con la suya.
+          TOOLS="$APP/Contents/Resources/work-tools"
           while IFS= read -r f; do
             file -b "$f" | grep -q 'Mach-O' || continue
             lipo "$f" -verify_arch arm64 x86_64
-          done < <(find "$APP" -type f)
+          done < <(find "$APP" -type f -not -path "$TOOLS/*")
+          for pair in aarch64-apple-darwin:arm64 x86_64-apple-darwin:x86_64; do
+            while IFS= read -r f; do
+              file -b "$f" | grep -q 'Mach-O' || continue
+              lipo "$f" -verify_arch "${pair#*:}"
+            done < <(find "$TOOLS/${pair%%:*}" -type f)
+          done
 
       # Con `CI=true` Tauri arma el `.dmg` sin acomodar la ventana (`--skip-jenkins`)
       # y le pone al disco el ícono de la app: la gente abría Terminus desde el
@@ -1066,7 +1083,7 @@ jobs:
           out=$(Terminus.app/Contents/MacOS/terminus --external-host 2>&1) && { echo "::error::Arrancó con un argumento inválido"; exit 1; }
           echo "$out" | grep -q invalid_request
           python3 apps/desktop/scripts/work-tools-release.py verify --directory Terminus.app/Contents/Resources/work-tools
-          python3 apps/desktop/scripts/work-tools-runtime-smoke.py --engine Terminus.app/Contents/MacOS/seldon-runtime --resources Terminus.app/Contents/Resources --browser --clone
+          python3 apps/desktop/scripts/work-tools-runtime-smoke.py --engine Terminus.app/Contents/MacOS/seldon-runtime --resources Terminus.app/Contents/Resources --browser --clone --app Terminus.app
 
   # El AppImage que se va a publicar, en un Ubuntu limpio: la firma minisign
   # con el mismo verificador que usa `npx`, que lleve el motor, y que el binario

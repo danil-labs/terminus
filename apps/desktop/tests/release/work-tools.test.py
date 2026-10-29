@@ -3,6 +3,7 @@ import importlib.util
 import io
 import json
 import os
+import shutil
 from pathlib import Path
 import tarfile
 import tempfile
@@ -78,50 +79,158 @@ class WorkToolsTests(unittest.TestCase):
                 archive.addfile(info, io.BytesIO(b"ok"))
             self.assertEqual(tools.inspect_archive(path, item), 2)
 
-    def test_offline_stage_is_byte_exact_and_never_fetches_chrome(self):
+    def lab(self, root, target="x86_64-unknown-linux-gnu"):
+        """Pins and a staged tree shaped like a real target, without the real payloads."""
+        source = root / "source"
+        (source / target).mkdir(parents=True)
+        (source / "licenses").mkdir()
+        (source / "licenses" / "tool-LICENSE").write_text("MIT")
+        entries = [dict(id=id, version="1.0", archive=f"payloads/{id}", sha256="a" * 64, format="raw",
+                        executable=None if id == "computer-use" else ("tool.exe" if "windows" in target else "tool"),
+                        url="https://example.invalid/" + id, license="MIT", source="https://example.invalid/src", strip_components=0)
+                   for id in ["git", "python", "uv", "ripgrep", "agent-browser", "computer-use"]]
+        wheel = dict(archive="documents/wheels/sample.whl", sha256="b" * 64, name="sample", version="1",
+                     url="https://example.invalid/sample.whl", license="MIT")
+        requirements = f'sample==1 --hash=sha256:{wheel["sha256"]}\n'
+        (source / target / "documents-requirements.txt").write_text(requirements)
+        pins = dict(schema=1, target=target, entries=entries, documents=dict(
+            python="3.13", requirements="documents-requirements.txt", wheels=[wheel],
+            requirements_sha256=tools.hashlib.sha256(requirements.encode()).hexdigest()))
+        (source / target / "pins.json").write_text(json.dumps(pins))
+        navigation = dict(schema=1, target=target, entry=dict(id="browser-navigation", format="zip", strip_components=0,
+                          bytes=8, sha256="c" * 64, url="https://example.invalid/chrome", archive="chrome.zip", executable="chrome/browser"))
+        (source / target / "browser-navigation.json").write_text(json.dumps(navigation))
+        out = root / "out" / target
+        tree = out / "staging"
+        for entry in entries:
+            (tree / entry["id"]).mkdir(parents=True)
+            if entry["executable"]:
+                (tree / entry["id"] / entry["executable"]).write_text(entry["id"])
+        if "windows" in target:
+            lib = tree / "python" / "Lib"
+            (tree / "python" / "python3.exe").write_text("alias")
+        else:
+            lib = tree / "python" / "lib" / "python3.13"
+            (tree / "python" / "bin").mkdir()
+            (tree / "python" / "bin" / "python3.13").write_text("python")
+            (tree / "python" / "bin" / "python").symlink_to("python3.13")
+        (lib / "site-packages").mkdir(parents=True)
+        (lib / "EXTERNALLY-MANAGED").write_text(tools.EXTERNALLY_MANAGED)
+        shutil.copyfile(source / target / "browser-navigation.json", out / "browser-navigation.json")
+        shutil.copytree(source / "licenses", out / "licenses")
+        return source, out, pins
+
+    def sealed(self, root, target="x86_64-unknown-linux-gnu"):
+        source, out, pins = self.lab(root, target)
+        with patch.object(tools, "RESOURCES", source):
+            tools.normalize_modes(out / "staging")
+            manifest = tools.seal(out, target, pins, [{"name": "sample", "version": "1"}])
+        return source, out, manifest
+
+    def test_sealed_tree_matches_the_interface_and_its_inventory(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source, out, manifest = self.sealed(Path(temp))
+            target = "x86_64-unknown-linux-gnu"
+            self.assertEqual((manifest["schema"], manifest["layout"], manifest["inventory"]), (2, "tree", "inventory.json"))
+            self.assertEqual([e["id"] for e in manifest["entries"]], ["git", "python", "uv", "ripgrep", "agent-browser", "computer-use"])
+            self.assertNotIn("drawio", json.dumps(manifest))
+            raw = (out / "inventory.json").read_bytes()
+            self.assertEqual(manifest["inventory_sha256"], tools.hashlib.sha256(raw).hexdigest())
+            inventory = json.loads(raw)
+            self.assertEqual(inventory["tree"], manifest["tree"])
+            self.assertEqual(sorted(p.name for p in out.iterdir()),
+                             sorted(["browser-navigation.json", "inventory.json", "licenses", "manifest.json", manifest["tree"]]))
+            paths = [row["path"] for row in inventory["files"]]
+            self.assertEqual(paths, sorted(paths, key=lambda p: p.encode()))
+            self.assertIn({"path": "python/bin/python", "target": "python3.13"}, inventory["symlinks"])
+            self.assertEqual({row["mode"] for row in inventory["files"]}, {0o644})
+            self.assertEqual(manifest["documents"]["imports"], tools.IMPORTS)
+            with patch.object(tools, "RESOURCES", source):
+                self.assertEqual(tools.verify_output(out, target)["tree"], manifest["tree"])
+                tree = out / manifest["tree"]
+                (tree / "git" / "tool").write_text("tampered")
+                with self.assertRaisesRegex(ValueError, "differs from its inventory"):
+                    tools.verify_output(out, target)
+                (tree / "git" / "tool").write_text("git")
+                (out / "chrome.zip").write_text("forbidden")
+                with self.assertRaisesRegex(ValueError, "Unexpected resource"):
+                    tools.verify_output(out, target)
+
+    def test_same_inputs_give_the_same_tree(self):
+        with tempfile.TemporaryDirectory() as one, tempfile.TemporaryDirectory() as two:
+            first = self.sealed(Path(one))[2]
+            second = self.sealed(Path(two))[2]
+            self.assertEqual(first["tree"], second["tree"])
+            self.assertEqual(first["inventory_sha256"], second["inventory_sha256"])
+
+    def test_links_must_stay_inside_and_windows_has_none(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source, out, pins = self.lab(Path(temp))
+            (out / "staging" / "git" / "escape").symlink_to("../../..")
+            with patch.object(tools, "RESOURCES", source), self.assertRaises(ValueError):
+                tools.seal(out, "x86_64-unknown-linux-gnu", pins, [])
+        with tempfile.TemporaryDirectory() as temp:
+            target = "x86_64-pc-windows-msvc"
+            source, out, pins = self.lab(Path(temp), target)
+            (out / "staging" / "git" / "link").symlink_to("tool.exe")
+            with patch.object(tools, "RESOURCES", source), self.assertRaisesRegex(ValueError, "symlinks"):
+                tools.seal(out, target, pins, [])
+
+    def test_windows_paths_fit_max_path_under_a_long_profile(self):
+        with tempfile.TemporaryDirectory() as temp:
+            target = "x86_64-pc-windows-msvc"
+            source, out, pins = self.lab(Path(temp), target)
+            deep = out / "staging" / "python" / "Lib" / "site-packages" / ("p" * 120) / "module.py"
+            deep.parent.mkdir(parents=True)
+            deep.write_text("")
+            with patch.object(tools, "RESOURCES", source), self.assertRaisesRegex(ValueError, "too long"):
+                tools.seal(out, target, pins, [])
+
+    def test_hard_links_become_copies_and_strip_applies(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            source, dest, cache = root / "source", root / "output", root / "cache"
-            target = "x86_64-unknown-linux-gnu"
-            (source / target).mkdir(parents=True)
-            (source / "licenses").mkdir()
-            cache.mkdir()
-            (cache / "tool").write_bytes(b"native")
-            checksum = tools.digest(cache / "tool")
-            entries = [dict(id=id, version="1", archive="payloads/tool", sha256=checksum, format="raw", executable="tool", url="https://example.invalid/tool", license="MIT", strip_components=0) for id in sorted(tools.REQUIRED)]
-            wheel = cache / "sample.whl"
-            with zipfile.ZipFile(wheel, "w") as archive:
-                archive.writestr("sample-1.dist-info/METADATA", "Name: sample\nVersion: 1\n")
-            pin = dict(archive="documents/wheels/sample.whl", sha256=tools.digest(wheel), name="sample", version="1", url="https://example.invalid/sample.whl", license="MIT")
-            manifest = dict(schema=1, target=target, entries=entries, documents=dict(python="3.13", requirements="documents-requirements.txt", wheels=[pin]))
-            raw = json.dumps(manifest, indent=4).encode()
-            (source / target / "manifest.json").write_bytes(raw)
-            navigation = dict(schema=1, target=target, entry=dict(id="browser-navigation", format="zip", strip_components=0,
-                              bytes=8, sha256=checksum, url="https://example.invalid/chrome", archive="chrome.zip", executable="chrome/browser"))
-            (source / target / "browser-navigation.json").write_text(json.dumps(navigation))
-            (source / target / "documents-requirements.txt").write_text(f'sample==1 --hash=sha256:{pin["sha256"]}\n')
-            manifest["documents"]["requirements_sha256"] = tools.digest(source / target / "documents-requirements.txt")
-            raw = json.dumps(manifest, indent=4).encode()
-            (source / target / "manifest.json").write_bytes(raw)
-            args = argparse.Namespace(output=dest, command="prepare", cache=[cache], download=False)
-            with patch.object(tools, "RESOURCES", source), patch.object(tools.urllib.request, "urlopen") as fetch:
-                first = tools.prepare(args, target, [0])
-                second = tools.prepare(args, target, [0])
-                fetch.assert_not_called()
-                (dest / target / "chrome.zip").write_bytes(b"forbidden")
-                args.command = "verify"
-                with self.assertRaisesRegex(ValueError, "Unexpected resource"):
-                    tools.prepare(args, target, [0])
-                (dest / target / "chrome.zip").unlink()
-                self.assertFalse((dest / target / "build-report.json").exists())
-                (dest / target / "build-report.json").write_text("{}")
-                with self.assertRaisesRegex(ValueError, "Unexpected resource"):
-                    tools.prepare(args, target, [0])
-                (dest / target / "build-report.json").unlink()
-            self.assertTrue(first["complete"])
-            self.assertEqual(first, second)
-            self.assertEqual((dest / target / "manifest.json").read_bytes(), raw)
-            self.assertFalse(list((dest / target).rglob("chrome*.zip")))
+            path = root / "tool.tar.gz"
+            with tarfile.open(path, "w:gz") as archive:
+                info = tarfile.TarInfo("root/bin/git")
+                info.size, info.mode = 3, 0o755
+                archive.addfile(info, io.BytesIO(b"git"))
+                link = tarfile.TarInfo("root/libexec/git-core/git-add")
+                link.type, link.linkname = tarfile.LNKTYPE, "root/bin/git"
+                archive.addfile(link)
+            tools.extract(path, {"format": "tar.gz", "strip_components": 1, "executable": "bin/git"}, root / "git")
+            copy = root / "git" / "libexec" / "git-core" / "git-add"
+            self.assertEqual(copy.read_bytes(), b"git")
+            self.assertFalse(copy.is_symlink())
+
+    def test_tauri_overlay_keeps_symlinks_and_lists_linux_resources(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source, out, manifest = self.sealed(root)
+            languages = root / "languages"
+            languages.mkdir()
+            (languages / "es.json").write_text("{}")
+            config = root / "tauri.json"
+            with patch.object(tools, "RESOURCES", source), patch.object(tools, "LANGUAGES", languages):
+                tools.write_tauri_config(out.parent, ["x86_64-unknown-linux-gnu"], config)
+            files = json.loads(config.read_text())["bundle"]["linux"]["appimage"]["files"]
+            self.assertIn("/usr/share/Terminus/work-tools/x86_64-unknown-linux-gnu", files)
+            inventory = json.loads(Path(files["/usr/share/Terminus/resources-inventory.json"]).read_text())
+            paths = {row["path"] for row in inventory["files"]}
+            self.assertIn("lenguas/es.json", paths)
+            self.assertIn(f"work-tools/x86_64-unknown-linux-gnu/{manifest['tree']}/git/tool", paths)
+            self.assertIn(f"work-tools/x86_64-unknown-linux-gnu/{manifest['tree']}/python/bin/python",
+                          {row["path"] for row in inventory["symlinks"]})
+            mounted = root / "mounted"
+            shutil.copytree(languages, mounted / "lenguas")
+            shutil.copytree(out, mounted / "work-tools" / "x86_64-unknown-linux-gnu", symlinks=True)
+            shutil.copyfile(files["/usr/share/Terminus/resources-inventory.json"], mounted / "resources-inventory.json")
+            self.assertEqual(tools.verify_resources_inventory(mounted)["files"], len(inventory["files"]))
+            (mounted / "lenguas" / "es.json").write_text("[]")
+            with self.assertRaisesRegex(ValueError, "differs from its inventory"):
+                tools.verify_resources_inventory(mounted)
+            for targets, key in [(["aarch64-apple-darwin", "x86_64-apple-darwin"], "macOS"), (["x86_64-pc-windows-msvc"], "resources")]:
+                tools.write_tauri_config(out.parent, targets, config)
+                self.assertIn(key, json.loads(config.read_text())["bundle"])
 
 
 if __name__ == "__main__":

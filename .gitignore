@@ -27,8 +27,5 @@ apps/desktop/src-tauri/crates/*/target/
 apps/desktop/src-tauri/binaries/
 apps/desktop/dist-web/
 
-# Pinned work-tools metadata is tracked; downloaded payloads are not.
-apps/desktop/resources/work-tools/*/payloads/
-apps/desktop/resources/work-tools/*/documents/
-apps/desktop/resources/work-tools/*/licenses/
-apps/desktop/resources/work-tools/tauri.work-tools.json
+# Pinned work-tools metadata is tracked; the prepared tree and its downloads are not.
+apps/desktop/build/

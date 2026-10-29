@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Firma el código contenido en payloads macOS y conserva la procedencia original."""
+"""Firma en su sitio el código Mach-O del árbol de herramientas de macOS y lo vuelve a sellar."""
 
 import argparse
 import base64
-import copy
 import csv
 import hashlib
 import importlib.util
@@ -15,12 +14,9 @@ import platform
 import plistlib
 import re
 import secrets
-import stat
 import subprocess
-import tarfile
 import tempfile
 import time
-import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -69,65 +65,6 @@ def signature(path, executable, team=None):
         raise ValueError(f"Expected Danil Developer ID: {path.name}")
 
 
-def unpack(path, root, kind):
-    if kind == "tar.gz":
-        execute(["/usr/bin/tar", "-xzf", path, "-C", root], "unpack pinned payload")
-    else:
-        with zipfile.ZipFile(path) as archive:
-            for item in archive.infolist():
-                tools.relative(item.filename)
-                if stat.S_ISLNK(item.external_attr >> 16):
-                    raise ValueError("Unexpected symlink in native ZIP")
-                archive.extract(item, root)
-                mode = (item.external_attr >> 16) & 0o777
-                if mode:
-                    tools.child(root, item.filename).chmod(mode)
-
-
-def wheel_record(root):
-    records = list(root.glob("*.dist-info/RECORD"))
-    if len(records) != 1 or list(root.glob("*.dist-info/RECORD.*")):
-        raise ValueError("Expected one unsigned wheel RECORD")
-    record = records[0]
-    rows = list(csv.reader(io.StringIO(record.read_text())))
-    for row in rows:
-        path = tools.child(root, row[0])
-        if path == record:
-            row[1:] = ["", ""]
-        else:
-            data = path.read_bytes()
-            row[1:] = ["sha256=" + base64.urlsafe_b64encode(hashlib.sha256(data).digest()).decode().rstrip("="), str(len(data))]
-    stream = io.StringIO()
-    csv.writer(stream, lineterminator="\n").writerows(rows)
-    record.write_text(stream.getvalue())
-
-
-def repack(path, root, kind):
-    output = path.with_name(path.name + ".signed")
-    try:
-        if kind == "tar.gz":
-            with tarfile.open(path, "r:gz") as source, tarfile.open(output, "w:gz") as target:
-                for item in source.getmembers():
-                    item = copy.copy(item)
-                    if item.isdir() and item.name in {".", "./"}:
-                        target.addfile(item)
-                        continue
-                    file = tools.child(root, item.name)
-                    if item.isfile():
-                        item.size = file.stat().st_size
-                        with file.open("rb") as stream:
-                            target.addfile(item, stream)
-                    else:
-                        target.addfile(item)
-        else:
-            with zipfile.ZipFile(path) as source, zipfile.ZipFile(output, "w") as target:
-                for item in source.infolist():
-                    target.writestr(item, b"" if item.is_dir() else tools.child(root, item.filename).read_bytes())
-        output.replace(path)
-    finally:
-        output.unlink(missing_ok=True)
-
-
 class Signer:
     def __init__(self, identity, team, keychain, entitlements):
         self.identity, self.team = identity, team
@@ -162,115 +99,82 @@ def signing_identity(keychain, configured, team):
     return candidates[0]
 
 
-def transform(path, kind, signer, python=False, wheel=False):
-    with tempfile.TemporaryDirectory(prefix="terminus-native-signing-") as temporary:
-        root = Path(temporary)
-        unpack(path, root, kind)
-        native = native_files(root)
-        before = {p.relative_to(root).as_posix(): tools.digest(p) for p, _ in native}
-        seen = set()
-        for p, executable in native:
-            inode = (p.stat().st_dev, p.stat().st_ino)
-            if inode in seen:
-                continue
-            seen.add(inode)
-            try:
-                signature(p, executable)
-            except (ValueError, RuntimeError):
-                signer.sign(p, python and executable)
-                signature(p, executable, signer.team)
-        codes = [{"path": p.relative_to(root).as_posix(), "source_sha256": before[p.relative_to(root).as_posix()],
-                  "sha256": tools.digest(p)} for p, _ in native]
-        if not any(c["sha256"] != c["source_sha256"] for c in codes):
-            return None
-        if wheel:
-            wheel_record(root)
-        repack(path, root, kind)
-        return codes
-
-
 def sign_tree(directory, target, signer):
-    source = tools.RESOURCES / target
-    original = tools.load_manifest(source, target)
-    tools.verify_tree(source, directory, original)
-    manifest = copy.deepcopy(original)
-    records = []
-    for item in manifest["entries"] + manifest["documents"]["wheels"]:
-        path = tools.child(directory, item["archive"])
-        if tools.digest(path) != item["sha256"]:
-            raise ValueError("Upstream payload checksum mismatch before signing")
-        if item.get("id") in {"computer-use", "uv", "drawio"}:
+    """Firma en su sitio el código Mach-O del árbol y vuelve a sellar inventario y manifiesto."""
+    manifest = tools.verify_output(directory, target)
+    tree = directory / manifest["tree"]
+    tools.verify_cua(tree / "computer-use", target)
+    signed = []
+    seen = set()
+    for p, executable in native_files(tree):
+        rel = p.relative_to(tree).as_posix()
+        # Cua conserva la firma original de su bundle.
+        if rel.startswith("computer-use/"):
             continue
-        wheel = "id" not in item
-        kind = "zip" if wheel else item["format"]
-        tools.inspect_archive(path, {"format": kind, "executable": None})
-        upstream = item["sha256"]
-        codes = transform(path, kind, signer, item.get("id") == "python", wheel)
-        if codes:
-            item["sha256"] = tools.digest(path)
-            if "unpacked_bytes" in item:
-                item["unpacked_bytes"] = tools.inspect_archive(path, item)
-            if "bytes" in item:
-                item["bytes"] = path.stat().st_size
-            records.append({"archive": item["archive"], "source_sha256": upstream, "sha256": item["sha256"],
-                            "bytes": path.stat().st_size, "code": codes})
-    docs = manifest["documents"]
-    requirements = tools.child(directory, docs["requirements"])
-    requirements.write_text("".join(f'{w["name"]}=={w["version"]} --hash=sha256:{w["sha256"]}\n' for w in docs["wheels"]))
-    docs["requirements_sha256"] = tools.digest(requirements)
-    manifest["macos_signing"] = {"schema": 1, "source_manifest_sha256": tools.digest(source / "manifest.json"),
-                                 "team_id": signer.team, "archives": records}
-    (directory / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
-    verify_tree(source, directory, target, signer.team)
+        inode = (p.stat().st_dev, p.stat().st_ino)
+        if inode in seen:
+            continue
+        seen.add(inode)
+        try:
+            signature(p, executable)
+        except (ValueError, RuntimeError):
+            before = tools.digest(p)
+            signer.sign(p, rel.startswith("python/") and executable)
+            signature(p, executable, signer.team)
+            signed.append({"path": rel, "source_sha256": before, "sha256": tools.digest(p)})
+    records(tree / "python", target, signed)
+    pins = tools.load_pins(tools.RESOURCES / target, target)
+    packages = [{"name": w["name"], "version": w["version"]} for w in pins["documents"]["wheels"]]
+    receipt = {"schema": 2, "team_id": signer.team, "unsigned_tree": manifest["tree"],
+               "unsigned_inventory_sha256": manifest["inventory_sha256"], "signed": signed}
+    tools.seal(directory, target, pins, packages, {"macos_signing": receipt})
+    return verify_signed(directory, target, signer.team)
 
 
-def verify_tree(source, directory, target, team):
-    original = tools.load_manifest(source, target)
+def records(python, target, signed):
+    """Los RECORD de los wheels siguen describiendo los .so ya firmados."""
+    site = tools.stdlib(python, target) / "site-packages"
+    changed = {}
+    for row in signed:
+        path = python.parent / row["path"]
+        if path.is_relative_to(site):
+            changed[path.relative_to(site).as_posix()] = path
+    if not changed:
+        return
+    for record in site.glob("*.dist-info/RECORD"):
+        rows = list(csv.reader(io.StringIO(record.read_text())))
+        touched = False
+        for row in rows:
+            if row and row[0] in changed:
+                data = changed[row[0]].read_bytes()
+                row[1:] = ["sha256=" + base64.urlsafe_b64encode(hashlib.sha256(data).digest()).decode().rstrip("="), str(len(data))]
+                touched = True
+        if touched:
+            stream = io.StringIO()
+            csv.writer(stream, lineterminator="\n").writerows(rows)
+            record.write_text(stream.getvalue())
+
+
+def verify_signed(directory, target, team):
+    report = tools.verify_output(directory, target)
     manifest = tools.load_manifest(directory, target)
     receipt = manifest.get("macos_signing", {})
-    if (not team or receipt.get("schema") != 1 or receipt.get("team_id") != team
-            or receipt.get("source_manifest_sha256") != tools.digest(source / "manifest.json")):
+    if not team or receipt.get("schema") != 2 or receipt.get("team_id") != team:
         raise ValueError("Native signing provenance/team mismatch")
-    expected = copy.deepcopy(original)
-    items = {i["archive"]: i for i in expected["entries"] + expected["documents"]["wheels"]}
-    seen = set()
-    for record in receipt["archives"]:
-        name = record["archive"]
-        if name in seen or name not in items:
-            raise ValueError("Unexpected signed payload")
-        seen.add(name)
-        item = items[name]
-        if item.get("id") in {"computer-use", "uv", "drawio"} or record["source_sha256"] != item["sha256"]:
-            raise ValueError("Protected/upstream payload was replaced")
-        path = tools.child(directory, name)
-        if record["sha256"] != tools.digest(path) or record["bytes"] != path.stat().st_size:
-            raise ValueError("Signed payload checksum mismatch")
-        item["sha256"] = record["sha256"]
-        if "unpacked_bytes" in item:
-            item["unpacked_bytes"] = tools.inspect_archive(path, item)
-        if "bytes" in item:
-            item["bytes"] = record["bytes"]
-        with tempfile.TemporaryDirectory(prefix="terminus-verify-native-") as temporary:
-            root = Path(temporary)
-            unpack(path, root, item.get("format", "zip"))
-            codes = {c["path"]: c for c in record["code"]}
-            native = native_files(root)
-            if len(codes) != len(record["code"]) or set(codes) != {p.relative_to(root).as_posix() for p, _ in native}:
-                raise ValueError("Native code inventory mismatch")
-            for p, executable in native:
-                code = codes[p.relative_to(root).as_posix()]
-                if code["sha256"] != tools.digest(p):
-                    raise ValueError("Native code checksum mismatch")
-                signature(p, executable, team if code["sha256"] != code["source_sha256"] else None)
-    docs = expected["documents"]
-    docs["requirements_sha256"] = tools.digest(tools.child(directory, docs["requirements"]))
-    actual = {k: v for k, v in manifest.items() if k != "macos_signing"}
-    if actual != expected:
-        raise ValueError("Signing changed unapproved tool/document metadata")
-    if (directory / "browser-navigation.json").read_bytes() != (source / "browser-navigation.json").read_bytes():
-        raise ValueError("Signing changed the Chrome catalog")
-    tools.verify_tree(directory, directory, manifest)
-    tools.verify_documents(directory, manifest)
+    tree = directory / manifest["tree"]
+    tools.verify_cua(tree / "computer-use", target)
+    ours = {row["path"]: row for row in receipt["signed"]}
+    native = {p.relative_to(tree).as_posix(): (p, executable) for p, executable in native_files(tree)}
+    if not set(ours) <= set(native):
+        raise ValueError("Native code inventory mismatch")
+    for rel, (p, executable) in native.items():
+        if rel.startswith("computer-use/"):
+            continue
+        if rel in ours and ours[rel]["sha256"] != tools.digest(p):
+            raise ValueError("Native code checksum mismatch")
+        signature(p, executable, team if rel in ours else None)
+    report["signed"] = len(ours)
+    return report
 
 
 def main():
@@ -308,8 +212,7 @@ def main():
                     "make imported signing identity available")
             signer = Signer(signing_identity(keychain, identity, team), team, keychain, entitlements)
             for target in ("aarch64-apple-darwin", "x86_64-apple-darwin"):
-                sign_tree(args.directory / target, target, signer)
-                print(json.dumps({"target": target, "signed_manifest_sha256": tools.digest(args.directory / target / "manifest.json")}))
+                print(json.dumps(sign_tree(args.directory / target, target, signer)))
         finally:
             if created:
                 try:

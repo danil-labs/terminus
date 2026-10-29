@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFileSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
@@ -32,19 +32,10 @@ const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 const arch = { x64: "x86_64", arm64: "aarch64" }[process.arch];
 const os = { darwin: "apple-darwin", linux: "unknown-linux-gnu", win32: "pc-windows-msvc" }[process.platform];
 const target = `${arch}-${os}`;
-if (!arch || !os || manifest.schema !== 1 || manifest.target !== target) throw new Error("Candidate resources must match the native target.");
-const relative = (name) => {
-  if (typeof name !== "string" || !name || name.startsWith("/") || /[\\:]/.test(name) || name.split("/").some((part) => !part || part === "." || part === "..")) throw new Error("Unsafe candidate resource path.");
-  return name;
-};
-const verified = (entry) => {
-  const path = join(resources, relative(entry.archive));
-  let current = resources;
-  for (const part of entry.archive.split("/")) { current = join(current, part); if (lstatSync(current).isSymbolicLink()) throw new Error("Candidate resources cannot contain symlinks."); }
-  if (hash(path) !== entry.sha256) throw new Error(`Candidate payload SHA-256 mismatch: ${entry.archive}.`);
-};
-for (const entry of [...manifest.entries, ...manifest.documents.wheels]) verified(entry);
-verified({ archive: manifest.documents.requirements, sha256: manifest.documents.requirements_sha256 });
+if (!arch || !os || manifest.schema !== 2 || manifest.layout !== "tree" || manifest.target !== target) throw new Error("Candidate resources must be a prepared tree for the native target.");
+if (hash(join(resources, "inventory.json")) !== manifest.inventory_sha256) throw new Error("Candidate inventory SHA-256 mismatch.");
+const resourcesInventory = join(dirname(resources), "resources-inventory.json");
+if (process.platform === "linux" && !existsSync(resourcesInventory)) throw new Error("Prepare with --tauri-config first: the AppImage needs resources-inventory.json.");
 const lock = JSON.parse(readFileSync(join(root, "seldon-runtime.lock"), "utf8"));
 if (Object.values(lock.platforms ?? {}).some((pin) => pin.sha256 === expectedEngine)) throw new Error("Candidate engine is the published pin; a new local engine is required.");
 const contract = hash(join(root, "src-tauri/crates/engine-protocol/commands.json"));
@@ -52,7 +43,7 @@ const bundleEnvironment = process.platform === "linux" ? {
   NO_STRIP: "1",
   PATCHELF: join(root, "scripts/work-tools-patchelf.py"),
   TERMINUS_REAL_PATCHELF: resolve(required("patchelf")),
-  TERMINUS_WORK_TOOLS_ROOT: join(root, "src-tauri/target/release/bundle/appimage/Terminus.AppDir/usr/lib/Terminus/work-tools"),
+  TERMINUS_WORK_TOOLS_ROOT: join(root, "src-tauri/target/release/bundle/appimage/Terminus.AppDir/usr/share/Terminus/work-tools"),
 } : {};
 const output = join(root, ".engine", `work-tools-candidate-${version}-${target}`);
 if (existsSync(output)) throw new Error("Candidate directory already exists; use a new version or inspect it first.");
@@ -60,6 +51,7 @@ mkdirSync(output, { recursive: true });
 const stagedResources = join(output, "resources", "work-tools", target);
 cpSync(resources, stagedResources, { recursive: true, dereference: false, errorOnExist: true, force: false });
 if (hash(join(stagedResources, "manifest.json")) !== expectedManifest) throw new Error("Candidate manifest copy failed verification.");
+if (process.platform === "linux") copyFileSync(resourcesInventory, join(output, "resources", "resources-inventory.json"));
 const lab = mkdtempSync(join(output, "contract-lab-"));
 const home = join(lab, "home");
 mkdirSync(home);
@@ -98,7 +90,16 @@ if (hash(sidecar) !== expectedEngine) throw new Error("Candidate sidecar copy fa
 const config = {
   version,
   build: { beforeBuildCommand: "pnpm build" },
-  bundle: { createUpdaterArtifacts: false, externalBin: [join(binaries, "seldon-runtime")], resources: { [stagedResources]: `work-tools/${target}` } },
+  // Los resources de Tauri copian el destino de cada symlink; macOS y AppImage `files`, no.
+  bundle: {
+    createUpdaterArtifacts: false,
+    externalBin: [join(binaries, "seldon-runtime")],
+    ...(process.platform === "linux"
+      ? { linux: { appimage: { files: { [`/usr/share/Terminus/work-tools/${target}`]: stagedResources, "/usr/share/Terminus/lenguas": join(root, "plugins", "languages"), "/usr/share/Terminus/resources-inventory.json": join(output, "resources", "resources-inventory.json") } } } }
+      : process.platform === "darwin"
+        ? { macOS: { files: { [`Resources/work-tools/${target}`]: stagedResources } } }
+        : { resources: { [stagedResources]: `work-tools/${target}` } }),
+  },
 };
 const configPath = join(output, "tauri.candidate.json");
 writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
