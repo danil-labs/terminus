@@ -36,7 +36,7 @@ import {
 import { type ClonEnCurso, faseDeClon } from "../projects/AddWorkdir";
 import { AstroAvatar } from "../projects/AstroAvatar";
 import { watchHandlerStatuses } from "../projects/handlerPresence";
-import NewAgent, { type ModelChoices } from "../projects/NewAgent";
+import type { ModelChoices } from "../projects/NewAgent";
 import { watchProfiles } from "../projects/profiles";
 import Sessions, { type SessionRow } from "../projects/Sessions";
 import type { Etapa } from "../projects/TaskStage";
@@ -54,6 +54,8 @@ import {
 import type { DockAgent } from "./dockLayout";
 import { flattenTasks, folderCounts } from "./sidebarTasks";
 import { machineName, machines } from "../machines/store";
+// Solo al crear un encargado: fuera de la carga inicial.
+const NewAgent = lazy(() => import("../projects/NewAgent"));
 
 // Fuera de la carga inicial: el botón y el dock llegan un instante después de la lista.
 const SidebarFilter = lazy(() => import("./SidebarFilter").then((m) => ({ default: m.SidebarFilter })));
@@ -594,12 +596,12 @@ export default function Sidebar(props: {
       // fuera de la vista lo que estuviera a la derecha, como el «+».
       class="relative z-40 h-full min-h-0 w-full min-w-0 overflow-hidden"
     >
-      <Show when={creatingAgentIn()}>{project => <NewAgent
+      <Show when={creatingAgentIn()}>{project => <Suspense><NewAgent
         abierto onAbrir={open => { if (!open) setCreatingAgentIn(null); }}
         project={project().id}
         modelos={props.modelos}
         onCreado={() => setCreatingAgentIn(null)}
-      />}</Show>
+      /></Suspense>}</Show>
       <SidebarShell
         state={props.collapsed ? "collapsed" : "expanded"}
         class="h-full w-full min-w-0"

@@ -36,10 +36,12 @@ import MaterialPicker from "../settings/MaterialPicker";
 import { AstroAvatar } from "./AstroAvatar";
 import BaseBranchPicker from "./BaseBranchPicker";
 import { watchHandlerStatuses } from "./handlerPresence";
-import NewAgent, { type ModelChoices } from "./NewAgent";
+import type { ModelChoices } from "./NewAgent";
 import { displayName, notifyProfiles, watchProfiles } from "./profiles";
 import Sessions, { type SessionRow } from "./Sessions";
 import type { Etapa } from "./TaskStage";
+// Solo al crear un encargado: fuera de la carga inicial.
+const NewAgent = lazy(() => import("./NewAgent"));
 
 // Fuera de la carga inicial: la memoria se pinta abajo de la vista y trae el cliente de la cuenta.
 const Memoria = lazy(() => import("./Memoria"));
@@ -624,13 +626,17 @@ export default function VistaDeProyecto(props: {
               {t("projects.agents.new_open")}
             </Button>
           </header>
-          <NewAgent
-            abierto={creando()}
-            onAbrir={setCreando}
-            project={props.proyecto.id}
-            modelos={props.modelos}
-            onCreado={releerEncargados}
-          />
+          <Show when={creando()}>
+            <Suspense>
+              <NewAgent
+                abierto
+                onAbrir={setCreando}
+                project={props.proyecto.id}
+                modelos={props.modelos}
+                onCreado={releerEncargados}
+              />
+            </Suspense>
+          </Show>
           <Show
             when={visibles().length > 0}
             fallback={
