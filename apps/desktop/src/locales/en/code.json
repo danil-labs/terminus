@@ -230,5 +230,7 @@
   "code.panel.changes.pending": "Not saved to the live folder",
   "code.panel.changes.none": "The task hasn't changed anything yet",
   "code.panel.tab.preview": "Preview: double-click to keep it open",
-  "code.panel.tab.close": "Close"
+  "code.panel.tab.close": "Close",
+  "code.panel.show_in_folder": "Show in folder",
+  "code.panel.download": "Download"
 }

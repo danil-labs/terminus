@@ -82,7 +82,7 @@ import CambiosDelTurno from "../features/code/TurnChanges";
 import { arbolesDe, contiene, ubicar } from "../features/code/treeKind";
 import type { Tipo } from "../features/code/FileTree";
 const ColumnaDeTrabajo = lazy(() => import("../features/code/WorkTreeColumn"));
-import TaskFilesRow from "../features/code/TaskFilesRow";
+import TaskFilesRow, { taskFilesWidth } from "../features/code/TaskFilesRow";
 const TaskFilesCard = lazy(() => import("../features/code/TaskFiles"));
 import { createTaskFiles } from "../lib/taskFiles";
 import { esDeCodigo } from "../features/code/workdirKind";
@@ -7831,7 +7831,7 @@ export default function App() {
           createEffect(() => { if (panel().open) setUsado(true); });
           const cubre = () => panel().expanded || paneles.isSplit() || compacta();
           const visible = () => panel().open && celda() !== undefined && !tapadoPorElProyecto(sitio());
-          const ancho = () => (cubre() ? undefined : panel().tabs.length > 0 ? `${anchoDeArchivos() * 100}%` : `${anchoDelArbol()}px`);
+          const ancho = () => (cubre() ? undefined : taskFilesWidth(panel().tabs.length > 0, anchoDeArchivos(), anchoDelArbol()));
           return (
             <Show when={usado()}>
               <div class="z-10 flex min-h-0 min-w-0 justify-self-end pt-9 pr-2 pb-2"
