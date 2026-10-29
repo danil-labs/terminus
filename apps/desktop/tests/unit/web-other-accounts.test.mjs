@@ -2,7 +2,8 @@
  * Terminus in the browser with several Danil accounts (`docs/web-multi-account.md`):
  * the column shows the open account's workspaces and, under each other account,
  * its own; opening one of those reloads with its account, an expired one asks to
- * sign in again, and «Agregar cuenta» is always there. Mounts `dist-web/`.
+ * sign in again. With a single workspace, the name menu opens creation and
+ * offers another account within that flow. Mounts `dist-web/`.
  */
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -61,7 +62,7 @@ test("the column lists other accounts' workspaces and opens them with their acco
       },
     });
     const doc = app.w.document;
-    assert.ok(await until(() => doc.querySelector("[data-workspace-column]")), "the column shows even with one workspace of this account");
+    assert.ok(await until(() => doc.querySelector("[data-workspace-column]")), "other accounts keep the column visible");
     const headers = () => [...doc.querySelectorAll("[data-account-header]")].map((h) => h.getAttribute("data-account-header"));
     assert.ok(await until(() => headers().length === 3), "one header per account");
     assert.deepEqual(headers(), ["u-alberto", "u-fund", "u-ytw"]);
@@ -77,9 +78,65 @@ test("the column lists other accounts' workspaces and opens them with their acco
     tiles[2].click();
     assert.deepEqual(opened, ["f2"], "an expired account does not open");
     assert.deepEqual(added, ["alberto@ytw.mx"], "it asks to sign in again with that email");
-    doc.querySelector("[data-add-account]").click();
-    assert.deepEqual(added, ["alberto@ytw.mx", null]);
+    assert.equal(doc.querySelector("[data-add-account]"), null, "workspace creation is the only add action");
   } finally {
+    globalThis.fetch = own;
+  }
+});
+
+for (const emptyAccount of [false, true]) test(`a single workspace hides the column with empty extra account: ${emptyAccount}`, async () => {
+  const added = [];
+  const own = globalThis.fetch;
+  globalThis.fetch = async () => new Response("{}", { status: 404 });
+  let app;
+  try {
+    const f = fleet({ cmp_vm: { table: engine, state: "online" } });
+    app = await boot("listo", `web-single-workspace-${emptyAccount}`, {}, undefined, {}, {
+      web: true,
+      antes: (w) => {
+        globalThis.WebSocket = f.Socket;
+        w.terminusWeb = {
+          endpoint: API,
+          computers: [{ computer_id: "cmp_vm", name: "Danil VM", state: "online", provider: "aws-ec2" }],
+          getToken: async () => "tok",
+          webAccounts: {
+            current: { user_id: "u-alberto", email: "alberto@danil.ai", name: "Alberto", extra: false },
+            others: () => emptyAccount ? [{ user_id: "empty", email: "empty@example.com", extra: true, signedIn: true, stale: false, workspaces: [] }] : [],
+            open: () => undefined,
+            add: () => added.push(true),
+            remove: async () => undefined,
+          },
+        };
+      },
+    });
+    const doc = app.w.document;
+    assert.ok(await until(() => doc.querySelector("[data-workspace-name]")));
+    assert.equal(doc.querySelector("[data-workspace-column]"), null);
+    const key = (el, value) => el.dispatchEvent(new app.w.KeyboardEvent("keydown", { key: value, bubbles: true }));
+    const item = (text) => [...doc.querySelectorAll('[role="menuitem"]')].find(el => el.textContent.trim() === text);
+    const openMenu = async () => {
+      const trigger = doc.querySelector("[data-workspace-name]");
+      trigger.focus();
+      key(trigger, "ArrowDown");
+      assert.ok(await until(() => item("Nuevo workspace")));
+      assert.ok(doc.querySelector('[data-workspace-option="w"]'));
+    };
+    await openMenu();
+    assert.equal(item("Agregar cuenta"), undefined, "the menu only adds workspaces");
+    key(doc.activeElement, "Escape");
+    assert.ok(await until(() => !doc.querySelector("[data-workspace-menu]")));
+    assert.equal(doc.activeElement, doc.querySelector("[data-workspace-name]"));
+    await openMenu();
+    key(item("Nuevo workspace"), "Enter");
+    assert.ok(await until(() => doc.querySelector('[data-web-onboarding="space"]')), "creation opens the existing workspace flow");
+    const other = [...doc.querySelectorAll("button")].find(el => el.textContent.trim() === "Usar otra cuenta");
+    assert.ok(other, "the workspace flow keeps access to other Danil accounts");
+    other.click();
+    assert.deepEqual(added, [true]);
+    assert.equal(f.relays.cmp_vm.calls.some(call => call.command === "add_workspace"), false, "choosing another account does not create in the previous account");
+    assert.deepEqual(app.fallos, []);
+  } finally {
+    app?.w.close();
     globalThis.fetch = own;
   }
 });

@@ -48,6 +48,58 @@ async function until(check, ms = 8000) {
 const VM = { computer_id: "cmp_vm", name: "Danil VM", state: "online", provider: "aws-ec2", os: "linux" };
 const MAC = { computer_id: "cmp_mac", name: "Mac de Ana", state: "online", provider: "self", kind: "physical", os: "macos" };
 
+test("storage keeps its machine and workspace and never waits for an offline VM", async () => {
+  const storage = (bytes) => ({ bytes, tareas: [], compartido: [], sueltos: [], recuperable: 0, medido_en: 1, aviso: null });
+  const resources = { measured_at: 1, storage: [{ id: "volume", total_bytes: 1000, free_bytes: 400, available_bytes: 300, terminus_bytes: null, attribution: "unknown" }] };
+  const { app, invoke, calls, f } = await open("web-storage-target", [VM, MAC], {
+    cmp_vm: { state: "offline", table: table("Panel", "Tarea VM", { list_storage: storage(111) }) },
+    cmp_mac: { table: table("Notas", "Tarea Mac", {
+      list_storage: storage(222), reclaim_storage: { bytes: 1, cuantos: 1, detalle: "" },
+      empty_build_cache: { bytes: 2, cuantos: 1, detalle: "" }, collect_orphans: { bytes: 3, cuantos: 1, detalle: "" },
+      list_workspaces: (_args, call) => ({ workspaces: [SAME], active: "w", ...(call.workspace === null ? { machine_resources: resources } : {}) }),
+    }) },
+  });
+  const target = { headers: { "x-terminus-machine": "cmp_mac", "x-terminus-workspace": "w" } };
+  assert.equal((await invoke("list_storage", { refrescar: true }, target)).bytes, 222);
+  f.relays.cmp_vm.setState("online");
+  await invoke("set_active_workspace", { id: "another" });
+  f.relays.cmp_vm.setState("offline");
+  assert.equal((await invoke("list_storage", { refrescar: false }, target)).bytes, 222);
+  assert.equal(calls("cmp_mac", "list_storage").at(-1).workspace, "w", "a captured workspace survives a later selection");
+  for (const command of ["reclaim_storage", "empty_build_cache", "collect_orphans"]) {
+    await invoke(command, command === "reclaim_storage" ? { session: "cmp_mac~t1", project: "p1", rutas: [] } : {}, target);
+    assert.equal(calls("cmp_mac", command).at(-1).workspace, "w");
+    assert.equal(calls("cmp_vm", command).length, 0);
+  }
+  assert.deepEqual((await invoke("list_workspaces", {}, target)).machine_resources, resources);
+  assert.equal(calls("cmp_mac", "list_workspaces").at(-1).workspace, null);
+  const joined = await invoke("list_workspaces");
+  assert.equal(joined.machine_resources, undefined, "a merged startup never labels one machine as all machines");
+  assert.deepEqual(joined.machine_resources_by_machine.cmp_mac, resources);
+  await sleep(31000);
+  const cached = JSON.parse(app.w.localStorage.getItem("terminus-fleet:slices:v1") ?? "{}");
+  assert.ok(Object.keys(cached).some((key) => key.includes("list_workspaces")), "the listing itself is persisted");
+  for (const entry of Object.values(cached)) assert.equal(JSON.parse(entry.value)?.machine_resources, undefined, "machine resources stay in memory");
+  await assert.rejects(invoke("list_storage", { refrescar: true }, { headers: { "x-terminus-machine": "cmp_vm", "x-terminus-workspace": "w" } }), (e) => e.detail === "machine_off");
+  assert.equal(calls("cmp_vm", "list_storage").length, 0, "an offline machine is not asked to measure");
+  await assert.rejects(invoke("collect_orphans", {}, { headers: { "x-terminus-machine": "missing" } }), (e) => e.detail === "unknown_machine");
+  await assert.rejects(invoke("reclaim_storage", { session: "cmp_vm~t1", project: "p1", rutas: [] }, target), (e) => e.detail === "cross_machine");
+  f.relays.cmp_mac.setState("offline");
+  await assert.rejects(invoke("collect_orphans", {}, target), (e) => e.detail === "machine_off");
+  assert.equal(calls("cmp_mac", "collect_orphans").length, 1, "cleanup is never queued while off");
+  f.relays.cmp_mac.setState("online");
+  const trigger = app.w.document.querySelector('button[aria-label="Almacenamiento"]');
+  assert.ok(trigger);
+  trigger.click();
+  assert.ok(await until(() => app.w.document.querySelector('[data-storage-machine="cmp_mac"]')));
+  const measured = calls("cmp_mac", "list_storage").length;
+  f.relays.cmp_mac.setState("offline");
+  assert.ok(await until(() => app.w.document.querySelector('[data-storage-machine="cmp_mac"]')?.textContent.includes("Sin conexión")), "the open panel follows relay state without interaction");
+  assert.equal(calls("cmp_mac", "list_storage").length, measured, "a status transition does not scan storage");
+  trigger.click();
+  assert.deepEqual(app.fallos, []);
+});
+
 /** The account's registry: `w` (and any other given) on the machines named. */
 const registry = (spaces) =>
   Object.entries(spaces).map(([id, computers]) => ({ id, name: id === "w" ? "W" : id, radiant_workspace_id: null, settings: null, settings_version: 1, created_at: "2026-10-01T10:00:00Z", updated_at: "2026-10-01T10:00:00Z", projects: [], computers }));
@@ -253,7 +305,11 @@ test("a new task is born on the machine chosen, with the same project id, and ma
   assert.equal(await invoke("send_message", { project: "p1", session: null, prompt: "otra" }, vm), "cmp_vm~r1");
   assert.deepEqual(calls("cmp_vm", "materialize_workspace").map((c) => [c.args.id, c.workspace]), [["w2", "w2"]], "the VM makes the workspace its own with the same id, said in the envelope");
   assert.deepEqual(calls("cmp_vm", "send_message").at(-1).workspace, "w2", "and then gets the task in it");
-  const after = await invoke("list_workspaces");
+  let after = await invoke("list_workspaces");
+  for (let attempt = 0; attempt < 20 && !after.workspaces.find(w => w.id === "w2")?.machines.includes("cmp_vm"); attempt++) {
+    await sleep(50);
+    after = await invoke("list_workspaces");
+  }
   assert.deepEqual(after.workspaces.find((w) => w.id === "w2").machines, ["cmp_vm", "cmp_mac"]);
   assert.deepEqual(app.fallos, []);
 });
@@ -276,8 +332,12 @@ test("«Ejecutar en» disables, with the reason, a machine that cannot make the 
   assert.equal(calls("cmp_old", "send_message").length, 0, "and never got the task");
   assert.deepEqual((await invoke("machine_list")).find((m) => m.id === "cmp_old"), { id: "cmp_old", local: false, active: false, on: true, hosts: false, materializes: false, wakes: true });
 
+  doc.querySelector('[aria-label="Ejecutar en"]').click();
+  assert.ok(await until(() => doc.querySelector('[data-machine-option="cmp_mac"]')), "the machine picker opens");
+  doc.querySelector('[data-machine-option="cmp_mac"]').click();
+  await sleep(300);
   doc.querySelector('[aria-label="Proyecto"]').click();
-  assert.ok(await until(() => [...doc.querySelectorAll("button")].some((b) => b.textContent.includes("Notas") && b.textContent.includes("tarea"))), "the project picker opens");
+  assert.ok(await until(() => [...doc.querySelectorAll("button")].some((b) => b.textContent.includes("Notas") && b.textContent.includes("tarea"))), "the project picker opens with that machine's folders");
   [...doc.querySelectorAll("button")].find((b) => b.textContent.includes("Notas") && b.textContent.includes("tarea")).click();
   await sleep(300);
   doc.querySelector('[aria-label="Ejecutar en"]').click();
@@ -316,7 +376,7 @@ test("an action on a computer that is off and cannot be woken fails short and ne
   assert.ok(vmCard?.parentElement.textContent.includes("Danil VM"), "the VM card names its machine");
   assert.ok(vmCard?.parentElement.textContent.includes("(Linux)"), "the VM card names Linux when the row says so");
   await assert.rejects(invoke("send_message", { session: "cmp_mac~t1", text: "hola" }, on("cmp_mac")), (e) => {
-    assert.equal(e.what, "Mac de Ana está apagada. Enciéndela para seguir.");
+    assert.equal(e.what, "Mac de Ana está sin conexión. Verifica que Terminus esté abierto y tenga acceso a internet.");
     return true;
   });
   assert.equal(calls("cmp_mac", "send_message").length, 0, "nothing tries to start a computer the relay cannot start");
@@ -483,27 +543,29 @@ test("provider login from settings receives its link and code", async () => {
   assert.deepEqual(app.fallos, []);
 });
 
-test("the audited additive engine works in the panel and through the relay contract gate", async () => {
+// Un cambio de contrato nunca deja sin uso máquinas enteras: como el teléfono,
+// solo `version_mismatch` del relay o del motor la marca desactualizada.
+test("an engine of the previous additive family stays in service", async () => {
   const contract = "3972c281dba1b61f9ad06fc82fbf059af3dbc55770b0a1bcb59ce786ec0a56f1";
   const { app, calls, doc, text } = await open("web-machines-additive-contract", [{ ...VM, contract }], {
     cmp_vm: { table: table("Panel actualizado", "Tarea de la VM"), contract },
   });
+  assert.ok(await until(() => text().includes("Panel actualizado")), "its panel is read as usual");
   assert.equal(doc.querySelector('[data-machine-row="cmp_vm"]')?.dataset.state, "online");
   assert.ok(calls("cmp_vm", "list_projects").length > 0);
-  assert.ok(text().includes("Panel actualizado"));
   assert.deepEqual(app.fallos, []);
 });
 
-test("the computer list says which engine needs an update before anything is asked", async () => {
+test("a machine on another contract is not marked outdated by its hash", async () => {
   const own = createHash("sha256").update(readFileSync(new URL("../../src-tauri/crates/engine-protocol/commands.json", import.meta.url))).digest("hex");
   const { app, calls, doc, text } = await open("web-machines-contract", [{ ...VM, contract: own }, { ...MAC, contract: "0".repeat(64) }], {
-    cmp_vm: { table: table("Panel", "Tarea de la VM") },
-    cmp_mac: { table: table("Notas", "Tarea del Mac") },
+    cmp_vm: { table: table("Panel", "Tarea de la VM", {}, "pv") },
+    cmp_mac: { table: table("Notas", "Tarea del Mac", {}, "pm") },
   });
-  assert.equal(doc.querySelector('[data-machine-row="cmp_vm"]')?.dataset.state, "online", "the same contract works as usual");
-  assert.equal(doc.querySelector('[data-machine-row="cmp_mac"]')?.dataset.state, "outdated", "another contract needs an update");
-  assert.equal(calls("cmp_mac", "list_projects").length, 0, "it is never asked for panel reads");
-  assert.ok(text().includes("Panel") && !text().includes("Notas"));
+  assert.ok(await until(() => text().includes("Panel") && text().includes("Notas")), "both panels are read");
+  assert.equal(doc.querySelector('[data-machine-row="cmp_vm"]')?.dataset.state, "online");
+  assert.equal(doc.querySelector('[data-machine-row="cmp_mac"]')?.dataset.state, "online", "another contract keeps working");
+  assert.ok(calls("cmp_mac", "list_projects").length > 0);
   assert.deepEqual(app.fallos, []);
 });
 
@@ -515,7 +577,7 @@ test("a computer the relay cannot start answers off at once, never starting", as
     cmp_own: { table: table("Notas", "Tarea del portátil"), state: "offline", notStartable: true },
   });
   await assert.rejects(invoke("send_message", { session: "cmp_own~t1", text: "hola" }, on("cmp_own")), (e) => {
-    assert.equal(e.what, "Portátil está apagada. Enciéndela para seguir.");
+    assert.equal(e.what, "Portátil está sin conexión. Verifica que Terminus esté abierto y tenga acceso a internet.");
     return true;
   });
   assert.equal(calls("cmp_own", "send_message").length, 1, "the relay was asked and refused");

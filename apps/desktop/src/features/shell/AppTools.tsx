@@ -13,6 +13,7 @@ const Almacenamiento = sharedLazy(() => import("./Storage"));
 type AgentsViewStatus = { installed: boolean; enabled: boolean };
 
 export default function AppTools(props: {
+  workspace: string | null;
   busy: boolean;
   onAbrirSitio: (url: string, project: string, session: string) => void;
   onObservability: () => void;
@@ -57,6 +58,7 @@ export default function AppTools(props: {
       <PuertosAbiertos vertical busy={props.busy} onAbrirSitio={props.onAbrirSitio} />
       <Almacenamiento
         vertical
+        workspace={props.workspace}
         trabajando={props.trabajando}
         conPestana={props.conPestana}
         onAbrirTarea={props.onAbrirTarea}

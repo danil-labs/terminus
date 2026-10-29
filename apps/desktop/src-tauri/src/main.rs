@@ -9,6 +9,7 @@ mod cli;
 mod console;
 
 fn main() {
+    app_lib::background_dispatch();
     cli::dispatch();
     if std::env::args_os()
         .nth(1)

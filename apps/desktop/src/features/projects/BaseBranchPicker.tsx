@@ -28,6 +28,7 @@ type Branches = {
 export default function BaseBranchPicker(props: {
   project: string;
   directory?: string | null;
+  machine?: string | null;
   preference?: boolean;
   value?: string | null;
   disabled?: boolean;
@@ -40,6 +41,7 @@ export default function BaseBranchPicker(props: {
   const [opened, setOpened] = createSignal(false);
   const [query, setQuery] = createSignal("");
   const [scope, setScope] = createSignal("");
+  const options = () => props.machine ? { headers: { "x-terminus-machine": props.machine } } : undefined;
   let generation = 0;
   onCleanup(() => {
     generation += 1;
@@ -50,7 +52,7 @@ export default function BaseBranchPicker(props: {
         project,
         refresh: false,
         details: true,
-      });
+      }, options());
       if (request !== generation || project !== props.project) return;
       setData((current) => current && ({
         ...current,
@@ -75,7 +77,7 @@ export default function BaseBranchPicker(props: {
         project,
         refresh,
         details: false,
-      });
+      }, options());
       if (
         request !== generation ||
         project !== props.project ||
@@ -91,7 +93,7 @@ export default function BaseBranchPicker(props: {
     }
   }
   createEffect(
-    on([() => props.project, () => props.directory], ([project]) => {
+    on([() => props.project, () => props.directory, () => props.machine], ([project]) => {
       generation += 1;
       setBusy(false);
       setSaving(false);
@@ -119,7 +121,7 @@ export default function BaseBranchPicker(props: {
         await invoke("set_project_base_branch", {
           project,
           reference: branch.reference,
-        });
+        }, options());
       if (request !== generation || project !== props.project) return;
       if (props.preference)
         setData((d) => (d ? { ...d, selected: branch.reference } : d));

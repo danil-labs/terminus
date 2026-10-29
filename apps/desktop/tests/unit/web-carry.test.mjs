@@ -70,9 +70,17 @@ test("llevar por el relay: sellado para la VM, partes de 512 KiB y la tarea nace
   await sleep(2500);
   const doc = app.w.document;
   const calls = (id, command) => f.relays[id].calls.filter((c) => c.command === command);
+  doc.querySelector('[aria-label="Ejecutar en"]').click();
+  assert.ok(await until(() => doc.querySelector('[data-machine-option="cmp_mac"]')));
+  doc.querySelector('[data-machine-option="cmp_mac"]').click();
+  await sleep(300);
   doc.querySelector('[aria-label="Proyecto"]').click();
   assert.ok(await until(() => [...doc.querySelectorAll("button")].some((b) => b.textContent.includes("Notas") && b.textContent.includes("tarea"))));
   [...doc.querySelectorAll("button")].find((b) => b.textContent.includes("Notas") && b.textContent.includes("tarea")).click();
+  await sleep(300);
+  doc.querySelector('[aria-label="Ejecutar en"]').click();
+  assert.ok(await until(() => doc.querySelector('[data-machine-option="cmp_vm"]')));
+  doc.querySelector('[data-machine-option="cmp_vm"]').click();
   await sleep(300);
   const field = doc.querySelector("textarea");
   field.value = "sigue en la VM";

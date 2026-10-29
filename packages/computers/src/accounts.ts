@@ -7,13 +7,20 @@ import { word } from "../../design/src/index.ts";
 
 type Lang = "es" | "en";
 
-export type AccountRowLike = { id: string; label?: string | null; identity?: string | null; plan?: string | null };
+export type AccountRowLike = {
+  id: string;
+  label?: string | null;
+  identity?: string | null;
+  plan?: string | null;
+  /** Identidad estable del workspace o suscripción; distingue organizaciones con el mismo plan. */
+  credential_group?: string | null;
+};
 
 /** Una máquina donde la cuenta tiene sesión: su id local allí y si está encendida. */
 export type AccountMember = { machine: string; id: string; on: boolean };
 
 export type AccountGroup<R extends AccountRowLike = AccountRowLike> = {
-  /** Proveedor, correo y tipo conocido; sin tipo, máquina e id local. */
+  /** Proveedor, correo y grupo o tipo conocido; sin grupo, máquina e id local. */
   key: string;
   provider: string;
   /** La credencial de la máquina elegida para leer consumo. */
@@ -39,9 +46,11 @@ export function groupAccounts<R extends AccountRowLike>(
       if (typeof row?.id !== "string") continue;
       const member = { machine, id: row.id, on };
       const email = text(row.identity).toLowerCase() || null;
-      const plan = text(row.plan).toLowerCase();
-      if (email && plan) {
-        const key = JSON.stringify([provider, email, plan]);
+      // El grupo autoritativo (el workspace de OpenCode) manda sobre el plan
+      // visible; sin él, el plan conserva el comportamiento de los demás agentes.
+      const group = text(row.credential_group) || text(row.plan).toLowerCase();
+      if (email && group) {
+        const key = JSON.stringify([provider, email, group]);
         const entries = candidates.get(key) ?? [];
         entries.push({ row, member, email });
         candidates.set(key, entries);

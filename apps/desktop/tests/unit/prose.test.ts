@@ -11,6 +11,7 @@ import {
   type Manifiesto,
 } from "../../src/lib/i18n.ts";
 import { SIN_ESPACIO } from "../../src/lib/no-space.ts";
+import { asFailure, claveDe, detalleDe, prosaDe } from "../../src/lib/failure.ts";
 import { prosa } from "../../src/lib/prose.ts";
 
 // El control en español evita que un respaldo fijo en inglés pase como traducción.
@@ -87,4 +88,74 @@ test("los datos se interpolan en la lengua elegida", () => {
     ingles,
     saltillo(es["mcp.error.no_binary"]).replace("{agent}", "Claude Code"),
   );
+});
+
+
+test("los errores desconocidos ofrecen una salida y conservan el diagnóstico", () => {
+  elegirLengua("es");
+  const errors = [{ message: "rpc failed", code: 500 }, new Error("socket closed"), null, undefined,
+    { what: null, detail: "bad envelope" }, { what: {}, detail: "bad phrase" },
+    { clave: "future.error", datos: {} }, "[object Object]", "", 42];
+  for (const error of errors) {
+    assert.ok(prosaDe(error).includes(saltillo(es["common.failure.generic"])));
+    const failure = asFailure(error);
+    assert.equal(prosa(failure.what), saltillo(es["common.failure.generic"]));
+    assert.doesNotMatch(failure.detail, /\[object Object\]/);
+  }
+  assert.match(prosaDe(errors[0]), /rpc failed/);
+  assert.match(prosaDe(errors[1]), /socket closed/);
+  assert.match(detalleDe(errors[0]), /rpc failed/);
+  assert.match(detalleDe(errors[0]), /500/);
+  assert.match(detalleDe(errors[1]), /socket closed/);
+  assert.match(detalleDe(errors[1]), /stack/);
+  assert.match(detalleDe(new Error("outer", { cause: new Error("inner") })), /inner/);
+});
+
+test("las frases estructuradas conservan sus datos y su instrucción", () => {
+  elegirLengua("es");
+  const phrase = { clave: "mcp.error.no_binary", datos: { agent: "Claude Code" } };
+  for (const error of [phrase, { what: phrase, detail: "ENOENT" }]) {
+    assert.equal(prosaDe(error), prosa(phrase));
+    assert.equal(claveDe(error), phrase.clave);
+  }
+  assert.equal(prosaDe("mcp.error.no_binary", { agent: "Codex" }), prosa({ ...phrase, datos: { agent: "Codex" } }));
+  assert.equal(detalleDe({ what: phrase, detail: "" }), prosa(phrase));
+  assert.equal(detalleDe({ what: phrase, detail: { code: "ENOENT" } }), '{"code":"ENOENT"}');
+  assert.equal(prosaDe("Una instrucción del motor. Revisa la cuenta."), "Una instrucción del motor. Revisa la cuenta.");
+  const raw = "git rev-parse failed";
+  assert.equal(prosa(asFailure(raw).what), saltillo(es["common.failure.generic"]));
+  assert.equal(asFailure(raw).detail, raw);
+});
+
+test("el diagnóstico admite ciclos y el respaldo cambia con la lengua", () => {
+  const circular: Record<string, unknown> = { code: "broken", bytes: 12n };
+  circular.cause = circular;
+  assert.match(detalleDe(circular), /broken/);
+  assert.match(detalleDe(circular), /12/);
+  elegirLengua("en");
+  assert.equal(prosaDe(circular), saltillo(en["common.failure.generic"]));
+  elegirLengua("es");
+  assert.equal(prosaDe(circular), saltillo(es["common.failure.generic"]));
+});
+
+
+test("la falta de espacio conserva las cifras del motor o las del evento", () => {
+  elegirLengua("es");
+  const datos = { needed: 1048576, free: 1024 };
+  const expected = prosa({ clave: SIN_ESPACIO, datos });
+  assert.equal(prosaDe({ clave: SIN_ESPACIO, datos }), expected);
+  assert.equal(prosaDe({ what: { clave: SIN_ESPACIO, datos }, detail: "" }), expected);
+  assert.equal(prosaDe(SIN_ESPACIO, datos), expected);
+  assert.equal(prosaDe(SIN_ESPACIO), saltillo(es["common.install.no_space_plain"]));
+});
+
+
+test("un error guardado conserva su frase al cambiar de idioma", () => {
+  elegirLengua("es");
+  const error = asFailure({ what: { clave: "mcp.error.no_binary", datos: { agent: "Codex" } }, detail: "ENOENT" });
+  const unknown = asFailure({ code: "unknown" });
+  elegirLengua("en");
+  assert.equal(prosa(error.what), prosa({ clave: "mcp.error.no_binary", datos: { agent: "Codex" } }));
+  assert.equal(prosa(unknown.what), saltillo(en["common.failure.generic"]));
+  elegirLengua("es");
 });

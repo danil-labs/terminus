@@ -116,7 +116,7 @@ test("approving without a license or on a used code says why", async () => {
       if (view === "license") {
         const text = root().textContent;
         assert.ok(text.includes("Activa Terminus") && text.includes("99 MXN al mes con IVA incluido"), text);
-        const buttons = [...root().querySelectorAll("button")].map((b) => b.textContent.trim());
+        const buttons = [...root().querySelectorAll("[data-terminus-license] button")].map((b) => b.textContent.trim());
         assert.deepEqual(buttons, ["Empezar prueba gratis", "Ya lo activé · Reintentar"]);
         root().querySelector("[data-license-retry]").click();
         await sleep(300);

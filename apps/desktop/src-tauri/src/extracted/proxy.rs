@@ -117,10 +117,16 @@ impl State {
     /// Relanza el motor empaquetado tras un corte, o adopta el que otra ventana relanzó;
     /// como mucho tres veces en diez minutos.
     fn restart(&self) -> Result<(), Error> {
+        let mut restarts = self.restarts.lock().unwrap_or_else(|p| p.into_inner());
+        let current = self.client();
+        if super::engine_profile::managed(&current.selection().data_directory)? {
+            let client = super::engine::reconnect_managed(&current)?;
+            *self.client.write().unwrap_or_else(|p| p.into_inner()) = Arc::new(client);
+            return Ok(());
+        }
         if !self.autostart || !self.machine().local {
             return Err(Error::new("app_unavailable"));
         }
-        let mut restarts = self.restarts.lock().unwrap_or_else(|p| p.into_inner());
         restarts.retain(|at| at.elapsed() < Duration::from_secs(600));
         let mut last_failure = self
             .restart_failure
@@ -218,9 +224,7 @@ impl State {
 }
 fn manifest() -> &'static Value {
     static M: OnceLock<Value> = OnceLock::new();
-    M.get_or_init(|| {
-        serde_json::from_str(terminus_engine_protocol::MANIFEST).expect("frozen command manifest")
-    })
+    M.get_or_init(terminus_engine_protocol::full_manifest)
 }
 fn command(name: &str) -> Option<&'static Value> {
     manifest()["commands"]
@@ -257,7 +261,6 @@ pub(super) fn desktop_command(name: &str) -> bool {
                 | "window_background"
                 | "update_install"
                 | "update_pending"
-                | "close_confirmed"
                 | "window_to_background"
                 | "tray_update"
                 | "quit_completely"
@@ -267,6 +270,7 @@ pub(super) fn desktop_command(name: &str) -> bool {
                 | "account_relay_token"
                 | "service_filter"
                 | "load_history"
+                | "handler_action"
         )
 }
 pub(super) fn with_desktop(
@@ -281,7 +285,7 @@ pub(super) fn with_desktop(
         }
     }
 }
-fn failure(error: &Error) -> Value {
+pub(super) fn failure(error: &Error) -> Value {
     if error.code == "operation_failed"
         && (error.detail.is_string() || error.detail.get("what").is_some())
     {
@@ -294,7 +298,16 @@ fn failure(error: &Error) -> Value {
     if error.code == "engine_missing" {
         return json!({"what":{"clave":"shell.service.engine_missing"},"detail":error.detail});
     }
+    if error.code.starts_with("handler_")
+        || error.code.starts_with("pending_")
+        || error.code.starts_with("peer_")
+    {
+        return json!({"what":{"clave":error.message_key},"detail":{"code":error.code,"detail":error.detail}});
+    }
     let key = match error.code.as_str() {
+        "managed_service_unavailable" | "managed_profile_invalid" => {
+            super::util::Frase::new("shell.service.managed").0
+        }
         "service_busy" | "task_busy" => "shell.service.busy",
         "invalid_token" | "io" => "shell.service.unreachable",
         "version_mismatch" | "service_version" => "shell.service.version",
@@ -303,7 +316,12 @@ fn failure(error: &Error) -> Value {
         "command" | "unsupported" => "shell.service.command",
         _ => "shell.service.failed",
     };
-    json!({"what":{"clave":key},"detail":error.code})
+    let detail = if error.detail.is_null() {
+        json!(error.code)
+    } else {
+        json!({"code": error.code, "message_key": error.message_key, "detail": error.detail})
+    };
+    json!({"what":{"clave":key},"detail":detail})
 }
 fn reply(value: Value) -> Result<Value, Value> {
     if let Some(error) = value.get("error") {
@@ -346,7 +364,8 @@ impl Drop for Slot {
 
 pub(super) fn handle(invoke: tauri::ipc::Invoke) {
     let name = invoke.message.command().to_owned();
-    let Some(spec) = command(&name).filter(|c| c["kind"] != "desktop") else {
+    let Some(spec) = command(&name).filter(|c| c["kind"] == "invoke" || c["kind"] == "stream")
+    else {
         invoke.resolver.reject(failure(&Error::new("command")));
         return;
     };
@@ -376,7 +395,9 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
         return;
     }
     let slot = Slot(state.clone());
-    let workspace = if matches!(name.as_str(), "tree_show" | "tree_open_external")
+    let workspace = if name == "list_workspaces" {
+        None
+    } else if matches!(name.as_str(), "tree_show" | "tree_open_external")
         && args["tree"] == "terminus-chat-visuals"
     {
         // El scope pertenece al sobre RPC1, no a los parámetros congelados del comando.
@@ -395,7 +416,16 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
         Some(workspace.to_owned())
     } else if matches!(
         name.as_str(),
-        "stop_turn" | "stop_shell_command" | "write_shell_input" | "pending_requests"
+        "stop_turn"
+            | "stop_shell_command"
+            | "write_shell_input"
+            | "pending_requests"
+            | "respond_permission"
+            | "answer_question"
+            | "list_storage"
+            | "reclaim_storage"
+            | "empty_build_cache"
+            | "collect_orphans"
     ) {
         // Cerrar con tareas vivas detiene también las de otros workspaces.
         invoke
@@ -500,7 +530,11 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
             }
 
             let target = match name.as_str() {
-                "workspaces_startup" if state.workspace().is_none() => value["active"].as_str(),
+                // La ventana abre con `list_workspaces` sin esperar al arranque,
+                // que migra dentro y tarda: la primera respuesta fija el ámbito.
+                "workspaces_startup" | "list_workspaces" if state.workspace().is_none() => {
+                    value["active"].as_str()
+                }
                 _ => None,
             };
             if let Some(target) = target {
@@ -754,7 +788,14 @@ fn restarted(app: &tauri::AppHandle, state: &State, error: Error) -> Result<Valu
     }
     // Sin motor que relanzar (un antivirus puede apartarlo), el aviso dice eso y no «no responde».
     if let Err(restart) = state.restart() {
-        let shown = if restart.code == "engine_missing" {
+        let shown = if matches!(
+            restart.code.as_str(),
+            "engine_missing"
+                | "managed_service_unavailable"
+                | "managed_profile_invalid"
+                | "version_mismatch"
+                | "invalid_token"
+        ) {
             restart
         } else {
             error
@@ -883,6 +924,22 @@ fn read_history(
     id: &str,
     before: Option<u64>,
 ) -> Result<Value, Error> {
+    if client.status()["service_features"]
+        .as_array()
+        .is_some_and(|features| features.iter().any(|f| f == "bounded_history_v1"))
+    {
+        let reply = client.invoke(
+            "load_session",
+            workspace,
+            json!({"project":project,"id":id,"history_request":{"version":1,"before":before}}),
+        )?;
+        if let Some(value) = reply.get("value") {
+            return Ok(value.clone());
+        }
+        let mut error = Error::new("operation_failed");
+        error.detail = reply.get("error").cloned().unwrap_or_default();
+        return Err(error);
+    }
     if !client.push_stream() {
         let reply = client.invoke(
             "load_session",
@@ -942,13 +999,33 @@ pub(super) fn machine_list(app: tauri::AppHandle) -> Result<Value, Value> {
     let state = app
         .try_state::<Arc<State>>()
         .ok_or_else(|| failure(&Error::new("app_unavailable")))?;
-    let on = answers(&state.client());
-    Ok(json!([{"id": "local", "local": !state.remote(), "active": true, "on": on, "hosts": true}]))
+    let client = state.client();
+    let on = answers(&client);
+    let features = client.status()["service_features"].clone();
+    let features = if features.is_array() {
+        features
+    } else {
+        json!([])
+    };
+    Ok(
+        json!([{"id": "local", "local": !state.remote(), "active": true, "on": on, "hosts": true, "features": features}]),
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn conserva_el_diagnostico_de_un_rechazo_del_motor() {
+        let error = Error {
+            detail: json!({"provider": "codex", "reason": "permissions_ceiling"}),
+            ..Error::new("handler_limit_unenforceable")
+        };
+        let shown = failure(&error);
+        assert_eq!(shown["detail"]["code"], error.code);
+        assert_eq!(shown["detail"]["detail"], error.detail);
+    }
 
     #[test]
     fn una_respuesta_demasiado_grande_lo_dice() {

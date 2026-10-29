@@ -1,6 +1,7 @@
 import { invoke } from "../../lib/invoke.ts";
 import Blocks from "lucide-solid/icons/blocks";
 import CircleUserRound from "lucide-solid/icons/circle-user-round";
+import Plug from "lucide-solid/icons/plug";
 import Palette from "lucide-solid/icons/palette";
 import Bot from "lucide-solid/icons/bot";
 import Folders from "lucide-solid/icons/folders";
@@ -41,6 +42,7 @@ import Workspaces from "./Workspaces";
 const DanilAccount = lazy(() => import("./DanilAccount"));
 const Integrations = lazy(() => import("./Integrations"));
 const ActivityLogs = lazy(() => import("./ActivityLogs"));
+const Connections = lazy(() => import("./Connections"));
 const Appearance = lazy(() => import("./Appearance"));
 
 /**
@@ -228,10 +230,21 @@ const destinosDe = (
   ...(capabilities().danilAccount || capabilities().accountProfile
     ? [
         {
-          id: "cuenta-danil",
-          // En el escritorio, una sesión por cuenta; la web entra con una sola.
+          id: "conexiones",
           get name() {
-            return capabilities().accountProfile ? t("settings.nav.danil_account") : t("settings.nav.danil_accounts");
+            return t("settings.nav.connections");
+          },
+          icono: () => <Plug size={15} />,
+          panel: () => (
+            <Suspense fallback={null}>
+              <Connections workspace={workspace()} />
+            </Suspense>
+          ),
+        },
+        {
+          id: "cuenta-danil",
+          get name() {
+            return t("settings.nav.danil_account");
           },
           icono: () => <CircleUserRound size={15} />,
           panel: () => (
@@ -245,12 +258,11 @@ const destinosDe = (
 ];
 
 const GRUPOS: { nombre: () => string; ids: string[] }[] = [
-  // Las sesiones de Danil son de la computadora, no del workspace abierto.
-  { nombre: () => t("settings.nav.group_app"), ids: ["general", "appearance", "entorno", "activity", "cuenta-danil"] },
+  { nombre: () => t("settings.nav.group_app"), ids: ["general", "appearance", "entorno", "activity"] },
   { nombre: () => t("settings.nav.group_custom"), ids: ["skills", "agentes", "proyectos", "plugins"] },
   {
     nombre: () => t("settings.nav.group_connections"),
-    ids: ["proveedores-ia", "fuentes", "integrations", "radiant"],
+    ids: ["cuenta-danil", "conexiones", "proveedores-ia", "fuentes", "integrations", "radiant"],
   },
 ];
 

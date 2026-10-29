@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "target": "aarch64-apple-darwin",
+  "entry": {
+    "id": "browser-navigation",
+    "version": "156.0.8078.47",
+    "archive": "chrome-mac-arm64.zip",
+    "sha256": "ad7f2b49a4dc679af286b1b1b386670d93ca7868079f69012d21ba0ac8293df3",
+    "format": "zip",
+    "executable": "chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+    "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.47/mac-arm64/chrome-mac-arm64.zip",
+    "license": "LicenseRef-Chrome-for-Testing",
+    "source": "https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json",
+    "strip_components": 0,
+    "bytes": 194932023
+  }
+}

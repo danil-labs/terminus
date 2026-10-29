@@ -82,6 +82,30 @@ impl Response {
 pub const PRODUCT: &str = "plan-seldon-existing-runtime";
 pub const MANIFEST: &str = include_str!("../commands.json");
 
+/// Copias de los manifiestos de extensión del motor (`seldon-host`
+/// `crates/engine-manifest/extensions/`): órdenes aditivas que no entran en la
+/// huella. La ventana las despacha igual que las del contrato; con un motor que
+/// no las conoce, la orden falla sola y esa función se apaga.
+pub const EXTENSIONS: &[&str] = &[include_str!("../extensions/orchestrators.json")];
+
+/// Las órdenes del contrato más las de las extensiones. La huella sigue siendo
+/// solo de [`MANIFEST`].
+pub fn full_manifest() -> serde_json::Value {
+    let mut manifest: serde_json::Value = serde_json::from_str(MANIFEST).expect("frozen command manifest");
+    for raw in EXTENSIONS {
+        let ext: serde_json::Value = serde_json::from_str(raw).expect("extension manifest");
+        let extra = ext["commands"].as_array().cloned().unwrap_or_default();
+        if let Some(list) = manifest["commands"].as_array_mut() {
+            for command in extra {
+                if !list.iter().any(|c| c["name"] == command["name"]) {
+                    list.push(command);
+                }
+            }
+        }
+    }
+    manifest
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct Endpoint {

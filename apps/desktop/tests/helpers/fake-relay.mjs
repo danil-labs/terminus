@@ -84,13 +84,19 @@ export function relay({ state: initial = "online", wakeAfter = 300, cachedAt = n
           ? { type: "result", id: m.id, error: { code: "version_mismatch" } }
           : answer === undefined
           ? { type: "result", id: m.id, error: { code: "command" } }
-          : { type: "result", id: m.id, value: typeof answer === "function" ? answer(m.args) : answer };
+          : { type: "result", id: m.id, value: typeof answer === "function" ? answer(m.args, m) : answer };
+        if (reply.value instanceof Promise) {
+          void reply.value.then((value) => {
+            if (this.readyState === 1) this.onmessage?.({ data: JSON.stringify({ ...reply, value }) });
+          });
+          return;
+        }
         if (this.readyState === 1) this.onmessage?.({ data: JSON.stringify(reply) });
       };
       if (state === "online") return void setTimeout(respond, delay);
       if (!INTENT.has(m.command) && cachedAt && table[m.command] !== undefined) {
         const answer = table[m.command];
-        const value = typeof answer === "function" ? answer(m.args) : answer;
+        const value = typeof answer === "function" ? answer(m.args, m) : answer;
         const reply = { type: "result", id: m.id, value, cached: { updated_at: cachedAt } };
         return void setTimeout(() => this.readyState === 1 && this.onmessage?.({ data: JSON.stringify(reply) }), 0);
       }

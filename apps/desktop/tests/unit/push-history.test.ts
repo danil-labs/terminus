@@ -43,3 +43,27 @@ test("anteponer conserva los objetos de lo que ya estaba", () => {
   assert.equal(after[3], before[1]);
   assert.equal(after.length, 4);
 });
+
+test("una revisión distinta invalida páginas aunque conserve el mismo número de turnos", () => {
+  const first = refreshHistory(undefined, turns(250, 400), { ...page(250, 400, 400), revision: "original" });
+  assert.equal(prependHistory(first, turns(100, 250), { ...page(100, 250, 400), revision: "rewritten" }), null);
+  const fresh = refreshHistory(first, turns(300, 400), { ...page(300, 400, 400), revision: "rewritten" });
+  assert.equal(fresh.start, 300);
+  assert.equal(fresh.revision, "rewritten");
+  assert.deepEqual(fresh.turns, turns(300, 400));
+});
+
+test("bounded history drops a recoverable edge instead of retaining every visited page", () => {
+  const records = Array.from({ length: 12 }, (_, id) => ({ id, text: "x".repeat(250_000) }));
+  const versioned = { ...page(0, 12, 12), version: 1, revision: "same" };
+  const tail = refreshHistory(undefined, records, versioned);
+  assert.ok(tail.start > 0);
+  assert.equal(tail.turns.at(-1)?.id, 11);
+  assert.ok(Buffer.byteLength(JSON.stringify(tail.turns)) <= 2 * 1024 * 1024);
+  const older = prependHistory(tail, records.slice(0, tail.start), { ...versioned, end: tail.start });
+  assert.ok(older);
+  assert.equal(older.start, 0);
+  assert.equal(older.turns[0].id, 0);
+  assert.ok(older.turns.length < older.total);
+  assert.ok(Buffer.byteLength(JSON.stringify(older.turns)) <= 2 * 1024 * 1024);
+});

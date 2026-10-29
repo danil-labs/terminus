@@ -1,5 +1,5 @@
 {
-  "common.failure.generic": "Something broke in here. Try again.",
+  "common.failure.generic": "The action failed. Check whether it completed before retrying; if it persists, share the details with support.",
   "common.failure.detail": "Detail for reporting it",
   "common.install.no_space": "You need {needed} free and have {free}. Free up some space and try again.",
   "common.install.no_space_plain": "There isn't enough disk space. Free up some space and try again.",
@@ -125,5 +125,7 @@
   "common.duration.min_sec": "{minutes}m {seconds}s",
   "common.duration.sec": "{seconds}s",
   "common.usage.millions": "{value}M",
-  "common.usage.thousands": "{value}k"
+  "common.usage.thousands": "{value}k",
+  "common.part.failed": "This part of the window could not load.",
+  "common.part.retry": "Retry"
 }

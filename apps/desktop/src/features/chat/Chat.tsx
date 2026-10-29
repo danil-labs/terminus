@@ -1,3 +1,6 @@
+import type { HistoryRef } from "@terminus/protocol";
+import { HistoryDetails } from "./HistoryDetails";
+import type { InvokeOptions } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -130,8 +133,9 @@ import Entrega, { type Producido } from "./Delivery";
 import {
   type CambioPorCupo,
   type FalloDelTurno,
+  avisoDeEncargado,
   cupoResuelveElFallo,
-  gestoDelFallo,
+  gestoDeLaFila,
   prosaDelCambioPorCupo,
   prosaDelFallo,
 } from "./failures";
@@ -181,6 +185,7 @@ export type Author = {
 export type { CambioPorCupo, FalloDelTurno };
 
 export type Msg = {
+  historyRefs?: HistoryRef[];
   role: "user" | "agent" | "system";
   text: string;
   task_mentions?: TaskMention[];
@@ -219,6 +224,12 @@ export type Msg = {
   turno?: string;
   /** El turno guardado en el que el motor ya escribió este mensaje vivo (`segment_saved`). */
   tramo?: string;
+  /**
+   * Lo que la persona metió en el turno vivo con un motor que no devuelve el
+   * turno guardado: `tras` es el último turno del disco cuando se metió, y lo
+   * guardado después con el mismo texto es él (`mensajesDelHilo`).
+   */
+  inyectado?: { tras: string | null };
   /** La subtarea a la que la persona escribió por su padre. Ver `relevoDe`. */
   relevo?: { titulo: string };
 
@@ -335,7 +346,12 @@ export type PermissionOrigin = {
 
 export type PermissionRequest = {
   session: string;
+  workspace?: string;
   requestId: string;
+  revision?: number;
+  durableId?: string;
+  /** Orden de llegada por evento: decide qué conserva una relectura que aún no lo trae. */
+  llegada?: number;
   tool: string;
   target: string | null;
   origin: PermissionOrigin | null;
@@ -456,6 +472,8 @@ export type ChatProps = {
   cargando?: boolean;
   /** Si hay turnos anteriores a lo cargado que el motor puede dar por páginas. */
   masAntiguos?: boolean;
+  masRecientes?: boolean;
+  onRecientes?: () => void;
   /** Pide la página anterior; resuelve con lo que la pone en el hilo, o `null`. */
   onAntiguos?: () => Promise<(() => void) | null>;
   busy: boolean;
@@ -670,6 +688,9 @@ export type ChatProps = {
   onPermission: (permission: PermissionRequest, allow: boolean) => void;
   /** El material adjunto a ESTA tarea. */
   material: Source[];
+  materialOptions?: InvokeOptions;
+  materialTarget: string;
+  materialAvailable: boolean;
   /** Lo que la tarea YA lee. No son pendientes: están guardados en ella. */
   contexto: Source[];
   /** Todo el material del workspace, para poner nombre a los ids que la
@@ -1517,6 +1538,11 @@ export default function Chat(props: ChatProps) {
    * el agente para responder esto", que es lo que se quiere leer.
    */
 
+  /** Dónde está el último mensaje escrito: lo que `onReintentar` vuelve a mandar. */
+  const ultimoEscrito = createMemo(() => {
+    for (let i = props.msgs.length - 1; i >= 0; i--) if (props.msgs[i].role === "user") return i;
+    return -1;
+  });
   /**
    * El turno que no cerró se queda fuera: un fallo es lo único de esa
    * tira que cambia lo que hay que hacer después, no entra en nada plegable.
@@ -2128,6 +2154,9 @@ export default function Chat(props: ChatProps) {
         rotulo={t("chat.scope.sources")}
         agregar={t("chat.scope.sources_add")}
         items={fuentes()}
+        materialOptions={props.materialOptions}
+        materialTarget={props.materialTarget}
+        materialAvailable={props.materialAvailable}
         bloqueado={props.busy}
         onTraer={props.onAdjuntarFuente}
         onQuitar={props.onQuitarFuente}
@@ -2780,6 +2809,7 @@ export default function Chat(props: ChatProps) {
           scrollea, el de dentro es lo único medible —tiene el alto de su
           hueco y no cambia—. `lib/paste.ts`. */}
       <div class="relative flex min-h-0 flex-1 flex-col">
+      <Show when={props.masRecientes}><button type="button" class="shrink-0 py-2 text-xs text-primary underline" onClick={() => props.onRecientes?.()}>{t("chat.history.latest")}</button></Show>
       {props.location}
       {props.coordinator}
       <Show when={!props.agentDraft ? props.chatEncargado : null}>
@@ -3030,6 +3060,7 @@ export default function Chat(props: ChatProps) {
                   {(m) => (
                     <HitoDelHilo
                       msg={m()}
+                      vigente={(mensaje()?.i ?? -1) > ultimoEscrito()}
                       onReintentar={props.onReintentar}
                       onCuentas={props.onConectar}
                       onOpenTask={props.onOpenTask}
@@ -3077,6 +3108,7 @@ export default function Chat(props: ChatProps) {
                         entrante() ? presentation().incomingMessage : presentation().userMessage,
                       )}
                     >
+                      <Show when={m().historyRefs?.length}><HistoryDetails refs={m().historyRefs!} /></Show>
                       <Show when={entrante()}>
                         <div class="mb-1 flex justify-start gap-1 text-[0.72rem] text-neutral-500" data-sender={m().encargado ? "agent" : "task"}>
                           <Show when={m().encargado}>
@@ -3566,6 +3598,7 @@ function TrabajoDeAgente(props: {
         )}
       </Show>
 
+      <Show when={props.msg.historyRefs?.length}><HistoryDetails refs={props.msg.historyRefs!} /></Show>
       <Show when={props.msg.images?.length ? props.msg.images : null}>
         {(images) => <ImagenesEntregadas items={images()} />}
       </Show>
@@ -3850,6 +3883,8 @@ function FilaDeLaBandeja(props: {
  * `failures::Fallo`, traducido; con un gesto que sirva son dos botones. */
 function HitoDelHilo(props: {
   msg: Msg;
+  /** Si es el fallo de lo último que se escribió: solo ése ofrece reintentar. */
+  vigente: boolean;
   /** Volver a mandar lo último que se escribió. */
   onReintentar: () => void;
   /** Llevar a donde se conectan y se cambian las cuentas. */
@@ -3872,7 +3907,7 @@ function HitoDelHilo(props: {
       <span class="flex min-w-0 flex-col items-start gap-0.5">
         <span class="break-words">
           {prosaDelFallo(props.msg)}
-          <Show when={gestoDelFallo(props.msg.fallo?.clase)}>
+          <Show when={gestoDeLaFila(props.msg, props.vigente)}>
             {(g) => (
               <>
                 {" — "}
@@ -3906,23 +3941,15 @@ function HitoDelHilo(props: {
             )}
           </Show>
         </span>
-        {/* El renglón de máquina, debajo y en `mono`, como en el resto de
-            la app (`ui/Failure.tsx`): arriba la frase con acción, la
-            única parte que le sirve a quien opera el negocio; abajo lo
-            que hace falta para reportarlo. Solo cuando hay clase: sin
-            ella la frase de arriba ya es el crudo, y repetirlo debajo
-            sería decir dos veces lo mismo. */}
         <Show
-          when={
-            props.msg.fallo?.clase && props.msg.fallo.clase !== "desconocido"
-              ? props.msg.fallo
-              : null
-          }
+          when={props.msg.fallo?.detail && props.msg.fallo.detail !== prosaDelFallo(props.msg)
+            ? props.msg.fallo : null}
         >
           {(f) => (
-            <span class="font-mono text-[0.7rem] break-all text-neutral-500">
-              {f().detail}
-            </span>
+            <details class="text-neutral-500">
+              <summary class="cursor-pointer text-[0.6875rem]">{t("common.failure.detail")}</summary>
+              <p class="m-0 font-mono text-[0.7rem] break-all whitespace-pre-wrap">{f().detail}</p>
+            </details>
           )}
         </Show>
       </span>
@@ -4123,6 +4150,8 @@ function CambioDeContexto(props: {
  * que se auditó.
  */
 function textoDeSistema(m: Msg): string {
+  const aviso = avisoDeEncargado(m);
+  if (aviso) return aviso;
   if (m.meta !== "reenvio" || m.text) return m.text;
   const a = (m.recipients ?? []).map((r) => r.name).join(", ");
   return m.encargado && a

@@ -79,7 +79,7 @@ const sano = (p: P) => {
   for (const c of cols)
     for (const g of c) {
       assert.ok(
-        p.groupCount() === 1 || g.pestanas.length > 0,
+        g.pestanas.length > 0 || g.activa === null,
         "una ventana se quedó vacía y no se cerró",
       );
       if (g.activa !== null)
@@ -102,12 +102,12 @@ const con = (...ids: string[]): P => {
   return p;
 };
 
-test("no se parte lo que se quedaría solo", () => {
+test("separar la única vista deja disponible la celda de origen", () => {
   const p = con("a");
-  // Mover la única pestaña a una ventana nueva cerraría la de origen: el
-  // resultado sería el mismo de antes en otro sitio. Es lo que apaga el botón.
-  assert.equal(p.split("a"), false);
-  assert.equal(p.groupCount(), 1);
+  assert.equal(p.split("a"), true);
+  assert.equal(p.groupCount(), 2);
+  assert.deepEqual(p.tabsAt({ col: 0, fila: 0 }), []);
+  assert.deepEqual(p.siteOf("a"), { col: 1, fila: 0 });
   sano(p);
 });
 
@@ -714,4 +714,39 @@ test("lo reabierto vuelve tras su vecina izquierda, no al final", () => {
   q.placeLikeStrip(["b", "c"], ["a", "b", "c", "d"]);
   assert.deepEqual(q.tabsAt(q.activeSite()), ["a", "b", "c", "d"]);
   sano(q);
+});
+
+
+test("el layout solo guarda la misma proyección de tareas restaurables", () => {
+  const p = createPanels(() => ["saved"]);
+  p.sync(["saved", "preview", "file"]);
+  p.activate("preview");
+  p.bindTo("restorable-layout", "space");
+  const stored = readLayout("restorable-layout", "space")!;
+  assert.deepEqual(stored.columnas, [[{ pestanas: ["saved"], activa: "saved" }]]);
+  assert.deepEqual(p.tabsAt({ col: 0, fila: 0 }), ["saved", "preview", "file"]);
+});
+
+test("la tarea conservada vuelve al cuadrante elegido aunque el origen esté vacío", () => {
+  const p = createPanels(() => ["saved"]);
+  p.sync(["saved"]);
+  p.split("saved");
+  p.bindTo("empty-origin", "space");
+  const restored = createPanels(() => ["saved"]);
+  restored.restore(readLayout("empty-origin", "space"), ["saved"]);
+  assert.deepEqual(restored.siteOf("saved"), { col: 1, fila: 0 });
+  assert.equal(restored.activeTabAt({ col: 0, fila: 0 }), null);
+  sano(restored);
+});
+
+test("an unplaced rail task previews only available split destinations", () => {
+  const p = createPanels();
+  const site = { col: 0, fila: 0 };
+  assert.equal(p.canSplitAt("rail", site, "right"), false);
+  assert.equal(p.canSplitAt("rail", site, "right", true), true);
+  assert.equal(p.canSplitAt("rail", { col: 9, fila: 0 }, "right", true), false);
+  assert.equal(p.siteOf("rail"), null);
+  p.sync(["rail"]);
+  assert.equal(p.splitAt("rail", site, "right"), true);
+  assert.equal(p.siteOf("rail")?.col, 1);
 });

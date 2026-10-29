@@ -60,7 +60,7 @@ function webBuild(serve: boolean): UserConfig {
   const endpoint = origin(env.TERMINUS_WEB_ENDPOINT || "https://computers.danil.ai");
   const supabaseUrl = origin(env.TERMINUS_WEB_SUPABASE_URL);
   const supabaseKey = (env.TERMINUS_WEB_SUPABASE_KEY ?? "").trim();
-  const login = env.TERMINUS_WEB_LOGIN || "/";
+  const login = env.TERMINUS_WEB_LOGIN || `${base}auth`;
   const extra = (env.TERMINUS_WEB_CONNECT ?? "").replace(/[^\w:/.* -]/g, " ").split(/\s+/).filter(Boolean);
   const connect = [endpoint, endpoint.replace(/^http/, "ws"), supabaseUrl, ...extra].filter(Boolean).join(" ");
   const version = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")).version as string;

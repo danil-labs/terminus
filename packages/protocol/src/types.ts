@@ -14,7 +14,17 @@ export type WorkspaceDanil = { user_id: string; email?: string | null; name?: st
  */
 export type Workspace = { id: string; name: string; provider?: string | null; remote?: string | null; danil?: WorkspaceDanil | null; default_permission_mode?: string | null };
 /** `list_workspaces`. */
-export type Startup = { workspaces: Workspace[]; active: string | null };
+export type MachineResources = {
+  measured_at: number;
+  error?: "measurement_failed" | "unsupported";
+  storage: { id: string; label: string; total_bytes: number; free_bytes: number; available_bytes: number; terminus_bytes: null; attribution: "unknown" }[];
+};
+export type WorkspaceStorage = {
+  bytes: number; recuperable: number; medido_en: number; aviso: string | null;
+  tareas: { session: string; project: string; tarea: string; proyecto: string | null; bytes: number }[];
+  compartido: { bytes: number }[]; sueltos: { bytes: number }[];
+};
+export type Startup = { workspaces: Workspace[]; active: string | null; machine_resources?: MachineResources };
 /** `list_projects`: una carpeta del workspace. */
 export type Project = { id: string; name: string; working_directory?: string | null; kind?: "git" | "folder"; remote_url?: string | null };
 /**
@@ -57,6 +67,8 @@ export type SessionRow = {
   parent?: string | null;
   launched_by?: string | null;
   launcher_available?: boolean;
+  /** Hija de una delegación entre máquinas; un motor viejo no lo manda (`@terminus/tasks` `remote.ts`). */
+  remote_parent?: { machine: string; workspace?: string | null; task: string; request_id?: string | null } | null;
   stage?: "in_progress" | "review" | "done" | null;
 };
 
@@ -76,6 +88,7 @@ export type Answer = { turn: string; question: string; chosen: string[]; free_te
 
 /** Un turno de `load_session`. */
 export type Turn = {
+  history_refs?: HistoryRef[];
   id?: string;
   role: string;
   text: string;
@@ -166,7 +179,15 @@ export type TaskBlockers = { unsaved: { session: string; title: string; files: s
 // --- Cuentas de IA ---------------------------------------------------------------
 
 /** Una cuenta de `list_accounts`; `identity` es el correo, si el CLI lo dice. */
-export type AiAccount = { id: string; label: string; created_at?: number | null; identity: string | null; authenticated_at: number | null };
+export type AiAccount = {
+  id: string;
+  label: string;
+  created_at?: number | null;
+  identity: string | null;
+  authenticated_at: number | null;
+  /** Identidad estable de la suscripción o workspace; no se muestra. */
+  credential_group?: string | null;
+};
 /** `list_accounts(provider)`. */
 export type AccountList = { provider: string; active: string | null; accounts: AiAccount[] };
 /** `account_status`. */
@@ -182,3 +203,7 @@ export type AccountLimits =
 export type ShellRun = { session: string; turn: string };
 /** El evento `account` de un inicio de sesión por tubería (enlace y código); `account` es el id de la cuenta. */
 export type LoginEvent = { account: string; kind: "url" | "confirm" | "code" | "notice" | "done"; text: string };
+
+/** Referencia de sólo lectura a un campo original; cada fragmento vuelve autorizado por tarea. */
+export type HistoryRef = { version: 1; turn: number; pointer: string; revision: string; bytes: number; project?: string; session?: string };
+export type HistoryChunk = { version: 1; revision: string; offset: number; next: number; total: number; done: boolean; text: string };

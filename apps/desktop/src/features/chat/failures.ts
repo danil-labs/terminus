@@ -5,6 +5,8 @@
  */
 // Con extensión: este módulo se carga también desde `node --test`, que no tiene
 // el resolvedor de Vite. Es el mismo motivo escrito en `lib/prose.ts`.
+import { asFailure, prosaDe } from "../../lib/failure.ts";
+import { prosa } from "../../lib/prose.ts";
 import { df } from "../../lib/format.ts";
 import { clavesConocidas, t } from "../../lib/i18n.ts";
 
@@ -47,17 +49,33 @@ export function horaDeVuelta(ms: number) {
 }
 
 /** Lo mínimo que hace falta para pintar la fila. Ver `Msg`. */
-type ConFallo = { text: string; fallo?: FalloDelTurno };
+type ConFallo = { text: string; meta?: string; fallo?: FalloDelTurno };
 
-/**
- * Qué dice la fila de un fallo. Sin clase se devuelve el texto tal cual: un
- * fallo sin clasificar tiene que seguir enseñando lo que dijo el proceso, y
- * una frase genérica perdería el único dato que hay.
- */
+/** Conserva el diagnóstico también cuando el fallo ocurre antes de abrir el turno. */
+export function mensajeDeFallo(error: unknown, datos?: Record<string, string | number>) {
+  const failure = asFailure(error, datos);
+  return {
+    text: prosa(failure.what),
+    fallo: { clase: "desconocido", detail: failure.detail },
+  };
+}
+
+/** El aviso de encargado en la lengua de la ventana; el motor lo guarda en la suya. */
+export function avisoDeEncargado(msg: ConFallo): string | null {
+  // Los que traduce la ventana son las claves de `chat.notice.json`, un trozo perezoso: sin su frase vale la prosa del motor.
+  if (!msg.meta || !clavesConocidas().has(`chat.notice.${msg.meta}`)) return null;
+  const notice = t(`chat.notice.${msg.meta}`);
+  const tool = msg.meta === "handler_requires_tool_missing" ? /`([^`]+)`/.exec(msg.text)?.[1] : null;
+  return tool ? `${notice} (${tool})` : notice;
+}
+
+/** Los mensajes antiguos pasan por el mismo respaldo que los fallos nuevos. */
 export function prosaDelFallo(msg: ConFallo) {
+  if (msg.text === "chat.mentions.in_code") return t("chat.mentions.in_code");
+  const aviso = avisoDeEncargado(msg);
+  if (aviso) return aviso;
   const f = msg.fallo;
-  if (!f) return clavesConocidas().has(msg.text) ? t(msg.text) : msg.text;
-  if (f.clase === "desconocido") return msg.text;
+  if (!f || !clavesConocidas().has(`chat.failure.${f.clase}`)) return prosaDe(msg.text);
   const partes = [t(`chat.failure.${f.clase}`)];
   // Cuándo sigue sola gana a cuándo vuelve: puede volver antes otra cuenta.
   if (f.resumes_at) partes.push(t("chat.failure.resumes_at", { time: horaDeVuelta(f.resumes_at) }));
@@ -94,6 +112,25 @@ export function gestoDelFallo(clase?: string) {
     default:
       return null;
   }
+}
+
+/** Lo que la fila necesita para elegir su gesto. Ver `Msg`. */
+type FilaDeFallo = { meta?: string; text: string; fallo?: FalloDelTurno };
+
+/**
+ * Sin clase (envío rechazado o fallo sin clasificar) ofrece reintentar. Solo la
+ * fila vigente: reintentar manda el último texto, no el de una fila vieja.
+ */
+export function gestoDeLaFila(msg: FilaDeFallo, vigente: boolean) {
+  if (msg.meta !== "fallo") return null;
+  if (msg.text === "chat.turn.unsaved" || msg.text === t("chat.turn.unsaved")) return null;
+  const clase = msg.fallo?.clase;
+  const gesto =
+    clase && clase !== "desconocido"
+      ? gestoDelFallo(clase)
+      : { accion: "reintentar" as const, clave: "chat.failure.retry" };
+  if (gesto?.accion === "reintentar" && !vigente) return null;
+  return gesto;
 }
 
 /** Los fallos que la línea del cupo deja resueltos: la tarea ya siguió. */

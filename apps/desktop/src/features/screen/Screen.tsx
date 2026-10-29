@@ -1,9 +1,9 @@
-import { screenEnd, type ScreenEnd } from "@terminus/computers";
+import { SCREEN_CONTROL_DESKTOP } from "@terminus/computers";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { t } from "../../lib/i18n";
 import { Button } from "../../ui/Button";
-
-type Phase = "connecting" | "live" | ScreenEnd | "failed";
+import { screenConnection, type Phase } from "./connection";
+import { screenInput } from "./input";
 
 const MESSAGE: Record<Exclude<Phase, "connecting" | "live">, () => string> = {
   offline: () => t("screen.offline"),
@@ -13,56 +13,35 @@ const MESSAGE: Record<Exclude<Phase, "connecting" | "live">, () => string> = {
   failed: () => t("screen.failed"),
 };
 
-/** La pantalla de una VM administrada, de solo ver: VNC sobre el WebSocket que abre `open`. */
+/** VNC sobre el WebSocket autenticado que abre `open`. */
 export default function Screen(props: { open: () => Promise<WebSocket> }) {
   const [phase, setPhase] = createSignal<Phase>("connecting");
+  const [controllable, setControllable] = createSignal(false);
   let target!: HTMLDivElement;
-  let rfb: { disconnect(): void } | null = null;
-  let attempt = 0;
-
-  const stop = () => {
-    const current = rfb;
-    rfb = null;
-    current?.disconnect();
-    target?.replaceChildren();
-  };
-
-  const connect = async () => {
-    const mine = ++attempt;
-    stop();
-    setPhase("connecting");
-    try {
-      const [{ default: RFB }, socket] = await Promise.all([import("@novnc/novnc"), props.open()]);
-      if (mine !== attempt) return socket.close();
-      let live = false;
-      let code = 1000;
-      socket.addEventListener("close", (e) => {
-        code = e.code;
-      });
-      const view = new RFB(target, socket, { shared: true });
-      view.viewOnly = true;
-      view.scaleViewport = true;
-      view.background = "transparent";
-      view.addEventListener("connect", () => {
-        live = true;
-        if (mine === attempt) setPhase("live");
-      });
-      view.addEventListener("disconnect", () => {
-        if (mine !== attempt) return;
-        rfb = null;
-        setPhase(live ? "ended" : screenEnd(code));
-      });
-      rfb = view;
-    } catch {
-      if (mine === attempt) setPhase("failed");
-    }
-  };
-
-  onMount(() => void connect());
-  onCleanup(() => {
-    attempt++;
-    stop();
+  let connection: ReturnType<typeof screenConnection> | undefined;
+  onMount(() => {
+    connection = screenConnection({
+      target, open: () => props.open(), load: () => import("@novnc/novnc"), phase: setPhase,
+      configure(view) {
+        const controls = screenInput(target);
+        const named = (event: Event) => {
+          // Los motores anteriores mantienen su visor de solo lectura.
+          const supported = (event as CustomEvent<{ name: string }>).detail.name === SCREEN_CONTROL_DESKTOP;
+          controls.release();
+          view.viewOnly = !supported;
+          setControllable(supported);
+        };
+        view.addEventListener("desktopname", named);
+        return () => {
+          view.removeEventListener("desktopname", named);
+          controls.dispose();
+          setControllable(false);
+        };
+      },
+    });
+    void connection.connect();
   });
+  onCleanup(() => connection?.disconnect());
 
   const ended = () => {
     const p = phase();
@@ -70,20 +49,25 @@ export default function Screen(props: { open: () => Promise<WebSocket> }) {
   };
 
   return (
-    <main data-screen="" data-screen-phase={phase()} class="relative h-full min-h-0 w-full overflow-hidden bg-surface">
-      <div ref={target} class="absolute inset-0" classList={{ invisible: phase() !== "live" }} />
+    <main data-screen="" data-screen-phase={phase()} class="relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-surface">
       <Show when={phase() === "live"}>
-        <span class="pointer-events-none absolute top-2 right-2 rounded-sm bg-neutral-900/70 px-1.5 py-0.5 text-[0.6875rem] font-medium text-white">
-          {t("screen.view_only")}
-        </span>
+        <div class="flex shrink-0 items-center justify-between gap-3 border-b border-border px-3 py-1.5">
+          {/* La pantalla virtual no tiene escritorio: vacía se ve negra y parece rota. */}
+          <span class="min-w-0 truncate text-xs text-neutral-500">{t("screen.empty_hint")}</span>
+          {/* Con control, la pantalla se maneja directo: no hay modo que cambiar. */}
+          <Show when={!controllable()}>
+            <span class="shrink-0 text-xs text-neutral-500">{t("screen.control_unavailable")}</span>
+          </Show>
+        </div>
       </Show>
+      <div ref={target} class="min-h-0 flex-1" classList={{ invisible: phase() !== "live" }} />
       <Show when={phase() !== "live"}>
         <div class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-8 text-center">
           <Show when={ended()} fallback={<p role="status" class="text-sm text-neutral-500">{t("screen.connecting")}</p>}>
             {(key) => (
               <>
                 <p role="alert" class="max-w-sm text-sm text-neutral-700">{key()()}</p>
-                <Button size="sm" variant="outline" onClick={() => void connect()}>{t("screen.retry")}</Button>
+                <Button size="sm" variant="outline" onClick={() => void connection?.connect()}>{t("screen.retry")}</Button>
               </>
             )}
           </Show>

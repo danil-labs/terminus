@@ -37,7 +37,7 @@
  * Si un comando se registra a propósito antes de tener interfaz que lo use, va en
  * `SIN_INTERFAZ` con el motivo escrito al lado. Que cueste una línea es el punto.
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { relative } from "node:path";
 // Ver la nota de `paths.mjs`: `.pathname` en Windows da `/C:/…` y revienta.
 import { fileURLToPath } from "node:url";
@@ -46,6 +46,9 @@ import { COMANDOS_PENDIENTES } from "../engine-pending.mjs";
 
 const LIB = fileURLToPath(new URL("../../src-tauri/src/extracted/mod.rs", import.meta.url));
 const CONTRACT = fileURLToPath(new URL("../../src-tauri/crates/engine-protocol/commands.json", import.meta.url));
+// Extensiones del motor fuera de la huella (`engine-protocol` `EXTENSIONS`): las despacha
+// la ventana igual que el contrato.
+const EXTENSIONS = fileURLToPath(new URL("../../src-tauri/crates/engine-protocol/extensions", import.meta.url));
 const WEB = fileURLToPath(new URL("../../src", import.meta.url));
 /**
  * **Todos los árboles de interfaz, no uno.**
@@ -66,6 +69,10 @@ const ARBOLES = [WEB].filter((d) => existsSync(d));
  * normal: el registro es la lista de lo que la app hace, no de lo que podría.
  */
 const SIN_INTERFAZ = {
+  // Extensión de orquestadores: las pide el relay de Danil Computers (MCP remoto), no una pantalla.
+  connect_external: "la pide el MCP remoto de Danil Computers por el relay",
+  connection_call: "la pide el MCP remoto de Danil Computers por el relay",
+  disconnect_external: "la pide Danil Computers al revocar una conexión",
   run_activity_command: "el CLI ejecuta mantenimiento; los clientes solo consultan sus registros",
   import_chat_background: "la ventana manda el fondo reducido como `data:` (`set_chat_background`); queda en el contrato congelado para motores anteriores",
   git_host_pending_setup: "el CLI del motor lo usa para completar la conexión; permanece en el contrato congelado",
@@ -81,7 +88,9 @@ const SIN_INTERFAZ = {
   session_worktree: "el árbol y sus notas aún no se pintan en ninguna pantalla",
   // El renombre lo hace hoy el agente con `git branch -m`; la app lo reconcilia.
   worktree_rename_branch: "el renombre al entregar aún no tiene gesto en pantalla",
-  install_tool: "pnpm y Bun los instala bootstrap::prepare_runtime desde Rust; ninguna pantalla lo invoca",
+  // Lo incluido se repara entero con `install_tool {"tool":"bundled-work-tools"}`.
+  install_base_tool: "lo usa bootstrap::prepare_runtime; la ventana repara lo incluido con install_tool",
+  remove_tool: "lo incluido con Terminus no se desinstala; queda en el contrato congelado",
   remove_google_drive: "quitar el binario de Drive es de Configuración; el onboarding solo desconecta",
   // Del contrato de seldon-host dev; la ventana los llama en terminus#243.
   google_drive_desktop_status: "lo llama el alta de Drive con la app oficial (terminus#243)",
@@ -156,7 +165,14 @@ for (const l of bloque[1].split("\n")) {
 // manda el contrato congelado (`commands.json`).
 const manifest = JSON.parse(readFileSync(CONTRACT, "utf8"));
 for (const command of manifest.commands) {
+  if (!["invoke", "stream", "desktop"].includes(command.kind)) continue;
   if (!registrados.has(command.name)) registrados.set(command.name, `contrato (${command.path})`);
+}
+for (const file of existsSync(EXTENSIONS) ? readdirSync(EXTENSIONS).filter((f) => f.endsWith(".json")) : []) {
+  for (const command of JSON.parse(readFileSync(`${EXTENSIONS}/${file}`, "utf8")).commands ?? []) {
+    if (!["invoke", "stream"].includes(command.kind)) continue;
+    if (!registrados.has(command.name)) registrados.set(command.name, `extensión ${file} (${command.path})`);
+  }
 }
 
 // ------------------------------------------------- lo que el frontend invoca

@@ -25,6 +25,7 @@ test("el main de producción reenvía la CLI con pipes, archivos, salida descart
     const stub = join(scratch, "app_lib.rs");
     const library = join(scratch, "libapp_lib.rlib");
     writeFileSync(stub, `pub struct Error { pub message_key: &'static str }
+pub fn background_dispatch() {}
 pub fn launch() -> Result<(), Error> { println!("window"); Ok(()) }
 pub fn stop_engine() -> i32 { println!("stop-engine"); 0 }
 `);
@@ -84,6 +85,13 @@ fn main() {
       }
       t.diagnostic(`${roots.size} comandos raíz contrastados con ${lock.release}`);
     });
+
+    for (const rank of ["peer", "worker"]) {
+      const args = ["task", "create", "--as", rank, "--handler", "reviewer", "--json"];
+      const result = run(args);
+      assert.equal(result.status, 23);
+      assert.equal(result.stdout, `${args.join("\n")}\n`);
+    }
 
     const piped = run(["task", "á con espacios", "--json"], { input: "entrada\n" });
     assert.equal(piped.status, 23);

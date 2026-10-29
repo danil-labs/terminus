@@ -1,3 +1,4 @@
+import { withTaskAncestors, taskIdentity } from "@terminus/tasks";
 import Search from "lucide-solid/icons/search";
 import { type ComponentProps, createEffect, createMemo, createSignal, For, on, Show } from "solid-js";
 import { t } from "../../lib/i18n";
@@ -27,9 +28,11 @@ export default function AgentPageTasks(props: {
   createEffect(on(filtro, () => setPaginas(1), { defer: true }));
 
   const de = (f: FiltroDeTareas) => filtrarTareas(props.tasks, f, props.list.vivas, props.list.aprobando);
+  const matches = createMemo(() => de(filtro()));
+  const contextRows = createMemo(() => withTaskAncestors(props.tasks, matches()));
   const visibles = createMemo(() => search().trim()
-    ? { rows: de(filtro()), quedan: false }
-    : primerasRaices(de(filtro()), paginas() * PAGINA));
+    ? { rows: contextRows(), quedan: false }
+    : primerasRaices(contextRows(), paginas() * PAGINA));
   const filtros: { id: FiltroDeTareas; label: () => string }[] = [
     { id: "all", label: () => t("projects.agent_tasks.filter_all") },
     { id: "running", label: () => t("projects.agent_tasks.filter_running") },
@@ -61,7 +64,7 @@ export default function AgentPageTasks(props: {
       }</For>
     </div>
     <Show when={visibles().rows.length > 0} fallback={<p class="m-0 px-2 py-3 text-sm text-neutral-500">{t("projects.agent_tasks.no_results")}</p>}>
-      <Sessions {...props.list} sessions={visibles().rows} onPick={props.onPick} groupByAuthor={false} search={search()} />
+      <Sessions {...props.list} sessions={visibles().rows} matchingIds={filtro() === "all" ? undefined : matches().map(taskIdentity)} onPick={props.onPick} groupByAuthor={false} search={search()} />
     </Show>
     <Show when={visibles().quedan}>
       <Button variant="ghost" size="compact" class="self-start" onClick={() => setPaginas(paginas() + 1)}>

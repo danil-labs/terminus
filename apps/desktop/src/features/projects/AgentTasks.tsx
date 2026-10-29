@@ -4,12 +4,7 @@ import { t } from "../../lib/i18n";
 import { Input } from "../../ui/Input";
 import Sessions, { type SessionRow } from "./Sessions";
 
-export function createdTasks(rows: SessionRow[], agent: string, thread: string | null): SessionRow[] {
-  const conversations = new Set(rows.filter(row => row.chat_de_agente && row.agent === agent).map(row => row.id));
-  return rows.filter(row => !row.chat_de_agente && (thread
-    ? row.launched_by === thread
-    : !!row.launched_by && (conversations.has(row.launched_by) || row.launcher_name === agent)));
-}
+export { createdTasks } from "./agentPageFilters";
 
 export default function AgentTasks(props: {
   context: string;

@@ -14,6 +14,7 @@ import {
   INTENT_COMMANDS,
   isDeferrable,
   linkedWorkspaces,
+  serviceFeatures,
   orderComputers,
   wakes,
 } from "@terminus/computers";
@@ -42,6 +43,8 @@ export type Host = {
   readonly managed: boolean;
   /** Los workspaces vinculados a la cuenta en esta máquina; `null` es que no se filtra (el bridge, un plano de control anterior). */
   readonly linked: ReadonlySet<string> | null;
+  /** Lo que su motor anuncia (`status.service_features`); sin el dato, nada. */
+  features?(): readonly string[];
   power(): Power;
   /** Si una acción se puede mandar ya, enciende la máquina, no tiene cómo o su motor está desactualizado. */
   canAct(): "now" | "wakes" | "asleep" | "outdated";
@@ -50,8 +53,8 @@ export type Host = {
   onEvents(listener: (events: EngineEvent[], gap: boolean) => void): () => void;
   call<T>(command: AppCommand, workspace: string | null, args?: object): Promise<CallAnswer<T>>;
   /**
-   * Antes de una acción que el relay no toma por intención (fijar, archivar,
-   * cerrar una sesión): enciende la VM administrada apagada y espera a que
+   * Antes de una acción que el relay no toma por intención (fijar, renombrar,
+   * archivar, cerrar una sesión): enciende la VM administrada apagada y espera a que
    * conteste. Una máquina propia apagada no se puede despertar (`machine_asleep`).
    */
   wake(): Promise<void>;
@@ -70,6 +73,7 @@ function allowed(command: string) {
  */
 export const WAKES_FIRST: ReadonlySet<string> = new Set([
   "set_session_pinned",
+  "rename_session",
   "set_task_archived",
   "finish_task",
   "guardar_imagen_pegada",
@@ -207,6 +211,7 @@ export function accountFleet(config: AccountFleetConfig, factory?: SocketFactory
       get linked() {
         return fleet.info(id)?.linked ?? null;
       },
+      features: () => fleet.info(id)?.features ?? [],
       power,
       canAct,
       onChange: (listener) => listen(changes, id, listener),
@@ -255,7 +260,7 @@ export function accountFleet(config: AccountFleetConfig, factory?: SocketFactory
       const ordered = orderComputers(computers);
       rows = new Map(ordered.map((c) => [c.computer_id, c]));
       fleet.setMachines(
-        ordered.map((c) => ({ id: c.computer_id, name: c.name?.trim() || c.computer_id, wakes: wakes(c), outdated: c.state === "outdated", linked: linkedWorkspaces(c) })),
+        ordered.map((c) => ({ id: c.computer_id, name: c.name?.trim() || c.computer_id, wakes: wakes(c), outdated: c.state === "outdated", linked: linkedWorkspaces(c), features: serviceFeatures(c) })),
       );
       for (const id of [...hosts.keys()]) if (!rows.has(id)) hosts.delete(id);
       return ordered.map((c) => {

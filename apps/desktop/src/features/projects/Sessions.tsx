@@ -44,7 +44,7 @@ import { canFinishTask, effectiveTaskGit, type GitStatus, sharesTaskGit, watchSe
 import { authorKey, authorKeys, shownUnderLauncher } from "./taskAuthors";
 import { descendientes, type Rama as RamaDeTareas, taskTree } from "./taskTree";
 import { type TaskActivity, taskPriority } from "@terminus/design";
-import { taskCard } from "@terminus/tasks";
+import { taskCard, buildTaskTree, taskIdentity, withTaskAncestors } from "@terminus/tasks";
 
 export function readableSessionTitle(title: string): string {
   if (!title.startsWith("/root/")) return title;
@@ -53,7 +53,7 @@ export function readableSessionTitle(title: string): string {
 
 /** Lo que devuelve `task_blockers`: qué estorba para terminar o archivar. */
 export type Blockers = {
-  unsaved: { session: string; title: string; files: string[] }[];
+  unsaved: { project?: string; session: string; title: string; files: string[] }[];
   not_finished: boolean;
 };
 
@@ -86,6 +86,9 @@ export type SessionRow = {
   pinned?: boolean | null;
   launched_by?: string | null;
   launcher_available?: boolean;
+  /** Hija de una delegación entre máquinas: su coordinador vive allá (`@terminus/tasks` `remote.ts`). */
+  remote_parent?: unknown;
+  remote_launcher?: string | null;
   has_delegates?: boolean;
   launcher_name?: string | null;
   archived?: boolean | null;
@@ -248,6 +251,7 @@ export default function Sessions(props: {
   groupByAuthor?: boolean;
   groupByHandler?: boolean;
   search?: string;
+  matchingIds?: readonly string[];
   onSearchResults?: (count: number) => void;
   current: string | null;
   /**
@@ -287,6 +291,8 @@ export default function Sessions(props: {
    */
   de: string;
   onPick: (id: string) => void;
+  draggedTask?: string | null;
+  onDrag?: (row: SessionRow, event: PointerEvent) => void;
   onDelete: (id: string) => void;
   onMove: (id: string, to: string) => void;
   /**
@@ -330,6 +336,7 @@ export default function Sessions(props: {
   card?: boolean;
   /** Hacia dónde sale la tarjeta flotante; el riel la saca a la derecha. */
   hoverCardPlacement?: "left-start" | "right-start";
+  folderGroup?: string;
 }) {
   /** Fila de dos líneas con tarjeta flotante: el riel y quien la pide. */
   const tarjetaDelRiel = () => !!props.sidebar || !!props.card;
@@ -429,7 +436,7 @@ export default function Sessions(props: {
     marcar(ids => [...ids, a.id]);
     try {
       for (const work of a.blockers.unsaved) {
-        await invoke("discard_task_changes", { project: projectOfId(a.id), id: work.session, files: work.files }, enSuMaquina(a.id));
+        await invoke("discard_task_changes", { project: work.project ?? projectOfId(a.id), id: work.session, files: work.files }, enSuMaquina(a.id));
       }
     } catch (error) {
       setActionFailure(asFailure(error));
@@ -443,6 +450,8 @@ export default function Sessions(props: {
   };
   // La barra enseña solo lo vivo: las archivadas no se pintan ni se observan. Con
   // cientos archivadas, pedir su git y su historial en cada barrido trababa la ventana.
+  // En la barra no se anidan subtareas: se consultan desde la vista de subtareas
+  // del chat. Solo asoman, sueltas, al buscar o si las fijaron.
   const enBarra = createMemo(() => props.sessions.filter(s => (props.includeArchived || !s.archived)
     && (!props.sidebar || !!props.search?.trim() || s.pinned || !shownUnderLauncher(s, props.sessions))));
   // Un observador de git, de perfiles y de historiales por carpeta de la
@@ -518,18 +527,42 @@ export default function Sessions(props: {
     return todas.length === 1 ? todas[0].profiles() : Object.assign({}, ...todas.map((c) => c.profiles()));
   });
   const query = createMemo(() => (props.search ?? "").trim());
-  const filteredSessions = createMemo(() => !query() ? enBarra() : enBarra().filter(session => {
+  const matchedSessions = createMemo(() => enBarra().filter(session => {
+    if (props.matchingIds && !props.matchingIds.includes(taskIdentity(session))) return false;
+    if (!query()) return true;
     const git = effectiveTaskGit(session, gitRows(), props.relatedSessions ?? props.sessions);
     const agente = session.agent ? displayName(session.agent, profiles()[session.agent]) : null;
     return matchesTaskQuery([session.title, session.last_message, git?.branch, git?.alias, agente, props.carpetaDe?.(session)], query());
   }));
+  const filteredSessions = createMemo(() => props.sidebar ? matchedSessions() : withTaskAncestors(enBarra(), matchedSessions()));
+  const matchIds = createMemo(() => new Set(matchedSessions().map(taskIdentity)));
+  const contextual = (row: SessionRow) => !matchIds().has(taskIdentity(row));
+  const [expansionOverrides, setExpansionOverrides] = createSignal<Record<string, boolean>>({});
+  const expansionContext = createMemo(() => JSON.stringify([
+    query(), props.matchingIds ? [...props.matchingIds].sort() : null, props.current,
+    enBarra().filter(row => row.pinned).map(taskIdentity).sort(),
+  ]));
+  createEffect(on(expansionContext, () => setExpansionOverrides({})));
+  const temporaryExpansion = createMemo(() => {
+    const targets = query() || props.matchingIds ? matchedSessions() : enBarra().filter(row => row.pinned || row.id === props.current);
+    const ancestors = new Set<string>();
+    const visit = (branches: RamaDeTareas<SessionRow>[]) => {
+      for (const branch of branches) {
+        if (branch.hijas.length) ancestors.add(taskIdentity(branch.tarea));
+        visit(branch.hijas);
+      }
+    };
+    visit(buildTaskTree(withTaskAncestors(enBarra(), targets)));
+    return ancestors;
+  });
   if (props.onSearchResults) {
-    createEffect(() => props.onSearchResults?.(filteredSessions().length));
+    createEffect(() => props.onSearchResults?.(matchedSessions().length));
     onCleanup(() => props.onSearchResults?.(0));
   }
   const activas = createMemo<RamaDeTareas<SessionRow>[]>((previas) => props.flat || props.sidebar
     ? filteredSessions().map(tarea => ({ tarea, hijas: [] }))
     : taskTree(filteredSessions(), props.includeArchived ? null : false, previas, props.groupByHandler === true));
+  const hideFolder = (row: SessionRow) => props.hideFolder && (props.folderGroup === undefined || projectOf(row) === props.folderGroup);
   const destinosDe = (row: SessionRow) => props.destinosDe?.(row) ?? props.destinos;
   const fijada = (row: SessionRow) => row.pinned ?? (row.chat_de_agente || row.inbox === true);
   const setPinned = async (row: SessionRow) => {
@@ -561,7 +594,7 @@ export default function Sessions(props: {
    */
   const FilaDelRiel = (r: { s: SessionRow; actividad: TaskActivity; titulo: JSX.Element }) => {
     // Qué lleva la línea 2 lo decide la tarjeta compartida con el teléfono (`@terminus/tasks`).
-    const tarjeta = () => taskCard(r.s, { live: props.vivas, approving: props.aprobando, hideFolder: props.hideFolder });
+    const tarjeta = () => taskCard(r.s, { live: props.vivas, approving: props.aprobando, hideFolder: hideFolder(r.s) });
     const estado = () => taskPriority(r.actividad);
     const pide = () => tarjeta().request;
     const pull = () => hoverCardPull(gitDe(r.s));
@@ -608,7 +641,7 @@ export default function Sessions(props: {
                   <Show when={tarjeta().provider}>
                     {(proveedor) => <span data-session-provider class="flex shrink-0" title={proveedor()} aria-label={proveedor()}><MarcaAgente id={proveedor()} size={13} /></span>}
                   </Show>
-                  <Show when={!props.hideFolder && props.carpetaDe?.(r.s)}>
+                  <Show when={!hideFolder(r.s) && props.carpetaDe?.(r.s)}>
                     {(nombre) => <FolderChip id={projectOf(r.s)} name={nombre()} untitled={props.sidebar} class="max-w-[108px] shrink-0" />}
                   </Show>
                   <WorktreeFaltante />
@@ -638,7 +671,7 @@ export default function Sessions(props: {
             >
               <span data-session-request class="min-w-0 flex-1 truncate text-neutral-700">{pide()}</span>
               <ChipDeGit />
-              <Show when={!props.hideFolder}>
+              <Show when={!hideFolder(r.s)}>
                 <span title={props.carpetaDe?.(r.s)} class="flex shrink-0"><FolderSquare id={projectOf(r.s)} /></span>
               </Show>
               <WorktreeFaltante />
@@ -670,14 +703,15 @@ export default function Sessions(props: {
     </Show>
   );
 
-  const Fila = (f: { s: SessionRow; hija?: boolean }) => {
-    const activity = (): TaskActivity => f.s.delegated_activity ?? {
+  const Fila = (f: { s: SessionRow }) => {
+    // En la barra el coordinador lleva también la actividad de sus subtareas, que no se pintan ahí.
+    const activity = (): TaskActivity => (props.sidebar ? f.s.delegated_activity : undefined) ?? ({
       aprobando: props.aprobando.includes(f.s.id),
       viva: props.vivas.includes(f.s.id),
       esperando: f.s.esperando,
       outcome: f.s.outcome,
       sinVer: f.s.sin_ver,
-    };
+    });
     // Agrupando por agente la cabecera ya lo dice; en el chat del agente, también.
     const conPastilla = () => !(props.groupByHandler && props.groupByAuthor !== false) && !f.s.chat_de_agente && !!f.s.agent;
     const title = () => f.s.inbox ? t("projects.threads.inbox")
@@ -712,9 +746,10 @@ export default function Sessions(props: {
           // `:has`, no por clase reactiva: cada fila mutaría al llegar git.
           <div class="flex min-w-0 items-center gap-1 text-[0.8125rem] leading-[1.35] [:has(>[data-finish-slot])_&]:pr-16">
             <Show when={fijada(f.s) && !tarjetaDelRiel()}>{marcaDeFijada()}</Show>
+            <Show when={contextual(f.s)}><span class="shrink-0 text-[0.6875rem] font-normal text-neutral-500">{t("projects.sessions.context")}</span></Show>
             <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"><WithMentions>{f.s.subagent ? readableSessionTitle(title()) : title()}</WithMentions></span>
                 <Show when={tarjetaDelRiel() && fijada(f.s)}>{marcaDeFijada()}</Show>
-                <Show when={tarjetaDelRiel() && compacta() && !props.hideFolder}>
+                <Show when={tarjetaDelRiel() && compacta() && !hideFolder(f.s)}>
                   <span title={props.carpetaDe?.(f.s)} class="ml-auto flex shrink-0 pl-1"><FolderSquare id={projectOf(f.s)} /></span>
                 </Show>
           </div>
@@ -785,7 +820,7 @@ export default function Sessions(props: {
             // Con el menú abierto el puntero puede irse de la fila, y el velo
             // del menú se vería recortado sobre otro fondo.
             menu() === f.s.id && "bg-neutral-100",
-            tareaEnVuelo()?.id === f.s.id &&
+            (props.draggedTask ?? tareaEnVuelo()?.id) === f.s.id &&
               "border-border bg-transparent opacity-40 [border-style:dashed]",
           )}
           aria-current={f.s.id === props.current ? "true" : undefined}
@@ -809,12 +844,11 @@ export default function Sessions(props: {
           //  intacta y el arrastre parece no mover nada. Es la
           //  retroalimentación que da por hecha cualquier arrastre del
           //  sistema: lo que se levanta deja su hueco marcado.
-          data-en-vuelo={tareaEnVuelo()?.id === f.s.id ? "true" : undefined}
-          // Arrastrar la fila hasta un proyecto la mueve. El umbral y
-          // por qué no es el arrastre de HTML5 están en `lib/drag.ts`.
-          // Una hija no se arrastra: ver la cabecera del módulo.
+          data-en-vuelo={(props.draggedTask ?? tareaEnVuelo()?.id) === f.s.id ? "true" : undefined}
+          // El shell puede abrir la vista en un panel; el gesto de mover
+          // entre carpetas conserva sus restricciones para tareas hijas.
           onPointerDown={(e) => {
-            if (props.readOnly || f.hija || f.s.parent || f.s.chat_de_agente) return;
+            if (props.readOnly) return;
             const en = e.target as HTMLElement;
             if (en.closest("[data-session-actions]")) return;
             // Tampoco desde la confirmación de borrado: ahí lo que hay
@@ -824,6 +858,11 @@ export default function Sessions(props: {
             // seleccionar texto, y sin esta línea seleccionar media palabra
             // levantaría la tarea y la movería de proyecto al soltar.
             if (en.closest("[data-session-rename]")) return;
+            if (props.onDrag) {
+              props.onDrag(f.s, e);
+              return;
+            }
+            if (f.s.parent || f.s.chat_de_agente) return;
             arrastrar(e, { id: f.s.id, de: projectOf(f.s), titulo: f.s.title }, (a) =>
               props.onMove(f.s.id, a),
             );
@@ -955,10 +994,10 @@ export default function Sessions(props: {
             <FilaDelRiel s={f.s} actividad={activity()} titulo={<Titulo />} />
           </Show>
 
-          {/* 24 px en la línea del título se salen por arriba. Al centro y fuera de
-              flujo: en columna se corren la rama y el PR. `right-8` deja el menú. */}
+          {/* Fuera del flujo y junto al título para no tapar el PR de la segunda línea.
+              `right-8` deja libre el menú de acciones. */}
           <Show when={puedeFinalizar() && renombrando() !== f.s.id}>
-            <span data-session-actions data-finish-slot class="absolute top-1/2 right-8 z-10 flex -translate-y-1/2">
+            <span data-session-actions data-finish-slot class="absolute top-0 right-8 z-10 flex">
               <FinishTaskButton
                 label={t("projects.sessions.finish")}
                 description={f.s.subagent || gitRows()[f.s.id]?.shared_with
@@ -1082,7 +1121,7 @@ export default function Sessions(props: {
                     </button>
                     <span class="my-1 block h-px bg-border" />
 
-                    <Show when={!f.hija && !f.s.parent && destinosDe(f.s).length > 0}>
+                    <Show when={!f.s.parent && destinosDe(f.s).length > 0}>
                       <Popover placement="right-start" gutter={6}>
                         <div onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
                           <PopoverTrigger as={(trigger: object) => (
@@ -1111,7 +1150,7 @@ export default function Sessions(props: {
                       <span class="my-1 block h-px bg-border" />
                     </Show>
 
-                    <Show when={!f.hija && !f.s.parent && !f.s.archived && otherSpaces(f.s).length > 0}>
+                    <Show when={!f.s.parent && !f.s.archived && otherSpaces(f.s).length > 0}>
                       <Popover placement="right-start" gutter={6}>
                         <div onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
                           <PopoverTrigger as={(trigger: object) => (
@@ -1142,7 +1181,7 @@ export default function Sessions(props: {
                       </Popover>
                     </Show>
 
-                    <Show when={!f.hija && !f.s.parent && projectOf(f.s) !== ""}>
+                    <Show when={!f.s.parent && projectOf(f.s) !== ""}>
                       <button
                         role="menuitem"
                         class={ITEM_DE_MENU}
@@ -1253,16 +1292,23 @@ export default function Sessions(props: {
     const rama = () => r.rama;
     // Cuenta y estado del plegado: todo lo de debajo, a cualquier nivel.
     const escondidas = () => descendientes(rama());
+    const expanded = () => expansionOverrides()[taskIdentity(rama().tarea)] ?? (temporaryExpansion().has(taskIdentity(rama().tarea)) || desplegadas().includes(rama().tarea.id));
+    const toggle = () => {
+      const id = taskIdentity(rama().tarea);
+      if (temporaryExpansion().has(id) || expansionOverrides()[id] !== undefined) {
+        setExpansionOverrides(previous => ({ ...previous, [id]: !expanded() }));
+      } else alternarDesplegada(rama().tarea.id);
+    };
     return (
       <li>
-        <Fila s={rama().tarea} hija={r.hija} />
+        <Fila s={rama().tarea} />
         <Show when={rama().hijas.length > 0}>
           <button
             type="button"
             class="mt-0.5 ml-2.5 flex w-[calc(100%-10px)] cursor-pointer items-center gap-1.5 rounded-sm border-0 bg-transparent px-1.5 py-0.5 text-left text-[0.6875rem] leading-[1.2] text-neutral-500 tabular-nums hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
-            aria-expanded={(!!query() || desplegadas().includes(rama().tarea.id))}
+            aria-expanded={expanded()}
             aria-label={
-              !(!!query() || desplegadas().includes(rama().tarea.id))
+              !expanded()
                 ? t("projects.sessions.subtasks_expand", {
                     count: escondidas().length,
                     title: rama().tarea.title,
@@ -1272,13 +1318,13 @@ export default function Sessions(props: {
                     title: rama().tarea.title,
                   })
             }
-            onClick={() => alternarDesplegada(rama().tarea.id)}
+            onClick={toggle}
           >
             <ChevronRight
               size={12}
               class={cn(
                 "shrink-0 transition-transform",
-                (!!query() || desplegadas().includes(rama().tarea.id)) && "rotate-90",
+                expanded() && "rotate-90",
               )}
             />
             {/* El estado de lo escondido va aquí, que es donde está lo
@@ -1307,11 +1353,11 @@ export default function Sessions(props: {
             la fila de arriba, sin rótulo que lo explique. */}
         <Show
           when={
-            rama().hijas.length > 0 && (!!query() || desplegadas().includes(rama().tarea.id))
+            rama().hijas.length > 0 && expanded()
           }
         >
           <ul class="mt-0.5 ml-2.5 flex min-w-0 list-none flex-col gap-0.5 border-l border-border p-0 pl-1.5 [&>li]:min-w-0">
-            <KeyedList each={rama().hijas} by={branch => branch.tarea.id}>{h => <Rama rama={h()} hija />}</KeyedList>
+            <KeyedList each={rama().hijas} by={branch => taskIdentity(branch.tarea)}>{h => <Rama rama={h()} hija />}</KeyedList>
           </ul>
         </Show>
       </li>
@@ -1331,7 +1377,7 @@ export default function Sessions(props: {
     // El orden relativo viene del backend; solo las fijadas suben dentro de su agente.
     const ofAuthor = (key: string) => groupProps.branches.filter(branch => authorKey(branch.tarea, props.groupByHandler) === key)
       .sort((a, b) => Number(fijada(b.tarea)) - Number(fijada(a.tarea)));
-    return <Show when={props.groupByAuthor !== false} fallback={<ul class="m-0 flex min-w-0 list-none flex-col gap-2 p-0 [&>li]:min-w-0"><KeyedList each={[...groupProps.branches].sort((a, b) => Number(fijada(b.tarea)) - Number(fijada(a.tarea)))} by={branch => branch.tarea.id}>{branch => <Rama rama={branch()} />}</KeyedList></ul>}>
+    return <Show when={props.groupByAuthor !== false} fallback={<ul class="m-0 flex min-w-0 list-none flex-col gap-2 p-0 [&>li]:min-w-0"><KeyedList each={[...groupProps.branches].sort((a, b) => Number(fijada(b.tarea)) - Number(fijada(a.tarea)))} by={branch => taskIdentity(branch.tarea)}>{branch => <Rama rama={branch()} />}</KeyedList></ul>}>
       <For each={keys()}>{key => <section data-task-author={key} aria-label={authorLabel(key)} class="flex min-w-0 flex-col gap-1">
       <div class="group/task-author flex items-center gap-1.5 px-2 pt-1 text-xs font-medium text-neutral-500">
         <Show
@@ -1360,7 +1406,7 @@ export default function Sessions(props: {
           dice de qué carpeta es: sin él, cabecera y tareas están al mismo
           nivel y el grupo no se ve dónde acaba. */}
       <ul hidden={collapsedAuthors().includes(key)} class="m-0 ml-2 flex min-w-0 list-none flex-col gap-2 border-l border-border p-0 pl-1.5 [&>li]:min-w-0">
-        <KeyedList each={ofAuthor(key)} by={branch => branch.tarea.id}>{branch => <Rama rama={branch()} />}</KeyedList>
+        <KeyedList each={ofAuthor(key)} by={branch => taskIdentity(branch.tarea)}>{branch => <Rama rama={branch()} />}</KeyedList>
       </ul>
     </section>}</For>
     </Show>;
@@ -1379,7 +1425,7 @@ export default function Sessions(props: {
       )}</Show>
       <Show when={query()}>
         <p data-search-results class="m-0 px-2 text-[0.6875rem] text-neutral-500" aria-live="polite">
-          {filteredSessions().length === 0 ? t("projects.agent_tasks.no_results") : t("projects.sessions.search_results", { count: filteredSessions().length })}
+          {matchedSessions().length === 0 ? t("projects.agent_tasks.no_results") : t("projects.sessions.search_results", { count: matchedSessions().length })}
         </p>
       </Show>
       <Show when={aviso()}>{a => (

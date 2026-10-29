@@ -8,11 +8,16 @@ export type LauncherRow = {
   launched_by?: string | null;
   parent?: string | null;
   launcher_available?: boolean;
+  /** El coordinador en otra máquina, ya con el id de la lista (`withRemoteLaunchers`). */
+  remote_launcher?: string | null;
 };
 
-/** La tarea que lanzó a esta (`parent` de un subagente, `launched_by` de una delegada), o `null`. */
+/**
+ * La tarea que lanzó a esta (`parent` de un subagente, `launched_by` de una
+ * delegada, `remote_launcher` de una hija remota), o `null`.
+ */
 export function launcherOf(session: LauncherRow): string | null {
-  return session.parent ?? session.launched_by ?? null;
+  return session.parent ?? session.launched_by ?? session.remote_launcher ?? null;
 }
 
 /**
@@ -20,9 +25,11 @@ export function launcherOf(session: LauncherRow): string | null {
  * lanzador de la misma lista: el de otra carpeta no la muestra en esta.
  */
 export function shownUnderLauncher(session: LauncherRow, rows: readonly { id: string }[]): boolean {
-  const launcher = launcherOf(session);
-  return !!launcher && session.launcher_available !== false
-    && rows.some((row) => row.id === launcher);
+  const local = session.parent ?? session.launched_by ?? null;
+  if (local) return session.launcher_available !== false && rows.some((row) => row.id === local);
+  // `launcher_available` es lo que el motor de la hija sabe de un lanzador suyo: no aplica al de otra máquina.
+  const remote = session.remote_launcher ?? null;
+  return !!remote && rows.some((row) => row.id === remote);
 }
 
 /** Lo mínimo de una tarea para juntarla con las de las demás carpetas. */
@@ -53,11 +60,13 @@ export function flattenTasks<R extends FlatRow>(
   const vistas = new Set<string>();
   // «Sin carpeta» al final: si una fila llegara repetida, gana la carpeta.
   const entradas = Object.entries(byProject).sort(([a], [b]) => Number(a === "") - Number(b === ""));
+  const todas = entradas.flatMap(([, rows]) => rows);
   for (const [project, rows] of entradas) {
     for (const row of rows) {
       if (row.archived || vistas.has(row.id)) continue;
       vistas.add(row.id);
-      if (!searching && !row.pinned && shownUnderLauncher(row, rows)) continue;
+      // El coordinador de una hija remota puede vivir en otra carpeta: se busca en todas.
+      if (!searching && !row.pinned && shownUnderLauncher(row, row.parent ?? row.launched_by ? rows : todas)) continue;
       out.push({ project, row });
     }
   }

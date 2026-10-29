@@ -2,10 +2,12 @@
 //! Sin argumentos usa el motor empaquetado, que se resuelve con la ventana ya abierta;
 //! una raíz de 0.2.74 pasa antes por el traspaso.
 mod appearance;
+mod background_service;
 mod desktop;
 mod engine;
 mod engine_profile;
 pub mod env;
+mod handler_policy;
 mod instance;
 mod launcher;
 mod legacy;
@@ -19,6 +21,10 @@ mod placement;
 mod proxy;
 #[cfg(target_os = "macos")]
 mod relocate;
+#[cfg(target_os = "linux")]
+mod resources;
+#[cfg(any(target_os = "macos", test))]
+mod service_plan;
 mod sites;
 mod startup;
 mod tray;
@@ -29,6 +35,8 @@ use std::{path::PathBuf, sync::Arc};
 use tauri::{Emitter, Manager};
 use terminus_engine_client::Client;
 use terminus_engine_protocol::{Error, Result};
+
+pub use background_service::dispatch as background_dispatch;
 
 pub fn launch() -> Result<()> {
     let result = open();
@@ -186,6 +194,8 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
                     if url.scheme() == "tauri"
                         || url.host_str() == Some("tauri.localhost")
                         || url.as_str() == "about:srcdoc"
+                        // El iframe aislado nace vacío antes de recibir su documento.
+                        || url.as_str() == "about:blank"
                         // El marco de la vista previa de un `.html`: en macOS y Linux esto también filtra marcos.
                         || url.scheme() == page_preview::SCHEME
                         || url.host_str() == Some("terminus-page.localhost")
@@ -201,6 +211,9 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
             }
             #[cfg(windows)]
             tray::register_notice_scheme();
+            if let Err(error) = tray::initialize(app.handle()) {
+                log::warn!("[tray] not initialized: {error}");
+            }
             launcher::start(app.handle().clone(), starting.clone());
             if let Some(listener) = listener {
                 let handle = app.handle().clone();
@@ -231,7 +244,6 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
         .plugin(log)
         .invoke_handler(proxy::with_desktop(tauri::generate_handler![
             desktop::request_close,
-            desktop::close_confirmed,
             tray::window_to_background,
             tray::tray_update,
             tray::quit_completely,
@@ -248,6 +260,7 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
             proxy::account_relay_token,
             proxy::service_filter,
             proxy::load_history,
+            handler_policy::handler_action,
             proxy::service_prepare_update,
             proxy::service_cancel_update,
             sites::site_sweep,
@@ -273,6 +286,19 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
         .build(context)
         .expect("tauri extracted client")
         .run(move |app, event| {
+            if let tauri::RunEvent::ExitRequested {
+                code: None,
+                ref api,
+                ..
+            } = event
+            {
+                api.prevent_exit();
+                desktop::request_quit(app);
+            }
+            #[cfg(target_os = "macos")]
+            if matches!(event, tauri::RunEvent::Reopen { .. }) {
+                tray::show_window(app);
+            }
             if matches!(event, tauri::RunEvent::Exit) {
                 instance::exiting();
                 placement::write(&placed_on_exit);

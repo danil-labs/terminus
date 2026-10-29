@@ -27,7 +27,7 @@ export function claimNextSession(workspace: string, sessions: DanilSessionInfo[]
   let done = false;
   const offs = [
     listen<DanilSessionInfo[]>("danil-sessions", (e) => void check(Array.isArray(e.payload) ? e.payload : null)),
-    listen("danil-connect", () => void readSessions().then(check)),
+    listen("danil-connect", () => void readSessions().then(check).catch(() => {})),
   ];
   const timer = setTimeout(() => stop(), WAIT_MS);
   function stop() {

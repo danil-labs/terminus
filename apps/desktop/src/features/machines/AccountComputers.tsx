@@ -3,7 +3,7 @@ import {
   type Computer,
   COMPUTER_NAME_MAX,
   listComputers,
-  machineCompatibility,
+  listWorkspaces,
   orderComputers,
   renameComputer,
   wakes,
@@ -15,11 +15,11 @@ import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke";
 import { capabilities, type AccountComputersSource } from "../../lib/platform";
 import { isMac } from "../../lib/window";
+import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
 import { SettingsBlock, SettingsRow, SettingsSection } from "../settings/layout";
+import { workspaceComputersSource } from "./workspace-computers";
 import { machineNamesChanged } from "./store";
-
-declare const __TERMINUS_CONTRACT__: string;
 
 /**
  * Dónde se leen y renombran las computadoras: lo que da la plataforma (la web)
@@ -31,6 +31,10 @@ export function accountComputersSource(account: string | null = null): AccountCo
   if (!capabilities().danilAccount) return null;
   const client = () => invoke<{ token: string; endpoint: string }>("account_relay_token", account ? { account } : {}).catch(() => null);
   return {
+    workspaces: async () => {
+      const c = await client();
+      return c ? listWorkspaces(c.endpoint, c.token) : { kind: "error", status: null };
+    },
     list: async () => {
       const c = await client();
       return c ? listComputers(c.endpoint, c.token) : { kind: "error", status: null };
@@ -39,7 +43,6 @@ export function accountComputersSource(account: string | null = null): AccountCo
       const c = await client();
       return c ? renameComputer(c.endpoint, c.token, id, name) : { kind: "error", status: null };
     },
-    outdated: (c) => machineCompatibility(c.contract, __TERMINUS_CONTRACT__) === "outdated",
     // La flota del escritorio vuelve a leer la cuenta (`account.tsx`) y toma el nombre nuevo.
     onRenamed: () => window.dispatchEvent(new CustomEvent("harness:account-computers")),
   };
@@ -64,6 +67,7 @@ function renameFailure(answer: Exclude<Answer<unknown>, { kind: "ok" }>): string
 
 export type AccountComputersProps = {
   source: AccountComputersSource;
+  empty?: string;
   /** La computadora de esta ventana, si es una de la cuenta. */
   self?: string | null;
   /** El nombre de la de esta ventana cambió aquí. */
@@ -73,18 +77,20 @@ export type AccountComputersProps = {
 /** Las computadoras de la cuenta: tipo, estado y el nombre, que se edita en su sitio. */
 export function AccountComputers(props: AccountComputersProps) {
   const [list, setList] = createSignal<Computer[] | null>(null);
-  const [failed, setFailed] = createSignal(false);
+  const [failed, setFailed] = createSignal<"missing" | "failed" | null>(null);
   const [editing, setEditing] = createSignal<string | null>(null);
   const [draft, setDraft] = createSignal("");
   const [saving, setSaving] = createSignal(false);
   const [problem, setProblem] = createSignal<{ id: string; text: string } | null>(null);
 
   async function load() {
+    setList(null);
+    setFailed(null);
+    setEditing(null);
     const answer = await props.source.list().catch(() => null);
     if (answer?.kind === "ok") {
       setList(orderComputers(answer.value));
-      setFailed(false);
-    } else if (list() === null) setFailed(true);
+    } else setFailed(answer?.kind === "missing" ? "missing" : "failed");
   }
   onMount(() => void load());
 
@@ -101,7 +107,6 @@ export function AccountComputers(props: AccountComputersProps) {
         : t("danil.computers.kind.own");
 
   const status = (c: Computer) => {
-    if (props.source.outdated?.(c)) return t("danil.computers.state.outdated");
     if (c.state === "online") return t("danil.computers.state.online");
     if (c.state === "starting") return t("danil.computers.state.starting");
     const seen = seenAt(c.last_seen);
@@ -138,15 +143,18 @@ export function AccountComputers(props: AccountComputersProps) {
   }
 
   return (
-    <div class="grid min-w-0" data-account-computers={list() === null ? (failed() ? "failed" : "loading") : list()?.length}>
+    <div class="grid min-w-0" data-account-computers={list() === null ? (failed() ?? "loading") : list()?.length}>
       <Show when={list() === null}>
         <SettingsBlock>
-          <p class="m-0 text-sm text-neutral-500">{failed() ? t("danil.computers.load_failed") : t("danil.computers.loading")}</p>
+          <p class="m-0 text-sm text-neutral-500">{failed() === "missing" ? t("danil.computers.workspace_missing") : failed() ? t("danil.computers.load_failed") : t("danil.computers.loading")}</p>
+          <Show when={failed()}>
+            <Button size="sm" variant="secondary" class="justify-self-start" onClick={() => void load()}>{t("danil.workspace.retry")}</Button>
+          </Show>
         </SettingsBlock>
       </Show>
       <Show when={list()?.length === 0}>
         <SettingsBlock>
-          <p class="m-0 text-sm text-neutral-500">{t("danil.computers.empty")}</p>
+          <p class="m-0 text-sm text-neutral-500">{props.empty ?? t("danil.computers.empty")}</p>
         </SettingsBlock>
       </Show>
       <For each={list() ?? []}>
@@ -228,20 +236,22 @@ export function AccountComputers(props: AccountComputersProps) {
 /** Configuración → Cuenta de Danil: las computadoras de la cuenta, con su propia sección. */
 export function AccountComputersSection(props: {
   account?: string | null;
+  workspace?: string;
   /** Con varias cuentas, de quién son. */
   owner?: string | null;
   self?: string | null;
   onSelfName?: (name: string) => void;
 }) {
-  const source = accountComputersSource(props.account ?? null);
+  const accountSource = accountComputersSource(props.account ?? null);
+  const source = accountSource && props.workspace ? workspaceComputersSource(accountSource, props.workspace) : accountSource;
   return (
     <Show when={source}>
       {(s) => (
         <SettingsSection
-          title={props.owner ? t("danil.computers.title_of", { account: props.owner }) : t("danil.computers.title")}
-          description={t("danil.computers.description")}
+          title={props.workspace ? t("danil.computers.workspace_title") : props.owner ? t("danil.computers.title_of", { account: props.owner }) : t("danil.computers.title")}
+          description={props.workspace ? t("danil.computers.workspace_description") : t("danil.computers.description")}
         >
-          <AccountComputers source={s()} self={props.self} onSelfName={props.onSelfName} />
+          <AccountComputers source={s()} self={props.self} onSelfName={props.onSelfName} empty={props.workspace ? t("danil.computers.workspace_empty") : undefined} />
         </SettingsSection>
       )}
     </Show>

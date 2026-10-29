@@ -1,6 +1,5 @@
 import Plus from "lucide-solid/icons/plus";
 import SettingsIcon from "lucide-solid/icons/settings";
-import UserPlus from "lucide-solid/icons/user-plus";
 import { children, createEffect, createSignal, For, type JSX, onCleanup, Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { t } from "../../lib/i18n";
@@ -319,18 +318,6 @@ export default function WorkspaceColumn(props: {
             </>
           )}
         </For>
-        <Show when={accounts}>
-          <button
-            type="button"
-            data-add-account=""
-            class="mt-2 grid size-10 shrink-0 place-items-center rounded-lg text-neutral-500 outline-none hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            aria-label={t("shell.workspaces.add_account")}
-            title={t("shell.workspaces.add_account")}
-            onClick={() => accounts?.add()}
-          >
-            <UserPlus size={16} aria-hidden="true" />
-          </button>
-        </Show>
       </div>
       <ColumnFoot tools={props.tools} onSettings={props.onSettings} onReportarBug={props.onReportarBug} />
     </nav>

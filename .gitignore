@@ -26,3 +26,6 @@ apps/desktop/src-tauri/crates/*/target/
 # Engine copied for bundle.externalBin (`pnpm engine:sidecar`)
 apps/desktop/src-tauri/binaries/
 apps/desktop/dist-web/
+
+# Pinned work-tools metadata is tracked; the prepared tree and its downloads are not.
+apps/desktop/build/

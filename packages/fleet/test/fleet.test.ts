@@ -363,6 +363,25 @@ test("events of another machine arrive with the panel's ids; a machine that come
   assert.deepEqual(seen, [["cmp_vm", [{ name: "turn", payload: { session: "cmp_vm~t1" } }], false], ["cmp_vm", [], true]]);
 });
 
+test("events of a workspace no machine has linked say the links are stale; one linked on another machine does not", () => {
+  const unlinked: [string, string[]][] = [];
+  const seen: unknown[] = [];
+  const { fleet, link } = setup({ cmp_vm: {}, cmp_mac: {} }, [{ ...VM, linked: new Set(["w1"]) }, { ...MAC, linked: new Set(["w2"]) }], {
+    onEvents: (_machine, events) => seen.push(...events),
+    onUnlinked: (machine, workspaces) => unlinked.push([machine, workspaces]),
+  });
+  fleet.subscribeEvents();
+  link("cmp_vm").push({ cursor: 1, events: [{ name: "workspace.changed", workspace: "w3", payload: { workspace: "w3", settings_version: 1 } }] });
+  link("cmp_vm").push({ cursor: 2, events: [{ name: "chat", payload: { workspace: "w2", session: "t1" } }] });
+  assert.deepEqual(unlinked, [["cmp_vm", ["w3"]]]);
+  // The stale row still filters them until the list is read again.
+  assert.deepEqual(seen, []);
+  fleet.setMachines([{ ...VM, linked: new Set(["w1", "w3"]) }, { ...MAC, linked: new Set(["w2"]) }]);
+  link("cmp_vm").push({ cursor: 3, events: [{ name: "chat", payload: { workspace: "w3", session: "t2" } }] });
+  assert.deepEqual(unlinked.length, 1);
+  assert.equal(seen.length, 1);
+});
+
 test("activity notices retain the originating machine without turning log ids into task ids", () => {
   const seen: unknown[] = [];
   const { fleet, link } = setup({ cmp_vm: {} }, [VM], { onEvents: (_machine, events) => seen.push(...events) });
@@ -653,11 +672,12 @@ test("workspace context survives when only a later machine has a primary source"
   const first = { id: "w", context_root: null };
   const slices: Slice[] = [
     { ...local({ active: "w", workspaces: [first] }), machine: "cmp_vm" },
-    { ...local({ active: "w", workspaces: [{ id: "w", context_root: "/lab/context" }] }), machine: "cmp_mac" },
+    { ...local({ active: "w", workspaces: [{ id: "w", context_root: "/lab/context", context_machine: "cmp_vm" }] }), machine: "cmp_mac" },
   ];
   for (const command of ["list_workspaces", "workspaces_startup"]) {
-    const result = fleet.merge(command, slices) as { workspaces: { context_root: string | null }[] };
+    const result = fleet.merge(command, slices) as { workspaces: { context_root: string | null; context_machine: string }[] };
     assert.equal(result.workspaces[0].context_root, "/lab/context");
+    assert.equal(result.workspaces[0].context_machine, "cmp_mac", "the envelope owns the source, regardless of row metadata");
     assert.equal(first.context_root, null, "merging does not change a machine's saved slice");
   }
 });
@@ -674,4 +694,65 @@ test("shared spaces order wins over machine slice order in desktop and web", () 
     assert.deepEqual(value.map(space => space.id), ["b", "a"]);
     fleet.close();
   }
+});
+
+test("storage never wakes a machine and a slow scan is not retried", async () => {
+  const off = setup({ cmp_vm: { state: "stopped" } }, [VM]);
+  for (const command of ["list_storage", "reclaim_storage", "empty_build_cache", "collect_orphans"]) {
+    await assert.rejects(off.fleet.call({ machine: "cmp_vm", workspace: "w", command }), (error: FleetError) => error.code === "machine_off");
+  }
+  assert.equal(off.link("cmp_vm").calls.length, 0);
+  const slow = setup({ cmp_vm: { error: "io" } }, [VM]);
+  await assert.rejects(slow.fleet.call({ machine: "cmp_vm", workspace: "w", command: "list_storage", args: { refrescar: true } }));
+  assert.equal(slow.link("cmp_vm").calls.length, 1, "the scan may still be running after the transport fails");
+});
+
+test("disk resources remain live but are excluded from persisted listings", async () => {
+  const storage = memoryStorage();
+  const resources = { measured_at: 123, storage: [] };
+  const { fleet } = setup({ cmp_vm: { answers: { list_workspaces: { workspaces: [], machine_resources: resources } } } }, [VM], { storage });
+  const envelope = { machine: "cmp_vm", workspace: null, command: "list_workspaces" };
+  const slice = await fleet.read(envelope);
+  assert.deepEqual((slice.value as Record<string, unknown>).machine_resources, resources);
+  fleet.flush();
+  const persisted = storage.items.get(SLICES_KEY);
+  assert.ok(persisted);
+  assert.ok(!persisted.includes("machine_resources"));
+  assert.ok(persisted.includes("workspaces"));
+});
+
+test("branches and usage reopen from their saved slices without waking an off VM", async () => {
+  for (const command of ["project_base_branches", "account_limits"]) {
+    const storage = memoryStorage();
+    const value = command === "project_base_branches" ? { branches: [], selected: "refs/heads/dev" } : { mode: "read", windows: [], fetched_at: 10 };
+    const args = command === "project_base_branches" ? { project: "p1" } : { provider: "claude", id: "a1", force: false };
+    const envelope = { machine: VM.id, workspace: "w", command, args };
+    const first = setup({ cmp_vm: { answers: { [command]: value } } }, [VM], { storage });
+    await first.fleet.read(envelope);
+    first.fleet.close();
+    let wakes = 0;
+    const reopened = setup({ cmp_vm: { state: "stopped" } }, [VM], { storage, wake: async () => { wakes++; return true; } });
+    try {
+      const kept = await reopened.fleet.read(envelope);
+      assert.equal(kept.status, "cached");
+      assert.deepEqual(kept.value, value);
+      assert.equal(wakes, 0);
+      assert.equal(reopened.link(VM.id).calls.length, 0);
+    } finally { reopened.fleet.close(); }
+  }
+});
+
+test("the in-memory slice cache evicts old pages and keeps the recently used one", async () => {
+  const { SliceBook } = await import("../src/slices.ts");
+  const book = new SliceBook();
+  for (let i = 0; i < 40; i++) {
+    book.put({ machine: "mac", status: "ok", has: true, at: i, value: "x".repeat(300_000) }, String(i));
+    if (i > 0) book.get("mac", "0");
+  }
+  assert.ok(book.get("mac", "0"));
+  assert.equal(book.get("mac", "1"), null);
+  assert.ok(book.get("mac", "39"));
+  book.forget("mac");
+  assert.equal(book.get("mac", "0"), null);
+  assert.equal(book.get("mac", "39"), null);
 });

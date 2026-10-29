@@ -1,5 +1,7 @@
 import { invoke } from "../../lib/invoke";
 import { t } from "../../lib/i18n";
+import { errorCode } from "../../lib/errorCode.ts";
+import { machineOf } from "../machines/store";
 import { readVisualHtml, type VisualPart, type VisualWhole, VISUAL_FILE, VISUAL_TREE } from "@terminus/chat/visual";
 
 type Scope = { workspace: string; project: string; session: string };
@@ -8,7 +10,7 @@ export async function readChatVisual(scope: Scope, file: string): Promise<string
   if (!scope.workspace || !scope.session || file.length > 128 || !VISUAL_FILE.test(file)) {
     throw { what: t("chat.visual.invalid"), detail: "invalid_visual_file" };
   }
-  const options = { headers: { "x-terminus-workspace": scope.workspace } };
+  const options = { headers: { ...machineOf(scope.session)?.headers, "x-terminus-workspace": scope.workspace } };
   try {
     return await readVisualHtml({
       part: (offset, size, revision) => invoke<VisualPart>("chat_visual_part", {
@@ -19,7 +21,7 @@ export async function readChatVisual(scope: Scope, file: string): Promise<string
       }, options),
     });
   } catch (error) {
-    const detail = error && typeof error === "object" && "detail" in error ? error.detail : null;
+    const detail = errorCode(error);
     if (detail === "invalid_visual_file") throw { what: t("chat.visual.invalid"), detail };
     if (detail === "visual_too_large") throw { what: t("chat.visual.too_large"), detail };
     if (detail === "visual_read_failed") throw { what: t("chat.visual.failed"), detail };
@@ -34,5 +36,5 @@ export async function openChatVisual(scope: Scope, file: string): Promise<void> 
   }
   await invoke("tree_open_external", {
     project: scope.project, session: scope.session, tree: VISUAL_TREE, path: file,
-  }, { headers: { "x-terminus-workspace": scope.workspace } });
+  }, { headers: { ...machineOf(scope.session)?.headers, "x-terminus-workspace": scope.workspace } });
 }

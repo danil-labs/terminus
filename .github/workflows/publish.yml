@@ -391,6 +391,12 @@ jobs:
             [ -f "src-tauri/binaries/$f" ] || { echo "::error title=Motor sin empaquetar::falta src-tauri/binaries/$f."; exit 1; }
           done
 
+      - name: Preparar herramientas incluidas verificadas
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/work-tools-release.py prepare --directory "$RUNNER_TEMP/work-tools-release"
+
       # La notarización pide un `.p8` en disco, no el contenido en una variable.
       # Tauri busca `AuthKey_<APPLE_API_KEY>.p8` o `APPLE_API_KEY_PATH`. El
       # secret es el PEM entero; aquí se escribe y se borra con el runner.
@@ -510,6 +516,13 @@ jobs:
           original=$(cygpath -u "$1")
           name=$(basename "$original")
 
+          # Tauri también pasa cada .exe y .dll de los recursos. Las herramientas
+          # incluidas conservan su firma de origen: firmarlas aquí cambiaría bytes
+          # ya inventariados y gastaría cientos de firmas.
+          case "$original" in
+            */work-tools-release/work-tools/*)
+              exit 0 ;;
+          esac
           case "$name" in
             NSISdl.dll|StartMenu.dll|System.dll|nsDialogs.dll|nsis_tauri_utils.dll)
               echo "Authenticode: $name no se firma (plugin de NSIS, no se instala)."
@@ -599,7 +612,7 @@ jobs:
             esac
           fi
 
-          pnpm desktop:build --bundles nsis "${SIGN_CONFIG[@]}"
+          pnpm desktop:build --bundles nsis --config "$WORK_TOOLS_CONFIG" "${SIGN_CONFIG[@]}"
 
           INSTALLER=$(find src-tauri/target/release/bundle -type f -name '*_x64-setup.exe' | head -1)
           [ -n "$INSTALLER" ] || { echo "::error::No se construyó ningún *_x64-setup.exe."; exit 1; }
@@ -733,7 +746,9 @@ jobs:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_KEY_PATH: ${{ env.APPLE_API_KEY_PATH }}
-        run: pnpm desktop:build --target universal-apple-darwin
+        run: |
+          python3 scripts/work-tools-macos.py --directory "$RUNNER_TEMP/work-tools-release/work-tools"
+          pnpm desktop:build --target universal-apple-darwin --config "$WORK_TOOLS_CONFIG"
 
       # `tauri.linux.conf.json` vive en el repo del código y ajusta el bundle a
       # AppImage. Firma con la llave de minisign, como en las otras dos.
@@ -742,7 +757,37 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: pnpm exec tauri build --config src-tauri/tauri.linux.conf.json
+        run: pnpm exec tauri build --config src-tauri/tauri.linux.conf.json --config "$WORK_TOOLS_CONFIG"
+
+      - name: Verificar los recursos después del empaquetado
+        shell: bash
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          case "$RUNNER_OS" in
+            macOS)
+              app=src-tauri/target/universal-apple-darwin/release/bundle/macos/Terminus.app
+              resources="$app/Contents/Resources/work-tools"
+              engine="$app/Contents/MacOS/seldon-runtime"
+              ;;
+            Windows)
+              resources="$(cygpath -u "$LOCALAPPDATA")/Terminus/work-tools"
+              engine="$(cygpath -u "$LOCALAPPDATA")/Terminus/seldon-runtime.exe"
+              ;;
+            Linux)
+              image=$(find src-tauri/target/release/bundle -name '*.AppImage' -type f | head -1)
+              image=$(realpath "$image")
+              mkdir -p "$RUNNER_TEMP/work-tools-final"
+              (cd "$RUNNER_TEMP/work-tools-final" && "$image" --appimage-extract >/dev/null)
+              resources="$RUNNER_TEMP/work-tools-final/squashfs-root/usr/share/Terminus/work-tools"
+              engine="$RUNNER_TEMP/work-tools-final/squashfs-root/usr/bin/seldon-runtime"
+              ;;
+          esac
+          python3 scripts/work-tools-release.py verify --directory "$resources"
+          app_args=()
+          [ "$RUNNER_OS" != macOS ] || app_args=(--app "$app")
+          python3 scripts/work-tools-runtime-smoke.py --engine "$engine" --resources "$(dirname "$resources")" --browser --clone "${app_args[@]}"
 
       - name: Comprobar el bundle universal
         if: runner.os == 'macOS'
@@ -750,10 +795,18 @@ jobs:
           set -euo pipefail
           APP=src-tauri/target/universal-apple-darwin/release/bundle/macos/Terminus.app
           lipo "$APP/Contents/MacOS/terminus" -verify_arch arm64 x86_64
+          # Las herramientas van en un árbol por arquitectura: cada uno con la suya.
+          TOOLS="$APP/Contents/Resources/work-tools"
           while IFS= read -r f; do
             file -b "$f" | grep -q 'Mach-O' || continue
             lipo "$f" -verify_arch arm64 x86_64
-          done < <(find "$APP" -type f)
+          done < <(find "$APP" -type f -not -path "$TOOLS/*")
+          for pair in aarch64-apple-darwin:arm64 x86_64-apple-darwin:x86_64; do
+            while IFS= read -r f; do
+              file -b "$f" | grep -q 'Mach-O' || continue
+              lipo "$f" -verify_arch "${pair#*:}"
+            done < <(find "$TOOLS/${pair%%:*}" -type f)
+          done
 
       # Con `CI=true` Tauri arma el `.dmg` sin acomodar la ventana (`--skip-jenkins`)
       # y le pone al disco el ícono de la app: la gente abría Terminus desde el
@@ -915,6 +968,83 @@ jobs:
           if-no-files-found: error
           path: apps/desktop/release-assets/*
 
+      - name: Dividir el instalador para revisión del ensayo
+        if: inputs.dry_run
+        shell: bash
+        run: |
+          node scripts/work-tools-qa-artifacts.mjs release-assets "$RUNNER_TEMP/qa-installer" "${{ matrix.name }}"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: inputs.dry_run
+        with:
+          name: qa-${{ matrix.name }}-installer-1
+          path: ${{ runner.temp }}/qa-installer/*.part-01
+          if-no-files-found: ignore
+          compression-level: 0
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: inputs.dry_run
+        with:
+          name: qa-${{ matrix.name }}-installer-2
+          path: ${{ runner.temp }}/qa-installer/*.part-02
+          if-no-files-found: ignore
+          compression-level: 0
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: inputs.dry_run
+        with:
+          name: qa-${{ matrix.name }}-installer-3
+          path: ${{ runner.temp }}/qa-installer/*.part-03
+          if-no-files-found: ignore
+          compression-level: 0
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: inputs.dry_run
+        with:
+          name: qa-${{ matrix.name }}-installer-4
+          path: ${{ runner.temp }}/qa-installer/*.part-04
+          if-no-files-found: ignore
+          compression-level: 0
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: inputs.dry_run
+        with:
+          name: qa-${{ matrix.name }}-installer-5
+          path: ${{ runner.temp }}/qa-installer/*.part-05
+          if-no-files-found: ignore
+          compression-level: 0
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: inputs.dry_run
+        with:
+          name: qa-${{ matrix.name }}-installer-6
+          path: ${{ runner.temp }}/qa-installer/*.part-06
+          if-no-files-found: ignore
+          compression-level: 0
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: inputs.dry_run
+        with:
+          name: qa-${{ matrix.name }}-installer-7
+          path: ${{ runner.temp }}/qa-installer/*.part-07
+          if-no-files-found: ignore
+          compression-level: 0
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: inputs.dry_run
+        with:
+          name: qa-${{ matrix.name }}-installer-8
+          path: ${{ runner.temp }}/qa-installer/*.part-08
+          if-no-files-found: ignore
+          compression-level: 0
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: inputs.dry_run
+        with:
+          name: qa-${{ matrix.name }}-installer-metadata
+          path: ${{ runner.temp }}/qa-installer/*.json
+          if-no-files-found: error
+
   # ─────────────────────────────────────────────────────────────────────────────
   # Una sola release con Windows, macOS universal y Linux dentro, y el
   # `latest.json` que la app consulta. Va en un job aparte porque **publicar
@@ -940,6 +1070,8 @@ jobs:
           name: dist-macos
           path: release-assets
       - name: Ejecutar el mismo universal en ambas arquitecturas
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
           tar xzf release-assets/Terminus.app.tar.gz
@@ -950,6 +1082,8 @@ jobs:
           # sale con `cli.error.invalid_request`: el ejecutable carga; la interfaz no se prueba.
           out=$(Terminus.app/Contents/MacOS/terminus --external-host 2>&1) && { echo "::error::Arrancó con un argumento inválido"; exit 1; }
           echo "$out" | grep -q invalid_request
+          python3 apps/desktop/scripts/work-tools-release.py verify --directory Terminus.app/Contents/Resources/work-tools
+          python3 apps/desktop/scripts/work-tools-runtime-smoke.py --engine Terminus.app/Contents/MacOS/seldon-runtime --resources Terminus.app/Contents/Resources --browser --clone --app Terminus.app
 
   # El AppImage que se va a publicar, en un Ubuntu limpio: la firma minisign
   # con el mismo verificador que usa `npx`, que lleve el motor, y que el binario
@@ -1010,6 +1144,7 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: release-assets
+          pattern: dist-*
           merge-multiple: true
 
       # La firma no cubre solo los bytes: su comentario de confianza lleva el

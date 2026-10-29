@@ -24,6 +24,8 @@ export type Computer = {
   host_version?: string | null;
   /** El contrato del motor en su último `hello` (hash de `commands.json`), si lo dijo. */
   contract?: string | null;
+  /** Lo que el motor anunció en `status.service_features` en su último `hello`. Sin el campo, nada. */
+  service_features?: string[] | null;
   /** `linux`, `macos` o `windows`, si el plano de control lo dice. Sin el campo, no se sabe. */
   os?: string | null;
   /** Los workspaces de esta computadora vinculados a la cuenta. Sin el campo, un plano de control de antes. */
@@ -34,6 +36,7 @@ export type Answer<T> =
   | { kind: "ok"; value: T }
   | { kind: "unauthorized" }
   | { kind: "license" }
+  | { kind: "no_account" }
   | { kind: "missing" }
   | { kind: "error"; status: number | null; code?: string };
 
@@ -53,9 +56,9 @@ export function apiUrl(endpoint: string, path: string): string {
   return `${url.origin}${url.pathname.replace(/\/+$/, "")}${path}`;
 }
 
-const globalFetch: Fetch = (input, init) => (globalThis.fetch as unknown as Fetch)(input, init);
+export const globalFetch: Fetch = (input, init) => (globalThis.fetch as unknown as Fetch)(input, init);
 
-async function request<T>(url: string, token: string, method: string, read: (body: unknown) => T, f: Fetch, payload?: unknown): Promise<Answer<T>> {
+export async function request<T>(url: string, token: string, method: string, read: (body: unknown) => T, f: Fetch, payload?: unknown): Promise<Answer<T>> {
   let response: Awaited<ReturnType<Fetch>>;
   try {
     const headers: Record<string, string> = { authorization: `Bearer ${token}` };
@@ -66,8 +69,11 @@ async function request<T>(url: string, token: string, method: string, read: (bod
   }
   if (response.status === 401) return { kind: "unauthorized" };
   if (response.status === 403) {
-    // `unknown_user` también es 403: la persona no existe en Danil, que para ella es lo mismo que no tener licencia.
-    return { kind: "license" };
+    const body = await response.json().catch(() => null) as { error?: string | { code?: string } } | null;
+    const code = typeof body?.error === "string" ? body.error : body?.error?.code;
+    if (code === "unknown_user") return { kind: "no_account" };
+    if (code === "license_required") return { kind: "license" };
+    return { kind: "error", status: response.status };
   }
   if (response.status === 404) return { kind: "missing" };
   if (!response.ok) {

@@ -1,7 +1,7 @@
 /**
  * A Supabase session in the browser. The primary one is what the Danil app
  * already stored on this same origin (the default storage key): Terminus reads
- * it and never signs it in or out. An extra account (`accounts.ts`) has its own
+ * it; the common auth entry signs it in. An extra account (`accounts.ts`) has its own
  * key, `terminus-auth:<slot>`, and signs in from «Agregar cuenta».
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -12,6 +12,8 @@ export type Session = {
   getToken(): Promise<string>;
   /** The API or the relay refused the token: refresh once, else `onGone`. */
   unauthorized(): Promise<boolean>;
+  email?(): Promise<string | null>;
+  signOut?(): Promise<void>;
 };
 
 export type BrowserSession = Session & AuthClient & { client: SupabaseClient };
@@ -43,25 +45,45 @@ export function supabaseSession(url: string, key: string, options: Options = {})
   });
   /** The person this session belonged to when the page read it. */
   let known: string | null = null;
+  let invalidated = false;
+  const gone = () => {
+    invalidated = true;
+    options.onGone?.();
+  };
   // Signing out in another tab of the app ends this session here too; so does
   // signing in there as someone else, which writes the same key.
   client.auth.onAuthStateChange((event, session) => {
-    if (event === "SIGNED_OUT") options.onGone?.();
-    else if (known && session?.user?.id && session.user.id !== known) {
-      known = session.user.id;
-      options.onGone?.();
-    }
+    if (event === "SIGNED_OUT") gone();
+    else if (known && session?.user?.id && session.user.id !== known) gone();
+    else known ??= session?.user?.id ?? null;
   });
-  const gone = () => options.onGone?.();
+  const checkedSession = async () => {
+    const { data } = await client.auth.getSession();
+    if (invalidated || (known && data.session?.user.id !== known)) {
+      if (!invalidated) gone();
+      throw new Error("session changed");
+    }
+    known ??= data.session?.user.id ?? null;
+    return data.session;
+  };
+  const signOutLocal = async () => {
+    await checkedSession();
+    const { error } = await client.auth.signOut({ scope: "local" });
+    if (error) throw error;
+  };
   return {
     client,
+    async email() {
+      return (await checkedSession())?.user.email ?? null;
+    },
+    signOut: signOutLocal,
     async getToken() {
-      const { data } = await client.auth.getSession();
-      if (!data.session) {
+      const session = await checkedSession();
+      if (!session) {
         gone();
         throw new Error("no session");
       }
-      return data.session.access_token;
+      return session.access_token;
     },
     async unauthorized() {
       const { data, error } = await client.auth.refreshSession();
@@ -72,13 +94,10 @@ export function supabaseSession(url: string, key: string, options: Options = {})
       return true;
     },
     async user() {
-      const { data } = await client.auth.getSession();
-      const user = userOf(data.session?.user);
+      const user = userOf((await checkedSession())?.user);
       known ??= user?.user_id ?? null;
       return user;
     },
-    async signOutLocal() {
-      await client.auth.signOut({ scope: "local" });
-    },
+    signOutLocal,
   };
 }

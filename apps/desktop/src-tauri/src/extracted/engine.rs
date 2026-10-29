@@ -74,8 +74,8 @@ fn lab(base: &Path) -> Option<(String, PathBuf)> {
     Some((identity, root))
 }
 
-/// Los recursos de la instalación (`lenguas/`), los mismos que `resource_dir()` de Tauri.
-/// Dentro de un AppImage el montaje desaparece con la ventana: se copian a `<root>/resources`.
+/// Los recursos de la instalación (`lenguas/`, `work-tools/`), los mismos que `resource_dir()` de Tauri.
+/// Dentro de un AppImage el montaje desaparece con la ventana: se copian a `<root>/resource-versions/<clave>`.
 fn installed_resources(root: &Path) -> Result<PathBuf> {
     let exe = std::env::current_exe()?;
     let dir = exe.parent().ok_or_else(|| Error::new("invalid_request"))?;
@@ -86,8 +86,14 @@ fn installed_resources(root: &Path) -> Result<PathBuf> {
     if let Some(appdir) =
         std::env::var_os("APPDIR").filter(|_| std::env::var_os("APPIMAGE").is_some())
     {
+        let appdir = PathBuf::from(appdir);
+        // `work-tools.py` deja ahí los recursos con su inventario, fuera del alcance de linuxdeploy.
+        let prepared = appdir.join("usr/share/Terminus");
+        if prepared.join(super::resources::INVENTORY).is_file() {
+            return Ok(super::resources::materialize(&prepared, root)?);
+        }
         // productName de tauri.conf.json: el bundle de Linux pone ahí los recursos.
-        let mounted = PathBuf::from(appdir).join("usr/lib/Terminus");
+        let mounted = appdir.join("usr/lib/Terminus");
         let copy = root.join("resources");
         super::legacy::mirror(&mounted, &copy)?;
         return Ok(copy);
@@ -107,6 +113,12 @@ pub fn prepare(paths: &Paths) -> Result<()> {
 /// La selección del motor de esta ventana: el vivo sobre la raíz o uno recién lanzado.
 /// `adopt` pasa `--adopt-existing`: solo tras el traspaso que la persona aceptó.
 pub fn ensure(paths: &Paths, adopt: bool) -> Result<PathBuf> {
+    if super::engine_profile::managed(&paths.data)? {
+        if adopt {
+            return Err(Error::new("managed_service_unavailable"));
+        }
+        return attach_managed(paths, START_TIMEOUT);
+    }
     prepare(paths)?;
     // La raíz de 0.2.74 ya existe y es del motor validarla; una nueva la crea él.
     if paths.identity != PRODUCTION {
@@ -119,12 +131,17 @@ pub fn ensure(paths: &Paths, adopt: bool) -> Result<PathBuf> {
     let endpoint = paths.data.join("seldon-endpoint.json");
     let patience = Instant::now() + START_TIMEOUT;
     let mut waited = false;
+    // Una ventana apartada por el instalador sigue con el motor de su versión y nunca toma el nuevo.
+    let aside = super::legacy::set_aside(std::process::id());
     loop {
         let probed = terminus_engine_client::probe(&endpoint);
         if let Some((found, status)) = probed.as_ref().ok().filter(|(found, _)| ours(paths, found))
         {
             // Uno que trabaja sigue con su versión; la nueva entra cuando lo dejen parar.
-            if !super::legacy::engine_replaced(found.pid, true) || !retire(&endpoint, found.pid) {
+            if aside
+                || !super::legacy::engine_replaced(found.pid, true)
+                || !retire(&endpoint, found.pid)
+            {
                 if waited {
                     log::info!("[engine] answered after waiting: pid={}", found.pid);
                 }
@@ -134,10 +151,13 @@ pub fn ensure(paths: &Paths, adopt: bool) -> Result<PathBuf> {
             .ok()
             .filter(|(found, _)| ours(paths, found))
         {
+            if aside {
+                return Err(Error::new("window_replaced"));
+            }
             // Tras actualizar el contrato cambia: esta ventana no puede usarlo, lo para en cuanto quede libre.
             if working(&status["busy"]) || !retire(&endpoint, found.pid) {
                 return Err(Error {
-                    detail: status["busy"].clone(),
+                    detail: serde_json::json!({"turns": status["busy"]["turns"], "pid": found.pid}),
                     ..Error::new("previous_engine_busy")
                 });
             }
@@ -161,6 +181,9 @@ pub fn ensure(paths: &Paths, adopt: bool) -> Result<PathBuf> {
         waited = true;
         std::thread::sleep(Duration::from_millis(500));
     }
+    if aside {
+        return Err(Error::new("window_replaced"));
+    }
     let offset = std::fs::metadata(&paths.launch_log).map_or(0, |m| m.len());
     let mut child = spawn(paths, adopt)?;
     let deadline = Instant::now() + if adopt { ADOPT_TIMEOUT } else { START_TIMEOUT };
@@ -176,6 +199,63 @@ pub fn ensure(paths: &Paths, adopt: bool) -> Result<PathBuf> {
         std::thread::sleep(Duration::from_millis(200));
     }
     Err(failed(paths, offset))
+}
+
+/// Un supervisor administra esta raíz: se espera su descriptor, sin arrancar ni adoptar.
+fn attach_managed(paths: &Paths, within: Duration) -> Result<PathBuf> {
+    prepare(paths)?;
+    let deadline = Instant::now() + within;
+    loop {
+        match managed_endpoint(&paths.data) {
+            Ok((found, status)) => {
+                return write_selection(
+                    paths,
+                    &paths.data.join("seldon-endpoint.json"),
+                    &found,
+                    &status,
+                )
+            }
+            Err(error)
+                if error.code == "managed_service_unavailable" && Instant::now() < deadline =>
+            {
+                std::thread::sleep(Duration::from_millis(500));
+            }
+            Err(error) => return Err(error),
+        }
+    }
+}
+
+fn managed_endpoint(
+    data: &Path,
+) -> Result<(terminus_engine_protocol::Endpoint, serde_json::Value)> {
+    let (found, status) = terminus_engine_client::probe(&data.join("seldon-endpoint.json"))
+        .map_err(|error| match error.code.as_str() {
+            "io" | "app_unavailable" => Error::new("managed_service_unavailable"),
+            _ => error,
+        })?;
+    if super::engine_profile::canonical(&found.data_directory)
+        != super::engine_profile::canonical(data)
+    {
+        return Err(Error::new("invalid_token"));
+    }
+    Ok((found, status))
+}
+
+/// Recupera sólo el cliente del servicio; cada nuevo descriptor y token se validan de nuevo.
+pub fn reconnect_managed(
+    current: &terminus_engine_client::Client,
+) -> Result<terminus_engine_client::Client> {
+    let previous = current.selection();
+    let (found, status) = managed_endpoint(&previous.data_directory)?;
+    let file = previous.window_data.join("managed-selection.json");
+    write_selection_at(
+        &previous.window_data,
+        &file,
+        &previous.data_directory.join("seldon-endpoint.json"),
+        &found,
+        &status,
+    )?;
+    terminus_engine_client::Client::select(&file)
 }
 
 /// Un descriptor dentro de la raíz que nombra otra (una raíz copiada) no es de esta ventana.
@@ -244,6 +324,9 @@ pub fn stop() -> Stopped {
     let Ok(paths) = paths() else {
         return Stopped::Unanswered;
     };
+    if !matches!(super::engine_profile::managed(&paths.data), Ok(false)) {
+        return Stopped::Busy;
+    }
     let endpoint = paths.data.join("seldon-endpoint.json");
     // Una orden de una ventana que se acaba de cerrar termina sola; un turno o una descarga, no.
     let settle = Instant::now() + Duration::from_secs(20);
@@ -276,7 +359,13 @@ pub fn stop() -> Stopped {
 
 /// Con otra versión instalada, el motor viejo se para en cuanto queda sin trabajo;
 /// la ventana arranca el nuevo en su siguiente sondeo, como tras cualquier caída.
+/// Una ventana apartada no lo para: sigue con él hasta que se reinicie.
 pub fn retire_if_replaced(paths: &Paths) {
+    if !matches!(super::engine_profile::managed(&paths.data), Ok(false))
+        || super::legacy::set_aside(std::process::id())
+    {
+        return;
+    }
     let endpoint = paths.data.join("seldon-endpoint.json");
     let Ok((found, status)) = terminus_engine_client::probe(&endpoint) else {
         return;
@@ -286,9 +375,12 @@ pub fn retire_if_replaced(paths: &Paths) {
     }
 }
 
-/// «Actualizar ya» con el motor anterior trabajando: corta sus turnos y apunta sus
+/// «Detener y entrar ya» con el motor anterior trabajando: corta sus turnos y apunta sus
 /// tareas para que el nuevo las retome. Uno sin esa orden se niega y se termina su proceso.
 pub fn force_previous(paths: &Paths) -> Result<()> {
+    if super::engine_profile::managed(&paths.data)? {
+        return Err(Error::new("managed_service_unavailable"));
+    }
     let endpoint = paths.data.join("seldon-endpoint.json");
     let (found, _) = previous(&endpoint)?;
     let asked = terminus_engine_client::force_stop_any_contract(&endpoint, Duration::from_secs(5));
@@ -379,8 +471,16 @@ fn bundled_engine() -> Result<PathBuf> {
 }
 
 /// El binario que arranca la ventana: en un AppImage, la copia estable que deja `stable_engine`.
+fn engine_root(paths: &Paths) -> PathBuf {
+    if paths.data == paths.root.join("engine") {
+        paths.root.join("sidecar")
+    } else {
+        paths.root.clone()
+    }
+}
+
 fn installed_engine(paths: &Paths, bundled: PathBuf) -> PathBuf {
-    let copy = paths.root.join("engine").join("seldon-runtime");
+    let copy = engine_root(paths).join("engine").join("seldon-runtime");
     if cfg!(target_os = "linux") && std::env::var_os("APPIMAGE").is_some() && copy.is_file() {
         return copy;
     }
@@ -388,7 +488,10 @@ fn installed_engine(paths: &Paths, bundled: PathBuf) -> PathBuf {
 }
 
 fn spawn(paths: &Paths, adopt: bool) -> Result<Child> {
-    let exe = super::legacy::stable_engine(&bundled_engine()?, &paths.root)?;
+    if super::engine_profile::managed(&paths.data)? {
+        return Err(Error::new("managed_service_unavailable"));
+    }
+    let exe = super::legacy::stable_engine(&bundled_engine()?, &engine_root(paths))?;
     let mut log = OpenOptions::new()
         .create(true)
         .append(true)
@@ -433,7 +536,7 @@ fn spawn(paths: &Paths, adopt: bool) -> Result<Child> {
 
 // Sale del job de quien lanzó la ventana para sobrevivirla; si ese job no lo permite, queda dentro.
 #[cfg(windows)]
-fn spawn_detached(command: &mut Command) -> std::io::Result<(Child, bool)> {
+pub(super) fn spawn_detached(command: &mut Command) -> std::io::Result<(Child, bool)> {
     use std::os::windows::process::CommandExt;
     const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
     const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
@@ -482,7 +585,7 @@ fn launch_note(_child: &Child, _outside: bool) -> String {
 }
 
 #[cfg(unix)]
-fn spawn_detached(command: &mut Command) -> std::io::Result<(Child, bool)> {
+pub(super) fn spawn_detached(command: &mut Command) -> std::io::Result<(Child, bool)> {
     use std::os::unix::process::CommandExt;
     command.process_group(0);
     Ok((command.spawn()?, true))
@@ -518,6 +621,16 @@ fn write_selection(
     found: &terminus_engine_protocol::Endpoint,
     status: &serde_json::Value,
 ) -> Result<PathBuf> {
+    write_selection_at(&paths.window, &paths.selection, endpoint, found, status)
+}
+
+fn write_selection_at(
+    window: &Path,
+    file: &Path,
+    endpoint: &Path,
+    found: &terminus_engine_protocol::Endpoint,
+    status: &serde_json::Value,
+) -> Result<PathBuf> {
     let selection = Selection {
         version: VERSION,
         endpoint: endpoint.to_path_buf(),
@@ -529,21 +642,21 @@ fn write_selection(
             .as_str()
             .unwrap_or_default()
             .to_owned(),
-        window_data: paths.window.clone(),
+        window_data: window.to_path_buf(),
     };
     let bytes = serde_json::to_vec(&selection)?;
     // Reescribirla igual invalidaría el cliente de las otras ventanas sobre el mismo motor.
-    if std::fs::read(&paths.selection).is_ok_and(|current| current == bytes) {
-        return Ok(paths.selection.clone());
+    if std::fs::read(file).is_ok_and(|current| current == bytes) {
+        return Ok(file.to_path_buf());
     }
-    let temporary = paths.selection.with_extension("json.tmp");
+    let temporary = file.with_extension("json.tmp");
     let _ = std::fs::remove_file(&temporary);
-    let mut file = private_file(&temporary)?;
-    file.write_all(&bytes)?;
-    file.sync_all()?;
-    drop(file);
-    std::fs::rename(&temporary, &paths.selection)?;
-    Ok(paths.selection.clone())
+    let mut output = private_file(&temporary)?;
+    output.write_all(&bytes)?;
+    output.sync_all()?;
+    drop(output);
+    std::fs::rename(&temporary, file)?;
+    Ok(file.to_path_buf())
 }
 
 fn private_dir(dir: &Path) -> Result<()> {

@@ -13,10 +13,11 @@ import { useWorkspaces } from "../lib/workspaces";
 import { BrandMark } from "../ui/BrandMark";
 import { Dot } from "../ui/components";
 import { Icon } from "../ui/Icon";
+import { MachineStorage } from "../ui/MachineStorage";
 import { Sheet, SheetOption } from "../ui/Sheet";
 import { type Theme, useTheme } from "../ui/theme";
 
-type ProviderAccounts = { provider: ProviderInfo; groups: AccountGroup<AiAccount>[]; limits: Record<string, AccountLimits | null> };
+type ProviderAccounts = { provider: ProviderInfo; groups: AccountGroup<AiAccount>[]; limits: Record<string, AccountLimits | null>; cachedAt: Record<string, number | null> };
 /** `workspace`: el de las llamadas de cuentas a esa máquina (`accountWorkspace`). */
 type Login = LoginProgress & { host: Host; workspace: string | null; provider: ProviderInfo; id: string | null };
 
@@ -38,6 +39,7 @@ export default function Accounts() {
   const currentId = current?.id ?? null;
   const scopeOf = useCallback((host: Host) => accountWorkspace(host, currentId), [currentId]);
   const [data, setData] = useState<ProviderAccounts[] | null>(null);
+  const [storageOpen, setStorageOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   const [pick, setPick] = useState<{ provider: ProviderInfo; exclude: string[] } | null>(null);
@@ -59,8 +61,8 @@ export default function Accounts() {
       for (const list of lists) for (const p of list) if (p.driver && !providers.has(p.id)) providers.set(p.id, p);
       const result = await Promise.all(
         [...providers.values()].map(async (provider) => {
-          const { groups, limits } = await providerUsage(hosts, provider.id, scopeOf);
-          return { provider, groups, limits };
+          const { groups, limits, cachedAt } = await providerUsage(hosts, provider.id, scopeOf);
+          return { provider, groups, limits, cachedAt };
         }),
       );
       if (mine === asked.current) {
@@ -156,6 +158,11 @@ export default function Accounts() {
   return (
     <>
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.page} refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}>
+        <Pressable accessibilityRole="button" accessibilityState={{ expanded: storageOpen }} onPress={() => setStorageOpen((open) => !open)} style={{ minHeight: 48, justifyContent: "center" }} testID="storage-toggle">
+          <Text style={{ color: theme.text, fontSize: 18, fontWeight: "600" }}>{t("storage.title")}</Text>
+          <Text style={{ color: theme.textMuted }}>{t("storage.subtitle")}</Text>
+        </Pressable>
+        {storageOpen ? <MachineStorage hosts={hosts} workspace={currentId} theme={theme} /> : null}
         <Text style={{ color: theme.textMuted, paddingHorizontal: 4 }}>{t("accounts.subtitle")}</Text>
         {failed ? <Text accessibilityRole="alert" style={{ color: theme.error }}>{t("accounts.load_failed")}</Text> : null}
         {offHosts.map((h) => (
@@ -163,7 +170,7 @@ export default function Accounts() {
             {t("accounts.machine_off", { name: h.label })}
           </Text>
         ))}
-        {data?.map(({ provider, groups, limits }) => (
+        {data?.map(({ provider, groups, limits, cachedAt }) => (
           <View key={provider.id} style={styles.provider} testID={`provider-${provider.id}`}>
             <View style={styles.providerHead}>
               <BrandMark id={provider.id} size={18} color={theme.text} />
@@ -181,6 +188,7 @@ export default function Accounts() {
                     <Plan limits={limits[g.key]} theme={theme} />
                   </View>
                   <Usage limits={limits[g.key]} signedIn={Boolean(g.row.authenticated_at)} theme={theme} />
+                  {cachedAt[g.key] ? <Text style={{ color: theme.textMuted, fontSize: 12 }}>{t("accounts.cached", { time: new Date(cachedAt[g.key]!).toLocaleString() })}</Text> : null}
                   <View style={styles.chips}>
                     {g.members.map((m) => {
                       const host = hosts.find((h) => h.id === m.machine);

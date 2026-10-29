@@ -30,7 +30,7 @@ function fakeLink(answers: Record<string, unknown>, state: "online" | "offline" 
         if (silent) return void setTimeout(() => reject({ code: "io", detail: "timeout" }), timeout ?? 50);
         const answer = answers[command];
         if (answer === undefined) return reject({ code: "command" });
-        resolve({ value: typeof answer === "function" ? (answer as (a: Args) => unknown)(args as Args) : answer, cached: null });
+        Promise.resolve(typeof answer === "function" ? (answer as (a: Args) => unknown)(args as Args) : answer).then(value => resolve({ value, cached: null }), reject);
       });
     },
     onState: () => () => {},
@@ -176,13 +176,26 @@ test("a workspace only other machines have answers at once from their last slice
   assert.equal(vm.calls.length, 2, "and the VM is asked again behind");
 });
 
-test("the account and danil_* always stay on this computer, whatever the header says", async () => {
-  const vm = fakeLink({ danil_sessions: [{ account: "x" }], list_accounts: { accounts: [{ id: "a" }] } });
+test("danil_* always stays on this computer, whatever the header says", async () => {
+  const vm = fakeLink({ danil_sessions: [{ account: "x" }] });
   const { router, native } = setup({ cmp_vm: vm });
   assert.deepEqual(await router.handle("danil_sessions", {}, on("cmp_vm")), []);
-  assert.deepEqual(await router.handle("list_accounts", {}), { accounts: [], active: null });
   assert.equal(vm.calls.length, 0);
-  assert.deepEqual(native.map((c) => c.command), ["danil_sessions", "list_accounts"]);
+  assert.deepEqual(native.map((c) => c.command), ["danil_sessions"]);
+});
+
+test("AI accounts: the list joins every machine's, grouped with their machines; an action goes to the machine of the header", async () => {
+  const ana = (id: string) => ({ provider: "codex", accounts: [{ id, label: "Ana", identity: "ana@x.com", plan: "Pro" }], active: id });
+  const vm = fakeLink({ list_accounts: ana("a"), remove_account: null });
+  const { router, native } = setup({ cmp_vm: vm }, { list_accounts: ana("h"), remove_account: null });
+  const listed = (await router.handle("list_accounts", { provider: "codex" })) as { accounts: { machines: { machine: string }[] }[] };
+  assert.equal(listed.accounts.length, 1, "the same email and plan on two machines is one account");
+  assert.deepEqual(listed.accounts[0].machines.map((m) => m.machine).sort(), ["cmp_home", "cmp_vm"]);
+  await router.handle("remove_account", { provider: "codex", id: "a" }, on("cmp_vm"));
+  assert.deepEqual(vm.calls.map((c) => c.command), ["list_accounts", "remove_account"]);
+  assert.ok(!native.some((c) => c.command === "remove_account"), "signing out there never touches this computer");
+  await router.handle("remove_account", { provider: "codex", id: "h" }, on("cmp_home"));
+  assert.equal(native.at(-1)?.command, "remove_account");
 });
 
 test("the account's credentials are the workspace's: here by default, on the machine of the header when it names one", async () => {
@@ -227,7 +240,7 @@ test("an action to the person's own machine that is off says so plainly, without
   const mac = fakeLink({ send_message: "x" }, "offline");
   const { router } = setup({ cmp_mac: mac });
   await assert.rejects(router.handle("send_message", { project: "p1", session: "cmp_mac~t1", prompt: "hola" }, on("cmp_mac")), (e: { what: string; detail: string }) => {
-    assert.equal(e.what, "Mac de Ana está apagada. Enciéndela para seguir.");
+    assert.equal(e.what, "Mac de Ana está sin conexión. Verifica que Terminus esté abierto y tenga acceso a internet.");
     assert.equal(e.detail, "machine_off");
     return true;
   });
@@ -482,4 +495,69 @@ test("local composer mentions omit about with or without the machine router", as
   } finally {
     router.close();
   }
+});
+
+test("explicit local storage never falls back and its disk listing stays direct", async () => {
+  const vm = fakeLink({ list_workspaces: { workspaces: [{ id: "remote", name: "Remote" }], active: "remote" }, reclaim_storage: { bytes: 999 } });
+  const resources = { measured_at: 1, storage: [] };
+  const { router, native, fleet } = setup({ cmp_vm: vm }, { list_workspaces: { workspaces: [{ id: "w", name: "W" }], active: "w", machine_resources: resources }, reclaim_storage: { bytes: 1 } });
+  await router.handle("list_workspaces");
+  fleet.setRegistry([{ id: "remote", name: "Remote", computers: ["cmp_vm"] }] as never);
+  await router.handle("set_active_workspace", { id: "remote" });
+  const target = { headers: { "x-terminus-machine": "cmp_home", "x-terminus-workspace": "remote" } };
+  await assert.rejects(router.handle("reclaim_storage", {}, target), (error: { detail: string }) => error.detail === "workspace_missing");
+  assert.equal(vm.calls.filter((call) => call.command === "reclaim_storage").length, 0);
+  assert.equal(native.filter((call) => call.command === "reclaim_storage").length, 0);
+  const result = await router.handle("list_workspaces", {}, target) as { machine_resources?: unknown };
+  assert.deepEqual(result.machine_resources, resources);
+  assert.equal(router.activeWorkspace(), "remote");
+  assert.equal(new Headers((native.at(-1)?.options as { headers?: HeadersInit })?.headers).get("x-terminus-workspace"), null);
+  router.close();
+});
+
+
+test("web source origins survive collisions and outdated owners without falling back to task routing", async () => {
+  for (const replies of [["cmp_mac", "cmp_vm"], ["cmp_vm", "cmp_mac"]]) {
+    const listing = (root: string | null, machine: string) => ({ workspaces: [{ id: "w", context_root: root, logo: `/${machine}/logo` }], active: "w" });
+    const vmAnswers: Record<string, unknown> = { list_workspaces: listing(null, "vm"), list_sources: [{ id: "same" }], remove_source: "vm", list_mentions: "vm", set_source_branch: "vm" };
+    const macAnswers: Record<string, unknown> = { list_workspaces: listing("root", "mac"), list_sources: [{ id: "same" }], remove_source: "mac" };
+    const links = { cmp_vm: fakeLink(vmAnswers), cmp_mac: fakeLink(macAnswers) };
+    const fleet = new Fleet({ self: null, connect: (info) => links[info.id as keyof typeof links], deadlines: { read: 40, action: 200, intent: 400 } });
+    fleet.setMachines([VM, MAC]);
+    const router = createRouter({ self: null, fleet, native: null });
+    const first = await router.handle("list_workspaces") as { workspaces: { logo: string }[] };
+    assert.equal(first.workspaces[0].logo, "cmp_mac~/mac/logo", "root and local metadata use the same envelope");
+    for (const machine of replies) await router.handle("list_sources", {}, on(machine));
+    await assert.rejects(router.handle("remove_source", { source: "same" }), (error: { detail: string }) => error.detail === "context_ambiguous");
+    assert.equal(await router.handle("remove_source", { source: "same" }, on("cmp_mac")), "mac", "the explicit envelope resolves a collision");
+    vmAnswers.list_workspaces = listing("another-root", "vm");
+    fleet.setMachines([VM, { ...MAC, outdated: true }]);
+    const partial = await router.handle("list_workspaces") as { workspaces: { context_root: string }[] };
+    assert.equal(partial.workspaces[0].context_root, "root", "an outdated owner is not replaced by an unrelated catalog");
+    assert.deepEqual(await router.handle("list_sources"), [{ id: "same" }], "the cached owner remains authoritative");
+    assert.equal(await router.handle("list_mentions"), "vm");
+    assert.equal(await router.handle("set_source_branch", { project: "p", source: "same" }), "vm", "project mutations retain their existing routing");
+    macAnswers.list_workspaces = listing(null, "mac");
+    fleet.setMachines([VM, MAC]);
+    const refreshed = await router.handle("list_workspaces") as { workspaces: { context_root: string }[] };
+    assert.equal(refreshed.workspaces[0].context_root, "another-root", "a confirmed absence releases the previous owner");
+    macAnswers.list_sources = [];
+    await router.handle("list_sources", {}, on("cmp_mac"));
+    assert.equal(await router.handle("remove_source", { source: "same" }), "vm", "a refreshed catalog removes obsolete collisions");
+    fleet.close();
+  }
+});
+
+test("handler approvals never fall back from a remote destination to the native engine", async () => {
+  const vm = fakeLink({});
+  const { router, native } = setup({ cmp_vm: vm }, { handler_action: { released: true } });
+  await router.handle("list_workspaces");
+  native.length = 0;
+  const args = { input: { workspace: "w", project: "p1", request: { action: "release", name: "reviewer" } } };
+  await assert.rejects(router.handle("handler_action", args, on("cmp_vm")));
+  assert.equal(native.length, 0);
+  assert.equal(vm.calls.length, 0);
+  assert.deepEqual(await router.handle("handler_action", args), { released: true });
+  assert.equal(native[0].command, "handler_action");
+  assert.equal((native[0].args.input as Args).workspace, "w");
 });

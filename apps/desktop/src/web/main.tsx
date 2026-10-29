@@ -13,13 +13,13 @@ import {
   type MachineState,
   RelaySession,
   linkedWorkspaces,
+  serviceFeatures,
   listComputers,
   listWorkspaces,
   createSpaceOrderSource,
   orderComputers,
   renameComputer,
-  screenProtocols,
-  screenUrl,
+  createScreenAccess,
   sessionProbe,
   startComputer,
   systemOf,
@@ -36,10 +36,10 @@ import { type OtherAccount, setCapabilities, type WebAccountsSource } from "../l
 import { deliver } from "../lib/serviceEvents";
 // In the page, not in the lazy app chunk: the stylesheet loads with the HTML.
 import "../styles/global.css";
-import { machineCompatibility, machineContracts } from "./compatibility";
 import { HomeLink } from "./HomeLink";
 import { installIpc } from "./ipc";
 import { webAccountProfile } from "./account";
+import { authLocation } from "./auth/return";
 import { webGithubAccount } from "./github-account";
 import { type Account, type Listing, SLOT_PREFIX, loadAccounts, ownerOf, pickAccount, readListings, rememberLast, removeExtra, savedListings } from "./accounts";
 import { forgetShellCache, setShellCacheScope } from "../lib/shellCache";
@@ -60,6 +60,10 @@ export type TerminusWebConfig = Partial<
 
 /** How often the page lists the computers again to pick up machines and links changed since it loaded; the desktop's cadence. */
 const RELIST = 10 * 60_000;
+/** A link seen in the events lists again after this pause, so the copies from every machine of the account make one read. */
+const RELIST_SOON = 1_000;
+/** The same unknown workspace asks for another list at most this often: one the control plane does not list does not loop. */
+const UNLINKED_AGAIN = 60_000;
 
 /**
  * A tab opened before a deploy asks for chunks the new build no longer has, and
@@ -76,7 +80,7 @@ window.addEventListener("vite:preloadError", (event) => {
 });
 
 const Picker = lazy(() => import("../features/machines/MachinePicker").then((m) => ({ default: m.MachinePicker })));
-const AccountMachines = lazy(() => import("./AccountMachines"));
+const AccountMachines = lazy(() => import("../features/machines/AccountMachines"));
 
 const browser: BrowserHost = {
   openUrl: (url) => void window.open(url, "_blank", "noopener,noreferrer"),
@@ -104,8 +108,8 @@ const infoOf = (c: Computer): MachineInfo => {
     id: c.computer_id,
     name: c.name?.trim() || c.computer_id,
     wakes: wakes(c),
-    outdated: machineCompatibility(c.contract) === "outdated",
     linked: linkedWorkspaces(c),
+    features: serviceFeatures(c),
     ...(os ? { os } : {}),
   };
 };
@@ -134,6 +138,7 @@ function rowLink(relay: RelaySession, row: () => string | undefined): Link {
 
 /** Another machine's slice changed: the window rereads just that. */
 function slicesChanged(changes: SliceChange[]) {
+  if (changes.includes("workspaces")) window.dispatchEvent(new CustomEvent("harness:workspace-name"));
   window.dispatchEvent(new CustomEvent("harness:machine-slices", { detail: { changes } }));
   if (changes.includes("attention")) window.dispatchEvent(new CustomEvent("harness:service-resync"));
 }
@@ -145,6 +150,13 @@ type Mounted = { storage: ReturnType<typeof pageStorage>; webAccounts?: WebAccou
 function mountApp(computers: Computer[], base: Base, before?: (id: string) => () => Promise<boolean>, mounted: Mounted = { storage: pageStorage() }): (computers: Computer[]) => void {
   const [changed, bump] = createSignal(0);
   let rows = new Map(computers.map((c) => [c.computer_id, c]));
+  // A workspace linked from the desktop after the page loaded: its events arrive before its row says it.
+  const unlinkedAt = new Map<string, number>();
+  let soon: ReturnType<typeof setTimeout> | undefined;
+  const relistSoon = () => {
+    clearTimeout(soon);
+    soon = setTimeout(() => void relistNow?.(), RELIST_SOON);
+  };
   const token = async () => base.getToken();
   let router: Router | null = null;
   const powers = new Map<string, string>();
@@ -158,22 +170,20 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
           getToken: base.getToken,
           onUnauthorized: base.onUnauthorized,
           beforeReconnect: before?.(info.id),
-          contracts: machineContracts(),
           // Un upgrade sin licencia no trae cuerpo: se pregunta por HTTP para no reintentar en bucle.
           probe: async () => sessionProbe(base.endpoint, await token(), info.id),
         }),
         () => rows.get(info.id)?.state,
       ),
-    compatible: (contract) => {
-      const verdict = machineCompatibility(contract);
-      return verdict === "unknown" ? null : verdict === "ok";
-    },
+    // Sin `contracts` ni `compatible`, como el teléfono: un motor con otro contrato
+    // sigue en servicio y solo falla la orden que no conoce (nunca la máquina entera).
     wake: async (id) => (await startComputer(base.endpoint, await token(), id)).kind === "ok",
     storage: mounted.storage,
     onSlice: () => bump((n) => n + 1),
     // La cola de aplazadas cambió (aquí, en el escritorio o en el teléfono): la lista se relee.
     onDeferred: (machine) => router?.deferredChanged(machine),
     onChange: (machine) => {
+      window.dispatchEvent(new CustomEvent("harness:machines"));
       bump((n) => n + 1);
       const now = fleet.power(machine);
       // Sin workspaces de nadie al abrir: la primera máquina que se enciende los trae.
@@ -182,7 +192,19 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
     },
     onEvents: (machine, events, gap) => {
       if (events.length) router?.events(machine, events);
-      if (gap) window.dispatchEvent(new CustomEvent("harness:service-resync"));
+      if (gap) {
+        window.dispatchEvent(new CustomEvent("harness:service-resync"));
+        window.dispatchEvent(new CustomEvent("harness:service-gap"));
+      }
+      // Renamed, linked or unlinked in the account's registry: the links of each machine may have changed too.
+      if (events.some((e) => e.name === "workspace.changed")) relistSoon();
+    },
+    onUnlinked: (_machine, workspaces) => {
+      const now = Date.now();
+      const fresh = workspaces.filter((w) => now - (unlinkedAt.get(w) ?? 0) >= UNLINKED_AGAIN);
+      if (!fresh.length) return;
+      for (const w of fresh) unlinkedAt.set(w, now);
+      relistSoon();
     },
   });
   // The account's workspaces list even with every machine of theirs asleep; an older control plane answers none.
@@ -213,6 +235,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
   };
   // A file dropped outside the chat would replace the page with it.
   for (const type of ["dragover", "drop"]) window.addEventListener(type, (e) => e.preventDefault());
+  const screens = createScreenAccess({ endpoint: base.endpoint, getToken: token, knows: (id) => !!fleet.info(id) });
   setCapabilities({
     inbox: import.meta.env.TERMINUS_ALPHA ? attentionCapability(false, window.location.pathname.replace(/\/+$/, "").endsWith("/inbox"), { userId: base.userId ?? mounted.webAccounts?.current.user_id, subscribe: base.subscribe, getToken: async () => await base.getToken(), unauthorized: async () => base.refresh ? await base.refresh() : false }) : undefined,
     spaceOrder: createSpaceOrderSource(base.endpoint, token),
@@ -233,7 +256,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
       return id ? { id, name: fleet.name(id), local: false } : undefined;
     },
     remoteCreate: (workspace) => active.createsOn(workspace),
-    machineScreen: (id) => (fleet.info(id)?.wakes ? async () => new WebSocket(screenUrl(base.endpoint, id), screenProtocols(await token())) : null),
+    machineScreen: (id) => screens.opener(id),
     machineOnCreate: (workspace) =>
       several() ? (
         <Suspense fallback={null}>
@@ -244,14 +267,13 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
         </Suspense>
       ) : null,
     accountComputers: {
+      workspaces: async () => listWorkspaces(base.endpoint, await token()),
       list: async () => listComputers(base.endpoint, await token()),
       rename: async (id, name) => renameComputer(base.endpoint, await token(), id, name),
-      outdated: (c) => machineCompatibility(c.contract) === "outdated",
       onRenamed: (id, name) => rename(id, name),
     },
     connectMachine: {
       list: async () => listComputers(base.endpoint, await token()),
-      outdated: (c) => machineCompatibility(c.contract) === "outdated",
       // La nueva suma su rebanada sin recargar la página ni cerrar las demás.
       onReady: () => void relistNow?.(),
     },
@@ -295,6 +317,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
   });
   return (fresh) => {
     rows = new Map(fresh.map((c) => [c.computer_id, c]));
+    active.registryChanged();
     const before = fleet.machines().map((m) => `${m.id}\u0000${m.name}`).join("\n");
     fleet.setMachines(orderComputers(fresh).map(infoOf));
     // Renamed from another window or the phone.
@@ -351,7 +374,7 @@ async function start(settings: WebSettings) {
   ]);
   aplicarLengua();
   const { endpoint } = settings;
-  const leave = () => window.location.assign(settings.login);
+  const leave = () => window.location.assign(authLocation(settings.login, window.location.origin, `${window.location.pathname}${window.location.search}`));
   if (!settings.supabaseUrl || !settings.supabaseKey) {
     console.error("terminus web: built without TERMINUS_WEB_SUPABASE_URL and TERMINUS_WEB_SUPABASE_KEY");
     return;
@@ -440,7 +463,7 @@ async function start(settings: WebSettings) {
 
   /** A refusal found after mounting covers the app: retrying the socket would not change it. */
   let blocked = false;
-  const block = (initial: { t: "license" } | { t: "not_yours" }) => {
+  const block = (initial: { t: "license" } | { t: "no_account" } | { t: "not_yours" }) => {
     if (blocked) return;
     blocked = true;
     const layer = document.createElement("div");
@@ -463,7 +486,7 @@ async function start(settings: WebSettings) {
             { endpoint, userId: current.user_id, refresh: () => session.unauthorized(), getToken: () => session.getToken(), onUnauthorized: () => void session.unauthorized(), subscribe: clear => { const { data } = session.client.auth.onAuthStateChange((event, value) => { if (event === "SIGNED_OUT" || (value && value.user.id !== current.user_id)) clear(); }); return () => data.subscription.unsubscribe(); } },
             (computerId) => async () => {
               const answer = await computersOf(endpoint, session);
-              if (answer.kind === "license") block({ t: "license" });
+              if (answer.kind === "license" || answer.kind === "no_account") block({ t: answer.kind });
               // One computer gone from several only stops its own session.
               else if (answer.kind === "ok" && !answer.value.some((c) => c.computer_id === computerId)) {
                 if (!several) block({ t: "not_yours" });
@@ -499,6 +522,7 @@ let relisting = false;
 const given = (window as Window & { terminusWeb?: TerminusWebConfig }).terminusWeb ?? {};
 const preset = given.computers ?? (given.computerId ? [{ computer_id: given.computerId, state: "unknown" }] : null);
 const connecting = window.location.pathname.replace(/\/+$/, "") === `${import.meta.env.BASE_URL}connect`;
+const authenticating = window.location.pathname.replace(/\/+$/, "") === `${import.meta.env.BASE_URL}auth`;
 
 /**
  * Un teléfono abre el Terminus del teléfono (`<base>m/`, la app de Expo para
@@ -514,8 +538,8 @@ function toPhone(): boolean {
     window.location.replace(`${phone}?to=${encodeURIComponent(path.slice(phone.length - 1) + window.location.search)}`);
     return true;
   }
-  if (path.startsWith(phone) || connecting || preset || given.addAccount || chosenWebLayout(window) !== "mobile") return false;
-  window.location.replace(phone);
+  if (path.startsWith(phone) || connecting || authenticating || preset || given.addAccount || chosenWebLayout(window) !== "mobile") return false;
+  window.location.replace(`${phone}${window.location.search}`);
   return true;
 }
 
@@ -525,7 +549,8 @@ if (import.meta.env.TERMINUS_ALPHA && window.location.pathname.replace(/\/+$/, "
   void import("./attention/main").then((m) => m.startAttention(__TERMINUS_WEB__));
 } else if (toPhone()) {
   // Se va al del teléfono: no se monta nada aquí.
-} else if (connecting) void import("./connect/main").then((m) => m.startConnect({ ...__TERMINUS_WEB__, ...given } as WebSettings, document.getElementById("root") as HTMLElement));
+} else if (authenticating) void import("./auth/main").then((m) => m.startAuth({ ...__TERMINUS_WEB__, ...given } as WebSettings, document.getElementById("root") as HTMLElement));
+else if (connecting) void import("./connect/main").then((m) => m.startConnect({ ...__TERMINUS_WEB__, ...given } as WebSettings, document.getElementById("root") as HTMLElement));
 else if (given.addAccount) {
   const options = given.addAccount;
   void import("./AddAccount").then((m) => m.startAddAccount(document.getElementById("root") as HTMLElement, options));

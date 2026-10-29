@@ -40,6 +40,28 @@ test("la misma suscripción une máquinas, elige una encendida y conserva el id 
   assert.deepEqual(groups[1].members, [{ machine: "vm", id: "team", on: false }]);
 });
 
+test("OpenCode une el mismo correo y orgID aunque el plan visible cambie", () => {
+  const groups = groupAccounts("opencode-zen", [
+    { machine: "vm", on: false, accounts: [{ id: "oauth", identity: "Ana@Example.com", credential_group: "org-1", plan: "Go" }] },
+    { machine: "mac", on: true, accounts: [{ id: "copy", identity: "ana@example.com", credential_group: "org-1" }] },
+  ]);
+  assert.equal(groups.length, 1);
+  assert.deepEqual(groups[0].members, [
+    { machine: "vm", id: "oauth", on: false },
+    { machine: "mac", id: "copy", on: true },
+  ]);
+  assert.deepEqual(groups[0].usageFrom, { machine: "mac", id: "copy", on: true });
+});
+
+test("OpenCode no une el mismo correo en organizaciones distintas", () => {
+  const groups = groupAccounts("opencode-zen", [
+    { machine: "vm", on: true, accounts: [{ id: "org-1", identity: "ana@example.com", credential_group: "org-1", plan: "Go" }] },
+    { machine: "mac", on: true, accounts: [{ id: "org-2", identity: "ana@example.com", credential_group: "org-2", plan: "Go" }] },
+  ]);
+  assert.equal(groups.length, 2);
+  assert.ok(groups.every((group) => group.members.length === 1));
+});
+
 test("el tipo desconocido y dos cuentas del mismo tipo en una máquina no se atribuyen por correo", () => {
   const groups = groupAccounts("claude", [
     { machine: "vm", on: true, accounts: [{ id: "a", identity: "ana@example.com", plan: "team" }, { id: "b", identity: "ana@example.com", plan: "team" }] },

@@ -3,13 +3,13 @@
  * el valor por defecto; la entrada web (`src/web/main.tsx`) lo fija antes de
  * importar la app y no cambia después.
  */
-import type { Answer, Computer, CredentialSource, MemorySource, SpaceOrderSource } from "@terminus/computers";
-import type { JSX } from "solid-js";
+import type { Answer, AccountWorkspace, Computer, CredentialSource, MemorySource, SpaceOrderSource } from "@terminus/computers";
+import { createRoot, createSignal, type JSX } from "solid-js";
 import type { AccountProfileSource } from "../features/settings/account-profile";
 import type { Account } from "../features/settings/accounts-store";
 import type { WorkspaceAssetsSource } from "../web/workspace-assets";
 
-/** Una cuenta agrupada en la web: las máquinas donde tiene sesión (`@terminus/fleet`, `merge.ts`). */
+/** Una cuenta agrupada (web y escritorio): las máquinas donde tiene sesión (`@terminus/fleet`, `merge.ts`). */
 export type AccountMachinesProps = {
   account: Account;
   provider: string;
@@ -21,9 +21,8 @@ export type AccountMachinesProps = {
 /** Las computadoras de la cuenta en Configuración: leerlas, renombrarlas y avisar del nombre nuevo. */
 export type AccountComputersSource = {
   list: () => Promise<Answer<Computer[]>>;
+  workspaces?: () => Promise<Answer<AccountWorkspace[]>>;
   rename: (id: string, name: string) => Promise<Answer<{ computer_id: string; name: string }>>;
-  /** Si su motor no habla el contrato de esta ventana. */
-  outdated?: (computer: Computer) => boolean;
   /** Quien pinta nombres de máquina (la flota) toma el nuevo sin recargar. */
   onRenamed: (id: string, name: string) => void;
 };
@@ -80,7 +79,7 @@ export type Capabilities = {
   remoteCreate?: (workspace: string | null) => { machine: string; lead: boolean } | null;
   /** Los adjuntos salen del navegador como bytes: el motor solo guarda imágenes (`guardar_imagen_pegada`). */
   browserFiles?: boolean;
-  /** El visor de la pantalla de una VM administrada (solo ver); `null` si esa máquina no tiene. */
+  /** Transporte para intentar ver la pantalla; `null` si la máquina no pertenece a esta cuenta. La captura la decide el motor. */
   machineScreen?: (machine: string) => (() => Promise<WebSocket>) | null;
   /** `license_required` si el relay detuvo las otras máquinas por falta de Terminus de pago (aviso `TerminusLicense`); `null` si no. */
   machinesLicense?: () => "license_required" | null;
@@ -112,7 +111,6 @@ export type Capabilities = {
   webAccounts?: WebAccountsSource;
   connectMachine?: {
     list: () => Promise<Answer<Computer[]>>;
-    outdated?: (computer: Computer) => boolean;
     onReady: (computer: Computer) => void;
   };
 };
@@ -120,9 +118,19 @@ export type Capabilities = {
 const DESKTOP: Capabilities = { nativeWindow: true, updater: true, localSetup: true, computerStatus: false, danilAccount: true, radiant: true };
 
 let current = DESKTOP;
+const [screenAccess, setScreenAccess] = createRoot(() => createSignal<Capabilities["machineScreen"]>(DESKTOP.machineScreen));
 
 export const capabilities = (): Capabilities => current;
 
 export function setCapabilities(next: Capabilities) {
   current = next;
+  setScreenAccess(() => next.machineScreen);
+}
+
+export const machineScreen = (machine: string) => screenAccess()?.(machine) ?? null;
+
+/** Cada reintento usa la sesión vigente, aunque la pestaña sobreviviera a una reconexión de la cuenta. */
+export function openMachineScreen(machine: string): Promise<WebSocket> {
+  const open = machineScreen(machine);
+  return open ? open() : Promise.reject(new Error("screen_unavailable"));
 }

@@ -1,5 +1,5 @@
 {
-  "common.failure.generic": "Algo se rompió aquí dentro. Vuelve a intentar.",
+  "common.failure.generic": "No se pudo completar la acción. Revisa si se completó antes de reintentar; si persiste, comparte el detalle con soporte.",
   "common.failure.detail": "Detalle para reportarlo",
   "common.install.no_space": "Necesitas {needed} libres y tienes {free}. Libera espacio y vuelve a intentar.",
   "common.install.no_space_plain": "No hay espacio suficiente en el disco. Libera espacio y vuelve a intentar.",
@@ -125,5 +125,7 @@
   "common.duration.min_sec": "{minutes}m {seconds}s",
   "common.duration.sec": "{seconds}s",
   "common.usage.millions": "{value}M",
-  "common.usage.thousands": "{value}k"
+  "common.usage.thousands": "{value}k",
+  "common.part.failed": "No se pudo cargar esta parte de la ventana.",
+  "common.part.retry": "Reintentar"
 }

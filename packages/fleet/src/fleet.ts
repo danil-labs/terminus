@@ -14,7 +14,7 @@
  * La máquina de la ventana no pasa por aquí: quien la tiene la lee nativa y
  * suma su rebanada con `merge`.
  */
-import { type AccountWorkspace, type Blocked, type CallResult, type DeferredFrame, type EngineInfo, type EventsPage, type MachineState, type SystemId, cachedAt, callWorkspace, isDeferrable, linkedAttention, linkedEvents, linkedListing, requestId } from "../../computers/src/index.ts";
+import { type AccountWorkspace, type Blocked, type CallResult, type DeferredFrame, type EngineInfo, type EventsPage, type MachineState, type SystemId, cachedAt, callWorkspace, isDeferrable, linkedAttention, linkedEvents, linkedListing, requestId, unlinkedWorkspaces } from "../../computers/src/index.ts";
 import { DEADLINES, type Deadlines, classOf } from "./deadlines.ts";
 import { FleetError, fromRelay } from "./errors.ts";
 import { argsFor } from "./ids.ts";
@@ -25,7 +25,8 @@ type Row = Record<string, unknown>;
 
 /** `outdated`: su motor habla otro contrato, sabido por el plano de control. `linked`: `null` enseña todos sus workspaces. */
 /** `os` solo si se sabe: la tarjeta de la tarea lo lee y, si falta, no inventa un sistema. */
-export type MachineInfo = { id: string; name: string; wakes: boolean; outdated?: boolean; linked?: ReadonlySet<string> | null; os?: SystemId };
+/** `features`: lo que su motor anuncia (`status.service_features`); cada función se enciende por máquina. */
+export type MachineInfo = { id: string; name: string; wakes: boolean; outdated?: boolean; linked?: ReadonlySet<string> | null; os?: SystemId; features?: readonly string[] };
 export type Power = "on" | "off" | "starting" | "outdated";
 
 export type Envelope = { machine: string; workspace: string | null; command: string; args?: Row };
@@ -70,6 +71,12 @@ export type FleetConfig = {
   onEvents?(machine: string, events: FleetEvent[], gap: boolean): void;
   /** Cambió la cola de acciones aplazadas de `machine` (se encoló o se aplicó una): la lista se relee. */
   onDeferred?(machine: string, frame: DeferredFrame): void;
+  /**
+   * Llegaron eventos de `workspaces` que ninguna máquina tiene vinculados según
+   * su fila (`MachineInfo.linked`). El relay ya los dejó pasar: se vincularon
+   * después de listar las computadoras, y la lista se relee para verlos.
+   */
+  onUnlinked?(machine: string, workspaces: string[]): void;
   /** `false`: los eventos llegan con los ids de su máquina (el teléfono nombra cada tarea con su máquina aparte). */
   panelIds?: boolean;
 };
@@ -99,6 +106,8 @@ export class Fleet {
   private readonly book: SliceBook;
   private readonly deadlines: Deadlines;
   private readonly inflight = new Map<string, Promise<Slice>>();
+  private readonly contextRows = new Map<string, Map<string, Row>>();
+  private readonly contextOwners = new Map<string, string>();
   private listening = false;
   private closed = false;
   private readonly config: FleetConfig;
@@ -123,6 +132,7 @@ export class Fleet {
         this.drop(member);
         this.members.delete(id);
         this.book.forget(id);
+        this.contextRows.delete(id);
         this.config.onChange?.(id);
       }
     for (const info of next.values()) {
@@ -132,7 +142,8 @@ export class Fleet {
         continue;
       }
       const before = member.info;
-      const same = before.name === info.name && before.wakes === info.wakes && before.os === info.os && !!before.outdated === !!info.outdated && sameLinks(before.linked ?? null, info.linked ?? null);
+      const same = before.name === info.name && before.wakes === info.wakes && before.os === info.os && !!before.outdated === !!info.outdated && sameLinks(before.linked ?? null, info.linked ?? null)
+        && (before.features ?? []).join() === (info.features ?? []).join();
       // Un contrato que vuelve a ser compatible quita la marca que puso el relay.
       if (before.outdated && !info.outdated) member.outdated = false;
       member.info = { ...info };
@@ -230,6 +241,14 @@ export class Fleet {
     });
   }
 
+  /** Si alguna máquina tiene `workspace` vinculado según su fila (o no dice cuáles tiene). */
+  private linkedAnywhere(workspace: string): boolean {
+    return [...this.members.values()].some((m) => {
+      const linked = m.info.linked ?? null;
+      return linked === null || linked.has(workspace);
+    });
+  }
+
   inRegistry(workspace: string | null): boolean {
     return !!workspace && !!this.registry?.some((w) => w.id === workspace);
   }
@@ -252,6 +271,7 @@ export class Fleet {
       registry: this.registry,
       shared: (s) => this.shared.has(s),
       name: (m) => this.name(m),
+      workspaceContext: (workspace) => this.workspaceContext(workspace),
     };
   }
 
@@ -260,9 +280,33 @@ export class Fleet {
     return encode(this.context(), machine, value, command);
   }
 
+  private workspaceContext(workspace: string): { machine: string; row: Row } | null {
+    const members = new Set([...(this.self ? [this.self] : []), ...this.membersOf(workspace)]);
+    const primary = (machine: string) => {
+      const row = this.contextRows.get(machine)?.get(workspace);
+      return row && typeof row.context_root === "string" && row.context_root.trim() ? row : null;
+    };
+    const previous = this.contextOwners.get(workspace);
+    const machine = previous && members.has(previous) && this.power(previous) === "outdated" && primary(previous)
+      ? previous
+      : [...members].find((id) => primary(id));
+    if (!machine) {
+      this.contextOwners.delete(workspace);
+      return null;
+    }
+    this.contextOwners.set(workspace, machine);
+    return { machine, row: primary(machine)! };
+  }
+
   /** Las rebanadas juntas; `undefined` si ninguna trae valor (`merge.ts`). */
   merge(command: string, slices: readonly Slice[], workspace: string | null = null): unknown {
-    for (const s of slices) if (s.has) this.learn(command, s.value);
+    for (const s of slices) if (s.has) {
+      this.learn(command, s.value);
+      if (command === "list_workspaces" || command === "workspaces_startup") {
+        const rows = (s.value as { workspaces?: Row[] } | null)?.workspaces;
+        if (Array.isArray(rows)) this.contextRows.set(s.machine, new Map(rows.filter((row) => typeof row?.id === "string").map((row) => [row.id as string, row])));
+      }
+    }
     return merge(this.context(), command, slices, workspace);
   }
 
@@ -425,6 +469,7 @@ export class Fleet {
     const kind = classOf(command);
     if (kind !== "read" && this.isOutdated(member)) throw new FleetError("version_mismatch", machine);
     const off = OFF.includes(member.link.state());
+    if (off && ["list_storage", "reclaim_storage", "empty_build_cache", "collect_orphans"].includes(command)) throw new FleetError("machine_off", machine);
     // Archivar, borrar, renombrar, fijar o mover de space: el relay la guarda sin encenderla.
     if (off && kind !== "read" && !this.defers(command, args)) {
       if (!member.info.wakes) throw new FleetError("machine_off", machine, null, false);
@@ -432,7 +477,7 @@ export class Fleet {
       if (kind === "action") await this.wakeMember(member);
     }
     const workspace = callWorkspace(envelope.workspace, args);
-    const timeout = this.deadlines[kind];
+    const timeout = envelope.command === "list_storage" ? this.deadlines.action : this.deadlines[kind];
     const id = requestId();
     const attempt = async (retried: boolean): Promise<CallResult> => {
       try {
@@ -443,7 +488,7 @@ export class Fleet {
         if (e.code === "version_mismatch") this.markOutdated(member);
         if (e.code === "not_remotely_startable") throw new FleetError("machine_off", machine, null, false);
         const again = kind === "read" ? RETRY_READ : RETRY_ACTION;
-        if (retried || !again.has(e.code)) throw e;
+        if (retried || command === "list_storage" || !again.has(e.code)) throw e;
         return attempt(true);
       }
     };
@@ -526,6 +571,9 @@ export class Fleet {
       }) ?? (() => {}),
       link.onEvents((page) => {
         if (!this.listening || this.isOutdated(member)) return;
+        // Uno vinculado en otra máquina de la cuenta también llega por esta (el `account` del relay): eso no es una lista vieja.
+        const unknown = unlinkedWorkspaces(page.events ?? [], member.info.linked ?? null).filter((w) => !this.linkedAnywhere(w));
+        if (unknown.length) this.config.onUnlinked?.(info.id, unknown);
         const linked = linkedEvents(page.events ?? [], member.info.linked ?? null);
         const events = this.config.panelIds === false ? linked.map((e) => ({ name: e.name, payload: e.payload })) : linked.map((e) => ({ name: e.name, payload: encodeEvent(this.context(), info.id, e.name, e.payload) }));
         this.config.onEvents?.(info.id, events, page.gap === true);

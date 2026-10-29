@@ -18,6 +18,21 @@ export {
   startComputer,
 } from "./api.ts";
 export {
+  type AuditEntry,
+  type Connection,
+  type ConnectionMachine,
+  type ConnectionPatch,
+  type ConnectionState,
+  type UpdatedConnection,
+  PERMISSION_MODES,
+  connectionAudit,
+  listConnections,
+  mcpUrl,
+  revokeConnection,
+  updateConnection,
+  webhookUrlOk,
+} from "./connections.ts";
+export {
   type MachineState,
   type Power,
   DEFERRED_COMMANDS,
@@ -36,7 +51,7 @@ export {
   wakes,
 } from "./machine.ts";
 export { type WorkspaceGroup, type WorkspaceRow, groupWorkspaces, hasAccountWorkspaces, registryProjects, withRegistry } from "./fleet.ts";
-export { callWorkspace, hasLinkedWorkspaces, linkedAttention, linkedEvent, linkedEvents, linkedListing, linkedWorkspaces, onlyLinked } from "./links.ts";
+export { callWorkspace, hasLinkedWorkspaces, linkedAttention, linkedEvent, linkedEvents, linkedListing, linkedWorkspaces, onlyLinked, serviceFeatures, unlinkedWorkspaces } from "./links.ts";
 export { type Compatibility, machineCompatibility, machineContracts } from "./compatibility.ts";
 export {
   type ConnectHop,
@@ -70,7 +85,7 @@ export {
   sessionUrl,
   tokenExpiry,
 } from "./relay.ts";
-export { type ScreenEnd, SCREEN_SUBPROTOCOL, screenEnd, screenProtocols, screenUrl } from "./screen.ts";
+export { type ScreenEnd, SCREEN_CONTROL_DESKTOP, SCREEN_SUBPROTOCOL, createScreenAccess, screenEnd, screenProtocols, screenUrl } from "./screen.ts";
 export {
   type AccountGroup,
   type AccountMember,

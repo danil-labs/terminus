@@ -1,4 +1,6 @@
 {
+  "projects.tabs.keep": "Keep tab",
+  "projects.sessions.context": "Context",
   "projects.agent_tasks.search": "Search tasks…",
   "projects.agent_tasks.no_results": "No matching tasks.",
   "projects.agent_tasks.open": "Show tasks",
@@ -131,6 +133,10 @@
   "projects.agents.telegram_token_how": "Get it in Telegram: message @BotFather, send /newbot and paste the token it gives you here. Each agent uses its own bot. It is stored encrypted and never shown again.",
   "projects.agents.telegram_token_save": "Save",
   "projects.context.connect": "Connect",
+  "projects.context.target_changed": "The task or workspace changed. Attach the source again in the current destination.",
+  "projects.context.task_unavailable": "The machine for this task is not available yet. Try again after it finishes loading.",
+  "projects.context.ambiguous": "This source exists on multiple machines. Choose the machine to continue.",
+  "projects.context.unavailable": "The main context source could not be read. Check its connection in Settings.",
   "projects.context.empty": "No context source",
   "projects.context.pick_folder": "Select folder",
   "projects.error.clone_cancelled": "Clone cancelled.",
@@ -389,5 +395,6 @@
   "projects.memory.history_error": "I could not read the account's history.",
   "projects.memory.history_loading": "Reading the history…",
   "projects.memory.history_title": "History of {file}",
-  "projects.memory.history_view": "See this version"
+  "projects.memory.history_view": "See this version",
+  "projects.view.opening": "Opening folder…"
 }

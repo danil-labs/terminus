@@ -37,13 +37,16 @@ import type {
 import { readVisualHtml, type VisualPart, type VisualWhole, VISUAL_FILE, VISUAL_TREE } from "@terminus/chat/visual";
 import { arrangeSpaces, spaceOrder, type AccountWorkspace, groupWorkspaces, linkedAttention, onlyLinked, registryProjects, withRegistry } from "@terminus/computers";
 import { type ChatBackgroundView, chatBackgroundImageUrl, chatBackgroundView, isSingleAttention } from "@terminus/protocol";
-import { type FlatRow, flattenTasks, launcherOf } from "@terminus/tasks";
+import { type FlatRow, flattenTasks, launcherOf, REMOTE_CHILD_FEATURE, type RemoteScope, remoteLauncherOf } from "@terminus/tasks";
+import { AUTO_MODE } from "./composer.ts";
 import { type Host, HostError } from "./hosts.ts";
 
 /** Una tarea de la lista, con la máquina y la carpeta de donde viene. */
 export type Task = SessionRow & {
   /** `computer_id` o `bridge`. */
   host: string;
+  /** Hija remota: la `taskKey` de su coordinador en otra máquina (`mergeSnapshots`). */
+  remote_launcher?: string | null;
   workspace: string;
   /** Id de la carpeta en su máquina; `""` es sin carpeta. */
   folder: string;
@@ -87,6 +90,8 @@ export type HostSnapshot = {
   providers: ProviderInfo[];
   /** Si salió de la copia del relay (máquina apagada): cuándo. */
   cachedAt: number | null;
+  /** Lo que el motor de la máquina anuncia (`status.service_features`). */
+  features?: readonly string[];
 };
 
 const off = (error: unknown) => error instanceof HostError && (error.code === "machine_off" || error.code === "machine_asleep");
@@ -281,6 +286,7 @@ export async function snapshotOf(host: Host, workspace: string): Promise<HostSna
     live,
     providers: Array.isArray(providers) ? providers : [],
     cachedAt: at.cachedAt,
+    features: host.features?.() ?? [],
   };
 }
 
@@ -325,6 +331,16 @@ export function mergeSnapshots(parts: HostSnapshot[], tagMachines: (host: string
     for (const task of part.delegated) delegated.push(tag ? { ...task, machine: tag.machine, machine_on: tag.on } : task);
     for (const id of part.live) live.add(`${part.host}/${id}`);
     if (part.cachedAt !== null) cached = Math.max(cached ?? 0, part.cachedAt);
+  }
+  // Una hija remota (otra máquina la mandó crear) va con su coordinador si está a la vista, como en el riel.
+  const remote: RemoteScope = {
+    announces: (machine) => !!parts.find((p) => p.host === machine)?.features?.includes(REMOTE_CHILD_FEATURE),
+    idOf: (machine, task) => taskKey({ host: machine, id: task }),
+  };
+  const keys = new Set(tasks.map(taskKey));
+  for (const task of tasks.splice(0)) {
+    const launcher = remoteLauncherOf({ ...task, machine: task.host }, remote);
+    (launcher && !task.pinned && keys.has(launcher) ? delegated : tasks).push(launcher ? { ...task, remote_launcher: launcher } : task);
   }
   tasks.sort((a, b) => b.created_at - a.created_at);
   const providers = Object.fromEntries(parts.map((p) => [p.host, p.providers]));
@@ -377,7 +393,7 @@ export async function loadTask(host: Host, workspace: string, folder: string, id
       questions: remaining,
     }] : [];
   });
-  return { session, permissions: pending?.permissions ?? [], questions, running: live.includes(id), cachedAt: at.cachedAt };
+  return { session, permissions: pending?.permissions ?? [], questions, running: live.includes(id) && host.power() === "on", cachedAt: at.cachedAt };
 }
 
 /**
@@ -532,6 +548,22 @@ export function respondPermission(host: Host, workspace: string, id: string, req
   return host.call("respond_permission", workspace, { session: id, requestId, allow });
 }
 
+/**
+ * Elegir modo con el turno en marcha, como `elegirModo` del escritorio: el
+ * turno vivo arrancó con el modo de entonces y no lo relee, así que se le pide
+ * al motor. Pasar a automático además contesta lo que el turno ya pidió, como
+ * el botón «Aprobar»; si mientras tanto se eligió otro modo (`still` en falso), ya no.
+ */
+export async function switchLiveMode(host: Host, workspace: string, folder: string, id: string, mode: string, still: () => boolean = () => true) {
+  await host.call("set_permission_mode", workspace, { project: folder, session: id, mode });
+  if (mode !== AUTO_MODE) return;
+  const now = await loadTask(host, workspace, folder, id);
+  for (const p of now.permissions) {
+    if (!still()) return;
+    await respondPermission(host, workspace, id, p.request_id, true);
+  }
+}
+
 export async function answerQuestion(host: Host, workspace: string, folder: string, id: string, pending: PendingQuestion, chosen: Record<string, string[]>, free: Record<string, string>) {
   const respuestas: Answer[] = pending.questions.map((q) => ({
     turn: pending.turn,
@@ -569,11 +601,16 @@ export async function attentionOf(host: Host): Promise<WorkspaceAttention[]> {
   return linkedAttention(list, host.linked);
 }
 
-// --- Fijar y archivar (la vista previa) -----------------------------------------
+// --- Fijar, renombrar y archivar (la vista previa) ------------------------------
 
 /** Fijar o desfijar, como la ventana (`set_session_pinned`). Con la máquina apagada, el relay lo aplaza. */
 export async function setPinned(host: Host, workspace: string, folder: string, id: string, pinned: boolean) {
   await host.call("set_session_pinned", workspace, { project: folder, id, pinned });
+}
+
+/** Cambiarle el nombre, como la ventana (`rename_session`). Con la máquina apagada, el relay lo aplaza. */
+export async function renameTask(host: Host, workspace: string, folder: string, id: string, title: string) {
+  await host.call("rename_session", workspace, { project: folder, id, title });
 }
 
 /**
@@ -739,9 +776,12 @@ export async function accountsOf(host: Host, workspace: string | null, provider:
   return read<AccountList | null>(host, "list_accounts", workspace, { provider }, null, at);
 }
 
+export async function limitsSnapshotOf(host: Host, workspace: string | null, provider: string, id: string) {
+  return host.call<AccountLimits | null>("account_limits", workspace, { provider, id, force: false }).catch(() => ({ value: null, cachedAt: null }));
+}
+
 export async function limitsOf(host: Host, workspace: string | null, provider: string, id: string): Promise<AccountLimits | null> {
-  const at = { cachedAt: null as number | null };
-  return read<AccountLimits | null>(host, "account_limits", workspace, { provider, id, force: false }, null, at).catch(() => null);
+  return (await limitsSnapshotOf(host, workspace, provider, id)).value;
 }
 
 /** Cerrar la sesión de una cuenta en una máquina (`remove_account`), como la ✕ de la chapa en la web. */

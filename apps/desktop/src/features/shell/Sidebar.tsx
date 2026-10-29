@@ -30,7 +30,7 @@ import {
 import { type ClonEnCurso, faseDeClon } from "../projects/AddWorkdir";
 import { AstroAvatar } from "../projects/AstroAvatar";
 import { watchHandlerStatuses } from "../projects/handlerPresence";
-import NewAgent, { type ModelChoices } from "../projects/NewAgent";
+import type { ModelChoices } from "../projects/NewAgent";
 import { watchProfiles } from "../projects/profiles";
 import Sessions, { type SessionRow } from "../projects/Sessions";
 import type { Etapa } from "../projects/TaskStage";
@@ -47,6 +47,9 @@ import {
 import type { DockAgent } from "./dockLayout";
 import { flattenTasks, folderCounts } from "./sidebarTasks";
 import { machineName, machines } from "../machines/store";
+// Solo al crear un encargado: fuera de la carga inicial.
+import { LazyPart, retryableLazy } from "../../ui/LazyPart";
+const NewAgent = retryableLazy(() => import("../projects/NewAgent"));
 
 // Fuera de la carga inicial: el botón y el dock llegan un instante después de la lista.
 const SidebarFilter = lazy(() => import("./SidebarFilter").then((m) => ({ default: m.SidebarFilter })));
@@ -102,6 +105,9 @@ export default function Sidebar(props: {
   collapsed: boolean;
   onToggle: () => void;
   onPick: (project: string, id: string) => void;
+  draggedTask?: string | null;
+  dragFolder?: string | null;
+  onDrag?: (project: string, row: SessionRow, event: PointerEvent) => void;
   onNew: () => void;
   onRenombrarProyecto: (id: string, name: string) => Promise<void> | void;
   onBorrarProyecto: (id: string) => Promise<void> | void;
@@ -358,6 +364,7 @@ export default function Sidebar(props: {
    */
   const Historial = (p: { filas: SessionRow[]; clave: string; sinCarpeta?: boolean }) => (
     <Sessions sidebar
+      draggedTask={props.draggedTask}
       density={vista().density}
       hideFolder={p.sinCarpeta}
       sessions={p.filas}
@@ -373,6 +380,7 @@ export default function Sidebar(props: {
       destinos={[]}
       destinosDe={(row) => destinos(carpetaDe(row.id))}
       carpetaDe={(row) => nombreDe(carpetaDe(row.id))}
+      onDrag={props.onDrag ? (row, event) => props.onDrag?.(carpetaDe(row.id), row, event) : undefined}
       onPick={(s) => {
         props.onPick(carpetaDe(s), s);
         setDesplegado(false);
@@ -478,7 +486,7 @@ export default function Sidebar(props: {
             fallback={
               <div
                 data-destino={g().kind === "folder" ? "" : undefined}
-                class={cn("rounded-[var(--radius-sm)]", g().kind === "folder" && destinoEnVuelo() === "" && RECIBE_LA_TAREA)}
+                class={cn("rounded-[var(--radius-sm)]", g().kind === "folder" && (props.dragFolder ?? destinoEnVuelo()) === "" && RECIBE_LA_TAREA)}
               >
                 <Rotulo
                   tono={necesita() ? "need" : undefined}
@@ -505,6 +513,7 @@ export default function Sidebar(props: {
             {(proj) => (
               <Suspense>
                 <FolderGroupHeader
+                  dragFolder={props.dragFolder}
                   p={proj()}
                   rotulo={g().machine === undefined ? undefined : titulo()}
                   maquina={g().machine}
@@ -581,12 +590,12 @@ export default function Sidebar(props: {
       // fuera de la vista lo que estuviera a la derecha, como el «+».
       class="relative z-40 h-full min-h-0 w-full min-w-0 overflow-hidden"
     >
-      <Show when={creatingAgentIn()}>{project => <NewAgent
+      <Show when={creatingAgentIn()}>{project => <LazyPart><NewAgent
         abierto onAbrir={open => { if (!open) setCreatingAgentIn(null); }}
         project={project().id}
         modelos={props.modelos}
         onCreado={() => setCreatingAgentIn(null)}
-      />}</Show>
+      /></LazyPart>}</Show>
       <SidebarShell
         state={props.collapsed ? "collapsed" : "expanded"}
         class="h-full w-full min-w-0"

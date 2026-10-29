@@ -28,6 +28,11 @@ window` to open another window against the running engine.
 All commands accept `--lab <dir>` to use another lab folder. The engine's log is
 `engine.log` in the lab, the window's stderr is `window.err`.
 
+The lab drops every `SELDON_*`, `TERMINUS_*` and `DANIL_*` variable of the calling
+shell, so it never signs in with the machine's real Danil credential. The one
+exception is a `DANIL_COMPUTERS_URL` pointing at `localhost`, `127.0.0.1` or `[::1]`,
+for a local fake control plane.
+
 On a machine with little memory, limit Rust parallelism:
 `CARGO_BUILD_JOBS=2 pnpm window:build`.
 
@@ -70,11 +75,18 @@ Build-time settings (environment variables; all are public values):
 | `TERMINUS_WEB_ENDPOINT` | `https://computers.danil.ai` | Control plane and relay; added to `connect-src` as `https` and `wss` |
 | `TERMINUS_WEB_SUPABASE_URL` | none | The Danil app's Supabase project; added to `connect-src` |
 | `TERMINUS_WEB_SUPABASE_KEY` | none | Its publishable (anon) key |
-| `TERMINUS_WEB_LOGIN` | `/` | Where to go when there is no session |
+| `TERMINUS_WEB_LOGIN` | `<base>auth` | Browser sign-in entry when there is no session; an override must preserve `next` |
 | `TERMINUS_WEB_CONNECT` | empty | Extra `connect-src` sources |
 
-The page is served on the Danil app's origin, so it reads the Supabase session
-that app stored (`supabase.auth.getSession()`); it never signs in. After a 401
+The page shares the Danil app's origin and Supabase session storage. Without a
+session it opens `<base>auth`, shared with the phone browser and device approval.
+This entry supports email/password registration and sign-in, Google and Microsoft,
+email confirmation and resending confirmation. Authentication callbacks run here
+before the machine gate or phone redirect. `next` stays inside the configured
+Terminus base and travels in the callback URL, including a device code; it does
+not depend on the original tab's storage. Supabase must allow that callback URL
+and its email templates must preserve the supplied redirect. Registration does
+not grant a license or provision a machine. After a 401
 from the API or a relay close 4003 it calls `refreshSession()` and, if that
 fails, goes to the login. It lists the person's computers (`GET
 /v1/computers`), opens the only one or the remembered one, or shows a picker
@@ -133,6 +145,44 @@ its contract from those bytes, so it refuses the pinned engine until a
 ([runtime-binary-release.md](https://github.com/danil-labs/seldon-host/blob/dev/docs/runtime-binary-release.md)) and pinned here. Until then
 the `contract` guard requires the pending contract to be named in
 `MOTOR_PENDIENTE`, and `publish.yml` refuses to publish.
+
+## Bundled work tools
+
+Git, Python with the document libraries, uv, ripgrep, agent-browser and Cua
+ship prepared inside the app; nothing is extracted or installed at first
+launch. The pins are `resources/work-tools/<target>/pins.json` and
+`documents-requirements.txt` (every wheel with its hash). draw.io is a plugin,
+not part of this base.
+
+```sh
+python3 scripts/work-tools.py prepare --target x86_64-unknown-linux-gnu --download
+python3 scripts/work-tools-smoke.py build/work-tools/x86_64-unknown-linux-gnu
+python3 tests/release/work-tools.test.py
+```
+
+`prepare` downloads into `build/work-tools/.payloads/`, extracts every archive
+into one tree, installs the wheels with the pinned uv (`--target`
+`--python-platform`, so the x86_64 macOS tree builds on Apple silicon without
+Rosetta), drops the packages' `tests/`, precompiles bytecode with
+`--invalidation-mode unchecked-hash`, adds `EXTERNALLY-MANAGED` and the
+`python` alias, and writes `inventory.json` and `manifest.json`. Building a
+macOS tree off macOS needs `--cross` and skips Cua's signature check; it is
+never used for packaging. `--tauri-config` writes the overlay `publish.yml`
+passes to `tauri build`: Tauri's `resources` copy the target of every symlink,
+so macOS and the AppImage use `bundle.macOS.files` and
+`bundle.linux.appimage.files`, which keep them. The AppImage carries them in
+`usr/share/Terminus/`: linuxdeploy walks `usr/lib` and would copy every
+library the tools link into the image. Windows trees have no symlinks
+and use `resources`.
+
+`work-tools-smoke.py` runs the tree in place with a `PATH` without node, npm,
+pnpm, bun, python or git and without `PYTHONPYCACHEPREFIX`, then checks the
+tree still matches its inventory. `work-tools-runtime-smoke.py` does the same
+through a packaged engine; it needs an engine that reads schema 2.
+
+WebView2 on Windows comes from `bundle.windows.webviewInstallMode` in
+`src-tauri/tauri.windows.conf.json` (`embedBootstrapper`: about 2 MB, still
+needs a network on a Windows 10 without WebView2).
 
 ## Releases
 

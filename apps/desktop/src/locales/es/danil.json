@@ -73,12 +73,6 @@
   "danil.error.workspace_not_found": "Ese workspace no está en tu cuenta de Danil.",
   "danil.error.account_not_found": "Esa cuenta ya no tiene sesión en esta computadora. Vuelve a iniciar sesión con ella.",
   "danil.error.workspace_id_taken": "Este workspace sigue siendo de la otra cuenta. Inicia sesión con esa cuenta en esta computadora para moverlo.",
-  "danil.accounts.title": "Cuentas de Danil",
-  "danil.accounts.description": "Las sesiones de Danil de esta computadora, para toda la app. Iniciar sesión no mete ningún workspace a la cuenta: cada uno elige la suya, arriba o en Workspaces, y solo así se ve en la web y el teléfono de esa cuenta.",
-  "danil.accounts.default": "Principal",
-  "danil.accounts.make_default": "Usar como principal",
-  "danil.accounts.add": "Agregar otra cuenta",
-  "danil.accounts.adding_hint": "Se abrió la página de Danil. Inicia sesión ahí con la otra cuenta y confirma.",
   "danil.accounts.online": "En línea",
   "danil.accounts.offline": "Sin conexión por ahora",
   "danil.accounts.row": "{status} · {workspaces}",
@@ -150,7 +144,6 @@
   "danil.computers.state.starting": "encendiéndose",
   "danil.computers.state.off": "apagada",
   "danil.computers.state.off_seen": "apagada · visto {time}",
-  "danil.computers.state.outdated": "desactualizada",
   "danil.computers.rename": "Cambiar nombre",
   "danil.computers.rename_label": "Nombre de {name}",
   "danil.computers.rename_failed.invalid_name": "El nombre debe tener de 1 a {max} caracteres, sin saltos de línea.",
@@ -200,5 +193,15 @@
     "other": "Subir {count}"
   },
   "danil.credentials.failed.recipient": "Una de las máquinas ya no está ligada a este workspace. Vuelve a abrir Configuración e inténtalo de nuevo.",
-  "danil.credentials.provider_opencode_go": "OpenCode Go"
+  "danil.credentials.provider_opencode_go": "OpenCode Go",
+  "danil.workspace.manage": "Cambiar cuenta…",
+  "danil.workspace.connect": "Vincular cuenta…",
+  "danil.workspace.done": "Listo",
+  "danil.workspace.read_failed": "No se pudo verificar la cuenta de este workspace.",
+  "danil.workspace.retry": "Reintentar",
+  "danil.computers.workspace_title": "Máquinas de este workspace",
+  "danil.computers.workspace_description": "Máquinas vinculadas a este workspace en su cuenta de Danil. Haz clic en un nombre para cambiarlo en la cuenta.",
+  "danil.computers.workspace_empty": "Este workspace todavía no tiene máquinas vinculadas.",
+  "danil.connect_machine.workspace_hint": "Aprueba la conexión con la cuenta de este workspace. Esto registra la máquina en la cuenta; el workspace se vincula cuando lo uses en ella.",
+  "danil.computers.workspace_missing": "Este workspace no está vinculado a esta cuenta. Vuelve a verificar su cuenta."
 }

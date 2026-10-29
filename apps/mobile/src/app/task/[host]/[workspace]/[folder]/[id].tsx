@@ -20,6 +20,7 @@ import {
   respondPermission,
   runShell,
   sendToTask,
+  switchLiveMode,
   stopShell,
   stopTask,
   taskDefaults,
@@ -44,7 +45,7 @@ import { BrandMark } from "../../../../../ui/BrandMark";
 import { Avatar } from "../../../../../ui/components";
 
 /** Kinds that change what the task reports: pending requests or whether it runs. */
-const REFRESH = new Set(["permission", "started", "done", "presence", "segment_saved"]);
+const REFRESH = new Set(["permission", "permission_resolved", "started", "done", "presence", "segment_saved"]);
 /** Tras estos, lo que llegó en vivo ya está guardado: la lectura lo reemplaza (`liveAfterRead`). */
 const SAVED = new Set(["done", "segment_saved"]);
 
@@ -89,8 +90,12 @@ export default function TaskScreen() {
   const [background, setBackground] = useState<Backdrop | null>(null);
   const list = useRef<FlatList<Line>>(null);
   const key = `${params.host}/${id}`;
-  // Las que esta tarea lanzó: la lista las esconde bajo ella, como el riel del escritorio.
-  const delegated = useMemo(() => delegatedOf((snapshot?.delegated ?? []).filter((task) => task.host === params.host), id), [snapshot, params.host, id]);
+  // Las que esta tarea lanzó: la lista las esconde bajo ella, como el riel del escritorio. Las hijas
+  // remotas viven en otra máquina y nombran a esta por su `taskKey`.
+  const delegated = useMemo(() => [
+    ...delegatedOf((snapshot?.delegated ?? []).filter((task) => task.host === params.host && !task.remote_launcher), id),
+    ...(snapshot?.delegated ?? []).filter((task) => !task.archived && task.remote_launcher === key),
+  ].sort((a, b) => b.created_at - a.created_at), [snapshot, params.host, id, key]);
   // Si el chat sigue el final, como el hilo del escritorio (ver `lib/follow.ts`). Ref y no estado:
   // cambia con cada evento de scroll; solo el botón, que se ve, va en estado.
   const follow = useRef<Follow>(OPENED);
@@ -269,8 +274,18 @@ export default function TaskScreen() {
       .catch(() => stopTask(host, workspace, folder, id))
       .catch(fail);
 
-  const running = view?.running ?? false;
+  const running = host?.power() === "on" && (view?.running ?? false);
   const permissions = view?.permissions ?? [];
+
+  /** Elegir modo con el turno en marcha: el motor lo aplica al turno vivo (`switchLiveMode`). */
+  const chosenMode = useRef<string | null>(null);
+  const changeMode = (mode: string) => {
+    if (!host) return;
+    chosenMode.current = mode;
+    void switchLiveMode(host, workspace, folder, id, mode, () => chosenMode.current === mode)
+      .then(() => refresh())
+      .catch(fail);
+  };
   const questions = view?.questions ?? [];
   const asleep = host?.canAct() === "asleep" || host?.canAct() === "outdated";
   const turns = view?.session.turns;
@@ -409,6 +424,7 @@ export default function TaskScreen() {
         onSubmit={submit}
         onInject={inject}
         onStop={stop}
+        onModeChange={changeMode}
       />
       </ChatScopeContext.Provider>
     </KeyboardScreen>

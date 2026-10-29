@@ -16,6 +16,7 @@ import {
   createSignal,
   For,
   type JSX,
+  on,
   onCleanup,
   onMount,
   Show,
@@ -29,6 +30,7 @@ import { ITEM_DE_MENU, Popover, PopoverContent } from "../../ui/Popover";
 import { IconoDeArchivo } from "./FileIcon";
 import { colorDeMarca, describirEstado, publicarLocales } from "./localStatus";
 import { alMoverseElArbol, avisarDeIdos, avisarDeLosArboles, idos } from "./refresh";
+import { crearLector, esTransitorio } from "./treeLoader";
 import {
   arrastrarRuta,
   conVistaTypst,
@@ -135,61 +137,59 @@ export default function ArbolDeArchivos(props: {
     busca().trim() ? rutasDeCarpetas(visibles()) : abiertas(),
   );
 
-  async function cargar() {
+  type Archivos = {
+    paths: string[];
+    folders: Carpeta[];
+    truncated: boolean;
+    cloud_only?: string[];
+  };
+
+  // La lista de archivos va por `crearLector` (`treeLoader.ts`): una a la vez,
+  // reintentos solos tras un fallo del transporte y lo último bueno en pantalla
+  // mientras tanto. El estado local y el resumen salen detrás de cada lista buena.
+  function leerArchivos() {
+    if (props.preview) {
+      return invoke<Archivos>("preview_tree_files", { project: props.project, baseRef: props.preview.baseRef });
+    }
+    return invoke<Archivos>("tree_files", { project: props.project, session: props.session, tree: props.arbol }, machineOf(props.session));
+  }
+
+  async function aplicarArchivos(f: Archivos) {
     const turno = ++lectura;
     const vigente = () => turno === lectura;
-    setLeyendoEstado(props.kind === "git");
-    try {
-      type Archivos = {
-        paths: string[];
-        folders: Carpeta[];
-        truncated: boolean;
-        cloud_only?: string[];
-      };
-      const f: Archivos = props.preview
-        ? await invoke<Archivos>("preview_tree_files", { project: props.project, baseRef: props.preview.baseRef })
-        : await invoke<Archivos>("tree_files", { project: props.project, session: props.session, tree: props.arbol }, machineOf(props.session));
-      if (!vigente()) return;
-      if (!props.preview && !recortado() && !f.truncated) {
-        const fuera = idos(paths(), f.paths);
-        if (fuera.length > 0) avisarDeIdos(props.session, props.arbol, fuera);
-      }
-      setPaths(f.paths);
-      setCarpetas(f.folders);
-      setNube(f.cloud_only ?? []);
-      setRecortado(f.truncated);
-      setCargando(false);
-      void refrescarPlegadas();
-      if (props.kind === "folder" || props.preview) {
-        fijarLocales(new Map());
-        setCambios(null);
-        setFalloEstado(null);
-        setFallo(null);
-        return;
-      }
+    if (!props.preview && !recortado() && !f.truncated) {
+      const fuera = idos(paths(), f.paths);
+      if (fuera.length > 0) avisarDeIdos(props.session, props.arbol, fuera);
+    }
+    setPaths(f.paths);
+    setCarpetas(f.folders);
+    setNube(f.cloud_only ?? []);
+    setRecortado(f.truncated);
+    setCargando(false);
+    setFallo(null);
+    void refrescarPlegadas();
+    if (props.kind === "folder" || props.preview) {
+      fijarLocales(new Map());
+      setCambios(null);
+      setFalloEstado(null);
+      return;
+    }
 
-      setLeyendoEstado(true);
-      try {
-        const leidos = props.kind === "kn"
-          ? localesDeKn(await invoke<CambioKn[]>("kn_status", {
-            project: props.project,
-            session: props.session,
-          }, machineOf(props.session)))
-          : localesDeGit(await invoke<EstadoGit[]>("tree_git_status", {
-            project: props.project,
-            session: props.session,
-            tree: props.arbol,
-          }, machineOf(props.session)));
-        if (!vigente()) return;
-        fijarLocales(leidos);
-        setFalloEstado(null);
-      } catch (e) {
-        if (!vigente()) return;
-        fijarLocales(new Map());
-        setFalloEstado(asFailure(e));
-      } finally {
-        if (vigente()) setLeyendoEstado(false);
-      }
+    setLeyendoEstado(true);
+    try {
+      const leidos = props.kind === "kn"
+        ? localesDeKn(await invoke<CambioKn[]>("kn_status", {
+          project: props.project,
+          session: props.session,
+        }, machineOf(props.session)))
+        : localesDeGit(await invoke<EstadoGit[]>("tree_git_status", {
+          project: props.project,
+          session: props.session,
+          tree: props.arbol,
+        }, machineOf(props.session)));
+      if (!vigente()) return;
+      fijarLocales(leidos);
+      setFalloEstado(null);
       if (props.kind !== "kn") {
         const c = await invoke<Resumen>("tree_summary", {
           project: props.project,
@@ -201,22 +201,48 @@ export default function ArbolDeArchivos(props: {
       } else {
         setCambios(null);
       }
-
-      setFallo(null);
     } catch (e) {
+      // Los archivos ya están en pantalla: lo que falló es el estado, y se dice
+      // en su sitio, con su «Reintentar», sin tapar el árbol.
       if (!vigente()) return;
-      setFallo(asFailure(e));
+      setFalloEstado(asFailure(e));
     } finally {
-      if (vigente()) {
-        setCargando(false);
-        setLeyendoEstado(false);
-      }
+      if (vigente()) setLeyendoEstado(false);
     }
   }
 
+  const [falloTransitorio, setFalloTransitorio] = createSignal(false);
+  const lector = crearLector<Archivos>({
+    leer: leerArchivos,
+    aplicar: (f) => void aplicarArchivos(f),
+    fallar: (e) => {
+      setFallo(asFailure(e));
+      setFalloTransitorio(esTransitorio(e));
+      setCargando(false);
+    },
+  });
+  const cargar = () => lector.pedir();
+
   onCleanup(() => {
     lectura++;
+    lector.soltar();
   });
+
+  // Volver a la ventana o a esta pestaña con un fallo a medias pide otra vez.
+  onMount(() => {
+    const alVolver = () => {
+      if (props.visible && document.visibilityState === "visible" && lector.pendiente()) lector.pedir();
+    };
+    window.addEventListener("focus", alVolver);
+    document.addEventListener("visibilitychange", alVolver);
+    onCleanup(() => {
+      window.removeEventListener("focus", alVolver);
+      document.removeEventListener("visibilitychange", alVolver);
+    });
+  });
+  createEffect(on(() => props.visible, (visible) => {
+    if (visible && lector.pendiente()) lector.pedir();
+  }, { defer: true }));
 
   const pedirPagina = (ruta: string, desde: number): Promise<Pagina> =>
     props.preview
@@ -298,7 +324,12 @@ export default function ArbolDeArchivos(props: {
 
   function alternar(ruta: string) {
     const abiertas_ = new Set(abiertas());
-    if (!abiertas_.delete(ruta)) abiertas_.add(ruta);
+    const abre = !abiertas_.delete(ruta);
+    if (abre) abiertas_.add(ruta);
+    // Abrir una carpeta que falló la vuelve a pedir, y con el árbol a medias
+    // también la lista: abrir y cerrar no deja un error viejo puesto.
+    if (abre && plegadas().get(ruta)?.fallo) fijarPlegada(ruta, () => null);
+    if (abre && lector.pendiente()) lector.pedir();
     setAbiertas(abiertas_);
   }
 
@@ -869,7 +900,13 @@ export default function ArbolDeArchivos(props: {
       <Show when={fallo()}>
         {(f) => (
           <div class="px-3 pb-3">
-            <FailureNote f={f()} />
+            {/* Un plazo vencido no es «reinicia la app»: se dice qué pasó y se ofrece otra vez. */}
+            <Show when={falloTransitorio()} fallback={<FailureNote f={f()} />}>
+              <p class="m-0 py-3 text-[0.8125rem] text-error-strong">{t("code.tree.failed.slow")}</p>
+            </Show>
+            <Button variant="ghost" size="compact" onClick={() => lector.reintentar()}>
+              {t("code.tree.retry")}
+            </Button>
           </div>
         )}
       </Show>
