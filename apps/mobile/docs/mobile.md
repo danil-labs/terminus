@@ -132,7 +132,7 @@ workspaces, que va a la raíz que fijó la compilación,
 | Escritorio (#151) | Teléfono | Por qué |
 |---|---|---|
 | Lista plana «Tareas»: cada tarea en su sitio, la que te necesita lo dice su marca | Igual, en una sola columna | La tarea no salta de lugar cuando cambia de estado |
-| Botón «Filtrar y agrupar» con popover (carpetas, agente, agrupar, densidad) | El mismo botón al lado de la línea de alcance; abre una hoja del sistema (`formSheet`) con las mismas opciones y palabras | Un popover no cabe ni se toca bien con el dedo; la hoja es el popover del teléfono y se cierra con el gesto |
+| Botón «Filtrar y agrupar» con popover (carpetas, agente, agrupar) | El mismo botón al lado de la línea de alcance; abre una hoja del sistema (`formSheet`) con las mismas opciones y palabras | Un popover no cabe ni se toca bien con el dedo; la hoja es el popover del teléfono y se cierra con el gesto |
 | Tarjeta de dos líneas: estado + título + chincheta; debajo, lo que pide o carpeta, agente, máquina y PR | Igual, sacado de `taskCard`; sin PR ni worktree (el teléfono no lee git); la máquina solo con más de una | Misma información en el mismo orden; lo que el teléfono no puede saber no se inventa |
 | Dock de agentes: una fila de caras al pie del sidebar; clic abre el chat, clic derecho «Ver sus tareas» | Una fila de caras **arriba de la lista**, del mismo orden y reparto (`planDock`, «+k»); tocar abre su chat, mantener pulsado filtra por sus tareas; «Ver todos» abre una hoja | Abajo le quita alto a la lista; arriba se ve al entrar y se va al hacer scroll, sin robar alto a la lista. Mantener pulsado es el clic derecho del teléfono |
 | SpaceBar | Las píldoras de space bajo el workspace, como antes | El escritorio la conserva; es el alcance de la lista |

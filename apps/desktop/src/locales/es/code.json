@@ -216,5 +216,20 @@
   "code.typst.complete.label": "Etiqueta",
   "code.typst.complete.file": "Archivo",
   "code.typst.complete.folder": "Carpeta",
-  "code.typst.complete.function": "Función"
+  "code.typst.complete.function": "Función",
+  "code.panel.toggle": "Archivos de la tarea",
+  "code.panel.resize": "Ancho del panel de archivos",
+  "code.panel.expand": "Expandir dentro de la tarea",
+  "code.panel.collapse": "Volver al chat",
+  "code.panel.tree": "Mostrar el árbol",
+  "code.panel.more": "Más",
+  "code.panel.close_all": "Cerrar todas las pestañas",
+  "code.panel.side.files": "Archivos",
+  "code.panel.side.changes": "Cambios",
+  "code.panel.changes.pending": "Sin guardar en la carpeta en vivo",
+  "code.panel.changes.none": "La tarea no ha cambiado nada todavía",
+  "code.panel.tab.preview": "Vista previa: doble clic para dejarla abierta",
+  "code.panel.tab.close": "Cerrar",
+  "code.panel.show_in_folder": "Mostrar en el explorador",
+  "code.panel.download": "Descargar"
 }

@@ -1,7 +1,4 @@
 {
-  "chat.search.split_hint": "Dividir vista ({key}). Requiere otra pestaña abierta en esta vista.",
-  "chat.search.split": "Dividir vista",
-  "chat.search.join": "Unir vistas",
   "chat.search.label": "Buscar en esta tarea",
   "chat.search.placeholder": "Buscar en esta tarea…",
   "chat.search.open": "Buscar en esta tarea ({key})",

@@ -426,6 +426,12 @@ const steps = [
     root,
   ],
   [
+    "El panel de archivos de cada tarea guarda sus pestañas",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/task-files.test.ts")],
+    root,
+  ],
+  [
     "El atajo de pestaña lee la tecla física y no choca con otro",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/tab-shortcuts.test.ts")],

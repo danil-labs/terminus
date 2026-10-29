@@ -88,6 +88,11 @@ test("grouping keeps only non-empty groups; finished tasks stay in theirs", () =
   assert.deepEqual(ids(byStatus[3].tasks), ["e"]);
   assert.equal(groupLabel(byStatus[3], (id) => id), "Terminadas");
 
+  // Detenida por ti no es un fallo: su propio grupo, entre los fallos y lo que no has visto.
+  const stopped = applySidebarView([...tasks, task("f", { outcome: "interrupted" }), task("g", { outcome: "failed" }), task("h", { sin_ver: true })], view({ group: "status" }), { live: ["c"], approving: [] });
+  assert.deepEqual(stopped.map((g) => g.key), ["asked", "working", "failed", "interrupted", "unseen", "idle", "finished"]);
+  assert.equal(groupLabel(stopped[3], (id) => id), "Detenidas");
+
   const byAgent = applySidebarView(tasks, view({ group: "agent" }), idle);
   assert.deepEqual(byAgent.map((g) => g.key), ["ada", "bob", ""]);
   assert.deepEqual(ids(byAgent[2].tasks), ["d", "b", "e"]);
@@ -97,13 +102,14 @@ test("the view survives a restart and bad data falls back to the default", () =>
   store.clear();
   const key = sidebarViewKey("w", "s1");
   assert.deepEqual(loadSidebarView(key), DEFAULT_SIDEBAR_VIEW);
-  const chosen = view({ folders: ["terminus"], agent: "ada", group: "status", density: "compact" });
+  const chosen = view({ folders: ["terminus"], agent: "ada", group: "status" });
   saveSidebarView(key, chosen);
   assert.deepEqual(loadSidebarView(key), chosen);
   store.set("harness.layout.sidebar.view.w.s1", "{broken");
   assert.deepEqual(loadSidebarView(key), DEFAULT_SIDEBAR_VIEW);
+  // Una vista guardada con la densidad que ya no existe la pierde sin perder lo demás.
   store.set("harness.layout.sidebar.view.w.s1", JSON.stringify({ folders: ["a", 3, "a"], agent: 7, group: "size", density: "compact" }));
-  assert.deepEqual(loadSidebarView(key), view({ folders: ["a"], density: "compact" }));
+  assert.deepEqual(loadSidebarView(key), view({ folders: ["a"] }));
 });
 
 test("each workspace and space keeps its own view; the old global one is ignored", () => {
@@ -125,7 +131,7 @@ test("the badge counts each setting away from its default", () => {
   assert.equal(nonDefaultCount(view({ group: "folder" })), 0);
   assert.equal(nonDefaultCount(view({ group: "none" })), 1);
   assert.equal(nonDefaultCount(view({ folders: ["a", "b"] })), 1);
-  assert.equal(nonDefaultCount(view({ folders: ["a"], agent: "ada", group: "agent", density: "compact" })), 4);
+  assert.equal(nonDefaultCount(view({ folders: ["a"], agent: "ada", group: "agent" })), 3);
 });
 
 test("the scope line says what is shown, in the app language", () => {

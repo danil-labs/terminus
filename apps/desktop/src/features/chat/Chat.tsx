@@ -440,6 +440,8 @@ export type ChatProps = {
   coordinator?: JSX.Element;
   /** Máquina / proyecto / rama, arriba a la izquierda (`TaskLocation`). */
   location?: JSX.Element;
+  /** The task's files panel is open beside the chat: the composer loses its right margin. */
+  besideFiles?: boolean;
   /** La máquina de la tarea si no es la de la ventana: los archivos del chat se leen allí. */
   machine?: string;
   chatEstado?: HandlerStatus;
@@ -3358,6 +3360,7 @@ export default function Chat(props: ChatProps) {
             class={cn(
               "pointer-events-auto relative flex max-h-full min-h-0 w-full flex-col items-center overflow-hidden",
               presentation().composerBar,
+              props.besideFiles && "pr-0",
             )}
           >
             <Show when={props.recovery} fallback={<Caja />}>{props.recovery}</Show>

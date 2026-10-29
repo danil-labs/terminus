@@ -134,11 +134,23 @@ pub fn ensure(paths: &Paths, adopt: bool) -> Result<PathBuf> {
     // Una ventana apartada por el instalador sigue con el motor de su versión y nunca toma el nuevo.
     let aside = super::legacy::set_aside(std::process::id());
     loop {
-        let probed = terminus_engine_client::probe(&endpoint);
+        // Cualquier contrato: la ventana tolera un motor que hable otro, como con las máquinas remotas.
+        let probed = previous(&endpoint);
         if let Some((found, status)) = probed.as_ref().ok().filter(|(found, _)| ours(paths, found))
         {
-            // Uno que trabaja sigue con su versión; la nueva entra cuando lo dejen parar.
-            if aside
+            if other_version(paths, &found.contract) {
+                if aside {
+                    return Err(Error::new("window_replaced"));
+                }
+                // Tras actualizar el motor es de la versión anterior: se para en cuanto quede libre.
+                if working(&status["busy"]) || !retire(&endpoint, found.pid) {
+                    return Err(Error {
+                        detail: serde_json::json!({"turns": status["busy"]["turns"], "pid": found.pid}),
+                        ..Error::new("previous_engine_busy")
+                    });
+                }
+            } else if aside
+                // Uno que trabaja sigue con su versión; la nueva entra cuando lo dejen parar.
                 || !super::legacy::engine_replaced(found.pid, true)
                 || !retire(&endpoint, found.pid)
             {
@@ -146,20 +158,6 @@ pub fn ensure(paths: &Paths, adopt: bool) -> Result<PathBuf> {
                     log::info!("[engine] answered after waiting: pid={}", found.pid);
                 }
                 return selected(paths, &endpoint, found, status);
-            }
-        } else if let Some((found, status)) = previous(&endpoint)
-            .ok()
-            .filter(|(found, _)| ours(paths, found))
-        {
-            if aside {
-                return Err(Error::new("window_replaced"));
-            }
-            // Tras actualizar el contrato cambia: esta ventana no puede usarlo, lo para en cuanto quede libre.
-            if working(&status["busy"]) || !retire(&endpoint, found.pid) {
-                return Err(Error {
-                    detail: serde_json::json!({"turns": status["busy"]["turns"], "pid": found.pid}),
-                    ..Error::new("previous_engine_busy")
-                });
             }
         }
         // El candado de la raíz es la prueba de vida: un motor que arranca, se cierra o está saturado lo retiene.
@@ -191,8 +189,10 @@ pub fn ensure(paths: &Paths, adopt: bool) -> Result<PathBuf> {
         if child.try_wait()?.is_some() {
             return Err(failed(paths, offset));
         }
-        if let Ok((found, status)) = terminus_engine_client::probe(&endpoint) {
+        // El que acaba de lanzar es el motor empaquetado, hable el contrato que hable.
+        if let Ok((found, status)) = previous(&endpoint) {
             if found.pid == child.id() {
+                remember_bundled_contract(paths, &found.contract);
                 return selected(paths, &endpoint, &found, &status);
             }
         }
@@ -367,7 +367,7 @@ pub fn retire_if_replaced(paths: &Paths) {
         return;
     }
     let endpoint = paths.data.join("seldon-endpoint.json");
-    let Ok((found, status)) = terminus_engine_client::probe(&endpoint) else {
+    let Ok((found, status)) = previous(&endpoint) else {
         return;
     };
     if super::legacy::engine_replaced(found.pid, false) && !working(&status["busy"]) {
@@ -412,6 +412,73 @@ fn previous(endpoint: &Path) -> Result<(terminus_engine_protocol::Endpoint, serd
         return Err(Error::new("version_mismatch"));
     }
     Ok((found, status))
+}
+
+/// Otra versión del motor: no habla el contrato del que viaja con la ventana. Hasta que la
+/// ventana lo lance una vez no lo sabe y compara con el suyo, como antes de tolerar otros.
+fn other_version(paths: &Paths, contract: &str) -> bool {
+    differs(
+        contract,
+        bundled_contract(paths).as_deref(),
+        &terminus_engine_client::contract(),
+    )
+}
+
+fn differs(running: &str, bundled: Option<&str>, window: &str) -> bool {
+    running != bundled.unwrap_or(window)
+}
+
+fn bundled_contract_file(paths: &Paths) -> PathBuf {
+    paths.root.join("bundled-contract.json")
+}
+
+/// Tamaño y fechas del binario: si cambian, se instaló otro y su contrato se aprende de nuevo.
+fn engine_stamp() -> Option<serde_json::Value> {
+    let engine = bundled_engine().ok()?;
+    let meta = std::fs::metadata(&engine).ok()?;
+    let nanos = |time: std::io::Result<std::time::SystemTime>| {
+        time.ok()
+            .and_then(|time| time.duration_since(std::time::SystemTime::UNIX_EPOCH).ok())
+            .map(|elapsed| elapsed.as_nanos().to_string())
+    };
+    Some(serde_json::json!({
+        "engine": engine,
+        "len": meta.len(),
+        "modified": nanos(meta.modified()),
+        "created": nanos(meta.created()),
+    }))
+}
+
+/// El contrato del motor empaquetado, el que contestó la última vez que esta ventana lo lanzó.
+fn bundled_contract(paths: &Paths) -> Option<String> {
+    let saved: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(bundled_contract_file(paths)).ok()?).ok()?;
+    if saved["stamp"] != engine_stamp()? {
+        return None;
+    }
+    saved["contract"].as_str().map(str::to_owned)
+}
+
+fn remember_bundled_contract(paths: &Paths, contract: &str) {
+    let window = terminus_engine_client::contract();
+    if contract != window {
+        log::warn!(
+            "[engine] bundled engine speaks contract {contract}, window {window}: tolerated"
+        );
+    }
+    let Some(stamp) = engine_stamp() else {
+        return;
+    };
+    let bytes = serde_json::json!({"stamp": stamp, "contract": contract}).to_string();
+    let file = bundled_contract_file(paths);
+    let temporary = file.with_extension("json.tmp");
+    let _ = std::fs::remove_file(&temporary);
+    let written = private_file(&temporary)
+        .and_then(|mut output| Ok(output.write_all(bytes.as_bytes())?))
+        .and_then(|()| Ok(std::fs::rename(&temporary, &file)?));
+    if let Err(error) = written {
+        log::warn!("[engine] bundled contract not saved: {}", error.code);
+    }
 }
 
 /// Una sola petición: al abrir la ventana no se espera a que acaben las órdenes.
@@ -676,8 +743,19 @@ fn private_file(path: &Path) -> Result<File> {
 
 #[cfg(test)]
 mod tests {
-    use super::{only_operations, working};
+    use super::{differs, only_operations, working};
     use serde_json::json;
+
+    #[test]
+    fn an_engine_of_another_contract_is_old_only_against_the_bundled_one() {
+        // El empaquetado habla otro contrato que la ventana: es el suyo, no uno viejo.
+        assert!(!differs("old", Some("old"), "new"));
+        // Tras actualizar, el que sigue vivo no habla el del empaquetado: es de la versión anterior.
+        assert!(differs("old", Some("new"), "new"));
+        // Sin haberlo lanzado nunca, se compara con el de la ventana, como antes.
+        assert!(differs("old", None, "new"));
+        assert!(!differs("new", None, "new"));
+    }
 
     #[test]
     fn only_turns_downloads_and_real_operations_keep_the_installer_out() {

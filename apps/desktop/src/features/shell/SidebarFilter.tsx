@@ -3,7 +3,6 @@ import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
 import { For, type JSX, Show } from "solid-js";
 import { t } from "../../lib/i18n";
 import {
-  type SidebarDensity,
   type SidebarGrouping,
   type SidebarView,
   DEFAULT_SIDEBAR_VIEW,
@@ -77,7 +76,7 @@ function Opcion(props: {
   );
 }
 
-/** El botón de filtro del sidebar y su panel: carpetas, agente, agrupar y densidad. */
+/** El botón de filtro del sidebar y su panel: carpetas, agente y agrupar. */
 export function SidebarFilter(props: SidebarFilterProps) {
   const cambiados = () => nonDefaultCount(props.view);
   const set = (patch: Partial<SidebarView>) => props.onChange({ ...props.view, ...patch });
@@ -184,18 +183,6 @@ export function SidebarFilter(props: SidebarFilterProps) {
                 aside={g === DEFAULT_SIDEBAR_VIEW.group ? t("shell.sidebar.view.default") : undefined}
               >
                 {groupingLabel(g)}
-              </Opcion>
-            )}
-          </For>
-        </div>
-
-        <span class="my-1 h-px bg-border" />
-        <div role="group" aria-label={t("shell.sidebar.view.density")} class="grid gap-0.5">
-          <div class={titulo}>{t("shell.sidebar.view.density")}</div>
-          <For each={["comfortable", "compact"] as SidebarDensity[]}>
-            {(d) => (
-              <Opcion role="menuitemradio" on={props.view.density === d} onSelect={() => set({ density: d })}>
-                {d === "compact" ? t("shell.sidebar.view.density_compact") : t("shell.sidebar.view.density_comfortable")}
               </Opcion>
             )}
           </For>
