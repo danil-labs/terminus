@@ -138,6 +138,7 @@ import type { ContextoDeProyectos } from "../features/settings/ManageProjects";
 // Configuración solo se abre a pedido: no entra en la carga inicial.
 const Settings = lazy(() => import("../features/settings/Settings"));
 import type { Startup } from "../features/settings/workspaces-store";
+import { listaBasta, reconciliar } from "../features/settings/early-startup";
 import { createAttention, topState } from "../features/shell/attention";
 import TaskNotifier from "../features/shell/TaskNotifier";
 const DeleteSpace = lazy(() => import("../features/shell/DeleteSpace"));
@@ -2254,6 +2255,18 @@ export default function App() {
     // están los proyectos»: lo que quede en `localStorage` de cuando esa
     // carpeta era una preferencia de esta máquina se lee UNA vez, aquí.
     let workspaceRequest = 0;
+    // `workspaces_startup` migra dentro y tarda minutos; la ventana abre con
+    // `list_workspaces` y el arranque la confirma al llegar (`early-startup.ts`).
+    let arranqueLlego = false;
+    let aplicadaDeLista: Startup | null = null;
+    void invoke<Startup>("list_workspaces").then((lista) => {
+      if (arranqueLlego || workspaceRequest !== 0 || bloqueo()) return;
+      if (!listaBasta(lista)) return;
+      aplicadaDeLista = lista;
+      return aplicar(lista);
+    }).catch(() => {
+      // Sin lista se espera al arranque, como antes: su error es el que se pinta.
+    });
     // Que el servicio no conteste todavía no es una respuesta. Recién
     // instalado arranca en frío —`workspaces_startup` tardó nueve segundos
     // en una medición— y el primer intento de la ventana se pasa del plazo:
@@ -2261,16 +2274,21 @@ export default function App() {
     const arrancar = async (quedan: number) => {
       try {
         const a = await invoke<Startup>("workspaces_startup");
-        if (workspaceRequest !== 0) return;
+        arranqueLlego = true;
         // `bloqueo` no pasa por `aplicar`: es lo que lo hace seguro. Viene
         // con `workspaces` y `active` vacíos, que para `aplicar` significan
         // «primer arranque» y abren el alta — la negativa acabaría
         // invitando a crear un workspace en la carpeta que se negó a tocar.
         if (a.bloqueo) {
+          // Antes que `workspaceRequest`: tapa aunque la lista ya abriera la ventana.
           setEnCache(false);
           setBloqueo(a.bloqueo);
           return;
         }
+        if (workspaceRequest !== 0) return;
+        // Lo que la lista ya pintó se queda si el arranque dice lo mismo:
+        // volver a aplicar cerraría la tarea que la persona ya abrió.
+        if (reconciliar(aplicadaDeLista, a) === "nada") return;
         await aplicar(a);
       } catch (e) {
         if (workspaceRequest !== 0) return;
@@ -2280,6 +2298,8 @@ export default function App() {
         }
         // En la web una máquina apagada tiene su indicador: no es un error, y al encenderse trae sus workspaces.
         if (!apagadaEnLaWeb(e)) setError(prosaDe(e));
+        // La lista ya abrió la ventana: se dice el error y no se vacía lo que se está usando.
+        if (aplicadaDeLista) return;
         if (enCache()) {
           batch(() => {
             setEnCache(false);
