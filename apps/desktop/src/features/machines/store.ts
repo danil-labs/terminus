@@ -77,11 +77,11 @@ export function runOnOptions(workspace: string | null, project?: ProjectPlace) {
  * `machine`. El coordinador va con el id de panel: suelto si es de esta máquina.
  */
 export function remoteChildScope(): RemoteScope {
-  const list = machines();
-  const self = list.find((m) => m.local)?.id ?? null;
+  // `machines()` se lee solo ante una fila con `remote_parent`: sin hijas remotas,
+  // el riel no se suscribe a la lista de máquinas ni se recalcula cuando cambia.
   return {
-    announces: (machine) => !!list.find((m) => (machine ? m.id === machine : m.local))?.features?.includes(REMOTE_CHILD_FEATURE),
-    idOf: (machine, task) => (machine === self ? task : `${machine}${SEP}${task}`),
+    announces: (machine) => !!machines().find((m) => (machine ? m.id === machine : m.local))?.features?.includes(REMOTE_CHILD_FEATURE),
+    idOf: (machine, task) => (machine === (machines().find((m) => m.local)?.id ?? null) ? task : `${machine}${SEP}${task}`),
   };
 }
 
