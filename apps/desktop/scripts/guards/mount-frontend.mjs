@@ -302,32 +302,18 @@ if (!roto) {
   mostrar.click();
   await sleep(50);
 
-  /**
-   * Abre la tercera columna para ejecutar también su render. Con la tarea ya
-   * empezada el conmutador debe estar habilitado; sin tarea no hay carpeta de
-   * trabajo que enseñar.
-   */
-  const arbol = normal.w.document.querySelector(
-    'button[aria-label="Ver el árbol de trabajo"]',
-  );
-  if (!arbol || arbol.hasAttribute("disabled")) {
-    console.error(
-      `Con una tarea abierta no se puede abrir la columna del árbol de trabajo: presente=${!!arbol}, deshabilitado=${arbol?.hasAttribute("disabled")}.`,
-    );
+  // Abre el panel de archivos de la tarea para ejecutar también su render.
+  const arbol = normal.w.document.querySelector('button[aria-label="Archivos de la tarea"]');
+  if (!arbol) {
+    console.error("Con una tarea abierta no aparece el botón de sus archivos.");
     process.exit(1);
   }
   arbol.click();
-  await sleep(100);
-  const tirador = normal.w.document.querySelector(
-    '[role="separator"][aria-label="Ancho del árbol de trabajo"]',
-  );
-  const cerrar = normal.w.document.querySelector(
-    'button[aria-label="Cerrar el árbol de trabajo"]',
-  );
-  if (!tirador || !cerrar || normal.fallos.length > 0) {
-    console.error(
-      `La columna del árbol de trabajo no montó: tirador=${!!tirador}, conmutador=${!!cerrar}.`,
-    );
+  await sleep(300);
+  const tirador = normal.w.document.querySelector('[role="separator"][aria-label="Ancho del panel de archivos"]');
+  const panelDeArchivos = normal.w.document.querySelector("[data-task-files]");
+  if (!tirador || !panelDeArchivos || normal.fallos.length > 0) {
+    console.error(`El panel de archivos de la tarea no montó: tirador=${!!tirador}, tarjeta=${!!panelDeArchivos}.`);
     for (const f of normal.fallos.slice(0, 3)) {
       for (const l of String(f).split("\n").slice(0, 6)) console.error(`      ${l}`);
     }
@@ -356,18 +342,14 @@ if (!roto) {
   // El tirador es lo único que distingue abierta de cerrada: la cabecera de la
   // columna sigue en el documento colapsada, y su botón de cerrar con ella.
   const columnaAbierta = () =>
-    Boolean(
-      semaforo.w.document.querySelector(
-        '[role="separator"][aria-label="Ancho del árbol de trabajo"]',
-      ),
-    );
+    Boolean(semaforo.w.document.querySelector('[role="separator"][aria-label="Ancho del panel de archivos"]'));
   assert.equal(columnaAbierta(), false, "la columna nace cerrada");
   assert.equal(semaforos(), 1, "con la columna cerrada el semáforo es el del chasis");
   semaforo.w.document.querySelector('[data-sesion="s1"]').click();
   await sleep(150);
-  semaforo.w.document.querySelector('[aria-label="Ver el árbol de trabajo"]').click();
-  await sleep(150);
-  assert.equal(columnaAbierta(), true, "el conmutador tiene que abrir la columna");
+  semaforo.w.document.querySelector('[aria-label="Archivos de la tarea"]').click();
+  await sleep(300);
+  assert.equal(columnaAbierta(), true, "el conmutador tiene que abrir el panel de archivos");
   assert.equal(semaforos(), 1, "con la columna abierta el semáforo no se duplica");
   assert.deepEqual(semaforo.fallos, []);
   semaforo.w.close();
@@ -434,8 +416,8 @@ if (!roto) {
   assert.equal(treeDocument.querySelector('[role="tab"]'), null, "abrir no conserva una pestaña");
   keepPreview();
 
-  clickTree('[aria-label="Ver el árbol de trabajo"]');
-  await sleep(150);
+  clickTree('[aria-label="Archivos de la tarea"]');
+  await sleep(300);
   const venv = () => [...treeDocument.querySelectorAll('button[aria-expanded]')].find((button) => button.textContent.trim() === ".venv");
   assert.ok(venv(), "a heavy ignored folder shows folded");
   const enVenv = () => [...treeDocument.querySelectorAll("button[data-ruta]")].filter((b) => b.dataset.ruta.startsWith(".venv/")).length;
@@ -459,13 +441,16 @@ if (!roto) {
   clickTree('[data-sesion="s2"]');
   await sleep(150);
   keepPreview();
+  clickTree('[aria-label="Archivos de la tarea"]');
+  await sleep(300);
   clickTree('[role="tab"][data-pestana="0"]');
   await sleep(150);
   assert.deepEqual(treeReads, ["s1", "s2"], "switching tabs must reuse the loaded tree");
   assert.equal(directory.isConnected, true);
   assert.equal(directory.getAttribute("aria-expanded"), "true");
-  clickTree('[aria-label="Cerrar el árbol de trabajo"]');
-  clickTree('[aria-label="Ver el árbol de trabajo"]');
+  clickTree('[aria-label="Archivos de la tarea"]');
+  await sleep(50);
+  clickTree('[aria-label="Archivos de la tarea"]');
   await sleep(150);
   assert.deepEqual(treeReads, ["s1", "s2"], "reopening the column must reuse the tree");
   treeApp.w.dispatchEvent(new treeApp.w.CustomEvent("harness:arboles", { detail: { session: "s2" } }));
@@ -3858,10 +3843,10 @@ if (!roto) {
   assert.equal(d3.querySelector("[data-title-bar]").classList.contains("pl-[84px]"), false, "fuera de macOS no hay semáforo");
   d3.querySelector('[data-sesion="s1"]').click();
   await sleep(250);
-  d3.querySelector('button[aria-label="Ver el árbol de trabajo"]')?.click();
-  await sleep(150);
-  assert.ok(d3.querySelector('button[aria-label="Cerrar el árbol de trabajo"]'), "el árbol de trabajo abre");
-  assert.equal(minimizar().length, 1, "con el árbol abierto siguen siendo uno");
+  d3.querySelector('button[aria-label="Archivos de la tarea"]')?.click();
+  await sleep(300);
+  assert.ok(d3.querySelector("[data-task-files]"), "el panel de archivos abre");
+  assert.equal(minimizar().length, 1, "con el panel abierto siguen siendo uno");
   assert.ok(minimizar()[0].closest("[data-title-bar]"));
   d3.querySelector('button[aria-label="Configuración"]')?.click();
   await sleep(150);

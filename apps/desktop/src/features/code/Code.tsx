@@ -37,6 +37,7 @@ export default function Codigo(props: {
   visible: boolean;
   /** Abrir un archivo es abrir una pestaña del centro; lo hace `App.tsx`. */
   onAbrir: (arbol: string, ruta: string, cambiado: boolean) => void;
+  onAbrirFijo?: (arbol: string, ruta: string, cambiado: boolean) => void;
   onMovido: (session: string, arbol: string, desde: string, hasta: string) => void;
   onBorrado: (session: string, arbol: string, ruta: string) => void;
 }) {
@@ -179,6 +180,7 @@ export default function Codigo(props: {
                   kind={a.kind}
                   visible={props.visible}
                   onAbrir={(ruta, cambiado) => props.onAbrir(a.key, ruta, cambiado)}
+                  onAbrirFijo={(ruta, cambiado) => props.onAbrirFijo?.(a.key, ruta, cambiado)}
                   onMovido={(desde, hasta) => props.onMovido(props.session, a.key, desde, hasta)}
                   onBorrado={(ruta) => props.onBorrado(props.session, a.key, ruta)}
                 />
