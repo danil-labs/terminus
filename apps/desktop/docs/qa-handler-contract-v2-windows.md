@@ -11,7 +11,7 @@ desde `a76aadd`, con los arreglos de esta QA encima.
   `5096a84a…`, el mismo que vendoriza la ventana.
 - Laboratorio: raíz de datos temporal fuera del repositorio, identidad
   `ai.danil.seldon.qa-daphne-<hex>`, `--adopt-existing`, `CREATE_NO_WINDOW` y
-  `scripts/lab_vault.py` (`track()`) para borrar la maestra del llavero al salir.
+  `lab_vault.py` de seldon-host (`track()`) para borrar la maestra del llavero al salir.
   El entorno del motor quita `TERMINUS_*`, `CLAUDE_*`, `ANTHROPIC_*`,
   `SELDON_*`, `HARNESS_*` y `CLAUDECODE`; conserva el HOME real solo como
   proveedor. El lanzador de Claude del laboratorio retira `CLAUDE_CONFIG_DIR` y
