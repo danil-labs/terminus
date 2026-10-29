@@ -1,10 +1,10 @@
 import { type Accessor, For, Show, createSignal } from "solid-js";
 import X from "lucide-solid/icons/x";
-import { t } from "../lib/i18n";
-import { invoke } from "../lib/invoke.ts";
-import type { AccountMachinesProps } from "../lib/platform";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/DropdownMenu";
-import type { MachineRow } from "./SyncNote";
+import { t } from "../../lib/i18n";
+import { invoke } from "../../lib/invoke.ts";
+import type { AccountMachinesProps } from "../../lib/platform";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../../ui/DropdownMenu";
+import type { MachineRow } from "../../web/SyncNote";
 
 /**
  * The machines where one account is signed in, under its card: each chip says

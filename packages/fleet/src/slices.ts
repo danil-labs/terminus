@@ -30,6 +30,9 @@ export type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 type Schedule = (run: () => void, ms: number) => unknown;
 type Entry = { at: number; value: string };
 
+const LIVE_BYTES = 8 * 1024 * 1024;
+const LIVE_ENTRIES = 256;
+const LIVE_ENTRY_BYTES = 1024 * 1024;
 const ENTRY = 200_000;
 const TOTAL = 2_000_000;
 export const SAVE_EVERY = 30_000;
@@ -42,6 +45,8 @@ export const SLICES_KEY = "terminus-fleet:slices:v1";
  */
 export class SliceBook {
   private slices = new Map<string, Map<string, Slice>>();
+  private liveSizes = new Map<string, number>();
+  private liveBytes = 0;
   private saved = new Map<string, Entry>();
   private timer: unknown;
   private readonly storage: StorageLike | null;
@@ -58,7 +63,12 @@ export class SliceBook {
 
   get(machine: string, key: string): Slice | null {
     const live = this.slices.get(machine)?.get(key);
-    if (live) return live;
+    if (live) {
+      const id = storeKey(machine, key);
+      const bytes = this.liveSizes.get(id);
+      if (bytes !== undefined) { this.liveSizes.delete(id); this.liveSizes.set(id, bytes); }
+      return live;
+    }
     const entry = this.saved.get(storeKey(machine, key));
     if (!entry) return null;
     try {
@@ -69,11 +79,27 @@ export class SliceBook {
   }
 
   put(slice: Slice, key: string) {
+    const id = storeKey(slice.machine, key);
+    const bytes = new TextEncoder().encode(JSON.stringify(slice)).length;
+    this.liveBytes -= this.liveSizes.get(id) ?? 0;
+    this.liveSizes.delete(id);
+    this.slices.get(slice.machine)?.delete(key);
+    if (bytes > LIVE_ENTRY_BYTES) return;
+    this.liveSizes.set(id, bytes);
+    this.liveBytes += bytes;
     const of = this.slices.get(slice.machine) ?? new Map<string, Slice>();
     // La más reciente al final: `statuses` lee la última.
     of.delete(key);
     of.set(key, slice);
     this.slices.set(slice.machine, of);
+    while (this.liveBytes > LIVE_BYTES || this.liveSizes.size > LIVE_ENTRIES) {
+      const oldest = this.liveSizes.entries().next().value;
+      if (!oldest) break;
+      this.liveSizes.delete(oldest[0]); this.liveBytes -= oldest[1];
+      const [machine, oldKey] = oldest[0].split("\u0000");
+      this.slices.get(machine)?.delete(oldKey);
+      if (this.slices.get(machine)?.size === 0) this.slices.delete(machine);
+    }
     if (!slice.has || (slice.status !== "ok" && slice.status !== "cached")) return;
     let text: string;
     try {
@@ -84,7 +110,6 @@ export class SliceBook {
     } catch {
       return;
     }
-    const id = storeKey(slice.machine, key);
     if (this.saved.get(id)?.value === text) return;
     this.saved.delete(id);
     if (text.length <= ENTRY) this.saved.set(id, { at: slice.at ?? Date.now(), value: text });
@@ -94,6 +119,9 @@ export class SliceBook {
   /** La máquina ya no es de la cuenta: nada suyo se queda, ni guardado. */
   forget(machine: string) {
     this.slices.delete(machine);
+    for (const [id, bytes] of this.liveSizes) if (id.startsWith(`${machine}\u0000`)) {
+      this.liveSizes.delete(id); this.liveBytes -= bytes;
+    }
     for (const id of [...this.saved.keys()]) if (id.startsWith(`${machine}\u0000`)) this.saved.delete(id);
     this.flush();
   }
