@@ -42,6 +42,7 @@ export function statusGroupLabel(lang: Lang, key: SidebarStatusKey): string {
     case "asked": return word(lang, "shell.sidebar.view.status_asked");
     case "working": return word(lang, "shell.sidebar.view.status_working");
     case "failed": return word(lang, "shell.sidebar.view.status_failed");
+    case "interrupted": return word(lang, "shell.sidebar.view.status_interrupted");
     case "unseen": return word(lang, "shell.sidebar.view.status_unseen");
     case "finished": return word(lang, "shell.sidebar.view.status_finished");
     default: return word(lang, "shell.sidebar.view.status_idle");

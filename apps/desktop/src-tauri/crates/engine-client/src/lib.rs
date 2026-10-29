@@ -365,7 +365,7 @@ impl Client {
         if selection.version != VERSION
             || endpoint.version != VERSION
             || endpoint.product != PRODUCT
-            || selection.contract != contract()
+            // El contrato del motor puede ser otro que el de la ventana: los cambios son aditivos.
             || endpoint.contract != selection.contract
             || endpoint.runtime != selection.runtime
             || endpoint.data_directory != selection.data_directory

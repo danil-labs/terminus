@@ -405,6 +405,8 @@ test("la atención gana a trabajo y fallo; fin de turno no significa tarea termi
   assert.equal(taskPriority({ ...base, viva: true }), "working");
   assert.equal(taskPriority(base), "failed");
   assert.equal(taskPriority({ ...base, outcome: "delivered" }), null);
+  assert.equal(taskPriority({ ...base, outcome: "interrupted", sinVer: true }), "interrupted", "detenida no es fallo y va antes que sin ver");
+  assert.equal(taskPriority({ ...base, outcome: "interrupted", viva: true }), "working");
 });
 
 test("compact Git retains known stale PRs but never invents an observation", () => {
