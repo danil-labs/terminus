@@ -74,7 +74,8 @@ async function check() {
     if (!then) return;
     if (turns.length === 0) {
       cancelWait();
-      await invoke(then === "restart" ? "restart_app" : "quit_completely");
+      if (then === "restart") await invoke("restart_app");
+      else await invoke("quit_completely");
       return;
     }
     setWaitRows(await titled(turns));
