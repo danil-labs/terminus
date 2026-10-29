@@ -218,7 +218,6 @@
   "code.typst.complete.folder": "Folder",
   "code.typst.complete.function": "Function",
   "code.panel.toggle": "Task files",
-  "code.panel.toggle.hint": "Task files ({key})",
   "code.panel.resize": "Files panel width",
   "code.panel.expand": "Expand inside the task",
   "code.panel.collapse": "Back to chat",

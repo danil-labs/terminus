@@ -1,7 +1,4 @@
 {
-  "chat.search.split_hint": "Split view ({key}). Requires another open tab in this view.",
-  "chat.search.split": "Split view",
-  "chat.search.join": "Join views",
   "chat.search.label": "Find in this task",
   "chat.search.placeholder": "Find in this task…",
   "chat.search.open": "Find in this task ({key})",
