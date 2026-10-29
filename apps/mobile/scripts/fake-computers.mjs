@@ -299,6 +299,13 @@ function invoke(m, command, args) {
       emit(m, "session", { workspace: e.ws, project: s.project, session: s.id });
       return null;
     }
+    case "rename_session": {
+      const s = e.sessions.get(args.id);
+      if (!s) throw { code: "command_failed", detail: "no such task" };
+      s.title = String(args.title);
+      emit(m, "session", { workspace: e.ws, project: s.project, session: s.id });
+      return null;
+    }
     case "task_blockers": {
       const s = e.sessions.get(args.id);
       return { unsaved: s?.unsaved ? [{ session: s.id, title: s.title, files: s.unsaved }] : [], not_finished: Boolean(args.finish && (!s || PULLS[s.id]?.state !== "merged" || e.live.has(s.id))) };

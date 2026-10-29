@@ -586,11 +586,16 @@ export async function attentionOf(host: Host): Promise<WorkspaceAttention[]> {
   return linkedAttention(list, host.linked);
 }
 
-// --- Fijar y archivar (la vista previa) -----------------------------------------
+// --- Fijar, renombrar y archivar (la vista previa) ------------------------------
 
 /** Fijar o desfijar, como la ventana (`set_session_pinned`). Con la máquina apagada, el relay lo aplaza. */
 export async function setPinned(host: Host, workspace: string, folder: string, id: string, pinned: boolean) {
   await host.call("set_session_pinned", workspace, { project: folder, id, pinned });
+}
+
+/** Cambiarle el nombre, como la ventana (`rename_session`). Con la máquina apagada, el relay lo aplaza. */
+export async function renameTask(host: Host, workspace: string, folder: string, id: string, title: string) {
+  await host.call("rename_session", workspace, { project: folder, id, title });
 }
 
 /**
