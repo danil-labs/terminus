@@ -167,6 +167,7 @@ export {
   SECRETS_FEATURE,
   sealRecipientsFor,
   type EnvSecretSlot,
+  envSecretFolderValid,
   envSecretNameProblem,
   envSecretOf,
   deleteCredential,

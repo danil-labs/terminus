@@ -258,24 +258,29 @@ export type EnvSecretSlot = { folder: string | null; name: string };
 
 export function envSecretOf(slot: string): EnvSecretSlot | null {
   const m = /^env\/([^/]+)\/([^/]+)$/.exec(slot);
-  if (!m || !ENV_SECRET_NAME.test(m[2]!)) return null;
+  if (!m || !ENV_SECRET_FOLDER.test(m[1]!) || !ENV_SECRET_NAME.test(m[2]!)) return null;
   return { folder: m[1] === "*" ? null : m[1]!, name: m[2]! };
 }
 
-/** Copia de la lista del motor (seldon-host `docs/account-credentials.md`), que es quien decide: estas cambiarían la cuenta o el entorno del agente. */
-const RESERVED_ENV_PREFIXES = ["TERMINUS_", "SELDON_", "ANTHROPIC_", "OPENAI_", "CLAUDE_", "CODEX_", "OPENCODE_", "LD_", "DYLD_", "GIT_"];
+/** Copia de seldon-host `docs/account-credentials.md` § Secretos genéricos; `test/fixtures/env-secret-names.json` es el mismo archivo que prueba el motor. */
+const RESERVED_ENV_PREFIXES = ["TERMINUS_", "SELDON_", "HARNESS_", "ANTHROPIC_", "OPENAI_", "CLAUDE_", "CODEX_", "OPENCODE_", "GROK_", "AGY_", "XDG_", "LD_", "DYLD_", "GIT_"];
 const RESERVED_ENV = new Set([
-  "PATH", "HOME", "SHELL", "USER", "TMPDIR", "NODE_OPTIONS", "GH_TOKEN", "GITHUB_TOKEN",
-  "USERPROFILE", "APPDATA", "LOCALAPPDATA", "SYSTEMROOT", "COMSPEC", "PATHEXT", "TEMP", "TMP",
+  "PATH", "HOME", "SHELL", "USER", "TMPDIR", "TERM", "NODE_OPTIONS", "GH_TOKEN", "GITHUB_TOKEN", "XAI_API_KEY", "ZCODE_DATA_BASE_DIR", "DANIL_COMPUTERS_URL",
+  "USERPROFILE", "APPDATA", "LOCALAPPDATA", "SYSTEMROOT", "COMSPEC", "PATHEXT", "TEMP", "TMP", "SYSTEMDRIVE", "WINDIR", "PROGRAMFILES", "PROGRAMDATA", "PSMODULEPATH",
 ]);
+const ENV_SECRET_NAME_MAX = 128;
+const ENV_SECRET_FOLDER = /^(\*|[A-Za-z0-9_-]{1,64})$/;
 
 /** Por qué un nombre no sirve para un secreto genérico, o null si sirve. */
 export function envSecretNameProblem(name: string): "empty" | "grammar" | "reserved" | null {
   if (!name) return "empty";
-  if (!ENV_SECRET_NAME.test(name)) return "grammar";
+  if (!ENV_SECRET_NAME.test(name) || name.length > ENV_SECRET_NAME_MAX) return "grammar";
   if (RESERVED_ENV.has(name) || RESERVED_ENV_PREFIXES.some((p) => name.startsWith(p))) return "reserved";
   return null;
 }
+
+/** Si sirve como alcance de un secreto: `*` (todo el workspace) o el id de una carpeta. */
+export const envSecretFolderValid = (folder: string) => ENV_SECRET_FOLDER.test(folder);
 
 /** Los últimos 4 que se enseñan; un secreto genérico corto no da pista (deja poco por adivinar). */
 export function credentialHint(kind: CredentialKind, value: string): string | null {

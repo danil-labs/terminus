@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
   type CredentialFetch,
@@ -8,6 +9,7 @@ import {
   credentialsListingOf,
   deleteCredential,
   credentialHint,
+  envSecretFolderValid,
   envSecretNameProblem,
   envSecretOf,
   sealRecipientsFor,
@@ -191,4 +193,15 @@ test("una máquina sin secrets_v1 sale «unsupported», nunca activa, y no recib
   assert.deepEqual(credentialMachines(listing.credentials[0]!).map((m) => `${m.computer_id}:${m.state}`), ["cmp_mac:active", "cmp_old:unsupported"]);
   assert.deepEqual(sealRecipientsFor("env_secret", listing.recipients).map((r) => r.computer_id), ["cmp_mac"]);
   assert.equal(sealRecipientsFor("mcp_secret", listing.recipients).length, 3, "las demás credenciales se sellan para todas");
+});
+
+test("nombres y carpetas como el fixture del motor (seldon-host docs/fixtures/env-secret-names.json)", () => {
+  const fixture = JSON.parse(readFileSync(new URL("./fixtures/env-secret-names.json", import.meta.url), "utf8"));
+  const reason = { empty: "invalid_name", grammar: "invalid_name", reserved: "reserved" };
+  for (const name of fixture.accepted) assert.equal(envSecretNameProblem(name), null, name);
+  for (const r of fixture.rejected) assert.equal(reason[envSecretNameProblem(r.name) ?? "none"], r.reason, r.name.slice(0, 40));
+  for (const f of fixture.folders.accepted) assert.ok(envSecretFolderValid(f), f);
+  for (const f of fixture.folders.rejected) assert.ok(!envSecretFolderValid(f), f);
+  assert.equal(credentialHint("env_secret", "x".repeat(fixture.hint.min_value_chars - 1)), null);
+  assert.equal(credentialHint("env_secret", "x".repeat(fixture.hint.min_value_chars))?.length, fixture.hint.max_chars);
 });
