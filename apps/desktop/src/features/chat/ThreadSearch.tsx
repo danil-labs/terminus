@@ -202,11 +202,11 @@ export function ThreadSearch(props: {
           <Button variant="chrome" size="iconCompact" title={t("chat.search.close")} aria-label={t("chat.search.close")} onClick={close}><X size={14} /></Button>
         </div>
       </Show>
-      <div class="flex shrink-0 flex-col gap-1">
+      <div class="flex shrink-0 items-center gap-1.5">
         {props.leadingTools}
-        <Button variant="chrome" size="iconCompact" class="size-7 text-neutral-500" onClick={show}
+        <Button variant="chrome" size="iconCompact" class="size-6 text-neutral-500" onClick={show}
           title={t("chat.search.open", { key: textoDeAtajo("findInTask") })} aria-label={t("chat.search.label")}
-          aria-keyshortcuts={ariaDeAtajo("findInTask")} aria-expanded={open()}><Search size={14} /></Button>
+          aria-keyshortcuts={ariaDeAtajo("findInTask")} aria-expanded={open()}><Search size={13} /></Button>
         {props.tools}
       </div>
     </div>
