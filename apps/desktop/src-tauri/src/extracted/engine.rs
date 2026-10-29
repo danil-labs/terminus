@@ -125,12 +125,17 @@ pub fn ensure(paths: &Paths, adopt: bool) -> Result<PathBuf> {
     let endpoint = paths.data.join("seldon-endpoint.json");
     let patience = Instant::now() + START_TIMEOUT;
     let mut waited = false;
+    // Una ventana apartada por el instalador sigue con el motor de su versión y nunca toma el nuevo.
+    let aside = super::legacy::set_aside(std::process::id());
     loop {
         let probed = terminus_engine_client::probe(&endpoint);
         if let Some((found, status)) = probed.as_ref().ok().filter(|(found, _)| ours(paths, found))
         {
             // Uno que trabaja sigue con su versión; la nueva entra cuando lo dejen parar.
-            if !super::legacy::engine_replaced(found.pid, true) || !retire(&endpoint, found.pid) {
+            if aside
+                || !super::legacy::engine_replaced(found.pid, true)
+                || !retire(&endpoint, found.pid)
+            {
                 if waited {
                     log::info!("[engine] answered after waiting: pid={}", found.pid);
                 }
@@ -140,10 +145,13 @@ pub fn ensure(paths: &Paths, adopt: bool) -> Result<PathBuf> {
             .ok()
             .filter(|(found, _)| ours(paths, found))
         {
+            if aside {
+                return Err(Error::new("window_replaced"));
+            }
             // Tras actualizar el contrato cambia: esta ventana no puede usarlo, lo para en cuanto quede libre.
             if working(&status["busy"]) || !retire(&endpoint, found.pid) {
                 return Err(Error {
-                    detail: status["busy"].clone(),
+                    detail: serde_json::json!({"turns": status["busy"]["turns"], "pid": found.pid}),
                     ..Error::new("previous_engine_busy")
                 });
             }
@@ -166,6 +174,9 @@ pub fn ensure(paths: &Paths, adopt: bool) -> Result<PathBuf> {
         }
         waited = true;
         std::thread::sleep(Duration::from_millis(500));
+    }
+    if aside {
+        return Err(Error::new("window_replaced"));
     }
     let offset = std::fs::metadata(&paths.launch_log).map_or(0, |m| m.len());
     let mut child = spawn(paths, adopt)?;
@@ -342,8 +353,11 @@ pub fn stop() -> Stopped {
 
 /// Con otra versión instalada, el motor viejo se para en cuanto queda sin trabajo;
 /// la ventana arranca el nuevo en su siguiente sondeo, como tras cualquier caída.
+/// Una ventana apartada no lo para: sigue con él hasta que se reinicie.
 pub fn retire_if_replaced(paths: &Paths) {
-    if !matches!(super::engine_profile::managed(&paths.data), Ok(false)) {
+    if !matches!(super::engine_profile::managed(&paths.data), Ok(false))
+        || super::legacy::set_aside(std::process::id())
+    {
         return;
     }
     let endpoint = paths.data.join("seldon-endpoint.json");
@@ -355,7 +369,7 @@ pub fn retire_if_replaced(paths: &Paths) {
     }
 }
 
-/// «Actualizar ya» con el motor anterior trabajando: corta sus turnos y apunta sus
+/// «Detener y entrar ya» con el motor anterior trabajando: corta sus turnos y apunta sus
 /// tareas para que el nuevo las retome. Uno sin esa orden se niega y se termina su proceso.
 pub fn force_previous(paths: &Paths) -> Result<()> {
     if super::engine_profile::managed(&paths.data)? {
@@ -508,7 +522,7 @@ fn spawn(paths: &Paths, adopt: bool) -> Result<Child> {
 
 // Sale del job de quien lanzó la ventana para sobrevivirla; si ese job no lo permite, queda dentro.
 #[cfg(windows)]
-fn spawn_detached(command: &mut Command) -> std::io::Result<(Child, bool)> {
+pub(super) fn spawn_detached(command: &mut Command) -> std::io::Result<(Child, bool)> {
     use std::os::windows::process::CommandExt;
     const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
     const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
@@ -557,7 +571,7 @@ fn launch_note(_child: &Child, _outside: bool) -> String {
 }
 
 #[cfg(unix)]
-fn spawn_detached(command: &mut Command) -> std::io::Result<(Child, bool)> {
+pub(super) fn spawn_detached(command: &mut Command) -> std::io::Result<(Child, bool)> {
     use std::os::unix::process::CommandExt;
     command.process_group(0);
     Ok((command.spawn()?, true))

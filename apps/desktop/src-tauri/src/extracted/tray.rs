@@ -162,6 +162,15 @@ pub(super) fn quit_completely(app: AppHandle) {
 #[tauri::command]
 pub(super) fn restart_app(app: AppHandle) {
     super::instance::exiting();
+    // La ventana anterior que se abrió desde `old_*` reiniciaría en sí misma: abre la instalada.
+    if super::legacy::set_aside(std::process::id()) {
+        let opened = super::update::installed_window()
+            .and_then(|window| super::launcher::open_window(&window));
+        if opened.is_some() {
+            app.exit(0);
+            return;
+        }
+    }
     app.restart();
 }
 
