@@ -16,6 +16,8 @@ export function stateColor(state: TaskState, theme: Theme) {
       return theme.primary;
     case "unseen":
       return theme.unseenMark;
+    case "interrupted":
+      return theme.textMuted;
     default:
       return theme.asked;
   }

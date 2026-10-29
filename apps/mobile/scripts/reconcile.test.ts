@@ -75,7 +75,7 @@ test("una tarea que se va sale de la lista", () => {
 });
 
 test("dos tarjetas que dicen lo mismo son iguales aunque sean objetos distintos", () => {
-  const card = { activity: { aprobando: false, esperando: false, viva: false, outcome: null }, state: null, delivered: false, pinned: false, needsYou: false, request: null, provider: "claude", folder: "vm/p1", agent: null, machine: { id: "VM", on: true } } as const;
+  const card = { activity: { aprobando: false, esperando: false, viva: false, outcome: null }, state: null, delivered: false, pinned: false, needsYou: false, provider: "claude", folder: "vm/p1", agent: null, machine: { id: "VM", on: true } } as const;
   assert.ok(sameCard({ ...card, machine: { ...card.machine } } as never, { ...card, machine: { ...card.machine } } as never));
   assert.ok(!sameCard(card as never, { ...card, state: "working" } as never));
   assert.ok(!sameCard(card as never, { ...card, machine: { id: "VM", on: false } } as never));

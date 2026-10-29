@@ -22,7 +22,7 @@ export default function AgentScreen() {
   const theme = useTheme();
   const { workspace, name } = useLocalSearchParams<{ workspace: string; name: string }>();
   const { attention, hostOf, preferred, rememberMachine } = useMachines();
-  const { snapshot, hostsOfCurrent, view, current } = useWorkspaces();
+  const { snapshot, hostsOfCurrent, current } = useWorkspaces();
   const agent = snapshot?.agents.find((a) => a.name === name);
   const [note, setNote] = useState<string | null>(null);
   const marks = useMemo(() => marksOf(attention, current?.members, snapshot?.live ?? new Set()), [attention, current?.members, snapshot?.live]);
@@ -82,7 +82,6 @@ export default function AgentScreen() {
             card={cardOf(item, marks)}
             git={effectiveGit(git, item, snapshot?.tasks ?? [])}
             folderName={folderName}
-            density={view.density}
             onPress={() => openTask(item.host, item.workspace, item.folder, item.id)}
             onLongPress={() => openPreview(item.host, item.id)}
             onFinish={() => openPreview(item.host, item.id, "finish")}

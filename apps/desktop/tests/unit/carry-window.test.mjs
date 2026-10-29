@@ -249,7 +249,7 @@ test("una carpeta sin remoto se lleva desde su menú: viaja entera y la VM crea 
       log.push({ name: "work_status", machine: machineOf(options), args });
       return { ...STATUS, upstream: null, remoteBase: null, remoteUrl: null, ahead: 12 };
     },
-  }), undefined, { "harness.layout.sidebar.view.w": JSON.stringify({ folders: [], agent: null, group: "folder", density: "comfortable" }) });
+  }), undefined, { "harness.layout.sidebar.view.w": JSON.stringify({ folders: [], agent: null, group: "folder" }) });
   await sleep(600);
   const doc = app.w.document;
   doc.querySelector('[data-folder-group="p1"] [aria-haspopup="menu"]').click();

@@ -4,8 +4,7 @@ import type { CardPull, TaskCard } from "@terminus/tasks";
 
 export type LineChip = "provider" | "folder" | "machine" | "agent" | "pull";
 
-export function secondLine(card: TaskCard, pull: CardPull | null, compact: boolean): LineChip[] {
-  if (compact) return [];
+export function secondLine(card: TaskCard, pull: CardPull | null): LineChip[] {
   const chips: (LineChip | false)[] = [
     // Un proveedor sin marca conocida no deja un hueco.
     !!agentMarkId(card.provider) && "provider",
