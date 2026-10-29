@@ -907,10 +907,18 @@ fn read_history(
     id: &str,
     before: Option<u64>,
 ) -> Result<Value, Error> {
-    if client.status()["service_features"].as_array().is_some_and(|features| features.iter().any(|f| f == "bounded_history_v1")) {
-        let reply = client.invoke("load_session", workspace,
-            json!({"project":project,"id":id,"history_request":{"version":1,"before":before}}))?;
-        if let Some(value) = reply.get("value") { return Ok(value.clone()); }
+    if client.status()["service_features"]
+        .as_array()
+        .is_some_and(|features| features.iter().any(|f| f == "bounded_history_v1"))
+    {
+        let reply = client.invoke(
+            "load_session",
+            workspace,
+            json!({"project":project,"id":id,"history_request":{"version":1,"before":before}}),
+        )?;
+        if let Some(value) = reply.get("value") {
+            return Ok(value.clone());
+        }
         let mut error = Error::new("operation_failed");
         error.detail = reply.get("error").cloned().unwrap_or_default();
         return Err(error);
