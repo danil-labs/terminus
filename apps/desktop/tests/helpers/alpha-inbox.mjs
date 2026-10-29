@@ -40,7 +40,7 @@ try{
  await click('Listo');await click('Inbox');
  assert.ok(w.document.querySelector('[data-alpha-inbox]'),'enabled Inbox mounts inside App Paneles');
  assert.ok(w.document.querySelector('[data-sesion]'),'real Sidebar still mounts');
- await click('Conectar lectura real');
+ await sleep(150);
  assert.equal(refreshes,1,'401 awaits refresh and retries the GET once');
  await choose(1);assert.match(text(),/Contact 1/);
  await choose(2);assert.doesNotMatch(text(),/Contact 1/);assert.match(text(),/Contact 2/);

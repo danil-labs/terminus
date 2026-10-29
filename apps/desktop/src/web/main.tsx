@@ -521,7 +521,7 @@ function toPhone(): boolean {
 
 if (import.meta.env.TERMINUS_ALPHA && window.location.pathname.replace(/\/+$/, "") === `${import.meta.env.BASE_URL}sign-in`) {
   void import("./attention/SignIn").then((m) => m.startSignIn(__TERMINUS_WEB__));
-} else if (import.meta.env.TERMINUS_ALPHA && ((!window.location.pathname.startsWith(`${import.meta.env.BASE_URL}m/`) && new URLSearchParams(window.location.search).get("demo") === "1") || (window.location.pathname.replace(/\/+$/, "") === `${import.meta.env.BASE_URL}inbox` && !new URLSearchParams(window.location.search).has("live")))) {
+} else if (import.meta.env.TERMINUS_ALPHA && !window.location.pathname.startsWith(`${import.meta.env.BASE_URL}m/`) && new URLSearchParams(window.location.search).get("demo") === "1") {
   void import("./attention/main").then((m) => m.startAttention(__TERMINUS_WEB__));
 } else if (toPhone()) {
   // Se va al del teléfono: no se monta nada aquí.

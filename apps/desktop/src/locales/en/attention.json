@@ -20,6 +20,5 @@
   "attention.local": "Local browser preference; grants no permissions and connects no services.",
   "attention.future": "This preference uses a newer format. No destinations will be enabled or overwritten.",
   "attention.close": "Done",
-  "attention.demo_mode": "Explore demo · no real data",
   "attention.leave_demo": "Leave demo"
 }

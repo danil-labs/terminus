@@ -31,12 +31,13 @@ function useInboxModel() {
     clear();
     if(ALPHA_DEMO){if(enabled)setRows([{id:1,account_id:1,contact_name:t('alpha.customer'),channel_name:t('alpha.channel'),last_message:t('alpha.message'),ai_assistance:true,unread_count:1}]);return;}
     if(!enabled)return;
+    if(session.session)void connect();
     const {data}=supabase.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT')clear();});
     return()=>{generation.current++;data.subscription.unsubscribe();};
   },[session.session?.user.id,scope]);
   async function connect(){
     if(!api||!enabled||active.current!==scope)return;clear();setConsent(true);setBusy(true);const request=generation.current;
-    try{const value=await api.accounts();if(request===generation.current)setAccounts(value);}
+    try{const value=await api.accounts();if(request===generation.current){setAccounts(value);if(value.length===1)void selectAccount(value[0]);}}
     catch(cause){if(request===generation.current)setError(cause instanceof Error?cause.message:'');}
     finally{if(request===generation.current)setBusy(false);}
   }

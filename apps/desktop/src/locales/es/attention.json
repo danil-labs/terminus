@@ -20,6 +20,5 @@
   "attention.local": "Preferencia local de este navegador; no concede permisos ni conecta servicios.",
   "attention.future": "Esta preferencia usa un formato más nuevo. No se activarán destinos ni se sobrescribirá.",
   "attention.close": "Listo",
-  "attention.demo_mode": "Explorar demostración · sin datos reales",
   "attention.leave_demo": "Salir de la demostración"
 }

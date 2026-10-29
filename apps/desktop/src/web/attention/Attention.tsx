@@ -26,11 +26,12 @@ export function Attention(props: { demo: boolean; session?: InboxSession & { sub
   onMount(() => {
     const stop = props.session?.subscribe?.(() => { clear(); setAccounts([]); setAccount(undefined); setConsent(false); setBusy(false); });
     if (stop) onCleanup(stop);
+    if (!props.demo) void connect();
     if (props.demo) setRows([1,2,3].map(id => ({ id, account_id:1, contact_name:t(`web.alpha.contact${id}`), channel_name:id === 2 ? 'Web':'WhatsApp', last_message:t(`web.alpha.preview${id}`), ai_assistance:id !== 1, unread_count:id === 1 ? 2:0 })));
   });
   async function connect() {
     clear(); setAccounts([]); setAccount(undefined); const request = epoch; setConsent(true); setBusy(true);
-    try { if (!api) throw new Error(t("web.alpha.session_required")); const value = await api.accounts(); if (request === epoch) setAccounts(value); }
+    try { if (!api) throw new Error(t("web.alpha.session_required")); const value = await api.accounts(); if (request === epoch) { setAccounts(value); if (value.length === 1) void load(value[0].id); } }
     catch (cause) { if (request === epoch) setError(cause instanceof Error ? cause.message : t("web.alpha.error")); }
     finally { if (request === epoch) setBusy(false); }
   }
@@ -52,8 +53,7 @@ export function Attention(props: { demo: boolean; session?: InboxSession & { sub
   const label=(key:string)=>t(`web.alpha.${key}`);
   const assistance = (row: Conversation) => (row.ai_assistance === true ? t("customize.ai_enabled") : row.ai_assistance === false ? t("customize.ai_paused") : t("customize.unknown"));
   return <section class="flex h-full min-h-0 min-w-0 flex-col overflow-hidden" data-alpha-inbox="">
-    <p class="m-0 border-b border-border px-4 py-2 text-xs text-neutral-500">{props.demo?label('demo_badge'):label('live_badge')} · {label('external_only')} <Show when={props.demo}><a class="ml-2 underline" href={`${import.meta.env.BASE_URL}inbox`}>{label('change_mode')}</a></Show></p>
-    <Show when={!props.demo && !consent()}><div class="flex flex-col gap-3 p-5"><p class="text-sm">{label('validation_warning')}</p><p class="text-sm text-neutral-500">{label('production_warning')}</p><Button class="self-start" onClick={()=>void connect()}>{label('connect')}</Button></div></Show>
+    <p class="m-0 border-b border-border px-4 py-2 text-xs text-neutral-500">{props.demo?label('demo_badge'):label('live_badge')} · {label('external_only')}<Show when={!props.demo}> · {label('production_warning')}</Show> <Show when={props.demo}><a class="ml-2 underline" href={`${import.meta.env.BASE_URL}inbox`}>{label('change_mode')}</a></Show></p>
     <Show when={!props.demo && consent()}><div class="flex flex-wrap items-center gap-3 border-b border-border p-3"><label class="text-sm">{label('account')} <select class="rounded-md border border-border bg-surface px-2 py-1" value={account()??''} onChange={event=>{if(event.currentTarget.value)void load(Number(event.currentTarget.value));}}><option value="">{label('select_account')}</option><For each={accounts()}>{row=><option value={row.id}>{row.name} · {row.id}</option>}</For></select></label><Button size="sm" variant="secondary" disabled={busy()} onClick={()=>account()?void load(account()!):void connect()}>{label('refresh')}</Button></div></Show>
     <Show when={error()}><div role="alert" class="flex flex-wrap items-center gap-2 border-b border-border p-3"><p class="m-0 text-sm text-error-strong">{label('error')} {error()}</p><Button size="sm" variant="secondary" disabled={busy()} onClick={() => selected() ? void open(selected()!) : account() ? void load(account()!) : void connect()}>{t("customize.retry")}</Button></div></Show>
     <Show when={!props.demo && consent() && !busy() && !error() && accounts().length === 0}><p role="status" class="px-4 text-sm text-neutral-500">{t("customize.no_accounts")}</p></Show>
