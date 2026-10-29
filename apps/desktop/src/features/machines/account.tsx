@@ -16,8 +16,6 @@ import {
   listComputers,
   listWorkspaces,
   createSpaceOrderSource,
-  machineCompatibility,
-  machineContracts,
   orderComputers,
   RelaySession,
   sessionProbe,
@@ -43,8 +41,6 @@ import AccountMachines from "./AccountMachines";
 import { MachinePicker } from "./MachinePicker";
 import { createRouter, type Invoke, type Router, type SliceChange } from "./router";
 import { machineNamesChanged, refetchMachines } from "./store";
-
-declare const __TERMINUS_CONTRACT__: string;
 
 type Internals = { invoke: Invoke };
 type Target = Window & { __TAURI_INTERNALS__?: Internals };
@@ -96,7 +92,6 @@ const infoOf = (c: Computer): MachineInfo => {
     id: c.computer_id,
     name: c.name?.trim() || c.computer_id,
     wakes: wakes(c),
-    outdated: machineCompatibility(c.contract, __TERMINUS_CONTRACT__) === "outdated",
     linked: linkedWorkspaces(c),
     ...(os ? { os } : {}),
   };
@@ -151,7 +146,6 @@ export function startAccountMachines(target: Target = window) {
         new RelaySession({
           endpoint,
           computerId: info.id,
-          contracts: machineContracts(__TERMINUS_CONTRACT__),
           getToken: async () => (await getToken()).token,
           // Un upgrade sin licencia no trae cuerpo: se pregunta por HTTP para no reintentar en bucle.
           probe: async () => sessionProbe(endpoint, (await getToken()).token, info.id),
@@ -160,10 +154,8 @@ export function startAccountMachines(target: Target = window) {
             void sync();
           },
         }),
-      compatible: (contract) => {
-        const verdict = machineCompatibility(contract, __TERMINUS_CONTRACT__);
-        return verdict === "unknown" ? null : verdict === "ok";
-      },
+      // Sin `contracts` ni `compatible`, como el teléfono: un motor con otro contrato
+      // sigue en servicio y solo falla la orden que no conoce (nunca la máquina entera).
       wake: async (id) => (await startComputer(endpoint, (await getToken()).token, id)).kind === "ok",
       storage: localStorage,
       onChange: () => {

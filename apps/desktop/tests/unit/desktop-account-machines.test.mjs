@@ -536,22 +536,19 @@ test("a workspace whose account is signed out here keeps the window local", asyn
   assert.deepEqual(app.fallos, []);
 });
 
-test("the session says which contract this window speaks; a VM on another one is outdated until its engine says hello with this one", async () => {
-  const { app, doc, f, relayCalls } = await open("desktop-account-contract", {
+// Un cambio de contrato nunca deja sin uso máquinas enteras: como el teléfono,
+// solo `version_mismatch` del relay o del motor la marca desactualizada.
+test("a VM whose engine speaks another contract keeps adding its tasks", async () => {
+  const { app, doc, f } = await open("desktop-account-contract", {
     computers: [HOME, { ...VM, state: "online" }],
     relays: { cmp_vm: { table: remote("Panel", "Tarea de la VM"), state: "online", contract: "otro-contrato" } },
   });
-  const spoken = new URL(f.relays.cmp_vm.sockets[0].url.replace(/^ws/, "http")).searchParams.get("contracts");
-  assert.ok(spoken, "the session URL carries the window's contract");
+  const url = new URL(f.relays.cmp_vm.sockets[0].url.replace(/^ws/, "http"));
+  assert.equal(url.searchParams.get("contracts"), null, "the session does not ask the relay to gate by contract");
   assert.ok(doc.querySelector('[data-sesion="t1"]'), "this computer's tasks are there");
-  assert.equal(doc.querySelector('[data-sesion="cmp_vm~t1"]'), null, "an engine on another contract adds nothing");
-  assert.ok(relayCalls("cmp_vm", "send_message").length === 0);
-  f.relays.cmp_vm.hello(spoken.split(",")[0]);
+  f.relays.cmp_vm.hello("otro-contrato");
   await reread(app);
-  await sleep(1_600);
-  await reread(app);
-  assert.ok(doc.querySelector('[data-sesion="cmp_vm~t1"]'), "with this contract it is back without reconnecting");
-  assert.equal(f.relays.cmp_vm.sockets.length, 1);
+  assert.ok(doc.querySelector('[data-sesion="cmp_vm~t1"]'), "an engine on another contract still adds its tasks");
   assert.deepEqual(app.fallos, []);
 });
 

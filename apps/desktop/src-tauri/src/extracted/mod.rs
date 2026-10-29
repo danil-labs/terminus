@@ -7,6 +7,7 @@ mod desktop;
 mod engine;
 mod engine_profile;
 pub mod env;
+mod handler_policy;
 mod instance;
 mod launcher;
 mod legacy;
@@ -259,6 +260,7 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
             proxy::account_relay_token,
             proxy::service_filter,
             proxy::load_history,
+            handler_policy::handler_action,
             proxy::service_prepare_update,
             proxy::service_cancel_update,
             sites::site_sweep,

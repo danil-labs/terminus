@@ -38,6 +38,7 @@ import { readVisualHtml, type VisualPart, type VisualWhole, VISUAL_FILE, VISUAL_
 import { arrangeSpaces, spaceOrder, type AccountWorkspace, groupWorkspaces, linkedAttention, onlyLinked, registryProjects, withRegistry } from "@terminus/computers";
 import { type ChatBackgroundView, chatBackgroundImageUrl, chatBackgroundView, isSingleAttention } from "@terminus/protocol";
 import { type FlatRow, flattenTasks, launcherOf } from "@terminus/tasks";
+import { AUTO_MODE } from "./composer.ts";
 import { type Host, HostError } from "./hosts.ts";
 
 /** Una tarea de la lista, con la máquina y la carpeta de donde viene. */
@@ -532,6 +533,22 @@ export function respondPermission(host: Host, workspace: string, id: string, req
   return host.call("respond_permission", workspace, { session: id, requestId, allow });
 }
 
+/**
+ * Elegir modo con el turno en marcha, como `elegirModo` del escritorio: el
+ * turno vivo arrancó con el modo de entonces y no lo relee, así que se le pide
+ * al motor. Pasar a automático además contesta lo que el turno ya pidió, como
+ * el botón «Aprobar»; si mientras tanto se eligió otro modo (`still` en falso), ya no.
+ */
+export async function switchLiveMode(host: Host, workspace: string, folder: string, id: string, mode: string, still: () => boolean = () => true) {
+  await host.call("set_permission_mode", workspace, { project: folder, session: id, mode });
+  if (mode !== AUTO_MODE) return;
+  const now = await loadTask(host, workspace, folder, id);
+  for (const p of now.permissions) {
+    if (!still()) return;
+    await respondPermission(host, workspace, id, p.request_id, true);
+  }
+}
+
 export async function answerQuestion(host: Host, workspace: string, folder: string, id: string, pending: PendingQuestion, chosen: Record<string, string[]>, free: Record<string, string>) {
   const respuestas: Answer[] = pending.questions.map((q) => ({
     turn: pending.turn,
@@ -569,11 +586,16 @@ export async function attentionOf(host: Host): Promise<WorkspaceAttention[]> {
   return linkedAttention(list, host.linked);
 }
 
-// --- Fijar y archivar (la vista previa) -----------------------------------------
+// --- Fijar, renombrar y archivar (la vista previa) ------------------------------
 
 /** Fijar o desfijar, como la ventana (`set_session_pinned`). Con la máquina apagada, el relay lo aplaza. */
 export async function setPinned(host: Host, workspace: string, folder: string, id: string, pinned: boolean) {
   await host.call("set_session_pinned", workspace, { project: folder, id, pinned });
+}
+
+/** Cambiarle el nombre, como la ventana (`rename_session`). Con la máquina apagada, el relay lo aplaza. */
+export async function renameTask(host: Host, workspace: string, folder: string, id: string, title: string) {
+  await host.call("rename_session", workspace, { project: folder, id, title });
 }
 
 /**

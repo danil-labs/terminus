@@ -23,8 +23,6 @@ export type AccountComputersSource = {
   list: () => Promise<Answer<Computer[]>>;
   workspaces?: () => Promise<Answer<AccountWorkspace[]>>;
   rename: (id: string, name: string) => Promise<Answer<{ computer_id: string; name: string }>>;
-  /** Si su motor no habla el contrato de esta ventana. */
-  outdated?: (computer: Computer) => boolean;
   /** Quien pinta nombres de máquina (la flota) toma el nuevo sin recargar. */
   onRenamed: (id: string, name: string) => void;
 };
@@ -112,7 +110,6 @@ export type Capabilities = {
   webAccounts?: WebAccountsSource;
   connectMachine?: {
     list: () => Promise<Answer<Computer[]>>;
-    outdated?: (computer: Computer) => boolean;
     onReady: (computer: Computer) => void;
   };
 };

@@ -224,6 +224,7 @@
   "shell.theme.next.system": "el del sistema",
   "shell.theme.title": "Tema: {current} · pulsa para {next}",
   "shell.turn.permission_no_reply": "El agente pidió permiso, pero no indicó cómo contestarle.",
+  "shell.turn.permission_delivery_unknown": "No se sabe si la respuesta llegó al agente. No se volvió a enviar: revisa la tarea antes de repetirla.",
   "shell.turn.stop_failed": "No se pudo detener el turno: {error}",
   "shell.update.available": "Hay una versión nueva: {version}",
   "shell.update.background": "Se descarga en segundo plano. Puedes seguir trabajando.",
@@ -232,7 +233,7 @@
     "one": "Salir de Terminus · {count} tarea trabajando",
     "other": "Salir de Terminus · {count} tareas trabajando"
   },
-  "shell.close.body": "Cerrar la ventana mantiene el trabajo en segundo plano. Para salir ahora puedes detener estas tareas; después podrás retomarlas.",
+  "shell.close.body": "Cerrar la ventana mantiene el trabajo en segundo plano. Puedes salir cuando terminen estas tareas, o detenerlas ahora y salir; después podrás retomarlas.",
   "shell.close.working": "trabajando",
   "shell.close.waiting": "espera tu respuesta",
   "shell.close.untitled": "Tarea sin título",
@@ -240,6 +241,7 @@
   "shell.close.stop": "Detenerlas y salir",
   "shell.close.stopping": "Deteniendo…",
   "shell.close.background": "Seguir en segundo plano",
+  "shell.close.when_done": "Salir cuando terminen",
   "shell.tray.header": {
     "one": "Terminus · {count} tarea trabajando",
     "other": "Terminus · {count} tareas trabajando"
@@ -252,7 +254,24 @@
     "one": "El motor nuevo entra cuando termine {count} tarea que sigue trabajando.",
     "other": "El motor nuevo entra cuando terminen {count} tareas que siguen trabajando."
   },
-  "shell.update.stop_and_apply": "Detener y aplicar ya",
+  "shell.update.restart_when_done": "Reiniciar cuando terminen",
+  "shell.update.stop_and_restart": "Detener y reiniciar ya",
+  "shell.update.stop_confirm": {
+    "one": "Se va a detener {count} tarea: {titles}. Podrás retomarla después.",
+    "other": "Se van a detener {count} tareas: {titles}. Podrás retomarlas después."
+  },
+  "shell.update.stop_confirm_yes": "Detener y reiniciar",
+  "shell.update.stop_confirm_back": "Volver",
+  "shell.update.stop_failed": "No se pudo detener alguna tarea, y Terminus no se reinició. Vuelve a intentarlo o espera a que terminen.",
+  "shell.wait.restart_title": "Terminus se reinicia cuando terminen las tareas",
+  "shell.wait.quit_title": "Terminus se cierra cuando terminen las tareas",
+  "shell.wait.for": "Esperando a: {titles}",
+  "shell.wait.for_count": {
+    "one": "Esperando a {count} tarea",
+    "other": "Esperando a {count} tareas"
+  },
+  "shell.wait.more": "{list} y {count} más",
+  "shell.wait.cancel": "Cancelar espera",
   "shell.notify.finished": "Terminó «{title}»",
   "shell.notify.finished_hint": "Ábrela en Terminus para ver lo que hizo.",
   "shell.notify.waiting": "«{title}» espera tu respuesta",

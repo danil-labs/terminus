@@ -12,7 +12,7 @@ import { FailureNote, asFailure, type Failure } from "../../ui/Failure";
 import type { ArbolEnTarea } from "../../lib/model";
 import { t } from "../../lib/i18n";
 import { workLabel } from "../projects/branchLabel";
-import ArbolDeArchivos from "./FileTree";
+import ArbolDeArchivos from "./FileTreeLazy";
 import KnIntegrate from "./KnIntegrate";
 import KnCloud from "./KnCloud";
 import { siguienteLista } from "./trees";

@@ -64,7 +64,10 @@ impl Link {
         let mut reader = BufReader::new(socket);
         loop {
             let mut line = Vec::new();
-            match (&mut reader).take(MAX_FRAME + 1).read_until(b'\n', &mut line) {
+            match (&mut reader)
+                .take(MAX_FRAME + 1)
+                .read_until(b'\n', &mut line)
+            {
                 Ok(0) | Err(_) => break,
                 Ok(_) => {}
             }

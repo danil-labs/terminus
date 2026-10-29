@@ -133,6 +133,7 @@ import Entrega, { type Producido } from "./Delivery";
 import {
   type CambioPorCupo,
   type FalloDelTurno,
+  avisoDeEncargado,
   cupoResuelveElFallo,
   gestoDeLaFila,
   prosaDelCambioPorCupo,
@@ -223,6 +224,12 @@ export type Msg = {
   turno?: string;
   /** El turno guardado en el que el motor ya escribió este mensaje vivo (`segment_saved`). */
   tramo?: string;
+  /**
+   * Lo que la persona metió en el turno vivo con un motor que no devuelve el
+   * turno guardado: `tras` es el último turno del disco cuando se metió, y lo
+   * guardado después con el mismo texto es él (`mensajesDelHilo`).
+   */
+  inyectado?: { tras: string | null };
   /** La subtarea a la que la persona escribió por su padre. Ver `relevoDe`. */
   relevo?: { titulo: string };
 
@@ -339,7 +346,12 @@ export type PermissionOrigin = {
 
 export type PermissionRequest = {
   session: string;
+  workspace?: string;
   requestId: string;
+  revision?: number;
+  durableId?: string;
+  /** Orden de llegada por evento: decide qué conserva una relectura que aún no lo trae. */
+  llegada?: number;
   tool: string;
   target: string | null;
   origin: PermissionOrigin | null;
@@ -4138,6 +4150,8 @@ function CambioDeContexto(props: {
  * que se auditó.
  */
 function textoDeSistema(m: Msg): string {
+  const aviso = avisoDeEncargado(m);
+  if (aviso) return aviso;
   if (m.meta !== "reenvio" || m.text) return m.text;
   const a = (m.recipients ?? []).map((r) => r.name).join(", ");
   return m.encargado && a

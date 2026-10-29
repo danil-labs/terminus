@@ -137,7 +137,8 @@ function belongsToBlock(list: readonly Tab[], ids: readonly string[]): (p: Tab) 
   return (p) => requested.has(p.id) || tasks.has(p.session);
 }
 
-type StoredTabs = { abiertas: TaskTab[]; activa: string | null };
+// Las temporales vuelven temporales: el siguiente clic las sigue sustituyendo.
+type StoredTabs = { abiertas: TaskTab[]; activa: string | null; temporales?: string[] };
 
 // El índice es el de la tira al cerrar; reinsertar en orden ascendente la reconstruye.
 type ClosedBlock = { tabs: { tab: Tab; index: number }[]; active: string | null };
@@ -152,7 +153,10 @@ const readStoredTabs = (k: string): StoredTabs => {
   const openTabs = Array.isArray(g?.abiertas)
     ? g.abiertas.map(asTask).filter((p): p is TaskTab => p !== null)
     : [];
-  return { abiertas: openTabs, activa: g && openTabs.some((p) => p.id === g.activa) ? g.activa : null };
+  const temporales = Array.isArray(g?.temporales)
+    ? g.temporales.filter((id) => openTabs.some((p) => p.id === id))
+    : [];
+  return { abiertas: openTabs, activa: g && openTabs.some((p) => p.id === g.activa) ? g.activa : null, temporales };
 };
 
 // La clave anterior se conserva para que un build anterior pueda restaurar su tira.
@@ -222,9 +226,11 @@ export function createTabs(options: { transient?: boolean } = {}) {
     if (!workspace) return;
     // Los ids provisionales no existen en disco y no pueden restaurarse al arrancar.
     const activeTask = taskOf(active());
+    const abiertas = openTabs().filter(isTaskTab).filter((p) => !esProvisional(p.session));
     const g: StoredTabs = {
-      abiertas: openTabs().filter(isTaskTab).filter((p) => isPinned(p.id) && !esProvisional(p.session)),
-      activa: activeTask && isPinned(activeTask) && !esProvisional(activeTask) ? activeTask : null,
+      abiertas,
+      activa: activeTask && !esProvisional(activeTask) ? activeTask : null,
+      temporales: abiertas.filter((p) => !isPinned(p.id)).map((p) => p.id),
     };
     escribirPref(key(workspace, space), g);
   };
@@ -298,7 +304,7 @@ export function createTabs(options: { transient?: boolean } = {}) {
     pinned,
     isPinned,
     pin,
-    restorable: () => openTabs().filter((p) => isTaskTab(p) && isPinned(p.id) && !esProvisional(p.session)).map((p) => p.id),
+    restorable: () => openTabs().filter((p) => isTaskTab(p) && !esProvisional(p.session)).map((p) => p.id),
     // Sustituir una vista no cierra su tarea ni el bloque de documentos asociado.
     replacePreviews(groups: readonly (readonly string[])[], visible: readonly (string | null)[]) {
       const remove = new Set<string>();
@@ -325,7 +331,8 @@ export function createTabs(options: { transient?: boolean } = {}) {
         return null;
       }
       const g = readStoredTabs(key(ws, desk));
-      setPinned(new Set(g.abiertas.map((p) => p.id)));
+      const temporales = new Set(g.temporales);
+      setPinned(new Set(g.abiertas.map((p) => p.id).filter((id) => !temporales.has(id))));
       setOpenTabs(g.abiertas);
       return g.activa;
     },

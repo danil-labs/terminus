@@ -4,7 +4,6 @@ import { t } from "../lib/i18n";
 import { startTrialInPage, TerminusLicense } from "../features/settings/TerminusLicense";
 import { Button } from "../ui/Button";
 import { ConnectMachine } from "../features/machines/ConnectMachine";
-import { machineCompatibility } from "./compatibility";
 import { type Answer, type Computer, listComputers } from "./computers";
 import type { WebAccountsSource } from "../lib/platform";
 import type { Session } from "./session";
@@ -96,7 +95,6 @@ export function Gate(props: { session: Session; endpoint: string; initial?: Gate
           <div class="mt-6 max-w-[60ch]" data-web-connect="">
             <ConnectMachine
               list={() => computersOf(props.endpoint, props.session)}
-              outdated={(c) => machineCompatibility(c.contract) === "outdated"}
               onReady={() => void load()}
             />
           </div>

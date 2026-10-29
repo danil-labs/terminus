@@ -1,41 +1,18 @@
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { listen } from "../../lib/serviceEvents";
-import { invoke as routedInvoke } from "../../lib/invoke.ts";
 import { capabilities } from "../../lib/platform";
 import { t } from "../../lib/i18n";
 import { Button } from "../../ui/Button";
 import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
 import { FailureNote, asFailure, type Failure } from "../../ui/Failure";
 import { quietFinished } from "./TaskNotifier";
-
-type LiveTurn = {
-  session: string;
-  workspace: string;
-  project: string;
-  started_at: number;
-  shell?: { id: string; command: string };
-};
-type Pending = { questions: unknown[]; permissions: unknown[] };
-type Shown = LiveTurn & { title: string; waiting: boolean };
-
-/** Los turnos viven en el workspace que los lanzó, no en el que mira la ventana. */
-const scope = (workspace: string) => ({ headers: { "x-terminus-workspace": workspace } });
-
-export async function stopTurns(turns: LiveTurn[], call = routedInvoke) {
-  return await Promise.allSettled(
-    turns.map((turn) =>
-      turn.shell
-        ? call("stop_shell_command", { session: turn.session }, scope(turn.workspace))
-        : call("stop_turn", { project: turn.project, session: turn.session }, scope(turn.workspace)),
-    ),
-  );
-}
+import { setTurnTitles, stopTurns, titled, type LiveTurn, type ShownTurn } from "./liveTurns";
 
 /** Cerrar oculta; salir pide una decisión sobre los turnos del motor conectado a este cliente. */
 export default function CloseGuard(props: { title: (session: string) => string | undefined }) {
   const [shown, setShown] = createSignal(false);
-  const [rows, setRows] = createSignal<Shown[]>([]);
+  const [rows, setRows] = createSignal<ShownTurn[]>([]);
   const [stopping, setStopping] = createSignal(false);
   const [failure, setFailure] = createSignal<Failure | null>(null);
   let acting = false;
@@ -43,18 +20,7 @@ export default function CloseGuard(props: { title: (session: string) => string |
   let refreshing = false;
   let disposed = false;
 
-  async function titled(turns: LiveTurn[]): Promise<Shown[]> {
-    return Promise.all(turns.map(async (turn) => {
-      const pending = await invoke<Pending>("pending_requests", { session: turn.session }, scope(turn.workspace)).catch(() => null);
-      return {
-        ...turn,
-        title: props.title(turn.session) ?? turn.shell?.command ?? t("shell.close.untitled"),
-        waiting: !!pending && pending.questions.length + pending.permissions.length > 0,
-      };
-    }));
-  }
-
-  function payload(turns: Shown[] | null) {
+  function payload(turns: ShownTurn[] | null) {
     const header = turns === null ? t("shell.tray.unknown")
       : turns.length ? t("shell.tray.header", { count: turns.length }) : t("shell.tray.idle");
     return {
@@ -148,7 +114,14 @@ export default function CloseGuard(props: { title: (session: string) => string |
     }
   }
 
+  function quitWhenDone() {
+    const shown = rows();
+    setShown(false);
+    void import("./restartWait").then((m) => m.waitThen("quit", shown));
+  }
+
   onMount(() => {
+    setTurnTitles(props.title);
     if (!capabilities().nativeWindow) return;
     const unlisten = [
       listen("close-requested", () => { if (!acting) void toBackground(); }),
@@ -183,11 +156,12 @@ export default function CloseGuard(props: { title: (session: string) => string |
               )}</For>
             </ul>
           </Show>
-          <div class="flex justify-end gap-2">
+          <div class="flex flex-wrap justify-end gap-2">
             <Button variant="outline" size="sm" disabled={stopping()} onClick={() => setShown(false)}>{t("shell.close.cancel")}</Button>
             <Button variant="secondary" size="sm" disabled={stopping()} onClick={() => void stopAndMaybeQuit(true)}>
               {stopping() ? t("shell.close.stopping") : t("shell.close.stop")}
             </Button>
+            <Button variant="secondary" size="sm" disabled={stopping()} onClick={quitWhenDone}>{t("shell.close.when_done")}</Button>
             <Button size="sm" disabled={stopping()} onClick={() => void toBackground()}>{t("shell.close.background")}</Button>
           </div>
         </DialogContent>

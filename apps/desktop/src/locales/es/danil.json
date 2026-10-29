@@ -144,7 +144,6 @@
   "danil.computers.state.starting": "encendiéndose",
   "danil.computers.state.off": "apagada",
   "danil.computers.state.off_seen": "apagada · visto {time}",
-  "danil.computers.state.outdated": "desactualizada",
   "danil.computers.rename": "Cambiar nombre",
   "danil.computers.rename_label": "Nombre de {name}",
   "danil.computers.rename_failed.invalid_name": "El nombre debe tener de 1 a {max} caracteres, sin saltos de línea.",

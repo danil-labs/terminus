@@ -19,17 +19,30 @@
   ${EndIf}
 !macroend
 
+!macro TERMINUS_SWEEP
+  Delete "$INSTDIR\old_*seldon-runtime.exe"
+  ${IfNot} ${FileExists} "$INSTDIR\old_*seldon-runtime.exe"
+    Delete "$INSTDIR\old_*.exe"
+  ${EndIf}
+!macroend
+
 ; Windows renames a running .exe but does not overwrite it: what is open keeps
 ; running from old_*, and Terminus removes those files when it starts again.
-!macro TERMINUS_SET_ASIDE NAME
-  ${If} ${FileExists} "$INSTDIR\${NAME}"
-    Delete "$INSTDIR\old_${NAME}"
-    ClearErrors
-    Rename "$INSTDIR\${NAME}" "$INSTDIR\old_${NAME}"
-    ${If} ${Errors}
-      System::Call 'kernel32::GetTickCount()i.R9'
-      Rename "$INSTDIR\${NAME}" "$INSTDIR\old_$R9_${NAME}"
-    ${EndIf}
+; Window and engine share one prefix: a set-aside engine still working is reopened
+; with its own window, so that window stays while any set-aside engine is left.
+!macro TERMINUS_SET_ASIDE WINDOW
+  !insertmacro TERMINUS_SWEEP
+  StrCpy $R8 "$INSTDIR\old_"
+  ${If} ${FileExists} "$INSTDIR\old_${WINDOW}"
+  ${OrIf} ${FileExists} "$INSTDIR\old_seldon-runtime.exe"
+    System::Call 'kernel32::GetTickCount()i.R9'
+    StrCpy $R8 "$INSTDIR\old_$R9_"
+  ${EndIf}
+  ${If} ${FileExists} "$INSTDIR\${WINDOW}"
+    Rename "$INSTDIR\${WINDOW}" "$R8${WINDOW}"
+  ${EndIf}
+  ${If} ${FileExists} "$INSTDIR\seldon-runtime.exe"
+    Rename "$INSTDIR\seldon-runtime.exe" "$R8seldon-runtime.exe"
   ${EndIf}
 !macroend
 
@@ -41,7 +54,6 @@
   !ifdef __UNINSTALL__
     ${If} $EXEDIR == $INSTDIR
       !insertmacro TERMINUS_SET_ASIDE "${executableName}"
-      !insertmacro TERMINUS_SET_ASIDE "seldon-runtime.exe"
     ${Else}
       nsis_tauri_utils::FindProcessCurrentUser "${executableName}"
       Pop $R0
@@ -62,16 +74,15 @@
 
 !macro NSIS_HOOK_PREINSTALL
   !insertmacro TERMINUS_SET_ASIDE "${MAINBINARYNAME}.exe"
-  !insertmacro TERMINUS_SET_ASIDE "seldon-runtime.exe"
 !macroend
 
 ; The app shows its own notice; silent and passive runs come from it.
 !macro NSIS_HOOK_POSTINSTALL
-  Delete "$INSTDIR\old_*.exe"
+  !insertmacro TERMINUS_SWEEP
   ${If} ${FileExists} "$INSTDIR\old_*.exe"
   ${AndIfNot} ${Silent}
   ${AndIf} $PassiveMode <> 1
-    MessageBox MB_OK|MB_ICONINFORMATION "Terminus ${VERSION} is installed. Restart Terminus to use it; tasks that are running keep working.$\r$\n$\r$\nTerminus ${VERSION} quedó instalado. Reinicia Terminus para usarlo; las tareas que están corriendo siguen trabajando."
+    MessageBox MB_OK|MB_ICONINFORMATION "Terminus ${VERSION} is installed. Restart Terminus to use it. If tasks are working, Terminus will offer to restart when they finish.$\r$\n$\r$\nTerminus ${VERSION} quedó instalado. Reinicia Terminus para usarlo. Si hay tareas trabajando, Terminus te avisará para reiniciar cuando terminen."
     ; The finish page would run a second window next to the open one; its shortcut box is checked by default.
     Call CreateOrUpdateDesktopShortcut
     ; Without it, Quit exits with 2, as if the script had aborted.
@@ -89,7 +100,7 @@
 ; The engine keeps older tool trees while turns use them, so the template's per-file
 ; delete leaves them behind. Only a real uninstall (a temporary copy) removes them all.
 !macro NSIS_HOOK_POSTUNINSTALL
-  Delete "$INSTDIR\old_*.exe"
+  !insertmacro TERMINUS_SWEEP
   ${If} $EXEDIR != $INSTDIR
     RMDir /r "$INSTDIR\work-tools"
   ${EndIf}

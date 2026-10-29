@@ -256,8 +256,34 @@ export function tramoGuardado(msgs: Msg[], turno: string): Msg[] {
 export function mensajesDelHilo(h: { base: Msg[]; vivo: Msg[]; guardados?: ReadonlySet<string> }): Msg[] {
   const guardados = h.guardados;
   const enDisco = (id?: string) => id !== undefined && guardados!.has(id);
-  const vivo = guardados?.size ? h.vivo.filter((m) => !enDisco(m.turno) && !enDisco(m.tramo)) : h.vivo;
+  const vivo = sinInyectadosGuardados(
+    h.base,
+    guardados?.size ? h.vivo.filter((m) => !enDisco(m.turno) && !enDisco(m.tramo)) : h.vivo,
+  );
   return vivo.length ? [...h.base, ...vivo] : h.base;
+}
+
+/**
+ * Un mensaje metido sin id (`Msg.inyectado`) que el disco ya trae: el primer turno
+ * de la persona con su texto guardado después de `tras`. Cada guardado cuenta
+ * una vez, para que dos «sí» seguidos sigan siendo dos.
+ */
+function sinInyectadosGuardados(base: Msg[], vivo: Msg[]): Msg[] {
+  if (!vivo.some((m) => m.inyectado && !m.turno)) return vivo;
+  const usados = new Set<number>();
+  return vivo.filter((m) => {
+    if (!m.inyectado || m.turno) return true;
+    const tras = m.inyectado.tras;
+    const desde = tras === null ? 0 : base.findIndex((b) => b.turno === tras) + 1;
+    if (desde === 0 && tras !== null) return true;
+    for (let i = desde; i < base.length; i++) {
+      const b = base[i];
+      if (usados.has(i) || b.role !== "user" || !b.turno || b.text !== m.text) continue;
+      usados.add(i);
+      return false;
+    }
+    return true;
+  });
 }
 
 /**
