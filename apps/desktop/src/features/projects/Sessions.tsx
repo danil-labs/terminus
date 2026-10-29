@@ -1212,7 +1212,7 @@ export default function Sessions(props: {
             // Fijada: el borde lo dibuja `::after` para poder abrirle un hueco
             // arriba al centro, donde va el alfiler sin fondo; los 7 px de
             // arriba son los que el alfiler necesita para no recortarse.
-            fijada(f.s) && "mt-[7px] border-transparent after:pointer-events-none after:absolute after:-inset-px after:rounded-[inherit] after:border after:border-neutral-950/18 after:content-[''] after:[-webkit-mask:radial-gradient(circle_9px_at_50%_0,transparent_8.5px,#000_9px)] after:[mask:radial-gradient(circle_9px_at_50%_0,transparent_8.5px,#000_9px)]",
+            fijada(f.s) && "mt-[7px] border-transparent after:pointer-events-none after:absolute after:-inset-px after:rounded-[inherit] after:border after:border-neutral-950/18 after:[-webkit-mask:radial-gradient(circle_9px_at_50%_0,transparent_8.5px,#000_9px)] after:[mask:radial-gradient(circle_9px_at_50%_0,transparent_8.5px,#000_9px)]",
             renombrando() === f.s.id && "bg-neutral-950/9 hover:bg-neutral-950/9",
             menu() === f.s.id && f.s.id !== props.current && "bg-neutral-950/6",
             (props.draggedTask ?? tareaEnVuelo()?.id) === f.s.id &&
