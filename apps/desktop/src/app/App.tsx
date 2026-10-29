@@ -6755,9 +6755,10 @@ export default function App() {
       const fila = filaDe(pp.sesion ?? "");
       return fila && esChatDeAgente(fila) ? (fila.agent ?? null) : null;
     });
-    const identidadVisualDeLaCelda = () => pp.sesion
+    // Memo: releer la fila tras una aprobación no es cambiar de agente ni cierra su perfil.
+    const identidadVisualDeLaCelda = createMemo(() => pp.sesion
       ? (filaDe(pp.sesion)?.agent ?? null)
-      : encargadoDeLaCelda();
+      : encargadoDeLaCelda());
     /**
      * El estado que enseña la cabecera es el MISMO que pinta su fila del riel.
      * Derivarlo de «esta conversación tiene turno vivo» decía «Despierto» de
@@ -6834,6 +6835,7 @@ export default function App() {
       setRequestedProfile(null);
       setViewingProfile(true);
     });
+    // Releer la lista de proyectos no cambia el alcance: unas acciones nuevas reiniciarían el panel y borrarían su resultado.
     const handlerPolicy = createMemo<HandlerPolicyActions | undefined>(() => {
       const workspace = workspaceActivo();
       const project = proyectoDeLaCelda()?.id ?? "";
@@ -6852,7 +6854,7 @@ export default function App() {
         revoke: () => call<HandlerRequests>({ action: "revoke", name }),
         release: () => call<HandlerRelease>({ action: "release", name }),
       };
-    });
+    }, undefined, { equals: (a, b) => a?.scope === b?.scope });
     const lecturaDeLaCelda = () => lecturas.get(pp.sesion ?? "") ?? null;
     const preguntasDeLaCelda = almacenDePreguntas(() => pp.sesion);
     const vistaDeLaCelda = vistaDe(pp.sesion ?? "");

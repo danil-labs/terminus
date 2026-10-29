@@ -131,6 +131,7 @@ import Entrega, { type Producido } from "./Delivery";
 import {
   type CambioPorCupo,
   type FalloDelTurno,
+  avisoDeEncargado,
   cupoResuelveElFallo,
   gestoDeLaFila,
   prosaDelCambioPorCupo,
@@ -4133,6 +4134,8 @@ function CambioDeContexto(props: {
  * que se auditó.
  */
 function textoDeSistema(m: Msg): string {
+  const aviso = avisoDeEncargado(m);
+  if (aviso) return aviso;
   if (m.meta !== "reenvio" || m.text) return m.text;
   const a = (m.recipients ?? []).map((r) => r.name).join(", ");
   return m.encargado && a

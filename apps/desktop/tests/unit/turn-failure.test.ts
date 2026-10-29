@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 // abajo son identificadores en vez de frases.
 import "../helpers/catalog.ts";
 import {
+  avisoDeEncargado as handlerNotice,
   mensajeDeFallo,
   cupoResuelveElFallo as quotaResolves,
   gestoDelFallo as failureAction,
@@ -301,6 +302,14 @@ test("handler notices remain translated when history is reloaded", () => {
   }
 });
 
+
+test("a handler notice saved with engine prose uses the window catalog and keeps the tool", () => {
+  const saved = { text: "El encargado pide la herramienta `seldon-lab-missing-tool` y no está en el PATH de este turno.", meta: "handler_requires_tool_missing" };
+  assert.equal(handlerNotice(saved), failureText(saved));
+  assert.match(handlerNotice(saved) ?? "", /\(seldon-lab-missing-tool\)$/);
+  assert.notEqual(handlerNotice(saved), saved.text);
+  assert.equal(handlerNotice({ text: "otro aviso", meta: "aviso" }), null);
+});
 
 import { handlerMutation, pendingHandlerOperation, resumeHandlerOperation } from "../../src/features/settings/handlerOperations.ts";
 test("an uncertain handler mutation survives scope switches and resumes without repeating", async () => {
