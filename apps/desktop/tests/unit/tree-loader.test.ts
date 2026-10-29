@@ -4,10 +4,8 @@ import test from "node:test";
 import { crearLector, esTransitorio } from "../../src/features/code/treeLoader.ts";
 
 /**
- * **El panel «Carpeta» no se queda con un error viejo.** Un `tree_files` tardó
- * 180–240 s y devolvió `io`; las siguientes contestaban en un segundo, pero el
- * panel no volvía a preguntar. Aquí: una lectura a la vez, reintentos solos
- * tras un fallo del transporte y lo último bueno sin tocar mientras tanto.
+ * El panel «Carpeta» no se queda con un error viejo: una lectura a la vez,
+ * reintentos solos tras un fallo del transporte y lo último bueno sin tocar.
  */
 
 type Pendiente = { resolve: (v: string) => void; reject: (e: unknown) => void };

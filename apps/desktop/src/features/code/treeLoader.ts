@@ -1,24 +1,11 @@
 /**
- * Cómo pide el panel «Carpeta» su árbol: sin amontonar lecturas, sin tirar lo
- * último bueno y sin enseñar un error que un segundo intento habría resuelto.
+ * Cómo pide el panel «Carpeta» su árbol (`tests/unit/tree-loader.test.ts`).
  *
- * Una vez pasó: un `tree_files` tardó 180–240 s, volvió `io` y el panel se
- * quedó en «Terminus no respondió… reinicia la app» aunque la siguiente
- * lectura contestaba en un segundo. No reintentaba nunca.
- *
- * Aquí está la decisión, aparte de la fontanería de Solid, para probarla sola
- * (`tests/unit/tree-loader.test.ts`):
- *
- * - **Una lectura a la vez.** Lo que se pide mientras hay una en vuelo se
- *   junta en una sola al terminar. Si la que está en vuelo pasa de `lentaTras`,
- *   se deja de esperarla y sale otra: el motor no cancela la vieja, pero que
- *   una tarde no bloquea las siguientes.
- * - **Gana la respuesta buena más nueva.** Una lectura vieja que contesta
- *   después de una más nueva no pisa nada; un fallo solo cuenta si es de la
- *   última que salió.
- * - **Un fallo del transporte se reintenta solo** con espera creciente
- *   (`esperas`), sin avisar. Solo si se agotan se llama a `fail`. Un fallo del
- *   comando (carpeta borrada, permiso) se dice a la primera.
+ * - Una lectura a la vez: lo pedido en vuelo se junta en una al terminar; una
+ *   que pasa de `lentaTras` ya no frena a la siguiente.
+ * - Gana la respuesta buena más nueva; un fallo solo cuenta si es de la última.
+ * - Un fallo del transporte se reintenta solo (`esperas`) sin tapar lo último
+ *   bueno; al agotarse, o con un fallo del comando, se llama a `fallar`.
  */
 
 /** Los fallos que dicen «no llegó» o «no contestó a tiempo», no «no se puede». */
