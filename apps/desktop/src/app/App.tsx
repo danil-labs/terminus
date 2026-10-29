@@ -7809,7 +7809,8 @@ export default function App() {
           tira, donde manda la barra de inserción— es el marco del cuadrante
           entero; en un borde que admite partida, media ventana, que es donde
           va a nacer la nueva. No recibe puntero: taparía el gesto que lo pinta. */}
-      <Show when={arrastrando() !== null && donde() !== null}>
+      {/* Con una sola ventana no hay a cuál caer: reordenar ya lo dice la barra de inserción de la tira. */}
+      <Show when={paneles.isSplit() && arrastrando() !== null && donde() !== null}>
         <Show
           when={dropSide()}
           fallback={
