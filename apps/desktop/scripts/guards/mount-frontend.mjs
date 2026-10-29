@@ -856,7 +856,8 @@ if (!roto) {
   assert.equal(sidebarTask("dm-work"), null, "el trabajo delegado se consulta desde su coordinador");
   assert.ok(sidebarTask("topic-work").querySelector("[data-session-agent]"), "la tarea delegada fijada conserva la tarjeta compartida");
   const taskOrder = [...threadDoc.querySelectorAll('[data-sidebar-tasks] [data-sesion]')].map(row => row.dataset.sesion);
-  assert.ok(taskOrder.indexOf("topic-work") < taskOrder.indexOf("topic"), "las fijadas van antes que las demás sin alterar sus turnos");
+  assert.ok(taskOrder.indexOf("topic-work") > taskOrder.indexOf("topic"), "una hija fijada permanece bajo su padre");
+  assert.equal(taskOrder.filter(id => id === "topic-work").length, 1, "fijar una hija no duplica la tarea");
   const openPinnedTaskMenu = id => sidebarTask(id).querySelector('[data-session-actions] button[aria-haspopup="menu"]').click();
   const pinMenuItem = label => [...threadDoc.querySelectorAll('[role="menu"] [role="menuitem"]')].find(item => item.textContent.trim() === label);
   const pinButton = id => sidebarTask(id).querySelector("[data-session-pin]");
@@ -903,18 +904,23 @@ if (!roto) {
   assert.ok(delegatedToolbar, "la barra derecha permite consultar subtareas de una conversación existente");
   // En el riel el estado va en su columna fija, delante del título.
   const previewOfCoordinator = () => sidebarTask("topic").querySelector("[data-session-status]");
+  const previewOfDelegates = () => sidebarTask("topic").closest("li").querySelector(":scope > button[aria-expanded]");
   threadApp.emit("chat", { kind: "started", session: "topic-work", workspace: "w" });
   await sleep(100);
-  assert.equal(previewOfCoordinator().querySelectorAll('[aria-label="Está trabajando"]').length, 1,
-    "el coordinador conserva un foco de actividad cuando solo trabaja su subtarea");
+  assert.equal(previewOfCoordinator().querySelectorAll('[aria-label="Está trabajando"]').length, 0,
+    "el estado propio del coordinador no hereda la actividad de su subtarea");
+  assert.equal(previewOfDelegates().querySelectorAll('[aria-label="Aquí dentro se está trabajando"]').length, 1,
+    "el resumen de subtareas conserva la actividad delegada");
   threadApp.emit("chat", { kind: "started", session: "topic", workspace: "w" });
   await sleep(100);
   assert.equal(previewOfCoordinator().querySelectorAll("[aria-label]").length, 1,
     "un solo estado ocupa su columna, sin contador de subtareas");
   threadApp.emit("chat", { kind: "done", session: "topic", workspace: "w", ok: true });
   await sleep(200);
-  assert.equal(previewOfCoordinator().querySelectorAll('[aria-label="Está trabajando"]').length, 1,
-    "terminar el turno principal conserva la actividad delegada");
+  assert.equal(previewOfCoordinator().querySelectorAll('[aria-label="Está trabajando"]').length, 0,
+    "terminar el turno principal actualiza solo su estado propio");
+  assert.equal(previewOfDelegates().querySelectorAll('[aria-label="Aquí dentro se está trabajando"]').length, 1,
+    "terminar el turno principal conserva la actividad delegada en su resumen");
   threadApp.emit("chat", { kind: "done", session: "topic-work", workspace: "w", ok: true });
   await sleep(200);
   assert.equal(previewOfCoordinator().querySelectorAll('[aria-label="Está trabajando"]').length, 0,
@@ -1547,16 +1553,18 @@ if (!roto) {
   };
   const sidebar = await boot("listo", 4, sidebarResponses);
   const row = id => sidebar.w.document.querySelector(`[data-sesion="${id}"]`);
+  const delegatedFailure = () => row("p").closest("li").querySelector(':scope > button[aria-expanded] [aria-label="Una subtarea falló o se interrumpió"]');
   // La fila del riel dice el PR; la rama y el resto van en su `title` y en la tarjeta flotante.
   const gitDeFila = id => row(id)?.querySelector("[data-session-pr]")?.getAttribute("title") ?? "";
   assert.match(row("p").textContent, /Tarea p.*#12/s);
   assert.match(gitDeFila("p"), /feature\/parent.*#12/);
   assert.ok(row("p").querySelector('[data-session-pr] svg.lucide-git-branch'));
-  assert.equal(row("p").querySelector('[aria-label="Resultado entregado"]'), null,
-    "el fallo delegado tiene prioridad sobre la entrega del coordinador en el indicador común");
+  assert.ok(row("p").querySelector('[aria-label="Resultado entregado"]'),
+    "el coordinador conserva su entrega aunque una subtarea falle");
   assert.equal(row("own"), null, "la delegación no llena el sidebar");
-  assert.equal(row("p").querySelectorAll('[aria-label="Fallo o interrupción"]').length, 1,
-    "una subtarea fallida ocupa el único indicador del coordinador");
+  assert.equal(row("p").querySelectorAll('[aria-label="Fallo o interrupción"]').length, 0,
+    "el estado propio del coordinador no hereda el fallo delegado");
+  assert.ok(delegatedFailure(), "el resumen conserva el fallo de la subtarea");
   const taskSearch = sidebar.w.document.querySelector('[data-sidebar-search] input[role="searchbox"]');
   const searchTasks = async value => {
     taskSearch.value = value;
@@ -1582,11 +1590,25 @@ if (!roto) {
   }
   await searchTasks("");
   assert.equal(row("own"), null);
-  assert.equal(row("p").querySelectorAll('[aria-label="Fallo o interrupción"]').length, 1,
-    "cerrar la búsqueda conserva el único estado común del coordinador");
-  assert.equal(row("p").querySelector('[aria-label="Resultado entregado"]'), null);
+  assert.ok(delegatedFailure(), "cerrar la búsqueda conserva el fallo en el resumen");
+  assert.ok(row("p").querySelector('[aria-label="Resultado entregado"]'));
   await searchTasks("a");
   assert.ok(row("own"), "la búsqueda conserva acceso a las subtareas");
+  const expandDelegations = () => row("p").closest("li").querySelector(':scope > button[aria-expanded]');
+  expandDelegations().click();
+  await sleep(40);
+  assert.equal(row("own"), null, "el cierre manual vence a la búsqueda");
+  for (const active of [true, false]) {
+    sidebarResponses.list_live_sessions = sidebarResponses.list_live_sessions.map(s => ({ ...s, updated_at: active ? 3 : 4 }));
+    sidebar.emit("chat", { kind: active ? "started" : "done", project: "", session: "own", workspace: "w", ok: true });
+    sidebar.emit("session", { project: "", session: "own", workspace: "w" });
+    await sleep(350);
+    assert.equal(expandDelegations().getAttribute("aria-expanded"), "false", "la actividad no deshace el cierre manual");
+    assert.equal(row("own"), null, "la actualización de filas conserva la rama cerrada");
+  }
+  expandDelegations().click();
+  await sleep(40);
+  assert.ok(row("own"));
   blockRemote = false; releaseRemote(gitRows); await sleep(100);
   gitRows.shared = gitRow("feature/parent", { shared_with: "p", pull_known: true });
   gitRows.p = gitRow("renamed", { pull: { number: 12, state: "merged", head_sha: "abc" }, pull_known: true });
@@ -1618,7 +1640,7 @@ if (!roto) {
   sidebar.emit("session", { project: "", session: "p", workspace: "w" });
   await sleep(350);
   assert.equal(row("p").querySelector('[aria-label="Respuesta nueva sin leer"]'), null);
-  assert.ok(row("p").querySelector('[aria-label="Fallo o interrupción"]'),
+  assert.ok(delegatedFailure(),
     "una respuesta del coordinador no oculta el fallo pendiente de su subtarea");
   assert.equal(row("p").querySelector('svg.lucide-mail'), null);
   row("p").click();
@@ -1630,7 +1652,7 @@ if (!roto) {
   sidebar.w.dispatchEvent(new sidebar.w.Event("focus"));
   await sleep(120);
   assert.doesNotMatch(tab("p").getAttribute("aria-label"), /sin leer/);
-  assert.ok(row("p").querySelector('[aria-label="Fallo o interrupción"]'),
+  assert.ok(delegatedFailure(),
     "ver el resultado del coordinador conserva la atención delegada");
   assert.equal(row("shared").querySelector('[aria-label="Respuesta nueva sin leer"]'), null);
   sidebar.emit("chat", { kind: "done", project: "", session: "p", workspace: "w", ok: true });

@@ -588,7 +588,7 @@ const steps = [
   ["En el navegador cada clave de la cuenta dice en qué máquinas está, se quita con aviso y se cambia sellada aquí", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-account-credentials.test.mjs")], root],
   ["En el escritorio las claves de la cuenta pasan por el motor y el aviso sube solo las elegidas", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/desktop-account-credentials.test.mjs")], root],
   ["La página de aprobación y la compatibilidad de contrato hablan con el plano de control", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/danil-connect-web.test.ts")], root],
-  ["Con el stream empujado los lotes llegan a los oyentes y el historial se pagina", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/push-stream.test.mjs")], root],
+  ["Con el stream empujado los lotes llegan a los oyentes y el historial se pagina", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/push-stream.test.mjs"), join(root, "tests/unit/push-history.test.mjs")], root],
   ["Al enviar a otra máquina la hoja lleva el trabajo sin subir, y traerlo de vuelta lo deja en una rama de aquí", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/carry-window.test.mjs")], root],
   ["Una tarea de una máquina apagada abre y se enciende al mandarle algo", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/machine-task.test.mjs")], root],
   ["Por carpeta, una carpeta en dos máquinas es un grupo por máquina y su «+» lanza en la suya", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/sidebar-folder-machines.test.mjs")], root],

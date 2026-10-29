@@ -147,3 +147,104 @@ test("si el padre kn ya guardó, la hija se puede finalizar aunque su copia est�
   const rootDraft = { parent: draft };
   assert.equal(canFinishTask({}, effectiveTaskGit(parent, rootDraft, [parent]), false), false);
 });
+
+const { buildTaskTree, taskIdentity, taskParent, withTaskAncestors, taskDescendants } = await import("../../../../packages/tasks/src/tree.ts");
+
+test("parent prevalece y unavailable corta únicamente launched_by", () => {
+  const root = { id: "root" };
+  const launcher = { id: "launcher" };
+  const child = { id: "child", parent: "root", launched_by: "launcher", launcher_available: false };
+  const delegated = { id: "delegated", launched_by: "launcher" };
+  const unavailable = { id: "unavailable", launched_by: "launcher", launcher_available: false };
+  assert.equal(taskParent(child), "root");
+  assert.equal(taskParent(delegated), "launcher");
+  assert.equal(taskParent(unavailable), null);
+  const rows = [root, launcher, child, delegated, unavailable];
+  assert.deepEqual(buildTaskTree(rows).map((branch) => [branch.tarea.id, ...descendants(branch).map((row) => row.id)]),
+    [["root", "child"], ["launcher", "delegated"], ["unavailable"]]);
+  assert.deepEqual(withTaskAncestors(rows, [unavailable]), [unavailable]);
+  assert.deepEqual(taskDescendants(rows, [launcher]), [delegated]);
+});
+
+test("ciclos, huérfanas y fijadas aparecen una vez en orden estable", () => {
+  const a = { id: "a", parent: "b", pinned: true };
+  const b = { id: "b", launched_by: "a" };
+  const orphan = { id: "orphan", parent: "missing" };
+  const self = { id: "self", parent: "self" };
+  const rows = [a, b, orphan, self, a];
+  const tree = buildTaskTree(rows);
+  assert.deepEqual(tree.map((branch) => branch.tarea.id), ["orphan", "self", "a"]);
+  assert.deepEqual(tree.flatMap((branch) => [branch.tarea.id, ...descendants(branch).map((row) => row.id)]), ["orphan", "self", "a", "b"]);
+  assert.deepEqual(withTaskAncestors(rows, [b]), [a, b]);
+  assert.deepEqual(taskDescendants(rows, [a]), [b]);
+  assert.deepEqual(buildTaskTree(rows, tree).map((branch, i) => branch === tree[i]), [true, true, true]);
+});
+
+test("ancestros conservan orden de entrada y descendientes excluyen semillas", () => {
+  const leaf = { id: "leaf", launched_by: "child" };
+  const root = { id: "root" };
+  const child = { id: "child", parent: "root" };
+  const rows = [leaf, root, child];
+  assert.deepEqual(withTaskAncestors(rows, [leaf, leaf]), rows);
+  assert.deepEqual(taskDescendants(rows, [root, child]), [leaf]);
+});
+
+test("workspace y máquina separan identidades y vínculos", () => {
+  const root = { id: "root", machine: "one", workspace: "workspace" };
+  const other = { id: "root", machine: "two", workspace: "workspace" };
+  const child = { id: "child", parent: "root", machine: "two", workspace: "workspace" };
+  const foreign = { id: "foreign", parent: "root", machine: "one", workspace: "other" };
+  const rows = [root, other, child, foreign];
+  const tree = buildTaskTree(rows);
+  assert.equal(tree[0].hijas.length, 0);
+  assert.equal(tree[1].hijas[0].tarea, child);
+  assert.equal(tree[2].tarea, foreign);
+  assert.deepEqual(withTaskAncestors(rows, [child]), [other, child]);
+  assert.deepEqual(taskDescendants(rows, [foreign]), []);
+  const moved = buildTaskTree([{ ...root, machine: "three" }], tree);
+  assert.notEqual(moved[0], tree[0]);
+});
+
+test("wrapper filtra archivadas antes de adjuntar tareas delegadas", () => {
+  const root = { id: "root", archived: false };
+  const child = { id: "child", launched_by: "root", archived: true };
+  const leaf = { id: "leaf", launched_by: "child", archived: true, pinned: true };
+  assert.deepEqual(taskTree([root, child, leaf], true), [{ tarea: child, hijas: [{ tarea: leaf, hijas: [] }] }]);
+  assert.deepEqual(taskTree([root, child, leaf], false), [{ tarea: root, hijas: [] }]);
+  assert.deepEqual(taskTree([root, child, leaf], null), [{ tarea: root, hijas: [{ tarea: child, hijas: [{ tarea: leaf, hijas: [] }] }] }]);
+});
+
+test("descendientes eligen raíces por identidad completa, no por id", () => {
+  const roots = [
+    { id: "r", workspace: "w1", machine: "m1" },
+    { id: "r", workspace: "w1", machine: "m2" },
+    { id: "r", workspace: "w2", machine: "m1" },
+  ];
+  const children = roots.map((root) => ({ ...root, id: "child", parent: "r" }));
+  const leaves = roots.map((root) => ({ ...root, id: "leaf", launched_by: "child" }));
+  const ambiguous = { id: "ambiguous", parent: "r" };
+  const rows = [...roots, ...children, ...leaves, ambiguous];
+  assert.equal(new Set(roots.map(taskIdentity)).size, 3);
+  for (let i = 0; i < roots.length; i++) {
+    assert.deepEqual(taskDescendants(rows, [{ ...roots[i] }]), [children[i], leaves[i]]);
+  }
+  assert.deepEqual(taskDescendants(rows, [roots[0], roots[2]]), [children[0], children[2], leaves[0], leaves[2]]);
+  assert.deepEqual(taskDescendants(rows, []), []);
+});
+
+test("raíz ausente encuentra su familia compatible sin cruzar scopes", () => {
+  const root = { id: "r", workspace: "w1", machine: "m1" };
+  const other = { ...root, machine: "m2" };
+  const foreign = { ...root, workspace: "w2" };
+  const child = { ...root, id: "child", launched_by: "r" };
+  const leaf = { ...root, id: "leaf", parent: "child" };
+  const otherChild = { ...other, id: "child", parent: "r" };
+  const foreignChild = { ...foreign, id: "child", parent: "r" };
+  const ambiguous = { id: "ambiguous", parent: "r" };
+  const unavailable = { ...root, id: "unavailable", launched_by: "r", launcher_available: false };
+  const rows = [other, foreign, child, leaf, otherChild, foreignChild, ambiguous, unavailable];
+  assert.deepEqual(taskDescendants(rows, [root]), [child, leaf]);
+  assert.deepEqual(taskDescendants(rows.filter((row) => row !== other && row !== foreign), [root, other, foreign]),
+    [child, leaf, otherChild, foreignChild]);
+  assert.deepEqual(taskDescendants(rows, [{ ...root, machine: "missing" }]), []);
+});
