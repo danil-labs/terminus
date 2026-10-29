@@ -1,11 +1,14 @@
-import { Show, createSignal, onCleanup, onMount } from "solid-js";
+import { Show, createSignal, lazy, onCleanup, onMount } from "solid-js";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { Button } from "../../ui/Button";
 import { Toast } from "../../ui/Toast";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
-import { quietFinished } from "./TaskNotifier";
-import { cancelWait, namesOf, stopTurns, titled, waitRows, waitThen, waitingThen, type LiveTurn, type ShownTurn } from "./liveTurns";
+import { waitingThen } from "./liveTurns";
+
+/** Elegir qué hacer con las tareas vivas solo hace falta con una versión lista: va aparte de la carga inicial. */
+const Aplicar = lazy(() => import("./restartWait").then((m) => ({ default: m.Aplicar })));
+const EsperaDeTareas = lazy(() => import("./restartWait").then((m) => ({ default: m.EsperaDeTareas })));
 
 /** El reinicio requiere una acción de la persona; descartar dura hasta otra versión. */
 const CADA = 30 * 60 * 1000;
@@ -112,7 +115,9 @@ export default function AvisoDeVersion() {
           <Button variant="ghost" size="compact" onClick={() => setAlDia(false)}>{t("shell.update.later")}</Button>
         </Toast>
       </Show>
-      <EsperaDeTareas />
+      <Show when={waitingThen()}>
+        <EsperaDeTareas />
+      </Show>
       <Show when={instalada() && !instaladaVista() && !hay() && !waitingThen()}>
         <Toast>
           <p class="m-0 text-xs text-neutral-500">{t("shell.update.installed")}</p>
@@ -177,129 +182,5 @@ export default function AvisoDeVersion() {
         )}
       </Show>
     </>
-  );
-}
-
-/**
- * Reiniciar aplica la ventana nueva; el motor nuevo entra cuando el viejo queda
- * sin trabajo. Con tareas vivas no se ofrece reiniciar ya: se espera a que
- * terminen, o se detienen después de ver cuáles se cortan.
- */
-function Aplicar(props: { onLater: () => void }) {
-  const [vivas, setVivas] = createSignal<LiveTurn[]>([]);
-  const [confirmando, setConfirmando] = createSignal<ShownTurn[] | null>(null);
-  const [deteniendo, setDeteniendo] = createSignal(false);
-  const [fallo, setFallo] = createSignal(false);
-  async function mirar() {
-    const turnos = (await invoke("list_live_turns").catch(() => [])) as LiveTurn[];
-    setVivas(turnos);
-    return turnos;
-  }
-  onMount(() => {
-    void mirar();
-    const reloj = setInterval(() => void mirar(), 10_000);
-    onCleanup(() => clearInterval(reloj));
-  });
-  async function reiniciar() {
-    // Una tarea pudo arrancar desde la última mirada: entonces se ofrece esperar.
-    if ((await mirar()).length === 0) void invoke("restart_app");
-  }
-  async function esperar() {
-    waitThen("restart", await titled(vivas()));
-  }
-  async function confirmar() {
-    setFallo(false);
-    setConfirmando(await titled(await mirar()));
-  }
-  async function detenerYReiniciar() {
-    setDeteniendo(true);
-    setFallo(false);
-    quietFinished();
-    const resultados = await stopTurns(await mirar());
-    setDeteniendo(false);
-    if (resultados.some((r) => r.status === "rejected")) {
-      setFallo(true);
-      return;
-    }
-    void invoke("restart_app");
-  }
-  return (
-    <Show
-      when={vivas().length > 0}
-      fallback={
-        <>
-          <Button variant="secondary" size="compact" onClick={() => void reiniciar()}>
-            {t("shell.update.restart")}
-          </Button>
-          <Button variant="ghost" size="compact" onClick={props.onLater}>
-            {t("shell.update.later")}
-          </Button>
-        </>
-      }
-    >
-      <Show
-        when={confirmando()}
-        fallback={
-          <>
-            <p class="m-0 basis-full text-xs text-neutral-500">
-              {t("shell.update.waiting_tasks", { count: vivas().length })}
-            </p>
-            <Button variant="primary" size="compact" onClick={() => void esperar()}>
-              {t("shell.update.restart_when_done")}
-            </Button>
-            <Button variant="secondary" size="compact" onClick={() => void confirmar()}>
-              {t("shell.update.stop_and_restart")}
-            </Button>
-            <Button variant="ghost" size="compact" onClick={props.onLater}>
-              {t("shell.update.later")}
-            </Button>
-          </>
-        }
-      >
-        {(filas) => (
-          <>
-            <p class="m-0 basis-full text-xs text-neutral-700" data-stop-confirm>
-              {t("shell.update.stop_confirm", { count: filas().length, titles: namesOf(filas(), 5) })}
-            </p>
-            <Show when={fallo()}>
-              <p class="m-0 basis-full text-xs text-warning-strong">{t("shell.update.stop_failed")}</p>
-            </Show>
-            <Button variant="danger" size="compact" disabled={deteniendo()} onClick={() => void detenerYReiniciar()}>
-              {deteniendo() ? t("shell.close.stopping") : t("shell.update.stop_confirm_yes")}
-            </Button>
-            <Button variant="ghost" size="compact" disabled={deteniendo()} onClick={() => setConfirmando(null)}>
-              {t("shell.update.stop_confirm_back")}
-            </Button>
-          </>
-        )}
-      </Show>
-    </Show>
-  );
-}
-
-/** Lo que se espera para reiniciar o salir: queda a la vista hasta que termina o se cancela. */
-function EsperaDeTareas() {
-  return (
-    <Show when={waitingThen()}>
-      {(then) => (
-        <Toast data-wait-notice="">
-          <p class="m-0 text-[0.8125rem] font-semibold">
-            {then() === "restart" ? t("shell.wait.restart_title") : t("shell.wait.quit_title")}
-          </p>
-          <Show when={waitRows().length > 0}>
-            <p class="m-0 text-xs text-neutral-500">
-              {waitRows().some((row) => row.named)
-                ? t("shell.wait.for", { titles: namesOf(waitRows()) })
-                : t("shell.wait.for_count", { count: waitRows().length })}
-            </p>
-          </Show>
-          <div class="flex gap-1.5">
-            <Button variant="ghost" size="compact" onClick={cancelWait}>
-              {t("shell.wait.cancel")}
-            </Button>
-          </div>
-        </Toast>
-      )}
-    </Show>
   );
 }

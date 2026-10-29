@@ -7,7 +7,7 @@ import { Button } from "../../ui/Button";
 import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
 import { FailureNote, asFailure, type Failure } from "../../ui/Failure";
 import { quietFinished } from "./TaskNotifier";
-import { setTurnTitles, stopTurns, titled, waitThen, type LiveTurn, type ShownTurn } from "./liveTurns";
+import { setTurnTitles, stopTurns, titled, type LiveTurn, type ShownTurn } from "./liveTurns";
 
 /** Cerrar oculta; salir pide una decisión sobre los turnos del motor conectado a este cliente. */
 export default function CloseGuard(props: { title: (session: string) => string | undefined }) {
@@ -115,8 +115,9 @@ export default function CloseGuard(props: { title: (session: string) => string |
   }
 
   function quitWhenDone() {
-    waitThen("quit", rows());
+    const shown = rows();
     setShown(false);
+    void import("./restartWait").then((m) => m.waitThen("quit", shown));
   }
 
   onMount(() => {
