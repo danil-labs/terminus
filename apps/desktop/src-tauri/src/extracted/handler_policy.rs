@@ -81,12 +81,17 @@ fn arguments(input: &Input) -> Result<(&'static str, Value), Error> {
     Ok((command, args))
 }
 
+/// Sin carpeta el motor no recibe `folder`, y su recibo la deja vacía o nula.
+fn folder(input: &Input) -> Option<String> {
+    (!input.project.is_empty()).then(|| input.project.clone())
+}
+
 fn validate_receipt(input: &Input, receipt: &Value) -> Result<(), Error> {
     if !matches!(
         receipt["command"].as_str(),
         Some("handler approve" | "handler revoke" | "handler release")
     ) || receipt["workspace"] != input.workspace
-        || receipt["folder"] != input.project
+        || receipt["folder"].as_str().unwrap_or("") != input.project
     {
         return Err(Error::new("invalid_request"));
     }
@@ -111,30 +116,35 @@ pub(super) fn handler_action(app: tauri::AppHandle, input: Input) -> Result<Valu
         let mut result = client.request_scoped(
             command,
             Some(input.workspace.clone()),
-            Some(input.project.clone()),
+            folder(&input),
             args,
             Duration::from_secs(30),
         )?;
         if matches!(input.request, Action::List | Action::Requests { .. }) {
             return Ok(result);
         }
-        validate_receipt(&input, &result)?;
         let operation = result["id"]
             .as_str()
             .ok_or_else(|| Error::new("invalid_request"))?
             .to_owned();
+        // La mutación ya salió: un recibo que no casa no es un fallo firme, se consulta otra vez.
+        validate_receipt(&input, &result).map_err(|_| Error {
+            detail: json!({"operation":operation}),
+            ..Error::new("operation_pending")
+        })?;
         let deadline = Instant::now() + Duration::from_secs(30);
         loop {
             match result["status"].as_str() {
                 Some("completed") => return Ok(result["result"].clone()),
-                Some("failed" | "interrupted") => {
+                Some("accepted" | "started" | "awaiting_user") => {}
+                // `failed`, `interrupted` o un estado que esta ventana no conoce: cierra la espera.
+                _ => {
                     let mut error: Error = serde_json::from_value(result["error"].clone())
                         .unwrap_or_else(|_| Error::new("operation_failed"));
                     error.detail =
                         json!({"operation":operation,"settled":true,"detail":error.detail});
                     return Err(error);
                 }
-                _ => {}
             }
             if Instant::now() >= deadline {
                 return Err(Error {
@@ -144,9 +154,10 @@ pub(super) fn handler_action(app: tauri::AppHandle, input: Input) -> Result<Valu
             }
             std::thread::sleep(Duration::from_millis(100));
             result = client
-                .request(
+                .request_scoped(
                     "operation show",
                     Some(input.workspace.clone()),
+                    folder(&input),
                     json!({"operation":operation}),
                     Duration::from_secs(3),
                 )
@@ -174,6 +185,9 @@ mod tests {
         );
         let receipt = json!({"command":"handler approve","workspace":"w","folder":""});
         assert!(validate_receipt(&input, &receipt).is_ok());
+        assert_eq!(folder(&input), None);
+        let unscoped = json!({"command":"handler approve","workspace":"w","folder":null});
+        assert!(validate_receipt(&input, &unscoped).is_ok());
         for (key, value) in [
             ("workspace", "other"),
             ("folder", "other"),

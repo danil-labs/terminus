@@ -344,6 +344,8 @@ export type PermissionRequest = {
   requestId: string;
   revision?: number;
   durableId?: string;
+  /** Orden de llegada por evento: decide qué conserva una relectura que aún no lo trae. */
+  llegada?: number;
   tool: string;
   target: string | null;
   origin: PermissionOrigin | null;

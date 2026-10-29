@@ -16,6 +16,7 @@ import * as store from "./chat-background-store.ts";
 import { invoke } from "./invoke.ts";
 import { capabilities } from "./platform.ts";
 import { shrinkImage } from "./shrink-image.ts";
+import { errorCode } from "./errorCode.ts";
 
 /** El tope de un motor anterior: si lo rechaza, se reduce hasta ahí y se intenta otra vez. */
 const TOPE_DE_MOTOR_ANTERIOR = 700_000;
@@ -25,15 +26,15 @@ const velos = () => ({ chat: store.veloDeFondo(), tabs: store.veloDePestanas(), 
 /** El motor no conoce la orden (`command` del proxy o del relay): un motor anterior. */
 export function ordenDesconocida(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
-  const { detail, what, code } = error as { detail?: unknown; what?: { clave?: unknown }; code?: unknown };
-  return detail === "command" || detail === "unsupported" || code === "command" || what?.clave === "shell.service.command";
+  const code = errorCode(error);
+  return code === "command" || code === "unsupported" || (error as { what?: { clave?: unknown } }).what?.clave === "shell.service.command";
 }
 
 /** El motor o la cuenta rechazaron la imagen por su peso. */
 function demasiadoGrande(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
-  const { detail, what } = error as { detail?: unknown; what?: { clave?: unknown } };
-  return what?.clave === "settings.appearance.background.too_big" || detail === "image_too_large";
+  const { what } = error as { what?: { clave?: unknown } };
+  return what?.clave === "settings.appearance.background.too_big" || errorCode(error) === "image_too_large";
 }
 
 /** Guarda en el workspace; solo ante un motor que no conoce la orden pasa la imagen nueva por `choose_chat_background`. */

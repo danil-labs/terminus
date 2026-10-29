@@ -87,7 +87,7 @@ import Observability from "../features/observability/Observability";
 import AnadirCarpeta, { type ClonEnCurso, type InicioDeCarpeta } from "../features/projects/AddWorkdir";
 import AgentPageTasks from "../features/projects/AgentPageTasks";
 // Chunk aparte: el perfil completo de un agente solo se carga al abrirlo.
-const AgentProfile = lazy(() => import("../features/projects/AgentProfile"));
+const AgentProfile = retryableLazy(() => import("../features/projects/AgentProfile"));
 // El alta solo se abre sin workspace o al agregar otro: no entra en la carga inicial.
 const Onboarding = lazy(() => import("../features/onboarding/Onboarding"));
 const TaskLocation = lazy(() => import("../features/chat/TaskLocation"));
@@ -280,6 +280,9 @@ import {
   toggleMaximizeFromHeader,
 } from "../lib/window";
 import { Button } from "../ui/Button";
+import { LazyPart, retryableLazy } from "../ui/LazyPart";
+import { mergeGates } from "../features/chat/permissionGates";
+import { errorCode } from "../lib/errorCode.ts";
 import { Dialog, DialogContent, DialogTitle } from "../ui/Dialog";
 import { asFailure, claveDe, prosaDe } from "../ui/Failure";
 import { BotonConAtajo } from "../ui/Shortcut";
@@ -2065,7 +2068,7 @@ export default function App() {
   // conversación y deja la anterior abandonada, sin error y sin aviso. Para
   // eso está `recargarMaterial`.
   /** En la web una máquina apagada tiene su indicador y su rebanada: lo que no contestó no es un error. */
-  const apagadaEnLaWeb = (e: unknown) => !!capabilities().computerStatus && (e as { detail?: unknown } | null)?.detail === "machine_off";
+  const apagadaEnLaWeb = (e: unknown) => !!capabilities().computerStatus && errorCode(e) === "machine_off";
 
   async function aplicar(a: Startup) {
     guardarCache.flush();
@@ -2909,6 +2912,7 @@ export default function App() {
                 {
                   session,
                   workspace: workspace ?? workspaceActivo() ?? undefined,
+                  llegada: ++gateSeq,
                   requestId: request_id,
                   tool: text,
                   target: target ?? meta,
@@ -3261,7 +3265,7 @@ export default function App() {
       const cerrada = sinRespuesta(p, await pendientesDe(p.session, workspace), e);
       if (cerrada) {
         setPermissions(ps => ps.filter(x => x.session !== p.session || x.requestId !== p.requestId));
-        asentar(p.session, ms => [...ms, cerrada]);
+        if (cerrada !== "respondida") asentar(p.session, ms => [...ms, cerrada]);
         return;
       }
       await reponerGates(p.session, workspace);
@@ -5985,26 +5989,15 @@ export default function App() {
    * decisión que nadie puede tomar.
    */
   const permissionReads = new Map<string, number>();
+  let gateSeq = 0;
   async function reponerGates(session: string, workspace = workspaceActivo()) {
     const generation = sessionGeneration;
     const reading = (permissionReads.get(session) ?? 0) + 1;
     permissionReads.set(session, reading);
+    const desde = gateSeq;
     const pendientes = await pendientesDe(session, workspace);
     if (!pendientes || generation !== sessionGeneration || reading !== permissionReads.get(session)) return;
-    setPermissions((ps) => [
-      ...ps.filter((p) => p.session !== session),
-      ...pendientes.permissions
-        .map((p) => ({
-          session,
-          workspace: workspace ?? undefined,
-          requestId: p.request_id,
-          revision: p.revision,
-          durableId: p.id,
-          tool: p.tool,
-          target: p.target,
-          origin: ps.find((x) => x.session === session && x.requestId === p.request_id)?.origin ?? null,
-        })),
-    ]);
+    setPermissions((ps) => mergeGates(ps, session, workspace, pendientes.permissions, desde));
   }
 
   /**
@@ -7261,7 +7254,7 @@ export default function App() {
       }
     >
       {(e) => (
-        <AgentProfile
+        <LazyPart><AgentProfile
           project={proyectoDeLaCelda()?.id ?? ""}
           agent={e()}
           profile={cellProfile()}
@@ -7284,7 +7277,7 @@ export default function App() {
           }}
           onDeleted={() => setViewingProfile(false)}
           onClose={() => setViewingProfile(false)}
-        />
+        /></LazyPart>
       )}
     </Show>
     );

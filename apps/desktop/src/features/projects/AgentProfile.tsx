@@ -5,7 +5,7 @@ import EyeOff from "lucide-solid/icons/eye-off";
 import FolderOpen from "lucide-solid/icons/folder-open";
 import ImagePlus from "lucide-solid/icons/image-plus";
 import Trash2 from "lucide-solid/icons/trash-2";
-import { createEffect, createMemo, createSignal, lazy, on, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, on, onCleanup, Show } from "solid-js";
 import SelectorDeModelo from "../chat/ModelPicker";
 import { t } from "../../lib/i18n";
 import type { AgentProfile as Profile, HandlerDefinition, HandlerStatus } from "../../lib/model";
@@ -21,7 +21,8 @@ import { BodyPicker } from "./BodyPicker";
 import { DEFAULT_PROFILE, notifyProfiles } from "./profiles";
 import { TelegramSection } from "./TelegramSection";
 import type { HandlerTarget } from "../settings/HandlerPolicy";
-const HandlerPolicy = lazy(() => import("../settings/HandlerPolicy"));
+import { LazyPart, retryableLazy } from "../../ui/LazyPart";
+const HandlerPolicy = retryableLazy(() => import("../settings/HandlerPolicy"));
 
 /** Las extensiones que el webview pinta como `data:` URI (`preview::data_url`). */
 const IMAGES = ["png", "jpg", "jpeg", "webp", "gif"];
@@ -482,7 +483,7 @@ export default function AgentProfile(props: {
             </Show>
           </section>
 
-          <Show when={props.handlerPolicy}>{target => <HandlerPolicy name={props.agent.name} target={target()} />}</Show>
+          <Show when={props.handlerPolicy}>{target => <LazyPart><HandlerPolicy name={props.agent.name} target={target()} /></LazyPart>}</Show>
           <TelegramSection project={props.project} name={props.agent.name} />
 
           <section class={SECTION}>
