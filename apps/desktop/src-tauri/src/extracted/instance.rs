@@ -101,3 +101,8 @@ pub fn serve(listener: TcpListener, show: impl Fn(Option<String>) + Send + 'stat
 pub fn exiting() {
     EXITING.store(true, Ordering::SeqCst);
 }
+
+/// La ventana que iba a reemplazarla no arrancó: esta vuelve a contestar.
+pub fn stay() {
+    EXITING.store(false, Ordering::SeqCst);
+}

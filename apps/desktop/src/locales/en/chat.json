@@ -422,6 +422,7 @@
   "chat.greeting.8": "What's next on your list?",
   "chat.greeting.9": "I'm here. What should we do?",
   "chat.greeting.10": "What do you want to get done?",
+  "chat.mentions.in_code": "Mentions inside code cannot be recipients. Write the mention outside the code.",
   "chat.history.open": "View full content",
   "chat.history.next": "Next chunk",
   "chat.history.previous": "Previous chunk",

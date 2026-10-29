@@ -491,6 +491,12 @@ const steps = [
     root,
   ],
   [
+    "Un permiso decidido o en vuelo no se pinta como cerrado y una relectura no borra gates nuevos",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/permission-gates.test.ts")],
+    root,
+  ],
+  [
     "El reintento de entregas no reenvía a la persona",
     process.execPath,
     ["--test", join(root, "tests/unit/retry-delivery-resume.test.mjs")],
@@ -570,6 +576,7 @@ const steps = [
   ["La preparación no se abre con la app pintada ni se queda ciega", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/setup-repair.test.mjs")], root],
   ["La franja de consumo sigue a la cuenta activa cuando cambia por cupo", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/usage-active-account.test.mjs")], root],
   ["Con una cuenta que comparte credencial, el motivo de no poder agregar otra se ve", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/shared-credential-note.test.mjs")], root],
+  ["Esperar a la versión anterior es un aviso y detenerla se confirma", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/launcher-previous.test.mjs")], root],
   ["Las cuentas de Danil entran con el navegador, se agregan y cierran sesión", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/danil-account-panel.test.mjs")], root],
   ["El alta y el pie de la barra lateral ofrecen la cuenta de Danil", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/danil-sign-in-entry.test.mjs")], root],
   ["Google Drive del alta vuelve a conectar después de desconectar", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/onboarding-drive-reconnect.test.mjs")], root],

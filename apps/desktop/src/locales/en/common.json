@@ -125,5 +125,7 @@
   "common.duration.min_sec": "{minutes}m {seconds}s",
   "common.duration.sec": "{seconds}s",
   "common.usage.millions": "{value}M",
-  "common.usage.thousands": "{value}k"
+  "common.usage.thousands": "{value}k",
+  "common.part.failed": "This part of the window could not load.",
+  "common.part.retry": "Retry"
 }

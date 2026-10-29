@@ -210,3 +210,52 @@ test("el composer consulta la máquina elegida y descarta respuestas tardías", 
   assert.ok(doc.querySelector('[aria-label*="VM model"]'), "la tarea remota conserva los modelos locales");
   assert.deepEqual(app.fallos, []);
 });
+
+test("reopening a live permission sends the observed durable id and revision", async () => {
+  let waiting = true;
+  const decisions = [];
+  const pending = { id: "durable-7", request_id: "provider-1", revision: 7, tool: "Bash", target: "echo permission-proof" };
+  const app = await boot("listo", "durable-permission", responses({
+    list_live_sessions: () => [row("t1")],
+    list_active_turns: ["t1"],
+    load_session: ({ id }) => session(id, [turn(0, "Waiting for approval")]),
+    pending_requests: () => ({ permissions: waiting ? [pending] : [], questions: [], records: { permissions: [{ ...pending, id: "old-delivery", state: "delivery_unknown" }] } }),
+    respond_permission: args => {
+      decisions.push(args);
+      waiting = false;
+      return { id: "decision", role: "user", text: "", permission: { request_id: "provider-1", tool: "Bash", target: pending.target, allow: args.allow, when: 1 } };
+    },
+  }));
+  await sleep(600);
+  await openTask(app, "t1");
+  const approve = [...app.w.document.querySelectorAll("button")].find(button => button.textContent?.trim() === "Aprobar y ejecutar");
+  assert.ok(approve, "pending permission must be restored without a live event");
+  approve.click();
+  await sleep(200);
+  assert.deepEqual(decisions, [{ session: "t1", requestId: "durable-7", revision: 7, allow: true }]);
+  assert.equal([...app.w.document.querySelectorAll("button")].some(button => button.textContent?.trim() === "Aprobar y ejecutar"), false);
+  assert.deepEqual(app.fallos, []);
+});
+
+for (const state of ["delivery_unknown", "owner_lost"]) test(`a missing live permission retains its durable ${state} outcome without resending`, async () => {
+  let waiting = true;
+  let sent = 0;
+  const pending = { id: "durable-lost", request_id: "provider-lost", revision: 7, tool: "Bash", target: "echo proof" };
+  const app = await boot("listo", `permission-${state}`, responses({
+    list_live_sessions: () => [row("t1")], list_active_turns: ["t1"],
+    load_session: ({ id }) => session(id, [turn(0, "Waiting")]),
+    pending_requests: () => ({ permissions: waiting ? [pending] : [], questions: [], records: { permissions: [{ ...pending, state: waiting ? "waiting" : state === "owner_lost" ? "closed" : state, closed: !waiting && state === "owner_lost" ? "owner_lost" : null }] } }),
+    respond_permission: () => { sent++; waiting = false; throw { what: "Transport failed", detail: "io" }; },
+  }));
+  await sleep(600);
+  await openTask(app, "t1");
+  const approve = [...app.w.document.querySelectorAll("button")].find(b => b.textContent?.trim() === "Aprobar y ejecutar");
+  assert.ok(approve);
+  approve.click();
+  await sleep(300);
+  assert.equal(sent, 1);
+  assert.ok(app.w.document.body.textContent.includes(state), "durable outcome remains in the conversation diagnostic");
+  if (state === "owner_lost") assert.ok(app.w.document.body.textContent.includes("El proceso que esperaba la respuesta"));
+  assert.equal([...app.w.document.querySelectorAll("button")].some(b => b.textContent?.trim() === "Aprobar y ejecutar"), false);
+  assert.deepEqual(app.fallos, []);
+});

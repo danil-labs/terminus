@@ -15,6 +15,9 @@ import { aplicarLengua, elegirLengua, lenguasDisponibles, semillaDelAlta } from 
 import { cargarPaquetes } from "../locales/packs";
 import { capabilities } from "../lib/platform";
 import "../styles/global.css";
+// Errores y avisos de encargado se leen al fallar algo, ya con la ventana montada: entran por detrás.
+// Si el trozo no carga, caen a la prosa del motor; el panel de encargados lo vuelve a pedir.
+void import("../locales/failurePhrases").catch((e) => console.warn("[lenguas] failurePhrases", e));
 
 /**
  * El arranque fija tema y lengua antes del primer pintado. Los efectos declaran

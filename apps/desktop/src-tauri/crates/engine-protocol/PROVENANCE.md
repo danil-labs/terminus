@@ -6,8 +6,8 @@ Apache-2.0); the manifest was regenerated on
 `b40d34999d140d30a0e1192ba752b2fdb860dc90`. The generator reads the engine
 source and is not part of this repository.
 
-`commands.json`: 328 commands, 303 ordinary invocations, three channels and
-twenty-two window/bridge functions. Names, camelCase parameters, reference Rust
+`commands.json`: 549 entries: 370 invocations, 142 CLI routes, 12 RPC routes,
+three channels and twenty-two window/bridge functions; 37 events. Names, camelCase parameters, reference Rust
 types and literal events are kept.
 
 On 2026-10-19 the contract renamed its two concepts (317 commands, 27 events):
@@ -20,7 +20,7 @@ repositories, and `GitHostInfo`. Files on disk keep their keys; the types that
 are stored and also travel cross the contract wrapped in `Wire`, which renames
 their keys. There are no aliases. This copy is byte-identical to the engine's.
 SHA-256:
-`93b1c32f25c4fb5fd722079a5593f8316125d91e8ecf12e64c3d7e1f7aebae98`.
+`5096a84a8341725f8926cdcbfb0e8b29cb85f58abee26151cbfc1f5aecc35d02`.
 
 seldon-host `4e21caf` (#66) added the Danil account (321 commands, 28 events):
 `danil_connect_start`, `danil_connect_status`, `danil_connect_options`,
@@ -230,3 +230,14 @@ seldon-host `feat/deferred-actions` (`0c867e2`, on dev with `feat/account-spaces
 seldon-host dev `e567260` merges the Danil account's credentials (#145) and GitHub in the account (#144), on top of the chat visuals by parts (391 commands, 32 events). Credentials, all with `scope: "workspace"` on the request's workspace: `account_credentials_list` → `{credentials, recipients, local_only: [{slot, kind, provider, label, hint, upload_error?}]}`, `account_credentials_upload` (`{slots}`) → `{uploaded, failed: [{slot, error}]}`, `account_credential_delete` (`{credential}`), and `account_credential_remove_machine` / `account_credential_restore_machine` (`{credential, computer}`) → the credential; `sync_account_credentials` and `reseal_account_credential` are for the connector. GitHub: `github_account_status`, `github_account_authorize`, `github_account_installations`, `github_account_set_areas`, `github_account_disconnect` and `github_account_changed`. Errors are `credentials.error.<code>`. This copy is `git show e567260:crates/engine-protocol/commands.json` byte for byte; no `seldon-runtime` with it is published yet.
 
 The `feat/activity-logs` engine (`3e7748f`) extends dev `714e4c1` with four workspace-scoped invocations (`run_activity_command`, `list_activity`, `read_activity`, `read_activity_log`) and the `activity` event (395 commands, 33 events). All earlier command descriptors are unchanged. This copy matches the engine manifest byte for byte. Maintenance output is persisted outside task sessions and is read in bounded pages.
+
+The window snapshot is byte-identical to seldon-host dev `437a280`,
+`crates/engine-manifest/commands.json`. It includes durable pending revisions,
+handler approvals and quarantine routes. The public projection in
+engine-protocol `e3199a5` is for the CLI and is not the window manifest.
+A compatible published engine remains required before a desktop release.
+
+Handler and peer error keys come from the CLI catalogs at seldon-host
+`437a280` (`crates/terminus-cli/src/messages.{es,en}.json`); the window completes
+the Spanish translations. Pending error codes come from that engine
+(`runtime/chat/durable_pending.rs`) and use window-authored ES/EN phrases.
