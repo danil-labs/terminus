@@ -903,7 +903,7 @@ if (!roto) {
     "el menú ocupa el hueco del estado, a la derecha del título");
   // Fijada: el alfiler va en el hueco del borde, no dentro de la tarjeta.
   assert.ok(sidebarTask("dm").querySelector(':scope > [role="img"][aria-label="Fijada"] svg.lucide-pin'), "la fijada lleva su alfiler en el borde");
-  assert.ok(sidebarTask("dm").className.includes("after:border"), "la fijada dibuja su borde con ::after");
+  assert.ok(sidebarTask("dm").className.includes("tarjeta-fijada"), "la fijada dibuja su borde con ::after");
   assert.equal(sidebarTask("dm").querySelector('[data-session-preview] [aria-label="Fijada"]'), null);
   openPinnedTaskMenu("dm");
   await sleep(50);

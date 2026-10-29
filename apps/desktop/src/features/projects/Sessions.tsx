@@ -868,7 +868,7 @@ export default function Sessions(props: {
             "flex min-w-0 items-center gap-1 text-[0.8125rem] leading-[1.35] [:has(>[data-finish-slot])_&]:pr-16",
             // La tarjeta del riel: 13,5 px en su línea de 18, sin chincheta ni «Contexto».
             tarjetaDelRiel() && "text-[0.84375rem] leading-[18px]",
-            apagada() && "text-neutral-950/62 group-hover/session:text-neutral-950",
+            apagada() && "text-neutral-500 group-hover/session:text-neutral-950",
           )}>
             <Show when={fijada(f.s) && !tarjetaDelRiel()}>{marcaDeFijada()}</Show>
             <Show when={contextual(f.s) && !tarjetaDelRiel()}><span class="shrink-0 text-[0.6875rem] font-normal text-neutral-500">{t("projects.sessions.context")}</span></Show>
@@ -939,8 +939,8 @@ export default function Sessions(props: {
               {...p}
               class={m.riel
                 ? cn(
-                    "grid h-5 w-[22px] place-items-center rounded-[5px] border-0 bg-transparent p-0 text-neutral-500 hover:bg-neutral-950/9 hover:text-neutral-950 focus-visible:outline-2 focus-visible:outline-primary",
-                    menu() === f.s.id && "bg-neutral-950/10 text-neutral-950",
+                    "grid h-5 w-[22px] place-items-center rounded-[5px] border-0 bg-transparent p-0 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-2 focus-visible:outline-primary",
+                    menu() === f.s.id && "bg-neutral-200 text-neutral-950",
                   )
                 : "grid place-items-center rounded-sm border-0 bg-transparent px-1 py-0.5 leading-[1.3] text-neutral-500 hover:bg-neutral-200 hover:text-neutral-950"}
               aria-label={t("projects.sessions.actions_named", {
@@ -1206,15 +1206,15 @@ export default function Sessions(props: {
           data-apagada={apagada() ? "true" : undefined}
           class={tarjetaDelRiel() ? cn(
             // La tarjeta: 52 px fijos y dos líneas, pase lo que pase con los datos.
-            "group/session relative flex h-[52px] min-w-0 cursor-pointer flex-col justify-center gap-[5px] rounded-[10px] border border-transparent py-[7px] pr-2 pl-2.5 hover:bg-neutral-950/6 focus-visible:outline-2 focus-visible:outline-primary",
+            "group/session relative flex h-[52px] min-w-0 cursor-pointer flex-col justify-center gap-[5px] rounded-[10px] border border-transparent py-[7px] pr-2 pl-2.5 hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-primary",
             // Abierta: un tinte y un borde suave. Ni barra de color, ni negrita, ni sombra.
-            f.s.id === props.current && "border-neutral-950/10 bg-neutral-950/9 hover:bg-neutral-950/9",
+            f.s.id === props.current && "border-border bg-neutral-200 hover:bg-neutral-200",
             // Fijada: el borde lo dibuja `::after` para poder abrirle un hueco
             // arriba al centro, donde va el alfiler sin fondo; los 7 px de
             // arriba son los que el alfiler necesita para no recortarse.
-            fijada(f.s) && "mt-[7px] border-transparent after:pointer-events-none after:absolute after:-inset-px after:rounded-[inherit] after:border after:border-neutral-950/18 after:[-webkit-mask:radial-gradient(circle_9px_at_50%_0,transparent_8.5px,#000_9px)] after:[mask:radial-gradient(circle_9px_at_50%_0,transparent_8.5px,#000_9px)]",
-            renombrando() === f.s.id && "bg-neutral-950/9 hover:bg-neutral-950/9",
-            menu() === f.s.id && f.s.id !== props.current && "bg-neutral-950/6",
+            fijada(f.s) && "tarjeta-fijada mt-[7px] border-transparent",
+            renombrando() === f.s.id && "bg-neutral-200 hover:bg-neutral-200",
+            menu() === f.s.id && f.s.id !== props.current && "bg-neutral-100",
             (props.draggedTask ?? tareaEnVuelo()?.id) === f.s.id &&
               "border-neutral-500 bg-transparent opacity-45 [border-style:dashed] hover:bg-transparent",
           ) : cn(
@@ -1399,7 +1399,7 @@ export default function Sessions(props: {
             <Show when={fijada(f.s)}>
               {/* El alfiler va en el hueco del borde, arriba al centro, sin fondo. */}
               <span role="img" aria-label={t("projects.sessions.pinned")} class="pointer-events-none absolute -top-1.5 left-1/2 flex size-3 -translate-x-1/2 items-center justify-center text-neutral-500">
-                <Pin size={11} class="rotate-[35deg]" aria-hidden="true" />
+                <Pin size={11} class="tarjeta-fijada-alfiler" aria-hidden="true" />
               </span>
             </Show>
             <FilaDelRiel
@@ -1500,7 +1500,7 @@ export default function Sessions(props: {
     return (
       <li>
         <Show when={r.trasLasFijadas}>
-          <span aria-hidden="true" data-pinned-divider class="mx-1.5 my-[5px] block h-px bg-neutral-950/8" />
+          <span aria-hidden="true" data-pinned-divider class="mx-1.5 my-[5px] block h-px bg-border" />
         </Show>
         <Fila s={rama().tarea} />
         <Show when={rama().hijas.length > 0}>

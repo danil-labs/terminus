@@ -800,6 +800,21 @@
   mask: radial-gradient(circle at 100% 0, transparent var(--tab-foot), #000 calc(var(--tab-foot) + 0.5px));
 }
 
+/* La tarjeta fijada del riel: el borde lo dibuja ::after para abrirle arriba
+   al centro un hueco redondo, donde va el alfiler sin fondo. Una clase y no
+   ocho utilidades `after:` porque la carga inicial va al límite de su techo. */
+.tarjeta-fijada::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border: 1px solid color-mix(in srgb, var(--color-neutral-950) 18%, transparent);
+  border-radius: inherit;
+  pointer-events: none;
+  -webkit-mask: radial-gradient(circle 9px at 50% 0, transparent 8.5px, #000 9px);
+  mask: radial-gradient(circle 9px at 50% 0, transparent 8.5px, #000 9px);
+}
+.tarjeta-fijada-alfiler { rotate: 35deg; }
+
 /* Nace en la tobera del icono de 15 px centrado en 20 px, sobre el eje del
    cohete (x + y = 20); arriba-centro de la llama queda en (6, 14). */
 .finish-task-flame {
