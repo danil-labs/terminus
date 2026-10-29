@@ -151,3 +151,53 @@ test("the web lists secrets by scope, marks an old engine as not compatible, and
     globalThis.fetch = own;
   }
 });
+
+test("the web refuses to create a secret when no machine announces secrets_v1", async () => {
+  const old = generateKeyPairSync("x25519");
+  const calls = [];
+  const own = globalThis.fetch;
+  globalThis.fetch = async (input, init = {}) => {
+    const url = String(input);
+    const method = init.method ?? "GET";
+    if (url === `${API}/v1/me`) return Response.json({ name: "Ana", email: "ana@danil.ai", avatar_url: null });
+    if (url === `${API}/v1/computers`) return Response.json([{ computer_id: "cmp_vm", name: "vm-alberto", state: "online", provider: "aws-ec2" }]);
+    const path = url.slice(API.length);
+    if (!path.startsWith("/v1/workspaces/w/credentials")) return new Response("{}", { status: 404 });
+    calls.push(method);
+    if (method === "GET") return Response.json({ credentials: [], recipients: [{ computer_id: "cmp_old", name: "vm-vieja", public_key: publicOf(old), online: true }] });
+    return new Response("{}", { status: 400 });
+  };
+  try {
+    const table = { ...engine, list_known_mcp: [], list_mcp_servers: [], list_mcp_providers: [], list_skill_sources: [] };
+    const f = fleet({ cmp_vm: { table, state: "online" } });
+    const app = await boot("listo", "web-secrets-sin-destino", {}, undefined, {}, {
+      web: true,
+      antes: (w) => {
+        globalThis.WebSocket = f.Socket;
+        w.terminusWeb = { endpoint: API, computers: [{ computer_id: "cmp_vm", name: "vm-alberto", state: "online", provider: "aws-ec2" }], getToken: async () => "tok" };
+      },
+    });
+    const { w } = app;
+    const doc = w.document;
+    await sleep(2500);
+    w.dispatchEvent(new w.CustomEvent("harness:open-settings", { detail: "secretos" }));
+    const panel = () => doc.querySelector("[data-settings-secrets]");
+    assert.ok(await until(() => panel()?.querySelector("[data-secrets-empty]")), "the empty state");
+    [...panel().querySelectorAll("button")].find((b) => b.textContent.trim() === "Añadir secreto").click();
+    const form = () => doc.querySelector("[data-secret-add]");
+    assert.ok(await until(() => form()));
+    for (const [id, value] of [["secret-name", "STRIPE_KEY"], ["secret-value", "sk_live_valor_largo_1234"]]) {
+      const input = form().querySelector(`#${id}`);
+      input.value = value;
+      input.dispatchEvent(new w.Event("input", { bubbles: true }));
+    }
+    assert.ok(await until(() => form().querySelector("[data-secret-no-recipients]")), "it says why before sending");
+    assert.ok([...form().querySelectorAll("button")].find((b) => b.textContent.trim() === "Guardar").disabled);
+    form().requestSubmit();
+    await sleep(300);
+    assert.deepEqual(calls.filter((m) => m !== "GET"), [], "no secret without copies is created");
+    assert.deepEqual(app.fallos, []);
+  } finally {
+    globalThis.fetch = own;
+  }
+});

@@ -11,7 +11,7 @@
  * Trozo perezoso: lo carga quien abre la sección.
  */
 import "../../locales/danilPhrases";
-import { type Credential, type CredentialMachine, credentialMachines, credentialSlot, envSecretNameProblem, envSecretOf } from "@terminus/computers";
+import { type Credential, type CredentialMachine, credentialMachines, credentialSlot, envSecretNameProblem, envSecretOf, sealRecipientsFor } from "@terminus/computers";
 import { createMemo, createResource, createSignal, For, Match, onMount, Show, Switch } from "solid-js";
 import { unknownCommand } from "../../lib/errorCode.ts";
 import { df } from "../../lib/format";
@@ -36,8 +36,17 @@ import { SettingsBlock, SettingsPanel, SettingsSection } from "./layout";
 const NAME_PROBLEM = {
   empty: () => t("danil.secrets.name_empty"),
   grammar: () => t("danil.secrets.name_grammar"),
-  reserved: () => t("danil.secrets.name_reserved"),
+  reserved: (name: string) => t("danil.secrets.name_reserved", { name }),
 } as const;
+
+const openSettings = (panel: string) => window.dispatchEvent(new CustomEvent("harness:open-settings", { detail: panel }));
+
+/** En la web: si ninguna máquina anuncia `secrets_v1` no hay para quién sellar, y un secreto sin copias no se crea. */
+function noSecretRecipients(): boolean {
+  if (viaEngine()) return false;
+  const v = credentialsView();
+  return v.kind === "ready" && sealRecipientsFor("env_secret", v.listing.recipients).filter((r) => r.public_key).length === 0;
+}
 
 /** Lo que el motor de esta máquina tiene en su bóveda (`env_secrets_list`), sin valores. */
 type EngineSecret = { slot: string; folder: string; name: string; hint: string | null; in_account: boolean };
@@ -162,7 +171,7 @@ function SecretDialog(props: { rows: SecretRow[]; folders: Project[]; initial: {
   const problem = () => (name() ? envSecretNameProblem(name()) : null);
   const slot = () => credentialSlot.envSecret(folder(), name());
   const existing = () => props.rows.find((r) => r.slot === slot());
-  const valid = () => !!value() && !envSecretNameProblem(name());
+  const valid = () => !!value() && !envSecretNameProblem(name()) && !noSecretRecipients();
 
   async function save(e: Event) {
     e.preventDefault();
@@ -217,9 +226,22 @@ function SecretDialog(props: { rows: SecretRow[]; folders: Project[]; initial: {
             />
             <Show when={problem()}>
               {(p) => (
-                <p id="secret-name-problem" class="m-0 text-xs text-error-strong" data-secret-name-problem={p()}>
-                  {NAME_PROBLEM[p()]()}
-                </p>
+                <div id="secret-name-problem" class="flex flex-wrap items-center gap-x-2 text-xs text-error-strong" data-secret-name-problem={p()}>
+                  <span>{NAME_PROBLEM[p()](name())}</span>
+                  <Show when={p() === "reserved"}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="compact"
+                      onClick={() => {
+                        props.onClose();
+                        openSettings("proveedores-ia");
+                      }}
+                    >
+                      {t("danil.secrets.go_ai_providers")}
+                    </Button>
+                  </Show>
+                </div>
               )}
             </Show>
             <Show when={!problem() && existing()}>
@@ -238,6 +260,8 @@ function SecretDialog(props: { rows: SecretRow[]; folders: Project[]; initial: {
               id="secret-value"
               type="password"
               autocomplete="off"
+              spellcheck={false}
+              autocapitalize="off"
               autofocus={!!props.initial}
               disabled={busy()}
               placeholder={t("danil.secrets.value_placeholder")}
@@ -261,6 +285,11 @@ function SecretDialog(props: { rows: SecretRow[]; folders: Project[]; initial: {
             <p class="m-0 text-xs text-neutral-500">{t("danil.secrets.scope_help")}</p>
           </div>
           <p class="m-0 border-t border-border pt-3 text-xs text-neutral-500">{t("danil.secrets.add_help")}</p>
+          <Show when={noSecretRecipients()}>
+            <p class="m-0 text-xs text-warning-strong" data-secret-no-recipients="">
+              {t("danil.secrets.no_recipients")}
+            </p>
+          </Show>
           <Show when={failure()}>{(f) => <FailureNote f={f()} />}</Show>
           <div class="flex justify-end gap-2">
             <Button type="button" variant="outline" disabled={busy()} onClick={props.onClose}>
@@ -286,7 +315,7 @@ function ModeLine() {
       <Badge>{t("danil.secrets.mode_local")}</Badge>
       <p class="m-0 min-w-0 flex-1 text-xs text-neutral-500">{t("danil.secrets.mode_no_session")}</p>
       <Show when={capabilities().danilAccount || capabilities().accountProfile}>
-        <Button variant="ghost" size="compact" onClick={() => window.dispatchEvent(new CustomEvent("harness:open-settings", { detail: "cuenta-danil" }))}>
+        <Button variant="ghost" size="compact" onClick={() => openSettings("cuenta-danil")}>
           {t("danil.secrets.sign_in")}
         </Button>
       </Show>
@@ -297,7 +326,12 @@ function ModeLine() {
 export default function Secrets() {
   onMount(() => void reloadCredentials(false));
   const [editing, setEditing] = createSignal<{ name: string; folder: string | null } | null | undefined>(undefined);
-  let addButton: HTMLButtonElement | undefined;
+  // El foco vuelve a quien abrió el diálogo: «Añadir secreto» o el «Cambiar» de su fila.
+  let opener: HTMLElement | null = null;
+  const edit = (what: { name: string; folder: string | null } | null) => {
+    opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setEditing(what);
+  };
   // Las carpetas del workspace, para elegir alcance y nombrar los grupos; sin lista se ve el id.
   const [folders] = createResource(() => invoke<Project[]>("list_projects").catch(() => [] as Project[]), { initialValue: [] });
   const folderName = (id: string) => folders().find((p) => p.id === id)?.name ?? id;
@@ -348,7 +382,7 @@ export default function Secrets() {
         description={t("danil.secrets.description")}
         aside={
           <Show when={canWrite()}>
-            <Button ref={addButton} variant="secondary" size="sm" onClick={() => setEditing(null)}>
+            <Button variant="secondary" size="sm" onClick={() => edit(null)}>
               {t("danil.secrets.add")}
             </Button>
           </Show>
@@ -403,7 +437,7 @@ export default function Secrets() {
                           <SecretItem
                             row={r()}
                             overrides={g().folder !== null && workspaceNames().has(r().name)}
-                            onChange={() => setEditing({ name: r().name, folder: r().folder })}
+                            onChange={() => edit({ name: r().name, folder: r().folder })}
                             onChanged={reread}
                           />
                         )}
@@ -424,7 +458,7 @@ export default function Secrets() {
           onSaved={reread}
           onClose={() => {
             setEditing(undefined);
-            addButton?.focus();
+            opener?.focus();
           }}
         />
       </Show>

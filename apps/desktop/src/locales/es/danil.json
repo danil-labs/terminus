@@ -237,12 +237,14 @@
   "danil.secrets.exists": "Ya tienes {name} aquí ({hint}, actualizado el {date}). Guardar reemplaza su valor.",
   "danil.secrets.name_empty": "Escribe un nombre.",
   "danil.secrets.name_grammar": "Solo letras A–Z, números y _, y sin empezar por número.",
-  "danil.secrets.name_reserved": "Ese nombre lo usa Terminus o la cuenta del agente. Para la clave del agente, ve a Proveedores de IA.",
+  "danil.secrets.name_reserved": "{name} lo usa Terminus o la cuenta del agente. Para la clave del agente, ve a Proveedores de IA.",
   "danil.secrets.scope": "Alcance",
   "danil.secrets.scope_help": "Una carpeta gana sobre el workspace.",
   "danil.secrets.sign_in": "Iniciar sesión",
   "danil.secrets.change_title": "Cambiar secreto",
   "danil.secrets.delete_warning_local": "Se borra de esta máquina. Las tareas que ya están corriendo pueden conservarlo hasta que terminen. No se revoca en quien lo emitió.",
   "danil.secrets.engine_unsupported": "El motor de esta máquina no admite secretos",
-  "danil.secrets.engine_unsupported_help": "Actualiza Terminus en esta máquina para usarlos. Todo lo demás sigue funcionando."
+  "danil.secrets.engine_unsupported_help": "Actualiza Terminus en esta máquina para usarlos. Todo lo demás sigue funcionando.",
+  "danil.secrets.go_ai_providers": "Ir a Proveedores de IA",
+  "danil.secrets.no_recipients": "Ninguna de tus máquinas admite secretos todavía, así que no hay a quién entregárselo. Actualiza Terminus en una de ellas y vuelve a intentarlo."
 }

@@ -124,6 +124,7 @@ function workerBackend(source: CredentialSource): CredentialsBackend {
   async function sealAndPut(workspace: string, draft: SealedDraft, value: string, listing: CredentialsListing) {
     if (!(await canSeal())) throw { what: t("danil.credentials.rotate.no_webcrypto"), detail: "webcrypto_x25519" } satisfies Failure;
     const copies = await sealForRecipients(sealRecipientsFor(draft.kind, listing.recipients), workspace, draft.slot, value);
+    if (draft.kind === "env_secret" && !copies.length) throw { what: t("danil.secrets.no_recipients"), detail: "no_recipients" } satisfies Failure;
     await done(putCredential(source, workspace, { ...draft, hint: credentialHint(draft.kind, value), copies }));
   }
 }
