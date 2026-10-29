@@ -311,6 +311,11 @@ test("a handler notice saved with engine prose uses the window catalog and keeps
   assert.equal(handlerNotice({ text: "otro aviso", meta: "aviso" }), null);
 });
 
+test("a notice the engine saves as a catalog key reads as its phrase", () => {
+  assert.doesNotMatch(failureText({ text: "chat.mentions.in_code" }), /chat\.mentions/);
+  assert.match(failureText({ text: "chat.mentions.in_code" }), /código/);
+});
+
 import { handlerMutation, pendingHandlerOperation, resumeHandlerOperation } from "../../src/features/settings/handlerOperations.ts";
 test("an uncertain handler mutation survives scope switches and resumes without repeating", async () => {
   let mutations = 0;

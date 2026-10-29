@@ -20,7 +20,7 @@ import { AstroAvatar } from "./AstroAvatar";
 import { BodyPicker } from "./BodyPicker";
 import { DEFAULT_PROFILE, notifyProfiles } from "./profiles";
 import { TelegramSection } from "./TelegramSection";
-import type { HandlerPolicyActions } from "../settings/HandlerPolicy";
+import type { HandlerTarget } from "../settings/HandlerPolicy";
 const HandlerPolicy = lazy(() => import("../settings/HandlerPolicy"));
 
 /** Las extensiones que el webview pinta como `data:` URI (`preview::data_url`). */
@@ -55,7 +55,7 @@ export default function AgentProfile(props: {
   onModelChosen?: (agent: string | null, model: string | null) => void;
   /** Que quien lista los encargados relea: el borrado no deja fila que mirar. */
   onDeleted?: () => void;
-  handlerPolicy?: HandlerPolicyActions;
+  handlerPolicy?: HandlerTarget;
   onClose: () => void;
 }) {
   const [name, setName] = createSignal(props.profile.display_name ?? "");
@@ -482,7 +482,7 @@ export default function AgentProfile(props: {
             </Show>
           </section>
 
-          <Show when={props.handlerPolicy}>{actions => <HandlerPolicy name={props.agent.name} actions={actions()} />}</Show>
+          <Show when={props.handlerPolicy}>{target => <HandlerPolicy name={props.agent.name} target={target()} />}</Show>
           <TelegramSection project={props.project} name={props.agent.name} />
 
           <section class={SECTION}>

@@ -1,5 +1,4 @@
-import type { HandlerMemory, HandlerRequests, HandlerRelease } from "../lib/model";
-import type { HandlerPolicyActions } from "../features/settings/HandlerPolicy";
+import type { HandlerTarget } from "../features/settings/HandlerPolicy";
 import { deliver, type JournalEvent, listen } from "../lib/serviceEvents";
 import { open } from "@tauri-apps/plugin-dialog";
 import Archive from "lucide-solid/icons/archive";
@@ -641,6 +640,9 @@ export default function App() {
   // El árbol, el visor y kn piden por `machineOf` desde fuera de aquí: con la fila, no solo con el prefijo.
   setTaskRowMachine((id) => filaDe(id)?.machine);
   const deLaTarea = (id: string | null | undefined) => machineOf(id);
+  /** La máquina de esa tarea o carpeta y su workspace, para lo que responde o actúa en ellas. */
+  const opcionesDeLaTarea = (id: string | null | undefined, workspace: string | null | undefined) =>
+    ({ headers: { ...machineOf(id)?.headers, ...(workspace ? { "x-terminus-workspace": workspace } : {}) } });
   const enMaquina = (machine: string | undefined) => (machine ? { headers: { "x-terminus-machine": machine } } : undefined);
   // En qué máquina vive cada adjunto que no está en el motor de la ventana:
   // la imagen pegada recién guardada y su copia ya preparada.
@@ -3232,7 +3234,6 @@ export default function App() {
     setRespondiendoPermiso(true);
     setPermissionError(null);
     const workspace = p.workspace ?? workspaceActivo();
-    const options = { headers: { ...deLaTarea(p.session)?.headers, ...(workspace ? { "x-terminus-workspace": workspace } : {}) } };
     try {
       const current = p.revision === undefined
         ? (await pendientesDe(p.session, workspace))?.permissions.find((x) => (x.request_id === p.requestId || x.id === p.requestId))
@@ -3243,7 +3244,7 @@ export default function App() {
         requestId: current.id ?? p.requestId,
         revision: current.revision,
         allow,
-      }, options);
+      }, opcionesDeLaTarea(p.session, workspace));
       // El `permission_resolved` de esta misma decisión puede haber llegado
       // antes que la respuesta: ese turno ya está pintado.
       const fila: Msg = {
@@ -3256,14 +3257,11 @@ export default function App() {
       asentar(p.session, (ms) => [...ms.filter((m) => !fila.turno || m.turno !== fila.turno), fila]);
       setPermissions((ps) => ps.filter((x) => x.session !== p.session || x.requestId !== p.requestId));
     } catch (e) {
-      const pendientes = await pendientesDe(p.session, workspace);
-      if (pendientes && !pendientes.permissions.some((x) => x.id === p.durableId || x.request_id === p.requestId)) {
-        const record = pendientes.records?.permissions.find(x => p.durableId ? x.id === p.durableId : x.request_id === p.requestId);
+      const { sinRespuesta } = await import("../features/chat/permissionRecovery");
+      const cerrada = sinRespuesta(p, await pendientesDe(p.session, workspace), e);
+      if (cerrada) {
         setPermissions(ps => ps.filter(x => x.session !== p.session || x.requestId !== p.requestId));
-        asentar(p.session, ms => [...ms, { role: "system", ...mensajeDeFallo({
-          what: { clave: record?.closed === "owner_lost" ? "cli.error.pending_owner_lost" : "shell.turn.permission_no_reply" },
-          detail: { error: e, record: record ?? null },
-        }), meta: "fallo" }]);
+        asentar(p.session, ms => [...ms, cerrada]);
         return;
       }
       await reponerGates(p.session, workspace);
@@ -5966,10 +5964,7 @@ export default function App() {
   };
   /** Lo que esa tarea tiene esperando. No lanza: sin respuesta, no hay nada. */
   const pendientesDe = (session: string, workspace = workspaceActivo()) =>
-    invoke<Pendientes>("pending_requests", { session }, { headers: {
-      ...deLaTarea(session)?.headers,
-      ...(workspace ? { "x-terminus-workspace": workspace } : {}),
-    } }).catch(() => null);
+    invoke<Pendientes>("pending_requests", { session }, opcionesDeLaTarea(session, workspace)).catch(() => null);
 
   /**
    * El `request_id` de la pregunta viva de este turno, si alguien espera.
@@ -6057,7 +6052,6 @@ export default function App() {
   ): Promise<boolean> {
     const questionSession = sessionId();
     const questionWorkspace = workspaceActivo();
-    const questionOptions = { headers: { ...deLaTarea(questionSession)?.headers, ...(questionWorkspace ? { "x-terminus-workspace": questionWorkspace } : {}) } };
     const mensaje = msgs().find((m) => m.turno === turno);
     if (!mensaje)
       throw new Error(t("shell.answer.question_missing"));
@@ -6083,7 +6077,7 @@ export default function App() {
           requestId: pending.id,
           revision: pending.revision,
           respuestas: manda,
-        }, questionOptions);
+        }, opcionesDeLaTarea(questionSession, questionWorkspace));
         soltarPreguntas(sid, turno);
         asentar(sid, (ms) => [
           ...ms,
@@ -6895,26 +6889,15 @@ export default function App() {
       setRequestedProfile(null);
       setViewingProfile(true);
     });
-    // Releer la lista de proyectos no cambia el alcance: unas acciones nuevas reiniciarían el panel y borrarían su resultado.
-    const handlerPolicy = createMemo<HandlerPolicyActions | undefined>(() => {
+    // Una cadena y no un objeto: releer la lista de proyectos no reinicia el panel ni borra su resultado.
+    const handlerPolicy = createMemo<HandlerTarget | undefined>(() => {
       const workspace = workspaceActivo();
       const project = proyectoDeLaCelda()?.id ?? "";
       const name = identidadVisualDeLaCelda();
-      if (!workspace || !name) return undefined;
-      const options = { headers: { ...machineOf(project)?.headers, "x-terminus-workspace": workspace } };
-      const call = <T,>(request: Record<string, unknown>) => invoke<T>("handler_action", {
-        input: { workspace, project, request },
-      }, options);
-      return {
-        scope: JSON.stringify([workspace, project, name, options.headers]),
-        resume: (operation: string) => call<HandlerRequests | HandlerRelease>({ action: "resume", operation }),
-        requests: () => call<HandlerRequests>({ action: "requests", name }),
-        memory: async () => (await call<{ handlers: { name: string; memory: HandlerMemory }[] }>({ action: "list" })).handlers.find(row => row.name === name)?.memory ?? null,
-        approve: args => call<HandlerRequests>({ action: "approve", name, mcp: args.mcp, tool: args.tool, acceptHints: args["accept-hints"] }),
-        revoke: () => call<HandlerRequests>({ action: "revoke", name }),
-        release: () => call<HandlerRelease>({ action: "release", name }),
-      };
-    }, undefined, { equals: (a, b) => a?.scope === b?.scope });
+      return workspace && name
+        ? JSON.stringify([workspace, project, name, opcionesDeLaTarea(project, workspace).headers])
+        : undefined;
+    });
     const lecturaDeLaCelda = () => lecturas.get(pp.sesion ?? "") ?? null;
     const preguntasDeLaCelda = almacenDePreguntas(() => pp.sesion);
     const vistaDeLaCelda = vistaDe(pp.sesion ?? "");

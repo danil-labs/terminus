@@ -1,6 +1,8 @@
 import { handlerMutation, handlerOperationRunning, pendingHandlerOperation, resumeHandlerOperation } from "./handlerOperations";
 import "../../locales/handlerPhrases";
-import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import "../../locales/failurePhrases";
+import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+import { invoke } from "../../lib/invoke.ts";
 import { t } from "../../lib/i18n";
 import { detalleDe } from "../../lib/failure";
 import type { HandlerApproval, HandlerMemory, HandlerRelease, HandlerRequests } from "../../lib/model";
@@ -19,15 +21,33 @@ export type HandlerPolicyActions = {
   release: () => Promise<HandlerRelease>;
 };
 
+/** Dónde actúa el panel: `[workspace, project, name, headers]` en JSON. Mientras no cambie, el panel conserva su estado. */
+export type HandlerTarget = string;
+
+function handlerActions(scope: HandlerTarget): HandlerPolicyActions {
+  const [workspace, project, name, headers] = JSON.parse(scope) as [string, string, string, Record<string, string>];
+  const call = <T,>(request: Record<string, unknown>) => invoke<T>("handler_action", { input: { workspace, project, request } }, { headers });
+  return {
+    scope,
+    resume: operation => call<HandlerRequests | HandlerRelease>({ action: "resume", operation }),
+    requests: () => call<HandlerRequests>({ action: "requests", name }),
+    memory: async () => (await call<{ handlers: { name: string; memory: HandlerMemory }[] }>({ action: "list" })).handlers.find(row => row.name === name)?.memory ?? null,
+    approve: args => call<HandlerRequests>({ action: "approve", name, mcp: args.mcp, tool: args.tool, acceptHints: args["accept-hints"] }),
+    revoke: () => call<HandlerRequests>({ action: "revoke", name }),
+    release: () => call<HandlerRelease>({ action: "release", name }),
+  };
+}
+
 const failureText = (error: unknown) => {
   const message = prosaDe(error);
   const detail = detalleDe(error);
   return detail && detail !== message ? `${message}\n${detail}` : message;
 };
 
-export default function HandlerPolicy(props: { name: string; actions: HandlerPolicyActions }) {
-  const pending = () => pendingHandlerOperation(props.actions.scope);
-  const locked = () => busy() || !!pending() || handlerOperationRunning(props.actions.scope);
+export default function HandlerPolicy(props: { name: string; target: HandlerTarget }) {
+  const bound = createMemo(() => handlerActions(props.target));
+  const pending = () => pendingHandlerOperation(bound().scope);
+  const locked = () => busy() || !!pending() || handlerOperationRunning(bound().scope);
   const [report, setReport] = createSignal<HandlerRequests>();
   const [memory, setMemory] = createSignal<HandlerMemory | null>(null);
   const [busy, setBusy] = createSignal(false);
@@ -40,7 +60,7 @@ export default function HandlerPolicy(props: { name: string; actions: HandlerPol
   let generation = 0;
   onCleanup(() => generation++);
 
-  async function refresh(actions = props.actions) {
+  async function refresh(actions = bound()) {
     const current = ++generation;
     setBusy(true);
     setFailure(null);
@@ -56,7 +76,7 @@ export default function HandlerPolicy(props: { name: string; actions: HandlerPol
     }
   }
   createEffect(() => {
-    const actions = props.actions;
+    const actions = bound();
     setReport(undefined);
     setMemory(null);
     setDialog(null);
@@ -68,7 +88,7 @@ export default function HandlerPolicy(props: { name: string; actions: HandlerPol
   async function act(action: "approve" | "revoke" | "release") {
     if (locked()) return;
     const current = generation;
-    const actions = props.actions;
+    const actions = bound();
     setBusy(true);
     setFailure(null);
     setResult(null);
@@ -96,7 +116,7 @@ export default function HandlerPolicy(props: { name: string; actions: HandlerPol
 
   async function resume() {
     if (busy()) return;
-    const actions = props.actions;
+    const actions = bound();
     const current = generation;
     setBusy(true);
     try {

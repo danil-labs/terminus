@@ -15,6 +15,8 @@ import { aplicarLengua, elegirLengua, lenguasDisponibles, semillaDelAlta } from 
 import { cargarPaquetes } from "../locales/packs";
 import { capabilities } from "../lib/platform";
 import "../styles/global.css";
+// Errores y avisos de encargado se leen al fallar algo, ya con la ventana montada: entran por detrás.
+void import("../locales/failurePhrases");
 
 /**
  * El arranque fija tema y lengua antes del primer pintado. Los efectos declaran
