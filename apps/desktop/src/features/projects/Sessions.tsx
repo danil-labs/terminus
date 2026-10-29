@@ -41,7 +41,7 @@ import EtapaDeTarea, { ETAPAS, type Etapa } from "./TaskStage";
 import EstadoDeTarea from "./TaskStatus";
 import { matchesTaskQuery } from "./taskSearch";
 import { canFinishTask, effectiveTaskGit, type GitStatus, sharesTaskGit, watchSessionGit } from "./taskGit";
-import { authorKey, authorKeys } from "./taskAuthors";
+import { authorKey, authorKeys, shownUnderLauncher } from "./taskAuthors";
 import { descendientes, type Rama as RamaDeTareas, taskTree } from "./taskTree";
 import { type TaskActivity, taskPriority } from "@terminus/design";
 import { taskCard, buildTaskTree, taskIdentity, withTaskAncestors } from "@terminus/tasks";
@@ -448,7 +448,10 @@ export default function Sessions(props: {
   };
   // La barra enseña solo lo vivo: las archivadas no se pintan ni se observan. Con
   // cientos archivadas, pedir su git y su historial en cada barrido trababa la ventana.
-  const enBarra = createMemo(() => props.sessions.filter(s => props.includeArchived || !s.archived));
+  // En la barra no se anidan subtareas: se consultan desde la vista de subtareas
+  // del chat. Solo asoman, sueltas, al buscar o si las fijaron.
+  const enBarra = createMemo(() => props.sessions.filter(s => (props.includeArchived || !s.archived)
+    && (!props.sidebar || !!props.search?.trim() || s.pinned || !shownUnderLauncher(s, props.sessions))));
   // Un observador de git, de perfiles y de historiales por carpeta de la
   // lista: las cachés son por carpeta y se comparten con las demás vistas.
   const carpetasVistas = createMemo(
@@ -529,7 +532,7 @@ export default function Sessions(props: {
     const agente = session.agent ? displayName(session.agent, profiles()[session.agent]) : null;
     return matchesTaskQuery([session.title, session.last_message, git?.branch, git?.alias, agente, props.carpetaDe?.(session)], query());
   }));
-  const filteredSessions = createMemo(() => withTaskAncestors(enBarra(), matchedSessions()));
+  const filteredSessions = createMemo(() => props.sidebar ? matchedSessions() : withTaskAncestors(enBarra(), matchedSessions()));
   const matchIds = createMemo(() => new Set(matchedSessions().map(taskIdentity)));
   const contextual = (row: SessionRow) => !matchIds().has(taskIdentity(row));
   const [expansionOverrides, setExpansionOverrides] = createSignal<Record<string, boolean>>({});
@@ -554,9 +557,9 @@ export default function Sessions(props: {
     createEffect(() => props.onSearchResults?.(matchedSessions().length));
     onCleanup(() => props.onSearchResults?.(0));
   }
-  const activas = createMemo<RamaDeTareas<SessionRow>[]>((previas) => props.flat
+  const activas = createMemo<RamaDeTareas<SessionRow>[]>((previas) => props.flat || props.sidebar
     ? filteredSessions().map(tarea => ({ tarea, hijas: [] }))
-    : taskTree(filteredSessions(), props.includeArchived ? null : false, previas, props.sidebar || props.groupByHandler === true));
+    : taskTree(filteredSessions(), props.includeArchived ? null : false, previas, props.groupByHandler === true));
   const hideFolder = (row: SessionRow) => props.hideFolder && (props.folderGroup === undefined || projectOf(row) === props.folderGroup);
   const destinosDe = (row: SessionRow) => props.destinosDe?.(row) ?? props.destinos;
   const fijada = (row: SessionRow) => row.pinned ?? (row.chat_de_agente || row.inbox === true);
@@ -699,7 +702,8 @@ export default function Sessions(props: {
   );
 
   const Fila = (f: { s: SessionRow }) => {
-    const activity = (): TaskActivity => ({
+    // En la barra el coordinador lleva también la actividad de sus subtareas, que no se pintan ahí.
+    const activity = (): TaskActivity => (props.sidebar ? f.s.delegated_activity : undefined) ?? ({
       aprobando: props.aprobando.includes(f.s.id),
       viva: props.vivas.includes(f.s.id),
       esperando: f.s.esperando,
@@ -1293,7 +1297,7 @@ export default function Sessions(props: {
         setExpansionOverrides(previous => ({ ...previous, [id]: !expanded() }));
       } else alternarDesplegada(rama().tarea.id);
     };
-    const origin = () => r.hija ? null : (rama().tarea.parent ?? rama().tarea.launched_by);
+    const origin = () => r.hija || props.sidebar ? null : (rama().tarea.parent ?? rama().tarea.launched_by);
     const parentRow = () => (props.relatedSessions ?? props.sessions).find(row => row.id === origin()
       && (!row.machine || !rama().tarea.machine || row.machine === rama().tarea.machine)
       && (!row.workspace || !rama().tarea.workspace || row.workspace === rama().tarea.workspace));
