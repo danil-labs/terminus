@@ -7651,7 +7651,7 @@ export default function App() {
               tools={<>
                 <Show keyed when={delegatedToolbarTargets().get(`${workspaceActivo()}/${task()?.session ?? ""}`)}>{render => render()}</Show>
                 <UsageTool usage={consumo} agent={agenteDeLaVentana()} onGestionarCuentas={() => setSettings("proveedores-ia")} />
-                <Show when={!artOpen() && !paginaDeAgente() && sameSite(site(), esquina())}>{botonDelArbol()}</Show>
+                <Show when={!artOpen() && !paginaDeAgente()}>{botonDelArbol()}</Show>
               </>} />;
         // Centrada con la fila de máquina, proyecto y rama de la tarea (`TaskLocation`).
         return <Show when={Boolean(task()) && !tapadoPorElProyecto(site())}>
@@ -8375,9 +8375,6 @@ export default function App() {
           </Show>}
           centro={tiraDeLaVentana()}
           derecha={<>
-            <Show when={!artOpen() && !paginaDeAgente() && !esquinaConTarea()}>
-              {botonDelArbol()}
-            </Show>
           </>}
         />
         <div class="relative flex min-h-0 flex-1 overflow-visible">
