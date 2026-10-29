@@ -232,7 +232,7 @@
     "one": "Quit Terminus · {count} task working",
     "other": "Quit Terminus · {count} tasks working"
   },
-  "shell.close.body": "Closing the window keeps work running in the background. To quit now you can stop these tasks; you can resume them later.",
+  "shell.close.body": "Closing the window keeps work running in the background. You can quit when these tasks finish, or stop them now and quit; you can resume them later.",
   "shell.close.working": "working",
   "shell.close.waiting": "waiting for your answer",
   "shell.close.untitled": "Untitled task",
@@ -240,6 +240,7 @@
   "shell.close.stop": "Stop them and quit",
   "shell.close.stopping": "Stopping…",
   "shell.close.background": "Keep in background",
+  "shell.close.when_done": "Quit when they finish",
   "shell.tray.header": {
     "one": "Terminus · {count} task working",
     "other": "Terminus · {count} tasks working"
@@ -252,7 +253,24 @@
     "one": "The new engine takes over when {count} working task finishes.",
     "other": "The new engine takes over when {count} working tasks finish."
   },
-  "shell.update.stop_and_apply": "Stop and apply now",
+  "shell.update.restart_when_done": "Restart when they finish",
+  "shell.update.stop_and_restart": "Stop and restart now",
+  "shell.update.stop_confirm": {
+    "one": "{count} task will be stopped: {titles}. You can resume it later.",
+    "other": "{count} tasks will be stopped: {titles}. You can resume them later."
+  },
+  "shell.update.stop_confirm_yes": "Stop and restart",
+  "shell.update.stop_confirm_back": "Back",
+  "shell.update.stop_failed": "A task could not be stopped, so Terminus did not restart. Try again or wait for them to finish.",
+  "shell.wait.restart_title": "Terminus restarts when the tasks finish",
+  "shell.wait.quit_title": "Terminus quits when the tasks finish",
+  "shell.wait.for": "Waiting for: {titles}",
+  "shell.wait.for_count": {
+    "one": "Waiting for {count} task",
+    "other": "Waiting for {count} tasks"
+  },
+  "shell.wait.more": "{list} and {count} more",
+  "shell.wait.cancel": "Stop waiting",
   "shell.notify.finished": "“{title}” finished",
   "shell.notify.finished_hint": "Open it in Terminus to see what it did.",
   "shell.notify.waiting": "“{title}” is waiting for your answer",
