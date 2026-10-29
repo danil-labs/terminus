@@ -4,7 +4,8 @@
 use super::{engine, legacy, proxy};
 use serde::Serialize;
 use std::{
-    path::PathBuf,
+    path::{Path, PathBuf},
+    process::{Child, Command, Stdio},
     sync::{Arc, Condvar, Mutex, OnceLock},
     time::{Duration, Instant},
 };
@@ -12,6 +13,8 @@ use tauri::{Emitter, Manager};
 use terminus_engine_client::Client;
 
 const BUSY_WITHIN: Duration = Duration::from_secs(120);
+// Una ventana que no puede arrancar (sin WebView2, ejecutable roto) sale antes.
+const HANDOVER_WITHIN: Duration = Duration::from_secs(2);
 
 #[derive(Serialize, Clone, Copy, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -188,6 +191,56 @@ fn attach(app: &tauri::AppHandle, client: Client) {
     log::warn!("[tiempo] engine — {elapsed} ms");
 }
 
+/// Abre la ventana `exe` sin argumentos: una de otra versión rechaza los que no conoce.
+pub(super) fn open_window(exe: &Path) -> Option<Child> {
+    // proceso largo: a propósito. La otra ventana reemplaza a esta y la sobrevive.
+    let mut command = Command::new(exe);
+    if let Some(dir) = exe.parent() {
+        command.current_dir(dir);
+    }
+    command
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    match engine::spawn_detached(&mut command) {
+        Ok((child, _)) => {
+            log::info!("[launcher] opened {} pid={}", exe.display(), child.id());
+            Some(child)
+        }
+        Err(error) => {
+            log::error!("[launcher] {} did not open: {error}", exe.display());
+            None
+        }
+    }
+}
+
+/// Deja el sitio a `window` y sale. Sin contestar como instancia, la otra no le pide que
+/// se muestre; si se cierra enseguida, esta se queda y espera.
+fn hand_over(app: &tauri::AppHandle, window: Option<PathBuf>) -> bool {
+    let Some(window) = window else {
+        return false;
+    };
+    super::instance::exiting();
+    let Some(mut child) = open_window(&window) else {
+        super::instance::stay();
+        return false;
+    };
+    let deadline = Instant::now() + HANDOVER_WITHIN;
+    while Instant::now() < deadline {
+        if let Ok(Some(status)) = child.try_wait() {
+            log::error!("[launcher] {} exited at once: {status}", window.display());
+            super::instance::stay();
+            return false;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    if let Some(main) = app.get_window("main") {
+        let _ = main.hide();
+    }
+    app.exit(0);
+    true
+}
+
 /// Sin traspaso pendiente: el motor vivo de la raíz o uno recién lanzado, con la ventana ya pintando.
 fn connect(app: &tauri::AppHandle, launcher: &Launcher, paths: &engine::Paths) {
     loop {
@@ -197,8 +250,23 @@ fn connect(app: &tauri::AppHandle, launcher: &Launcher, paths: &engine::Paths) {
             return;
         }
         if let Err(error) = &selected {
+            // Esta ventana quedó apartada y su motor ya no está: entra la instalada, con el suyo.
+            if error.code == "window_replaced" && hand_over(app, super::update::installed_window())
+            {
+                return;
+            }
             if error.code == "previous_engine_busy" {
                 let tasks = error.detail["turns"].as_u64().filter(|n| *n > 0);
+                // La ventana anterior sigue con su motor hasta que termine; la espera es si no está.
+                if !matches!(launcher.phase(), Phase::Previous { .. }) {
+                    let window = error.detail["pid"]
+                        .as_u64()
+                        .and_then(|pid| u32::try_from(pid).ok())
+                        .and_then(super::update::previous_window);
+                    if hand_over(app, window) {
+                        return;
+                    }
+                }
                 let waiting = Phase::Previous {
                     tasks,
                     stopping: false,

@@ -224,6 +224,16 @@ pub fn set_aside(_pid: u32) -> bool {
     false
 }
 
+/// La ruta de hoy del ejecutable de un proceso, en minúsculas: la que dejó el instalador.
+#[cfg(windows)]
+pub fn image_path(pid: u32) -> Option<PathBuf> {
+    windows::image(pid).map(|(image, _)| PathBuf::from(image))
+}
+#[cfg(not(windows))]
+pub fn image_path(_pid: u32) -> Option<PathBuf> {
+    None
+}
+
 /// El motor vivo corre de un binario que ya no es el instalado. `deep` compara
 /// además el contenido de la copia del AppImage, que solo cambia al arrancar.
 #[cfg(windows)]

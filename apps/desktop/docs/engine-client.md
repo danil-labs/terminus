@@ -162,8 +162,8 @@ its `status`. If it answers with this window's contract and its
 `data_directory` is this root (both canonical), the window connects to it,
 whoever started it: another window, the CLI or a previous session; two windows
 share one engine. An engine of another contract or build is handled as in
-[Updating on Windows](#updating-on-windows): the window waits for its tasks or
-offers «Actualizar ya»; it never uses the engine's own handoff.
+[Updating on Windows](#updating-on-windows): the window reopens the previous
+window or waits for its tasks; it never uses the engine's own handoff.
 
 If nothing answers, the window does not trust a probe: the engine holds
 `seldon-runtime.lock` in the data root exclusively for as long as it lives, so
@@ -455,32 +455,51 @@ the plugin's signature check and runs the installer with `/S /UPDATE`.
 `terminus.exe` is already in its place, whether the app or a manual installer
 did it, and the front asks for a restart. A manual installer that finds
 Terminus open shows the same notice and ends there, instead of running a second
-window from its finish page. On the next start, an engine running from
-`old_seldon-runtime.exe` gets `service stop`; one that refuses keeps working
-and the new engine waits for the next start. An update usually changes the
-contract, and the window cannot use an engine of another contract: it asks it
-for `status` and `service stop` anyway (`request_any_contract`), stops it as
-soon as it has no turns, downloads or operations, and until then shows how many
-tasks the previous version is finishing instead of failing with
-`service_busy`. This holds on every platform. The screen also offers «Actualizar ya», which
-says how many tasks will be cut off and, once confirmed, asks the previous
-engine for `service stop` with `{"force": true}`: an engine that knows it
-writes those tasks to `update-resume.json`, stops their turns like Stop, and
-exits; the new engine resumes each one in its own provider session with an
-`engine_updated` line. An engine older than that ignores `force` and refuses
-with `task_busy`; the window then terminates its process, as the uninstaller
-does, and those tasks do not resume on their own. Then the window deletes the
-`old_*` files no one holds, retrying for a few seconds while the window it
-replaces exits.
+window from its finish page. `restart_app` from a window running from `old_*`
+opens the installed `terminus.exe`, not itself.
 
-An open window does not wait for a restart either: every 15 s it checks
-whether the live engine was replaced and, once that engine has no turns,
-downloads or operations, asks it for `service stop`. The next `service_poll`
-starts the installed engine. The update notice says how many tasks the old
-engine is still running and offers to stop them and restart. A replaced engine
-is one running from `old_*` on Windows, from a deleted binary or an AppImage
-copy that differs from the bundled one on Linux, and from a path other than
-the bundled engine on macOS. The Linux and macOS checks have not been tried on
+The installer sets the window and the engine aside with one prefix
+(`old_`, or `old_<tick>_` when one of those names is still taken), and it
+and the window delete `old_*.exe` only when no set-aside engine is left: a
+window binary stays on disk while the engine of its contract runs.
+
+The old version keeps working whole until its tasks finish, and the new one
+comes in whole afterwards; a window and an engine of different versions are not
+mixed. On the next start, an engine running from `old_seldon-runtime.exe` gets
+`service stop`; one of this contract that refuses keeps working and the new
+window uses it. An update usually changes the contract, and the window cannot
+use an engine of another contract: it asks it for `status` and `service stop`
+anyway (`request_any_contract`) and stops it as soon as it has no turns,
+downloads or operations. While it is working, the new window opens the window
+set aside with the same prefix as that engine, with no arguments (an older
+build rejects arguments it does not know), stops answering as the single
+instance so the old one does not show it instead, and exits. The old window
+connects to its own engine and shows its update notice. If that binary is
+missing or exits within 2 s, and on macOS and Linux, where the update replaces
+the bundle or the AppImage in place and nothing is set aside, the new window
+mounts and shows a notice: how many tasks the previous version is finishing,
+and «Detener y entrar ya», which says how many tasks will be cut off and, once
+confirmed, asks the previous engine for `service stop` with `{"force": true}`:
+an engine that knows it writes those tasks to `update-resume.json`, stops
+their turns like Stop, and exits; the new engine resumes each one in its own
+provider session with an `engine_updated` line. An engine older than that
+ignores `force` and refuses with `task_busy`; the window then terminates its
+process, as the uninstaller does, and those tasks do not resume on their own.
+Without a click the window keeps asking and comes in when the engine is free.
+Then the window deletes the `old_*` files no one holds, retrying for a few
+seconds while the window it replaces exits.
+
+A window that runs from `old_*` (Windows) keeps its engine: it does not stop
+it when it has no work, does not take an engine of another contract and does
+not start the installed one (`window_replaced`); at startup that error opens
+the installed window instead. Any other open window checks every 15 s whether
+the live engine was replaced and, once that engine has no turns, downloads or
+operations, asks it for `service stop`. The next `service_poll` starts the
+installed engine. The update notice says how many tasks the old engine is
+still running and offers to stop them and restart. A replaced engine is one
+running from `old_*` on Windows, from a deleted binary or an AppImage copy
+that differs from the bundled one on Linux, and from a path other than the
+bundled engine on macOS. The Linux and macOS checks have not been tried on
 those systems.
 
 ## Not done yet
