@@ -153,6 +153,8 @@ import { createSpaceNavigationOrder } from "../lib/space-navigation-order";
 import SpaceBar from "../features/shell/SpaceBar";
 import TitleBar from "../features/shell/TitleBar";
 import UsageBar from "../features/shell/UsageBar";
+import UsageTool from "../features/shell/UsageTool";
+import { createUsage } from "../features/shell/usage";
 import AvisoDeVersion from "../features/shell/VersionNotice";
 import CloseGuard from "../features/shell/CloseGuard";
 import WorkspaceColumn from "../features/shell/WorkspaceColumn";
@@ -6471,6 +6473,31 @@ export default function App() {
    */
   const [threadSearchTargets, setThreadSearchTargets] = createSignal(new Map<string, ThreadSearchTarget>());
   const [delegatedToolbarTargets, setDelegatedToolbarTargets] = createSignal(new Map<string, () => JSX.Element>());
+  const consumo = createUsage({ agents, agent, busy, reload: cuentasTocadas });
+  // La ventana de arriba a la derecha lleva el conmutador del árbol en su fila de herramientas.
+  const esquina = () => ventanas()
+    .filter((sitio) => sitio.fila === 0)
+    .reduce<SitioDePanel | null>((a, b) => (!a || b.col > a.col ? b : a), null);
+  const esquinaConTarea = () => {
+    const sitio = esquina();
+    return !!sitio && !tapadoPorElProyecto(sitio) &&
+      pestanas.open().find(p => p.id === paneles.activeTabAt(sitio))?.clase === "tarea";
+  };
+  const botonDelArbol = () => (
+    <BotonConAtajo
+      variant="ghost"
+      size="icon"
+      class="relative size-7 shrink-0 text-neutral-500"
+      disabled={!columnaConContenido()}
+      onClick={() => setArtOpen(true)}
+      aria-pressed={false}
+      aria-label={nombreDelArbol()}
+      accion="workTree"
+      etiqueta={columnaConContenido() ? nombreDelArbol() : t("shell.work_tree.no_session")}
+    >
+      <PanelRightOpen size={16} />
+    </BotonConAtajo>
+  );
   const PanelDeChat = (pp: {
     sesion: string | null;
     /** El proyecto de esa tarea. `null` en la ventana en blanco, que no tiene. */
@@ -7250,20 +7277,8 @@ export default function App() {
         {/* Solo con la columna cerrada: abierta, su conmutador vive en la
             cabecera del panel derecho (`features/shell/RightPanelHeader.tsx`). */}
         <div ref={controlesDerechos} class="relative z-40 ml-auto flex shrink-0 items-center gap-3">
-        <Show when={!artOpen() && !paginaDeAgente()}>
-          <BotonConAtajo
-            variant="ghost"
-            size="icon"
-            class="relative size-7 shrink-0 text-neutral-500"
-            disabled={!columnaConContenido()}
-            onClick={() => setArtOpen(true)}
-            aria-pressed={false}
-            aria-label={nombreDelArbol()}
-            accion="workTree"
-            etiqueta={columnaConContenido() ? nombreDelArbol() : t("shell.work_tree.no_session")}
-          >
-            <PanelRightOpen size={16} />
-          </BotonConAtajo>
+        <Show when={!artOpen() && !paginaDeAgente() && !esquinaConTarea()}>
+          {botonDelArbol()}
         </Show>
         </div>
       </div>
@@ -7304,10 +7319,11 @@ export default function App() {
       <Index each={ventanas()}>{site => {
         const task = () => pestanas.open().find(p => p.id === paneles.activeTabAt(site()) && p.clase === "tarea");
         const target = () => threadSearchTargets().get(task()?.session ?? "");
-        return <Show when={Boolean(task()) && !tapadoPorElProyecto(site())}>
-          <div class="z-20 min-w-0 max-w-full self-start justify-self-end px-4 py-1" style={estiloDeLaCelda(site())}
-            classList={{ "mt-8": llevaTiraInterior(site()) }} onPointerDown={() => mandarVentana(site())}>
-            <ThreadSearch conversation={task()?.session ?? ""} active={sameSite(site(), paneles.activeSite()) && settings() === null && alta() === null}
+        // La ventana activa responde con lo elegido en el composer; las demás, con el agente de su tarea.
+        const agenteDeLaVentana = () => sameSite(site(), paneles.activeSite())
+          ? agent()
+          : (filaDe(task()?.session ?? "")?.agent ?? agent());
+        const herramientas = () => <ThreadSearch conversation={task()?.session ?? ""} active={sameSite(site(), paneles.activeSite()) && settings() === null && alta() === null}
               messages={target()?.messages() ?? []} thread={() => target()?.thread()}
               onJump={block => target()?.jump(block)}
               leadingTools={<Button variant="chrome" size="iconCompact" class="size-7 text-neutral-500"
@@ -7318,7 +7334,16 @@ export default function App() {
                   if (paneles.isSplit()) { mandarVentana(site()); juntarLaActiva(); }
                   else partirVentana(site());
                 }}><Columns2 size={14} /></Button>}
-              tools={<Show keyed when={delegatedToolbarTargets().get(`${workspaceActivo()}/${task()?.session ?? ""}`)}>{render => render()}</Show>} />
+              tools={<>
+                <Show keyed when={delegatedToolbarTargets().get(`${workspaceActivo()}/${task()?.session ?? ""}`)}>{render => render()}</Show>
+                <UsageTool usage={consumo} agent={agenteDeLaVentana()} onGestionarCuentas={() => setSettings("proveedores-ia")} />
+                <Show when={!artOpen() && !paginaDeAgente() && sameSite(site(), esquina())}>{botonDelArbol()}</Show>
+              </>} />;
+        // Centrada con la fila de máquina, proyecto y rama de la tarea (`TaskLocation`).
+        return <Show when={Boolean(task()) && !tapadoPorElProyecto(site())}>
+          <div class="z-20 min-w-0 max-w-full self-start justify-self-end pt-px pr-3" style={estiloDeLaCelda(site())}
+            classList={{ "mt-8": llevaTiraInterior(site()) }} onPointerDown={() => mandarVentana(site())}>
+            {herramientas()}
           </div>
         </Show>;
       }}</Index>
@@ -8207,15 +8232,7 @@ export default function App() {
           angosta. Lo que enseña es del workspace —las cuentas cuelgan de él—
           pero no del proyecto. */}
       <UsageBar
-        agents={agents()}
-        agent={agent()}
         busy={busy()}
-        reload={cuentasTocadas()}
-        /* El destino es la sección, no el agente: los ids de panel
-           eran del agente —«claude», «codex»—, uno por proveedor; con
-           Configuración agrupada por secciones dejaron de existir.
-           Ahora lleva a «Proveedores de IA». */
-        onGestionarCuentas={() => setSettings("proveedores-ia")}
         /* El panel de puertos vive ahí abajo, y la pestaña se abre
            aquí: el gesto cruza toda la app —lo que se abre es del
            espacio principal, no de la barra. */

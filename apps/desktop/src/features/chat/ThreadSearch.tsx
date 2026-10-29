@@ -185,9 +185,10 @@ export function ThreadSearch(props: {
   });
   onCleanup(() => cancelAnimationFrame(frame));
   return <>
-    <div class="relative flex max-w-full items-start gap-1">
+    <div class="relative flex max-w-full items-center gap-1">
+      {/* Cae bajo los botones: en la cabecera no cabe la fila de búsqueda. */}
       <Show when={open()}>
-        <div class="flex min-w-0 flex-wrap items-center gap-1 rounded-md border border-border-strong bg-surface-raised p-1 shadow-sm" role="search" aria-label={t("chat.search.label")}>
+        <div class="absolute top-full right-0 z-50 mt-1 flex min-w-0 flex-wrap items-center gap-1 rounded-md border border-border-strong bg-surface-raised p-1 shadow-sm" role="search" aria-label={t("chat.search.label")}>
           <Input ref={input} class="w-44 min-w-0" value={query()} placeholder={t("chat.search.placeholder")}
             aria-label={t("chat.search.label")} onInput={event => setQuery(event.currentTarget.value)}
             onKeyDown={event => {
@@ -202,7 +203,7 @@ export function ThreadSearch(props: {
           <Button variant="chrome" size="iconCompact" title={t("chat.search.close")} aria-label={t("chat.search.close")} onClick={close}><X size={14} /></Button>
         </div>
       </Show>
-      <div class="flex shrink-0 flex-col gap-1">
+      <div class="flex shrink-0 items-center gap-1">
         {props.leadingTools}
         <Button variant="chrome" size="iconCompact" class="size-7 text-neutral-500" onClick={show}
           title={t("chat.search.open", { key: textoDeAtajo("findInTask") })} aria-label={t("chat.search.label")}

@@ -24,7 +24,6 @@ const CUPO_TAILWIND = {
   "features/settings/General.tsx": 2,
   "features/shell/Sidebar.tsx": 1,
   "features/shell/Storage.tsx": 1,
-  "features/shell/UsageBar.tsx": 2,
   "ui/Terminal.tsx": 1,
 };
 

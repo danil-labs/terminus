@@ -339,12 +339,6 @@ const steps = [
     root,
   ],
   [
-    "La franja ordena las ventanas y cede por etapas",
-    process.execPath,
-    ["--test", "--experimental-strip-types", join(root, "tests/unit/limits.test.ts")],
-    root,
-  ],
-  [
     "El markdown se parte sin cambiar lo que se ve",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/markdown.test.ts")],

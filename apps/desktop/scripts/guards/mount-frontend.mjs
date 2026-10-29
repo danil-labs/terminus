@@ -878,8 +878,8 @@ if (!roto) {
     "el foco de actividad se apaga al terminar la última subtarea");
   const toolbarButtons = [...delegatedToolbar.parentElement.querySelectorAll("button")];
   assert.deepEqual(toolbarButtons.map(button => button.getAttribute("aria-label")), [
-    "Dividir vista", "Buscar en esta tarea", delegatedToolbar.getAttribute("aria-label"),
-  ], "la columna ordena dividir pantalla, búsqueda y subtareas debajo del sidebar");
+    "Dividir vista", "Buscar en esta tarea", delegatedToolbar.getAttribute("aria-label"), "Ver tareas",
+  ], "la fila ordena dividir pantalla, búsqueda y subtareas, y acaba en el conmutador del árbol");
   delegatedToolbar.click();
   await sleep(50);
   assert.equal([...threadDoc.querySelectorAll('button')].find(button => button.textContent === "Activas")?.getAttribute("aria-pressed"), "true",
