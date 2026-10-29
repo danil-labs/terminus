@@ -357,7 +357,7 @@ export default function Almacenamiento(props: {
     children: JSX.Element;
   }) {
     return (
-      <TooltipRoot openDelay={RETARDO_TOOLTIP} placement="top">
+      <TooltipRoot openDelay={RETARDO_TOOLTIP} placement="bottom">
         <TooltipTrigger
           as={(p: object) => (
             <button
@@ -614,7 +614,7 @@ export default function Almacenamiento(props: {
         setAbierto(v);
         if (v && !clearing()) void consultar(true);
       }}
-      placement="top"
+      placement="bottom-end"
       gutter={6}
     >
       {/* El disparador **no lleva `onClick` propio**: Kobalte no compone

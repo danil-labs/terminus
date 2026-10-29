@@ -3593,7 +3593,7 @@ if (!roto) {
     ["AC", "B", "GL", "D"], "la columna lista cada workspace con sus iniciales");
   assert.equal(cuadro("w").getAttribute("aria-current"), "true", "el activo lleva la marca de selección");
   assert.equal(cuadro("w2").getAttribute("aria-current"), null);
-  assert.equal(doc.querySelector("[data-title-bar] [data-workspace-name]")?.textContent.trim(), "Acme Corp", "el nombre abre la fila del título");
+  assert.equal(doc.querySelector("[data-title-bar] [data-workspace-name]"), null, "la franja de la ventana ya no nombra el workspace: se cambia en la columna");
   assert.equal(doc.querySelector('button[aria-label^="Workspace: "]'), null, "el menú de workspace del pie del riel se fue");
   assert.equal(cuadro("w").dataset.attention, "failed", "fallo sin ver gana a terminada sin ver");
   assert.ok(cuadro("w").querySelector('[data-attention-badge="failed"].text-error-strong svg.lucide-circle-alert'));
@@ -3629,44 +3629,18 @@ if (!roto) {
   await sleep(300);
   assert.deepEqual(cambiosDeColumna, ["w2"], "un clic cambia de workspace");
   assert.equal(cuadro("w2").getAttribute("aria-current"), "true");
-  assert.equal(doc.querySelector("[data-title-bar] [data-workspace-name]")?.textContent.trim(), "Beta");
   cuadro("w2").dispatchEvent(new columna.w.MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
   await sleep(80);
   assert.ok([...doc.querySelectorAll('[role="menuitem"]')].some((b) => b.textContent.trim() === "Administrar workspaces"), "administrar sigue alcanzable desde el cuadro");
   assert.ok(doc.querySelector('[data-workspace-column] button[aria-label="Nuevo workspace"]'), "y crear uno, desde la columna");
-  /**
-   * El menú del nombre cambia de cliente igual que la columna. El actual va marcado y sin señal:
-   * sus tareas ya están en el riel. Los demás dicen lo más urgente, y el nombre nunca lleva señal.
-   */
-  const teclaEn = (el, key) => el.dispatchEvent(new columna.w.KeyboardEvent("keydown", { key, bubbles: true }));
-  const nombreEnLaBarra = () => doc.querySelector("[data-title-bar] [data-workspace-name]");
-  teclaEn(nombreEnLaBarra(), "ArrowDown");
-  await sleep(100);
-  const menuDelNombre = doc.querySelector('[role="menu"][data-workspace-menu]');
-  assert.ok(menuDelNombre, "flecha abajo sobre el nombre abre su menú");
-  const renglonDe = (id) => menuDelNombre.querySelector(`[role="menuitemradio"][data-workspace-option="${id}"]`);
-  assert.deepEqual([...menuDelNombre.querySelectorAll('[role="menuitemradio"]')].map((r) => r.dataset.workspaceOption), ["w", "w2", "w3", "w4"]);
-  assert.equal(renglonDe("w2").getAttribute("aria-checked"), "true", "el activo va marcado en el menú");
-  assert.equal(renglonDe("w2").querySelector("[data-attention-badge]"), null, "y sin señal, aunque tenga un permiso pendiente");
-  assert.equal(renglonDe("w").querySelector("[data-attention-badge]")?.dataset.attentionBadge, "failed");
-  assert.equal(renglonDe("w3").querySelector("[data-attention-badge]")?.dataset.attentionBadge, "asked");
-  assert.equal(renglonDe("w4").querySelector("[data-attention-badge]"), null, "un estado que la ventana no conoce tampoco se pinta aquí");
-  assert.equal(nombreEnLaBarra().querySelector("[data-attention-badge]"), null, "el nombre no lleva señal aunque otro workspace espere");
-  teclaEn(renglonDe("w"), "Enter");
-  await sleep(300);
-  assert.deepEqual(cambiosDeColumna, ["w2", "w"], "elegir en el menú cambia de workspace");
-  assert.equal(nombreEnLaBarra()?.textContent.trim(), "Acme Corp");
-  assert.equal(doc.querySelector('[role="menu"][data-workspace-menu]'), null, "y el menú se cierra");
-  assert.equal(cuadro("w").getAttribute("aria-current"), "true", "la columna sigue al menú");
   espaciosDeColumna.workspaces = espaciosDeColumna.workspaces.slice(0, 1);
   columna.w.dispatchEvent(new columna.w.CustomEvent("harness:workspace"));
   await sleep(300);
-  assert.equal(doc.querySelector("[data-workspace-column]"), null, "al quedar uno, la columna se va sin recargar");
-  assert.equal(nombreEnLaBarra()?.textContent.trim(), "Acme Corp", "y el nombre se queda");
+  assert.ok(doc.querySelector("[data-workspace-column]"), "con uno solo la columna se queda: es el único sitio para cambiar de workspace");
   assert.deepEqual(columna.fallos, []);
   /**
-   * Con un solo workspace no hay columna: crear el segundo sale del menú del nombre. En macOS solo
-   * la fila del título se aparta del semáforo, y el build de una rama se nombra al final.
+   * Con un solo workspace la columna sigue a la vista y crea el segundo. En macOS solo la franja
+   * de la ventana se aparta del semáforo, y no nombra ninguna build.
    */
   const MAC = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)";
   const LARGO = "Software y Servicios Danil, Consultoría de Gobierno de Agentes";
@@ -3680,35 +3654,16 @@ if (!roto) {
   await sleep(300);
   const d1 = solo.w.document;
   const barra = d1.querySelector("[data-title-bar]");
-  const nombreSolo = barra?.querySelector("[data-workspace-name]");
-  assert.equal(nombreSolo?.textContent.trim(), LARGO, "el nombre del workspace abre la fila del título");
-  assert.equal(nombreSolo.getAttribute("title"), LARGO, "un nombre que no cabe se lee entero al pasar por encima");
-  assert.equal(nombreSolo.querySelector("[data-attention-badge]"), null, "el nombre no lleva señal");
-  assert.equal(d1.querySelector("[data-workspace-column]"), null, "con un solo workspace no hay columna");
-  assert.ok(barra.classList.contains("pl-[84px]"), "en macOS la fila del título se aparta del semáforo");
+  assert.ok(d1.querySelector("[data-workspace-column]"), "con un solo workspace la columna sigue");
+  assert.ok(barra.classList.contains("pl-[84px]"), "en macOS la franja se aparta del semáforo");
   assert.equal(d1.querySelectorAll(".pl-\\[84px\\]").length, 1, "y ninguna otra cabecera reserva su hueco");
-  assert.equal(barra.querySelector("[data-window-branch]")?.textContent, "una-rama", "la rama de desarrollo se nombra al final sin etiqueta de motor");
-  assert.equal(d1.body.textContent.split("una-rama").length, 2, "una sola vez");
+  assert.equal(d1.querySelector("[data-window-branch]"), null, "la franja no nombra la build");
+  assert.ok(d1.querySelector('[data-workspace-column-foot] button[aria-label="Configuración"]'), "Configuración vive al pie de la columna");
   const altas = [];
   solo.w.addEventListener("harness:new-workspace", () => altas.push(1));
-  const abrirMenuSolo = async () => {
-    nombreSolo.dispatchEvent(new solo.w.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    await sleep(100);
-    return d1.querySelector('[role="menu"][data-workspace-menu]');
-  };
-  let menuSolo = await abrirMenuSolo();
-  assert.ok(menuSolo, "Enter sobre el nombre abre su menú");
-  assert.deepEqual([...menuSolo.querySelectorAll('[role="menuitemradio"]')].map((r) => r.getAttribute("aria-checked")), ["true"]);
-  assert.equal(menuSolo.querySelector("[data-attention-badge]"), null, "la pregunta de este workspace se ve en el riel, no en el menú");
-  menuSolo.dispatchEvent(new solo.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-  await sleep(100);
-  assert.equal(d1.querySelector('[role="menu"][data-workspace-menu]'), null, "Escape cierra el menú");
-  assert.equal(d1.activeElement, nombreSolo, "y el foco vuelve al nombre");
-  menuSolo = await abrirMenuSolo();
-  const itemDe = (texto) => [...menuSolo.querySelectorAll('[role="menuitem"]')].find((b) => b.textContent.trim() === texto);
-  itemDe("Nuevo workspace").dispatchEvent(new solo.w.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  d1.querySelector('[data-workspace-column] button[aria-label="Nuevo workspace"]').click();
   await sleep(150);
-  assert.equal(altas.length, 1, "Nuevo workspace pide el alta desde el menú del nombre");
+  assert.equal(altas.length, 1, "Nuevo workspace pide el alta desde la columna");
   assert.deepEqual(solo.fallos, []);
   /**
    * Ocultar el riel vive a la izquierda de Agentes y Tareas. Oculto, lo trae de vuelta la fila de
@@ -3728,8 +3683,7 @@ if (!roto) {
   ocultarRiel.click();
   await sleep(100);
   assert.equal(d2.querySelector('[data-sidebar-search]'), null, "el buscador desaparece cuando el sidebar está cerrado");
-  assert.ok(d2.querySelector('[data-conversacion] button[aria-label="Mostrar el historial"]'), "con el riel oculto, la fila de pestañas lo trae de vuelta");
-  assert.equal(d2.querySelector("[data-title-bar] [data-workspace-name]")?.textContent.trim(), LARGO, "y la fila del título no cambia");
+  assert.ok(d2.querySelector('[data-title-bar] button[aria-label="Mostrar el historial"]'), "con el riel oculto, el mismo botón de la franja lo trae de vuelta");
   assert.equal(d2.querySelector("[data-window-branch]"), null, "sin título de ventana no se nombra ninguna build");
   d2.querySelector('button[aria-label="Mostrar el historial"]').click();
   await sleep(100);

@@ -231,7 +231,7 @@ export default function PuertosAbiertos(props: {
     children: JSX.Element;
   }) {
     return (
-      <TooltipRoot openDelay={RETARDO_TOOLTIP} placement="top">
+      <TooltipRoot openDelay={RETARDO_TOOLTIP} placement="bottom">
         <TooltipTrigger
           as={(p: object) => (
             <button
@@ -356,7 +356,7 @@ export default function PuertosAbiertos(props: {
         setAbierto(v);
         if (v) void consultar();
       }}
-      placement="top"
+      placement="bottom-end"
       gutter={6}
     >
       {/* El disparador **no lleva `onClick` propio**: Kobalte no compone

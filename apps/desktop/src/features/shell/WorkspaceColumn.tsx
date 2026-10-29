@@ -1,6 +1,7 @@
 import Plus from "lucide-solid/icons/plus";
+import SettingsIcon from "lucide-solid/icons/settings";
 import UserPlus from "lucide-solid/icons/user-plus";
-import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createSignal, For, lazy, onCleanup, Show, Suspense } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { t } from "../../lib/i18n";
 import { createNavigationReorder } from "../../lib/navigation-order";
@@ -80,9 +81,13 @@ export function AttentionBadge(props: { state: AttentionState; class?: string })
 }
 
 /** Cambiar de workspace con un clic y ver, sin entrar, qué espera en cada uno. */
+const DanilFooterEntry = lazy(() => import("./DanilFooterEntry"));
+
 export default function WorkspaceColumn(props: {
   attention: WorkspaceAttention[];
   onManage: () => void;
+  /** Ajustes, en su sección si se da. */
+  onSettings: (panel?: string) => void;
 }) {
   const ws = createWorkspaces();
   let list: HTMLDivElement | undefined;
@@ -282,10 +287,8 @@ export default function WorkspaceColumn(props: {
     );
   };
 
-  // Con uno solo no hay a dónde cambiar: crear el segundo vive en el menú del nombre (`TitleBar.tsx`).
-  // En la web siempre: es donde se agregan y se ven las otras cuentas de Danil.
+  // Siempre a la vista: es el único sitio donde se cambia de workspace.
   return (
-    <Show when={(ws.lista()?.length ?? 0) > 1 || !!accounts}>
     <nav
       aria-label={t("shell.workspaces.label")}
       data-workspace-column=""
@@ -326,7 +329,24 @@ export default function WorkspaceColumn(props: {
           </button>
         </Show>
       </div>
+      <ColumnFoot onSettings={props.onSettings} />
     </nav>
-    </Show>
+  );
+}
+
+/** Ajustes y la cuenta de Danil, al pie de la columna. */
+function ColumnFoot(props: { onSettings: (panel?: string) => void }) {
+  const boton = "grid size-9 shrink-0 place-items-center rounded-lg text-neutral-500 outline-none hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+  return (
+    <div class="flex shrink-0 flex-col items-center gap-1 pt-1 pb-2" data-workspace-column-foot="">
+      <button type="button" class={boton} aria-label={t("settings.title")} title={t("settings.title")} onClick={() => props.onSettings()}>
+        <SettingsIcon size={17} aria-hidden="true" />
+      </button>
+      <Show when={capabilities().danilAccount || capabilities().accountProfile}>
+        <Suspense>
+          <DanilFooterEntry collapsed onOpen={() => props.onSettings("cuenta-danil")} />
+        </Suspense>
+      </Show>
+    </div>
   );
 }

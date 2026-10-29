@@ -74,7 +74,7 @@ export default function KeepAwake() {
 
   return (
     <Show when={status()?.supported}>
-      <Popover open={open()} onOpenChange={setOpen} placement="top-end" gutter={6}>
+      <Popover open={open()} onOpenChange={setOpen} placement="bottom-end" gutter={6}>
         <PopoverTrigger
           as={(p: object) => (
             <button

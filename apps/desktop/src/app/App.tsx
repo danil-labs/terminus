@@ -6,7 +6,9 @@ import Check from "lucide-solid/icons/check";
 import Columns2 from "lucide-solid/icons/columns-2";
 import Copy from "lucide-solid/icons/copy";
 import FolderOpen from "lucide-solid/icons/folder-open";
+import PanelLeftClose from "lucide-solid/icons/panel-left-close";
 import PanelLeftOpen from "lucide-solid/icons/panel-left-open";
+import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
 import PanelRightOpen from "lucide-solid/icons/panel-right-open";
 import {
   batch,
@@ -136,7 +138,7 @@ import {
 import type { ContextoDeProyectos } from "../features/settings/ManageProjects";
 // Configuración solo se abre a pedido: no entra en la carga inicial.
 const Settings = lazy(() => import("../features/settings/Settings"));
-import type { Startup } from "../features/settings/workspaces-store";
+import { createWorkspaces, type Startup } from "../features/settings/workspaces-store";
 import { createAttention, topState } from "../features/shell/attention";
 import TaskNotifier from "../features/shell/TaskNotifier";
 import DeleteSpace from "../features/shell/DeleteSpace";
@@ -150,9 +152,10 @@ import { recordarCarpetas } from "../lib/folderKinds";
 import { lista } from "../lib/format";
 import ColumnaLateral from "../features/shell/SideColumn";
 import { createSpaceNavigationOrder } from "../lib/space-navigation-order";
-import SpaceBar from "../features/shell/SpaceBar";
 import TitleBar from "../features/shell/TitleBar";
-import UsageBar from "../features/shell/UsageBar";
+import AppTools from "../features/shell/AppTools";
+import { ConexionesMenu } from "../features/settings/Tools";
+import SpaceMenu from "../features/shell/SpaceMenu";
 import UsageTool from "../features/shell/UsageTool";
 import { createUsage } from "../features/shell/usage";
 import AvisoDeVersion from "../features/shell/VersionNotice";
@@ -442,6 +445,18 @@ export default function App() {
   const [spacesContext, setSpacesContext] = createSignal<string | null>(null);
   const customization = capabilities().inbox?.customization(() => ({ user: capabilities().inbox?.userId, workspace: workspaceActivo(), space: spacesContext() === workspaceActivo() ? escritorio() : null }), capabilities().inbox?.subscribe) ?? {ready:()=>false,scope:()=>"",selection:()=>({enabled:[],writable:false}),temporary:()=>true,toggle:(_id:string)=>{},enabled:(_id:string)=>false};
   const [personalizing, setPersonalizing] = createSignal(false);
+  // El nombre del workspace abierto rotula el menú de espacios de la franja.
+  const workspacesDeLaFranja = createWorkspaces();
+  const workspaceActual = () => workspacesDeLaFranja.actual();
+  // Dónde termina la barra lateral: Personalizar va pegado a ese borde en la franja.
+  const [bordeDeLaBarra, setBordeDeLaBarra] = createSignal<number | null>(null);
+  const medirBordeDeLaBarra = (el: HTMLDivElement) => {
+    const medir = () => setBordeDeLaBarra(el.getBoundingClientRect().right || null);
+    const ojo = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(medir);
+    ojo?.observe(el);
+    queueMicrotask(medir);
+    onCleanup(() => ojo?.disconnect());
+  };
   const attentionEntries = () => capabilities().inbox?.entries(customization.selection().enabled) ?? [];
   const activeSpace = () => spaces().find((i) => i.id === escritorio()) ?? null;
   const multipleSpaces = () => spaces().length > 1;
@@ -7137,34 +7152,6 @@ export default function App() {
         onDblClick={toggleMaximizeFromHeader}
       >
         <div ref={controlesIzquierdos} class="relative z-40 flex shrink-0 items-center gap-3">
-        <Show when={sidebar.colapsado()}>
-          <BotonConAtajo
-            variant="ghost"
-            size="icon"
-            class="size-7 shrink-0 text-neutral-500"
-            onClick={sidebar.alternar}
-            aria-pressed={false}
-            aria-label={t("shell.sidebar.show")}
-            accion="sidebar"
-            etiqueta={t("shell.sidebar.show")}
-          >
-            <PanelLeftOpen size={16} />
-          </BotonConAtajo>
-        </Show>
-        <Show when={sidebar.colapsado() && spaces().length > 0}>
-          <Button
-            variant="ghost"
-            size="icon"
-            class="size-7 shrink-0 text-neutral-500"
-            data-archived-collapsed=""
-            aria-pressed={viendoArchivadas()}
-            aria-label={t("spaces.archived.title")}
-            title={t("spaces.archived.foot_title")}
-            onClick={alternarArchivadas}
-          >
-            <Archive size={16} />
-          </Button>
-        </Show>
         </div>
         {/* Las pestañas, donde estaba el título de la conversación: con
             una se ve como el título de siempre; con varias, las tareas
@@ -8014,31 +8001,80 @@ export default function App() {
         {/* Las dos columnas son hermanas de ancho propio y usan
             `ColumnaLateral`, que documenta sus límites. */}
         <TitleBar
-          attention={attention.list()}
-          onManage={() => setSettings("workspaces")}
-          escritorios={
-            spaces().length > 0
-              ? (nombre) => (
-                  <SpaceBar
-                    onReorder={spaceOrder.save}
-                    reordering={spaceOrder.saving()}
-                    workspace={nombre()}
-                    workspaceId={workspaceActivo() ?? ""}
-                    spaces={spaces()}
-                    activa={escritorio()}
-                    proyectos={projectList()}
-                    senal={(id) => senalDe(id)}
-                    onElegir={cambiarEscritorio}
-                    onCrear={createSpace}
-                    onRenombrar={renameSpace}
-                    onEliminar={(id) => setDeletingSpace(id)}
-                  />
-                )
-              : undefined
-          }
+          bordeDeLaBarra={sidebar.colapsado() ? null : bordeDeLaBarra()}
+          izquierda={<>
+            <BotonConAtajo
+              variant="ghost"
+              size="icon"
+              class="size-7 shrink-0 text-neutral-500"
+              onClick={sidebar.alternar}
+              aria-pressed={!sidebar.colapsado()}
+              aria-label={sidebar.colapsado() ? t("shell.sidebar.show") : t("shell.sidebar.hide")}
+              accion="sidebar"
+              etiqueta={sidebar.colapsado() ? t("shell.sidebar.show") : t("shell.sidebar.hide")}
+            >
+              <Show when={sidebar.colapsado()} fallback={<PanelLeftClose size={16} />}><PanelLeftOpen size={16} /></Show>
+            </BotonConAtajo>
+            <Show when={spaces().length > 0}>
+              <SpaceMenu
+                workspace={workspaceActual()?.name ?? ""}
+                spaces={spaces()}
+                activa={escritorio()}
+                proyectos={projectList()}
+                senal={(id) => senalDe(id)}
+                onElegir={cambiarEscritorio}
+                onCrear={createSpace}
+                onRenombrar={renameSpace}
+                onEliminar={(id) => setDeletingSpace(id)}
+              />
+            </Show>
+            {capabilities().sidebarExtra?.()}
+          </>}
+          finDeIzquierda={<Show when={capabilities().inbox}>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="size-7 shrink-0 text-neutral-500"
+              aria-label={t("attention.personalize")}
+              title={t("attention.personalize")}
+              data-personalize=""
+              onClick={() => setPersonalizing(true)}
+            >
+              <SlidersHorizontal size={15} />
+            </Button>
+          </Show>}
+          derecha={<>
+            <Show when={spaces().length > 0}>
+              <Button
+                variant={viendoArchivadas() ? "secondary" : "ghost"}
+                size="icon"
+                class="size-7 shrink-0 text-neutral-500"
+                data-archived-foot=""
+                aria-pressed={viendoArchivadas()}
+                aria-label={t("spaces.archived.title")}
+                title={t("spaces.archived.foot_title")}
+                onClick={alternarArchivadas}
+              >
+                <Archive size={15} aria-hidden="true" />
+              </Button>
+            </Show>
+            <ConexionesMenu onManage={() => setSettings("skills")} />
+            <span aria-hidden="true" class="mx-1 h-4 w-px shrink-0 bg-border-strong" />
+            <AppTools
+              busy={busy()}
+              onAbrirSitio={(url, proyecto, session) => void abrirSitio(url, proyecto, session)}
+              onObservability={abrirObservabilidad}
+              onReportarBug={() => setInput(t("chat.composer.bug_report_starter"))}
+              trabajando={vivas()}
+              conPestana={sesionesConPestana()}
+              onAbrirTarea={(proyecto, session) => void abrirSesion(proyecto, session)}
+            />
+          </>}
         />
         <div class="relative flex min-h-0 flex-1 overflow-visible">
-          <WorkspaceColumn attention={attention.list()} onManage={() => setSettings("workspaces")} />
+          <WorkspaceColumn attention={attention.list()} onManage={() => setSettings("workspaces")} onSettings={(panel) => setSettings(panel ?? "")} />
+          {/* La superficie: barra, ventanas y panel derecho, con la esquina redondeada sobre el marco. */}
+          <div class="relative flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-tl-[10px] border-t border-l border-border-strong shadow-sm" data-surface="">
           {/* Los topes los pone quien monta: el ancho por debajo del
               cual algo deja de caber solo lo sabe su contenido. Por
               debajo de 220 los títulos del historial dejan de caber; por
@@ -8052,7 +8088,7 @@ export default function App() {
             max={420}
             etiqueta={t("shell.column.sidebar_width")}
           >
-            <div class="relative h-full min-h-0 w-full min-w-0">
+            <div ref={medirBordeDeLaBarra} class="relative h-full min-h-0 w-full min-w-0">
             {/* Las otras máquinas se ven por el relay, que es de pago: si la flota lo
                 detuvo por la licencia, el aviso de Terminus (el pago vive en la web). */}
             <Show when={capabilities().machinesLicense?.() === "license_required" && !sidebar.colapsado()}>
@@ -8069,7 +8105,6 @@ export default function App() {
             >
             <Sidebar
               attentionMenu={capabilities().inbox ? collapsed => capabilities().inbox!.sidebarMenu({get entries(){return attentionEntries().filter(entry=>entry.selected);},get active(){return pestanas.active();},collapsed,onOpen:openAttentionFeature}) : undefined}
-              personalizeMenu={capabilities().inbox ? collapsed => capabilities().inbox!.personalizeMenu({collapsed,onOpen:()=>setPersonalizing(true)}) : undefined}
               projects={proyectosDelRiel()}
               modelos={modelosParaAgentes()}
               sessions={sesionesDelRiel()}
@@ -8224,27 +8259,10 @@ export default function App() {
               />}
             </Show>
           </ColumnaLateral>
+          </div>
         </div>
       </Show>
 
-      {/* Chrome de la app, por debajo de todo: no está dentro del chat ni de
-          ninguna columna. La ventana es 28 px más corta, no una columna más
-          angosta. Lo que enseña es del workspace —las cuentas cuelgan de él—
-          pero no del proyecto. */}
-      <UsageBar
-        busy={busy()}
-        /* El panel de puertos vive ahí abajo, y la pestaña se abre
-           aquí: el gesto cruza toda la app —lo que se abre es del
-           espacio principal, no de la barra. */
-        onAbrirSitio={(url, proyecto, session) =>
-          void abrirSitio(url, proyecto, session)
-        }
-        onObservability={abrirObservabilidad}
-        onReportarBug={() => setInput(t("chat.composer.bug_report_starter"))}
-        trabajando={vivas()}
-        conPestana={sesionesConPestana()}
-        onAbrirTarea={(proyecto, session) => void abrirSesion(proyecto, session)}
-      />
 
       <AnadirCarpeta
         abierto={anadiendoCarpeta()}

@@ -14,17 +14,16 @@ import {
 import KeepAwake from "./KeepAwake";
 import PuertosAbiertos from "./OpenPorts";
 import BotonDeTema from "./ThemeButton";
-import PieVersion from "./VersionFooter";
 
 const Almacenamiento = sharedLazy(() => import("./Storage"));
 
-// El consumo vive en las herramientas de cada ventana (`UsageTool`); el pie queda para la app.
+// Los controles de la app, al final de la franja de la ventana; el consumo vive en cada ventana (`UsageTool`).
 
 type AgentsViewStatus = { installed: boolean; enabled: boolean };
 
 const BUG_REPORT_URL = "https://github.com/danil-labs/terminus/issues/new?template=bug_report.yml";
 
-export default function UsageBar(props: {
+export default function AppTools(props: {
   busy: boolean;
   onAbrirSitio: (url: string, project: string, session: string) => void;
   onObservability: () => void;
@@ -56,8 +55,7 @@ export default function UsageBar(props: {
   });
 
   return (
-    // La versión identifica el build incluso sin cuentas conectadas.
-    <footer class="flex h-7 min-w-0 shrink-0 items-center gap-2 glass-panel border-t border-border px-2 text-xs">
+    <div class="flex shrink-0 items-center gap-1 text-xs" data-app-tools="">
       <div class="ml-auto flex min-w-0 shrink-0 items-center gap-1">
         <Show when={observability()}>
           <button
@@ -69,7 +67,7 @@ export default function UsageBar(props: {
             <ChartNoAxesCombined size={13} />
           </button>
         </Show>
-        <Popover placement="top-start" gutter={6}>
+        <Popover placement="bottom-end" gutter={6}>
           <PopoverTrigger
             as={(p: object) => (
               <button
@@ -112,8 +110,7 @@ export default function UsageBar(props: {
         <PuertosAbiertos busy={props.busy} onAbrirSitio={props.onAbrirSitio} />
         <KeepAwake />
         <BotonDeTema />
-        <PieVersion />
       </div>
-    </footer>
+    </div>
   );
 }

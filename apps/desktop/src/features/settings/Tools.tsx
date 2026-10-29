@@ -1052,7 +1052,7 @@ export function ConexionesMenu(props: {
         setAbierto(v);
         if (v) void cargar();
       }}
-      placement="top-start"
+      placement="bottom-end"
       gutter={4}
     >
       <PopoverTrigger

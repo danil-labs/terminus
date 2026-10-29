@@ -29,7 +29,7 @@ const app=await boot('listo','alpha-real-shell',{},undefined,{}, {web:true,antes
 }});
 const {w}=app;
 const text=()=>w.document.body.textContent;
-const button=label=>[...w.document.querySelectorAll('button')].find(node=>node.textContent.trim()===label);
+const button=label=>[...w.document.querySelectorAll('button')].find(node=>node.textContent.trim()===label||node.getAttribute('aria-label')===label);
 const click=async label=>{const node=button(label);assert.ok(node,label);node.click();await sleep(100);};
 const choose=async id=>{const select=w.document.querySelector('[data-alpha-inbox] select');assert.ok(select);select.value=String(id);select.dispatchEvent(new w.Event('change',{bubbles:true}));await sleep(100);};
 try{

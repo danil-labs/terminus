@@ -1,10 +1,7 @@
-import Archive from "lucide-solid/icons/archive";
 import History from "lucide-solid/icons/history";
 import Loader2 from "lucide-solid/icons/loader-2";
-import PanelLeftClose from "lucide-solid/icons/panel-left-close";
 import Plus from "lucide-solid/icons/plus";
 import Search from "lucide-solid/icons/search";
-import SettingsIcon from "lucide-solid/icons/settings";
 import SquarePen from "lucide-solid/icons/square-pen";
 import TriangleAlert from "lucide-solid/icons/triangle-alert";
 import X from "lucide-solid/icons/x";
@@ -18,16 +15,13 @@ import type { AgentProfile, HandlerList, HandlerStatus, Project } from "../../li
 import { createPref } from "../../lib/prefs";
 import { sharedLazy } from "../../lib/sharedLazy";
 import { ariaDeAtajo } from "../../lib/shortcuts";
-import { capabilities } from "../../lib/platform";
 import { cn } from "../../lib/utils";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
 import { KeyedList } from "../../ui/KeyedList";
-import { BotonConAtajo, TeclaDeAtajo } from "../../ui/Shortcut";
+import { TeclaDeAtajo } from "../../ui/Shortcut";
 import {
   SidebarContent,
-  SidebarFooter,
-  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -40,7 +34,6 @@ import NewAgent, { type ModelChoices } from "../projects/NewAgent";
 import { watchProfiles } from "../projects/profiles";
 import Sessions, { type SessionRow } from "../projects/Sessions";
 import type { Etapa } from "../projects/TaskStage";
-import { ConexionesMenu } from "../settings/Tools";
 import {
   agentOptions,
   applySidebarView,
@@ -59,7 +52,6 @@ import { machineName, machines } from "../machines/store";
 const SidebarFilter = lazy(() => import("./SidebarFilter").then((m) => ({ default: m.SidebarFilter })));
 const AgentDock = lazy(() => import("./AgentDock"));
 const FolderGroupHeader = sharedLazy(() => import("./FolderGroupHeader"));
-const DanilFooterEntry = lazy(() => import("./DanilFooterEntry"));
 
 /* El ancho vive en `ColumnaLateral`, que es la columna que envuelve a esta
    barra. Aquí había cuatro constantes —expandido, mínimo, máximo y el riel— que
@@ -143,7 +135,6 @@ export default function Sidebar(props: {
   onPin?: (project: string, id: string, pinned: boolean) => void | Promise<void>;
   onSettings: (panel?: string) => void;
   attentionMenu?: (collapsed: boolean) => JSX.Element;
-  personalizeMenu?: (collapsed: boolean) => JSX.Element;
   /** Abre el chat con un agente de esa carpeta, como su fila de antes. */
   onHablarCon: (project: string, name: string) => void;
   onAgentProfile: (project: string, name: string) => void;
@@ -604,27 +595,8 @@ export default function Sidebar(props: {
         {/* Sin cabecera, el pie cae en la fila `1fr` de las tres que reparte
             `ui/sidebar.tsx`: se pega debajo de la lista y se va con lo que ésta
             crezca. */}
-        <SidebarHeader class="px-2 pt-2 pb-2">
-          <div class={cn("flex min-w-0 items-center gap-1", props.collapsed && "flex-col")}>
-          <BotonConAtajo
-            variant="ghost"
-            size="icon"
-            class="size-7 shrink-0 text-neutral-500"
-            onClick={props.onToggle}
-            aria-pressed
-            accion="sidebar"
-            etiqueta={t("shell.sidebar.hide")}
-            aria-label={t("shell.sidebar.hide")}
-          >
-            <PanelLeftClose size={16} />
-          </BotonConAtajo>
-          <Show when={!props.collapsed}>
-            {capabilities().sidebarExtra?.()}
-          </Show>
-          </div>
-        </SidebarHeader>
 
-        <SidebarContent class="gap-2 px-2 pb-0">
+        <SidebarContent class="gap-2 px-2 pt-2 pb-0">
           <SidebarMenu class="gap-1.5">
 
             <SidebarMenuItem>
@@ -729,41 +701,6 @@ export default function Sidebar(props: {
             />
           </Suspense>
         </Show>
-        <SidebarFooter class="border-t border-border p-2">
-          {props.personalizeMenu?.(Boolean(props.collapsed))}
-          <div class={cn("flex items-center justify-end gap-1", props.collapsed && "flex-col")}>
-            <Show when={capabilities().danilAccount || capabilities().accountProfile}>
-              <Suspense>
-                <DanilFooterEntry collapsed={props.collapsed} onOpen={() => props.onSettings("cuenta-danil")} />
-              </Suspense>
-            </Show>
-            <Show when={!props.collapsed && props.onArchivadas}>
-              <Button
-                variant={props.viendoArchivadas ? "secondary" : "ghost"}
-                size="icon"
-                class="size-7 shrink-0 text-neutral-500"
-                data-archived-foot=""
-                aria-pressed={props.viendoArchivadas}
-                aria-label={t("spaces.archived.title")}
-                title={t("spaces.archived.foot_title")}
-                onClick={() => props.onArchivadas?.()}
-              >
-                <Archive size={15} aria-hidden="true" />
-              </Button>
-            </Show>
-            <ConexionesMenu onManage={() => props.onSettings("skills")} />
-            <Button
-              variant="ghost"
-              size="icon"
-              class="size-7 shrink-0 text-neutral-500"
-              aria-label={t("settings.title")}
-              title={t("settings.title")}
-              onClick={() => props.onSettings()}
-            >
-              <SettingsIcon size={15} />
-            </Button>
-          </div>
-        </SidebarFooter>
       </SidebarShell>
 
       {/* El historial colapsado no desaparece: se abre al lado del riel. Este SÍ
