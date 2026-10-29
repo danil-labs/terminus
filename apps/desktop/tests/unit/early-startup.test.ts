@@ -4,7 +4,7 @@ import test from "node:test";
 import { listaBasta, reconciliar } from "../../src/features/settings/early-startup.ts";
 
 /**
- * **La ventana no espera a `workspaces_startup`.** El arranque migra dentro y
+ * La ventana no espera a `workspaces_startup`. El arranque migra dentro y
  * ha tardado minutos; la lista ligera abre la ventana y el arranque la
  * confirma. Lo que no se adelanta es el alta ni la negativa (`bloqueo`).
  */

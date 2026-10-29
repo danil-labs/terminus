@@ -2255,14 +2255,8 @@ export default function App() {
     // están los proyectos»: lo que quede en `localStorage` de cuando esa
     // carpeta era una preferencia de esta máquina se lee UNA vez, aquí.
     let workspaceRequest = 0;
-    // Que el servicio no conteste todavía no es una respuesta. Recién
-    // instalado arranca en frío —`workspaces_startup` tardó nueve segundos
-    // en una medición— y el primer intento de la ventana se pasa del plazo:
-    // la app abría a medias y no se recuperaba sola.
-    // `workspaces_startup` corre las migraciones dentro y ha tardado de 30 a
-    // 158 segundos; `list_workspaces` contesta en unos tres. La ventana se
-    // abre con la lista y el arranque la confirma al llegar
-    // (`early-startup.ts`). `aplicadaDeLista` es lo que se pintó con la lista.
+    // `workspaces_startup` migra dentro y tarda minutos; la ventana abre con
+    // `list_workspaces` y el arranque la confirma al llegar (`early-startup.ts`).
     let arranqueLlego = false;
     let aplicadaDeLista: Startup | null = null;
     void invoke<Startup>("list_workspaces").then((lista) => {
@@ -2273,6 +2267,10 @@ export default function App() {
     }).catch(() => {
       // Sin lista se espera al arranque, como antes: su error es el que se pinta.
     });
+    // Que el servicio no conteste todavía no es una respuesta. Recién
+    // instalado arranca en frío —`workspaces_startup` tardó nueve segundos
+    // en una medición— y el primer intento de la ventana se pasa del plazo:
+    // la app abría a medias y no se recuperaba sola.
     const arrancar = async (quedan: number) => {
       try {
         const a = await invoke<Startup>("workspaces_startup");
@@ -2281,10 +2279,8 @@ export default function App() {
         // con `workspaces` y `active` vacíos, que para `aplicar` significan
         // «primer arranque» y abren el alta — la negativa acabaría
         // invitando a crear un workspace en la carpeta que se negó a tocar.
-        // Va antes que mirar `workspaceRequest`: aunque la lista ya haya
-        // abierto la ventana, o la persona haya cambiado de workspace
-        // entretanto, la negativa tapa la app igual.
         if (a.bloqueo) {
+          // Antes que `workspaceRequest`: tapa aunque la lista ya abriera la ventana.
           setEnCache(false);
           setBloqueo(a.bloqueo);
           return;

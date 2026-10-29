@@ -20,13 +20,9 @@ type Forma = {
 };
 
 /**
- * Si la lista ligera basta para abrir la ventana antes del arranque.
- *
- * Solo con un workspace activo que esté en la lista. Sin activo, `aplicar`
- * abre el alta de «primer arranque», y eso es justo lo que no se puede
- * adelantar: puede ser una instalación que el arranque va a rechazar
- * (`bloqueo` llega con la lista vacía) o una que una migración todavía no
- * ha traído. Ese caso espera al arranque, como antes.
+ * Si la lista ligera basta para abrir la ventana antes del arranque: con un
+ * activo que esté en la lista. Sin activo, `aplicar` abriría el alta, y puede
+ * ser una instalación que el arranque va a rechazar (`bloqueo`).
  */
 export function listaBasta(lista: Forma): boolean {
   if (lista.bloqueo) return false;
@@ -35,14 +31,9 @@ export function listaBasta(lista: Forma): boolean {
 }
 
 /**
- * Qué hacer cuando llega `workspaces_startup` habiendo aplicado ya `previa`
- * (o nada, `null`).
- *
- * - `"aplicar"`: no se aplicó nada, o lo aplicado ya no vale — otro activo,
- *   otros workspaces o corrió una migración que la lista no había visto (los
- *   datos cambiaron debajo de lo pintado).
- * - `"nada"`: es lo mismo que ya está en pantalla. Re-aplicar cerraría la tarea
- *   que la persona ya abrió.
+ * Al llegar `workspaces_startup` con `previa` ya aplicada: se reaplica si cambió
+ * el activo, los workspaces o corrió una migración; si no, nada, y la tarea que
+ * la persona ya abrió sigue abierta.
  */
 export function reconciliar(previa: Forma | null, arranque: Forma): "aplicar" | "nada" {
   if (!previa) return "aplicar";
