@@ -79,7 +79,7 @@ window.addEventListener("vite:preloadError", (event) => {
 });
 
 const Picker = lazy(() => import("../features/machines/MachinePicker").then((m) => ({ default: m.MachinePicker })));
-const AccountMachines = lazy(() => import("./AccountMachines"));
+const AccountMachines = lazy(() => import("../features/machines/AccountMachines"));
 
 const browser: BrowserHost = {
   openUrl: (url) => void window.open(url, "_blank", "noopener,noreferrer"),

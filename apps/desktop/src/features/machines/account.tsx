@@ -39,6 +39,7 @@ import { isMac, isWindows } from "../../lib/window";
 import { Toast, ToastPortal } from "../../ui/Toast";
 import type { MachineStatus } from "../../web/SyncNote";
 import { type DanilSessionInfo, sessionForWorkspace, type WorkspaceAccount } from "../settings/danil-sessions";
+import AccountMachines from "./AccountMachines";
 import { MachinePicker } from "./MachinePicker";
 import { createRouter, type Invoke, type Router, type SliceChange } from "./router";
 import { machineNamesChanged, refetchMachines } from "./store";
@@ -202,6 +203,10 @@ export function startAccountMachines(target: Target = window) {
       knows: (id) => id === self || !!fleet.info(id),
     });
 
+    const status = (id: string): MachineStatus => {
+      const power = fleet.power(id);
+      return power === "on" ? "online" : power === "off" ? "offline" : power;
+    };
     const previous: Capabilities = capabilities();
     setCapabilities({
       ...previous,
@@ -220,6 +225,23 @@ export function startAccountMachines(target: Target = window) {
           <MachinePicker workspace={workspace} />
         </div>
       ),
+      // Bajo cada cuenta de IA, sus máquinas: el mismo componente que la web, con esta computadora primero; con una sola, nada.
+      accountMachines: (props) => {
+        changed();
+        if (!fleet.machines().length) return null;
+        return (
+          <AccountMachines
+            {...props}
+            machines={() => {
+              changed();
+              return [
+                { id: self, name: homeName(), status: "online" as const, at: null },
+                ...fleet.machines().map((info) => ({ id: info.id, name: info.name, status: status(info.id), at: null })),
+              ];
+            }}
+          />
+        );
+      },
       machinesLicense: () => {
         changed();
         return fleet.license();
@@ -233,10 +255,6 @@ export function startAccountMachines(target: Target = window) {
     setMachineRoute(route);
     const layer = document.createElement("div");
     document.body.append(layer);
-    const status = (id: string): MachineStatus => {
-      const power = fleet.power(id);
-      return power === "on" ? "online" : power === "off" ? "offline" : power;
-    };
     const unmount = render(
       () => (
         <MachineToasts
