@@ -71,7 +71,7 @@ const es = {
   "danil.license.start": "Empezar prueba gratis",
   "danil.license.retry": "Ya lo activé · Reintentar",
   "web.machines.create_on": "Se crea en",
-  "web.machines.off_action": "{name} está apagada. Enciéndela para seguir.",
+  "web.machines.off_action": "{name} está sin conexión. Verifica que Terminus esté abierto y tenga acceso a internet.",
   "web.machines.outdated_action": "{name} necesita actualizarse antes de usarla desde aquí.",
   // La tarjeta de vista previa (hover card del escritorio), el cuadro de escribir y las cuentas.
   "projects.hover_card.open": "Abrir",
@@ -239,7 +239,7 @@ const en: Record<WordKey, Word> = {
   "danil.license.start": "Start free trial",
   "danil.license.retry": "I already activated it · Retry",
   "web.machines.create_on": "Created on",
-  "web.machines.off_action": "{name} is off. Turn it on to continue.",
+  "web.machines.off_action": "{name} is disconnected. Check that Terminus is open and has internet access.",
   "web.machines.outdated_action": "{name} needs an update before you can use it from here.",
   "projects.hover_card.open": "Open",
   "projects.hover_card.archive": "Archive",

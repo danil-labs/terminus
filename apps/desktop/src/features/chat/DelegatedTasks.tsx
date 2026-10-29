@@ -1,4 +1,4 @@
-import { type ComponentProps, createEffect, createMemo, createSignal, For, on, Show } from "solid-js";
+import { type ComponentProps, createEffect, createSignal, on, Show } from "solid-js";
 import GitBranch from "lucide-solid/icons/git-branch";
 import { t } from "../../lib/i18n";
 import type { SenderTask } from "../../lib/recipients";
@@ -7,39 +7,27 @@ import { asFailure, FailureNote } from "../../ui/Failure";
 import { Popover, PopoverContent, PopoverTrigger } from "../../ui/Popover";
 import Sessions, { type SessionRow } from "../projects/Sessions";
 import { delegatedRailRows } from "./delegatedRail";
+import { buildTaskTree, type TaskBranch, type TaskTreeRow, taskIdentity, taskDescendants, withTaskAncestors } from "@terminus/tasks";
+import { taskPriority } from "@terminus/design";
+import { delegatedAttention } from "./delegatedRail";
 
 export { delegatedAttention } from "./delegatedRail";
 
 export type DelegatedListProps = Omit<ComponentProps<typeof Sessions>, "sessions" | "flat" | "card" | "hoverCardPlacement" | "includeArchived" | "groupByAuthor" | "groupByHandler">;
 
-export function delegatedDescendants(rows: SessionRow[], root: string): SessionRow[] {
-  const selected = new Set([root]);
-  let previous = 0;
-  while (previous !== selected.size) {
-    previous = selected.size;
-    for (const row of rows) {
-      const launcher = row.parent ?? row.launched_by;
-      if (launcher && selected.has(launcher)) selected.add(row.id);
-    }
-  }
-  return rows.filter(row => row.id !== root && selected.has(row.id));
+export function delegatedDescendants(rows: SessionRow[], root: TaskTreeRow): SessionRow[] {
+  return taskDescendants(rows, [root]);
 }
 
 export function delegatedFamilies(rows: SessionRow[]): Map<string, string[]> {
-  const known = new Map(rows.map(row => [row.id, row]));
   const families = new Map<string, string[]>();
-  for (const row of rows) {
-    const seen = new Set([row.id]);
-    let parent = row.parent ?? row.launched_by;
-    while (parent && !seen.has(parent)) {
-      seen.add(parent);
-      const family = families.get(parent);
-      if (family) family.push(row.id);
-      else families.set(parent, [row.id]);
-      const ancestor = known.get(parent);
-      parent = ancestor?.parent ?? ancestor?.launched_by;
+  const visit = (branches: TaskBranch<SessionRow>[], ancestors: string[]) => {
+    for (const branch of branches) {
+      for (const ancestor of ancestors) families.set(ancestor, [...(families.get(ancestor) ?? []), branch.tarea.id]);
+      visit(branch.hijas, [...ancestors, branch.tarea.id]);
     }
-  }
+  };
+  visit(buildTaskTree(rows), []);
   return families;
 }
 
@@ -49,12 +37,21 @@ export function DelegatedTaskList(props: {
   list: (folder: string) => DelegatedListProps;
   readOnly?: boolean;
   hoverCardPlacement?: "left-start" | "right-start";
+  matchingIds?: readonly string[];
 }) {
-  const folders = createMemo(() => [...new Set(props.rows.map(row => row.folder ?? ""))]);
-  return <For each={folders()}>{folder => <Sessions {...props.list(folder)}
-    sessions={props.rows.filter(row => (row.folder ?? "") === folder)}
-    flat card hoverCardPlacement={props.hoverCardPlacement}
-    includeArchived readOnly={props.readOnly} groupByAuthor={false} groupByHandler={false} />}</For>;
+  const folderOf = (id: string) => props.rows.find(row => row.id === id)?.folder ?? "";
+  const base = () => props.list(props.rows[0]?.folder ?? "");
+  return <Sessions {...base()} card hoverCardPlacement={props.hoverCardPlacement} sessions={props.rows} includeArchived readOnly={props.readOnly}
+    matchingIds={props.matchingIds} groupByAuthor={false} groupByHandler={false}
+    projectOf={row => row.folder ?? ""}
+    carpetaDe={row => props.list(row.folder ?? "").carpetaDe?.(row)}
+    destinosDe={row => props.list(row.folder ?? "").destinos}
+    onPick={id => props.list(folderOf(id)).onPick(id)}
+    onDelete={id => props.list(folderOf(id)).onDelete(id)}
+    onMove={(id, to) => props.list(folderOf(id)).onMove(id, to)}
+    onEtapa={(id, stage) => props.list(folderOf(id)).onEtapa(id, stage)}
+    onRenombrar={(id, title) => props.list(folderOf(id)).onRenombrar(id, title)}
+    onPin={base().onPin ? (id, pinned) => props.list(folderOf(id)).onPin?.(id, pinned) : undefined} />;
 }
 
 export function DelegatedLaunch(props: {
@@ -72,7 +69,7 @@ export function DelegatedLaunch(props: {
     esperando: false, stage: null, agent: null, parent_agent: null, chat_de_agente: false,
   });
   return <div data-delegated-launch={props.reference.task} class="my-2 min-w-0 border-l border-border pl-2">
-    <DelegatedTaskList rows={[row() ?? referenceRow()]} list={props.list} readOnly={!row()} />
+    <DelegatedTaskList rows={[row() ?? referenceRow(), ...taskDescendants(props.rows, [row() ?? referenceRow()])]} list={props.list} readOnly={!row()} />
     <Show when={!row()}><p class="m-0 px-2 pt-1 text-xs text-neutral-500">
       {props.loading ? t("chat.delegation.loading") : props.error ? t("chat.delegation.failed") : t("chat.delegation.unavailable")}
     </p></Show>
@@ -93,7 +90,8 @@ export default function DelegatedActivity(props: {
   const [open, setOpen] = createSignal(false);
   createEffect(on(() => props.context, () => { setOpen(false); setAll(false); }));
   const rows = () => delegatedRailRows(props.rows, true, props.live, props.approvals);
-  const shown = () => delegatedRailRows(props.rows, all(), props.live, props.approvals);
+  const active = () => rows().filter(row => taskPriority(delegatedAttention([row], props.live, props.approvals)));
+  const shown = () => all() ? rows() : withTaskAncestors(rows(), active());
   return <Show when={rows().length || props.error}>
     <Popover open={open()} onOpenChange={setOpen} placement="left-start" gutter={8}>
       <PopoverTrigger as={(trigger: object) => <Button {...trigger} type="button" variant="chrome" size="iconCompact"
@@ -115,8 +113,7 @@ export default function DelegatedActivity(props: {
         <div data-delegated-list class="max-h-[min(55vh,420px)] overflow-y-auto overscroll-contain">
           <Show when={props.error}>{error => <><FailureNote f={asFailure(error())} /><Button variant="ghost" size="sm" onClick={props.onRetry}>{t("chat.delegation.retry")}</Button></>}</Show>
           <Show when={shown().length} fallback={<p class="m-0 px-2 py-3 text-xs text-neutral-500">{props.loading ? t("chat.delegation.loading") : t("chat.delegation.idle")}</p>}>
-            {/* El panel cuelga a la izquierda del botón: la tarjeta flotante también. */}
-            <DelegatedTaskList rows={shown()} hoverCardPlacement="left-start" list={folder => ({ ...props.list(folder), onPick: id => {
+            <DelegatedTaskList rows={shown()} hoverCardPlacement="left-start" matchingIds={all() ? undefined : active().map(taskIdentity)} list={folder => ({ ...props.list(folder), onPick: id => {
               setOpen(false);
               props.list(folder).onPick(id);
             } })} />

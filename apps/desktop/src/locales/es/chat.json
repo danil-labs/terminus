@@ -427,5 +427,16 @@
   "chat.notice.handler_memory_unavailable": "El almacén de memoria del encargado no está disponible. Continúa sin memoria propia.",
   "chat.notice.handler_memory_legacy": "Hay notas de memoria guardadas por nombre que no se cargan para esta identidad.",
   "chat.notice.handler_requires_tool_missing": "Una herramienta pedida por el encargado no está en el PATH del turno.",
-  "chat.mentions.in_code": "Las menciones dentro de código no pueden ser destinatarios. Escribe la mención fuera del código."
+  "chat.mentions.in_code": "Las menciones dentro de código no pueden ser destinatarios. Escribe la mención fuera del código.",
+  "chat.history.open": "Ver contenido completo",
+  "chat.history.next": "Siguiente fragmento",
+  "chat.history.previous": "Fragmento anterior",
+  "chat.history.close": "Cerrar contenido",
+  "chat.history.error": "No se pudo leer este fragmento. Vuelve a abrir la tarea si cambió el historial.",
+  "chat.history.latest": "Volver a los mensajes recientes",
+  "chat.history.loading": "Cargando contenido…",
+  "chat.history.tools": "Resultados de herramientas",
+  "chat.history.text": "Texto del mensaje",
+  "chat.history.pieces": "Registro completo",
+  "chat.history.content": "Contenido guardado"
 }

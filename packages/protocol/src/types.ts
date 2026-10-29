@@ -86,6 +86,7 @@ export type Answer = { turn: string; question: string; chosen: string[]; free_te
 
 /** Un turno de `load_session`. */
 export type Turn = {
+  history_refs?: HistoryRef[];
   id?: string;
   role: string;
   text: string;
@@ -200,3 +201,7 @@ export type AccountLimits =
 export type ShellRun = { session: string; turn: string };
 /** El evento `account` de un inicio de sesión por tubería (enlace y código); `account` es el id de la cuenta. */
 export type LoginEvent = { account: string; kind: "url" | "confirm" | "code" | "notice" | "done"; text: string };
+
+/** Referencia de sólo lectura a un campo original; cada fragmento vuelve autorizado por tarea. */
+export type HistoryRef = { version: 1; turn: number; pointer: string; revision: string; bytes: number; project?: string; session?: string };
+export type HistoryChunk = { version: 1; revision: string; offset: number; next: number; total: number; done: boolean; text: string };

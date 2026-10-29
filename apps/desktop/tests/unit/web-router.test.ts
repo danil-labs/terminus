@@ -153,7 +153,7 @@ test("a message to a task of the VM that is off wakes it and is delivered; to th
   assert.equal(seen.id, "cmp_mac~t2", "the last it said is still visible");
   await assert.rejects(router.handle("send_message", { project: "p1", session: "cmp_mac~t2", prompt: "hola" }, on("cmp_mac")), (e: { detail: string; what: string }) => {
     assert.equal(e.detail, "machine_off");
-    assert.match(e.what, /Mac de Ana está apagada/);
+    assert.match(e.what, /Mac de Ana está sin conexión/);
     return true;
   });
   assert.equal(mac.calls.filter((c) => c.command === "send_message").length, 0, "nothing was sent to it");
@@ -363,4 +363,20 @@ test("web publishes available slices while a cold machine is still pending, then
     for (const read of pending) read.resolve({ value: [], cached: null });
     router.close();
   }
+});
+
+test("web history forwards its cursor to the host and preserves its bounded page", async () => {
+  const mac = fakeLink({ load_session: ({ history_request }: Args) => ({
+    id: "t1", turns: [{ id: "a", text: "last" }],
+    history: { version: 1, revision: "r1", start: 5, end: 6, total: 7, has_more: true },
+    requested: history_request,
+  }) });
+  const { router } = web({ cmp_mac: mac });
+  try {
+    const page = await router.handle("load_history", { project: "p1", id: "cmp_mac~t1", before: 6 }, on("cmp_mac")) as { history: { start: number }; requested: unknown };
+    assert.equal(page.history.start, 5);
+    assert.deepEqual(mac.calls[0].args.history_request, { version: 1, before: 6, revision: null });
+    assert.equal(mac.calls[0].command, "load_session");
+    assert.equal(mac.calls[0].args.id, "t1");
+  } finally { router.close(); }
 });

@@ -176,13 +176,26 @@ test("a workspace only other machines have answers at once from their last slice
   assert.equal(vm.calls.length, 2, "and the VM is asked again behind");
 });
 
-test("the account and danil_* always stay on this computer, whatever the header says", async () => {
-  const vm = fakeLink({ danil_sessions: [{ account: "x" }], list_accounts: { accounts: [{ id: "a" }] } });
+test("danil_* always stays on this computer, whatever the header says", async () => {
+  const vm = fakeLink({ danil_sessions: [{ account: "x" }] });
   const { router, native } = setup({ cmp_vm: vm });
   assert.deepEqual(await router.handle("danil_sessions", {}, on("cmp_vm")), []);
-  assert.deepEqual(await router.handle("list_accounts", {}), { accounts: [], active: null });
   assert.equal(vm.calls.length, 0);
-  assert.deepEqual(native.map((c) => c.command), ["danil_sessions", "list_accounts"]);
+  assert.deepEqual(native.map((c) => c.command), ["danil_sessions"]);
+});
+
+test("AI accounts: the list joins every machine's, grouped with their machines; an action goes to the machine of the header", async () => {
+  const ana = (id: string) => ({ provider: "codex", accounts: [{ id, label: "Ana", identity: "ana@x.com", plan: "Pro" }], active: id });
+  const vm = fakeLink({ list_accounts: ana("a"), remove_account: null });
+  const { router, native } = setup({ cmp_vm: vm }, { list_accounts: ana("h"), remove_account: null });
+  const listed = (await router.handle("list_accounts", { provider: "codex" })) as { accounts: { machines: { machine: string }[] }[] };
+  assert.equal(listed.accounts.length, 1, "the same email and plan on two machines is one account");
+  assert.deepEqual(listed.accounts[0].machines.map((m) => m.machine).sort(), ["cmp_home", "cmp_vm"]);
+  await router.handle("remove_account", { provider: "codex", id: "a" }, on("cmp_vm"));
+  assert.deepEqual(vm.calls.map((c) => c.command), ["list_accounts", "remove_account"]);
+  assert.ok(!native.some((c) => c.command === "remove_account"), "signing out there never touches this computer");
+  await router.handle("remove_account", { provider: "codex", id: "h" }, on("cmp_home"));
+  assert.equal(native.at(-1)?.command, "remove_account");
 });
 
 test("the account's credentials are the workspace's: here by default, on the machine of the header when it names one", async () => {
@@ -227,7 +240,7 @@ test("an action to the person's own machine that is off says so plainly, without
   const mac = fakeLink({ send_message: "x" }, "offline");
   const { router } = setup({ cmp_mac: mac });
   await assert.rejects(router.handle("send_message", { project: "p1", session: "cmp_mac~t1", prompt: "hola" }, on("cmp_mac")), (e: { what: string; detail: string }) => {
-    assert.equal(e.what, "Mac de Ana está apagada. Enciéndela para seguir.");
+    assert.equal(e.what, "Mac de Ana está sin conexión. Verifica que Terminus esté abierto y tenga acceso a internet.");
     assert.equal(e.detail, "machine_off");
     return true;
   });

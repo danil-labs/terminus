@@ -37,7 +37,7 @@
   "web.home": "Back to Danil Agents",
   "web.local_files": "The browser cannot pick files or folders on this device. Use the Terminus desktop app for that.",
   "web.machines.create_on": "Created on",
-  "web.machines.off_action": "{name} is off. Turn it on to continue.",
+  "web.machines.off_action": "{name} is disconnected. Check that Terminus is open and has internet access.",
   "web.machines.outdated_action": "{name} needs an update before you can use it from here.",
   "web.machines.missing_workspace": "{name} doesn't have this workspace and its engine can't create it yet. Update it to create tasks there.",
   "web.machines.none_for_workspace": "No machine of the account has this workspace.",

@@ -1260,13 +1260,24 @@ export default function App() {
   // Los turnos de cada tarea que trajo `service history`, desde `start`; lo anterior se pide al subir.
   const historias = new Map<string, LoadedHistory<Session["turns"][number]>>();
   const [conAntiguos, setConAntiguos] = createSignal<Readonly<Record<string, boolean>>>({});
-  const marcarAntiguos = (id: string, loaded: LoadedHistory<unknown>) =>
+  const [conRecientes, setConRecientes] = createSignal<Readonly<Record<string, boolean>>>({});
+  const marcarAntiguos = (id: string, loaded: LoadedHistory<unknown>) => {
     setConAntiguos((all) => (!!all[id] === loaded.start > 0 ? all : { ...all, [id]: loaded.start > 0 }));
+    const recent = loaded.start + loaded.turns.length < loaded.total;
+    setConRecientes(all => !!all[id] === recent ? all : { ...all, [id]: recent });
+  };
   // Con el stream empujado el motor sabe paginar: abrir trae los últimos turnos y no la transcripción entera.
   let historialPaginado = false;
-  const leerTarea = (project: string, id: string, before: number | null = null) => {
-    if (historialPaginado) return invoke<Session>("load_history", { project, id, before }, deLaTarea(id));
-    return invoke<Session>("load_session", { project, id }, deLaTarea(id));
+  const leerTarea = async (project: string, id: string, before: number | null = null) => {
+    const result = historialPaginado
+      ? await invoke<Session>("load_history", { project, id, before }, deLaTarea(id))
+      : await invoke<Session>("load_session", { project, id, history_request: { version: 1, before } }, deLaTarea(id));
+    if (result.history?.version === 1) {
+      result.turns = result.turns.map(turn => ({ ...turn,
+        history_refs: turn.history_refs?.map(ref => ({ ...ref, project, session: id })),
+      }));
+    }
+    return result;
   };
   /**
    * La página anterior a lo cargado de `id`, lista para anteponerse: devuelve con qué
@@ -1275,7 +1286,7 @@ export default function App() {
   const pidiendoAntiguos = new Set<string>();
   async function cargarAntiguos(project: string, id: string): Promise<(() => void) | null> {
     const loaded = historias.get(id);
-    if (!historialPaginado || !loaded || loaded.start === 0 || pidiendoAntiguos.has(id)) return null;
+    if (!loaded || loaded.start === 0 || pidiendoAntiguos.has(id)) return null;
     pidiendoAntiguos.add(id);
     const generation = sessionGeneration;
     try {
@@ -4309,6 +4320,21 @@ export default function App() {
       loadResult(id, s, false, generation);
       void refreshFolder(proyecto, id);
     } catch (e) {
+      if (!current()) return;
+      try {
+        const state = await invoke<Session>("load_session", {
+          project: proyecto, id, history_request: { version: 1, kind: "state" },
+        }, deLaTarea(id));
+        if (!current()) return;
+        setAgent(state.provider);
+        setModel(modeloDeSubtarea(state) ?? "");
+        setEffort(state.effort ?? "");
+        setModo(state.permission_mode ?? "");
+        setAdjuntas(state.sources ?? []);
+        restoreSessionConfiguration();
+        void refreshFolder(proyecto, id);
+      } catch { /* Sin estado autoritativo se conserva el error de la lectura original. */ }
+      if (!current()) return;
       releer(id, [{ role: "system", text: prosaDe(e) }], false);
       if (propagateError) throw e;
     } finally {
@@ -4792,16 +4818,37 @@ export default function App() {
     return sitio ? { sitio, zone: edgeZone(panel, x, y) } : null;
   }
 
+  let railDrag: { project: string; row: SessionRow } | null = null;
   const tabDrag = createPointerDrag({
     scope: () => `${workspaceActivo()}\u0000${escritorio()}`,
-    canStart: id => pestanas.open().some(tab => tab.id === id),
-    locate: point => ventanaBajo(point.x, point.y),
+    canStart: id => pestanas.open().some(tab => tab.id === id) || (railDrag?.row.id === id && !!filaDe(id)),
+    locate: point => {
+      const panel = ventanaBajo(point.x, point.y);
+      if (panel) return { ...panel, folder: undefined as string | undefined };
+      const folder = railDrag && !railDrag.row.parent && !railDrag.row.chat_de_agente
+        ? document.elementFromPoint(point.x, point.y)?.closest<HTMLElement>("[data-destino]")?.dataset.destino
+        : undefined;
+      return folder !== undefined && folder !== railDrag?.project
+        ? { sitio: paneles.activeSite(), indice: undefined, zone: undefined, folder }
+        : null;
+    },
     scroll(point) {
       const element = document.elementFromPoint(point.x, point.y)
         ?.closest("[data-tira]")?.querySelector<HTMLElement>("[data-tab-scroll]");
-      return element ? { element, axis: "x" } : null;
+      if (element) return { element, axis: "x" };
+      const rail = railDrag ? document.elementFromPoint(point.x, point.y)
+        ?.closest<HTMLElement>("[data-arrastre-scroll]") : null;
+      return rail ? { element: rail, axis: "y" } : null;
     },
     drop(id, destino) {
+      if (destino.folder !== undefined && railDrag) {
+        void moverSesion(railDrag.project, id, destino.folder);
+        return;
+      }
+      if (railDrag && !pestanas.open().some(tab => tab.id === id)) {
+        pestanas.ensure({ id, project: railDrag.project, titulo: railDrag.row.title });
+        paneles.sync(pestanas.open().map(tab => tab.id));
+      }
       if (destino.zone && destino.zone !== "center" && paneles.splitAt(id, destino.sitio, destino.zone)) {
         pestanas.pin(id);
         const p = pestanas.open().find(tab => tab.id === id);
@@ -4820,8 +4867,21 @@ export default function App() {
   });
   const arrastrando = tabDrag.source;
   const cursor = tabDrag.cursor;
-  const donde = tabDrag.destination;
-  const arrastrarPestana = tabDrag.start;
+  const donde = () => {
+    const destination = tabDrag.destination();
+    return destination?.folder === undefined ? destination : null;
+  };
+  const arrastrarPestana = (id: string, event: PointerEvent) => {
+    if (event.button !== 0 || event.isPrimary === false) return;
+    railDrag = null;
+    tabDrag.start(id, event);
+  };
+  const arrastrarTarea = (project: string, row: SessionRow, event: PointerEvent) => {
+    if (event.button !== 0 || event.isPrimary === false) return;
+    if (esProvisional(row.id) || (row.workspace && row.workspace !== workspaceActivo())) return;
+    railDrag = { project, row };
+    tabDrag.start(row.id, event);
+  };
 
   /**
    * Cómo se llama una pestaña, para el fantasma del arrastre. La tira
@@ -4830,7 +4890,7 @@ export default function App() {
    */
   const tituloDePestana = (id: string) => {
     const p = pestanasEnPantalla().find((x) => x.id === id);
-    if (!p) return "";
+    if (!p) return railDrag?.row.id === id ? railDrag.row.title : "";
     if (isTaskTab(p)) return p.titulo;
     if (p.clase === "observabilidad" || p.clase === "pantalla") return p.titulo;
     if (p.clase === "sitio" && !p.url) return t("sites.new_tab");
@@ -4853,7 +4913,7 @@ export default function App() {
     const d = donde();
     const id = arrastrando();
     if (!d?.zone || d.zone === "center" || !id) return null;
-    return paneles.canSplitAt(id, d.sitio, d.zone) ? d.zone : null;
+    return paneles.canSplitAt(id, d.sitio, d.zone, railDrag?.row.id === id) ? d.zone : null;
   };
 
   /**
@@ -6681,10 +6741,10 @@ export default function App() {
       return value?.workspace === workspaceActivo() && value?.id === pp.sesion ? value : undefined;
     };
     const delegatedRows = createMemo<SessionRow[]>((previous) => {
-      const all = Object.values(sesionesConEstado()).flat();
+      const all = Object.entries(sesionesConEstado()).flatMap(([folder, rows]) => rows.map(row => ({ ...row, folder })));
       const known = new Map(all.map(row => [row.id, row]));
       const rows = new Map((delegationData()?.rows ?? []).map(row => [row.id, row]));
-      for (const row of delegatedDescendants(all, pp.sesion ?? "")) rows.set(row.id, row);
+      for (const row of delegatedDescendants(all, filaDe(pp.sesion ?? "") ?? { id: pp.sesion ?? "" })) rows.set(row.id, row);
       const unseen = attention.unseen(workspaceActivo());
       const waiting = new Set(preguntadas());
       return conservar(previous ?? [], [...rows.values()].map(row => ({
@@ -6693,7 +6753,7 @@ export default function App() {
       })), row => row.id);
     }, []);
     const delegatedList = (folder: string): DelegatedListProps => ({
-      relatedSessions: [...Object.values(sesionesConEstado()).flat(), ...delegatedRows()],
+      relatedSessions: [...Object.entries(sesionesConEstado()).flatMap(([folder, rows]) => rows.map(row => ({ ...row, folder }))), ...delegatedRows()],
       de: folder, current: pp.sesion ?? null, vivas: vivas(), aprobando: permissions().map(item => item.session),
       carpetaDe: () => projectList().find(item => item.id === folder)?.name,
       destinos: projectList().filter(item => item.id !== folder).map(item => ({ id: item.id, name: item.name })),
@@ -6978,18 +7038,21 @@ export default function App() {
         }</Show>}
         agentTasks={<Show when={!pp.sesion && encargadoDeLaCelda()}>{agent => {
           const de = () => proyectoDeLaCelda()?.id ?? "";
+          const folderOf = (id: string) => Object.entries(sesionesConEstado()).find(([, rows]) => rows.some(row => row.id === id))?.[0] ?? de();
           return <AgentPageTasks
             context={`${de()}/${agent()}`}
-            tasks={createdTasks(sesionesConEstado()[de()] ?? [], agent(), null)}
+            tasks={createdTasks(Object.entries(sesionesConEstado()).flatMap(([folder, rows]) => rows.map(row => ({ ...row, folder }))), agent(), null, de())}
             list={{
+              carpetaDe: row => projectList().find(item => item.id === folderOf(row.id))?.name,
+              projectOf: row => folderOf(row.id), destinosDe: row => projectList().filter(item => item.id !== folderOf(row.id)).map(item => ({ id: item.id, name: item.name })),
               de: de(), current: null, vivas: vivas(), aprobando: permissions().map(item => item.session),
               destinos: projectList().filter(item => item.id !== de()).map(item => ({ id: item.id, name: item.name })),
-              onDelete: id => void borrarSesion(de(), id),
-              onMove: (id, destination) => void moverSesion(de(), id, destination),
-              onEtapa: (id, stage) => void etaparSesion(de(), id, stage),
-              onRenombrar: (id, title) => void renombrarSesion(de(), id, title),
+              onDelete: id => void borrarSesion(folderOf(id), id),
+              onMove: (id, destination) => void moverSesion(folderOf(id), id, destination),
+              onEtapa: (id, stage) => void etaparSesion(folderOf(id), id, stage),
+              onRenombrar: (id, title) => void renombrarSesion(folderOf(id), id, title),
             }}
-            onPick={id => { setHablandoCon(null); void abrirSesion(de(), id); }} />;
+            onPick={id => { setHablandoCon(null); void abrirSesion(folderOf(id), id); }} />;
         }}</Show>}
         chatEstado={!pp.sesion && encargadoDeLaCelda() ? "awake" : estadoDelEncargado()}
         chatName={filaDe(pp.sesion ?? "")?.agent_thread
@@ -7009,6 +7072,13 @@ export default function App() {
            abierta—: una celda separada tiene su propia lectura en vuelo. Es
            opcional: `tsc` no avisa si se pierde. */
         cargando={cargandoHilo() !== null && cargandoHilo() === pp.sesion}
+        masRecientes={!!conRecientes()[pp.sesion ?? ""]}
+        onRecientes={() => {
+          if (!pp.sesion) return;
+          const id = pp.sesion, generation = sessionGeneration;
+          historias.delete(id);
+          void leerTarea(proyectoDeLaCelda()?.id ?? "", id).then(s => loadResult(id, s, false, generation)).catch(setError);
+        }}
         masAntiguos={!!conAntiguos()[pp.sesion ?? ""]}
         onAntiguos={() => cargarAntiguos(proyectoDeLaCelda()?.id ?? "", pp.sesion ?? "")}
         /* El medidor de memoria es de la sesión abierta —`ventana` se
@@ -8257,6 +8327,9 @@ export default function App() {
         aprobando={permissions().map((p) => p.session)}
               collapsed={sidebar.colapsado()}
               onToggle={sidebar.alternar}
+              draggedTask={arrastrando()}
+              dragFolder={tabDrag.destination()?.folder}
+              onDrag={arrastrarTarea}
               onPick={(p, id) => {
                 // Abrir una tarea suelta la marca del agente: su fila no
                 // puede seguir señalada cuando ya se mira otra cosa.
@@ -8370,24 +8443,29 @@ export default function App() {
               onArchivoBorrado={archivoBorrado}
               onClose={() => setArtOpen(false)}
             />}>
-              {owner => <AgentTasks
+              {owner => {
+                const folderOf = (id: string) => Object.entries(sesionesConEstado()).find(([, rows]) => rows.some(row => row.id === id))?.[0] ?? owner().project;
+                return <AgentTasks
                 context={`${owner().project}/${sessionId() ?? owner().name}`}
-                tasks={createdTasks(sesionesConEstado()[owner().project] ?? [], owner().name, filaDe(sessionId() ?? "")?.agent_thread ? sessionId() : null)}
+                tasks={createdTasks(Object.entries(sesionesConEstado()).flatMap(([folder, rows]) => rows.map(row => ({ ...row, folder }))), owner().name, filaDe(sessionId() ?? "")?.agent_thread ? sessionId() : null, owner().project)}
                 list={{
+                  carpetaDe: row => projectList().find(item => item.id === folderOf(row.id))?.name,
+                  projectOf: row => folderOf(row.id), destinosDe: row => projectList().filter(item => item.id !== folderOf(row.id)).map(item => ({ id: item.id, name: item.name })),
                   de: owner().project, current: sessionId(), vivas: vivas(), aprobando: permissions().map(item => item.session),
                   destinos: projectList().filter(item => item.id !== owner().project).map(item => ({ id: item.id, name: item.name })),
-                  onDelete: id => void borrarSesion(owner().project, id),
-                  onMove: (id, destination) => void moverSesion(owner().project, id, destination),
-                  onEtapa: (id, stage) => void etaparSesion(owner().project, id, stage),
-                  onRenombrar: (id, title) => void renombrarSesion(owner().project, id, title),
+                  onDelete: id => void borrarSesion(folderOf(id), id),
+                  onMove: (id, destination) => void moverSesion(folderOf(id), id, destination),
+                  onEtapa: (id, stage) => void etaparSesion(folderOf(id), id, stage),
+                  onRenombrar: (id, title) => void renombrarSesion(folderOf(id), id, title),
                 }}
                 onClose={() => setArtOpen(false)}
                 onPick={id => {
-                  const destination = { project: owner().project, id };
+                  const destination = { project: folderOf(id), id };
                   setHablandoCon(null);
                   void abrirSesion(destination.project, id);
                 }}
-              />}
+              />;
+              }}
             </Show>
           </ColumnaLateral>
         </div>

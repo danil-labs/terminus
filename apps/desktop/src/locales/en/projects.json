@@ -1,6 +1,6 @@
 {
-  "projects.tabs.preview_drag": "Drag to the tab bar or a section to keep",
   "projects.tabs.keep": "Keep tab",
+  "projects.sessions.context": "Context",
   "projects.agent_tasks.search": "Search tasks…",
   "projects.agent_tasks.no_results": "No matching tasks.",
   "projects.agent_tasks.open": "Show tasks",

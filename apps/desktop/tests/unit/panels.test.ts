@@ -738,3 +738,15 @@ test("la tarea conservada vuelve al cuadrante elegido aunque el origen esté vac
   assert.equal(restored.activeTabAt({ col: 0, fila: 0 }), null);
   sano(restored);
 });
+
+test("an unplaced rail task previews only available split destinations", () => {
+  const p = createPanels();
+  const site = { col: 0, fila: 0 };
+  assert.equal(p.canSplitAt("rail", site, "right"), false);
+  assert.equal(p.canSplitAt("rail", site, "right", true), true);
+  assert.equal(p.canSplitAt("rail", { col: 9, fila: 0 }, "right", true), false);
+  assert.equal(p.siteOf("rail"), null);
+  p.sync(["rail"]);
+  assert.equal(p.splitAt("rail", site, "right"), true);
+  assert.equal(p.siteOf("rail")?.col, 1);
+});

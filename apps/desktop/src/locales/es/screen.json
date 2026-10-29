@@ -9,6 +9,7 @@
   "screen.busy": "Ya hay dos pantallas abiertas de esta computadora. Cierra una para ver esta.",
   "screen.ended": "Se cerró la pantalla.",
   "screen.failed": "No se pudo conectar con la pantalla.",
+  "screen.empty_hint": "Aquí aparece lo que abren los agentes, como su navegador. Si no hay nada abierto, se ve en negro.",
   "screen.retry": "Reconectar",
   "screen.control_active": "Control activo · haz clic en la pantalla para escribir",
   "screen.control_unavailable": "El motor de esta computadora permite solo ver.",

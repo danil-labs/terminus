@@ -131,6 +131,7 @@ export function requestId(): string {
 }
 
 type Pending = {
+  history: boolean;
   message: string;
   resolve: (result: CallResult) => void;
   reject: (error: RelayFailure) => void;
@@ -246,6 +247,9 @@ export class RelaySession {
    * rechaza con `error`. Se reenvía con el mismo id tras una reconexión.
    */
   call(id: string, command: string, workspace: string | null, folder: string | null, args: unknown, timeoutMs = CALL_TIMEOUT): Promise<CallResult> {
+    const request = (args as { history_request?: { kind?: string } } | null)?.history_request;
+    const history = command === "load_session" && !!request && request.kind !== "state";
+    if (history && [...this.pending.values()].filter(call => call.history).length >= 4) return Promise.reject({ code: "service_busy" });
     const message = JSON.stringify({ type: "call", id, command, workspace, folder, args: args ?? {} });
     if (this.stopped) return Promise.reject({ code: this.stopped });
     return new Promise((resolve, reject) => {
@@ -253,7 +257,7 @@ export class RelaySession {
         this.pending.delete(id);
         reject({ code: "io", detail: "timeout" });
       }, timeoutMs);
-      this.pending.set(id, { message, resolve, reject, timer });
+      this.pending.set(id, { message, resolve, reject, timer, history });
       if (this.connected()) this.socket?.send(message);
     });
   }
