@@ -6496,6 +6496,9 @@ export default function App() {
     const sourceProject = project();
     const sourceWorkspace = workspaceActivo();
     setInjecting((items) => [...items, { session: abierta, id }]);
+    // Lo último del disco antes de meterlo: con un motor que no devuelve el turno,
+    // lo guardado después con su texto es él (`mensajesDelHilo`).
+    const tras = [...(hilos()[abierta]?.base ?? [])].reverse().find((msg) => msg.turno)?.turno ?? null;
     try {
       const attachments = await attachmentsFor(m.attachments, deLaTarea(abierta), sourceProject);
       // El turno tal como queda en la transcripción; `null` en un motor que todavía no lo devuelve.
@@ -6524,6 +6527,7 @@ export default function App() {
         attachments: attachments.length ? attachments : undefined,
         turno: guardado?.id ?? undefined,
         author: guardado?.author ?? undefined,
+        inyectado: guardado?.id ? undefined : { tras },
       }]);
     } catch (e) {
       const clave = claveDe(e);

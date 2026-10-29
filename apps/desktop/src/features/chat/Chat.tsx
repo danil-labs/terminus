@@ -224,6 +224,12 @@ export type Msg = {
   turno?: string;
   /** El turno guardado en el que el motor ya escribió este mensaje vivo (`segment_saved`). */
   tramo?: string;
+  /**
+   * Lo que la persona metió en el turno vivo con un motor que no devuelve el
+   * turno guardado: `tras` es el último turno del disco cuando se metió, y lo
+   * guardado después con el mismo texto es él (`mensajesDelHilo`).
+   */
+  inyectado?: { tras: string | null };
   /** La subtarea a la que la persona escribió por su padre. Ver `relevoDe`. */
   relevo?: { titulo: string };
 
