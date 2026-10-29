@@ -161,12 +161,37 @@ def verify_cua(root, target):
         return "not-applicable"
     if platform.system() != "Darwin":
         raise ValueError("Cua macOS signature verification requires a macOS packaging runner")
-    apps = list(root.glob("*/CuaDriver.app"))
-    if len(apps) != 1:
+    apps = [root / "CuaDriver.app"]
+    if not apps[0].is_dir():
         raise ValueError("Expected one intact CuaDriver.app")
     subprocess.run(["/usr/bin/codesign", "--verify", "--deep", "--strict", "--verbose=2", str(apps[0])],
                    check=True, timeout=60)
     return "codesign-deep-strict"
+
+
+# Lo que Cua usa al correr, igual que KEEP en environment/computer_use.rs del motor;
+# el resto del archivo es su SDK para embeberlo.
+CUA_KEEP = {
+    "apple-darwin": ["CuaDriver.app", "LICENSE", "THIRD_PARTY_NOTICES.md"],
+    "windows-msvc": ["cua-driver.exe", "cua-driver-uia.exe", "cua-cursor-theme.exe", "LICENSE", "THIRD_PARTY_NOTICES.md"],
+    "linux-gnu": ["cua-driver", "cua-cursor-theme", "wayland-helper", "LICENSE", "THIRD_PARTY_NOTICES.md"],
+}
+
+
+def keep_cua(root, target):
+    """Aplana la única carpeta del archivo de Cua y deja solo lo que el driver usa."""
+    keep = next(names for suffix, names in CUA_KEEP.items() if target.endswith(suffix))
+    inner = [p for p in root.iterdir()]
+    if len(inner) != 1 or not inner[0].is_dir() or inner[0].is_symlink():
+        raise ValueError("Expected one top-level Cua folder")
+    for name in keep:
+        if (inner[0] / name).exists() or (inner[0] / name).is_symlink():
+            (inner[0] / name).rename(root / name)
+    shutil.rmtree(inner[0])
+    binary = "CuaDriver.app/Contents/MacOS/cua-driver" if "apple-darwin" in target else (
+        "cua-driver.exe" if windows(target) else "cua-driver")
+    if not (root / binary).is_file():
+        raise ValueError(f"Cua archive lacks {binary}")
 
 
 def obtain(item, destination, caches, download, budget):
@@ -610,6 +635,8 @@ def prepare(args, target, budget, compilers):
                 raise ValueError(f'Payload checksum mismatch: {item["id"]}')
             inspect_archive(path, item)
             extract(path, item, tree / item["id"])
+            if item["id"] == "computer-use":
+                keep_cua(tree / item["id"], target)
         if "apple-darwin" in target and not args.cross:
             verify_cua(tree / "computer-use", target)
         compiler = compiler_for(tree, target, compilers)

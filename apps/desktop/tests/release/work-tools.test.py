@@ -204,6 +204,29 @@ class WorkToolsTests(unittest.TestCase):
             self.assertEqual(copy.read_bytes(), b"git")
             self.assertFalse(copy.is_symlink())
 
+    def test_cua_keeps_only_what_the_engine_runs(self):
+        cases = {
+            "x86_64-unknown-linux-gnu": (["cua-driver", "cua-cursor-theme", "wayland-helper"], "linux-x86_64"),
+            "x86_64-pc-windows-msvc": (["cua-driver.exe", "cua-driver-uia.exe", "cua-cursor-theme.exe"], "windows-x86_64"),
+            "aarch64-apple-darwin": (["CuaDriver.app/Contents/MacOS/cua-driver"], "darwin-universal"),
+        }
+        for target, (binaries, label) in cases.items():
+            with self.subTest(target=target), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / "computer-use"
+                inner = root / f"cua-driver-rs-0.32.0-{label}"
+                for name in binaries + ["LICENSE", "THIRD_PARTY_NOTICES.md", "libcua_driver_sdk.so",
+                                        "cua_driver_node_runtime.node", "include/cua_driver.h", "cua-driver"]:
+                    (inner / name).parent.mkdir(parents=True, exist_ok=True)
+                    (inner / name).write_text(name)
+                tools.keep_cua(root, target)
+                expected = {name.split("/")[0] for name in binaries} | {"LICENSE", "THIRD_PARTY_NOTICES.md"}
+                self.assertEqual({p.name for p in root.iterdir()}, expected)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "computer-use"
+            (root / "cua-driver-rs-0.32.0-linux-x86_64").mkdir(parents=True)
+            with self.assertRaisesRegex(ValueError, "lacks"):
+                tools.keep_cua(root, "x86_64-unknown-linux-gnu")
+
     def test_tauri_overlay_keeps_symlinks_and_lists_linux_resources(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
