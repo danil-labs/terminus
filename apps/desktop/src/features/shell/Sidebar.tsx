@@ -55,7 +55,8 @@ import type { DockAgent } from "./dockLayout";
 import { flattenTasks, folderCounts } from "./sidebarTasks";
 import { machineName, machines } from "../machines/store";
 // Solo al crear un encargado: fuera de la carga inicial.
-const NewAgent = lazy(() => import("../projects/NewAgent"));
+import { LazyPart, retryableLazy } from "../../ui/LazyPart";
+const NewAgent = retryableLazy(() => import("../projects/NewAgent"));
 
 // Fuera de la carga inicial: el botón y el dock llegan un instante después de la lista.
 const SidebarFilter = lazy(() => import("./SidebarFilter").then((m) => ({ default: m.SidebarFilter })));
@@ -596,12 +597,12 @@ export default function Sidebar(props: {
       // fuera de la vista lo que estuviera a la derecha, como el «+».
       class="relative z-40 h-full min-h-0 w-full min-w-0 overflow-hidden"
     >
-      <Show when={creatingAgentIn()}>{project => <Suspense><NewAgent
+      <Show when={creatingAgentIn()}>{project => <LazyPart><NewAgent
         abierto onAbrir={open => { if (!open) setCreatingAgentIn(null); }}
         project={project().id}
         modelos={props.modelos}
         onCreado={() => setCreatingAgentIn(null)}
-      /></Suspense>}</Show>
+      /></LazyPart>}</Show>
       <SidebarShell
         state={props.collapsed ? "collapsed" : "expanded"}
         class="h-full w-full min-w-0"

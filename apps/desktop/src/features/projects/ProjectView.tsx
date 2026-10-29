@@ -41,7 +41,8 @@ import { displayName, notifyProfiles, watchProfiles } from "./profiles";
 import Sessions, { type SessionRow } from "./Sessions";
 import type { Etapa } from "./TaskStage";
 // Solo al crear un encargado: fuera de la carga inicial.
-const NewAgent = lazy(() => import("./NewAgent"));
+import { LazyPart, retryableLazy } from "../../ui/LazyPart";
+const NewAgent = retryableLazy(() => import("./NewAgent"));
 
 // Fuera de la carga inicial: la memoria se pinta abajo de la vista y trae el cliente de la cuenta.
 const Memoria = lazy(() => import("./Memoria"));
@@ -627,7 +628,7 @@ export default function VistaDeProyecto(props: {
             </Button>
           </header>
           <Show when={creando()}>
-            <Suspense>
+            <LazyPart>
               <NewAgent
                 abierto
                 onAbrir={setCreando}
@@ -635,7 +636,7 @@ export default function VistaDeProyecto(props: {
                 modelos={props.modelos}
                 onCreado={releerEncargados}
               />
-            </Suspense>
+            </LazyPart>
           </Show>
           <Show
             when={visibles().length > 0}

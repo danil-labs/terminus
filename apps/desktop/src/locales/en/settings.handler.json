@@ -42,5 +42,6 @@
   "settings.handler.pending": "Outcome pending. Check the same operation before changing resources.",
   "settings.handler.resume": "Check outcome",
   "settings.handler.memory_declared": "Declared configuration. Approvals are shown separately; the engine determines availability during a turn.",
-  "settings.handler.memory_slot": "Requested external store: {slot}"
+  "settings.handler.memory_slot": "Requested external store: {slot}",
+  "settings.handler.receipt_mismatch": "The result of this operation could not be confirmed. Press Refresh to reload the handler state."
 }

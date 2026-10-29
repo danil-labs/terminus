@@ -15,6 +15,11 @@ test("a read keeps a gate that arrived after it started and is not in it yet", (
   assert.equal(merged.find((p) => p.requestId === "a")?.durableId, "d-a");
 });
 
+test("the gate whose event triggered the read survives until the record appears", () => {
+  const merged = mergeGates([gate("trigger", { llegada: 4 })], "s1", "w", [read("d-x", "x")], 4) as { requestId: string }[];
+  assert.deepEqual(merged.map((p) => p.requestId).sort(), ["trigger", "x"]);
+});
+
 test("an empty read removes nothing and a read gate keeps its origin", () => {
   const ps = [gate("a", { llegada: 1, origin: { kind: "task" } })];
   assert.equal(mergeGates(ps, "s1", "w", [], 5), ps);

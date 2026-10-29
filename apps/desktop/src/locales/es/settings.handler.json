@@ -42,5 +42,6 @@
   "settings.handler.pending": "Resultado pendiente. Consulta la misma operación antes de cambiar recursos.",
   "settings.handler.resume": "Consultar resultado",
   "settings.handler.memory_declared": "Configuración declarada. Las aprobaciones se muestran aparte; la disponibilidad durante un turno la determina el motor.",
-  "settings.handler.memory_slot": "Almacén externo solicitado: {slot}"
+  "settings.handler.memory_slot": "Almacén externo solicitado: {slot}",
+  "settings.handler.receipt_mismatch": "No se pudo confirmar el resultado de esta operación. Pulsa Actualizar para recargar el estado del encargado."
 }

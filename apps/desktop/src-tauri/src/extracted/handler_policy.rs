@@ -127,24 +127,36 @@ pub(super) fn handler_action(app: tauri::AppHandle, input: Input) -> Result<Valu
             .as_str()
             .ok_or_else(|| Error::new("invalid_request"))?
             .to_owned();
-        // La mutación ya salió: un recibo que no casa no es un fallo firme, se consulta otra vez.
-        validate_receipt(&input, &result).map_err(|_| Error {
-            detail: json!({"operation":operation}),
-            ..Error::new("operation_pending")
-        })?;
+        if validate_receipt(&input, &result).is_err() {
+            // Consultar otra vez no lo arregla: se salda y se pide recargar el estado.
+            if matches!(input.request, Action::Resume { .. }) {
+                return Err(Error {
+                    detail: json!({
+                        "what": {"clave": super::util::Frase::new("settings.handler.receipt_mismatch").0},
+                        "detail": {"operation": operation, "settled": true},
+                    }),
+                    ..Error::new("operation_failed")
+                });
+            }
+            // La mutación ya salió: un recibo que no casa no es un fallo firme, se consulta otra vez.
+            return Err(Error {
+                detail: json!({"operation":operation}),
+                ..Error::new("operation_pending")
+            });
+        }
         let deadline = Instant::now() + Duration::from_secs(30);
         loop {
             match result["status"].as_str() {
                 Some("completed") => return Ok(result["result"].clone()),
-                Some("accepted" | "started" | "awaiting_user") => {}
-                // `failed`, `interrupted` o un estado que esta ventana no conoce: cierra la espera.
-                _ => {
+                Some("failed" | "interrupted") => {
                     let mut error: Error = serde_json::from_value(result["error"].clone())
                         .unwrap_or_else(|_| Error::new("operation_failed"));
                     error.detail =
                         json!({"operation":operation,"settled":true,"detail":error.detail});
                     return Err(error);
                 }
+                // Cualquier otro estado sigue abierto: si no se salda, el plazo deja la operación reanudable.
+                _ => {}
             }
             if Instant::now() >= deadline {
                 return Err(Error {
