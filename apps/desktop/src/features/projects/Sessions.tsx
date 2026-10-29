@@ -288,7 +288,6 @@ export default function Sessions(props: {
    */
   de: string;
   onPick: (id: string) => void;
-  onPickRelated?: (row: SessionRow) => void;
   draggedTask?: string | null;
   onDrag?: (row: SessionRow, event: PointerEvent) => void;
   onDelete: (id: string) => void;
@@ -1297,21 +1296,9 @@ export default function Sessions(props: {
         setExpansionOverrides(previous => ({ ...previous, [id]: !expanded() }));
       } else alternarDesplegada(rama().tarea.id);
     };
-    const origin = () => r.hija || props.sidebar ? null : (rama().tarea.parent ?? rama().tarea.launched_by);
-    const parentRow = () => (props.relatedSessions ?? props.sessions).find(row => row.id === origin()
-      && (!row.machine || !rama().tarea.machine || row.machine === rama().tarea.machine)
-      && (!row.workspace || !rama().tarea.workspace || row.workspace === rama().tarea.workspace));
-    const canOpenParent = () => (rama().tarea.launcher_available !== false || !!rama().tarea.parent) && !!parentRow() && (!!props.onPickRelated || props.sessions.includes(parentRow()!));
-    const originLabel = () => t("projects.sessions.delegated_by", { title: parentRow()?.title ?? origin() ?? "" });
     return (
       <li>
         <Fila s={rama().tarea} />
-        <Show when={origin()}>
-          <Show when={canOpenParent()} fallback={<p title={originLabel()} class="m-0 truncate px-2 text-[0.6875rem] text-neutral-500">{originLabel()}</p>}>
-            <button type="button" title={originLabel()} class="block w-full truncate border-0 bg-transparent px-2 text-left text-[0.6875rem] text-neutral-500 hover:text-neutral-950 focus-visible:outline-2 focus-visible:outline-primary"
-              onClick={() => { const parent = parentRow(); if (parent) props.onPickRelated ? props.onPickRelated(parent) : props.onPick(parent.id); }}>{originLabel()}</button>
-          </Show>
-        </Show>
         <Show when={rama().hijas.length > 0}>
           <button
             type="button"
