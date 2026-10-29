@@ -39,7 +39,7 @@ export const ESPERAS = [1_000, 3_000, 10_000, 30_000];
 /** Una lectura que pasa de esto ya no frena a las demás. `tree_files` suele tardar ~1 s. */
 export const LENTA_TRAS = 15_000;
 
-export type Lector<T> = {
+export type Lector = {
   /** Pedir una lectura (un turno que acabó, volver a la ventana, abrir una carpeta). */
   pedir: () => void;
   /** Lo mismo pero empezando la cuenta de reintentos de cero: el botón «Reintentar». */
@@ -59,7 +59,7 @@ export function crearLector<T>(opts: {
   programar?: (fn: () => void, ms: number) => () => void;
   esperas?: readonly number[];
   lentaTras?: number;
-}): Lector<T> {
+}): Lector {
   const ahora = opts.ahora ?? (() => Date.now());
   const programar = opts.programar ?? ((fn: () => void, ms: number) => {
     const id = setTimeout(fn, ms);
