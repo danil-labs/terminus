@@ -192,12 +192,22 @@ gets that lab identity: it never reads the data or the keychain entries of
 With `launch.lock` held, the window also takes the start lock it shares with
 the `terminus` CLI (below), so a window and a terminal never start two engines
 on one root. Then it asks the engine named by `engine/seldon-endpoint.json` for
-its `status`. If it answers with this window's contract and its
-`data_directory` is this root (both canonical), the window connects to it,
-whoever started it: another window, the CLI or a previous session; two windows
-share one engine. An engine of another contract or build is handled as in
-[Updating on Windows](#updating-on-windows): the window reopens the previous
-window or waits for its tasks; it never uses the engine's own handoff.
+its `status`, whatever its contract (`request_any_contract`). If its
+`data_directory` is this root (both canonical) and it speaks the contract of
+the engine that travels with this window, the window connects to it, whoever
+started it: another window, the CLI or a previous session; two windows share
+one engine. That contract may differ from the window's own: contract changes
+are additive, so, as with remote machines, a different hash is not a reason to
+refuse an engine; only a real `version_mismatch` from a command is. The window
+learns the bundled engine's contract the first time it starts it and keeps it
+in `bundled-contract.json` beside the window data, with the size and times of
+the binary; when the binary changes it learns it again, and until then it
+compares with its own contract, as before. An engine that does not speak the
+bundled contract is from the previous version, and one whose binary was
+replaced is handled as in [Updating on Windows](#updating-on-windows): the
+window reopens the previous window or waits for its tasks; it never uses the
+engine's own handoff. The engine the window has just started is always taken,
+even if its contract differs from the window's.
 
 If nothing answers, the window does not trust a probe: the engine holds
 `seldon-runtime.lock` in the data root exclusively for as long as it lives, so
@@ -501,10 +511,10 @@ The old version keeps working whole until its tasks finish, and the new one
 comes in whole afterwards; a window and an engine of different versions are not
 mixed. On the next start, an engine running from `old_seldon-runtime.exe` gets
 `service stop`; one of this contract that refuses keeps working and the new
-window uses it. An update usually changes the contract, and the window cannot
-use an engine of another contract: it asks it for `status` and `service stop`
-anyway (`request_any_contract`) and stops it as soon as it has no turns,
-downloads or operations. While it is working, the new window opens the window
+window uses it. An update usually changes the contract, and an engine that does not speak the
+contract of the bundled engine is from the previous version: the window asks
+it for `status` and `service stop` (`request_any_contract`) and stops it as
+soon as it has no turns, downloads or operations. While it is working, the new window opens the window
 set aside with the same prefix as that engine, with no arguments (an older
 build rejects arguments it does not know), stops answering as the single
 instance so the old one does not show it instead, and exits. The old window
@@ -524,7 +534,7 @@ Then the window deletes the `old_*` files no one holds, retrying for a few
 seconds while the window it replaces exits.
 
 A window that runs from `old_*` (Windows) keeps its engine: it does not stop
-it when it has no work, does not take an engine of another contract and does
+it when it has no work, does not take an engine of another version and does
 not start the installed one (`window_replaced`); at startup that error opens
 the installed window instead. Any other open window checks every 15 s whether
 the live engine was replaced and, once that engine has no turns, downloads or
