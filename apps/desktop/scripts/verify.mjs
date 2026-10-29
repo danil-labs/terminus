@@ -73,6 +73,7 @@ const steps = [
   ["Llevar trabajo a otra máquina copia por partes, sigue desde la que falló y limpia al cancelar", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/carry-work.test.ts")], root],
   ["Los visuales del chat llegan por partes y caen a tree_show con un motor anterior", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/chat-visual-parts.test.ts")], root],
   ["La foto del sidebar se guarda acotada y con espera", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/shell-cache.test.ts")], root],
+  ["La configuración de un orquestador de esta máquina arranca mcp serve con su credencial", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/orchestrator-snippets.test.ts")], root],
   ["El panel Carpeta reintenta solo, no amontona lecturas y no tira lo último bueno", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/tree-loader.test.ts")], root],
   ["La ventana abre con la lista ligera y el arranque la confirma sin saltarse la negativa", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/early-startup.test.ts")], root],
   ["La nota de la versión sale en el idioma de la app", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/release-notes.test.ts")], root],
