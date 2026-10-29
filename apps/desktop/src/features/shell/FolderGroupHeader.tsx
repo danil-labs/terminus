@@ -8,6 +8,7 @@ import { t } from "../../lib/i18n";
 import type { Project } from "../../lib/model";
 import { PROJECT_NAME_MAX_LENGTH } from "../../lib/projectNames";
 import { cn } from "../../lib/utils";
+import { rolledOutcome } from "@terminus/design";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
 import { ITEM_DE_MENU, Popover, PopoverContent, PopoverTrigger } from "../../ui/Popover";
@@ -105,7 +106,7 @@ export default function FolderGroupHeader(pp: {
                 aprobando={pp.tareas.some((x) => pp.aprobando.includes(x.id))}
                 viva={pp.tareas.some((x) => pp.vivas.includes(x.id))}
                 esperando={pp.tareas.some((x) => x.esperando)}
-                outcome={pp.tareas.some((x) => x.sin_ver && x.outcome === "failed") ? "failed" : null}
+                outcome={rolledOutcome(pp.tareas.filter((x) => x.sin_ver))}
                 sinVer={pp.tareas.some((x) => x.sin_ver)}
               />
             </Show>

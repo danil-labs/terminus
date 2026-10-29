@@ -1,7 +1,6 @@
 export {
   type AgentOption,
   type SidebarContext,
-  type SidebarDensity,
   type SidebarGroup,
   type SidebarGrouping,
   type SidebarSection,
@@ -9,7 +8,6 @@ export {
   type SidebarTask,
   type SidebarView,
   DEFAULT_SIDEBAR_VIEW,
-  DENSITIES,
   GROUPINGS,
   activityOf,
   agentOptions,

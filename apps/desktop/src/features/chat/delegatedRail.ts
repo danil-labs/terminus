@@ -1,4 +1,4 @@
-import { taskPriority, type TaskActivity } from "@terminus/design";
+import { rolledOutcome, taskPriority, type TaskActivity } from "@terminus/design";
 import type { SessionRow } from "../projects/Sessions";
 
 export function delegatedAttention(rows: SessionRow[], live: readonly string[], approvals: readonly string[]): TaskActivity {
@@ -6,7 +6,7 @@ export function delegatedAttention(rows: SessionRow[], live: readonly string[], 
     aprobando: rows.some(row => approvals.includes(row.id)),
     esperando: rows.some(row => row.esperando),
     viva: rows.some(row => live.includes(row.id)),
-    outcome: rows.some(row => row.outcome === "failed") ? "failed" : null,
+    outcome: rolledOutcome(rows),
     sinVer: rows.some(row => row.sin_ver),
   };
 }

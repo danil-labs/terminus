@@ -890,27 +890,39 @@ if (!roto) {
   const taskOrder = [...threadDoc.querySelectorAll('[data-sidebar-tasks] [data-sesion]')].map(row => row.dataset.sesion);
   assert.ok(taskOrder.indexOf("topic-work") < taskOrder.indexOf("topic"), "las fijadas van antes que las demás sin alterar sus turnos");
   const openPinnedTaskMenu = id => sidebarTask(id).querySelector('[data-session-actions] button[aria-haspopup="menu"]').click();
-  const pinMenuItem = label => [...threadDoc.querySelectorAll('[role="menu"] [role="menuitem"]')].find(item => item.textContent.trim() === label);
-  const pinButton = id => sidebarTask(id).querySelector("[data-session-pin]");
+  const menuItems = () => [...threadDoc.querySelectorAll('[role="menu"] [role="menuitem"]')];
+  const pinMenuItem = label => menuItems().find(item => item.textContent.trim() === label);
+  const closeMenu = async () => {
+    threadDoc.dispatchEvent(new threadApp.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await sleep(50);
+  };
+  // La tarjeta del riel no lleva botón de fijar ni capa de acciones: el menú sale del hueco del estado.
+  assert.equal(sidebarTask("dm").querySelector("[data-session-pin]"), null, "fijar no tiene botón propio en la tarjeta");
+  assert.equal(sidebarTask("dm").querySelector(".bg-linear-to-l"), null, "la tarjeta no lleva el velo degradado de las acciones");
+  assert.ok(sidebarTask("dm").querySelector('[data-session-status] + [data-session-actions] button[aria-haspopup="menu"]'),
+    "el menú ocupa el hueco del estado, a la derecha del título");
+  // Fijada: el alfiler va en el hueco del borde, no dentro de la tarjeta.
+  assert.ok(sidebarTask("dm").querySelector(':scope > [role="img"][aria-label="Fijada"] svg.lucide-pin'), "la fijada lleva su alfiler en el borde");
+  assert.ok(sidebarTask("dm").className.includes("tarjeta-fijada"), "la fijada dibuja su borde con ::after");
+  assert.equal(sidebarTask("dm").querySelector('[data-session-preview] [aria-label="Fijada"]'), null);
   openPinnedTaskMenu("dm");
   await sleep(50);
-  assert.equal(pinMenuItem("Desfijar"), undefined, "fijar ya no está en el menú: es el botón de debajo");
+  assert.equal(menuItems()[0]?.textContent.trim(), "Desfijar", "fijar es lo primero del menú");
+  assert.equal(pinMenuItem("Etapa"), undefined, "la tarjeta del riel no marca la etapa");
   assert.equal(pinMenuItem("Archivar tarea"), undefined, "una tarea fijada no ofrece archivado");
-  threadDoc.dispatchEvent(new threadApp.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-  await sleep(50);
-  const accionesDeFila = pinButton("dm").closest("[data-session-actions]");
-  assert.ok(accionesDeFila.className.includes("flex-col"), "el menú y fijar van en una columna");
-  const botonDelMenu = accionesDeFila.querySelector('button[aria-haspopup="menu"]');
-  assert.ok(botonDelMenu.compareDocumentPosition(pinButton("dm")) & threadApp.w.Node.DOCUMENT_POSITION_FOLLOWING, "el menú va arriba y fijar abajo");
-  assert.equal(pinButton("dm").getAttribute("aria-pressed"), "true", "el botón dice que la tarea está fijada");
-  pinButton("dm").click();
+  pinMenuItem("Desfijar").click();
   await sleep(150);
   assert.deepEqual(pinChanges.at(-1), { project: "p", id: "dm", pinned: false });
   assert.equal(sidebarTask("dm")?.dataset.pinned, undefined);
-  assert.equal(pinButton("dm").getAttribute("aria-pressed"), "false");
-  pinButton("dm").click();
+  assert.equal(sidebarTask("dm").querySelector(':scope > [role="img"][aria-label="Fijada"]'), null, "sin fijar no queda alfiler");
+  await closeMenu();
+  openPinnedTaskMenu("dm");
+  await sleep(50);
+  assert.equal(menuItems()[0]?.textContent.trim(), "Fijar");
+  pinMenuItem("Fijar").click();
   await sleep(150);
-  assert.equal(sidebarTask("dm")?.dataset.pinned, "true", "la tarea se vuelve a fijar con el mismo botón");
+  assert.equal(sidebarTask("dm")?.dataset.pinned, "true", "la tarea se vuelve a fijar desde el mismo menú");
+  await closeMenu();
   assert.equal(threadDoc.querySelector('[data-agent-conversations]'), null, "los historiales antiguos solo aparecen en Tareas");
   sidebarTask("dm").click();
   await sleep(200);
@@ -933,7 +945,7 @@ if (!roto) {
     "el rótulo antecede a la primera tarea creada");
   const delegatedToolbar = threadDoc.querySelector('[data-delegated-trigger="toolbar"]');
   assert.ok(delegatedToolbar, "la barra derecha permite consultar subtareas de una conversación existente");
-  // En el riel el estado va en su columna fija, delante del título.
+  // En la tarjeta del riel el estado va en su hueco de 16 px, a la derecha del título.
   const previewOfCoordinator = () => sidebarTask("topic").querySelector("[data-session-status]");
   threadApp.emit("chat", { kind: "started", session: "topic-work", workspace: "w" });
   await sleep(100);
@@ -1722,42 +1734,60 @@ if (!roto) {
     gitRows.p = gitRow(null, { kind: "kn", kn, alias: "cone-260911" });
     sidebar.w.dispatchEvent(new sidebar.w.Event("focus"));
     await sleep(100);
-    for (const surface of [row("p"), tab("p")]) {
-      assert.ok(surface.querySelector(`.${color} > svg.lucide-${icon}`), kn);
-      assert.equal(surface.querySelector("svg.lucide-git-branch"), null);
+    assert.ok(tab("p").querySelector(`.${color} > svg.lucide-${icon}`), kn);
+    for (const surface of [row("p"), tab("p")]) assert.equal(surface.querySelector("svg.lucide-git-branch"), null);
+    // La tarjeta del riel solo avisa del borrador sin guardar, con el ícono solo.
+    if (kn === "draft") {
+      assert.ok(row("p").querySelector("[data-session-pr] svg.lucide-file-pen-line"), kn);
+      assert.match(gitDeFila("p"), /Cone/);
+      assert.doesNotMatch(row("p").querySelector("[data-session-pr]").textContent, /Cone/);
+    } else {
+      assert.equal(row("p").querySelector("[data-session-pr]"), null, kn);
     }
-    assert.match(gitDeFila("p"), /Cone/);
     assert.match(tab("p").title, label);
   }
-  gitRows.p = gitRow(null, { kind: "kn", kn: "saved", alias: "gbsxhmdk" });
+  gitRows.p = gitRow(null, { kind: "kn", kn: "draft", alias: "gbsxhmdk" });
   sidebar.w.dispatchEvent(new sidebar.w.Event("focus"));
   await sleep(100);
   assert.match(gitDeFila("p"), /gbsxhmdk/);
   assert.doesNotMatch(row("p").textContent, /desconocido/);
-  for (const [checks, review, visible, overrides] of [
-    ["success", "approved", true, {}],
-    ["pending", "changes_requested", true, {}],
-    ["failure", "approved", true, {}],
-    ["success", "approved", true, { state: "draft" }],
-    ["unknown", "unknown", false, {}],
-    ["none", "unreviewed", false, {}],
-    ["success", "approved", false, { head_sha: "old" }],
-    ["success", "approved", false, { state: "merged" }],
-    ["success", "approved", false, { state: "closed" }],
-    ["success", "approved", true, { stale: true }],
+  // La pestaña lleva checks y revisión; la tarjeta del riel, UNA señal por
+  // prioridad: cambios pedidos › checks que fallan › en curso › aprobado › en verde.
+  for (const [checks, review, visible, overrides, signal] of [
+    ["success", "approved", true, {}, "approved"],
+    ["pending", "changes_requested", true, {}, "changes_requested"],
+    ["failure", "approved", true, {}, "failure"],
+    ["pending", "approved", true, {}, "pending"],
+    ["success", "unreviewed", true, {}, "success"],
+    ["success", "approved", true, { state: "draft" }, null],
+    ["unknown", "unknown", false, {}, null],
+    ["none", "unreviewed", false, {}, null],
+    ["success", "approved", false, { head_sha: "old" }, null],
+    ["success", "approved", false, { state: "merged" }, null],
+    ["success", "approved", false, { state: "closed" }, null],
+    ["success", "approved", true, { stale: true }, "stale"],
   ]) {
     const { stale = false, ...pullOverrides } = overrides;
     gitRows.p = gitRow("feature/parent", { pull: { number: 12, state: "open", head_sha: "abc", checks, review, ...pullOverrides }, pull_known: true, stale });
     sidebar.w.dispatchEvent(new sidebar.w.Event("focus"));
     await sleep(100);
-    for (const surface of [row("p"), tab("p")]) {
-      assert.equal(!!surface.querySelector("[data-git-checks]"), visible, JSON.stringify(overrides));
-      assert.equal(!!surface.querySelector("[data-git-review]"), visible, JSON.stringify(overrides));
-      if (visible) {
-        assert.ok(surface.querySelector(`[data-git-checks="${checks}"]`));
-        assert.ok(surface.querySelector(`[data-git-review="${review}"]`));
-      }
+    const surface = tab("p");
+    // Sin revisión registrada la pestaña no pinta ícono de revisión.
+    const reviewVisible = visible && (review === "approved" || review === "changes_requested");
+    assert.equal(!!surface.querySelector("[data-git-checks]"), visible, JSON.stringify(overrides));
+    assert.equal(!!surface.querySelector("[data-git-review]"), reviewVisible, JSON.stringify({ review, ...overrides }));
+    if (visible) {
+      assert.ok(surface.querySelector(`[data-git-checks="${checks}"]`));
+      if (reviewVisible) assert.ok(surface.querySelector(`[data-git-review="${review}"]`));
     }
+    const signals = [...row("p").querySelectorAll("[data-session-pr] [data-git-signal]")].map((el) => el.dataset.gitSignal);
+    assert.deepEqual(signals, signal ? [signal] : [], `${checks}/${review} ${JSON.stringify(overrides)}`);
+    assert.equal(row("p").querySelector("[data-git-checks], [data-git-review]"), null, "la tarjeta no repite las dos señales");
+    if (signal === "stale") {
+      assert.ok(row("p").querySelector('[data-git-signal="stale"] svg.lucide-clock'), "desactualizado: solo el reloj");
+      assert.ok(row("p").querySelector("[data-session-pr].text-neutral-500"), "desactualizado: el chip entero en gris");
+    }
+    assert.equal(!!row("p").querySelector("[data-session-pr] [data-pr-number].text-error-strong"), signal === "failure", "el número va en rojo si los checks fallan");
     if (stale) {
       assert.match(tab("p").title, /Último estado conocido/);
       assert.ok(tab("p").querySelector('[data-git-checks].text-neutral-500[data-git-stale]'));
@@ -2412,7 +2442,8 @@ if (!roto) {
   // Entregada y vista, la tarea se queda donde estaba, entre las «Tareas».
   assert.equal(pendingDoc.querySelector('[data-sidebar-section="settled"]'), null, "no hay sección «Asentadas»");
   assert.equal(hiddenRow().querySelector('[aria-label="Está trabajando"]'), null);
-  assert.ok(hiddenRow().querySelector('[aria-label="Resultado entregado"]'), "recovering a missed done refreshes the hidden task result");
+  // En la tarjeta del riel una entregada no lleva ícono: vista se apaga, sin ver lleva el punto verde.
+  assert.ok(hiddenRow().dataset.apagada === "true" || hiddenRow().querySelector('[aria-label="Terminó y no la has abierto"]'), "recovering a missed done refreshes the hidden task result");
   assert.deepEqual(pendingTurnApp.fallos, []);
   pendingTurnApp.w.close();
 
@@ -3719,8 +3750,10 @@ if (!roto) {
   assert.ok(cuadro("w3").querySelector("svg.lucide-circle-question-mark"));
   assert.equal(cuadro("w4").dataset.attention, undefined, "un estado que la ventana no conoce no se pinta");
   const filaDeColumna = (id) => doc.querySelector(`[data-sesion="${id}"]`);
-  assert.ok(filaDeColumna("s1").querySelector('[aria-label="Terminó y no la has abierto"].text-success-strong svg.lucide-check'), "la fila dice terminada sin ver");
-  assert.ok(filaDeColumna("s3").querySelector('[aria-label="Resultado entregado"].text-neutral-500'), "una entregada ya vista queda en gris, en su sitio");
+  // La tarjeta del riel: sin ver es un punto verde; vista no lleva ícono y se apaga.
+  assert.ok(filaDeColumna("s1").querySelector('[aria-label="Terminó y no la has abierto"] .bg-success-strong'), "la fila dice terminada sin ver");
+  assert.equal(filaDeColumna("s3").dataset.apagada, "true", "una entregada ya vista se apaga, en su sitio");
+  assert.equal(filaDeColumna("s3").querySelector('[aria-label="Resultado entregado"]'), null, "y no lleva ícono");
   const pliegue = doc.querySelector('button[aria-label="Plegar «Proyecto»"]');
   pliegue.click();
   await sleep(50);
@@ -3736,7 +3769,7 @@ if (!roto) {
   columna.emit("attention", structuredClone(atencion));
   await sleep(50);
   assert.equal(filaDeColumna("s1").querySelector('[aria-label="Terminó y no la has abierto"]'), null, "y la marca se limpia con el evento");
-  assert.ok(filaDeColumna("s1").querySelector('[aria-label="Resultado entregado"]'));
+  assert.equal(filaDeColumna("s1").dataset.apagada, "true");
   columna.emit("attention", [{ workspace: "w", tasks: [{ session: "s1", project: "pa", state: "unseen" }] }]);
   await sleep(80);
   assert.deepEqual(vistos, [["w", "s1"], ["w", "s1"]], "un turno que cierra con la tarea delante no queda sin ver");

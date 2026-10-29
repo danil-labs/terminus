@@ -1,10 +1,10 @@
 /**
  * La tarjeta de dos líneas de una tarea (sidebar del escritorio, #151).
  *
- * Línea 1: la marca de estado en su columna fija, el título y la chincheta.
- * Línea 2: lo que te piden si espera aprobación o respuesta (el último
- * mensaje); si no, también si falló, la marca del proveedor, la carpeta, la máquina (solo si no es la de la ventana)
- * y la cara del agente. En «Compacta» no hay línea 2.
+ * Línea 1: el título y la marca de estado. Línea 2: metadatos de la tarea
+ * —proveedor, carpeta, máquina (solo si no es la de la ventana) y la cara del
+ * agente—, nunca el mensaje que la tarea pide: la pregunta o la aprobación se
+ * leen al abrirla.
  *
  * Cada cliente pinta esto a su manera; qué entra y en qué orden sale de aquí.
  * Lo que solo el escritorio sabe (git, PR, worktree) lo añade él.
@@ -29,9 +29,6 @@ export type TaskCard = {
   delivered: boolean;
   pinned: boolean;
   needsYou: boolean;
-  /** Línea 2 si espera aprobación o respuesta: lo que pide. Una fallida no
-   *  pide nada: su último mensaje no es la causa, la marca roja ya lo dice. */
-  request: string | null;
   /** El proveedor de IA, va primero en la línea 2. */
   provider: string | null;
   /** La carpeta de la fila, si se enseña (`""` es sin carpeta y no se enseña). */
@@ -56,7 +53,6 @@ export function taskCard<T extends CardTask>(task: T, options: CardOptions<T>): 
     delivered: !state && activity.outcome === "delivered",
     pinned: isPinned(task),
     needsYou: needsYou(state),
-    request: state === "approving" || state === "asked" ? (task.last_message || null) : null,
     provider: task.provider || null,
     folder,
     agent: task.agent && !task.chat_de_agente ? task.agent : null,
