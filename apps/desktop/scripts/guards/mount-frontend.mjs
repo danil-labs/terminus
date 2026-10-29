@@ -1772,11 +1772,13 @@ if (!roto) {
     sidebar.w.dispatchEvent(new sidebar.w.Event("focus"));
     await sleep(100);
     const surface = tab("p");
+    // Sin revisión registrada la pestaña no pinta ícono de revisión.
+    const reviewVisible = visible && (review === "approved" || review === "changes_requested");
     assert.equal(!!surface.querySelector("[data-git-checks]"), visible, JSON.stringify(overrides));
-    assert.equal(!!surface.querySelector("[data-git-review]"), visible, JSON.stringify(overrides));
+    assert.equal(!!surface.querySelector("[data-git-review]"), reviewVisible, JSON.stringify({ review, ...overrides }));
     if (visible) {
       assert.ok(surface.querySelector(`[data-git-checks="${checks}"]`));
-      assert.ok(surface.querySelector(`[data-git-review="${review}"]`));
+      if (reviewVisible) assert.ok(surface.querySelector(`[data-git-review="${review}"]`));
     }
     const signals = [...row("p").querySelectorAll("[data-session-pr] [data-git-signal]")].map((el) => el.dataset.gitSignal);
     assert.deepEqual(signals, signal ? [signal] : [], `${checks}/${review} ${JSON.stringify(overrides)}`);
@@ -2440,7 +2442,8 @@ if (!roto) {
   // Entregada y vista, la tarea se queda donde estaba, entre las «Tareas».
   assert.equal(pendingDoc.querySelector('[data-sidebar-section="settled"]'), null, "no hay sección «Asentadas»");
   assert.equal(hiddenRow().querySelector('[aria-label="Está trabajando"]'), null);
-  assert.ok(hiddenRow().querySelector('[aria-label="Resultado entregado"]'), "recovering a missed done refreshes the hidden task result");
+  // En la tarjeta del riel una entregada no lleva ícono: vista se apaga, sin ver lleva el punto verde.
+  assert.ok(hiddenRow().dataset.apagada === "true" || hiddenRow().querySelector('[aria-label="Terminó y no la has abierto"]'), "recovering a missed done refreshes the hidden task result");
   assert.deepEqual(pendingTurnApp.fallos, []);
   pendingTurnApp.w.close();
 
@@ -3747,8 +3750,10 @@ if (!roto) {
   assert.ok(cuadro("w3").querySelector("svg.lucide-circle-question-mark"));
   assert.equal(cuadro("w4").dataset.attention, undefined, "un estado que la ventana no conoce no se pinta");
   const filaDeColumna = (id) => doc.querySelector(`[data-sesion="${id}"]`);
-  assert.ok(filaDeColumna("s1").querySelector('[aria-label="Terminó y no la has abierto"].text-success-strong svg.lucide-check'), "la fila dice terminada sin ver");
-  assert.ok(filaDeColumna("s3").querySelector('[aria-label="Resultado entregado"].text-neutral-500'), "una entregada ya vista queda en gris, en su sitio");
+  // La tarjeta del riel: sin ver es un punto verde; vista no lleva ícono y se apaga.
+  assert.ok(filaDeColumna("s1").querySelector('[aria-label="Terminó y no la has abierto"] .bg-success-strong'), "la fila dice terminada sin ver");
+  assert.equal(filaDeColumna("s3").dataset.apagada, "true", "una entregada ya vista se apaga, en su sitio");
+  assert.equal(filaDeColumna("s3").querySelector('[aria-label="Resultado entregado"]'), null, "y no lleva ícono");
   const pliegue = doc.querySelector('button[aria-label="Plegar «Proyecto»"]');
   pliegue.click();
   await sleep(50);
@@ -3764,7 +3769,7 @@ if (!roto) {
   columna.emit("attention", structuredClone(atencion));
   await sleep(50);
   assert.equal(filaDeColumna("s1").querySelector('[aria-label="Terminó y no la has abierto"]'), null, "y la marca se limpia con el evento");
-  assert.ok(filaDeColumna("s1").querySelector('[aria-label="Resultado entregado"]'));
+  assert.equal(filaDeColumna("s1").dataset.apagada, "true");
   columna.emit("attention", [{ workspace: "w", tasks: [{ session: "s1", project: "pa", state: "unseen" }] }]);
   await sleep(80);
   assert.deepEqual(vistos, [["w", "s1"], ["w", "s1"]], "un turno que cierra con la tarea delante no queda sin ver");
