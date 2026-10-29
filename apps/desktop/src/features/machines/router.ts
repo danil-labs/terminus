@@ -10,8 +10,9 @@
  * la ventana. En el escritorio un id de otra máquina sin esa cabecera es un
  * error antes de mandar: el id no elige la máquina. En la web no hay máquina de
  * la ventana; si los argumentos nombran una sola (el id con su prefijo), la
- * llamada va allá, y si nombran dos se rechaza igual. En el escritorio la cuenta
- * y `danil_*` van siempre aquí. Un workspace de la cuenta que esta computadora
+ * llamada va allá, y si nombran dos se rechaza igual. En el escritorio `danil_*`
+ * y Radiant van siempre aquí; las cuentas de IA, a la máquina de la cabecera o del
+ * id, y su lista junta las de todas. Un workspace de la cuenta que esta computadora
  * no tiene se lee de sus miembros y actúa en el primero.
  */
 import { type AccountWorkspace, type SystemId, callWorkspace, isDeferrable, systemOf } from "@terminus/computers";
@@ -40,6 +41,8 @@ const OF_THIS_MACHINE = /(^|_)accounts?($|_)|login|^radiant_|^danil_|^account_re
 /** Las credenciales de la cuenta son del workspace: van a la máquina que lo atiende, como las demás órdenes con `scope`. */
 const ACCOUNT_CREDENTIALS = /^account_credentials?_|^github_account_/;
 const ofThisMachine = (command: string) => OF_THIS_MACHINE.test(command) && !ACCOUNT_CREDENTIALS.test(command);
+/** La sesión de Danil y Radiant son siempre de esta ventana; las cuentas de IA, de la máquina que nombra la cabecera o el id. */
+const OF_THIS_WINDOW = /^radiant_|^danil_|^account_relay_token$/;
 /** Las órdenes con canal pierden el canal por el relay: vuelve solo la respuesta final. */
 const CHANNELS: Record<string, string> = { clone_project: "progress", list_session_git: "progress", watch_task_tree: "changes" };
 const UNKNOWN = new Set(["command", "unsupported", "command_not_allowed"]);
@@ -587,6 +590,15 @@ export function createRouter(config: RouterConfig) {
     return remote(lead, command, args, callWorkspace(workspace, args));
   }
 
+  /** En el escritorio, las cuentas de esta computadora y las de las demás, agrupadas como en la web: cada una con sus máquinas. */
+  async function accountsHere(args: Args, workspace: string | null, options: Options): Promise<unknown> {
+    const value = await native("list_accounts", args, options);
+    const envelopes = fleet.machines().map((m) => ({ machine: m.id, workspace, command: "list_accounts", args }));
+    const others = await gather(envelopes, { fresh: true }).catch(() => [] as Slice[]);
+    const merged = fleet.merge("list_accounts", [{ machine: self as string, status: "ok", has: true, value, at: Date.now() }, ...others.filter((s) => s.has)], workspace);
+    return merged === undefined ? value : merged;
+  }
+
   async function handle(command: string, args: Args = {}, options?: Options): Promise<unknown> {
     if (command === "machine_list") return machineList();
     if (command === "machine_select") {
@@ -597,7 +609,20 @@ export function createRouter(config: RouterConfig) {
     const workspace = command === "list_workspaces" ? null : headerOf(options, "x-terminus-workspace") ?? active;
     if (command === "list_workspaces") options = withoutHeader(options, "x-terminus-workspace");
     if (STORAGE.has(command) && !workspace) throw { what: { clave: "shell.service.failed" }, detail: "workspace_missing" };
-    if (local && ofThisMachine(command)) return native(command, args, options);
+    if (local && ofThisMachine(command)) {
+      if (OF_THIS_WINDOW.test(command)) return native(command, args, options);
+      try {
+        // Los chips de una cuenta actúan en su máquina: la de la cabecera o la que nombra el id.
+        const there = machine && machine !== self && fleet.has(machine) ? machine : homeOf(args);
+        if (there && fleet.has(there)) return await remote(there, command, args, callWorkspace(workspace, args));
+        if (machine && machine !== self) throw new FleetError("unknown_machine", machine);
+        if (command === "list_accounts" && fleet.machines().length) return await accountsHere(args, workspace, withoutHeader(options, "x-terminus-machine"));
+      } catch (error) {
+        if (error instanceof FleetError) throw named(error);
+        throw error;
+      }
+      return native(command, args, withoutHeader(options, "x-terminus-machine"));
+    }
     if (!local && command in NO_SETUP) return NO_SETUP[command];
     if (FILES.test(command) && ((machine && machine !== self && fleet.has(machine)) || namesOther(args)))
       throw { what: t("shell.machines.local_only"), detail: "machine_files" };
