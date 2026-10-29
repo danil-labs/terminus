@@ -8414,8 +8414,8 @@ export default function App() {
             />
             </>}
           />
-          {/* La superficie: barra, ventanas y panel derecho, con la esquina redondeada sobre el marco. */}
-          <div class="relative flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-tl-[10px]" data-surface="">
+          {/* La superficie: barra, ventana y panel derecho, una caja redondeada que flota sobre el marco. */}
+          <div class="relative mr-2 mb-2 flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-[10px]" data-surface="">
           {/* Los topes los pone quien monta: el ancho por debajo del
               cual algo deja de caber solo lo sabe su contenido. Por
               debajo de 220 los títulos del historial dejan de caber; por
