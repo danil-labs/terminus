@@ -659,7 +659,7 @@ export default function VisorDeArchivo(props: {
         e.preventDefault();
         alternarAjuste();
       }}
-      class="flex h-full min-h-0 flex-col"
+      class="@container flex h-full min-h-0 flex-col"
     >
       {/* Los controles de escritura van en esta fila: es la única que está siempre. */}
       <div class="flex h-8.5 shrink-0 items-center gap-2 border-b border-border pr-1.5 pl-2.5">
@@ -723,7 +723,7 @@ export default function VisorDeArchivo(props: {
           </BotonDeBarra>
         </Show>
         <Show when={mostrarCambios()}>
-          <SelectorDeDisposicion />
+          <div class="flex @max-[560px]:hidden"><SelectorDeDisposicion /></div>
         </Show>
 
         <Show when={conPrevia()}>
@@ -732,7 +732,7 @@ export default function VisorDeArchivo(props: {
               <IconoCodigo size={13} aria-hidden="true" />
               <span class="sr-only">{t("code.file.layout.code")}</span>
             </BotonDeBarra>
-            <BotonDeBarra pulsado={disposicion() === "lado"} onClick={() => elegir("lado")} titulo={t("code.file.layout.split.title")}>
+            <BotonDeBarra pulsado={disposicion() === "lado"} onClick={() => elegir("lado")} titulo={t("code.file.layout.split.title")} class="@max-[560px]:hidden">
               <IconoLado size={13} aria-hidden="true" />
               <span class="sr-only">{t("code.file.layout.split")}</span>
             </BotonDeBarra>
