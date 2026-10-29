@@ -4839,6 +4839,42 @@ if (!roto) {
     auto.w.close();
   }
 
+  // Un motor anterior a los pendientes durables los lista sin `id` ni
+  // `revision`: el gate se contesta igual, por su `request_id`.
+  {
+    const respuestas = [];
+    const viejo = await boot("listo", "permiso-motor-sin-revision", {
+      ...VENTANA,
+      pending_requests: ({ session }) =>
+        session === "s1"
+          ? { questions: [], permissions: [{ request_id: "perm-1", tool: "Bash", target: "rm -rf" }] }
+          : { questions: [], permissions: [] },
+      respond_permission: (args) => {
+        respuestas.push(args);
+        return {
+          id: "t-decision", role: "user", text: "", author: null,
+          permission: { request_id: args.requestId, tool: "Bash", target: "rm -rf", allow: args.allow, when: 1 },
+        };
+      },
+    });
+    const docO = viejo.w.document;
+    docO.querySelector('[data-sesion="s1"]')?.click();
+    await sleep(200);
+    viejo.w.dispatchEvent(new viejo.w.Event("focus"));
+    await sleep(400);
+    [...docO.querySelectorAll("button")].find((b) => b.textContent.trim() === "Aprobar y ejecutar")?.click();
+    await sleep(300);
+    assert.deepEqual(
+      respuestas.map(({ session, requestId, revision, allow }) => ({ session, requestId, revision, allow })),
+      [{ session: "s1", requestId: "perm-1", revision: undefined, allow: true }],
+      "sin revisión el permiso se aprueba por su request_id",
+    );
+    assert.ok(!docO.body.textContent.includes("Aprobar acción"), "el gate aprobado deja de pedir respuesta");
+    assert.ok(!docO.body.textContent.includes("no indicó cómo contestarle"));
+    assert.deepEqual(viejo.fallos, []);
+    viejo.w.close();
+  }
+
   // Lo nuevo del workspace arranca con su modo por defecto y lo que ya existe
   // conserva el suyo. El ajuste vive en General, antes del contexto.
   const defaultSaves = [];

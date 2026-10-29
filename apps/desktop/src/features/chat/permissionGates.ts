@@ -1,6 +1,6 @@
 import type { PermissionRequest } from "./Chat";
 
-export type PendingPermission = { id: string; request_id: string; revision: number; tool: string; target: string | null };
+export type PendingPermission = { id?: string; request_id: string; revision?: number; tool: string; target: string | null };
 
 /**
  * Funde una lectura de `pending_requests` con los gates de esa tarea.
@@ -17,7 +17,9 @@ export function mergeGates(
   desde: number,
 ): PermissionRequest[] {
   if (!read.length) return ps;
-  const leido = (p: PermissionRequest) => read.some((x) => x.request_id === p.requestId || x.id === p.durableId || x.id === p.requestId);
+  // Sin `id` (motor anterior) solo casa el `request_id`: `undefined === undefined` daba por leídos todos los gates.
+  const leido = (p: PermissionRequest) =>
+    read.some((x) => x.request_id === p.requestId || (x.id !== undefined && (x.id === p.durableId || x.id === p.requestId)));
   return [
     ...ps.filter((p) => p.session !== session || (!leido(p) && (p.llegada ?? 0) >= desde)),
     ...read.map((p) => ({

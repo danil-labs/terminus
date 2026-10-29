@@ -20,6 +20,13 @@ test("the gate whose event triggered the read survives until the record appears"
   assert.deepEqual(merged.map((p) => p.requestId).sort(), ["trigger", "x"]);
 });
 
+test("a read from an engine without durable ids only matches by request_id", () => {
+  const ps = [gate("old", { llegada: 1 }), gate("live", { llegada: 3 })];
+  const merged = mergeGates(ps, "s1", "w", [{ request_id: "a", tool: "Bash", target: "echo" }], 2) as { requestId: string; durableId?: string }[];
+  assert.deepEqual(merged.map((p) => p.requestId).sort(), ["a", "live"]);
+  assert.equal(merged.find((p) => p.requestId === "a")?.durableId, undefined);
+});
+
 test("an empty read removes nothing and a read gate keeps its origin", () => {
   const ps = [gate("a", { llegada: 1, origin: { kind: "task" } })];
   assert.equal(mergeGates(ps, "s1", "w", [], 5), ps);

@@ -4,7 +4,7 @@ import { mensajeDeFallo } from "./failures.ts";
 import { claveDe } from "../../lib/failure.ts";
 import { t } from "../../lib/i18n.ts";
 
-type Pendiente = { id: string; request_id: string; state?: string; closed?: string | null };
+type Pendiente = { id?: string; request_id: string; state?: string; closed?: string | null };
 type Pendientes = { permissions: Pendiente[]; records?: { permissions: Pendiente[] } };
 
 const RESPONDIDA = new Set(["answering", "sent", "resolved"]);
