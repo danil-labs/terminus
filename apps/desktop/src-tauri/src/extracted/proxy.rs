@@ -517,7 +517,11 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
             }
 
             let target = match name.as_str() {
-                "workspaces_startup" if state.workspace().is_none() => value["active"].as_str(),
+                // La ventana abre con `list_workspaces` sin esperar al arranque,
+                // que migra dentro y tarda: la primera respuesta fija el ámbito.
+                "workspaces_startup" | "list_workspaces" if state.workspace().is_none() => {
+                    value["active"].as_str()
+                }
                 _ => None,
             };
             if let Some(target) = target {

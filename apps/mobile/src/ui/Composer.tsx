@@ -72,6 +72,7 @@ export function Composer({
   onSubmit,
   onInject,
   onStop,
+  onModeChange,
   bottomInset = true,
   testID = "composer",
 }: {
@@ -98,6 +99,8 @@ export function Composer({
   onSubmit: (submission: Submission) => Promise<boolean>;
   onInject?: (text: string, attachments: string[]) => Promise<boolean>;
   onStop?: () => void;
+  /** Elegir modo con el turno en marcha: el turno vivo arrancó con el de entonces y no lo relee. */
+  onModeChange?: (mode: string) => void;
   /** Bajo una barra de pestañas, la barra ya deja el hueco del sistema. */
   bottomInset?: boolean;
   testID?: string;
@@ -522,6 +525,7 @@ export function Composer({
             onPress={() => {
               setMode(m.id);
               setSheet(null);
+              if (running) onModeChange?.(m.id);
             }}
           />
         ))}

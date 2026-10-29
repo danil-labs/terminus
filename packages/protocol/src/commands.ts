@@ -63,6 +63,8 @@ export const APP_ACTIONS = [
   "inject_message",
   "stop_turn",
   "respond_permission",
+  // Cambiar el modo de permisos con el turno en marcha: el turno vivo no relee el del cuadro.
+  "set_permission_mode",
   "answer_question",
   "mark_task_seen",
   // La tarjeta de vista previa: Fijar y Archivar.

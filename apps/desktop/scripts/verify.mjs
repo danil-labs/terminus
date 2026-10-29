@@ -74,6 +74,7 @@ const steps = [
   ["Los visuales del chat llegan por partes y caen a tree_show con un motor anterior", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/chat-visual-parts.test.ts")], root],
   ["La foto del sidebar se guarda acotada y con espera", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/shell-cache.test.ts")], root],
   ["El panel Carpeta reintenta solo, no amontona lecturas y no tira lo último bueno", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/tree-loader.test.ts")], root],
+  ["La ventana abre con la lista ligera y el arranque la confirma sin saltarse la negativa", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/early-startup.test.ts")], root],
   ["La nota de la versión sale en el idioma de la app", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/release-notes.test.ts")], root],
   ["Las tareas de la página de un agente se paginan sin separar subtareas de su padre", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/agent-page-tasks.test.ts")], root],
   ["El riel de subtareas lanzadas suelta las que ya se terminaron", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/delegated-rail.test.ts")], root],
