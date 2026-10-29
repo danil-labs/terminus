@@ -608,6 +608,7 @@ const steps = [
   ["El visor espera a noVNC y libera cada conexión al cerrar o reintentar", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/screen-connection.test.ts"), join(root, "../../packages/computers/test/screen.test.ts")], root],
   ["Sin el stream empujado la ventana sondea como siempre", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/push-fallback.test.mjs")], root],
   ["El mantenimiento exitoso no avisa y los fallos descartados no se repiten", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/activity-notice.test.mjs")], root],
+  ["Con tareas trabajando, reiniciar o salir espera a que terminen o detiene las que nombra", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/update-wait.test.mjs")], root],
   ["Una respuesta con visual no desaparece del chat aunque el turno no se guarde o el visual no se lea", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/chat-turn-unsaved.test.mjs")], root],
   ["Abrir una tarea larga no cuesta más que su techo", process.execPath, [join(root, "tests/perf/open-task-cost.mjs")], root],
   ["Releer una tarea abierta no remonta su hilo", process.execPath, [join(root, "tests/perf/reread-thread.mjs")], root],
