@@ -23,12 +23,14 @@ export {
   type ConnectionMachine,
   type ConnectionPatch,
   type ConnectionState,
+  type UpdatedConnection,
   PERMISSION_MODES,
   connectionAudit,
   listConnections,
   mcpUrl,
   revokeConnection,
   updateConnection,
+  webhookUrlOk,
 } from "./connections.ts";
 export {
   type MachineState,
