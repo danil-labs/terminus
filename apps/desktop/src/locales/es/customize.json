@@ -1,8 +1,5 @@
 {
-  "customize.title": "Personalizar",
   "customize.description": "Elige qué aparece en este espacio. Agregar una vista no conecta servicios ni autoriza lecturas.",
-  "customize.add": "Agregar",
-  "customize.remove": "Quitar",
   "customize.unavailable": "No disponible",
   "customize.broadcasts": "Difusiones",
   "customize.prototype": "Prototipo · datos de ejemplo",

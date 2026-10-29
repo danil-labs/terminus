@@ -8,17 +8,16 @@ import { createCustomization } from '../../lib/customization';
 import { featureEntries } from '../../lib/attention-labels';
 import { AttentionMenu, PersonalizeMenu } from './SidebarEntries';
 
-const CustomizationDialog = lazy(() => import('./CustomizationDialog').then(module => ({default:module.CustomizationDialog})));
+const CustomizationSection = lazy(() => import('./CustomizationSection').then(module => ({default:module.CustomizationSection})));
 const Channels = lazy(() => import('./Channels').then(module => ({default:module.Channels})));
 const Broadcasts = lazy(() => import('./Broadcasts').then(module => ({default:module.Broadcasts})));
 
 export function attentionCapability(demo: boolean, initial: boolean, session?: InboxSession & { subscribe?: (clear: () => void) => () => void; userId?: string | null }) {
-  let personalizeTrigger: HTMLButtonElement | undefined;
   return {
     customization: createCustomization, entries: featureEntries,
     demo, userId: demo ? 'demo' : session?.userId, subscribe: session?.subscribe,
-    sidebarMenu: AttentionMenu, personalizeMenu: (props: {collapsed:boolean;onOpen():void}) => <PersonalizeMenu {...props} onTrigger={trigger=>{personalizeTrigger=trigger;}}/>,
-    dialog: (props: import("./CustomizationDialog").CustomizationDialogProps) => <Suspense fallback={null}><CustomizationDialog {...props} restoreFocus={()=>personalizeTrigger?.isConnected && personalizeTrigger.focus()}/></Suspense>,
+    sidebarMenu: AttentionMenu, personalizeMenu: PersonalizeMenu,
+    catalog: (props: import("./CustomizationSection").CustomizationSectionProps) => <Suspense fallback={null}><CustomizationSection {...props}/></Suspense>,
     broadcasts: () => <Suspense fallback={null}><Broadcasts/></Suspense>,
     initial,
     render: () => <Attention demo={demo} session={session}/>,

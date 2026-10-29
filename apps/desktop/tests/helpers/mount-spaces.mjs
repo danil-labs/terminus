@@ -159,9 +159,9 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
       pref: (k) => JSON.parse(app.w.localStorage.getItem(`harness.layout.${k}`) ?? "null"),
       caja: () =>
         [...doc.querySelectorAll("[data-ventana]")].find((el) => !el.classList.contains("hidden") && el.querySelector("textarea"))?.querySelector("textarea"),
-      /** Elige un agente en el menú de filtro del riel; `null` es «Todos». */
+      /** Elige un agente en «Filtrar y agrupar» de Personalizar; `null` es «Todos». */
       filtrarPorAgente: async (nombre) => {
-        doc.querySelector('button[aria-haspopup="menu"][aria-label^="Filtrar y agrupar"]').click();
+        doc.querySelector("button[data-personalize]").click();
         await sleep(80);
         const grupo = doc.querySelector('[role="menu"] [role="group"][aria-label="Agente"]');
         assert.ok(grupo, "el menú de filtro ofrece agentes");
@@ -357,11 +357,11 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     await sleep(400);
     assert.ok(u.doc.querySelector('[data-sesion="t3"]') && u.doc.querySelector('[data-sesion="t4"]'), "otro espacio no hereda el filtro");
     // Agrupar por carpeta es lo de omisión: no cuenta como cambio, el agente sí.
-    assert.equal(u.doc.querySelector('[data-sidebar-scope] button[aria-haspopup="menu"]').getAttribute("aria-label"), "Filtrar y agrupar");
+    assert.equal(u.doc.querySelector("button[data-personalize]").getAttribute("aria-label"), "Personalizar");
     u.doc.querySelector('[data-space="i1"]').click();
     await sleep(400);
     assert.ok(u.doc.querySelector('[data-sesion="t1"]') && !u.doc.querySelector('[data-sesion="t2"]'), "volver al espacio recupera su filtro");
-    assert.match(u.doc.querySelector('[data-sidebar-scope] button[aria-haspopup="menu"]').getAttribute("aria-label"), /\(1 cambiados\)/);
+    assert.match(u.doc.querySelector("button[data-personalize]").getAttribute("aria-label"), /\(1 cambiados\)/);
     assert.equal(u.pref("sidebar.view.w.i1").agent, "ada");
     assert.equal(u.pref("sidebar.view.w.i2")?.agent ?? null, null);
     await u.filtrarPorAgente(null);

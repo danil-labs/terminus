@@ -1,20 +1,20 @@
-import { For, Show } from 'solid-js';
+import { Index, Show } from 'solid-js';
 import { t } from '../../lib/i18n';
 import { Badge } from '../../ui/Badge';
-import { Button } from '../../ui/Button';
+import { Toggle } from '../../ui/Toggle';
 
 export type FeatureEntry = { id: string; title: string; description: string; available: boolean; selected: boolean };
 
 export function FeatureCatalog(props: { entries: readonly FeatureEntry[]; onToggle(id: string): void }) {
-  return <section class="min-w-0" aria-label={t("customize.title")}>
-    <p class="mb-4 text-sm leading-relaxed text-neutral-500">{t("customize.description")}</p>
-    <ul class="m-0 list-none p-0"><For each={props.entries}>{entry =>
-      <li class="flex min-w-0 items-start gap-3 border-t border-border py-3">
-        <div class="min-w-0 flex-1"><h3 class="m-0 text-sm font-semibold">{entry.title}</h3><p class="mb-0 mt-1 text-xs leading-relaxed text-neutral-500">{entry.description}</p></div>
-        <Show when={entry.available} fallback={<Badge class="mt-1 shrink-0" forma="dato">{t("customize.unavailable")}</Badge>}>
-          <Button size="sm" variant="secondary" aria-label={`${(entry.selected ? t("customize.remove") : t("customize.add"))} ${entry.title}`} aria-pressed={entry.selected} onClick={() => props.onToggle(entry.id)}>{(entry.selected ? t("customize.remove") : t("customize.add"))}</Button>
+  return <section class="min-w-0" aria-label={t("shell.customize.in_sidebar")}>
+    <p class="m-0 mb-1 text-[0.6875rem] leading-snug text-neutral-500">{t("customize.description")}</p>
+    <ul class="m-0 list-none p-0"><Index each={props.entries}>{entry =>
+      <li class="flex min-w-0 items-center gap-3 py-1.5" title={entry().description}>
+        <span class={`min-w-0 flex-1 truncate text-[0.8125rem] ${entry().available ? 'text-neutral-950' : 'text-neutral-500'}`}>{entry().title}</span>
+        <Show when={entry().available} fallback={<Badge class="shrink-0" forma="dato">{t("customize.unavailable")}</Badge>}>
+          <Toggle checked={entry().selected} label={entry().title} onChange={() => props.onToggle(entry().id)}/>
         </Show>
       </li>
-    }</For></ul>
+    }</Index></ul>
   </section>;
 }
