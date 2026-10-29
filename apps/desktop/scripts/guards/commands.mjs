@@ -156,6 +156,7 @@ for (const l of bloque[1].split("\n")) {
 // manda el contrato congelado (`commands.json`).
 const manifest = JSON.parse(readFileSync(CONTRACT, "utf8"));
 for (const command of manifest.commands) {
+  if (!["invoke", "stream", "desktop"].includes(command.kind)) continue;
   if (!registrados.has(command.name)) registrados.set(command.name, `contrato (${command.path})`);
 }
 

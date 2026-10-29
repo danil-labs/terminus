@@ -512,3 +512,41 @@ those systems.
   window runs its Tinymist. Settings stops every live view before touching the
   plugin (`typst_live_stop`); moving the plugin into the window is planned in
   seldon-host.
+
+## Handler policy and durable decisions
+
+The handler profile reads memory and requested access through the local
+`handler_action` facade (`src-tauri/src/extracted/handler_policy.rs`). Its
+closed request type permits only `handler list`, `handler requests`,
+`handler approve`, `handler revoke` and `handler release`. The RPC envelope
+captures workspace and folder, including an empty folder; the engine's
+private native credential supplies authority. These routes are not relayed.
+The machine router rejects web and other-machine destinations before calling
+the facade. Approval hints and quarantine release require explicit input.
+
+The facade checks the exact route in engine capabilities and follows a durable
+mutation receipt until completion or a bounded timeout. Errors retain their
+code and structured detail. A timeout retains the operation id when received;
+an uncertain initial delivery is not automatically retried. A pending receipt locks
+further mutations for the captured handler scope while the window remains open,
+including closing and reopening its panel. The resume action only reads
+`operation show`; it rejects receipts for other workspaces, folders or commands.
+
+Permission events trigger a reread of `pending_requests`. The window restores
+only the live permissions list, keeps durable id and revision, and sends both
+when answering. Question answers also reread the matching request. A stale
+permission response refreshes the pending state without automatically approving
+it. If a failed decision disappears from the live list, its durable record and
+transport error remain in the conversation diagnostic; absence is not delivery.
+The native window still authenticates as the legacy administrative client;
+this update does not register a new client principal.
+
+The desktop CLI forwards `task create --as peer|worker` arguments unchanged to
+the bundled engine executable. Rank semantics and negotiation of `peer_rank_v1`
+belong to that CLI and engine; the window does not derive rank from parent ids.
+The contract snapshot comes from seldon-host `437a280`. Its compatible engine
+release is not pinned yet: `MOTOR_PENDIENTE` preserves the publication block.
+
+`handler list` describes memory configuration, not effective turn availability.
+External slots are shown as declarations; grants come separately from requests.
+The window does not infer an effective memory store from either view.

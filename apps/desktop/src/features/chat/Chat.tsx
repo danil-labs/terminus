@@ -133,6 +133,7 @@ import Entrega, { type Producido } from "./Delivery";
 import {
   type CambioPorCupo,
   type FalloDelTurno,
+  avisoDeEncargado,
   cupoResuelveElFallo,
   gestoDeLaFila,
   prosaDelCambioPorCupo,
@@ -339,7 +340,12 @@ export type PermissionOrigin = {
 
 export type PermissionRequest = {
   session: string;
+  workspace?: string;
   requestId: string;
+  revision?: number;
+  durableId?: string;
+  /** Orden de llegada por evento: decide qué conserva una relectura que aún no lo trae. */
+  llegada?: number;
   tool: string;
   target: string | null;
   origin: PermissionOrigin | null;
@@ -4138,6 +4144,8 @@ function CambioDeContexto(props: {
  * que se auditó.
  */
 function textoDeSistema(m: Msg): string {
+  const aviso = avisoDeEncargado(m);
+  if (aviso) return aviso;
   if (m.meta !== "reenvio" || m.text) return m.text;
   const a = (m.recipients ?? []).map((r) => r.name).join(", ");
   return m.encargado && a

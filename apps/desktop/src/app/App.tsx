@@ -1,3 +1,4 @@
+import type { HandlerTarget } from "../features/settings/HandlerPolicy";
 import { deliver, type JournalEvent, listen } from "../lib/serviceEvents";
 import { open } from "@tauri-apps/plugin-dialog";
 import Archive from "lucide-solid/icons/archive";
@@ -86,7 +87,7 @@ import Observability from "../features/observability/Observability";
 import AnadirCarpeta, { type ClonEnCurso, type InicioDeCarpeta } from "../features/projects/AddWorkdir";
 import AgentPageTasks from "../features/projects/AgentPageTasks";
 // Chunk aparte: el perfil completo de un agente solo se carga al abrirlo.
-const AgentProfile = lazy(() => import("../features/projects/AgentProfile"));
+const AgentProfile = retryableLazy(() => import("../features/projects/AgentProfile"));
 // El alta solo se abre sin workspace o al agregar otro: no entra en la carga inicial.
 const Onboarding = lazy(() => import("../features/onboarding/Onboarding"));
 const TaskLocation = lazy(() => import("../features/chat/TaskLocation"));
@@ -280,6 +281,9 @@ import {
   toggleMaximizeFromHeader,
 } from "../lib/window";
 import { Button } from "../ui/Button";
+import { LazyPart, retryableLazy } from "../ui/LazyPart";
+import { mergeGates } from "../features/chat/permissionGates";
+import { errorCode } from "../lib/errorCode.ts";
 import { Dialog, DialogContent, DialogTitle } from "../ui/Dialog";
 import { asFailure, claveDe, prosaDe } from "../ui/Failure";
 import { BotonConAtajo } from "../ui/Shortcut";
@@ -640,6 +644,9 @@ export default function App() {
   // El árbol, el visor y kn piden por `machineOf` desde fuera de aquí: con la fila, no solo con el prefijo.
   setTaskRowMachine((id) => filaDe(id)?.machine);
   const deLaTarea = (id: string | null | undefined) => machineOf(id);
+  /** La máquina de esa tarea o carpeta y su workspace, para lo que responde o actúa en ellas. */
+  const opcionesDeLaTarea = (id: string | null | undefined, workspace: string | null | undefined) =>
+    ({ headers: { ...machineOf(id)?.headers, ...(workspace ? { "x-terminus-workspace": workspace } : {}) } });
   const enMaquina = (machine: string | undefined) => (machine ? { headers: { "x-terminus-machine": machine } } : undefined);
   // En qué máquina vive cada adjunto que no está en el motor de la ventana:
   // la imagen pegada recién guardada y su copia ya preparada.
@@ -2062,7 +2069,7 @@ export default function App() {
   // conversación y deja la anterior abandonada, sin error y sin aviso. Para
   // eso está `recargarMaterial`.
   /** En la web una máquina apagada tiene su indicador y su rebanada: lo que no contestó no es un error. */
-  const apagadaEnLaWeb = (e: unknown) => !!capabilities().computerStatus && (e as { detail?: unknown } | null)?.detail === "machine_off";
+  const apagadaEnLaWeb = (e: unknown) => !!capabilities().computerStatus && errorCode(e) === "machine_off";
 
   async function aplicar(a: Startup) {
     guardarCache.flush();
@@ -2878,8 +2885,9 @@ export default function App() {
       // pinta con lo que trae el evento; la relectura del cierre la reemplaza.
       if (kind === "permission_resolved") {
         if (!request_id) return;
-        const gate = permissions().find((p) => p.requestId === request_id);
-        setPermissions((ps) => ps.filter((p) => p.requestId !== request_id));
+        permissionReads.set(session, (permissionReads.get(session) ?? 0) + 1);
+        const gate = permissions().find((p) => p.session === session && (p.requestId === request_id || p.durableId === request_id));
+        setPermissions((ps) => ps.filter((p) => p.session !== session || (p.requestId !== request_id && p.durableId !== request_id)));
         if (gate && id && esDelWorkspaceAbierto(workspace)) {
           asentar(session, (ms) => ms.some((m) => m.turno === id) ? ms : [
             ...ms,
@@ -2917,12 +2925,14 @@ export default function App() {
           return;
         }
         setPermissions((ps) =>
-          ps.some((p) => p.requestId === request_id)
+          ps.some((p) => p.session === session && (p.requestId === request_id || p.durableId === request_id))
             ? ps
             : [
                 ...ps,
                 {
                   session,
+                  workspace: workspace ?? workspaceActivo() ?? undefined,
+                  llegada: ++gateSeq,
                   requestId: request_id,
                   tool: text,
                   target: target ?? meta,
@@ -2930,6 +2940,7 @@ export default function App() {
                 },
               ],
         );
+        void reponerGates(session, workspace ?? workspaceActivo());
         return;
       }
 
@@ -2960,7 +2971,7 @@ export default function App() {
       }
       if (kind === "notice") {
         const message = clavesConocidas().has(text) ? t(text) : text;
-        append((m) => [...m, { role: "system", text: message, meta: "aviso" }]);
+        append((m) => [...m, { role: "system", text: message, meta: meta?.startsWith("handler_") ? meta : "aviso" }]);
         return;
       }
 
@@ -3246,12 +3257,18 @@ export default function App() {
   async function responderPermiso(p: PermissionRequest, allow: boolean) {
     setRespondiendoPermiso(true);
     setPermissionError(null);
+    const workspace = p.workspace ?? workspaceActivo();
     try {
+      const current = p.revision === undefined
+        ? (await pendientesDe(p.session, workspace))?.permissions.find((x) => (x.request_id === p.requestId || x.id === p.requestId))
+        : { revision: p.revision, id: p.durableId };
+      if (!current || current.revision === undefined) throw new Error(t("shell.turn.permission_no_reply"));
       const guardado = await invoke<Turn>("respond_permission", {
         session: p.session,
-        requestId: p.requestId,
+        requestId: current.id ?? p.requestId,
+        revision: current.revision,
         allow,
-      }, deLaTarea(p.session));
+      }, opcionesDeLaTarea(p.session, workspace));
       // El `permission_resolved` de esta misma decisión puede haber llegado
       // antes que la respuesta: ese turno ya está pintado.
       const fila: Msg = {
@@ -3262,16 +3279,16 @@ export default function App() {
         author: guardado.author ?? undefined,
       };
       asentar(p.session, (ms) => [...ms.filter((m) => !fila.turno || m.turno !== fila.turno), fila]);
-      setPermissions((ps) => ps.filter((x) => x.requestId !== p.requestId));
+      setPermissions((ps) => ps.filter((x) => x.session !== p.session || x.requestId !== p.requestId));
     } catch (e) {
-      // Si el pedido ya no está pendiente —lo decidió otra ventana o su turno
-      // cerró— no hay nada que contestar: se quita el gate en vez de dejarlo
-      // con un error que ningún botón resuelve.
-      const pendientes = await pendientesDe(p.session);
-      if (pendientes && !pendientes.permissions.some((x) => x.request_id === p.requestId)) {
-        setPermissions((ps) => ps.filter((x) => x.requestId !== p.requestId));
+      const { sinRespuesta } = await import("../features/chat/permissionRecovery");
+      const cerrada = sinRespuesta(p, await pendientesDe(p.session, workspace), e);
+      if (cerrada) {
+        setPermissions(ps => ps.filter(x => x.session !== p.session || x.requestId !== p.requestId));
+        if (cerrada !== "respondida") asentar(p.session, ms => [...ms, cerrada]);
         return;
       }
+      await reponerGates(p.session, workspace);
       setPermissionError(prosaDe(e));
     } finally {
       setRespondiendoPermiso(false);
@@ -5965,12 +5982,13 @@ export default function App() {
   }
 
   type Pendientes = {
-    questions: { request_id: string; turn: string }[];
-    permissions: { request_id: string; tool: string; target: string | null }[];
+    records?: { permissions: { id: string; request_id: string; state: string; [key: string]: unknown }[] };
+    questions: { id: string; request_id: string; revision: number; turn: string }[];
+    permissions: { id: string; request_id: string; revision: number; tool: string; target: string | null }[];
   };
   /** Lo que esa tarea tiene esperando. No lanza: sin respuesta, no hay nada. */
-  const pendientesDe = (session: string) =>
-    invoke<Pendientes>("pending_requests", { session }, deLaTarea(session)).catch(() => null);
+  const pendientesDe = (session: string, workspace = workspaceActivo()) =>
+    invoke<Pendientes>("pending_requests", { session }, opcionesDeLaTarea(session, workspace)).catch(() => null);
 
   /**
    * El `request_id` de la pregunta viva de este turno, si alguien espera.
@@ -5990,21 +6008,16 @@ export default function App() {
    * mientras no había nadie escuchando, y sin gate el turno espera una
    * decisión que nadie puede tomar.
    */
-  async function reponerGates(session: string) {
-    const pendientes = await pendientesDe(session);
-    if (!pendientes?.permissions.length) return;
-    setPermissions((ps) => [
-      ...ps,
-      ...pendientes.permissions
-        .filter((p) => !ps.some((x) => x.requestId === p.request_id))
-        .map((p) => ({
-          session,
-          requestId: p.request_id,
-          tool: p.tool,
-          target: p.target,
-          origin: null,
-        })),
-    ]);
+  const permissionReads = new Map<string, number>();
+  let gateSeq = 0;
+  async function reponerGates(session: string, workspace = workspaceActivo()) {
+    const generation = sessionGeneration;
+    const reading = (permissionReads.get(session) ?? 0) + 1;
+    permissionReads.set(session, reading);
+    const desde = gateSeq;
+    const pendientes = await pendientesDe(session, workspace);
+    if (!pendientes || generation !== sessionGeneration || reading !== permissionReads.get(session)) return;
+    setPermissions((ps) => mergeGates(ps, session, workspace, pendientes.permissions, desde));
   }
 
   /**
@@ -6050,6 +6063,8 @@ export default function App() {
     turno: string,
     manda: RespuestaEnviada[],
   ): Promise<boolean> {
+    const questionSession = sessionId();
+    const questionWorkspace = workspaceActivo();
     const mensaje = msgs().find((m) => m.turno === turno);
     if (!mensaje)
       throw new Error(t("shell.answer.question_missing"));
@@ -6063,16 +6078,19 @@ export default function App() {
     // proceso.
     const viva = mensaje?.questionRequestId
       ? mensaje.questionRequestId
-      : await atadura(sessionId(), turno);
+      : await atadura(questionSession, turno);
     if (viva) {
-      const sid = sessionId();
+      const sid = questionSession;
       if (!sid) throw new Error(t("shell.answer.no_session"));
       try {
+        const pending = (await pendientesDe(sid, questionWorkspace))?.questions.find((q) => (q.request_id === viva || q.id === viva) && q.turn === turno);
+        if (!pending) throw new Error(t("shell.answer.question_missing"));
         const guardado = await invoke<Turn>("answer_question", {
           session: sid,
-          requestId: viva,
+          requestId: pending.id,
+          revision: pending.revision,
           respuestas: manda,
-        }, deLaTarea(sid));
+        }, opcionesDeLaTarea(questionSession, questionWorkspace));
         soltarPreguntas(sid, turno);
         asentar(sid, (ms) => [
           ...ms,
@@ -6804,9 +6822,10 @@ export default function App() {
       const fila = filaDe(pp.sesion ?? "");
       return fila && esChatDeAgente(fila) ? (fila.agent ?? null) : null;
     });
-    const identidadVisualDeLaCelda = () => pp.sesion
+    // Memo: releer la fila tras una aprobación no es cambiar de agente ni cierra su perfil.
+    const identidadVisualDeLaCelda = createMemo(() => pp.sesion
       ? (filaDe(pp.sesion)?.agent ?? null)
-      : encargadoDeLaCelda();
+      : encargadoDeLaCelda());
     /**
      * El estado que enseña la cabecera es el MISMO que pinta su fila del riel.
      * Derivarlo de «esta conversación tiene turno vivo» decía «Despierto» de
@@ -6882,6 +6901,15 @@ export default function App() {
       if (pedido.project !== proyectoDeLaCelda()?.id) return;
       setRequestedProfile(null);
       setViewingProfile(true);
+    });
+    // Una cadena y no un objeto: releer la lista de proyectos no reinicia el panel ni borra su resultado.
+    const handlerPolicy = createMemo<HandlerTarget | undefined>(() => {
+      const workspace = workspaceActivo();
+      const project = proyectoDeLaCelda()?.id ?? "";
+      const name = identidadVisualDeLaCelda();
+      return workspace && name
+        ? JSON.stringify([workspace, project, name, opcionesDeLaTarea(project, workspace).headers])
+        : undefined;
     });
     const lecturaDeLaCelda = () => lecturas.get(pp.sesion ?? "") ?? null;
     const preguntasDeLaCelda = almacenDePreguntas(() => pp.sesion);
@@ -7246,10 +7274,11 @@ export default function App() {
       }
     >
       {(e) => (
-        <AgentProfile
+        <LazyPart><AgentProfile
           project={proyectoDeLaCelda()?.id ?? ""}
           agent={e()}
           profile={cellProfile()}
+          handlerPolicy={handlerPolicy()}
           status={estadoDelEncargado()}
           background={chatBackground() ?? null}
           superficies={superficies() ?? []}
@@ -7268,7 +7297,7 @@ export default function App() {
           }}
           onDeleted={() => setViewingProfile(false)}
           onClose={() => setViewingProfile(false)}
-        />
+        /></LazyPart>
       )}
     </Show>
     );

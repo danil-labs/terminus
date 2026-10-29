@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 // abajo son identificadores en vez de frases.
 import "../helpers/catalog.ts";
 import {
+  avisoDeEncargado as handlerNotice,
   mensajeDeFallo,
   cupoResuelveElFallo as quotaResolves,
   gestoDelFallo as failureAction,
@@ -278,4 +279,69 @@ test("el historial con object Object ofrece una salida al volver a abrirlo", () 
     assert.match(text, /soporte/);
     assert.doesNotMatch(text, /object Object/);
   }
+});
+
+test("a handler limit preserves its explanation and structured diagnostic", () => {
+  const error = {
+    code: "handler_limit_unenforceable",
+    message_key: "cli.error.handler_limit_unenforceable",
+    detail: { provider: "codex", reason: "permissions_ceiling", alternatives: ["claude"] },
+  };
+  const message = mensajeDeFallo(error);
+  assert.match(message.text, /l\u00edmites del encargado/);
+  assert.match(message.fallo.detail, /permissions_ceiling/);
+  assert.match(message.fallo.detail, /claude/);
+  assert.doesNotMatch(message.text, /object Object|cli\.error/);
+});
+
+test("handler notices remain translated when history is reloaded", () => {
+  for (const meta of ["handler_definition_modified", "handler_memory_in_doubt", "handler_memory_unavailable", "handler_memory_legacy", "handler_requires_tool_missing"]) {
+    const text = failureText({ text: meta, meta });
+    assert.doesNotMatch(text, /handler_|chat\.notice/);
+    assert.ok(text.length > 20);
+  }
+});
+
+
+test("a handler notice saved with engine prose uses the window catalog and keeps the tool", () => {
+  const saved = { text: "El encargado pide la herramienta `seldon-lab-missing-tool` y no está en el PATH de este turno.", meta: "handler_requires_tool_missing" };
+  assert.equal(handlerNotice(saved), failureText(saved));
+  assert.match(handlerNotice(saved) ?? "", /\(seldon-lab-missing-tool\)$/);
+  assert.notEqual(handlerNotice(saved), saved.text);
+  assert.equal(handlerNotice({ text: "otro aviso", meta: "aviso" }), null);
+});
+
+test("a notice the engine saves as a catalog key reads as its phrase", () => {
+  assert.doesNotMatch(failureText({ text: "chat.mentions.in_code" }), /chat\.mentions/);
+  assert.match(failureText({ text: "chat.mentions.in_code" }), /código/);
+});
+
+import { handlerMutation, pendingHandlerOperation, resumeHandlerOperation, staleReason } from "../../src/features/settings/handlerOperations.ts";
+test("an uncertain handler mutation survives scope switches and resumes without repeating", async () => {
+  let mutations = 0;
+  const unknown = { detail: { detail: { operation: "op-7" } } };
+  await assert.rejects(handlerMutation("workspace-a/folder/handler", "approve", async () => { mutations++; throw unknown; }));
+  await handlerMutation("workspace-b/folder/handler", "revoke", async () => true);
+  assert.equal(pendingHandlerOperation("workspace-a/folder/handler")?.operation, "op-7");
+  await assert.rejects(handlerMutation("workspace-a/folder/handler", "release", async () => { mutations++; }));
+  await assert.rejects(resumeHandlerOperation("workspace-a/folder/handler", async id => { assert.equal(id, "op-7"); throw new Error("offline"); }));
+  assert.ok(pendingHandlerOperation("workspace-a/folder/handler"));
+  await resumeHandlerOperation("workspace-a/folder/handler", async id => { assert.equal(id, "op-7"); return {}; });
+  assert.equal(pendingHandlerOperation("workspace-a/folder/handler"), undefined);
+  assert.equal(mutations, 1);
+});
+test("a terminal handler receipt releases the mutation lock and retains its error", async () => {
+  await assert.rejects(handlerMutation("terminal-scope", "approve", async () => { throw { detail: { detail: { operation: "op-8" } } }; }));
+  const terminal = { detail: { detail: { operation: "op-8", settled: true, detail: { read_tools: ["read"] } } } };
+  await assert.rejects(resumeHandlerOperation("terminal-scope", async () => { throw terminal; }), e => e === terminal);
+  assert.equal(pendingHandlerOperation("terminal-scope"), undefined);
+});
+
+test("a stale approval reads its reason as a phrase, never the engine code", () => {
+  const approval = { digest: "sha256:a", at: 1, by: "person", revoked_at: null };
+  const revoked = staleReason({ approval: { ...approval, revoked_at: 2 }, dirty: false });
+  const changed = staleReason({ approval, dirty: false });
+  assert.ok(revoked.length > 5 && changed.length > 5 && revoked !== changed);
+  assert.doesNotMatch(revoked + changed, /revoked|settings\.handler|sha256/);
+  assert.equal(staleReason({ approval, dirty: true }), "");
 });

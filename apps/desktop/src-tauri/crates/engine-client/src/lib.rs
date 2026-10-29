@@ -16,8 +16,8 @@ pub mod push;
 mod windows;
 use link::{Failure, Link, Pushes};
 use terminus_engine_protocol::{
-    Endpoint, Error, Request, Response, Result, Selection, MAX_FRAME, PRODUCT,
-    PUSH_STREAM_FEATURE, VERSION,
+    Endpoint, Error, Request, Response, Result, Selection, MAX_FRAME, PRODUCT, PUSH_STREAM_FEATURE,
+    VERSION,
 };
 
 // Una conexión con más peticiones en vuelo que esto abre otra: pasadas 32 el
@@ -252,7 +252,10 @@ pub fn request_any_contract(
 
 /// «Actualizar ya»: `service stop` con `force` corta los turnos del motor anterior.
 /// Uno anterior a la orden ignora el argumento y se niega con `task_busy`.
-pub fn force_stop_any_contract(endpoint_path: &Path, timeout: Duration) -> Result<(Endpoint, Value)> {
+pub fn force_stop_any_contract(
+    endpoint_path: &Path,
+    timeout: Duration,
+) -> Result<(Endpoint, Value)> {
     request(
         endpoint_path,
         "service stop",
@@ -326,7 +329,8 @@ impl Backoff {
         if self.failures == 0 {
             return Duration::ZERO;
         }
-        Duration::from_millis(100 << self.failures.min(5).saturating_sub(1)).min(Duration::from_secs(2))
+        Duration::from_millis(100 << self.failures.min(5).saturating_sub(1))
+            .min(Duration::from_secs(2))
     }
     fn waiting(&self) -> bool {
         self.until.is_some_and(|until| Instant::now() < until)
@@ -341,7 +345,13 @@ impl Backoff {
 }
 impl Drop for Client {
     fn drop(&mut self) {
-        for link in self.links.lock().unwrap_or_else(|p| p.into_inner()).pool.drain(..) {
+        for link in self
+            .links
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .pool
+            .drain(..)
+        {
             link.close();
         }
     }
@@ -431,11 +441,21 @@ impl Client {
         args: Value,
         timeout: Duration,
     ) -> Result<Value> {
+        self.request_scoped(command, workspace, None, args, timeout)
+    }
+    pub fn request_scoped(
+        &self,
+        command: &str,
+        workspace: Option<String>,
+        folder: Option<String>,
+        args: Value,
+        timeout: Duration,
+    ) -> Result<Value> {
         let request = Request {
             version: VERSION,
             token: self.token.clone(),
             workspace,
-            folder: None,
+            folder,
             command: command.to_owned(),
             args,
             request_id: uuid::Uuid::new_v4().to_string(),

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { canRepeat, retrying, untilConnected, WAITS } from "../../src/lib/invoke.ts";
+import { canRepeat, neverRan, retrying, untilConnected, WAITS } from "../../src/lib/invoke.ts";
 
 function service(failures: number, code = "app_unavailable") {
   const waits: number[] = [];
@@ -77,4 +77,10 @@ test("con el motor ya conectado, engine_down llega a la pantalla", async () => {
   };
   await assert.rejects(untilConnected(call, () => true, async () => void (waited = true)));
   assert.equal(waited, false);
+});
+
+test("a proxy failure with engine detail keeps its code inside detail", () => {
+  const busy = { what: { clave: "shell.service.busy" }, detail: { code: "service_busy", message_key: "cli.error.service_busy", detail: { task: "t1" } } };
+  assert.equal(neverRan(busy), true);
+  assert.equal(neverRan({ what: { clave: "shell.service.failed" }, detail: { code: "forbidden", detail: {} } }), false);
 });

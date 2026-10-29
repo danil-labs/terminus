@@ -490,6 +490,12 @@ const steps = [
     root,
   ],
   [
+    "Un permiso decidido o en vuelo no se pinta como cerrado y una relectura no borra gates nuevos",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/permission-gates.test.ts")],
+    root,
+  ],
+  [
     "El reintento de entregas no reenvía a la persona",
     process.execPath,
     ["--test", join(root, "tests/unit/retry-delivery-resume.test.mjs")],

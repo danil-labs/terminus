@@ -611,6 +611,12 @@ export function createRouter(config: RouterConfig) {
     const machine = headerOf(options, "x-terminus-machine");
     const workspace = command === "list_workspaces" ? null : headerOf(options, "x-terminus-workspace") ?? active;
     if (command === "list_workspaces") options = withoutHeader(options, "x-terminus-workspace");
+    if (command === "handler_action") {
+      const input = args.input as Args | undefined;
+      if (!local || !self || !input || (machine && machine !== self) || namesOther(input) || elsewhere(workspace))
+        throw { what: t("shell.machines.local_only"), detail: "handler_local_only" };
+      return native(command, { input: fleet.argsFor(self, input) }, options);
+    }
     if (STORAGE.has(command) && !workspace) throw { what: { clave: "shell.service.failed" }, detail: "workspace_missing" };
     if (local && ofThisMachine(command)) {
       if (OF_THIS_WINDOW.test(command)) return native(command, args, options);
