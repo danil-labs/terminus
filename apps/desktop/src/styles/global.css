@@ -807,6 +807,12 @@
   -webkit-mask: radial-gradient(circle at 100% 0, transparent var(--tab-foot), #000 calc(var(--tab-foot) + 0.5px));
   mask: radial-gradient(circle at 100% 0, transparent var(--tab-foot), #000 calc(var(--tab-foot) + 0.5px));
 }
+/* En la franja de la ventana la primera pestaña nace en el borde de la barra lateral:
+   un pie cóncavo ahí corta la esquina, así que la base queda recta. */
+[data-title-bar] .tab-active::before,
+[data-title-bar] .tab-active::after {
+  display: none;
+}
 
 /* Nace en la tobera del icono de 15 px centrado en 20 px, sobre el eje del
    cohete (x + y = 20); arriba-centro de la llama queda en (6, 14). */
