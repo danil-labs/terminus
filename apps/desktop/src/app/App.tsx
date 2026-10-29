@@ -105,7 +105,7 @@ import ArchivedTasks from "../features/projects/ArchivedTasks";
 import BaseBranchPicker from "../features/projects/BaseBranchPicker";
 import { watchHandlerStatus, watchHandlerStatuses } from "../features/projects/handlerPresence";
 import { EmptyContext, ProjectPicker } from "../features/projects/Projects";
-import { bringHereLabel, canBringHere, carryOrigin, machineName, machineOf, machines, refetchMachines, runOn, runOnOptions, setRunOn, setTaskRowMachine } from "../features/machines/store";
+import { bringHereLabel, canBringHere, carryOrigin, machineName, machineOf, machines, refetchMachines, runOn, setRunOn, setTaskRowMachine } from "../features/machines/store";
 import type { CarriedBase, CarryCheck } from "../features/machines/carry";
 // Chunk aparte: solo lo carga quien crea una tarea, no la carga inicial.
 const MachinePicker = lazy(() =>
@@ -127,6 +127,7 @@ import { type SessionRow, threadTitle } from "../features/projects/Sessions";
 import TabStrip, { NewTabButton } from "../features/projects/Tabs";
 import { createTaskWork, ResumeTask } from "../features/projects/TaskHistory";
 import { workLabel } from "../features/projects/branchLabel";
+import { mensajeDeFallo } from "../features/chat/failures";
 import type { Etapa } from "../features/projects/TaskStage";
 import { esChatDeAgente } from "../features/projects/taskTree";
 import {
@@ -139,7 +140,7 @@ const Settings = lazy(() => import("../features/settings/Settings"));
 import type { Startup } from "../features/settings/workspaces-store";
 import { createAttention, topState } from "../features/shell/attention";
 import TaskNotifier from "../features/shell/TaskNotifier";
-import DeleteSpace from "../features/shell/DeleteSpace";
+const DeleteSpace = lazy(() => import("../features/shell/DeleteSpace"));
 import AvisoDeCarpeta from "../features/shell/FolderNotice";
 import PantallaDeBloqueo from "../features/shell/LockScreen";
 import AvisoDeMaterial from "../features/shell/MaterialNotice";
@@ -160,7 +161,7 @@ import Sitio from "../features/sites/Site";
 import { claseDeFondo, VELO_DE_FONDO } from "../lib/chat-background";
 import { fondoDeChat, fondoPropio, imagenDelWorkspace, veloDeFondo } from "../lib/chat-background-store";
 import { copyText } from "../lib/clipboard";
-import { capabilities } from "../lib/platform";
+import { capabilities, openMachineScreen } from "../lib/platform";
 import { pedirElCampo } from "../lib/focus";
 import { lastRoster, rememberRoster } from "../lib/handlerRoster";
 import { aplicarLenguaDeWorkspace, clavesConocidas, t } from "../lib/i18n";
@@ -374,6 +375,34 @@ export default function App() {
   const setProjectList = (next: Project[]) => setProjectRows((previous) => conservar(previous, next, (p) => p.id));
   createEffect(() => recordarCarpetas(projectList()));
   const [sources, setSources] = createSignal<Source[]>([]);
+  const [draftProjects, setDraftProjects] = createSignal<{ workspace: string; machine: string; rows: Project[] } | null>(null);
+  const draftMachine = () => runOn(workspaceActivo()) ?? machines().find(m => m.active)?.id ?? null;
+  const draftOptions = () => {
+    const machine = draftMachine();
+    return machine ? { headers: { "x-terminus-machine": machine } } : undefined;
+  };
+  const composerProjects = createMemo(() => {
+    const machine = draftMachine();
+    if (!machine) return projectList();
+    if (machines().find(m => m.id === machine)?.local) return projectList().filter(p => !p.machines || p.machines.includes(machine));
+    const found = draftProjects();
+    return found?.machine === machine && found.workspace === workspaceActivo() ? found.rows : [];
+  });
+  createEffect(on([workspaceActivo, draftMachine, projectList], ([workspace, machine]) => {
+    setDraftProjects(previous => previous?.workspace === workspace && previous.machine === machine ? previous : null);
+    if (!workspace || !machine || machines().find(m => m.id === machine)?.local) return;
+    let current = true;
+    onCleanup(() => { current = false; });
+    void invoke<Project[]>("list_projects", {}, { headers: { "x-terminus-machine": machine } }).then(rows => {
+      if (current) setDraftProjects({ workspace, machine, rows: rows.map(row => ({
+        ...row, machines: projectList().find(p => p.id === row.id)?.machines ?? [machine],
+      })) });
+    }).catch(e => { if (current) setError(prosaDe(e)); });
+  }));
+  createEffect(on(draftMachine, (machine, before) => {
+    if (before !== undefined && machine !== before) setDraftBases({});
+  }));
+
   const [taskSources, setTaskSources] = createSignal<Source[] | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   // Por qué esta ventana no puede abrir estos datos, si es que no puede: una
@@ -1229,13 +1258,24 @@ export default function App() {
   // Los turnos de cada tarea que trajo `service history`, desde `start`; lo anterior se pide al subir.
   const historias = new Map<string, LoadedHistory<Session["turns"][number]>>();
   const [conAntiguos, setConAntiguos] = createSignal<Readonly<Record<string, boolean>>>({});
-  const marcarAntiguos = (id: string, loaded: LoadedHistory<unknown>) =>
+  const [conRecientes, setConRecientes] = createSignal<Readonly<Record<string, boolean>>>({});
+  const marcarAntiguos = (id: string, loaded: LoadedHistory<unknown>) => {
     setConAntiguos((all) => (!!all[id] === loaded.start > 0 ? all : { ...all, [id]: loaded.start > 0 }));
+    const recent = loaded.start + loaded.turns.length < loaded.total;
+    setConRecientes(all => !!all[id] === recent ? all : { ...all, [id]: recent });
+  };
   // Con el stream empujado el motor sabe paginar: abrir trae los últimos turnos y no la transcripción entera.
   let historialPaginado = false;
-  const leerTarea = (project: string, id: string, before: number | null = null) => {
-    if (historialPaginado) return invoke<Session>("load_history", { project, id, before }, deLaTarea(id));
-    return invoke<Session>("load_session", { project, id }, deLaTarea(id));
+  const leerTarea = async (project: string, id: string, before: number | null = null) => {
+    const result = historialPaginado
+      ? await invoke<Session>("load_history", { project, id, before }, deLaTarea(id))
+      : await invoke<Session>("load_session", { project, id, history_request: { version: 1, before } }, deLaTarea(id));
+    if (result.history?.version === 1) {
+      result.turns = result.turns.map(turn => ({ ...turn,
+        history_refs: turn.history_refs?.map(ref => ({ ...ref, project, session: id })),
+      }));
+    }
+    return result;
   };
   /**
    * La página anterior a lo cargado de `id`, lista para anteponerse: devuelve con qué
@@ -1244,7 +1284,7 @@ export default function App() {
   const pidiendoAntiguos = new Set<string>();
   async function cargarAntiguos(project: string, id: string): Promise<(() => void) | null> {
     const loaded = historias.get(id);
-    if (!historialPaginado || !loaded || loaded.start === 0 || pidiendoAntiguos.has(id)) return null;
+    if (!loaded || loaded.start === 0 || pidiendoAntiguos.has(id)) return null;
     pidiendoAntiguos.add(id);
     const generation = sessionGeneration;
     try {
@@ -1903,7 +1943,7 @@ export default function App() {
   /** Los bytes ya están en la ventana: van directo a la máquina del turno, sin pasar por la miniatura de 4 MB. */
   async function pegarImagen(mime: string, datos: string): Promise<string> {
     const abierta = sessionId();
-    const opciones = abierta ? deLaTarea(abierta) : runOnOptions(workspaceActivo(), projectList().find((p) => p.id === project()));
+    const opciones = abierta ? deLaTarea(abierta) : draftOptions();
     const ruta = await invoke<string>("guardar_imagen_pegada", { mime, datos }, opciones);
     const machine = opciones?.headers["x-terminus-machine"];
     if (machine) pegadasEn.set(ruta, machine);
@@ -1924,7 +1964,23 @@ export default function App() {
   // Sin tarea abierta, el panel enseña la carpeta de trabajo del proyecto.
   const rutaDelPanel = () => folder() ?? carpetaDelProyecto() ?? null;
 
+  const maquinaDeLaCarpeta = () => {
+    const id = sessionId();
+    const lugar = projectList().find((p) => p.id === project());
+    return id
+      ? deLaTarea(id)?.headers["x-terminus-machine"] ?? maquinaDeLaVentana()
+      : runOn(workspaceActivo(), lugar) ?? (lugar?.machines?.includes(maquinaDeLaVentana()) ? maquinaDeLaVentana() : lugar?.machines?.[0] ?? maquinaDeLaVentana());
+  };
+  const carpetaLocal = () => capabilities().nativeWindow && maquinaDeLaCarpeta() === maquinaDeLaVentana();
+  const nombreDeAbrirCarpeta = () => carpetaLocal()
+    ? t("shell.folder.open")
+    : t("shell.folder.view_on", { name: machineName(maquinaDeLaCarpeta()) });
+
   function abrirCarpeta() {
+    if (!carpetaLocal()) {
+      setArtOpen(true);
+      return;
+    }
     const f = rutaDelPanel();
     if (f) void invoke("open_external", { target: f }).catch((e) => setError(prosaDe(e)));
   }
@@ -1961,12 +2017,15 @@ export default function App() {
       const current = arranque.workspaces.find((w) => w.id === workspace);
       if (!current) throw { what: t("projects.context.unavailable"), detail: "context_unavailable" };
       const root = current.context_root;
-      const [proyectos, fuentes] = await Promise.all([
-        invoke<Project[]>("list_projects"),
+      const [, fuentes] = await Promise.all([
+        invoke<Project[]>("list_projects").then(rows => {
+          if (generation === sessionGeneration && request === materialRequest) setProjectList(rows);
+          return rows;
+        }),
         invoke<Source[]>("list_sources"),
       ]);
       if (generation !== sessionGeneration || request !== materialRequest) return;
-      setProjectList(proyectos);
+
       setSources(fuentes);
       confirmContext(root, fuentes);
     } catch (e) {
@@ -2100,12 +2159,15 @@ export default function App() {
       // esperaba a que volviera `list_projects` para preguntar algo que
       // no usa su respuesta.
       // Las fuentes que no llegan (su máquina apagada, sin copia) dejan las de antes y no tumban las carpetas.
-      const [proyectos, fuentes] = await Promise.all([
-        invoke<Project[]>("list_projects"),
+      const [, fuentes] = await Promise.all([
+        invoke<Project[]>("list_projects").then(rows => {
+          if (generation === sessionGeneration) setProjectList(rows);
+          return rows;
+        }),
         invoke<Source[]>("list_sources").catch(() => null),
       ]);
       if (generation !== sessionGeneration) return;
-      setProjectList(proyectos);
+
       if (material === materialRequest) {
         if (fuentes) {
           setSources(fuentes);
@@ -2467,7 +2529,7 @@ export default function App() {
         if (page.gap && vivas().length > 0) setError(t("chat.error.service_gap"));
         if (failingSince !== null) {
           failingSince = null;
-          if (error() === t("chat.error.service_unavailable") || error() === t("shell.service.engine_down") || error() === t("shell.service.engine_missing") || error() === t("shell.service.machine_off") || error() === t("shell.service.machine_starting")) setError(null);
+          if (error() === t("chat.error.service_unavailable") || error() === t("shell.service.engine_down") || error() === t("shell.service.engine_missing") || error() === t("shell.service.managed") || error() === t("shell.service.machine_off") || error() === t("shell.service.machine_starting")) setError(null);
         }
       } catch (e) {
         // Un sondeo suelto falla al empezar un turno y el siguiente ya contesta.
@@ -2476,11 +2538,12 @@ export default function App() {
         // Una máquina remota apagada no es un fallo: se enciende al enviar algo.
         const apagada = claveDe(e) === "shell.service.machine_off";
         const encendiendo = claveDe(e) === "shell.service.machine_starting";
-        const caido = sinMotor || apagada || encendiendo || claveDe(e) === "shell.service.engine_down";
+        const managed = claveDe(e) === "shell.service.managed";
+        const caido = sinMotor || managed || apagada || encendiendo || claveDe(e) === "shell.service.engine_down";
         // En la web la computadora en reposo tiene su indicador: no es un error.
         if ((apagada || encendiendo) && capabilities().computerStatus) return;
         if (!disposed && Date.now() - failingSince > (caido ? 2_000 : 10_000)) {
-          setError(sinMotor ? t("shell.service.engine_missing") : apagada ? t("shell.service.machine_off") : encendiendo ? t("shell.service.machine_starting") : t(caido ? "shell.service.engine_down" : "chat.error.service_unavailable"));
+          setError(sinMotor ? t("shell.service.engine_missing") : managed ? t("shell.service.managed") : apagada ? t("shell.service.machine_off") : encendiendo ? t("shell.service.machine_starting") : t(caido ? "shell.service.engine_down" : "chat.error.service_unavailable"));
         }
       } finally {
         if (!disposed) timer = setTimeout(() => void poll(), pushed ? 0 : 250);
@@ -3152,6 +3215,11 @@ export default function App() {
           .catch(() => {});
     });
     onCleanup(() => void sesionEv.then((f) => f()));
+    // Los eventos de otra máquina llegan por el relay, no por `service_poll`:
+    // un hueco ahí se llevó sus `session` y el sondeo de esta ventana no lo ve.
+    const trasHueco = () => releerTrasHueco();
+    window.addEventListener("harness:service-gap", trasHueco);
+    onCleanup(() => window.removeEventListener("harness:service-gap", trasHueco));
     serviceListenersReady = Promise.all([chat, question, usageEv, agentsEv, cuentaEv, cliChanged, cliOpen, sesionEv]);
   });
 
@@ -3322,7 +3390,7 @@ export default function App() {
         return;
       }
     } catch (error) {
-      anexar(session, (ms) => [...ms, { role: "system", text: prosaDe(error), meta: "fallo" }]);
+      anexar(session, (ms) => [...ms, { role: "system", ...mensajeDeFallo(error), meta: "fallo" }]);
     }
     pendingStarts.delete(session);
     marcarQuieta(session);
@@ -3356,7 +3424,7 @@ export default function App() {
           marcarQuieta(session);
         }
       }
-      anexar(session, (ms) => [...ms, { role: "system", text: prosaDe(error), meta: "fallo" }]);
+      anexar(session, (ms) => [...ms, { role: "system", ...mensajeDeFallo(error), meta: "fallo" }]);
       return error;
     }
   }
@@ -3404,7 +3472,7 @@ export default function App() {
       ponerTerminal("", { id: "", command: command.trim(), cwd: null, output: "", truncated: false, desde: Date.now() });
     });
     try {
-      const enOtra = runOnOptions(workspaceActivo(), projectList().find((p) => p.id === proyecto));
+      const enOtra = draftOptions();
       const corrida = await invoke<Corrida>("run_shell_command", {
         project: proyecto,
         session: null,
@@ -3436,7 +3504,7 @@ export default function App() {
       if (nace.generation !== sessionGeneration) return false;
       // La frase de un modo que el agente no sostiene nombra al agente.
       const label = agents().find((a) => a.id === lanzado.provider)?.label ?? lanzado.provider;
-      anexar("", (ms) => [...ms, { role: "system", text: prosaDe(error, { agent: label }), meta: "fallo" }]);
+      anexar("", (ms) => [...ms, { role: "system", ...mensajeDeFallo(error, { agent: label }), meta: "fallo" }]);
       return false;
     }
   }
@@ -3471,7 +3539,7 @@ export default function App() {
     try {
       if (!(await invoke<boolean>("write_shell_input", { session: id, input: texto }, deLaTarea(id)))) return false;
     } catch (e) {
-      anexar(id, (m) => [...m, { role: "system", text: prosaDe(e), meta: "fallo" }]);
+      anexar(id, (m) => [...m, { role: "system", ...mensajeDeFallo(e), meta: "fallo" }]);
       return false;
     }
     // Una tecla suelta (flecha, Enter de menú) no se pinta: la dibuja el propio programa.
@@ -3717,7 +3785,7 @@ export default function App() {
     const active = machines().find((m) => m.active)?.id ?? null;
     return id
       ? machineOf(id)?.headers["x-terminus-machine"] ?? active
-      : runOn(workspaceActivo(), projectList().find((p) => p.id === project())) ?? active;
+      : draftMachine();
   });
   const composerOptions = () => {
     const machine = composerMachine();
@@ -4237,6 +4305,21 @@ export default function App() {
       loadResult(id, s, false, generation);
       void refreshFolder(proyecto, id);
     } catch (e) {
+      if (!current()) return;
+      try {
+        const state = await invoke<Session>("load_session", {
+          project: proyecto, id, history_request: { version: 1, kind: "state" },
+        }, deLaTarea(id));
+        if (!current()) return;
+        setAgent(state.provider);
+        setModel(modeloDeSubtarea(state) ?? "");
+        setEffort(state.effort ?? "");
+        setModo(state.permission_mode ?? "");
+        setAdjuntas(state.sources ?? []);
+        restoreSessionConfiguration();
+        void refreshFolder(proyecto, id);
+      } catch { /* Sin estado autoritativo se conserva el error de la lectura original. */ }
+      if (!current()) return;
       releer(id, [{ role: "system", text: prosaDe(e) }], false);
       if (propagateError) throw e;
     } finally {
@@ -4608,7 +4691,7 @@ export default function App() {
     pestanas.openObservability(t("observability.tab"));
   }
 
-  /** La pantalla de una VM, en una ventana al lado de la conversación: se mira mientras se trabaja. */
+  /** La pantalla de una computadora, en una ventana al lado de la conversación. */
   function abrirPantalla(machine: string) {
     const id = screenTabId(machine);
     const nueva = !pestanas.open().some((p) => p.id === id);
@@ -4720,16 +4803,37 @@ export default function App() {
     return sitio ? { sitio, zone: edgeZone(panel, x, y) } : null;
   }
 
+  let railDrag: { project: string; row: SessionRow } | null = null;
   const tabDrag = createPointerDrag({
     scope: () => `${workspaceActivo()}\u0000${escritorio()}`,
-    canStart: id => pestanas.open().some(tab => tab.id === id),
-    locate: point => ventanaBajo(point.x, point.y),
+    canStart: id => pestanas.open().some(tab => tab.id === id) || (railDrag?.row.id === id && !!filaDe(id)),
+    locate: point => {
+      const panel = ventanaBajo(point.x, point.y);
+      if (panel) return { ...panel, folder: undefined as string | undefined };
+      const folder = railDrag && !railDrag.row.parent && !railDrag.row.chat_de_agente
+        ? document.elementFromPoint(point.x, point.y)?.closest<HTMLElement>("[data-destino]")?.dataset.destino
+        : undefined;
+      return folder !== undefined && folder !== railDrag?.project
+        ? { sitio: paneles.activeSite(), indice: undefined, zone: undefined, folder }
+        : null;
+    },
     scroll(point) {
       const element = document.elementFromPoint(point.x, point.y)
         ?.closest("[data-tira]")?.querySelector<HTMLElement>("[data-tab-scroll]");
-      return element ? { element, axis: "x" } : null;
+      if (element) return { element, axis: "x" };
+      const rail = railDrag ? document.elementFromPoint(point.x, point.y)
+        ?.closest<HTMLElement>("[data-arrastre-scroll]") : null;
+      return rail ? { element: rail, axis: "y" } : null;
     },
     drop(id, destino) {
+      if (destino.folder !== undefined && railDrag) {
+        void moverSesion(railDrag.project, id, destino.folder);
+        return;
+      }
+      if (railDrag && !pestanas.open().some(tab => tab.id === id)) {
+        pestanas.ensure({ id, project: railDrag.project, titulo: railDrag.row.title });
+        paneles.sync(pestanas.open().map(tab => tab.id));
+      }
       if (destino.zone && destino.zone !== "center" && paneles.splitAt(id, destino.sitio, destino.zone)) {
         pestanas.pin(id);
         const p = pestanas.open().find(tab => tab.id === id);
@@ -4748,8 +4852,21 @@ export default function App() {
   });
   const arrastrando = tabDrag.source;
   const cursor = tabDrag.cursor;
-  const donde = tabDrag.destination;
-  const arrastrarPestana = tabDrag.start;
+  const donde = () => {
+    const destination = tabDrag.destination();
+    return destination?.folder === undefined ? destination : null;
+  };
+  const arrastrarPestana = (id: string, event: PointerEvent) => {
+    if (event.button !== 0 || event.isPrimary === false) return;
+    railDrag = null;
+    tabDrag.start(id, event);
+  };
+  const arrastrarTarea = (project: string, row: SessionRow, event: PointerEvent) => {
+    if (event.button !== 0 || event.isPrimary === false) return;
+    if (esProvisional(row.id) || (row.workspace && row.workspace !== workspaceActivo())) return;
+    railDrag = { project, row };
+    tabDrag.start(row.id, event);
+  };
 
   /**
    * Cómo se llama una pestaña, para el fantasma del arrastre. La tira
@@ -4758,7 +4875,7 @@ export default function App() {
    */
   const tituloDePestana = (id: string) => {
     const p = pestanasEnPantalla().find((x) => x.id === id);
-    if (!p) return "";
+    if (!p) return railDrag?.row.id === id ? railDrag.row.title : "";
     if (isTaskTab(p)) return p.titulo;
     if (p.clase === "observabilidad" || p.clase === "pantalla") return p.titulo;
     if (p.clase === "sitio" && !p.url) return t("sites.new_tab");
@@ -4781,7 +4898,7 @@ export default function App() {
     const d = donde();
     const id = arrastrando();
     if (!d?.zone || d.zone === "center" || !id) return null;
-    return paneles.canSplitAt(id, d.sitio, d.zone) ? d.zone : null;
+    return paneles.canSplitAt(id, d.sitio, d.zone, railDrag?.row.id === id) ? d.zone : null;
   };
 
   /**
@@ -4968,7 +5085,7 @@ export default function App() {
     const row = sid ? filaDe(sid) : null;
     const named = sid ? machines().find((m) => sid.startsWith(`${m.id}~`))?.id : null;
     if (sid && !row && !named) return undefined;
-    const chosen = sid ? undefined : runOnOptions(workspaceActivo(), projectList().find((p) => p.id === project()));
+    const chosen = sid ? undefined : draftOptions();
     const machine = row?.machine ?? named ?? machines().find((m) => m.local || m.active)?.id;
     return chosen ?? (machine ? { headers: { "x-terminus-machine": machine } } : undefined);
   }
@@ -5144,9 +5261,8 @@ export default function App() {
   async function crearEnTareaVacia(tipo: Tipo, ruta: string) {
     const proyecto = project();
     const claveBorrador = claveAbierta();
-    const lugar = projectList().find((p) => p.id === proyecto);
     // La tarea nace en la máquina elegida, y lo que se crea dentro va a la misma.
-    const enSuMaquina = runOnOptions(workspaceActivo(), lugar);
+    const enSuMaquina = draftOptions();
     const { session } = await invoke<{ session: string; folder: string }>("create_empty_session", {
       provider: agent(),
       project: proyecto,
@@ -5578,6 +5694,7 @@ export default function App() {
     // una tarea nueva lo recibe al volver de Rust, más abajo.
     const generation = sessionGeneration;
     const abierta = destination?.session ?? sessionId();
+    const creationOptions = abierta ? undefined : draftOptions();
     if (abierta) advanceTurn(abierta);
     else lifecycleRevision++;
     const start = Symbol();
@@ -5648,8 +5765,7 @@ export default function App() {
     const dormida = abierta ? apagadas()[abierta] ?? null : null;
     if (abierta && dormida) anotar(setEncendiendo, abierta, dormida);
     // Y crear en la elegida en «Ejecutar en» si está apagada: el aviso cuelga de la pestaña que nace.
-    const lugar = projectList().find((p) => p.id === proyecto);
-    const destino = abierta ? null : runOn(workspaceActivo(), lugar);
+    const destino = creationOptions?.headers["x-terminus-machine"] ?? null;
     const naceDormida = destino && machines().find((x) => x.id === destino)?.on === false ? destino : null;
     if (provisional && naceDormida) anotar(setEncendiendo, provisional, naceDormida);
     try {
@@ -5657,7 +5773,7 @@ export default function App() {
       if (llevar && !llevado) throw CARRY_STOPPED;
       // La respuesta de una persona no existe en la interfaz hasta que Rust la
       // validó y la escribió: primero persistir, y solo entonces pintarla.
-      const opciones = abierta ? deLaTarea(abierta) : llevado ? { headers: { "x-terminus-machine": llevado.target } } : runOnOptions(workspaceActivo(), lugar);
+      const opciones = abierta ? deLaTarea(abierta) : llevado ? { headers: { "x-terminus-machine": llevado.target } } : creationOptions;
       const attachments = await attachmentsFor(m.attachments, opciones, proyecto);
       const id = await invoke<string>("send_message", {
         provider: m.provider,
@@ -5813,7 +5929,7 @@ export default function App() {
         {
           role: "system",
           // Una negativa de comando llega como clave: la frase nombra lo escrito.
-          text: prosaDe(e, {
+          ...mensajeDeFallo(e, {
             command: comandoEscrito(m.text),
             agent: agents().find((a) => a.id === m.provider)?.label ?? m.provider,
           }),
@@ -5898,7 +6014,7 @@ export default function App() {
     } catch (error) {
       anexar(sid, (ms) => [
         ...ms,
-        { role: "system", text: prosaDe(error), meta: "fallo" },
+        { role: "system", ...mensajeDeFallo(error), meta: "fallo" },
       ]);
       throw error;
     }
@@ -5952,7 +6068,7 @@ export default function App() {
       } catch (error) {
         anexar(sid, (ms) => [
           ...ms,
-          { role: "system", text: prosaDe(error), meta: "fallo" },
+          { role: "system", ...mensajeDeFallo(error), meta: "fallo" },
         ]);
         throw error;
       }
@@ -6092,7 +6208,7 @@ export default function App() {
     const workspace = workspaceActivo();
     const proyecto = projectList().find((p) => p.id === project());
     // En la web la máquina de la tarea nueva puede ser la que lleva el workspace, sin elegir ninguna.
-    const target = runOn(workspace, proyecto) ?? capabilities().remoteCreate?.(workspace)?.machine ?? null;
+    const target = draftMachine();
     if (!workspace || !proyecto || !target || proyecto.kind !== "git") return "none";
     if (decidiendoLlevar) return "busy";
     decidiendoLlevar = true;
@@ -6345,7 +6461,8 @@ export default function App() {
     setInjecting((items) => [...items, { session: abierta, id }]);
     try {
       const attachments = await attachmentsFor(m.attachments, deLaTarea(abierta), sourceProject);
-      await invoke("inject_message", {
+      // El turno tal como queda en la transcripción; `null` en un motor que todavía no lo devuelve.
+      const guardado = await invoke<Turn | null>("inject_message", {
         project: sourceProject,
         session: abierta,
         prompt: m.text,
@@ -6362,7 +6479,15 @@ export default function App() {
       const saved = savedQueues.get(abierta);
       if (saved) savedQueues.set(abierta, { ...saved, items: saved.items.filter((item) => item.id !== id) });
       if (sessionId() === abierta && project() === sourceProject) setCola((c) => c.filter((q) => q.id !== id));
-      anexar(abierta, (ms) => [...ms, { role: "user", text: m.text, task_mentions: m.task_mentions, attachments: attachments.length ? attachments : undefined }]);
+      // Con su `turno`: la relectura de la tarea a mitad del turno ya lo trae de disco, y sin id salía dos veces.
+      anexar(abierta, (ms) => [...ms, {
+        role: "user",
+        text: m.text,
+        task_mentions: m.task_mentions,
+        attachments: attachments.length ? attachments : undefined,
+        turno: guardado?.id ?? undefined,
+        author: guardado?.author ?? undefined,
+      }]);
     } catch (e) {
       const clave = claveDe(e);
       // El turno acaba de cerrar: el mensaje sigue en la cola y sale como el siguiente.
@@ -6382,7 +6507,7 @@ export default function App() {
       }
       anexar(abierta, (ms) => [
         ...ms,
-        { role: "system", text: prosaDe(e), meta: clave === "chat.steer.unsupported" ? "aviso" : "fallo" },
+        { role: "system", ...mensajeDeFallo(e), meta: clave === "chat.steer.unsupported" ? "aviso" : "fallo" },
       ]);
     } finally {
       setInjecting((items) => items.filter((item) => item.id !== id));
@@ -6477,7 +6602,7 @@ export default function App() {
         <ProjectPicker
           branch={props.branch}
           locked={props.locked}
-          projects={projectList()}
+          projects={props.nueva ? composerProjects() : projectList()}
           project={project()}
           sources={sources()}
           onPick={elegirProyecto}
@@ -6558,7 +6683,7 @@ export default function App() {
     // Un ternario en la prop crea un memo en cada lectura, y la que llega fuera de un dueño no se suelta nunca.
     const esperandoAqui = () => !pp.soloLectura && esperando();
     const proyectoDeLaCelda = () =>
-      projectList().find((p) => p.id === (pp.proyecto ?? project()));
+      (pp.sesion ? projectList() : composerProjects()).find((p) => p.id === (pp.proyecto ?? project()));
     const [estadoDelTrabajo, { refetch: refreshWork }] = createTaskWork(() => pp.sesion
       ? { project: proyectoDeLaCelda()?.id ?? "", id: pp.sesion }
       : undefined);
@@ -6585,10 +6710,10 @@ export default function App() {
       return value?.workspace === workspaceActivo() && value?.id === pp.sesion ? value : undefined;
     };
     const delegatedRows = createMemo<SessionRow[]>((previous) => {
-      const all = Object.values(sesionesConEstado()).flat();
+      const all = Object.entries(sesionesConEstado()).flatMap(([folder, rows]) => rows.map(row => ({ ...row, folder })));
       const known = new Map(all.map(row => [row.id, row]));
       const rows = new Map((delegationData()?.rows ?? []).map(row => [row.id, row]));
-      for (const row of delegatedDescendants(all, pp.sesion ?? "")) rows.set(row.id, row);
+      for (const row of delegatedDescendants(all, filaDe(pp.sesion ?? "") ?? { id: pp.sesion ?? "" })) rows.set(row.id, row);
       const unseen = attention.unseen(workspaceActivo());
       const waiting = new Set(preguntadas());
       return conservar(previous ?? [], [...rows.values()].map(row => ({
@@ -6597,7 +6722,7 @@ export default function App() {
       })), row => row.id);
     }, []);
     const delegatedList = (folder: string): DelegatedListProps => ({
-      relatedSessions: [...Object.values(sesionesConEstado()).flat(), ...delegatedRows()],
+      relatedSessions: [...Object.entries(sesionesConEstado()).flatMap(([folder, rows]) => rows.map(row => ({ ...row, folder }))), ...delegatedRows()],
       de: folder, current: pp.sesion ?? null, vivas: vivas(), aprobando: permissions().map(item => item.session),
       carpetaDe: () => projectList().find(item => item.id === folder)?.name,
       destinos: projectList().filter(item => item.id !== folder).map(item => ({ id: item.id, name: item.name })),
@@ -6832,6 +6957,10 @@ export default function App() {
             machine={filaDe(id())?.machine}
             on={!apagadas()[id()] && filaDe(id())?.machine_on !== false}
             onScreen={abrirPantalla}
+            onFiles={() => {
+              const folder = proyectoDeLaCelda()?.id;
+              if (folder) void abrirSesion(folder, id()).then(() => setArtOpen(true));
+            }}
             project={proyectoDeLaCelda()?.name}
             path={estadoDelTrabajo()?.path || undefined}
             branch={workLabel(estadoDelTrabajo()?.branch, estadoDelTrabajo()?.alias) || undefined} /></Suspense>;
@@ -6857,18 +6986,21 @@ export default function App() {
         }</Show>}
         agentTasks={<Show when={!pp.sesion && encargadoDeLaCelda()}>{agent => {
           const de = () => proyectoDeLaCelda()?.id ?? "";
+          const folderOf = (id: string) => Object.entries(sesionesConEstado()).find(([, rows]) => rows.some(row => row.id === id))?.[0] ?? de();
           return <AgentPageTasks
             context={`${de()}/${agent()}`}
-            tasks={createdTasks(sesionesConEstado()[de()] ?? [], agent(), null)}
+            tasks={createdTasks(Object.entries(sesionesConEstado()).flatMap(([folder, rows]) => rows.map(row => ({ ...row, folder }))), agent(), null, de())}
             list={{
+              carpetaDe: row => projectList().find(item => item.id === folderOf(row.id))?.name,
+              projectOf: row => folderOf(row.id), destinosDe: row => projectList().filter(item => item.id !== folderOf(row.id)).map(item => ({ id: item.id, name: item.name })),
               de: de(), current: null, vivas: vivas(), aprobando: permissions().map(item => item.session),
               destinos: projectList().filter(item => item.id !== de()).map(item => ({ id: item.id, name: item.name })),
-              onDelete: id => void borrarSesion(de(), id),
-              onMove: (id, destination) => void moverSesion(de(), id, destination),
-              onEtapa: (id, stage) => void etaparSesion(de(), id, stage),
-              onRenombrar: (id, title) => void renombrarSesion(de(), id, title),
+              onDelete: id => void borrarSesion(folderOf(id), id),
+              onMove: (id, destination) => void moverSesion(folderOf(id), id, destination),
+              onEtapa: (id, stage) => void etaparSesion(folderOf(id), id, stage),
+              onRenombrar: (id, title) => void renombrarSesion(folderOf(id), id, title),
             }}
-            onPick={id => { setHablandoCon(null); void abrirSesion(de(), id); }} />;
+            onPick={id => { setHablandoCon(null); void abrirSesion(folderOf(id), id); }} />;
         }}</Show>}
         chatEstado={!pp.sesion && encargadoDeLaCelda() ? "awake" : estadoDelEncargado()}
         chatName={filaDe(pp.sesion ?? "")?.agent_thread
@@ -6888,6 +7020,13 @@ export default function App() {
            abierta—: una celda separada tiene su propia lectura en vuelo. Es
            opcional: `tsc` no avisa si se pierde. */
         cargando={cargandoHilo() !== null && cargandoHilo() === pp.sesion}
+        masRecientes={!!conRecientes()[pp.sesion ?? ""]}
+        onRecientes={() => {
+          if (!pp.sesion) return;
+          const id = pp.sesion, generation = sessionGeneration;
+          historias.delete(id);
+          void leerTarea(proyectoDeLaCelda()?.id ?? "", id).then(s => loadResult(id, s, false, generation)).catch(setError);
+        }}
         masAntiguos={!!conAntiguos()[pp.sesion ?? ""]}
         onAntiguos={() => cargarAntiguos(proyectoDeLaCelda()?.id ?? "", pp.sesion ?? "")}
         /* El medidor de memoria es de la sesión abierta —`ventana` se
@@ -6904,6 +7043,7 @@ export default function App() {
             <Show when={!pp.sesion && esRepositorio()}>
               <BaseBranchPicker
                 project={project()}
+                machine={draftMachine()}
                 directory={carpetaDeTrabajo(proyectoDeLaCelda() ?? {})}
                 value={draftBases()[claveAbierta()]}
                 disabled={busy()}
@@ -7831,14 +7971,13 @@ export default function App() {
 
       <For each={pestanas.open().filter((p): p is ScreenTab => p.clase === "pantalla")}>
         {(p) => {
-          const open = capabilities().machineScreen?.(p.machine);
           return (
             <div
               class="min-h-0 min-w-0"
               classList={{ hidden: celdaDe(p.id) === undefined || tapadoPorElProyecto(paneles.siteOf(p.id)), "pt-8": llevaTiraInterior(paneles.siteOf(p.id)) }}
               style={celdaDe(p.id)}
             >
-              <Show when={open}>{(abrir) => <Suspense fallback={null}><Screen open={abrir()} /></Suspense>}</Show>
+              <Suspense fallback={null}><Screen open={() => openMachineScreen(p.machine)} /></Suspense>
             </div>
           );
         }}
@@ -8135,6 +8274,9 @@ export default function App() {
         aprobando={permissions().map((p) => p.session)}
               collapsed={sidebar.colapsado()}
               onToggle={sidebar.alternar}
+              draggedTask={arrastrando()}
+              dragFolder={tabDrag.destination()?.folder}
+              onDrag={arrastrarTarea}
               onPick={(p, id) => {
                 // Abrir una tarea suelta la marca del agente: su fila no
                 // puede seguir señalada cuando ya se mira otra cosa.
@@ -8214,10 +8356,10 @@ export default function App() {
                     variant="ghost"
                     size="icon"
                     class="size-7 shrink-0 text-neutral-500"
-                    disabled={!rutaDelPanel()}
+                    disabled={carpetaLocal() ? !rutaDelPanel() : !columnaConContenido()}
                     onClick={abrirCarpeta}
-                    aria-label={t("shell.folder.open")}
-                    title={t("shell.folder.open")}
+                    aria-label={nombreDeAbrirCarpeta()}
+                    title={nombreDeAbrirCarpeta()}
                   >
                     <FolderOpen size={16} />
                   </Button>
@@ -8248,24 +8390,29 @@ export default function App() {
               onArchivoBorrado={archivoBorrado}
               onClose={() => setArtOpen(false)}
             />}>
-              {owner => <AgentTasks
+              {owner => {
+                const folderOf = (id: string) => Object.entries(sesionesConEstado()).find(([, rows]) => rows.some(row => row.id === id))?.[0] ?? owner().project;
+                return <AgentTasks
                 context={`${owner().project}/${sessionId() ?? owner().name}`}
-                tasks={createdTasks(sesionesConEstado()[owner().project] ?? [], owner().name, filaDe(sessionId() ?? "")?.agent_thread ? sessionId() : null)}
+                tasks={createdTasks(Object.entries(sesionesConEstado()).flatMap(([folder, rows]) => rows.map(row => ({ ...row, folder }))), owner().name, filaDe(sessionId() ?? "")?.agent_thread ? sessionId() : null, owner().project)}
                 list={{
+                  carpetaDe: row => projectList().find(item => item.id === folderOf(row.id))?.name,
+                  projectOf: row => folderOf(row.id), destinosDe: row => projectList().filter(item => item.id !== folderOf(row.id)).map(item => ({ id: item.id, name: item.name })),
                   de: owner().project, current: sessionId(), vivas: vivas(), aprobando: permissions().map(item => item.session),
                   destinos: projectList().filter(item => item.id !== owner().project).map(item => ({ id: item.id, name: item.name })),
-                  onDelete: id => void borrarSesion(owner().project, id),
-                  onMove: (id, destination) => void moverSesion(owner().project, id, destination),
-                  onEtapa: (id, stage) => void etaparSesion(owner().project, id, stage),
-                  onRenombrar: (id, title) => void renombrarSesion(owner().project, id, title),
+                  onDelete: id => void borrarSesion(folderOf(id), id),
+                  onMove: (id, destination) => void moverSesion(folderOf(id), id, destination),
+                  onEtapa: (id, stage) => void etaparSesion(folderOf(id), id, stage),
+                  onRenombrar: (id, title) => void renombrarSesion(folderOf(id), id, title),
                 }}
                 onClose={() => setArtOpen(false)}
                 onPick={id => {
-                  const destination = { project: owner().project, id };
+                  const destination = { project: folderOf(id), id };
                   setHablandoCon(null);
                   void abrirSesion(destination.project, id);
                 }}
-              />}
+              />;
+              }}
             </Show>
           </ColumnaLateral>
         </div>

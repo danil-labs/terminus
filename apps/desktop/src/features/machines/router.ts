@@ -10,8 +10,9 @@
  * la ventana. En el escritorio un id de otra máquina sin esa cabecera es un
  * error antes de mandar: el id no elige la máquina. En la web no hay máquina de
  * la ventana; si los argumentos nombran una sola (el id con su prefijo), la
- * llamada va allá, y si nombran dos se rechaza igual. En el escritorio la cuenta
- * y `danil_*` van siempre aquí. Un workspace de la cuenta que esta computadora
+ * llamada va allá, y si nombran dos se rechaza igual. En el escritorio `danil_*`
+ * y Radiant van siempre aquí; las cuentas de IA, a la máquina de la cabecera o del
+ * id, y su lista junta las de todas. Un workspace de la cuenta que esta computadora
  * no tiene se lee de sus miembros y actúa en el primero.
  */
 import { type AccountWorkspace, type SystemId, callWorkspace, isDeferrable, systemOf } from "@terminus/computers";
@@ -40,6 +41,8 @@ const OF_THIS_MACHINE = /(^|_)accounts?($|_)|login|^radiant_|^danil_|^account_re
 /** Las credenciales de la cuenta son del workspace: van a la máquina que lo atiende, como las demás órdenes con `scope`. */
 const ACCOUNT_CREDENTIALS = /^account_credentials?_|^github_account_/;
 const ofThisMachine = (command: string) => OF_THIS_MACHINE.test(command) && !ACCOUNT_CREDENTIALS.test(command);
+/** La sesión de Danil y Radiant son siempre de esta ventana; las cuentas de IA, de la máquina que nombra la cabecera o el id. */
+const OF_THIS_WINDOW = /^radiant_|^danil_|^account_relay_token$/;
 /** Las órdenes con canal pierden el canal por el relay: vuelve solo la respuesta final. */
 const CHANNELS: Record<string, string> = { clone_project: "progress", list_session_git: "progress", watch_task_tree: "changes" };
 const UNKNOWN = new Set(["command", "unsupported", "command_not_allowed"]);
@@ -64,14 +67,18 @@ const REGISTRY_FOR = 30_000;
 const REGISTRY_WAIT = 4_000;
 /** Cuánto espera lo que la ventana no relee sola (workspaces, cuentas) a lo vivo antes de contestar con lo guardado. */
 const FRESH_WAIT = 1_500;
+const FIRST_ANSWER_GRACE = 100;
+const PROGRESSIVE = new Set([...LISTING, "list_projects", "list_portfolios", "list_live_sessions", "list_spaces", "list_workspace_attention", "list_task_mentions"]);
 /** Lo que espera `service_poll` en la web: los eventos ya llegan solos (`events`). */
 const POLL_WAIT = 20_000;
 /** En la web no hay instalador: lo que la ventana pregunta de él se contesta aquí. */
 const NO_SETUP: Record<string, unknown> = { setup_required: false, prepare_runtime: { stages: [], running: false }, list_live_turns: [] };
 
 /** Qué vuelve a leer la ventana cuando cambia la rebanada de una lectura. */
-export type SliceChange = "sessions" | "projects" | "spaces" | "attention" | "mentions";
+export type SliceChange = "sessions" | "projects" | "spaces" | "attention" | "mentions" | "workspaces";
 const CHANGES: Record<string, SliceChange> = {
+  list_workspaces: "workspaces",
+  workspaces_startup: "workspaces",
   list_live_sessions: "sessions",
   list_active_turns: "sessions",
   list_projects: "projects",
@@ -291,6 +298,7 @@ export function createRouter(config: RouterConfig) {
    * espera a que contesten, con su tope. Una apagada con copia contesta de su copia sin preguntar.
    */
   async function gather(envelopes: Envelope[], { settles = false, fresh = false } = {}): Promise<Slice[]> {
+    if (PROGRESSIVE.has(envelopes[0]?.command)) return gatherAvailable(envelopes, settles);
     const before = envelopes.map((envelope) => fleet.peek(envelope));
     if (!settles && !before.some((b) => b?.has)) return Promise.all(envelopes.map((e) => fleet.read(e)));
     if (!fresh) {
@@ -314,6 +322,30 @@ export function createRouter(config: RouterConfig) {
       () => {},
     );
     return before.filter((b): b is Slice => !!b);
+  }
+
+  /** La primera máquina con datos libera la lista; las pendientes conservan su última rebanada y avisan al contestar. */
+  async function gatherAvailable(envelopes: Envelope[], settles: boolean): Promise<Slice[]> {
+    const slices = envelopes.map(previousSlice);
+    let returned = false;
+    let finish!: () => void;
+    const available = new Promise<void>(resolve => { finish = resolve; });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const soon = () => { timer ??= setTimeout(finish, FIRST_ANSWER_GRACE); };
+    if (settles || slices.some(slice => slice?.has)) timer = setTimeout(finish, 0);
+    const live = envelopes.map(async (envelope, i) => {
+      const before = slices[i];
+      const slice = await fleet.read(envelope);
+      slices[i] = slice;
+      if (envelope.command === "list_live_sessions" && slice.has) sessionReads.set(JSON.stringify([envelope.machine, envelope.workspace, envelope.args?.project]), envelope);
+      if (returned) {
+        if (differs(before, slice)) notify(envelope.command);
+      } else if (slice.has) soon();
+    });
+    await Promise.race([Promise.all(live), available]);
+    returned = true;
+    clearTimeout(timer);
+    return slices.filter((slice): slice is Slice => !!slice);
   }
 
   /** Nadie trajo nada: se dice por qué, y la ventana se queda con lo que tenía. */
@@ -372,8 +404,11 @@ export function createRouter(config: RouterConfig) {
     if (CREATE.has(command) && workspace && fleet.inRegistry(workspace) && !fleet.membersOf(workspace).includes(machine)) await materialize(machine, workspace);
     if (WITH_SPACE.has(command)) args = await withSharedSpace(machine, workspace, args);
     if (command === "load_history") {
-      // El relay no pagina: la tarea entera, con la forma de la página.
-      const session = (await remote(machine, "load_session", { project: args.project, id: args.id }, workspace)) as { turns?: unknown[] } | null;
+      const session = await remote(machine, "load_session", {
+        project: args.project, id: args.id,
+        history_request: { version: 1, before: args.before ?? null, revision: args.revision ?? null },
+      }, workspace) as { turns?: unknown[]; history?: unknown } | null;
+      if (session?.history) return session;
       const total = Array.isArray(session?.turns) ? session.turns.length : 0;
       return { ...session, history: { total, start: 0, end: total, limit: total, has_more: false } };
     }
@@ -558,6 +593,15 @@ export function createRouter(config: RouterConfig) {
     return remote(lead, command, args, callWorkspace(workspace, args));
   }
 
+  /** En el escritorio, las cuentas de esta computadora y las de las demás, agrupadas como en la web: cada una con sus máquinas. */
+  async function accountsHere(args: Args, workspace: string | null, options: Options): Promise<unknown> {
+    const value = await native("list_accounts", args, options);
+    const envelopes = fleet.machines().map((m) => ({ machine: m.id, workspace, command: "list_accounts", args }));
+    const others = await gather(envelopes, { fresh: true }).catch(() => [] as Slice[]);
+    const merged = fleet.merge("list_accounts", [{ machine: self as string, status: "ok", has: true, value, at: Date.now() }, ...others.filter((s) => s.has)], workspace);
+    return merged === undefined ? value : merged;
+  }
+
   async function handle(command: string, args: Args = {}, options?: Options): Promise<unknown> {
     if (command === "machine_list") return machineList();
     if (command === "machine_select") {
@@ -568,7 +612,20 @@ export function createRouter(config: RouterConfig) {
     const workspace = command === "list_workspaces" ? null : headerOf(options, "x-terminus-workspace") ?? active;
     if (command === "list_workspaces") options = withoutHeader(options, "x-terminus-workspace");
     if (STORAGE.has(command) && !workspace) throw { what: { clave: "shell.service.failed" }, detail: "workspace_missing" };
-    if (local && ofThisMachine(command)) return native(command, args, options);
+    if (local && ofThisMachine(command)) {
+      if (OF_THIS_WINDOW.test(command)) return native(command, args, options);
+      try {
+        // Los chips de una cuenta actúan en su máquina: la de la cabecera o la que nombra el id.
+        const there = machine && machine !== self && fleet.has(machine) ? machine : homeOf(args);
+        if (there && fleet.has(there)) return await remote(there, command, args, callWorkspace(workspace, args));
+        if (machine && machine !== self) throw new FleetError("unknown_machine", machine);
+        if (command === "list_accounts" && fleet.machines().length) return await accountsHere(args, workspace, withoutHeader(options, "x-terminus-machine"));
+      } catch (error) {
+        if (error instanceof FleetError) throw named(error);
+        throw error;
+      }
+      return native(command, args, withoutHeader(options, "x-terminus-machine"));
+    }
     if (!local && command in NO_SETUP) return NO_SETUP[command];
     if (FILES.test(command) && ((machine && machine !== self && fleet.has(machine)) || namesOther(args)))
       throw { what: t("shell.machines.local_only"), detail: "machine_files" };
@@ -629,9 +686,10 @@ export function createRouter(config: RouterConfig) {
 
   /** Eventos de otra máquina: `attention` sale como la lista de todas. */
   function events(machine: string, list: { name: string; payload: unknown }[]) {
-    // Un cambio de tarea invalida el intervalo: la relectura que dispara el
-    // evento debe consultar la VM aunque acabemos de leer su lista.
-    if (list.some((event) => event.name === "session")) {
+    // Un cambio de tarea, carpeta, portafolio o espacio (`cli-changed`)
+    // invalida el intervalo: la relectura que dispara el evento debe consultar
+    // la VM aunque acabemos de leer su lista.
+    if (list.some((event) => event.name === "session" || event.name === "cli-changed")) {
       for (const id of lastRead.keys()) {
         const [owner, command] = JSON.parse(id) as [string, string];
         if (owner === machine && FAN.has(command)) lastRead.delete(id);

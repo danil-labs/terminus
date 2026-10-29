@@ -5,6 +5,7 @@
  * dominio y se prueba desde Node.
  */
 
+import type { HistoryRef } from "@terminus/protocol";
 import type { CodeRange } from "../../lib/model.ts";
 import type { Recipient, ReplyTo, SenderTask } from "../../lib/recipients.ts";
 import { type Detalle, pasoDe } from "../../lib/steps.ts";
@@ -379,6 +380,7 @@ export type Turn = {
   hops?: number | null;
   /** Las tareas que despertaron a la Bandeja (`Turn::woke_by`). */
   woke_by?: string[] | null;
+  history_refs?: HistoryRef[];
   tools?: Tool[];
   /**
    * El turno en su orden: el texto partido en los mensajes que el agente
@@ -565,6 +567,7 @@ export function transcripcion(turns: Turn[]): Msg[] {
     const propio: Msg = {
       role: t.role as Msg["role"],
       text: relevo ? relevo.texto : t.text,
+      historyRefs: t.history_refs,
       ...(relevo ? { relevo: { titulo: relevo.titulo } } : {}),
       task_mentions: t.task_mentions,
       // Un aviso de cierre —una interrupción— vive en el turno, no en el evento
@@ -639,7 +642,8 @@ export function transcripcion(turns: Turn[]): Msg[] {
       !propio.attachments &&
       !propio.preguntas &&
       !propio.respuestas &&
-      !propio.permission
+      !propio.permission &&
+      !propio.historyRefs?.length
     )
       return [...cambio, ...pasos, ...entrega];
     // Con el orden registrado se pinta el orden. Lo que el turno arrastra

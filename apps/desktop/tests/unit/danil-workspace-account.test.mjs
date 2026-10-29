@@ -7,6 +7,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { boot, sleep } from "../helpers/jsdom-app.mjs";
+import { engine as relayEngine, fleet as relayFleet } from "../helpers/fake-relay.mjs";
 
 const W = { id: "w", name: "Danil", context_root: null };
 const W2 = { id: "w2", name: "Fundación Donde Banco", context_root: null };
@@ -186,8 +187,8 @@ test("«Conectar otra cuenta…» on a workspace with an account does not move i
   assert.deepEqual(app.fallos, []);
 });
 
-async function openDanilAccounts(name, e) {
-  const app = await boot("listo", name, { ...BASE, ...e.table });
+async function openDanilAccounts(name, e, antes) {
+  const app = await boot("listo", name, { ...BASE, ...e.table }, undefined, {}, { antes });
   app.w.dispatchEvent(new app.w.CustomEvent("harness:open-settings", { detail: "cuenta-danil" }));
   await sleep(1000);
   return app;
@@ -195,18 +196,17 @@ async function openDanilAccounts(name, e) {
 const here = (w) => w.document.querySelector("[data-danil-here]");
 const buttonIn = (root, label) => [...(root?.querySelectorAll("button") ?? [])].find((b) => b.textContent.trim() === label);
 
-test("Cuentas de Danil is the app's, and on top says the open workspace belongs to no account and links it with one click", async () => {
+test("a workspace without an account reveals account choices only when asked", async () => {
   const e = engine({ map: {} });
   const app = await openDanilAccounts("danil-accounts-here-none", e);
   const { w } = app;
   assert.ok(here(w), w.document.body.textContent.slice(0, 400));
   assert.ok(here(w).textContent.includes("Este workspace: Danil"), here(w).textContent);
   assert.ok(here(w).textContent.includes("Este workspace no es de ninguna cuenta"), here(w).textContent);
-  assert.ok(!here(w).textContent.includes("Cuenta de este workspace"), "the section title already says so");
-  const nav = w.document.querySelector("#cfg-tab-cuenta-danil");
-  assert.equal(nav?.closest("div[role=presentation]")?.querySelector("p")?.textContent, "Aplicación", "in the app's group, not the workspace's connections");
-  assert.ok(w.document.querySelector("[data-danil-account]").textContent.includes("Iniciar sesión no mete ningún workspace a la cuenta"));
-
+  assert.ok(here(w).textContent.includes("Cuenta de este workspace"));
+  assert.equal(here(w).querySelector("[data-workspace-account-select]"), null);
+  here(w).querySelector("[data-danil-manage]").click();
+  await sleep(300);
   buttonIn(here(w), "Usar alberto@danil.ai").click();
   await sleep(400);
   assert.deepEqual(
@@ -223,7 +223,9 @@ test("signing in another account from a workspace without one links that workspa
   const e = engine({ map: { w2: "u_fdb" } });
   const app = await openDanilAccounts("danil-accounts-add-claims", e);
   const { w } = app;
-  buttonIn(w.document.querySelector("[data-danil-account]"), "Agregar otra cuenta").click();
+  here(w).querySelector("[data-danil-manage]").click();
+  await sleep(300);
+  await choose(w, "+other");
   await sleep(300);
   assert.deepEqual(e.calls.find((c) => c.command === "danil_connect_start")?.args, { add: true });
   assert.ok(!e.calls.some((c) => c.command === "danil_workspace_set_account"), "nothing until it signs in");
@@ -252,7 +254,8 @@ test("the first sign-in on this computer, from a workspace, links that workspace
   const app = await openDanilAccounts("danil-accounts-first-claims", e);
   const { w } = app;
   assert.ok(here(w)?.textContent.includes("Este workspace no es de ninguna cuenta"), w.document.body.textContent.slice(0, 400));
-  assert.equal(here(w).querySelectorAll("button").length, 0, "no second sign-in button up there: it is just below");
+  here(w).querySelector("[data-danil-manage]").click();
+  await sleep(300);
   buttonIn(w.document.querySelector("[data-danil-account]"), "Iniciar sesión con Danil").click();
   await sleep(300);
   assert.ok(e.calls.some((c) => c.command === "danil_connect_start"));
@@ -343,5 +346,179 @@ test("the sidebar footer shows the open workspace's account and follows a switch
   app.emit("danil-sessions", e.state.sessions);
   await sleep(400);
   assert.equal(foot(), null, "its account signed out: nobody, and not the other account");
+  assert.deepEqual(app.fallos, []);
+});
+
+test("settings follows the workspace account and reads only its registry's machines", async () => {
+  const e = engine();
+  const asked = [];
+  const peers = relayFleet({ "not-linked": { table: relayEngine, state: "offline" } });
+  let app;
+  e.table.account_relay_token = ({ account }) => {
+    if (!account) throw unknown();
+    asked.push(account);
+    return { token: account, endpoint: "https://settings.test" };
+  };
+  const previous = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    const account = new Headers(init.headers).get("authorization")?.replace("Bearer ", "");
+    const id = account === "u_fdb" ? "cmp_b" : "cmp_a";
+    if (String(url).endsWith("/v1/workspaces")) return Response.json({ workspaces: [{ id: account === "u_fdb" ? "w2" : "w", computers: [id] }] });
+    if (String(url).endsWith("/v1/computers")) return Response.json([
+      { computer_id: id, name: `Machine ${account}`, state: "online" },
+      { computer_id: "not-linked", name: "Other workspace machine", state: "online" },
+    ]);
+    return new Response("{}", { status: 404 });
+  };
+  globalThis.fetch.__jsdomApp = true;
+  try {
+    app = await openDanilAccounts("danil-settings-machines-scope", e, () => { globalThis.WebSocket = peers.Socket; });
+    const { w } = app;
+    const panel = () => w.document.querySelector("[data-danil-account]");
+    const rows = () => [...panel().querySelectorAll("[data-account-computer]")].map((el) => el.dataset.accountComputer);
+    assert.deepEqual(rows(), ["cmp_a"]);
+    assert.ok(!panel().textContent.includes(FDB.email));
+    assert.ok(asked.every((account) => account === "u_alberto"));
+    e.state.active = "w2";
+    w.dispatchEvent(new w.CustomEvent("harness:workspace"));
+    await sleep(800);
+    assert.deepEqual(rows(), ["cmp_b"]);
+    assert.ok(!panel().textContent.includes(ALBERTO.email));
+    assert.ok(asked.includes("u_fdb"));
+    assert.deepEqual(app.fallos, []);
+  } finally {
+    if (app) app.w.dispatchEvent(new app.w.Event("pagehide"));
+    globalThis.fetch = previous;
+  }
+});
+
+test("a failed account lookup does not show the default account or its computers", async () => {
+  const e = engine();
+  e.table.danil_workspace_account = () => { throw Object.assign(new Error("unauthorized"), { detail: "unauthorized" }); };
+  const app = await openDanilAccounts("danil-settings-failed-authority", e);
+  const panel = app.w.document.querySelector("[data-danil-account]");
+  assert.ok(panel.textContent.includes("No se pudo verificar la cuenta de este workspace."));
+  assert.equal(panel.querySelector("[data-danil-session]"), null);
+  assert.equal(panel.querySelector("[data-account-computers]"), null);
+  assert.ok(buttonIn(panel, "Reintentar"));
+  assert.deepEqual(app.fallos, []);
+});
+
+test("same-account workspace switches discard old machine reads, controls and connection polling", async () => {
+  const e = engine({ map: { w: "u_alberto", w2: "u_alberto" } });
+  e.table.account_relay_token = ({ account }) => {
+    if (!account) throw unknown();
+    return { token: account, endpoint: "https://same-account.test" };
+  };
+  let releaseOld;
+  const oldRegistry = new Promise((resolve) => { releaseOld = resolve; });
+  let delayed = false;
+  let inventories = 0;
+  const registry = { workspaces: [{ id: "w", computers: ["cmp_a"] }, { id: "w2", computers: [] }] };
+  const previous = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    if (String(url).endsWith("/v1/workspaces")) {
+      if (!delayed && globalThis.document.querySelector("[data-account-computers]")) {
+        delayed = true;
+        await oldRegistry;
+      }
+      return Response.json(registry);
+    }
+    if (String(url).endsWith("/v1/computers")) {
+      inventories++;
+      return Response.json([{ computer_id: "cmp_a", name: "W1 machine", state: "online" }]);
+    }
+    return new Response("{}", { status: 404 });
+  };
+  globalThis.fetch.__jsdomApp = true;
+  try {
+    const app = await openDanilAccounts("danil-settings-same-account-late", e);
+    const { w } = app;
+    const panel = () => w.document.querySelector("[data-danil-account]");
+    const manage = panel().querySelector("[data-danil-manage]");
+    assert.ok(manage, panel().textContent + JSON.stringify(app.fallos));
+    manage.click();
+    const connect = panel().querySelector("[data-connect-machine-open]");
+    assert.ok(connect, panel().textContent + JSON.stringify(app.fallos));
+    connect.click();
+    await sleep(200);
+    assert.ok(panel().querySelector("[data-connect-machine]"));
+    assert.ok(delayed, "W1 machine membership is still pending when switching");
+    e.state.active = "w2";
+    w.dispatchEvent(new w.CustomEvent("harness:workspace"));
+    await sleep(700);
+    assert.deepEqual([...panel().querySelectorAll("[data-account-computer]")].map((el) => el.dataset.accountComputer), []);
+    assert.equal(panel().querySelector("[data-workspace-account-select]"), null, "manage state is new for W2");
+    assert.equal(panel().querySelector("[data-connect-machine]"), null, "W1's connection watcher was unmounted");
+    releaseOld();
+    await sleep(300);
+    const count = inventories;
+    await sleep(2300);
+    assert.equal(inventories, count, "the old connection watcher stopped polling");
+    assert.deepEqual([...panel().querySelectorAll("[data-account-computer]")].map((el) => el.dataset.accountComputer), [], "late W1 authority cannot restore W1 rows");
+    assert.deepEqual(app.fallos, []);
+  } finally {
+    releaseOld();
+    globalThis.fetch = previous;
+  }
+});
+
+test("a delayed account change from W1 cannot overwrite W2's account", async () => {
+  let release;
+  const result = new Promise((resolve) => { release = resolve; });
+  const e = engine({ setAccount: () => result });
+  const app = await openDanilAccounts("danil-settings-late-account-change", e);
+  const { w } = app;
+  here(w).querySelector("[data-danil-manage]").click();
+  await sleep(100);
+  const picker = select(w);
+  picker.value = "u_fdb";
+  picker.dispatchEvent(new w.Event("change", { bubbles: true }));
+  await sleep(100);
+  e.state.active = "w2";
+  w.dispatchEvent(new w.CustomEvent("harness:workspace"));
+  await sleep(500);
+  release({ account: "u_alberto", email: ALBERTO.email, signed_in: true, linked: true });
+  await sleep(300);
+  const panel = w.document.querySelector("[data-danil-account]");
+  assert.ok(panel.querySelector('[data-danil-session="u_fdb"]'));
+  assert.equal(panel.querySelector('[data-danil-session="u_alberto"]'), null);
+  assert.ok(here(w).textContent.includes(W2.name));
+  assert.deepEqual(app.fallos, []);
+});
+
+test("workspace-list errors offer retry and recover instead of loading forever", async () => {
+  const e = engine();
+  let failed = true;
+  const read = e.table.list_workspaces;
+  e.table.list_workspaces = () => {
+    if (failed) throw Object.assign(new Error("unauthorized"), { detail: "unauthorized" });
+    return read();
+  };
+  const app = await openDanilAccounts("danil-settings-workspace-list-failure", e);
+  const panel = () => app.w.document.querySelector("[data-danil-account]");
+  assert.equal(panel().dataset.danilAccount, "failed");
+  failed = false;
+  buttonIn(panel(), "Reintentar").click();
+  await sleep(500);
+  assert.equal(panel().dataset.danilAccount, "workspace");
+  assert.ok(here(app.w).textContent.includes(W.name));
+  assert.deepEqual(app.fallos, []);
+});
+
+test("a returned account-link error remains visible after the account action closes", async () => {
+  const e = engine();
+  e.table.danil_workspace_set_account = ({ workspace, account }) => {
+    e.state.map[workspace] = account;
+    return { account, email: FDB.email, signed_in: true, linked: false, error: "workspace_id_taken" };
+  };
+  const read = e.table.danil_workspace_account;
+  e.table.danil_workspace_account = (args) => ({ ...read(args), linked: false });
+  const app = await openDanilAccounts("danil-settings-returned-link-error", e);
+  here(app.w).querySelector("[data-danil-manage]").click();
+  await choose(app.w, "u_fdb");
+  const panel = app.w.document.querySelector("[data-danil-account]");
+  assert.equal(panel.querySelector("[data-workspace-account-select]"), null);
+  assert.ok(panel.querySelector("[role=alert]")?.textContent.includes("Este workspace sigue siendo de la otra cuenta."));
   assert.deepEqual(app.fallos, []);
 });

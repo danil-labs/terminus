@@ -227,9 +227,8 @@ const destinosDe = (
     ? [
         {
           id: "cuenta-danil",
-          // En el escritorio, una sesión por cuenta; la web entra con una sola.
           get name() {
-            return capabilities().accountProfile ? t("settings.nav.danil_account") : t("settings.nav.danil_accounts");
+            return t("settings.nav.danil_account");
           },
           icono: () => <CircleUserRound size={15} />,
           panel: () => (
@@ -243,12 +242,11 @@ const destinosDe = (
 ];
 
 const GRUPOS: { nombre: () => string; ids: string[] }[] = [
-  // Las sesiones de Danil son de la computadora, no del workspace abierto.
-  { nombre: () => t("settings.nav.group_app"), ids: ["general", "appearance", "entorno", "activity", "cuenta-danil"] },
+  { nombre: () => t("settings.nav.group_app"), ids: ["general", "appearance", "entorno", "activity"] },
   { nombre: () => t("settings.nav.group_custom"), ids: ["skills", "agentes", "proyectos", "plugins"] },
   {
     nombre: () => t("settings.nav.group_connections"),
-    ids: ["proveedores-ia", "fuentes", "radiant"],
+    ids: ["cuenta-danil", "proveedores-ia", "fuentes", "radiant"],
   },
 ];
 

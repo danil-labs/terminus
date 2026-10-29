@@ -1,7 +1,6 @@
-import { createEffect, createSignal, For, type JSX, Match, on, Show, Switch } from "solid-js";
+import { createEffect, createSignal, Match, on, Show, Switch } from "solid-js";
 import { t } from "../../lib/i18n";
 import { capabilities } from "../../lib/platform";
-import { Badge } from "../../ui/Badge";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
 import { engineAccountProfile, engineAccountProfileOf, profileFromStatus } from "./account-engine";
@@ -9,12 +8,11 @@ import type { AccountProfile, AccountProfileSource } from "./account-profile";
 import { AccountIdentityBlock, type AccountIdentityState, createAccountIdentity } from "./AccountIdentity";
 import type { DanilConnectStatus } from "./danil-account";
 import { createDanilAccounts, type DanilAccounts } from "./danil-accounts";
-import { claimNextSession } from "./danil-claim";
 import { createDanilSession, DanilSignInChoices, said } from "./danil-session";
-import { type DanilSessionInfo, sessionKey, statusOf } from "./danil-sessions";
+import { type DanilSessionInfo, sessionForWorkspace, sessionKey, statusOf, syncLine } from "./danil-sessions";
 import { AccountComputersSection } from "../machines/AccountComputers";
 import { ConnectMachineSection } from "../machines/ConnectMachine";
-import { LICENSE_REQUIRED, startTrialInBrowser, TerminusLicense } from "./TerminusLicense";
+import { startTrialInBrowser, TerminusLicense } from "./TerminusLicense";
 import { SettingsBlock, SettingsPanel, SettingsRow, SettingsSection } from "./layout";
 import { createWorkspaces } from "./workspaces-store";
 import WorkspaceAccount from "./WorkspaceAccount";
@@ -28,160 +26,106 @@ export default function DanilAccount() {
 /** En la web la persona ya entró con su cuenta: aquí solo su foto, nombre y correo. */
 function WebAccount(props: { source: AccountProfileSource }) {
   const identity = createAccountIdentity(props.source);
+  const workspaces = createWorkspaces();
   return (
     <SettingsPanel data-danil-account="web">
       <SettingsSection title={t("danil.account.title")} description={t("danil.account.web_description")}>
         <AccountIdentityBlock identity={identity} />
       </SettingsSection>
-      <AccountComputersSection />
+      <Show when={workspaces.actual()} keyed>
+        {(workspace) => <AccountComputersSection workspace={workspace.id} />}
+      </Show>
       <ConnectMachineSection />
     </SettingsPanel>
   );
 }
 
-/**
- * Lo que la sección sabe del workspace abierto: las sesiones son de la
- * computadora, y ninguna lo mete a una cuenta salvo que se elija aquí.
- */
-type Here = {
-  /** «Este workspace»: de qué cuenta es, o que no es de ninguna. */
-  section: () => JSX.Element;
-  /** Antes de iniciar sesión: sin cuenta, el workspace queda en la que entre. */
-  beforeSignIn: () => void;
-};
-
-/**
- * En el escritorio: una sesión por cuenta. Sin ninguna (o con un motor que no
- * las trae) es la cuenta única de siempre; con alguna, la lista de cuentas.
- */
+/** La cuenta se resuelve por el workspace, nunca por la sesión principal de la máquina. */
 function MachineAccount() {
-  const accounts = createDanilAccounts({ workspace: "active" });
   const workspaces = createWorkspaces();
-  // `null` es un motor sin sesiones por cuenta: ahí no hay cuenta por workspace.
-  const open = () => (accounts.sessions() ? workspaces.actual() : null);
-  const here: Here = {
-    section: () => (
-      <Show when={open()}>
-        {(w) => (
-          <SettingsSection title={t("danil.here.title", { name: w().name })} data-danil-here="">
-            <SettingsBlock>
-              <WorkspaceAccount workspace={w().id} name={w().name} placement="section" />
-            </SettingsBlock>
-          </SettingsSection>
-        )}
-      </Show>
-    ),
-    beforeSignIn: () => {
-      const w = open();
-      if (w && accounts.of()?.account === null) claimNextSession(w.id, accounts.sessions());
-    },
-  };
+  const accounts = createDanilAccounts({ workspace: () => workspaces.actual()?.id });
+  const loadFailed = () => accounts.loadFailed() || Boolean(workspaces.fallo());
+  const retry = () => void Promise.all([accounts.reload(), workspaces.cargar()]);
+  const aLoadText = () => t(loadFailed() ? "danil.workspace.read_failed" : "danil.account.loading");
   return (
-    <Switch>
-      <Match when={accounts.sessions() === undefined}>
-        <SettingsPanel data-danil-account="loading">
-          <SettingsSection title={t("danil.accounts.title")}>
-            <SettingsBlock>
-              <p class="m-0 text-sm text-neutral-500">{t("danil.account.loading")}</p>
-            </SettingsBlock>
-          </SettingsSection>
+    <Show when={accounts.sessions() !== null} fallback={<SingleAccount />}>
+      <Show when={accounts.sessions() !== undefined && !accounts.loadingOf() && !workspaces.cargando() && accounts.workspaceOf() === workspaces.actual()?.id && workspaces.actual()?.id} keyed fallback={
+        <SettingsPanel data-danil-account={loadFailed() ? "failed" : "loading"}>
+          <SettingsRow label={aLoadText()}>
+            <Show when={loadFailed()}>
+              <Button size="sm" variant="secondary" onClick={retry}>{t("danil.workspace.retry")}</Button>
+            </Show>
+          </SettingsRow>
         </SettingsPanel>
-      </Match>
-      <Match when={accounts.connected().length > 0}>
-        <AccountList accounts={accounts} here={here} />
-      </Match>
-      <Match when={true}>
-        <SingleAccount here={accounts.sessions() ? here : null} />
-      </Match>
-    </Switch>
+      }>
+        {(id) => <WorkspacePanel workspace={{ id, name: workspaces.actual()!.name }} accounts={accounts} />}
+      </Show>
+    </Show>
   );
 }
 
-/** Las cuentas con sesión en esta computadora, la que se está agregando y «Agregar otra cuenta». */
-function AccountList(props: { accounts: DanilAccounts; here: Here }) {
+function WorkspacePanel(props: { workspace: { id: string; name: string }; accounts: DanilAccounts }) {
   const a = props.accounts;
-  const keys = () => a.connected().map(sessionKey).filter((k): k is string => Boolean(k));
-  const many = () => keys().length > 1;
-  const pending = () => a.pending();
-  const problem = () => a.problem() ?? (pending()?.status === "error" ? (pending()?.error ?? "failed") : null);
-  // El nombre de esta computadora recién cambiado aquí, por cuenta: el motor lo sabe al volver a conectarse.
-  const [renamed, setRenamed] = createSignal<Record<string, string>>({});
-
-  const add = () => {
-    props.here.beforeSignIn();
-    return a.add();
+  const [manage, setManage] = createSignal(false);
+  const [renamed, setRenamed] = createSignal<string | null>(null);
+  const session = () => a.of()?.signed_in ? sessionForWorkspace(a.sessions(), a.of()) : null;
+  let shownAccount: string | null | undefined;
+  createEffect(() => {
+    const s = session();
+    const key = s ? sessionKey(s) : null;
+    if (key === shownAccount) return;
+    shownAccount = key;
+    setRenamed(null);
+    setManage(false);
+  });
+  const line = () => syncLine(a.of(), a.sessions());
+  const description = () => {
+    const l = line();
+    if (l.kind === "synced") return t("danil.workspace.synced", { email: l.email });
+    if (l.kind === "unlinked") return t("danil.workspace.unlinked", { email: l.email });
+    if (l.kind === "none") return t("danil.workspace.no_account");
+    return l.email ? t("danil.workspace.unsynced_account", { email: l.email }) : t("danil.workspace.unsynced");
   };
-
   return (
-    <SettingsPanel data-danil-account="sessions">
-      {props.here.section()}
-      <SettingsSection title={t("danil.accounts.title")} description={t("danil.accounts.description")}>
-        <For each={keys()}>
-          {(key) => (
-            <Show when={a.connected().find((s) => sessionKey(s) === key)}>
-              {(session) => <SessionCard session={session()} accounts={a} many={many()} computerName={renamed()[key]} />}
-            </Show>
-          )}
-        </For>
-        <Show
-          when={pending()?.status === "pending"}
-          fallback={
-            <SettingsBlock>
-              <Button
-                size="sm"
-                variant="secondary"
-                class="justify-self-start"
-                disabled={a.busy()}
-                onClick={() => void add()}
-                data-danil-add=""
-              >
-                {t("danil.accounts.add")}
-              </Button>
-            </SettingsBlock>
-          }
-        >
-          <SettingsRow
-            label={t("danil.account.pending", { code: pending()?.user_code ?? "" })}
-            description={t("danil.accounts.adding_hint")}
-            data-danil-adding=""
-          >
-            <Show when={pending()?.verification_uri_complete}>
-              <Button size="sm" variant="secondary" onClick={a.reopen}>
-                {t("danil.account.open_again")}
-              </Button>
-            </Show>
+    <SettingsPanel data-danil-account="workspace">
+      <SettingsSection title={t("danil.here.title", { name: props.workspace.name })} data-danil-here="">
+        <Show when={a.of()} fallback={
+          <SettingsRow label={t("danil.workspace.read_failed")}>
+            <Button size="sm" variant="secondary" onClick={() => void a.reload()}>{t("danil.workspace.retry")}</Button>
           </SettingsRow>
-        </Show>
-        <Show when={problem() === LICENSE_REQUIRED}>
-          <SettingsBlock>
-            <TerminusLicense onStart={startTrialInBrowser} onRetry={() => void add()} busy={a.busy()} />
-          </SettingsBlock>
-        </Show>
-        <Show when={problem() !== LICENSE_REQUIRED && problem()}>
-          {(code) => <p class="m-0 pt-2 text-[0.8125rem] text-error-strong" role="alert">{said(code())}</p>}
+        }>
+          <SettingsRow label={t("danil.workspace.title")} description={description()}>
+            <Button size="sm" variant="secondary" aria-expanded={manage()} onClick={() => setManage(!manage())} data-danil-manage="">
+              {manage() ? t("danil.workspace.done") : a.of()?.account ? t("danil.workspace.manage") : t("danil.workspace.connect")}
+            </Button>
+          </SettingsRow>
+          <Show when={manage()}>
+            <SettingsBlock>
+              <WorkspaceAccount workspace={props.workspace.id} name={props.workspace.name} state={a} placement="section" onChanged={(problem) => { a.setProblem(problem); void a.reload(); }} />
+            </SettingsBlock>
+          </Show>
         </Show>
       </SettingsSection>
-      <For each={keys()}>
+      <Show when={session() && sessionKey(session()!)} keyed>
         {(key) => (
-          <Show when={a.connected().find((s) => sessionKey(s) === key)}>
-            {(session) => (
-              <AccountComputersSection
-                account={key}
-                owner={session().email || session().name || key}
-                self={session().computer_id}
-                onSelfName={(name) => setRenamed((r) => ({ ...r, [key]: name }))}
-              />
-            )}
-          </Show>
+          <>
+            <SettingsSection title={t("danil.account.title")}>
+              <SessionCard session={session()!} accounts={a} computerName={renamed() ?? undefined} />
+              <Show when={a.problem()}>{(code) => <p class="m-0 text-sm text-error-strong" role="alert">{said(code())}</p>}</Show>
+            </SettingsSection>
+            <Show when={a.of()?.linked}>
+              <AccountComputersSection account={key} workspace={props.workspace.id} self={session()?.computer_id} onSelfName={setRenamed} />
+              <ConnectMachineSection account={key} />
+            </Show>
+          </>
         )}
-      </For>
-      <ConnectMachineSection />
+      </Show>
     </SettingsPanel>
   );
 }
 
 /** Una cuenta: su persona (con la foto), esta computadora en ella, y sus acciones. */
-function SessionCard(props: { session: DanilSessionInfo; accounts: DanilAccounts; many: boolean; computerName?: string }) {
+function SessionCard(props: { session: DanilSessionInfo; accounts: DanilAccounts; computerName?: string }) {
   const key = sessionKey(props.session) as string;
   const s = () => props.session;
   const identity = createAccountIdentity(engineAccountProfileOf(key), undefined, {
@@ -206,14 +150,6 @@ function SessionCard(props: { session: DanilSessionInfo; accounts: DanilAccounts
         label={t("danil.account.this_computer", { name: props.computerName || s().computer_name || s().computer_id || "" })}
         description={state()}
       >
-        <Show when={props.many && s().default}>
-          <Badge>{t("danil.accounts.default")}</Badge>
-        </Show>
-        <Show when={!s().default}>
-          <Button size="sm" variant="ghost" disabled={props.accounts.busy()} onClick={() => void props.accounts.makeDefault(key)}>
-            {t("danil.accounts.make_default")}
-          </Button>
-        </Show>
         <Show when={!asking()}>
           <Button size="sm" variant="secondary" disabled={props.accounts.busy()} onClick={() => setAsking(true)} data-danil-sign-out="">
             {t("danil.account.sign_out")}
@@ -244,17 +180,15 @@ function SessionCard(props: { session: DanilSessionInfo; accounts: DanilAccounts
 }
 
 /**
- * La cuenta única: iniciar sesión registra esta computadora en la cuenta. Con
- * `here` (motor con sesiones por cuenta), arriba el workspace abierto.
+ * Compatibilidad con el motor anterior: su única sesión pertenece a esta computadora.
  */
-function SingleAccount(props: { here?: Here | null }) {
+function SingleAccount() {
   const session = createDanilSession();
   const { view, status, name, setName, busy } = session;
   const [renamed, setRenamed] = createSignal<string | null>(null);
 
   return (
     <SettingsPanel data-danil-account={status()?.state ?? view().t}>
-      {props.here?.section()}
       <SettingsSection title={t("danil.account.title")} description={t("danil.account.description")}>
         <Switch>
           <Match when={view().t === "loading"}>
@@ -300,7 +234,7 @@ function SingleAccount(props: { here?: Here | null }) {
                 <Input value={name()} onInput={(e) => setName(e.currentTarget.value)} disabled={busy()} data-machine-name="" />
                 <span class="text-xs">{t("danil.account.name_hint")}</span>
               </label>
-              <DanilSignInChoices session={session} onStart={props.here?.beforeSignIn} />
+              <DanilSignInChoices session={session} />
             </SettingsBlock>
           </Match>
         </Switch>
@@ -309,7 +243,6 @@ function SingleAccount(props: { here?: Here | null }) {
             <TerminusLicense
               onStart={startTrialInBrowser}
               onRetry={() => {
-                if (status()?.state !== "connected") props.here?.beforeSignIn();
                 void session.retry();
               }}
               busy={busy()}

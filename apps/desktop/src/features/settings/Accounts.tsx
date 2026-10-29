@@ -8,6 +8,7 @@ import Loader2 from "lucide-solid/icons/loader-circle";
 import RefreshCw from "lucide-solid/icons/refresh-cw";
 import Trash2 from "lucide-solid/icons/trash-2";
 import { createEffect, createMemo, createSignal, createUniqueId, For, type JSX, lazy, on, onCleanup, onMount, Show, Suspense, untrack } from "solid-js";
+import { createStore, reconcile } from "solid-js/store";
 import { copyText } from "../../lib/clipboard";
 import { enfocar } from "../../lib/focus";
 import { t } from "../../lib/i18n";
@@ -106,7 +107,7 @@ export default function Accounts(props: {
   const [lista, setLista] = createSignal<AccountList | null>(null);
   const [cargando, setCargando] = createSignal(true);
   const [estados, setEstados] = createSignal<Record<string, AccountStatus>>({});
-  const tarjetas = createMemo<Account[]>(() => {
+  const agrupadas = createMemo<Account[]>(() => {
     const accounts = lista()?.accounts ?? [];
     if (!accounts.some((a) => a.machines?.length)) return accounts;
     const groups = groupAccounts(agente(), accounts.flatMap((a) => (a.machines ?? []).map((m) => ({
@@ -116,6 +117,13 @@ export default function Accounts(props: {
     }))));
     return groups.map((g) => ({ ...g.row, machines: g.members }));
   });
+  // Cada tarjeta conserva su objeto por id: `For` las sigue por referencia, y
+  // un objeto nuevo desmonta la tarjeta y vuelve a pedir su consumo. Sin esto,
+  // cada `account_status` que contestaba (cambia `estados`, y con él el plan)
+  // y cada refresco de la lista montaban todas las tarjetas desde cero.
+  const [tarjetas, setTarjetas] = createStore<Account[]>([]);
+  // Copia: `reconcile` escribe en los objetos que recibe, y son los de `lista()`.
+  createEffect(() => setTarjetas(reconcile(structuredClone(agrupadas()), { key: "id" })));
   const [comprobando, setComprobando] = createSignal<Record<string, boolean>>({});
   // Las que la última consulta de estado no pudo responder. No es «sin
   // conectar» —nadie lo dijo— ni «conectada»: una cuenta cuyo `account_status`
@@ -327,7 +335,10 @@ export default function Accounts(props: {
   }
 
   async function refrescar() {
-    setCargando(true);
+    // El esqueleto es de la primera lectura. Después, la lista que ya se ve se
+    // queda mientras llega la nueva: autenticar o quitar una cuenta no vuelve
+    // a vaciar la sección, y cada tarjeta dice su propia carga.
+    if (lista() === null) setCargando(true);
     try {
       setLista(await invoke<AccountList>("list_accounts", { provider: agente() }));
       setFallo(null);
@@ -350,6 +361,8 @@ export default function Accounts(props: {
       setSinComprobar({});
       comprobadas.clear();
       setPorQuitar(null);
+      // Las tarjetas del agente anterior no se quedan a la vista del nuevo.
+      setLista(null);
       void refrescar();
     }),
   );
@@ -829,7 +842,7 @@ export default function Accounts(props: {
                     {t("settings.account_card.active")}
                   </Badge>
                   <span class="shrink-0">
-                    {t("settings.accounts.count", { count: tarjetas().length })}
+                    {t("settings.accounts.count", { count: tarjetas.length })}
                   </span>
                 </span>
               )}
@@ -1052,7 +1065,7 @@ export default function Accounts(props: {
 
       <Show when={hayCuentas()}>
       <ul class="m-0 grid list-none gap-2 p-0">
-        <For each={tarjetas()}>
+        <For each={tarjetas}>
           {(a, i) => {
             const activa = () => a.id === lista()?.active || !!a.machines?.some((m) => m.id === lista()?.active);
             const estado = () => estados()[a.id];

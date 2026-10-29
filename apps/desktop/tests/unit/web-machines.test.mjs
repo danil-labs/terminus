@@ -305,7 +305,11 @@ test("a new task is born on the machine chosen, with the same project id, and ma
   assert.equal(await invoke("send_message", { project: "p1", session: null, prompt: "otra" }, vm), "cmp_vm~r1");
   assert.deepEqual(calls("cmp_vm", "materialize_workspace").map((c) => [c.args.id, c.workspace]), [["w2", "w2"]], "the VM makes the workspace its own with the same id, said in the envelope");
   assert.deepEqual(calls("cmp_vm", "send_message").at(-1).workspace, "w2", "and then gets the task in it");
-  const after = await invoke("list_workspaces");
+  let after = await invoke("list_workspaces");
+  for (let attempt = 0; attempt < 20 && !after.workspaces.find(w => w.id === "w2")?.machines.includes("cmp_vm"); attempt++) {
+    await sleep(50);
+    after = await invoke("list_workspaces");
+  }
   assert.deepEqual(after.workspaces.find((w) => w.id === "w2").machines, ["cmp_vm", "cmp_mac"]);
   assert.deepEqual(app.fallos, []);
 });
@@ -328,8 +332,12 @@ test("«Ejecutar en» disables, with the reason, a machine that cannot make the 
   assert.equal(calls("cmp_old", "send_message").length, 0, "and never got the task");
   assert.deepEqual((await invoke("machine_list")).find((m) => m.id === "cmp_old"), { id: "cmp_old", local: false, active: false, on: true, hosts: false, materializes: false, wakes: true });
 
+  doc.querySelector('[aria-label="Ejecutar en"]').click();
+  assert.ok(await until(() => doc.querySelector('[data-machine-option="cmp_mac"]')), "the machine picker opens");
+  doc.querySelector('[data-machine-option="cmp_mac"]').click();
+  await sleep(300);
   doc.querySelector('[aria-label="Proyecto"]').click();
-  assert.ok(await until(() => [...doc.querySelectorAll("button")].some((b) => b.textContent.includes("Notas") && b.textContent.includes("tarea"))), "the project picker opens");
+  assert.ok(await until(() => [...doc.querySelectorAll("button")].some((b) => b.textContent.includes("Notas") && b.textContent.includes("tarea"))), "the project picker opens with that machine's folders");
   [...doc.querySelectorAll("button")].find((b) => b.textContent.includes("Notas") && b.textContent.includes("tarea")).click();
   await sleep(300);
   doc.querySelector('[aria-label="Ejecutar en"]').click();
@@ -368,7 +376,7 @@ test("an action on a computer that is off and cannot be woken fails short and ne
   assert.ok(vmCard?.parentElement.textContent.includes("Danil VM"), "the VM card names its machine");
   assert.ok(vmCard?.parentElement.textContent.includes("(Linux)"), "the VM card names Linux when the row says so");
   await assert.rejects(invoke("send_message", { session: "cmp_mac~t1", text: "hola" }, on("cmp_mac")), (e) => {
-    assert.equal(e.what, "Mac de Ana está apagada. Enciéndela para seguir.");
+    assert.equal(e.what, "Mac de Ana está sin conexión. Verifica que Terminus esté abierto y tenga acceso a internet.");
     return true;
   });
   assert.equal(calls("cmp_mac", "send_message").length, 0, "nothing tries to start a computer the relay cannot start");
@@ -567,7 +575,7 @@ test("a computer the relay cannot start answers off at once, never starting", as
     cmp_own: { table: table("Notas", "Tarea del portátil"), state: "offline", notStartable: true },
   });
   await assert.rejects(invoke("send_message", { session: "cmp_own~t1", text: "hola" }, on("cmp_own")), (e) => {
-    assert.equal(e.what, "Portátil está apagada. Enciéndela para seguir.");
+    assert.equal(e.what, "Portátil está sin conexión. Verifica que Terminus esté abierto y tenga acceso a internet.");
     return true;
   });
   assert.equal(calls("cmp_own", "send_message").length, 1, "the relay was asked and refused");

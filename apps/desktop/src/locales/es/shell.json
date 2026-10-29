@@ -123,7 +123,6 @@
   "shell.workspaces.label": "Workspaces",
   "shell.workspaces.new": "Nuevo workspace",
   "shell.workspaces.tile_with_state": "{name}: {state}",
-  "shell.workspaces.add_account": "Agregar cuenta",
   "shell.workspaces.account": "Cuenta {email}",
   "shell.workspaces.other_tile": "{name} · {email}",
   "shell.workspaces.expired_tile": "{name} · {email}: la sesión caducó",
@@ -230,14 +229,13 @@
   "shell.update.background": "Se descarga en segundo plano. Puedes seguir trabajando.",
   "shell.update.downloading": "Descargando…",
   "shell.close.title": {
-    "one": "Hay {count} tarea trabajando",
-    "other": "Hay {count} tareas trabajando"
+    "one": "Salir de Terminus · {count} tarea trabajando",
+    "other": "Salir de Terminus · {count} tareas trabajando"
   },
-  "shell.close.body": "Si sigues en segundo plano, terminan aunque cierres la ventana. Si las detienes, quedan interrumpidas y puedes retomarlas después.",
+  "shell.close.body": "Cerrar la ventana mantiene el trabajo en segundo plano. Para salir ahora puedes detener estas tareas; después podrás retomarlas.",
   "shell.close.working": "trabajando",
   "shell.close.waiting": "espera tu respuesta",
   "shell.close.untitled": "Tarea sin título",
-  "shell.close.remember": "Recordar mi elección",
   "shell.close.cancel": "Cancelar",
   "shell.close.stop": "Detenerlas y salir",
   "shell.close.stopping": "Deteniendo…",
@@ -249,7 +247,7 @@
   "shell.tray.idle": "Terminus · sin tareas trabajando",
   "shell.tray.open": "Abrir Terminus",
   "shell.tray.stop_all": "Detener todas las tareas",
-  "shell.tray.quit": "Salir por completo",
+  "shell.tray.quit": "Salir de Terminus",
   "shell.update.waiting_tasks": {
     "one": "El motor nuevo entra cuando termine {count} tarea que sigue trabajando.",
     "other": "El motor nuevo entra cuando terminen {count} tareas que siguen trabajando."
@@ -279,6 +277,7 @@
   "shell.work_tree.no_session": "Todavía no hay ninguna tarea abierta",
   "shell.work_tree.open": "Ver el árbol de trabajo",
   "shell.folder.open": "Abrir carpeta",
+  "shell.folder.view_on": "Ver archivos en {name}",
   "shell.folder.copy": "Copiar ruta",
   "shell.folder.copied": "Ruta copiada",
   "shell.engine.connecting": "Conectando con el motor…",
@@ -310,5 +309,8 @@
   "shell.relocate.body": "Muévelo a Aplicaciones para que se actualice y siga ahí cuando expulses el disco.",
   "shell.relocate.move": "Mover a Aplicaciones",
   "shell.relocate.later": "Ahora no",
-  "shell.relocate.failed": "No se pudo copiar Terminus a Aplicaciones: {error}\n\nArrástralo desde la ventana del disco a Aplicaciones."
+  "shell.relocate.failed": "No se pudo copiar Terminus a Aplicaciones: {error}\n\nArrástralo desde la ventana del disco a Aplicaciones.",
+  "shell.close.error": "No se pudo completar la salida. El cliente sigue abierto. Revisa el error y vuelve a intentar.",
+  "shell.tray.unknown": "Terminus · estado de tareas sin comprobar",
+  "shell.service.managed": "El motor lo administra un servicio externo. Revisa su configuración y estado; Terminus volverá a conectarse cuando esté disponible."
 }

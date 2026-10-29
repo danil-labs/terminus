@@ -66,12 +66,21 @@ test("el árbol de una tarea de otra máquina se pide a esa máquina y enseña l
     if (machine !== "vm") throw { what: { clave: "development.error.task_folder_open" }, detail: "not_found" };
     return value;
   };
-  const app = await boot("listo", "machine-task-tree", responses(there), undefined, { "harness.layout.shell.right.open": "true" });
+  const values = responses(there);
+  let external = 0;
+  values.open_external = () => { external++; return null; };
+  const app = await boot("listo", "machine-task-tree", values, undefined, { "harness.layout.shell.right.open": "false" });
   await sleep(600);
   const doc = app.w.document;
   const fila = doc.querySelector('[data-sesion="r1"]');
   assert.ok(fila, "no está la fila de la tarea de la VM");
   fila.click();
+  await sleep(800);
+
+  const files = doc.querySelector("[data-task-location-project]")?.closest("button");
+  assert.ok(files, "la carpeta de la tarea debe abrir archivos dentro de Terminus");
+  assert.match(files.getAttribute("aria-label"), /vm/i);
+  files.click();
   await sleep(800);
 
   for (const command of ["list_task_trees", "tree_files", "kn_status"]) {
@@ -80,4 +89,22 @@ test("el árbol de una tarea de otra máquina se pide a esa máquina y enseña l
     assert.deepEqual(calls.map((c) => c.machine), calls.map(() => "vm"), `${command} fue al motor de la ventana`);
   }
   assert.ok(doc.querySelector('[data-ruta="DANIL.md"]'), "el árbol no enseña el archivo que creó el agente");
+  assert.equal(external, 0, "la ruta remota no debe abrirse en el explorador local");
+});
+
+test("una carpeta local conserva el acceso al explorador del equipo", async () => {
+  const values = responses((_command, value) => () => value);
+  values.list_live_sessions = ({ project }) => project === "p1" ? [row("l1", { machine: "local", machine_on: true })] : [];
+  const opened = [];
+  values.open_external = ({ target }) => { opened.push(target); return null; };
+  const app = await boot("listo", "local-task-folder", values, undefined, { "harness.layout.shell.right.open": "true" });
+  await sleep(600);
+  const doc = app.w.document;
+  doc.querySelector('[data-sesion="l1"]').click();
+  await sleep(800);
+  const open = doc.querySelector('button[aria-label="Abrir carpeta"]');
+  assert.ok(open, "la carpeta local conserva la acción del explorador");
+  open.click();
+  await sleep(100);
+  assert.deepEqual(opened, ["/tmp"]);
 });

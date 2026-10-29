@@ -153,7 +153,7 @@ test("a message to a task of the VM that is off wakes it and is delivered; to th
   assert.equal(seen.id, "cmp_mac~t2", "the last it said is still visible");
   await assert.rejects(router.handle("send_message", { project: "p1", session: "cmp_mac~t2", prompt: "hola" }, on("cmp_mac")), (e: { detail: string; what: string }) => {
     assert.equal(e.detail, "machine_off");
-    assert.match(e.what, /Mac de Ana está apagada/);
+    assert.match(e.what, /Mac de Ana está sin conexión/);
     return true;
   });
   assert.equal(mac.calls.filter((c) => c.command === "send_message").length, 0, "nothing was sent to it");
@@ -328,4 +328,55 @@ test("desktop keeps a machine's known task rows while a new open list is pending
   assert.deepEqual(ids(await router.handle("list_live_sessions", opened)), ["local"], "a successful empty response removes the old rows");
   for (const finish of pending.values()) finish({ value: [], cached: null });
   router.close();
+});
+
+test("web publishes available slices while a cold machine is still pending, then announces late data", async () => {
+  const slow = fakeLink({});
+  const pending: { command: string; resolve: (answer: { value: unknown; cached: null }) => void }[] = [];
+  slow.call = (_id, command) => new Promise(resolve => { pending.push({ command, resolve }); });
+  const fast = fakeLink({ list_workspaces: { workspaces: [{ id: "w" }], active: "w" }, list_live_sessions: [row("fast")], list_projects: [] });
+  const fleet = new Fleet({ self: null, connect: info => info.id === VM.id ? slow : fast, deadlines: { read: 2000 } });
+  fleet.setMachines([VM, MAC]);
+  const changes: string[] = [];
+  const router = createRouter({ self: null, fleet, native: null, registry: async () => REGISTRY as never, onSlices: batch => changes.push(...batch) });
+  try {
+    const started = Date.now();
+    await router.handle("list_workspaces");
+    const initial = await router.handle("list_live_sessions", { project: "p1", open: [] }) as { id: string }[];
+    assert.ok(Date.now() - started < 800, "the slow machine's deadline is outside the initial render");
+    assert.deepEqual(initial.map(r => r.id), ["cmp_mac~fast"]);
+    const listing = pending.find(read => read.command === "list_workspaces")!;
+    const tasks = pending.find(read => read.command === "list_live_sessions")!;
+    listing.resolve({ value: { workspaces: [{ id: "w" }], active: "w" }, cached: null });
+    tasks.resolve({ value: [row("late")], cached: null });
+    await new Promise(resolve => setTimeout(resolve, 250));
+    assert.ok(changes.includes("workspaces"));
+    assert.ok(changes.includes("sessions"));
+    const retained = await router.handle("list_live_sessions", { project: "p1", open: ["cmp_vm~late"] }) as { id: string }[];
+    assert.ok(retained.some(r => r.id === "cmp_vm~late"), "a pending open slice retains the machine's last rows");
+    const latest = pending.filter(read => read.command === "list_live_sessions").at(-1)!;
+    latest.resolve({ value: [], cached: null });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const empty = await router.handle("list_live_sessions", { project: "p1", open: ["cmp_vm~late"] }) as { id: string }[];
+    assert.ok(!empty.some(r => r.id === "cmp_vm~late"), "a confirmed empty response clears the old slice");
+  } finally {
+    for (const read of pending) read.resolve({ value: [], cached: null });
+    router.close();
+  }
+});
+
+test("web history forwards its cursor to the host and preserves its bounded page", async () => {
+  const mac = fakeLink({ load_session: ({ history_request }: Args) => ({
+    id: "t1", turns: [{ id: "a", text: "last" }],
+    history: { version: 1, revision: "r1", start: 5, end: 6, total: 7, has_more: true },
+    requested: history_request,
+  }) });
+  const { router } = web({ cmp_mac: mac });
+  try {
+    const page = await router.handle("load_history", { project: "p1", id: "cmp_mac~t1", before: 6 }, on("cmp_mac")) as { history: { start: number }; requested: unknown };
+    assert.equal(page.history.start, 5);
+    assert.deepEqual(mac.calls[0].args.history_request, { version: 1, before: 6, revision: null });
+    assert.equal(mac.calls[0].command, "load_session");
+    assert.equal(mac.calls[0].args.id, "t1");
+  } finally { router.close(); }
 });

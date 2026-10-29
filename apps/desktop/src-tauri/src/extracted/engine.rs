@@ -110,6 +110,12 @@ pub fn prepare(paths: &Paths) -> Result<()> {
 /// La selección del motor de esta ventana: el vivo sobre la raíz o uno recién lanzado.
 /// `adopt` pasa `--adopt-existing`: solo tras el traspaso que la persona aceptó.
 pub fn ensure(paths: &Paths, adopt: bool) -> Result<PathBuf> {
+    if super::engine_profile::managed(&paths.data)? {
+        if adopt {
+            return Err(Error::new("managed_service_unavailable"));
+        }
+        return attach_managed(paths, START_TIMEOUT);
+    }
     prepare(paths)?;
     // La raíz de 0.2.74 ya existe y es del motor validarla; una nueva la crea él.
     if paths.identity != PRODUCTION {
@@ -181,6 +187,63 @@ pub fn ensure(paths: &Paths, adopt: bool) -> Result<PathBuf> {
     Err(failed(paths, offset))
 }
 
+/// Un supervisor administra esta raíz: se espera su descriptor, sin arrancar ni adoptar.
+fn attach_managed(paths: &Paths, within: Duration) -> Result<PathBuf> {
+    prepare(paths)?;
+    let deadline = Instant::now() + within;
+    loop {
+        match managed_endpoint(&paths.data) {
+            Ok((found, status)) => {
+                return write_selection(
+                    paths,
+                    &paths.data.join("seldon-endpoint.json"),
+                    &found,
+                    &status,
+                )
+            }
+            Err(error)
+                if error.code == "managed_service_unavailable" && Instant::now() < deadline =>
+            {
+                std::thread::sleep(Duration::from_millis(500));
+            }
+            Err(error) => return Err(error),
+        }
+    }
+}
+
+fn managed_endpoint(
+    data: &Path,
+) -> Result<(terminus_engine_protocol::Endpoint, serde_json::Value)> {
+    let (found, status) = terminus_engine_client::probe(&data.join("seldon-endpoint.json"))
+        .map_err(|error| match error.code.as_str() {
+            "io" | "app_unavailable" => Error::new("managed_service_unavailable"),
+            _ => error,
+        })?;
+    if super::engine_profile::canonical(&found.data_directory)
+        != super::engine_profile::canonical(data)
+    {
+        return Err(Error::new("invalid_token"));
+    }
+    Ok((found, status))
+}
+
+/// Recupera sólo el cliente del servicio; cada nuevo descriptor y token se validan de nuevo.
+pub fn reconnect_managed(
+    current: &terminus_engine_client::Client,
+) -> Result<terminus_engine_client::Client> {
+    let previous = current.selection();
+    let (found, status) = managed_endpoint(&previous.data_directory)?;
+    let file = previous.window_data.join("managed-selection.json");
+    write_selection_at(
+        &previous.window_data,
+        &file,
+        &previous.data_directory.join("seldon-endpoint.json"),
+        &found,
+        &status,
+    )?;
+    terminus_engine_client::Client::select(&file)
+}
+
 /// Un descriptor dentro de la raíz que nombra otra (una raíz copiada) no es de esta ventana.
 fn ours(paths: &Paths, found: &terminus_engine_protocol::Endpoint) -> bool {
     use super::engine_profile::canonical;
@@ -247,6 +310,9 @@ pub fn stop() -> Stopped {
     let Ok(paths) = paths() else {
         return Stopped::Unanswered;
     };
+    if !matches!(super::engine_profile::managed(&paths.data), Ok(false)) {
+        return Stopped::Busy;
+    }
     let endpoint = paths.data.join("seldon-endpoint.json");
     // Una orden de una ventana que se acaba de cerrar termina sola; un turno o una descarga, no.
     let settle = Instant::now() + Duration::from_secs(20);
@@ -280,6 +346,9 @@ pub fn stop() -> Stopped {
 /// Con otra versión instalada, el motor viejo se para en cuanto queda sin trabajo;
 /// la ventana arranca el nuevo en su siguiente sondeo, como tras cualquier caída.
 pub fn retire_if_replaced(paths: &Paths) {
+    if !matches!(super::engine_profile::managed(&paths.data), Ok(false)) {
+        return;
+    }
     let endpoint = paths.data.join("seldon-endpoint.json");
     let Ok((found, status)) = terminus_engine_client::probe(&endpoint) else {
         return;
@@ -292,6 +361,9 @@ pub fn retire_if_replaced(paths: &Paths) {
 /// «Actualizar ya» con el motor anterior trabajando: corta sus turnos y apunta sus
 /// tareas para que el nuevo las retome. Uno sin esa orden se niega y se termina su proceso.
 pub fn force_previous(paths: &Paths) -> Result<()> {
+    if super::engine_profile::managed(&paths.data)? {
+        return Err(Error::new("managed_service_unavailable"));
+    }
     let endpoint = paths.data.join("seldon-endpoint.json");
     let (found, _) = previous(&endpoint)?;
     let asked = terminus_engine_client::force_stop_any_contract(&endpoint, Duration::from_secs(5));
@@ -399,6 +471,9 @@ fn installed_engine(paths: &Paths, bundled: PathBuf) -> PathBuf {
 }
 
 fn spawn(paths: &Paths, adopt: bool) -> Result<Child> {
+    if super::engine_profile::managed(&paths.data)? {
+        return Err(Error::new("managed_service_unavailable"));
+    }
     let exe = super::legacy::stable_engine(&bundled_engine()?, &engine_root(paths))?;
     let mut log = OpenOptions::new()
         .create(true)
@@ -529,6 +604,16 @@ fn write_selection(
     found: &terminus_engine_protocol::Endpoint,
     status: &serde_json::Value,
 ) -> Result<PathBuf> {
+    write_selection_at(&paths.window, &paths.selection, endpoint, found, status)
+}
+
+fn write_selection_at(
+    window: &Path,
+    file: &Path,
+    endpoint: &Path,
+    found: &terminus_engine_protocol::Endpoint,
+    status: &serde_json::Value,
+) -> Result<PathBuf> {
     let selection = Selection {
         version: VERSION,
         endpoint: endpoint.to_path_buf(),
@@ -540,21 +625,21 @@ fn write_selection(
             .as_str()
             .unwrap_or_default()
             .to_owned(),
-        window_data: paths.window.clone(),
+        window_data: window.to_path_buf(),
     };
     let bytes = serde_json::to_vec(&selection)?;
     // Reescribirla igual invalidaría el cliente de las otras ventanas sobre el mismo motor.
-    if std::fs::read(&paths.selection).is_ok_and(|current| current == bytes) {
-        return Ok(paths.selection.clone());
+    if std::fs::read(file).is_ok_and(|current| current == bytes) {
+        return Ok(file.to_path_buf());
     }
-    let temporary = paths.selection.with_extension("json.tmp");
+    let temporary = file.with_extension("json.tmp");
     let _ = std::fs::remove_file(&temporary);
-    let mut file = private_file(&temporary)?;
-    file.write_all(&bytes)?;
-    file.sync_all()?;
-    drop(file);
-    std::fs::rename(&temporary, &paths.selection)?;
-    Ok(paths.selection.clone())
+    let mut output = private_file(&temporary)?;
+    output.write_all(&bytes)?;
+    output.sync_all()?;
+    drop(output);
+    std::fs::rename(&temporary, file)?;
+    Ok(file.to_path_buf())
 }
 
 fn private_dir(dir: &Path) -> Result<()> {

@@ -25,6 +25,7 @@ test("el main de producción reenvía la CLI con pipes, archivos, salida descart
     const stub = join(scratch, "app_lib.rs");
     const library = join(scratch, "libapp_lib.rlib");
     writeFileSync(stub, `pub struct Error { pub message_key: &'static str }
+pub fn background_dispatch() {}
 pub fn launch() -> Result<(), Error> { println!("window"); Ok(()) }
 pub fn stop_engine() -> i32 { println!("stop-engine"); 0 }
 `);

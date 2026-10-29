@@ -54,6 +54,8 @@ import {
 import type { DockAgent } from "./dockLayout";
 import { flattenTasks, folderCounts } from "./sidebarTasks";
 import { machineName, machines } from "../machines/store";
+import { buildTaskTree, taskIdentity, withTaskAncestors } from "@terminus/tasks";
+import { descendientes } from "../projects/taskTree";
 
 // Fuera de la carga inicial: el botón y el dock llegan un instante después de la lista.
 const SidebarFilter = lazy(() => import("./SidebarFilter").then((m) => ({ default: m.SidebarFilter })));
@@ -110,6 +112,9 @@ export default function Sidebar(props: {
   collapsed: boolean;
   onToggle: () => void;
   onPick: (project: string, id: string) => void;
+  draggedTask?: string | null;
+  dragFolder?: string | null;
+  onDrag?: (project: string, row: SessionRow, event: PointerEvent) => void;
   onNew: () => void;
   onRenombrarProyecto: (id: string, name: string) => Promise<void> | void;
   onBorrarProyecto: (id: string) => Promise<void> | void;
@@ -231,7 +236,7 @@ export default function Sidebar(props: {
   const nombreDe = (project: string) => props.projects.find((p) => p.id === project)?.name;
   const relacionadas = createMemo(() => Object.values(props.sessions).flat());
 
-  const todas = createMemo(() => flattenTasks(props.sessions, !!query()));
+  const todas = createMemo(() => flattenTasks(props.sessions, true));
   const cuentas = createMemo(() => folderCounts(todas()));
   // La de esta computadora, con el nombre que le da la cuenta, como su tarjeta flotante.
   const nombreDeMaquina = (id: string) => {
@@ -249,12 +254,19 @@ export default function Sidebar(props: {
     const carpetas = v.folders.filter((f) => (cuentas().get(f) ?? 0) > 0);
     return carpetas.length === v.folders.length ? v : { ...v, folders: carpetas };
   });
+  const matches = createMemo(() => applySidebarView(todas().map(x => x.row), vistaEfectiva(), {
+    live: props.vivas, approving: props.aprobando, folderOf: row => carpetaDe(row.id),
+  }).flatMap(group => group.tasks));
+  const filteredView = () => vistaEfectiva().folders.length > 0 || vistaEfectiva().agent !== null;
+  const matchingIds = createMemo(() => filteredView() ? matches().map(taskIdentity) : undefined);
   const grupos = createMemo(() => {
-    const todosLosGrupos = applySidebarView(todas().map((x) => x.row), vistaEfectiva(), {
-      live: props.vivas,
-      approving: props.aprobando,
-      folderOf: (row) => carpetaDe(row.id),
-    });
+    const rows = withTaskAncestors(todas().map(x => x.row), matches());
+    const families = buildTaskTree(rows);
+    const roots = families.map(branch => branch.tarea);
+    const byRoot = new Map(families.map(branch => [taskIdentity(branch.tarea), [branch.tarea, ...descendientes(branch)]]));
+    const todosLosGrupos = applySidebarView(roots, { ...vistaEfectiva(), folders: [], agent: null }, {
+      live: props.vivas, approving: props.aprobando, folderOf: row => carpetaDe(row.id),
+    }).map(group => ({ ...group, tasks: group.tasks.flatMap(row => byRoot.get(taskIdentity(row)) ?? [row]) }));
     // Por carpeta, en el orden del riel (la principal primero) y «sin carpeta» al final.
     const orden = (g: SidebarGroup<SessionRow>) => {
       if (g.kind !== "folder") return Number.MAX_SAFE_INTEGER;
@@ -363,12 +375,16 @@ export default function Sidebar(props: {
    * sitios —expandida y en el desplegable—; una variable contendría un solo
    * nodo del DOM y colocarlo dos veces lo movería del primero al segundo.
    */
-  const Historial = (p: { filas: SessionRow[]; clave: string; sinCarpeta?: boolean }) => (
+  const Historial = (p: { filas: SessionRow[]; clave: string; sinCarpeta?: boolean; folderGroup?: string }) => (
     <Sessions sidebar
+      draggedTask={props.draggedTask}
       density={vista().density}
       hideFolder={p.sinCarpeta}
+      folderGroup={p.folderGroup}
+      onPickRelated={row => { props.onPick(carpetaDe(row.id), row.id); setDesplegado(false); }}
       sessions={p.filas}
       relatedSessions={relacionadas()}
+      matchingIds={matchingIds()}
       groupByAuthor={false}
       search={query()}
       onSearchResults={count => reportResults(p.clave, count)}
@@ -380,6 +396,7 @@ export default function Sidebar(props: {
       destinos={[]}
       destinosDe={(row) => destinos(carpetaDe(row.id))}
       carpetaDe={(row) => nombreDe(carpetaDe(row.id))}
+      onDrag={props.onDrag ? (row, event) => props.onDrag?.(carpetaDe(row.id), row, event) : undefined}
       onPick={(s) => {
         props.onPick(carpetaDe(s), s);
         setDesplegado(false);
@@ -485,7 +502,7 @@ export default function Sidebar(props: {
             fallback={
               <div
                 data-destino={g().kind === "folder" ? "" : undefined}
-                class={cn("rounded-[var(--radius-sm)]", g().kind === "folder" && destinoEnVuelo() === "" && RECIBE_LA_TAREA)}
+                class={cn("rounded-[var(--radius-sm)]", g().kind === "folder" && (props.dragFolder ?? destinoEnVuelo()) === "" && RECIBE_LA_TAREA)}
               >
                 <Rotulo
                   tono={necesita() ? "need" : undefined}
@@ -512,6 +529,7 @@ export default function Sidebar(props: {
             {(proj) => (
               <Suspense>
                 <FolderGroupHeader
+                  dragFolder={props.dragFolder}
                   p={proj()}
                   rotulo={g().machine === undefined ? undefined : titulo()}
                   maquina={g().machine}
@@ -537,7 +555,7 @@ export default function Sidebar(props: {
               when={g().tasks.length > 0}
               fallback={<p class="m-0 py-0.5 pl-7 text-[0.6875rem] text-neutral-500" data-folder-empty="">{t("shell.sidebar.folder_empty")}</p>}
             >
-              <Historial filas={g().tasks} clave={clave()} sinCarpeta={g().kind === "folder" && !!g().key} />
+              <Historial filas={g().tasks} clave={clave()} sinCarpeta={g().kind === "folder" && !!g().key} folderGroup={g().kind === "folder" ? g().key : undefined} />
             </Show>
           </Show>
         </section>
