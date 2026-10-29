@@ -47,7 +47,6 @@ export function DelegatedTaskList(props: {
     carpetaDe={row => props.list(row.folder ?? "").carpetaDe?.(row)}
     destinosDe={row => props.list(row.folder ?? "").destinos}
     onPick={id => props.list(folderOf(id)).onPick(id)}
-    onPickRelated={row => props.list(row.folder ?? "").onPick(row.id)}
     onDelete={id => props.list(folderOf(id)).onDelete(id)}
     onMove={(id, to) => props.list(folderOf(id)).onMove(id, to)}
     onEtapa={(id, stage) => props.list(folderOf(id)).onEtapa(id, stage)}

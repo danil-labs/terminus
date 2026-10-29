@@ -1,7 +1,6 @@
 {
   "projects.tabs.keep": "Conservar pestaña",
   "projects.sessions.context": "Contexto",
-  "projects.sessions.delegated_by": "Delegada por {title}",
   "projects.agent_tasks.search": "Buscar tareas…",
   "projects.agent_tasks.no_results": "No hay tareas que coincidan.",
   "projects.agent_tasks.open": "Ver tareas",
