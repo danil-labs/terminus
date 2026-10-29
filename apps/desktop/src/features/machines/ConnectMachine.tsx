@@ -4,7 +4,6 @@ import {
   type ConnectProgress,
   installCommand,
   listComputers,
-  machineCompatibility,
   watchNewComputer,
 } from "@terminus/computers";
 import Check from "lucide-solid/icons/check";
@@ -19,13 +18,9 @@ import { Input } from "../../ui/Input";
 import { Spinner } from "../../ui/Spinner";
 import { SettingsBlock, SettingsSection } from "../settings/layout";
 
-declare const __TERMINUS_CONTRACT__: string;
-
 export type ConnectMachineProps = {
   /** `GET /v1/computers` con la sesión de la cuenta. */
   list: () => Promise<Answer<Computer[]>>;
-  /** Si su motor no habla el contrato de esta ventana. */
-  outdated?: (computer: Computer) => boolean;
   /** La nueva ya está en línea: abrirla o volver a leer la flota. */
   onReady: (computer: Computer) => void;
 };
@@ -51,7 +46,7 @@ export function ConnectMachine(props: ConnectMachineProps) {
     const before = await props.list().catch(() => null);
     if (mine.signal.aborted) return;
     const known = before?.kind === "ok" ? before.value.map((c) => c.computer_id) : [];
-    await watchNewComputer({ list: props.list, known, outdated: props.outdated, onProgress: setProgress, signal: mine.signal });
+    await watchNewComputer({ list: props.list, known, onProgress: setProgress, signal: mine.signal });
   }
 
   onMount(() => void start());
@@ -184,7 +179,6 @@ export function connectSource(account?: string | null): ConnectMachineProps | nu
       const client = await invoke<{ token: string; endpoint: string }>("account_relay_token", account ? { account } : {}).catch(() => null);
       return client ? listComputers(client.endpoint, client.token) : { kind: "error", status: null };
     },
-    outdated: (c) => machineCompatibility(c.contract, __TERMINUS_CONTRACT__) === "outdated",
     // La flota del escritorio vuelve a leer la cuenta (`account.tsx`) y suma la nueva.
     onReady: () => window.dispatchEvent(new CustomEvent("harness:account-computers")),
   };

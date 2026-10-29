@@ -4,7 +4,6 @@ import {
   COMPUTER_NAME_MAX,
   listComputers,
   listWorkspaces,
-  machineCompatibility,
   orderComputers,
   renameComputer,
   wakes,
@@ -21,8 +20,6 @@ import { Input } from "../../ui/Input";
 import { SettingsBlock, SettingsRow, SettingsSection } from "../settings/layout";
 import { workspaceComputersSource } from "./workspace-computers";
 import { machineNamesChanged } from "./store";
-
-declare const __TERMINUS_CONTRACT__: string;
 
 /**
  * Dónde se leen y renombran las computadoras: lo que da la plataforma (la web)
@@ -46,7 +43,6 @@ export function accountComputersSource(account: string | null = null): AccountCo
       const c = await client();
       return c ? renameComputer(c.endpoint, c.token, id, name) : { kind: "error", status: null };
     },
-    outdated: (c) => machineCompatibility(c.contract, __TERMINUS_CONTRACT__) === "outdated",
     // La flota del escritorio vuelve a leer la cuenta (`account.tsx`) y toma el nombre nuevo.
     onRenamed: () => window.dispatchEvent(new CustomEvent("harness:account-computers")),
   };
@@ -111,7 +107,6 @@ export function AccountComputers(props: AccountComputersProps) {
         : t("danil.computers.kind.own");
 
   const status = (c: Computer) => {
-    if (props.source.outdated?.(c)) return t("danil.computers.state.outdated");
     if (c.state === "online") return t("danil.computers.state.online");
     if (c.state === "starting") return t("danil.computers.state.starting");
     const seen = seenAt(c.last_seen);

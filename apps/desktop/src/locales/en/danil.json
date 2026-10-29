@@ -144,7 +144,6 @@
   "danil.computers.state.starting": "starting",
   "danil.computers.state.off": "off",
   "danil.computers.state.off_seen": "off · seen {time}",
-  "danil.computers.state.outdated": "outdated",
   "danil.computers.rename": "Rename",
   "danil.computers.rename_label": "Name of {name}",
   "danil.computers.rename_failed.invalid_name": "The name must be 1 to {max} characters, with no line breaks.",
