@@ -855,11 +855,9 @@ export default function Sessions(props: {
      * —el título al 62 % y la segunda línea al 80 %— y recupera su color al
      * pasar el puntero.
      */
-    // Memos: al hacer clic la tarea pasa un instante por «en vuelo» y la
-    // actividad se recalcula; sin memo, cada vuelta reescribe las clases de la
-    // tarjeta con el mismo valor (tests/perf/open-task-cost.mjs lo cuenta).
     const apagada = createMemo(() => tarjetaDelRiel() && !taskPriority(activity()) && !esProvisional(f.s.id));
     const conMenu = createMemo(() => !props.readOnly && renombrando() !== f.s.id && (props.draggedTask ?? tareaEnVuelo()?.id) !== f.s.id);
+    // Sin memo, el clic (que pasa por «en vuelo») reescribe las clases con el mismo valor: tests/perf/open-task-cost.mjs.
     /** El título, o el campo que lo renombra en su sitio y con su misma medida. */
     const Titulo = () => (
       <>
@@ -1030,7 +1028,7 @@ export default function Sessions(props: {
               <span class="my-1 block h-px bg-border" />
               </Show>
 
-              {/* **Renombrar está escrito, y el doble clic es el atajo.**
+              {/* Renombrar está escrito, y el doble clic es el atajo.
                 El gesto de la fila no lo encuentra quien no lo prueba, y
                 con el teclado no se da: si la única forma de cambiarle el
                 nombre a una tarea fuera un doble clic, para media pantalla
