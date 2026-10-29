@@ -7,7 +7,13 @@ type Data = Record<string, string | number>;
 const record = (e: unknown): e is Record<string, unknown> => e !== null && typeof e === "object";
 const readable = (e: unknown): e is string =>
   typeof e === "string" && e.trim().length > 0 && !/\[object \w+\]/.test(e);
-const whatOf = (e: unknown) => record(e) && "what" in e ? e.what : e;
+const whatOf = (e: unknown): unknown => {
+  if (typeof e === "string" && clavesConocidas().has(`cli.error.${e}`)) return { clave: `cli.error.${e}` };
+  if (!record(e)) return e;
+  if ("what" in e) return e.what;
+  if (typeof e.message_key === "string" && clavesConocidas().has(e.message_key)) return { clave: e.message_key };
+  return e;
+};
 
 /** El diagnóstico conserva los objetos y los Error sin depender de su toString. */
 function diagnostic(e: unknown): string {

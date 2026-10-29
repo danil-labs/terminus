@@ -496,6 +496,55 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
   }
 
   /**
+   * Lo abierto con un clic en el riel es temporal y también es del reparto.
+   * Falla si al ir y volver de espacio la ventana vuelve sin ella o si
+   * vuelve conservada.
+   */
+  {
+    const s = servicio({
+      spaces: [
+        { id: "i1", name: null, folders: ["pa"], created_at: 1, updated_at: 1 },
+        { id: "i2", name: "Facturación", folders: ["pb"], created_at: 2, updated_at: 2 },
+      ],
+      filas: [fila("t1", "pa", "i1"), fila("t4", "pb", "i2"), fila("t3", "pb", "i2"), fila("t5", "pb", "i2")],
+    });
+    const app = await boot("listo", "spaces-reparto-temporal", base(s, {
+      "pestanas.w.i1": tira(["t1"], "t1"),
+      "pestanas.w.i2": tira(["t4", "t3"], "t3"),
+      "panels.w.i2": {
+        columnas: [[{ pestanas: ["t4"], activa: "t4" }], [{ pestanas: ["t3"], activa: "t3" }]],
+        anchos: [0.5, 0.5],
+        altos: [1],
+        activo: { col: 1, fila: 0 },
+      },
+      "space.w": "i2",
+    }));
+    await sleep(500);
+    const u = util(app);
+    const tiraDe = (v) => u.doc.querySelector(`[data-tira][data-ventana="${v}"]`);
+    const temporal = (v, titulo) =>
+      [...(tiraDe(v)?.querySelectorAll('[role="tab"]') ?? [])].find((el) => el.textContent.includes(titulo))?.closest(".italic") !== null;
+    const idaYVuelta = async () => {
+      u.doc.querySelector('[data-space="i1"]').click();
+      await sleep(400);
+      u.doc.querySelector('[data-space="i2"]').click();
+      await sleep(400);
+    };
+    u.doc.querySelector('[data-sesion="t5"]').click();
+    await sleep(300);
+    assert.match(tiraDe("1,0")?.textContent ?? "", /Tarea t5/, "el clic abre la temporal en la ventana activa");
+    assert.ok(temporal("1,0", "Tarea t5"), "abierta con un clic es temporal");
+    await idaYVuelta();
+    assert.equal(u.doc.querySelectorAll("[data-tira]").length, 2, "volver al espacio perdió ventanas");
+    assert.match(tiraDe("1,0")?.textContent ?? "", /Tarea t5/, "la temporal no volvió a su ventana");
+    assert.ok(temporal("1,0", "Tarea t5"), "la temporal volvió conservada");
+    assert.deepEqual(u.pref("panels.w.i2").columnas[1][0].pestanas, ["t3", "t5"]);
+    guarda("layout-temporary", app, s);
+    assert.deepEqual(app.fallos, []);
+    app.w.close();
+  }
+
+  /**
    * Borrar con lo que cambia mientras se mira. Falla si se manda algo que no
    * se vio, si el aviso de cambios no se enseña o no recibe el foco, si un
    * fallo sale fuera del diálogo o si la tira borrada sigue guardada.

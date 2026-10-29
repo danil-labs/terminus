@@ -471,7 +471,6 @@ export function createPanels(restorable?: () => readonly string[]) {
       );
       persist();
     },
-    persist,
     layout,
     // Un reparto guardado puede apuntar a pestañas borradas o contener tamaños inválidos.
     restore(layout: Layout | null, live: readonly string[]) {

@@ -98,6 +98,8 @@
     "other": "Mostrar más ({count} restantes)"
   },
   "code.tree.folded.failed": "No se pudo abrir esta carpeta.",
+  "code.tree.failed.slow": "No se pudo leer la carpeta: el motor tardó demasiado en contestar.",
+  "code.tree.retry": "Reintentar",
   "code.editor.fold_line": "Plegar línea",
   "code.editor.unfold_line": "Desplegar línea",
   "code.editor.folded_code": "código plegado",

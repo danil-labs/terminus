@@ -86,6 +86,13 @@ fn main() {
       t.diagnostic(`${roots.size} comandos raíz contrastados con ${lock.release}`);
     });
 
+    for (const rank of ["peer", "worker"]) {
+      const args = ["task", "create", "--as", rank, "--handler", "reviewer", "--json"];
+      const result = run(args);
+      assert.equal(result.status, 23);
+      assert.equal(result.stdout, `${args.join("\n")}\n`);
+    }
+
     const piped = run(["task", "á con espacios", "--json"], { input: "entrada\n" });
     assert.equal(piped.status, 23);
     assert.equal(piped.stdout, "task\ná con espacios\n--json\nentrada\n");

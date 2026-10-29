@@ -106,8 +106,8 @@ export default function DelegatedActivity(props: {
         <div class="flex items-center justify-between gap-2 px-2 pb-2 text-xs">
           <span class="font-medium">{t("chat.delegation.total", { count: rows().length })}</span>
           <div class="flex gap-1" role="group" aria-label={t("chat.delegation.filter")}>
-            <Button size="sm" variant="ghost" class="h-6 px-2 text-xs" aria-pressed={!all()} onClick={() => setAll(false)}>{t("chat.delegation.activity")}</Button>
-            <Button size="sm" variant="ghost" class="h-6 px-2 text-xs" aria-pressed={all()} onClick={() => setAll(true)}>{t("chat.delegation.all")}</Button>
+            <Button size="sm" variant="ghost" class="h-6 px-2 text-xs aria-pressed:bg-surface-muted aria-pressed:text-neutral-950" aria-pressed={!all()} onClick={() => setAll(false)}>{t("chat.delegation.activity")}</Button>
+            <Button size="sm" variant="ghost" class="h-6 px-2 text-xs aria-pressed:bg-surface-muted aria-pressed:text-neutral-950" aria-pressed={all()} onClick={() => setAll(true)}>{t("chat.delegation.all")}</Button>
           </div>
         </div>
         <div data-delegated-list class="max-h-[min(55vh,420px)] overflow-y-auto overscroll-contain">

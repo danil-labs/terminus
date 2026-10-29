@@ -49,7 +49,7 @@ export function horaDeVuelta(ms: number) {
 }
 
 /** Lo mínimo que hace falta para pintar la fila. Ver `Msg`. */
-type ConFallo = { text: string; fallo?: FalloDelTurno };
+type ConFallo = { text: string; meta?: string; fallo?: FalloDelTurno };
 
 /** Conserva el diagnóstico también cuando el fallo ocurre antes de abrir el turno. */
 export function mensajeDeFallo(error: unknown, datos?: Record<string, string | number>) {
@@ -60,8 +60,20 @@ export function mensajeDeFallo(error: unknown, datos?: Record<string, string | n
   };
 }
 
+/** El aviso de encargado en la lengua de la ventana; el motor lo guarda en la suya. */
+export function avisoDeEncargado(msg: ConFallo): string | null {
+  // Los que traduce la ventana son las claves de `chat.notice.json`, un trozo perezoso: sin su frase vale la prosa del motor.
+  if (!msg.meta || !clavesConocidas().has(`chat.notice.${msg.meta}`)) return null;
+  const notice = t(`chat.notice.${msg.meta}`);
+  const tool = msg.meta === "handler_requires_tool_missing" ? /`([^`]+)`/.exec(msg.text)?.[1] : null;
+  return tool ? `${notice} (${tool})` : notice;
+}
+
 /** Los mensajes antiguos pasan por el mismo respaldo que los fallos nuevos. */
 export function prosaDelFallo(msg: ConFallo) {
+  if (msg.text === "chat.mentions.in_code") return t("chat.mentions.in_code");
+  const aviso = avisoDeEncargado(msg);
+  if (aviso) return aviso;
   const f = msg.fallo;
   if (!f || !clavesConocidas().has(`chat.failure.${f.clase}`)) return prosaDe(msg.text);
   const partes = [t(`chat.failure.${f.clase}`)];

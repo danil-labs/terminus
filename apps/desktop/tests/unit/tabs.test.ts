@@ -922,7 +922,7 @@ test("conservar no cambia la identidad y protege ediciones sin guardar", () => {
   assert.ok(t.dirty().has(a.id));
 });
 
-test("solo se restauran tareas conservadas y las anteriores siguen conservadas", () => {
+test("las tareas temporales vuelven temporales y las anteriores siguen conservadas", () => {
   const legacy = tira("temporal-legacy");
   legacy.ensure(tarea("anterior"));
   const t = createTabs({ transient: true });
@@ -931,11 +931,14 @@ test("solo se restauran tareas conservadas y las anteriores siguen conservadas",
   t.ensure(tarea("temporal"));
   t.activate("temporal");
   const restored = createTabs({ transient: true });
-  restored.load("temporal-legacy");
-  assert.deepEqual(restored.open().map(p => p.id), ["anterior"]);
+  assert.equal(restored.load("temporal-legacy"), "temporal");
+  assert.deepEqual(restored.open().map(p => p.id), ["anterior", "temporal"]);
+  assert.equal(restored.isPinned("anterior"), true);
+  assert.equal(restored.isPinned("temporal"), false, "volver no la conserva");
+  assert.deepEqual(restored.restorable(), ["anterior", "temporal"]);
   t.pin("temporal");
   restored.load("temporal-legacy");
-  assert.deepEqual(restored.open().map(p => p.id), ["anterior", "temporal"]);
+  assert.equal(restored.isPinned("temporal"), true);
 });
 
 test("conservar un editor temporal conserva su tarea aunque ya se sustituyó su vista", () => {

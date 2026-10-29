@@ -272,6 +272,7 @@ pub(super) fn desktop_command(name: &str) -> bool {
                 | "account_relay_token"
                 | "service_filter"
                 | "load_history"
+                | "handler_action"
         )
 }
 pub(super) fn with_desktop(
@@ -286,7 +287,7 @@ pub(super) fn with_desktop(
         }
     }
 }
-fn failure(error: &Error) -> Value {
+pub(super) fn failure(error: &Error) -> Value {
     if error.code == "operation_failed"
         && (error.detail.is_string() || error.detail.get("what").is_some())
     {
@@ -298,6 +299,12 @@ fn failure(error: &Error) -> Value {
     }
     if error.code == "engine_missing" {
         return json!({"what":{"clave":"shell.service.engine_missing"},"detail":error.detail});
+    }
+    if error.code.starts_with("handler_")
+        || error.code.starts_with("pending_")
+        || error.code.starts_with("peer_")
+    {
+        return json!({"what":{"clave":error.message_key},"detail":{"code":error.code,"detail":error.detail}});
     }
     let key = match error.code.as_str() {
         "managed_service_unavailable" | "managed_profile_invalid" => {
@@ -311,7 +318,12 @@ fn failure(error: &Error) -> Value {
         "command" | "unsupported" => "shell.service.command",
         _ => "shell.service.failed",
     };
-    json!({"what":{"clave":key},"detail":error.code})
+    let detail = if error.detail.is_null() {
+        json!(error.code)
+    } else {
+        json!({"code": error.code, "message_key": error.message_key, "detail": error.detail})
+    };
+    json!({"what":{"clave":key},"detail":detail})
 }
 fn reply(value: Value) -> Result<Value, Value> {
     if let Some(error) = value.get("error") {
@@ -354,7 +366,8 @@ impl Drop for Slot {
 
 pub(super) fn handle(invoke: tauri::ipc::Invoke) {
     let name = invoke.message.command().to_owned();
-    let Some(spec) = command(&name).filter(|c| c["kind"] != "desktop") else {
+    let Some(spec) = command(&name).filter(|c| c["kind"] == "invoke" || c["kind"] == "stream")
+    else {
         invoke.resolver.reject(failure(&Error::new("command")));
         return;
     };
@@ -409,6 +422,8 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
             | "stop_shell_command"
             | "write_shell_input"
             | "pending_requests"
+            | "respond_permission"
+            | "answer_question"
             | "list_storage"
             | "reclaim_storage"
             | "empty_build_cache"
@@ -517,7 +532,11 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke) {
             }
 
             let target = match name.as_str() {
-                "workspaces_startup" if state.workspace().is_none() => value["active"].as_str(),
+                // La ventana abre con `list_workspaces` sin esperar al arranque,
+                // que migra dentro y tarda: la primera respuesta fija el ámbito.
+                "workspaces_startup" | "list_workspaces" if state.workspace().is_none() => {
+                    value["active"].as_str()
+                }
                 _ => None,
             };
             if let Some(target) = target {
@@ -989,6 +1008,17 @@ pub(super) fn machine_list(app: tauri::AppHandle) -> Result<Value, Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn conserva_el_diagnostico_de_un_rechazo_del_motor() {
+        let error = Error {
+            detail: json!({"provider": "codex", "reason": "permissions_ceiling"}),
+            ..Error::new("handler_limit_unenforceable")
+        };
+        let shown = failure(&error);
+        assert_eq!(shown["detail"]["code"], error.code);
+        assert_eq!(shown["detail"]["detail"], error.detail);
+    }
 
     #[test]
     fn una_respuesta_demasiado_grande_lo_dice() {

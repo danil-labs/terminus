@@ -34,7 +34,6 @@ import { type OtherAccount, setCapabilities, type WebAccountsSource } from "../l
 import { deliver } from "../lib/serviceEvents";
 // In the page, not in the lazy app chunk: the stylesheet loads with the HTML.
 import "../styles/global.css";
-import { machineCompatibility, machineContracts } from "./compatibility";
 import { HomeLink } from "./HomeLink";
 import { installIpc } from "./ipc";
 import { webAccountProfile } from "./account";
@@ -107,7 +106,6 @@ const infoOf = (c: Computer): MachineInfo => {
     id: c.computer_id,
     name: c.name?.trim() || c.computer_id,
     wakes: wakes(c),
-    outdated: machineCompatibility(c.contract) === "outdated",
     linked: linkedWorkspaces(c),
     ...(os ? { os } : {}),
   };
@@ -169,16 +167,13 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
           getToken: base.getToken,
           onUnauthorized: base.onUnauthorized,
           beforeReconnect: before?.(info.id),
-          contracts: machineContracts(),
           // Un upgrade sin licencia no trae cuerpo: se pregunta por HTTP para no reintentar en bucle.
           probe: async () => sessionProbe(base.endpoint, await token(), info.id),
         }),
         () => rows.get(info.id)?.state,
       ),
-    compatible: (contract) => {
-      const verdict = machineCompatibility(contract);
-      return verdict === "unknown" ? null : verdict === "ok";
-    },
+    // Sin `contracts` ni `compatible`, como el teléfono: un motor con otro contrato
+    // sigue en servicio y solo falla la orden que no conoce (nunca la máquina entera).
     wake: async (id) => (await startComputer(base.endpoint, await token(), id)).kind === "ok",
     storage: mounted.storage,
     onSlice: () => bump((n) => n + 1),
@@ -271,12 +266,10 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
       workspaces: async () => listWorkspaces(base.endpoint, await token()),
       list: async () => listComputers(base.endpoint, await token()),
       rename: async (id, name) => renameComputer(base.endpoint, await token(), id, name),
-      outdated: (c) => machineCompatibility(c.contract) === "outdated",
       onRenamed: (id, name) => rename(id, name),
     },
     connectMachine: {
       list: async () => listComputers(base.endpoint, await token()),
-      outdated: (c) => machineCompatibility(c.contract) === "outdated",
       // La nueva suma su rebanada sin recargar la página ni cerrar las demás.
       onReady: () => void relistNow?.(),
     },

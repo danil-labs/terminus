@@ -44,7 +44,9 @@ import {
   modelsOf,
   noticer,
   permissionModesOf,
+  switchLiveMode,
   projectDirectoryOf,
+  renameTask,
   respondPermission,
   runShell,
   sendToTask,
@@ -172,6 +174,15 @@ const ok = (step: string) => {
     assert.equal((await loadTask(mac, "w-prod", "p-mac-api", pid)).permissions.length, 0);
     ok("en la Mac: la tarea pide permiso, se aprueba desde el teléfono y termina; avisos de aprobación y de terminada");
 
+    const aid = await createTask(mac, "w-prod", { folder: "p-mac-api", prompt: "Pide permiso para borrar build", provider: "claude", model: null, agent: null, space: null, permissionMode: "manual" });
+    const asking = () => (events.get("cmp_mac") ?? []).some((e) => e.name === "chat" && (e.payload as { kind: string; session: string }).kind === "permission" && (e.payload as { session: string }).session === aid);
+    await until("pide permiso en manual", asking);
+    assert.equal((await loadTask(mac, "w-prod", "p-mac-api", aid)).permissions.length, 1);
+    await switchLiveMode(mac, "w-prod", "p-mac-api", aid, "auto");
+    await until("termina al pasar a automático", () => (events.get("cmp_mac") ?? []).some((e) => e.name === "chat" && (e.payload as { kind: string; session: string }).kind === "done" && (e.payload as { session: string }).session === aid));
+    assert.equal((await loadTask(mac, "w-prod", "p-mac-api", aid)).permissions.length, 0);
+    ok("con el turno en marcha, pasar a automático lo cambia en el turno vivo y aprueba lo que ya pidió");
+
     close();
   } finally {
     child.kill();
@@ -236,6 +247,10 @@ const ok = (step: string) => {
     await setPinned(vm, "w-prod", "p-vm-web", "t-vm-1", false);
     assert.equal((await live(vm, "w-prod")).find((t) => t.id === "t-vm-1")?.pinned, false);
     ok("Fijar y Desfijar desde la vista previa (set_session_pinned) en la VM encendida");
+
+    await renameTask(vm, "w-prod", "p-vm-web", "t-vm-1", "Revisar el pago");
+    assert.equal((await live(vm, "w-prod")).find((t) => t.id === "t-vm-1")?.title, "Revisar el pago");
+    ok("Cambiarle el nombre desde la vista previa (rename_session)");
 
     const blocked = await archiveTask(mac, "w-prod", "p-mac-web", "t-mac-2");
     assert.ok("blocked" in blocked && blocked.blocked[0].files.includes("src/home.tsx"));
