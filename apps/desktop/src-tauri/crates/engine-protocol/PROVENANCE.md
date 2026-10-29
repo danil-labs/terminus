@@ -255,3 +255,7 @@ them answers that the command is unknown, and only that feature turns off.
   and orchestrators on this machine (`local_orchestrator_connect`,
   `list_local_orchestrators`, `local_orchestrator_disconnect`), from
   seldon-host PR #239.
+- `secrets_v1.json`: generic secrets (`env_secret_set`, `env_secret_remove`,
+  `env_secrets_list`, `secret run`), from seldon-host PR #240 at
+  `c4c7eaca08aa9582fe773bf358c696b91b77fe14` (unchanged up to `9978392a`),
+  SHA-256 `729ffeccacb4a92bb5167d84de63732c6745b6e03d30e60000e5bac31324d728`.

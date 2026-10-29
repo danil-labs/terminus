@@ -86,7 +86,10 @@ pub const MANIFEST: &str = include_str!("../commands.json");
 /// `crates/engine-manifest/extensions/`): órdenes aditivas que no entran en la
 /// huella. La ventana las despacha igual que las del contrato; con un motor que
 /// no las conoce, la orden falla sola y esa función se apaga.
-pub const EXTENSIONS: &[&str] = &[include_str!("../extensions/orchestrators.json")];
+pub const EXTENSIONS: &[&str] = &[
+    include_str!("../extensions/orchestrators.json"),
+    include_str!("../extensions/secrets_v1.json"),
+];
 
 /// Las órdenes del contrato más las de las extensiones. La huella sigue siendo
 /// solo de [`MANIFEST`].
@@ -172,4 +175,30 @@ pub struct Push {
     pub session: Option<String>,
     #[serde(default)]
     pub detail: Value,
+}
+
+#[cfg(test)]
+mod extension_tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    /// `full_manifest` salta un nombre repetido sin avisar: aquí falla, para que una
+    /// extensión nunca redefina una orden de la base ni de otra extensión.
+    #[test]
+    fn extensions_do_not_redefine_commands() {
+        let base: serde_json::Value = serde_json::from_str(MANIFEST).unwrap();
+        let mut seen: HashSet<String> = base["commands"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|c| c["name"].as_str().map(str::to_owned))
+            .collect();
+        for raw in EXTENSIONS {
+            let ext: serde_json::Value = serde_json::from_str(raw).expect("extension manifest");
+            for command in ext["commands"].as_array().expect("extension commands") {
+                let name = command["name"].as_str().expect("command name").to_owned();
+                assert!(seen.insert(name.clone()), "la orden {name} ya existe en la base o en otra extensión");
+            }
+        }
+    }
 }

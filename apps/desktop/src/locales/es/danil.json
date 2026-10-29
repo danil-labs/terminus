@@ -240,5 +240,9 @@
   "danil.secrets.name_reserved": "Ese nombre lo usa Terminus o la cuenta del agente. Para la clave del agente, ve a Proveedores de IA.",
   "danil.secrets.scope": "Alcance",
   "danil.secrets.scope_help": "Una carpeta gana sobre el workspace.",
-  "danil.secrets.sign_in": "Iniciar sesión"
+  "danil.secrets.sign_in": "Iniciar sesión",
+  "danil.secrets.change_title": "Cambiar secreto",
+  "danil.secrets.delete_warning_local": "Se borra de esta máquina. Las tareas que ya están corriendo pueden conservarlo hasta que terminen. No se revoca en quien lo emitió.",
+  "danil.secrets.engine_unsupported": "El motor de esta máquina no admite secretos",
+  "danil.secrets.engine_unsupported_help": "Actualiza Terminus en esta máquina para usarlos. Todo lo demás sigue funcionando."
 }

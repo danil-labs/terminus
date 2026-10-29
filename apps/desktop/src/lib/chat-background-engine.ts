@@ -16,19 +16,13 @@ import * as store from "./chat-background-store.ts";
 import { invoke } from "./invoke.ts";
 import { capabilities } from "./platform.ts";
 import { shrinkImage } from "./shrink-image.ts";
-import { errorCode } from "./errorCode.ts";
+import { errorCode, unknownCommand } from "./errorCode.ts";
 
 /** El tope de un motor anterior: si lo rechaza, se reduce hasta ahí y se intenta otra vez. */
 const TOPE_DE_MOTOR_ANTERIOR = 700_000;
 
 const velos = () => ({ chat: store.veloDeFondo(), tabs: store.veloDePestanas(), panels: store.veloDePaneles() });
 
-/** El motor no conoce la orden (`command` del proxy o del relay): un motor anterior. */
-export function ordenDesconocida(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-  const code = errorCode(error);
-  return code === "command" || code === "unsupported" || (error as { what?: { clave?: unknown } }).what?.clave === "shell.service.command";
-}
 
 /** El motor o la cuenta rechazaron la imagen por su peso. */
 function demasiadoGrande(error: unknown): boolean {
@@ -42,7 +36,7 @@ async function guardarEnElMotor(cambio: ChatBackgroundChange): Promise<unknown> 
   try {
     return await invoke<unknown>("set_chat_background", { ...cambio });
   } catch (error) {
-    if (!ordenDesconocida(error)) throw error;
+    if (!unknownCommand(error)) throw error;
     if (cambio.path) await invoke("choose_chat_background", { path: cambio.path });
     else if (cambio.dataUrl) {
       const copia = await invoke<string>("import_chat_background_data", { dataUrl: cambio.dataUrl });

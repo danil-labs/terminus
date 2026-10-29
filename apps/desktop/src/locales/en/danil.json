@@ -240,5 +240,9 @@
   "danil.secrets.name_reserved": "Terminus or the agent's account uses that name. For the agent's key, go to AI providers.",
   "danil.secrets.scope": "Scope",
   "danil.secrets.scope_help": "A folder wins over the workspace.",
-  "danil.secrets.sign_in": "Sign in"
+  "danil.secrets.sign_in": "Sign in",
+  "danil.secrets.change_title": "Change secret",
+  "danil.secrets.delete_warning_local": "It is deleted from this machine. Tasks already running may keep it until they finish. It is not revoked by whoever issued it.",
+  "danil.secrets.engine_unsupported": "This machine's engine doesn't support secrets",
+  "danil.secrets.engine_unsupported_help": "Update Terminus on this machine to use them. Everything else keeps working."
 }

@@ -127,7 +127,7 @@ export function CredentialMachines(props: { credential: Credential; onChanged?: 
 }
 
 /** Cambiar el valor desde la web: se sella aquí para cada máquina y el Worker no lo lee. */
-export function Rotate(props: { credential: Credential; onDone: () => void }) {
+function Rotate(props: { credential: Credential; onDone: () => void }) {
   const [value, setValue] = createSignal("");
   const [busy, setBusy] = createSignal(false);
   const [failure, setFailure] = createSignal<Failure | null>(null);
