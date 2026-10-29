@@ -220,5 +220,12 @@
   "web.alpha.send_reply": "Send reply",
   "web.alpha.send_unavailable": "Sending is not available in this alpha: the Inbox is read-only.",
   "web.alpha.ai_on_short": "On",
-  "web.alpha.ai_paused_short": "Paused"
+  "web.alpha.ai_paused_short": "Paused",
+  "web.alpha.search_label": "Search conversations",
+  "web.alpha.search_placeholder": "Search",
+  "web.alpha.search_empty": "No conversations found for “{query}”.",
+  "web.alpha.channel_filter": "Filter by channel",
+  "web.alpha.all_channels": "All channels",
+  "web.alpha.channel_empty": "No {channel} conversations among the loaded ones.",
+  "web.alpha.filter_loaded_only": "Search and channel only look at the loaded conversations. Load more to widen them."
 }

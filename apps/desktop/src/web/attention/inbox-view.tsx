@@ -1,4 +1,5 @@
 import ArrowLeft from 'lucide-solid/icons/arrow-left';
+import ChevronDown from 'lucide-solid/icons/chevron-down';
 import Globe from 'lucide-solid/icons/globe';
 import IdCard from 'lucide-solid/icons/id-card';
 import InboxIcon from 'lucide-solid/icons/inbox';
@@ -6,12 +7,14 @@ import Mail from 'lucide-solid/icons/mail';
 import MessageCircle from 'lucide-solid/icons/message-circle';
 import MessageSquare from 'lucide-solid/icons/message-square';
 import Paperclip from 'lucide-solid/icons/paperclip';
+import Search from 'lucide-solid/icons/search';
 import SendHorizontal from 'lucide-solid/icons/send-horizontal';
-import { Show } from 'solid-js';
+import { For, Show } from 'solid-js';
 import { Dynamic } from 'solid-js/web';
 import type { Conversation, Message } from '../../../../../packages/attention/src/inbox.ts';
 import { t } from '../../lib/i18n';
 import { Button } from '../../ui/Button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../ui/DropdownMenu';
 import { Textarea } from '../../ui/Textarea';
 import { Toggle } from '../../ui/Toggle';
 
@@ -29,6 +32,28 @@ function ContactAvatar(props: { name: string; channel: string; size: 'row' | 'ca
     <span aria-hidden="true" class={`grid place-items-center rounded-full bg-neutral-100 text-neutral-700 dark:bg-surface-raised ${props.size === 'row' ? 'size-9 text-[0.8rem]' : 'size-11 text-[0.85rem]'}`}>{initials(props.name)}</span>
     <Show when={props.size === 'row'}><span aria-hidden="true" class="absolute -right-0.5 -bottom-0.5 grid size-[15px] place-items-center rounded-full border border-border bg-surface text-neutral-500"><Dynamic component={channelIcon(props.channel)} size={9}/></span></Show>
   </span>;
+}
+
+export function ConversationSearch(props: { value: string; onChange: (value: string) => void }) {
+  return <div class="flex h-8 w-full min-w-0 items-center gap-1.5 rounded-full border border-border bg-surface py-0 pr-1 pl-2.5 text-neutral-500 transition-all duration-150 ease-out focus-within:border-primary focus-within:ring-[3px] focus-within:ring-primary/15">
+    <Search size={13} class="shrink-0 text-neutral-500" aria-hidden="true"/>
+    <input type="search" aria-label={t("web.alpha.search_label")} placeholder={t("web.alpha.search_placeholder")} value={props.value} onInput={event => props.onChange(event.currentTarget.value)} class="h-full w-full min-w-0 border-none bg-transparent p-0 text-[12px] text-neutral-950 outline-none placeholder:text-neutral-500 [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-cancel-button]:[-webkit-appearance:none]"/>
+  </div>;
+}
+
+const channelOption = 'flex cursor-pointer items-center gap-2 border border-transparent text-[0.78rem] aria-[current=true]:border-border-strong aria-[current=true]:bg-surface-raised aria-[current=true]:shadow-sm';
+
+export function ChannelFilter(props: { channels: string[]; value: string | null; onChange: (value: string | null) => void }) {
+  return <DropdownMenu>
+    <DropdownMenuTrigger aria-label={t("web.alpha.channel_filter")} class="inline-flex h-8 min-h-8 w-auto max-w-[11rem] shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-neutral-200 bg-surface-raised px-2.5 py-1 text-[0.78rem] font-medium text-neutral-900 transition-colors outline-none hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-primary/20 dark:border-border-strong dark:text-neutral-950 dark:hover:bg-surface-muted">
+      <Show when={props.value} fallback={<span class="truncate">{t("web.alpha.all_channels")}</span>}>{value => <><Dynamic component={channelIcon(value())} size={13} aria-hidden="true"/><span class="max-w-[80px] truncate">{value()}</span></>}</Show>
+      <ChevronDown size={13} class="shrink-0 opacity-60" aria-hidden="true"/>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent class="min-w-[180px]">
+      <DropdownMenuItem class={channelOption} aria-current={props.value === null ? 'true' : undefined} onSelect={() => props.onChange(null)}><span class="flex-1 truncate">{t("web.alpha.all_channels")}</span></DropdownMenuItem>
+      <For each={props.channels}>{channel => <DropdownMenuItem class={channelOption} aria-current={props.value === channel ? 'true' : undefined} onSelect={() => props.onChange(channel)}><Dynamic component={channelIcon(channel)} size={13} aria-hidden="true"/><span class="flex-1 truncate">{channel}</span></DropdownMenuItem>}</For>
+    </DropdownMenuContent>
+  </DropdownMenu>;
 }
 
 export function ConversationRow(props: { conversation: Conversation; active: boolean; onSelect: () => void }) {
