@@ -26,7 +26,7 @@ import { cn } from "../../lib/utils";
 import { Button } from "../../ui/Button";
 import { asFailure, type Failure, FailureNote, prosaDe } from "../../ui/Failure";
 import { Toast, ToastPortal } from "../../ui/Toast";
-import { esIncluida, fallasIncluidas, funcion } from "../onboarding/bundled";
+import { esIncluida, fallasIncluidas, funcion, motivo, motivoConocido, nombreDe } from "../onboarding/bundled";
 import type { Conexiones } from "../onboarding/connect-store";
 import { crearWorkspace } from "../onboarding/onboarding-store";
 import { CabeceraDelAlta } from "../onboarding/Phases";
@@ -204,6 +204,20 @@ export default function Setup(props: { children: JSX.Element }) {
       case "installed":
         anotar(e.stage, { version: valor, origen: ORIGEN_APP });
         return [{ tono: "ok", texto: t("setup.log.installed", { name, version: valor }) }];
+      // La etapa `work-tools` informa cada herramienta incluida: `value` es su id.
+      case "tool":
+        return [{ tono: "ok", texto: t("setup.log.tool_ready", { name: nombreDe(valor), version: e.extra ?? "" }) }];
+      case "tool_failed":
+        return [
+          {
+            tono: "error",
+            texto: t("setup.log.tool_failed", {
+              name: nombreDe(valor),
+              reason: motivo(motivoConocido(e.extra)),
+              function: funcion(valor),
+            }),
+          },
+        ];
       case "timed_out":
         return [{ tono: "warn", texto: t("setup.log.timed_out", { name }) }];
       case "stalled":

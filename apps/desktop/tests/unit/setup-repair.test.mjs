@@ -185,6 +185,21 @@ caso("cada evento de la preparación pinta una sola línea", async () => {
   assert.equal(lineas(app).filter((l) => l.includes("windows x86_64")).length, 1);
 });
 
+caso("la etapa work-tools dice qué herramienta quedó lista y cuál falló", async () => {
+  const s = servicio({ setupRequired: true, entorno: reporte(false, []), preparar: enCurso });
+  const app = await boot("listo", "notas-de-herramientas", s.respuestas);
+  s.conectar(app);
+  s.publicar("bootstrap-run", { type: "note", stage: "work-tools", kind: "tool", value: "git", extra: "2.53.0" });
+  s.publicar("bootstrap-run", { type: "note", stage: "work-tools", kind: "tool_failed", value: "python", extra: "import_failed" });
+  s.publicar("bootstrap-run", { type: "note", stage: "work-tools", kind: "tool_failed", value: "uv", extra: "algo-nuevo" });
+  await sleep(1500);
+
+  const texto = lineas(app);
+  assert.equal(texto.filter((l) => l.includes("Git 2.53.0 listo")).length, 1, `sin la línea de Git: ${texto}`);
+  assert.ok(texto.some((l) => l.includes("Python (Editar Excel, Word, PowerPoint y PDF): No pudo cargar sus bibliotecas.")), `sin el fallo de Python: ${texto}`);
+  assert.ok(texto.some((l) => l.includes("uv (Paquetes extra y servidores MCP): Falta una parte")), `un motivo desconocido no cae a faltante: ${texto}`);
+});
+
 caso("la corrida que retoma un servicio nuevo empieza con la terminal limpia", async () => {
   const s = servicio({ setupRequired: true, entorno: reporte(false, []), preparar: enCurso });
   const app = await boot("listo", "dos-corridas", s.respuestas);
