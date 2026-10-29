@@ -24,6 +24,13 @@ export function taskPriority(s: TaskActivity): TaskState | null {
   return null;
 }
 
+/** El resultado que resume a un grupo: un fallo pesa más que una interrupción. */
+export function rolledOutcome(rows: readonly { outcome?: TaskActivity["outcome"] }[]): "failed" | "interrupted" | null {
+  if (rows.some((row) => row.outcome === "failed")) return "failed";
+  if (rows.some((row) => row.outcome === "interrupted")) return "interrupted";
+  return null;
+}
+
 /** The most urgent state of a group, like a folded row of the sidebar. */
 export function topState(states: readonly (TaskState | null)[]): TaskState | null {
   return TASK_STATES.find((state) => states.includes(state)) ?? null;

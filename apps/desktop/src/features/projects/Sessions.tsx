@@ -49,7 +49,7 @@ import { matchesTaskQuery } from "./taskSearch";
 import { canFinishTask, effectiveTaskGit, type GitStatus, sharesTaskGit, watchSessionGit } from "./taskGit";
 import { authorKey, authorKeys, shownUnderLauncher } from "./taskAuthors";
 import { descendientes, type Rama as RamaDeTareas, taskTree } from "./taskTree";
-import { type TaskActivity, taskPriority } from "@terminus/design";
+import { rolledOutcome, type TaskActivity, taskPriority } from "@terminus/design";
 import { taskCard, buildTaskTree, launcherOf, sameAgent, taskIdentity, withTaskAncestors } from "@terminus/tasks";
 
 export function readableSessionTitle(title: string): string {
@@ -713,7 +713,7 @@ export default function Sessions(props: {
               data-session-status
               class={cn(
                 "inline-flex size-4 items-center justify-center",
-                r.conMenu && "group-hover/session:hidden group-focus-visible/session:hidden group-has-[:focus-visible]/session:hidden",
+                r.conMenu && "group-hover/session:hidden group-focus-visible/session:sr-only group-has-[:focus-visible]/session:sr-only",
                 r.conMenu && abierto() && "hidden",
               )}
             >
@@ -1537,7 +1537,7 @@ export default function Sessions(props: {
               )}
               viva={escondidas().some((h) => props.vivas.includes(h.id))}
               esperando={escondidas().some((h) => h.esperando)}
-              outcome={escondidas().some((h) => h.outcome === "failed") ? "failed" : null}
+              outcome={rolledOutcome(escondidas())}
               sinVer={escondidas().some((h) => h.sin_ver)}
             />
             {/* Sin repetirlo al lector de pantalla: el `aria-label` del
