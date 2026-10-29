@@ -974,6 +974,7 @@ if (!roto) {
   [...threadDoc.querySelectorAll('button')].find(button => button.textContent === "Todas").click();
   await sleep(50);
   assert.ok(threadDoc.querySelector('[data-delegated-list] [data-sesion="topic-work"]'), "el desplegable conserva trabajo de turnos anteriores");
+  assert.equal(threadDoc.querySelector('[data-delegated-list] [data-folder-chip]'), null, "las delegadas no repiten la carpeta de su madre");
   threadDoc.querySelector('[data-delegated-list] [data-sesion="topic-work"]').click();
   await sleep(200);
   assert.equal(threadLoads.at(-1), "topic-work", "la tarjeta abre la tarea de su carpeta");

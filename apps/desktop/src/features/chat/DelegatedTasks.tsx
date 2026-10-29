@@ -6,8 +6,9 @@ import { Button } from "../../ui/Button";
 import { asFailure, FailureNote } from "../../ui/Failure";
 import { Popover, PopoverContent, PopoverTrigger } from "../../ui/Popover";
 import Sessions, { type SessionRow } from "../projects/Sessions";
+import { DelegatedSkeleton } from "./DelegatedSkeleton";
 import { delegatedRailRows } from "./delegatedRail";
-import { buildTaskTree, type TaskBranch, type TaskTreeRow, taskIdentity, taskDescendants, withTaskAncestors } from "@terminus/tasks";
+import { buildTaskTree, type TaskBranch, type TaskTreeRow, taskDescendants } from "@terminus/tasks";
 import { taskPriority } from "@terminus/design";
 import { delegatedAttention } from "./delegatedRail";
 
@@ -31,20 +32,22 @@ export function delegatedFamilies(rows: SessionRow[]): Map<string, string[]> {
   return families;
 }
 
-/** Las delegadas con la tarjeta del riel (`taskCard`): estado y título; proveedor, carpeta, máquina, agente y PR. */
+/**
+ * Las delegadas con la tarjeta del riel (`taskCard`): estado y título; proveedor, máquina, agente y PR.
+ *
+ * Sin carpeta: viven en la de su madre. No se pasa `carpetaDe` (aunque la traiga la lista) y se pide `hideFolder`.
+ */
 export function DelegatedTaskList(props: {
   rows: SessionRow[];
   list: (folder: string) => DelegatedListProps;
   readOnly?: boolean;
   hoverCardPlacement?: "left-start" | "right-start";
-  matchingIds?: readonly string[];
 }) {
   const folderOf = (id: string) => props.rows.find(row => row.id === id)?.folder ?? "";
-  const base = () => props.list(props.rows[0]?.folder ?? "");
+  const base = (): DelegatedListProps => ({ ...props.list(props.rows[0]?.folder ?? ""), carpetaDe: undefined });
   return <Sessions {...base()} card hoverCardPlacement={props.hoverCardPlacement} sessions={props.rows} includeArchived readOnly={props.readOnly}
-    matchingIds={props.matchingIds} groupByAuthor={false} groupByHandler={false}
+    groupByAuthor={false} groupByHandler={false} hideFolder
     projectOf={row => row.folder ?? ""}
-    carpetaDe={row => props.list(row.folder ?? "").carpetaDe?.(row)}
     destinosDe={row => props.list(row.folder ?? "").destinos}
     onPick={id => props.list(folderOf(id)).onPick(id)}
     onDelete={id => props.list(folderOf(id)).onDelete(id)}
@@ -69,10 +72,12 @@ export function DelegatedLaunch(props: {
     esperando: false, stage: null, agent: null, parent_agent: null, chat_de_agente: false,
   });
   return <div data-delegated-launch={props.reference.task} class="my-2 min-w-0 border-l border-border pl-2">
-    <DelegatedTaskList rows={[row() ?? referenceRow(), ...taskDescendants(props.rows, [row() ?? referenceRow()])]} list={props.list} readOnly={!row()} />
-    <Show when={!row()}><p class="m-0 px-2 pt-1 text-xs text-neutral-500">
-      {props.loading ? t("chat.delegation.loading") : props.error ? t("chat.delegation.failed") : t("chat.delegation.unavailable")}
-    </p></Show>
+    <Show when={row() || !props.loading} fallback={<DelegatedSkeleton />}>
+      <DelegatedTaskList rows={[row() ?? referenceRow(), ...taskDescendants(props.rows, [row() ?? referenceRow()])]} list={props.list} readOnly={!row()} />
+      <Show when={!row()}><p class="m-0 px-2 pt-1 text-xs text-neutral-500">
+        {props.error ? t("chat.delegation.failed") : t("chat.delegation.unavailable")}
+      </p></Show>
+    </Show>
   </div>;
 }
 
@@ -91,7 +96,8 @@ export default function DelegatedActivity(props: {
   createEffect(on(() => props.context, () => { setOpen(false); setAll(false); }));
   const rows = () => delegatedRailRows(props.rows, true, props.live, props.approvals);
   const active = () => rows().filter(row => taskPriority(delegatedAttention([row], props.live, props.approvals)));
-  const shown = () => all() ? rows() : withTaskAncestors(rows(), active());
+  // «Activas» son solo las que te necesitan o siguen trabajando, sin sus madres de contexto.
+  const shown = () => all() ? rows() : active();
   return <Show when={rows().length || props.error}>
     <Popover open={open()} onOpenChange={setOpen} placement="left-start" gutter={8}>
       <PopoverTrigger as={(trigger: object) => <Button {...trigger} type="button" variant="chrome" size="iconCompact"
@@ -112,8 +118,8 @@ export default function DelegatedActivity(props: {
         </div>
         <div data-delegated-list class="max-h-[min(55vh,420px)] overflow-y-auto overscroll-contain">
           <Show when={props.error}>{error => <><FailureNote f={asFailure(error())} /><Button variant="ghost" size="sm" onClick={props.onRetry}>{t("chat.delegation.retry")}</Button></>}</Show>
-          <Show when={shown().length} fallback={<p class="m-0 px-2 py-3 text-xs text-neutral-500">{props.loading ? t("chat.delegation.loading") : t("chat.delegation.idle")}</p>}>
-            <DelegatedTaskList rows={shown()} hoverCardPlacement="left-start" matchingIds={all() ? undefined : active().map(taskIdentity)} list={folder => ({ ...props.list(folder), onPick: id => {
+          <Show when={shown().length} fallback={props.loading ? <DelegatedSkeleton /> : <p class="m-0 px-2 py-3 text-xs text-neutral-500">{t("chat.delegation.idle")}</p>}>
+            <DelegatedTaskList rows={shown()} hoverCardPlacement="left-start" list={folder => ({ ...props.list(folder), onPick: id => {
               setOpen(false);
               props.list(folder).onPick(id);
             } })} />
