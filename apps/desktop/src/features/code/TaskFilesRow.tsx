@@ -2,6 +2,13 @@ import { type JSX, Show, createSignal } from "solid-js";
 import { t } from "../../lib/i18n";
 import { setMoviendoHueco } from "../../lib/sites";
 
+/** The chat keeps its 320 px minimum plus the 16 px gutter, whatever width was chosen. */
+const CHAT_ROOM = 336;
+
+/** The card's width, shared by the room reserved in the row and the card itself so they never drift apart. */
+export const taskFilesWidth = (hasTabs: boolean, fraction: number, treePx: number) =>
+  `min(${hasTabs ? `${fraction * 100}%` : `${treePx}px`}, calc(100% - ${CHAT_ROOM}px))`;
+
 /**
  * The task row: the chat, the resize gutter and the room the files card takes.
  * The card itself is a sibling in the panel grid, so it outlives the chat when the task is hidden.
@@ -19,12 +26,13 @@ export default function TaskFilesRow(props: {
 }) {
   let row: HTMLDivElement | undefined;
   const [dragging, setDragging] = createSignal(false);
-  const cardStyle = () => (props.hasTabs ? { width: `${props.width * 100}%` } : { width: `${props.treeWidth}px` });
+  const cardStyle = () => ({ width: taskFilesWidth(props.hasTabs, props.width, props.treeWidth) });
   const move = (clientX: number) => {
     const box = row?.getBoundingClientRect();
     if (!box || box.width === 0) return;
-    if (props.hasTabs) props.onWidth(Math.min(0.75, Math.max(0.32, (box.right - clientX) / box.width)));
-    else props.onTreeWidth(Math.round(Math.min(Math.max(box.width - 360, 240), Math.max(240, box.right - clientX))));
+    const most = Math.max(0, box.width - CHAT_ROOM);
+    if (props.hasTabs) props.onWidth(Math.min(0.75, most / box.width, Math.max(0.32, (box.right - clientX) / box.width)));
+    else props.onTreeWidth(Math.round(Math.min(Math.max(most, 240), Math.max(240, box.right - clientX))));
   };
   return (
     <div ref={row} class="flex h-full min-h-0 min-w-0">

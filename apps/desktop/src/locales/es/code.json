@@ -230,5 +230,7 @@
   "code.panel.changes.pending": "Sin guardar en la carpeta en vivo",
   "code.panel.changes.none": "La tarea no ha cambiado nada todavía",
   "code.panel.tab.preview": "Vista previa: doble clic para dejarla abierta",
-  "code.panel.tab.close": "Cerrar"
+  "code.panel.tab.close": "Cerrar",
+  "code.panel.show_in_folder": "Mostrar en el explorador",
+  "code.panel.download": "Descargar"
 }

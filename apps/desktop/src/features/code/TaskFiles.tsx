@@ -5,6 +5,8 @@ import ListTree from "lucide-solid/icons/list-tree";
 import Maximize2 from "lucide-solid/icons/maximize-2";
 import Minimize2 from "lucide-solid/icons/minimize-2";
 import X from "lucide-solid/icons/x";
+import { capabilities } from "../../lib/platform";
+import { arbolesDe } from "./treeKind";
 import { Button } from "../../ui/Button";
 import { ITEM_DE_MENU, Popover, PopoverContent, PopoverTrigger } from "../../ui/Popover";
 import { t } from "../../lib/i18n";
@@ -44,6 +46,42 @@ export default function TaskFilesCard(props: {
   const open = (tree: string, path: string, changes: boolean, pinned = false, changed = changes) =>
     props.files.open(props.session, { tree, path, changes, changed, pinned });
 
+  // The file is on this computer: it can be opened or shown here, and downloading it makes no sense.
+  const here = () => capabilities().nativeWindow && !machineOf(props.session);
+  const activeTab = () => panel().tabs.find((tab) => tab.id === panel().active);
+  const absolute = async (tab: { tree: string; path: string }) => {
+    const tree = (await arbolesDe(props.project, props.session)).find((item) => item.key === tab.tree);
+    if (!tree) return null;
+    const sep = tree.path.includes("\\") ? "\\" : "/";
+    return `${tree.path.replace(/[\\/]$/, "")}${sep}${tab.path.split("/").join(sep)}`;
+  };
+  const openOutside = async () => {
+    const tab = activeTab();
+    if (!tab) return;
+    await invoke("tree_open_external", { project: props.project, session: props.session, tree: tab.tree, path: tab.path }, machineOf(props.session)).catch(() => {});
+  };
+  const showInFolder = async () => {
+    const tab = activeTab();
+    const path = tab && (await absolute(tab));
+    if (!path) return;
+    const folder = path.slice(0, Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")));
+    await invoke("open_external", { target: folder }).catch(() => {});
+  };
+  const download = async () => {
+    const tab = activeTab();
+    if (!tab) return;
+    const content = await invoke<{ kind: string; text: string; data_url: string | null; pdf: string | null }>("tree_show",
+      { project: props.project, session: props.session, tree: tab.tree, path: tab.path }, machineOf(props.session)).catch(() => null);
+    if (!content) return;
+    const blob = content.pdf
+      ? new Blob([Uint8Array.from(atob(content.pdf), (c) => c.charCodeAt(0))], { type: "application/pdf" })
+      : content.data_url ? await (await fetch(content.data_url)).blob() : new Blob([content.text]);
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = nameOf(tab.path);
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  };
   const tool = "size-6 shrink-0 p-0 text-neutral-500";
   const tools = () => (
     <div class="ml-auto flex shrink-0 items-center gap-1.5 pr-1.5">
@@ -56,6 +94,14 @@ export default function TaskFilesCard(props: {
         <PopoverTrigger as={(trigger: object) => <Button {...trigger} type="button" variant="ghost" size="iconCompact" class={tool}
           title={t("code.panel.more")} aria-label={t("code.panel.more")}><Ellipsis size={15} /></Button>} />
         <PopoverContent class="w-56 p-1">
+          <Show when={activeTab() && here()}>
+            <button type="button" class={ITEM_DE_MENU} onClick={() => { setMenu(false); void openOutside(); }}>{t("code.file.open_external")}</button>
+            <button type="button" class={ITEM_DE_MENU} onClick={() => { setMenu(false); void showInFolder(); }}>{t("code.panel.show_in_folder")}</button>
+          </Show>
+          <Show when={activeTab() && !here()}>
+            <button type="button" class={ITEM_DE_MENU} onClick={() => { setMenu(false); void download(); }}>{t("code.panel.download")}</button>
+          </Show>
+          <Show when={activeTab()}><div class="my-1 h-px bg-border" /></Show>
           <button type="button" class={ITEM_DE_MENU} disabled={!hasTabs()}
             onClick={() => { props.files.close(props.session, panel().tabs.map((tab) => tab.id)); setMenu(false); }}>
             {t("code.panel.close_all")}
