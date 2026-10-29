@@ -626,7 +626,8 @@ export default function Sessions(props: {
       const lanzador = launcherOf(row);
       if (!lanzador || row.archived || lanzador === row.id) continue;
       const hijas = porLanzador.get(lanzador);
-      if (hijas) hijas.push(row);
+      // Una subtarea que llega por dos listas cuenta una vez.
+      if (hijas) { if (!hijas.some((h) => h.id === row.id)) hijas.push(row); }
       else porLanzador.set(lanzador, [row]);
     }
     return porLanzador;
