@@ -430,14 +430,14 @@ def scan(tree):
     return sorted(files, key=key), sorted(symlinks, key=key)
 
 
-def inventory_bytes(files, symlinks, tree=""):
-    body = {"schema": 1, "tree": tree, "files": files, "symlinks": symlinks}
+def inventory_bytes(files, symlinks):
+    body = {"schema": 1, "files": files, "symlinks": symlinks}
     return (json.dumps(body, indent=1, sort_keys=False, ensure_ascii=False) + "\n").encode("utf-8")
 
 
-def tree_name(files, symlinks):
-    # The tree is named from the listing without its own name, so the file can carry it.
-    return hashlib.sha256(inventory_bytes(files, symlinks)).hexdigest()[:12]
+def tree_name(raw):
+    """The tree is named by the sha256 of the exact bytes of inventory.json."""
+    return hashlib.sha256(raw).hexdigest()[:12]
 
 
 def folder_bytes(files, prefix):
@@ -462,8 +462,8 @@ def seal(directory, target, pins, packages, extra=None):
         if symlinks:
             raise ValueError("Windows trees cannot contain symlinks")
         check_windows_paths(files, symlinks)
-    name = tree_name(files, symlinks)
-    raw = inventory_bytes(files, symlinks, name)
+    raw = inventory_bytes(files, symlinks)
+    name = tree_name(raw)
     final = directory / name
     if staged != final:
         if final.exists():
@@ -510,10 +510,12 @@ def verify_output(directory, target):
     if hashlib.sha256(raw).hexdigest() != manifest["inventory_sha256"]:
         raise ValueError("Inventory checksum mismatch")
     inventory = json.loads(raw)
-    if inventory["schema"] != 1 or inventory["tree"] != manifest["tree"]:
-        raise ValueError("Inventory/manifest tree mismatch")
+    if set(inventory) != {"schema", "files", "symlinks"} or inventory["schema"] != 1:
+        raise ValueError("Unexpected inventory fields")
+    if manifest["tree"] != manifest["inventory_sha256"][:12]:
+        raise ValueError("Manifest tree must be inventory_sha256[:12]")
     files, symlinks = inventory["files"], inventory["symlinks"]
-    if raw != inventory_bytes(files, symlinks, manifest["tree"]) or tree_name(files, symlinks) != manifest["tree"]:
+    if raw != inventory_bytes(files, symlinks):
         raise ValueError("Inventory is not canonical")
     tree = directory / manifest["tree"]
     actual_files, actual_links = scan(tree)
@@ -627,7 +629,7 @@ def resources_inventory(output, targets):
         files += [{**row, "path": f"{prefix}/{row['path']}"} for row in found_files]
         symlinks += [{**row, "path": f"{prefix}/{row['path']}"} for row in found_links]
     key = lambda row: row["path"].encode("utf-8")
-    return inventory_bytes(sorted(files, key=key), sorted(symlinks, key=key), "resources")
+    return inventory_bytes(sorted(files, key=key), sorted(symlinks, key=key))
 
 
 def verify_resources_inventory(root):

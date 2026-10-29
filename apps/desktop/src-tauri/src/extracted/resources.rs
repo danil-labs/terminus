@@ -289,7 +289,7 @@ mod tests {
                 serde_json::json!({"path": path, "target": target})
             })
             .collect();
-        let inventory = serde_json::json!({"schema": 1, "tree": "resources", "files": rows, "symlinks": symlinks});
+        let inventory = serde_json::json!({"schema": 1, "files": rows, "symlinks": symlinks});
         fs::write(dir.join(INVENTORY), serde_json::to_vec(&inventory).unwrap()).unwrap();
     }
 

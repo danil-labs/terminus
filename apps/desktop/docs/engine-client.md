@@ -135,10 +135,9 @@ because the engine outlives the window (see below).
 `work-tools/<target>/` holds the prepared tree the engine runs in place:
 `manifest.json` (schema 2, `layout: "tree"`), `inventory.json`,
 `browser-navigation.json` (Chrome metadata only), `licenses/` and
-`<tree>/{git,python,uv,ripgrep,agent-browser,computer-use}`. `<tree>` is the
-first 12 hex of the sha256 of the inventory listing written without its own
-`tree` field, so the file can carry the name; `inventory_sha256` is the sha256
-of the bytes of `inventory.json`. The tree is never rewritten: a new version
+`<tree>/{git,python,uv,ripgrep,agent-browser,computer-use}`. `inventory.json`
+is `{schema, files, symlinks}`; `inventory_sha256` is the sha256 of its exact
+bytes and `<tree>` is the first 12 hex of that digest. The tree is never rewritten: a new version
 is a new folder name. `scripts/work-tools.py` builds it from the pins in
 `resources/work-tools/<target>/pins.json`; see
 [development](development.md#bundled-work-tools).

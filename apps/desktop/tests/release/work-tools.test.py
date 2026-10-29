@@ -137,7 +137,9 @@ class WorkToolsTests(unittest.TestCase):
             raw = (out / "inventory.json").read_bytes()
             self.assertEqual(manifest["inventory_sha256"], tools.hashlib.sha256(raw).hexdigest())
             inventory = json.loads(raw)
-            self.assertEqual(inventory["tree"], manifest["tree"])
+            # Enmienda 1: el motor exige tree == inventory_sha256[:12] y el inventario no lleva su nombre.
+            self.assertEqual(manifest["tree"], tools.hashlib.sha256(raw).hexdigest()[:12])
+            self.assertEqual(set(inventory), {"schema", "files", "symlinks"})
             self.assertEqual(sorted(p.name for p in out.iterdir()),
                              sorted(["browser-navigation.json", "inventory.json", "licenses", "manifest.json", manifest["tree"]]))
             paths = [row["path"] for row in inventory["files"]]
