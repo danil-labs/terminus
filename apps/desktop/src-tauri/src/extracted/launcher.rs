@@ -198,7 +198,7 @@ pub(super) fn open_window(exe: &Path) -> Option<Child> {
     if let Some(dir) = exe.parent() {
         command.current_dir(dir);
     }
-    command
+    crate::util::no_console_window(&mut command)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
