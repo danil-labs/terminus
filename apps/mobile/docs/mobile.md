@@ -136,7 +136,7 @@ workspaces, que va a la raíz que fijó la compilación,
 | Tarjeta de dos líneas: estado + título + chincheta; debajo, lo que pide o carpeta, agente, máquina y PR | Igual, sacado de `taskCard`; sin PR ni worktree (el teléfono no lee git); la máquina solo con más de una | Misma información en el mismo orden; lo que el teléfono no puede saber no se inventa |
 | Dock de agentes: una fila de caras al pie del sidebar; clic abre el chat, clic derecho «Ver sus tareas» | Una fila de caras **arriba de la lista**, del mismo orden y reparto (`planDock`, «+k»); tocar abre su chat, mantener pulsado filtra por sus tareas; «Ver todos» abre una hoja | Abajo le quita alto a la lista; arriba se ve al entrar y se va al hacer scroll, sin robar alto a la lista. Mantener pulsado es el clic derecho del teléfono |
 | SpaceBar | Las píldoras de space bajo el workspace, como antes | El escritorio la conserva; es el alcance de la lista |
-| Tarjeta flotante al pasar el mouse (`TaskHoverCard`): título, último mensaje, Carpeta, Agente, Proveedor; Abrir, Fijar, Archivar | **Mantener pulsada** la tarjeta abre una hoja del sistema (`preview`, `fitToContents`) con lo mismo, de `taskPreview` (`@terminus/tasks`), más Máquina si hay más de una; Abrir, Fijar/Desfijar y Archivar con los comandos de la ventana | El teléfono no tiene hover; mantener pulsado es su gesto de vista previa, y la hoja se cierra con el gesto |
+| Tarjeta flotante al pasar el mouse (`TaskHoverCard`): título, último mensaje, Carpeta, Agente, Proveedor; Abrir, Fijar, Archivar | **Mantener pulsada** la tarjeta abre una hoja del sistema (`preview`, `fitToContents`) con lo mismo, de `taskPreview` (`@terminus/tasks`), más Máquina si hay más de una; Abrir, Fijar/Desfijar y Archivar con los comandos de la ventana, y «Cambiarle el nombre» (`rename_session`, como el menú de la fila) | El teléfono no tiene hover; mantener pulsado es su gesto de vista previa, y la hoja se cierra con el gesto |
 | Cuadro de escribir (`Chat.tsx`): adjuntar y permisos a la izquierda; modelo y razonamiento, y enviar/detener a la derecha; `/`, `@`, `!`; cola con «Mandar ahora» | El mismo cuadro y la misma fila (`apps/mobile/src/ui/Composer.tsx`), con el texto que crece hasta seis líneas; los selectores son hojas desde abajo; `/` y `@` abren la lista sobre el cuadro; `!` lo vuelve terminal («Ejecutar»). En una tarea nueva, encima del cuadro: «Ejecutar en» (más de una máquina), Carpeta, Rama base (con git) y Agente | Popovers y menús no se tocan con el dedo; una fila compacta y hojas sí |
 | Ajustes → Proveedores de IA en la web (#154): una tarjeta por proveedor y correo, consumo una vez, chapas de máquina, «Iniciar sesión en otra máquina» | La misma pantalla (`accounts`), desde la hoja de workspaces (sección Máquinas); el inicio sin pantalla de la máquina (enlace y código) va en una hoja; cerrar sesión pide confirmar | Es la misma regla (`groupAccounts` en `@terminus/computers`); el teléfono abre el enlace en el navegador del sistema y ahí mismo se copia el código |
 | Pestaña Memoria de la vista de proyecto: alcance Proyecto, Workspace o encargado; escribir a mano, editar, borrar; historial por entrada y copias `.conflicto-*` marcadas | Pantalla `memory/[workspace]` desde la hoja de workspaces (sección Memoria, un renglón por workspace de la cuenta): alcance Workspace o cada proyecto del registro; editar y escribir en una tarjeta en la misma pantalla; el historial se despliega bajo la entrada y tocar una versión muestra su texto. Habla **directo con el Worker** (`/v1/workspaces/:id/memory/*`, cliente de `@terminus/computers`, lógica en `apps/mobile/src/lib/memory.ts`), nunca con el relay: funciona con todas las máquinas apagadas y no enciende ninguna. Avisa la copia de un conflicto al guardar, un borrado que no pisó (409) y una memoria ocupada (503) sin perder lo escrito | La memoria vive en el repo de la cuenta (D8): el teléfono no tiene motor que la guarde; los encargados no están en el registro, así que su memoria todavía no se ofrece |
@@ -179,7 +179,7 @@ Los avisos salen en la app, igual para los dos caminos: una tarea que entra en
 | `(home)/index` | Tareas: workspace, spaces, alcance y filtro, dock de agentes y la lista plana |
 | `(home)/notifications` | «Ahora» de todas las máquinas y «Antes», lo que llegó con la app abierta |
 | `(home)/new` | Nueva tarea: el cuadro de escribir con «Ejecutar en» (la última usada, si no la VM), carpeta, rama base y agente; `!` la crea con un comando. La hoja de Carpeta termina en «Nueva carpeta» y «Clonar repo» (ver «Carpetas nuevas») |
-| `preview` | Menú de una tarea (⋯ o pulsación larga): PR, Abrir, Fijar, Archivar, Eliminar y Finalizar con confirmación; el cohete de la lista abre directamente la confirmación |
+| `preview` | Menú de una tarea (⋯ o pulsación larga): PR, Abrir, Cambiarle el nombre, Fijar, Archivar, Eliminar y Finalizar con confirmación; el cohete de la lista abre directamente la confirmación |
 | `accounts` | Proveedores de IA: cuentas por proveedor y correo, consumo, máquinas, iniciar y cerrar sesión |
 | `filter` | Hoja «Filtrar y agrupar» |
 | `agents` | Hoja «Ver todos» del dock |
@@ -201,7 +201,7 @@ lleva su comentario allí:
 
 | Para qué | Lecturas | Acciones |
 |---|---|---|
-| Vista previa y finalizar | `task_blockers` | `set_session_pinned`, `set_task_archived`, `finish_task`, `delete_session` |
+| Vista previa y finalizar | `task_blockers` | `set_session_pinned`, `rename_session`, `set_task_archived`, `finish_task`, `delete_session` |
 | Cuadro de escribir | `list_models`, `list_permission_modes`, `list_slash_menu`, `list_mentions`, `project_base_branches` | `run_shell_command`, `stop_shell_command`, `guardar_imagen_pegada`, `prepare_attachments`, `set_permission_mode` (cambiar el modo del turno en marcha; a automático aprueba lo pendiente) |
 | Almacenamiento por máquina (en Consumos) | `list_workspaces` sin workspace para capacidad; `list_storage` al abrir el detalle del workspace | — |
 | Identidad de agentes | `list_agent_profiles`, `preview_file` | — |
@@ -222,7 +222,7 @@ la fecha de los datos anteriores, marcados como desactualizados.
 
 **Qué enciende la VM.** El relay solo enciende con su lista de intención
 (`INTENT_COMMANDS`: escribir, crear, aprobar, `!`, iniciar sesión…). Fijar,
-archivar, subir una imagen y agregar o quitar una cuenta no están en ella: para
+renombrar, archivar, subir una imagen y agregar o quitar una cuenta no están en ella: para
 esas (`WAKES_FIRST` en `apps/mobile/src/lib/hosts.ts`) el teléfono pide encenderla al plano de
 control (`POST /v1/computers/:id/start`) y espera a que conteste antes de
 mandarlas. Marcar vista, detener o cancelar nunca encienden; abrir la app, una

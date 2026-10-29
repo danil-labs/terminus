@@ -67,8 +67,9 @@ export const APP_ACTIONS = [
   "set_permission_mode",
   "answer_question",
   "mark_task_seen",
-  // La tarjeta de vista previa: Fijar y Archivar.
+  // La tarjeta de vista previa: Fijar, Archivar y Cambiarle el nombre.
   "set_session_pinned",
+  "rename_session",
   "set_task_archived",
   "finish_task",
   "delete_session",

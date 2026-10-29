@@ -46,6 +46,7 @@ import {
   permissionModesOf,
   switchLiveMode,
   projectDirectoryOf,
+  renameTask,
   respondPermission,
   runShell,
   sendToTask,
@@ -246,6 +247,10 @@ const ok = (step: string) => {
     await setPinned(vm, "w-prod", "p-vm-web", "t-vm-1", false);
     assert.equal((await live(vm, "w-prod")).find((t) => t.id === "t-vm-1")?.pinned, false);
     ok("Fijar y Desfijar desde la vista previa (set_session_pinned) en la VM encendida");
+
+    await renameTask(vm, "w-prod", "p-vm-web", "t-vm-1", "Revisar el pago");
+    assert.equal((await live(vm, "w-prod")).find((t) => t.id === "t-vm-1")?.title, "Revisar el pago");
+    ok("Cambiarle el nombre desde la vista previa (rename_session)");
 
     const blocked = await archiveTask(mac, "w-prod", "p-mac-web", "t-mac-2");
     assert.ok("blocked" in blocked && blocked.blocked[0].files.includes("src/home.tsx"));

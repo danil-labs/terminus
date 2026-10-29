@@ -50,8 +50,8 @@ export type Host = {
   onEvents(listener: (events: EngineEvent[], gap: boolean) => void): () => void;
   call<T>(command: AppCommand, workspace: string | null, args?: object): Promise<CallAnswer<T>>;
   /**
-   * Antes de una acción que el relay no toma por intención (fijar, archivar,
-   * cerrar una sesión): enciende la VM administrada apagada y espera a que
+   * Antes de una acción que el relay no toma por intención (fijar, renombrar,
+   * archivar, cerrar una sesión): enciende la VM administrada apagada y espera a que
    * conteste. Una máquina propia apagada no se puede despertar (`machine_asleep`).
    */
   wake(): Promise<void>;
@@ -70,6 +70,7 @@ function allowed(command: string) {
  */
 export const WAKES_FIRST: ReadonlySet<string> = new Set([
   "set_session_pinned",
+  "rename_session",
   "set_task_archived",
   "finish_task",
   "guardar_imagen_pegada",
