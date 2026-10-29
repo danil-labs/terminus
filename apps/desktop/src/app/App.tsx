@@ -494,10 +494,10 @@ export default function App() {
   // El nombre del workspace abierto rotula el menú de espacios de la franja.
   const workspacesDeLaFranja = createWorkspaces();
   const workspaceActual = () => workspacesDeLaFranja.actual();
-  // Dónde termina la barra lateral: Personalizar va pegado a ese borde en la franja.
+  // Dónde empieza el chat, ya pasada la línea de la barra lateral: la primera pestaña nace ahí.
   const [bordeDeLaBarra, setBordeDeLaBarra] = createSignal<number | null>(null);
   const medirBordeDeLaBarra = (el: HTMLDivElement) => {
-    const medir = () => setBordeDeLaBarra(el.getBoundingClientRect().right || null);
+    const medir = () => setBordeDeLaBarra(el.getBoundingClientRect().left || null);
     const ojo = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(medir);
     ojo?.observe(el);
     queueMicrotask(medir);
@@ -8429,7 +8429,7 @@ export default function App() {
             max={420}
             etiqueta={t("shell.column.sidebar_width")}
           >
-            <div ref={medirBordeDeLaBarra} class="relative h-full min-h-0 w-full min-w-0">
+            <div class="relative h-full min-h-0 w-full min-w-0">
             {/* Las otras máquinas se ven por el relay, que es de pago: si la flota lo
                 detuvo por la licencia, el aviso de Terminus (el pago vive en la web). */}
             <Show when={capabilities().machinesLicense?.() === "license_required" && !sidebar.colapsado()}>
@@ -8510,7 +8510,7 @@ export default function App() {
           {/* 30rem es lo que cabe en la caja sin partir el modelo ni el modo.
               Las columnas laterales encogen mil veces más rápido, hasta su
               mínimo; un factor menor que 1 aquí dejaría desbordar la fila. */}
-          <div class="min-h-0 min-w-0 flex-[1_1_30rem] overflow-hidden" data-conversacion>
+          <div ref={medirBordeDeLaBarra} class="min-h-0 min-w-0 flex-[1_1_30rem] overflow-hidden" data-conversacion>
             <Conversacion />
           </div>
 
