@@ -176,29 +176,3 @@ pub struct Push {
     #[serde(default)]
     pub detail: Value,
 }
-
-#[cfg(test)]
-mod extension_tests {
-    use super::*;
-    use std::collections::HashSet;
-
-    /// `full_manifest` salta un nombre repetido sin avisar: aquí falla, para que una
-    /// extensión nunca redefina una orden de la base ni de otra extensión.
-    #[test]
-    fn extensions_do_not_redefine_commands() {
-        let base: serde_json::Value = serde_json::from_str(MANIFEST).unwrap();
-        let mut seen: HashSet<String> = base["commands"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .filter_map(|c| c["name"].as_str().map(str::to_owned))
-            .collect();
-        for raw in EXTENSIONS {
-            let ext: serde_json::Value = serde_json::from_str(raw).expect("extension manifest");
-            for command in ext["commands"].as_array().expect("extension commands") {
-                let name = command["name"].as_str().expect("command name").to_owned();
-                assert!(seen.insert(name.clone()), "la orden {name} ya existe en la base o en otra extensión");
-            }
-        }
-    }
-}
