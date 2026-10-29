@@ -95,6 +95,19 @@ test("la lista del teléfono esconde las delegadas bajo su lanzador, como el esc
 });
 
 
+test("una hija remota cuelga de su coordinador en otra máquina solo si su máquina anuncia `remote_child_v1`", () => {
+  const row = (id: string, created_at: number, extra: object = {}) => ({ id, title: id, provider: "codex", model: null, created_at, updated_at: 0, esperando: false, agent: null, ...extra });
+  const mac = tasksOf({ p1: [row("coord", 3)] }, "cmp_mac", "w1");
+  const vm = tasksOf({ p1: [row("hija", 2, { remote_parent: { machine: "cmp_mac", workspace: "w1", task: "coord", request_id: "r" } })] }, "cmp_vm", "w1");
+  const part = (host: string, p: typeof mac, features: string[]) => ({ host, folders: [], spaces: [], ...p, agents: [], live: [], providers: [], cachedAt: null, features });
+  const on = mergeSnapshots([part("cmp_mac", mac, []), part("cmp_vm", vm, ["remote_child_v1"])], () => null);
+  assert.deepEqual(on.tasks.map((t) => t.id), ["coord"]);
+  assert.deepEqual(on.delegated.map((t) => [t.id, t.remote_launcher]), [["hija", "cmp_mac/coord"]]);
+  const off = mergeSnapshots([part("cmp_mac", mac, []), part("cmp_vm", vm, [])], () => null);
+  assert.deepEqual(off.tasks.map((t) => t.id), ["coord", "hija"], "sin la función, suelta como siempre");
+  assert.deepEqual(off.delegated, []);
+});
+
 test("el teléfono usa el orden compartido aunque los motores listen en otro orden", () => {
   const snapshot = { folders: [], tasks: [], spaces: [
     { id: "a", name: "A", folders: [] }, { id: "b", name: "B", folders: [] },

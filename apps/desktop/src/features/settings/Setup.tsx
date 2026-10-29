@@ -19,13 +19,14 @@ import { connected } from "../../lib/engineConnection";
 import { elapsed, peso } from "../../lib/format";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
-import { anotarFalta, SIN_ESPACIO, textoDeFalta, textoSinEspacio } from "../../lib/no-space";
+import { anotarFalta, SIN_ESPACIO, textoSinEspacio } from "../../lib/no-space";
 import { capabilities } from "../../lib/platform";
 import { hasShellCache } from "../../lib/shellCache";
 import { cn } from "../../lib/utils";
 import { Button } from "../../ui/Button";
-import { asFailure, FailureNote, prosaDe } from "../../ui/Failure";
+import { asFailure, type Failure, FailureNote, prosaDe } from "../../ui/Failure";
 import { Toast, ToastPortal } from "../../ui/Toast";
+import { esIncluida, fallasIncluidas, funcion, motivo, motivoConocido, nombreDe } from "../onboarding/bundled";
 import type { Conexiones } from "../onboarding/connect-store";
 import { crearWorkspace } from "../onboarding/onboarding-store";
 import { CabeceraDelAlta } from "../onboarding/Phases";
@@ -60,7 +61,6 @@ const LINEAS_MAX = 400;
 const RANGO: Record<EstadoDeEtapa, number> = { waiting: 0, running: 1, succeeded: 2, failed: 2, skipped: 2 };
 const RITMO_CONSEJOS = 5000;
 const RITMO_FOTO = 5000;
-const CON_DESCRIPCION = new Set(["pnpm", "bun", "agent-browser", "uv", "python"]);
 
 // Conectar la IA y personalizar solo se cargan en el primer arranque: la carga inicial está en su techo.
 const MapaDeConexiones = lazy(() => import("../onboarding/ConnectAI").then((m) => ({ default: m.MapaDeConexiones })));
@@ -70,10 +70,44 @@ const Personalizar = lazy(() => import("../onboarding/Personalize"));
 const SelectorDeVista = lazy(() => import("../onboarding/Prepare").then((m) => ({ default: m.SelectorDeVista })));
 const VistaSencilla = lazy(() => import("../onboarding/Prepare").then((m) => ({ default: m.VistaSencilla })));
 const VistaTerminal = lazy(() => import("../onboarding/Prepare").then((m) => ({ default: m.VistaTerminal })));
+const FuncionesAfectadas = lazy(() => import("../onboarding/Repair").then((m) => ({ default: m.FuncionesAfectadas })));
+
+/** El hueco de una tarjeta mientras llega su trozo: mismo borde, sin contenido. */
+function TarjetaVacia() {
+  return <div class="min-h-0 flex-1 rounded-lg border border-border bg-surface-raised" aria-hidden="true" />;
+}
+
+/**
+ * El primer frame, antes de saber si hace falta preparar. Con la foto del sidebar
+ * de la vez anterior es neutro: a quien ya usa Terminus no le parpadea el alta.
+ */
+function Esqueleto(props: { preparando: boolean }) {
+  return (
+    <Show
+      when={props.preparando}
+      fallback={
+        <div class="flex h-full items-center justify-center bg-bg" aria-busy="true" data-setup-skeleton="neutral">
+          <Show when={!connected()}>
+            <p role="status" class="m-0 text-sm text-neutral-500">{t("shell.engine.connecting")}</p>
+          </Show>
+        </div>
+      }
+    >
+      <main class="flex h-full flex-col overflow-hidden bg-bg" aria-busy="true" data-setup-skeleton="preparing">
+        <CabeceraDelAlta />
+        <Escenario
+          izquierda={<TituloCambiante titulo={t("setup.title")} lede={t("setup.description")} />}
+          derecha={<TarjetaVacia />}
+        />
+      </main>
+    </Show>
+  );
+}
 
 export default function Setup(props: { children: JSX.Element }) {
   // En el navegador no hay instalador: cada máquina de la cuenta llega preparada y la app abre sin esperarla.
   if (!capabilities().localSetup) return props.children;
+  const conFoto = hasShellCache();
   const [reporte, setReporte] = createSignal<EnvReport | null>(null);
   const [mostrar, setMostrar] = createSignal<boolean | null>(null);
   const [seguir, setSeguir] = createSignal(false);
@@ -88,12 +122,8 @@ export default function Setup(props: { children: JSX.Element }) {
   const [parcial, setParcial] = createSignal(0);
   const [datos, setDatos] = createSignal<Record<string, Dato>>({});
   const [descarga, setDescarga] = createSignal<{ stage: string; file: string; done: number; total: number } | null>(null);
-  const [quiere, setQuiere] = createSignal<Record<string, boolean>>({});
-  // Lo que se hace con un opcional fuera de la corrida (instalarlo solo, desinstalarlo) manda sobre su etapa.
-  const [sueltos, setSueltos] = createSignal<Record<string, PasoDeFila>>({});
-  const [cancelados, setCancelados] = createSignal<Set<string>>(new Set());
-  // Los que se cortaron con la ×: su línea es «descarga cancelada», no «omitido».
-  const conLaX = new Set<string>();
+  const [reparando, setReparando] = createSignal(false);
+  const [falloDeReparar, setFalloDeReparar] = createSignal<Failure | null>(null);
   const [consejo, setConsejo] = createSignal(0);
   const [sinSoporte, setSinSoporte] = createSignal(false);
   // Lo esencial no cabe en disco: la corrida se para antes de empezar y se reintenta entera.
@@ -115,18 +145,11 @@ export default function Setup(props: { children: JSX.Element }) {
     [t("setup.tips.workspaces.title"), t("setup.tips.workspaces.body")],
     [t("setup.tips.memory.title"), t("setup.tips.memory.body")],
   ];
-  const quiereEsta = (name: string) => quiere()[name] !== false;
-  const ponerSuelto = (name: string, paso: PasoDeFila | null) =>
-    setSueltos((x) => {
-      const y = { ...x };
-      if (paso) y[name] = paso;
-      else delete y[name];
-      return y;
-    });
-
   function nombre(stage: string) {
     if (stage === "platform") return t("setup.stage.platform");
-    if (stage === "python") return "Python";
+    if (stage === "work-tools") return t("setup.stage.work_tools");
+    // Un motor anterior aún manda una etapa por herramienta: se nombra por su función.
+    if (esIncluida(stage)) return funcion(stage);
     return reporte()?.items.find((r) => r.id === stage)?.label ?? stage;
   }
 
@@ -181,6 +204,20 @@ export default function Setup(props: { children: JSX.Element }) {
       case "installed":
         anotar(e.stage, { version: valor, origen: ORIGEN_APP });
         return [{ tono: "ok", texto: t("setup.log.installed", { name, version: valor }) }];
+      // La etapa `work-tools` informa cada herramienta incluida: `value` es su id.
+      case "tool":
+        return [{ tono: "ok", texto: t("setup.log.tool_ready", { name: nombreDe(valor), version: e.extra ?? "" }) }];
+      case "tool_failed":
+        return [
+          {
+            tono: "error",
+            texto: t("setup.log.tool_failed", {
+              name: nombreDe(valor),
+              reason: motivo(motivoConocido(e.extra)),
+              function: funcion(valor),
+            }),
+          },
+        ];
       case "timed_out":
         return [{ tono: "warn", texto: t("setup.log.timed_out", { name }) }];
       case "stalled":
@@ -195,11 +232,7 @@ export default function Setup(props: { children: JSX.Element }) {
         return [{ tono: "error", texto: t("setup.log.unsupported", { version: valor, minimum: e.extra ?? "" }) }];
       case "failed": {
         if (e.stage === "platform" && sinSoporte()) return [];
-        if (cancelados().has(e.stage)) return [];
-        const esencial = etapas().find((s) => s.name === e.stage)?.essential ?? true;
-        const cabeza: Linea = esencial
-          ? { tono: "error", texto: t("setup.log.failed", { name }) }
-          : { tono: "warn", texto: t("setup.log.optional_failed", { name }) };
+        const cabeza: Linea = { tono: "error", texto: t("setup.log.failed", { name }) };
         // La nota `no_space` ya lo dijo con cifras.
         const detalle = valor === SIN_ESPACIO ? [] : valor.split("\n").filter((l) => l.trim());
         return [cabeza, ...detalle.map((texto): Linea => ({ tono: "err", texto }))];
@@ -234,29 +267,12 @@ export default function Setup(props: { children: JSX.Element }) {
         return;
       case "stage": {
         vistas.set(e.name, masAvanzado(e.state, vistas.get(e.name)));
-        const etapa = etapas().find((s) => s.name === e.name);
         setEtapas((antes) => antes.map((s) => (s.name === e.name ? { ...s, state: e.state } : s)));
-        if (e.state === "running" && etapa && !etapa.essential && !quiereEsta(e.name)) {
-          // Se desmarcó mientras esperaba: el motor ya la arrancó, se corta en cuanto empieza.
-          setCancelados((c) => new Set(c).add(e.name));
-          void invoke("cancel_install", { operation: `tool:${e.name}` }).catch(() => {});
-        }
-        const cortada = e.state === "failed" && cancelados().has(e.name);
-        if ((e.state === "skipped" || cortada) && !conLaX.has(e.name)) {
-          agregar([{ tono: "omite", texto: t("setup.log.skipped", { name: nombre(e.name) }) }]);
-        }
+        if (e.state === "skipped") agregar([{ tono: "omite", texto: t("setup.log.skipped", { name: nombre(e.name) }) }]);
         if (e.state === "running") {
           setActiva(e.name);
           setParcial(0);
-          agregar([
-            {
-              tono: "etapa",
-              texto: t("setup.log.stage_start", {
-                name: nombre(e.name),
-                kind: etapa?.essential === false ? t("setup.log.optional") : t("setup.log.essential"),
-              }),
-            },
-          ]);
+          agregar([{ tono: "etapa", texto: t("setup.log.stage_start", { name: nombre(e.name) }) }]);
         } else {
           if (descarga()?.stage === e.name) setDescarga(null);
           if (e.state === "succeeded" && e.durationMs !== undefined) {
@@ -282,16 +298,9 @@ export default function Setup(props: { children: JSX.Element }) {
   }
 
   const escuchaEtapas = listen<Evento>("bootstrap-run", (e) => recibir(e.payload));
-  // Un opcional que se instala solo, después de la corrida, cuenta su descarga por aquí.
   // Este oyente vive mientras viva la app: anota para todas las pantallas lo que no cupo en disco.
-  const escuchaInstalaciones = listen<AvanceDeInstalacion>("install", (e) => {
-    anotarFalta(e.payload);
-    const name = e.payload.operation.startsWith("tool:") ? e.payload.operation.slice(5) : null;
-    if (!name || sueltos()[name] !== "run" || e.payload.bytes <= 0) return;
-    setParcial(e.payload.done / e.payload.bytes);
-    setDescarga({ stage: name, file: nombre(name), done: e.payload.done, total: e.payload.bytes });
-  });
-  // pnpm y Bun bajan por `toolchain::install_tool`, que ya reporta su avance por aquí.
+  const escuchaInstalaciones = listen<AvanceDeInstalacion>("install", (e) => anotarFalta(e.payload));
+  // Las herramientas administradas bajan por `toolchain::install_tool`, que ya reporta su avance por aquí.
   const escuchaHerramientas = listen<Avance>("toolchain", (e) => {
     if (e.payload.id !== activa() || e.payload.bytes <= 0) return;
     setParcial(e.payload.done / e.payload.bytes);
@@ -341,10 +350,7 @@ export default function Setup(props: { children: JSX.Element }) {
   async function consultar(joinOnly = true) {
     let corrida: Preparacion | null = null;
     try {
-      const skip = Object.entries(quiere())
-        .filter(([, si]) => !si)
-        .map(([name]) => name);
-      corrida = await invoke<Preparacion | null>("prepare_runtime", skip.length ? { joinOnly, skip } : { joinOnly });
+      corrida = await invoke<Preparacion | null>("prepare_runtime", { joinOnly });
     } catch (e) {
       // Sin parar de preguntar: un servicio que vuelve retoma la corrida y borra el aviso.
       setFalloDelServicio(prosaDe(e));
@@ -397,7 +403,7 @@ export default function Setup(props: { children: JSX.Element }) {
     setFallo(null);
     // Con la foto del sidebar de la vez anterior la preparación ya se hizo: la app
     // monta sin esperar al motor y esta pantalla vuelve solo si el motor dice que falta.
-    const optimista = mostrar() === null && !connected() && hasShellCache();
+    const optimista = mostrar() === null && !connected() && conFoto;
     if (optimista) setMostrar(false);
     // A la vez: el reporte no depende de si hace falta la preparación.
     const reporteEnCurso = invoke<EnvReport>("check_environment", { force: false });
@@ -445,15 +451,13 @@ export default function Setup(props: { children: JSX.Element }) {
 
   /** El estado de cada fila como lo cuenta el diseño. */
   function pasoDe(s: Etapa): PasoDeFila {
-    const suelto = sueltos()[s.name];
-    if (suelto) return suelto;
     switch (s.state) {
       case "running":
         return "run";
       case "succeeded":
         return "ok";
       case "failed":
-        return cancelados().has(s.name) ? "skip" : "fail";
+        return "fail";
       case "skipped":
         return "skip";
       default:
@@ -468,28 +472,29 @@ export default function Setup(props: { children: JSX.Element }) {
     if (cerrada()) setCorriendo(false);
   });
   const terminado = () => corridaHecha();
-  const solo = () => Object.values(sueltos()).includes("run");
-  /** Terminada y sin nada suelto en curso: lo omitido ya se puede marcar para instalarlo. */
-  const fin = () => terminado() && !solo();
-  // Lo que cuenta para el avance: lo esencial, lo opcional que se quiere y lo que ya quedó.
-  const elegidas = () =>
-    etapas().filter((s) => s.essential || pasoDe(s) === "ok" || (quiereEsta(s.name) && pasoDe(s) !== "skip"));
+  const fin = terminado;
+  const elegidas = () => etapas().filter((s) => s.state !== "skipped");
   const hechas = () => elegidas().filter((s) => ["ok", "fail"].includes(pasoDe(s))).length;
-  const omitidas = () => etapas().filter((s) => ["skip", "bye"].includes(pasoDe(s))).length;
-  const falloOpcional = () => etapas().some((s) => pasoDe(s) === "fail");
-  // Un solo avance para toda la instalación: solo baja si se agrega o se quita un opcional.
+  /** Lo incluido que no pasó la comprobación, con la función que afecta. */
+  const fallas = () =>
+    fallasIncluidas(
+      reporte(),
+      etapas().filter((s) => s.state === "failed").map((s) => s.name),
+    );
+  const conFallas = () => fallas().length > 0;
+  // Un solo avance para toda la preparación, que nunca retrocede.
   const porcentaje = () => {
     if (!etapas().length) return 0;
     if (fin()) return 100;
     const total = Math.max(1, elegidas().length);
-    const enCurso = corriendo() || solo() ? Math.min(parcial(), 0.99) : 0;
+    const enCurso = corriendo() ? Math.min(parcial(), 0.99) : 0;
     const valor = Math.round(((hechas() + enCurso) / total) * 100);
     if (tope.total !== total) tope = { total, valor };
     tope.valor = Math.max(tope.valor, valor);
     return tope.valor;
   };
 
-  const reparando = () => {
+  const nombreAReparar = () => {
     const fallida = etapas().find((s) => s.essential && s.state === "failed");
     if (fallida) return nombre(fallida.name);
     const esencial = (reporte()?.bootstrap ?? []).find((id) => reporte()?.essential?.includes(id));
@@ -497,7 +502,7 @@ export default function Setup(props: { children: JSX.Element }) {
   };
   // Cerrar el aviso solo descarta lo que dice ahora: si la instalación pasa a
   // fallar, el aviso de error vuelve a salir.
-  const claveDelAviso = () => `${falloEsencial() ? "failed" : "running"}:${reparando()}`;
+  const claveDelAviso = () => `${falloEsencial() ? "failed" : "running"}:${nombreAReparar()}`;
   const [descartado, setDescartado] = createSignal<string | null>(null);
   const aviso = () =>
     mostrar() === false && bloqueado() && (corriendo() || falloEsencial()) && descartado() !== claveDelAviso();
@@ -510,37 +515,22 @@ export default function Setup(props: { children: JSX.Element }) {
     if (!etapas().length) return t("setup.status.checking");
     if (sinSoporte()) return t("setup.status.unsupported");
     if (falloEsencial()) return t("setup.status.failed");
-    if (fin()) return falloOpcional() ? t("setup.status.partial") : t("setup.status.done");
+    if (fin()) return conFallas() ? t("setup.status.partial") : t("setup.status.done");
     return t("setup.status.running", { percent: porcentaje() });
   };
 
   function detalle(s: Etapa): string {
     const d = datos()[s.name] ?? {};
     const paso = pasoDe(s);
-    if (paso === "run") return t("setup.row.installing");
+    if (paso === "run") return t("setup.row.checking");
     if (paso === "fail") return t("setup.row.failed");
     if (paso !== "ok") return "";
     // El espacio libre solo importa antes de instalar: la vista terminal lo dice; aquí, el sistema.
     if (s.name === "platform") return d.plataforma ?? "";
-    if (!d.version) return t("setup.row.ready");
-    return d.origen === ORIGEN_SISTEMA
-      ? t("setup.row.system", { version: d.version })
-      : t("setup.row.installed", { version: d.version });
+    return t("setup.row.ready");
   }
 
-  const version = (name: string) =>
-    datos()[name]?.version ?? reporte()?.items.find((r) => r.id === name)?.detail ?? "";
-
-  const fila = (s: Etapa): FilaDeEtapa => ({
-    name: s.name,
-    label: nombre(s.name),
-    essential: s.essential,
-    paso: pasoDe(s),
-    quiere: quiereEsta(s.name),
-    detalle: detalle(s),
-    version: version(s.name),
-    descripcion: CON_DESCRIPCION.has(s.name) ? t(`setup.optional.about.${s.name}`) : "",
-  });
+  const fila = (s: Etapa): FilaDeEtapa => ({ name: s.name, label: nombre(s.name), paso: pasoDe(s), detalle: detalle(s) });
 
   const instalacion = (): Instalacion => {
     const corre = etapas().find((s) => pasoDe(s) === "run");
@@ -548,17 +538,13 @@ export default function Setup(props: { children: JSX.Element }) {
       if (!etapas().length) return t("setup.status.checking");
       if (sinSoporte()) return t("setup.status.unsupported");
       if (falloEsencial()) return t("setup.status.failed");
-      if (fin()) return falloOpcional() ? t("setup.simple.essentials_ready") : t("setup.simple.done");
+      if (fin()) return conFallas() ? t("setup.simple.essentials_ready") : t("setup.simple.done");
       if (!corre) return t("setup.status.checking");
-      return t("setup.simple.installing", { name: nombre(corre.name) });
+      return t("setup.simple.checking", { name: nombre(corre.name) });
     };
     const subtitulo = () => {
       if (!etapas().length) return "";
-      if (fin()) {
-        return omitidas()
-          ? t("setup.simple.summary_skipped", { tools: hechas(), count: omitidas() })
-          : t("setup.simple.summary", { count: hechas() });
-      }
+      if (fin()) return t("setup.simple.summary", { count: hechas() });
       return t("setup.simple.step", { step: Math.min(hechas() + 1, elegidas().length), total: elegidas().length });
     };
     const d = descarga();
@@ -568,11 +554,11 @@ export default function Setup(props: { children: JSX.Element }) {
       estado: estado(),
       porcentaje: porcentaje(),
       terminado: fin() && !falloEsencial(),
-      corriendo: corriendo() || solo(),
+      fallido: !corriendo() && (falloEsencial() || sinSoporte()),
+      corriendo: corriendo(),
       hechas: hechas(),
       total: elegidas().length,
-      esenciales: etapas().filter((s) => s.essential).map(fila),
-      opcionales: etapas().filter((s) => !s.essential).map(fila),
+      etapas: etapas().map(fila),
       lineas: lineas(),
       descarga:
         d && d.total > 0
@@ -586,77 +572,27 @@ export default function Setup(props: { children: JSX.Element }) {
     };
   };
 
-  async function refrescarReporte() {
-    const r = await invoke<EnvReport>("check_environment", { force: false }).catch(() => null);
-    if (r) setReporte(r);
-  }
-
-  /** Lo omitido o fallido se instala solo, ya con la corrida terminada, por la misma etapa. */
-  async function instalarSuelto(name: string) {
-    if (sueltos()[name] === "run") return;
-    setQuiere((q) => ({ ...q, [name]: true }));
-    ponerSuelto(name, "run");
-    setParcial(0);
-    const inicio = Date.now();
-    agregar([{ tono: "etapa", texto: t("setup.log.stage_start", { name: nombre(name), kind: t("setup.log.optional") }) }]);
+  /** «Reparar»: el motor verifica todo lo incluido, limpia su estado y vuelve a comprobar. */
+  async function reparar() {
+    if (reparando()) return;
+    setReparando(true);
+    setFalloDeReparar(null);
     try {
-      await invoke<string>("install_base_tool", { tool: name });
-      await refrescarReporte();
-      anotar(name, { version: version(name), origen: ORIGEN_APP });
-      ponerSuelto(name, "ok");
-      agregar([
-        { tono: "ok", texto: t("setup.log.installed", { name: nombre(name), version: version(name) }) },
-        { tono: "ok", texto: t("setup.log.stage_done", { name: nombre(name), duration: elapsed(Math.max(1, Math.round((Date.now() - inicio) / 1000))) }) },
-      ]);
+      await invoke("install_tool", { tool: "bundled-work-tools" });
     } catch (e) {
-      if (prosaDe(e).includes("install.cancelled") || cancelados().has(name)) {
-        ponerSuelto(name, "skip");
-      } else {
-        ponerSuelto(name, "fail");
-        agregar([
-          { tono: "warn", texto: t("setup.log.optional_failed", { name: nombre(name) }) },
-          { tono: "err", texto: (await textoDeFalta(e, `tool:${name}`)) ?? prosaDe(e) },
-        ]);
-      }
+      setFalloDeReparar({ ...asFailure(e), what: t("setup.functions.repair_failed") });
+    }
+    try {
+      const r = await invoke<EnvReport>("check_environment", { force: true });
+      setReporte(r);
+      setBloqueado(r?.blocked === true);
+      if (etapas().some((s) => s.state === "failed")) await preparar();
+    } catch (e) {
+      setFalloDeReparar((antes) => antes ?? { ...asFailure(e), what: t("setup.error_check") });
     } finally {
-      setDescarga((d) => (d?.stage === name ? null : d));
+      setReparando(false);
     }
   }
-
-  /** La casilla: antes de que corra, decide si se instala; al terminar, marcar lo omitido lo instala solo. */
-  function marcar(name: string, marcado: boolean) {
-    const s = etapas().find((x) => x.name === name);
-    const paso = s ? pasoDe(s) : "wait";
-    if (fin() && (paso === "skip" || paso === "fail") && marcado) return void instalarSuelto(name);
-    setQuiere((q) => ({ ...q, [name]: marcado }));
-  }
-
-  /** La × corta la descarga de un opcional; queda omitido y se puede instalar después. */
-  function cancelarOpcional(name: string) {
-    setQuiere((q) => ({ ...q, [name]: false }));
-    setCancelados((c) => new Set(c).add(name));
-    conLaX.add(name);
-    if (sueltos()[name] === "run") ponerSuelto(name, "skip");
-    agregar([{ tono: "aviso", texto: t("setup.log.cancelled", { name: nombre(name) }) }]);
-    void invoke("cancel_install", { operation: `tool:${name}` }).catch(() => {});
-  }
-
-  /** La basura quita la copia que instaló Terminus; la del sistema no se toca. */
-  async function desinstalar(name: string) {
-    ponerSuelto(name, "bye");
-    try {
-      await invoke("remove_tool", { tool: name });
-      setQuiere((q) => ({ ...q, [name]: false }));
-      ponerSuelto(name, "skip");
-      agregar([{ tono: "omite", texto: t("setup.log.removed", { name: nombre(name) }) }]);
-      await refrescarReporte();
-    } catch (e) {
-      ponerSuelto(name, "ok");
-      agregar([{ tono: "warn", texto: prosaDe(e) }]);
-    }
-  }
-
-  const acciones = { onMarcar: marcar, onCancelar: cancelarOpcional, onDesinstalar: (n: string) => void desinstalar(n) };
 
   /** El workspace «Personal» nace aquí, que es de quien cuelgan las cuentas de la IA, y los proveedores se cargan. */
   let preparadas: Promise<void> | null = null;
@@ -706,12 +642,12 @@ export default function Setup(props: { children: JSX.Element }) {
 
   const titulo = () => {
     if (ia()) return t("onboarding.ai.title");
-    if ((terminado() || solo()) && !falloEsencial()) return t("setup.done_title");
+    if (terminado() && !falloEsencial() && !conFallas()) return t("setup.done_title");
     return t("setup.title");
   };
   const lede = () => {
     if (ia()) return t("onboarding.ai.lede");
-    if ((terminado() || solo()) && !falloEsencial()) return alta() ? t("setup.done_lede") : t("setup.done_lede_app");
+    if (terminado() && !falloEsencial() && !conFallas()) return alta() ? t("setup.done_lede") : t("setup.done_lede_app");
     return t("setup.description");
   };
 
@@ -724,6 +660,19 @@ export default function Setup(props: { children: JSX.Element }) {
             <FailureNote f={asFailure(f())} />
           </div>
         )}
+      </Show>
+      <Show when={!ia() && !corriendo() && conFallas()}>
+        <div class="mt-6 w-full">
+          <Suspense>
+          <FuncionesAfectadas
+            fallas={fallas()}
+            reparando={reparando()}
+            error={falloDeReparar()}
+            onReparar={() => void reparar()}
+            onReiniciar={() => void invoke("restart_app")}
+          />
+          </Suspense>
+        </div>
       </Show>
       <Show when={!ia() && !corriendo() && sinEspacio()}>
         {(texto) => (
@@ -795,14 +744,14 @@ export default function Setup(props: { children: JSX.Element }) {
   const derecha = () => (
     <div class="relative min-h-0 flex-1">
       <div class={cn(CAPA, ia() && "pointer-events-none -translate-x-[90px] opacity-0")} inert={ia() || undefined}>
-        <Suspense>
+        <Suspense fallback={<TarjetaVacia />}>
         <SelectorDeVista class="self-end" vista={vista()} onCambiar={setVista} />
         {/* Las dos vistas siguen montadas: cambiar de una a otra no pierde el desplazamiento ni la corrida. */}
         <div class={cn("min-h-0 flex-1 flex-col", vista() === "sencilla" ? "flex" : "hidden")}>
-          <VistaSencilla i={instalacion()} {...acciones} />
+          <VistaSencilla i={instalacion()} />
         </div>
         <div class={cn("min-h-0 flex-1 flex-col", vista() === "terminal" ? "flex" : "hidden")}>
-          <VistaTerminal i={instalacion()} {...acciones} ref={(el) => (log = el)} />
+          <VistaTerminal i={instalacion()} ref={(el) => (log = el)} />
         </div>
         </Suspense>
       </div>
@@ -824,8 +773,8 @@ export default function Setup(props: { children: JSX.Element }) {
           <>
             <p class="m-0 text-xs text-neutral-500">{t("setup.footer")}</p>
             <span class="flex-1" />
-            {/* Solo lo esencial se reintenta aquí: lo opcional se marca en su fila. */}
-            <Show when={!sinSoporte() && (falloDelServicio() || (!corriendo() && (fallo() || falloEsencial())))}>
+            {/* Lo incluido se repara con «Reparar»; esto reintenta cuando no hay nada que reparar. */}
+            <Show when={!sinSoporte() && (falloDelServicio() || (!corriendo() && !conFallas() && (fallo() || falloEsencial())))}>
               <Button size="sm" variant="secondary" onClick={() => void empezar()}>
                 {t("setup.retry")}
               </Button>
@@ -838,7 +787,7 @@ export default function Setup(props: { children: JSX.Element }) {
               </Show>
               <Button
                 size="sm"
-                disabled={!(terminado() || solo()) || entrando()}
+                disabled={!terminado() || entrando()}
                 onClick={() => (alta() ? void aConectar() : setSeguir(true))}
               >
                 {alta() ? t("setup.next.ai") : t("setup.next.app")}
@@ -880,8 +829,8 @@ export default function Setup(props: { children: JSX.Element }) {
               >
                 <p class="m-0 break-words text-xs text-neutral-950">
                   {falloEsencial()
-                    ? t("setup.repair.failed", { name: reparando() })
-                    : t("setup.repair.running", { name: reparando() })}
+                    ? t("setup.repair.failed", { name: nombreAReparar() })
+                    : t("setup.repair.running", { name: nombreAReparar() })}
                 </p>
                 <Show when={falloEsencial()}>
                   <div>
@@ -897,11 +846,7 @@ export default function Setup(props: { children: JSX.Element }) {
       }
     >
       <Match when={mostrar() === null}>
-        <div class="flex h-full items-center justify-center bg-bg">
-          <Show when={!connected()}>
-            <p role="status" class="m-0 text-sm text-neutral-500">{t("shell.engine.connecting")}</p>
-          </Show>
-        </div>
+        <Esqueleto preparando={!conFoto} />
       </Match>
       <Match when={mostrar() && !seguir()}>
         <main class="flex h-full flex-col overflow-hidden bg-bg">
@@ -915,7 +860,7 @@ export default function Setup(props: { children: JSX.Element }) {
               </>
             }
           >
-            <Suspense>
+            <Suspense fallback={<TarjetaVacia />}>
               <Personalizar
                 workspace={workspace()}
                 ia={nombres()}

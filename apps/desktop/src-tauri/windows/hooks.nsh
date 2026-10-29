@@ -97,6 +97,11 @@
   ${EndIf}
 !macroend
 
+; The engine keeps older tool trees while turns use them, so the template's per-file
+; delete leaves them behind. Only a real uninstall (a temporary copy) removes them all.
 !macro NSIS_HOOK_POSTUNINSTALL
   !insertmacro TERMINUS_SWEEP
+  ${If} $EXEDIR != $INSTDIR
+    RMDir /r "$INSTDIR\work-tools"
+  ${EndIf}
 !macroend

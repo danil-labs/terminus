@@ -25,7 +25,8 @@ type Row = Record<string, unknown>;
 
 /** `outdated`: su motor habla otro contrato, sabido por el plano de control. `linked`: `null` enseña todos sus workspaces. */
 /** `os` solo si se sabe: la tarjeta de la tarea lo lee y, si falta, no inventa un sistema. */
-export type MachineInfo = { id: string; name: string; wakes: boolean; outdated?: boolean; linked?: ReadonlySet<string> | null; os?: SystemId };
+/** `features`: lo que su motor anuncia (`status.service_features`); cada función se enciende por máquina. */
+export type MachineInfo = { id: string; name: string; wakes: boolean; outdated?: boolean; linked?: ReadonlySet<string> | null; os?: SystemId; features?: readonly string[] };
 export type Power = "on" | "off" | "starting" | "outdated";
 
 export type Envelope = { machine: string; workspace: string | null; command: string; args?: Row };
@@ -141,7 +142,8 @@ export class Fleet {
         continue;
       }
       const before = member.info;
-      const same = before.name === info.name && before.wakes === info.wakes && before.os === info.os && !!before.outdated === !!info.outdated && sameLinks(before.linked ?? null, info.linked ?? null);
+      const same = before.name === info.name && before.wakes === info.wakes && before.os === info.os && !!before.outdated === !!info.outdated && sameLinks(before.linked ?? null, info.linked ?? null)
+        && (before.features ?? []).join() === (info.features ?? []).join();
       // Un contrato que vuelve a ser compatible quita la marca que puso el relay.
       if (before.outdated && !info.outdated) member.outdated = false;
       member.info = { ...info };

@@ -86,6 +86,9 @@ export type SessionRow = {
   pinned?: boolean | null;
   launched_by?: string | null;
   launcher_available?: boolean;
+  /** Hija de una delegación entre máquinas: su coordinador vive allá (`@terminus/tasks` `remote.ts`). */
+  remote_parent?: unknown;
+  remote_launcher?: string | null;
   has_delegates?: boolean;
   launcher_name?: string | null;
   archived?: boolean | null;

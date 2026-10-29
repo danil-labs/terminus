@@ -224,9 +224,7 @@ impl State {
 }
 fn manifest() -> &'static Value {
     static M: OnceLock<Value> = OnceLock::new();
-    M.get_or_init(|| {
-        serde_json::from_str(terminus_engine_protocol::MANIFEST).expect("frozen command manifest")
-    })
+    M.get_or_init(terminus_engine_protocol::full_manifest)
 }
 fn command(name: &str) -> Option<&'static Value> {
     manifest()["commands"]
@@ -1001,8 +999,17 @@ pub(super) fn machine_list(app: tauri::AppHandle) -> Result<Value, Value> {
     let state = app
         .try_state::<Arc<State>>()
         .ok_or_else(|| failure(&Error::new("app_unavailable")))?;
-    let on = answers(&state.client());
-    Ok(json!([{"id": "local", "local": !state.remote(), "active": true, "on": on, "hosts": true}]))
+    let client = state.client();
+    let on = answers(&client);
+    let features = client.status()["service_features"].clone();
+    let features = if features.is_array() {
+        features
+    } else {
+        json!([])
+    };
+    Ok(
+        json!([{"id": "local", "local": !state.remote(), "active": true, "on": on, "hosts": true, "features": features}]),
+    )
 }
 
 #[cfg(test)]

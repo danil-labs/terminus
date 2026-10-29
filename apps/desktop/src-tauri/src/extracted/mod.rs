@@ -21,6 +21,8 @@ mod placement;
 mod proxy;
 #[cfg(target_os = "macos")]
 mod relocate;
+#[cfg(target_os = "linux")]
+mod resources;
 #[cfg(any(target_os = "macos", test))]
 mod service_plan;
 mod sites;
@@ -192,6 +194,8 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
                     if url.scheme() == "tauri"
                         || url.host_str() == Some("tauri.localhost")
                         || url.as_str() == "about:srcdoc"
+                        // El iframe aislado nace vacío antes de recibir su documento.
+                        || url.as_str() == "about:blank"
                         // El marco de la vista previa de un `.html`: en macOS y Linux esto también filtra marcos.
                         || url.scheme() == page_preview::SCHEME
                         || url.host_str() == Some("terminus-page.localhost")

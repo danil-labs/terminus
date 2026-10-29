@@ -4049,6 +4049,23 @@ if (!roto) {
   );
   assert.deepEqual(mudo.fallos, []);
 
+  // El primer frame, mientras `setup_required` no contesta. Sin la foto del sidebar
+  // es «Preparando Terminus»; con ella, a quien ya usa Terminus no le parpadea el alta.
+  const sinContestar = { ...RESPUESTAS, setup_required: () => new Promise(() => {}) };
+  const nueva = await mount("listo", "primer-frame-sin-foto", sinContestar);
+  await sleep(100);
+  assert.equal(nueva.w.document.querySelector("[data-setup-skeleton]")?.dataset.setupSkeleton, "preparing");
+  assert.ok(nueva.w.document.body.textContent.includes("Preparando Terminus"), "sin foto el primer frame no es la preparación");
+  const fotoDelSidebar = JSON.stringify({ workspace: "w", projects: [], sessions: {}, spaces: [], desk: null });
+  const conocida = await mount("listo", "primer-frame-con-foto", sinContestar, undefined, {
+    "harness:shell-cache": JSON.stringify({ version: 2, last: "w", workspaces: { w: { saved: Date.now(), snapshot: fotoDelSidebar } } }),
+  });
+  await sleep(100);
+  assert.ok(conocida.w.document.querySelector("#root").children.length > 0, "con foto el primer frame queda en blanco");
+  assert.ok(!conocida.w.document.body.textContent.includes("Preparando Terminus"), "con foto el alta parpadea a quien ya usa Terminus");
+  assert.notEqual(conocida.w.document.querySelector("[data-setup-skeleton]")?.dataset.setupSkeleton, "preparing");
+  assert.deepEqual([...nueva.fallos, ...conocida.fallos], []);
+
   const blockerCalls = [];
   const discarded = [];
   const blockedFinishes = [];

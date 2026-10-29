@@ -24,6 +24,8 @@ export type Computer = {
   host_version?: string | null;
   /** El contrato del motor en su último `hello` (hash de `commands.json`), si lo dijo. */
   contract?: string | null;
+  /** Lo que el motor anunció en `status.service_features` en su último `hello`. Sin el campo, nada. */
+  service_features?: string[] | null;
   /** `linux`, `macos` o `windows`, si el plano de control lo dice. Sin el campo, no se sabe. */
   os?: string | null;
   /** Los workspaces de esta computadora vinculados a la cuenta. Sin el campo, un plano de control de antes. */
@@ -54,9 +56,9 @@ export function apiUrl(endpoint: string, path: string): string {
   return `${url.origin}${url.pathname.replace(/\/+$/, "")}${path}`;
 }
 
-const globalFetch: Fetch = (input, init) => (globalThis.fetch as unknown as Fetch)(input, init);
+export const globalFetch: Fetch = (input, init) => (globalThis.fetch as unknown as Fetch)(input, init);
 
-async function request<T>(url: string, token: string, method: string, read: (body: unknown) => T, f: Fetch, payload?: unknown): Promise<Answer<T>> {
+export async function request<T>(url: string, token: string, method: string, read: (body: unknown) => T, f: Fetch, payload?: unknown): Promise<Answer<T>> {
   let response: Awaited<ReturnType<Fetch>>;
   try {
     const headers: Record<string, string> = { authorization: `Bearer ${token}` };

@@ -74,8 +74,8 @@ fn lab(base: &Path) -> Option<(String, PathBuf)> {
     Some((identity, root))
 }
 
-/// Los recursos de la instalación (`lenguas/`), los mismos que `resource_dir()` de Tauri.
-/// Dentro de un AppImage el montaje desaparece con la ventana: se copian a `<root>/resources`.
+/// Los recursos de la instalación (`lenguas/`, `work-tools/`), los mismos que `resource_dir()` de Tauri.
+/// Dentro de un AppImage el montaje desaparece con la ventana: se copian a `<root>/resource-versions/<clave>`.
 fn installed_resources(root: &Path) -> Result<PathBuf> {
     let exe = std::env::current_exe()?;
     let dir = exe.parent().ok_or_else(|| Error::new("invalid_request"))?;
@@ -86,8 +86,14 @@ fn installed_resources(root: &Path) -> Result<PathBuf> {
     if let Some(appdir) =
         std::env::var_os("APPDIR").filter(|_| std::env::var_os("APPIMAGE").is_some())
     {
+        let appdir = PathBuf::from(appdir);
+        // `work-tools.py` deja ahí los recursos con su inventario, fuera del alcance de linuxdeploy.
+        let prepared = appdir.join("usr/share/Terminus");
+        if prepared.join(super::resources::INVENTORY).is_file() {
+            return Ok(super::resources::materialize(&prepared, root)?);
+        }
         // productName de tauri.conf.json: el bundle de Linux pone ahí los recursos.
-        let mounted = PathBuf::from(appdir).join("usr/lib/Terminus");
+        let mounted = appdir.join("usr/lib/Terminus");
         let copy = root.join("resources");
         super::legacy::mirror(&mounted, &copy)?;
         return Ok(copy);
@@ -465,8 +471,16 @@ fn bundled_engine() -> Result<PathBuf> {
 }
 
 /// El binario que arranca la ventana: en un AppImage, la copia estable que deja `stable_engine`.
+fn engine_root(paths: &Paths) -> PathBuf {
+    if paths.data == paths.root.join("engine") {
+        paths.root.join("sidecar")
+    } else {
+        paths.root.clone()
+    }
+}
+
 fn installed_engine(paths: &Paths, bundled: PathBuf) -> PathBuf {
-    let copy = paths.root.join("engine").join("seldon-runtime");
+    let copy = engine_root(paths).join("engine").join("seldon-runtime");
     if cfg!(target_os = "linux") && std::env::var_os("APPIMAGE").is_some() && copy.is_file() {
         return copy;
     }
@@ -477,7 +491,7 @@ fn spawn(paths: &Paths, adopt: bool) -> Result<Child> {
     if super::engine_profile::managed(&paths.data)? {
         return Err(Error::new("managed_service_unavailable"));
     }
-    let exe = super::legacy::stable_engine(&bundled_engine()?, &paths.root)?;
+    let exe = super::legacy::stable_engine(&bundled_engine()?, &engine_root(paths))?;
     let mut log = OpenOptions::new()
         .create(true)
         .append(true)

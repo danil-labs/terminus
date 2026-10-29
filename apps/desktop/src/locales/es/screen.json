@@ -3,7 +3,6 @@
   "screen.open_tip": "Ver la pantalla de {name}",
   "screen.tab": "Pantalla de {name}",
   "screen.connecting": "Conectando con la pantalla…",
-  "screen.view_only": "Solo ver",
   "screen.offline": "La computadora está apagada. Su pantalla se ve cuando está encendida.",
   "screen.unavailable": "La pantalla no está disponible en esta computadora.",
   "screen.busy": "Ya hay dos pantallas abiertas de esta computadora. Cierra una para ver esta.",
@@ -11,8 +10,5 @@
   "screen.failed": "No se pudo conectar con la pantalla.",
   "screen.empty_hint": "Aquí aparece lo que abren los agentes, como su navegador. Si no hay nada abierto, se ve en negro.",
   "screen.retry": "Reconectar",
-  "screen.control_active": "Control activo · haz clic en la pantalla para escribir",
-  "screen.control_unavailable": "El motor de esta computadora permite solo ver.",
-  "screen.start_control": "Controlar",
-  "screen.stop_control": "Solo ver"
+  "screen.control_unavailable": "El motor de esta computadora permite solo ver."
 }
