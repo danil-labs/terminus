@@ -1,5 +1,5 @@
 //! Las extensiones del motor (`engine-protocol` `EXTENSIONS`) no redefinen órdenes:
-//! `full_manifest` salta un nombre repetido sin avisar, así que aquí falla.
+//! `full_manifest` salta un nombre repetido sin avisar: esta prueba lo hace fallar.
 use std::collections::HashSet;
 
 use terminus_engine_protocol::{EXTENSIONS, MANIFEST};
