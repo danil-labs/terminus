@@ -235,7 +235,7 @@ const destinosDe = (
           icono: () => <Plug size={15} />,
           panel: () => (
             <Suspense fallback={null}>
-              <Connections />
+              <Connections workspace={workspace()} />
             </Suspense>
           ),
         },

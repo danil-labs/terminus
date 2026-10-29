@@ -241,3 +241,17 @@ Handler and peer error keys come from the CLI catalogs at seldon-host
 `437a280` (`crates/terminus-cli/src/messages.{es,en}.json`); the window completes
 the Spanish translations. Pending error codes come from that engine
 (`runtime/chat/durable_pending.rs`) and use window-authored ES/EN phrases.
+
+## Extensions (outside the hash)
+
+`extensions/*.json` are byte copies of seldon-host
+`crates/engine-manifest/extensions/`. They hold additive engine commands that
+do not enter the compatibility hash (decision of 2026-10-29 on additive
+commands). `commands.json` and its SHA-256 do not change when an extension does.
+The window dispatches extension commands like contract ones; an engine without
+them answers that the command is unknown, and only that feature turns off.
+
+- `orchestrators.json`: external orchestrators (remote connections, `task result`)
+  and orchestrators on this machine (`local_orchestrator_connect`,
+  `list_local_orchestrators`, `local_orchestrator_disconnect`), from
+  seldon-host PR #239.

@@ -224,9 +224,7 @@ impl State {
 }
 fn manifest() -> &'static Value {
     static M: OnceLock<Value> = OnceLock::new();
-    M.get_or_init(|| {
-        serde_json::from_str(terminus_engine_protocol::MANIFEST).expect("frozen command manifest")
-    })
+    M.get_or_init(terminus_engine_protocol::full_manifest)
 }
 fn command(name: &str) -> Option<&'static Value> {
     manifest()["commands"]
