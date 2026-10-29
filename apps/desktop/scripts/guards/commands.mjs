@@ -81,7 +81,9 @@ const SIN_INTERFAZ = {
   session_worktree: "el árbol y sus notas aún no se pintan en ninguna pantalla",
   // El renombre lo hace hoy el agente con `git branch -m`; la app lo reconcilia.
   worktree_rename_branch: "el renombre al entregar aún no tiene gesto en pantalla",
-  install_tool: "pnpm y Bun los instala bootstrap::prepare_runtime desde Rust; ninguna pantalla lo invoca",
+  // Lo incluido se repara entero con `install_tool {"tool":"bundled-work-tools"}`.
+  install_base_tool: "lo usa bootstrap::prepare_runtime; la ventana repara lo incluido con install_tool",
+  remove_tool: "lo incluido con Terminus no se desinstala; queda en el contrato congelado",
   remove_google_drive: "quitar el binario de Drive es de Configuración; el onboarding solo desconecta",
   // Del contrato de seldon-host dev; la ventana los llama en terminus#243.
   google_drive_desktop_status: "lo llama el alta de Drive con la app oficial (terminus#243)",

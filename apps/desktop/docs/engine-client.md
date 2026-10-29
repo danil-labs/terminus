@@ -126,8 +126,42 @@ ships with it: `seldon-runtime` next to the window executable, packaged as
 `bundle.externalBin` on every platform. Its `--resource-dir` is the
 installation's resource folder, the one Tauri's `resource_dir()` names (the
 executable's folder on Windows, `Contents/Resources` on macOS), where the
-bundled language packs (`lenguas/`) live. Inside an AppImage those resources
-are copied to `resources/` beside the window first.
+bundled language packs (`lenguas/`) and the bundled work tools (`work-tools/`)
+live. Inside an AppImage those resources are copied out of the mount first,
+because the engine outlives the window (see below).
+
+### Bundled work tools
+
+`work-tools/<target>/` holds the prepared tree the engine runs in place:
+`manifest.json` (schema 2, `layout: "tree"`), `inventory.json`,
+`browser-navigation.json` (Chrome metadata only), `licenses/` and
+`<tree>/{git,python,uv,ripgrep,agent-browser,computer-use}`. `inventory.json`
+is `{schema, files, symlinks}`; `inventory_sha256` is the sha256 of its exact
+bytes and `<tree>` is the first 12 hex of that digest. The tree is never rewritten: a new version
+is a new folder name. `scripts/work-tools.py` builds it from the pins in
+`resources/work-tools/<target>/pins.json`; see
+[development](development.md#bundled-work-tools).
+
+- **macOS:** two trees in the universal app, one per architecture, under
+  `Contents/Resources/work-tools/`. Their Mach-O files are signed in place
+  before the app is signed and notarized.
+- **Windows:** NSIS installs the tree per user in
+  `%LOCALAPPDATA%\Terminus\work-tools\<target>\<tree>\`. The build fails if a
+  path would pass `MAX_PATH` under a 32-character profile name. The engine
+  removes older sibling trees once nothing uses them; a real uninstall runs
+  `RMDir /r` on `work-tools`.
+- **Linux AppImage:** the resources travel in `usr/share/Terminus/` (with a
+  copy of `lenguas/`), where linuxdeploy neither deploys dependencies nor
+  patches an ELF. The mount changes on every start, so the window copies
+  every resource (`lenguas/` and `work-tools/`) to
+  `<root>/resource-versions/<key>/` and passes that as `--resource-dir`. `<key>`
+  is the sha256 of `resources-inventory.json`, the build-time inventory of all
+  resources. The copy checks every byte once, keeps relative symlinks and
+  executable bits, and ends by writing `ready` (its content is the key). Later
+  starts only read that marker. `selection.json` there keeps the current and
+  the previous key; any other copy is removed only when no engine holds a
+  shared lock on its `ready` file. Copies from 0.2.89 and earlier have no
+  `ready` and are left alone.
 
 A release build uses the identity `ai.danil.terminus` and passes
 `--production-identity`. Its data root is the one 0.2.74 used,
@@ -143,7 +177,7 @@ identity except `ai.danil.terminus`). Then everything lives under one root:
 | Path under `<local data>/ai.danil.seldon.dev/` (or `TERMINUS_LAB_ROOT`) | What it is |
 |---|---|
 | `engine/` | the engine's `--data-dir` (its log is `engine/host.log`) |
-| `resources/` | inside an AppImage, the copy of the bundled resources |
+| `resource-versions/` | inside an AppImage, one verified copy of the bundled resources per build (`resources/` for builds without `resources-inventory.json`) |
 | `window/` | the window's `window_data` (log and webview storage) |
 | `selection.json` | the selection the window builds |
 | `engine-launch.log` | the engine's stdout and stderr when the window starts it, plus one line per launch: on Windows, whether the window and the engine are in a Job Object and whether breakaway was accepted |

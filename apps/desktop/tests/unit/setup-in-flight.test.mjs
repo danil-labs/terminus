@@ -9,8 +9,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { boot, sleep } from "../helpers/jsdom-app.mjs";
 
-const ETAPAS = ["platform", "git", "node", "pnpm", "bun", "agent-browser"];
-const ESENCIALES = ["platform", "git", "node"];
+const ETAPAS = ["platform", "work-tools"];
 
 const respuestas = (prepare_runtime) => ({
   setup_required: true,
@@ -23,18 +22,17 @@ const acciones = (app) => [...app.w.document.querySelectorAll("main > footer but
 const estado = (app) => app.w.document.querySelector('main [role="status"]')?.textContent;
 
 test("la ventana que llega con una preparación en curso ofrece cómo seguir cuando esta termina", async () => {
-  const hechas = new Set(["platform", "git"]);
+  const hechas = new Set(["platform"]);
   const app = await boot("listo", "preparacion-en-curso", respuestas({
     stages: ETAPAS.map((name) => ({
       name,
-      essential: ESENCIALES.includes(name),
-      state: hechas.has(name) ? "succeeded" : name === "node" ? "running" : "waiting",
+      essential: true,
+      state: hechas.has(name) ? "succeeded" : "running",
     })),
     running: true,
   }));
   assert.ok(app.comandos.includes("prepare_runtime"), "la ventana pidió preparar");
   for (const name of ETAPAS.filter((n) => !hechas.has(n))) {
-    if (name !== "node") app.emit("bootstrap-run", { type: "stage", name, state: "running" });
     app.emit("bootstrap-run", { type: "stage", name, state: "succeeded", durationMs: 1 });
   }
   await sleep(100);

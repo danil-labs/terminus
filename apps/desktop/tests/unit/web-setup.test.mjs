@@ -28,7 +28,7 @@ test("the app opens at once, never the installer nor a preparation screen", asyn
     return new Response(JSON.stringify([{ computer_id: "cmp_a", name: "Casa", state: "online" }]), { status: 200 });
   };
   engine.setup_required = true;
-  engine.prepare_runtime = { running: true, stages: [{ name: "node", essential: true, state: "running" }] };
+  engine.prepare_runtime = { running: true, stages: [{ name: "platform", essential: true, state: "succeeded" }, { name: "work-tools", essential: true, state: "running" }] };
 
   let w;
   const app = await boot("listo", "web-setup", {}, undefined, { "sb-supabase-auth-token": session }, {
@@ -45,7 +45,7 @@ test("the app opens at once, never the installer nor a preparation screen", asyn
     assert.equal(fake.sockets.length, 1, "the only computer opens");
     assert.ok(text().includes("Tarea t1"), "the app is already there");
     assert.ok(!/Preparando tu computadora|Conectando con tu computadora|Connecting to your computer/.test(text()), "no waiting screen");
-    assert.ok(!text().includes("Preparemos tu entorno"), "never the installer");
+    assert.ok(!text().includes("Preparando Terminus"), "never the installer");
     assert.ok(!fake.calls.some((c) => ["check_environment", "prepare_runtime", "setup_required"].includes(c.command)), "nor its checks");
     assert.deepEqual(app.fallos, []);
   } finally {

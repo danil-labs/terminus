@@ -141,6 +141,44 @@ its contract from those bytes, so it refuses the pinned engine until a
 the `contract` guard requires the pending contract to be named in
 `MOTOR_PENDIENTE`, and `publish.yml` refuses to publish.
 
+## Bundled work tools
+
+Git, Python with the document libraries, uv, ripgrep, agent-browser and Cua
+ship prepared inside the app; nothing is extracted or installed at first
+launch. The pins are `resources/work-tools/<target>/pins.json` and
+`documents-requirements.txt` (every wheel with its hash). draw.io is a plugin,
+not part of this base.
+
+```sh
+python3 scripts/work-tools.py prepare --target x86_64-unknown-linux-gnu --download
+python3 scripts/work-tools-smoke.py build/work-tools/x86_64-unknown-linux-gnu
+python3 tests/release/work-tools.test.py
+```
+
+`prepare` downloads into `build/work-tools/.payloads/`, extracts every archive
+into one tree, installs the wheels with the pinned uv (`--target`
+`--python-platform`, so the x86_64 macOS tree builds on Apple silicon without
+Rosetta), drops the packages' `tests/`, precompiles bytecode with
+`--invalidation-mode unchecked-hash`, adds `EXTERNALLY-MANAGED` and the
+`python` alias, and writes `inventory.json` and `manifest.json`. Building a
+macOS tree off macOS needs `--cross` and skips Cua's signature check; it is
+never used for packaging. `--tauri-config` writes the overlay `publish.yml`
+passes to `tauri build`: Tauri's `resources` copy the target of every symlink,
+so macOS and the AppImage use `bundle.macOS.files` and
+`bundle.linux.appimage.files`, which keep them. The AppImage carries them in
+`usr/share/Terminus/`: linuxdeploy walks `usr/lib` and would copy every
+library the tools link into the image. Windows trees have no symlinks
+and use `resources`.
+
+`work-tools-smoke.py` runs the tree in place with a `PATH` without node, npm,
+pnpm, bun, python or git and without `PYTHONPYCACHEPREFIX`, then checks the
+tree still matches its inventory. `work-tools-runtime-smoke.py` does the same
+through a packaged engine; it needs an engine that reads schema 2.
+
+WebView2 on Windows comes from `bundle.windows.webviewInstallMode` in
+`src-tauri/tauri.windows.conf.json` (`embedBootstrapper`: about 2 MB, still
+needs a network on a Windows 10 without WebView2).
+
 ## Releases
 
 Maintainers publish with a version tag:
