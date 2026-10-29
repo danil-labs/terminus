@@ -4,7 +4,7 @@ import Monitor from "lucide-solid/icons/monitor";
 import Plus from "lucide-solid/icons/plus";
 import SquarePen from "lucide-solid/icons/square-pen";
 import X from "lucide-solid/icons/x";
-import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from "solid-js";
 import { t } from "../../lib/i18n";
 import type { AgentProfile } from "../../lib/model";
 import { ariaDeAtajo, flechaDeLista, textoDeAtajo } from "../../lib/shortcuts";
@@ -161,46 +161,9 @@ export default function TabStrip(props: {
     if (el.scrollLeft !== before) e.preventDefault();
   }
 
-  // La barra nativa ocuparía alto bajo las pestañas; esta flota encima.
-  // Vive dentro del contenedor que se desplaza, así que su left suma el scrollLeft.
-  const [thumb, setThumb] = createSignal<{ left: number; width: number } | null>(null);
-  function measure() {
-    if (!strip || strip.scrollWidth <= strip.clientWidth) return setThumb(null);
-    const ratio = strip.clientWidth / strip.scrollWidth;
-    setThumb({ left: strip.scrollLeft * (1 + ratio), width: strip.clientWidth * ratio });
-  }
+  // Sin barra de desplazamiento: las pestañas se recorren con la rueda o el trackpad.
   function scrolled() {
     if (strip) scrollBySite.set(site(), strip.scrollLeft);
-    measure();
-  }
-  createEffect(on(() => props.tabs.length, () => queueMicrotask(measure)));
-  onMount(() => {
-    // ResizeObserver puede faltar en el entorno que monta el guarda mount-frontend.
-    if (!strip || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(measure);
-    observer.observe(strip);
-    onCleanup(() => observer.disconnect());
-  });
-  function dragThumb(e: PointerEvent) {
-    if (!strip) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const handle = e.currentTarget as HTMLElement;
-    handle.setPointerCapture(e.pointerId);
-    const startX = e.clientX;
-    const startLeft = strip.scrollLeft;
-    const scale = strip.scrollWidth / strip.clientWidth;
-    const move = (ev: PointerEvent) => {
-      if (strip) strip.scrollLeft = startLeft + (ev.clientX - startX) * scale;
-    };
-    const end = () => {
-      handle.removeEventListener("pointermove", move);
-      handle.removeEventListener("pointerup", end);
-      handle.removeEventListener("pointercancel", end);
-    };
-    handle.addEventListener("pointermove", move);
-    handle.addEventListener("pointerup", end);
-    handle.addEventListener("pointercancel", end);
   }
 
   const [selected, setSelectedTab] = createSignal<string | null>(null);
@@ -497,16 +460,6 @@ export default function TabStrip(props: {
       <div data-preview-header="" class="ml-2 flex shrink-0 items-end self-stretch border-l border-border pl-2">
         <For each={previewTabs()}>{(p, i) => renderTab(p, () => keptTabs().length + i())}</For>
       </div>
-      </Show>
-      <Show when={thumb()}>
-        {(bar) => (
-          <div
-            aria-hidden="true"
-            onPointerDown={dragThumb}
-            class="absolute bottom-0 h-1 rounded-full bg-[var(--scrollbar-thumb)] opacity-0 transition-opacity group-hover/strip:opacity-100 hover:bg-[var(--scrollbar-thumb-hover)]"
-            style={{ left: `${bar().left}px`, width: `${bar().width}px` }}
-          />
-        )}
       </Show>
     </ContextMenuTrigger>
     <ContextMenuContent>

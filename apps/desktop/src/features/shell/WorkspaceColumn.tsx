@@ -133,7 +133,7 @@ export default function WorkspaceColumn(props: {
             type="button"
             data-workspace-tile={p.w.id}
             data-attention={state() ?? undefined}
-            class={cn("marca-seleccion group relative grid h-12 w-full shrink-0 touch-none place-items-center outline-none select-none", reorder.source() === p.w.id && "cursor-grabbing opacity-40")}
+            class={cn("marca-seleccion group relative grid h-10 w-full shrink-0 touch-none place-items-center outline-none select-none", reorder.source() === p.w.id && "cursor-grabbing opacity-40")}
             aria-current={active() ? "true" : undefined}
             aria-label={label()}
             onPointerDown={(e: PointerEvent) => reorder.start(p.w.id, e)}
@@ -155,7 +155,7 @@ export default function WorkspaceColumn(props: {
             <span
               aria-hidden="true"
               class={cn(
-                "relative grid size-10 place-items-center rounded-lg border text-[0.875rem] font-semibold group-focus-visible:outline-solid group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-primary",
+                "relative grid size-8 place-items-center rounded-md border text-[0.75rem] font-semibold group-focus-visible:outline-solid group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-primary",
                 active()
                   ? "border-border-strong bg-surface-raised text-neutral-950"
                   : "border-border bg-surface text-neutral-700 group-hover:bg-neutral-200 group-hover:text-neutral-950",
@@ -269,13 +269,13 @@ export default function WorkspaceColumn(props: {
           as="button"
           type="button"
           data-other-workspace-tile={p.w.id}
-          class={cn("group relative grid h-12 w-full shrink-0 place-items-center outline-none select-none", !p.account.signedIn && "opacity-50")}
+          class={cn("group relative grid h-10 w-full shrink-0 place-items-center outline-none select-none", !p.account.signedIn && "opacity-50")}
           aria-label={label()}
           onClick={() => (p.account.signedIn ? accounts?.open(p.w.id) : accounts?.add(p.account.email))}
         >
           <span
             aria-hidden="true"
-            class="relative grid size-10 place-items-center rounded-lg border border-border bg-surface text-[0.875rem] font-semibold text-neutral-700 group-hover:bg-neutral-200 group-hover:text-neutral-950 group-focus-visible:outline-solid group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-primary"
+            class="relative grid size-8 place-items-center rounded-md border border-border bg-surface text-[0.75rem] font-semibold text-neutral-700 group-hover:bg-neutral-200 group-hover:text-neutral-950 group-focus-visible:outline-solid group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-primary"
           >
             <span class="absolute inset-0 overflow-hidden rounded-[inherit]">
               <span class="relative grid size-full place-items-center">
@@ -294,7 +294,7 @@ export default function WorkspaceColumn(props: {
     <nav
       aria-label={t("shell.workspaces.label")}
       data-workspace-column=""
-      class="glass-panel flex h-full w-16 shrink-0 flex-col border-r border-border"
+      class="glass-panel flex h-full w-12 shrink-0 flex-col border-r border-border"
     >
       <div ref={list} class="flex min-h-0 flex-1 flex-col items-center gap-1 overflow-x-hidden overflow-y-auto pt-2 pb-2">
         <Show when={accounts && others().length > 0}>
@@ -303,7 +303,7 @@ export default function WorkspaceColumn(props: {
         <KeyedList each={ws.lista() ?? []} by={w => w.id}>{w => <Tile w={w()} />}</KeyedList>
         <button
           type="button"
-          class="mt-1 grid size-10 shrink-0 place-items-center rounded-lg border border-dashed border-neutral-500 text-neutral-500 outline-none hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          class="mt-1 grid size-8 shrink-0 place-items-center rounded-md border border-dashed border-neutral-500 text-neutral-500 outline-none hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           aria-label={t("shell.workspaces.new")}
           title={t("shell.workspaces.new")}
           onClick={() => window.dispatchEvent(new CustomEvent("harness:new-workspace"))}
@@ -330,7 +330,7 @@ function ColumnFoot(props: {
   onSettings: (panel?: string) => void;
   onReportarBug: () => void;
 }) {
-  const boton = "grid size-9 shrink-0 place-items-center rounded-lg text-neutral-500 outline-none hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+  const boton = "grid size-8 shrink-0 place-items-center rounded-md text-neutral-500 outline-none hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
   // Leer `props.tools` dos veces montaría dos copias, y cada una consulta por su cuenta.
   const tools = children(() => props.tools);
   return (

@@ -371,14 +371,24 @@ export default function PuertosAbiertos(props: {
             {...p}
             class={cn(
               "flex shrink-0 items-center text-neutral-500 outline-none transition-colors hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary data-[expanded]:bg-surface-muted",
-              props.vertical ? "w-12 flex-col gap-0.5 rounded-lg py-1.5 text-[0.625rem]" : "gap-1 rounded-sm px-1.5 py-0.5",
+              props.vertical ? "relative size-8 justify-center rounded-md" : "gap-1 rounded-sm px-1.5 py-0.5",
             )}
             aria-label={`${t("shell.ports.aria", { mine: mios(), external: externos() })} · ${t("shell.ports.aria_processes", { processes: processes() })}`}
           >
             <Plug size={props.vertical ? 16 : 12} class={hot() ? "text-warning-strong" : ""} aria-hidden />
-            <span class={cn("font-mono tabular-nums", hot() && "text-warning-strong")}>
-              {mios() + processes()}
-            </span>
+            {/* En la columna la cifra no cabe al lado: un punto dice que hay algo abierto. */}
+            <Show
+              when={!props.vertical}
+              fallback={
+                <Show when={mios() + processes() > 0}>
+                  <span aria-hidden="true" class={cn("absolute top-1 right-1 size-1.5 rounded-full", hot() ? "bg-warning" : "bg-success")} />
+                </Show>
+              }
+            >
+              <span class={cn("font-mono tabular-nums", hot() && "text-warning-strong")}>
+                {mios() + processes()}
+              </span>
+            </Show>
           </button>
         )}
       />

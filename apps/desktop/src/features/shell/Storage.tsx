@@ -778,7 +778,7 @@ export default function Almacenamiento(props: {
             {...p}
             class={cn(
               "flex shrink-0 items-center text-neutral-500 outline-none transition-colors hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary data-[expanded]:bg-surface-muted",
-              props.vertical ? "w-12 flex-col gap-0.5 rounded-lg py-1.5 text-[0.625rem]" : "gap-1 rounded-sm px-1.5 py-0.5",
+              props.vertical ? "size-8 justify-center rounded-md" : "gap-1 rounded-sm px-1.5 py-0.5",
             )}
             aria-label={t("shell.storage.title")}
             title={t("shell.storage.title")}

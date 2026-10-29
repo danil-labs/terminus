@@ -43,13 +43,13 @@ export default function ProfileMenu(props: {
 
   return (
     <Popover open={open()} onOpenChange={setOpen} placement="right-end" gutter={8}>
-      <PopoverAnchor class="relative grid size-9 place-items-center" data-profile-menu="">
+      <PopoverAnchor class="relative grid size-8 place-items-center" data-profile-menu="">
         <Show
           when={cuenta()}
           fallback={
             <button
               type="button"
-              class="grid size-9 place-items-center rounded-lg text-neutral-500 outline-none hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary"
+              class="grid size-8 place-items-center rounded-md text-neutral-500 outline-none hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary"
               aria-label={t("shell.profile.menu")}
               title={t("shell.profile.menu")}
               aria-expanded={open()}

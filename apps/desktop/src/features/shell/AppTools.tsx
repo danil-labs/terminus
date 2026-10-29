@@ -47,7 +47,7 @@ export default function AppTools(props: {
     <div class="flex shrink-0 flex-col items-center gap-1 text-xs" data-app-tools="">
       <Show when={observability()}>
         <button
-          class="grid size-9 shrink-0 place-items-center rounded-lg text-neutral-500 outline-none hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          class="grid size-8 shrink-0 place-items-center rounded-md text-neutral-500 outline-none hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           aria-label={t("observability.tab")}
           title={t("observability.tab")}
           onClick={props.onObservability}

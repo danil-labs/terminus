@@ -598,7 +598,8 @@ export default function Sidebar(props: {
       /></LazyPart>}</Show>
       <SidebarShell
         state={props.collapsed ? "collapsed" : "expanded"}
-        class="h-full w-full min-w-0"
+        // Sin cabecera ni pie: la lista se estira y Agentes queda pegado al fondo.
+        class="h-full w-full min-w-0 grid-rows-[minmax(0,1fr)_auto]"
         aria-label={t("shell.sidebar.label")}
       >
         {/* Sin cabecera, el pie cae en la fila `1fr` de las tres que reparte
@@ -692,9 +693,6 @@ export default function Sidebar(props: {
           </Show>
         </SidebarContent>
 
-        {/* El de MCP es chico a propósito: es una consulta de un vistazo, del
-            peso del botón que oculta el historial. «Archivadas» va primero: abre
-            una página, no levanta un panel. */}
         <Show when={!props.collapsed && agentesDelDock().length > 0}>
           <Suspense>
             <AgentDock

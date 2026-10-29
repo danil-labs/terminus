@@ -8391,7 +8391,7 @@ export default function App() {
               <Button
                 variant={viendoArchivadas() ? "secondary" : "ghost"}
                 size="icon"
-                class="size-9 shrink-0 rounded-lg text-neutral-500"
+                class="size-8 shrink-0 rounded-md text-neutral-500"
                 data-archived-foot=""
                 aria-pressed={viendoArchivadas()}
                 aria-label={t("spaces.archived.title")}
@@ -8401,7 +8401,7 @@ export default function App() {
                 <Archive size={17} aria-hidden="true" />
               </Button>
             </Show>
-            <ConexionesMenu triggerClass="size-9 rounded-lg" onManage={() => setSettings("skills")} />
+            <ConexionesMenu triggerClass="size-8 rounded-md" onManage={() => setSettings("skills")} />
             <AppTools
               workspace={workspaceActivo()}
               busy={busy()}
