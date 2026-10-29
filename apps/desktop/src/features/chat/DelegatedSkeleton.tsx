@@ -5,7 +5,7 @@ import { Spinner } from "../../ui/Spinner";
 /**
  * Las delegadas que todavía no llegaron, con la forma de la tarjeta del riel.
  *
- * **Sustituye al «Leyendo tareas…».** Tres tarjetas de su misma medida (52px,
+ * Sustituye al «Leyendo tareas…». Tres tarjetas de su misma medida (52px,
  * esquinas de 10px) con dos barras donde irán el título y la línea de abajo, y
  * el giro lento en la ranura del estado. Con `prefers-reduced-motion` se quedan
  * quietas: las barras siguen diciendo que viene algo.

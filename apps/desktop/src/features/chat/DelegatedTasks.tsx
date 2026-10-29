@@ -35,8 +35,7 @@ export function delegatedFamilies(rows: SessionRow[]): Map<string, string[]> {
 /**
  * Las delegadas con la tarjeta del riel (`taskCard`): estado y título; proveedor, máquina, agente y PR.
  *
- * **Sin carpeta**: viven en la de su madre, así que repetirla en cada fila no dice nada.
- * Por eso no se pasa `carpetaDe` (aunque la traiga la lista) y se pide `hideFolder`.
+ * Sin carpeta: viven en la de su madre. No se pasa `carpetaDe` (aunque la traiga la lista) y se pide `hideFolder`.
  */
 export function DelegatedTaskList(props: {
   rows: SessionRow[];
