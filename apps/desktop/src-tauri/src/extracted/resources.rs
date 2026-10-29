@@ -181,6 +181,14 @@ fn lock_versions(root: &Path) -> io::Result<File> {
     }
 }
 
+/// Un `ready` sin candado exclusivo posible es de un motor vivo: esa carpeta se queda.
+fn unlocked(dir: &Path) -> bool {
+    match File::open(dir.join(READY)) {
+        Ok(marker) => marker.try_lock().is_ok(),
+        Err(_) => true,
+    }
+}
+
 /// Se quedan la versión actual y la anterior. Las demás se borran solo si nadie tiene
 /// el candado compartido de su `ready`; las copias viejas sin `ready` no se tocan.
 fn collect(versions: &Path, selection: &Selection) {
@@ -191,7 +199,10 @@ fn collect(versions: &Path, selection: &Selection) {
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().into_owned();
         if name.starts_with(".resources-") {
-            let _ = fs::remove_dir_all(&path);
+            // Una copia apartada por daño puede seguir en uso por el motor que la marcó.
+            if unlocked(&path) {
+                let _ = fs::remove_dir_all(&path);
+            }
             continue;
         }
         if !path.is_dir()
@@ -241,7 +252,7 @@ pub(super) fn materialize(source: &Path, root: &Path) -> io::Result<PathBuf> {
         let inventory: Inventory =
             serde_json::from_slice(&raw).map_err(|_| invalid("resource_inventory"))?;
         if target.exists() {
-            // Sin marca la copia quedó a medias; lo que tenga abierto un archivo lo sigue leyendo.
+            // Sin marca la copia quedó a medias; con otra marca el motor la declaró dañada.
             let aside = versions.join(format!(".resources-{}", uuid::Uuid::new_v4()));
             fs::rename(&target, aside)?;
         }
@@ -417,6 +428,50 @@ mod tests {
         let mut previous = String::new();
         open.read_to_string(&mut previous)?;
         assert_eq!(previous, "valid");
+        Ok(())
+    }
+
+    #[test]
+    fn a_copy_marked_damaged_is_replaced_and_kept_while_locked() -> io::Result<()> {
+        let lab = tempfile::tempdir()?;
+        let source = lab.path().join("mount");
+        resources(&source, &[("work-tools/a", b"good", 0o644)], &[]);
+        let root = lab.path().join("private");
+        let copy = materialize(&source, &root)?;
+        // Así la marca el motor al reparar: trunca y escribe sobre el descriptor con candado.
+        let mut engine = File::options().write(true).open(copy.join(READY))?;
+        engine.lock_shared()?;
+        fs::write(copy.join("work-tools/a"), b"evil")?;
+        engine.set_len(0)?;
+        engine.write_all(b"damaged\n")?;
+        let versions = root.join("resource-versions");
+        let aside = |versions: &Path| -> io::Result<Vec<PathBuf>> {
+            Ok(fs::read_dir(versions)?
+                .flatten()
+                .map(|e| e.path())
+                .filter(|p| {
+                    p.file_name()
+                        .is_some_and(|n| n.to_string_lossy().starts_with(".resources-"))
+                })
+                .collect())
+        };
+        let repaired = materialize(&source, &root)?;
+        assert_eq!(repaired, copy);
+        assert_eq!(fs::read(repaired.join("work-tools/a"))?, b"good");
+        let set_aside = aside(&versions)?;
+        assert_eq!(set_aside.len(), 1, "the damaged copy is set aside");
+        assert_eq!(fs::read(set_aside[0].join("work-tools/a"))?, b"evil");
+        materialize(&source, &root)?;
+        assert!(
+            set_aside[0].is_dir(),
+            "a locked copy survives the collection"
+        );
+        drop(engine);
+        materialize(&source, &root)?;
+        assert!(
+            aside(&versions)?.is_empty(),
+            "an unlocked copy is collected"
+        );
         Ok(())
     }
 }
