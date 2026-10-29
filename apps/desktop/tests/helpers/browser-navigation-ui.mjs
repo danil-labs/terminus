@@ -44,11 +44,10 @@ const app = await boot("listo", "browser-navigation", {
 const prepare = await waitFor(() => button(app, "Preparar navegación"));
 assert.ok(!app.comandos.includes("install_tool"), "Abrir ajustes no instala Chrome");
 await waitFor(() => app.w.document.body.textContent.includes("Importación pendiente"));
-const npm = [...app.w.document.querySelectorAll("tr")].find(row => row.textContent.includes("npm"));
-assert.ok(npm, "npm opcional sigue disponible sin bootstrap");
-npm.querySelector("button").click();
-await waitFor(() => calls.includes("node"));
+// Node y npm son de quien usa la computadora: ni se listan ni se ofrecen.
+assert.equal([...app.w.document.querySelectorAll("tr")].some(row => /\b(npm|node)\b/.test(row.textContent)), false);
 assert.equal(app.comandos.includes("install_tool"), false);
+assert.equal(app.comandos.includes("install_base_tool"), false);
 calls.length = 0;
 prepare.click();
 await waitFor(() => rejectInstall);
@@ -79,7 +78,6 @@ chromeNeedsUpdate = true;
 (await waitFor(() => button(app, "General"))).click();
 (await waitFor(() => button(app, "Estado del entorno"))).click();
 await waitFor(() => button(app, "Actualizar"));
-assert.ok(app.w.document.body.textContent.includes("Actualización pendiente"));
 assert.equal(app.comandos.filter(c => c === "install_tool").length, 4, "Reabrir el inventario no instala Chrome");
 assert.equal(app.comandos.includes("install_provider"), false);
 assert.deepEqual(app.fallos, []);
