@@ -147,10 +147,12 @@ export default function ArbolDeArchivos(props: {
   // La lista de archivos va por `crearLector` (`treeLoader.ts`): una a la vez,
   // reintentos solos tras un fallo del transporte y lo último bueno en pantalla
   // mientras tanto. El estado local y el resumen salen detrás de cada lista buena.
-  const leerArchivos = (): Promise<Archivos> =>
-    props.preview
-      ? invoke<Archivos>("preview_tree_files", { project: props.project, baseRef: props.preview.baseRef })
-      : invoke<Archivos>("tree_files", { project: props.project, session: props.session, tree: props.arbol }, machineOf(props.session));
+  function leerArchivos() {
+    if (props.preview) {
+      return invoke<Archivos>("preview_tree_files", { project: props.project, baseRef: props.preview.baseRef });
+    }
+    return invoke<Archivos>("tree_files", { project: props.project, session: props.session, tree: props.arbol }, machineOf(props.session));
+  }
 
   async function aplicarArchivos(f: Archivos) {
     const turno = ++lectura;
