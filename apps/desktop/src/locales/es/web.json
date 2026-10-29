@@ -220,5 +220,12 @@
   "web.alpha.send_reply": "Enviar respuesta",
   "web.alpha.send_unavailable": "Enviar no está disponible en este alfa: el Inbox es de solo lectura.",
   "web.alpha.ai_on_short": "Activa",
-  "web.alpha.ai_paused_short": "En pausa"
+  "web.alpha.ai_paused_short": "En pausa",
+  "web.alpha.search_label": "Buscar conversaciones",
+  "web.alpha.search_placeholder": "Buscar",
+  "web.alpha.search_empty": "No encontramos conversaciones para “{query}”.",
+  "web.alpha.channel_filter": "Filtrar por canal",
+  "web.alpha.all_channels": "Todos los canales",
+  "web.alpha.channel_empty": "No hay conversaciones de {channel} entre las cargadas.",
+  "web.alpha.filter_loaded_only": "La búsqueda y el canal miran solo las conversaciones cargadas. Carga más para ampliar."
 }
