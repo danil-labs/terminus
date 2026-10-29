@@ -1,6 +1,7 @@
 import GitBranch from "lucide-solid/icons/git-branch";
 import { t } from "../../lib/i18n";
-import ArbolDeArchivos, { type Tipo } from "./FileTree";
+import type { Tipo } from "./FileTree";
+import ArbolDeArchivos from "./FileTreeLazy";
 
 /**
  * La carpeta del proyecto antes de que la tarea exista: el commit del que
