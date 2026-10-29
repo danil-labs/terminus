@@ -189,6 +189,7 @@
   "settings.appearance.background.not_imported": "That file is not a background imported on this computer.",
   "settings.appearance.background.workspace_missing": "That workspace no longer exists on this computer; the background was not saved.",
   "settings.appearance.background.dusk": "Default",
+  "settings.appearance.background.neutro": "Neutral",
   "settings.appearance.background.propia": "Custom background",
   "settings.appearance.background.pick": "Upload image",
   "settings.appearance.background.change": "Change image",

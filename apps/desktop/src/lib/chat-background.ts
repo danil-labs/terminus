@@ -1,9 +1,9 @@
 /**
- * Fondos que la app trae para los chats. Son dos: el atardecer, que se
- * enseña como «Por defecto», y la imagen propia. Lo guardado antes cae al
- * atardecer: ningún fondo anterior deja de pintarse al actualizar.
+ * Fondos que la app trae para los chats: el atardecer, que se enseña como
+ * «Por defecto», el neutro sin imagen y la imagen propia. Lo guardado antes
+ * cae al atardecer: ningún fondo anterior deja de pintarse al actualizar.
  */
-export const FONDOS = ["dusk", "propia"] as const;
+export const FONDOS = ["dusk", "neutro", "propia"] as const;
 export type FondoDeChat = (typeof FONDOS)[number];
 
 /** El mismo velo que el fondo de un agente, para que el texto siga leyéndose. */

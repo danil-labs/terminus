@@ -7468,16 +7468,20 @@ export default function App() {
   const imagenDeVentana = () =>
     fondoDelAgente()?.url ?? (fondoDeChat() === "propia" ? (imagenDelWorkspace() ?? fondoPropioUrl()) : null) ?? null;
   const veloDeVentana = () => (fondoDelAgente() ? (fondoDelAgente()?.veil ?? VELO_DE_FONDO) : veloDeFondo());
+  // Neutro: sin imagen ni velo, solo el `bg-surface` de la raíz.
+  const sinFondo = () => !fondoDelAgente() && fondoDeChat() === "neutro";
   const FondoDeVentana = () => (
     <Show
       when={imagenDeVentana()}
       fallback={
+        <Show when={!sinFondo()}>
         <div class={cn("pointer-events-none absolute inset-0", claseDeFondo("dusk"))} aria-hidden="true">
           <div
             class="absolute inset-0 bg-surface"
             style={{ opacity: String(veloDeVentana()) }}
           />
         </div>
+        </Show>
       }
     >
       {(url) => (
@@ -8156,7 +8160,7 @@ export default function App() {
       class="relative isolate flex h-full flex-col overflow-hidden bg-surface"
       // `.tab-active` repite este fondo dentro de la pestaña para fundirse con su panel.
       style={{
-        "--window-image": imagenDeVentana() ? `url("${imagenDeVentana()}")` : undefined,
+        "--window-image": imagenDeVentana() ? `url("${imagenDeVentana()}")` : sinFondo() ? "none" : undefined,
         "--window-veil": String(veloDeVentana()),
       }}
     >

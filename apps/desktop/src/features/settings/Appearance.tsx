@@ -325,7 +325,7 @@ export default function Appearance(props: { proyecto: string }) {
                             "absolute inset-0",
                             id === "propia"
                               ? "grid place-items-center bg-surface-muted text-neutral-500"
-                              : claseDeFondo(id),
+                              : (claseDeFondo(id) ?? "bg-surface"),
                           )}
                           aria-hidden="true"
                         >

@@ -189,6 +189,7 @@
   "settings.appearance.background.not_imported": "Ese archivo no es un fondo importado en esta computadora.",
   "settings.appearance.background.workspace_missing": "Ese workspace ya no existe en esta computadora; el fondo no se guardó.",
   "settings.appearance.background.dusk": "Por defecto",
+  "settings.appearance.background.neutro": "Neutro",
   "settings.appearance.background.propia": "Fondo propio",
   "settings.appearance.background.pick": "Subir imagen",
   "settings.appearance.background.change": "Cambiar imagen",
