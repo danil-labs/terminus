@@ -13,15 +13,18 @@ export function anchorOf(scroller: Element): ScrollAnchor {
   const { left, top, width, height } = scroller.getBoundingClientRect();
   const element = document.elementFromPoint(left + width / 2, top + height / 2);
   if (!element || !scroller.contains(element)) return null;
-  const row = element.closest('[id^="chat-row:"]') ?? element;
+  const nearest = element.closest('[id^="chat-row:"]');
+  const row = nearest && scroller.contains(nearest) ? nearest : element;
   return { element: row, top: row.getBoundingClientRect().top, ...(row.id ? { id: row.id } : {}) };
 }
 
 /** Devuelve el ancla a su sitio; la dirección del desplazamiento depende de si la lista está invertida. */
 export function restoreAnchor(scroller: Element, anchor: ScrollAnchor, inverted = true): boolean {
   if (!anchor) return false;
-  const element = anchor.element.isConnected ? anchor.element : anchor.id && typeof document !== "undefined" ? document.getElementById(anchor.id) : null;
-  if (!element) return false;
+  const element = anchor.element.isConnected && scroller.contains(anchor.element)
+    ? anchor.element
+    : anchor.id ? [...scroller.querySelectorAll("[id]")].find((row) => row.id === anchor.id) : null;
+  if (!element || !scroller.contains(element)) return false;
   const moved = element.getBoundingClientRect().top - anchor.top;
   if (Math.abs(moved) >= 1) scroller.scrollTop += inverted ? -moved : moved;
   return Math.abs(element.getBoundingClientRect().top - anchor.top) < 1;

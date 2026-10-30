@@ -11,7 +11,7 @@ import { restoreAnchor } from "../src/lib/scrollAnchor.ts";
 /** Un hilo invertido: subir `scrollTop` baja lo que se ve. `pushed` es lo que creció por abajo. */
 const thread = (scrollTop: number) => {
   const state = { pushed: 0 };
-  const scroller = { scrollTop } as unknown as Element;
+  const scroller = { scrollTop, contains: () => true } as unknown as Element;
   const element = { isConnected: true, getBoundingClientRect: () => ({ top: scroller.scrollTop - state.pushed }) } as unknown as Element;
   return { state, scroller, element };
 };
@@ -36,7 +36,7 @@ test("un ancla que ya no está en el hilo no mueve nada", () => {
 
 
 test("chronological content keeps its visual anchor when older rows prepend or shrink", () => {
-  const scroller = { scrollTop: 500 } as unknown as Element;
+  const scroller = { scrollTop: 500, contains: () => true } as unknown as Element;
   let added = 0;
   const element = { isConnected: true, getBoundingClientRect: () => ({ top: added - scroller.scrollTop }) } as unknown as Element;
   const anchor = { element, top: -500 };
@@ -54,19 +54,18 @@ test("chronological content keeps its visual anchor when older rows prepend or s
 
 
 test("a virtualized row can remount before the anchor is restored", () => {
-  const before = Object.getOwnPropertyDescriptor(globalThis, "document");
-  const scroller = { scrollTop: 500 } as unknown as Element;
-  const old = { isConnected: false } as Element;
   let row: Element | null = null;
-  Object.defineProperty(globalThis, "document", { configurable: true, value: { getElementById: (id: string) => id === "chat-row:qa" ? row : null } });
-  try {
-    const anchor = { element: old, top: -500, id: "chat-row:qa" };
-    assert.equal(restoreAnchor(scroller, anchor, false), false);
-    row = { isConnected: true, getBoundingClientRect: () => ({ top: 300 - scroller.scrollTop }) } as unknown as Element;
-    assert.equal(restoreAnchor(scroller, anchor, false), true);
-    assert.equal(scroller.scrollTop, 800);
-  } finally {
-    if (before) Object.defineProperty(globalThis, "document", before);
-    else Reflect.deleteProperty(globalThis, "document");
-  }
+  const scroller = { scrollTop: 500, contains: (candidate: Element) => candidate === row, querySelectorAll: () => row ? [row] : [] } as unknown as Element;
+  const anchor = { element: { isConnected: false } as Element, top: -500, id: "chat-row:qa" };
+  assert.equal(restoreAnchor(scroller, anchor, false), false);
+  row = { id: "chat-row:qa", isConnected: true, getBoundingClientRect: () => ({ top: 300 - scroller.scrollTop }) } as unknown as Element;
+  assert.equal(restoreAnchor(scroller, anchor, false), true);
+  assert.equal(scroller.scrollTop, 800);
+});
+
+test("an anchor from another scroller never moves this conversation", () => {
+  const foreign = { id: "chat-row:qa", isConnected: true, getBoundingClientRect: () => ({ top: 999 }) } as unknown as Element;
+  const scroller = { scrollTop: 500, contains: () => false, querySelectorAll: () => [foreign] } as unknown as Element;
+  assert.equal(restoreAnchor(scroller, { element: foreign, top: 100, id: foreign.id }, false), false);
+  assert.equal(scroller.scrollTop, 500);
 });

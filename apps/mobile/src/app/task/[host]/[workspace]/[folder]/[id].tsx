@@ -54,6 +54,7 @@ const REFRESH = new Set(["permission", "permission_resolved", "started", "done",
 /** Tras estos, lo que llegó en vivo ya está guardado: la lectura lo reemplaza (`liveAfterRead`). */
 const SAVED = new Set(["done", "segment_saved"]);
 const TAIL_PAGE_SIZE = 20;
+const PREPEND_RECOVERY_MS = 500;
 
 const sameLine = (a: Line, b: Line) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -99,7 +100,7 @@ export default function TaskScreen() {
   const [finding, setFinding] = useState<string | null>(null);
   const key = `${params.host}/${id}`;
   const needle = finding?.trim().toLowerCase() ?? "";
-  const webScope = `${key}\0${needle}`;
+  const webScope = JSON.stringify([params.host, workspace, folder, id, needle]);
   // Las que esta tarea lanzó: la lista las esconde bajo ella, como el riel del escritorio. Las hijas
   // remotas viven en otra máquina y nombran a esta por su `taskKey`.
   const delegated = useMemo(() => [
@@ -112,6 +113,17 @@ export default function TaskScreen() {
   const [jump, setJump] = useState<{ shown: boolean; unseen: number }>({ shown: false, unseen: 0 });
   const anchor = useRef<ScrollAnchor>(null);
   const prepending = useRef<ScrollAnchor>(null);
+  const prependTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const readingScope = useRef<string | null>(null);
+  const clearPrepending = () => {
+    if (prependTimer.current !== null) clearTimeout(prependTimer.current);
+    prependTimer.current = null;
+    prepending.current = null;
+  };
+  const resetReading = () => {
+    clearPrepending();
+    anchor.current = null;
+  };
   const webReady = useRef<string | null>(null);
   const [paintedScope, setPaintedScope] = useState<string | null>(null);
   const [webWindow, setWebWindow] = useState<{ scope: string; first: string | null }>({ scope: "", first: null });
@@ -129,7 +141,7 @@ export default function TaskScreen() {
     if (held) {
       if (restoreAnchor(node, held, false)) {
         anchor.current = held;
-        prepending.current = null;
+        clearPrepending();
       }
     } else restoreAnchor(node, anchor.current, false);
   };
@@ -344,7 +356,11 @@ export default function TaskScreen() {
       anchor.current = next.following ? null : anchorOf(node);
       const page = webSlice.current;
       if (webReady.current === page.scope && contentOffset.y < MARGIN && page.first > 0 && !prepending.current) {
-        prepending.current = anchorOf(node);
+        const held = anchorOf(node);
+        prepending.current = held;
+        if (held) prependTimer.current = setTimeout(() => {
+          if (prepending.current === held) resetReading();
+        }, PREPEND_RECOVERY_MS);
         setWebWindow({ scope: page.scope, first: page.rows[Math.max(0, page.first - TAIL_PAGE_SIZE)].key });
       }
     }
@@ -381,6 +397,11 @@ export default function TaskScreen() {
   const listed = useMemo(() => Platform.OS === "web" ? visible.slice(webStart) : [...visible].reverse(), [visible, webStart]);
   webSlice.current = { first: webStart, rows: visible, scope: webScope };
   useLayoutEffect(() => {
+    if (readingScope.current !== webScope) {
+      resetReading();
+      webReady.current = null;
+      readingScope.current = webScope;
+    }
     const node = scroller();
     if (!node || !view) return;
     if (webReady.current !== webScope) {
@@ -400,8 +421,15 @@ export default function TaskScreen() {
       if (prepending.current || !follow.current.following) restoreReading(node);
     });
     observer.observe(node, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["style"] });
-    return () => observer.disconnect();
-  }, [key]);
+    const intent = ["wheel", "touchstart", "pointerdown"] as const;
+    const interruptPrepend = () => { if (prepending.current) resetReading(); };
+    for (const event of intent) node.addEventListener(event, interruptPrepend, { passive: true });
+    return () => {
+      observer.disconnect();
+      for (const event of intent) node.removeEventListener(event, interruptPrepend);
+      resetReading();
+    };
+  }, [webScope]);
   const cached = cachedNote ? <Text style={[styles.banner, { color: theme.textMuted, backgroundColor: theme.muted }]}>{cachedNote}</Text> : undefined;
   const liveFooter = (
           <View style={styles.footer}>
@@ -467,7 +495,7 @@ export default function TaskScreen() {
         // Lo que cambia de alto por encima de lo que se lee (una imagen que carga, pasos que se abren) no lo mueve.
         maintainVisibleContentPosition={Platform.OS === "web" ? { minIndexForVisible: 0 } : { minIndexForVisible: 0, autoscrollToTopThreshold: MARGIN }}
         renderItem={({ item }) => Platform.OS === "web"
-          ? <View nativeID={`chat-row:${key}:${item.key}`}><Row line={item} theme={theme} onQuickReply={item.key === lastAgent && !running && !asleep ? quickReply : undefined} /></View>
+          ? <View nativeID={`chat-row:${encodeURIComponent(webScope)}:${item.key}`}><Row line={item} theme={theme} onQuickReply={item.key === lastAgent && !running && !asleep ? quickReply : undefined} /></View>
           : <Row line={item} theme={theme} onQuickReply={item.key === lastAgent && !running && !asleep ? quickReply : undefined} />}
         ListFooterComponent={Platform.OS === "web" ? liveFooter : cached}
         ListHeaderComponent={Platform.OS === "web" ? cached : liveFooter}
