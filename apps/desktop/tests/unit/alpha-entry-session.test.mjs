@@ -16,6 +16,9 @@ function world(overrides = {}) {
     workosUser: { id: "user_01ABC", email: "Prueba@danil.ai", email_verified: true, first_name: "Prueba", last_name: "Danil" },
     sessions: [{ id: "session_01ABC", user_id: "user_01ABC", status: "active", ended_at: null, expires_at: new Date(Date.now() + 3_600_000).toISOString() }],
     person: 42,
+    resolverMissing: false,
+    access: true,
+    accessRpcMissing: false,
     row: { id: 42, uuid, merged_into_user_id: null },
     login: { id: uuid, email: "prueba@danil.ai", banned_until: null },
     refreshes: 0,
@@ -42,7 +45,12 @@ function world(overrides = {}) {
     }
     if (url.origin === supabaseUrl) {
       assert.equal(request.headers.get("apikey"), "service");
-      if (url.pathname === "/rest/v1/rpc/resolve_login") return Response.json(state.person);
+      if (url.pathname === "/rest/v1/rpc/resolve_existing_terminus_login") return state.resolverMissing
+        ? Response.json({ code: "PGRST202" }, { status: 404 })
+        : Response.json(state.person);
+      if (url.pathname === "/rest/v1/rpc/user_can_access_terminus") return state.accessRpcMissing
+        ? Response.json({ code: "PGRST202" }, { status: 404 })
+        : Response.json(state.access);
       if (url.pathname === "/rest/v1/users") return Response.json(state.row ? [state.row] : []);
       if (url.pathname === `/auth/v1/admin/users/${uuid}`) return state.login ? Response.json(state.login) : Response.json({}, { status: 404 });
       const gotrue = (refresh) => Response.json({ access_token: `sb.${refresh}`, refresh_token: refresh, expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600,
@@ -108,6 +116,7 @@ test("start sends to WorkOS with PKCE and a sealed, host-only flow cookie", asyn
   assert.equal(location.searchParams.get("client_id"), "client_01TEST");
   assert.equal(location.searchParams.get("redirect_uri"), `${origin}/auth/workos/callback`);
   assert.equal(location.searchParams.get("provider"), "GoogleOAuth");
+  assert.equal(location.searchParams.get("screen_hint"), "sign-in");
   assert.equal(location.searchParams.get("code_challenge_method"), "S256");
   const cookie = response.headers.getSetCookie()[0];
   assert.match(cookie, /^__Host-danil_alfa_flow=v1\.[\w-]+\.[\w-]+; Path=\/; Max-Age=600; HttpOnly; Secure; SameSite=Lax$/);
@@ -126,7 +135,7 @@ test("callback opens a real Supabase session and the page only ever gets its acc
   const sent = JSON.parse(w.calls.find(c => c.url.endsWith("/user_management/authenticate")).body);
   assert.equal(sent.grant_type, "authorization_code");
   assert.ok(sent.code_verifier.length >= 43);
-  const resolve = JSON.parse(w.calls.find(x => x.url.endsWith("/rpc/resolve_login")).body);
+  const resolve = JSON.parse(w.calls.find(x => x.url.endsWith("/rpc/resolve_existing_terminus_login")).body);
   assert.deepEqual(resolve, { p_provider: "workos", p_subject: "user_01ABC", p_email: "prueba@danil.ai", p_email_verified: true, p_name: "Prueba Danil" });
 
   const first = await session(w, cookie);
@@ -140,17 +149,17 @@ test("callback opens a real Supabase session and the page only ever gets its acc
   const rotated = latest(cookie, first);
   assert.notEqual(rotated, cookie);
   assert.equal((await (await session(w, rotated)).json()).access_token, "sb.rt_2");
-  assert.equal(w.calls.filter(x => x.url.endsWith("/rpc/resolve_login")).length, 1, "resolve_login writes: only at the callback");
+  assert.equal(w.calls.filter(x => x.url.endsWith("/rpc/resolve_existing_terminus_login")).length, 1, "existing-person resolution runs only at the callback");
 });
 
 test("callback refuses a forged state, a missing flow cookie and a refused code", async () => {
   const w = world();
   const started = await call(w, "/auth/workos/start");
   const state = new URL(started.headers.get("Location")).searchParams.get("state");
-  for (const [query, cookie] of [[`code=code_ok&state=x${state.slice(1)}`, cookieHeader(started)], [`code=code_ok&state=${state}`, ""], [`code=bad&state=${state}`, cookieHeader(started)], [`error=access_denied&state=${state}`, cookieHeader(started)]]) {
+  for (const [query, cookie] of [[`code=code_ok&state=x${state}`, cookieHeader(started)], [`code=code_ok&state=${state}`, ""], [`code=bad&state=${state}`, cookieHeader(started)], [`error=access_denied&state=${state}`, cookieHeader(started)]]) {
     const response = await call(w, `/auth/workos/callback?${query}`, { headers: { Cookie: cookie } });
     assert.equal(response.status, 303);
-    assert.equal(response.headers.get("Location"), `${origin}/auth?error=callback_failed`);
+    assert.equal(new URL(response.headers.get("Location")).searchParams.get("error"), "callback_failed");
     assert.ok(!cookiesOf(response).some(c => c.startsWith("__Host-danil_alfa=") && !c.endsWith("=")));
   }
 });
@@ -158,14 +167,20 @@ test("callback refuses a forged state, a missing flow cookie and a refused code"
 test("the database decides who enters", async () => {
   for (const [overrides, error] of [
     [{ workosUser: { id: "user_01ABC", email: "prueba@danil.ai", email_verified: false } }, "email_not_verified"],
-    [{ person: null }, "unknown_person"],
+    [{ person: null }, "access_required"],
+    [{ resolverMissing: true }, "identity_unavailable"],
     [{ row: { id: 42, uuid, merged_into_user_id: 9 } }, "unknown_person"],
     [{ row: { id: 42, uuid: null, merged_into_user_id: null } }, "no_login_yet"],
     [{ login: null }, "no_login_yet"],
     [{ login: { id: uuid, email: "prueba@danil.ai", banned_until: "2126-01-01T00:00:00Z" } }, "login_banned"],
   ]) {
-    const { back } = await signedIn(world(overrides));
-    assert.equal(back.headers.get("Location"), `${origin}/auth?error=${error}`, error);
+    const w = world(overrides);
+    const { back } = await signedIn(w, "/connect?code=ABCD-EFGH");
+    const location = new URL(back.headers.get("Location"));
+    assert.equal(location.searchParams.get("error"), error);
+    assert.equal(location.searchParams.get("next"), "/connect?code=ABCD-EFGH");
+    assert.equal(w.calls.some(c => c.url.endsWith("/auth/v1/admin/generate_link")), false);
+    assert.ok(!cookiesOf(back).some(c => c.startsWith("__Host-danil_alfa=")));
   }
   const w = world();
   const { cookie } = await signedIn(w);
@@ -284,5 +299,38 @@ test("callback refuses authentication and foreign return destinations without re
   for (const next of ["/sign-in", "/sign-in?next=/inbox", "/x/../auth", "/%61uth", "//evil.example/", "https://evil.example/", "/\\evil.example/"]) {
     const { back } = await signedIn(world(), next);
     assert.equal(back.headers.get("Location"), `${origin}/`, next);
+  }
+});
+
+
+test("each token checks the current grant, including a cookie issued before revocation", async () => {
+  const w = world();
+  const { cookie } = await signedIn(w);
+  const allowed = await session(w, cookie);
+  assert.equal(allowed.status, 200);
+  const current = latest(cookie, allowed);
+  w.state.access = false;
+  const response = await session(w, current);
+  assert.equal(response.status, 403);
+  assert.deepEqual(await response.json(), { error: "access_required" });
+  assert.deepEqual(cookiesOf(response), ["__Host-danil_alfa="]);
+  assert.equal(w.state.refreshes, 1, "a refused grant never refreshes or emits a token");
+  assert.equal(w.calls.filter(c => c.url.endsWith("/rpc/resolve_existing_terminus_login")).length, 1, "refresh does not mutate identity");
+});
+
+test("eligibility lookup fails closed when unavailable, malformed or no longer bound to the login", async () => {
+  for (const change of [
+    { accessRpcMissing: true },
+    { access: "true" },
+    { row: null },
+    { row: { id: 42, uuid, merged_into_user_id: 9 } },
+  ]) {
+    const w = world();
+    const { cookie } = await signedIn(w);
+    Object.assign(w.state, change);
+    const response = await session(w, cookie);
+    assert.ok([403, 503].includes(response.status));
+    assert.equal("access_token" in await response.json(), false);
+    assert.equal(w.state.refreshes, 0);
   }
 });
