@@ -1,0 +1,55 @@
+{
+  "classification": "Observed on exact candidate; no baseline execution comparison. Earlier pre-existing label is not substantiated.",
+  "fmt": {
+    "exit": 1,
+    "file": "apps/desktop/src-tauri/crates/engine-protocol/src/lib.rs",
+    "line": 97,
+    "diagnostic": "rustfmt splits let mut manifest: serde_json::Value = serde_json::from_str(MANIFEST).expect(\"frozen command manifest\"); into two lines"
+  },
+  "clippy": {
+    "exit": 101,
+    "flags": "--locked -- -D warnings",
+    "errors": [
+      {
+        "file": "apps/desktop/src-tauri/src/extracted/typst_live.rs",
+        "line": 369,
+        "column": 39,
+        "lint": "clippy::explicit_auto_deref",
+        "diagnostic": "deref which would be done by auto-deref"
+      },
+      {
+        "file": "apps/desktop/src-tauri/src/extracted/typst_live.rs",
+        "line": 385,
+        "column": 40,
+        "lint": "clippy::explicit_auto_deref",
+        "diagnostic": "deref which would be done by auto-deref"
+      },
+      {
+        "file": "apps/desktop/src-tauri/src/extracted/typst_live.rs",
+        "line": 559,
+        "column": 13,
+        "lint": "clippy::while_let_loop",
+        "diagnostic": "this loop could be written as a while let loop"
+      },
+      {
+        "file": "apps/desktop/src-tauri/src/extracted/update.rs",
+        "line": 118,
+        "column": 10,
+        "lint": "clippy::unnecessary_fold",
+        "diagnostic": "this .fold can be written more succinctly using another method; all short circuits and may change side effects"
+      }
+    ]
+  },
+  "checkExit": 0,
+  "testExit": 0,
+  "logs": [
+    "mac-evidence/rust-checks.log",
+    "mac-evidence/rust-remaining.log",
+    "mac-evidence/rust-results.json"
+  ],
+  "toolchainObserved": {
+    "rustc": "1.96.0 (ac68faa20 2026-05-25)",
+    "cargo": "1.96.0 (30a34c682 2026-05-25)",
+    "active": "stable-aarch64-apple-darwin"
+  }
+}

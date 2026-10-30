@@ -48,13 +48,13 @@
     }
   },
   "schemaVersion": 1,
-  "capturedAt": "2026-10-30T17:51:54.754081+00:00",
+  "capturedAt": "2026-10-30T18:18:37.951240+00:00",
   "snapshotOnly": true,
   "publication": false,
   "operators": {
     "coordinator": {
       "task": "sre19sr7",
-      "stage": "producers_running"
+      "stage": "both_platforms_terminal"
     },
     "mac": {
       "taskID": "0qs6mqpm",
@@ -66,9 +66,11 @@
     },
     "windows": {
       "taskID": "31ze36h8",
-      "stage": "building_normal_tauri",
+      "stage": "terminal",
       "buildsStarted": 1,
-      "updatedAt": "2026-10-30T17:47:33.072381+00:00"
+      "updatedAt": "2026-10-30T18:17:40.585803+00:00",
+      "result": "INCOMPLETE_REQUIRED_REOPEN_FAILED",
+      "completedAt": "2026-10-30T18:17:40.585803+00:00"
     }
   },
   "mac": {
@@ -284,19 +286,20 @@
     "terminalReport": "# Mac QA93: cierre sin aprobación\n\nOID exacto: `93eeb9ef51b71f3cece7fa04942fa76e3b15adc2`. Fuente limpia, versión `0.3.0-rc.1`, pin `4e10efc24a9be6f8dbf15559f767a50fb109a0a7`. Un build normal Tauri; sin rebuild ni cambios de fuente.\n\nBuild, inventario canónico y smoke de runtimes sin PATH global: PASS. Firma Developer ID app y DMG: PASS. Procedencia del motor igual al pin tras quitar firma en copias y normalizar exclusivamente __LINKEDIT vmsize. Inventario de la app original sin cambios al cierre. Gatekeeper exit 3; stapler exit 65; sin notarización ni updater: NO apta para clientes.\n\nQA nativo INCOMPLETO. Arranque y onboarding hasta principal comprobados, título Danil. Personalize muestra contenido central en blanco y botones Back / I’ll do it later / Start; Start permite llegar a principal. No se atribuye PASS a personalización ni se establece causa. Captura: `isolated-personalize.png`.\n\nAparecieron tareas/historial no originados por este operador, incluso después de usar bundle ID, HOME y raíz propios. Se detuvo el turno no reconocido en UI y se comprobó Interrupted. No se acreditan dos turnos propios, archivo/visor/persistencia, carpeta adjunta ni aislamiento completo. No se investigó la causa ni se modificó producción. Procesos de laboratorio 99869 y 99921 detenidos; no quedaron descendientes proveedor en el árbol al cierre. No se alteró instalación o motor global ni se apagó la Mac.\n\nRust: cargo check --locked PASS; cargo test --locked PASS, 35 tests. cargo fmt --all -- --check FAIL exit 1: crates/engine-protocol/src/lib.rs:97 requiere salto de línea. Clippy -D warnings FAIL exit 101: src/extracted/typst_live.rs:369:39 y 385:40 explicit_auto_deref; 559:13 while_let_loop; src/extracted/update.rs:118:10 unnecessary_fold. Baseline no comparado: no se califican como heredados. Rust 1.96.0 ac68faa20; Cargo 1.96.0; Clippy 0.1.96. Cache .rustc_info.json y lectura actual coinciden; versión inicial no capturada por separado en build.log, no hubo cambio de toolchain por este operador.\n\nLogs: rust-checks.log, rust-remaining.log, rust-results.json, build.log, runtime-smoke.log. Metadatos, hashes, bytes, firma, inventario y límites completos en ../mac-status.json. No hay secretos ni contenido de DB en este informe.\n"
   },
   "windows": {
-    "signature": "not yet built; no signing credentials used",
-    "notary": "not applicable Windows",
-    "updater": "disabled via private overlay only",
+    "signature": "NotSigned setup/main/engine",
+    "notary": "N/A Windows",
+    "updater": {
+      "artifactsEnabled": false,
+      "privateOverlayOnly": true,
+      "pubkeyChanged": false,
+      "testKeyUsed": false,
+      "signedUpdaterTested": false
+    },
     "canonicalPrepare": "PASS",
     "frozenInstall": {
       "exitCode": 0,
       "pnpm": "10.15.0",
       "durationSeconds": 48.7
-    },
-    "lastObservation": {
-      "stage": "cargo release compilation active",
-      "cargoPID": 4600,
-      "freeDiskBytes": 5869076480
     },
     "sourceOID": "93eeb9ef51b71f3cece7fa04942fa76e3b15adc2",
     "sourceTree": "ffcf873dfff20d8b33b7aa489551567cdac5ca5f",
@@ -312,19 +315,195 @@
     "sourceZipSHA256": "0973797f40497c01c51d0961b5c3720872e22a9060e46161ffb476160978b88d",
     "remoteLab": "C:\\TerminusQA\\rc030-final-93-31ze36h8",
     "cleanup": {
-      "pending": true
+      "noOtherAppStopped": true,
+      "qaterminusFilesUnchanged": true,
+      "allAccountEnabledFlagsUnchanged": true,
+      "remainingOwnProcesses": 0,
+      "sourceOID": "93eeb9ef51b71f3cece7fa04942fa76e3b15adc2",
+      "qaterminusFiles": [
+        {
+          "unchanged": true,
+          "path": "C:\\Users\\qaterminus\\AppData\\Local\\Terminus\\terminus.exe"
+        },
+        {
+          "unchanged": true,
+          "path": "C:\\Users\\qaterminus\\AppData\\Local\\Terminus\\seldon-runtime.exe"
+        }
+      ],
+      "installationRemoved": true,
+      "freeDiskBytes": 4261404672,
+      "remainingOwnProcessNames": [],
+      "pending": false,
+      "rights": {
+        "removedOnlyQASIDBatchRight": true,
+        "qaDirectRightsAfter": [],
+        "changedRightNames": [],
+        "beforeCount": 31,
+        "afterCount": 31,
+        "allUserRightAssignmentsEqual": true,
+        "qaDirectRightsBefore": []
+      },
+      "account": {
+        "isAdmin": false,
+        "ownScheduledTasks": 0,
+        "user": "qarc030",
+        "enabled": false
+      },
+      "uninstall": {
+        "exit": 0,
+        "product_key_exists": true,
+        "remaining_shortcuts": [],
+        "uninstall_key_exists": false,
+        "phase": "uninstall",
+        "remaining_files": [],
+        "destination_exists": true,
+        "qa_data_preserved": true,
+        "user": "qarc030"
+      },
+      "manualResidueCleanup": {
+        "productKeyExists": false,
+        "destinationExists": false,
+        "scope": "only own new product registry and empty directory",
+        "manualCleanup": true
+      },
+      "localInspectionTunnelClosed": true,
+      "browserControllerClosed": true
     },
     "preparationAttempt1": "blocked: uv interpreter discovery; corrected with private UV_PYTHON, no source edits",
-    "artifacts": {}
+    "artifacts": {
+      "setup": {
+        "sha256": "97c75273e511087106244cf5336562f5997c1666b3cd6c2f700b2dbaae0ceb94",
+        "bytes": 137685904,
+        "path": "/Users/aceballosvilla/qa/rc030-final-93/Terminus_0.3.0-rc.1_x64-setup.exe",
+        "sourceOID": "93eeb9ef51b71f3cece7fa04942fa76e3b15adc2",
+        "signature": "NotSigned"
+      },
+      "main": {
+        "sha256": "5972563a2e42819ed200f48d368acd713625db4971db157cc7e2e191d1965bae",
+        "bytes": 35068928,
+        "path": "C:\\TerminusQA\\rc030-final-93-31ze36h8\\source\\apps\\desktop\\src-tauri\\target\\release\\terminus.exe",
+        "kind": "raw build executable before standard NSIS marker patch"
+      },
+      "engine": {
+        "sha256": "9b8e940fdc2cbd2c39cd6344bab648bfd4ed1d72b20c3d50e7b3be7764939920",
+        "bytes": 33082880,
+        "path": "C:\\TerminusQA\\rc030-final-93-31ze36h8\\source\\apps\\desktop\\src-tauri\\target\\release\\seldon-runtime.exe",
+        "sourceOID": "4e10efc24a9be6f8dbf15559f767a50fb109a0a7"
+      },
+      "mainInstalled": {
+        "sha256": "de7a117f894bc4e67b782dfc23e681c694b3811e46d7b6d3b1e47a8722fa93ed",
+        "bytes": 35068928,
+        "equalsBuildAfterOnlyStandardNSISMarkerPatch": true,
+        "pathAtInspection": "C:\\TerminusQA\\rc030-final-93-31ze36h8\\installed-93eeb9ef\\terminus.exe",
+        "pathInNSIS": "terminus.exe",
+        "installationRemoved": true
+      }
+    },
+    "versions": {
+      "package": "0.3.0-rc.1",
+      "cargo": "0.3.0-rc.1",
+      "tauri": "0.3.0-rc.1"
+    },
+    "scopeNote": "Finish exact93 candidate; later Terminal/bundled-detection change excluded; no rebuild.",
+    "nsisInstallMode": "currentUser",
+    "sidecarBuildSHA256": "9b8e940fdc2cbd2c39cd6344bab648bfd4ed1d72b20c3d50e7b3be7764939920",
+    "sidecarMatchesPin": true,
+    "buildWrapper": {
+      "exitCode": 1,
+      "error": "Info Looking up installed tauri packages to check mismatched versions...",
+      "cause": "PowerShell ErrorAction Stop promoted native stderr Info to terminating error",
+      "tauriExitCode": "not captured; cannot claim exit0",
+      "noRebuild": true
+    },
+    "nsisIntegrity": {
+      "exitCode": 0,
+      "files": 6788,
+      "uncompressedBytes": 453877179
+    },
+    "localArtifact": "/Users/aceballosvilla/qa/rc030-final-93/Terminus_0.3.0-rc.1_x64-setup.exe",
+    "result": "INCOMPLETE_REQUIRED_REOPEN_FAILED",
+    "completedAt": "2026-10-30T18:17:40.585803+00:00",
+    "build": "ARTIFACT_CREATED_WRAPPER_EXIT1_TAURI_EXIT_UNKNOWN",
+    "evidencePath": "/Users/aceballosvilla/qa/rc030-final-93/windows-evidence",
+    "sourceCleanAtEnd": true,
+    "sourceLocksAndConfigUnchangedAfterBuild": true,
+    "notTested": [
+      "Real interactive Windows desktop UX (session0 only)",
+      "Full pnpm verify on Windows; fmt/clippy/test not run",
+      "Upgrade of qaterminus0.2.86 or any production installation",
+      "Authenticode and signed updater",
+      "Cua MCP desktop actions and actual browser navigation"
+    ],
+    "findings": [
+      {
+        "id": "W93-1",
+        "observed": "Build wrapper returned1 on native stderr Info; complete NSIS exists and passed integrity/install. Tauri exit code not captured.",
+        "classification": "harness limitation",
+        "confirmation": "observed once; no rebuild",
+        "evidence": "error.txt; artifacts.json; nsis-integrity.json; real-install/install-result.json"
+      },
+      {
+        "id": "W93-2",
+        "observed": "After quit_completely acknowledged without window exit, verified own idle window was stopped and relaunched; UI showed engine unavailable and no workspace despite own engine process present.",
+        "expected": "Reopened installed app restores workspace, conversation and file viewer.",
+        "confirmation": "observed once; no causal attribution or fix",
+        "evidence": "08-reopen-engine-unavailable.png; reopen-stop-window.json; file-after-reopen.json"
+      },
+      {
+        "id": "W93-3",
+        "observed": "document.title is Terminus while visible setup, close labels and environment say Danil.",
+        "expected": "Requested visible title Danil.",
+        "confirmation": "read in initial app and task UI",
+        "evidence": "environment-ui.json"
+      }
+    ],
+    "globalChangesPerformed": false,
+    "newBuildsAfterFirst": 0,
+    "published": false,
+    "checks": {
+      "installation": "PASS exit0 currentUser qarc030, own registry and shortcuts",
+      "tools": "PASS canonical verify + six executables/document imports; PATH only Windows",
+      "personalize": "PASS rendered, screenshot03-personalize.png; no blank reproduced in this run",
+      "folderByUI": "PASS Add project > Start empty > Create; own qarc030 folder RC030-Final93-31ze36h8",
+      "freeTurns": "PASS two completed opencode/big-pickle; gratis=true fallback=false; current four cost fields0; tools3+1; reported model matches",
+      "environment": "UI Danil0.3.0-rc.1 engine0.2.73 4e10efc; OpenCode2.2.4 installed in private lab",
+      "fileViewer": "PASS before restart; UI after reopen FAIL engine unavailable; disk persistence PASS (see filePersistence)",
+      "interactiveUX": "NOT TESTED: all installed app render/turns in session0",
+      "title": "FAIL document.title remains Terminus; visible setup/close/environment text Danil",
+      "reopen": "FAIL: quit_completely acknowledged without window exit; after verified own idle window termination and relaunch, UI reports engine unavailable despite own engine process present",
+      "filePersistence": {
+        "disk": "PASS",
+        "uiAfterReopen": "FAIL engine unavailable",
+        "bytes": 22,
+        "sha256": "79371705c6d6fbfd642cd685b10f5b08114b2a8ea9b5bb156f8bf2f25d514fe2"
+      },
+      "reinstall": "PASS exit0 own same-version installer; old_* recorded",
+      "uninstall": "PASS exit0 files/shortcuts/uninstall registration removed; product path key and empty directory remained, then manually cleaned",
+      "activeProviderTurnsAtEnd": 0
+    },
+    "diagnosticLogs": [
+      {
+        "path": "/Users/aceballosvilla/qa/rc030-final-93/windows-evidence/error.txt",
+        "sha256": "a6964832a1982594d221f77a5eadf6d06d4c5fec86c6fc521e1743dcf43b929d",
+        "bytes": 82,
+        "sanitizedContent": "        Info Looking up installed tauri packages to check mismatched versions...\r\n"
+      },
+      {
+        "path": "/Users/aceballosvilla/qa/rc030-final-93/windows-evidence/nsis-integrity.log",
+        "sha256": "f101c75f9837321cd85f12f7231b1a997d0c101b58a1df2e0b3ec63a42d4a7c5",
+        "bytes": 661,
+        "sanitizedContent": "\r\n7-Zip 26.05 (x64) : Copyright (c) 1999-2026 Igor Pavlov : 2026-10-21\r\n\r\nScanning the drive for archives:\r\n1 file, 137685904 bytes (132 MiB)\r\n\r\nTesting archive: C:\\TerminusQA\\rc030-final-93-31ze36h8\\source\\apps\\desktop\\src-tauri\\target\\release\\bundle\\nsis\\Terminus_0.3.0-rc.1_x64-setup.exe\r\n--\r\nPath = C:\\TerminusQA\\rc030-final-93-31ze36h8\\source\\apps\\desktop\\src-tauri\\target\\release\\bundle\\nsis\\Terminus_0.3.0-rc.1_x64-setup.exe\r\nType = Nsis\r\nPhysical Size = 137685904\r\nMethod = LZMA:23\r\nSolid = +\r\nHeaders Size = 1930818\r\nEmbedded Stub Size = 62464\r\nSubType = NSIS-3 Unicode\r\n\r\nEverything is Ok\r\n\r\nFiles: 6788\r\nSize:       453877179\r\nCompressed: 137685904\r\n"
+      }
+    ]
   },
   "limitations": [
     "Snapshot of existing evidence only; no new build or QA executed by exporter.",
     "Mac Gatekeeper exit 3 and stapler exit 65; notarization and updater absent.",
     "Rust format exit 1 and clippy exit 101; check and tests exit 0.",
-    "Windows compilation in progress; final NSIS hash, size and completed QA unavailable.",
     "Removing Terminal from preparation/selector and simplifying bundled-tool detection assigned separately on Linux; do not rebuild QA93 for that change yet.",
     "No global installation, Mac shutdown, workflow, release or binary upload authorized by this receipt.",
-    "Mac QA closed incomplete: two operator turns, folder attachment, file viewer/persistence and complete isolation not accredited. Own laboratory stopped."
+    "Mac QA closed incomplete: two operator turns, folder attachment, file viewer/persistence and complete isolation not accredited. Own laboratory stopped.",
+    "Windows closed incomplete: required UI reopen failed; session0 only, real interactive desktop UX not tested; unsigned binaries and updater absent; wrapper exit1, Tauri exit unknown despite created NSIS and integrity/install PASS."
   ],
   "coordination": {
     "delivery": "steered",
@@ -332,7 +511,15 @@
       "sre19sr7": "945f3ce9-76e0-476e-9055-be3e18d7d9f0",
       "0qs6mqpm": "7a7303b5-7e17-4c97-9ec3-0cce5fd0a27b",
       "31ze36h8": "8d870aba-3dd5-4d6d-a00a-09a5623ddb5d"
-    }
+    },
+    "errors": [
+      {
+        "command": "task send windows followup",
+        "operation": "3e935cc8-91da-453c-975f-1a6fbcab2edc",
+        "error": "chain_limit",
+        "delivered": false
+      }
+    ]
   },
   "evidenceFiles": [
     {
@@ -376,6 +563,31 @@
       "exportedPath": "qa/rc030-final93/mac-isolated-personalize.png",
       "sha256": "1f812d38b607b9d74a285de17b6075aae9dec09ed01b0fa755a72c3f3234016b",
       "bytes": 61568
+    },
+    {
+      "path": "/Users/aceballosvilla/qa/rc030-final-93/windows-evidence/08-reopen-engine-unavailable.png",
+      "exportedPath": "qa/rc030-final93/windows-reopen-engine-unavailable.png",
+      "sha256": "927a4cf69055574ec0cbcce3e6b6793030da7a67809fc301678010513d9cc70e",
+      "bytes": 40193
+    },
+    {
+      "path": "/Users/aceballosvilla/qa/rc030-final-93/rust-diagnostics.json",
+      "exportedPath": "qa/rc030-final93/mac-rust-diagnostics.json",
+      "sha256": "a972cb7524274d2d15bd4836b13647b3375033b54dfa31a1bdc79ee3f81ae270",
+      "bytes": 1869
+    },
+    {
+      "path": "/Users/aceballosvilla/qa/rc030-final-93/windows-status.json",
+      "sha256": "10640b6abdff4451f7f3981227cdb71b0aec0cf648cd587f1ab2e9613e5726ca",
+      "bytes": 10785,
+      "capture": "terminal"
     }
-  ]
+  ],
+  "terminal": true,
+  "separateValidation": {
+    "file": "qa/rc030-final93/pr530-checks.json",
+    "commit": "063a466bb7df68fec7939ca2e75f67c4209921ad",
+    "candidate": "PR530 HEAD948aabad",
+    "note": "Separate validation, does not approve exact QA93 candidate."
+  }
 }
