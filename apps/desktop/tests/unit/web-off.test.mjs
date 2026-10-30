@@ -48,7 +48,7 @@ test("an off computer mounts as it is and wakes with the first message", async (
     assert.equal(w.document.querySelector("[data-web-sync]")?.dataset.state, "offline", "the indicator shows it off");
     assert.ok(!text().includes("La máquina de este host está apagada"), "no error notice");
     assert.ok(!text().includes("Algo se rompió"), "no generic failure");
-    assert.ok(!text().includes("Preparando Terminus"), "no installer");
+    assert.ok(!text().includes("Preparando Danil"), "no installer");
     assert.ok(!fake.calls.some((c) => c.command === "prepare_runtime"));
 
     const before = fake.calls.filter((c) => c.command === "list_projects").length;

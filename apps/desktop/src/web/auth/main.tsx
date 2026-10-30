@@ -142,7 +142,7 @@ export function startAuth(settings: { supabaseUrl: string; supabaseKey: string; 
     return (
       <main class="flex h-full flex-col items-center overflow-y-auto bg-bg px-6 py-10 text-neutral-950" data-web-auth={pending() ? "confirmation" : "signin"} aria-busy={busy()}>
         <div class="grid w-full max-w-sm gap-6">
-          <h1 class="m-0 text-3xl font-display font-bold tracking-[-0.03em]">Terminus</h1>
+          <h1 class="m-0 text-3xl font-display font-bold tracking-[-0.03em]">{t("common.brand_name")}</h1>
           <div class="grid gap-2">
             <h2 ref={heading} tabIndex={-1} class="m-0 text-xl font-semibold">{pending() ? t("web.auth.check_email") : t("web.auth.signin_title")}</h2>
             <p class="m-0 text-sm text-neutral-500" role="status">{pending() ? t("web.auth.confirm_hint", { email: email().trim() }) : t("web.auth.identity_hint")}</p>

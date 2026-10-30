@@ -14,7 +14,7 @@
   "cli.error.handler_dirty_not_approvable": "The handler folder has uncommitted changes: a definition without a fixed digest cannot be approved.",
   "cli.error.handler_request_unknown": "The handler does not request that slot or tool.",
   "cli.error.handler_mcp_server_unknown": "That server is not in this workspace's MCP catalog.",
-  "cli.error.handler_mcp_server_unreachable": "Terminus could not list that server's tools, so it cannot tell what it would grant. Nothing was approved.",
+  "cli.error.handler_mcp_server_unreachable": "Danil could not list that server's tools, so it cannot tell what it would grant. Nothing was approved.",
   "cli.error.handler_mcp_access_not_distinguished": "The server does not mark which tools only read: it cannot be approved as read. Approve it as slot=server:write if you accept it writes, or do not approve it.",
   "cli.error.handler_not_approved": "That handler has no approval to revoke.",
   "cli.error.handler_mcp_hints_not_accepted": "A read slot grants the tools the server marks readOnlyHint. Review detail.read_tools and repeat with --accept-hints and exactly that list.",

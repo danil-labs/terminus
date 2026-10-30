@@ -149,9 +149,9 @@ test("Drive oficial ya con sesiÃ³n sale conectada; desconectar no desinstala y Â
   const { app, card } = await aPersonaliza(m, "drive-oficial-detectada", MAC);
   assert.ok(card()?.textContent.includes("Conectado"), card()?.textContent);
 
-  button(card(), "Dejar de usar Google Drive en Terminus (la app de Google sigue instalada)").click();
+  button(card(), "Dejar de usar Google Drive en Danil (la app de Google sigue instalada)").click();
   await sleep(50);
-  assert.ok(card().textContent.includes("Terminus no la usa"), card().textContent);
+  assert.ok(card().textContent.includes("Danil no la usa"), card().textContent);
   assert.deepEqual(m.llamadas, ["use:false"], "dejar de usarla solo se guarda en el motor: no desinstala ni desconecta");
 
   button(card(), "Usar esta").click();

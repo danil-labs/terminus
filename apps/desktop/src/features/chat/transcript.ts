@@ -5,6 +5,7 @@
  * dominio y se prueba desde Node.
  */
 
+import { isQuestionFile } from "@terminus/chat/steps";
 import type { HistoryRef } from "@terminus/protocol";
 import type { CodeRange } from "../../lib/model.ts";
 import type { Recipient, ReplyTo, SenderTask } from "../../lib/recipients.ts";
@@ -557,7 +558,7 @@ export function transcripcion(turns: Turn[]): Msg[] {
       paso: pasoDe(h.name, h.target, { ok: h.ok ?? null, mcpApp: h.mcp_app ?? mcpCallFromName(h.name) }),
     });
     const visible = (h: Tool | undefined) =>
-      h !== undefined && !h.target?.includes(".preguntas.json");
+      h !== undefined && !isQuestionFile(h.target);
     const pasos: Msg[] = (t.tools ?? []).filter(visible).map(paso);
     if (t.shell) {
       return [

@@ -15,7 +15,7 @@ const CASOS = new Map();
 const caso = (nombre, cuerpo) => CASOS.set(nombre, cuerpo);
 
 const ETAPAS = ["platform", "work-tools"];
-const TITULO = "Preparando Terminus";
+const TITULO = "Preparando Danil";
 
 const foto = (estado, running) => ({
   stages: ETAPAS.map((name) => ({ name, essential: true, state: estado(name) })),
@@ -236,16 +236,16 @@ const boton = (app, nombre) => [...app.w.document.querySelectorAll("main button"
 const MAC = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15";
 const fallidaConFoto = () => foto((name) => (name === "work-tools" ? "failed" : "succeeded"), false);
 
-caso("la preparación es solo «Preparando Terminus» con sus dos etapas, sin opcionales", async () => {
+caso("la preparación es solo «Preparando Danil» con sus dos etapas, sin opcionales", async () => {
   const s = servicio({ setupRequired: true, entorno: reporte(false, []), preparar: enCurso });
   const app = await boot("listo", "dos-etapas", s.respuestas);
   s.conectar(app);
   await sleep(600);
 
-  assert.ok(enPantalla(app), "no se ve «Preparando Terminus»");
+  assert.ok(enPantalla(app), "no se ve «Preparando Danil»");
   assert.deepEqual(
     [...app.w.document.querySelectorAll("main ol > li")].map((li) => li.textContent.trim()),
-    ["Plataforma", "Entorno de Terminus"],
+    ["Plataforma", "Entorno de Danil"],
   );
   assert.equal(app.w.document.querySelectorAll('main input[type="checkbox"]').length, 0, "quedan casillas");
   assert.ok(!/Opcionales|opcional/i.test(texto(app)), "quedan los opcionales");
@@ -265,7 +265,7 @@ caso("una función incluida que falla se nombra y «Reparar» repara todo lo inc
   boton(app, "Reparar").click();
   await sleep(400);
   assert.deepEqual(s.llamadas.install_tool, [{ tool: "bundled-work-tools" }]);
-  assert.ok(texto(app).includes("No se pudo reparar el entorno de Terminus."), "el error de reparar no se ve en la pantalla");
+  assert.ok(texto(app).includes("No se pudo reparar el entorno de Danil."), "el error de reparar no se ve en la pantalla");
   assert.ok(app.comandos.filter((c) => c === "check_environment").length >= 2, "después de reparar no se vuelve a comprobar");
 });
 
@@ -285,8 +285,8 @@ caso("lo que no contestó a tiempo se dice distinto de lo dañado", async () => 
   assert.ok(filas.git?.includes("Clonar y versionar repositorios") && filas.git.includes("No contestó a tiempo"));
   assert.ok(filas["agent-browser"]?.includes("Abrir y usar páginas web") && filas["agent-browser"].includes("Sus archivos cambiaron"));
   // jsdom no es Mac ni Windows: en Linux reiniciar vuelve a copiar los recursos.
-  assert.ok(boton(app, "Reiniciar Terminus"), "en Linux lo dañado no propone reiniciar");
-  assert.ok(texto(app).includes("Reinicia Terminus para volver a copiar"));
+  assert.ok(boton(app, "Reiniciar Danil"), "en Linux lo dañado no propone reiniciar");
+  assert.ok(texto(app).includes("Reinicia Danil para volver a copiar"));
 });
 
 caso("en Mac lo dañado propone reinstalar, no reiniciar", async () => {
@@ -297,8 +297,8 @@ caso("en Mac lo dañado propone reinstalar, no reiniciar", async () => {
   await sleep(800);
 
   assert.ok(texto(app).includes("Paquetes extra y servidores MCP"));
-  assert.ok(texto(app).includes("Reinstala Terminus"));
-  assert.equal(boton(app, "Reiniciar Terminus"), undefined);
+  assert.ok(texto(app).includes("Reinstala Danil"));
+  assert.equal(boton(app, "Reiniciar Danil"), undefined);
   assert.ok(boton(app, "Reparar"));
 });
 
@@ -355,7 +355,7 @@ caso("Estado del entorno lista solo los extras y lo incluido en una línea con �
   reparar.click();
   await sleep(300);
   assert.deepEqual(s.llamadas.install_tool, [{ tool: "bundled-work-tools" }]);
-  assert.ok(app.w.document.body.textContent.includes("No se pudo reparar el entorno de Terminus."));
+  assert.ok(app.w.document.body.textContent.includes("No se pudo reparar el entorno de Danil."));
   assert.equal(app.comandos.includes("install_base_tool"), false);
 });
 

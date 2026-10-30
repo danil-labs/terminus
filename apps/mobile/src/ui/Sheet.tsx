@@ -1,7 +1,8 @@
 import { TEXT } from "@terminus/design";
-import { type ReactNode, useEffect, useState } from "react";
-import { KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import { KeyboardAvoidingView, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { t } from "../lib/i18n";
 import { Icon, type IconName } from "./Icon";
 import { SearchField } from "./Search";
 import { useTheme } from "./theme";
@@ -11,18 +12,22 @@ import { useTheme } from "./theme";
  * permisos, máquina, carpeta, rama, adjuntar): el popover del escritorio en el
  * teléfono. Se cierra tocando fuera o con el gesto atrás de Android. Con
  * `search` lleva un buscador arriba y `children` es una función que recibe lo
- * buscado; la búsqueda se borra al cerrar.
+ * buscado; la búsqueda se borra al cerrar. Con `detents` (fracciones de la
+ * ventana, de menor a mayor) tiene alto fijo, cambia de altura desde el asa y
+ * `children` pone su propio scroller: en web no existe el `formSheet`.
  */
 export function Sheet({
   visible,
   title,
   search,
+  detents,
   onClose,
   children,
 }: {
   visible: boolean;
   title?: string;
   search?: string;
+  detents?: readonly [number, number];
   onClose: () => void;
   children: ReactNode | ((query: string) => ReactNode);
 }) {
@@ -32,17 +37,50 @@ export function Sheet({
   useEffect(() => {
     if (!visible) setQuery("");
   }, [visible]);
+  const { height: windowHeight } = useWindowDimensions();
+  const [detent, setDetent] = useState(0);
+  const [drag, setDrag] = useState(0);
+  const height = detents ? Math.max(0, Math.min(windowHeight * detents[1], windowHeight * detents[detent] - drag)) : undefined;
+  const measured = useRef({ height: 0, windowHeight, detents, onClose });
+  measured.current = { height: height ?? 0, windowHeight, detents, onClose };
+  const pan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 4,
+      onPanResponderMove: (_, gesture) => setDrag(gesture.dy),
+      onPanResponderRelease: () => {
+        const now = measured.current;
+        const middle = now.detents ? (now.detents[0] + now.detents[1]) / 2 : 0;
+        setDrag(0);
+        // Muy por debajo de la altura menor, arrastrar es cerrar.
+        if (now.detents && now.height < now.windowHeight * now.detents[0] * 0.7) return now.onClose();
+        setDetent(now.height / now.windowHeight > middle ? 1 : 0);
+      },
+      onPanResponderTerminate: () => setDrag(0),
+    }),
+  ).current;
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       <KeyboardAvoidingView style={styles.root} behavior="padding">
         <Pressable style={styles.backdrop} onPress={onClose} accessibilityRole="button" />
-        <View style={[styles.sheet, { backgroundColor: theme.surface, paddingBottom: insets.bottom + 12, borderColor: theme.border }]}>
-          <View style={[styles.grabber, { backgroundColor: theme.border }]} />
+        <View style={[styles.sheet, detents ? { height, maxHeight: height } : null, { backgroundColor: theme.surface, paddingBottom: detents ? insets.bottom : insets.bottom + 12, borderColor: theme.border }]}>
+          {detents ? (
+            <View {...pan.panHandlers} style={styles.handleArea}>
+              <Pressable testID="sheet-handle" accessibilityRole="button" accessibilityLabel={t(detent === 0 ? "sheet.expand" : "sheet.collapse")} onPress={() => setDetent((now) => (now === 0 ? 1 : 0))} style={styles.handle}>
+                <View style={[styles.grabber, { backgroundColor: theme.border, marginBottom: 0 }]} />
+              </Pressable>
+            </View>
+          ) : (
+            <View style={[styles.grabber, { backgroundColor: theme.border }]} />
+          )}
           {title ? <Text style={[styles.title, { color: theme.text }]}>{title}</Text> : null}
           {search ? <SearchField testID="sheet-search" value={query} onChange={setQuery} placeholder={search} /> : null}
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 4 }}>
-            {typeof children === "function" ? children(query) : children}
-          </ScrollView>
+          {detents ? (
+            <View style={styles.fixed}>{typeof children === "function" ? children(query) : children}</View>
+          ) : (
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 4 }}>
+              {typeof children === "function" ? children(query) : children}
+            </ScrollView>
+          )}
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -106,6 +144,10 @@ const styles = StyleSheet.create({
   root: { flex: 1, justifyContent: "flex-end" },
   backdrop: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(0,0,0,0.35)" },
   sheet: { maxHeight: "80%", borderTopLeftRadius: 18, borderTopRightRadius: 18, borderWidth: StyleSheet.hairlineWidth, paddingTop: 8 },
+  // El arrastre va solo en el asa: `touch-action: none` en la lista bloquearía su scroll.
+  handleArea: { touchAction: "none", cursor: "grab" } as object,
+  handle: { height: 24, alignItems: "center", justifyContent: "center" },
+  fixed: { flex: 1, minHeight: 0 },
   grabber: { alignSelf: "center", width: 36, height: 5, borderRadius: 3, marginBottom: 6 },
   title: { fontSize: 18, fontWeight: "700", paddingHorizontal: 18, paddingVertical: 8 },
   section: { fontSize: TEXT.ui, fontWeight: "600", paddingHorizontal: 18, paddingTop: 12, paddingBottom: 4 },

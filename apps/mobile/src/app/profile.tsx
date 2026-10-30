@@ -69,7 +69,7 @@ export default function Profile() {
           <View style={[styles.avatar, { backgroundColor: theme.merged }]}>
             <Text style={styles.avatarText}>{initials(email)}</Text>
           </View>
-          <Text style={[styles.name, { color: theme.text }]}>{email?.split("@")[0] ?? "Terminus"}</Text>
+          <Text style={[styles.name, { color: theme.text }]}>{email?.split("@")[0] ?? w("common.brand_name")}</Text>
           {email ? <Text style={{ color: theme.textMuted, fontSize: TEXT.lead }}>{email}</Text> : null}
         </View>
 

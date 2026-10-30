@@ -216,6 +216,10 @@ export type Turn = {
   at?: number;
   meta?: string | null;
   model?: string | null;
+  /** Tiempo de trabajo activo del tramo del agente; falta en tareas antiguas. */
+  duration_ms?: number | null;
+  /** Una decisión de permiso: va firmada por la persona, con el texto vacío. */
+  permission?: PermissionDecision | null;
   tools?: TurnTool[];
   questions?: Question[] | null;
   answers?: Answer[] | null;
@@ -230,6 +234,10 @@ export type Turn = {
   /** La tarea que lo escribió por el CLI (`Turn::from_task`). */
   from_task?: SenderTask | null;
 };
+/** `sessions::PermissionDecision`. */
+export type PermissionDecision = { tool: string; target?: string | null; allow: boolean };
+/** Un turno que sigue contestando (`turn::list_live_turns`); `started_at` en ms de la máquina. */
+export type LiveTurn = { session: string; started_at: number };
 /** La tarea que escribió un input, como era al escribirlo (`sessions::SenderTask`). */
 export type SenderTask = { folder: string; task: string; title: string; provider: string; model?: string | null; machine?: string | null };
 /** Un paso del turno; `images` son data URLs que produjo la herramienta. `ok: false` si falló. */
