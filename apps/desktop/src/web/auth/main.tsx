@@ -7,13 +7,18 @@ import { Input } from "../../ui/Input";
 import "../phrases";
 import { authClient, authFailure } from "./client";
 import { authDestination } from "./return";
+import { WorkosAuthPage } from "./workos";
 
-export function startAuth(settings: { supabaseUrl: string; supabaseKey: string }, root: HTMLElement) {
+export function startAuth(settings: { supabaseUrl: string; supabaseKey: string; workos?: boolean }, root: HTMLElement) {
   aplicarLengua();
   seguirElTema();
   const base = import.meta.env.BASE_URL;
   const params = new URLSearchParams(window.location.search);
   const next = authDestination(params.get("next"), window.location.origin, base);
+  if (settings.workos) {
+    render(() => <WorkosAuthPage base={base} next={next} error={params.get("error")} />, root);
+    return;
+  }
   const callback = new URL(`${base}auth`, window.location.origin);
   callback.searchParams.set("next", next);
   const configured = !!settings.supabaseUrl && !!settings.supabaseKey;

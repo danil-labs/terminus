@@ -4,10 +4,14 @@ import * as WebBrowser from "expo-web-browser";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ALPHA_DEMO, demoDenied } from "./alpha-mode";
 import { supabase } from "./supabase";
+import { WorkosAccountProvider } from "./workos-account";
+
+/** Alfa en el navegador entra con WorkOS por su Worker de entrada (build con `TERMINUS_WEB_WORKOS=1`). */
+const WORKOS = process.env.EXPO_PUBLIC_TERMINUS_WEB_WORKOS === "1";
 
 export type OAuthProvider = "google" | "azure";
 
-type Account = {
+export type Account = {
   ready: boolean;
   session: Session | null;
   email: string | null;
@@ -44,6 +48,7 @@ export async function finishOAuth(url: string): Promise<string | null> {
 
 export function AccountProvider({ children }: { children: ReactNode }) {
   if (ALPHA_DEMO) return <Context.Provider value={{ ready: true, session: null, email: null, signInWithPassword: async () => "demo_read_only", signInWithProvider: async () => "demo_read_only", signOut: async () => { throw demoDenied(); }, getToken: async () => { throw demoDenied(); }, unauthorized: async () => false }}>{children}</Context.Provider>;
+  if (WORKOS) return <WorkosAccountProvider context={Context}>{children}</WorkosAccountProvider>;
   return <LiveAccountProvider>{children}</LiveAccountProvider>;
 }
 
