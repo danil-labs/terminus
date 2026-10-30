@@ -361,7 +361,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     u.doc.querySelector('[data-space="i1"]').click();
     await sleep(400);
     assert.ok(u.doc.querySelector('[data-sesion="t1"]') && !u.doc.querySelector('[data-sesion="t2"]'), "volver al espacio recupera su filtro");
-    assert.match(u.doc.querySelector("button[data-personalize]").getAttribute("aria-label"), /\(1 cambiados\)/);
+    assert.equal(u.doc.querySelector("button[data-personalize] span"), null);
     assert.equal(u.pref("sidebar.view.w.i1").agent, "ada");
     assert.equal(u.pref("sidebar.view.w.i2")?.agent ?? null, null);
     await u.filtrarPorAgente(null);

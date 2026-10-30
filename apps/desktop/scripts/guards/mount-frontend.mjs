@@ -624,7 +624,7 @@ if (!roto) {
   verSusTareas.dispatchEvent(new bubbleApp.w.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
   await sleep(120);
   assert.ok(filasDelRiel().includes("s-task") && !filasDelRiel().includes("s-plain"), "ver sus tareas filtra por el agente");
-  assert.match(bubbleDocument.querySelector("button[data-personalize]").getAttribute("aria-label"), /\(1 cambiados\)/, "el filtro cuenta el cambio");
+  assert.equal(bubbleDocument.querySelector("button[data-personalize] span"), null, "Personalizar no lleva contador de filtros");
   bubbleDocument.querySelector("button[data-personalize]").click();
   await sleep(80);
   [...bubbleDocument.querySelectorAll('[role="menu"] [role="group"][aria-label="Agente"] [role="menuitemradio"]')].find((b) => b.textContent.trim() === "Todos").click();

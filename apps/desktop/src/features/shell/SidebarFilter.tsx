@@ -7,7 +7,6 @@ import {
   type SidebarView,
   DEFAULT_SIDEBAR_VIEW,
   groupingLabel,
-  nonDefaultCount,
   sameAgent,
 } from "../../lib/sidebarView";
 import { cn } from "../../lib/utils";
@@ -163,10 +162,6 @@ export function SidebarFilterSections(props: SidebarFilterProps) {
  * las hay, y «Filtrar y agrupar». Cada parte guarda lo suyo donde siempre.
  */
 export function CustomizeMenu(props: { filter: SidebarFilterProps | null; catalog?: () => JSX.Element }) {
-  const cambiados = () => (props.filter ? nonDefaultCount(props.filter.view) : 0);
-  const etiqueta = () =>
-    cambiados() > 0 ? t("shell.customize.trigger_count", { count: cambiados() }) : t("shell.customize.trigger");
-
   return (
     <Popover placement="bottom-end" gutter={4}>
       <PopoverTrigger
@@ -177,19 +172,11 @@ export function CustomizeMenu(props: { filter: SidebarFilterProps | null; catalo
             size="icon"
             class="relative size-7 shrink-0 text-neutral-500"
             aria-haspopup="dialog"
-            aria-label={etiqueta()}
+            aria-label={t("shell.customize.trigger")}
             title={t("shell.customize.trigger")}
             data-personalize=""
           >
             <SlidersHorizontal size={15} />
-            <Show when={cambiados() > 0}>
-              <span
-                aria-hidden="true"
-                class="absolute -top-0.5 -right-0.5 min-w-3.5 rounded-full bg-neutral-950 px-1 text-center text-[0.625rem] leading-3.5 font-semibold text-surface-raised"
-              >
-                {cambiados()}
-              </span>
-            </Show>
           </Button>
         )}
       />

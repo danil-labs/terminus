@@ -73,7 +73,6 @@
   "shell.sidebar.search": "Search folders and tasks",
   "shell.sidebar.view.trigger": "Filter and group",
   "shell.customize.trigger": "Customize",
-  "shell.customize.trigger_count": "Customize ({count} changed)",
   "shell.customize.in_sidebar": "In the sidebar",
   "shell.sidebar.view.folders": "Folders",
   "shell.sidebar.view.all_folders": "All folders",
