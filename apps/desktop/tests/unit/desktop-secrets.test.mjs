@@ -7,7 +7,9 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { boot, sleep } from "../helpers/jsdom-app.mjs";
+import { setTimeout as sleep } from "node:timers/promises";
+import { secretsRoute } from "../../src/features/settings/secrets-support.ts";
+import { unknownCommand } from "../../src/lib/errorCode.ts";
 
 const workspace = { workspaces: [{ id: "w", name: "W", context_root: null }], active: "w" };
 
@@ -34,6 +36,7 @@ function table(extra) {
     workspaces_startup: workspace,
     list_projects: [{ id: "web", name: "Web", node: null, sources: [], created_at: 1, updated_at: 1 }],
     list_sources: [],
+    machine_list: [{ id: "local", active: true, local: true, on: true, hosts: true, features: ["secrets_v1"] }],
     list_live_sessions: [],
     list_live_turns: [],
     list_models: { models: [], fallback: false },
@@ -53,6 +56,7 @@ async function openSecrets(app) {
 }
 
 test("sin cuenta, Secretos lista la bóveda local, guarda y borra por el motor", async () => {
+  const { boot } = await import("../helpers/jsdom-app.mjs");
   const calls = [];
   let secrets = [{ slot: "env/*/STRIPE_KEY", folder: "*", name: "STRIPE_KEY", hint: "3f9a", in_account: false }];
   const app = await boot(
@@ -120,19 +124,58 @@ test("sin cuenta, Secretos lista la bóveda local, guarda y borra por el motor",
 });
 
 test("un motor sin secrets_v1 apaga solo Secretos", async () => {
+  const { boot } = await import("../helpers/jsdom-app.mjs");
   const app = await boot(
     "listo",
     "secretos-motor-viejo",
     table({
-      env_secrets_list: () => {
-        throw { what: { clave: "shell.service.command" }, detail: "command" };
-      },
+      machine_list: [{ id: "local", active: true, local: true, on: true, hosts: true, features: [] }],
+      env_secrets_list: () => { assert.fail("Un motor sin soporte no recibe consultas de secretos"); },
     }),
   );
   const panel = await openSecrets(app);
+  assert.equal(app.w.document.querySelector("#cfg-tab-secretos"), null, "Secretos no se ofrece en navegación");
   await waitFor(() => panel.querySelector("[data-secrets-unsupported]"), "Falta el aviso de motor sin secretos");
   assert.match(panel.textContent, /El motor de esta máquina no admite secretos/);
   assert.equal(button(panel, "Añadir secreto"), undefined, "no se ofrece guardar");
   assert.equal(panel.querySelector("[data-secret]"), null);
   assert.deepEqual(app.fallos, []);
+});
+
+
+test("an announced extension that returns the legacy literal shows incompatibility", async () => {
+  const { boot } = await import("../helpers/jsdom-app.mjs");
+  const app = await boot("listo", "secretos-legacy-literal", table({
+    env_secrets_list: () => { throw "service.error.command"; },
+    env_secret_set: () => { assert.fail("No se escribe después de orden desconocida"); },
+    env_secret_remove: () => { assert.fail("No se borra después de orden desconocida"); },
+  }));
+  const panel = await openSecrets(app);
+  await waitFor(() => panel.querySelector("[data-secrets-unsupported]"), "Falta incompatibilidad específica");
+  assert.equal(button(panel, "Añadir secreto"), undefined);
+  assert.deepEqual(app.fallos, []);
+});
+
+test("secrets capability follows the active engine, not the local or run-on machine", () => {
+  const machines = [
+    { id: "local", active: false, features: ["secrets_v1"] },
+    { id: "remote", active: true, features: [] },
+  ];
+  assert.equal(secretsRoute("engine", machines), "unsupported");
+  machines[0].features = [];
+  machines[1].features = ["secrets_v1"];
+  assert.equal(secretsRoute("engine", machines), "engine:remote");
+  assert.equal(secretsRoute("engine", [{ id: "old", active: true }]), "unsupported");
+  assert.equal(secretsRoute("engine", []), "unsupported");
+  assert.equal(secretsRoute("worker", machines), "worker");
+  assert.equal(secretsRoute("worker", []), "worker");
+});
+
+test("unknown command recognizes the pinned legacy transport literal only", () => {
+  assert.equal(unknownCommand("service.error.command"), true);
+  assert.equal(unknownCommand({ what: { clave: "shell.service.failed" }, detail: "service.error.command" }), true);
+  assert.equal(unknownCommand({ detail: { code: "command", detail: "env_secrets_list" } }), true);
+  for (const error of ["service.error.io", "command", "unsupported", "message mentions service.error.command", { detail: "io" }, { detail: "permission_denied" }]) {
+    assert.equal(unknownCommand(error), false);
+  }
 });
