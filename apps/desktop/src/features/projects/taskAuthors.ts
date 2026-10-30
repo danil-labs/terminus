@@ -43,5 +43,5 @@ export function authorKeys(rows: AuthorRow[], groupByHandler = false): string[] 
   );
 }
 
-// Si la lista esconde una tarea bajo su lanzador: la misma regla en el teléfono (`@terminus/tasks`).
-export { shownUnderLauncher } from "@terminus/tasks";
+// Si la tarea es subtarea de otra y no va en el riel: la misma regla en el teléfono (`@terminus/tasks`).
+export { isSubtask } from "@terminus/tasks";
