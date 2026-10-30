@@ -121,7 +121,7 @@ test("the web hides a delegated task under its launcher like the desktop, also f
   await router.handle("list_workspaces");
   const listed = (await router.handle("list_live_sessions", args)) as Row[];
   const shown = flattenTasks({ "": listed }).map((t) => t.row.id).sort();
-  assert.deepEqual(shown, ["cmp_mac~lanzador", "cmp_vm~lanzador"], "the delegated ones hang from their launcher; one whose launcher is gone does not show loose either");
+  assert.deepEqual(shown, ["cmp_mac~lanzador", "cmp_vm~lanzador"], "only tasks the person opened: a delegated one stays out, even if its launcher is gone");
   assert.deepEqual(delegatedOf(listed, "cmp_mac~lanzador").map((r) => r.id), ["cmp_mac~delegada"], "and the launcher's panel finds its own");
 });
 
