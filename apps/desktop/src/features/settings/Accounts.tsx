@@ -4,7 +4,6 @@ import ChevronRight from "lucide-solid/icons/chevron-right";
 import Copy from "lucide-solid/icons/copy";
 import Ellipsis from "lucide-solid/icons/ellipsis";
 import ExternalLink from "lucide-solid/icons/external-link";
-import Loader2 from "lucide-solid/icons/loader-circle";
 import RefreshCw from "lucide-solid/icons/refresh-cw";
 import Trash2 from "lucide-solid/icons/trash-2";
 import { createEffect, createMemo, createSignal, createUniqueId, For, type JSX, lazy, on, onCleanup, onMount, Show, Suspense, untrack } from "solid-js";
@@ -51,6 +50,7 @@ import ListaDeModelosLocales from "./LocalModels";
 import { LoginCodeForm } from "./LoginCodeForm";
 import { SettingsBlock, SettingsRow, SettingsSection } from "./layout";
 import { crearModelosLocales } from "./local-models-store";
+import { Spinner } from "../../ui/Spinner";
 
 // Las claves en la cuenta de Danil: un trozo aparte, solo para agentes con API key.
 const CredentialsInUse = lazy(() => import("./credentials/AccountCredentials").then((m) => ({ default: m.CredentialsInUse })));
@@ -1287,7 +1287,7 @@ export default function Accounts(props: {
                         pasa algo. */}
                     <Show when={instalando() || (!url() && !pideCodigo() && !porConfirmar())}>
                       <span class="flex items-center gap-1.5 text-xs text-neutral-500">
-                        <Loader2 size={12} class="animate-spin" />
+                        <Spinner size={12} />
                         {instalando() ? acto().curso : t("settings.accounts.connecting")}
                       </span>
                     </Show>

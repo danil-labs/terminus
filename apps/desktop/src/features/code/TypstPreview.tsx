@@ -269,7 +269,7 @@ export default function VistaPreviaTypst(props: {
             fallback={
               <Show when={compilando()}>
                 <span role="status" title={t("code.typst.compiling")} aria-label={t("code.typst.compiling")} class="grid size-6 place-items-center">
-                  <RefreshCw size={13} class="animate-spin-fluido text-primary" aria-hidden="true" />
+                  <RefreshCw size={13} class="animate-spin text-primary" aria-hidden="true" />
                 </span>
               </Show>
             }

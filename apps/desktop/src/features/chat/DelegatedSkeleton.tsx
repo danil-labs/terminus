@@ -22,7 +22,7 @@ export function DelegatedSkeleton(props: { rows?: number }) {
               <Bar class="h-[9px] w-[150px]" />
               <span class="flex-1" />
               <span class="flex h-5 min-w-[22px] shrink-0 items-center justify-end">
-                <Spinner size={14} class="text-primary motion-safe:animate-[spin_2.4s_steps(48)_infinite] motion-reduce:animate-none" />
+                <Spinner size={14} class="text-primary motion-safe:animate-spin-lento motion-reduce:animate-none" />
               </span>
             </div>
             <div class="flex h-4 min-w-0 items-center">
