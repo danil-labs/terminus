@@ -73,7 +73,7 @@ test("the page shows the computer, takes a new name and approves the code", asyn
     assert.equal(approve?.url, `${API}/approve`);
     assert.deepEqual(approve?.body, { user_code: "WDJB-MJHT", name: "Mac de Alberto" });
     assert.equal(root()?.dataset.webConnect, "done");
-    assert.ok(text().includes("Listo, vuelve a Terminus."));
+    assert.ok(text().includes("Listo, vuelve a Danil."));
     assert.deepEqual(app.fallos, []);
   } finally {
     restore();
@@ -115,7 +115,7 @@ test("approving without a license or on a used code says why", async () => {
       assert.equal(root()?.dataset.webConnect, view);
       if (view === "license") {
         const text = root().textContent;
-        assert.ok(text.includes("Activa Terminus") && text.includes("99 MXN al mes con IVA incluido"), text);
+        assert.ok(text.includes("Activa Danil") && text.includes("99 MXN al mes con IVA incluido"), text);
         const buttons = [...root().querySelectorAll("[data-terminus-license] button")].map((b) => b.textContent.trim());
         assert.deepEqual(buttons, ["Empezar prueba gratis", "Ya lo activé · Reintentar"]);
         root().querySelector("[data-license-retry]").click();

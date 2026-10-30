@@ -17,7 +17,6 @@ import { Input } from "../../ui/Input";
 import { MarcaFuente, repoDe } from "../../ui/sources";
 import { SalidaDelAgente } from "./AgentOutput";
 import { CloseBehavior } from "./CloseBehavior";
-import { NotifyBehavior } from "./NotifyBehavior";
 import { DefaultPermissions } from "./DefaultPermissions";
 import { Governed } from "./Governed";
 import { Lengua } from "./Language";
@@ -385,7 +384,6 @@ export default function General() {
         </SettingsRow>
         <DefaultPermissions />
         <CloseBehavior />
-        <NotifyBehavior />
       </SettingsSection>
 
       {/* Los temas de terminal aún no alcanzan el código ni el diff. Ofrecerlos aquí aparentaría un ajuste que apenas cambia la pantalla; docs/visual-system.md. */}

@@ -43,6 +43,7 @@ import { installIpc } from "./ipc";
 import { webAccountProfile } from "./account";
 import { webAccountEmails } from "./account-emails";
 import { authLocation } from "./auth/return";
+import { adminPageCapability } from "./admin/capability";
 import { webGithubAccount } from "./github-account";
 import { type Account, type Listing, SLOT_PREFIX, loadAccounts, ownerOf, pickAccount, readListings, rememberLast, removeExtra, savedListings } from "./accounts";
 import { forgetShellCache, setShellCacheScope } from "../lib/shellCache";
@@ -243,6 +244,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
     initialSettings: takeSettingsParam(),
     accountAssets: webWorkspaceAssets(base.endpoint, base.getToken, base.onUnauthorized),
     accountAuditLog: import.meta.env.TERMINUS_ALPHA && base.supabaseUrl && base.supabaseKey ? webAuditLog(base.supabaseUrl, base.supabaseKey, base.getToken, base.onUnauthorized) : undefined,
+    adminPage: import.meta.env.TERMINUS_ALPHA ? adminPageCapability({ getToken: async () => await base.getToken(), unauthorized: async () => base.refresh ? await base.refresh() : false }) : undefined,
     accountMemory: { endpoint: base.endpoint, getToken: token },
     accountCredentials: { endpoint: base.endpoint, getToken: token },
     machineName: (id) => fleet.name(id),
@@ -324,7 +326,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
 }
 
 /** Paneles que se abren desde la URL (`?settings=`); el parámetro sale de la barra al leerlo. */
-const LINKED_SETTINGS = ["cuenta-danil"];
+const LINKED_SETTINGS = ["cuenta-danil", "emails"];
 
 function takeSettingsParam(): string | undefined {
   const params = new URLSearchParams(window.location.search);
@@ -558,10 +560,16 @@ function toPhone(): boolean {
   return true;
 }
 
+const adminPath = `${import.meta.env.BASE_URL}admin`;
+const demo = new URLSearchParams(window.location.search).get("demo") === "1";
+
 if (import.meta.env.TERMINUS_ALPHA && window.location.pathname.replace(/\/+$/, "") === `${import.meta.env.BASE_URL}sign-in`) {
   // With WorkOS the alfa sign-in is the common one; `login` points here, so it renders in place.
   if (__TERMINUS_WEB__.workos) void import("./auth/main").then((m) => m.startAuth(__TERMINUS_WEB__, document.getElementById("root") as HTMLElement));
   else void import("./attention/SignIn").then((m) => m.startSignIn(__TERMINUS_WEB__));
+} else if (import.meta.env.TERMINUS_ALPHA && window.location.pathname.replace(/\/+$/, "") === adminPath) {
+  if (demo) void import("./admin/main").then((m) => m.startAdminDemo({ dark: new URLSearchParams(window.location.search).get("theme") === "dark" }));
+  else void import("./admin/main").then((m) => m.startAdmin({ ...__TERMINUS_WEB__, ...given } as WebSettings));
 } else if (import.meta.env.TERMINUS_ALPHA && !window.location.pathname.startsWith(`${import.meta.env.BASE_URL}m/`) && new URLSearchParams(window.location.search).get("demo") === "1") {
   void import("./attention/main").then((m) => m.startAttention(__TERMINUS_WEB__));
 } else if (toPhone()) {

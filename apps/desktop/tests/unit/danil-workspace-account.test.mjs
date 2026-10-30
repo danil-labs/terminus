@@ -187,9 +187,9 @@ test("«Conectar otra cuenta…» on a workspace with an account does not move i
   assert.deepEqual(app.fallos, []);
 });
 
-async function openDanilAccounts(name, e, antes) {
+async function openDanilAccounts(name, e, antes, panel = "cuenta-danil") {
   const app = await boot("listo", name, { ...BASE, ...e.table }, undefined, {}, { antes });
-  app.w.dispatchEvent(new app.w.CustomEvent("harness:open-settings", { detail: "cuenta-danil" }));
+  app.w.dispatchEvent(new app.w.CustomEvent("harness:open-settings", { detail: panel }));
   await sleep(1000);
   return app;
 }
@@ -370,7 +370,7 @@ test("settings follows the workspace account and reads only its registry's machi
   };
   globalThis.fetch.__jsdomApp = true;
   try {
-    app = await openDanilAccounts("danil-settings-machines-scope", e, () => { globalThis.WebSocket = peers.Socket; });
+    app = await openDanilAccounts("danil-settings-machines-scope", e, () => { globalThis.WebSocket = peers.Socket; }, "machines");
     const { w } = app;
     const panel = () => w.document.querySelector("[data-danil-account]");
     const rows = () => [...panel().querySelectorAll("[data-account-computer]")].map((el) => el.dataset.accountComputer);
@@ -402,6 +402,22 @@ test("a failed account lookup does not show the default account or its computers
   assert.deepEqual(app.fallos, []);
 });
 
+test("switching workspace inside the same account resets «Administrar» in Perfil", async () => {
+  const e = engine({ map: { w: "u_alberto", w2: "u_alberto" } });
+  const app = await openDanilAccounts("danil-settings-manage-reset", e);
+  const { w } = app;
+  const panel = () => w.document.querySelector("[data-danil-account]");
+  panel().querySelector("[data-danil-manage]").click();
+  await sleep(100);
+  assert.ok(panel().querySelector("[data-workspace-account-select]"), "«Administrar» opens the account choices");
+  e.state.active = "w2";
+  w.dispatchEvent(new w.CustomEvent("harness:workspace"));
+  await sleep(700);
+  assert.ok(panel().querySelector("[data-danil-manage]"), "W2 shows its own account row");
+  assert.equal(panel().querySelector("[data-workspace-account-select]"), null, "manage state is new for W2");
+  assert.deepEqual(app.fallos, []);
+});
+
 test("same-account workspace switches discard old machine reads, controls and connection polling", async () => {
   const e = engine({ map: { w: "u_alberto", w2: "u_alberto" } });
   e.table.account_relay_token = ({ account }) => {
@@ -430,12 +446,9 @@ test("same-account workspace switches discard old machine reads, controls and co
   };
   globalThis.fetch.__jsdomApp = true;
   try {
-    const app = await openDanilAccounts("danil-settings-same-account-late", e);
+    const app = await openDanilAccounts("danil-settings-same-account-late", e, undefined, "machines");
     const { w } = app;
     const panel = () => w.document.querySelector("[data-danil-account]");
-    const manage = panel().querySelector("[data-danil-manage]");
-    assert.ok(manage, panel().textContent + JSON.stringify(app.fallos));
-    manage.click();
     const connect = panel().querySelector("[data-connect-machine-open]");
     assert.ok(connect, panel().textContent + JSON.stringify(app.fallos));
     connect.click();
@@ -446,7 +459,6 @@ test("same-account workspace switches discard old machine reads, controls and co
     w.dispatchEvent(new w.CustomEvent("harness:workspace"));
     await sleep(700);
     assert.deepEqual([...panel().querySelectorAll("[data-account-computer]")].map((el) => el.dataset.accountComputer), []);
-    assert.equal(panel().querySelector("[data-workspace-account-select]"), null, "manage state is new for W2");
     assert.equal(panel().querySelector("[data-connect-machine]"), null, "W1's connection watcher was unmounted");
     releaseOld();
     await sleep(300);

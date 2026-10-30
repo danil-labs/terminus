@@ -378,7 +378,7 @@
   "projects.add.on_this_machine": "En esta máquina · {path}",
   "projects.add.workspace_history": "Historial de este workspace",
   "projects.error.repository_history": "No se pudo leer el historial de repositorios de este workspace. Revisa los detalles y vuelve a abrir el selector.",
-  "projects.agents.profile_prompt_radiant": "Lo instaló el gobierno de Radiant; se cambia en su repositorio fuente.",
+  "projects.agents.profile_prompt_radiant": "Lo instaló el gobierno de Danil Teams; se cambia en su repositorio fuente.",
   "projects.tabs.new": "Abrir una pestaña",
   "projects.tabs.new_task_in": "Nueva tarea en",
   "projects.tabs.new_browser": "Navegador",

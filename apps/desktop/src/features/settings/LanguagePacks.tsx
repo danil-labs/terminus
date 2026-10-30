@@ -130,7 +130,7 @@ export function PaquetesDeLengua() {
     <SettingsSection
       title={t("settings.languages.title")}
       aside={
-        <div class="flex items-center gap-2">
+        <div class="flex min-w-0 flex-wrap items-center gap-2">
           <Button
             variant="ghost"
             size="compact"
