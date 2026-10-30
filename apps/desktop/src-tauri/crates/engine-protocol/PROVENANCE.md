@@ -6,7 +6,7 @@ Apache-2.0); the manifest was regenerated on
 `b40d34999d140d30a0e1192ba752b2fdb860dc90`. The generator reads the engine
 source and is not part of this repository.
 
-`commands.json`: 549 entries: 370 invocations, 142 CLI routes, 12 RPC routes,
+`commands.json`: 553 entries: 370 invocations, 146 CLI routes, 12 RPC routes,
 three channels and twenty-two window/bridge functions; 37 events. Names, camelCase parameters, reference Rust
 types and literal events are kept.
 
@@ -20,7 +20,7 @@ repositories, and `GitHostInfo`. Files on disk keep their keys; the types that
 are stored and also travel cross the contract wrapped in `Wire`, which renames
 their keys. There are no aliases. This copy is byte-identical to the engine's.
 SHA-256:
-`5096a84a8341725f8926cdcbfb0e8b29cb85f58abee26151cbfc1f5aecc35d02`.
+`5f59d6031b76b0248f09d7e19d184a542259d773c62080a30cb9298e7b5033ca`.
 
 seldon-host `4e21caf` (#66) added the Danil account (321 commands, 28 events):
 `danil_connect_start`, `danil_connect_status`, `danil_connect_options`,
@@ -236,6 +236,12 @@ The window snapshot is byte-identical to seldon-host dev `437a280`,
 handler approvals and quarantine routes. The public projection in
 engine-protocol `e3199a5` is for the CLI and is not the window manifest.
 A compatible published engine remains required before a desktop release.
+
+seldon-host `release/train-2026-10-30` (`b8e7fcd`) adds the four admin CLI routes
+`executor release status|stage|activate|rollback` (553 entries; invocations,
+events and the other routes unchanged). The window invokes none of them. This
+copy is `git show b8e7fcd:crates/engine-manifest/commands.json` byte for byte; no
+`seldon-runtime` with it is published yet.
 
 Handler and peer error keys come from the CLI catalogs at seldon-host
 `437a280` (`crates/terminus-cli/src/messages.{es,en}.json`); the window completes
