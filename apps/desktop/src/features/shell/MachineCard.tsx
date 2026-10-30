@@ -21,7 +21,7 @@ export type Power = "on" | "off" | "starting" | "no_answer";
 const POWER_DOT: Record<Power, string> = {
   on: "bg-success-strong",
   off: "bg-neutral-500",
-  starting: "bg-warning-strong animate-pulse",
+  starting: "bg-warning-strong animate-danil-pulse",
   no_answer: "bg-error-strong",
 };
 
