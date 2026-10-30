@@ -77,6 +77,27 @@ test("upstream redirects, HTML and transport failures fail closed", async () => 
   assert.equal((await h.fetch(prefix + "/auth/profile", { headers: auth })).status, 502);
 });
 
+test("support access is one read with account_id only; revocation does not pass", async () => {
+  const h = harness();
+  const path = "/auth/account/support-access?account_id=7";
+  const response = await h.fetch(prefix + path, { headers: auth });
+  assert.equal(response.status, 200);
+  assert.equal(h.calls.length, 1);
+  assert.equal(h.calls[0].url, origin + path);
+  assert.equal(h.calls[0].headers.get("Authorization"), auth.Authorization);
+  for (const query of ["", "account_id=0", "account_id=7&limit=10", "account_id=7&account_id=8", "status=active"]) {
+    assert.equal((await h.fetch(prefix + "/auth/account/support-access?" + query, { headers: auth })).status, 400);
+  }
+  for (const target of ["/auth/account/support-access/9/revoke?account_id=7", "/auth/account/support-access/", "/internal/support-access"]) {
+    assert.ok([400, 404].includes((await h.fetch(prefix + target, { headers: auth })).status));
+  }
+  for (const method of ["POST", "DELETE"]) {
+    assert.equal((await h.fetch(prefix + "/auth/account/support-access/9/revoke?account_id=7", { method, headers: auth })).status, 405);
+  }
+  assert.equal((await h.fetch(prefix + path)).status, 401);
+  assert.equal(h.calls.length, 1);
+});
+
 test("assets preserve CSP and legacy paths are not handled", async () => {
   const h = harness();
   for (const path of ["/terminus/inbox", "/terminus/m/inbox", "/terminus/sign-in", "/terminus/m/sw.js"]) {

@@ -1,0 +1,54 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { createSupportAccess, grantOf } from '../src/support-access.ts';
+
+const session = (refresh = true) => ({ getToken: async () => 'jwt', unauthorized: async () => refresh });
+const row = (over: Record<string, unknown> = {}) => ({
+  id: 9, account_id: 44, operator_email: 'support@danil.ai', role: 'support_write', level: 'write', reason: 'Revisar el canal',
+  ticket: null, created_at: '2026-10-30T10:00:00Z', expires_at: '2026-10-31T10:00:00Z', revoked_at: null, revoked_by_kind: null, status: 'active', ...over,
+});
+
+test('lists only the Danil workspaces the person manages, never ones entered through support', async () => {
+  const seen: string[] = [];
+  const api = createSupportAccess(session(), async (input) => {
+    seen.push(String(input));
+    return Response.json({ user: { accounts: [
+      { id: 44, name: 'Cliente', role: 'owner' }, { id: 45, name: 'Otra', role: 'admin' },
+      { id: 46, name: 'Lectura', role: 'viewer' }, { id: 47, name: 'Por soporte', role: 'support_write', access: 'support' },
+    ] } });
+  });
+  assert.deepEqual(await api.workspaces(), [{ id: 44, name: 'Cliente' }, { id: 45, name: 'Otra' }]);
+  assert.deepEqual(seen, ['/terminus/alpha-api/auth/profile']);
+});
+
+test('reads the grants of one workspace through the single allowed route', async () => {
+  const seen: Array<{ url: string; auth: string | null }> = [];
+  const api = createSupportAccess(session(), async (input, init) => {
+    seen.push({ url: String(input), auth: new Headers(init?.headers).get('Authorization') });
+    return Response.json({ grants: [row(), row({ id: 8, role: 'support_read', level: undefined, status: 'revoked', revoked_at: '2026-10-30T11:00:00Z', revoked_by_kind: 'client' })], can_revoke_all: true });
+  });
+  const result = await api.list(44);
+  assert.equal(seen[0].url, '/terminus/alpha-api/auth/account/support-access?account_id=44');
+  assert.equal(seen[0].auth, 'Bearer jwt');
+  assert.equal(result.canRevokeAll, true);
+  assert.deepEqual(result.grants.map(g => [g.id, g.level, g.status]), [[9, 'write', 'active'], [8, 'read', 'revoked']]);
+});
+
+test('fails closed on other accounts, unknown states and malformed answers', async () => {
+  assert.throws(() => grantOf(row({ account_id: 99 }), 44), /invalid_scope/);
+  assert.throws(() => grantOf(row({ status: 'pending' }), 44), /invalid_response/);
+  assert.throws(() => grantOf(row({ id: 0 }), 44), /invalid_response/);
+  assert.throws(() => grantOf(row({ operator_email: 5 }), 44), /invalid_response/);
+  const api = (body: unknown, status = 200) => createSupportAccess(session(false), async () => Response.json(body, { status }));
+  await assert.rejects(api({ grants: {}, can_revoke_all: true }).list(44), /invalid_response/);
+  await assert.rejects(api({ grants: [] }).list(44), /invalid_response/);
+  await assert.rejects(api({ error: 'members_manage_required' }, 403).list(44), /HTTP 403/);
+  await assert.rejects(api({ grants: [], can_revoke_all: true }).list(0), /invalid_response/);
+});
+
+test('a 401 refreshes the session once and retries', async () => {
+  let calls = 0;
+  const api = createSupportAccess(session(true), async () => (++calls === 1 ? new Response('', { status: 401 }) : Response.json({ grants: [], can_revoke_all: false })));
+  assert.deepEqual(await api.list(44), { grants: [], canRevokeAll: false });
+  assert.equal(calls, 2);
+});
