@@ -1757,7 +1757,7 @@ export default function App() {
   });
 
   // `null` = cerrada. Una cadena es además con qué destino abrirla.
-  const [settings, setSettings] = createSignal<string | null>(null);
+  const [settings, setSettings] = createSignal<string | null>(capabilities().initialSettings ?? null);
   const [activityNotice, setActivityNotice] = createSignal<ActivityEvent | null>(null);
   const [activityMachine, setActivityMachine] = createSignal<string | null>(null);
   onMount(() => {

@@ -1,5 +1,7 @@
+import ExternalLink from "lucide-solid/icons/external-link";
 import { createEffect, createSignal, Match, on, Show, Switch } from "solid-js";
 import { t } from "../../lib/i18n";
+import { invoke } from "../../lib/invoke";
 import { capabilities } from "../../lib/platform";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
@@ -9,6 +11,7 @@ import { AccountIdentityBlock, type AccountIdentityState, createAccountIdentity 
 import type { DanilConnectStatus } from "./danil-account";
 import { createDanilAccounts, type DanilAccounts } from "./danil-accounts";
 import { createDanilSession, DanilSignInChoices, said } from "./danil-session";
+import { EmailsSection } from "./EmailsSection";
 import { type DanilSessionInfo, sessionForWorkspace, sessionKey, statusOf, syncLine } from "./danil-sessions";
 import { AccountComputersSection } from "../machines/AccountComputers";
 import { ConnectMachineSection } from "../machines/ConnectMachine";
@@ -23,7 +26,26 @@ export default function DanilAccount() {
   return web ? <WebAccount source={web} /> : <MachineAccount />;
 }
 
-/** En la web la persona ya entró con su cuenta: aquí solo su foto, nombre y correo. */
+/** Los correos se administran en la web de alfa, con la sesión del navegador. */
+const EMAILS_URL = "https://alfa-app.danil.ai/terminus/?settings=cuenta-danil";
+
+/** Sin fuente de correos aquí (el escritorio, o la web fuera de alfa): la fila que abre la web. */
+function ManageEmailsRow(props: { web?: boolean }) {
+  const open = () => {
+    if (props.web) window.open(EMAILS_URL, "_blank", "noopener");
+    else void invoke("open_external", { target: EMAILS_URL }).catch(() => {});
+  };
+  return (
+    <SettingsRow label={t("danil.emails.manage_label")} description={t("danil.emails.manage_description")} data-account-emails-link="">
+      <Button size="sm" variant="secondary" onClick={open}>
+        <ExternalLink size={14} />
+        {t("danil.emails.manage")}
+      </Button>
+    </SettingsRow>
+  );
+}
+
+/** En la web la persona ya entró con su cuenta: su foto, nombre y correos. */
 function WebAccount(props: { source: AccountProfileSource }) {
   const identity = createAccountIdentity(props.source);
   const workspaces = createWorkspaces();
@@ -31,7 +53,11 @@ function WebAccount(props: { source: AccountProfileSource }) {
     <SettingsPanel data-danil-account="web">
       <SettingsSection title={t("danil.account.title")} description={t("danil.account.web_description")}>
         <AccountIdentityBlock identity={identity} />
+        <Show when={!capabilities().accountEmails}>
+          <ManageEmailsRow web />
+        </Show>
       </SettingsSection>
+      <Show when={capabilities().accountEmails}>{(emails) => <EmailsSection source={emails()} />}</Show>
       <Show when={workspaces.actual()} keyed>
         {(workspace) => <AccountComputersSection workspace={workspace.id} />}
       </Show>
@@ -146,6 +172,7 @@ function SessionCard(props: { session: DanilSessionInfo; accounts: DanilAccounts
   return (
     <div class="grid border-b border-border last:border-b-0" data-danil-session={key} data-default={s().default ? "" : undefined}>
       <AccountIdentityBlock identity={shown} />
+      <ManageEmailsRow />
       <SettingsRow
         label={t("danil.account.this_computer", { name: props.computerName || s().computer_name || s().computer_id || "" })}
         description={state()}
@@ -203,6 +230,7 @@ function SingleAccount() {
           </Match>
           <Match when={status()?.state === "connected"}>
             <ConnectedIdentity status={status} />
+            <ManageEmailsRow />
             <SettingsRow
               label={t("danil.account.this_computer", { name: renamed() || status()?.name || status()?.computer_id || "" })}
               description={status()?.online ? t("danil.account.online") : t("danil.account.offline")}
