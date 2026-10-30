@@ -230,6 +230,10 @@
   --color-inbox-bubble-out-text: var(--color-neutral-950);
   --color-inbox-bubble-out-muted: var(--color-neutral-500);
   --color-inbox-bubble-out-label: var(--color-neutral-700);
+  /* El ícono de canal del Inbox alfa lleva el color de marca, igual en los dos temas, como en Appv2. */
+  --color-inbox-channel-whatsapp: #25d366;
+  --color-inbox-channel-instagram: #e1306c;
+  --color-inbox-channel-messenger: #1877f2;
   --color-surface-muted: #f3f4f8;
   /* El riel de Configuración. Un escalón por debajo de `surface-muted` para que la
      pestaña abierta, que se funde con el contenido en `surface`, se separe del riel:
