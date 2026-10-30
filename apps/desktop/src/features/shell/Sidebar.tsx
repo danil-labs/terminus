@@ -1,5 +1,4 @@
 import History from "lucide-solid/icons/history";
-import Loader2 from "lucide-solid/icons/loader-2";
 import Plus from "lucide-solid/icons/plus";
 import SquarePen from "lucide-solid/icons/square-pen";
 import TriangleAlert from "lucide-solid/icons/triangle-alert";
@@ -46,6 +45,7 @@ import { flattenTasks, folderCounts } from "./sidebarTasks";
 import { machineName, machines } from "../machines/store";
 // Solo al crear un encargado: fuera de la carga inicial.
 import { LazyPart, retryableLazy } from "../../ui/LazyPart";
+import { Spinner } from "../../ui/Spinner";
 const NewAgent = retryableLazy(() => import("../projects/NewAgent"));
 
 // Fuera de la carga inicial: el botón y el dock llegan un instante después de la lista.
@@ -436,11 +436,7 @@ export default function Sidebar(props: {
           />
         }
       >
-        <Loader2
-          size={14}
-          class="animate-spin justify-self-center text-neutral-500"
-          aria-hidden="true"
-        />
+        <Spinner size={14} class="justify-self-center text-neutral-500" />
       </Show>
       <span class="grid min-w-0">
         <span class="truncate text-[0.8125rem] font-medium text-neutral-500">

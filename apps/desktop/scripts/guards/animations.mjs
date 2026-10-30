@@ -16,20 +16,12 @@ const RAIZ = fileURLToPath(new URL("../../src", import.meta.url));
 /** Animaciones de CSS que corren solo mientras dura un gesto corto. */
 const KEYFRAMES_PERMITIDOS = new Set(["finish-task-ignition", "finish-task-exhaust"]);
 
-/** Cuántas clases continuas de Tailwind puede llevar cada archivo. El cupo no sube. */
-const CUPO_TAILWIND = {
-  "features/settings/AccountCard.tsx": 2,
-  "features/settings/Accounts.tsx": 1,
-  "features/settings/Environment.tsx": 1,
-  "features/settings/General.tsx": 2,
-  "features/shell/Sidebar.tsx": 1,
-  "features/shell/Storage.tsx": 1,
-  "ui/Terminal.tsx": 1,
-};
-
 const DECLARACION = /(?:^|[;{\s])(?:animation|--animate-[\w-]+)\s*:\s*([^;}]+)/g;
 const POR_PASOS = /\bsteps\(|\bstep-(?:start|end)\b/;
-const TAILWIND_CONTINUA = /\banimate-(?:spin|pulse|ping|bounce)(?![\w-])/g;
+/** `animate-spin` y `animate-pulse` van por pasos (`global.css`); estos dos no. */
+const TAILWIND_CONTINUA = /\banimate-(?:ping|bounce)(?![\w-])/g;
+/** Una animación escrita en la clase, `animate-[nombre_1s_infinite]`. */
+const CLASE_ARBITRARIA = /\banimate-\[([^\]]+)\]/g;
 
 const fallos = [];
 for (const f of walkFiles(RAIZ, [".css"])) {
@@ -44,10 +36,13 @@ for (const f of walkFiles(RAIZ, [".css"])) {
 }
 
 for (const f of walkFiles(RAIZ, [".ts", ".tsx"])) {
-  const cuantas = [...readFileSync(f, "utf8").matchAll(TAILWIND_CONTINUA)].length;
+  const fuente = readFileSync(f, "utf8");
   const clave = relative(RAIZ, f).replaceAll("\\", "/");
-  const cupo = CUPO_TAILWIND[clave] ?? 0;
-  if (cuantas > cupo) fallos.push(`${clave}  ${cuantas} clases animate-spin/pulse/ping/bounce, cupo ${cupo}`);
+  for (const m of fuente.matchAll(TAILWIND_CONTINUA)) fallos.push(`${clave}  ${m[0]}`);
+  for (const m of fuente.matchAll(CLASE_ARBITRARIA)) {
+    const valor = m[1].replaceAll("_", " ");
+    if (/\binfinite\b/.test(valor) && !POR_PASOS.test(valor)) fallos.push(`${clave}  ${m[0]}`);
+  }
 }
 
 if (fallos.length === 0) {
@@ -58,8 +53,8 @@ if (fallos.length === 0) {
 for (const f of fallos) console.error(`Animación infinita continua — ${f}`);
 console.error(
   "\nMientras esté en pantalla, WebKit recompone la ventana a 60 cuadros por segundo.\n" +
-    "Usa `steps()` —o los tokens `animate-danil-pulse` y `animate-spin-steps`— y, si\n" +
+    "Usa `steps()` —o los tokens `animate-spin`, `animate-pulse` y `animate-skeleton`— y, si\n" +
     "hay varias a la vez, periodos múltiplos de un mismo paso anclados a un reloj\n" +
-    "común (ver los astros en `global.css`).",
+    "común (`lib/sharedClock.ts`).",
 );
 process.exit(1);

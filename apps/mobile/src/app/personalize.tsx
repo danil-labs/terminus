@@ -1,8 +1,9 @@
 import { DEFAULT_SIDEBAR_VIEW, GROUPINGS, groupingLabel } from "@terminus/tasks";
 import { router } from "expo-router";
-import { ScrollView, Switch, View } from "react-native";
+import { Linking, ScrollView, Switch, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ALPHA_ORDINARY } from "../lib/alpha-mode";
+import { MOBILE_WEB_DIR } from "@terminus/design";
+import { ALPHA_DEMO, ALPHA_ORDINARY, WEB_BASE } from "../lib/alpha-mode";
 import { useCustomization } from "../lib/customization";
 import { useHomeLabel } from "../lib/homeLabel";
 import { lang, t, w } from "../lib/i18n";
@@ -72,6 +73,14 @@ export default function Personalize() {
               })}
             </Group>
             {model.temporary ? <GroupFooter>{t("attention.memory")}</GroupFooter> : null}
+            {ALPHA_DEMO ? (
+              <>
+                <View style={{ height: 12 }} />
+                <Group>
+                  <ListRow testID="leave-demo" title={t("attention.leave_demo")} chevron onPress={() => void Linking.openURL(`${WEB_BASE}${MOBILE_WEB_DIR}/`)} />
+                </Group>
+              </>
+            ) : null}
           </>
         ) : null}
 

@@ -44,8 +44,8 @@ export default function Profile() {
   useEffect(() => {
     if (!first || !workspace || !reachable) return;
     let live = true;
-    if (ready("keepAwake")) void keepAwakeOf(first, workspace).then((value) => { if (live) setAwake(value); }, () => {});
-    if (ready("ports")) void portsOf(first, workspace).then((value) => { if (live) setPorts(value); }, () => {});
+    if (ready("keep_awake", first)) void keepAwakeOf(first, workspace).then((value) => { if (live) setAwake(value); }, () => {});
+    if (ready("ports", first)) void portsOf(first, workspace).then((value) => { if (live) setPorts(value); }, () => {});
     return () => { live = false; };
   }, [first, workspace, reachable]);
 
@@ -91,7 +91,7 @@ export default function Profile() {
           />
         </View>
 
-        {ready("keepAwake") && awake?.supported ? (
+        {ready("keep_awake", first) && awake?.supported ? (
           <>
             <GroupHeader right={
               <View style={styles.state}>
@@ -122,7 +122,7 @@ export default function Profile() {
         <View style={{ height: 20 }} />
         <Group inset={56}>
           <ListRow testID="settings" icon={{ name: "settings", color: "#64748b" }} title={w("settings.title")} chevron onPress={() => router.push("/settings")} />
-          {ready("ports") && ports ? (
+          {ready("ports", first) && ports ? (
             <ListRow testID="ports" icon={{ name: "plug", color: "#0ea5e9" }} title={w("shell.ports.title")} value={String(portList.length)} chevron onPress={() => setPortsOpen(true)} />
           ) : null}
           <ListRow testID="storage" icon={{ name: "hard-drive", color: "#8b5cf6" }} title={t("storage.title")} chevron onPress={() => router.push({ pathname: "/accounts", params: { storage: "1" } })} />

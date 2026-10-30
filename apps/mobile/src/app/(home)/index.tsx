@@ -111,7 +111,7 @@ export default function Home() {
     return host && on && current?.members.has(host.id) ? { host, workspace: current.members.get(host.id)!, id: on[1] } : null;
   };
   const title = space ? spaceName(space, t("space.general")) : current?.name ?? "Terminus";
-  const manage = ready("spaces") && !!target;
+  const manage = !!target && ready("spaces", target.host);
   const spaceItems: MenuItem[] = [
     ...(spaces.length > 1 ? spaces.map((s) => ({
       key: `space-${s.id}`,

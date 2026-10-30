@@ -1,5 +1,9 @@
 const HOST = "alfa-app.danil.ai";
-const PREFIX = "/terminus/alpha-api";
+// La web vive en la raíz del dominio (build con `TERMINUS_WEB_BASE=/`).
+const PREFIX = "/alpha-api";
+// Donde vivía antes; sus enlaces y PWA instaladas se mandan a la raíz.
+const LEGACY = "/terminus";
+const PHONE_ROUTES = ["inbox", "inbox-thread", "inbox-detail", "personalize", "broadcasts", "channels", "attention-agents"].map(route => `/m/${route}`);
 const json = (error, status) => Response.json({ error }, {
   status,
   headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" },
@@ -27,9 +31,9 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.hostname !== HOST || url.protocol !== "https:") return json("not_found", 404);
-    if (url.pathname === "/terminus") {
+    if (url.pathname === LEGACY || url.pathname.startsWith(`${LEGACY}/`)) {
       if (request.method !== "GET" && request.method !== "HEAD") return json("method_not_allowed", 405);
-      url.pathname = "/terminus/";
+      url.pathname = url.pathname.slice(LEGACY.length) || "/";
       return new Response(null, { status: 308, headers: { Location: url.href, "Cache-Control": "no-store" } });
     }
     if (url.pathname === PREFIX || url.pathname.startsWith(`${PREFIX}/`)) {
@@ -73,11 +77,10 @@ export default {
         },
       });
     }
-    if (!url.pathname.startsWith("/terminus/")) return json("not_found", 404);
     if (request.method !== "GET" && request.method !== "HEAD") return json("method_not_allowed", 405);
     if (!env.TERMINUS_WEB) return json("assets_unavailable", 503);
-    if (["/terminus/m/inbox", "/terminus/m/inbox-thread", "/terminus/m/inbox-detail", "/terminus/m/personalize", "/terminus/m/broadcasts", "/terminus/m/channels", "/terminus/m/attention-agents"].includes(url.pathname)) {
-      url.pathname = "/terminus/m/";
+    if (PHONE_ROUTES.includes(url.pathname)) {
+      url.pathname = "/m/";
       return env.TERMINUS_WEB.fetch(new Request(url, request));
     }
     return env.TERMINUS_WEB.fetch(request);

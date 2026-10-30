@@ -54,7 +54,7 @@ export default function Search() {
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState<Kind>("all");
   const [archived, setArchived] = useState<Task[] | null>(null);
-  const withArchived = ready("archived");
+  const withArchived = ready("archived") && !!current && [...current.members.keys()].some((id) => ready("archived", hostOf(id)));
 
   // Las archivadas se piden una vez al abrir, a cada máquina encendida del workspace.
   useEffect(() => {

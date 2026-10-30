@@ -10,7 +10,8 @@ import {
   type InboxFilter,
   matchesFilter,
 } from "../../../../packages/attention/src/inbox.ts";
-import { ALPHA_DEMO } from "../lib/alpha-mode";
+import { MOBILE_WEB_DIR } from "@terminus/design";
+import { ALPHA_DEMO, WEB_BASE } from "../lib/alpha-mode";
 import { useCustomization } from "../lib/customization";
 import { useHomeLabel } from "../lib/homeLabel";
 import { lang, t, w } from "../lib/i18n";
@@ -89,7 +90,7 @@ export default function Inbox() {
             <GroupFooter>{t("alpha.intro")}</GroupFooter>
             <View style={{ height: 12 }} />
             <Group>
-              <ListRow testID="inbox-signin" title={t("alpha.signin")} chevron onPress={() => void Linking.openURL(`${process.env.EXPO_PUBLIC_TERMINUS_WEB_BASE || "/terminus/"}sign-in?next=%2Fterminus%2Fm%2Finbox`)} />
+              <ListRow testID="inbox-signin" title={t("alpha.signin")} chevron onPress={() => void Linking.openURL(`${WEB_BASE}sign-in?next=${encodeURIComponent(`${WEB_BASE}${MOBILE_WEB_DIR}/inbox`)}`)} />
             </Group>
           </>
         ) : (
