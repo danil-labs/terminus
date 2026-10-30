@@ -42,6 +42,7 @@ import Sessions, { type SessionRow } from "./Sessions";
 import type { Etapa } from "./TaskStage";
 // Solo al crear un encargado: fuera de la carga inicial.
 import { LazyPart, retryableLazy } from "../../ui/LazyPart";
+import { SectionLabel } from "../../ui/SectionLabel";
 const NewAgent = retryableLazy(() => import("./NewAgent"));
 
 // Fuera de la carga inicial: la memoria se pinta abajo de la vista y trae el cliente de la cuenta.
@@ -367,9 +368,9 @@ export default function VistaDeProyecto(props: {
 
         <section class="grid gap-2">
           <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-            <h2 class="m-0 text-caption font-medium tracking-wide text-neutral-500 uppercase">
+            <SectionLabel>
               {t("projects.view.work_title")}
-            </h2>
+            </SectionLabel>
             <Button variant="ghost" size="sm" onClick={() => void elegirCarpeta()}>
               <FolderOpen size={14} />
               {t("projects.view.work_pick")}
@@ -451,9 +452,9 @@ export default function VistaDeProyecto(props: {
 
         <section class="grid gap-2">
           <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-            <h2 class="m-0 text-caption font-medium tracking-wide text-neutral-500 uppercase">
+            <SectionLabel>
               {t("projects.view.sources_title")}
-            </h2>
+            </SectionLabel>
             <Popover
               open={anadiendo()}
               onOpenChange={(abre) => {
@@ -611,9 +612,9 @@ export default function VistaDeProyecto(props: {
 
         <section class="grid gap-2">
           <header class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-            <h2 class="m-0 text-caption font-medium tracking-wide text-neutral-500 uppercase">
+            <SectionLabel>
               {t("projects.view.agents_title")}
-            </h2>
+            </SectionLabel>
             <Button size="sm" variant="ghost" onClick={() => setCreando(true)}>
               <Plus size={14} />
               {t("projects.agents.new_open")}
@@ -672,9 +673,9 @@ export default function VistaDeProyecto(props: {
               del proyecto, y el único camino de vuelta para uno del
               repositorio al que se le quitó la fila del riel. */}
           <Show when={ocultos().length > 0}>
-            <h3 class="m-0 text-caption font-medium tracking-wide text-neutral-500 uppercase">
+            <SectionLabel as="h3">
               {t("projects.view.agents_hidden")}
-            </h3>
+            </SectionLabel>
             <ul class="m-0 grid list-none gap-1 p-0">
               <For each={ocultos()}>
                 {(uno) => (
@@ -706,9 +707,9 @@ export default function VistaDeProyecto(props: {
         </section>
 
         <section class="grid gap-2">
-          <h2 class="m-0 text-caption font-medium tracking-wide text-neutral-500 uppercase">
+          <SectionLabel>
             {t("projects.view.tasks_title")}
-          </h2>
+          </SectionLabel>
           {/* La misma lista que el historial del sidebar, y a propósito: sus
               filas ya llevan el estado de cada tarea —trabajando, preguntó,
               espera aprobación— y su menú de mover y borrar. Dos listas de lo
