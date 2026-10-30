@@ -83,6 +83,7 @@ import { arbolesDe, contiene, ubicar } from "../features/code/treeKind";
 import type { Tipo } from "../features/code/FileTree";
 const ColumnaDeTrabajo = lazy(() => import("../features/code/WorkTreeColumn"));
 import TaskFilesRow, { taskFilesWidth } from "../features/code/TaskFilesRow";
+import { moviendoHueco } from "../lib/sites";
 const TaskFilesCard = lazy(() => import("../features/code/TaskFiles"));
 import { createTaskFiles } from "../lib/taskFiles";
 import { esDeCodigo } from "../features/code/workdirKind";
@@ -7835,7 +7836,7 @@ export default function App() {
           return (
             <Show when={usado()}>
               <div class="z-10 flex min-h-0 min-w-0 justify-self-end pt-9 pr-2 pb-2"
-                classList={{ hidden: !visible(), "w-full pl-2": cubre(), "mt-8": llevaTiraInterior(sitio()) }}
+                classList={{ hidden: !visible(), "w-full pl-2": cubre(), "mt-8": llevaTiraInterior(sitio()), "transition-[width] duration-200 ease-out": !moviendoHueco() }}
                 style={{ ...placement(), width: ancho() }}
                 onPointerDown={() => { const d = sitio(); if (d) mandarVentana(d); }}>
                 <Suspense fallback={null}>

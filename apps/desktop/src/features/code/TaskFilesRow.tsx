@@ -76,7 +76,7 @@ export default function TaskFilesRow(props: {
           </div>
       </Show>
       <Show when={props.open && !props.covers}>
-        <div aria-hidden="true" class="shrink-0" style={cardStyle()} />
+        <div aria-hidden="true" class="shrink-0" classList={{ "transition-[width] duration-200 ease-out": !dragging() }} style={cardStyle()} />
       </Show>
     </div>
   );
