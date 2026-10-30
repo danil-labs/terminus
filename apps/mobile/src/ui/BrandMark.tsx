@@ -1,6 +1,6 @@
+import { useTheme } from "./theme";
 import { AGENT_MARKS, agentMarkId } from "@terminus/design";
 import { useId } from "react";
-import { useColorScheme } from "react-native";
 import Svg, { Defs, FeGaussianBlur, Filter, G, Mask, Path } from "react-native-svg";
 
 /**
@@ -10,7 +10,7 @@ import Svg, { Defs, FeGaussianBlur, Filter, G, Mask, Path } from "react-native-s
  * (el del texto). Un proveedor desconocido no pinta nada.
  */
 export function BrandMark({ id, size = 14, color }: { id: string | null | undefined; size?: number; color: string }) {
-  const dark = useColorScheme() === "dark";
+  const dark = useTheme().dark;
   // Ids por instancia: la marca se pinta varias veces por pantalla, y dos ids iguales se pisan.
   const uid = useId().replace(/[^\w-]/g, "");
   const which = agentMarkId(id);
