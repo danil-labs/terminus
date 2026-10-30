@@ -1769,6 +1769,10 @@ if (!roto) {
     const signals = [...row("p").querySelectorAll("[data-session-pr] [data-git-signal]")].map((el) => el.dataset.gitSignal);
     assert.deepEqual(signals, signal ? [signal] : [], `${checks}/${review} ${JSON.stringify(overrides)}`);
     assert.equal(row("p").querySelector("[data-git-checks], [data-git-review]"), null, "la tarjeta no repite las dos señales");
+    if (signal === "pending") {
+      assert.ok(row("p").querySelector('[data-git-signal="pending"] svg.lucide-circle-dashed'), "checks pendientes: el círculo punteado de la flotante");
+      assert.equal(row("p").querySelector("[data-session-pr] svg[data-spinner]"), null, "el único loader de la tarjeta es el de «trabajando»");
+    }
     if (signal === "stale") {
       assert.ok(row("p").querySelector('[data-git-signal="stale"] svg.lucide-clock'), "desactualizado: solo el reloj");
       assert.ok(row("p").querySelector("[data-session-pr].text-neutral-500"), "desactualizado: el chip entero en gris");
