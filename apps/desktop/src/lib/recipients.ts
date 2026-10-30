@@ -39,6 +39,8 @@ export type SenderTask = {
   title: string;
   provider: string;
   model?: string | null;
+  /** La computadora donde vive, si no es la que guardó el mensaje. */
+  machine?: string | null;
 };
 
 /** El nombre del encargado, y el intervalo de su etiqueta en el texto de la caja. */

@@ -709,7 +709,7 @@ export type ChatProps = {
   /** Abrir lo que el hilo acaba de anunciar, por su ruta dentro de la tarea. */
   onAbrirArtefacto: (rel: string) => void;
   /** Abre la tarea que firmó un mensaje (`Turn::from_task`). */
-  onOpenTask?: (folder: string, task: string) => void;
+  onOpenTask?: (folder: string, task: string, machine?: string | null) => void;
   /** Una tarea del riel por su id, para las filas guardadas sin `from_task`. */
   tareaPorId?: (id: string) => SenderTask | null;
 
@@ -3124,7 +3124,7 @@ export default function Chat(props: ChatProps) {
                                   type="button"
                                   class={cn("truncate underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-primary", !m().encargado && "font-semibold")}
                                   aria-label={t("chat.recipients.open_task", { title: sender().title })}
-                                  onClick={() => props.onOpenTask?.(sender().folder, sender().task)}
+                                  onClick={() => props.onOpenTask?.(sender().folder, sender().task, sender().machine)}
                                 >
                                   {sender().title}
                                 </button>
@@ -3512,7 +3512,7 @@ function RegistroDeTrabajo(props: {
                         type="button"
                         title={t("chat.work.open_changes")}
                         onClick={() => props.onVerCambios?.()}
-                        class="pointer-events-auto relative rounded-sm underline decoration-neutral-400 underline-offset-2 hover:text-neutral-950 hover:decoration-current focus-visible:outline-2 focus-visible:outline-primary"
+                        class="pointer-events-auto relative rounded-sm underline decoration-neutral-500 underline-offset-2 hover:text-neutral-950 hover:decoration-current focus-visible:outline-2 focus-visible:outline-primary"
                       >
                         {parte().texto}
                       </button>
@@ -3873,7 +3873,7 @@ function SiguioTrasElCupo(props: { cambio: CambioPorCupo }) {
  */
 function FilaDeLaBandeja(props: {
   msg: Msg;
-  onOpenTask?: (folder: string, task: string) => void;
+  onOpenTask?: (folder: string, task: string, machine?: string | null) => void;
   tareaPorId?: (id: string) => SenderTask | null;
 }) {
   const informe = () => (citaInforme(props.msg.meta) ? props.msg.text.trim() : "");
@@ -3901,7 +3901,7 @@ function FilaDeLaBandeja(props: {
                   type="button"
                   class="cursor-pointer underline underline-offset-2"
                   aria-label={t("chat.recipients.open_task", { title: sender().title })}
-                  onClick={() => props.onOpenTask?.(sender().folder, sender().task)}
+                  onClick={() => props.onOpenTask?.(sender().folder, sender().task, sender().machine)}
                 >
                   {t("chat.task_completed.open")}
                 </button>
@@ -3938,7 +3938,7 @@ function HitoDelHilo(props: {
   /** Llevar a donde se conectan y se cambian las cuentas. */
   onCuentas: () => void;
   /** Abre la tarea que firmó la fila (`Turn::from_task`). */
-  onOpenTask?: (folder: string, task: string) => void;
+  onOpenTask?: (folder: string, task: string, machine?: string | null) => void;
 }) {
   const esFallo = () => props.msg.meta === "fallo";
   return (
@@ -3981,7 +3981,7 @@ function HitoDelHilo(props: {
                   type="button"
                   class="cursor-pointer underline underline-offset-2"
                   aria-label={t("chat.recipients.open_task", { title: sender().title })}
-                  onClick={() => props.onOpenTask?.(sender().folder, sender().task)}
+                  onClick={() => props.onOpenTask?.(sender().folder, sender().task, sender().machine)}
                 >
                   {t("chat.task_completed.open")}
                 </button>
