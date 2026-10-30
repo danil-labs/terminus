@@ -46,7 +46,7 @@ import {
   modoRecordado,
   recordarModo,
 } from "../features/chat/modes";
-import DelegatedActivity, { DelegatedLaunch, delegatedAttention, delegatedDescendants, delegatedFamilies, type DelegatedListProps } from "../features/chat/DelegatedTasks";
+import DelegatedActivity, { DelegatedLaunch, DelegatedNone, delegatedAttention, delegatedDescendants, delegatedFamilies, type DelegatedListProps } from "../features/chat/DelegatedTasks";
 import PreviousAgentChat from "../features/chat/PreviousAgentChat";
 import type { AlmacenDePreguntas, PreguntasAMedias, Respuesta, RespuestaEnviada } from "../features/chat/Questions";
 import { contestaALaTerminal, despachable, esDeLaTerminal, guardable, inyectable, type RazonDeRetencion, retencionAlCargar, siguienteLote, sueltaElBorrador } from "../features/chat/queue";
@@ -6831,8 +6831,9 @@ export default function App() {
     .reduce<SitioDePanel | null>((a, b) => (!a || b.col > a.col ? b : a), null);
   const esquinaConTarea = () => {
     const sitio = esquina();
-    return !!sitio && !tapadoPorElProyecto(sitio) &&
-      pestanas.open().find(p => p.id === paneles.activeTabAt(sitio))?.clase === "tarea";
+    // La tarea nueva también: su barra de herramientas ya lleva el conmutador.
+    return !!sitio && !tapadoPorElProyecto(sitio) && (paneles.activeTabAt(sitio) === null ||
+      pestanas.open().find(p => p.id === paneles.activeTabAt(sitio))?.clase === "tarea");
   };
   // Una sola ventana: sus pestañas van en la franja de la ventana, entre la navegación y los controles.
   const tiraDeLaVentana = () => (
@@ -7134,7 +7135,14 @@ export default function App() {
     };
     // Máquina, carpeta y rama de la tarea. Una función y no un elemento: el chat la pinta
     // y, cuando los archivos lo tapan, la fila de la tarea pinta la suya.
-    const ubicacion = () => <Show when={pp.sesion}>{(id) => {
+    const ubicacion = () => <Show when={pp.sesion} fallback={<Show when={!paginaDeAgente()}><Suspense fallback={null}><TaskLocation
+      /* La tarea nueva: la máquina y la carpeta donde va a correr. La rama sale al empezarla. */
+      machine={draftMachine() ?? undefined}
+      on={machines().find(m => m.id === draftMachine())?.on !== false}
+      onScreen={abrirPantalla}
+      onFiles={columnaConContenido() ? () => setArtOpen(true) : undefined}
+      project={proyectoDeLaCelda()?.name}
+      path={carpetaDeTrabajo(proyectoDeLaCelda() ?? {}) || undefined} /></Suspense></Show>}>{(id) => {
       return <Suspense fallback={null}><TaskLocation
         machine={filaDe(id())?.machine}
         on={!apagadas()[id()] && filaDe(id())?.machine_on !== false}
@@ -7672,17 +7680,20 @@ export default function App() {
           ? agent()
           : (filaDe(task()?.session ?? "")?.agent ?? agent());
         const herramientas = () => <ThreadSearch conversation={task()?.session ?? ""} active={sameSite(site(), paneles.activeSite()) && settings() === null && alta() === null}
+              disabled={!task()?.session}
               messages={target()?.messages() ?? []} thread={() => target()?.thread()}
               onJump={block => target()?.jump(block)}
               tools={<>
-                <Show keyed when={delegatedToolbarTargets().get(`${workspaceActivo()}/${task()?.session ?? ""}`)}>{render => render()}</Show>
+                <Show keyed when={delegatedToolbarTargets().get(`${workspaceActivo()}/${task()?.session ?? ""}`)} fallback={<DelegatedNone />}>{render => render()}</Show>
                 <UsageTool usage={consumo} agent={agenteDeLaVentana()} onGestionarCuentas={() => setSettings("proveedores-ia")} />
                 <Show when={task()?.session} fallback={<Show when={!artOpen() && !paginaDeAgente()}>{botonDelArbol()}</Show>}>
                   {botonDeArchivos(() => task()?.session ?? "")}
                 </Show>
               </>} />;
         // Centrada con la fila de máquina, proyecto y rama de la tarea (`TaskLocation`).
-        return <Show when={Boolean(task()) && !tapadoPorElProyecto(site())}>
+        // La tarea nueva (ventana sin pestaña) lleva la misma barra, con lo que aún no tiene apagado;
+        // la página de un agente también es una ventana sin pestaña, y no es una tarea.
+        return <Show when={(Boolean(task()) || (paneles.activeTabAt(site()) === null && !paginaDeAgente())) && !tapadoPorElProyecto(site())}>
           <div class="z-20 min-w-0 max-w-full self-start justify-self-end pt-px pr-3" style={estiloDeLaCelda(site())}
             classList={{ "mt-8": llevaTiraInterior(site()) }} onPointerDown={() => mandarVentana(site())}>
             {herramientas()}

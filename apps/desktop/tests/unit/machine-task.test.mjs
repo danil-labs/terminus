@@ -130,6 +130,36 @@ test("la ventana de una tarea local dice su máquina, su proyecto y su rama", as
   assert.deepEqual(app.fallos, []);
 });
 
+test("la tarea nueva lleva la barra de una tarea: ubicación, herramientas apagadas con su porqué y carpeta encendida", async () => {
+  const app = await boot("listo", "machine-task-draft-bar", responses({
+    list_live_sessions: ({ project }) => (project === "p1" ? [row("t1")] : []),
+    load_session: ({ id }) => session(id, [turn(0, "Hola local"), turn(1, "Respuesta local")]),
+  }));
+  await sleep(600);
+  const doc = app.w.document;
+  const boton = (label) => doc.querySelector(`button[aria-label="${label}"]`);
+  boton("Nueva tarea en P1").click();
+  await sleep(400);
+  assert.equal(doc.querySelector("[data-task-location-project]")?.textContent, "P1");
+  const buscar = doc.querySelector('button[aria-label="Buscar en esta tarea"][aria-keyshortcuts]');
+  assert.equal(buscar?.getAttribute("aria-disabled"), "true");
+  assert.equal(buscar.title, "Buscar estará disponible cuando la tarea tenga mensajes");
+  buscar.click();
+  await sleep(50);
+  assert.equal(doc.querySelector('[role="search"]'), null, "la búsqueda se abrió sin nada que buscar");
+  const delegadas = doc.querySelector('[data-delegated-trigger="toolbar"]');
+  assert.equal(delegadas?.getAttribute("aria-disabled"), "true");
+  assert.equal(delegadas.title, "Aún no hay tareas delegadas");
+  boton("Cerrar el árbol de trabajo").click();
+  await sleep(100);
+  assert.equal(boton("Ver el árbol de trabajo")?.disabled, false, "la carpeta existe: su icono no se apaga");
+  // Una tarea real sin delegadas conserva el hueco, y su búsqueda sí funciona.
+  await openTask(app, "t1");
+  assert.equal(doc.querySelector('[data-delegated-trigger="toolbar"]')?.getAttribute("aria-disabled"), "true");
+  assert.equal(doc.querySelector('button[aria-label="Buscar en esta tarea"][aria-keyshortcuts]')?.getAttribute("aria-disabled"), null);
+  assert.deepEqual(app.fallos, []);
+});
+
 test("el PDF que nombra el chat de una tarea de otra máquina se lee en esa máquina", async () => {
   const PDF = "/Users/alberto/exchange/Propuesta%20Chemara.pdf";
   const reads = [];
