@@ -88,6 +88,7 @@ pub const MANIFEST: &str = include_str!("../commands.json");
 /// no las conoce, la orden falla sola y esa función se apaga.
 pub const EXTENSIONS: &[&str] = &[
     include_str!("../extensions/orchestrators.json"),
+    include_str!("../extensions/secrets_v1.json"),
     include_str!("../extensions/artifact_parts_v1.json"),
 ];
 

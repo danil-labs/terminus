@@ -8,6 +8,7 @@ import Folders from "lucide-solid/icons/folders";
 import Puzzle from "lucide-solid/icons/puzzle";
 import Radar from "lucide-solid/icons/radar";
 import GitBranch from "lucide-solid/icons/git-branch";
+import KeyRound from "lucide-solid/icons/key-round";
 import Monitor from "lucide-solid/icons/monitor";
 import ScrollText from "lucide-solid/icons/scroll-text";
 import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
@@ -43,6 +44,7 @@ const DanilAccount = lazy(() => import("./DanilAccount"));
 const ActivityLogs = lazy(() => import("./ActivityLogs"));
 const Connections = lazy(() => import("./Connections"));
 const Appearance = lazy(() => import("./Appearance"));
+const Secrets = lazy(() => import("./Secrets"));
 
 /**
  * Configuración: el contenedor y su navegación.
@@ -213,6 +215,22 @@ const destinosDe = (
     icono: () => <GitBranch size={15} />,
     panel: () => <Providers />,
   },
+  ...(capabilities().nativeWindow || capabilities().accountCredentials
+    ? [
+        {
+          id: "secretos",
+          get name() {
+            return t("settings.nav.secrets");
+          },
+          icono: () => <KeyRound size={15} />,
+          panel: () => (
+            <Suspense fallback={null}>
+              <Secrets />
+            </Suspense>
+          ),
+        },
+      ]
+    : []),
   ...(capabilities().radiant
     ? [
         {
@@ -260,7 +278,7 @@ const GRUPOS: { nombre: () => string; ids: string[] }[] = [
   { nombre: () => t("settings.nav.group_custom"), ids: ["skills", "agentes", "proyectos", "plugins"] },
   {
     nombre: () => t("settings.nav.group_connections"),
-    ids: ["cuenta-danil", "conexiones", "proveedores-ia", "fuentes", "radiant"],
+    ids: ["cuenta-danil", "conexiones", "proveedores-ia", "secretos", "fuentes", "radiant"],
   },
 ];
 
@@ -387,6 +405,16 @@ export default function Settings(props: {
     };
     window.addEventListener("keydown", alTeclear, true);
     onCleanup(() => window.removeEventListener("keydown", alTeclear, true));
+  });
+  // Con la hoja ya abierta, `panel` no vuelve a leerse: un enlace interno («Iniciar sesión» en Secretos) cambia de destino por aquí.
+  onMount(() => {
+    const alPedir = (e: Event) => {
+      const id = (e as CustomEvent<unknown>).detail;
+      const d = TODOS().find((x) => x.id === id);
+      if (d) abrir(d);
+    };
+    window.addEventListener("harness:open-settings", alPedir);
+    onCleanup(() => window.removeEventListener("harness:open-settings", alPedir));
   });
 
   function mover(paso: number | "inicio" | "fin") {

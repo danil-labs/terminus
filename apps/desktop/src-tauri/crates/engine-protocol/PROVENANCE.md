@@ -255,6 +255,10 @@ them answers that the command is unknown, and only that feature turns off.
   and orchestrators on this machine (`local_orchestrator_connect`,
   `list_local_orchestrators`, `local_orchestrator_disconnect`), from
   seldon-host PR #239.
+- `secrets_v1.json`: generic secrets (`env_secret_set`, `env_secret_remove`,
+  `env_secrets_list`, `secret run`), from seldon-host PR #240 at
+  `30b22f9c` (unchanged at `5a1b1d8e`), SHA-256
+  `2ae19484093d481df8ded327eff1a2504bee138bca4a5109a0ec7baae3239c11`.
 - `artifact_parts_v1.json`: `artifact_read_part`, the bytes of a sealed artifact
   version in parts, so a window downloads a document from a task on another
   machine (seldon-host `feat/artifact-read-part`).

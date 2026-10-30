@@ -15,6 +15,7 @@ import {
   type CredentialsListing,
   type CredentialSource,
   canSeal,
+  credentialHint,
   credentialsListingOf,
   deleteCredential,
   listCredentials,
@@ -22,6 +23,7 @@ import {
   removeCredentialMachine,
   restoreCredentialMachine,
   sealForRecipients,
+  sealRecipientsFor,
 } from "@terminus/computers";
 import { createRoot, createSignal } from "solid-js";
 import { t } from "../../../lib/i18n";
@@ -47,7 +49,12 @@ export type CredentialsBackend = {
   upload?(workspace: string, slots: string[]): Promise<void>;
   /** Solo la web: cambia el valor sellándolo en el navegador para cada máquina. */
   rotate?(workspace: string, credential: Credential, value: string, listing: CredentialsListing): Promise<void>;
+  /** Solo la web: crea una credencial sellándola aquí; el valor no viaja en claro. */
+  create?(workspace: string, put: SealedDraft, value: string, listing: CredentialsListing): Promise<void>;
 };
+
+/** Una credencial por crear o rotar, sin el valor ni sus copias. */
+export type SealedDraft = Omit<CredentialPut, "hint" | "copies">;
 
 /** Los códigos que el motor manda como `credentials.error.<código>` (el del Worker o uno propio), en palabras de la persona. */
 const ENGINE_CODES: Record<string, string> = {
@@ -55,6 +62,14 @@ const ENGINE_CODES: Record<string, string> = {
   unauthorized: "danil.credentials.failed.unauthorized",
   license_required: "danil.credentials.failed.license",
   invalid_recipient: "danil.credentials.failed.recipient",
+  env_secret_invalid_folder: "credentials.error.env_secret_invalid_folder",
+  env_secret_invalid_name: "credentials.error.env_secret_invalid_name",
+  env_secret_reserved: "credentials.error.env_secret_reserved",
+  env_secret_empty: "credentials.error.env_secret_empty",
+  env_secret_exists: "credentials.error.env_secret_exists",
+  too_large: "credentials.error.too_large",
+  storage: "credentials.error.storage",
+  recipients_unsupported: "credentials.error.recipients_unsupported",
 };
 
 /** Cualquier fallo como `Failure`; uno del motor sale con frase propia y el código abajo. */
@@ -97,21 +112,21 @@ function workerBackend(source: CredentialSource): CredentialsBackend {
     remove: async (workspace, credential) => void (await done(deleteCredential(source, workspace, credential))),
     removeMachine: async (workspace, credential, computer) => void (await done(removeCredentialMachine(source, workspace, credential, computer))),
     restoreMachine: async (workspace, credential, computer) => void (await done(restoreCredentialMachine(source, workspace, credential, computer))),
-    async rotate(workspace, credential, value, listing) {
-      if (!(await canSeal())) throw { what: t("danil.credentials.rotate.no_webcrypto"), detail: "webcrypto_x25519" } satisfies Failure;
-      const copies = await sealForRecipients(listing.recipients, workspace, credential.slot, value);
-      const put: CredentialPut = {
-        kind: credential.kind as CredentialPut["kind"],
-        provider: credential.provider,
-        slot: credential.slot,
-        label: credential.label,
-        hint: value.length >= 4 ? value.slice(-4) : null,
-        config: credential.config,
-        copies,
-      };
-      await done(putCredential(source, workspace, put));
-    },
+    rotate: (workspace, credential, value, listing) =>
+      sealAndPut(
+        workspace,
+        { kind: credential.kind as CredentialPut["kind"], provider: credential.provider, slot: credential.slot, label: credential.label, config: credential.config },
+        value,
+        listing,
+      ),
+    create: (workspace, draft, value, listing) => sealAndPut(workspace, draft, value, listing),
   };
+  async function sealAndPut(workspace: string, draft: SealedDraft, value: string, listing: CredentialsListing) {
+    if (!(await canSeal())) throw { what: t("danil.credentials.rotate.no_webcrypto"), detail: "webcrypto_x25519" } satisfies Failure;
+    const copies = await sealForRecipients(sealRecipientsFor(draft.kind, listing.recipients), workspace, draft.slot, value);
+    if (draft.kind === "env_secret" && !copies.length) throw { what: t("danil.secrets.no_recipients"), detail: "no_recipients" } satisfies Failure;
+    await done(putCredential(source, workspace, { ...draft, hint: credentialHint(draft.kind, value), copies }));
+  }
 }
 
 /** El motor toma el workspace del sobre de la llamada (`scope: workspace` en el contrato), no de los argumentos. */
