@@ -1,0 +1,199 @@
+{
+  "head": "948aabad1ee473f3581dfb38a32a1f288edc31a2",
+  "source": "<PR530_CHECKS>/source",
+  "cache": "<QA93>/mac-cargo-target",
+  "ownerTask": "0qs6mqpm",
+  "coordinatorTask": "k5thkf5z",
+  "lock": "<QA93>/mac-cargo-target.exclusive.lock",
+  "startedAt": "2026-10-30T18:01:37.307545+00:00",
+  "state": "completed",
+  "commands": [
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exitCode": 0,
+      "seconds": 0.28,
+      "log": "<PR530_CHECKS>/evidence/fmt.log"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exitCode": 0,
+      "seconds": 8.06,
+      "log": "<PR530_CHECKS>/evidence/clippy.log"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--locked"
+      ],
+      "exitCode": 0,
+      "seconds": 25.12,
+      "log": "<PR530_CHECKS>/evidence/test.log"
+    }
+  ],
+  "sidecarFixture": "Ignored symlink to existing QA93 source sidecar; no download, engine execution or modification",
+  "initialAttempt": "initial-checks.json: missing sidecar; sidecar-only-checks.json: missing frontendDist",
+  "frontendFixture": "Ignored symlink to existing QA93 dist for generate_context only; no frontend build or frontend validation",
+  "artifacts93Before": {
+    "appMain": {
+      "path": "<QA93>/mac-cargo-target/aarch64-apple-darwin/release/bundle/macos/Terminus.app/Contents/MacOS/terminus",
+      "bytes": 30344160,
+      "sha256": "9bf76316fa62de2d7394b865e8a02de4d351c459f362bf9bcbd152faf366d50c"
+    },
+    "engine": {
+      "path": "<QA93>/mac-cargo-target/aarch64-apple-darwin/release/bundle/macos/Terminus.app/Contents/MacOS/seldon-runtime",
+      "bytes": 30013200,
+      "sha256": "c39f25022cc7fb09b537be8b9b8c6f1f88ca721021cbc38bde7173a69442ae8f"
+    },
+    "dmg": {
+      "path": "<QA93>/mac-cargo-target/aarch64-apple-darwin/release/bundle/dmg/Terminus_0.3.0-rc.1_aarch64.dmg",
+      "bytes": 219169665,
+      "sha256": "4a7b80a2a2dda2f949c5322b37f5a10c6e4251fa7ba3be4b4f0b626b21ef6b1f"
+    }
+  },
+  "tauriConfigOverride": false,
+  "rustupToolchainOverride": null,
+  "toolchain": {
+    "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: aarch64-apple-darwin\nrelease: 1.96.0\nLLVM version: 22.1.2",
+    "cargo": "cargo 1.96.0 (30a34c682 2026-05-25)",
+    "clippy": "clippy 0.1.96 (ac68faa20c 2026-05-25)"
+  },
+  "artifacts93After": {
+    "appMain": {
+      "path": "<QA93>/mac-cargo-target/aarch64-apple-darwin/release/bundle/macos/Terminus.app/Contents/MacOS/terminus",
+      "bytes": 30344160,
+      "sha256": "9bf76316fa62de2d7394b865e8a02de4d351c459f362bf9bcbd152faf366d50c"
+    },
+    "engine": {
+      "path": "<QA93>/mac-cargo-target/aarch64-apple-darwin/release/bundle/macos/Terminus.app/Contents/MacOS/seldon-runtime",
+      "bytes": 30013200,
+      "sha256": "c39f25022cc7fb09b537be8b9b8c6f1f88ca721021cbc38bde7173a69442ae8f"
+    },
+    "dmg": {
+      "path": "<QA93>/mac-cargo-target/aarch64-apple-darwin/release/bundle/dmg/Terminus_0.3.0-rc.1_aarch64.dmg",
+      "bytes": 219169665,
+      "sha256": "4a7b80a2a2dda2f949c5322b37f5a10c6e4251fa7ba3be4b4f0b626b21ef6b1f"
+    }
+  },
+  "artifacts93Unchanged": true,
+  "sourceOIDAfter": "948aabad1ee473f3581dfb38a32a1f288edc31a2",
+  "sourceCleanAfter": false,
+  "finishedAt": "2026-10-30T18:02:11.637992+00:00",
+  "lockReleased": true,
+  "sourceCleanAfterFixtureCleanup": true,
+  "fixtureCleanup": "Only two operator-created symlinks and their empty binaries directory removed; referenced QA93 inputs unchanged. During checks dist symlink appeared untracked; tracked sources unchanged.",
+  "baseOID": "a35f82efb6238e0cf03d5a32252398f680f5481e",
+  "sourceTreeOID": "e637577feb6a27abfd5867750749955f1b74e2c1",
+  "baselineBlobComparison": [
+    {
+      "path": "apps/desktop/src-tauri/crates/engine-protocol/src/lib.rs",
+      "parentBlob": "246065e06a2d0179afcebe43821be3fa1a757af8",
+      "qa93Blob": "246065e06a2d0179afcebe43821be3fa1a757af8",
+      "equal": true
+    },
+    {
+      "path": "apps/desktop/src-tauri/src/extracted/typst_live.rs",
+      "parentBlob": "8e973e63831786633766d063c14932a2c7452930",
+      "qa93Blob": "8e973e63831786633766d063c14932a2c7452930",
+      "equal": true
+    },
+    {
+      "path": "apps/desktop/src-tauri/src/extracted/update.rs",
+      "parentBlob": "71fae8a53be781ca1de06f49b2d4726f3a67eb44",
+      "qa93Blob": "71fae8a53be781ca1de06f49b2d4726f3a67eb44",
+      "equal": true
+    }
+  ],
+  "testsPassed": 35,
+  "updaterRegression": true,
+  "lockReleasedVerified": true,
+  "processesAtClose": [],
+  "logs": [
+    {
+      "path": "<PR530_CHECKS>/evidence/clippy-initial.log",
+      "bytes": 1817,
+      "sanitizedContent": "    Checking terminus-engine-protocol v0.1.0 (<PR530_CHECKS>/source/apps/desktop/src-tauri/crates/engine-protocol)\n   Compiling terminus v0.3.0-rc.1 (<PR530_CHECKS>/source/apps/desktop/src-tauri)\n    Checking terminus-engine-client v0.1.0 (<PR530_CHECKS>/source/apps/desktop/src-tauri/crates/engine-client)\nerror: failed to run custom build command for `terminus v0.3.0-rc.1 (<PR530_CHECKS>/source/apps/desktop/src-tauri)`\n\nCaused by:\n  process didn't exit successfully: `<QA93>/mac-cargo-target/debug/build/terminus-2cde03d973d1cfff/build-script-build` (exit status: 101)\n  --- stdout\n  cargo:rustc-env=HARNESS_COMMIT=948aabad\n  cargo:rerun-if-changed=../.git/HEAD\n  cargo:rerun-if-changed=../.git/index\n  cargo:rerun-if-env-changed=TAURI_CONFIG\n  cargo:rustc-check-cfg=cfg(desktop)\n  cargo:rustc-cfg=desktop\n  cargo:rustc-check-cfg=cfg(mobile)\n  cargo:rerun-if-changed=<PR530_CHECKS>/source/apps/desktop/src-tauri/tauri.conf.json\n  cargo:rustc-env=TAURI_ANDROID_PACKAGE_NAME_APP_NAME=terminus\n  cargo:rustc-env=TAURI_ANDROID_PACKAGE_NAME_PREFIX=ai_danil\n  cargo:rustc-check-cfg=cfg(dev)\n  cargo:PERMISSION_FILES_PATH=<QA93>/mac-cargo-target/debug/build/terminus-9e0f298f5af28716/out/app-manifest/__app__-permission-files\n  cargo:rerun-if-changed=capabilities\n  cargo:rerun-if-env-changed=REMOVE_UNUSED_COMMANDS\n  cargo:rustc-env=TAURI_ENV_TARGET_TRIPLE=aarch64-apple-darwin\n\n  --- stderr\n\n  thread 'main' (14032416) panicked at build.rs:71:42:\n  tauri_build: resource path `binaries/seldon-runtime-aarch64-apple-darwin` doesn't exist\n  note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+      "rawSha256": "f034faa53a825c5360bdc5aa10932c6975757a3bb7292b6bdcc6d6ee3201d8ce",
+      "sanitizedSha256": "6d6efd97a59c63ab64206db56522d4556320e12fc4d8c4c439376f3f3a586d24"
+    },
+    {
+      "path": "<PR530_CHECKS>/evidence/clippy-sidecar-only.log",
+      "bytes": 456,
+      "sanitizedContent": "   Compiling terminus v0.3.0-rc.1 (<PR530_CHECKS>/source/apps/desktop/src-tauri)\nerror: proc macro panicked\n   --> src/extracted/mod.rs:131:19\n    |\n131 |     let context = tauri::generate_context!();\n    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: message: The `frontendDist` configuration is set to `\"../dist\"` but this path doesn't exist\n\nerror: could not compile `terminus` (lib) due to 1 previous error\n",
+      "rawSha256": "fb679590e6277c5952804b9f0d7cf09a443412e6896a2c5907d19436e49da54a",
+      "sanitizedSha256": "f1584f8b958f3163c0f697b7fbe15869d06e93181a7a9ecb85f4a97ab36e681e"
+    },
+    {
+      "path": "<PR530_CHECKS>/evidence/clippy.log",
+      "bytes": 180,
+      "sanitizedContent": "   Compiling terminus v0.3.0-rc.1 (<PR530_CHECKS>/source/apps/desktop/src-tauri)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.85s\n",
+      "rawSha256": "a3922e862f8ed80512b5da755db98cf0d881ebd0074190b7828dfe77e0d73478",
+      "sanitizedSha256": "ac6918494168d822903161fe634acc6b6b3e4febe1b877e1faa3ee2e6c2eca42"
+    },
+    {
+      "path": "<PR530_CHECKS>/evidence/fmt-initial.log",
+      "bytes": 0,
+      "sanitizedContent": "",
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sanitizedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "<PR530_CHECKS>/evidence/fmt-sidecar-only.log",
+      "bytes": 0,
+      "sanitizedContent": "",
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sanitizedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "<PR530_CHECKS>/evidence/fmt.log",
+      "bytes": 0,
+      "sanitizedContent": "",
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sanitizedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "<PR530_CHECKS>/evidence/test-initial.log",
+      "bytes": 1817,
+      "sanitizedContent": "   Compiling terminus-engine-protocol v0.1.0 (<PR530_CHECKS>/source/apps/desktop/src-tauri/crates/engine-protocol)\n   Compiling terminus v0.3.0-rc.1 (<PR530_CHECKS>/source/apps/desktop/src-tauri)\n   Compiling terminus-engine-client v0.1.0 (<PR530_CHECKS>/source/apps/desktop/src-tauri/crates/engine-client)\nerror: failed to run custom build command for `terminus v0.3.0-rc.1 (<PR530_CHECKS>/source/apps/desktop/src-tauri)`\n\nCaused by:\n  process didn't exit successfully: `<QA93>/mac-cargo-target/debug/build/terminus-cd8ae87baf0f5e5c/build-script-build` (exit status: 101)\n  --- stdout\n  cargo:rustc-env=HARNESS_COMMIT=948aabad\n  cargo:rerun-if-changed=../.git/HEAD\n  cargo:rerun-if-changed=../.git/index\n  cargo:rerun-if-env-changed=TAURI_CONFIG\n  cargo:rustc-check-cfg=cfg(desktop)\n  cargo:rustc-cfg=desktop\n  cargo:rustc-check-cfg=cfg(mobile)\n  cargo:rerun-if-changed=<PR530_CHECKS>/source/apps/desktop/src-tauri/tauri.conf.json\n  cargo:rustc-env=TAURI_ANDROID_PACKAGE_NAME_APP_NAME=terminus\n  cargo:rustc-env=TAURI_ANDROID_PACKAGE_NAME_PREFIX=ai_danil\n  cargo:rustc-check-cfg=cfg(dev)\n  cargo:PERMISSION_FILES_PATH=<QA93>/mac-cargo-target/debug/build/terminus-0238d862fabc435a/out/app-manifest/__app__-permission-files\n  cargo:rerun-if-changed=capabilities\n  cargo:rerun-if-env-changed=REMOVE_UNUSED_COMMANDS\n  cargo:rustc-env=TAURI_ENV_TARGET_TRIPLE=aarch64-apple-darwin\n\n  --- stderr\n\n  thread 'main' (14032795) panicked at build.rs:71:42:\n  tauri_build: resource path `binaries/seldon-runtime-aarch64-apple-darwin` doesn't exist\n  note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+      "rawSha256": "c7b073d0a699c87add6742c6552e707bec36c0063885137431f459afc5c540ec",
+      "sanitizedSha256": "b8a158014f575a9310ab293e40afc984be9b68ff31544ce62fb833e9a71b2cc9"
+    },
+    {
+      "path": "<PR530_CHECKS>/evidence/test-sidecar-only.log",
+      "bytes": 586,
+      "sanitizedContent": "   Compiling terminus v0.3.0-rc.1 (<PR530_CHECKS>/source/apps/desktop/src-tauri)\nerror: proc macro panicked\n   --> src/extracted/mod.rs:131:19\n    |\n131 |     let context = tauri::generate_context!();\n    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: message: The `frontendDist` configuration is set to `\"../dist\"` but this path doesn't exist\n\nerror: could not compile `terminus` (lib) due to 1 previous error\nwarning: build failed, waiting for other jobs to finish...\nerror: could not compile `terminus` (lib test) due to 1 previous error\n",
+      "rawSha256": "a3c6381bb15ddd910bbe95e88f7bafdd7d0c9e887c2950fec32c305914acd29e",
+      "sanitizedSha256": "64066e4e6f10f861b9b8367a45f0b2a76e9682389a64270686be64006c343fc8"
+    },
+    {
+      "path": "<PR530_CHECKS>/evidence/test.log",
+      "bytes": 4270,
+      "sanitizedContent": "   Compiling terminus v0.3.0-rc.1 (<PR530_CHECKS>/source/apps/desktop/src-tauri)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 18.25s\n     Running unittests src/lib.rs (<QA93>/mac-cargo-target/debug/deps/app_lib-92ede2111cc1f5e6)\n\nrunning 26 tests\ntest extracted::appearance::tests::only_six_digit_hex_becomes_a_color ... ok\ntest extracted::engine::tests::an_engine_of_another_contract_is_old_only_against_the_bundled_one ... ok\ntest extracted::engine::tests::only_turns_downloads_and_real_operations_keep_the_installer_out ... ok\ntest extracted::handler_policy::tests::resume_only_accepts_handler_receipts_in_the_captured_scope ... ok\ntest extracted::handler_policy::tests::only_declared_actions_and_arguments_cross_the_bridge ... ok\ntest extracted::page_preview::tests::la_ruta_no_sale_de_su_carpeta ... ok\ntest extracted::page_preview::tests::los_rangos_se_leen_como_http ... ok\ntest extracted::engine_profile::tests::a_root_that_does_not_exist_yet_hashes_like_the_cli ... ok\ntest extracted::proxy::tests::conserva_el_diagnostico_de_un_rechazo_del_motor ... ok\ntest extracted::proxy::tests::una_respuesta_demasiado_grande_lo_dice ... ok\ntest extracted::relocate::tests::only_a_disk_or_a_translocation_is_outside_applications ... ok\ntest extracted::relocate::tests::the_bundle_is_the_app_around_the_executable ... ok\ntest extracted::engine_profile::tests::the_window_keeps_other_profiles_and_only_production_takes_default ... ok\ntest extracted::service_plan::tests::plist_escapes_paths_and_supervises_only_failures ... ok\ntest extracted::service_plan::tests::preflight_requires_exact_contract_and_all_strict_features ... ok\ntest extracted::engine_profile::tests::a_managed_alias_protects_the_root_and_the_published_profile ... ok\ntest extracted::tray::tests::notice_link_keeps_its_key_after_windows_normalizes_it ... ok\ntest extracted::typst_live::tests::las_etiquetas_salen_del_texto_aunque_no_compile ... ok\ntest extracted::update::tests::a_set_aside_name_goes_back_to_the_installed_one ... ok\ntest extracted::engine_profile::tests::malformed_profiles_fail_closed_and_false_matches_the_cli ... ok\ntest extracted::update::tests::the_set_aside_window_is_the_one_with_the_engine_prefix ... ok\ntest extracted::service_plan::tests::readiness_rejects_other_writers_and_unproven_residency ... ok\ntest extracted::update::tests::a_running_set_aside_engine_keeps_its_window_on_disk ... ok\ntest extracted::service_plan::tests::preparation_preserves_other_profiles_but_rejects_authority_conflicts ... ok\ntest extracted::update::tests::an_open_window_does_not_stop_the_rest ... ok\ntest extracted::update::tests::without_set_aside_engines_every_old_file_goes ... ok\n\ntest result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n     Running unittests src/main.rs (<QA93>/mac-cargo-target/debug/deps/terminus-58b03b2a97200545)\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\n\n     Running tests/engine_extensions.rs (<QA93>/mac-cargo-target/debug/deps/engine_extensions-c7721ca876e3adb9)\n\nrunning 1 test\ntest extensions_do_not_redefine_commands ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s\n\n     Running tests/engine_push.rs (<QA93>/mac-cargo-target/debug/deps/engine_push-f1dc17c9ff19ed8c)\n\nrunning 8 tests\ntest old_engine_keeps_one_connection_per_request ... ok\ntest feed_reports_an_engine_that_stopped_answering ... ok\ntest feed_delivers_pushed_events_and_updates_its_filter ... ok\ntest feed_marks_a_gap_and_resumes_from_latest_on_resync_required ... ok\ntest feed_resubscribes_from_its_cursor_after_the_link_drops ... ok\ntest a_changed_selection_is_refused_before_reconnecting ... ok\ntest link_reconnects_and_validates_the_engine_again ... ok\ntest persistent_link_matches_answers_that_arrive_out_of_order ... ok\n\ntest result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s\n\n   Doc-tests app_lib\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+      "rawSha256": "b5c86f59817b67a9e6d5f0e12da837c2166066f2055a7567c156f397fcf3e978",
+      "sanitizedSha256": "eaa459d5910a9a71fa644977e3d5e6c3384b33d8f432ac4b6b3d25ff57a238de"
+    }
+  ],
+  "result": "PASS",
+  "limits": [
+    "Rust checks only; no frontend validation",
+    "Existing QA93 dist and sidecar used only as local build prerequisites via temporary symlinks",
+    "No distribution/bundle/DMG build, engine execution, credentials, GitHub Actions, publication, PR531 or global app changes",
+    "Initial prerequisite failures preserved, final checks all exit0"
+  ],
+  "pr": 530,
+  "candidate93SourceOID": "93eeb9ef51b71f3cece7fa04942fa76e3b15adc2",
+  "evidenceScope": "PR530 Rust checks, separate from candidate93 package QA"
+}
