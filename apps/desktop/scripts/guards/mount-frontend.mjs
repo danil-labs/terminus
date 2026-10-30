@@ -2058,7 +2058,9 @@ if (!roto) {
   assert.equal(controlsDoc.querySelector("[data-session-origin]"), null);
   const savedTaskRow = controlsDoc.querySelector('[data-sesion="recent"]');
   const sidebarViewport = savedTaskRow.closest("[data-arrastre-scroll]");
-  assert.ok(controlsDoc.querySelector('[data-sidebar-tasks] [data-sesion="agent-root"]'));
+  // El riel enseña solo lo que abrió la persona: lo que lanzó un agente es de su lanzador, esté o no en la lista.
+  assert.equal(controlsDoc.querySelector('[data-sidebar-tasks] [data-sesion="agent-root"]'), null);
+  assert.equal(controlsDoc.querySelector('[data-sidebar-tasks] [data-sesion="orphan-root"]'), null);
   assert.ok(controlsDoc.querySelector('[data-destino="p1"]'));
   assert.equal(controlsDoc.querySelector('[data-portfolio]'), null);
   sidebarViewport.scrollTop = 120;

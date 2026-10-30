@@ -793,5 +793,6 @@
   "settings.tab.secrets": "Secretos",
   "settings.tab.orchestrators": "Orquestadores",
   "settings.admin": "Administración",
-  "settings.nav.connections": "Conexiones"
+  "settings.nav.connections": "Conexiones",
+  "settings.tab.emails": "Correos"
 }

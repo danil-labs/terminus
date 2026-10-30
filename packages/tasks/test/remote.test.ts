@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildTaskTree, delegatedOf, flattenTasks, REMOTE_CHILD_FEATURE, remoteLauncherOf, shownUnderLauncher, taskDescendants, withRemoteLaunchers, type RemoteScope } from "../src/index.ts";
+import { buildTaskTree, delegatedOf, flattenTasks, REMOTE_CHILD_FEATURE, remoteLauncherOf, taskDescendants, withRemoteLaunchers, type RemoteScope } from "../src/index.ts";
 
 // El panel del escritorio: la Mac es la ventana (ids sueltos); la VM lleva prefijo.
 const panel = (features: Record<string, string[]>): RemoteScope => ({
@@ -33,19 +33,14 @@ test("un motor viejo (sin `remote_parent`) sale igual", () => {
   assert.deepEqual(withRemoteLaunchers(rows, on), rows);
 });
 
-test("el riel la esconde aunque el coordinador esté en otra carpeta; suelta al buscar o fijada", () => {
+test("el riel no la enseña aunque el coordinador esté en otra carpeta; sale al buscar o fijada", () => {
   const byProject = { a: [coordinador], b: withRemoteLaunchers([hija], on) };
   assert.deepEqual(flattenTasks(byProject).map((t) => t.row.id), ["coord"]);
   assert.deepEqual(flattenTasks(byProject, true).map((t) => t.row.id), ["coord", "vm~hija"]);
   const fijada = { a: [coordinador], b: withRemoteLaunchers([{ ...hija, pinned: true }], on) };
   assert.deepEqual(flattenTasks(fijada).map((t) => t.row.id), ["coord", "vm~hija"]);
   const sinCoordinador = { b: withRemoteLaunchers([hija], on) };
-  assert.deepEqual(flattenTasks(sinCoordinador).map((t) => t.row.id), ["vm~hija"], "sin coordinador a la vista, suelta");
-});
-
-test("`launcher_available` del motor de la hija no aplica al coordinador remoto", () => {
-  const [fila] = withRemoteLaunchers([{ ...hija, launcher_available: false }], on);
-  assert.equal(shownUnderLauncher(fila, [coordinador]), true);
+  assert.deepEqual(flattenTasks(sinCoordinador).map((t) => t.row.id), [], "sin coordinador a la vista tampoco sube");
 });
 
 test("en la vista de subtareas cuelga del coordinador, con sus propias delegadas debajo", () => {

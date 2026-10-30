@@ -21,15 +21,12 @@ export function launcherOf(session: LauncherRow): string | null {
 }
 
 /**
- * Si la lista esconde una tarea para mostrarla bajo su lanzador. Solo cuenta un
- * lanzador de la misma lista: el de otra carpeta no la muestra en esta.
+ * Si la tarea es subtarea de otra: el riel solo enseña las que abrió la persona.
+ * No depende de que el lanzador esté en la lista: archivado, en otra carpeta o
+ * sin cargar todavía, la subtarea sigue siendo suya y no sube al riel.
  */
-export function shownUnderLauncher(session: LauncherRow, rows: readonly { id: string }[]): boolean {
-  const local = session.parent ?? session.launched_by ?? null;
-  if (local) return session.launcher_available !== false && rows.some((row) => row.id === local);
-  // `launcher_available` es lo que el motor de la hija sabe de un lanzador suyo: no aplica al de otra máquina.
-  const remote = session.remote_launcher ?? null;
-  return !!remote && rows.some((row) => row.id === remote);
+export function isSubtask(session: LauncherRow): boolean {
+  return launcherOf(session) !== null;
 }
 
 /** Lo mínimo de una tarea para juntarla con las de las demás carpetas. */
@@ -49,8 +46,8 @@ export type FlatTask<R extends FlatRow = FlatRow> = { project: string; row: R };
 
 /**
  * Todas las tareas vivas de todas las carpetas en una sola lista, de la más
- * nueva a la más vieja. Una tarea que su lanzador ya enseña no se repite,
- * salvo fijada o buscando: es la misma regla que la lista por carpeta.
+ * nueva a la más vieja. Una subtarea no sale, salvo fijada o buscando: es la
+ * misma regla que la lista por carpeta.
  */
 export function flattenTasks<R extends FlatRow>(
   byProject: Record<string, R[]>,
@@ -60,13 +57,11 @@ export function flattenTasks<R extends FlatRow>(
   const vistas = new Set<string>();
   // «Sin carpeta» al final: si una fila llegara repetida, gana la carpeta.
   const entradas = Object.entries(byProject).sort(([a], [b]) => Number(a === "") - Number(b === ""));
-  const todas = entradas.flatMap(([, rows]) => rows);
   for (const [project, rows] of entradas) {
     for (const row of rows) {
       if (row.archived || vistas.has(row.id)) continue;
       vistas.add(row.id);
-      // El coordinador de una hija remota puede vivir en otra carpeta: se busca en todas.
-      if (!searching && !row.pinned && shownUnderLauncher(row, row.parent ?? row.launched_by ? rows : todas)) continue;
+      if (!searching && !row.pinned && isSubtask(row)) continue;
       out.push({ project, row });
     }
   }

@@ -155,6 +155,107 @@ test("channels list is read-only and takes no query", async () => {
   assert.equal(h.calls.length, 0);
 });
 
+test("email writes: only the four exact routes, from this page, with the exact JSON body", async () => {
+  const cases = [
+    ["/auth/emails", { email: "b@x.mx" }],
+    ["/auth/emails/verify", { email: "b@x.mx", code: "123456" }],
+    ["/auth/emails/primary", { email: "b@x.mx" }],
+    ["/auth/emails/remove", { email: "b@x.mx" }],
+  ];
+  for (const [path, body] of cases) {
+    const h = harness();
+    const response = await h.fetch(prefix + path, {
+      method: "POST",
+      headers: { ...auth, Origin: origin, Referer: origin + "/", "Content-Type": "application/json", Cookie: "legacy=1", "X-Danil-Actor": "member" },
+      body: JSON.stringify(body),
+    });
+    assert.equal(response.status, 200, path);
+    assert.equal(h.calls.length, 1);
+    const sent = h.calls[0];
+    assert.equal(sent.method, "POST");
+    assert.equal(sent.url, origin + path);
+    assert.equal(sent.headers.get("Authorization"), auth.Authorization);
+    assert.equal(sent.headers.get("Origin"), origin);
+    assert.equal(sent.headers.get("Cookie"), null);
+    assert.equal(sent.headers.get("X-Danil-Actor"), null);
+    assert.deepEqual(await sent.json(), body);
+    assert.equal(response.headers.get("Cache-Control"), "no-store");
+  }
+});
+
+test("the email list is a plain read without query", async () => {
+  const h = harness();
+  assert.equal((await h.fetch(prefix + "/auth/emails", { headers: auth })).status, 200);
+  assert.equal(h.calls[0].method, "GET");
+  assert.equal((await h.fetch(prefix + "/auth/emails?account_id=1", { headers: auth })).status, 400);
+  assert.equal(h.calls.length, 1);
+});
+
+test("email writes fail closed on origin, session, content type, size and fields", async () => {
+  const h = harness();
+  const post = (path, { headers = {}, body = JSON.stringify({ email: "b@x.mx" }) } = {}) =>
+    h.fetch(prefix + path, { method: "POST", headers: { ...auth, Origin: origin, "Content-Type": "application/json", ...headers }, body });
+  assert.equal((await post("/auth/emails", { headers: { Origin: "https://evil.example" } })).status, 403);
+  assert.equal((await h.fetch(prefix + "/auth/emails", { method: "POST", headers: { ...auth, "Content-Type": "application/json" }, body: "{}" })).status, 403);
+  assert.equal((await post("/auth/emails", { headers: { Authorization: "" } })).status, 401);
+  assert.equal((await post("/auth/emails", { headers: { "Content-Type": "text/plain" } })).status, 400);
+  assert.equal((await post("/auth/emails?x=1")).status, 400);
+  for (const body of [
+    "",
+    "not json",
+    "[]",
+    JSON.stringify({}),
+    JSON.stringify({ email: "b@x.mx", extra: 1 }),
+    JSON.stringify({ email: 7 }),
+    JSON.stringify({ email: "b@x.mx\r\nBcc: evil@x.mx" }),
+    JSON.stringify({ email: "a".repeat(255) }),
+    JSON.stringify({ email: "b@x.mx", pad: "x".repeat(2000) }),
+  ]) {
+    assert.equal((await post("/auth/emails", { body })).status, 400, body.slice(0, 40));
+  }
+  for (const code of ["12345", "1234567", "12a456", 123456]) {
+    assert.equal((await post("/auth/emails/verify", { body: JSON.stringify({ email: "b@x.mx", code }) })).status, 400);
+  }
+  assert.equal((await post("/auth/emails/verify")).status, 400);
+  for (const path of ["/auth/emails/", "/auth/emails/other", "/auth/profile", "/auth/account"]) {
+    assert.equal((await post(path)).status, 405, path);
+  }
+  for (const method of ["PUT", "PATCH", "DELETE"]) {
+    assert.equal((await h.fetch(prefix + "/auth/emails/remove", { method, headers: { ...auth, Origin: origin } })).status, 405);
+  }
+  assert.equal(h.calls.length, 0);
+});
+
+test("email writes: a chunked body over 1 KB is cut while reading, and an AI actor is refused here", async () => {
+  const h = harness();
+  let pulled = 0;
+  const stream = new ReadableStream({
+    pull(controller) {
+      pulled++;
+      if (pulled > 64) return controller.close();
+      controller.enqueue(new TextEncoder().encode("x".repeat(512)));
+    },
+  });
+  const chunked = await h.fetch(prefix + "/auth/emails", {
+    method: "POST",
+    headers: { ...auth, Origin: origin, "Content-Type": "application/json" },
+    body: stream,
+    duplex: "half",
+  });
+  assert.equal(chunked.status, 400);
+  assert.ok(pulled < 64, `leyó ${pulled} partes`);
+  for (const actor of ["ai", " AI "]) {
+    const response = await h.fetch(prefix + "/auth/emails", {
+      method: "POST",
+      headers: { ...auth, Origin: origin, "Content-Type": "application/json", "X-Danil-Actor": actor },
+      body: JSON.stringify({ email: "b@x.mx" }),
+    });
+    assert.equal(response.status, 403);
+    assert.deepEqual(await response.json(), { error: "identity_requires_person" });
+  }
+  assert.equal(h.calls.length, 0);
+});
+
 test("WorkOS sign-in routes stay in the Worker; the sign-in page is an asset", async () => {
   const h = harness();
   const session = await h.fetch("/auth/session", { method: "POST", headers: { Origin: origin } });

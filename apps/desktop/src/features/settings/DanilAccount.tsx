@@ -1,14 +1,17 @@
+import ExternalLink from "lucide-solid/icons/external-link";
 import { createEffect, createSignal, Match, on, Show, Switch } from "solid-js";
 import { t } from "../../lib/i18n";
+import { invoke } from "../../lib/invoke";
 import { capabilities } from "../../lib/platform";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
 import { engineAccountProfile, engineAccountProfileOf, profileFromStatus } from "./account-engine";
-import type { AccountProfile, AccountProfileSource } from "./account-profile";
+import { type AccountProfile, type AccountProfileSource, PROFILE_CHANGED } from "./account-profile";
 import { AccountIdentityBlock, type AccountIdentityState, createAccountIdentity } from "./AccountIdentity";
 import type { DanilConnectStatus } from "./danil-account";
 import { createDanilAccounts, type DanilAccounts } from "./danil-accounts";
 import { createDanilSession, DanilSignInChoices, said } from "./danil-session";
+import { EmailsSection } from "./EmailsSection";
 import { type DanilSessionInfo, sessionForWorkspace, sessionKey, statusOf, syncLine } from "./danil-sessions";
 import { AccountComputersSection } from "../machines/AccountComputers";
 import { ConnectMachineSection } from "../machines/ConnectMachine";
@@ -19,9 +22,9 @@ import WorkspaceAccount from "./WorkspaceAccount";
 
 /**
  * `profile`: la persona y su sesión (Cuenta › Perfil); `machines`: sus máquinas
- * (Máquinas), o la sesión mientras no hay máquinas que listar. Sin `part`, todo.
+ * (Máquinas), o la sesión mientras no hay máquinas que listar; `emails`: sus correos (solo la web).
  */
-export type DanilAccountPart = "profile" | "machines";
+export type DanilAccountPart = "profile" | "emails" | "machines";
 
 /** El nombre nuevo de esta computadora: Perfil lo enseña aunque se haya cambiado en Máquinas. */
 const [selfRename, setSelfRename] = createSignal<{ id: string; name: string } | null>(null);
@@ -39,18 +42,44 @@ export default function DanilAccount(props: { part?: DanilAccountPart }) {
   return web ? <WebAccount source={web} part={props.part} /> : <MachineAccount part={props.part} />;
 }
 
-/** En la web la persona ya entró con su cuenta: aquí solo su foto, nombre y correo. */
+/** Los correos se administran en la web de alfa (vive en la raíz del dominio), con la sesión del navegador. */
+const EMAILS_URL = "https://alfa-app.danil.ai/?settings=emails";
+
+/** Sin fuente de correos aquí (el escritorio, o la web fuera de alfa): la fila que abre la web. */
+function ManageEmailsRow(props: { web?: boolean }) {
+  const open = () => {
+    if (props.web) window.open(EMAILS_URL, "_blank", "noopener");
+    else void invoke("open_external", { target: EMAILS_URL }).catch(() => {});
+  };
+  return (
+    <SettingsRow label={t("danil.emails.manage_label")} description={t("danil.emails.manage_description")} data-account-emails-link="">
+      <Button size="sm" variant="secondary" onClick={open}>
+        <ExternalLink size={14} />
+        {t("danil.emails.manage")}
+      </Button>
+    </SettingsRow>
+  );
+}
+
+/** En la web la persona ya entró con su cuenta. Perfil se monta de nuevo al volver a su pestaña, así que relee un principal cambiado en Correos. */
 function WebAccount(props: { source: AccountProfileSource; part?: DanilAccountPart }) {
   const identity = createAccountIdentity(props.source);
   const workspaces = createWorkspaces();
+  const emails = () => props.part === "emails" ? capabilities().accountEmails : undefined;
   return (
     <SettingsPanel data-danil-account="web">
-      <Show when={props.part !== "machines"}>
+      <Show when={props.part === "profile"}>
         <SettingsSection title={t("danil.account.title")} description={t("danil.account.web_description")}>
           <AccountIdentityBlock identity={identity} />
+          <Show when={!capabilities().accountEmails}>
+            <ManageEmailsRow web />
+          </Show>
         </SettingsSection>
       </Show>
-      <Show when={props.part !== "profile"}>
+      <Show when={emails()}>
+        {(source) => <EmailsSection source={source()} onPrimaryChanged={() => window.dispatchEvent(new CustomEvent(PROFILE_CHANGED))} />}
+      </Show>
+      <Show when={props.part === "machines"}>
         <Show when={workspaces.actual()} keyed>
           {(workspace) => <AccountComputersSection workspace={workspace.id} />}
         </Show>
@@ -169,6 +198,7 @@ function SessionCard(props: { session: DanilSessionInfo; accounts: DanilAccounts
   return (
     <div class="grid border-b border-border last:border-b-0" data-danil-session={key} data-default={s().default ? "" : undefined}>
       <AccountIdentityBlock identity={shown} />
+      <ManageEmailsRow />
       <SettingsRow
         label={t("danil.account.this_computer", { name: props.computerName || s().computer_name || s().computer_id || "" })}
         description={state()}
@@ -227,6 +257,7 @@ function SingleAccount(props: { part?: DanilAccountPart }) {
           </Match>
           <Match when={status()?.state === "connected"}>
             <ConnectedIdentity status={status} />
+            <ManageEmailsRow />
             <SettingsRow
               label={t("danil.account.this_computer", { name: renamedFor(status()?.computer_id) || status()?.name || status()?.computer_id || "" })}
               description={status()?.online ? t("danil.account.online") : t("danil.account.offline")}

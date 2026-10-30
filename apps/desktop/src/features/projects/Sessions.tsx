@@ -46,7 +46,7 @@ import EtapaDeTarea, { ETAPAS, type Etapa } from "./TaskStage";
 import EstadoDeTarea from "./TaskStatus";
 import { matchesTaskQuery } from "./taskSearch";
 import { canFinishTask, effectiveTaskGit, type GitStatus, sharesTaskGit, watchSessionGit } from "./taskGit";
-import { authorKey, authorKeys, shownUnderLauncher } from "./taskAuthors";
+import { authorKey, authorKeys, isSubtask } from "./taskAuthors";
 import { descendientes, type Rama as RamaDeTareas, taskTree } from "./taskTree";
 import { rolledOutcome, type TaskActivity, taskPriority } from "@terminus/design";
 import { taskCard, buildTaskTree, launcherOf, sameAgent, taskIdentity, withTaskAncestors } from "@terminus/tasks";
@@ -483,7 +483,7 @@ export default function Sessions(props: {
   // En la barra no se anidan subtareas: se consultan desde la vista de subtareas
   // del chat. Solo asoman, sueltas, al buscar o si las fijaron.
   const enBarra = createMemo(() => props.sessions.filter(s => (props.includeArchived || !s.archived)
-    && (!props.sidebar || !!props.search?.trim() || s.pinned || !shownUnderLauncher(s, props.sessions))));
+    && (!props.sidebar || !!props.search?.trim() || s.pinned || !isSubtask(s))));
   // Un observador de git, de perfiles y de historiales por carpeta de la
   // lista: las cachés son por carpeta y se comparten con las demás vistas.
   const carpetasVistas = createMemo(

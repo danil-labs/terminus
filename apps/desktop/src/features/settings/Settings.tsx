@@ -99,8 +99,7 @@ const pestanasDe = (
   const tab = (id: string, name: () => string, panel: Pestana["panel"]): Pestana => ({ id, get name() { return name(); }, panel });
   return {
     "cuenta-danil": cuenta ? tab("cuenta-danil", () => t("settings.tab.profile"), () => <Suspense fallback={null}><DanilAccount part="profile" /></Suspense>) : undefined,
-    // Correos llega con su capacidad (PR #474); sin ella no hay pestaña.
-    emails: undefined,
+    emails: capabilities().accountEmails ? tab("emails", () => t("settings.tab.emails"), () => <Suspense fallback={null}><DanilAccount part="emails" /></Suspense>) : undefined,
     security: tab("security", () => t("settings.tab.security"), null),
     general: tab("general", () => t("settings.nav.general"), () => <General />),
     appearance: tab("appearance", () => t("settings.nav.appearance"), () => <Suspense fallback={null}><Appearance proyecto={agentes.proyecto} /></Suspense>),
