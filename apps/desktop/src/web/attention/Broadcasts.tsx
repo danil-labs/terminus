@@ -1,6 +1,6 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js';
-import { broadcastActions, canManageBroadcast, createBroadcasts, type Broadcast, type BroadcastAction, type BroadcastChannel, type BroadcastContact, type BroadcastPermissions, type BroadcastTemplate } from '../../../../../packages/attention/src/broadcasts.ts';
-import { createInbox, type Account, type InboxSession } from '../../../../../packages/attention/src/inbox.ts';
+import { BroadcastError, broadcastActions, canManageBroadcast, createBroadcasts, type Broadcast, type BroadcastAction, type BroadcastChannel, type BroadcastContact, type BroadcastPermissions, type BroadcastTemplate } from '../../../../../packages/attention/src/broadcasts.ts';
+import { type Account, type InboxSession } from '../../../../../packages/attention/src/inbox.ts';
 import { t } from '../../lib/i18n';
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
@@ -15,19 +15,31 @@ export function Broadcasts(props: { demo: boolean; session?: InboxSession & { su
   if (props.demo) return <BroadcastDemo/>;
   const prefix = `${import.meta.env.BASE_URL}alpha-api`;
   const api = props.session && !props.demo ? createBroadcasts(props.session, fetch, prefix) : null;
-  const inbox = props.session && !props.demo ? createInbox(props.session, fetch, prefix) : null;
   const [accounts, setAccounts] = createSignal<Account[]>([]);
   const [account, setAccount] = createSignal(0);
   const [rows, setRows] = createSignal<Broadcast[]>([]);
   const [perms, setPerms] = createSignal<BroadcastPermissions | null>(null);
   const [busy, setBusy] = createSignal(false);
-  const [error, setError] = createSignal(false);
+  const [error, setError] = createSignal('');
   const [success, setSuccess] = createSignal('');
   const [editor, setEditor] = createSignal<Editor | null>(null);
   const [pending, setPending] = createSignal(false);
   const [formLoading, setFormLoading] = createSignal(false);
-  const [formError, setFormError] = createSignal(false);
-  const [uncertain, setUncertain] = createSignal(false);
+  const [formError, setFormError] = createSignal('');
+  const [operationVersion, setOperationVersion] = createSignal(0);
+  let scope = new AbortController();
+  const bumpOperations = () => setOperationVersion(value => value + 1);
+  const resetScope = () => { scope.abort(); scope = new AbortController(); };
+  const errorMessage = (cause: unknown) => {
+    if (cause instanceof BroadcastError) {
+      if (cause.code === 'account_mismatch' || cause.code === 'missing_active_account') return t(`broadcast-writes.${cause.code}`);
+      if (cause.uncertain) return t("broadcast-writes.write_error");
+      return cause.status ? t("broadcast-writes.rejected", { code: cause.code }) : t("broadcast-writes.not_sent");
+    }
+    return t("broadcast-writes.load_error");
+  };
+  const resource = (edit: Editor) => edit.kind === 'create' ? 'create' : `${edit.kind === 'contacts' ? 'contacts' : 'campaign'}:${edit.campaign.id}`;
+  const blocked = () => { operationVersion(); const edit = editor(); return !!(api && edit && account() && api.blocked(account(), resource(edit))); };
   const [formSuccess, setFormSuccess] = createSignal('');
   const [templates, setTemplates] = createSignal<BroadcastTemplate[]>([]);
   const [templateId, setTemplateId] = createSignal(0);
@@ -43,76 +55,75 @@ export function Broadcasts(props: { demo: boolean; session?: InboxSession & { su
   const template = () => templates().find(row => row.id === templateId());
   const variableValue = (key: string) => Object.hasOwn(mapping(), key) ? mapping()[key] : '';
   const eligible = () => channels().some(row => row.id === channelId() && row.active) && canManageBroadcast(perms(), channelId());
-  const canCreate = () => !!template()?.supported && !!name().trim() && eligible() && template()!.variables.every(key => variableValue(key).trim());
+  const canCreate = () => !!template()?.supported && !!name().trim() && eligible() && template()!.variables.every(key => variableValue(key).trim() && variableValue(key).length <= 1024);
   const canSubmit = () => {
     const edit = editor();
-    if (!edit || !api || pending() || formLoading() || uncertain()) return false;
+    if (!edit || !api || pending() || formLoading() || blocked()) return false;
     if (edit.kind === 'create') return canCreate();
     if (!canManageBroadcast(perms(), edit.campaign.channel_id)) return false;
-    if (edit.kind === 'contacts') return selected().length > 0 && !formSuccess();
-    if (total() === null) return false;
-    if (['start', 'resume', 'schedule'].includes(edit.action) && total() === 0) return false;
-    return edit.action !== 'schedule' || Date.parse(scheduled()) > Date.now();
+    if (edit.kind === 'contacts') return false;
+    if (edit.action !== 'pause' && edit.action !== 'cancel') return false;
+    if (!broadcastActions(edit.campaign.status).includes(edit.action)) return false;
+    return total() !== null;
   };
   function clear() {
-    epoch++; formEpoch++; setAccounts([]); setAccount(0); setRows([]); setPerms(null); setEditor(null);
+    resetScope(); epoch++; formEpoch++; setAccounts([]); setAccount(0); setRows([]); setPerms(null); setEditor(null);
     setTemplates([]); setChannels([]); setContacts([]); setMapping({}); setName(''); setSelected([]); setScheduled(''); setTotal(null);
-    setBusy(false); setPending(false); setFormLoading(false); setError(false); setSuccess(''); setFormError(false); setFormSuccess('');
+    setBusy(false); setPending(false); setFormLoading(false); setError(''); setSuccess(''); setFormError(''); setFormSuccess('');
   }
   async function load(target = account()) {
     if (!api || !target) return;
+    resetScope();
     const version = ++epoch;
-    formEpoch++; setEditor(null); setAccount(target); setRows([]); setPerms(null); setBusy(true); setError(false); setSuccess('');
+    formEpoch++; setEditor(null); setAccount(target); setRows([]); setPerms(null); setBusy(true); setError(''); setSuccess('');
     try {
-      const [permissions, campaigns] = await Promise.all([api.permissions(target), api.list(target)]);
+      const [permissions, campaigns] = await Promise.all([api.permissions(target, scope.signal), api.list(target, scope.signal)]);
       if (version !== epoch) return;
       setPerms(permissions); setRows(campaigns);
-    } catch { if (version === epoch) setError(true); }
+    } catch (cause) { if (version === epoch) setError(errorMessage(cause)); }
     finally { if (version === epoch) setBusy(false); }
   }
   async function initialize() {
-    if (!inbox) return;
-    const version = ++epoch; setBusy(true); setError(false);
+    if (!api) return;
+    const version = ++epoch; setBusy(true); setError('');
     try {
-      const value = await inbox.accounts();
+      const [value, active] = await Promise.all([api.accounts(scope.signal), api.activeAccount(scope.signal)]);
       if (version !== epoch) return;
       setAccounts(value);
-      if (value[0]) await load(value[0].id); else setBusy(false);
-    } catch { if (version === epoch) { setError(true); setBusy(false); } }
+      if (!value.some(row => row.id === active)) throw new BroadcastError('account_mismatch');
+      await load(active);
+    } catch (cause) { if (version === epoch) { setError(errorMessage(cause)); setBusy(false); } }
   }
   onMount(() => {
     const stop = props.session?.subscribe?.(clear);
     if (stop) onCleanup(stop);
     void initialize();
   });
-  onCleanup(() => { epoch++; formEpoch++; });
+  onCleanup(() => { scope.abort(); epoch++; formEpoch++; });
   async function open(edit: Editor) {
-    if (!api || busy() || pending()) return;
+    if (!api || busy() || pending() || edit.kind === 'contacts' || (edit.kind === 'action' && edit.action !== 'pause' && edit.action !== 'cancel')) return;
     const version = ++formEpoch, current = epoch, target = account();
-    setEditor(edit); setUncertain(false); setFormError(false); setFormSuccess(''); setFormLoading(true); setTemplates([]); setTemplateId(0); setChannels([]); setChannelId(0);
+    setEditor(edit); bumpOperations(); setFormError(''); setFormSuccess(''); setFormLoading(true); setTemplates([]); setTemplateId(0); setChannels([]); setChannelId(0);
     setContacts([]); setSelected([]); setMapping({}); setName(''); setTotal(null); setScheduled('');
     try {
       if (edit.kind === 'create') {
-        const value = await api.templates(target);
+        const value = await api.templates(target, scope.signal);
         if (version === formEpoch && current === epoch) setTemplates(value);
-      } else if (edit.kind === 'contacts') {
-        const value = await api.contacts(target);
-        if (version === formEpoch && current === epoch) setContacts(value);
       } else {
-        const value = await api.stats(target, edit.campaign.id);
+        const value = await api.stats(target, edit.campaign.id, scope.signal);
         if (version === formEpoch && current === epoch) setTotal(value);
       }
-    } catch { if (version === formEpoch && current === epoch) setFormError(true); }
+    } catch (cause) { if (version === formEpoch && current === epoch) setFormError(errorMessage(cause)); }
     finally { if (version === formEpoch && current === epoch) setFormLoading(false); }
   }
   async function chooseTemplate(value: number) {
     if (!api) return;
     const version = ++formEpoch, current = epoch;
-    setTemplateId(value); setMapping({}); setChannels([]); setChannelId(0); setFormError(false); setFormLoading(true);
+    setTemplateId(value); setMapping({}); setChannels([]); setChannelId(0); setFormError(''); setFormLoading(true);
     try {
-      const valueChannels = value ? await api.channels(account(), value) : [];
+      const valueChannels = value ? await api.channels(account(), value, scope.signal) : [];
       if (version === formEpoch && current === epoch) setChannels(valueChannels.filter(row => row.active && canManageBroadcast(perms(), row.id)));
-    } catch { if (version === formEpoch && current === epoch) setFormError(true); }
+    } catch (cause) { if (version === formEpoch && current === epoch) setFormError(errorMessage(cause)); }
     finally { if (version === formEpoch && current === epoch) setFormLoading(false); }
   }
   async function submit(event: SubmitEvent) {
@@ -120,24 +131,40 @@ export function Broadcasts(props: { demo: boolean; session?: InboxSession & { su
     const edit = editor();
     if (!api || !edit || !canSubmit()) return;
     const current = epoch, version = formEpoch, target = account();
-    setPending(true); setFormError(false); setFormSuccess('');
+    setPending(true); setFormError(''); setFormSuccess('');
     try {
       if (edit.kind === 'create') {
-        await api.create(target, { name: name(), template_id: templateId(), channel_id: channelId(), variable_mapping: Object.fromEntries(template()!.variables.map(key => [key, variableValue(key).trim()])) });
+        await api.create(target, { name: name(), template_id: templateId(), channel_id: channelId(), variable_mapping: Object.fromEntries(template()!.variables.map(key => [key, variableValue(key).trim()])) }, scope.signal);
       } else if (edit.kind === 'contacts') {
-        const result = await api.addContacts(target, edit.campaign.id, selected());
+        const result = await api.addContacts(target, edit.campaign.id, selected(), scope.signal);
         if (current === epoch && version === formEpoch) {
           setSelected([]);
           setFormSuccess(t("broadcast-writes.contacts_result", { added: result.added, requested: result.requested, rejected: result.rejected.length }));
         }
         return;
-      } else await api.transition(target, edit.campaign.id, edit.action, scheduled() || undefined);
+      } else await api.transition(target, edit.campaign.id, edit.action, scheduled() || undefined, scope.signal);
       if (current !== epoch || version !== formEpoch) return;
       setEditor(null); setSuccess(t("broadcast-writes.saved"));
-      try { const campaigns = await api.list(target); if (current === epoch) setRows(campaigns); }
-      catch { if (current === epoch) { setRows([]); setPerms(null); setError(true); } }
-    } catch { if (current === epoch && version === formEpoch) { setFormError(true); setUncertain(true); } }
-    finally { if (current === epoch) setPending(false); }
+      try { const campaigns = await api.list(target, scope.signal); if (current === epoch) setRows(campaigns); }
+      catch (cause) { if (current === epoch) { setRows([]); setPerms(null); setError(errorMessage(cause)); } }
+    } catch (cause) { if (current === epoch && version === formEpoch) setFormError(errorMessage(cause)); }
+    finally { if (current === epoch) { setPending(false); bumpOperations(); } }
+  }
+  async function reread() {
+    const edit = editor();
+    if (!api || !edit || pending()) return;
+    const current = epoch, version = formEpoch;
+    setFormLoading(true); setFormError('');
+    try {
+      const campaigns = await api.list(account(), scope.signal, true);
+      const count = edit.kind === 'contacts' ? await api.stats(account(), edit.campaign.id, scope.signal, true) : null;
+      if (current !== epoch || version !== formEpoch) return;
+      setRows(campaigns);
+      setEditor(null);
+      setSuccess(count === null ? t("broadcast-writes.reloaded") : t("broadcast-writes.reloaded_contacts", { count }));
+      bumpOperations();
+    } catch (cause) { if (current === epoch && version === formEpoch) setFormError(errorMessage(cause)); }
+    finally { if (current === epoch && version === formEpoch) setFormLoading(false); }
   }
   const modalTitle = () => {
     const edit = editor();
@@ -152,15 +179,16 @@ export function Broadcasts(props: { demo: boolean; session?: InboxSession & { su
     <div class="grid gap-3 p-4">
       <p class="m-0 text-xs text-neutral-500">{t("broadcast-writes.boundary")}</p>
       <Show when={props.demo || !props.session}><p role="note">{t("broadcast-writes.session_required")}</p></Show>
-      <Show when={accounts().length}><label class="grid gap-1 text-xs">{t("broadcast-writes.account")}<Select value={account()} disabled={pending() || busy()} onChange={event => void load(Number(event.currentTarget.value))}><For each={accounts()}>{row => <option value={row.id}>{row.name}</option>}</For></Select></label></Show>
+      <Show when={accounts().length}><label class="grid gap-1 text-xs">{t("broadcast-writes.account")}<Select value={account()} disabled><For each={accounts()}>{row => <option value={row.id}>{row.name}</option>}</For></Select></label></Show>
+      <p class="m-0 text-xs text-neutral-500">{t("broadcast-writes.account_hint")}</p>
       <Show when={busy()}><p role="status">{t("broadcast-writes.loading")}</p></Show>
-      <Show when={error()}><p role="alert" class="text-sm text-error-strong">{t("broadcast-writes.load_error")}</p></Show>
+      <Show when={error()}><p role="alert" class="text-sm text-error-strong">{error()}</p></Show>
       <Show when={success()}><p role="status" class="text-sm text-success-strong">{success()}</p></Show>
       <Show when={perms() && !perms()!.permissions.includes('campaigns.manage')}><p role="note" class="text-xs text-neutral-500">{t("broadcast-writes.readonly")}</p></Show>
       <Show when={!busy() && !error() && account() && rows().length === 0}><p role="status">{t("broadcast-writes.empty")}</p></Show>
       <Table><TableHead><TableRow><TableHeaderCell>{t("broadcast-writes.name")}</TableHeaderCell><TableHeaderCell>{t("broadcast-writes.channel")}</TableHeaderCell><TableHeaderCell>{t("broadcast-writes.state")}</TableHeaderCell><TableHeaderCell>{t("broadcast-writes.actions")}</TableHeaderCell></TableRow></TableHead><TableBody><For each={rows()}>{row => <TableRow>
         <TableCell>{row.name}</TableCell><TableCell>{row.channel_id ?? t("broadcast-writes.no_channel")}</TableCell><TableCell><Badge forma="dato">{t(`broadcast-writes.state_${row.status}`)}</Badge></TableCell>
-        <TableCell><div class="flex flex-wrap gap-2"><Show when={row.status === 'draft' || row.status === 'scheduled' || row.status === 'paused'}><Button size="sm" variant="secondary" disabled={pending() || !canManageBroadcast(perms(), row.channel_id)} onClick={() => void open({ kind: 'contacts', campaign: row })}>{t("broadcast-writes.audience")}</Button></Show><For each={broadcastActions(row.status)}>{action => <Button size="sm" variant="secondary" disabled={pending() || !canManageBroadcast(perms(), row.channel_id)} onClick={() => void open({ kind: 'action', campaign: row, action })}>{t(`broadcast-writes.${action}`)}</Button>}</For></div></TableCell>
+        <TableCell><div class="flex flex-wrap gap-2"><Show when={row.status === 'draft' || row.status === 'scheduled' || row.status === 'paused'}><Button size="sm" variant="secondary" disabled title={t("broadcast-writes.boundary")} onClick={() => void open({ kind: 'contacts', campaign: row })}>{t("broadcast-writes.audience")}</Button></Show><For each={broadcastActions(row.status)}>{action => <Button size="sm" variant="secondary" disabled={pending() || !['pause', 'cancel'].includes(action) || !canManageBroadcast(perms(), row.channel_id)} title={!['pause', 'cancel'].includes(action) ? t("broadcast-writes.boundary") : undefined} onClick={() => void open({ kind: 'action', campaign: row, action })}>{t(`broadcast-writes.${action}`)}</Button>}</For></div></TableCell>
       </TableRow>}</For></TableBody></Table>
     </div>
     <Dialog open={editor() !== null} onOpenChange={value => { if (!value && !pending()) { formEpoch++; setEditor(null); } }}><DialogContent class="max-h-[85vh] overflow-y-auto"><DialogTitle>{modalTitle()}</DialogTitle>
@@ -173,11 +201,11 @@ export function Broadcasts(props: { demo: boolean; session?: InboxSession & { su
           <label class="grid gap-1 text-xs">{t("broadcast-writes.channel")}<Select value={channelId()} disabled={pending() || formLoading()} onChange={event => setChannelId(Number(event.currentTarget.value))}><option value={0}>{t("broadcast-writes.choose")}</option><For each={channels()}>{row => <option value={row.id}>{row.name || row.id}</option>}</For></Select></label>
           <Show when={templateId() && !formLoading() && channels().length === 0}><p role="note" class="text-xs">{t("broadcast-writes.no_channels")}</p></Show>
           <Show when={template() && !template()!.supported}><p role="alert" class="text-xs text-error-strong">{t("broadcast-writes.unsupported")}</p></Show>
-          <For each={template()?.variables ?? []}>{key => <label class="grid gap-1 text-xs">{t("broadcast-writes.variable", { name: key })}<Input value={variableValue(key)} disabled={pending()} onInput={event => setMapping(values => ({ ...values, [key]: event.currentTarget.value }))}/></label>}</For>
+          <For each={template()?.variables ?? []}>{key => <label class="grid gap-1 text-xs">{t("broadcast-writes.variable", { name: key })}<Input value={variableValue(key)} maxLength={1024} disabled={pending()} onInput={event => setMapping(values => ({ ...values, [key]: event.currentTarget.value }))}/></label>}</For>
         </Show>
         <Show when={editor()?.kind === 'contacts'}>
           <p class="m-0 text-sm">{(editor() as { campaign: Broadcast }).campaign.name}</p><p class="m-0 text-xs text-neutral-500">{t("broadcast-writes.audience_hint")}</p>
-          <div class="grid max-h-64 gap-2 overflow-y-auto"><For each={contacts()}>{row => <label class="flex items-center gap-2 text-sm"><input type="checkbox" checked={selected().includes(row.id)} disabled={pending() || !!formSuccess()} onChange={event => setSelected(ids => event.currentTarget.checked ? [...ids, row.id] : ids.filter(id => id !== row.id))}/>{row.name || t("broadcast-writes.contact")} {row.phone ? `••••${row.phone.replace(/\D/g, '').slice(-4)}` : ''}</label>}</For></div>
+          <div class="grid max-h-64 gap-2 overflow-y-auto"><For each={contacts()}>{row => <label class="flex items-center gap-2 text-sm"><input type="checkbox" checked={selected().includes(row.id)} disabled={pending() || !!formSuccess() || (!selected().includes(row.id) && selected().length >= 100)} onChange={event => setSelected(ids => event.currentTarget.checked ? [...ids, row.id] : ids.filter(id => id !== row.id))}/>{row.name || t("broadcast-writes.contact")} {row.phone ? `••••${row.phone.replace(/\D/g, '').slice(-4)}` : ''}</label>}</For></div>
           <Show when={!formLoading() && contacts().length === 0}><p role="status">{t("broadcast-writes.no_contacts")}</p></Show>
         </Show>
         <Show when={editor()?.kind === 'action'}>
@@ -188,7 +216,8 @@ export function Broadcasts(props: { demo: boolean; session?: InboxSession & { su
           <Show when={(editor() as { action?: string })?.action === 'schedule'}><label class="grid gap-1 text-xs">{t("broadcast-writes.schedule_at")}<Input type="datetime-local" value={scheduled()} disabled={pending()} onInput={event => setScheduled(event.currentTarget.value)}/></label></Show>
         </Show>
         <Show when={formLoading()}><p role="status" class="text-xs">{t("broadcast-writes.loading")}</p></Show>
-        <Show when={formError()}><p role="alert" class="text-sm text-error-strong">{t("broadcast-writes.write_error")}</p></Show>
+        <Show when={formError()}><p role="alert" class="text-sm text-error-strong">{formError()}</p></Show>
+        <Show when={blocked()}><p role="alert" class="text-sm text-error-strong">{t("broadcast-writes.reconcile_required")}</p><Button type="button" variant="secondary" disabled={pending() || formLoading()} onClick={() => void reread()}>{t("broadcast-writes.reread")}</Button></Show>
         <Show when={formSuccess()}><p role="status" class="text-sm text-success-strong">{formSuccess()}</p></Show>
         <div class="flex justify-end gap-2"><Button type="button" variant="secondary" disabled={pending()} onClick={() => { formEpoch++; setEditor(null); }}>{t("broadcast-writes.close")}</Button><Button type="submit" disabled={!canSubmit()}>{t(pending() ? 'broadcast-writes.pending' : editor()?.kind === 'create' ? 'broadcast-writes.create' : editor()?.kind === 'contacts' ? 'broadcast-writes.add' : 'broadcast-writes.confirm')}</Button></div>
       </form>
