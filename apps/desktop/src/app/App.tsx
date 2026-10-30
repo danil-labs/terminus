@@ -106,7 +106,7 @@ const MachinesLicense = lazy(() =>
     ),
   })),
 );
-import AgentTasks, { createdTasks } from "../features/projects/AgentTasks";
+import { createdTasks } from "../features/projects/agentPageFilters";
 import BaseBranchPicker from "../features/projects/BaseBranchPicker";
 import { watchHandlerStatus, watchHandlerStatuses } from "../features/projects/handlerPresence";
 import { EmptyContext, ProjectPicker } from "../features/projects/Projects";
@@ -1706,15 +1706,16 @@ export default function App() {
   const sidebar = createSidebar();
   const carpetaDelProyecto = () =>
     carpetaDeTrabajo(projectList().find((p) => p.id === project()) ?? {});
-  // Lo único que el panel derecho tiene para enseñar: el árbol de una tarea, o
-  // la previsualización de la carpeta de trabajo antes de empezarla. Es la
-  // regla que deshabilita el conmutador, y la que impide que un estado
+  // Lo único que el panel derecho tiene para enseñar: la previsualización de
+  // la carpeta de trabajo antes de empezar la tarea. Con tarea, sus archivos
+  // viven dentro de ella (`archivosDeTarea`), también en el chat de un agente.
+  // Es la regla que deshabilita el conmutador, y la que impide que un estado
   // recordado abra una columna vacía.
-  const columnaConContenido = () => !paginaDeAgente() && (agenteSenalado() || (!sessionId() && Boolean(carpetaDelProyecto())));
+  const columnaConContenido = () => !paginaDeAgente() && !sessionId() && Boolean(carpetaDelProyecto());
   // Abierta o cerrada es preferencia de esta máquina, igual que el historial
   // (`lib/prefs.ts`). Sin recordarla, cada tarea nueva y cada cambio de
   // proyecto reabrían la columna que se acababa de cerrar. La llave nombra la
-  // columna entera: el panel de tareas de agente comparte estado con el árbol.
+  // columna entera.
   const [arbolQuerido, setArtOpen] = createPref<boolean | null>(
     "shell.right.open",
     null,
@@ -1727,7 +1728,7 @@ export default function App() {
     columnaConContenido() && (arbolQuerido() ?? arbolDePartida());
   const alternarElArbol = () => {
     const id = sessionId();
-    if (id && !agenteSenalado()) { archivosDeTarea.toggle(id); return; }
+    if (id) { archivosDeTarea.toggle(id); return; }
     if (artOpen()) setArtOpen(false);
     else if (columnaConContenido()) setArtOpen(true);
   };
@@ -4556,24 +4557,6 @@ export default function App() {
   }
 
   /**
-   * Qué fila del riel se señala al abrir un chat o un borrador de agente.
-   */
-  const agenteSenalado = createMemo(() => {
-    const id = sessionId();
-    if (id) {
-      for (const [proyecto, filas] of Object.entries(sesiones())) {
-        const fila = filas.find((r) => r.id === id);
-        if (fila)
-          return fila.chat_de_agente && fila.agent
-            ? { project: proyecto, name: fila.agent }
-            : null;
-      }
-      return null;
-    }
-    return hablandoCon();
-  });
-
-  /**
    * Una carpeta con tareas en varias máquinas se parte en un grupo por máquina
    * en el riel: lo que se empieza desde un grupo corre en la suya (`""` es esta).
    */
@@ -5540,7 +5523,8 @@ export default function App() {
     if (!f) {
       // Revelar escribe la preferencia igual que el conmutador: con ella en
       // cerrada, abrir transitoriamente dejaría el gesto sin nada que enseñar.
-      setArtOpen(true);
+      // Sin nada que enseñar no la toca: si no, la columna se abriría sola después.
+      if (columnaConContenido()) setArtOpen(true);
       return;
     }
     // El separador es el de la carpeta: `rel` viaja con barras normales.
@@ -6830,9 +6814,7 @@ export default function App() {
     return t("projects.split.detach", { key: atajoDePartir(false) });
   };
   const nombreDelArbol = () =>
-    agenteSenalado()
-      ? artOpen() ? t("projects.agent_tasks.close") : t("projects.agent_tasks.open")
-      : artOpen() ? t("shell.work_tree.close") : t("shell.work_tree.open");
+    artOpen() ? t("shell.work_tree.close") : t("shell.work_tree.open");
 
   /**
    * La conversación de UNA tarea, para poder montar más de una: se
@@ -7695,7 +7677,7 @@ export default function App() {
               tools={<>
                 <Show keyed when={delegatedToolbarTargets().get(`${workspaceActivo()}/${task()?.session ?? ""}`)}>{render => render()}</Show>
                 <UsageTool usage={consumo} agent={agenteDeLaVentana()} onGestionarCuentas={() => setSettings("proveedores-ia")} />
-                <Show when={task()?.session && !agenteSenalado()} fallback={<Show when={!artOpen() && !paginaDeAgente()}>{botonDelArbol()}</Show>}>
+                <Show when={task()?.session} fallback={<Show when={!artOpen() && !paginaDeAgente()}>{botonDelArbol()}</Show>}>
                   {botonDeArchivos(() => task()?.session ?? "")}
                 </Show>
               </>} />;
@@ -8615,7 +8597,7 @@ export default function App() {
             max={560}
             etiqueta={t("shell.column.work_tree_width")}
           >
-            <Show when={agenteSenalado()} fallback={<Suspense fallback={null}><ColumnaDeTrabajo
+            <Suspense fallback={null}><ColumnaDeTrabajo
               folderActions={
                 <>
                   <Button
@@ -8655,31 +8637,7 @@ export default function App() {
               onArchivoMovido={archivoMovido}
               onArchivoBorrado={archivoBorrado}
               onClose={() => setArtOpen(false)}
-            /></Suspense>}>
-              {owner => {
-                const folderOf = (id: string) => Object.entries(sesionesConEstado()).find(([, rows]) => rows.some(row => row.id === id))?.[0] ?? owner().project;
-                return <AgentTasks
-                context={`${owner().project}/${sessionId() ?? owner().name}`}
-                tasks={createdTasks(Object.entries(sesionesConEstado()).flatMap(([folder, rows]) => rows.map(row => ({ ...row, folder }))), owner().name, filaDe(sessionId() ?? "")?.agent_thread ? sessionId() : null, owner().project)}
-                list={{
-                  carpetaDe: row => projectList().find(item => item.id === folderOf(row.id))?.name,
-                  projectOf: row => folderOf(row.id), destinosDe: row => projectList().filter(item => item.id !== folderOf(row.id)).map(item => ({ id: item.id, name: item.name })),
-                  de: owner().project, current: sessionId(), vivas: vivas(), aprobando: permissions().map(item => item.session),
-                  destinos: projectList().filter(item => item.id !== owner().project).map(item => ({ id: item.id, name: item.name })),
-                  onDelete: id => void borrarSesion(folderOf(id), id),
-                  onMove: (id, destination) => void moverSesion(folderOf(id), id, destination),
-                  onEtapa: (id, stage) => void etaparSesion(folderOf(id), id, stage),
-                  onRenombrar: (id, title) => void renombrarSesion(folderOf(id), id, title),
-                }}
-                onClose={() => setArtOpen(false)}
-                onPick={id => {
-                  const destination = { project: folderOf(id), id };
-                  setHablandoCon(null);
-                  void abrirSesion(destination.project, id);
-                }}
-              />;
-              }}
-            </Show>
+            /></Suspense>
           </ColumnaLateral>
           </div>
         </div>
