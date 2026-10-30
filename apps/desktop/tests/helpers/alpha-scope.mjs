@@ -72,8 +72,9 @@ try{
  const field=q('[data-broadcasts] input');field.value='BORRADOR';field.dispatchEvent(new w.Event('input',{bubbles:true}));await sleep(50);
  await enter('Dos');
  await until(()=>!q('[data-broadcasts] input'),'the form leaves with its workspace');
- assert.doesNotMatch(q('[data-broadcasts]').textContent,/BORRADOR/);
+ assert.doesNotMatch(text(),/BORRADOR/);
  await enter('Uno');
+ await sleep(300);byText('Difusiones')?.click();
  await until(()=>q('[data-broadcasts]')&&[...q('[data-broadcasts]').querySelectorAll('button')].some(n=>/Nueva/.test(n.textContent)),'Broadcasts back');
  assert.equal([...doc.querySelectorAll('[data-broadcasts] input')].some(n=>n.value==='BORRADOR'),false,'and the draft does not come back');
  console.log('alpha scope: detail cleared on workspace and session change, late answers dropped, Broadcasts form cleared');
