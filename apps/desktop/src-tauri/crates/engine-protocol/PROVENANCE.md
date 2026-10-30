@@ -255,3 +255,6 @@ them answers that the command is unknown, and only that feature turns off.
   and orchestrators on this machine (`local_orchestrator_connect`,
   `list_local_orchestrators`, `local_orchestrator_disconnect`), from
   seldon-host PR #239.
+- `artifact_parts_v1.json`: `artifact_read_part`, the bytes of a sealed artifact
+  version in parts, so a window downloads a document from a task on another
+  machine (seldon-host `feat/artifact-read-part`).

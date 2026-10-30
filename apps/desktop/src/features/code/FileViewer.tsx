@@ -379,7 +379,7 @@ export default function VisorDeArchivo(props: {
   });
 
   /** La salida usa lo que hay en disco, no lo escrito sin guardar. */
-  const canOpenExternal = () => !conGuardadoManual() && (props.suelto || props.session !== "");
+  const canOpenExternal = () => !conGuardadoManual() && (props.suelto || props.session !== "") && !machineOf(props.session);
 
   async function openExternal() {
     setFalloAfuera(null);
@@ -407,7 +407,7 @@ export default function VisorDeArchivo(props: {
 
   // El PDF de un documento de Office; sin archivo en disco (una rama base) no hay.
   function pedirOffice(): Promise<Preview> | null {
-    if (props.suelto) return invoke<Preview>("office_preview", { path: props.ruta });
+    if (props.suelto) return invoke<Preview>("office_preview", { path: props.ruta }, machineOf(props.session));
     if (props.session === "") return null;
     return invoke<Preview>("tree_office_preview", {
       project: props.project,
@@ -419,7 +419,7 @@ export default function VisorDeArchivo(props: {
 
   const pedirContenido = async (): Promise<Contenido> => {
     if (props.suelto) {
-      const p = await invoke<Preview>("preview_file", { path: props.ruta, rel: props.ruta });
+      const p = await invoke<Preview>("preview_file", { path: props.ruta, rel: props.ruta }, machineOf(props.session));
       return {
         kind: p.kind === "html" ? "text" : p.kind,
         text: p.text ?? "",

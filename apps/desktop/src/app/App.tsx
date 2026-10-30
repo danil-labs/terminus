@@ -8066,7 +8066,7 @@ export default function App() {
                       {(a) => (
                         <Show
                           when={a().codigo}
-                          fallback={<VisorDeArtefacto path={a().path} rel={a().rel} kind={a().kind} />}
+                          fallback={<VisorDeArtefacto path={a().path} rel={a().rel} kind={a().kind} session={a().session} />}
                         >
                           <Suspense fallback={null}><VisorDeArchivo
                             project={a().project}

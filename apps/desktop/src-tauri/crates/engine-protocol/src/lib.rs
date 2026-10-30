@@ -86,7 +86,10 @@ pub const MANIFEST: &str = include_str!("../commands.json");
 /// `crates/engine-manifest/extensions/`): órdenes aditivas que no entran en la
 /// huella. La ventana las despacha igual que las del contrato; con un motor que
 /// no las conoce, la orden falla sola y esa función se apaga.
-pub const EXTENSIONS: &[&str] = &[include_str!("../extensions/orchestrators.json")];
+pub const EXTENSIONS: &[&str] = &[
+    include_str!("../extensions/orchestrators.json"),
+    include_str!("../extensions/artifact_parts_v1.json"),
+];
 
 /// Las órdenes del contrato más las de las extensiones. La huella sigue siendo
 /// solo de [`MANIFEST`].

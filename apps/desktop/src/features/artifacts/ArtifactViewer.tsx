@@ -1,5 +1,7 @@
 import { createEffect, createSignal, on } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
+import { machineOf } from "../machines/store";
+import { FileMachine } from "../../ui/fileMachine";
 import PreviewPane, { type Preview } from "./Preview";
 import { prosaDe } from "../../ui/Failure";
 
@@ -24,7 +26,10 @@ export default function VisorDeArtefacto(props: {
   rel: string;
   /** Lo produjo el agente («output»), lo adjuntó la persona («input») o vive fuera de la tarea («external»). */
   kind: "output" | "input" | "external";
+  /** La tarea de la pestaña: si corre en otra máquina, el archivo está en su disco. */
+  session?: string;
 }) {
+  const machine = () => machineOf(props.session)?.headers["x-terminus-machine"];
   const [preview, setPreview] = createSignal<Preview | null>(null);
   const [fallo, setFallo] = createSignal<string | null>(null);
 
@@ -35,7 +40,7 @@ export default function VisorDeArtefacto(props: {
       () => props.path,
       (path) => {
         setFallo(null);
-        invoke<Preview>("preview_file", { path, rel: props.rel })
+        invoke<Preview>("preview_file", { path, rel: props.rel }, machineOf(props.session))
           .then(setPreview)
           .catch((e) => {
             setPreview(null);
@@ -49,6 +54,7 @@ export default function VisorDeArtefacto(props: {
     // El relleno lo decide `PreviewPane`, no esta pantalla: un artefacto web
     // va a sangre, y qué forma tiene lo sabe el visor. Es el mismo relleno que
     // la transcripción (`Chat.tsx`).
+    <FileMachine.Provider value={machine}>
     <div class="h-full">
       <PreviewPane
         preview={preview()}
@@ -60,5 +66,6 @@ export default function VisorDeArtefacto(props: {
         error={fallo()}
       />
     </div>
+    </FileMachine.Provider>
   );
 }
