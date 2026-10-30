@@ -783,7 +783,6 @@
   "settings.entry.projects_hint": "Las carpetas de este workspace y su control de fuentes.",
   "settings.entry.agents_skills": "Agentes y skills",
   "settings.entry.agents_skills_hint": "Quién trabaja en este workspace y con qué habilidades.",
-  "settings.entry.connections": "Conexiones",
   "settings.entry.connections_hint": "Los orquestadores y servicios que trabajan con este workspace.",
   "settings.tab.profile": "Perfil",
   "settings.tab.security": "Seguridad",
@@ -793,5 +792,6 @@
   "settings.tab.folders": "Carpetas",
   "settings.tab.secrets": "Secretos",
   "settings.tab.orchestrators": "Orquestadores",
-  "settings.admin": "Administración"
+  "settings.admin": "Administración",
+  "settings.nav.connections": "Conexiones"
 }

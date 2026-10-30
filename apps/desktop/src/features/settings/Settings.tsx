@@ -133,7 +133,7 @@ const ENCABEZADOS: Record<SettingsEntryId, { name: () => string; hint: () => str
   machines: { name: () => t("settings.entry.machines"), hint: () => t("settings.entry.machines_hint"), icono: () => <Monitor size={15} /> },
   projects: { name: () => t("settings.entry.projects"), hint: () => t("settings.entry.projects_hint"), icono: () => <Folders size={15} /> },
   "agents-skills": { name: () => t("settings.entry.agents_skills"), hint: () => t("settings.entry.agents_skills_hint"), icono: () => <Bot size={15} /> },
-  connections: { name: () => t("settings.entry.connections"), hint: () => t("settings.entry.connections_hint"), icono: () => <Plug size={15} /> },
+  connections: { name: () => t("settings.nav.connections"), hint: () => t("settings.entry.connections_hint"), icono: () => <Plug size={15} /> },
 };
 
 /** Una entrada sale si tiene alguna pestaña que ya existe. */
