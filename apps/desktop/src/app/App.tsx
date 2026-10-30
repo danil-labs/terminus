@@ -6826,13 +6826,14 @@ export default function App() {
           </div>
   );
   // En una tarea, el conmutador del panel derecho abre sus archivos dentro de la tarea.
-  const botonDeArchivos = (sesion: string) => (
+  // La sesión llega como accesor: leída al llamar, cada cambio de tarea volvería a montar el botón.
+  const botonDeArchivos = (sesion: () => string) => (
     <BotonConAtajo
-      variant={archivosDeTarea.panel(sesion).open ? "secondary" : "ghost"}
+      variant={archivosDeTarea.panel(sesion()).open ? "secondary" : "ghost"}
       size="icon"
       class="relative size-7 shrink-0 text-neutral-500"
-      onClick={() => archivosDeTarea.toggle(sesion)}
-      aria-pressed={archivosDeTarea.panel(sesion).open}
+      onClick={() => archivosDeTarea.toggle(sesion())}
+      aria-pressed={archivosDeTarea.panel(sesion()).open}
       aria-label={t("code.panel.toggle")}
       accion="workTree"
       etiqueta={t("code.panel.toggle")}
@@ -7646,7 +7647,7 @@ export default function App() {
                 <Show keyed when={delegatedToolbarTargets().get(`${workspaceActivo()}/${task()?.session ?? ""}`)}>{render => render()}</Show>
                 <UsageTool usage={consumo} agent={agenteDeLaVentana()} onGestionarCuentas={() => setSettings("proveedores-ia")} />
                 <Show when={task()?.session && !agenteSenalado()} fallback={<Show when={!artOpen() && !paginaDeAgente()}>{botonDelArbol()}</Show>}>
-                  {botonDeArchivos(task()?.session ?? "")}
+                  {botonDeArchivos(() => task()?.session ?? "")}
                 </Show>
               </>} />;
         // Centrada con la fila de máquina, proyecto y rama de la tarea (`TaskLocation`).
