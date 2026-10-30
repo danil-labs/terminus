@@ -1,5 +1,6 @@
+import { useTheme } from "../theme";
 import { useEffect, useState } from "react";
-import { useColorScheme, View } from "react-native";
+import { View } from "react-native";
 import { CodeFallback } from "./Mermaid";
 
 let seq = 0;
@@ -9,7 +10,7 @@ let seq = 0;
  * cargado al primer diagrama: la política de la página no deja traerlo de afuera.
  */
 export function MermaidDiagram({ definition }: { definition: string }) {
-  const dark = useColorScheme() === "dark";
+  const dark = useTheme().dark;
   const [svg, setSvg] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {

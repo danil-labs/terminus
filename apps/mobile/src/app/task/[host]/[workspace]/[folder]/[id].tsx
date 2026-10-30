@@ -41,6 +41,9 @@ import { Icon, type IconName } from "../../../../../ui/Icon";
 import { openTask } from "../../../../../ui/components";
 import { KeyboardScreen } from "../../../../../ui/KeyboardScreen";
 import { TaskHeader } from "../../../../../ui/TaskHeader";
+import { TaskTools } from "../../../../../ui/TaskTools";
+import { effectiveGit } from "../../../../../lib/taskGit";
+import { useTaskGit } from "../../../../../lib/useTaskGit";
 import { BrandMark } from "../../../../../ui/BrandMark";
 import { Avatar } from "../../../../../ui/components";
 
@@ -89,6 +92,8 @@ export default function TaskScreen() {
   const [pending, setPending] = useState<string | null>(null);
   const [background, setBackground] = useState<Backdrop | null>(null);
   const list = useRef<FlatList<Line>>(null);
+  // Buscar en el chat: con texto, solo las líneas que lo dicen; `null` cerrado.
+  const [finding, setFinding] = useState<string | null>(null);
   const key = `${params.host}/${id}`;
   // Las que esta tarea lanzó: la lista las esconde bajo ella, como el riel del escritorio. Las hijas
   // remotas viven en otra máquina y nombran a esta por su `taskKey`.
@@ -331,6 +336,17 @@ export default function TaskScreen() {
     return now ? send({ shell: false, prompt, ...taskDefaults(now), effort: null, permissionMode: now.session.permission_mode ?? null, attachments: [] }) : Promise.resolve(false);
   }, []);
 
+  const folderRow = snapshot?.folders.find((f) => f.host === params.host && f.id === folder) ?? null;
+  const gitBook = useTaskGit(hostOf, [{ host: params.host, workspace, folder, id }]);
+  const git = effectiveGit(gitBook, { id, host: params.host, workspace }, snapshot?.tasks ?? []);
+  const mine = lines.flatMap((line) => (line.kind === "message" && line.role === "user" && !line.from && line.text.trim() ? [{ key: line.key, text: line.text.split("\n")[0] }] : []));
+  const needle = finding?.trim().toLowerCase() ?? "";
+  const visible = needle ? lines.filter((line) => ("text" in line ? line.text : line.kind === "shell" ? `${line.command}\n${line.output}` : "").toLowerCase().includes(needle)) : lines;
+  const jumpTo = (lineKey: string) => {
+    const index = visible.findIndex((line) => line.key === lineKey);
+    if (index >= 0) list.current?.scrollToIndex({ index, viewPosition: 0, animated: true });
+  };
+
   return (
     <KeyboardScreen>
       <ChatScopeContext.Provider value={scope}>
@@ -351,16 +367,30 @@ export default function TaskScreen() {
         onChanged={() => { void reload(); }}
         onFinished={() => { void reload(); router.replace("/"); }}
       />
-      {delegated.length ? <Delegated tasks={delegated} theme={theme} /> : null}
+      <TaskTools
+        host={host}
+        workspace={workspace}
+        machine={host?.label ?? params.host}
+        folder={folderRow ? { key: folderRow.key, name: folderRow.name } : null}
+        branch={git?.branch ?? null}
+        provider={view?.session.provider ?? null}
+        subtasks={delegated.length}
+        mine={mine}
+        finding={finding}
+        onFind={setFinding}
+        onJump={jumpTo}
+        onTools={() => router.push({ pathname: "/task-tools", params: { host: params.host, workspace, folder: params.folder, id } })}
+      />
       <View style={styles.thread}>
       <FlatList
         ref={list}
-        data={lines}
+        data={visible}
         keyExtractor={(line) => line.key}
         contentContainerStyle={styles.list}
         onContentSizeChange={stick}
         onLayout={onLayout}
         onScroll={onScroll}
+        onScrollToIndexFailed={({ averageItemLength, index }) => list.current?.scrollToOffset({ offset: averageItemLength * index, animated: true })}
         scrollEventThrottle={16}
         // Lo que cambia de alto por encima de lo que se lee (una imagen que carga, pasos que se abren) no lo mueve.
         maintainVisibleContentPosition={Platform.OS === "web" ? undefined : { minIndexForVisible: 0 }}
@@ -527,29 +557,6 @@ function Bubble({ line, theme, streaming, onQuickReply }: { line: Extract<Line, 
 }
 
 /** «N tareas delegadas», como el panel del lanzador en el escritorio: se abre con un toque y cada una lleva a su chat. */
-function Delegated({ tasks, theme }: { tasks: Task[]; theme: Theme }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <View testID="delegated" style={[styles.delegated, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-      <Pressable onPress={() => setOpen((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: open }} hitSlop={6} style={styles.delegatedRow}>
-        <Icon name={open ? "chevron-down" : "chevron-right"} size={14} color={theme.textMuted} />
-        <Text style={{ color: theme.text, fontSize: 13, fontWeight: "500" }}>
-          {t(tasks.length === 1 ? "task.delegated.one" : "task.delegated.many", { count: tasks.length })}
-        </Text>
-      </Pressable>
-      {open
-        ? tasks.map((task) => (
-            <Pressable key={task.id} onPress={() => openTask(task.host, task.workspace, task.folder, task.id)} accessibilityRole="link" style={styles.delegatedRow}>
-              <Icon name="corner-down-right" size={14} color={theme.textMuted} />
-              <Text numberOfLines={1} style={{ color: theme.text, fontSize: 14, flex: 1 }}>
-                {taskTitle(lang, task)}
-              </Text>
-            </Pressable>
-          ))
-        : null}
-    </View>
-  );
-}
 
 const STEP_ICON: Record<StepRow["kind"], IconName> = { read: "file", search: "sparkles", edit: "square-pen", run: "terminal", web: "external-link", plan: "list-checks", other: "sparkles" };
 /** Las filas que se ven de entrada; las de antes se abren con un toque. */
