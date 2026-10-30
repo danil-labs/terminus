@@ -73,7 +73,7 @@ export function SettingsRow(props: SettingsRowProps) {
   return (
     <div
       class={cn(
-        "flex min-w-0 items-center gap-8 border-b border-border py-3.5 last:border-b-0",
+        "flex min-w-0 flex-col items-stretch gap-3 border-b border-border py-3.5 last:border-b-0 sm:flex-row sm:items-center sm:gap-8",
         own.class,
       )}
       {...rest}
@@ -92,7 +92,7 @@ export function SettingsRow(props: SettingsRowProps) {
         </div>
       </div>
       <Show when={control()}>
-        <div class="flex shrink-0 items-center gap-2">{control()}</div>
+        <div class="flex min-w-0 flex-wrap items-center gap-2 sm:shrink-0">{control()}</div>
       </Show>
     </div>
   );

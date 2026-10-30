@@ -17,6 +17,7 @@ import { type Superficie } from "../../lib/surfaces";
 import { cn } from "../../lib/utils";
 import { Badge } from "../../ui/Badge";
 import { Button } from "../../ui/Button";
+import { Select } from "../../ui/Select";
 import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
 import { Close } from "../../ui/icons";
 import {
@@ -425,17 +426,43 @@ export default function Settings(props: {
           {/* **La fila tiene que ser `minmax(0,1fr)` y no la implícita.** Con
               `grid-auto-rows: auto` el riel crece por debajo de la hoja y su
               `overflow-y-auto` no tiene nada que desplazar. */}
-          <div class="grid min-h-0 flex-1 grid-cols-[224px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)]">
+          <div class="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)] md:grid-cols-[224px_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)]">
+            <header class="grid gap-3 border-b border-border bg-rail px-4 py-3 md:hidden">
+              <div class="flex items-center justify-between gap-3">
+                <DialogTitle class="m-0 text-lead font-semibold">{t("settings.title")}</DialogTitle>
+                <Button variant="ghost" size="iconCompact" onClick={props.onClose} aria-label={t("settings.close")}>
+                  <Close size={16} />
+                </Button>
+              </div>
+              <Select
+                aria-label={t("settings.nav.label")}
+                value={activo()}
+                onChange={(event) => {
+                  const id = event.currentTarget.value as SettingsEntryId;
+                  setFoco(id);
+                  setActivo(id);
+                }}
+              >
+                <For each={GRUPOS}>{(group) => (
+                  <optgroup label={group.nombre()}>
+                    <For each={ENTRADAS.filter((entry) => entry.group === group.id)}>
+                      {(entry) => <option value={entry.id}>{entry.name}</option>}
+                    </For>
+                  </optgroup>
+                )}</For>
+              </Select>
+              <AdminLink workspace={props.workspaceName ?? null} />
+            </header>
             <Sidebar
               role="tablist"
               aria-orientation="vertical"
               aria-label={t("settings.nav.label")}
-              class="border-0 bg-rail"
+              class="hidden border-0 bg-rail md:grid"
             >
               <SidebarHeader class="pb-6 pl-5 pr-3 pt-4">
-                <DialogTitle class="m-0 text-lead font-semibold">
+                <h2 class="m-0 text-lead font-semibold">
                   {t("settings.title")}
-                </DialogTitle>
+                </h2>
               </SidebarHeader>
 
               {/* Sin barra visible: su canal separaba la pestaña activa del panel
@@ -461,7 +488,7 @@ export default function Settings(props: {
               <Button
                 variant="ghost"
                 size="iconCompact"
-                class="absolute right-8 top-3 z-10 size-7"
+                class="absolute right-8 top-3 z-10 hidden size-7 md:inline-flex"
                 onClick={props.onClose}
                 aria-label={t("settings.close")}
               >
@@ -473,7 +500,7 @@ export default function Settings(props: {
                 id="cfg-panel"
                 role="tabpanel"
                 aria-labelledby={idTab(entrada().id)}
-                class="h-full min-w-0 overflow-auto px-8 pb-10 pt-6"
+                class="h-full min-w-0 overflow-auto px-4 pb-10 pt-5 md:px-8 md:pt-6"
               >
                 <header class="mb-6 grid gap-0.5 pr-10">
                   <h2 class="m-0 text-lg font-semibold">{entrada().name}</h2>
@@ -484,7 +511,7 @@ export default function Settings(props: {
                     role="tablist"
                     aria-label={entrada().name}
                     onKeyDown={moverPestana}
-                    class="mb-6 flex items-end gap-5 border-0 border-b border-solid border-border"
+                    class="mb-6 flex items-end gap-5 overflow-x-auto border-0 border-b border-solid border-border"
                   >
                     <For each={entrada().tabs.filter(pestanaVisible)}>
                       {(p) => (
@@ -499,7 +526,7 @@ export default function Settings(props: {
                           tabindex={pestana().id === p.id ? 0 : -1}
                           onClick={() => elegir(p)}
                           class={cn(
-                            "-mb-px inline-flex items-center gap-1.5 border-0 border-b-2 border-solid border-transparent bg-transparent px-0 pt-0 pb-2 text-sm text-neutral-500 hover:text-neutral-950 aria-disabled:cursor-default aria-disabled:hover:text-neutral-500",
+                            "-mb-px inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap border-0 border-b-2 border-solid border-transparent bg-transparent px-0 pt-0 pb-2 text-sm text-neutral-500 hover:text-neutral-950 aria-disabled:cursor-default aria-disabled:hover:text-neutral-500",
                             pestana().id === p.id && "border-neutral-950 font-semibold text-neutral-950",
                           )}
                         >
