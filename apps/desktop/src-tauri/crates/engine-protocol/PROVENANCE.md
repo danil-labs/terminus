@@ -255,3 +255,9 @@ them answers that the command is unknown, and only that feature turns off.
   and orchestrators on this machine (`local_orchestrator_connect`,
   `list_local_orchestrators`, `local_orchestrator_disconnect`), from
   seldon-host PR #239.
+- `engine_update_v1.json`: remote engine update (`engine_update_status`,
+  `engine_update`), feature `engine_update_v1`, from seldon-host PR #252
+  (`feat/engine-update` 7318646).
+- `machine_usage_v1.json`: usage per task (`stop_task_processes`, the
+  `machine-usage` event and the additive `machine_resources` fields), feature
+  `machine_usage_v1`, from seldon-host PR #255 (`feat/machine-usage` 8c2ad2b).

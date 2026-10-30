@@ -88,13 +88,13 @@ test("storage keeps its machine and workspace and never waits for an offline VM"
   await assert.rejects(invoke("collect_orphans", {}, target), (e) => e.detail === "machine_off");
   assert.equal(calls("cmp_mac", "collect_orphans").length, 1, "cleanup is never queued while off");
   f.relays.cmp_mac.setState("online");
-  const trigger = app.w.document.querySelector('button[aria-label="Almacenamiento"]');
+  const trigger = app.w.document.querySelector('button[aria-label="Máquinas"]');
   assert.ok(trigger);
   trigger.click();
-  assert.ok(await until(() => app.w.document.querySelector('[data-storage-machine="cmp_mac"]')));
+  assert.ok(await until(() => app.w.document.querySelector('[data-machine-card="cmp_mac"]')));
   const measured = calls("cmp_mac", "list_storage").length;
   f.relays.cmp_mac.setState("offline");
-  assert.ok(await until(() => app.w.document.querySelector('[data-storage-machine="cmp_mac"]')?.textContent.includes("Sin conexión")), "the open panel follows relay state without interaction");
+  assert.ok(await until(() => app.w.document.querySelector('[data-machine-card="cmp_mac"]')?.querySelector("[data-machine-power]")?.textContent.includes("Apagada")), "the open panel follows relay state without interaction");
   assert.equal(calls("cmp_mac", "list_storage").length, measured, "a status transition does not scan storage");
   trigger.click();
   assert.deepEqual(app.fallos, []);
@@ -330,7 +330,7 @@ test("«Ejecutar en» disables, with the reason, a machine that cannot make the 
   });
   assert.equal(calls("cmp_old", "materialize_workspace").length, 1, "it was asked once");
   assert.equal(calls("cmp_old", "send_message").length, 0, "and never got the task");
-  assert.deepEqual((await invoke("machine_list")).find((m) => m.id === "cmp_old"), { id: "cmp_old", local: false, active: false, on: true, hosts: false, materializes: false, wakes: true });
+  assert.deepEqual((await invoke("machine_list")).find((m) => m.id === "cmp_old"), { id: "cmp_old", local: false, active: false, on: true, power: "on", hosts: false, materializes: false, wakes: true });
 
   doc.querySelector('[aria-label="Ejecutar en"]').click();
   assert.ok(await until(() => doc.querySelector('[data-machine-option="cmp_mac"]')), "the machine picker opens");

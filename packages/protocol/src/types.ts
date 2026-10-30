@@ -14,17 +14,77 @@ export type WorkspaceDanil = { user_id: string; email?: string | null; name?: st
  */
 export type Workspace = { id: string; name: string; provider?: string | null; remote?: string | null; danil?: WorkspaceDanil | null; default_permission_mode?: string | null };
 /** `list_workspaces`. */
+/**
+ * `list_workspaces` → `machine_resources`. Lo de `memory` en adelante es aditivo
+ * y llega con la característica de servicio `machine_usage_v1` (seldon-host
+ * `docs/proposals/2026-10-29-machine-resources.md` §3.3): un host anterior solo
+ * trae `storage`, y la interfaz lo muestra como «Solo disco», nunca como viejo.
+ */
 export type MachineResources = {
   measured_at: number;
   error?: "measurement_failed" | "unsupported";
   storage: { id: string; label: string; total_bytes: number; free_bytes: number; available_bytes: number; terminus_bytes: null; attribution: "unknown" }[];
+  memory?: { total_bytes: number; available_bytes: number; swap_total_bytes: number; swap_used_bytes: number };
+  /** `load` es la carga promedio de 1, 5 y 15 min; `usage_percent`, el uso de 0 a 100, desde la segunda lectura. */
+  cpu?: { cores: number; load: [number, number, number]; usage_percent?: number };
+  /** PSI `some avg60`, en %. `memory_history`: el de memoria por minuto, el más viejo primero (Linux; vacío el primer minuto). */
+  pressure?: { cpu: number; memory: number; io: number; memory_history?: number[] };
+  /** `rss_bytes` y `threads` llegan con `machine_usage_v1`; lo demás, ver `EngineUpdate`. */
+  engine?: { rss_bytes?: number; threads?: number } & EngineUpdate;
+  /** `cgroup` cuenta exacto; `best_effort` (macOS) reparte por proceso; `none`, sin reparto por tarea. */
+  attribution?: "cgroup" | "best_effort" | "none";
+  tasks?: MachineTaskUsage[];
+  other?: { memory_bytes: number; processes: number };
+  /** El aviso de presión activo del motor (memoria `some avg60` sostenida), con lo que más usa. */
+  pressure_alert?: { since: number; memory: number; tasks: { workspace: string; session: string; title: string; memory_bytes: number }[] };
+  /** Cuánto tardó la lectura, en µs. */
+  measure_us?: number;
+};
+/**
+ * `engine_update_status` y el bloque `engine` de `machine_resources` (seldon-host
+ * `engine_update.rs`): `version` y `build` siempre; el resto, con `engine_update_v1`.
+ */
+export type EngineUpdate = {
+  version?: string;
+  build?: string;
+  available?: boolean;
+  channel?: string;
+  /** La última release firmada del canal; `null` si no se conoce. */
+  latest?: { release: string; version?: string; commit?: string; sha256?: string; published_at?: string } | null;
+  update_available?: boolean;
+  /** `current` ya apunta a otra release: se cambia al quedar sin turnos. */
+  handover_pending?: boolean;
+  download?: { request_id: string; release: string; state: "downloading" | "staged" | "rejected"; error?: string } | null;
+  pending?: { request_id?: string; release?: string; mode?: "now" | "when_idle" } | null;
+  last?: { request_id?: string; state?: string; error?: string | null } | null;
+};
+export type MachineTaskUsage = {
+  workspace: string;
+  session: string;
+  /** De la tarea, no del proceso: `finished` (también archivada con turno vivo) con procesos es «Quedó corriendo». */
+  state: "running" | "idle" | "finished";
+  memory_bytes: number;
+  memory_peak_bytes: number;
+  /** % de un núcleo, como en `top`: puede pasar de 100. Promedio de los últimos 10 s. */
+  cpu_percent: number;
+  processes: number;
+  pressure_memory: number;
+  browsers: { session: string; since: number }[];
+  /** Hasta 5. */
+  top: { pid: number; command: string; rss_bytes: number }[];
+  title?: string;
+  project?: string | null;
+  archived?: boolean;
+  /** En ms, solo si terminó o se archivó. */
+  ended_at?: number;
 };
 export type WorkspaceStorage = {
   bytes: number; recuperable: number; medido_en: number; aviso: string | null;
   tareas: { session: string; project: string; tarea: string; proyecto: string | null; bytes: number }[];
   compartido: { bytes: number }[]; sueltos: { bytes: number }[];
 };
-export type Startup = { workspaces: Workspace[]; active: string | null; machine_resources?: MachineResources };
+/** `cached_at`: la ventana lo agrega cuando la máquina está apagada y la respuesta salió de su última copia. */
+export type Startup = { workspaces: Workspace[]; active: string | null; machine_resources?: MachineResources; cached_at?: number | null };
 /** `list_projects`: una carpeta del workspace. */
 export type Project = { id: string; name: string; working_directory?: string | null; kind?: "git" | "folder"; remote_url?: string | null };
 /**

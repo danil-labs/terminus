@@ -8448,6 +8448,13 @@ export default function App() {
               trabajando={vivas()}
               conPestana={sesionesConPestana()}
               onAbrirTarea={(proyecto, session) => void abrirSesion(proyecto, session)}
+              lookup={(session) => {
+                for (const [id, rows] of Object.entries(sesiones())) {
+                  const row = rows.find((r) => r.id === session);
+                  if (row) return { title: row.title, project: projectList().find((p) => p.id === id)?.name };
+                }
+                return undefined;
+              }}
             />
             </>}
           />
@@ -8487,7 +8494,7 @@ export default function App() {
               modelos={modelosParaAgentes()}
               sessions={sesionesDelRiel()}
               viewKey={sidebarViewKey(workspaceActivo(), escritorio())}
-              filterRef={setSidebarFilter}
+              filterRef={(filter, released) => setSidebarFilter((actual) => filter ?? (actual === released ? null : actual))}
               onHablarCon={hablarConEncargado}
               onAgentProfile={openAgentProfile}
               escritorio={activeSpace() ? spaceName(activeSpace()) : null}
