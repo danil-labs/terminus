@@ -26,7 +26,7 @@ export function beginDemoIsolation() {
   window.fetch = async (input, init) => {
     const url = new URL(input instanceof Request ? input.url : String(input), location.href);
     const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
-    if (url.origin !== location.origin || !url.pathname.startsWith('/terminus/assets/') || !['GET', 'HEAD'].includes(method)) {
+    if (url.origin !== location.origin || !url.pathname.startsWith(`${import.meta.env.BASE_URL}assets/`) || !['GET', 'HEAD'].includes(method)) {
       trace.network.push(url.pathname); throw new Error('demo_read_only');
     }
     return originalFetch(input, init);

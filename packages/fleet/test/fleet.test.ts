@@ -756,3 +756,8 @@ test("the in-memory slice cache evicts old pages and keeps the recently used one
   assert.equal(book.get("mac", "0"), null);
   assert.equal(book.get("mac", "39"), null);
 });
+
+test("the new phone UI commands: archived_tasks and keep_awake_status are reads; spaces and keep-awake changes are actions", () => {
+  for (const read of ["archived_tasks", "keep_awake_status", "list_ports", "list_spaces"]) assert.equal(classOf(read), "read", read);
+  for (const action of ["create_space", "rename_space", "space_delete_preview", "delete_space", "set_keep_awake"]) assert.equal(classOf(action), "action", action);
+});

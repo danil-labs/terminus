@@ -9,7 +9,7 @@ import type { Pregunta, Respuesta } from "./Questions";
  * Lo que el agente preguntó y lo que se le contestó, como bloque propio del
  * hilo. Una decisión de la persona no es una herramienta que corrió el agente,
  * así que no va dentro del pliegue de «Trabajó durante N»: tiene el mismo
- * rango que `Entrega` y `CambiosDelTurno` — tarjeta sobre `surface-raised`, en
+ * rango que `Entrega` — tarjeta sobre `surface-raised`, en
  * el sitio donde ocurrió.
  *
  * Nace abierto, y por eso el estado que se guarda es el pliegue: `Chat.tsx` lo

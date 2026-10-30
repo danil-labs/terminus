@@ -23,7 +23,7 @@ export function Attention(props: { demo: boolean; session?: InboxSession & { sub
   const [channel, setChannel] = createSignal<string | null>(null);
   const [filter, setFilter] = createSignal<InboxFilter>('all');
   const [counts, setCounts] = createSignal<ConversationCounts>({ assistance: null, aiDisabled: null });
-  const api = props.session ? createInbox(props.session) : null;
+  const api = props.session ? createInbox(props.session, fetch, `${import.meta.env.BASE_URL}alpha-api`) : null;
   let epoch = 0;
   let thread = 0;
   const clear = () => { epoch++; thread++; setRows([]); setSelected(undefined); setMessages([]); setMore(false); setOlder(false); setError(''); setDetail(false); setLoadingThread(false); setQuery(''); setChannel(null); setFilter('all'); setCounts({ assistance: null, aiDisabled: null }); };

@@ -6,8 +6,6 @@
  * los tiene, la entrada sobra y los guardas fallan hasta quitarla: esta lista
  * solo se vacía.
  */
-export const COMANDOS_PENDIENTES = {
-  stop_task_processes: "seldon-host feat/machine-usage (machine_usage_v1, propuesta §3.4); la ventana solo la pide si el host la anuncia",
-};
+export const COMANDOS_PENDIENTES = {};
 
 export const EVENTOS_PENDIENTES = {};

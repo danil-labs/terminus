@@ -158,7 +158,7 @@ export default function UsageTool(props: {
               disabled={props.usage.updating()}
               onClick={props.usage.refreshAll}
             >
-              <RefreshCw size={12} class={cn(props.usage.updating() && "animate-spin-steps")} />
+              <RefreshCw size={12} class={cn(props.usage.updating() && "animate-spin")} />
               {t("usage.refresh_all")}
             </Button>
             <Button

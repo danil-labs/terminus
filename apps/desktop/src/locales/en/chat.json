@@ -269,6 +269,7 @@
   "chat.turn.waiting_background": "Idle · a subagent is still running in the background",
   "chat.turn.working_aria": "The agent is working",
   "chat.work.duration": "Worked for {duration}",
+  "chat.work.open_changes": "View the changes in the task panel",
   "chat.work.running": "Working",
   "chat.work.title": "Work",
   "chat.steer.not_running": "This task no longer has a running turn. Send the message as a new turn.",

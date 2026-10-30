@@ -79,7 +79,6 @@ import {
 } from "../features/chat/transcript";
 const VisorDeArchivo = lazy(() => import("../features/code/FileViewer"));
 import { avisarDeLosArboles } from "../features/code/refresh";
-import CambiosDelTurno from "../features/code/TurnChanges";
 import { arbolesDe, contiene, ubicar } from "../features/code/treeKind";
 import type { Tipo } from "../features/code/FileTree";
 const ColumnaDeTrabajo = lazy(() => import("../features/code/WorkTreeColumn"));
@@ -7265,30 +7264,13 @@ export default function App() {
             </Show>
           } />
         }
-        /* Tarea de ESTA ventana, no la que tenga el mando: cerraba sobre los
-            globales `sessionId()`/`project()` aunque el bloque se pinta
-            DENTRO del hilo (`Chat.tsx`, bajo cada turno con archivos) —
-            mostraba el diff de otra tarea, y cambiar de ventana reevaluaba
-            este ámbito en TODOS los paneles montados. */
-        cambiosDelTurno={(code) => (
-          /* Sin git el rango no dice lo que parece: la foto la toma un
-             repositorio que monta la app para la tarea (`development::trees` ·
-             `asegurar_tienda`), así que una carpeta suelta también produce
-             diff — de todo lo que se movió dentro, sea o no del turno. */
-          <Show when={esRepositorio() ? pp.sesion : null}>
-            {(id) => (
-              <CambiosDelTurno
-                project={pp.proyecto ?? project()}
-                session={id()}
-                code={code}
-                /* `cambiado` va siempre en true: lo que sale de este bloque
-                   lo cambió el turno por definición; su pestaña nace con
-                   vista de diff. */
-                onAbrir={(arbol, ruta) => abrirArchivo(arbol, ruta, true)}
-              />
-            )}
-          </Show>
-        )}
+        /* Tarea de ESTA ventana (`pp.sesion`), no la que tenga el mando: el
+           botón vive dentro del hilo de cada panel. Sin git no se ofrece: la
+           foto del turno incluye todo lo que se movió en la carpeta. */
+        onVerCambios={esRepositorio() && pp.sesion ? () => {
+          archivosDeTarea.setSide(pp.sesion!, "changes");
+          archivosDeTarea.setOpen(pp.sesion!, true);
+        } : undefined}
         material={materialPendiente()}
         materialTarget={materialTarget()}
         materialAvailable={taskSources() !== null && (!pp.sesion || !!taskMaterialOptions())}

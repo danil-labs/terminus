@@ -4,7 +4,7 @@ import type { SupportAccessSource } from '../../features/settings/SupportAccess'
 
 /** Con la sesión de la página, por la entrada alfa (solo lectura). */
 export function supportAccessCapability(session: InboxSession): SupportAccessSource {
-  const api = createSupportAccess(session);
+  const api = createSupportAccess(session, fetch, `${import.meta.env.BASE_URL}alpha-api`);
   return { demo: false, workspaces: api.workspaces, list: api.list };
 }
 
