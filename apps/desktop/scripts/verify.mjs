@@ -620,6 +620,7 @@ const steps = [
   ["Difusiones: el panel completo, las reglas de Appv2 y lo que queda tras el interruptor", process.execPath, ["--test", "--experimental-strip-types", join(root, "../../packages/attention/test/broadcast-panel.test.ts")], root],
   ["La entrada de alfa acota lecturas y escrituras explícitas, y deja la entrada con WorkOS en el Worker", process.execPath, ["--test", join(root, "alpha-entry/worker.test.mjs")], root],
   ["Un workspace sin cuenta segura no muestra datos de ninguna", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/workspace-account.test.ts")]],
+  ["El directorio agrupa lo que se puede entrar y la barra muestra lo fijado", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/workspace-directory.test.ts")]],
   ["El lector de atención no saca valores de variables ni rutas de conexiones API", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/attention-service.test.ts")]],
   ["Inbox: permisos efectivos y respuestas en cola sin reintentos ambiguos", process.execPath, ["--test", "--experimental-strip-types", join(root, "../../packages/attention/test/inbox.test.ts"), join(root, "../../packages/attention/test/messaging.test.ts"), join(root, "tests/unit/inbox-drafts.test.ts")], root],
   ["Broadcasts: permisos por cuenta y canal, plantillas y transiciones reales", process.execPath, ["--test", "--experimental-strip-types", join(root, "../../packages/attention/test/broadcasts.test.ts")], root],

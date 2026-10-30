@@ -399,5 +399,14 @@
   "shell.relocate.failed": "Terminus could not be copied to Applications: {error}\n\nDrag it from the disk window to Applications.",
   "shell.close.error": "Could not complete the exit. The client is still open. Check the error and try again.",
   "shell.tray.unknown": "Terminus · task status unavailable",
-  "shell.service.managed": "An external service manages the engine. Check its configuration and status; Terminus will reconnect when it is available."
+  "shell.service.managed": "An external service manages the engine. Check its configuration and status; Terminus will reconnect when it is available.",
+  "shell.directory.title": "Workspaces",
+  "shell.directory.search": "Search workspaces",
+  "shell.directory.personal": "Personal",
+  "shell.directory.unlinked": "Not linked",
+  "shell.directory.support": "Support access",
+  "shell.directory.unnamed": "Unnamed",
+  "shell.directory.pin": "Pin {name} to the bar",
+  "shell.directory.unpin": "Remove {name} from the bar",
+  "shell.directory.truncated": "There are more workspaces. Use search."
 }

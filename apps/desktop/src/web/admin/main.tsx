@@ -1,6 +1,7 @@
 import { render } from "solid-js/web";
 import { createSupportAccess, type Membership } from "../../../../../packages/attention/src/support-access.ts";
 import { aplicarLengua, aplicarLenguaDeWorkspace, t } from "../../lib/i18n";
+import { accountSources, agentsSession } from "../attention/workspace-sources";
 import { activeAccountOf, type AuditEntry, webAuditLog } from "../audit-log";
 import { authLocation } from "../auth/return";
 import type { WatchedSession } from "../session";
@@ -13,7 +14,7 @@ const root = () => document.getElementById("root") as HTMLElement;
 const home = () => import.meta.env.BASE_URL;
 
 /** `/admin` con la sesión de la app de Danil en este mismo origen; sin ella, a entrar. */
-export async function startAdmin(settings: { login: string; supabaseUrl: string; supabaseKey: string; workos?: boolean }) {
+export async function startAdmin(settings: { endpoint: string; login: string; supabaseUrl: string; supabaseKey: string; workos?: boolean }) {
   aplicarLengua();
   const [{ seguirElTema }, { supabaseSession }] = await Promise.all([import("../../lib/theme"), import("../session")]);
   seguirElTema();
@@ -22,9 +23,11 @@ export async function startAdmin(settings: { login: string; supabaseUrl: string;
     ? (await import("../workos-session")).workosSession({ onGone: leave })
     : supabaseSession(settings.supabaseUrl, settings.supabaseKey, { onGone: leave });
   if (!(await session.user().catch(() => null))) return leave();
-  const api = createSupportAccess(session, fetch, `${import.meta.env.BASE_URL}alpha-api`);
+  const agents = agentsSession(settings.endpoint, session);
+  const api = createSupportAccess(agents, fetch, `${import.meta.env.BASE_URL}alpha-api`);
   const source: AdminSource = {
     memberships: api.memberships,
+    accounts: accountSources(agents),
     active: async () => activeAccountOf(await session.getToken()),
     support: { demo: false, workspaces: api.workspaces, list: api.list },
     auditLog: webAuditLog(settings.supabaseUrl, settings.supabaseKey, () => session.getToken(), () => void session.unauthorized()),
@@ -59,6 +62,7 @@ export async function startAdminDemo(options: { dark: boolean }) {
   const source: AdminSource = {
     memberships: async () => rows,
     active: async () => 1,
+    accounts: { directory: async () => [], active: async () => 1, enter: async () => undefined },
     support: supportAccessDemo(workspace),
     shared: sharedDemo(),
     workspace: null,

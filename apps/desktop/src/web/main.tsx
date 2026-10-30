@@ -15,7 +15,9 @@ import {
   linkedWorkspaces,
   serviceFeatures,
   listComputers,
+  listDirectory,
   listWorkspaces,
+  setDirectoryPins,
   createSpaceOrderSource,
   orderComputers,
   renameComputer,
@@ -44,6 +46,7 @@ import { webAccountProfile } from "./account";
 import { webAccountEmails } from "./account-emails";
 import { authLocation } from "./auth/return";
 import { adminPageCapability } from "./admin/capability";
+import { agentsSession } from "./attention/workspace-sources";
 import { webGithubAccount } from "./github-account";
 import { type Account, type Listing, SLOT_PREFIX, loadAccounts, ownerOf, pickAccount, readListings, rememberLast, removeExtra, savedListings } from "./accounts";
 import { forgetShellCache, setShellCacheScope } from "../lib/shellCache";
@@ -151,6 +154,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
     soon = setTimeout(() => void relistNow?.(), RELIST_SOON);
   };
   const token = async () => base.getToken();
+  const agents = agentsSession(base.endpoint, { getToken: async () => await base.getToken(), unauthorized: async () => base.refresh ? await base.refresh() : false });
   let router: Router | null = null;
   const powers = new Map<string, string>();
   const fleet = new Fleet({
@@ -230,7 +234,15 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
   for (const type of ["dragover", "drop"]) window.addEventListener(type, (e) => e.preventDefault());
   const screens = createScreenAccess({ endpoint: base.endpoint, getToken: token, knows: (id) => !!fleet.info(id) });
   setCapabilities({
-    inbox: import.meta.env.TERMINUS_ALPHA ? attentionCapability(false, window.location.pathname.replace(/\/+$/, "").endsWith("/inbox"), { userId: base.userId ?? mounted.webAccounts?.current.user_id, subscribe: base.subscribe, getToken: async () => await base.getToken(), unauthorized: async () => base.refresh ? await base.refresh() : false }) : undefined,
+    workspaceDirectory: import.meta.env.TERMINUS_ALPHA ? {
+      list: async () => {
+        const answer = await listDirectory(base.endpoint, await token());
+        if (answer.kind !== "ok") throw new Error("directory_unavailable");
+        return answer.value;
+      },
+      pin: async (keys) => { await setDirectoryPins(base.endpoint, await token(), keys); },
+    } : undefined,
+    inbox: import.meta.env.TERMINUS_ALPHA ? attentionCapability(false, window.location.pathname.replace(/\/+$/, "").endsWith("/inbox"), { userId: base.userId ?? mounted.webAccounts?.current.user_id, subscribe: base.subscribe, ...agents }) : undefined,
     supportAccess: import.meta.env.TERMINUS_ALPHA ? supportAccessCapability({ getToken: async () => await base.getToken(), unauthorized: async () => base.refresh ? await base.refresh() : false }) : undefined,
     spaceOrder: createSpaceOrderSource(base.endpoint, token),
     nativeWindow: false,

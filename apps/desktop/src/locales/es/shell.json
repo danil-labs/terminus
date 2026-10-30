@@ -399,5 +399,14 @@
   "shell.relocate.failed": "No se pudo copiar Terminus a Aplicaciones: {error}\n\nArrástralo desde la ventana del disco a Aplicaciones.",
   "shell.close.error": "No se pudo completar la salida. El cliente sigue abierto. Revisa el error y vuelve a intentar.",
   "shell.tray.unknown": "Terminus · estado de tareas sin comprobar",
-  "shell.service.managed": "El motor lo administra un servicio externo. Revisa su configuración y estado; Terminus volverá a conectarse cuando esté disponible."
+  "shell.service.managed": "El motor lo administra un servicio externo. Revisa su configuración y estado; Terminus volverá a conectarse cuando esté disponible.",
+  "shell.directory.title": "Workspaces",
+  "shell.directory.search": "Buscar workspace",
+  "shell.directory.personal": "Personal",
+  "shell.directory.unlinked": "Sin enlazar",
+  "shell.directory.support": "Acceso de soporte",
+  "shell.directory.unnamed": "Sin nombre",
+  "shell.directory.pin": "Fijar {name} en la barra",
+  "shell.directory.unpin": "Quitar {name} de la barra",
+  "shell.directory.truncated": "Hay más workspaces. Usa la búsqueda."
 }
