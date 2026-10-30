@@ -2,8 +2,9 @@ import { usageTone, windowLabel, windowLeft } from "@terminus/computers";
 import type { AccountLimits, UsageWindow } from "@terminus/protocol";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Modal, Platform, Pressable, ScrollView, type ScrollViewInstance, StyleSheet, Text, TextInput, View } from "react-native";
 import { type ProviderUsage, providerUsage } from "../lib/accountUsage";
+import { accountWorkspace } from "../lib/engine";
 import type { Host } from "../lib/hosts";
 import { lang, t, w } from "../lib/i18n";
 import { BrandMark } from "./BrandMark";
@@ -30,6 +31,7 @@ const toneColor = (theme: Theme, left: number) => {
  */
 export function TaskTools({
   host,
+  workspace,
   machine,
   folder,
   branch,
@@ -42,6 +44,7 @@ export function TaskTools({
   onTools,
 }: {
   host: Host | undefined;
+  workspace: string;
   machine: string;
   folder: { key: string; name: string } | null;
   branch: string | null;
@@ -58,14 +61,15 @@ export function TaskTools({
   const [revision, setRevision] = useState(0);
   const [anchor, setAnchor] = useState<Rect | null>(null);
   const bar = useRef(null);
+  const rail = useRef<ScrollViewInstance>(null);
   const on = host?.power() === "on";
 
   useEffect(() => {
     if (!host || !provider || !on) return;
     let live = true;
-    void providerUsage([host], provider).then((value) => { if (live) setUsage(value); }, () => {});
+    void providerUsage([host], provider, (h) => accountWorkspace(h, workspace)).then((value) => { if (live) setUsage(value); }, () => {});
     return () => { live = false; };
-  }, [host, provider, on, revision]);
+  }, [host, workspace, provider, on, revision]);
 
   const windows = usage ? usage.groups.flatMap((group) => windowsOf(usage.limits[group.key])) : [];
   const tightest = windows.length ? Math.min(...windows.map(windowLeft)) : null;
@@ -75,12 +79,12 @@ export function TaskTools({
       <View style={styles.row}>
         <View style={styles.place}>
           <Icon name="laptop" size={14} color={theme.textMuted} />
-          <Text numberOfLines={1} style={[styles.placeText, { color: theme.textMuted, maxWidth: 90 }]}>{machine}</Text>
+          <Text numberOfLines={1} style={[styles.placeText, { color: theme.textMuted, maxWidth: 90, flexShrink: 2 }]}>{machine}</Text>
           {folder ? (
             <>
               <Text style={{ color: theme.textMuted }}>/</Text>
               <FolderSquare id={folder.key} size={8} />
-              <Text numberOfLines={1} style={[styles.placeText, { color: theme.text, maxWidth: 100 }]}>{folder.name}</Text>
+              <Text numberOfLines={1} style={[styles.placeText, { color: theme.text, maxWidth: 100, flexShrink: 0 }]}>{folder.name}</Text>
             </>
           ) : null}
           {branch ? (
@@ -92,7 +96,7 @@ export function TaskTools({
           ) : null}
         </View>
         <Tap testID="chat-find" accessibilityRole="button" accessibilityLabel={t("task.tools.find")} accessibilityState={{ selected: finding !== null }} onPress={() => onFind(finding === null ? "" : null)} style={styles.tool}>
-          <Icon name="search" size={16} color={finding !== null ? theme.merged : theme.text} />
+          <Icon name="search" size={16} color={finding !== null && !theme.dark ? theme.merged : theme.text} strokeWidth={finding !== null ? 2.6 : 2} />
         </Tap>
         {subtasks ? (
           <Tap testID="chat-subtasks" accessibilityRole="button" accessibilityLabel={t("task.tools.subtasks", { count: subtasks })} onPress={onTools} style={styles.tool}>
@@ -108,7 +112,7 @@ export function TaskTools({
           <View ref={bar} collapsable={false}>
             <Tap testID="chat-usage" accessibilityRole="button" accessibilityLabel={t("task.tools.usage", { left: tightest })} onPress={() => void measure(bar).then(setAnchor)} style={styles.tool}>
               <View style={[styles.track, { backgroundColor: theme.border }]}>
-                <View style={[styles.fill, { width: `${tightest}%`, backgroundColor: toneColor(theme, tightest) }]} />
+                <View style={[styles.fill, { width: `${100 - tightest}%`, backgroundColor: toneColor(theme, tightest) }]} />
               </View>
             </Tap>
           </View>
@@ -124,7 +128,7 @@ export function TaskTools({
         </View>
       ) : null}
       {mine.length > 1 && finding === null ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
+        <ScrollView ref={rail} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail} onContentSizeChange={() => rail.current?.scrollToEnd({ animated: false })}>
           {mine.map((line, i) => (
             <Tap key={line.key} testID={`rail-${i}`} accessibilityRole="button" onPress={() => onJump(line.key)} style={[styles.railCard, { backgroundColor: i === mine.length - 1 ? theme.userBubble : theme.muted, borderColor: i === mine.length - 1 ? `${theme.merged}44` : "transparent" }]}>
               <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: "600" }}>{t("task.tools.of", { n: i + 1, total: mine.length })}</Text>

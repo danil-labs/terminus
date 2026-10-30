@@ -246,7 +246,7 @@ export function Segmented<T extends string>({ options, value, onChange, testID, 
             style={[styles.segment, on ? { backgroundColor: theme.surface, borderColor: theme.border, borderWidth: StyleSheet.hairlineWidth } : null]}
           >
             {option.icon ? <Icon name={option.icon} size={14} color={on ? theme.text : theme.textMuted} /> : null}
-            <Text numberOfLines={1} style={{ color: on ? theme.text : theme.textMuted, fontWeight: on ? "600" : "500", fontSize: 14 }}>{option.label}</Text>
+            <Text numberOfLines={1} style={{ color: on ? theme.text : theme.textMuted, fontWeight: on ? "600" : "500", fontSize: 13.5, flexShrink: 1 }}>{option.label}</Text>
           </Tap>
         );
       })}
@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
   nav: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingBottom: 8, minHeight: 52, gap: 8 },
   navSide: { minWidth: 44, flexDirection: "row", alignItems: "center" },
   navRight: { marginLeft: "auto", justifyContent: "flex-end", gap: 8 },
-  navTitle: { position: "absolute", left: 96, right: 96, bottom: 8, alignItems: "center" },
+  navTitle: { position: "absolute", left: 112, right: 112, bottom: 8, alignItems: "center" },
   navTitleText: { fontSize: 16, fontWeight: "700" },
   pill: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 40, paddingLeft: 10, paddingRight: 14, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, maxWidth: 160 },
   pillText: { fontSize: 15, fontWeight: "500", flexShrink: 1 },
@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
   value: { fontSize: 16, maxWidth: "50%" },
   count: { minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, alignItems: "center", justifyContent: "center" },
   segmented: { flexDirection: "row", borderRadius: 10, padding: 3, marginHorizontal: 16 },
-  segment: { flex: 1, minHeight: 38, borderRadius: 8, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 6 },
+  segment: { flex: 1, minHeight: 38, borderRadius: 8, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingHorizontal: 2 },
   chip: { minHeight: 36, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, justifyContent: "center" },
   soon: { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
 });

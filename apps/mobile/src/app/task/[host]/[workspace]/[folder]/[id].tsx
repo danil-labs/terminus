@@ -339,7 +339,7 @@ export default function TaskScreen() {
   const folderRow = snapshot?.folders.find((f) => f.host === params.host && f.id === folder) ?? null;
   const gitBook = useTaskGit(hostOf, [{ host: params.host, workspace, folder, id }]);
   const git = effectiveGit(gitBook, { id, host: params.host, workspace }, snapshot?.tasks ?? []);
-  const mine = lines.flatMap((line) => (line.kind === "message" && line.role === "user" && line.text.trim() ? [{ key: line.key, text: line.text.split("\n")[0] }] : []));
+  const mine = lines.flatMap((line) => (line.kind === "message" && line.role === "user" && !line.from && line.text.trim() ? [{ key: line.key, text: line.text.split("\n")[0] }] : []));
   const needle = finding?.trim().toLowerCase() ?? "";
   const visible = needle ? lines.filter((line) => ("text" in line ? line.text : line.kind === "shell" ? `${line.command}\n${line.output}` : "").toLowerCase().includes(needle)) : lines;
   const jumpTo = (lineKey: string) => {
@@ -369,6 +369,7 @@ export default function TaskScreen() {
       />
       <TaskTools
         host={host}
+        workspace={workspace}
         machine={host?.label ?? params.host}
         folder={folderRow ? { key: folderRow.key, name: folderRow.name } : null}
         branch={git?.branch ?? null}
