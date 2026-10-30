@@ -71,6 +71,8 @@ type TaskCardProps = {
   online: boolean;
   /** La hora corta a la derecha («2 min»); el menú queda en la pulsación larga. */
   when?: string;
+  /** Una etiqueta al final de la segunda línea («Archivada» en Buscar). */
+  tag?: string;
 };
 
 /**
@@ -84,6 +86,7 @@ const sameProps = (a: TaskCardProps, b: TaskCardProps) =>
   a.git === b.git &&
   a.online === b.online &&
   a.when === b.when &&
+  a.tag === b.tag &&
   !a.onFinish === !b.onFinish &&
   !a.onLongPress === !b.onLongPress &&
   sameCard(a.card, b.card) &&
@@ -106,6 +109,7 @@ function TaskCardView({
   onFinish,
   online,
   when,
+  tag,
 }: TaskCardProps) {
   const theme = useTheme();
   const git = observed && !online ? { ...observed, stale: true } : observed;
@@ -183,6 +187,7 @@ function TaskCardView({
           <Icon name="git-branch" size={11} color={theme.textMuted} />
           <Text numberOfLines={1} style={[styles.meta, { color: theme.textMuted, maxWidth: 160 }]}>{branch}</Text>
         </View> : null}
+        {tag ? <Text style={[styles.tag, { color: theme.textMuted, backgroundColor: theme.muted }]}>{tag}</Text> : null}
       </View>
     </Pressable>
   );
@@ -190,6 +195,7 @@ function TaskCardView({
 
 const styles = StyleSheet.create({
   card: { paddingHorizontal: 16, paddingVertical: 10, gap: 4, minHeight: 60, justifyContent: "center" },
+  tag: { fontSize: 11, fontWeight: "600", paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, overflow: "hidden" },
   when: { fontSize: 12.5, fontVariant: ["tabular-nums"] },
   line: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 18 },
   second: { paddingLeft: 24, gap: 8 },

@@ -222,10 +222,10 @@ export function ListRow({
 }
 
 /** El control segmentado (Tema, Mantener despierta). */
-export function Segmented<T extends string>({ options, value, onChange, testID }: { options: { value: T; label: string; icon?: IconName }[]; value: T | null; onChange: (value: T) => void; testID?: string }) {
+export function Segmented<T extends string>({ options, value, onChange, testID, style }: { options: { value: T; label: string; icon?: IconName }[]; value: T | null; onChange: (value: T) => void; testID?: string; style?: StyleProp<ViewStyle> }) {
   const theme = useTheme();
   return (
-    <View testID={testID} accessibilityRole="radiogroup" style={[styles.segmented, { backgroundColor: theme.muted }]}>
+    <View testID={testID} accessibilityRole="radiogroup" style={[styles.segmented, { backgroundColor: theme.muted }, style]}>
       {options.map((option) => {
         const on = option.value === value;
         return (

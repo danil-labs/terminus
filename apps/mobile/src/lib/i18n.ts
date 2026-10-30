@@ -438,6 +438,8 @@ const es = {
   "space.delete_body": "Se archivan sus {count} tareas.",
   "space.delete_dirty": "{count} con cambios sin commitear: esos cambios se descartan.",
   "space.delete_last": "Es el único espacio del workspace: no se puede eliminar.",
+  "search.archived_tag": "Archivada",
+  "workspaces.count_note": "El número es lo que te necesita en cada workspace.",
 } as const;
 
 type Key = keyof typeof es;
@@ -879,6 +881,8 @@ const en: Record<Key, string> = {
   "space.delete_body": "Its {count} tasks are archived.",
   "space.delete_dirty": "{count} with uncommitted changes: those changes are discarded.",
   "space.delete_last": "It's the workspace's only space: it can't be deleted.",
+  "search.archived_tag": "Archived",
+  "workspaces.count_note": "The number is what needs you in each workspace.",
 };
 
 /** The language the app speaks, also for the words that come from `@terminus/design`. */
