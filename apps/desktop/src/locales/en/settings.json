@@ -313,6 +313,7 @@
   "settings.memory.revert": "Revert to local",
   "settings.memory.saving": "Saving…",
   "settings.memory.title": "Memory",
+  "settings.nav.ai_providers": "AI providers",
   "settings.nav.agents": "Agents",
   "settings.nav.appearance": "Appearance",
   "settings.nav.environment": "Environment status",

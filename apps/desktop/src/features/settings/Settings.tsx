@@ -106,7 +106,7 @@ const pestanasDe = (
     appearance: tab("appearance", () => t("settings.nav.appearance"), () => <Suspense fallback={null}><Appearance proyecto={agentes.proyecto} /></Suspense>),
     notify: tab("notify", () => t("settings.tab.notify"), () => <SettingsPanel><SettingsSection title={t("settings.tab.notify")}><NotifyBehavior /></SettingsSection></SettingsPanel>),
     workspaces: tab("workspaces", () => t("settings.tab.workspace_bar"), () => <Workspaces />),
-    "proveedores-ia": tab("proveedores-ia", () => t("settings.entry.ai_accounts"), () => <AIProviders superficies={superficies()} agentesEnUso={agentes.agentesEnUso} />),
+    "proveedores-ia": tab("proveedores-ia", () => t("settings.nav.ai_providers"), () => <AIProviders superficies={superficies()} agentesEnUso={agentes.agentesEnUso} />),
     machines: cuenta ? tab("machines", () => t("settings.tab.machines"), () => <Suspense fallback={null}><DanilAccount part="machines" /></Suspense>) : undefined,
     entorno: tab("entorno", () => t("settings.nav.environment"), () => <Environment />),
     activity: tab("activity", () => t("activity.title"), () => <Suspense fallback={null}><ActivityLogs workspace={workspace()} machine={activityMachine()} /></Suspense>),
