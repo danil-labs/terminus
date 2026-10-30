@@ -94,6 +94,7 @@ export async function request<T>(url: string, token: string, method: string, rea
     const code = errorCodeOf(await response.json().catch(() => null));
     if (code === "unknown_user") return { kind: "no_account" };
     if (code === "license_required") return { kind: "license" };
+    if (code === "access_required") return { kind: "error", status: 403, code };
     return { kind: "error", status: response.status };
   }
   if (response.status === 404) return { kind: "missing" };
