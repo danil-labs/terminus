@@ -18,7 +18,7 @@ import { AttentionBadge } from "./WorkspaceColumn";
 /** El tope de `spaces::NAME_MAX_CHARS`. */
 const NOMBRE_MAX = 30;
 
-type Modo = { kind: "list" } | { kind: "new" } | { kind: "rename"; space: Space };
+type Modo = { kind: "list" } | { kind: "new" };
 
 /** El espacio actual en la franja de la ventana; elegir, crear, renombrar y eliminar viven en su menú. */
 export default function SpaceMenu(props: {
@@ -35,6 +35,8 @@ export default function SpaceMenu(props: {
   const [abierto, setAbierto] = createSignal(false);
   const [modo, setModo] = createSignal<Modo>({ kind: "list" });
   const [nombre, setNombre] = createSignal("");
+  // Renombrar se hace sobre el mismo nombre de la franja, no en otra ventana.
+  const [editando, setEditando] = createSignal<Space | null>(null);
   let creando = false;
   const actual = () => props.spaces.find((s) => s.id === props.activa) ?? props.spaces[0];
   // Lo que espera en otro espacio se avisa en el disparador: la lista está cerrada casi siempre.
@@ -45,16 +47,22 @@ export default function SpaceMenu(props: {
     if (si) setModo({ kind: "list" });
   };
   const renombrar = (space: Space) => {
+    setAbierto(false);
     setNombre(spaceName(space));
-    setModo({ kind: "rename", space });
+    setEditando(space);
   };
-  const guardarNombre = (space: Space) => {
+  const guardarNombre = () => {
+    const space = editando();
+    if (!space) return;
     const n = nombre().trim();
+    setEditando(null);
     if (n && n !== spaceName(space)) void props.onRenombrar(space.id, n);
-    setModo({ kind: "list" });
   };
 
   return (
+    <Show
+      when={editando()}
+      fallback={
     <Popover open={abierto()} onOpenChange={abrir} placement="bottom-start" gutter={4}>
       <PopoverTrigger
         as={(p: object) => (
@@ -66,6 +74,11 @@ export default function SpaceMenu(props: {
             class="h-7 min-w-0 max-w-44 gap-1.5 px-2 text-[0.8125rem] font-semibold"
             aria-label={t("spaces.bar.label", { workspace: props.workspace })}
             title={actual() ? spaceName(actual()!) : undefined}
+            onDblClick={(e: MouseEvent) => {
+              e.preventDefault();
+              const space = actual();
+              if (space) renombrar(space);
+            }}
           >
             <span class="min-w-0 truncate">{actual() ? spaceName(actual()!) : t("spaces.default_name")}</span>
             <Show when={esperaEnOtro()}>
@@ -85,32 +98,6 @@ export default function SpaceMenu(props: {
               onBusy={(b) => (creando = b)}
               onClose={() => setAbierto(false)}
             />
-          </Match>
-          <Match when={modo().kind === "rename" ? (modo() as Extract<Modo, { kind: "rename" }>).space : null}>
-            {(space) => (
-              <form
-                class="grid gap-2 p-2"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  guardarNombre(space());
-                }}
-              >
-                <Input
-                  ref={(el: HTMLInputElement) => setTimeout(() => el.select(), 0)}
-                  maxlength={NOMBRE_MAX}
-                  aria-label={t("spaces.rename.label", { name: spaceName(space()) })}
-                  value={nombre()}
-                  onInput={(e) => setNombre(e.currentTarget.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape") {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setModo({ kind: "list" });
-                    }
-                  }}
-                />
-              </form>
-            )}
           </Match>
           <Match when={modo().kind === "list"}>
             <p class="m-0 truncate px-2 pt-1 pb-1 text-[0.6875rem] font-medium text-neutral-500">
@@ -172,5 +159,29 @@ export default function SpaceMenu(props: {
         </Switch>
       </PopoverContent>
     </Popover>
+      }
+    >
+      {(space) => (
+        <Input
+          ref={(el: HTMLInputElement) => setTimeout(() => el.select(), 0)}
+          maxlength={NOMBRE_MAX}
+          class="h-7 w-44 px-2 text-[0.8125rem] font-semibold"
+          aria-label={t("spaces.rename.label", { name: spaceName(space()) })}
+          value={nombre()}
+          onInput={(e) => setNombre(e.currentTarget.value)}
+          onBlur={guardarNombre}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              guardarNombre();
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              e.stopPropagation();
+              setEditando(null);
+            }
+          }}
+        />
+      )}
+    </Show>
   );
 }
