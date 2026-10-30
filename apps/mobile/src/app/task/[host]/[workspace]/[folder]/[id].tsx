@@ -2,7 +2,7 @@ import { AgentAvatar } from "../../../../../ui/AgentAvatar";
 import { SendButton } from "../../../../../ui/SendButton";
 import { Stack, router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppState, FlatList, Image, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { AppState, FlatList, Image, type NativeScrollEvent, type NativeSyntheticEvent, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { type ChatEvent, type Question, type Turn, DEFAULT_CHAT_VEIL } from "@terminus/protocol";
 import { delegatedOf, taskTitle } from "@terminus/tasks";
 import {
@@ -28,7 +28,8 @@ import {
 import { HostError } from "../../../../../lib/hosts";
 import { type Line, type LivePiece, type StepRow, applyLive, bareCommand, fileName, linesOfLive, linesOfTurn, liveAfterRead } from "../../../../../lib/steps";
 import { lang, t, w } from "../../../../../lib/i18n";
-import { type Follow, OPENED, jumped, scrolled, shouldStick, showJump, unseen } from "../../../../../lib/follow";
+import { type ScrollAnchor, NEEDS_SCROLL_ANCHOR, anchorOf, restoreAnchor } from "../../../../../lib/scrollAnchor";
+import { type Follow, MARGIN, OPENED, fromTop, jumped, scrolled, showJump, unseen } from "../../../../../lib/follow";
 import { useAccount } from "../../../../../lib/account";
 import { useMachines } from "../../../../../lib/machines";
 import { COMPUTERS } from "../../../../../lib/supabase";
@@ -105,9 +106,12 @@ export default function TaskScreen() {
   // cambia con cada evento de scroll; solo el botón, que se ve, va en estado.
   const follow = useRef<Follow>(OPENED);
   const [jump, setJump] = useState<{ shown: boolean; unseen: number }>({ shown: false, unseen: 0 });
-  // Al final de verdad: el `scrollToEnd` de la `FlatList` calcula el fondo con el alto estimado de sus filas y sin el
-  // pie (lo que llega en vivo), y con eso se queda corto o sube. El de su `ScrollView` usa el alto medido.
-  const toBottom = (animated: boolean) => list.current?.getNativeScrollRef()?.scrollToEnd({ animated });
+  // La lista va invertida: abre en lo último sin desplazarse, y el final es el desplazamiento 0.
+  const toBottom = (animated: boolean) => list.current?.scrollToOffset({ offset: 0, animated });
+  // Lo que crece abajo empuja lo que se lee. Lo sostienen `maintainVisibleContentPosition` en nativo y `overflow-anchor`
+  // en el navegador; Safari no lo tiene (`lib/scrollAnchor.ts`).
+  const anchor = useRef<ScrollAnchor>(null);
+  const scroller = () => (Platform.OS === "web" && NEEDS_SCROLL_ANCHOR ? (list.current?.getScrollableNode() as unknown as Element | null) : null);
 
   const fail = useCallback(
     (error: unknown) => {
@@ -310,17 +314,20 @@ export default function TaskScreen() {
   replies.current = lines.filter((line) => line.kind === "message" && line.role !== "user" && line.role !== "system" && line.role !== "shell").length;
   const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-    const next = scrolled(follow.current, { offset: contentOffset.y, content: contentSize.height, viewport: layoutMeasurement.height }, replies.current);
+    const metrics = { content: contentSize.height, viewport: layoutMeasurement.height };
+    const next = scrolled(follow.current, { ...metrics, offset: fromTop(contentOffset.y, metrics) }, replies.current);
     follow.current = next;
+    const node = scroller();
+    if (node) anchor.current = next.following ? null : anchorOf(node);
     const shown = showJump(next);
     setJump((now) => (now.shown === shown ? now : { shown, unseen: unseen(next, replies.current) }));
   }, []);
-  // Siguiendo, todo lo que cambia de alto —el texto que llega, los pasos, una imagen, el teclado— baja de un corte.
-  // Suelto, no se mueve: crecer por abajo no toca el scroll.
-  const stick = useCallback(() => {
-    if (shouldStick(follow.current)) toBottom(false);
+  // Siguiendo no hay que hacer nada: el final es el desplazamiento 0 y ahí se queda aunque crezca. Bajar aquí además
+  // devolvería al final a quien acaba de empezar a subir, antes de que llegue su evento de scroll.
+  const onContentSize = useCallback(() => {
+    const node = scroller();
+    if (node) restoreAnchor(node, anchor.current);
   }, []);
-  const onLayout = useCallback((_: LayoutChangeEvent) => stick(), [stick]);
   const newReplies = jump.shown ? unseen(follow.current, replies.current) : 0;
   const streaming = liveLines.some((line) => line.key === "live");
   const scope = useMemo(() => (host ? { host, hostId: params.host, workspace, folder, session: id } : null), [host, params.host, workspace, folder, id]);
@@ -341,10 +348,10 @@ export default function TaskScreen() {
   const git = effectiveGit(gitBook, { id, host: params.host, workspace }, snapshot?.tasks ?? []);
   const mine = lines.flatMap((line) => (line.kind === "message" && line.role === "user" && !line.from && line.text.trim() ? [{ key: line.key, text: line.text.split("\n")[0] }] : []));
   const needle = finding?.trim().toLowerCase() ?? "";
-  const visible = needle ? lines.filter((line) => ("text" in line ? line.text : line.kind === "shell" ? `${line.command}\n${line.output}` : "").toLowerCase().includes(needle)) : lines;
+  const visible = useMemo(() => [...(needle ? lines.filter((line) => ("text" in line ? line.text : line.kind === "shell" ? `${line.command}\n${line.output}` : "").toLowerCase().includes(needle)) : lines)].reverse(), [lines, needle]);
   const jumpTo = (lineKey: string) => {
     const index = visible.findIndex((line) => line.key === lineKey);
-    if (index >= 0) list.current?.scrollToIndex({ index, viewPosition: 0, animated: true });
+    if (index >= 0) list.current?.scrollToIndex({ index, viewPosition: 1, animated: true });
   };
 
   return (
@@ -384,19 +391,21 @@ export default function TaskScreen() {
       <View style={styles.thread}>
       <FlatList
         ref={list}
+        inverted
         data={visible}
+        initialNumToRender={20}
         keyExtractor={(line) => line.key}
         contentContainerStyle={styles.list}
-        onContentSizeChange={stick}
-        onLayout={onLayout}
+        onContentSizeChange={onContentSize}
         onScroll={onScroll}
         onScrollToIndexFailed={({ averageItemLength, index }) => list.current?.scrollToOffset({ offset: averageItemLength * index, animated: true })}
         scrollEventThrottle={16}
         // Lo que cambia de alto por encima de lo que se lee (una imagen que carga, pasos que se abren) no lo mueve.
-        maintainVisibleContentPosition={Platform.OS === "web" ? undefined : { minIndexForVisible: 0 }}
+        maintainVisibleContentPosition={Platform.OS === "web" ? undefined : { minIndexForVisible: 0, autoscrollToTopThreshold: MARGIN }}
         renderItem={({ item }) => <Row line={item} theme={theme} onQuickReply={item.key === lastAgent && !running && !asleep ? quickReply : undefined} />}
-        ListHeaderComponent={cachedNote ? <Text style={[styles.banner, { color: theme.textMuted, backgroundColor: theme.muted }]}>{cachedNote}</Text> : undefined}
-        ListFooterComponent={
+        // Invertida, la cabecera queda abajo: ahí va lo que llega en vivo, y el aviso de la copia arriba.
+        ListFooterComponent={cachedNote ? <Text style={[styles.banner, { color: theme.textMuted, backgroundColor: theme.muted }]}>{cachedNote}</Text> : undefined}
+        ListHeaderComponent={
           <View style={styles.footer}>
             {liveLines.map((line) => (
               <Row key={line.key} line={line} theme={theme} streaming={line.key === "live"} />
@@ -719,7 +728,8 @@ const styles = StyleSheet.create({
   thread: { flex: 1 },
   delegated: { marginHorizontal: 12, marginTop: 8, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth },
   delegatedRow: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 6 },
-  list: { padding: 12, gap: 8 },
+  // `flex-end` en una lista invertida es arriba: un hilo corto sigue empezando arriba.
+  list: { flexGrow: 1, justifyContent: "flex-end", padding: 12, gap: 8 },
   // Como el del escritorio: una píldora centrada por encima del borde de abajo del hilo.
   toBottom: {
     position: "absolute",
