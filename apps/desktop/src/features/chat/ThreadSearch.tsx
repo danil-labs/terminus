@@ -65,6 +65,8 @@ export function ThreadSearch(props: {
   messages: SearchMessage[];
   thread: () => HTMLElement | undefined;
   onJump: (block: number) => void;
+  /** Sin mensajes todavía (la tarea nueva): el botón queda, apagado y con su porqué. */
+  disabled?: boolean;
   leadingTools?: JSX.Element;
   tools?: JSX.Element;
 }) {
@@ -173,7 +175,7 @@ export function ThreadSearch(props: {
       if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "f") {
         if ((event.target as Element | null)?.closest(".cm-editor, [role='dialog']")) return;
         event.preventDefault();
-        show();
+        if (!props.disabled) show();
       } else if (open() && event.key === "Escape") {
         event.preventDefault();
         event.stopImmediatePropagation();
@@ -205,8 +207,10 @@ export function ThreadSearch(props: {
       </Show>
       <div class="flex shrink-0 items-center gap-1.5">
         {props.leadingTools}
-        <Button variant="chrome" size="iconCompact" class="size-6 text-neutral-500" onClick={show}
-          title={t("chat.search.open", { key: textoDeAtajo("findInTask") })} aria-label={t("chat.search.label")}
+        {/* `aria-disabled` y no `disabled`: el botón apagado no recibe el puntero y perdería el porqué. */}
+        <Button variant="chrome" size="iconCompact" class="size-6 text-neutral-500 aria-disabled:cursor-default aria-disabled:opacity-60 aria-disabled:hover:bg-transparent"
+          onClick={() => { if (!props.disabled) show(); }} aria-disabled={props.disabled || undefined}
+          title={props.disabled ? t("chat.search.unavailable") : t("chat.search.open", { key: textoDeAtajo("findInTask") })} aria-label={t("chat.search.label")}
           aria-keyshortcuts={ariaDeAtajo("findInTask")} aria-expanded={open()}><Search size={13} /></Button>
         {props.tools}
       </div>

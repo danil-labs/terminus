@@ -975,8 +975,8 @@ if (!roto) {
     "el foco de actividad se apaga al terminar la última subtarea");
   const toolbarButtons = [...delegatedToolbar.parentElement.querySelectorAll("button")];
   assert.deepEqual(toolbarButtons.map(button => button.getAttribute("aria-label")), [
-    "Buscar en esta tarea", delegatedToolbar.getAttribute("aria-label"), "Ver tareas",
-  ], "la fila ordena búsqueda y subtareas, y acaba en el conmutador del árbol");
+    "Buscar en esta tarea", delegatedToolbar.getAttribute("aria-label"), "Archivos de la tarea",
+  ], "la fila ordena búsqueda y subtareas, y acaba en los archivos de la tarea");
   delegatedToolbar.click();
   await sleep(50);
   assert.equal([...threadDoc.querySelectorAll('button')].find(button => button.textContent === "Activas")?.getAttribute("aria-pressed"), "true",
@@ -1996,6 +1996,12 @@ if (!roto) {
       return capas.some((el) => el.className.includes("justify-center"));
     };
     assert.equal(cajaCentrada(newTaskClick.w.document), true, "la tarea nueva en blanco centra la caja");
+    const tareaNueva = newTaskClick.w.document.querySelector("[data-borrador]");
+    assert.ok(tareaNueva?.textContent.includes("Nueva tarea"), "la tarea nueva sin lanzar se ve en la tira");
+    tareaNueva.querySelector("button").click();
+    await sleep(50);
+    assert.equal(newTaskClick.w.document.querySelector("[data-borrador]"), null, "cerrarla vuelve a la pestaña anterior");
+    assert.ok(newTaskClick.w.document.querySelector('[role="tab"][aria-selected="true"]'));
   }
   assert.deepEqual(newTaskClick.fallos, []);
   assert.equal(newTaskClick.comandos.includes("delete_session"), false);
@@ -3985,11 +3991,9 @@ if (!roto) {
   assert.ok(!finishButton("merged").closest(".opacity-0"));
   finishButton("merged").click();
   await sleep(100);
-  assert.equal(finishButton("merged").getAttribute("aria-busy"), "true");
-  assert.ok(finishButton("merged").querySelector(".finish-task-flame"));
-  assert.equal(finishButton("merged").disabled, true);
+  // Sale de la barra en el clic, sin esperar al motor; si lo rechaza, vuelve.
+  assert.equal(finishButton("merged"), null);
   assert.equal(finishApp.w.document.querySelector("[data-finish-celebration]"), null);
-  finishButton("merged").click();
   assert.equal(finishCalls.length, 1);
   settleFinish();
   await sleep(100);
@@ -4061,8 +4065,11 @@ if (!roto) {
   const blockedApp = await boot("listo", "task-blockers", {
     ...CON_TAREA,
     list_projects: [{ id: "blocked-project", name: "Avisos", node: null, sources: [], working_directory: "/lab", created_at: 1, updated_at: 1, sessions: 1, kind: "folder" }],
-    list_live_sessions: ({ project }) => project === "blocked-project" ? [task("blocked", null, "delivered")] : [],
-    list_session_git: () => ({ blocked: gitRow("feature/done", { pull: { number: 44, state: "merged", head_sha: "abc" }, pull_known: true }) }),
+    list_live_sessions: ({ project }) => project === "blocked-project" ? [task("blocked", null, "delivered"), task("sin-integrar", null, "delivered")] : [],
+    list_session_git: () => ({
+      blocked: gitRow("feature/done", { pull: { number: 44, state: "merged", head_sha: "abc" }, pull_known: true }),
+      "sin-integrar": gitRow("feature/otra", { pull: { number: 45, state: "merged", head_sha: "abc" }, pull_known: true }),
+    }),
     task_blockers: args => { blockerCalls.push(args); return blockers; },
     discard_task_changes: args => {
       discarded.push(args);
@@ -4098,8 +4105,10 @@ if (!roto) {
   assert.deepEqual(discarded.at(-1), { project: "blocked-project", id: "blocked", files: ["llego-despues.txt"] });
   assert.deepEqual(blockedFinishes, [{ project: "blocked-project", id: "blocked" }]);
   assert.equal(blockedApp.w.document.querySelector('[role="dialog"]'), null);
+  // Finalizada, sale de la barra y no vuelve: el siguiente aviso va en otra tarea.
+  assert.equal(blockedFinish(), null);
   blockers = { unsaved: [], not_finished: true };
-  blockedFinish().click();
+  blockedApp.w.document.querySelector('[data-sesion="sin-integrar"] [data-session-finish]').click();
   await sleep(100);
   const avisoSinIntegrar = blockedApp.w.document.querySelector('[role="dialog"]');
   assert.ok(avisoSinIntegrar);

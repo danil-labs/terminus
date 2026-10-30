@@ -81,6 +81,16 @@ export function DelegatedLaunch(props: {
   </div>;
 }
 
+/** El sitio del botón de delegadas cuando no hay ninguna: apagado, para que la barra no cambie de forma. */
+export function DelegatedNone() {
+  return <Button type="button" variant="chrome" size="iconCompact"
+    class="relative size-7 cursor-default text-neutral-500 opacity-60 hover:bg-transparent"
+    data-delegated-trigger="toolbar" aria-disabled="true"
+    aria-label={t("chat.delegation.none")} title={t("chat.delegation.none")}>
+    <GitBranch size={14} aria-hidden="true" />
+  </Button>;
+}
+
 export default function DelegatedActivity(props: {
   context: string;
   rows: SessionRow[];
@@ -98,7 +108,7 @@ export default function DelegatedActivity(props: {
   const active = () => rows().filter(row => taskPriority(delegatedAttention([row], props.live, props.approvals)));
   // «Activas» son solo las que te necesitan o siguen trabajando, sin sus madres de contexto.
   const shown = () => all() ? rows() : active();
-  return <Show when={rows().length || props.error}>
+  return <Show when={rows().length || props.error} fallback={<DelegatedNone />}>
     <Popover open={open()} onOpenChange={setOpen} placement="left-start" gutter={8}>
       <PopoverTrigger as={(trigger: object) => <Button {...trigger} type="button" variant="chrome" size="iconCompact"
         class="relative size-7 text-neutral-500"

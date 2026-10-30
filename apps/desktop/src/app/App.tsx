@@ -46,7 +46,7 @@ import {
   modoRecordado,
   recordarModo,
 } from "../features/chat/modes";
-import DelegatedActivity, { DelegatedLaunch, delegatedAttention, delegatedDescendants, delegatedFamilies, type DelegatedListProps } from "../features/chat/DelegatedTasks";
+import DelegatedActivity, { DelegatedLaunch, DelegatedNone, delegatedAttention, delegatedDescendants, delegatedFamilies, type DelegatedListProps } from "../features/chat/DelegatedTasks";
 import PreviousAgentChat from "../features/chat/PreviousAgentChat";
 import type { AlmacenDePreguntas, PreguntasAMedias, Respuesta, RespuestaEnviada } from "../features/chat/Questions";
 import { contestaALaTerminal, despachable, esDeLaTerminal, guardable, inyectable, type RazonDeRetencion, retencionAlCargar, siguienteLote, sueltaElBorrador } from "../features/chat/queue";
@@ -106,7 +106,7 @@ const MachinesLicense = lazy(() =>
     ),
   })),
 );
-import AgentTasks, { createdTasks } from "../features/projects/AgentTasks";
+import { createdTasks } from "../features/projects/agentPageFilters";
 import BaseBranchPicker from "../features/projects/BaseBranchPicker";
 import { watchHandlerStatus, watchHandlerStatuses } from "../features/projects/handlerPresence";
 import { EmptyContext, ProjectPicker } from "../features/projects/Projects";
@@ -666,11 +666,24 @@ export default function App() {
    *  proyecto la tapa, aunque siga siendo la activa de su ventana. */
   const pestanaDelanteEn = (sitio: SitioDePanel) =>
     tapadoPorElProyecto(sitio) ? null : paneles.activeTabAt(sitio);
+  /** Si `sitio` enseña la conversación en blanco: la tarea nueva sin lanzar. */
+  const enBorrador = (sitio: SitioDePanel) =>
+    paneles.activeTabAt(sitio) === null && !tapadoPorElProyecto(sitio);
   /** Sitios sin pestaña delante, restando el que ocupa la vista de proyecto. */
-  const sitiosEnBlanco = () =>
-    paneles
-      .sites()
-      .filter((s) => paneles.activeTabAt(s) === null && !tapadoPorElProyecto(s));
+  const sitiosEnBlanco = () => paneles.sites().filter(enBorrador);
+  // La pestaña que había delante al pasar al blanco: cerrar la tarea nueva vuelve a ella.
+  const [antesDelBorrador, setAntesDelBorrador] = createSignal<string | null>(null);
+  /** A qué pestaña de `sitio` vuelve cerrar la tarea nueva; sin ninguna, no se cierra. */
+  const vueltaDelBorrador = (sitio: SitioDePanel) => {
+    const suyas = paneles.tabsAt(sitio);
+    const antes = antesDelBorrador();
+    return antes !== null && suyas.includes(antes) ? antes : (suyas.at(-1) ?? null);
+  };
+  function cerrarBorrador(sitio: SitioDePanel) {
+    const id = vueltaDelBorrador(sitio);
+    const p = pestanas.open().find((x) => x.id === id);
+    if (p) void activarPestana(p);
+  }
   /** La fila del historial de una tarea, en el grupo que esté. */
   const filaDe = (id: string) => {
     for (const grupo of Object.values(sesiones())) {
@@ -1706,15 +1719,16 @@ export default function App() {
   const sidebar = createSidebar();
   const carpetaDelProyecto = () =>
     carpetaDeTrabajo(projectList().find((p) => p.id === project()) ?? {});
-  // Lo único que el panel derecho tiene para enseñar: el árbol de una tarea, o
-  // la previsualización de la carpeta de trabajo antes de empezarla. Es la
-  // regla que deshabilita el conmutador, y la que impide que un estado
+  // Lo único que el panel derecho tiene para enseñar: la previsualización de
+  // la carpeta de trabajo antes de empezar la tarea. Con tarea, sus archivos
+  // viven dentro de ella (`archivosDeTarea`), también en el chat de un agente.
+  // Es la regla que deshabilita el conmutador, y la que impide que un estado
   // recordado abra una columna vacía.
-  const columnaConContenido = () => !paginaDeAgente() && (agenteSenalado() || (!sessionId() && Boolean(carpetaDelProyecto())));
+  const columnaConContenido = () => !paginaDeAgente() && !sessionId() && Boolean(carpetaDelProyecto());
   // Abierta o cerrada es preferencia de esta máquina, igual que el historial
   // (`lib/prefs.ts`). Sin recordarla, cada tarea nueva y cada cambio de
   // proyecto reabrían la columna que se acababa de cerrar. La llave nombra la
-  // columna entera: el panel de tareas de agente comparte estado con el árbol.
+  // columna entera.
   const [arbolQuerido, setArtOpen] = createPref<boolean | null>(
     "shell.right.open",
     null,
@@ -1727,7 +1741,7 @@ export default function App() {
     columnaConContenido() && (arbolQuerido() ?? arbolDePartida());
   const alternarElArbol = () => {
     const id = sessionId();
-    if (id && !agenteSenalado()) { archivosDeTarea.toggle(id); return; }
+    if (id) { archivosDeTarea.toggle(id); return; }
     if (artOpen()) setArtOpen(false);
     else if (columnaConContenido()) setArtOpen(true);
   };
@@ -4556,24 +4570,6 @@ export default function App() {
   }
 
   /**
-   * Qué fila del riel se señala al abrir un chat o un borrador de agente.
-   */
-  const agenteSenalado = createMemo(() => {
-    const id = sessionId();
-    if (id) {
-      for (const [proyecto, filas] of Object.entries(sesiones())) {
-        const fila = filas.find((r) => r.id === id);
-        if (fila)
-          return fila.chat_de_agente && fila.agent
-            ? { project: proyecto, name: fila.agent }
-            : null;
-      }
-      return null;
-    }
-    return hablandoCon();
-  });
-
-  /**
    * Una carpeta con tareas en varias máquinas se parte en un grupo por máquina
    * en el riel: lo que se empieza desde un grupo corre en la suya (`""` es esta).
    */
@@ -4596,11 +4592,14 @@ export default function App() {
   /**
    * La conversación en blanco: lo que el panel enseña sin tarea abierta.
    * `nuevaSesion` es esto más el aviso de que se va a empezar algo. No es
-   * una pestaña: «Nueva tarea» sería el rótulo de algo que no existe. Su
-   * borrador —separado por proyecto— espera hasta el primer turno.
+   * una pestaña de `lib/tabs.ts`: la tira solo la pinta como «Nueva tarea»
+   * (`enBorrador`). Su borrador —separado por proyecto— espera hasta el
+   * primer turno.
    */
   function irAlBlanco(enProyecto = project()) {
+    const delante = paneles.activeTabAt(paneles.activeSite());
     batch(() => {
+      if (delante !== null) setAntesDelBorrador(delante);
       setProject(enProyecto);
       setProyectoAbierto(null);
       pestanas.activate(null);
@@ -4627,6 +4626,7 @@ export default function App() {
     if (settings() !== null || alta() !== null) return;
     const id = pestanaActiva();
     if (id) cerrarPestana(id);
+    else if (enBorrador(paneles.activeSite())) cerrarBorrador(paneles.activeSite());
   }
 
   /**
@@ -5540,7 +5540,8 @@ export default function App() {
     if (!f) {
       // Revelar escribe la preferencia igual que el conmutador: con ella en
       // cerrada, abrir transitoriamente dejaría el gesto sin nada que enseñar.
-      setArtOpen(true);
+      // Sin nada que enseñar no la toca: si no, la columna se abriría sola después.
+      if (columnaConContenido()) setArtOpen(true);
       return;
     }
     // El separador es el de la carpeta: `rel` viaja con barras normales.
@@ -5784,9 +5785,11 @@ export default function App() {
     ]);
     // Y delante, en el mismo gesto: el efecto que reparte las pestañas vuelve
     // a activar la que ya estaba. Nacer sin activarse devuelve la vista a la
-    // tarea anterior hasta que Rust contesta.
+    // tarea anterior hasta que Rust contesta. Y conservada: como vista
+    // sustituiría a la pestaña de delante, y el siguiente clic, a ella.
     batch(() => {
       pestanas.ensure({ id: provisional, project: proyecto, titulo });
+      pestanas.pin(provisional);
       pestanas.activate(provisional);
     });
     return provisional;
@@ -5882,6 +5885,8 @@ export default function App() {
     const excluidas = destination ? borradores()[claveBorrador]?.excludedSourceIds ?? [] : excludedSourceIds();
     if (abierta) marcarViva(abierta);
     else setArrancando(true);
+    // Conversar es editar: la pestaña de la tarea deja de ser vista.
+    if (abierta) pestanas.pin(abierta);
     // La tarea se pinta antes de que Rust la cree. Lo que la retrasaba no era
     // su nombre —`mentions::titulo_desde` lo saca del encargo antes de lanzar
     // nada— sino el evento `started`, que `chat::acp` emite cuando el proceso
@@ -6830,9 +6835,7 @@ export default function App() {
     return t("projects.split.detach", { key: atajoDePartir(false) });
   };
   const nombreDelArbol = () =>
-    agenteSenalado()
-      ? artOpen() ? t("projects.agent_tasks.close") : t("projects.agent_tasks.open")
-      : artOpen() ? t("shell.work_tree.close") : t("shell.work_tree.open");
+    artOpen() ? t("shell.work_tree.close") : t("shell.work_tree.open");
 
   /**
    * La conversación de UNA tarea, para poder montar más de una: se
@@ -6849,8 +6852,9 @@ export default function App() {
     .reduce<SitioDePanel | null>((a, b) => (!a || b.col > a.col ? b : a), null);
   const esquinaConTarea = () => {
     const sitio = esquina();
-    return !!sitio && !tapadoPorElProyecto(sitio) &&
-      pestanas.open().find(p => p.id === paneles.activeTabAt(sitio))?.clase === "tarea";
+    // La tarea nueva también: su barra de herramientas ya lleva el conmutador.
+    return !!sitio && !tapadoPorElProyecto(sitio) && (paneles.activeTabAt(sitio) === null ||
+      pestanas.open().find(p => p.id === paneles.activeTabAt(sitio))?.clase === "tarea");
   };
   // Una sola ventana: sus pestañas van en la franja de la ventana, entre la navegación y los controles.
   const tiraDeLaVentana = () => (
@@ -6869,6 +6873,8 @@ export default function App() {
                   pinnedIds={pestanas.pinned()}
                   onPin={pestanas.pin}
                   activeId={pestanaDelanteEn(sitio)}
+                  draftLabel={enBorrador(sitio) ? t("projects.tabs.draft") : undefined}
+                  onCloseDraft={vueltaDelBorrador(sitio) !== null ? () => cerrarBorrador(sitio) : undefined}
                   liveIds={vivas()}
                   approvingIds={permissions().map((p) => p.session)}
                   waitingIds={preguntadas()}
@@ -7152,7 +7158,14 @@ export default function App() {
     };
     // Máquina, carpeta y rama de la tarea. Una función y no un elemento: el chat la pinta
     // y, cuando los archivos lo tapan, la fila de la tarea pinta la suya.
-    const ubicacion = () => <Show when={pp.sesion}>{(id) => {
+    const ubicacion = () => <Show when={pp.sesion} fallback={<Show when={!paginaDeAgente()}><Suspense fallback={null}><TaskLocation
+      /* La tarea nueva: la máquina y la carpeta donde va a correr. La rama sale al empezarla. */
+      machine={draftMachine() ?? undefined}
+      on={machines().find(m => m.id === draftMachine())?.on !== false}
+      onScreen={abrirPantalla}
+      onFiles={columnaConContenido() ? () => setArtOpen(true) : undefined}
+      project={proyectoDeLaCelda()?.name}
+      path={carpetaDeTrabajo(proyectoDeLaCelda() ?? {}) || undefined} /></Suspense></Show>}>{(id) => {
       return <Suspense fallback={null}><TaskLocation
         machine={filaDe(id())?.machine}
         on={!apagadas()[id()] && filaDe(id())?.machine_on !== false}
@@ -7604,6 +7617,8 @@ export default function App() {
                   pinnedIds={pestanas.pinned()}
                   onPin={pestanas.pin}
                     activeId={pestanaDelanteEn(sitio)}
+                    draftLabel={enBorrador(sitio) ? t("projects.tabs.draft") : undefined}
+                    onCloseDraft={vueltaDelBorrador(sitio) !== null ? () => cerrarBorrador(sitio) : undefined}
                     liveIds={vivas()}
                     approvingIds={permissions().map((p) => p.session)}
                     waitingIds={preguntadas()}
@@ -7690,17 +7705,20 @@ export default function App() {
           ? agent()
           : (filaDe(task()?.session ?? "")?.agent ?? agent());
         const herramientas = () => <ThreadSearch conversation={task()?.session ?? ""} active={sameSite(site(), paneles.activeSite()) && settings() === null && alta() === null}
+              disabled={!task()?.session}
               messages={target()?.messages() ?? []} thread={() => target()?.thread()}
               onJump={block => target()?.jump(block)}
               tools={<>
-                <Show keyed when={delegatedToolbarTargets().get(`${workspaceActivo()}/${task()?.session ?? ""}`)}>{render => render()}</Show>
+                <Show keyed when={delegatedToolbarTargets().get(`${workspaceActivo()}/${task()?.session ?? ""}`)} fallback={<DelegatedNone />}>{render => render()}</Show>
                 <UsageTool usage={consumo} agent={agenteDeLaVentana()} onGestionarCuentas={() => setSettings("proveedores-ia")} />
-                <Show when={task()?.session && !agenteSenalado()} fallback={<Show when={!artOpen() && !paginaDeAgente()}>{botonDelArbol()}</Show>}>
+                <Show when={task()?.session} fallback={<Show when={!artOpen() && !paginaDeAgente()}>{botonDelArbol()}</Show>}>
                   {botonDeArchivos(() => task()?.session ?? "")}
                 </Show>
               </>} />;
         // Centrada con la fila de máquina, proyecto y rama de la tarea (`TaskLocation`).
-        return <Show when={Boolean(task()) && !tapadoPorElProyecto(site())}>
+        // La tarea nueva (ventana sin pestaña) lleva la misma barra, con lo que aún no tiene apagado;
+        // la página de un agente también es una ventana sin pestaña, y no es una tarea.
+        return <Show when={(Boolean(task()) || (paneles.activeTabAt(site()) === null && !paginaDeAgente())) && !tapadoPorElProyecto(site())}>
           <div class="z-20 min-w-0 max-w-full self-start justify-self-end pt-px pr-3" style={estiloDeLaCelda(site())}
             classList={{ "mt-8": llevaTiraInterior(site()) }} onPointerDown={() => mandarVentana(site())}>
             {herramientas()}
@@ -7768,6 +7786,8 @@ export default function App() {
                   pinnedIds={pestanas.pinned()}
                   onPin={pestanas.pin}
                 activeId={pestanaDelanteEn(sitio)}
+                draftLabel={enBorrador(sitio) ? t("projects.tabs.draft") : undefined}
+                onCloseDraft={vueltaDelBorrador(sitio) !== null ? () => cerrarBorrador(sitio) : undefined}
                 liveIds={vivas()}
                 approvingIds={permissions().map((p) => p.session)}
                 waitingIds={preguntadas()}
@@ -8615,7 +8635,7 @@ export default function App() {
             max={560}
             etiqueta={t("shell.column.work_tree_width")}
           >
-            <Show when={agenteSenalado()} fallback={<Suspense fallback={null}><ColumnaDeTrabajo
+            <Suspense fallback={null}><ColumnaDeTrabajo
               folderActions={
                 <>
                   <Button
@@ -8655,31 +8675,7 @@ export default function App() {
               onArchivoMovido={archivoMovido}
               onArchivoBorrado={archivoBorrado}
               onClose={() => setArtOpen(false)}
-            /></Suspense>}>
-              {owner => {
-                const folderOf = (id: string) => Object.entries(sesionesConEstado()).find(([, rows]) => rows.some(row => row.id === id))?.[0] ?? owner().project;
-                return <AgentTasks
-                context={`${owner().project}/${sessionId() ?? owner().name}`}
-                tasks={createdTasks(Object.entries(sesionesConEstado()).flatMap(([folder, rows]) => rows.map(row => ({ ...row, folder }))), owner().name, filaDe(sessionId() ?? "")?.agent_thread ? sessionId() : null, owner().project)}
-                list={{
-                  carpetaDe: row => projectList().find(item => item.id === folderOf(row.id))?.name,
-                  projectOf: row => folderOf(row.id), destinosDe: row => projectList().filter(item => item.id !== folderOf(row.id)).map(item => ({ id: item.id, name: item.name })),
-                  de: owner().project, current: sessionId(), vivas: vivas(), aprobando: permissions().map(item => item.session),
-                  destinos: projectList().filter(item => item.id !== owner().project).map(item => ({ id: item.id, name: item.name })),
-                  onDelete: id => void borrarSesion(folderOf(id), id),
-                  onMove: (id, destination) => void moverSesion(folderOf(id), id, destination),
-                  onEtapa: (id, stage) => void etaparSesion(folderOf(id), id, stage),
-                  onRenombrar: (id, title) => void renombrarSesion(folderOf(id), id, title),
-                }}
-                onClose={() => setArtOpen(false)}
-                onPick={id => {
-                  const destination = { project: folderOf(id), id };
-                  setHablandoCon(null);
-                  void abrirSesion(destination.project, id);
-                }}
-              />;
-              }}
-            </Show>
+            /></Suspense>
           </ColumnaLateral>
           </div>
         </div>
