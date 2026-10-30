@@ -138,7 +138,7 @@ export default function SupportAccess(props: { source: SupportAccessSource }) {
       <Show when={active().find((g) => g.id === confirming())}>
         {(g) => (
           <div role="group" aria-label={t("settings.support_access.revoke")} class="grid gap-2 rounded-md border border-border p-3">
-            <p class="m-0 text-sm text-neutral-700">{t("settings.support_access.revoke_confirm", { email: g().operator_email })}</p>
+            <p class="m-0 text-sm text-neutral-900">{t("settings.support_access.revoke_confirm", { email: g().operator_email })}</p>
             <Show when={revokeFailed()}><p role="alert" class="m-0 text-sm text-error-strong">{t("settings.support_access.revoke_error")}</p></Show>
             <div class="flex gap-2">
               <Button size="sm" variant="danger" disabled={revoking()} onClick={() => void revoke(g())}>{t("settings.support_access.revoke")}</Button>
