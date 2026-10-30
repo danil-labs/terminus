@@ -87,10 +87,10 @@ test("la lista del teléfono esconde las delegadas bajo su lanzador, como el esc
     p1: [row("lanzador", 3), row("delegada", 2, { launched_by: "lanzador", launcher_available: true }), row("huerfana", 1, { launched_by: "borrado", launcher_available: false })],
     "": [row("vieja", 0, { launched_by: "lanzador", archived: true })],
   }, "cmp_mac", "w1");
-  assert.deepEqual(tasks.map((t) => t.id), ["lanzador", "huerfana"], "la de un lanzador que ya no existe sale suelta");
-  assert.deepEqual(delegated.map((t) => [t.id, t.folderKey]), [["delegada", "cmp_mac/p1"]], "la archivada no");
+  assert.deepEqual(tasks.map((t) => t.id), ["lanzador"], "la de un lanzador que ya no existe tampoco sale suelta");
+  assert.deepEqual(delegated.map((t) => [t.id, t.folderKey]), [["delegada", "cmp_mac/p1"], ["huerfana", "cmp_mac/p1"]], "la archivada no");
   const merged = mergeSnapshots([{ host: "cmp_mac", folders: [], spaces: [], tasks, delegated, agents: [], live: [], providers: [], cachedAt: null }], () => ({ machine: "Mac", on: false }));
-  assert.deepEqual(merged.delegated.map((t) => [t.id, t.machine, t.machine_on]), [["delegada", "Mac", false]], "con la máquina apagada siguen en el chat de su lanzador");
+  assert.deepEqual(merged.delegated.map((t) => [t.id, t.machine, t.machine_on]), [["delegada", "Mac", false], ["huerfana", "Mac", false]], "con la máquina apagada siguen en el chat de su lanzador");
   assert.deepEqual(delegatedOf(merged.delegated, "lanzador").map((t) => t.id), ["delegada"]);
 });
 
