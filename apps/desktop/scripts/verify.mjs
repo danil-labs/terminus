@@ -611,6 +611,7 @@ const steps = [
   ["En el navegador la página de aprobación conecta una computadora a la cuenta", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-connect.test.mjs")], root],
   ["Una aprobación invalida su identidad sin tocar otros slots", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/web-session.test.ts")], root],
   ["La sesión de WorkOS de alfa pide un token corto, lo renueva y termina sin respaldo", process.execPath, ["--test", "--test-force-exit", "--experimental-strip-types", join(root, "tests/unit/web-workos-session.test.ts")], root],
+  ["Difusiones: el panel completo, las reglas de Appv2 y lo que queda tras el interruptor", process.execPath, ["--test", "--experimental-strip-types", join(root, "../../packages/attention/test/broadcast-panel.test.ts")], root],
   ["La entrada de alfa acota lecturas y escrituras explícitas, y deja la entrada con WorkOS en el Worker", process.execPath, ["--test", join(root, "alpha-entry/worker.test.mjs")], root],
   ["Inbox: permisos efectivos y respuestas en cola sin reintentos ambiguos", process.execPath, ["--test", "--experimental-strip-types", join(root, "../../packages/attention/test/inbox.test.ts"), join(root, "../../packages/attention/test/messaging.test.ts"), join(root, "tests/unit/inbox-drafts.test.ts")], root],
   ["Broadcasts: permisos por cuenta y canal, plantillas y transiciones reales", process.execPath, ["--test", "--experimental-strip-types", join(root, "../../packages/attention/test/broadcasts.test.ts")], root],
