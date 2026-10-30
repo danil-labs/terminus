@@ -53,7 +53,7 @@ export function FinishTaskButton(props: {
     size="iconCompact"
     class={cn(
       "shrink-0 bg-brand-purple/10 text-brand-purple hover:bg-brand-purple/20 hover:text-brand-purple disabled:opacity-100",
-      props.compact ? "size-[18px] min-h-0 min-w-0 bg-transparent p-0" : "size-6",
+      props.compact ? "size-[18px] min-h-0 min-w-0 bg-transparent p-0 hover:bg-transparent" : "size-6",
     )}
     data-session-finish
     aria-label={props.label}

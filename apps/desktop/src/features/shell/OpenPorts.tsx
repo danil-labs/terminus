@@ -375,7 +375,7 @@ export default function PuertosAbiertos(props: {
             )}
             aria-label={`${t("shell.ports.aria", { mine: mios(), external: externos() })} · ${t("shell.ports.aria_processes", { processes: processes() })}`}
           >
-            <Plug size={props.vertical ? 16 : 12} class={hot() ? "text-warning-strong" : ""} aria-hidden />
+            <Plug size={props.vertical ? 16 : 12} class={!props.vertical && hot() ? "text-warning-strong" : ""} aria-hidden />
             {/* En la columna la cifra no cabe al lado: un punto dice que hay algo abierto. */}
             <Show
               when={!props.vertical}
