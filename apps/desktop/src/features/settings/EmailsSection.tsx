@@ -1,7 +1,7 @@
 import Mail from "lucide-solid/icons/mail";
 import Plus from "lucide-solid/icons/plus";
 import Trash2 from "lucide-solid/icons/trash-2";
-import { createResource, createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
+import { createResource, createSignal, For, Match, onMount, Show, Switch } from "solid-js";
 import { t } from "../../lib/i18n";
 import { Badge } from "../../ui/Badge";
 import { Button } from "../../ui/Button";
@@ -16,14 +16,13 @@ import {
   emailRows,
 } from "./account-emails";
 import { SettingsSection } from "./layout";
+import { createNow } from "../../lib/sharedClock";
 
 type Feedback = { kind: "success" | "error"; text: string } | null;
 
 /** Segundos que faltan hasta `until` (ms), con un tic por segundo. */
 function countdown(until: () => number | null) {
-  const [now, setNow] = createSignal(Date.now());
-  const id = window.setInterval(() => setNow(Date.now()), 1000);
-  onCleanup(() => window.clearInterval(id));
+  const now = createNow();
   return () => {
     const end = until();
     return end == null ? 0 : Math.max(0, Math.ceil((end - now()) / 1000));

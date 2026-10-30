@@ -7,7 +7,7 @@
  *
  * Sin APIs del DOM: `fetch` se inyecta (navegador, React Native, Node).
  */
-import { apiUrl } from "./api.ts";
+import { bearerCall, errorCodeOf } from "./api.ts";
 
 /** Una cuenta u organización elegida: `key` es su login en minúsculas. */
 export type GithubArea = { key: string; installation_id: number; repository_ids: number[] | null };
@@ -64,24 +64,15 @@ export type GithubFetch = (
 /** A dónde hablar y con qué token: el JWT en la web y el teléfono. */
 export type GithubSource = { endpoint: string; getToken: () => Promise<string>; fetch?: GithubFetch };
 
-const globalFetch: GithubFetch = (input, init) => (globalThis.fetch as unknown as GithubFetch)(input, init);
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 const str = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 
 async function call<T>(source: GithubSource, method: string, path: string, read: (body: unknown) => T, body?: unknown): Promise<GithubAnswer<T>> {
-  const f = source.fetch ?? globalFetch;
-  let response: Awaited<ReturnType<GithubFetch>>;
-  try {
-    const headers: Record<string, string> = { authorization: `Bearer ${await source.getToken()}` };
-    if (body !== undefined) headers["content-type"] = "application/json";
-    response = await f(apiUrl(source.endpoint, path), { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
-  } catch {
-    return { kind: "failed", status: null, code: null };
-  }
-  const json = await response.json().catch(() => null);
-  const said = isObj(json) ? json.error : undefined;
-  const code = typeof said === "string" ? said : isObj(said) && typeof said.code === "string" ? said.code : null;
+  const response = await bearerCall(source, method, path, body);
+  if (!response) return { kind: "failed", status: null, code: null };
+  const { json } = response;
+  const code = errorCodeOf(json) ?? null;
   if (response.status === 401) return { kind: "unauthorized" };
   if (!response.ok) return { kind: "failed", status: response.status, code };
   try {

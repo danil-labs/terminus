@@ -19,6 +19,7 @@ import { EmptyState } from "../../ui/EmptyState";
 import { capabilities } from "../../lib/platform";
 import HistorialDeEntrada from "./MemoryHistory";
 import { type EntradaDeCuenta, entradasDeCuenta, type MemoriaDeCuenta, memoriaDeCuenta } from "./memory-account";
+import { SectionLabel } from "../../ui/SectionLabel";
 
 function scopeIgual(a: MemoriaScope, b: MemoriaScope): boolean {
   if (a.kind !== b.kind) return false;
@@ -303,9 +304,9 @@ export default function Memoria(props: { project: string; workspace?: string | n
   return (
     <section class="grid gap-2">
       <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-        <h2 class="m-0 text-caption font-medium tracking-wide text-neutral-500 uppercase">
+        <SectionLabel>
           {t("projects.memory.title")}
-        </h2>
+        </SectionLabel>
         <Button variant="ghost" size="sm" onClick={() => setFormulario("nueva")}>
           <Plus size={14} />
           {t("projects.memory.write")}

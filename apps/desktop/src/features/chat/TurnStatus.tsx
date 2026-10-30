@@ -1,6 +1,7 @@
-import { Show, createMemo, createSignal, onCleanup } from "solid-js";
+import { Show, createMemo } from "solid-js";
 import { t } from "../../lib/i18n";
 import { enCurso, formatearDuracion, type Paso } from "../../lib/steps";
+import { createNow } from "../../lib/sharedClock";
 
 // El rótulo sigue rotando durante las herramientas; la actividad va aparte.
 // Esperar una respuesta o reintentar sí sustituye el rótulo de trabajo.
@@ -26,9 +27,7 @@ export default function EstadoDelTurno(props: {
   // remontaje: cambiar de workspace, de pestaña o de tarea y volver.
   const montado = Date.now();
   const desde = () => props.desde ?? montado;
-  const [ahora, setAhora] = createSignal(Date.now());
-  const reloj = setInterval(() => setAhora(Date.now()), 1000);
-  onCleanup(() => clearInterval(reloj));
+  const ahora = createNow();
 
   /**
    * Cuál de los verbos toca. **Del reloj y no de un temporizador propio**: dos

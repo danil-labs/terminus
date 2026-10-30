@@ -21,6 +21,7 @@ import { Skeleton } from "../../../ui/Skeleton";
 import { Toggle } from "../../../ui/Toggle";
 import { SettingsBlock, SettingsRow } from "../layout";
 import { githubAccountFailureOf, notHere } from "./failures.ts";
+import { ENLACE } from "../../../ui/ExternalLink";
 
 /**
  * GitHub en la cuenta de Danil: una conexión por workspace que guarda el Worker
@@ -219,8 +220,6 @@ export default function GithubAccount(props: {
   const machineName = (m: GithubMachine) => m.name || capabilities().machineName?.(m.computer_id) || m.computer_id;
   const areaKeys = (c: GithubCredential) => c.config.areas.map((a) => a.key);
   const openUrl = (url: string) => invoke("open_external", { target: url }).catch(() => {});
-  const link =
-    "text-link underline underline-offset-2 outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 
   return (
     <div data-github-account={mode()} class="contents">
@@ -229,7 +228,7 @@ export default function GithubAccount(props: {
           <SettingsRow
             label={t("providers.github.account.waiting")}
             description={
-              <a class={link} href={url()} target="_blank" rel="noopener noreferrer" onClick={(ev) => { ev.preventDefault(); void openUrl(url()); }}>
+              <a class={ENLACE} href={url()} target="_blank" rel="noopener noreferrer" onClick={(ev) => { ev.preventDefault(); void openUrl(url()); }}>
                 {t("providers.github.account.open_github")}
               </a>
             }
@@ -327,7 +326,7 @@ export default function GithubAccount(props: {
                 </Show>
                 <Show when={installUrl()}>
                   {(url) => (
-                    <a class={`${link} self-start text-xs`} href={url()} target="_blank" rel="noopener noreferrer" onClick={(ev) => { ev.preventDefault(); void openUrl(url()); }}>
+                    <a class={`${ENLACE} self-start text-xs`} href={url()} target="_blank" rel="noopener noreferrer" onClick={(ev) => { ev.preventDefault(); void openUrl(url()); }}>
                       {t("providers.github.account.install_more")}
                     </a>
                   )}

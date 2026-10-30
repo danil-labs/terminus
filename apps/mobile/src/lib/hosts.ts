@@ -18,7 +18,7 @@ import {
   orderComputers,
   wakes,
 } from "@terminus/computers";
-import { Fleet, type FleetEvent, type Link, type Slice, type StorageLike, isFleetError, isRead } from "@terminus/fleet";
+import { Fleet, relayLink, type FleetEvent, type Slice, type StorageLike, isFleetError, isRead } from "@terminus/fleet";
 import { type AppCommand, type AppFeature, COMMAND_NOT_HERE, COMMAND_UNSUPPORTED, CommandSupport, type EngineError, type EngineEvent, type Support, isAppCommand, isScopeRefusal } from "@terminus/protocol";
 
 export class HostError extends Error {
@@ -176,21 +176,7 @@ export function accountFleet(config: AccountFleetConfig, factory?: SocketFactory
       );
       // Hasta que el relay diga su estado, vale el de la fila de `/v1/computers`.
       const state = (): MachineState => (relay.state() === "unknown" ? ((rows.get(info.id)?.state as MachineState | undefined) ?? "unknown") : relay.state());
-      const link: Link = {
-        state,
-        call: (id, command, workspace, folder, args, timeout) => relay.call(id, command, workspace, folder, args, timeout),
-        onState: (listener) => relay.onState(listener),
-        onEvents: (listener) => relay.onEvents(listener),
-        onEngine: (listener) => relay.onEngine(listener),
-        blocked: () => relay.blocked(),
-        onBlocked: (listener) => relay.onBlocked(listener),
-        retry: () => relay.retry(),
-        onDeferred: (listener) => relay.onDeferred(listener),
-        deferred: () => relay.deferred(),
-        subscribe: (after) => relay.subscribe(after),
-        start: () => relay.start(),
-        close: () => relay.close(),
-      };
+      const link = relayLink(relay, state);
       // Un cambio de enlace (socket abierto o cerrado) también repinta.
       relay.onLink(() => changed(info.id));
       return link;
