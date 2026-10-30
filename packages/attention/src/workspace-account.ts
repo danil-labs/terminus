@@ -22,15 +22,16 @@ export type AccountSources = {
  * en otra cuenta, entra: el BFF ancla sus listas a la cuenta activa.
  */
 export async function resolveWorkspaceAccount(workspace: string | null, sources: AccountSources): Promise<Account | null> {
-  sources.remember?.(null);
-  if (!workspace?.trim()) return null;
+  // La clave se cambia al terminar: limpiarla antes dejaría sin comprobar lo que esté en vuelo.
+  const none = () => { sources.remember?.(null); return null; };
+  if (!workspace?.trim()) return none();
   const entries = await sources.directory();
   const entry = entries.find(row => row.key === workspace || row.workspace_id === workspace);
   const id = entry?.capabilities.agents ? entry.danil_workspace_id : null;
-  if (!entry || id === null) return null;
+  if (!entry || id === null) return none();
   if (await sources.active() !== id) {
     await sources.enter(entry.key);
-    if (await sources.active() !== id) return null;
+    if (await sources.active() !== id) throw new Error('workspace_not_entered');
   }
   sources.remember?.(entry.key);
   return { id, name: entry.name };

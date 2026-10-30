@@ -30,8 +30,8 @@ test("a session in another account enters; it never shows the other one", async 
   assert.deepEqual(s.entered, ["a:476"]);
   assert.equal(s.remembered.at(-1), "a:476");
   const stuck = sources(9, false);
-  assert.equal(await resolveWorkspaceAccount("fqgx1w8m", stuck), null);
-  assert.equal(stuck.remembered.at(-1), null);
+  await assert.rejects(resolveWorkspaceAccount("fqgx1w8m", stuck), /workspace_not_entered/);
+  assert.deepEqual(stuck.remembered, []);
 });
 
 test("anything else resolves to nothing, never to another account", async () => {

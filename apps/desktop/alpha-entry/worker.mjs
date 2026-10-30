@@ -30,7 +30,7 @@ const EMAIL_WRITES = {
   "/auth/emails/remove": ["email"],
 };
 const MAX_BODY = 1024;
-const WORKSPACE_KEY = /^(a:[1-9][0-9]{0,18}|w:[!-~]{1,128})$/;
+const WORKSPACE_KEY = /^(a:[1-9][0-9]{0,17}|w:[!-~]{1,128})$/;
 // Atención en Configuración: sin query; el BFF ancla cada una a la cuenta activa de la sesión.
 const SERVICE_READS = ["/api/agents", "/api/calendar/connections", "/api/http_tools", "/api/account_variables"];
 const SERVICE_AGENT = /^\/api\/agents\/[1-9]\d*(\/connections)?$/;
