@@ -130,7 +130,7 @@ export function AdminPage(props: { source: AdminSource }) {
                       {(w().name || "?").slice(0, 1).toUpperCase()}
                     </span>
                     <div class="min-w-0 leading-tight">
-                      <p class="m-0 truncate text-[0.8125rem] font-semibold">{w().name || t("settings.support_access.unnamed", { id: w().id })}</p>
+                      <p class="m-0 truncate text-ui font-semibold">{w().name || t("settings.support_access.unnamed", { id: w().id })}</p>
                       <p class="m-0 truncate text-xs text-neutral-500">
                         {[w().organization, w().plan, roleName(w().role)].filter(Boolean).join(" · ")}
                       </p>

@@ -473,7 +473,7 @@ export default function Settings(props: {
               >
                 <header class="mb-6 grid gap-0.5 pr-10">
                   <h2 class="m-0 text-lg font-semibold">{entrada().name}</h2>
-                  <p class="m-0 text-[0.8125rem] text-neutral-500">{entrada().hint}</p>
+                  <p class="m-0 text-ui text-neutral-500">{entrada().hint}</p>
                 </header>
                 <Show when={entrada().tabs.length > 1}>
                   <div

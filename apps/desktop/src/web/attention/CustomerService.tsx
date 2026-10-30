@@ -133,7 +133,7 @@ export function CustomerConnections(props: CustomerProps) {
         {row => <SettingsRow label={<span class="inline-flex flex-wrap items-center gap-2">{row.name}<Show when={row.method}><Badge forma="dato">{row.method}</Badge></Show></span>} description={row.host}><Show when={!row.active}><Badge>{t("web.service.inactive")}</Badge></Show></SettingsRow>}
       </Listed>
       <Listed title={t("web.service.variables")} description={t("web.service.variables_hint")} empty={t("web.service.variables_empty")} load={() => s().variables()}>
-        {row => <SettingsRow label={<span class="font-mono text-[0.8125rem]">{row.key}</span>} description={row.secret ? t("web.service.secret") : undefined} />}
+        {row => <SettingsRow label={<span class="font-mono text-ui">{row.key}</span>} description={row.secret ? t("web.service.secret") : undefined} />}
       </Listed>
     </Resolved>
   </SettingsPanel>}</Show>}</Watched>;
