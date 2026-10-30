@@ -4592,7 +4592,7 @@ export default function App() {
   /**
    * La conversación en blanco: lo que el panel enseña sin tarea abierta.
    * `nuevaSesion` es esto más el aviso de que se va a empezar algo. No es
-   * una pestaña de `lib/tabs.ts`: la tira solo la pinta como «Tarea nueva»
+   * una pestaña de `lib/tabs.ts`: la tira solo la pinta como «Nueva tarea»
    * (`enBorrador`). Su borrador —separado por proyecto— espera hasta el
    * primer turno.
    */

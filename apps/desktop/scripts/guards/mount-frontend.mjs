@@ -1997,7 +1997,7 @@ if (!roto) {
     };
     assert.equal(cajaCentrada(newTaskClick.w.document), true, "la tarea nueva en blanco centra la caja");
     const tareaNueva = newTaskClick.w.document.querySelector("[data-borrador]");
-    assert.ok(tareaNueva?.textContent.includes("Tarea nueva"), "la tarea nueva sin lanzar se ve en la tira");
+    assert.ok(tareaNueva?.textContent.includes("Nueva tarea"), "la tarea nueva sin lanzar se ve en la tira");
     tareaNueva.querySelector("button").click();
     await sleep(50);
     assert.equal(newTaskClick.w.document.querySelector("[data-borrador]"), null, "cerrarla vuelve a la pestaña anterior");
