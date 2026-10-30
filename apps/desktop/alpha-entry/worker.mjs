@@ -1,3 +1,5 @@
+import { handleAuth } from "./session.mjs";
+
 const HOST = "alfa-app.danil.ai";
 const PREFIX = "/terminus/alpha-api";
 const json = (error, status) => Response.json({ error }, {
@@ -73,6 +75,8 @@ export default {
         },
       });
     }
+    const signIn = await handleAuth(request, env, url);
+    if (signIn) return signIn;
     if (!url.pathname.startsWith("/terminus/")) return json("not_found", 404);
     if (request.method !== "GET" && request.method !== "HEAD") return json("method_not_allowed", 405);
     if (!env.TERMINUS_WEB) return json("assets_unavailable", 503);
