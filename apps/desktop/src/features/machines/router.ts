@@ -711,7 +711,9 @@ export function createRouter(config: RouterConfig) {
         if (owner === machine && FAN.has(command)) lastRead.delete(id);
       }
     }
-    config.deliver?.(list.map((e) => (e.name === "attention" ? { ...e, payload: attention.update(machine, e.payload) } : e)));
+    // `machine-usage` no dice de qué máquina es: el panel «Máquinas» relee la suya.
+    config.deliver?.(list.map((e) => (e.name === "attention" ? { ...e, payload: attention.update(machine, e.payload) }
+      : e.name === "machine-usage" && e.payload && typeof e.payload === "object" ? { ...e, payload: { ...e.payload, machine } } : e)));
   }
 
   /** Dónde se crea algo nuevo de `workspace` ahora y si esa máquina lo encabeza; `null` si ninguna puede. */

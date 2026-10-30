@@ -31,7 +31,7 @@ export function level(r: MachineResources | undefined): Level | null {
   const p = r.pressure;
   const free = r.memory.available_bytes / r.memory.total_bytes;
   if (free < CRITICAL.available || (p && (p.memory >= CRITICAL.memory || p.io >= CRITICAL.io))) return "critical";
-  if (p && (p.memory >= HIGH.memory || p.io >= HIGH.io)) return "high";
+  if (r.pressure_alert || (p && (p.memory >= HIGH.memory || p.io >= HIGH.io))) return "high";
   return "normal";
 }
 
@@ -72,8 +72,9 @@ export function leftovers(r: MachineResources | undefined): MachineTaskUsage[] {
   return (r?.tasks ?? []).filter((t) => t.state === "finished" && t.processes > 0).sort((a, b) => b.memory_bytes - a.memory_bytes);
 }
 
-/** Lo que más usa, para el aviso: hasta dos, de cualquier estado. */
-export function heaviest(r: MachineResources | undefined, n = 2): MachineTaskUsage[] {
+/** Lo que más usa, para el aviso: el del aviso activo del motor si hay uno; si no, hasta dos de cualquier estado. */
+export function heaviest(r: MachineResources | undefined, n = 2): { session: string; title?: string; memory_bytes: number }[] {
+  if (r?.pressure_alert?.tasks.length) return r.pressure_alert.tasks.slice(0, n);
   return [...(r?.tasks ?? [])].sort((a, b) => b.memory_bytes - a.memory_bytes).slice(0, n);
 }
 

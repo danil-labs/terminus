@@ -31,7 +31,7 @@ const SEG_TASKS = "bg-neutral-500";
 const SEG_ENGINE = "bg-info-strong";
 const SEG_OTHER = "bg-neutral-500/35";
 
-export function taskTitle(task: MachineTaskUsage, lookup: TaskLookup) {
+export function taskTitle(task: Pick<MachineTaskUsage, "session" | "title">, lookup: TaskLookup) {
   return task.title ?? lookup(task.session)?.title ?? t("shell.machine_panel.task.unknown", { id: task.session.slice(0, 8) });
 }
 

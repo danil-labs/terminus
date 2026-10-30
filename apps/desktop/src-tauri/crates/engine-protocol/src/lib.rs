@@ -89,6 +89,7 @@ pub const MANIFEST: &str = include_str!("../commands.json");
 pub const EXTENSIONS: &[&str] = &[
     include_str!("../extensions/orchestrators.json"),
     include_str!("../extensions/engine_update_v1.json"),
+    include_str!("../extensions/machine_usage_v1.json"),
 ];
 
 /// Las órdenes del contrato más las de las extensiones. La huella sigue siendo
