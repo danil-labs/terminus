@@ -2,6 +2,7 @@ import { TEXT } from "@terminus/design";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { KeyboardAvoidingView, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { t } from "../lib/i18n";
 import { Icon, type IconName } from "./Icon";
 import { SearchField } from "./Search";
 import { useTheme } from "./theme";
@@ -40,8 +41,8 @@ export function Sheet({
   const [detent, setDetent] = useState(0);
   const [drag, setDrag] = useState(0);
   const height = detents ? Math.max(0, Math.min(windowHeight * detents[1], windowHeight * detents[detent] - drag)) : undefined;
-  const measured = useRef({ height: 0, windowHeight, detents });
-  measured.current = { height: height ?? 0, windowHeight, detents };
+  const measured = useRef({ height: 0, windowHeight, detents, onClose });
+  measured.current = { height: height ?? 0, windowHeight, detents, onClose };
   const pan = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 4,
@@ -50,6 +51,8 @@ export function Sheet({
         const now = measured.current;
         const middle = now.detents ? (now.detents[0] + now.detents[1]) / 2 : 0;
         setDrag(0);
+        // Muy por debajo de la altura menor, arrastrar es cerrar.
+        if (now.detents && now.height < now.windowHeight * now.detents[0] * 0.7) return now.onClose();
         setDetent(now.height / now.windowHeight > middle ? 1 : 0);
       },
       onPanResponderTerminate: () => setDrag(0),
@@ -59,10 +62,10 @@ export function Sheet({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       <KeyboardAvoidingView style={styles.root} behavior="padding">
         <Pressable style={styles.backdrop} onPress={onClose} accessibilityRole="button" />
-        <View style={[styles.sheet, detents ? { height, maxHeight: height } : null, { backgroundColor: theme.surface, paddingBottom: detents ? 0 : insets.bottom + 12, borderColor: theme.border }]}>
+        <View style={[styles.sheet, detents ? { height, maxHeight: height } : null, { backgroundColor: theme.surface, paddingBottom: detents ? insets.bottom : insets.bottom + 12, borderColor: theme.border }]}>
           {detents ? (
             <View {...pan.panHandlers} style={styles.handleArea}>
-              <Pressable testID="sheet-handle" accessibilityRole="button" accessibilityLabel={`${Math.round(detents[detent === 0 ? 1 : 0] * 100)} %`} onPress={() => setDetent((now) => (now === 0 ? 1 : 0))} style={styles.handle}>
+              <Pressable testID="sheet-handle" accessibilityRole="button" accessibilityLabel={t(detent === 0 ? "sheet.expand" : "sheet.collapse")} onPress={() => setDetent((now) => (now === 0 ? 1 : 0))} style={styles.handle}>
                 <View style={[styles.grabber, { backgroundColor: theme.border, marginBottom: 0 }]} />
               </Pressable>
             </View>

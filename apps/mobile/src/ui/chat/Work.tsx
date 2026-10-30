@@ -2,7 +2,7 @@ import { STATUS_LABELS, TEXT } from "@terminus/design";
 import { stepCounts } from "@terminus/chat/steps";
 import { type ComponentRef, type ReactNode, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { OPENED, type Follow, scrolled, shouldStick } from "../../lib/follow";
+import { OPENED, type Follow, type Metrics, scrolled, shouldStick } from "../../lib/follow";
 import { lang, t, w } from "../../lib/i18n";
 import { type Step, type StepRow, type WorkItem, type WorkLine, type WorkRun, bareCommand, elapsed, fileName, hitOf, runningStep } from "../../lib/steps";
 import type { WorkSheetState } from "../../lib/workSheet";
@@ -250,13 +250,17 @@ export function WorkSheet({ state, run, last, focus, find, onClose }: { state: W
     placed.current = true;
     scroller.current?.scrollTo({ y: Math.max(0, y - 8), animated: false });
   }, [target]);
+  // También con lo medido: una ejecución que cabe no da ningún evento de scroll, y aun así está en su final.
+  const metrics = useRef({ offset: 0, content: 0, viewport: 0 });
+  const measured = useCallback((next: Partial<Metrics>) => {
+    metrics.current = { ...metrics.current, ...next };
+    follow.current = scrolled(follow.current, metrics.current, 0);
+    if (!("offset" in next) && shouldStick(follow.current)) scroller.current?.scrollToEnd({ animated: false });
+  }, []);
   const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-    follow.current = scrolled(follow.current, { offset: contentOffset.y, content: contentSize.height, viewport: layoutMeasurement.height }, 0);
-  }, []);
-  const stick = useCallback(() => {
-    if (shouldStick(follow.current)) scroller.current?.scrollToEnd({ animated: false });
-  }, []);
+    measured({ offset: contentOffset.y, content: contentSize.height, viewport: layoutMeasurement.height });
+  }, [measured]);
 
   const permission = state.permissions[0] ?? null;
   const live = (run?.live ?? false) && !permission;
@@ -274,6 +278,7 @@ export function WorkSheet({ state, run, last, focus, find, onClose }: { state: W
       {permission ? (
         <View style={styles.top}>
           <PermissionCard
+            key={permission.request_id}
             permission={permission}
             position={state.permissions.length > 1 ? { current: 1, total: state.permissions.length } : null}
             disabled={state.asleep !== null}
@@ -300,7 +305,8 @@ export function WorkSheet({ state, run, last, focus, find, onClose }: { state: W
         nestedScrollEnabled
         onScroll={onScroll}
         scrollEventThrottle={16}
-        onContentSizeChange={stick}
+        onContentSizeChange={(_, content) => measured({ content })}
+        onLayout={(e) => measured({ viewport: e.nativeEvent.layout.height })}
         contentInsetAdjustmentBehavior="automatic"
       >
         {(run?.items ?? []).map((item) =>
@@ -330,7 +336,7 @@ const styles = StyleSheet.create({
   sheetHead: { flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 16, paddingRight: 6 },
   sheetSummary: { flex: 1, fontSize: TEXT.label, lineHeight: 16 },
   close: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  top: { paddingHorizontal: 12, paddingBottom: 8 },
+  top: { flexShrink: 1, minHeight: 0, paddingHorizontal: 12, paddingBottom: 8 },
   question: { marginHorizontal: 12, marginBottom: 8, padding: 10, minHeight: 44, justifyContent: "center", borderRadius: 10, borderWidth: 1 },
   notice: { paddingHorizontal: 16, paddingBottom: 8, fontSize: TEXT.ui },
   list: { flex: 1, minHeight: 0 },

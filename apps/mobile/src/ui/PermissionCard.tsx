@@ -1,6 +1,6 @@
 import { RADIUS, TEXT } from "@terminus/design";
 import { useState } from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { Permission } from "../lib/engine";
 import { t, w } from "../lib/i18n";
 import { useTheme } from "./theme";
@@ -23,9 +23,11 @@ export function PermissionCard({ permission, position, disabled, busy, onDecide 
         {position ? <Text style={{ color: theme.textMuted, fontSize: TEXT.ui }}>{t("task.permission.position", position)}</Text> : null}
       </View>
       {target ? (
-        <Text selectable numberOfLines={isLong(target) && !full ? SHOWN_LINES : undefined} style={[styles.code, { color: theme.text, backgroundColor: theme.muted }]}>
-          {target}
-        </Text>
+        <ScrollView style={styles.command} nestedScrollEnabled>
+          <Text selectable numberOfLines={isLong(target) && !full ? SHOWN_LINES : undefined} style={[styles.code, { color: theme.text, backgroundColor: theme.muted }]}>
+            {target}
+          </Text>
+        </ScrollView>
       ) : null}
       {target && isLong(target) ? (
         <Pressable onPress={() => setFull((now) => !now)} hitSlop={8} style={styles.more}>
@@ -45,7 +47,9 @@ export function PermissionCard({ permission, position, disabled, busy, onDecide 
 }
 
 const styles = StyleSheet.create({
-  card: { borderWidth: 1, borderRadius: 14, padding: 12, gap: 10 },
+  // Lo que encoge es el comando: los botones siguen a la vista aunque la tarjeta no quepa en la hoja.
+  card: { flexShrink: 1, minHeight: 0, borderWidth: 1, borderRadius: 14, padding: 12, gap: 10 },
+  command: { flexShrink: 1, minHeight: 0, maxHeight: 168 },
   head: { flexDirection: "row", alignItems: "center", gap: 8 },
   code: { fontFamily: MONO, fontSize: TEXT.ui, padding: 8, borderRadius: RADIUS.lg },
   more: { alignSelf: "flex-start", paddingVertical: 4 },

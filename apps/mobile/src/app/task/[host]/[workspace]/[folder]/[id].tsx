@@ -465,6 +465,8 @@ export default function TaskScreen() {
 
   const openWork = useCallback(
     (line: WorkLine, at: number, find: string | null) => {
+      // Dos toques durante la transición serían hoja sobre hoja.
+      if (sheetOpened.current) return;
       sheetOpened.current = true;
       router.push({ pathname: "/task-work", params: { host: params.host, workspace, folder: params.folder, id, run: line.run, at: String(at), ...(find ? { find } : {}) } });
     },

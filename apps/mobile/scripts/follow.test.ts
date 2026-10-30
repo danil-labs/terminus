@@ -109,3 +109,11 @@ test("el primer gesto, si ya aleja del final, suelta el hilo", () => {
   assert.equal(next.following, false);
   assert.equal(next.seen, 3);
 });
+
+test("lo que cabe está en su final aunque nunca haya habido scroll", () => {
+  const closed: Follow = { ...OPENED, following: false, near: false };
+  const fits = scrolled(closed, { offset: 0, content: 300, viewport: 400 }, 0);
+  assert.equal(fits.following, true);
+  const grown = scrolled(fits, { offset: 0, content: 900, viewport: 400 }, 0);
+  assert.equal(grown.following, true, "crecer por abajo no suelta el hilo");
+});
