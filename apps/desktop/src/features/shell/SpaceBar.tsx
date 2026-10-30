@@ -236,39 +236,10 @@ function NewSpace(props: {
   onCrear: (name: string, folders: string[]) => Promise<void>;
 }) {
   const [abierta, setAbierta] = createSignal(false);
-  const [nombre, setNombre] = createSignal("");
-  const [elegidas, setElegidas] = createSignal<string[]>([]);
-  const [creando, setCreando] = createSignal(false);
-  const [fallo, setFallo] = createSignal<Failure | null>(null);
-  // Las últimas que se agregaron a Terminus, delante: lo reciente es lo que se
-  // agrega. Solo diez, que son las que caben sin desplazar el resto del alta.
-  const recientes = () => [...props.proyectos].reverse().slice(0, 10);
-  const abrir = (si: boolean) => {
-    if (!si && creando()) return;
-    setAbierta(si);
-    if (si) {
-      setNombre("");
-      setElegidas([]);
-      setFallo(null);
-    }
-  };
-  const crear = async () => {
-    const name = nombre().trim();
-    if (!name || creando()) return;
-    setCreando(true);
-    setFallo(null);
-    try {
-      await props.onCrear(name, elegidas());
-      setAbierta(false);
-    } catch (e) {
-      setFallo(asFailure(e));
-    } finally {
-      setCreando(false);
-    }
-  };
-
+  // Mientras crea no se cierra: el alta a medias quedaría sin aviso de fallo.
+  let creando = false;
   return (
-    <Popover open={abierta()} onOpenChange={abrir} placement="bottom-start" gutter={4}>
+    <Popover open={abierta()} onOpenChange={(si) => (si || !creando) && setAbierta(si)} placement="bottom-start" gutter={4}>
       <PopoverTrigger
         data-new-space=""
         aria-label={t("spaces.new.title")}
@@ -278,6 +249,45 @@ function NewSpace(props: {
         <Plus size={14} aria-hidden="true" />
       </PopoverTrigger>
       <PopoverContent class="w-80 p-3" aria-label={t("spaces.new.title")}>
+        <NewSpaceForm {...props} onBusy={(b) => (creando = b)} onClose={() => setAbierta(false)} />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** El formulario del alta, sin su ventana: lo usan el «+» y el menú de espacios. */
+export function NewSpaceForm(props: {
+  workspace: string;
+  proyectos: Project[];
+  onCrear: (name: string, folders: string[]) => Promise<void>;
+  onClose: () => void;
+  onBusy?: (busy: boolean) => void;
+}) {
+  const [nombre, setNombre] = createSignal("");
+  const [elegidas, setElegidas] = createSignal<string[]>([]);
+  const [creando, setCreando] = createSignal(false);
+  const [fallo, setFallo] = createSignal<Failure | null>(null);
+  // Las últimas que se agregaron a Terminus, delante: lo reciente es lo que se
+  // agrega. Solo diez, que son las que caben sin desplazar el resto del alta.
+  const recientes = () => [...props.proyectos].reverse().slice(0, 10);
+  const crear = async () => {
+    const name = nombre().trim();
+    if (!name || creando()) return;
+    setCreando(true);
+    props.onBusy?.(true);
+    setFallo(null);
+    try {
+      await props.onCrear(name, elegidas());
+      props.onClose();
+    } catch (e) {
+      setFallo(asFailure(e));
+    } finally {
+      setCreando(false);
+      props.onBusy?.(false);
+    }
+  };
+  return (
+    <>
         <h3 class="m-0 mb-2 text-[0.8125rem] font-semibold">{t("spaces.new.title")}</h3>
         <form
           class="grid gap-3"
@@ -329,7 +339,7 @@ function NewSpace(props: {
           </fieldset>
           <Show when={fallo()}>{(f) => <FailureNote f={f()} />}</Show>
           <div class="flex justify-end gap-2">
-            <Button type="button" variant="ghost" size="sm" disabled={creando()} onClick={() => setAbierta(false)}>
+            <Button type="button" variant="ghost" size="sm" disabled={creando()} onClick={props.onClose}>
               {t("spaces.new.cancel")}
             </Button>
             <Button type="submit" size="sm" disabled={!nombre().trim() || creando()}>
@@ -337,7 +347,6 @@ function NewSpace(props: {
             </Button>
           </div>
         </form>
-      </PopoverContent>
-    </Popover>
+    </>
   );
 }

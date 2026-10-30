@@ -1,3 +1,4 @@
+import { capabilities } from "../../lib/platform";
 import { listen } from "../../lib/serviceEvents";
 import ChartColumn from "lucide-solid/icons/chart-column";
 import FileText from "lucide-solid/icons/file-text";
@@ -148,6 +149,7 @@ export default function Integrations() {
 
   return (
     <>
+      {capabilities().inbox?.integrations()}
       <SettingsSection
         title={t("settings.integrations.title")}
         description={t("settings.integrations.description")}

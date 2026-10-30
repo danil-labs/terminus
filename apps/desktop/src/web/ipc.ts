@@ -13,7 +13,7 @@ type Internals = {
   metadata: { currentWindow: { label: string }; currentWebview: { windowLabel: string; label: string } };
 };
 
-export function installIpc(target: Window, transport: WebTransport) {
+export function installIpc(target: Window, transport: Pick<WebTransport, "handle">) {
   let lastId = 0;
   const internals: Internals = {
     invoke: (command, args, options) => {

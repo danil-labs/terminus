@@ -593,7 +593,9 @@ export function transcripcion(turns: Turn[]): Msg[] {
     const propio: Msg = {
       role: t.role as Msg["role"],
       text: relevo ? relevo.texto : t.text,
-      historyRefs: t.history_refs,
+      // El JSON crudo de las herramientas no se lee en el chat: solo se ofrece
+      // lo que le falta a la conversación, como un texto demasiado largo.
+      historyRefs: t.history_refs?.filter((ref) => ref.pointer !== "/tools"),
       ...(relevo ? { relevo: { titulo: relevo.titulo } } : {}),
       task_mentions: t.task_mentions,
       // Un aviso de cierre —una interrupción— vive en el turno, no en el evento

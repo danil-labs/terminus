@@ -1,0 +1,26 @@
+name = "terminus-entry-alfa"
+main = "worker.mjs"
+account_id = "e1f9a060a59fa8a648440321571892de"
+compatibility_date = "2026-10-01"
+workers_dev = false
+preview_urls = false
+
+# Todo el dominio: la web vive en la raíz y `/terminus/*` redirige a ella.
+[[routes]]
+pattern = "alfa-app.danil.ai/*"
+zone_id = "e14ef2690bfae6ea80d2b8fffbcfd708"
+
+[[services]]
+binding = "TERMINUS_WEB"
+service = "terminus-web-alfa"
+
+[[services]]
+binding = "APPV2_BFF"
+service = "appv2"
+
+# Entrada con WorkOS (session.mjs), ambiente Production. Secretos: WORKOS_API_KEY,
+# SUPABASE_SERVICE_ROLE_KEY y SESSION_COOKIE_KEY (32 bytes base64url, versión v1 del sello).
+# Sin uno de ellos, /auth/session responde 503 y nadie entra.
+[vars]
+SUPABASE_URL = "https://sqonjbpvairwfksotadj.supabase.co"
+WORKOS_CLIENT_ID = "client_01M2HETZ89A209TH6NNPF6P8YC"

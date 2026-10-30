@@ -197,36 +197,45 @@ export function agrupar(pasos: Paso[]): Fila[] {
  * `null` si el tramo no tiene ninguno que contar — solo avisos, gasto o cierre.
  */
 export function cuentaDelTramo(pasos: Paso[], vivo = false): string | null {
+  const partes = partesDelTramo(pasos, vivo);
+  return partes.length === 0 ? null : partes.map((p) => p.texto).join(t("common.steps.summary.separator"));
+}
+
+/**
+ * La misma cabecera en trozos, con la clase de cada uno: el chat hace de
+ * «Editó N archivos» un botón que abre los cambios en el panel de la tarea.
+ * Ya va con mayúscula inicial; se une con `common.steps.summary.separator`.
+ */
+export function partesDelTramo(pasos: Paso[], vivo = false): { clase: Clase; texto: string }[] {
   const de = (clase: Clase) => pasos.filter((p) => p.clase === clase);
   const editados = archivosDistintos(de("editar"));
   const permisos = de("permiso");
-  const cuentas: [number, (count: number) => string][] = vivo
+  const cuentas: [number, (count: number) => string, Clase][] = vivo
     ? [
-        [de("leer").length, (count) => t("common.steps.summary_live.read", { count })],
-        [de("buscar").length, (count) => t("common.steps.summary_live.search", { count })],
-        [editados, (count) => t("common.steps.summary_live.edit", { count })],
-        [de("ejecutar").length, (count) => t("common.steps.summary_live.run", { count })],
-        [de("web").length, (count) => t("common.steps.summary_live.web", { count })],
-        [de("plan").length, (count) => t("common.steps.summary_live.plan", { count })],
-        [de("otro").length, (count) => t("common.steps.summary_live.other", { count })],
+        [de("leer").length, (count) => t("common.steps.summary_live.read", { count }), "leer"],
+        [de("buscar").length, (count) => t("common.steps.summary_live.search", { count }), "buscar"],
+        [editados, (count) => t("common.steps.summary_live.edit", { count }), "editar"],
+        [de("ejecutar").length, (count) => t("common.steps.summary_live.run", { count }), "ejecutar"],
+        [de("web").length, (count) => t("common.steps.summary_live.web", { count }), "web"],
+        [de("plan").length, (count) => t("common.steps.summary_live.plan", { count }), "plan"],
+        [de("otro").length, (count) => t("common.steps.summary_live.other", { count }), "otro"],
       ]
     : [
-        [de("leer").length, (count) => t("common.steps.summary.read", { count })],
-        [de("buscar").length, (count) => t("common.steps.summary.search", { count })],
-        [editados, (count) => t("common.steps.summary.edit", { count })],
-        [de("ejecutar").length, (count) => t("common.steps.summary.run", { count })],
-        [de("web").length, (count) => t("common.steps.summary.web", { count })],
-        [de("plan").length, (count) => t("common.steps.summary.plan", { count })],
-        [de("otro").length, (count) => t("common.steps.summary.other", { count })],
+        [de("leer").length, (count) => t("common.steps.summary.read", { count }), "leer"],
+        [de("buscar").length, (count) => t("common.steps.summary.search", { count }), "buscar"],
+        [editados, (count) => t("common.steps.summary.edit", { count }), "editar"],
+        [de("ejecutar").length, (count) => t("common.steps.summary.run", { count }), "ejecutar"],
+        [de("web").length, (count) => t("common.steps.summary.web", { count }), "web"],
+        [de("plan").length, (count) => t("common.steps.summary.plan", { count }), "plan"],
+        [de("otro").length, (count) => t("common.steps.summary.other", { count }), "otro"],
       ];
   cuentas.push(
-    [permisos.filter((p) => p.permitido).length, (count) => t("common.steps.summary.allowed", { count })],
-    [permisos.filter((p) => !p.permitido).length, (count) => t("common.steps.summary.denied", { count })],
+    [permisos.filter((p) => p.permitido).length, (count) => t("common.steps.summary.allowed", { count }), "permiso"],
+    [permisos.filter((p) => !p.permitido).length, (count) => t("common.steps.summary.denied", { count }), "permiso"],
   );
-  const partes = cuentas.filter(([n]) => n > 0).map(([n, frase]) => frase(n));
-  if (partes.length === 0) return null;
-  const frase = partes.join(t("common.steps.summary.separator"));
-  return frase.charAt(0).toLocaleUpperCase(manifiesto().formato) + frase.slice(1);
+  const partes = cuentas.filter(([n]) => n > 0).map(([n, frase, clase]) => ({ clase, texto: frase(n) }));
+  if (partes[0]) partes[0].texto = partes[0].texto.charAt(0).toLocaleUpperCase(manifiesto().formato) + partes[0].texto.slice(1);
+  return partes;
 }
 
 /** Tres ediciones al mismo archivo son un archivo que revisar, no tres. */

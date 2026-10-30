@@ -29,12 +29,12 @@ export function Skeleton(props: {
           <div
             class={cn(
               "h-8 rounded-md bg-surface-muted",
-              "motion-safe:animate-[danil-skeleton_1.4s_ease-in-out_infinite]",
+              "motion-safe:animate-skeleton",
               props.class,
             )}
             // Desfasadas: a la vez parecen un solo bloque parpadeando, y en
             // cascada se leen como filas de una lista que todavía no llegó.
-            style={{ "animation-delay": `${i * 120}ms` }}
+            style={{ "animation-delay": `${(i * 1000) / 12}ms` }}
           />
         )}
       </For>

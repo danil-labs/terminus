@@ -1,4 +1,4 @@
-import type { MachineResources } from "@terminus/protocol";
+import type { EngineUpdate, MachineResources, MachineTaskUsage, Startup } from "@terminus/protocol";
 import type { JSX } from "solid-js";
 import {
   For,
@@ -8,6 +8,7 @@ import {
   createSignal,
   on,
   onCleanup,
+  untrack,
 } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
 import { t } from "../../lib/i18n";
@@ -15,7 +16,7 @@ import { peso } from "../../lib/format";
 import { conservar } from "../../lib/sessionRefresh";
 import { haceCuanto } from "../../lib/limits";
 import { cn } from "../../lib/utils";
-import HardDrive from "lucide-solid/icons/hard-drive";
+import Server from "lucide-solid/icons/server";
 import Trash2 from "lucide-solid/icons/trash-2";
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import ChevronDown from "lucide-solid/icons/chevron-down";
@@ -31,7 +32,11 @@ import {
 } from "../../ui/Tooltip";
 import { Badge } from "../../ui/Badge";
 import { ProgressBar } from "../../ui/ProgressBar";
-import { type Machine, machineName } from "../machines/store";
+import { type Machine, machineName, machines as fleetMachines } from "../machines/store";
+import { MachineCard, MemoryTab, type Power, type TaskLookup } from "./MachineCard";
+import { UPDATE_FEATURE, USAGE_FEATURE, hasUsage, remember, worst } from "./machineUsage";
+import { errorCode } from "../../lib/errorCode";
+import { listen } from "../../lib/serviceEvents";
 import { prosaDe } from "../../ui/Failure";
 
 type Clase = "recuperable" | "git" | "fuente" | "trabajo" | "registro";
@@ -71,7 +76,8 @@ type Almacen = {
 };
 
 
-type Summary = { resources?: MachineResources; workspaceName?: string; loading: boolean; stale?: boolean; error?: string };
+/** `cachedAt`: la respuesta salió de la última copia de una máquina apagada, y su hora. */
+type Summary = { resources?: MachineResources; workspaceName?: string; loading: boolean; stale?: boolean; error?: string; cachedAt?: number | null };
 type Target = { machine: string; workspace: string; generation: number };
 
 type Liberado = {
@@ -135,6 +141,10 @@ export default function Almacenamiento(props: {
   /** Tareas con una pestaña abierta en esta ventana. */
   conPestana: string[];
   onAbrirTarea: (project: string, session: string) => void;
+  /** En la columna de organizaciones: icono sobre la cifra y el panel a la derecha. */
+  vertical?: boolean;
+  /** El título y la carpeta de una tarea de este workspace, para la pestaña Memoria. */
+  lookup?: TaskLookup;
 }) {
   const [datos, setDatos] = createSignal<Almacen | null>(null);
   const [abierto, setAbierto] = createSignal(false);
@@ -158,6 +168,12 @@ export default function Almacenamiento(props: {
   const [readError, setReadError] = createSignal("");
   const [listing, setListing] = createSignal(false);
   const [operationPending, setOperationPending] = createSignal(false);
+  /** El detalle de la máquina elegida, plegado al tocar otra vez su tarjeta. */
+  const [expanded, setExpanded] = createSignal(true);
+  /** La pestaña elegida a mano; sin elegir, Memoria si el host la manda. */
+  const [tabChoice, setTabChoice] = createSignal<"memory" | "disk" | null>(null);
+  const [stopping, setStopping] = createSignal<Record<string, boolean>>({});
+  const [stopFailure, setStopFailure] = createSignal<Record<string, string>>({});
   let generation = 0;
   let inventoryRequest = 0;
   let detailRequest = 0;
@@ -181,8 +197,9 @@ export default function Almacenamiento(props: {
   const canClean = () => !!dataTarget && current(dataTarget) && !!target()
     && !clearing() && !listing() && !midiendo() && !inventoryError() && !readError() && !datos()?.aviso;
 
+  /** El resumen de la máquina; apagada, su última copia (`cached_at`), sin encenderla. */
   async function readSummary(m: Machine) {
-    if (!m.on || disposed) return;
+    if (disposed) return;
     const context = generation;
     const workspace = props.workspace;
     const request = (summaryRequests.get(m.id) ?? 0) + 1;
@@ -192,22 +209,27 @@ export default function Almacenamiento(props: {
     setSummaries((prev) => ({ ...prev, [m.id]: { ...prev[m.id], loading: true, error: undefined } }));
     try {
       // Startup directo: el resumen de disco no requiere ni materializa un workspace.
-      const startup = await invoke<{ machine_resources?: MachineResources; workspaces?: { id: string; name: string }[] }>("list_workspaces", {}, {
+      const startup = await invoke<Partial<Startup>>("list_workspaces", {}, {
         headers: { "x-terminus-machine": m.id },
       });
+      remember(m.id, startup.machine_resources);
       if (valid()) setSummaries((prev) => ({ ...prev, [m.id]: {
         resources: startup.machine_resources, workspaceName: startup.workspaces?.find((w) => w.id === workspace)?.name, loading: false,
+        cachedAt: startup.cached_at, stale: startup.cached_at != null || undefined,
       } }));
     } catch (error) {
+      // Apagada y sin copia no es un fallo: es «sin mediciones guardadas».
       if (valid()) setSummaries((prev) => ({ ...prev, [m.id]: {
-        ...prev[m.id], loading: false, error: prosaDe(error),
+        ...prev[m.id], loading: false, error: m.on ? prosaDe(error) : undefined,
       } }));
     }
   }
 
   async function consultar(refrescar = true) {
     const captured = target();
-    if (!captured || clearing()) return;
+    // El barrido del disco solo con la pestaña Disco a la vista: es lento y la
+    // de Memoria sale del resumen.
+    if (!captured || clearing() || !showsDisk()) return;
     const request = ++detailRequest;
     setMidiendo(true);
     setReadError("");
@@ -238,10 +260,125 @@ export default function Almacenamiento(props: {
   }
 
   function choose(m: Machine) {
-    if (clearing() || m.id === machine()) return;
+    if (clearing()) return;
+    if (m.id === machine()) {
+      setExpanded((v) => !v);
+      return;
+    }
     setMachine(m.id);
+    setExpanded(true);
+    setTabChoice(null);
     resetDetail();
     void openInventory();
+  }
+
+  const summaryOf = (id: string | null | undefined) => (id ? summaries()[id] : undefined);
+  /** Memoria si el host la manda, Disco si no; mientras llega el primer resumen, ninguna. */
+  const tab = () => {
+    const chosen = tabChoice();
+    if (chosen) return chosen;
+    const s = summaryOf(machine());
+    if (!s || (s.loading && !s.resources)) return null;
+    return hasUsage(s.resources) ? "memory" : "disk";
+  };
+  const showsDisk = () => abierto() && expanded() && tab() === "disk";
+  // Al pasar a Disco se mide; si es `openInventory` quien está listando, mide él.
+  createEffect(on(showsDisk, (shown) => {
+    if (shown) queueMicrotask(() => {
+      if (showsDisk() && !datos() && !midiendo() && !listing()) void consultar();
+    });
+  }, { defer: true }));
+
+  function powerOf(m: Machine): Power {
+    if (m.on) return summaryOf(m.id)?.error && !summaryOf(m.id)?.loading ? "no_answer" : "on";
+    return m.power === "starting" ? "starting" : "off";
+  }
+
+  /** La peor presión entre las encendidas, para el punto del botón. */
+  const pressure = createMemo(() => {
+    const on = new Set([...inventory(), ...fleetMachines()].filter((m) => m.on).map((m) => m.id));
+    return worst(Object.entries(summaries()).filter(([id]) => on.has(id)).map(([id, s]) => ({ id, resources: s.resources })));
+  });
+  const pressureName = () => {
+    const p = pressure();
+    const m = p && [...inventory(), ...fleetMachines()].find((x) => x.id === p.id);
+    return p ? machineName(p.id, m?.local) : "";
+  };
+
+  /**
+   * Con el panel cerrado, el punto del botón se mantiene al día leyendo cada
+   * minuto el resumen de las máquinas que mandan memoria (`machine_usage_v1`).
+   * A un host anterior no se le pregunta: no tiene presión que contar.
+   */
+  const watched = createMemo(() => fleetMachines().filter((m) => m.on && m.features?.includes(USAGE_FEATURE)).map((m) => m.id).join(","));
+  createEffect(() => {
+    if (abierto() || !watched()) return;
+    const tick = () => untrack(() => {
+      if (disposed || document.visibilityState === "hidden") return;
+      for (const m of fleetMachines()) if (m.on && m.features?.includes(USAGE_FEATURE)) void readSummary(m);
+    });
+    tick();
+    const timer = setInterval(tick, 60_000);
+    onCleanup(() => clearInterval(timer));
+  });
+
+  /** El texto de un fallo de la actualización: `no_release_known` tiene el suyo. */
+  const updateFailure = (code: string) => code === "no_release_known" ? t("shell.machine_panel.no_release_known") : code;
+
+  /**
+   * `engine_update({ release, force })` (§3.6). `release: null` es la última
+   * firmada de su canal; `force: true` solo tras confirmar «Actualizar ya».
+   */
+  async function updateEngine(m: Machine, force: boolean): Promise<string> {
+    try {
+      await invoke("engine_update", { release: null, force }, { headers: { "x-terminus-machine": m.id } });
+      await refreshEngine(m, false);
+      return "";
+    } catch (error) {
+      return (error === "no_release_known" || errorCode(error) === "no_release_known") ? updateFailure("no_release_known") : prosaDe(error);
+    }
+  }
+
+  /** `engine_update_status`: el bloque `engine` de la tarjeta, sin esperar al próximo resumen. */
+  async function refreshEngine(m: Machine, refresh = true) {
+    try {
+      const engine = await invoke<EngineUpdate>("engine_update_status", { refresh }, { headers: { "x-terminus-machine": m.id } });
+      setSummaries((prev) => {
+        const s = prev[m.id];
+        if (!s?.resources) return prev;
+        return { ...prev, [m.id]: { ...s, resources: { ...s.resources, engine: { ...s.resources.engine, ...engine } } } };
+      });
+    } catch {
+      // Sin respuesta queda lo último que se leyó.
+    }
+  }
+
+  /**
+   * `machine-usage` (`left_running` o `pressure`): se relee el resumen de esa
+   * máquina sin esperar al sondeo. Sin `machine`, es el motor de esta ventana.
+   */
+  const usageEvents = listen<{ machine?: string }>("machine-usage", (event) => {
+    const all = [...inventory(), ...fleetMachines()];
+    const m = event.payload?.machine ? all.find((x) => x.id === event.payload.machine) : all.find((x) => x.local);
+    if (m?.on) void readSummary(m);
+  });
+  onCleanup(() => void usageEvents.then((unlisten) => unlisten()).catch(() => {}));
+
+  async function stopTask(m: Machine, task: MachineTaskUsage) {
+    const key = task.session;
+    setStopping((prev) => ({ ...prev, [key]: true }));
+    setStopFailure((prev) => ({ ...prev, [key]: "" }));
+    try {
+      await invoke("stop_task_processes", { session: task.session, workspace: task.workspace }, { headers: {
+        "x-terminus-machine": m.id,
+        "x-terminus-workspace": task.workspace,
+      } });
+    } catch (error) {
+      setStopFailure((prev) => ({ ...prev, [key]: prosaDe(error) }));
+    } finally {
+      setStopping((prev) => ({ ...prev, [key]: false }));
+      void readSummary(m);
+    }
   }
 
   async function openInventory(expected?: Target, refreshDetail = true) {
@@ -260,7 +397,7 @@ export default function Almacenamiento(props: {
         setMachine((list.find((m) => m.active) ?? list[0])?.id ?? null);
         resetDetail();
       }
-      for (const m of list) if (m.on) void readSummary(m);
+      for (const m of list) void readSummary(m);
       void consultar(refreshDetail);
     } catch (error) {
       if (!disposed && context === generation && request === inventoryRequest) setInventoryError(prosaDe(error));
@@ -277,6 +414,8 @@ export default function Almacenamiento(props: {
     setSummaries({});
     setInventoryError("");
     setListing(false);
+    setTabChoice(null);
+    setExpanded(true);
     resetDetail();
     if (abierto() && !clearing()) void openInventory();
   }));
@@ -430,7 +569,7 @@ export default function Almacenamiento(props: {
     children: JSX.Element;
   }) {
     return (
-      <TooltipRoot openDelay={RETARDO_TOOLTIP} placement="top">
+      <TooltipRoot openDelay={RETARDO_TOOLTIP} placement="bottom">
         <TooltipTrigger
           as={(p: object) => (
             <button
@@ -735,97 +874,19 @@ export default function Almacenamiento(props: {
     );
   }
 
-  function MachineRow(props2: { machine: Machine }) {
-    const summary = () => summaries()[props2.machine.id];
+  const lookup: TaskLookup = (session) => props.lookup?.(session);
+  const triggerTitle = () => {
+    const p = pressure();
+    if (!p) return t("shell.machine_panel.title");
+    return p.level === "critical"
+      ? t("shell.machine_panel.trigger.critical", { name: pressureName() })
+      : t("shell.machine_panel.trigger.high", { name: pressureName() });
+  };
+
+  /** La vista de almacenamiento de siempre, ahora en la pestaña Disco. */
+  function DiskView() {
     return (
-      <button type="button" data-storage-machine={props2.machine.id} disabled={clearing()} aria-pressed={machine() === props2.machine.id}
-        class={cn("block w-full border-b border-border px-3 py-2 text-left outline-none hover:bg-surface-muted focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-60", machine() === props2.machine.id && "bg-surface-muted")}
-        onClick={() => choose(props2.machine)}>
-        <span class="flex items-center justify-between gap-2 text-xs">
-          <span class="truncate font-semibold text-neutral-950">{machineName(props2.machine.id, props2.machine.local)}</span>
-          <span class="shrink-0 text-neutral-500">{!props2.machine.on ? t("shell.storage.offline") : summary()?.loading ? t("shell.storage.measuring") : summary()?.error || summary()?.resources?.error ? t("shell.storage.summary_error") : t("shell.machines.on")}</span>
-        </span>
-        <Show when={summary()?.resources} fallback={<span class="block mt-1 text-[0.6875rem] text-neutral-500">{t("shell.storage.capacity_unavailable")}</span>}>
-          {(resources) => <>
-            <span class="block mt-1 text-[0.6875rem] text-neutral-500">{resources().error ? t("shell.storage.attempted", { when: haceCuanto(resources().measured_at) }) : t("shell.storage.measured", { when: haceCuanto(resources().measured_at) })}</span>
-            <Show when={summaryStale(props2.machine, summary())}><span class="block mt-1 text-[0.6875rem] text-warning-strong">{t("shell.storage.stale")}</span></Show>
-            <For each={resources().storage}>{(disk) => <Disk disk={disk} />}</For>
-          </>}
-        </Show>
-      </button>
-    );
-  }
-
-  return (
-    <Popover
-      open={abierto()}
-      onOpenChange={(v: boolean) => {
-        setAbierto(v);
-        if (v && !clearing()) void openInventory();
-      }}
-      placement="top"
-      gutter={6}
-    >
-      {/* El disparador **no lleva `onClick` propio**: Kobalte no compone
-          manejadores como hacía Radix con `asChild`, así que el último gana y el
-          panel dejaría de abrirse. Lo que hay que hacer al abrir va en
-          `onOpenChange`. */}
-      <PopoverTrigger
-        as={(p: object) => (
-          <button
-            {...p}
-            class="flex shrink-0 items-center gap-1 rounded-sm px-1.5 py-0.5 text-neutral-500 outline-none transition-colors hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary data-[expanded]:bg-surface-muted"
-            aria-label={t("shell.storage.title")}
-            title={t("shell.storage.title")}
-          >
-            <HardDrive
-              size={12}
-              class={midiendo() || clearing() ? "animate-pulse" : undefined}
-              aria-hidden
-            />
-            <span>{t("shell.storage.title")}</span>
-          </button>
-        )}
-      />
-
-      <PopoverContent
-        class="flex max-h-[min(560px,var(--kb-popper-content-available-height))] w-[520px] max-w-[calc(100vw-16px)] flex-col p-0"
-        onOpenAutoFocus={(e: Event) => e.preventDefault()}
-      >
-        <div class="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-2">
-          <h2 class="m-0 flex items-center gap-1.5 text-xs font-semibold text-neutral-950">
-            <HardDrive size={12} class="text-neutral-500" aria-hidden />
-            {t("shell.storage.title")}
-          </h2>
-          <span class="flex items-center gap-1">
-            <span class="font-mono text-[0.6875rem] tabular-nums text-neutral-500">
-              {clearing()
-                ? t("shell.storage.emptying")
-                : midiendo()
-                  ? t("shell.storage.measuring")
-                  : datos() ? haceCuanto(datos()!.medido_en) : ""}
-            </span>
-            <Accion
-              etiqueta={inventoryError() || readError() || summaries()[machine() ?? ""]?.error || summaries()[machine() ?? ""]?.resources?.error ? t("shell.storage.retry") : t("shell.storage.remeasure")}
-              disabled={midiendo() || clearing() || listing()}
-              onClick={() => void openInventory()}
-            >
-              <RefreshCw size={12} class={midiendo() ? "animate-spin-steps" : undefined} aria-hidden />
-            </Accion>
-          </span>
-        </div>
-
-        <div class="min-h-0 overflow-y-auto">
-          <Show when={inventoryError()}>
-            <p role="alert" class="m-0 px-3 py-2 text-xs text-error-strong">{inventoryError()}</p>
-          </Show>
-          <Show when={listing()}>
-            <p role="status" class="m-0 px-3 py-2 text-xs text-neutral-500">{t("shell.storage.measuring")}</p>
-          </Show>
-          <Show when={!listing() && !inventoryError() && inventory().length === 0}>
-            <p class="m-0 px-3 py-2 text-xs text-neutral-500">{t("shell.storage.no_machines")}</p>
-          </Show>
-          <For each={inventory()}>{(m) => <MachineRow machine={m} />}</For>
+      <>
           <Show when={selected()}>{(m) => (
             <section class="border-b border-border px-3 py-3">
               <h3 class="m-0 text-xs font-semibold text-neutral-950">{machineName(m().id, m().local)}</h3>
@@ -1044,6 +1105,132 @@ export default function Almacenamiento(props: {
             </Show>
           </div>
         </Show>
+      </>
+    );
+  }
+
+  return (
+    <Popover
+      open={abierto()}
+      onOpenChange={(v: boolean) => {
+        setAbierto(v);
+        if (v && !clearing()) void openInventory();
+      }}
+      placement={props.vertical ? "right-end" : "bottom-end"}
+      gutter={6}
+    >
+      {/* El disparador **no lleva `onClick` propio**: Kobalte no compone
+          manejadores como hacía Radix con `asChild`, así que el último gana y el
+          panel dejaría de abrirse. Lo que hay que hacer al abrir va en
+          `onOpenChange`. */}
+      <PopoverTrigger
+        as={(p: object) => (
+          <button
+            {...p}
+            class={cn(
+              "relative flex shrink-0 items-center text-neutral-500 outline-none transition-colors hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary data-[expanded]:bg-surface-muted",
+              props.vertical ? "size-8 justify-center rounded-md" : "gap-1 rounded-sm px-1.5 py-0.5",
+            )}
+            aria-label={t("shell.machine_panel.title")}
+            title={triggerTitle()}
+            data-machine-pressure={pressure()?.level}
+          >
+            <Server
+              size={props.vertical ? 16 : 12}
+              class={midiendo() || clearing() ? "animate-pulse" : undefined}
+              aria-hidden
+            />
+            <Show when={!props.vertical}><span>{t("shell.machine_panel.title")}</span></Show>
+            {/* Como el punto de «mantener despierta» en el avatar: sin presión, nada. */}
+            <Show when={pressure()}>
+              {(p) => (
+                <span aria-hidden class={cn(
+                  "pointer-events-none absolute top-1 right-1 size-2 rounded-full border-2 border-surface-raised",
+                  p().level === "critical" ? "bg-error-strong" : "bg-warning-strong",
+                )} />
+              )}
+            </Show>
+          </button>
+        )}
+      />
+
+      <PopoverContent
+        class="flex max-h-[min(560px,var(--kb-popper-content-available-height))] w-[520px] max-w-[calc(100vw-16px)] flex-col p-0"
+        onOpenAutoFocus={(e: Event) => e.preventDefault()}
+      >
+        <div class="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-2">
+          <h2 class="m-0 flex items-center gap-1.5 text-xs font-semibold text-neutral-950">
+            <Server size={12} class="text-neutral-500" aria-hidden />
+            {t("shell.machine_panel.title")}
+          </h2>
+          <span class="flex items-center gap-1">
+            <span class="font-mono text-[0.6875rem] tabular-nums text-neutral-500">
+              {clearing()
+                ? t("shell.storage.emptying")
+                : midiendo()
+                  ? t("shell.storage.measuring")
+                  : showsDisk() && datos() ? haceCuanto(datos()!.medido_en)
+                    : summaryOf(machine())?.resources ? haceCuanto(summaryOf(machine())!.resources!.measured_at) : ""}
+            </span>
+            <Accion
+              etiqueta={inventoryError() || readError() || summaries()[machine() ?? ""]?.error || summaries()[machine() ?? ""]?.resources?.error ? t("shell.storage.retry") : t("shell.storage.remeasure")}
+              disabled={midiendo() || clearing() || listing()}
+              onClick={() => void openInventory()}
+            >
+              <RefreshCw size={12} class={midiendo() ? "animate-spin" : undefined} aria-hidden />
+            </Accion>
+          </span>
+        </div>
+
+        <div class="min-h-0 overflow-y-auto">
+          <Show when={inventoryError()}>
+            <p role="alert" class="m-0 px-3 py-2 text-xs text-error-strong">{inventoryError()}</p>
+          </Show>
+          <Show when={listing()}>
+            <p role="status" class="m-0 px-3 py-2 text-xs text-neutral-500">{t("shell.storage.measuring")}</p>
+          </Show>
+          <Show when={!listing() && !inventoryError() && inventory().length === 0}>
+            <p class="m-0 px-3 py-2 text-xs text-neutral-500">{t("shell.storage.no_machines")}</p>
+          </Show>
+          <div class="flex flex-col gap-2 p-2">
+            <For each={inventory()}>{(m) => (
+              <>
+                <MachineCard machine={m} resources={summaryOf(m.id)?.resources} power={powerOf(m)} cachedAt={summaryOf(m.id)?.cachedAt}
+                  selected={machine() === m.id && expanded()} disabled={clearing()} lookup={lookup} when={actividadDe}
+                  onSelect={() => choose(m)} onUpdate={(force) => updateEngine(m, force)}
+                  onRefresh={m.features?.includes(UPDATE_FEATURE) ? () => refreshEngine(m) : undefined} failure={updateFailure} />
+                <Show when={machine() === m.id && expanded()}>
+                  <section class="-mt-1 rounded-b-lg border-t border-border pt-2" data-machine-detail={m.id}>
+                    <div class="flex items-center gap-1 px-1" role="tablist">
+                      <For each={(hasUsage(summaryOf(m.id)?.resources) ? ["memory", "disk"] : ["disk"]) as ("memory" | "disk")[]}>
+                        {(v) => (
+                          <button type="button" role="tab" aria-selected={tab() === v} onClick={() => setTabChoice(v)}
+                            class={cn("rounded-md px-2.5 py-1 text-xs outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary",
+                              tab() === v ? "bg-surface-muted font-semibold text-neutral-950" : "text-neutral-500 hover:text-neutral-950")}>
+                            {v === "memory" ? t("shell.machine_panel.tab.memory") : t("shell.machine_panel.tab.disk")}
+                          </button>
+                        )}
+                      </For>
+                    </div>
+                    <Show when={tab() === "memory" && summaryOf(m.id)?.resources}>
+                      {(r) => (
+                        <div class="px-1 pb-1">
+                          <MemoryTab resources={r()} lookup={lookup} when={actividadDe}
+                            canStop={m.on && !!m.features?.includes(USAGE_FEATURE)}
+                            stopping={stopping()} failure={stopFailure()} onStop={(x) => void stopTask(m, x)} />
+                        </div>
+                      )}
+                    </Show>
+                    <Show when={tab() === "disk"}>
+                      <div class="-mx-2">
+                        <DiskView />
+                      </div>
+                    </Show>
+                  </section>
+                </Show>
+              </>
+            )}</For>
+          </div>
         </div>
       </PopoverContent>
     </Popover>

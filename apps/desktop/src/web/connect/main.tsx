@@ -3,11 +3,12 @@ import { render } from "solid-js/web";
 import { aplicarLengua } from "../../lib/i18n";
 import "../../locales/danilPhrases";
 import { supabaseSession } from "../session";
+import { workosSession } from "../workos-session";
 import { authLocation } from "../auth/return";
 import { ConnectPage } from "./ConnectPage";
 import { normalizeCode } from "./devices";
 
-export type ConnectSettings = { endpoint: string; supabaseUrl: string; supabaseKey: string; login: string };
+export type ConnectSettings = { endpoint: string; supabaseUrl: string; supabaseKey: string; login: string; workos?: boolean };
 
 export function startConnect(settings: ConnectSettings, root: HTMLElement) {
   aplicarLengua();
@@ -16,7 +17,7 @@ export function startConnect(settings: ConnectSettings, root: HTMLElement) {
     return;
   }
   const leave = () => window.location.assign(authLocation(settings.login, window.location.origin, `${window.location.pathname}${window.location.search}`));
-  const session = supabaseSession(settings.supabaseUrl, settings.supabaseKey, { onGone: leave });
+  const session = settings.workos ? workosSession({ onGone: leave }) : supabaseSession(settings.supabaseUrl, settings.supabaseKey, { onGone: leave });
   const code = normalizeCode(new URLSearchParams(window.location.search).get("code"));
   render(() => <ConnectPage session={session} endpoint={settings.endpoint} code={code} />, root);
 }

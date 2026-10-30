@@ -1,3 +1,4 @@
+import { capabilities } from "../../lib/platform";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import ArrowLeft from "lucide-solid/icons/arrow-left";
@@ -483,6 +484,7 @@ export default function AgentProfile(props: {
             </Show>
           </section>
 
+          {capabilities().inbox?.agentSettings(props.agent.name)}
           <Show when={props.handlerPolicy}>{target => <LazyPart><HandlerPolicy name={props.agent.name} target={target()} /></LazyPart>}</Show>
           <TelegramSection project={props.project} name={props.agent.name} />
 

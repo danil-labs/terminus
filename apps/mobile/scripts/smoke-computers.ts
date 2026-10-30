@@ -20,7 +20,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { groupAccounts, groupWorkspaces, listComputers, listWorkspaces, orderComputers, startComputer, windowLabel } from "@terminus/computers";
 import { readTaskGit, canFinishTask, type TaskGitStatus } from "@terminus/tasks";
-import type { AiAccount, EngineEvent, LoginEvent } from "@terminus/protocol";
+import type { AiAccount, ArchivedTasks, DeleteOutcome, DeletePreview, EngineEvent, KeepAwakeStatus, LoginEvent, OpenPorts, Space } from "@terminus/protocol";
 import {
   type Notice,
   accountsOf,
@@ -344,6 +344,33 @@ const ok = (step: string) => {
     assert.equal((await live(mac, "w-prod")).some(t => t.id === "t-mac-1"), false);
     assert.ok("blocked" in await finishTask(mac, "w-prod", "p-mac-web", "t-mac-2"));
     ok("Git y Finalizar: lectura local y PR por el mismo motor; el cierre valida bloqueos y retira la tarea");
+
+    // La UI nueva: espacios, Mantener despierta, puertos y archivadas.
+    const spaces = async () => (await vm.call<Space[]>("list_spaces", "w-prod", {})).value;
+    const made = (await vm.call<Space>("create_space", "w-prod", { name: "Pagos" })).value;
+    await vm.call("rename_space", "w-prod", { id: made.id, name: "Cobros" });
+    assert.equal((await spaces()).find((x) => x.id === made.id)?.name, "Cobros");
+    const preview = (await vm.call<DeletePreview>("space_delete_preview", "w-prod", { id: made.id })).value;
+    const gone = (await vm.call<DeleteOutcome>("delete_space", "w-prod", { id: made.id, seen: { tasks: preview.tasks, discard: false } })).value;
+    assert.equal(gone.deleted, true);
+    assert.ok(!(await spaces()).some((x) => x.id === made.id));
+    assert.equal(vm.available?.("spaces"), "yes");
+    ok("espacios: crear, renombrar, ver qué toca eliminar y eliminar (create_space, rename_space, space_delete_preview, delete_space)");
+
+    assert.equal((await vm.call<KeepAwakeStatus>("keep_awake_status", "w-prod", {})).value.mode, "agent");
+    assert.equal((await vm.call<KeepAwakeStatus>("set_keep_awake", "w-prod", { mode: "on" })).value.mode, "on");
+    assert.equal(vm.available?.("keep_awake"), "yes");
+    assert.equal((await vm.call<OpenPorts>("list_ports", "w-prod", {})).value.externos[0].url, "http://localhost:5173");
+    await assert.rejects(mac.call("keep_awake_status", "w-prod", {}), (e: HostError) => e.code === "command_unsupported");
+    await assert.rejects(mac.call("list_ports", "w-prod", {}), (e: HostError) => e.code === "command_unsupported");
+    assert.equal(mac.available?.("keep_awake"), "no");
+    assert.equal(mac.available?.("ports"), "no");
+    assert.equal(mac.canAct(), "now", "la Mac con su motor anterior sigue en servicio");
+    ok("Mantener despierta y puertos (keep_awake_status, set_keep_awake, list_ports); la Mac de motor anterior contesta command_unsupported y solo se apagan esas funciones");
+
+    const archived = (await vm.call<ArchivedTasks>("archived_tasks", "w-prod", {})).value;
+    assert.ok(archived.tasks.some((t) => t.id === "t-vm-2" && t.folder === "p-vm-web"), "la que se archivó arriba");
+    ok("archivadas de todas las carpetas (archived_tasks)");
 
     close();
   } finally {

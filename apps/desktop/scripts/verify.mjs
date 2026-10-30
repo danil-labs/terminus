@@ -83,8 +83,8 @@ const steps = [
   ["La vista de Typst solo acompaña a un .typ, no al archivo que se abre después", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/typst-scope.test.ts")], root],
   ["El dock de agentes ordena por estado y cabe en una fila", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/agent-dock.test.ts")], root],
   ["El sidebar junta las tareas de todas las carpetas sin repetirlas", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/sidebar-tasks.test.ts")], root],
-  ["El sidebar filtra por carpeta y agente y reparte en secciones o grupos", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/sidebar-view.test.ts")], root],
-  ["El visor conserva navegación y rechaza los canales retirados", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/artifact-viewer.test.ts")], root],
+  ["El sidebar filtra por carpeta y agente y reparte en secciones o grupos", process.execPath, ["--conditions=browser", "--test", "--experimental-strip-types", join(root, "tests/unit/sidebar-view.test.ts")], root],
+  ["El visor conserva navegación y rechaza los canales retirados", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/artifact-viewer.test.ts"), join(root, "tests/unit/artifact-download.test.ts")], root],
   ["La ventana no deja salir material", process.execPath, [join(root, "scripts/guards/csp.mjs")], root],
   ["El tema de terminal no repinta el chrome", process.execPath, [join(root, "scripts/guards/terminal-themes.mjs")], root],
   ["El catálogo define lo que el código pide", process.execPath, [join(root, "scripts/guards/locales.mjs")], root],
@@ -200,7 +200,7 @@ const steps = [
   [
     "El turno reabierto conserva su orden",
     process.execPath,
-    ["--test", "--experimental-strip-types", join(root, "tests/unit/turn-order.test.ts")],
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/turn-order.test.ts"), join(root, "tests/unit/history-refs.test.ts")],
     root,
   ],
   [
@@ -312,6 +312,12 @@ const steps = [
     root,
   ],
   [
+    "En el navegador la bitácora de cambios se lee de la cuenta activa con la sesión",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/web-audit-log.test.ts")],
+    root,
+  ],
+  [
     "El recorte del logo conserva el cuadrado elegido",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/logo-crop.test.ts")],
@@ -345,12 +351,6 @@ const steps = [
     "El selector conserva el proveedor",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/models.test.ts")],
-    root,
-  ],
-  [
-    "La franja ordena las ventanas y cede por etapas",
-    process.execPath,
-    ["--test", "--experimental-strip-types", join(root, "tests/unit/limits.test.ts")],
     root,
   ],
   [
@@ -492,6 +492,12 @@ const steps = [
     root,
   ],
   [
+    "Máquinas lee presión, memoria y versión, y un host anterior queda en «Solo disco»",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/machine-usage.test.ts")],
+    root,
+  ],
+  [
     "La capa de un sitio se enseña cuando toca",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/sites.test.ts")],
@@ -601,6 +607,9 @@ const steps = [
   ["Cada workspace habla con su cuenta de Danil, y un motor anterior deja la cuenta única", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/danil-sessions.test.ts")], root],
   ["En el navegador la página de aprobación conecta una computadora a la cuenta", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-connect.test.mjs")], root],
   ["Una aprobación invalida su identidad sin tocar otros slots", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/web-session.test.ts")], root],
+  ["La sesión de WorkOS de alfa pide un token corto, lo renueva y termina sin respaldo", process.execPath, ["--test", "--test-force-exit", "--experimental-strip-types", join(root, "tests/unit/web-workos-session.test.ts")], root],
+  ["La entrada de alfa solo deja pasar lecturas exactas y los correos de la persona, y deja la entrada con WorkOS en el Worker", process.execPath, ["--test", join(root, "alpha-entry/worker.test.mjs")], root],
+  ["La entrada de alfa canjea la sesión de WorkOS por un token de la base y niega ante cualquier fallo", process.execPath, ["--test", join(root, "tests/unit/alpha-entry-session.test.mjs")], root],
   ["El retorno de autenticación permanece dentro de Terminus", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/web-auth-return.test.ts")], root],
   ["El registro web confirma correo y conserva el destino", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-auth.test.mjs")], root],
   ["En el navegador se ve la persona de la cuenta de Danil y cambia su foto", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-account.test.mjs")], root],
@@ -612,6 +621,7 @@ const steps = [
   ["En el escritorio las claves de la cuenta pasan por el motor y el aviso sube solo las elegidas", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/desktop-account-credentials.test.mjs")], root],
   ["En el escritorio Secretos guarda y borra por el motor, sin cuenta dice «Solo en esta máquina» y un motor viejo apaga solo esa sección", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/desktop-secrets.test.mjs")], root],
   ["La página de aprobación y la compatibilidad de contrato hablan con el plano de control", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/danil-connect-web.test.ts")], root],
+  ["Los correos de la cuenta en la web: cliente, orden y textos de rechazo", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/account-emails.test.ts")], root],
   ["Con el stream empujado los lotes llegan a los oyentes y el historial se pagina", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/push-stream.test.mjs"), join(root, "tests/unit/push-history.test.mjs")], root],
   ["Al enviar a otra máquina la hoja lleva el trabajo sin subir, y traerlo de vuelta lo deja en una rama de aquí", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/carry-window.test.mjs")], root],
   ["Una tarea de una máquina apagada abre y se enciende al mandarle algo", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/machine-task.test.mjs")], root],

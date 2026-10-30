@@ -31,7 +31,7 @@ export function HistoryDetails(props: { refs: HistoryRef[] }) {
   }
   return <div class="my-2 text-xs text-neutral-500">
     <For each={props.refs}>{ref => <button type="button" class="mr-2 underline" onClick={() => void read(ref, 0)}>
-      {t("chat.history.open")} ({ref.pointer === "/tools" ? t("chat.history.tools") : ref.pointer === "/text" ? t("chat.history.text") : ref.pointer === "/pieces" ? t("chat.history.pieces") : t("chat.history.content")}, {Math.ceil(ref.bytes / 1024)} KiB)
+      {t("chat.history.open")} ({ref.pointer === "/text" ? t("chat.history.text") : ref.pointer === "/pieces" ? t("chat.history.pieces") : t("chat.history.content")}, {Math.ceil(ref.bytes / 1024)} KiB)
     </button>}</For>
     <Show when={selected()}>{ref => <div class="mt-2 rounded border border-border p-2">
       <button type="button" onClick={close}>{t("chat.history.close")}</button>

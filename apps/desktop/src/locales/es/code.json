@@ -1,7 +1,4 @@
 {
-  "code.changes.observed_during_turn": "Cambios observados durante el turno",
-  "code.changes.retired": "Este cambio se hizo en una copia anterior a la migración; ya no se puede abrir.",
-  "code.changes.truncated": "El cambio es demasiado grande para enseñarlo entero: abajo está el principio.",
   "code.column.close.label": "Cerrar el árbol de trabajo",
   "code.column.close.title": "Cerrar el árbol de trabajo (Esc)",
   "code.column.export_chat": "Exportar chat",
@@ -13,14 +10,11 @@
   "code.diff.layout.split": "Dos paneles",
   "code.empty": "Este proyecto no tiene carpeta de trabajo.",
   "code.file.binary": "Es un archivo binario: no tiene líneas que comparar.",
-  "code.file.deleted_open": "Este cambio borró el archivo: no queda nada que abrir.",
   "code.file.discard": "Descartar",
   "code.file.discard.keep_agent": "Quedarse con lo que escribió el agente",
   "code.file.discard.leave": "Dejar el archivo como estaba",
   "code.file.gone_from_diff": "Este archivo ya no aparece en el cambio.",
   "code.file.image_too_big": "Esta imagen ocupa {size} y no cabe aquí.",
-  "code.file.open": "Abrir el archivo",
-  "code.file.open_aria": "Abrir «{ruta}»",
   "code.file.open_with_app": "Abrir con su aplicación",
   "code.file.open_external": "Abrir o ubicar",
   "code.file.open_external.title": "Los documentos se abren con su aplicación; los demás archivos se muestran en su carpeta",
@@ -52,18 +46,11 @@
   "code.file.unreadable": "No se pudo leer este archivo.",
   "code.file.view.changes": "Cambios",
   "code.file.view.preview": "Vista previa",
-  "code.files.count": {
-    "one": "{count} archivo",
-    "other": "{count} archivos"
-  },
   "code.gap.lines": {
     "one": "{count} línea sin cambios",
     "other": "{count} líneas sin cambios"
   },
   "code.gap.title": "Traer estas líneas",
-  "code.status.deleted": "borrado",
-  "code.status.new": "nuevo",
-  "code.status.renamed": "renombrado",
   "code.tree.dirty_before": {
     "one": "Ya tenía {count} archivo cambiado cuando empezó esta tarea; no cuentan como del agente.",
     "other": "Ya tenía {count} archivos cambiados cuando empezó esta tarea; no cuentan como del agente."
@@ -218,7 +205,6 @@
   "code.typst.complete.folder": "Carpeta",
   "code.typst.complete.function": "Función",
   "code.panel.toggle": "Archivos de la tarea",
-  "code.panel.toggle.hint": "Archivos de la tarea ({key})",
   "code.panel.resize": "Ancho del panel de archivos",
   "code.panel.expand": "Expandir dentro de la tarea",
   "code.panel.collapse": "Volver al chat",

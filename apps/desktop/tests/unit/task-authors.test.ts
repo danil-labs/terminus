@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-const { authorKey, authorKeys, shownUnderLauncher } = await import(
+const { authorKey, authorKeys, isSubtask } = await import(
   "../../src/features/projects/taskAuthors.ts"
 );
 
@@ -71,14 +71,13 @@ test("con el agrupado por encargado, Mis tareas va arriba", () => {
   );
 });
 
-// Una tarea lanzada desde otra carpeta se escondía en la suya con solo existir su
-// lanzador, aunque no estuviera en esa lista (#97).
-test("la barra solo agrupa una tarea bajo un lanzador de la misma carpeta", () => {
-  const lanzador = { id: "chat-a" };
-  const delegada = { id: "t1", launched_by: "chat-a", launcher_available: true };
-  assert.equal(shownUnderLauncher(delegada, [lanzador, delegada]), true);
-  assert.equal(shownUnderLauncher(delegada, [delegada]), false);
-  assert.equal(shownUnderLauncher({ ...delegada, launcher_available: false }, [lanzador, delegada]), false);
-  assert.equal(shownUnderLauncher({ parent: "chat-a" }, [lanzador]), true);
-  assert.equal(shownUnderLauncher({ launched_by: null }, [lanzador]), false);
+// El riel enseña solo lo que abrió la persona: una subtarea es de su madre, esté
+// o no en la lista (archivada, en otra carpeta o sin cargar).
+test("una subtarea lo es por su lanzador, no porque el lanzador esté a la vista", () => {
+  assert.equal(isSubtask({ launched_by: "chat-a", launcher_available: true }), true);
+  assert.equal(isSubtask({ launched_by: "chat-a", launcher_available: false }), true);
+  assert.equal(isSubtask({ parent: "chat-a" }), true);
+  assert.equal(isSubtask({ remote_launcher: "vm~coord" }), true);
+  assert.equal(isSubtask({ launched_by: null }), false);
+  assert.equal(isSubtask({}), false);
 });

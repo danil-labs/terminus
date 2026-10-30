@@ -36,5 +36,8 @@
   "artifacts.versions.of": "v{n} of {total}",
   "artifacts.versions.published_as": "went out as {vias}",
   "artifacts.versions.title": "This document's history",
-  "artifacts.versions.title_old": "You are looking at an earlier version, not the one in the document"
+  "artifacts.versions.title_old": "You are looking at an earlier version, not the one in the document",
+  "artifacts.download.too_large": "This file exceeds the 256 MiB download limit.",
+  "artifacts.download.incomplete": "The download is incomplete. Try again.",
+  "artifacts.download.timeout": "The download took too long. Try again."
 }

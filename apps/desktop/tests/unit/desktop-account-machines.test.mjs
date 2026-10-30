@@ -404,11 +404,8 @@ test("a workspace of the account that only another machine has lists with the wi
     relays: { cmp_vm: { table: remote("Panel", "Tarea de la VM"), state: "offline" } },
   });
   assert.ok(registered.includes("Bearer client-tok"), "the registry is read with the client token");
-  const menu = doc.querySelector("[data-workspace-name]");
-  menu?.dispatchEvent(new app.w.PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" }));
-  menu?.click();
-  assert.ok(await until(() => doc.querySelector('[data-workspace-option="w2"]')), "the account's workspace is in the switcher");
-  assert.ok(doc.querySelector('[data-workspace-option="w"]'), "next to the window's own");
+  assert.ok(await until(() => doc.querySelector('[data-workspace-column] [data-workspace-tile="w2"]')), "the account's workspace is in the column");
+  assert.ok(doc.querySelector('[data-workspace-column] [data-workspace-tile="w"]'), "next to the window's own");
   assert.ok(doc.querySelector('[data-sesion="t1"]'), "and the window stays in its own");
   assert.equal(relayCalls("cmp_vm", "send_message").length, 0, "reading wakes nothing");
   assert.deepEqual(app.fallos, []);
@@ -694,7 +691,11 @@ test("one desktop uses the shared spaces order instead of an old local preferenc
     computers: [HOME], registry, extra: { list_spaces: spaces },
     storage: { "harness.layout.spaces.order.w": '["b","a"]' },
   });
-  const ids = () => [...doc.querySelectorAll("[data-space]")].map(node => node.getAttribute("data-space"));
+  // The spaces are listed in the strip's space menu, which opens on click.
+  const ids = () => {
+    if (!doc.querySelector("[data-space-list]")) doc.querySelector("[data-title-bar] [data-space-menu]")?.click();
+    return [...doc.querySelectorAll("[data-space-list] [data-space]")].map(node => node.getAttribute("data-space"));
+  };
   assert.ok(await until(() => ids().join(",") === "a,b"), "the account wins over an old local order with only this machine");
   assert.equal(app.w.localStorage.getItem("harness.layout.spaces.order.w"), '["a","b"]');
   registry[0].settings.space_order = '["b","a"]';
@@ -719,7 +720,9 @@ for (const folder of ["", "p1"]) test(`remote row in folder ${JSON.stringify(fol
       },
     }) } },
   });
-  doc.querySelector('[data-space="sb"]').click();
+  doc.querySelector("[data-title-bar] [data-space-menu]").click();
+  assert.ok(await until(() => doc.querySelector('[data-space-list] [data-space="sb"]')), "the space menu lists the other machine's space");
+  doc.querySelector('[data-space-list] [data-space="sb"]').click();
   await sleep(200);
   const target = doc.querySelector('[data-sesion="cmp_vm~t1"]');
   assert.ok(target);
@@ -758,7 +761,8 @@ test("el composer pide proyectos y ramas a la máquina elegida", async () => {
   assert.deepEqual(app.fallos, []);
 });
 
-for (const [name, x, y, cells] of [["center", 500, 400, 1], ["right", 950, 400, 2], ["down", 500, 750, 2]]) {
+// With a single window there is no edge to split on: a drop near an edge opens in the window too.
+for (const [name, x, y, cells] of [["center", 500, 400, 1], ["right", 950, 400, 1], ["down", 500, 750, 1]]) {
   test(`rail task drops into ${name} without opening on pointerdown and keeps remote identity`, async () => {
     const { app, doc, relayCalls } = await open(`rail-drop-${name}`, {
       computers: [HOME, { ...VM, state: "online" }],

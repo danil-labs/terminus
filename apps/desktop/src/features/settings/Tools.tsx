@@ -1,12 +1,11 @@
 import { For, Show, Suspense, createSignal, lazy, onCleanup, onMount } from "solid-js";
 import { listen } from "../../lib/serviceEvents";
 import { invoke } from "../../lib/invoke.ts";
-import Plug from "lucide-solid/icons/plug";
 import { Button } from "../../ui/Button";
 import { Textarea } from "../../ui/Textarea";
 import { FailureNote, asFailure, type Failure } from "../../ui/Failure";
 import { cn } from "../../lib/utils";
-import { MarcaProveedor } from "../../ui/icons";
+import { MarcaProveedor, McpMark } from "../../ui/icons";
 import { t } from "../../lib/i18n";
 import { prosa, type Frase } from "../../lib/prose";
 import { ITEM_DE_MENU, Popover, PopoverContent, PopoverTrigger } from "../../ui/Popover";
@@ -950,6 +949,8 @@ export default function Herramientas(props: { solo?: string | string[] }) {
 export function ConexionesMenu(props: {
   /** Abre Configuración en el panel de Conexiones. */
   onManage: () => void;
+  /** El tamaño del disparador donde lo monten. */
+  triggerClass?: string;
 }) {
   const [conocidos, setConocidos] = createSignal<Conocido[]>([]);
   const [puestos, setPuestos] = createSignal<Puesto[]>([]);
@@ -970,7 +971,7 @@ export function ConexionesMenu(props: {
     }
   }
 
-  // Al montar, para que el número del riel no dependa de haber abierto el
+  // Al montar, para que el punto del disparador no dependa de haber abierto el
   // panel una vez, y otra vez cada apertura: lo declarado pudo cambiar desde
   // Configuración mientras el riel seguía a la vista.
   onMount(() => void cargar());
@@ -1052,7 +1053,7 @@ export function ConexionesMenu(props: {
         setAbierto(v);
         if (v) void cargar();
       }}
-      placement="top-start"
+      placement="right-end"
       gutter={4}
     >
       <PopoverTrigger
@@ -1061,19 +1062,15 @@ export function ConexionesMenu(props: {
             {...p}
             variant="ghost"
             size="icon"
-            class="relative size-7 shrink-0 text-neutral-500"
+            class={cn("relative size-7 shrink-0 text-neutral-500", props.triggerClass)}
             aria-haspopup="menu"
             aria-label={t("shell.sidebar.mcp.trigger")}
             title={t("shell.sidebar.mcp.trigger")}
           >
-            <Plug size={15} />
+            <McpMark size={props.triggerClass ? 16 : 14} />
+            {/* Sin contador: solo el punto, arriba, cuando alguno pide sesión. */}
             <Show when={pendientes().size > 0}>
-              <span class="absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full bg-error-strong" />
-            </Show>
-            <Show when={total() > 0}>
-              <span class="ui-sidebar-menu-badge absolute -top-1 -right-1 min-w-3.5 rounded-full bg-neutral-200 px-1 text-center text-[0.625rem] font-semibold text-neutral-950">
-                {total()}
-              </span>
+              <span class="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-error-strong" />
             </Show>
           </Button>
         )}

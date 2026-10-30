@@ -17,7 +17,7 @@ import {
  * workspace abierto. Guardarlos en el motor y leerlos al cambiar de workspace
  * es de `chat-background-engine.ts`, fuera de la carga inicial.
  */
-const [guardado, setGuardado] = createPref<string>("chat-background", "dusk");
+const [guardado, setGuardado] = createPref<string>("chat-background", "neutro");
 const [rutaPropia, setRutaPropia] = createPref<string | null>("chat-background-custom", null);
 /** El workspace donde el motor copió `rutaPropia`: la copia de otro no se pinta ni se manda. `null`, de antes de los fondos por workspace. */
 const [rutaDelWorkspace, setRutaDelWorkspace] = createPref<string | null>("chat-background-custom-workspace", null);
@@ -82,12 +82,12 @@ export function elegirVeloDeFondo(valor: number): number {
 
 export function fondoDeChat(): FondoDeChat {
   const fondo = fondoDe(guardado());
-  return fondo === "propia" && !fondoPropio() && !imagenDelWorkspace() ? "dusk" : fondo;
+  return fondo === "propia" && !fondoPropio() && !imagenDelWorkspace() ? "neutro" : fondo;
 }
 
 export function elegirFondoDeChat(id: string): FondoDeChat {
   const siguiente = fondoDe(id);
-  setGuardado(siguiente === "propia" && !fondoPropio() && !imagenDelWorkspace() ? "dusk" : siguiente);
+  setGuardado(siguiente === "propia" && !fondoPropio() && !imagenDelWorkspace() ? "neutro" : siguiente);
   return fondoDeChat();
 }
 
@@ -101,7 +101,7 @@ export function ponerFondoPropio(copia: string | null): FondoDeChat {
   setRutaPropia(copia);
   setRutaDelWorkspace(copia ? workspaceAbierto() : null);
   setImagenDelWorkspace(null);
-  setGuardado(copia ? "propia" : "dusk");
+  setGuardado(copia ? "propia" : "neutro");
   return fondoDeChat();
 }
 

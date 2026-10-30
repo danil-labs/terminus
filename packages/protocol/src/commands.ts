@@ -56,6 +56,12 @@ export const APP_READS = [
   "work_key",
   // El PR de cada tarea en su tarjeta: git por carpeta, primero las tareas visibles.
   "list_session_git",
+  // La UI nueva (`APP_FEATURES`): Mantener despierta, los puertos abiertos y las
+  // archivadas de todas las carpetas. Un motor anterior que no las conoce apaga
+  // solo esa función (`isUnknownCommand`).
+  "keep_awake_status",
+  "list_ports",
+  "archived_tasks",
 ] as const;
 
 export const APP_ACTIONS = [
@@ -99,6 +105,15 @@ export const APP_ACTIONS = [
   "work_cancel",
   // Una tarea nueva en otra máquina dentro del space de esta: el space se comparte antes con la cuenta.
   "share_space",
+  // Los espacios desde el teléfono: crear, renombrar y eliminar. Eliminar enseña
+  // antes lo que se detiene o descarta (`space_delete_preview`) y manda de vuelta
+  // eso mismo (`seen`): si el motor ve algo más, no borra.
+  "create_space",
+  "rename_space",
+  "space_delete_preview",
+  "delete_space",
+  // Mantener despierta la máquina de la tarea: Siempre (`on`), Con agentes (`agent`) o Apagado (`off`).
+  "set_keep_awake",
 ] as const;
 
 export const APP_COMMANDS: readonly AppCommand[] = [...APP_READS, ...APP_ACTIONS];
@@ -112,6 +127,20 @@ export function isAppCommand(command: string): command is AppCommand {
 export function isAppAction(command: string): boolean {
   return (APP_ACTIONS as readonly string[]).includes(command);
 }
+
+/**
+ * Lo que la UI nueva enciende por función, con los comandos que usa. El
+ * primero es la lectura que la prueba: si la máquina no la conoce, la función
+ * no se enseña para esa máquina (`CommandSupport.feature`).
+ */
+export const APP_FEATURES = {
+  spaces: ["list_spaces", "create_space", "rename_space", "space_delete_preview", "delete_space"],
+  keep_awake: ["keep_awake_status", "set_keep_awake"],
+  ports: ["list_ports"],
+  archived: ["archived_tasks"],
+} as const satisfies Record<string, readonly AppCommand[]>;
+
+export type AppFeature = keyof typeof APP_FEATURES;
 
 /** Estados de atención que avisan cuando una tarea entra en ellos. */
 export const NEEDS_YOU = ["approving", "asked", "failed"] as const;

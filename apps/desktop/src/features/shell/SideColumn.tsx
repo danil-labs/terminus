@@ -88,7 +88,7 @@ export default function ColumnaLateral(props: {
         aria-valuemin={props.min}
         aria-valuemax={props.max}
         aria-valuenow={ancho()}
-        class="absolute inset-y-0 -left-1.5 flex w-3 cursor-col-resize items-center justify-center bg-transparent focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-neutral-500"
+        class="group absolute inset-y-0 -left-1.5 flex w-3 cursor-col-resize items-center justify-center bg-transparent focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-neutral-500"
         onPointerDown={(e) => {
           e.preventDefault();
           const inicio = e.clientX;
@@ -105,7 +105,11 @@ export default function ColumnaLateral(props: {
       >
         <span
           aria-hidden="true"
-          class="pointer-events-none absolute h-full w-px rounded-full bg-border"
+          class={cn(
+            "pointer-events-none absolute h-full w-px rounded-full bg-border",
+            // La barra lateral ya se separa por tono: su línea solo aparece al agarrarla.
+            props.lado === "left" && "opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100",
+          )}
         />
       </div>
     </div>
@@ -139,15 +143,14 @@ export default function ColumnaLateral(props: {
           // despegarlo. Sigue siendo una superficie continua: los rieles pegan
           // con el chat y lo único que hay entre ellos es la hairline de abajo.
           "glass-panel",
+          props.lado === "left" && "sidebar-tone",
           // **El borde va aquí y desaparece con la columna.** Sigue haciendo
           // falta con el tono puesto: 1,22:1 entre `bg` y `surface` separa las
           // regiones a la vista, y WCAG 1.4.11 pide 3:1 para lo que delimita algo
           // —la línea es lo que lo sostiene—. Con la columna cerrada no puede
           // quedarse: a ancho cero un `border` de 1 px sigue pintando su raya.
-          !props.colapsada &&
-            (props.lado === "left"
-              ? "border-r border-border"
-              : "border-l border-border"),
+          // La barra lateral no lleva línea: en el marco nuevo la separa el tono.
+          !props.colapsada && props.lado === "right" && "border-l border-border",
         )}
         style={{
           width: props.colapsada ? "0px" : `${ancho()}px`,

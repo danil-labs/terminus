@@ -49,10 +49,11 @@ como la web.
   dock de agentes (ver «Patrones del teléfono»). Las palabras salen de las
   mismas claves que los catálogos del escritorio (`WORDS` en
   `@terminus/design`, vigiladas por el guard `shared-design`).
-- **Sin barra de pestañas.** Tareas es la pantalla de entrada; arriba a la
-  derecha, junto al workspace, el lápiz abre «Nueva tarea» y la campana,
-  Notificaciones (con el número de lo que te necesita). Las dos se abren encima,
-  con su botón de volver.
+- **Listas nativas, sin barra de pestañas** (diseño «listas nativas v2»,
+  aprobado el 2026-10-30; ver «Listas nativas» abajo). Inicio es la única raíz:
+  arriba el workspace, la lupa, Personalizar, Nueva tarea y el avatar; el
+  título grande es el espacio y abre su menú. Todo lo demás se apila encima
+  con su atrás. Nada flota.
 - **Tema claro y oscuro** según el sistema, con los tokens por omisión del
   escritorio en `apps/desktop/src/styles/global.css`: Violeta en claro y Grafito en oscuro.
 - **Solo los workspaces vinculados a la cuenta.** Con la sesión de Danil
@@ -176,14 +177,20 @@ Los avisos salen en la app, igual para los dos caminos: una tarea que entra en
 | Ruta | Qué es |
 |---|---|
 | `signin` | Entrar con la cuenta de Danil; en desarrollo, el enlace al bridge. Siempre va primero: sin sesión no se sincroniza nada, tampoco por un bridge emparejado. El bridge solo existe en desarrollo (`__DEV__`); el lab sin cuenta es en desarrollo, en Android y con `EXPO_PUBLIC_TERMINUS_BRIDGE_ONLY=1` (`BRIDGE_WITHOUT_ACCOUNT`). En iOS siempre se inicia sesión |
-| `(home)/index` | Tareas: workspace, spaces, alcance y filtro, dock de agentes y la lista plana |
+| `(home)/index` | Inicio: workspace, lupa, Personalizar, Nueva tarea y avatar; el título grande es el espacio (su menú); las secciones de Personalizar, Agentes y las tareas en grupos. Deslizar: Fijar · Archivar; pulsación larga: el menú de la tarea |
+| `search` | Buscar: el ⌘K del escritorio con sus chips; Recientes sin texto; Tareas (también subtareas), Archivadas (`archived_tasks`), Carpetas, Inbox y Acciones |
+| `personalize` | Personalizar: secciones de Inicio, Filtrar (abre `filter`) y Agrupar |
+| `profile` | Menú de perfil: Cuenta de Danil, Tema, Mantener despierta, Configuración, Puertos y Almacenamiento |
+| `settings` | Configuración (Proveedores de IA, actividad, memoria, máquinas, bridge); con `section=account`, Cuenta de Danil |
+| `inbox`, `inbox-thread` | El Inbox de Danil Agents de solo lectura y su conversación |
+| `task-tools` | Herramientas del chat: sus subtareas |
 | `(home)/notifications` | «Ahora» de todas las máquinas y «Antes», lo que llegó con la app abierta |
 | `(home)/new` | Nueva tarea: el cuadro de escribir con «Ejecutar en» (la última usada, si no la VM), carpeta, rama base y agente; `!` la crea con un comando. La hoja de Carpeta termina en «Nueva carpeta» y «Clonar repo» (ver «Carpetas nuevas») |
 | `preview` | Menú de una tarea (⋯ o pulsación larga): PR, Abrir, Cambiarle el nombre, Fijar, Archivar, Eliminar y Finalizar con confirmación; el cohete de la lista abre directamente la confirmación |
 | `accounts` | Proveedores de IA: cuentas por proveedor y correo, consumo, máquinas, iniciar y cerrar sesión |
 | `filter` | Hoja «Filtrar y agrupar» |
 | `agents` | Hoja «Ver todos» del dock |
-| `workspaces` | Hoja con los workspaces, las máquinas y su estado, la cuenta y la conexión de desarrollo |
+| `workspaces` | Cambiar de workspace: cada uno con sus máquinas y lo que te necesita (las máquinas, la cuenta y el bridge pasaron a `settings`) |
 | `agent/[workspace]/[name]` | Conversaciones con el agente y cuadro para empezar otra |
 | `task/[host]/[workspace]/[folder]/[id]` | Conversación en la máquina de la tarea: aprobaciones, preguntas y el cuadro de escribir (modelo, permisos, adjuntos, `/`, `@`, `!`, cola y detener) |
 | `pair` | Bridge de desarrollo; también `terminus-mobile://pair?url=…&token=…` |
@@ -212,6 +219,23 @@ lleva su comentario allí:
 | Registros de actividad por máquina | `list_activity`, `read_activity`, `read_activity_log` | — |
 | PR en la tarjeta | `list_session_git` (por carpeta, con las visibles en `priority`) | — |
 | Llevar trabajo | `work_status`, `work_key` | `work_export`, `work_read_part`, `work_write_part`, `work_import`, `work_cancel` |
+| Espacios (UI nueva) | `list_spaces` | `create_space`, `rename_space`, `space_delete_preview` (lo que eliminar detiene o descarta), `delete_space` (con ese `seen`) |
+| Mantener despierta (UI nueva) | `keep_awake_status` | `set_keep_awake` (`on`, `agent`, `off`) |
+| Puertos (UI nueva) | `list_ports` | — |
+| Archivadas (UI nueva) | `archived_tasks` (todas las carpetas; el relay la guarda en su espejo) | — |
+
+**Máquinas con un motor anterior.** Las funciones de la UI nueva se agrupan en
+`APP_FEATURES` (`packages/protocol`). Un motor que no conoce un comando contesta
+`command` (o el relay `unsupported` / `command_not_allowed`, o la frase
+`shell.service.command`); `Host.call` lo anota y falla con
+`command_unsupported` y el comando en `detail` (`isUnknownCommand`,
+`CommandSupport`). La UI pregunta `host.available(feature)`: `unknown` hasta la
+primera respuesta, `yes` si contestó la lectura de la función y `no` si
+rechazó cualquiera de sus comandos; el cambio avisa por `onChange`. La máquina
+nunca sale desactualizada por eso, y al volver a encenderse se vuelve a saber.
+`command_not_allowed` con `detail.scope` no cuenta: es el relay diciendo que un
+comando `scope: "machine"` (como `set_keep_awake`) solo pasa desde la sesión por
+omisión de la máquina. Sale `command_not_here` y la función no se oculta.
 
 En Consumos, «Almacenamiento» consulta el resumen de disco al desplegarlo y el
 workspace seleccionado al abrir una máquina o medir manualmente. No hay
@@ -222,7 +246,8 @@ la fecha de los datos anteriores, marcados como desactualizados.
 
 **Qué enciende la VM.** El relay solo enciende con su lista de intención
 (`INTENT_COMMANDS`: escribir, crear, aprobar, `!`, iniciar sesión…). Fijar,
-renombrar, archivar, subir una imagen y agregar o quitar una cuenta no están en ella: para
+renombrar, archivar, subir una imagen, agregar o quitar una cuenta, crear,
+renombrar o eliminar un espacio (también su previa) y cambiar Mantener despierta no están en ella: para
 esas (`WAKES_FIRST` en `apps/mobile/src/lib/hosts.ts`) el teléfono pide encenderla al plano de
 control (`POST /v1/computers/:id/start`) y espera a que conteste antes de
 mandarlas. Marcar vista, detener o cancelar nunca encienden; abrir la app, una
@@ -290,6 +315,48 @@ El camino de desarrollo con el motor del lab sigue igual:
 pnpm engine:download && node apps/desktop/scripts/engine.mjs engine   # motor del lab
 node apps/mobile/bridge/bridge.mjs                                      # imprime dirección y token
 ```
+
+## Listas nativas (2026-10-30)
+
+Mismas pantallas, textos y medidas en iOS, Android y la web; cambian solo el
+atrás, la búsqueda por gesto, el aspecto del menú y la respuesta al tocar.
+Las piezas viven en `apps/mobile/src/ui/list.tsx` (cabecera, título grande, grupos, filas
+de 48 o más, segmentado, chips), `apps/mobile/src/ui/Popover.tsx` (menú anclado) y
+`apps/mobile/src/ui/SwipeRow.tsx`.
+
+| | iOS | Android | Web |
+|---|---|---|---|
+| Atrás | «‹ Pantalla» en píldora y el gesto del borde | flecha sin texto y el atrás del sistema | «‹ Pantalla» y la historia del navegador |
+| Buscar | lupa y, además, tirar hacia abajo (campo escondido sobre la lista) | lupa | lupa (tirar recarga la página) |
+| Menú del espacio | `Menu` de `@expo/ui/swift-ui` (`apps/mobile/src/ui/SpaceMenu.ios.tsx`) | `DropdownMenu` de `@expo/ui/jetpack-compose` (`apps/mobile/src/ui/SpaceMenu.android.tsx`) | popover propio con borde y flecha; cierra tocando fuera o con Esc |
+| Filas | deslizar: Fijar · Archivar (`ReanimatedSwipeable`); pulsación larga: el menú anclado | igual, con vibración | igual |
+| Toque | gris | ripple | gris y anillo de foco solo con teclado |
+
+- El tema se elige en el perfil (Claro, Oscuro, El del sistema) y se recuerda
+  (`apps/mobile/src/lib/appearance.ts`); `useTheme()` lo respeta. En claro la lista va sobre
+  `surface-muted`; menús y popovers usan `surface-raised` y `border-strong`
+  (`raised`, `borderStrong` en `@terminus/design`).
+- Las subtareas no salen en Inicio: viven en el chat (Herramientas) y en Buscar.
+- Lo que necesita comandos nuevos se enseña solo si están en `APP_COMMANDS` y
+  la máquina no dijo que no los conoce (`ready()` en `apps/mobile/src/lib/pending.ts`, sobre
+  `host.available`): crear, renombrar y eliminar espacios (en la primera
+  máquina del workspace), Mantener despierta y Puertos (en la primera máquina),
+  Archivadas en Buscar. Mover una tarea a otro espacio (`move_task_to_space`)
+  y el árbol de trabajo del chat todavía no están en la lista y no se ven.
+- El chat lleva bajo el título la fila máquina / carpeta / rama con buscar en
+  el chat, subtareas y la barra de uso de la cuenta del proveedor (detalle con
+  sus ventanas, Actualizar y Gestionar cuentas); debajo, el riel de tus
+  mensajes como carrusel. La memoria de la conversación (`session_usage`) no
+  está en la lista cerrada.
+- La ficha del workspace (cabecera de Inicio y filas de Workspaces) pinta su
+  logo de la cuenta (`logo_url` de `GET /v1/workspaces`), leído con la sesión y
+  con las reglas de `readAccountAsset` de `@terminus/computers`, las mismas de
+  la web de escritorio (`apps/mobile/src/lib/workspaceLogo.ts`,
+  `apps/mobile/src/ui/WorkspaceAvatar.tsx`). Sin logo, mientras carga o si
+  falla, la inicial. En el falso, `--broken-logo` lo hace fallar y `--no-logo`
+  lo quita.
+- Sin fuentes propias: Geist y Bricolage del escritorio son `woff2` variables
+  y no se cargan en iOS ni Android; se usa la del sistema.
 
 ## Qué está comprobado (2026-10-19, macOS, sin simulador)
 
