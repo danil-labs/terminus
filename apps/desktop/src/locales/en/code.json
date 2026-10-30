@@ -216,5 +216,21 @@
   "code.typst.complete.label": "Label",
   "code.typst.complete.file": "File",
   "code.typst.complete.folder": "Folder",
-  "code.typst.complete.function": "Function"
+  "code.typst.complete.function": "Function",
+  "code.panel.toggle": "Task files",
+  "code.panel.toggle.hint": "Task files ({key})",
+  "code.panel.resize": "Files panel width",
+  "code.panel.expand": "Expand inside the task",
+  "code.panel.collapse": "Back to chat",
+  "code.panel.tree": "Show the tree",
+  "code.panel.more": "More",
+  "code.panel.close_all": "Close all tabs",
+  "code.panel.side.files": "Files",
+  "code.panel.side.changes": "Changes",
+  "code.panel.changes.pending": "Not saved to the live folder",
+  "code.panel.changes.none": "The task hasn't changed anything yet",
+  "code.panel.tab.preview": "Preview: double-click to keep it open",
+  "code.panel.tab.close": "Close",
+  "code.panel.show_in_folder": "Show in folder",
+  "code.panel.download": "Download"
 }

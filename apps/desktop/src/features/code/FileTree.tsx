@@ -89,6 +89,8 @@ export default function ArbolDeArchivos(props: {
    */
   crearSinTarea?: (tipo: Tipo, ruta: string) => Promise<void>;
   onAbrir: (ruta: string, cambiado: boolean) => void;
+  /** Double click: the file stays open instead of being the preview. */
+  onAbrirFijo?: (ruta: string, cambiado: boolean) => void;
   /** Un archivo o una carpeta cambió de ruta desde aquí: sus pestañas la siguen. */
   onMovido?: (desde: string, hasta: string) => void;
   /** Se borró desde aquí: sus pestañas ya no tienen qué enseñar. */
@@ -715,6 +717,7 @@ export default function ArbolDeArchivos(props: {
                     setSeleccion({ ruta: a().ruta, tipo: "archivo" });
                     props.onAbrir(a().ruta, Boolean(a().cambio));
                   }}
+                  onDblClick={() => props.onAbrirFijo?.(a().ruta, Boolean(a().cambio))}
                   onContextMenu={(e) => abrirMenu(e, a())}
                   onKeyDown={(e) => teclaDeFila(e, a())}
                 >
