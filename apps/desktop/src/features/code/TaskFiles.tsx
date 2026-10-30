@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createResource, createSignal, on, onCleanup, onMount } from "solid-js";
+import { For, Show, Suspense, createResource, createSignal, onCleanup, onMount } from "solid-js";
 import Ellipsis from "lucide-solid/icons/ellipsis";
 import GitCompare from "lucide-solid/icons/git-compare";
 import ListTree from "lucide-solid/icons/list-tree";
@@ -44,20 +44,25 @@ export default function TaskFilesCard(props: {
   // Narrow, the card shows the tree or the viewer, never both side by side.
   let root: HTMLElement | undefined;
   const [narrow, setNarrow] = createSignal(false);
+  // What a narrow card shows; the wide card's tree preference stays untouched.
+  const [narrowView, setNarrowView] = createSignal<"viewer" | "tree">("viewer");
   onMount(() => {
     if (!root || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(([entry]) => setNarrow(entry.contentRect.width < 720));
+    const observer = new ResizeObserver(([entry]) => setNarrow(entry.contentRect.width < 560));
     observer.observe(root);
     onCleanup(() => observer.disconnect());
   });
-  createEffect(on(narrow, (isNarrow) => { if (isNarrow && hasTabs()) props.files.setTree(props.session, false); }, { defer: true }));
-  const showTree = () => panel().tree || !hasTabs();
-  const showViewer = () => hasTabs() && !(narrow() && panel().tree);
+  const showViewer = () => hasTabs() && (!narrow() || narrowView() === "viewer");
+  const showTree = () => !hasTabs() || (narrow() ? narrowView() === "tree" : panel().tree);
+  const treePressed = () => (narrow() ? narrowView() === "tree" : panel().tree);
+  const toggleTree = () => (narrow()
+    ? setNarrowView((view) => (view === "tree" ? "viewer" : "tree"))
+    : props.files.setTree(props.session, !panel().tree));
   const [menu, setMenu] = createSignal(false);
 
   const open = (tree: string, path: string, changes: boolean, pinned = false, changed = changes) => {
     props.files.open(props.session, { tree, path, changes, changed, pinned });
-    if (narrow()) props.files.setTree(props.session, false);
+    if (narrow()) setNarrowView("viewer");
   };
 
   // The file is on this computer: it can be opened or shown here, and downloading it makes no sense.
@@ -100,9 +105,9 @@ export default function TaskFilesCard(props: {
   const tools = () => (
     <div class="ml-auto flex shrink-0 items-center gap-1.5 pr-1.5">
       <Show when={hasTabs()}>
-        <Button variant={panel().tree ? "secondary" : "ghost"} size="iconCompact" class={tool}
-          title={t("code.panel.tree")} aria-label={t("code.panel.tree")} aria-pressed={panel().tree}
-          onClick={() => props.files.setTree(props.session, !panel().tree)}><ListTree size={15} /></Button>
+        <Button variant={treePressed() ? "secondary" : "ghost"} size="iconCompact" class={tool}
+          title={t("code.panel.tree")} aria-label={t("code.panel.tree")} aria-pressed={treePressed()}
+          onClick={toggleTree}><ListTree size={15} /></Button>
       </Show>
       <Popover open={menu()} onOpenChange={setMenu} placement="bottom-end">
         <PopoverTrigger as={(trigger: object) => <Button {...trigger} type="button" variant="ghost" size="iconCompact" class={tool}
@@ -137,9 +142,9 @@ export default function TaskFilesCard(props: {
   );
 
   return (
-    <section ref={root} class="relative flex h-full min-w-0 flex-1 overflow-hidden rounded-lg border border-border bg-surface shadow-md" data-task-files>
-      <Show when={showViewer()}>
-        <div class="flex min-w-0 flex-1 flex-col">
+    <section ref={root} class="@container relative flex h-full min-w-0 flex-1 overflow-hidden rounded-lg border border-border bg-surface shadow-md" data-task-files>
+      <Show when={hasTabs()}>
+        <div class="flex min-w-0 flex-1 flex-col" classList={{ hidden: !showViewer() }}>
           <div class="flex h-9 shrink-0 items-center gap-1 border-b border-border pl-1.5">
             <div class="flex min-w-0 gap-0.5 overflow-x-auto [scrollbar-width:none]" role="tablist">
               <For each={panel().tabs}>{(tab) => {
@@ -170,6 +175,7 @@ export default function TaskFilesCard(props: {
             {tools()}
           </div>
           <div class="relative min-h-0 flex-1">
+            <Suspense fallback={null}>
             <For each={panel().tabs}>{(tab) => (
               <div class="absolute inset-0 flex flex-col" classList={{ hidden: panel().active !== tab.id }}>
                 <VisorDeArchivo
@@ -188,12 +194,13 @@ export default function TaskFilesCard(props: {
                 />
               </div>
             )}</For>
+            </Suspense>
           </div>
         </div>
       </Show>
 
-      <Show when={showTree()}>
-        <aside class={cn("flex min-h-0 flex-col", showViewer() ? "w-64 shrink-0 border-l border-border" : "flex-1")}>
+        <aside class="flex min-h-0 flex-col"
+          classList={{ hidden: !showTree(), "w-56 shrink-0 border-l border-border": showViewer(), "@4xl:w-64": showViewer(), "flex-1": !showViewer() }}>
           <div class="flex h-9 shrink-0 items-center gap-0.5 border-b border-border pl-1.5">
             <For each={["files", "changes"] as const}>{(side) => (
               <button type="button" onClick={() => props.files.setSide(props.session, side)}
@@ -205,18 +212,21 @@ export default function TaskFilesCard(props: {
             <Show when={!showViewer()}>{tools()}</Show>
           </div>
           <div class="min-h-0 flex-1" classList={{ hidden: panel().side !== "files" }}>
+            <Suspense fallback={null}>
             <Codigo project={props.project} session={props.session} visible={props.visible && panel().side === "files"}
               onAbrir={(tree, path, changed) => open(tree, path, false, false, changed)}
               onAbrirFijo={(tree, path, changed) => open(tree, path, false, true, changed)}
               onMovido={props.onMoved} onBorrado={props.onRemoved} />
+            </Suspense>
           </div>
           <Show when={panel().side === "changes"}>
+            <Suspense fallback={null}>
             <ChangesList project={props.project} session={props.session} visible={props.visible}
               active={panel().tabs.find((tab) => tab.id === panel().active)}
               onOpen={(tree, path) => open(tree, path, true)} />
+            </Suspense>
           </Show>
         </aside>
-      </Show>
     </section>
   );
 }
@@ -241,8 +251,8 @@ function ChangesList(props: {
   return (
     <div class="min-h-0 flex-1 overflow-y-auto py-1">
       <div class="px-3 pt-1 pb-2 text-[0.6875rem] text-neutral-500">{t("code.panel.changes.pending")}</div>
-      <Show when={(rows() ?? []).length > 0} fallback={<div class="px-3 text-xs text-neutral-500">{rows.loading ? "" : t("code.panel.changes.none")}</div>}>
-        <For each={rows()}>{(file) => {
+      <Show when={(rows.latest ?? []).length > 0} fallback={<div class="px-3 text-xs text-neutral-500">{rows.loading ? "" : t("code.panel.changes.none")}</div>}>
+        <For each={rows.latest}>{(file) => {
           const on = () => props.active?.changes && props.active.tree === file.tree && props.active.path === file.path;
           const mark = () => file.status.charAt(0).toUpperCase();
           return (
