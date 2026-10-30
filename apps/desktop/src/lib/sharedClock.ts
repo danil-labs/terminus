@@ -7,6 +7,8 @@
  * (`global.css`), todos cambian en el mismo cuadro: 12 repintados por segundo
  * con uno o con cuarenta. Entra sola toda animación de CSS infinita.
  */
+import { createSignal, onCleanup } from "solid-js";
+
 function alignToSharedClock(event: AnimationEvent) {
   const target = event.target as Element | null;
   if (!target?.getAnimations) return;
@@ -19,4 +21,12 @@ function alignToSharedClock(event: AnimationEvent) {
 
 if (typeof document !== "undefined") {
   document.addEventListener("animationstart", alignToSharedClock, true);
+}
+
+/** La hora en una señal, con un tic por segundo: para cuentas atrás y «hace N». */
+export function createNow(every = 1000) {
+  const [now, setNow] = createSignal(Date.now());
+  const timer = setInterval(() => setNow(Date.now()), every);
+  onCleanup(() => clearInterval(timer));
+  return now;
 }

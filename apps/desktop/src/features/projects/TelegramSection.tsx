@@ -7,6 +7,7 @@ import { invoke } from "../../lib/invoke.ts";
 import { Button } from "../../ui/Button";
 import { prosaDe } from "../../ui/Failure";
 import { Input } from "../../ui/Input";
+import { createNow } from "../../lib/sharedClock";
 
 type Pairing = { code: string; expires_at_ms: number };
 
@@ -37,7 +38,7 @@ export function TelegramSection(props: { project: string; name: string }) {
   const [busy, setBusy] = createSignal(false);
   const { copied, copy } = createCopied(1500, (error) => setFailure(prosaDe(error)));
   const [failure, setFailure] = createSignal<string | null>(null);
-  const [now, setNow] = createSignal(Date.now());
+  const now = createNow();
   const [replacing, setReplacing] = createSignal(false);
   const [awake, setAwake] = createSignal<AwakeMode | null>(null);
 
@@ -68,10 +69,8 @@ export function TelegramSection(props: { project: string; name: string }) {
   const awakeEvents = listen<{ mode: AwakeMode }>("keep-awake-changed", (e) =>
     setAwake(e.payload.mode),
   );
-  const clock = window.setInterval(() => setNow(Date.now()), 1000);
   onCleanup(() => {
     request++;
-    window.clearInterval(clock);
     void events.then((unlisten) => unlisten());
     void awakeEvents.then((unlisten) => unlisten());
   });

@@ -6,7 +6,7 @@
  *
  * Sin APIs del DOM: `fetch` se inyecta (navegador, React Native, Node).
  */
-import { apiUrl } from "./api.ts";
+import { bearerCall, errorCodeOf } from "./api.ts";
 
 /** Un cliente viejo recibe kinds que no conoce tal cual: cada consumidor filtra por `kinds`/`match`. */
 export type CredentialKind = "api_key" | "mcp_secret" | "zotero" | "github" | "subscription" | "mcp_oauth" | "env_secret";
@@ -102,24 +102,15 @@ export type CredentialFetch = (
 /** A dónde hablar y con qué token: el JWT en la web, el token de cliente en la ventana. */
 export type CredentialSource = { endpoint: string; getToken: () => Promise<string>; fetch?: CredentialFetch };
 
-const globalFetch: CredentialFetch = (input, init) => (globalThis.fetch as unknown as CredentialFetch)(input, init);
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 const str = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 
 async function call<T>(source: CredentialSource, method: string, path: string, read: (body: unknown) => T, body?: unknown): Promise<CredentialAnswer<T>> {
-  const f = source.fetch ?? globalFetch;
-  let response: Awaited<ReturnType<CredentialFetch>>;
-  try {
-    const headers: Record<string, string> = { authorization: `Bearer ${await source.getToken()}` };
-    if (body !== undefined) headers["content-type"] = "application/json";
-    response = await f(apiUrl(source.endpoint, path), { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
-  } catch {
-    return { kind: "error", status: null };
-  }
-  const json = await response.json().catch(() => null);
-  const said = isObj(json) ? json.error : undefined;
-  const code = typeof said === "string" ? said : isObj(said) && typeof said.code === "string" ? said.code : undefined;
+  const response = await bearerCall(source, method, path, body);
+  if (!response) return { kind: "error", status: null };
+  const { json } = response;
+  const code = errorCodeOf(json);
   const withCode = <A extends object>(a: A) => (code ? { ...a, code } : a);
   if (response.status === 401) return { kind: "unauthorized" };
   if (response.status === 403) return withCode({ kind: "license" as const });

@@ -18,6 +18,7 @@ import {
 } from "../../ui/DropdownMenu";
 import { SettingsBlock, SettingsPanel, SettingsRow, SettingsSection } from "./layout";
 import type { GithubAccountState } from "./github-account/GithubAccount";
+import { ExternalLink } from "../../ui/ExternalLink";
 
 // La tarjeta de Drive es la del alta; su chunk solo lo carga quien abre Fuentes.
 const Integraciones = lazy(() => import("../onboarding/ToolCards").then((m) => ({ default: m.Integraciones })));
@@ -808,18 +809,9 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                           <SettingsRow
                             label={t("settings.providers.waiting", { name: p.name })}
                             description={
-                              <a
-                                class="text-link underline underline-offset-2 outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                                href="#"
-                                onClick={(ev) => {
-                                  ev.preventDefault();
-                                  invoke("open_external", { target: e().url }).catch(
-                                    () => {},
-                                  );
-                                }}
-                              >
+                              <ExternalLink url={e().url}>
                                 {t("settings.providers.open", { name: p.name })}
-                              </a>
+                              </ExternalLink>
                             }
                           >
                             <Button
@@ -846,18 +838,9 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                         <SettingsRow
                           label={t("settings.providers.setup_waiting", { name: p.name })}
                           description={
-                            <a
-                              class="text-link underline underline-offset-2 outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                              href="#"
-                              onClick={(ev) => {
-                                ev.preventDefault();
-                                invoke("open_external", { target: url() }).catch(
-                                  () => {},
-                                );
-                              }}
-                            >
+                            <ExternalLink url={url()}>
                               {t("settings.providers.open", { name: p.name })}
-                            </a>
+                            </ExternalLink>
                           }
                         >
                           <Button size="compact" disabled={estado() !== null} onClick={() => void actualizarAcceso(p.id)}>
@@ -944,18 +927,9 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                               : prosa(p.token_label)
                           }
                           description={
-                            <a
-                              class="text-link underline underline-offset-2 outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                              href="#"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                invoke("open_external", {
-                                  target: p.token_url,
-                                }).catch(() => {});
-                              }}
-                            >
+                            <ExternalLink url={p.token_url}>
                               {t("settings.providers.create_token", { name: p.name })}
-                            </a>
+                            </ExternalLink>
                           }
                         >
                           {/* Oculto mientras se pega, y en cuanto el llavero lo

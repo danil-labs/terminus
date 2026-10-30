@@ -51,6 +51,7 @@ import { LoginCodeForm } from "./LoginCodeForm";
 import { SettingsBlock, SettingsRow, SettingsSection } from "./layout";
 import { crearModelosLocales } from "./local-models-store";
 import { Spinner } from "../../ui/Spinner";
+import { ExternalLink as EnlaceExterno } from "../../ui/ExternalLink";
 
 // Las claves en la cuenta de Danil: un trozo aparte, solo para agentes con API key.
 const CredentialsInUse = lazy(() => import("./credentials/AccountCredentials").then((m) => ({ default: m.CredentialsInUse })));
@@ -1434,17 +1435,9 @@ export default function Accounts(props: {
               {t("settings.accounts.cancel")}
             </Button>
           </div>
-          <a
-            class="text-link underline underline-offset-2 outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              const donde = claveDe();
-              if (donde) invoke("open_external", { target: donde }).catch(() => {});
-            }}
-          >
+          <EnlaceExterno url={claveDe()}>
             {t("settings.accounts.create_key")}
-          </a>
+          </EnlaceExterno>
           <div class="composer">
             <Input
               class="font-mono text-xs"
