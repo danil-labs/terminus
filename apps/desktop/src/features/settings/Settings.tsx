@@ -10,6 +10,7 @@ import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
 import Sparkles from "lucide-solid/icons/sparkles";
 import { listen } from "../../lib/serviceEvents";
 import { createResource, createSignal, For, type JSX, lazy, onCleanup, onMount, Show, Suspense } from "solid-js";
+import { Dynamic } from "solid-js/web";
 import { capabilities } from "../../lib/platform";
 import { t } from "../../lib/i18n";
 import { flechaDeLista } from "../../lib/shortcuts";
@@ -494,8 +495,9 @@ export default function Settings(props: {
               >
                 <Close size={16} />
               </Button>
-              {/* `pestana().panel?.()` vive dentro de una expresión reactiva:
-                  cambiar de entrada o de pestaña monta el panel que corresponde. */}
+              {/* Cada panel debe montarse como componente: invocarlo aquí
+                  metería sus señales en el efecto de selección y lo repintaría
+                  cuando cambian sus propios controles. */}
               <div
                 id="cfg-panel"
                 role="tabpanel"
@@ -540,7 +542,7 @@ export default function Settings(props: {
                   </div>
                 </Show>
                 <div id="cfg-subpanel" role={entrada().tabs.length > 1 ? "tabpanel" : undefined} aria-labelledby={entrada().tabs.length > 1 ? idSub(pestana().id) : undefined} class="min-w-0">
-                  {pestana().panel?.()}
+                  <Dynamic component={pestana().panel ?? (() => null)} />
                 </div>
               </div>
             </div>
