@@ -270,7 +270,7 @@ export default function TabStrip(props: {
           class={cn(
             "group flex h-7 shrink-0 touch-none items-center rounded-[var(--radius-sm)] pr-1 select-none",
             task() ? "w-[220px] text-sm" : "w-[180px] text-[0.75rem]",
-            active() && !transient()
+            active()
               ? "tab-active font-semibold text-neutral-950"
               : "font-medium text-neutral-500 hover:bg-neutral-950/5 hover:text-neutral-950",
           )}
@@ -278,6 +278,7 @@ export default function TabStrip(props: {
           <div
             role={transient() ? "button" : "tab"}
             aria-selected={transient() ? undefined : active()}
+            aria-current={transient() && active() ? "true" : undefined}
             onDblClick={(event) => {
               event.stopPropagation();
               props.onPin?.(p.id);

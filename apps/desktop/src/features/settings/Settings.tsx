@@ -50,6 +50,7 @@ const Agents = lazy(() => import("./Agents"));
 
 /** `/admin` de la web de alfa; el escritorio la abre en el navegador. */
 const ADMIN_URL = "https://alfa-app.danil.ai/admin";
+const Secrets = lazy(() => import("./Secrets"));
 
 /**
  * Configuración: siete entradas, y lo que eran secciones sueltas va en
@@ -110,7 +111,7 @@ const pestanasDe = (
     activity: tab("activity", () => t("activity.title"), () => <Suspense fallback={null}><ActivityLogs workspace={workspace()} machine={activityMachine()} /></Suspense>),
     proyectos: tab("proyectos", () => t("settings.tab.folders"), proyectos ? () => <Suspense fallback={null}><ManageProjects contexto={proyectos} /></Suspense> : null),
     fuentes: tab("fuentes", () => t("settings.nav.sources"), () => <Providers />),
-    secrets: tab("secrets", () => t("settings.tab.secrets"), null),
+    secrets: tab("secrets", () => t("settings.tab.secrets"), capabilities().nativeWindow || capabilities().accountCredentials ? () => <Suspense fallback={null}><Secrets /></Suspense> : null),
     agentes: tab("agentes", () => t("settings.nav.agents"), () => (
       <Suspense fallback={null}>
         <Agents
@@ -312,6 +313,19 @@ export default function Settings(props: {
     };
     window.addEventListener("keydown", alTeclear, true);
     onCleanup(() => window.removeEventListener("keydown", alTeclear, true));
+  });
+  // Con la hoja ya abierta, `panel` no vuelve a leerse: un enlace interno («Iniciar sesión» en Secretos) cambia de destino por aquí.
+  onMount(() => {
+    const alPedir = (e: Event) => {
+      const id = (e as CustomEvent<unknown>).detail;
+      const target = settingsTarget(typeof id === "string" ? id : undefined);
+      const d = ENTRADAS.find((x) => x.id === target?.entry);
+      if (!d) return;
+      if (target?.tab) setSubs((s) => ({ ...s, [d.id]: target.tab! }));
+      abrir(d);
+    };
+    window.addEventListener("harness:open-settings", alPedir);
+    onCleanup(() => window.removeEventListener("harness:open-settings", alPedir));
   });
 
   function mover(paso: number | "inicio" | "fin") {

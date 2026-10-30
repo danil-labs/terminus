@@ -15,6 +15,7 @@ export const SETTINGS_ENTRIES = [
 
 const MOVED: Record<string, string> = {
   plugins: "operation",
+  secretos: "secrets",
   mcp: "operation",
   conexiones: "operation",
   radiant: "operation",

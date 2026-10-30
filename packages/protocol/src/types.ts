@@ -182,6 +182,8 @@ export type SessionRow = {
   chat_de_agente?: boolean;
   /** Un hilo nuevo del agente (no su chat de siempre). */
   agent_thread?: boolean;
+  /** El título es solo el comando con que nació; un motor viejo no lo manda. */
+  command_title?: boolean;
   inbox?: boolean;
   parent?: string | null;
   launched_by?: string | null;
@@ -229,7 +231,7 @@ export type Turn = {
   from_task?: SenderTask | null;
 };
 /** La tarea que escribió un input, como era al escribirlo (`sessions::SenderTask`). */
-export type SenderTask = { folder: string; task: string; title: string; provider: string; model?: string | null };
+export type SenderTask = { folder: string; task: string; title: string; provider: string; model?: string | null; machine?: string | null };
 /** Un paso del turno; `images` son data URLs que produjo la herramienta. `ok: false` si falló. */
 export type TurnTool = { name?: string; target?: string | null; images?: string[]; ok?: boolean | null };
 /** Un trozo de `Turn.pieces`. */

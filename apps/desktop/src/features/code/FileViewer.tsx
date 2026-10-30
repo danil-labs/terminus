@@ -379,7 +379,7 @@ export default function VisorDeArchivo(props: {
   });
 
   /** La salida usa lo que hay en disco, no lo escrito sin guardar. */
-  const canOpenExternal = () => !conGuardadoManual() && (props.suelto || props.session !== "");
+  const canOpenExternal = () => !conGuardadoManual() && (props.suelto || props.session !== "") && !machineOf(props.session);
 
   async function openExternal() {
     setFalloAfuera(null);
@@ -407,7 +407,7 @@ export default function VisorDeArchivo(props: {
 
   // El PDF de un documento de Office; sin archivo en disco (una rama base) no hay.
   function pedirOffice(): Promise<Preview> | null {
-    if (props.suelto) return invoke<Preview>("office_preview", { path: props.ruta });
+    if (props.suelto) return invoke<Preview>("office_preview", { path: props.ruta }, machineOf(props.session));
     if (props.session === "") return null;
     return invoke<Preview>("tree_office_preview", {
       project: props.project,
@@ -419,7 +419,7 @@ export default function VisorDeArchivo(props: {
 
   const pedirContenido = async (): Promise<Contenido> => {
     if (props.suelto) {
-      const p = await invoke<Preview>("preview_file", { path: props.ruta, rel: props.ruta });
+      const p = await invoke<Preview>("preview_file", { path: props.ruta, rel: props.ruta }, machineOf(props.session));
       return {
         kind: p.kind === "html" ? "text" : p.kind,
         text: p.text ?? "",
@@ -821,7 +821,7 @@ export default function VisorDeArchivo(props: {
                     }
                   >
                     {(d) => (
-                      <div class="min-h-0 min-w-0 flex-1 overflow-hidden bg-surface-muted">
+                      <div data-select-scope class="min-h-0 min-w-0 flex-1 overflow-hidden bg-surface-muted">
                         {/* Ya llega con el archivo entero de contexto: no hay tramo que traer. */}
                         <CuerpoDeArchivo archivo={d()} onDesplegar={() => {}} llena />
                       </div>
@@ -830,7 +830,7 @@ export default function VisorDeArchivo(props: {
                 </Show>
 
                 <Show when={!mostrarCambios() && !editable()}>
-                  <div class="min-h-0 min-w-0 flex-1 overflow-y-auto bg-surface-muted">
+                  <div data-select-scope class="min-h-0 min-w-0 flex-1 overflow-y-auto bg-surface-muted">
                     <Cuerpo contenido={c()} ruta={props.ruta} onOpenExternal={() => void openExternal()} pedirOffice={pedirOffice} />
                   </div>
                 </Show>
@@ -868,6 +868,7 @@ export default function VisorDeArchivo(props: {
         {/* Con «Código» la vista de Typst se esconde sin desmontarse: soltarla apagaría Tinymist y sus marcas. */}
         <Show when={ladoPrevia() || vistaTypst()}>
           <div
+            data-select-scope
             class={cn(
               "min-h-0 min-w-0 flex-1 flex-col",
               ladoPrevia() ? "flex" : "hidden",

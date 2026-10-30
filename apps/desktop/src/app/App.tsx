@@ -110,7 +110,7 @@ import AgentTasks, { createdTasks } from "../features/projects/AgentTasks";
 import BaseBranchPicker from "../features/projects/BaseBranchPicker";
 import { watchHandlerStatus, watchHandlerStatuses } from "../features/projects/handlerPresence";
 import { EmptyContext, ProjectPicker } from "../features/projects/Projects";
-import { bringHereLabel, canBringHere, carryOrigin, machineName, machineOf, machines, refetchMachines, remoteChildScope, runOn, setRunOn, setTaskRowMachine } from "../features/machines/store";
+import { bringHereLabel, canBringHere, carryOrigin, machineName, machineOf, machines, refetchMachines, remoteChildScope, runOn, senderTaskId, setRunOn, setTaskRowMachine } from "../features/machines/store";
 import { withRemoteLaunchers } from "@terminus/tasks";
 import type { CarriedBase, CarryCheck } from "../features/machines/carry";
 // Chunk aparte: solo lo carga quien crea una tarea, no la carga inicial.
@@ -6826,13 +6826,14 @@ export default function App() {
           </div>
   );
   // En una tarea, el conmutador del panel derecho abre sus archivos dentro de la tarea.
-  const botonDeArchivos = (sesion: string) => (
+  // La sesión llega como accesor: leída al llamar, cada cambio de tarea volvería a montar el botón.
+  const botonDeArchivos = (sesion: () => string) => (
     <BotonConAtajo
-      variant={archivosDeTarea.panel(sesion).open ? "secondary" : "ghost"}
+      variant={archivosDeTarea.panel(sesion()).open ? "secondary" : "ghost"}
       size="icon"
       class="relative size-7 shrink-0 text-neutral-500"
-      onClick={() => archivosDeTarea.toggle(sesion)}
-      aria-pressed={archivosDeTarea.panel(sesion).open}
+      onClick={() => archivosDeTarea.toggle(sesion())}
+      aria-pressed={archivosDeTarea.panel(sesion()).open}
       aria-label={t("code.panel.toggle")}
       accion="workTree"
       etiqueta={t("code.panel.toggle")}
@@ -7283,7 +7284,7 @@ export default function App() {
         onQuitarFuente={quitarFuente}
         onCambiarRama={cambiarRama}
         onAbrirArtefacto={abrirPorRel}
-        onOpenTask={(folder, task) => void abrirSesion(folder, task)}
+        onOpenTask={(folder, task, machine) => void abrirSesion(folder, machine ? senderTaskId(machine, task) : task)}
         tareaPorId={tareaDelRiel}
         /* Solo con tarea abierta y con el turno cerrado: exportar a mitad de una
            respuesta se llevaría una conversación sin ella. */
@@ -7646,7 +7647,7 @@ export default function App() {
                 <Show keyed when={delegatedToolbarTargets().get(`${workspaceActivo()}/${task()?.session ?? ""}`)}>{render => render()}</Show>
                 <UsageTool usage={consumo} agent={agenteDeLaVentana()} onGestionarCuentas={() => setSettings("proveedores-ia")} />
                 <Show when={task()?.session && !agenteSenalado()} fallback={<Show when={!artOpen() && !paginaDeAgente()}>{botonDelArbol()}</Show>}>
-                  {botonDeArchivos(task()?.session ?? "")}
+                  {botonDeArchivos(() => task()?.session ?? "")}
                 </Show>
               </>} />;
         // Centrada con la fila de máquina, proyecto y rama de la tarea (`TaskLocation`).
@@ -8067,7 +8068,7 @@ export default function App() {
                       {(a) => (
                         <Show
                           when={a().codigo}
-                          fallback={<VisorDeArtefacto path={a().path} rel={a().rel} kind={a().kind} />}
+                          fallback={<VisorDeArtefacto path={a().path} rel={a().rel} kind={a().kind} session={a().session} />}
                         >
                           <Suspense fallback={null}><VisorDeArchivo
                             project={a().project}

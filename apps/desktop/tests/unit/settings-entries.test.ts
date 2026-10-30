@@ -12,6 +12,7 @@ test("old settings ids open the entry and tab that now hold them", () => {
   assert.deepEqual(settingsTarget("plugins"), { entry: "connections", tab: "operation" });
   assert.deepEqual(settingsTarget("mcp"), { entry: "connections", tab: "operation" });
   assert.deepEqual(settingsTarget("conexiones"), { entry: "connections", tab: "operation" });
+  assert.deepEqual(settingsTarget("secretos"), { entry: "projects", tab: "secrets" });
   assert.deepEqual(settingsTarget("radiant"), { entry: "connections", tab: "operation" });
   assert.deepEqual(settingsTarget("integrations"), { entry: "connections", tab: "customers" });
   assert.deepEqual(settingsTarget("connections"), { entry: "connections", tab: null });

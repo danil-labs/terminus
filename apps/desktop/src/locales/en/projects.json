@@ -30,6 +30,7 @@
   "projects.sessions.unpin_named": "Unpin “{title}”",
   "projects.sessions.without_agent": "My tasks",
   "projects.threads.persistent_chat": "Previous agent chat",
+  "projects.threads.command": "Terminal command",
   "projects.sessions.error_not_ephemeral": "The task is not ephemeral and cannot be purged.",
   "projects.sessions.error_ephemeral_busy": "The ephemeral task is still answering and cannot be purged.",
   "projects.add.back": "Back",
