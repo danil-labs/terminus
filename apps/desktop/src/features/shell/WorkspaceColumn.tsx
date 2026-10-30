@@ -294,7 +294,7 @@ export default function WorkspaceColumn(props: {
     <nav
       aria-label={t("shell.workspaces.label")}
       data-workspace-column=""
-      class="flex h-full w-12 shrink-0 flex-col"
+      class="tab-veil window-frame flex h-full w-12 shrink-0 flex-col"
     >
       <div ref={list} class="flex min-h-0 flex-1 flex-col items-center gap-1 overflow-x-hidden overflow-y-auto pt-2 pb-2">
         <Show when={accounts && others().length > 0}>

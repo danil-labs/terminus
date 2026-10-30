@@ -811,6 +811,19 @@
   -webkit-mask: radial-gradient(circle at 100% 0, transparent var(--tab-foot), #000 calc(var(--tab-foot) + 0.5px));
   mask: radial-gradient(circle at 100% 0, transparent var(--tab-foot), #000 calc(var(--tab-foot) + 0.5px));
 }
+/* Marco de la ventana (franja y columna de workspaces): en claro un gris sólido y la
+   barra lateral un tono hundido; en oscuro se queda el velo y el vidrio de siempre. */
+:root:not([data-theme="dark"]) .window-frame {
+  background: var(--color-neutral-200);
+}
+:root:not([data-theme="dark"]) .window-frame::before {
+  display: none;
+}
+:root:not([data-theme="dark"]) .sidebar-tone {
+  background: var(--color-surface-muted);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
 /* En la franja de la ventana la primera pestaña nace en el borde de la barra lateral:
    un pie cóncavo ahí corta la esquina, así que la base queda recta. */
 [data-title-bar] .tab-active::before,

@@ -8449,8 +8449,7 @@ export default function App() {
           derecha={<>
           </>}
         />
-        {/* El marco: franja y columna de workspaces de un color sólido, como el de Slack. */}
-        <div class="relative flex min-h-0 flex-1 overflow-visible bg-neutral-200 dark:bg-bg">
+        <div class="window-frame relative flex min-h-0 flex-1 overflow-visible">
           <WorkspaceColumn
             attention={attention.list()}
             onManage={() => setSettings("workspaces")}
@@ -8484,7 +8483,7 @@ export default function App() {
             </>}
           />
           {/* La superficie: barra, ventana y panel derecho, una caja redondeada que flota sobre el marco. */}
-          <div class="relative mr-2 mb-2 flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-[10px] bg-surface" data-surface="">
+          <div class="relative mr-1 mb-1 flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-[10px] bg-surface" data-surface="">
           {/* Los topes los pone quien monta: el ancho por debajo del
               cual algo deja de caber solo lo sabe su contenido. Por
               debajo de 220 los títulos del historial dejan de caber; por
