@@ -5,6 +5,7 @@
  */
 import type { Answer, AccountWorkspace, Computer, CredentialSource, MemorySource, SpaceOrderSource } from "@terminus/computers";
 import { createRoot, createSignal, type JSX } from "solid-js";
+import type { AccountEmailsSource } from "../features/settings/account-emails";
 import type { AccountProfileSource } from "../features/settings/account-profile";
 import type { SupportAccessSource } from "../features/settings/SupportAccess";
 import type { Account } from "../features/settings/accounts-store";
@@ -67,6 +68,10 @@ export type Capabilities = {
   danilAccount?: boolean;
   /** La persona de la cuenta de Danil leída sin el motor (la web, con su sesión): pie y Configuración. */
   accountProfile?: AccountProfileSource;
+  /** Los correos de la cuenta con la sesión (la web de alfa, por su proxy al BFF). */
+  accountEmails?: AccountEmailsSource;
+  /** El panel de Configuración que la página pidió abrir al cargar (`?settings=`). */
+  initialSettings?: string;
   /** La bitácora de cambios de la cuenta de Danil activa, con la sesión (la web en alfa); sin esto, Configuración no la ofrece. */
   accountAuditLog?: AuditLogSource;
   /** El logo y el fondo de los workspaces leídos y cambiados en la cuenta con la sesión (la web). */

@@ -41,6 +41,7 @@ import "../lib/sharedClock";
 import { HomeLink } from "./HomeLink";
 import { installIpc } from "./ipc";
 import { webAccountProfile } from "./account";
+import { webAccountEmails } from "./account-emails";
 import { authLocation } from "./auth/return";
 import { webGithubAccount } from "./github-account";
 import { type Account, type Listing, SLOT_PREFIX, loadAccounts, ownerOf, pickAccount, readListings, rememberLast, removeExtra, savedListings } from "./accounts";
@@ -252,6 +253,8 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
     browserFiles: true,
     sidebarExtra: () => <HomeLink />,
     accountProfile: webAccountProfile(base.endpoint, base.getToken, base.onUnauthorized),
+    accountEmails: import.meta.env.TERMINUS_ALPHA ? webAccountEmails({ getToken: async () => await base.getToken(), unauthorized: async () => base.refresh ? await base.refresh() : false }, `${import.meta.env.BASE_URL}alpha-api`) : undefined,
+    initialSettings: takeSettingsParam(),
     accountAssets: webWorkspaceAssets(base.endpoint, base.getToken, base.onUnauthorized),
     accountAuditLog: import.meta.env.TERMINUS_ALPHA && base.supabaseUrl && base.supabaseKey ? webAuditLog(base.supabaseUrl, base.supabaseKey, base.getToken, base.onUnauthorized) : undefined,
     accountMemory: { endpoint: base.endpoint, getToken: token },
@@ -332,6 +335,19 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
     // Every list of the window reads again, with the machines and links as they are now.
     for (const name of ["harness:workspace-name", "harness:service-resync"]) window.dispatchEvent(new CustomEvent(name));
   };
+}
+
+/** Paneles que se abren desde la URL (`?settings=`); el parámetro sale de la barra al leerlo. */
+const LINKED_SETTINGS = ["cuenta-danil"];
+
+function takeSettingsParam(): string | undefined {
+  const params = new URLSearchParams(window.location.search);
+  const wanted = params.get("settings");
+  if (wanted === null) return undefined;
+  params.delete("settings");
+  const rest = params.toString();
+  window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}${window.location.hash}`);
+  return LINKED_SETTINGS.includes(wanted) ? wanted : undefined;
 }
 
 /** Lists the computers again now; set once the page is mounted with a session. */
