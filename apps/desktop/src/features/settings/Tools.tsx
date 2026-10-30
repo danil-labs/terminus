@@ -971,7 +971,7 @@ export function ConexionesMenu(props: {
     }
   }
 
-  // Al montar, para que el número del riel no dependa de haber abierto el
+  // Al montar, para que el punto del disparador no dependa de haber abierto el
   // panel una vez, y otra vez cada apertura: lo declarado pudo cambiar desde
   // Configuración mientras el riel seguía a la vista.
   onMount(() => void cargar());
@@ -1068,13 +1068,9 @@ export function ConexionesMenu(props: {
             title={t("shell.sidebar.mcp.trigger")}
           >
             <McpMark size={props.triggerClass ? 16 : 14} />
+            {/* Sin contador: solo el punto, arriba, cuando alguno pide sesión. */}
             <Show when={pendientes().size > 0}>
-              <span class="absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full bg-error-strong" />
-            </Show>
-            <Show when={total() > 0}>
-              <span class="ui-sidebar-menu-badge absolute -top-1 -right-1 min-w-3.5 rounded-full bg-neutral-200 px-1 text-center text-[0.625rem] font-semibold text-neutral-950">
-                {total()}
-              </span>
+              <span class="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-error-strong" />
             </Show>
           </Button>
         )}
