@@ -48,8 +48,8 @@ export async function startAdminDemo(options: { dark: boolean }) {
     actor_name: null, actor_email: null, on_behalf_of_name: null, on_behalf_of_email: null, support_grant_id: null, ...over,
   });
   const entries = [
-    entry(1, { actor_type: "ai", changed_fields: ["instructions"], on_behalf_of_name: "María Ruiz" }),
-    entry(2, { actor_type: "member", entity_type: "channels", action: "insert", actor_name: "José López", actor_email: "jose@danil.ai" }),
+    entry(1, { actor_type: "ai", changed_fields: ["instructions"], on_behalf_of_email: "maria@danil.ai" }),
+    entry(2, { actor_type: "member", entity_type: "channels", action: "insert", actor_email: "jose@danil.ai" }),
     entry(3, { actor_type: "danil_support", event_type: "support_access.granted", actor_email: "soporte@danil.ai" }),
   ];
   const source: AdminSource = {
