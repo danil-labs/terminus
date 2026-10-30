@@ -31,6 +31,7 @@ import { type Accessor, createSignal, lazy, Suspense } from "solid-js";
 import { createRouter, type Router, type SliceChange } from "../features/machines/router";
 import { t } from "../lib/i18n";
 import { attentionCapability } from "./attention/capability";
+import { supportAccessCapability } from "./attention/support-access";
 import { leerPref } from "../lib/prefs";
 import { type OtherAccount, setCapabilities, type WebAccountsSource } from "../lib/platform";
 import { deliver } from "../lib/serviceEvents";
@@ -43,6 +44,7 @@ import { authLocation } from "./auth/return";
 import { webGithubAccount } from "./github-account";
 import { type Account, type Listing, SLOT_PREFIX, loadAccounts, ownerOf, pickAccount, readListings, rememberLast, removeExtra, savedListings } from "./accounts";
 import { forgetShellCache, setShellCacheScope } from "../lib/shellCache";
+import { webAuditLog } from "./audit-log";
 import { webWorkspaceAssets } from "./workspace-assets";
 import type { MachineRow, MachineStatus } from "./SyncNote";
 import { type BrowserHost, createWebTransport } from "./transport";
@@ -53,7 +55,7 @@ declare const __TERMINUS_WEB__: WebSettings;
 
 type WebSettings = { endpoint: string; supabaseUrl: string; supabaseKey: string; login: string };
 
-type Base = { userId?: string | null; refresh?: () => Promise<boolean>; subscribe?: (clear: () => void) => () => void; endpoint: string; getToken: () => string | Promise<string>; onUnauthorized?: () => void };
+type Base = { supabaseUrl?: string; supabaseKey?: string; userId?: string | null; refresh?: () => Promise<boolean>; subscribe?: (clear: () => void) => () => void; endpoint: string; getToken: () => string | Promise<string>; onUnauthorized?: () => void };
 export type TerminusWebConfig = Partial<
   WebSettings & Base & { computerId: string; computers: Computer[]; webAccounts: WebAccountsSource; addAccount: import("./AddAccount").AddAccountOptions }
 >;
@@ -238,6 +240,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
   const screens = createScreenAccess({ endpoint: base.endpoint, getToken: token, knows: (id) => !!fleet.info(id) });
   setCapabilities({
     inbox: import.meta.env.TERMINUS_ALPHA ? attentionCapability(false, window.location.pathname.replace(/\/+$/, "").endsWith("/inbox"), { userId: base.userId ?? mounted.webAccounts?.current.user_id, subscribe: base.subscribe, getToken: async () => await base.getToken(), unauthorized: async () => base.refresh ? await base.refresh() : false }) : undefined,
+    supportAccess: import.meta.env.TERMINUS_ALPHA ? supportAccessCapability({ getToken: async () => await base.getToken(), unauthorized: async () => base.refresh ? await base.refresh() : false }) : undefined,
     spaceOrder: createSpaceOrderSource(base.endpoint, token),
     nativeWindow: false,
     updater: false,
@@ -247,6 +250,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
     sidebarExtra: () => <HomeLink />,
     accountProfile: webAccountProfile(base.endpoint, base.getToken, base.onUnauthorized),
     accountAssets: webWorkspaceAssets(base.endpoint, base.getToken, base.onUnauthorized),
+    accountAuditLog: import.meta.env.TERMINUS_ALPHA && base.supabaseUrl && base.supabaseKey ? webAuditLog(base.supabaseUrl, base.supabaseKey, base.getToken, base.onUnauthorized) : undefined,
     accountMemory: { endpoint: base.endpoint, getToken: token },
     accountCredentials: { endpoint: base.endpoint, getToken: token },
     machineName: (id) => fleet.name(id),
@@ -483,7 +487,7 @@ async function start(settings: WebSettings) {
           const several = computers.length > 1;
           const relink = mountApp(
             computers,
-            { endpoint, userId: current.user_id, refresh: () => session.unauthorized(), getToken: () => session.getToken(), onUnauthorized: () => void session.unauthorized(), subscribe: clear => { const { data } = session.client.auth.onAuthStateChange((event, value) => { if (event === "SIGNED_OUT" || (value && value.user.id !== current.user_id)) clear(); }); return () => data.subscription.unsubscribe(); } },
+            { endpoint, supabaseUrl: settings.supabaseUrl, supabaseKey: settings.supabaseKey, userId: current.user_id, refresh: () => session.unauthorized(), getToken: () => session.getToken(), onUnauthorized: () => void session.unauthorized(), subscribe: clear => { const { data } = session.client.auth.onAuthStateChange((event, value) => { if (event === "SIGNED_OUT" || (value && value.user.id !== current.user_id)) clear(); }); return () => data.subscription.unsubscribe(); } },
             (computerId) => async () => {
               const answer = await computersOf(endpoint, session);
               if (answer.kind === "license" || answer.kind === "no_account") block({ t: answer.kind });

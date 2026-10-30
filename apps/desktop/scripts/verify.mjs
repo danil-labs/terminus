@@ -306,6 +306,12 @@ const steps = [
     root,
   ],
   [
+    "En el navegador la bitácora de cambios se lee de la cuenta activa con la sesión",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/web-audit-log.test.ts")],
+    root,
+  ],
+  [
     "El recorte del logo conserva el cuadrado elegido",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/logo-crop.test.ts")],

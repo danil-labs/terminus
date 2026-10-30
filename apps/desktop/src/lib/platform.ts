@@ -6,7 +6,9 @@
 import type { Answer, AccountWorkspace, Computer, CredentialSource, MemorySource, SpaceOrderSource } from "@terminus/computers";
 import { createRoot, createSignal, type JSX } from "solid-js";
 import type { AccountProfileSource } from "../features/settings/account-profile";
+import type { SupportAccessSource } from "../features/settings/SupportAccess";
 import type { Account } from "../features/settings/accounts-store";
+import type { AuditLogSource } from "../web/audit-log";
 import type { WorkspaceAssetsSource } from "../web/workspace-assets";
 
 /** Una cuenta agrupada (web y escritorio): las máquinas donde tiene sesión (`@terminus/fleet`, `merge.ts`). */
@@ -63,6 +65,8 @@ export type Capabilities = {
   danilAccount?: boolean;
   /** La persona de la cuenta de Danil leída sin el motor (la web, con su sesión): pie y Configuración. */
   accountProfile?: AccountProfileSource;
+  /** La bitácora de cambios de la cuenta de Danil activa, con la sesión (la web en alfa); sin esto, Configuración no la ofrece. */
+  accountAuditLog?: AuditLogSource;
   /** El logo y el fondo de los workspaces leídos y cambiados en la cuenta con la sesión (la web). */
   accountAssets?: WorkspaceAssetsSource;
   /** Botón extra al lado de la búsqueda de la barra lateral (en la web, volver a Danil Agents). */
@@ -107,6 +111,8 @@ export type Capabilities = {
    */
   /** Las computadoras de la cuenta con la sesión de la página (la web); el escritorio usa su token de cliente. */
   accountComputers?: AccountComputersSource;
+  /** El acceso de soporte de Danil a los workspaces de Danil que la persona administra (la web alfa), en Workspaces. */
+  supportAccess?: SupportAccessSource;
   /** Varias cuentas de Danil en una ventana (la web); el escritorio no la da. */
   webAccounts?: WebAccountsSource;
   connectMachine?: {

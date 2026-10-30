@@ -1,6 +1,7 @@
 import { invoke } from "../../lib/invoke.ts";
 import Blocks from "lucide-solid/icons/blocks";
 import CircleUserRound from "lucide-solid/icons/circle-user-round";
+import History from "lucide-solid/icons/history";
 import Plug from "lucide-solid/icons/plug";
 import Palette from "lucide-solid/icons/palette";
 import Bot from "lucide-solid/icons/bot";
@@ -42,6 +43,7 @@ import Workspaces from "./Workspaces";
 const DanilAccount = lazy(() => import("./DanilAccount"));
 const Integrations = lazy(() => import("./Integrations"));
 const ActivityLogs = lazy(() => import("./ActivityLogs"));
+const AuditLog = lazy(() => import("./AuditLog"));
 const Connections = lazy(() => import("./Connections"));
 const Appearance = lazy(() => import("./Appearance"));
 
@@ -241,6 +243,22 @@ const destinosDe = (
             </Suspense>
           ),
         },
+        ...(capabilities().accountAuditLog
+          ? [
+              {
+                id: "bitacora",
+                get name() {
+                  return t("audit.title");
+                },
+                icono: () => <History size={15} />,
+                panel: () => (
+                  <Suspense fallback={null}>
+                    <AuditLog source={capabilities().accountAuditLog!} />
+                  </Suspense>
+                ),
+              },
+            ]
+          : []),
         {
           id: "cuenta-danil",
           get name() {
@@ -262,7 +280,7 @@ const GRUPOS: { nombre: () => string; ids: string[] }[] = [
   { nombre: () => t("settings.nav.group_custom"), ids: ["skills", "agentes", "proyectos", "plugins"] },
   {
     nombre: () => t("settings.nav.group_connections"),
-    ids: ["cuenta-danil", "conexiones", "proveedores-ia", "fuentes", "integrations", "radiant"],
+    ids: ["cuenta-danil", "bitacora", "conexiones", "proveedores-ia", "fuentes", "integrations", "radiant"],
   },
 ];
 
