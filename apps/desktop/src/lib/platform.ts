@@ -6,6 +6,7 @@
 import type { Answer, AccountWorkspace, Computer, CredentialSource, MemorySource, SpaceOrderSource } from "@terminus/computers";
 import { createRoot, createSignal, type JSX } from "solid-js";
 import type { AccountProfileSource } from "../features/settings/account-profile";
+import type { SupportAccessSource } from "../features/settings/SupportAccess";
 import type { Account } from "../features/settings/accounts-store";
 import type { AuditLogSource } from "../web/audit-log";
 import type { WorkspaceAssetsSource } from "../web/workspace-assets";
@@ -110,6 +111,8 @@ export type Capabilities = {
    */
   /** Las computadoras de la cuenta con la sesión de la página (la web); el escritorio usa su token de cliente. */
   accountComputers?: AccountComputersSource;
+  /** El acceso de soporte de Danil a los workspaces de Danil que la persona administra (la web alfa), en Workspaces. */
+  supportAccess?: SupportAccessSource;
   /** Varias cuentas de Danil en una ventana (la web); el escritorio no la da. */
   webAccounts?: WebAccountsSource;
   connectMachine?: {

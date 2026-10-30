@@ -31,6 +31,7 @@ import { type Accessor, createSignal, lazy, Suspense } from "solid-js";
 import { createRouter, type Router, type SliceChange } from "../features/machines/router";
 import { t } from "../lib/i18n";
 import { attentionCapability } from "./attention/capability";
+import { supportAccessCapability } from "./attention/support-access";
 import { leerPref } from "../lib/prefs";
 import { type OtherAccount, setCapabilities, type WebAccountsSource } from "../lib/platform";
 import { deliver } from "../lib/serviceEvents";
@@ -239,6 +240,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
   const screens = createScreenAccess({ endpoint: base.endpoint, getToken: token, knows: (id) => !!fleet.info(id) });
   setCapabilities({
     inbox: import.meta.env.TERMINUS_ALPHA ? attentionCapability(false, window.location.pathname.replace(/\/+$/, "").endsWith("/inbox"), { userId: base.userId ?? mounted.webAccounts?.current.user_id, subscribe: base.subscribe, getToken: async () => await base.getToken(), unauthorized: async () => base.refresh ? await base.refresh() : false }) : undefined,
+    supportAccess: import.meta.env.TERMINUS_ALPHA ? supportAccessCapability({ getToken: async () => await base.getToken(), unauthorized: async () => base.refresh ? await base.refresh() : false }) : undefined,
     spaceOrder: createSpaceOrderSource(base.endpoint, token),
     nativeWindow: false,
     updater: false,
