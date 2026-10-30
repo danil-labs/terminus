@@ -90,10 +90,12 @@ const setCookie = (name, value, maxAge) => `${name}=${value}; Path=/; Max-Age=${
 
 /** A return path on this site, outside the sign-in itself and the data proxy; anything else goes to the root. */
 export function safeNext(value) {
-  if (!value || !value.startsWith("/") || value.startsWith("//") || /^\/(auth|alpha-api)(\/|\?|#|$)/.test(value) || /[\\\x00-\x1f]/.test(value)) return "/";
+  if (!value || !value.startsWith("/") || value.startsWith("//") || /[\\\x00-\x1f]/.test(value)) return "/";
   try {
     const url = new URL(value, HOST_ORIGIN);
-    return url.origin === HOST_ORIGIN ? url.pathname + url.search + url.hash : "/";
+    const path = decodeURIComponent(url.pathname);
+    if (url.origin !== HOST_ORIGIN || /^\/(auth|sign-in|alpha-api)(\/|$)/.test(path) || /[\\\x00-\x1f]/.test(path)) return "/";
+    return url.pathname + url.search + url.hash;
   } catch {
     return "/";
   }
@@ -316,7 +318,7 @@ async function logout(config, request) {
     if (ID_RE.test(session.sid ?? "")) {
       const end = new URL(`${WORKOS_API}/user_management/sessions/logout`);
       end.searchParams.set("session_id", session.sid);
-      end.searchParams.set("return_to", new URL("/auth", HOST_ORIGIN).href);
+      end.searchParams.set("return_to", location);
       location = end.href;
     }
   } catch {

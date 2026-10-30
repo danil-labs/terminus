@@ -226,9 +226,15 @@ test("logout clears the cookie and ends the WorkOS session in the browser", asyn
   const location = new URL((await response.json()).location);
   assert.equal(location.origin + location.pathname, "https://api.workos.com/user_management/sessions/logout");
   assert.equal(location.searchParams.get("session_id"), "session_01ABC");
-  assert.equal(location.searchParams.get("return_to"), `${origin}/auth`);
+  assert.equal(location.searchParams.get("return_to"), `${origin}/auth?signed_out=1`);
   const anonymous = await call(w, "/auth/logout", { method: "POST", headers: { Origin: origin } });
   assert.equal((await anonymous.json()).location, `${origin}/auth?signed_out=1`);
+  const returnTo = new URL(location.searchParams.get("return_to"));
+  const landing = await call(w, returnTo.pathname + returnTo.search);
+  assert.equal(landing.status, 200, "logging out must stop on the signed-out page without starting authentication");
+  assert.equal(await landing.text(), "assets");
+  const tampered = await call(w, "/auth/logout", { method: "POST", headers: { Origin: origin, Cookie: "__Host-danil_alfa=invalid" } });
+  assert.equal((await tampered.json()).location, `${origin}/auth?signed_out=1`);
 });
 
 test("without its configuration sign-in is unavailable, never open", async () => {
@@ -242,7 +248,14 @@ test("without its configuration sign-in is unavailable, never open", async () =>
 test("return paths stay inside Terminus", () => {
   assert.equal(safeNext("/inbox?x=1#y"), "/inbox?x=1#y");
   assert.equal(safeNext("/m/inbox"), "/m/inbox");
-  for (const value of [null, "", "inbox", "https://evil.example/", "//evil.example/", "/auth", "/auth?next=x", "/auth/workos/start", "/alpha-api/auth/profile", "/\\evil", "/inbox\n"]) {
+  for (const value of [null, "", "inbox", "https://evil.example/", "//evil.example/", "/auth", "/auth?next=x", "/auth/workos/start", "/sign-in", "/sign-in?next=/inbox", "/x/../auth", "/x/../sign-in", "/%61uth", "/%73ign-in", "/alpha-api/auth/profile", "/\\evil", "/inbox\n"]) {
     assert.equal(safeNext(value), "/", String(value));
+  }
+});
+
+test("callback refuses authentication and foreign return destinations without re-entering auth", async () => {
+  for (const next of ["/sign-in", "/sign-in?next=/inbox", "/x/../auth", "/%61uth", "//evil.example/", "https://evil.example/", "/\\evil.example/"]) {
+    const { back } = await signedIn(world(), next);
+    assert.equal(back.headers.get("Location"), `${origin}/`, next);
   }
 });
