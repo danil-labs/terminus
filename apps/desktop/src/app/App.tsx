@@ -1,7 +1,6 @@
 import type { HandlerTarget } from "../features/settings/HandlerPolicy";
 import { deliver, type JournalEvent, listen } from "../lib/serviceEvents";
 import { open } from "@tauri-apps/plugin-dialog";
-import Archive from "lucide-solid/icons/archive";
 import ArrowLeft from "lucide-solid/icons/arrow-left";
 import Check from "lucide-solid/icons/check";
 import Columns2 from "lucide-solid/icons/columns-2";
@@ -10,6 +9,7 @@ import FolderOpen from "lucide-solid/icons/folder-open";
 import PanelLeftClose from "lucide-solid/icons/panel-left-close";
 import PanelLeftOpen from "lucide-solid/icons/panel-left-open";
 import PanelRightOpen from "lucide-solid/icons/panel-right-open";
+import Search from "lucide-solid/icons/search";
 import {
   batch,
   createEffect,
@@ -108,7 +108,6 @@ const MachinesLicense = lazy(() =>
   })),
 );
 import AgentTasks, { createdTasks } from "../features/projects/AgentTasks";
-import ArchivedTasks from "../features/projects/ArchivedTasks";
 import BaseBranchPicker from "../features/projects/BaseBranchPicker";
 import { watchHandlerStatus, watchHandlerStatuses } from "../features/projects/handlerPresence";
 import { EmptyContext, ProjectPicker } from "../features/projects/Projects";
@@ -162,6 +161,8 @@ import { lista } from "../lib/format";
 import ColumnaLateral from "../features/shell/SideColumn";
 import { createSpaceNavigationOrder } from "../lib/space-navigation-order";
 import TitleBar from "../features/shell/TitleBar";
+import GlobalSearch, { type SearchFilter } from "../features/shell/GlobalSearch";
+import { flattenTasks } from "../features/shell/sidebarTasks";
 import AppTools from "../features/shell/AppTools";
 import { ConexionesMenu } from "../features/settings/Tools";
 import SpaceMenu from "../features/shell/SpaceMenu";
@@ -171,7 +172,7 @@ import AvisoDeVersion from "../features/shell/VersionNotice";
 import CloseGuard from "../features/shell/CloseGuard";
 import WorkspaceColumn from "../features/shell/WorkspaceColumn";
 import Sitio from "../features/sites/Site";
-import { claseDeFondo, FONDO_SOLO_EN_EL_TRABAJO, VELO_DE_FONDO } from "../lib/chat-background";
+import { FONDO_SOLO_EN_EL_TRABAJO, VELO_DE_FONDO } from "../lib/chat-background";
 import { fondoDeChat, fondoPropio, imagenDelWorkspace, veloDeFondo } from "../lib/chat-background-store";
 import { copyText } from "../lib/clipboard";
 import { capabilities, openMachineScreen } from "../lib/platform";
@@ -350,9 +351,6 @@ type LiveTurn = {
 export async function sleepSession(project: string, session: string) {
   await invoke<void>("sleep_session", { project, session }, machineOf(session));
 }
-
-/** La página de Archivadas ocupa el sitio de la vista de proyecto; ningún id de carpeta empieza así. */
-const ARCHIVADAS = "@archivadas";
 
 export default function App() {
   /**
@@ -550,7 +548,8 @@ export default function App() {
     requestAnimationFrame(() =>
       void invoke("window_painted", { at: Math.round(performance.now()), source }).catch(() => {}));
   });
-  const viendoArchivadas = () => proyectoAbierto() === ARCHIVADAS;
+  // `null` cerrado; si no, el chip con el que abre el buscador global.
+  const [buscando, setBuscando] = createSignal<SearchFilter | null>(null);
   // Los visores se recorren por id y no por el objeto abierto: `For`
   // compara por referencia, y marcar un archivo como cambiado —al
   // guardarlo— crea un objeto nuevo. Eso desmontaría y volvería a montar
@@ -648,11 +647,11 @@ export default function App() {
   // se declara más abajo, y memoizar lanzaba `ReferenceError` en el primer
   // pintado con la app en blanco.
   const tapadoPorElProyecto = (sitio: SitioDePanel | null | undefined) =>
-    (proyectoDeLaVista() !== null || viendoArchivadas()) &&
+    proyectoDeLaVista() !== null &&
     !!sitio &&
     sameSite(sitio, paneles.activeSite());
-  /** La pestaña que se ve en `sitio`: ninguna cuando Archivadas o la página
-   *  de un proyecto la tapan, aunque siga siendo la activa de su ventana. */
+  /** La pestaña que se ve en `sitio`: ninguna cuando la página de un
+   *  proyecto la tapa, aunque siga siendo la activa de su ventana. */
   const pestanaDelanteEn = (sitio: SitioDePanel) =>
     tapadoPorElProyecto(sitio) ? null : paneles.activeTabAt(sitio);
   /** Sitios sin pestaña delante, restando el que ocupa la vista de proyecto. */
@@ -862,12 +861,10 @@ export default function App() {
   /**
    * Cambia la tira y el riel a otro escritorio. Las pestañas del que se deja
    * no se cierran: sus lecturas siguen hasta que su pestaña se cierre en su tira.
-   * Archivadas es de todo el workspace y se queda abierta.
    */
   function cambiarEscritorio(id: string, restaurarActiva = true) {
     const ws = workspaceActivo();
     if (!ws || id === escritorio() || !spaces().some((i) => i.id === id)) return;
-    const enArchivadas = viendoArchivadas();
     const restored = batch(() => {
       setEscritorio(id);
       escribirPref(`space.${ws}`, id);
@@ -882,7 +879,7 @@ export default function App() {
       paneles.sync(vivos);
       paneles.bindTo(ws, id);
       if (r) paneles.activate(r);
-      if (!enArchivadas) setProyectoAbierto(null);
+      setProyectoAbierto(null);
       return r;
     });
     // Las demás ventanas del reparto que vuelve cargan su tarea, para que la
@@ -890,10 +887,6 @@ export default function App() {
     loadWindowThreads(restored);
     if (!restaurarActiva) return;
     const p = restored ? pestanas.open().find((x) => x.id === restored) : undefined;
-    if (enArchivadas) {
-      if (p) pestanas.activate(p.id);
-      return;
-    }
     if (p) void abrirSesion(p.project, p.id);
     else irAlBlanco(carpetaDelEscritorio(project()));
   }
@@ -1013,18 +1006,7 @@ export default function App() {
     }
   }
 
-  function alternarArchivadas() {
-    if (!viendoArchivadas()) {
-      setProyectoAbierto(ARCHIVADAS);
-      return;
-    }
-    const p = pestanas.activeTab();
-    setProyectoAbierto(null);
-    if (p) void activarPestana(p);
-    else irAlBlanco();
-  }
-
-  /** Borrada: sale de la barra, su tira se olvida y el aviso lleva a Archivadas. */
+  /** Borrada: sale de la barra, su tira se olvida y el aviso abre sus archivadas en el buscador. */
   function spaceDeleted(i: Space, archivadas: number) {
     const ws = workspaceActivo();
     setDeletingSpace(null);
@@ -1039,9 +1021,7 @@ export default function App() {
     setAviso({
       texto: t("spaces.delete.toast", { name: spaceName(i), count: archivadas }),
       boton: t("spaces.delete.see_archived"),
-      ir: () => {
-        if (!viendoArchivadas()) alternarArchivadas();
-      },
+      ir: () => setBuscando("archived"),
     });
   }
 
@@ -1751,6 +1731,7 @@ export default function App() {
         else if (accion === "closeTab") closeActiveTab();
         else if (accion === "reopenTab") reabrirPestana();
         else if (accion === "sidebar") sidebar.alternar();
+        else if (accion === "search") setBuscando((b) => (b === null ? "all" : null));
         else alternarElArbol();
         return;
       }
@@ -7508,22 +7489,9 @@ export default function App() {
   const imagenDeVentana = () =>
     fondoDelAgente()?.url ?? (fondoDeChat() === "propia" ? (imagenDelWorkspace() ?? fondoPropioUrl()) : null) ?? null;
   const veloDeVentana = () => (fondoDelAgente() ? (fondoDelAgente()?.veil ?? VELO_DE_FONDO) : veloDeFondo());
-  // Neutro: sin imagen ni velo, solo el `bg-surface` de la raíz.
-  const sinFondo = () => !fondoDelAgente() && fondoDeChat() === "neutro";
+  // Sin imagen no hay fondo ni velo: solo el `bg-surface` de la raíz.
   const FondoDeVentana = () => (
-    <Show
-      when={imagenDeVentana()}
-      fallback={
-        <Show when={!sinFondo()}>
-        <div class={cn("pointer-events-none absolute inset-0", claseDeFondo("dusk"))} aria-hidden="true">
-          <div
-            class="absolute inset-0 bg-surface"
-            style={{ opacity: String(veloDeVentana()) }}
-          />
-        </div>
-        </Show>
-      }
-    >
+    <Show when={imagenDeVentana()}>
       {(url) => (
         <div
           class="pointer-events-none absolute inset-0 bg-cover bg-center"
@@ -7934,21 +7902,6 @@ export default function App() {
       {/* El `For` de arriba pinta una conversación por tarea abierta: sin
           tareas no pinta ninguna. Sin este bloque, cerrar la última pestaña
           deja la ventana en negro sin que `tsc` lo detecte. */}
-      <Show when={viendoArchivadas()}>
-        <div
-          class="flex min-h-0 min-w-0 flex-col"
-          classList={{ "pt-8": llevaTiraInterior(paneles.activeSite()) }}
-          style={estiloDeLaCelda(paneles.activeSite())}
-          data-ventana={`${paneles.activeSite().col},${paneles.activeSite().fila}`}
-        >
-          <ArchivedTasks
-            spaces={spaces()}
-            proyectos={projectList()}
-            onAbrir={(p, id) => void abrirSesion(p, id)}
-          />
-        </div>
-      </Show>
-
       <Show when={proyectoDeLaVista()}>
         {(p) => (
           <div
@@ -8234,7 +8187,7 @@ export default function App() {
       class="relative isolate flex h-full flex-col overflow-hidden bg-surface"
       // `.tab-active` repite este fondo dentro de la pestaña para fundirse con su panel.
       style={{
-        "--window-image": imagenDeVentana() ? `url("${imagenDeVentana()}")` : sinFondo() ? "none" : undefined,
+        "--window-image": imagenDeVentana() ? `url("${imagenDeVentana()}")` : "none",
         "--window-veil": String(veloDeVentana()),
       }}
     >
@@ -8438,17 +8391,45 @@ export default function App() {
             </Show>
             {capabilities().sidebarExtra?.()}
           </>}
-          finDeIzquierda={<Show when={sidebarFilter() || capabilities().inbox}>
-            <Suspense>
-              <CustomizeMenu
-                filter={sidebarFilter()}
-                catalog={capabilities().inbox ? () => capabilities().inbox!.catalog({get temporary(){return customization.temporary();},get writable(){return customization.selection().writable;},demo:Boolean(capabilities().inbox?.demo),get entries(){return attentionEntries().map(entry=>({...entry,available:entry.available&&customization.selection().writable}));},onToggle:customization.toggle}) : undefined}
-              />
-            </Suspense>
-          </Show>}
+          finDeIzquierda={<>
+            <BotonConAtajo
+              variant="ghost"
+              size="icon"
+              class="size-7 shrink-0 text-neutral-500"
+              data-global-search-open=""
+              aria-expanded={buscando() !== null}
+              aria-label={t("search.open")}
+              accion="search"
+              etiqueta={t("search.open")}
+              onClick={() => setBuscando("all")}
+            >
+              <Search size={15} aria-hidden="true" />
+            </BotonConAtajo>
+            <Show when={sidebarFilter() || capabilities().inbox}>
+              <Suspense>
+                <CustomizeMenu
+                  filter={sidebarFilter()}
+                  catalog={capabilities().inbox ? () => capabilities().inbox!.catalog({get temporary(){return customization.temporary();},get writable(){return customization.selection().writable;},demo:Boolean(capabilities().inbox?.demo),get entries(){return attentionEntries().map(entry=>({...entry,available:entry.available&&customization.selection().writable}));},onToggle:customization.toggle}) : undefined}
+                />
+              </Suspense>
+            </Show>
+          </>}
           centro={tiraDeLaVentana()}
           derecha={<>
           </>}
+        />
+        <GlobalSearch
+          open={buscando()}
+          onClose={() => setBuscando(null)}
+          tasks={buscando() === null ? [] : flattenTasks(sesionesDelRiel(), true)}
+          folders={proyectosDelRiel()}
+          projects={projectList()}
+          spaces={spaces()}
+          conversations={capabilities().inbox?.search && customization.enabled("inbox") ? capabilities().inbox!.search.conversations : undefined}
+          onOpenTask={(p, id) => { setHablandoCon(null); void abrirSesion(p, id); }}
+          onOpenFolder={abrirProyecto}
+          onNewTask={(id) => nuevaSesion(id)}
+          onOpenConversation={(id) => { abrirInbox(); capabilities().inbox?.search.open(id); }}
         />
         {/* El velo del marco cubre la columna y el hueco alrededor de la caja: un solo tono también en la esquina. */}
         <div class="tab-veil window-frame relative flex min-h-0 flex-1 overflow-visible">
@@ -8458,20 +8439,6 @@ export default function App() {
             onSettings={(panel) => setSettings(panel ?? "")}
             onReportarBug={() => setInput(t("chat.composer.bug_report_starter"))}
             tools={<>
-            <Show when={spaces().length > 0}>
-              <Button
-                variant={viendoArchivadas() ? "secondary" : "ghost"}
-                size="icon"
-                class="size-8 shrink-0 rounded-md text-neutral-500"
-                data-archived-foot=""
-                aria-pressed={viendoArchivadas()}
-                aria-label={t("spaces.archived.title")}
-                title={t("spaces.archived.foot_title")}
-                onClick={alternarArchivadas}
-              >
-                <Archive size={17} aria-hidden="true" />
-              </Button>
-            </Show>
             <ConexionesMenu triggerClass="size-8 rounded-md" onManage={() => setSettings("skills")} />
             <AppTools
               workspace={workspaceActivo()}
@@ -8524,8 +8491,6 @@ export default function App() {
               onHablarCon={hablarConEncargado}
               onAgentProfile={openAgentProfile}
               escritorio={activeSpace() ? spaceName(activeSpace()) : null}
-              viendoArchivadas={viendoArchivadas()}
-              onArchivadas={spaces().length > 0 ? alternarArchivadas : undefined}
               spaces={opcionesDeMover()}
               onMoveToSpace={(p, id, i) => void moveToSpace(p, id, i)}
               onBringHere={(p, id) => void abrirTraer(p, id)}

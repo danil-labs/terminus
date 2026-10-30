@@ -1,15 +1,5 @@
 {
   "spaces.order.error": "Could not save the spaces order. Try again.",
-  "spaces.archived.deleted": "deleted",
-  "spaces.archived.empty": "There are no archived tasks.",
-  "spaces.archived.foot_title": "Every archived task in the workspace, from every space",
-  "spaces.archived.no_match": "No archived task matches.",
-  "spaces.archived.search": "Search by title, project or space",
-  "spaces.archived.subtitle": {
-    "one": "All projects and spaces · 1 task",
-    "other": "All projects and spaces · {count} tasks"
-  },
-  "spaces.archived.title": "Archived",
   "spaces.bar.label": "{workspace} spaces",
   "spaces.default_name": "Space 1",
   "spaces.delete.archive_and_delete": {

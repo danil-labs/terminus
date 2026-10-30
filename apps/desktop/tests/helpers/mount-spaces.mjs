@@ -204,17 +204,17 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     assert.deepEqual(u.pref("pestanas.w")?.abiertas.map((p) => p.id), ["t1", "t2"], "la clave vieja se queda para un build anterior");
     assert.deepEqual(u.pref("pestanas.w.i1")?.abiertas.map((p) => p.id), ["t1", "t2"], "y la tira vive en la de la primera");
     assert.equal(s.llamadas.some(([c]) => c === "archived_tasks"), false, "Archivadas no se lee al arrancar");
-    // Sin cabecera en el `aside`, el pie cae en la fila que se estira y sus
-    // botones se mueven con la lista.
-    const riel = u.doc.querySelector("[data-archived-foot]")?.closest("aside");
-    assert.ok(riel, "Archivadas vive en el riel");
-    const pie = riel.lastElementChild;
-    assert.ok(pie?.contains(u.doc.querySelector("[data-archived-foot]")), "Archivadas es un botón del pie, que es la última fila del riel");
-    assert.deepEqual(
-      [...pie.querySelectorAll("button")].map((b) => b.getAttribute("aria-label")),
-      ["Archivadas", "Herramientas MCP", "Configuración"],
-      "Archivadas va antes que MCP y que Configuración",
-    );
+    assert.equal(u.doc.querySelector("[data-archived-foot]"), null, "Archivadas ya no es un botón del pie");
+    assert.equal(u.doc.querySelector("[data-archived-page]"), null, "ni una página");
+    u.doc.querySelector("[data-title-bar] [data-global-search-open]").click();
+    await sleep(300);
+    assert.ok(u.doc.querySelector("[data-global-search]"), "la lupa de la franja abre el buscador");
+    assert.equal(s.llamadas.filter(([c]) => c === "archived_tasks").length, 1, "Archivadas se lee al abrir el buscador");
+    u.doc.querySelector('[data-search-chip="archived"]').click();
+    await sleep(200);
+    assert.ok(u.doc.querySelector('[data-search-key="archived:t0"]'), "la archivada sale con su chip");
+    u.doc.querySelector('[data-search-chip="all"]').click();
+    await sleep(100);
     assert.equal(u.pildora("i1").querySelector("[data-space-actions]"), null, "la píldora no lleva ⋯");
     const menu = await u.abrirMenu("i1");
     assert.ok(menu, "el clic derecho abre el menú del espacio");
@@ -610,20 +610,17 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     assert.equal(u.doc.querySelector('button[aria-label="Proyecto"]')?.textContent.trim(), "Terminus App", "la caja vacía elige la primera carpeta visible");
     assert.match(u.doc.querySelector("[data-space-toast]")?.textContent ?? "", /«Facturación» eliminado · 3 tareas archivadas/);
 
-    // En Archivadas, con su espacio eliminado, la fila se lee pero no se
-    // desarchiva: una archivada se retoma en una sesión nueva.
+    // El aviso abre el buscador en Archivadas: con su espacio eliminado, la
+    // fila se lee pero no se desarchiva; una archivada se retoma en una sesión nueva.
     u.boton("Ver en Archivadas").click();
     await sleep(400);
-    const fila7 = u.doc.querySelector('[data-archived-row="t7"]');
+    assert.equal(u.doc.querySelector('[data-search-chip="archived"]')?.getAttribute("aria-pressed"), "true", "el aviso abre el chip de Archivadas");
+    const fila7 = u.doc.querySelector('[data-search-key="archived:t7"]');
     assert.ok(fila7?.querySelector("[data-deleted-space]"), "la fila dice que su espacio se eliminó");
     assert.match(fila7.textContent, /Facturación/);
     assert.doesNotMatch(fila7.textContent, /Desarchivar/, "Archivadas no ofrece desarchivar");
     guarda("archivadas", app, s);
     assert.equal(s.llamadas.some(([c, a]) => c === "set_task_archived" && a?.archived === false), false, "nadie desarchiva");
-    u.doc.querySelector('[data-space="i3"]').click();
-    await sleep(300);
-    assert.equal(u.pref("space.w"), "i3");
-    assert.ok(u.doc.querySelector("[data-archived-page]"), "cambiar de escritorio deja Archivadas abierta");
     assert.deepEqual(app.fallos, []);
     app.w.close();
   }
@@ -648,13 +645,16 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     });
     await sleep(400);
     const u = util(app);
-    u.doc.querySelector('[data-archived-foot]').click();
+    u.doc.querySelector("[data-global-search-open]").click();
     await sleep(300);
+    u.doc.querySelector('[data-search-chip="archived"]').click();
+    await sleep(200);
     for (const row of legacy) {
-      assert.ok(u.doc.querySelector(`[data-archived-row="${row.id}"]`), "el historial antiguo archivado sigue accesible");
+      assert.ok(u.doc.querySelector(`[data-search-key="archived:${row.id}"]`), "el historial antiguo archivado sigue accesible");
     }
-    u.doc.querySelector('[data-archived-row="old-inbox"] button').click();
+    u.doc.querySelector('[data-search-key="archived:old-inbox"]').click();
     await sleep(300);
+    assert.equal(u.doc.querySelector("[data-global-search]"), null, "elegir una archivada cierra el buscador");
     assert.ok(opened.includes("old-inbox"), "la bandeja archivada abre su conversación original");
     assert.equal(s.llamadas.some(([command, args]) => command === "set_task_archived" && args.archived === false), false);
     assert.deepEqual(app.fallos, []);
