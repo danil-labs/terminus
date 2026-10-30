@@ -1,0 +1,143 @@
+name: Sign existing candidate (manual review only)
+
+# No compila ni publica. Requiere excepción explícita a la política sin Actions.
+on:
+  workflow_dispatch:
+    inputs:
+      source_oid:
+        description: OID completo del código de los binarios revisados
+        required: true
+      input_release:
+        description: Tag de pre-release que contiene los ZIP de firma revisados
+        required: true
+      windows_sha256:
+        description: SHA256 de windows-signing-input.zip (vacío omite Windows)
+        required: false
+      macos_sha256:
+        description: SHA256 de macos-signing-input.zip (vacío omite macOS)
+        required: false
+
+permissions:
+  contents: read
+concurrency:
+  group: sign-existing-candidate
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    if: github.repository == 'danil-labs/terminus' && inputs.windows_sha256 != ''
+    runs-on: windows-2022
+    timeout-minutes: 45
+    env:
+      INPUT_RELEASE: ${{ inputs.input_release }}
+      INPUT_SHA256: ${{ inputs.windows_sha256 }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - name: Fetch reviewed input
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_RELEASE: ${{ inputs.input_release }}
+          INPUT_SHA256: ${{ inputs.windows_sha256 }}
+          SOURCE_OID: ${{ inputs.source_oid }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          gh release download $env:INPUT_RELEASE --repo danil-labs/terminus --pattern windows-signing-input.zip --dir input
+          if ($LASTEXITCODE) { throw 'Download failed' }
+          if ($env:INPUT_SHA256 -notmatch '^[a-fA-F0-9]{64}$') { throw 'Invalid SHA256' }
+          $actual = (Get-FileHash input/windows-signing-input.zip -Algorithm SHA256).Hash
+          if ($actual -ne $env:INPUT_SHA256) { throw 'Input hash mismatch' }
+          Expand-Archive input/windows-signing-input.zip candidate
+          node apps/desktop/scripts/candidate-signing.mjs validate candidate windows $env:SOURCE_OID
+          if ($LASTEXITCODE) { throw 'Manifest validation failed' }
+      - name: Prepare pinned signing tools
+        run: |
+          npm install --prefix signing-cli --ignore-scripts --no-audit --no-fund @tauri-apps/cli@2.11.4
+          if ($LASTEXITCODE) { throw 'CLI installation failed' }
+          & apps/desktop/scripts/sign-existing-windows.ps1 -Phase prepare
+      - name: Sign compiled binaries
+        env:
+          ES_USERNAME: ${{ secrets.ES_USERNAME }}
+          ES_PASSWORD: ${{ secrets.ES_PASSWORD }}
+          ES_CREDENTIAL_ID: ${{ secrets.ES_CREDENTIAL_ID }}
+          ES_TOTP_SECRET: ${{ secrets.ES_TOTP_SECRET }}
+        run: '& apps/desktop/scripts/sign-existing-windows.ps1 -Phase internal'
+      - name: Repackage reviewed NSIS resources (no credentials)
+        run: '& apps/desktop/scripts/sign-existing-windows.ps1 -Phase package'
+      - name: Sign final installer
+        env:
+          ES_USERNAME: ${{ secrets.ES_USERNAME }}
+          ES_PASSWORD: ${{ secrets.ES_PASSWORD }}
+          ES_CREDENTIAL_ID: ${{ secrets.ES_CREDENTIAL_ID }}
+          ES_TOTP_SECRET: ${{ secrets.ES_TOTP_SECRET }}
+        run: '& apps/desktop/scripts/sign-existing-windows.ps1 -Phase final'
+      - name: Sign and verify updater artifact
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          & signing-cli/node_modules/.bin/tauri.cmd signer sign output/Terminus-Windows-Setup.exe
+          if ($LASTEXITCODE) { throw 'Updater signing failed' }
+          node apps/desktop/scripts/candidate-signing.mjs verify output/Terminus-Windows-Setup.exe
+          if ($LASTEXITCODE) { throw 'Updater verification failed' }
+      - name: Save review artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: signed-existing-windows
+          path: output/*
+          if-no-files-found: error
+          retention-days: 7
+
+  macos:
+    if: github.repository == 'danil-labs/terminus' && inputs.macos_sha256 != ''
+    runs-on: macos-14
+    timeout-minutes: 60
+    env:
+      INPUT_RELEASE: ${{ inputs.input_release }}
+      INPUT_SHA256: ${{ inputs.macos_sha256 }}
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - name: Fetch reviewed input
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_RELEASE: ${{ inputs.input_release }}
+          INPUT_SHA256: ${{ inputs.macos_sha256 }}
+          SOURCE_OID: ${{ inputs.source_oid }}
+        run: |
+          set -euo pipefail
+          gh release download "$INPUT_RELEASE" --repo danil-labs/terminus --pattern macos-signing-input.zip --dir input
+          [[ "$INPUT_SHA256" =~ ^[a-fA-F0-9]{64}$ ]]
+          actual=$(shasum -a 256 input/macos-signing-input.zip | cut -d' ' -f1)
+          test "$actual" = "$INPUT_SHA256"
+          ditto -x -k input/macos-signing-input.zip candidate
+          node apps/desktop/scripts/candidate-signing.mjs validate candidate macos "$SOURCE_OID"
+          npm install --prefix signing-cli --ignore-scripts --no-audit --no-fund @tauri-apps/cli@2.11.4
+      - name: Notarize existing app and repackage containers
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+        run: bash apps/desktop/scripts/sign-existing-macos.sh
+      - name: Sign and verify updater artifact
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          signing-cli/node_modules/.bin/tauri signer sign output/Terminus.app.tar.gz
+          node apps/desktop/scripts/candidate-signing.mjs verify output/Terminus.app.tar.gz
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: signed-existing-macos
+          path: output/*
+          if-no-files-found: error
+          retention-days: 7
