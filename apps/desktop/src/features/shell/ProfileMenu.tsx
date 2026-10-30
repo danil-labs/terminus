@@ -40,27 +40,26 @@ export default function ProfileMenu(props: {
   const despierta = watchKeepAwake();
   const cuenta = () => capabilities().danilAccount || capabilities().accountProfile;
   const alternar = () => setOpen((o) => !o);
+  const generico = () => (
+    <button
+      type="button"
+      class="grid size-8 place-items-center rounded-md text-neutral-500 outline-none hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary"
+      aria-label={t("shell.profile.menu")}
+      title={t("shell.profile.menu")}
+      aria-expanded={open()}
+      onClick={alternar}
+    >
+      <UserRound size={17} aria-hidden="true" />
+    </button>
+  );
 
   return (
     <Popover open={open()} onOpenChange={setOpen} placement="right-end" gutter={8}>
       <PopoverAnchor class="relative grid size-8 place-items-center" data-profile-menu="">
-        <Show
-          when={cuenta()}
-          fallback={
-            <button
-              type="button"
-              class="grid size-8 place-items-center rounded-md text-neutral-500 outline-none hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary"
-              aria-label={t("shell.profile.menu")}
-              title={t("shell.profile.menu")}
-              aria-expanded={open()}
-              onClick={alternar}
-            >
-              <UserRound size={17} aria-hidden="true" />
-            </button>
-          }
-        >
-          <Suspense>
-            <DanilFooterEntry collapsed onOpen={alternar} />
+        {/* Sin sesión de Danil la entrada no pinta a nadie; el avatar genérico sigue abriendo el menú. */}
+        <Show when={cuenta()} fallback={generico()}>
+          <Suspense fallback={generico()}>
+            <DanilFooterEntry collapsed onOpen={alternar} fallback={generico()} />
           </Suspense>
         </Show>
         {/* Mientras la computadora no puede dormir, el avatar lo dice sin abrir el menú. */}
