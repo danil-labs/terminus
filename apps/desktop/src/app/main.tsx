@@ -9,6 +9,7 @@ import { invoke } from "../lib/invoke.ts";
 import { seguirElTema } from "../lib/theme";
 import { aplicarEscala, atajoDeEscala } from "../lib/zoom";
 import { trimNativeMenu } from "../lib/contextMenu";
+import { acotarSeleccionarTodo } from "../lib/selectAll";
 import { activarBarrasAlDesplazar } from "../lib/scrollbars";
 import { aplicarVeloDePestanas } from "../lib/chat-background-store";
 import { aplicarLengua, elegirLengua, lenguasDisponibles, semillaDelAlta } from "../lib/i18n";
@@ -39,6 +40,7 @@ aplicarEscala();
 aplicarVeloDePestanas();
 window.addEventListener("keydown", atajoDeEscala);
 trimNativeMenu(window, import.meta.env.DEV);
+acotarSeleccionarTodo(window);
 activarBarrasAlDesplazar();
 // Igual que el tema, y por el mismo motivo: leída después de montar, la ventana
 // abriría en español y cambiaría de lengua delante de quien mira.
