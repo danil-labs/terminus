@@ -56,6 +56,28 @@ export function apiUrl(endpoint: string, path: string): string {
   return `${url.origin}${url.pathname.replace(/\/+$/, "")}${path}`;
 }
 
+/** El código de un error: `{ error: { code } }`, o `{ error: "<code>" }` de un plano de control anterior. */
+export function errorCodeOf(body: unknown): string | undefined {
+  const said = (body as { error?: unknown } | null)?.error;
+  const code = typeof said === "string" ? said : (said as { code?: unknown } | null | undefined)?.code;
+  return typeof code === "string" ? code : undefined;
+}
+
+/** A dónde hablar y con qué token: el JWT en la web, el token de cliente en la ventana. */
+export type BearerSource = { endpoint: string; getToken: () => Promise<string>; fetch?: Fetch };
+
+/** La llamada con su token y el cuerpo ya leído; `null` si no hubo red o token. Cada cliente decide qué significa cada estado. */
+export async function bearerCall(source: BearerSource, method: string, path: string, body?: unknown) {
+  try {
+    const headers: Record<string, string> = { authorization: `Bearer ${await source.getToken()}` };
+    if (body !== undefined) headers["content-type"] = "application/json";
+    const response = await (source.fetch ?? globalFetch)(apiUrl(source.endpoint, path), { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    return { status: response.status, ok: response.ok, json: await response.json().catch(() => null) };
+  } catch {
+    return null;
+  }
+}
+
 export const globalFetch: Fetch = (input, init) => (globalThis.fetch as unknown as Fetch)(input, init);
 
 export async function request<T>(url: string, token: string, method: string, read: (body: unknown) => T, f: Fetch, payload?: unknown): Promise<Answer<T>> {
@@ -69,8 +91,7 @@ export async function request<T>(url: string, token: string, method: string, rea
   }
   if (response.status === 401) return { kind: "unauthorized" };
   if (response.status === 403) {
-    const body = await response.json().catch(() => null) as { error?: string | { code?: string } } | null;
-    const code = typeof body?.error === "string" ? body.error : body?.error?.code;
+    const code = errorCodeOf(await response.json().catch(() => null));
     if (code === "unknown_user") return { kind: "no_account" };
     if (code === "license_required") return { kind: "license" };
     return { kind: "error", status: response.status };
@@ -78,10 +99,8 @@ export async function request<T>(url: string, token: string, method: string, rea
   if (response.status === 404) return { kind: "missing" };
   if (!response.ok) {
     // `409 workspace_deleted` y compañía: el código del cuerpo dice qué pasó.
-    // El plano de control dice `{ error: { code } }`; uno anterior, `{ error: "<code>" }`.
-    const said = ((await response.json().catch(() => null)) as { error?: unknown } | null)?.error;
-    const code = typeof said === "string" ? said : (said as { code?: unknown } | null | undefined)?.code;
-    return typeof code === "string" ? { kind: "error", status: response.status, code } : { kind: "error", status: response.status };
+    const code = errorCodeOf(await response.json().catch(() => null));
+    return code ? { kind: "error", status: response.status, code } : { kind: "error", status: response.status };
   }
   if (response.status === 204) return { kind: "ok", value: read(null) };
   const body = await response.json().catch(() => null);

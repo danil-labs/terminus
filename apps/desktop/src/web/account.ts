@@ -7,13 +7,10 @@
 import type { AccountProfile, AccountProfileSource, PreparedPhoto } from "../features/settings/account-profile.ts";
 import { blobToDataUrl, PHOTO_MAX_BYTES, PHOTO_TYPES } from "../features/settings/account-profile.ts";
 import { apiUrl } from "./computers.ts";
+import { type Fetch, refused, sessionCall } from "./control-plane.ts";
 
-type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
 type Me = { name?: unknown; email?: unknown; avatar_url?: unknown; avatar_source?: unknown };
-
-/** A refused call, shaped like an engine failure so the panel words it the same way. */
-const refused = (code: string) => Object.assign(new Error(code), { detail: code });
 
 const text = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
 
@@ -25,12 +22,7 @@ export function webAccountProfile(
 ): AccountProfileSource {
   const origin = new URL(apiUrl(endpoint, "/")).origin;
 
-  async function call(url: string, init: RequestInit = {}): Promise<Response> {
-    const token = await getToken();
-    const response = await f(url, { ...init, headers: { ...init.headers, authorization: `Bearer ${token}` } });
-    if (response.status === 401) onUnauthorized?.();
-    return response;
-  }
+  const call = sessionCall(getToken, onUnauthorized, f);
 
   /** The photo only from the control plane's own origin: the session goes nowhere else. */
   async function photo(url: string | null): Promise<string | null> {

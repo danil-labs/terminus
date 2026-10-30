@@ -52,6 +52,25 @@ export type Link = {
   deferred?(): DeferredFrame;
 };
 
+/** Una sesión de relay como enlace de la flota, con su estado leído aparte: hasta que el relay lo diga vale el de la fila. */
+export function relayLink(relay: Required<Link>, state: Link["state"]): Link {
+  return {
+    state,
+    call: (id, command, workspace, folder, args, timeout) => relay.call(id, command, workspace, folder, args, timeout),
+    onState: (listener) => relay.onState(listener),
+    onEvents: (listener) => relay.onEvents(listener),
+    onEngine: (listener) => relay.onEngine(listener),
+    blocked: () => relay.blocked(),
+    onBlocked: (listener) => relay.onBlocked(listener),
+    retry: () => relay.retry(),
+    onDeferred: (listener) => relay.onDeferred(listener),
+    deferred: () => relay.deferred(),
+    subscribe: (after) => relay.subscribe(after),
+    start: () => relay.start(),
+    close: () => relay.close(),
+  };
+}
+
 export type FleetEvent = { name: string; payload: unknown };
 
 export type FleetConfig = {
