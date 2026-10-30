@@ -2,7 +2,7 @@ import { usageTone, windowLabel, windowLeft } from "@terminus/computers";
 import type { AccountLimits, UsageWindow } from "@terminus/protocol";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Modal, Platform, Pressable, ScrollView, type ScrollViewInstance, StyleSheet, Text, TextInput, View } from "react-native";
+import { Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { type ProviderUsage, providerUsage } from "../lib/accountUsage";
 import { accountWorkspace } from "../lib/engine";
 import type { Host } from "../lib/hosts";
@@ -25,8 +25,7 @@ const toneColor = (theme: Theme, left: number) => {
 /**
  * Bajo el título del chat: dónde corre la tarea (máquina / carpeta / rama) y
  * sus herramientas: buscar en el chat, las subtareas (con su número), y la
- * barra de uso de la cuenta del proveedor, que abre su detalle. Debajo, el
- * riel de tus mensajes como carrusel: tocar uno salta a él. Leer el uso
+ * barra de uso de la cuenta del proveedor, que abre su detalle. Leer el uso
  * nunca enciende la máquina.
  */
 export function TaskTools({
@@ -37,10 +36,8 @@ export function TaskTools({
   branch,
   provider,
   subtasks,
-  mine,
   finding,
   onFind,
-  onJump,
   onTools,
 }: {
   host: Host | undefined;
@@ -50,10 +47,8 @@ export function TaskTools({
   branch: string | null;
   provider: string | null;
   subtasks: number;
-  mine: { key: string; text: string }[];
   finding: string | null;
   onFind: (query: string | null) => void;
-  onJump: (key: string) => void;
   onTools: () => void;
 }) {
   const theme = useTheme();
@@ -61,7 +56,6 @@ export function TaskTools({
   const [revision, setRevision] = useState(0);
   const [anchor, setAnchor] = useState<Rect | null>(null);
   const bar = useRef(null);
-  const rail = useRef<ScrollViewInstance>(null);
   const on = host?.power() === "on";
 
   useEffect(() => {
@@ -127,16 +121,6 @@ export function TaskTools({
           </Tap>
         </View>
       ) : null}
-      {mine.length > 1 && finding === null ? (
-        <ScrollView ref={rail} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail} onContentSizeChange={() => rail.current?.scrollToEnd({ animated: false })}>
-          {mine.map((line, i) => (
-            <Tap key={line.key} testID={`rail-${i}`} accessibilityRole="button" onPress={() => onJump(line.key)} style={[styles.railCard, { backgroundColor: i === mine.length - 1 ? theme.userBubble : theme.muted, borderColor: i === mine.length - 1 ? `${theme.merged}44` : "transparent" }]}>
-              <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: "600" }}>{t("task.tools.of", { n: i + 1, total: mine.length })}</Text>
-              <Text numberOfLines={2} style={{ color: theme.text, fontSize: 13, lineHeight: 17 }}>{line.text}</Text>
-            </Tap>
-          ))}
-        </ScrollView>
-      ) : null}
 
       <Modal visible={!!anchor} transparent animationType="fade" onRequestClose={() => setAnchor(null)}>
         <Pressable accessibilityRole="button" onPress={() => setAnchor(null)} style={[StyleSheet.absoluteFill, { backgroundColor: theme.dark ? "rgba(0,0,0,0.4)" : "rgba(10,13,35,0.18)" }]} />
@@ -192,8 +176,6 @@ const styles = StyleSheet.create({
   find: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 12, marginBottom: 8, height: 40, borderRadius: 10, paddingLeft: 12 },
   findInput: { flex: 1, fontSize: 15, minWidth: 0, ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null) },
   close: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  rail: { gap: 8, paddingHorizontal: 12, paddingBottom: 10 },
-  railCard: { width: 170, borderRadius: 12, padding: 10, gap: 4, borderWidth: 1 },
   popover: { position: "absolute", left: 16, right: 16, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, padding: 16, gap: 16, shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 20, elevation: 10 },
   groupHead: { flexDirection: "row", alignItems: "center", gap: 8 },
   buttons: { flexDirection: "row", gap: 8 },

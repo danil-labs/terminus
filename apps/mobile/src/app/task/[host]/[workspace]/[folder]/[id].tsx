@@ -339,13 +339,8 @@ export default function TaskScreen() {
   const folderRow = snapshot?.folders.find((f) => f.host === params.host && f.id === folder) ?? null;
   const gitBook = useTaskGit(hostOf, [{ host: params.host, workspace, folder, id }]);
   const git = effectiveGit(gitBook, { id, host: params.host, workspace }, snapshot?.tasks ?? []);
-  const mine = lines.flatMap((line) => (line.kind === "message" && line.role === "user" && !line.from && line.text.trim() ? [{ key: line.key, text: line.text.split("\n")[0] }] : []));
   const needle = finding?.trim().toLowerCase() ?? "";
   const visible = needle ? lines.filter((line) => ("text" in line ? line.text : line.kind === "shell" ? `${line.command}\n${line.output}` : "").toLowerCase().includes(needle)) : lines;
-  const jumpTo = (lineKey: string) => {
-    const index = visible.findIndex((line) => line.key === lineKey);
-    if (index >= 0) list.current?.scrollToIndex({ index, viewPosition: 0, animated: true });
-  };
 
   return (
     <KeyboardScreen>
@@ -375,10 +370,8 @@ export default function TaskScreen() {
         branch={git?.branch ?? null}
         provider={view?.session.provider ?? null}
         subtasks={delegated.length}
-        mine={mine}
         finding={finding}
         onFind={setFinding}
-        onJump={jumpTo}
         onTools={() => router.push({ pathname: "/task-tools", params: { host: params.host, workspace, folder: params.folder, id } })}
       />
       <View style={styles.thread}>
@@ -390,7 +383,6 @@ export default function TaskScreen() {
         onContentSizeChange={stick}
         onLayout={onLayout}
         onScroll={onScroll}
-        onScrollToIndexFailed={({ averageItemLength, index }) => list.current?.scrollToOffset({ offset: averageItemLength * index, animated: true })}
         scrollEventThrottle={16}
         // Lo que cambia de alto por encima de lo que se lee (una imagen que carga, pasos que se abren) no lo mueve.
         maintainVisibleContentPosition={Platform.OS === "web" ? undefined : { minIndexForVisible: 0 }}
