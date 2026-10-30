@@ -195,7 +195,7 @@ export function CustomizeMenu(props: { filter: SidebarFilterProps | null; catalo
       />
       <PopoverContent
         aria-label={t("shell.customize.trigger")}
-        class="grid max-h-[min(75vh,36rem)] w-72 gap-0.5 overflow-y-auto p-1.5"
+        class="grid max-h-[var(--kb-popper-content-available-height)] w-72 gap-0.5 overflow-y-auto p-1.5"
         onOpenAutoFocus={(e: Event) => e.preventDefault()}
       >
         <Show when={props.catalog}>

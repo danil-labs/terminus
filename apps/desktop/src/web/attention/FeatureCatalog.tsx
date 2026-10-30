@@ -7,7 +7,6 @@ export type FeatureEntry = { id: string; title: string; description: string; ava
 
 export function FeatureCatalog(props: { entries: readonly FeatureEntry[]; onToggle(id: string): void }) {
   return <section class="min-w-0" aria-label={t("shell.customize.in_sidebar")}>
-    <p class="m-0 mb-1 text-[0.6875rem] leading-snug text-neutral-500">{t("customize.description")}</p>
     <ul class="m-0 list-none p-0"><Index each={props.entries}>{entry =>
       <li class="flex min-w-0 items-center gap-3 py-1.5" title={entry().description}>
         <span class={`min-w-0 flex-1 truncate text-[0.8125rem] ${entry().available ? 'text-neutral-950' : 'text-neutral-500'}`}>{entry().title}</span>

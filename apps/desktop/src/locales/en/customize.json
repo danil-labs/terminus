@@ -1,5 +1,4 @@
 {
-  "customize.description": "Choose what appears in this space. Adding a view does not connect services or authorize reads.",
   "customize.unavailable": "Unavailable",
   "customize.broadcasts": "Broadcasts",
   "customize.prototype": "Prototype · sample data",
