@@ -40,7 +40,7 @@ export function grantOf(value: unknown, account: number): SupportGrant {
   };
 }
 
-/** Solo lectura: los workspaces de Danil que la persona administra y sus accesos de soporte. */
+/** Los workspaces de Danil que la persona administra, sus accesos de soporte y su revocación. */
 export function createSupportAccess(session: InboxSession, request: typeof fetch = fetch, prefix = '/terminus/alpha-api') {
   async function get(path: string) {
     const headers = async () => ({ Authorization: `Bearer ${await session.getToken()}` });
@@ -65,6 +65,17 @@ export function createSupportAccess(session: InboxSession, request: typeof fetch
       const data = await get(`/auth/account/support-access?account_id=${workspace}`);
       if (!Array.isArray(data.grants) || typeof data.can_revoke_all !== 'boolean') throw new Error('invalid_response');
       return { grants: data.grants.map(row => grantOf(row, workspace)), canRevokeAll: data.can_revoke_all };
+    },
+    /** La única escritura: revocar una concesión. La entrada alfa todavía no la deja pasar. */
+    async revoke(account: number, grant: number): Promise<string> {
+      const path = `${prefix}/auth/account/support-access/${id(grant)}/revoke?account_id=${id(account)}`;
+      const headers = async () => ({ Authorization: `Bearer ${await session.getToken()}` });
+      let response = await request(path, { method: 'POST', headers: await headers(), cache: 'no-store' });
+      if (response.status === 401 && await session.unauthorized()) response = await request(path, { method: 'POST', headers: await headers(), cache: 'no-store' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const status = object(await response.json()).status;
+      if (!['revoked', 'already_revoked', 'expired', 'not_found'].includes(String(status))) throw new Error('invalid_response');
+      return String(status);
     },
   };
 }

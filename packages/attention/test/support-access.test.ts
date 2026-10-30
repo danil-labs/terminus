@@ -52,3 +52,18 @@ test('a 401 refreshes the session once and retries', async () => {
   assert.deepEqual(await api.list(44), { grants: [], canRevokeAll: false });
   assert.equal(calls, 2);
 });
+
+test('revoke posts to the single revoke route and accepts only known outcomes', async () => {
+  const seen: Array<{ url: string; method: string }> = [];
+  const api = createSupportAccess(session(), async (input, init) => {
+    seen.push({ url: String(input), method: init?.method ?? 'GET' });
+    return Response.json({ status: 'revoked' });
+  });
+  assert.equal(await api.revoke(44, 9), 'revoked');
+  assert.deepEqual(seen, [{ url: '/terminus/alpha-api/auth/account/support-access/9/revoke?account_id=44', method: 'POST' }]);
+  const odd = createSupportAccess(session(false), async () => Response.json({ status: 'deleted' }));
+  await assert.rejects(odd.revoke(44, 9), /invalid_response/);
+  const blocked = createSupportAccess(session(false), async () => Response.json({ error: 'method_not_allowed' }, { status: 405 }));
+  await assert.rejects(blocked.revoke(44, 9), /HTTP 405/);
+  await assert.rejects(blocked.revoke(44, 0), /invalid_response/);
+});

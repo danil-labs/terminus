@@ -769,5 +769,9 @@
   "settings.support_access.history": "Previous access",
   "settings.support_access.status_active": "Active",
   "settings.support_access.status_expired": "Expired",
-  "settings.support_access.status_revoked": "Revoked"
+  "settings.support_access.status_revoked": "Revoked",
+  "settings.support_access.revoke": "Revoke",
+  "settings.support_access.cancel": "Cancel",
+  "settings.support_access.revoke_confirm": "{email} loses access to this workspace right away.",
+  "settings.support_access.revoke_error": "Could not revoke the access. Try again."
 }

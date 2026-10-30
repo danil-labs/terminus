@@ -15,11 +15,16 @@ const DEMO: SupportGrant[] = [
   { id: 1, account_id: 1, operator_email: 'cit@danil.ai', level: 'write', reason: 'Alta de la campaña de bienvenida', ticket: null, created_at: hours(-200), expires_at: hours(-176), revoked_at: hours(-190), revoked_by_kind: 'client', status: 'revoked' },
 ];
 
-/** Datos de ejemplo para `?demo=1`. */
+/** Datos de ejemplo para `?demo=1`; revocar solo cambia el ejemplo en esta página. */
 export function supportAccessDemo(workspace: string): SupportAccessSource {
+  let grants = DEMO;
   return {
     demo: true,
     workspaces: async () => [{ id: 1, name: workspace }],
-    list: async () => ({ grants: DEMO, canRevokeAll: true }),
+    list: async () => ({ grants, canRevokeAll: true }),
+    revoke: async (_account, id) => {
+      grants = grants.map((g) => (g.id === id && g.status === 'active' ? { ...g, status: 'revoked', revoked_at: new Date().toISOString(), revoked_by_kind: 'client' } : g));
+      return 'revoked';
+    },
   };
 }
