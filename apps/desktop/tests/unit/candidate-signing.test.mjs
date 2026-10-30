@@ -13,9 +13,8 @@ const hash = value => createHash('sha256').update(value).digest('hex');
 async function fixture(change = async () => {}, requestedPlatform = 'windows') {
   const directory = await mkdtemp(join(tmpdir(), 'candidate-signing-'));
   const manifest = {source_oid: source, version: '0.3.0-rc.1', platform: 'windows',
-    main: 'terminus.exe', engine: 'seldon-runtime.exe', nsis_script: 'installer.nsi',
-    installer: 'setup.exe', makensis_sha256: 'b'.repeat(64), files: {}};
-  for (const name of ['terminus.exe', 'seldon-runtime.exe', 'installer.nsi']) {
+    main: 'terminus.exe', engine: 'seldon-runtime.exe', windows_mode: 'internals', files: {}};
+  for (const name of ['terminus.exe', 'seldon-runtime.exe']) {
     await writeFile(join(directory, name), name);
     manifest.files[name] = hash(name);
   }
@@ -33,11 +32,12 @@ for (const [name, change, message] of [
   ['changed bytes', async d => writeFile(join(d, 'terminus.exe'), 'changed'), /Hash mismatch/],
   ['wrong OID', async (_d, m) => { m.source_oid = 'c'.repeat(40); }, /Provenance mismatch/],
   ['unlisted file', async d => writeFile(join(d, 'extra.exe'), 'extra'), /Hash mismatch/],
-  ['missing resource', async d => rm(join(d, 'installer.nsi')), /Missing input/],
+  ['missing resource', async d => rm(join(d, 'seldon-runtime.exe')), /Missing input/],
   ['parent path', async (_d, m) => { m.files['../outside'] = 'd'.repeat(64); }, /Invalid inventory path/],
   ['Windows alternate stream', async (_d, m) => { m.files['file:stream'] = 'd'.repeat(64); }, /Invalid inventory path/],
-  ['preexisting installer', async (d, m) => { await writeFile(join(d, 'setup.exe'), 'setup'); m.files['setup.exe'] = hash('setup'); }, /must not exist/],
-  ['toolchain not pinned', async (_d, m) => { delete m.makensis_sha256; }, /toolchain hash/],
+  ['packaging script', async (d, m) => { await writeFile(join(d, 'installer.nsi'), 'script'); m.files['installer.nsi'] = hash('script'); }, /only the signing roles/],
+  ['overlapping files and links', async (_d, m) => { m.links = {'terminus.exe': 'seldon-runtime.exe'}; }, /Overlapping/],
+  ['wrong Windows phase', async (_d, m) => { m.windows_mode = 'installer'; }, /phase mismatch/],
 ]) test(`rejects ${name}`, async () => {
   const result = await fixture(change);
   assert.notEqual(result.status, 0);
@@ -66,5 +66,15 @@ test('rejects a Linux artifact absent from the inventory', async () => {
     m.appimage = 'missing.AppImage';
   }, 'linux');
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /AppImage not inventoried/);
+  assert.match(result.stderr, /inventoried regular file/);
+});
+test('rejects a role that is a symlink even to an inventoried file', {skip: process.platform === 'win32'}, async () => {
+  const result = await fixture(async (d, m) => {
+    await rm(join(d, 'terminus.exe'));
+    delete m.files['terminus.exe'];
+    await symlink('seldon-runtime.exe', join(d, 'terminus.exe'));
+    m.links = {'terminus.exe': 'seldon-runtime.exe'};
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /inventoried regular file/);
 });

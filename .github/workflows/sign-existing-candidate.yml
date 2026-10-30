@@ -13,11 +13,25 @@ on:
       windows_sha256:
         description: SHA256 de windows-signing-input.zip (vacío omite Windows)
         required: false
+      windows_mode:
+        description: Dos despachos separados; NSIS ocurre localmente entre ambos
+        type: choice
+        default: internals
+        options: [internals, installer]
+      windows_receipt_sha256:
+        description: SHA256 externo de windows-build-receipt.json revisado
+        required: false
       macos_sha256:
         description: SHA256 de macos-signing-input.zip (vacío omite macOS)
         required: false
+      macos_receipt_sha256:
+        description: SHA256 externo de macos-build-receipt.json revisado
+        required: false
       linux_sha256:
         description: SHA256 de linux-signing-input.zip (vacío omite Linux)
+        required: false
+      linux_receipt_sha256:
+        description: SHA256 externo de linux-build-receipt.json revisado
         required: false
 
 permissions:
@@ -32,6 +46,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     env:
+      RECEIPT_SHA256: ${{ inputs.linux_receipt_sha256 }}
       INPUT_RELEASE: ${{ inputs.input_release }}
       INPUT_SHA256: ${{ inputs.linux_sha256 }}
     steps:
@@ -45,12 +60,22 @@ jobs:
         run: |
           set -euo pipefail
           gh release download "$INPUT_RELEASE" --repo danil-labs/terminus --pattern linux-signing-input.zip --dir input
+          gh release download "$INPUT_RELEASE" --repo danil-labs/terminus --pattern linux-build-receipt.json --dir input
+      - name: Inspect Linux input without credentials
+        env:
+          SOURCE_OID: ${{ inputs.source_oid }}
+        run: |
+          set -euo pipefail
           [[ "$INPUT_SHA256" =~ ^[a-f0-9]{64}$ ]]
           printf '%s  %s\n' "$INPUT_SHA256" input/linux-signing-input.zip | sha256sum -c -
-          unzip -q input/linux-signing-input.zip -d candidate
+          python3 apps/desktop/scripts/candidate-archive.py input/linux-signing-input.zip candidate "$INPUT_SHA256" linux
           node apps/desktop/scripts/candidate-signing.mjs validate candidate linux "$SOURCE_OID"
+          node apps/desktop/scripts/candidate-signing.mjs attest input/linux-build-receipt.json linux "$SOURCE_OID"
           mkdir output
           node --input-type=module -e 'import fs from "node:fs";const m=JSON.parse(fs.readFileSync("candidate/manifest.json","utf8"));fs.copyFileSync(`candidate/${m.appimage}`,"output/Terminus-Linux-x86_64.AppImage")'
+          sudo apt-get update -qq
+          sudo apt-get install -y squashfs-tools
+          python3 apps/desktop/scripts/candidate-native-linux.py
           npm install --prefix signing-cli --ignore-scripts --no-audit --no-fund @tauri-apps/cli@2.11.4
       - name: Sign and verify existing AppImage
         env:
@@ -72,6 +97,8 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 45
     env:
+      RECEIPT_SHA256: ${{ inputs.windows_receipt_sha256 }}
+      WINDOWS_MODE: ${{ inputs.windows_mode }}
       INPUT_RELEASE: ${{ inputs.input_release }}
       INPUT_SHA256: ${{ inputs.windows_sha256 }}
     defaults:
@@ -91,34 +118,49 @@ jobs:
           $ErrorActionPreference = 'Stop'
           gh release download $env:INPUT_RELEASE --repo danil-labs/terminus --pattern windows-signing-input.zip --dir input
           if ($LASTEXITCODE) { throw 'Download failed' }
+          gh release download $env:INPUT_RELEASE --repo danil-labs/terminus --pattern windows-build-receipt.json --dir input
+          if ($LASTEXITCODE) { throw 'Receipt download failed' }
+      - name: Inspect Windows input without credentials
+        env:
+          SOURCE_OID: ${{ inputs.source_oid }}
+        run: |
+          $ErrorActionPreference = 'Stop'
           if ($env:INPUT_SHA256 -notmatch '^[a-fA-F0-9]{64}$') { throw 'Invalid SHA256' }
           $actual = (Get-FileHash input/windows-signing-input.zip -Algorithm SHA256).Hash
           if ($actual -ne $env:INPUT_SHA256) { throw 'Input hash mismatch' }
-          Expand-Archive input/windows-signing-input.zip candidate
-          node apps/desktop/scripts/candidate-signing.mjs validate candidate windows $env:SOURCE_OID
+          python apps/desktop/scripts/candidate-archive.py input/windows-signing-input.zip candidate $env:INPUT_SHA256 windows
+          if ($LASTEXITCODE) { throw 'Archive validation failed' }
+          node apps/desktop/scripts/candidate-signing.mjs validate candidate windows $env:SOURCE_OID $env:WINDOWS_MODE
           if ($LASTEXITCODE) { throw 'Manifest validation failed' }
+          node apps/desktop/scripts/candidate-signing.mjs attest input/windows-build-receipt.json windows $env:SOURCE_OID
+          if ($LASTEXITCODE) { throw 'External build attestation failed' }
+          & apps/desktop/scripts/sign-existing-windows.ps1 -Phase inspect
       - name: Prepare pinned signing tools
         run: |
           npm install --prefix signing-cli --ignore-scripts --no-audit --no-fund @tauri-apps/cli@2.11.4
           if ($LASTEXITCODE) { throw 'CLI installation failed' }
           & apps/desktop/scripts/sign-existing-windows.ps1 -Phase prepare
       - name: Sign compiled binaries
+        if: inputs.windows_mode == 'internals'
         env:
           ES_USERNAME: ${{ secrets.ES_USERNAME }}
           ES_PASSWORD: ${{ secrets.ES_PASSWORD }}
           ES_CREDENTIAL_ID: ${{ secrets.ES_CREDENTIAL_ID }}
           ES_TOTP_SECRET: ${{ secrets.ES_TOTP_SECRET }}
-        run: '& apps/desktop/scripts/sign-existing-windows.ps1 -Phase internal'
-      - name: Repackage reviewed NSIS resources (no credentials)
-        run: '& apps/desktop/scripts/sign-existing-windows.ps1 -Phase package'
+        run: |
+          & apps/desktop/scripts/sign-existing-windows.ps1 -Phase internals
+          node apps/desktop/scripts/candidate-signing.mjs record output
+          if ($LASTEXITCODE) { throw 'Receipt failed' }
       - name: Sign final installer
+        if: inputs.windows_mode == 'installer'
         env:
           ES_USERNAME: ${{ secrets.ES_USERNAME }}
           ES_PASSWORD: ${{ secrets.ES_PASSWORD }}
           ES_CREDENTIAL_ID: ${{ secrets.ES_CREDENTIAL_ID }}
           ES_TOTP_SECRET: ${{ secrets.ES_TOTP_SECRET }}
-        run: '& apps/desktop/scripts/sign-existing-windows.ps1 -Phase final'
+        run: '& apps/desktop/scripts/sign-existing-windows.ps1 -Phase installer'
       - name: Sign and verify updater artifact
+        if: inputs.windows_mode == 'installer'
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -140,6 +182,7 @@ jobs:
     runs-on: macos-14
     timeout-minutes: 60
     env:
+      RECEIPT_SHA256: ${{ inputs.macos_receipt_sha256 }}
       INPUT_RELEASE: ${{ inputs.input_release }}
       INPUT_SHA256: ${{ inputs.macos_sha256 }}
     steps:
@@ -155,11 +198,19 @@ jobs:
         run: |
           set -euo pipefail
           gh release download "$INPUT_RELEASE" --repo danil-labs/terminus --pattern macos-signing-input.zip --dir input
+          gh release download "$INPUT_RELEASE" --repo danil-labs/terminus --pattern macos-build-receipt.json --dir input
+      - name: Inspect macOS input without credentials
+        env:
+          SOURCE_OID: ${{ inputs.source_oid }}
+        run: |
+          set -euo pipefail
           [[ "$INPUT_SHA256" =~ ^[a-fA-F0-9]{64}$ ]]
           actual=$(shasum -a 256 input/macos-signing-input.zip | cut -d' ' -f1)
           test "$actual" = "$INPUT_SHA256"
-          ditto -x -k input/macos-signing-input.zip candidate
+          python3 apps/desktop/scripts/candidate-archive.py input/macos-signing-input.zip candidate "$INPUT_SHA256" macos
           node apps/desktop/scripts/candidate-signing.mjs validate candidate macos "$SOURCE_OID"
+          node apps/desktop/scripts/candidate-signing.mjs attest input/macos-build-receipt.json macos "$SOURCE_OID"
+          bash apps/desktop/scripts/sign-existing-macos.sh inspect
           npm install --prefix signing-cli --ignore-scripts --no-audit --no-fund @tauri-apps/cli@2.11.4
       - name: Notarize existing app and repackage containers
         env:

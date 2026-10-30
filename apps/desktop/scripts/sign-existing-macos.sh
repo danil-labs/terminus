@@ -1,8 +1,5 @@
 #!/bin/bash
 set -euo pipefail
-for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_API_ISSUER APPLE_API_KEY APPLE_API_KEY_P8; do
-  test -n "${!name:-}" || { echo "Missing $name" >&2; exit 1; }
-done
 app="$PWD/candidate/Terminus.app"
 scratch=$(mktemp -d)
 keychain="$scratch/signing.keychain-db"
@@ -14,6 +11,17 @@ cleanup() {
   rm -rf "$scratch"
 }
 trap cleanup EXIT
+if [ "${1:-}" = inspect ]; then
+  python3 apps/desktop/scripts/candidate-native-macos.py
+  mkdir "$mount"
+  hdiutil attach candidate/template.dmg -readonly -nobrowse -mountpoint "$mount" >/dev/null
+  mounted=1
+  node apps/desktop/scripts/candidate-signing.mjs dmg "$mount"
+  exit 0
+fi
+for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_API_ISSUER APPLE_API_KEY APPLE_API_KEY_P8; do
+  test -n "${!name:-}" || { echo "Missing $name" >&2; exit 1; }
+done
 codesign --verify --deep --strict --verbose=2 "$app"
 info=$(codesign -dv --verbose=4 "$app" 2>&1)
 echo "$info" | grep -q 'Developer ID Application: Software y Servicios Danil'
@@ -40,6 +48,7 @@ mounted=1
 test -d "$mount/Terminus.app"
 rm -rf "$mount/Terminus.app"
 ditto "$app" "$mount/Terminus.app"
+node apps/desktop/scripts/candidate-signing.mjs dmg-final "$mount"
 hdiutil detach "$mount" >/dev/null
 mounted=0
 mkdir -p output
@@ -50,6 +59,12 @@ xcrun notarytool submit output/Terminus-macOS.dmg --key "$scratch/key.p8" --key-
 node -e 'const r=require(process.argv[1]);if(r.status!=="Accepted")process.exit(1)' "$scratch/dmg-result.json"
 xcrun stapler staple output/Terminus-macOS.dmg
 xcrun stapler validate output/Terminus-macOS.dmg
+hdiutil attach output/Terminus-macOS.dmg -readonly -nobrowse -mountpoint "$mount" >/dev/null
+mounted=1
+node apps/desktop/scripts/candidate-signing.mjs dmg-final "$mount"
+xcrun stapler validate "$mount/Terminus.app"
+hdiutil detach "$mount" >/dev/null
+mounted=0
 spctl --assess --type execute --verbose=2 "$app"
 tar -czf output/Terminus.app.tar.gz -C candidate Terminus.app
 cp "$scratch/app-result.json" output/notary-app.json

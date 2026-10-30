@@ -1,7 +1,8 @@
 # Firma de una candidata existente
 
 Este procedimiento prepara `0.3.0-rc.1` sin recompilar Rust ni el frontend.
-La revisión del código corresponde a `dev` en `9f2805d8`. No acredita una
+La revisión del código corresponde a `dev` en `9f2805d8`. El mecanismo sigue
+en revisión y no está autorizado para ejecutarse. No acredita una
 firma ejecutada, una notarización ni una publicación. La autorización para
 usar GitHub Actions debe resolverse por separado antes de ejecutar un job.
 
@@ -36,8 +37,9 @@ en GitHub. Este documento no realizó una lectura de sus valores.
 
 Conservar los artefactos originales y registrar SHA-256, tamaño, plataforma,
 arquitectura, versión, OID fuente, motor fijado y resultado de QA. La candidata
-existente proviene de `529c49c5`; cambios posteriores de `dev` no forman parte
-de sus bytes. Trabajar sobre copias y registrar todos los hashes resultantes.
+original proviene de `529c49c5`; cambios posteriores de `dev` no forman parte
+de sus bytes. Otra candidata requiere su OID y recibo propios. Trabajar sobre
+copias y registrar todos los hashes resultantes.
 
 No volver a firmar `work-tools` ni regenerar sus inventarios. Una firma cambia
 bytes y puede invalidar el inventario acreditado. Si Apple exige modificar
@@ -56,7 +58,7 @@ y QA propios.
 3. Si un ejecutable interno está sin firmar, firmar únicamente el setup no
    lo corrige. Conservar los binarios compilados y los recursos/script NSIS
    originales; firmar `terminus.exe` ya parcheado con la marca NSIS y el motor
-   pendiente, y volver a empaquetar con esos mismos recursos. No volver a
+   pendiente, y volver a empaquetar localmente con esos mismos recursos. No volver a
    invocar `tauri build`. Si faltan los recursos de empaquetado, esta ruta
    queda pendiente; el instalador existente no acredita una release completa.
 4. Usar el bloque de eSigner existente en `publish.yml`, conservando el pin
@@ -67,13 +69,16 @@ y QA propios.
    de tiempo en los ejecutables requeridos y el setup, y conservar el listado
    de archivos instalados. Sólo entonces crear la firma minisign del setup.
 
-Si sólo GitHub conserva los cuatro secrets de SSL.com, la alternativa es un
-job manual de firma con artefactos y hashes fijados. Debe descargar únicamente
-esos inputs, rechazar cualquier hash distinto, consumir los secrets en el paso
-de firma y subir los resultados para revisión. Sin compilación, tags, releases,
+Si sólo GitHub conserva los cuatro secrets de SSL.com, la alternativa son dos
+despachos manuales con hashes fijados. El primero (`windows_mode: internals`)
+devuelve main y motor firmados. Se descargan y se reempaquetan localmente sin
+secrets de GitHub. Tras QA y revisión del nuevo paquete, un segundo despacho
+(`windows_mode: installer`) recibe otro ZIP y firma el setup y su minisign
+en un runner nuevo. NSIS nunca entra ni se ejecuta en los runners de firma.
+Sin compilación, tags, releases,
 actualización de `latest.json` ni permisos de publicación. El borrador está en
 `.github/workflows/sign-existing-candidate.yml`; falta resolver la autorización
-de Actions y acreditar los inputs de NSIS. La candidata rc1 examinada por el
+de Actions y acreditar los recursos locales de NSIS. La candidata rc1 examinada por el
 coordinador tiene setup y `terminus.exe` sin Authenticode.
 
 ## macOS
@@ -118,8 +123,8 @@ autorizada; no cambiar el canal estable ni marcar esta candidata como latest.
 Se inspeccionaron `publish.yml`, `tauri.conf.json` y el verificador minisign.
 No se consultaron valores de secrets, ni se solicitaron firmas pagadas,
 notarizaciones, builds o publicaciones. No está verificada la ubicación AWS
-del minisign de Desktop, la disponibilidad local de la credencial Apple,
-el estado Authenticode del motor rc1 ni la conservación de recursos NSIS.
+del minisign de Desktop, el estado Authenticode del motor rc1 ni la conservación
+de recursos NSIS locales. La credencial API Apple sólo se encontró en GitHub.
 Esos datos determinan cuál de las rutas anteriores puede ejecutarse.
 
 ## Contrato del job propuesto
@@ -129,31 +134,68 @@ Es un borrador sin ejecución de plataforma. Sólo acepta despacho manual en
 durante siete días. No se sube este workflow sin decisión del coordinador.
 
 Entradas: OID completo del código compilado, tag de una pre-release de inputs
-revisados y SHA-256 de cada ZIP. Un hash vacío omite esa plataforma. Los ZIP
+revisados y SHA-256 externo de cada ZIP y cada recibo de build/QA. Un hash
+de ZIP vacío omite esa plataforma. Los ZIP
 se llaman `windows-signing-input.zip`, `macos-signing-input.zip` y
 `linux-signing-input.zip` y contienen
 un `manifest.json` con `source_oid`, `version: "0.3.0-rc.1"`, `platform`,
 `files` (mapa ruta relativa → SHA-256) y `links` (ruta → destino de symlink).
-Se exige inventario exhaustivo; no se admiten enlaces que salgan del árbol.
-El OID declarado requiere acreditar procedencia con el recibo original del
-build: incluirlo en un JSON no prueba por sí solo cómo se compilaron los bytes.
+Antes de extraer, `scripts/candidate-archive.py` inspecciona todas las entradas:
+rechaza rutas absolutas, traversal, duplicados y alias de mayúsculas/Unicode,
+entradas especiales, límites excesivos y escapes/ciclos de enlaces. No crea
+el directorio de extracción hasta completar esa inspección. Sólo macOS admite
+symlinks internos, creados al final y nunca seguidos para escribir.
 
-Windows añade `main`, `engine`, `nsis_script`, `installer` y `makensis_sha256`.
-Los tres primeros son rutas a archivos inventariados; `installer` es una ruta
-de salida aún inexistente. El script NSIS y todos sus recursos deben estar
-revisados y usar rutas relativas al ZIP. Se verifica el hash del `makensis`
-instalado en el runner; una diferencia detiene el job. El empaquetador ejecuta
-código del script revisado, sin credenciales de firma en su entorno.
+Se exige inventario exhaustivo con `files`/`links` disjuntos. Los roles de
+firma son archivos regulares con realpath directo y hash acreditado. El `.app`
+es un directorio real, con plist y ejecutable regulares.
+
+Los recibos externos se llaman `windows-build-receipt.json`,
+`macos-build-receipt.json` y `linux-build-receipt.json`. Su SHA-256 se introduce
+por separado al despachar; no se confía en un recibo declarado por el ZIP.
+Tienen `source_oid`, `version`, `identifier: "ai.danil.terminus"`,
+`product_name: "Terminus"`, `platform`, `qa_evidence` y `artifacts` con hashes
+por rol. El coordinador revisa la atribución al build/QA antes de autorizar
+ese hash. Ni un OID escrito en JSON ni un hash autoafirmado prueban por sí
+solos cómo se compilaron los bytes.
+
+Windows declara `windows_mode`. Para `internals` sólo acepta los roles `main`
+y `engine`, los dos archivos inventariados; para `installer`, sólo `installer`.
+No admite otros archivos, enlaces ni scripts. El segundo modo añade
+`signed_payloads: {main: {member, sha256}, engine: {member, sha256}}` con rutas
+exactas de los binarios dentro de NSIS y hashes del primer despacho. El recibo
+externo fija esos mismos hashes en `signed_payloads: {main: hash, engine: hash}`.
+7-Zip lee sólo esos miembros, sin ejecutar el setup; sus hashes, firmas y
+metadatos se comprueban antes de entregar secrets al paso de firma.
+
+La candidata original tiene AMD64 para main/motor, I386 para el launcher
+NSIS, `ProductName: Terminus` y `ProductVersion: 0.3.0-rc.1` para main/setup.
+El motor no tiene VERSIONINFO; PE no tiene bundle ID nativo. No se inventan
+esos campos; la identidad se ata también al recibo externo.
 
 macOS contiene `Terminus.app` y `template.dmg`, con roles `app` y `dmg` de esos
-nombres exactos. El DMG debe tener capacidad para reemplazar su app y conservar
+nombres exactos, y `architectures` (`["arm64"]` para la candidata original).
+Antes de usar secrets se verifican plist, lipo, Developer ID y hardened runtime
+y se monta el DMG sólo para lectura. `dmg_layout: {files, links, directories}`
+inventaría todos sus archivos, enlaces y directorios, incluido el `.app`, que debe coincidir con el
+del ZIP. Sólo el enlace `Applications → /Applications` admite destino externo.
+Se exigen `.DS_Store`, `.VolumeIcon.icns` y `.background.tiff`. Se rechaza
+contenido adicional y se compara también el layout del DMG final con el `.app`
+final grapado. El recibo externo liga `artifacts.dmg` y `artifacts.main` a sus
+hashes originales.
+
+El DMG debe tener capacidad para reemplazar su app y conservar
 la disposición existente. Su conversión y el reemplazo no se han ensayado en
 esta preparación. Si falta espacio, el job falla y requiere otro template;
 no compila ni modifica herramientas como respaldo.
 
-Linux añade `appimage`, ruta al AppImage inventariado. El job Ubuntu sólo
-valida/copia esos bytes, crea su firma minisign y la verifica contra la pubkey
-instalada; no ejecuta el AppImage, no lo reempaqueta ni instala Rust.
+Linux añade `appimage`, ruta al AppImage inventariado, y `squashfs_offset`
+revisado. Se comprueba ELF AMD64, AppImage tipo 2, Name/Exec del `.desktop` e
+identificador embebido; `unsquashfs -cat` lee el payload sin ejecutarlo ni
+extraer su árbol. ELF no tiene versión de aplicación estructurada. La versión
+se atribuye exclusivamente al recibo externo de build/QA ligado por hash al
+AppImage; el recibo final conserva esa limitación. Ubuntu firma y verifica
+los bytes existentes; no ejecuta el AppImage ni instala Rust.
 
 Los scripts de firma son `scripts/sign-existing-windows.ps1` y
 `scripts/sign-existing-macos.sh`. El validador y la verificación con la pubkey
@@ -164,3 +206,8 @@ El job entrega instaladores, firmas, recibos de notarización y un recibo que
 mantiene `installed_qa: pending`. La instalación y el arranque desde esos bytes
 finales siguen siendo requisito antes de publicar. No confundir un job verde
 de firma con QA de una candidata distribuible.
+
+El recibo final fija `updater_pubkey_sha256` a
+`dd20ff2f22272128f403eb4ab852c00890bdc8aae0e70f3fb4c62ec2d031022a`,
+hash del valor base64 instalado; si cambia, falla. Incluye hashes de outputs,
+OID del workflow, OID del build, hash del ZIP y hash del recibo externo.

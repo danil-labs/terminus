@@ -1,4 +1,4 @@
-param([Parameter(Mandatory)][ValidateSet('prepare','internal','package','final')][string]$Phase)
+param([Parameter(Mandatory)][ValidateSet('prepare','inspect','internals','installer')][string]$Phase)
 $ErrorActionPreference = 'Stop'
 $base = (Get-Location).Path
 $tools = Join-Path $base 'signing-tools'
@@ -11,6 +11,21 @@ function Assert-Signature([string]$File) {
     throw "Invalid Danil timestamped signature: $File"
   }
   return $signature
+}
+function Assert-PE([string]$File, [int]$Machine = 34404) {
+  $bytes = [IO.File]::ReadAllBytes($File)
+  if ($bytes.Length -lt 64 -or $bytes[0] -ne 77 -or $bytes[1] -ne 90) { throw 'Not a PE executable' }
+  $offset = [BitConverter]::ToUInt32($bytes, 60)
+  if ($offset -gt $bytes.Length - 26 -or [BitConverter]::ToUInt32($bytes, $offset) -ne 17744 -or [BitConverter]::ToUInt16($bytes, $offset + 4) -ne $Machine) { throw 'Unexpected PE machine' }
+}
+function Assert-Main([string]$File) {
+  Assert-PE $File
+  $config = Get-Content "$base/apps/desktop/src-tauri/tauri.conf.json" -Raw | ConvertFrom-Json
+  $version = [Diagnostics.FileVersionInfo]::GetVersionInfo($File)
+  if ($version.ProductName -ne $config.productName -or $version.ProductVersion -ne $config.version) { throw 'Native product/version mismatch' }
+  $text = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($File))
+  if (-not $text.Contains('__TAURI_BUNDLE_TYPE_VAR_NSS')) { throw 'Native NSIS marker missing' }
+  return @{product_name=$version.ProductName; product_version=$version.ProductVersion; architecture='x86_64'; identifier_source='externally pinned build receipt; PE has no native bundle ID'}
 }
 function Sign-File([string]$File) {
   foreach ($key in @('ES_USERNAME','ES_PASSWORD','ES_CREDENTIAL_ID','ES_TOTP_SECRET')) {
@@ -46,23 +61,51 @@ if ($Phase -eq 'prepare') {
   exit 0
 }
 $manifest = Get-Content "$candidate/manifest.json" -Raw | ConvertFrom-Json
-if ($Phase -eq 'internal') {
+if ($Phase -eq 'inspect') {
+  if ($manifest.windows_mode -eq 'internals') {
+    $native = Assert-Main (Join-Path $candidate $manifest.main)
+    Assert-PE (Join-Path $candidate $manifest.engine)
+  } else {
+    $installer = Join-Path $candidate $manifest.installer
+    # NSIS es un launcher I386; los payloads de la aplicación son AMD64.
+    Assert-PE $installer 332
+    $config = Get-Content "$base/apps/desktop/src-tauri/tauri.conf.json" -Raw | ConvertFrom-Json
+    $version = [Diagnostics.FileVersionInfo]::GetVersionInfo($installer)
+    if ($version.ProductName -ne $config.productName -or $version.ProductVersion -ne $config.version) { throw 'Native installer product/version mismatch' }
+    $seven = Join-Path $env:ProgramFiles '7-Zip/7z.exe'
+    if (-not (Test-Path $seven)) { throw '7-Zip unavailable; never execute the installer' }
+    foreach ($role in @('main','engine')) {
+      $payload = $manifest.signed_payloads.$role
+      if ($payload.member -match '[*?\[\]]' -or $payload.member.StartsWith('-')) { throw 'Unsafe payload member' }
+      $out = Join-Path $env:RUNNER_TEMP "payload-$role.exe"
+      $start = [Diagnostics.ProcessStartInfo]::new($seven)
+      $start.UseShellExecute = $false
+      $start.RedirectStandardOutput = $true
+      foreach ($arg in @('e','-so','--',$installer,$payload.member)) { $start.ArgumentList.Add($arg) }
+      $process = [Diagnostics.Process]::Start($start)
+      $stream = [IO.File]::Create($out)
+      try { $process.StandardOutput.BaseStream.CopyTo($stream) } finally { $stream.Dispose() }
+      $process.WaitForExit()
+      if ($process.ExitCode -ne 0 -or (Get-FileHash $out -Algorithm SHA256).Hash -ne $payload.sha256) { throw 'Repacked payload hash mismatch' }
+      $null = Assert-Signature $out
+      if ($role -eq 'main') { $native = Assert-Main $out } else { Assert-PE $out }
+    }
+  }
+  $native | ConvertTo-Json | Set-Content "$env:RUNNER_TEMP/native-identity.json"
+} elseif ($Phase -eq 'internals') {
+  if ($manifest.windows_mode -ne 'internals') { throw 'Phase mismatch' }
+  New-Item -ItemType Directory -Force output | Out-Null
   $main = Join-Path $candidate $manifest.main
-  if (-not [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($main)).Contains('__TAURI_BUNDLE_TYPE_VAR_NSS')) { throw 'Main executable lacks NSIS bundle marker' }
   foreach ($role in @('main','engine')) {
     $file = Join-Path $candidate $manifest.$role
     $signature = Get-AuthenticodeSignature -LiteralPath $file
     if ($signature.Status -eq 'NotSigned') { Sign-File $file }
     $null = Assert-Signature $file
+    $name = if ($role -eq 'main') { 'terminus.exe' } else { 'seldon-runtime.exe' }
+    Copy-Item -LiteralPath $file -Destination (Join-Path $base "output/$name")
   }
-} elseif ($Phase -eq 'package') {
-  $makensis = Join-Path ${env:ProgramFiles(x86)} 'NSIS/makensis.exe'
-  if (-not (Test-Path $makensis)) { throw 'Reviewed NSIS toolchain unavailable; no build fallback' }
-  if ((Get-FileHash $makensis -Algorithm SHA256).Hash -ne $manifest.makensis_sha256) { throw 'NSIS toolchain mismatch; no installation fallback' }
-  Push-Location $candidate
-  try { & $makensis '/V2' $manifest.nsis_script; Assert-Native } finally { Pop-Location }
-  if (-not (Test-Path (Join-Path $candidate $manifest.installer))) { throw 'NSIS did not produce declared installer' }
 } else {
+  if ($manifest.windows_mode -ne 'installer') { throw 'Phase mismatch' }
   New-Item -ItemType Directory -Force output | Out-Null
   Copy-Item -LiteralPath (Join-Path $candidate $manifest.installer) -Destination output/Terminus-Windows-Setup.exe
   Sign-File (Join-Path $base 'output/Terminus-Windows-Setup.exe')
