@@ -228,7 +228,7 @@ test("logout clears the cookie and ends the WorkOS session in the browser", asyn
   assert.equal(location.searchParams.get("session_id"), "session_01ABC");
   assert.equal(location.searchParams.get("return_to"), `${origin}/auth`);
   const anonymous = await call(w, "/auth/logout", { method: "POST", headers: { Origin: origin } });
-  assert.equal((await anonymous.json()).location, `${origin}/auth`);
+  assert.equal((await anonymous.json()).location, `${origin}/auth?signed_out=1`);
 });
 
 test("without its configuration sign-in is unavailable, never open", async () => {
