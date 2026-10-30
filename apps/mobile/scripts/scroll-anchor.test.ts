@@ -33,3 +33,40 @@ test("un ancla que ya no está en el hilo no mueve nada", () => {
   restoreAnchor(scroller, null);
   assert.equal(scroller.scrollTop, 500);
 });
+
+
+test("chronological content keeps its visual anchor when older rows prepend or shrink", () => {
+  const scroller = { scrollTop: 500 } as unknown as Element;
+  let added = 0;
+  const element = { isConnected: true, getBoundingClientRect: () => ({ top: added - scroller.scrollTop }) } as unknown as Element;
+  const anchor = { element, top: -500 };
+  added = 300;
+  restoreAnchor(scroller, anchor, false);
+  assert.equal(scroller.scrollTop, 800);
+  assert.equal(element.getBoundingClientRect().top, anchor.top);
+  restoreAnchor(scroller, anchor, false);
+  assert.equal(scroller.scrollTop, 800);
+  added = 100;
+  restoreAnchor(scroller, anchor, false);
+  assert.equal(scroller.scrollTop, 600);
+  assert.equal(element.getBoundingClientRect().top, anchor.top);
+});
+
+
+test("a virtualized row can remount before the anchor is restored", () => {
+  const before = Object.getOwnPropertyDescriptor(globalThis, "document");
+  const scroller = { scrollTop: 500 } as unknown as Element;
+  const old = { isConnected: false } as Element;
+  let row: Element | null = null;
+  Object.defineProperty(globalThis, "document", { configurable: true, value: { getElementById: (id: string) => id === "chat-row:qa" ? row : null } });
+  try {
+    const anchor = { element: old, top: -500, id: "chat-row:qa" };
+    assert.equal(restoreAnchor(scroller, anchor, false), false);
+    row = { isConnected: true, getBoundingClientRect: () => ({ top: 300 - scroller.scrollTop }) } as unknown as Element;
+    assert.equal(restoreAnchor(scroller, anchor, false), true);
+    assert.equal(scroller.scrollTop, 800);
+  } finally {
+    if (before) Object.defineProperty(globalThis, "document", before);
+    else Reflect.deleteProperty(globalThis, "document");
+  }
+});
