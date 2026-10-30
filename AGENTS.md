@@ -8,8 +8,10 @@ which is not here.
 |---|---|---|
 | `apps/desktop/` | The window: Tauri 2 (Rust) with a SolidJS front. The installers ship it. | [apps/desktop/AGENTS.md](apps/desktop/AGENTS.md) |
 | `apps/mobile/` | The iOS and Android app (Expo) and its development bridge. | [apps/mobile/AGENTS.md](apps/mobile/AGENTS.md) |
-| `packages/design` | Task states, marks, status and list words, folder colors and theme colors both apps use. | — |
+| `packages/design` | Task states, marks, status and list words, folder colors, theme colors, and the type and radius scale both apps use. | — |
 | `packages/tasks` | The task list both apps derive: flat list, filter and grouping, two-line card, agents dock. | — |
+| `packages/chat` | How every client reads an agent message: links, the visual directive, next steps, tool steps and the HTML sandbox. | — |
+| `packages/attention` | The Inbox, channels, customization and support access from any client, over the same-origin BFF. | — |
 | `packages/computers` | Danil Computers from any client: control-plane API, relay session (WebSocket injected) and wake rules. | — |
 | `packages/fleet` | Several machines behind one panel: the call envelope (the machine comes only from it), a slice with its status per machine, bounded waits and the merge. | — |
 | `packages/carry` | Carrying work between machines: what travels, the copy in parts and the base the new task starts on. | — |

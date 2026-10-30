@@ -512,7 +512,7 @@ export default function Settings(props: {
           <span class="truncate">{p.d.name}</span>
           <Show when={marca()}>
             {(m) => (
-              <span class="ui-sidebar-menu-badge text-[0.625rem] font-normal text-neutral-500">
+              <span class="ui-sidebar-menu-badge text-2xs font-normal text-neutral-500">
                 {m().texto}
               </span>
             )}
@@ -557,7 +557,7 @@ export default function Settings(props: {
               class="border-0 bg-rail"
             >
               <SidebarHeader class="pb-6 pl-5 pr-3 pt-4">
-                <DialogTitle class="m-0 text-[0.9375rem] font-semibold">
+                <DialogTitle class="m-0 text-lead font-semibold">
                   {t("settings.title")}
                 </DialogTitle>
               </SidebarHeader>

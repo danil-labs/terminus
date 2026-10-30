@@ -832,13 +832,13 @@ export default function Sessions(props: {
           // El cohete es absoluto: sin este hueco el título se mete debajo. Por
           // `:has`, no por clase reactiva: cada fila mutaría al llegar git.
           <div class={cn(
-            "flex min-w-0 items-center gap-1 text-[0.8125rem] leading-[1.35] [:has(>[data-finish-slot])_&]:pr-16",
+            "flex min-w-0 items-center gap-1 text-ui leading-[1.35] [:has(>[data-finish-slot])_&]:pr-16",
             // La tarjeta del riel: 13,5 px en su línea de 18, sin chincheta ni «Contexto».
             tarjetaDelRiel() && "text-[0.84375rem] leading-[18px]",
             apagada() && "text-neutral-500 group-hover/session:text-neutral-950",
           )}>
             <Show when={fijada(f.s) && !tarjetaDelRiel()}>{marcaDeFijada()}</Show>
-            <Show when={contextual(f.s) && !tarjetaDelRiel()}><span class="shrink-0 text-[0.6875rem] font-normal text-neutral-500">{t("projects.sessions.context")}</span></Show>
+            <Show when={contextual(f.s) && !tarjetaDelRiel()}><span class="shrink-0 text-caption font-normal text-neutral-500">{t("projects.sessions.context")}</span></Show>
             <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"><WithMentions>{f.s.subagent ? readableSessionTitle(title()) : title()}</WithMentions></span>
           </div>
         }
@@ -858,7 +858,7 @@ export default function Sessions(props: {
             // `p-0`/`min-h-0` devuelve su altura: 13 px por 1,35, los
             // mismos que el título. El peso lo hereda, para que
             // la tarea abierta siga en negrita mientras se renombra.
-            class="block h-auto min-h-0 rounded-none border-0 p-0 font-sans text-[0.8125rem] leading-[1.35] text-inherit [font-weight:inherit]"
+            class="block h-auto min-h-0 rounded-none border-0 p-0 font-sans text-ui leading-[1.35] text-inherit [font-weight:inherit]"
             maxlength={SESSION_TITLE_MAX_LENGTH}
             value={borrador()}
             aria-label={t("projects.sessions.rename_label", {
@@ -1060,7 +1060,7 @@ export default function Sessions(props: {
                       )}
                     </For>
                     <Show when={props.carpetaDe?.(f.s) ?? props.carpeta}>
-                      {(c) => <p class="m-0 px-2 pt-1 pb-1.5 text-[0.6875rem] text-neutral-500">{t("spaces.move.folder_stays", { folder: c() })}</p>}
+                      {(c) => <p class="m-0 px-2 pt-1 pb-1.5 text-caption text-neutral-500">{t("spaces.move.folder_stays", { folder: c() })}</p>}
                     </Show>
                   </PopoverContent>
                 </Popover>
@@ -1169,7 +1169,6 @@ export default function Sessions(props: {
         <div
           data-sesion={f.s.id}
           data-pinned={fijada(f.s) ? "true" : undefined}
-          data-legacy={f.s.chat_de_agente ? "true" : undefined}
           data-apagada={apagada() ? "true" : undefined}
           class={tarjetaDelRiel() ? cn(
             // La tarjeta: 52 px fijos y dos líneas, pase lo que pase con los datos.
@@ -1300,7 +1299,7 @@ export default function Sessions(props: {
             <div class="min-w-0 flex-1">
               <Titulo />
               {/* Proveedor, mensaje y estado del modelo en una línea. */}
-              <div data-session-preview class="mt-1 flex min-w-0 items-center gap-1.5 text-[0.6875rem] font-normal leading-tight text-neutral-500">
+              <div data-session-preview class="mt-1 flex min-w-0 items-center gap-1.5 text-caption font-normal leading-tight text-neutral-500">
                 <Show when={worktreeDe(f.s.id)?.owned && !worktreeDe(f.s.id)?.available}>
                   <span class="flex shrink-0 text-error-strong" title={t("projects.sessions.worktree_missing")} aria-label={t("projects.sessions.worktree_missing")}><WorktreeRoto size={13} /></span>
                 </Show>
@@ -1473,7 +1472,7 @@ export default function Sessions(props: {
         <Show when={rama().hijas.length > 0}>
           <button
             type="button"
-            class="mt-0.5 ml-2.5 flex w-[calc(100%-10px)] cursor-pointer items-center gap-1.5 rounded-sm border-0 bg-transparent px-1.5 py-0.5 text-left text-[0.6875rem] leading-[1.2] text-neutral-500 tabular-nums hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
+            class="mt-0.5 ml-2.5 flex w-[calc(100%-10px)] cursor-pointer items-center gap-1.5 rounded-sm border-0 bg-transparent px-1.5 py-0.5 text-left text-caption leading-[1.2] text-neutral-500 tabular-nums hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
             aria-expanded={expanded()}
             aria-label={
               !expanded()
@@ -1600,7 +1599,7 @@ export default function Sessions(props: {
         </ToastPortal>
       )}</Show>
       <Show when={query()}>
-        <p data-search-results class="m-0 px-2 text-[0.6875rem] text-neutral-500" aria-live="polite">
+        <p data-search-results class="m-0 px-2 text-caption text-neutral-500" aria-live="polite">
           {matchedSessions().length === 0 ? t("projects.agent_tasks.no_results") : t("projects.sessions.search_results", { count: matchedSessions().length })}
         </p>
       </Show>

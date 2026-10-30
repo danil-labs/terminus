@@ -1,4 +1,5 @@
 import type { InboxSession } from './inbox.ts';
+import { sessionFetch } from './request.ts';
 
 export type ConnectionState = 'connected' | 'connecting' | 'expired' | 'disconnected' | 'replaced' | 'failed' | 'untracked';
 export type Channel = { id: number; account_id: number | null; name: string; provider: string; identity: string; active: boolean; connection: ConnectionState };
@@ -20,11 +21,10 @@ const text = (value: unknown) => typeof value === 'string' ? value : '';
 
 /** Solo lectura: `GET /api/channels` del BFF, anclado por el servidor a la cuenta activa. Nunca credenciales. */
 export function createChannels(session: InboxSession, request: typeof fetch = fetch, prefix = '/terminus/alpha-api') {
-  const headers = async () => ({ Authorization: `Bearer ${await session.getToken()}` });
+  const send = sessionFetch(session, request);
   return {
     async list(): Promise<Channel[]> {
-      let response = await request(`${prefix}/api/channels`, { headers: await headers(), cache: 'no-store' });
-      if (response.status === 401 && await session.unauthorized()) response = await request(`${prefix}/api/channels`, { headers: await headers(), cache: 'no-store' });
+      const response = await send(`${prefix}/api/channels`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data: unknown = await response.json();
       const rows = data && typeof data === 'object' && !Array.isArray(data) ? (data as Record<string, unknown>).channels : null;

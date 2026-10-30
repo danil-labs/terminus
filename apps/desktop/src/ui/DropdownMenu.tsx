@@ -12,8 +12,6 @@ import { PANEL_DE_MENU, RENGLON_DE_MENU, SEPARADOR_DE_MENU, TITULO_DE_GRUPO } fr
 export const DropdownMenu = Kobalte;
 export const DropdownMenuTrigger = Kobalte.Trigger;
 export const DropdownMenuGroup = Kobalte.Group;
-export const DropdownMenuRadioGroup = Kobalte.RadioGroup;
-export const DropdownMenuItemIndicator = Kobalte.ItemIndicator;
 
 export function DropdownMenuContent(props: ComponentProps<typeof Kobalte.Content>) {
   const [propios, resto] = splitProps(props, ["class"]);
@@ -28,11 +26,6 @@ export function DropdownMenuContent(props: ComponentProps<typeof Kobalte.Content
 export function DropdownMenuItem(props: ComponentProps<typeof Kobalte.Item>) {
   const [propios, resto] = splitProps(props, ["class"]);
   return <Kobalte.Item class={cn(RENGLON_DE_MENU, propios.class)} {...resto} />;
-}
-
-export function DropdownMenuRadioItem(props: ComponentProps<typeof Kobalte.RadioItem>) {
-  const [propios, resto] = splitProps(props, ["class"]);
-  return <Kobalte.RadioItem class={cn(RENGLON_DE_MENU, propios.class)} {...resto} />;
 }
 
 export function DropdownMenuGroupLabel(props: ComponentProps<typeof Kobalte.GroupLabel>) {

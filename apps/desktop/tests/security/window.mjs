@@ -5,7 +5,7 @@
  * La pregunta es la misma que la del contenedor de artefactos, un piso más
  * arriba: cuando el agente contesta con markdown que salió del repo del cliente,
  * ¿puede ese markdown sacar material de la máquina? El contenedor no cubre esto
- * —el chat no va dentro de ningún marco— y `ARCHITECTURE.md` § 7 promete que todo
+ * —el chat no va dentro de ningún marco— y la app promete que todo
  * lo que sale queda anotado en `publications.jsonl`. Una imagen remota que se pide
  * sola no pasa por ninguna de las cinco salidas.
  *

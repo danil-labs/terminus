@@ -1,8 +1,6 @@
 import { For, Show, Suspense, createResource, createSignal, lazy, onMount, splitProps, type JSX } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
 import { open } from "@tauri-apps/plugin-dialog";
-import Check from "lucide-solid/icons/check";
-import ChevronsUpDown from "lucide-solid/icons/chevrons-up-down";
 import Cloud from "lucide-solid/icons/cloud";
 import ImagePlus from "lucide-solid/icons/image-plus";
 import Laptop from "lucide-solid/icons/laptop";
@@ -14,9 +12,7 @@ import { Input } from "../../ui/Input";
 import type { Project } from "../../lib/model";
 import { PROJECT_NAME_MAX_LENGTH } from "../../lib/projectNames";
 import { FailureNote, asFailure, type Failure } from "../../ui/Failure";
-import { SidebarMenuButton } from "../../ui/sidebar";
 import { SettingsRow } from "./layout";
-import { Popover, PopoverContent, PopoverTrigger } from "../../ui/Popover";
 import { Skeleton } from "../../ui/Skeleton";
 import { enfocar, enfocarYSeleccionar } from "../../lib/focus";
 import { t } from "../../lib/i18n";
@@ -27,7 +23,6 @@ import { imagenInerte } from "../../lib/links";
 import {
   anunciarMudanza,
   anunciarRenombrado,
-  cerrarConEscape,
   createWorkspaces,
   type Workspace,
 } from "./workspaces-store";
@@ -97,134 +92,6 @@ export function NavigationListRow(props: NavigationListRowProps) {
       })}
       {...resto}
     />
-  );
-}
-
-/**
- * El menú de workspace: el control del pie del riel que despliega dónde estás y
- * a dónde puedes ir.
- *
- * Va en dos sitios y es el mismo componente: el pie del riel, que es de donde se
- * cambia a diario, y la cabecera de Configuración, que es donde el workspace ya
- * encabeza el sidebar por ser el alcance de todo lo de abajo.
- *
- * Lo que el menú NO hace es administrar: renombrar, apuntar a otra carpeta y
- * borrar viven en su panel. Cambiar es de todos los días y administrar es de una
- * vez, así que uno está a un clic y el otro detrás de la puerta que le toca.
- *
- * **Y no abre Configuración**, que tiene su propio ícono al lado de éste en el
- * pie del riel — es la forma de Palette: cuenta y ajustes son dos botones al
- * mismo nivel, no uno escondido dentro del
- * otro.
- */
-export function WorkspaceMenu(props: {
-  /** `top` en el pie del riel, `bottom` en la cabecera de Configuración. */
-  lado?: "top" | "bottom";
-  /** En el riel colapsado solo cabe el ícono. */
-  compact?: boolean;
-  /** Abre el panel donde se administran. */
-  onManage?: () => void;
-}) {
-  const ws = createWorkspaces();
-  const [abierto, setAbierto] = createSignal(false);
-
-  cerrarConEscape(abierto, () => setAbierto(false));
-
-  function elegir(accion: () => void) {
-    setAbierto(false);
-    accion();
-  }
-
-  const item = `grid w-full grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-2
-    rounded-sm px-2 py-1.5 text-left text-[0.8125rem] hover:bg-surface-muted
-    disabled:pointer-events-none disabled:opacity-60`;
-
-  return (
-    <Popover
-      open={abierto()}
-      onOpenChange={setAbierto}
-      // Radix llevaba `side` + `align` + `sideOffset`; Kobalte compone los dos
-      // primeros en `placement` y llama `gutter` al tercero.
-      placement={props.lado === "bottom" ? "bottom-start" : "top-start"}
-      gutter={4}
-    >
-      <PopoverTrigger
-        as={(p: object) => (
-          <SidebarMenuButton
-            {...p}
-            class="grid-cols-[auto_minmax(0,1fr)_auto]"
-            aria-haspopup="menu"
-            aria-label={t("settings.workspaces.menu_label", {
-              name: ws.actual()?.name ?? t("settings.workspaces.none"),
-            })}
-            title={props.compact ? ws.actual()?.name : undefined}
-          >
-            <Show when={ws.actual()?.git_host} fallback={<Laptop size={15} />}>
-              <Cloud size={15} />
-            </Show>
-            <Show when={!props.compact}>
-              <span class="truncate text-left">
-                {ws.actual()?.name ?? "…"}
-              </span>
-              <ChevronsUpDown size={14} class="text-neutral-500" />
-            </Show>
-          </SidebarMenuButton>
-        )}
-      />
-
-      <PopoverContent
-        role="menu"
-        class="grid w-[260px] gap-0.5 p-1"
-        // **Al abrir no se enfoca nada.** Kobalte le daba el foco a la primera
-        // entrada, así que el anillo salía rodeando al primer workspace de la
-        // lista —siempre el mismo, porque van por fecha de creación— y no al que
-        // está puesto: se lee como si ése fuera el actual, y Enter cambiaría de
-        // cliente sin querer.
-        //
-        // Se quita en vez de moverlo al actual: quien abre este menú con el
-        // ratón no necesita que nada esté enfocado, y la marca ✓ ya dice cuál
-        // es. El teclado sigue entrando con Tab.
-        onOpenAutoFocus={(e: Event) => e.preventDefault()}
-      >
-        {/* Sale por el portal del átomo, fuera del recorte deliberado del
-            sidebar. Su z-[70] queda por encima del asa z-40 y del shell. */}
-        <For each={ws.lista() ?? []}>
-          {(w) => (
-            <button
-              role="menuitem"
-              class={item}
-              onClick={() => elegir(() => void ws.cambiarA(w.id))}
-            >
-              {/* La marca ocupa sitio siempre, esté o no: sin eso los nombres se
-                  desalinean y el activo se distingue por estar corrido. */}
-              <span class="text-primary">
-                <Show when={w.id === ws.activo()}>
-                  <Check size={14} />
-                </Show>
-              </span>
-              <span class="truncate">{w.name}</span>
-            </button>
-          )}
-        </For>
-
-        <Show when={props.onManage}>
-          {(abrir) => (
-            <>
-              <span class="my-1 h-px bg-border" />
-              <button
-                role="menuitem"
-                class={item}
-                onClick={() => elegir(abrir())}
-              >
-                <span />
-                <span>{t("settings.workspaces.manage")}</span>
-                <span />
-              </button>
-            </>
-          )}
-        </Show>
-      </PopoverContent>
-    </Popover>
   );
 }
 
@@ -439,7 +306,7 @@ export function LogoDelWorkspace(props: {
         <div class="grid gap-1 pl-[27px] text-xs">
           <span class="text-neutral-500">{t("settings.workspaces.logo.title")}</span>
           <div class="flex items-center gap-2">
-            {marca("size-10 text-[0.875rem]")}
+            {marca("size-10 text-body")}
             {acciones}
           </div>
           <p class="m-0 text-neutral-500">{t("settings.workspaces.logo.hint")}</p>
@@ -449,7 +316,7 @@ export function LogoDelWorkspace(props: {
       }
     >
       <SettingsRow
-        lead={marca("size-8 text-[0.75rem]")}
+        lead={marca("size-8 text-label")}
         label={t("settings.workspaces.logo.title")}
         description={t("settings.workspaces.logo.hint")}
       >

@@ -238,7 +238,7 @@ export default function ColaDeMensajes(props: ColaDeMensajesProps) {
                         class={cn(
                           "min-w-0 text-sm break-words text-neutral-700",
                           props.compact ? "line-clamp-1" : "line-clamp-2",
-                          esDeLaTerminal(it) && "font-mono text-[0.8125rem]",
+                          esDeLaTerminal(it) && "font-mono text-ui",
                         )}
                         title={props.compact ? it.text : undefined}
                       >

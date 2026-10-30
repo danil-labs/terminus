@@ -80,7 +80,7 @@ function ContactAvatar(props: { name: string; channel: string; provider: string;
 export function ConversationSearch(props: { value: string; onChange: (value: string) => void }) {
   return <div class="flex h-8 w-full min-w-0 items-center gap-1.5 rounded-full border border-border bg-surface py-0 pr-1 pl-2.5 text-neutral-500 transition-all duration-150 ease-out focus-within:border-primary focus-within:ring-[3px] focus-within:ring-primary/15">
     <Search size={13} class="shrink-0 text-neutral-500" aria-hidden="true"/>
-    <input type="search" aria-label={t("web.alpha.search_label")} placeholder={t("web.alpha.search_placeholder")} value={props.value} onInput={event => props.onChange(event.currentTarget.value)} class="h-full w-full min-w-0 border-none bg-transparent p-0 text-[12px] text-neutral-950 outline-none placeholder:text-neutral-500 [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-cancel-button]:[-webkit-appearance:none]"/>
+    <input type="search" aria-label={t("web.alpha.search_label")} placeholder={t("web.alpha.search_placeholder")} value={props.value} onInput={event => props.onChange(event.currentTarget.value)} class="h-full w-full min-w-0 border-none bg-transparent p-0 text-label text-neutral-950 outline-none placeholder:text-neutral-500 [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-cancel-button]:[-webkit-appearance:none]"/>
   </div>;
 }
 
@@ -146,7 +146,7 @@ export function SelectConversation() {
     <div class="grid justify-items-center gap-2 text-neutral-500">
       <InboxIcon size={22} stroke-width={1.5} aria-hidden="true"/>
       <p class="m-0 text-[0.85rem] font-medium text-neutral-700">{t("web.alpha.select_conversation")}</p>
-      <p class="m-0 text-[0.75rem]">{t("web.alpha.select_hint")}</p>
+      <p class="m-0 text-label">{t("web.alpha.select_hint")}</p>
     </div>
   </div>;
 }

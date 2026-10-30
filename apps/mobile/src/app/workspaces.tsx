@@ -1,3 +1,4 @@
+import { TEXT } from "@terminus/design";
 import type { AttentionState } from "@terminus/protocol";
 import { router } from "expo-router";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
@@ -54,7 +55,7 @@ export default function Workspaces() {
                 subtitle={subtitle || undefined}
                 right={
                   <View style={styles.right}>
-                    {pending ? <View style={[styles.count, { backgroundColor: theme.muted }]}><Text style={{ color: theme.text, fontSize: 12, fontWeight: "600" }}>{pending}</Text></View> : null}
+                    {pending ? <View style={[styles.count, { backgroundColor: theme.muted }]}><Text style={{ color: theme.text, fontSize: TEXT.label, fontWeight: "600" }}>{pending}</Text></View> : null}
                     {chosen ? <Icon name="check" size={18} color={theme.merged} /> : <View style={{ width: 18 }} />}
                   </View>
                 }

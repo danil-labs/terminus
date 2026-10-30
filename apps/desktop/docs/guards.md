@@ -25,7 +25,8 @@ sends).
 | `window` | `scripts/guards/window.mjs` | Platform overrides keep the window structure (`label`, `create`). |
 | `console-window` | `scripts/guards/console-window.mjs` | Production processes use `no_console_window` on Windows. |
 | `processes` | `scripts/guards/processes.mjs` | Finds processes awaited without a timeout. Unix `exec` replaces the caller without waiting for a child. The quota only goes down. |
-| `shared-design` | `scripts/guards/shared-design.mjs` | `packages/design` matches the desktop: theme tokens against `src/styles/global.css` (Violeta and Grafito), status phrases against `projects.status.*` in `es` and `en`, the shared task-list, dock and machine words (`WORDS`) against the same keys in the catalogs, and mark icons against `TaskStatus.tsx`. |
+| `shared-design` | `scripts/guards/shared-design.mjs` | `packages/design` matches the desktop: theme tokens, the type scale, radii and channel colors against `src/styles/global.css` (Violeta and Grafito), status phrases against `projects.status.*` in `es` and `en`, the shared task-list, dock and machine words (`WORDS`) against the same keys in the catalogs, and mark icons against `TaskStatus.tsx`. |
+| `design-tokens` | `scripts/guards/design-tokens.mjs`, `tests/unit/cn-text-scale.test.ts` | Un tamaño de letra con escalón en `packages/design/src/scale.ts` usa el token, y `cn` lo reconoce como tamaño. Los valores sueltos tienen un techo que solo baja. |
 | `doc-paths` | `scripts/guards/doc-paths.mjs` | Code paths and local links in the documentation exist. Generated files are excluded. |
 | `missing-classes` | `scripts/guards/missing-classes.mjs` | Finds written classes that Tailwind does not generate. |
 | `triggers` | `tests/unit/triggers.test.mjs` | A trigger keeps the handler that opens its panel. |

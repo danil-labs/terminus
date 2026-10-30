@@ -545,7 +545,7 @@ export default function ArbolDeArchivos(props: {
   function PieDePlegada(p: { ruta: string; hondura: number }) {
     const estado = () => plegadas().get(p.ruta);
     const sangria = () => `${p.hondura * SANGRIA + 12 + CHEVRON + 6}px`;
-    const nota = "m-0 py-1 pr-3 text-[0.6875rem] text-neutral-500";
+    const nota = "m-0 py-1 pr-3 text-caption text-neutral-500";
     createEffect(() => {
       if (!plegadas().has(p.ruta)) void cargarPlegada(p.ruta);
     });
@@ -571,7 +571,7 @@ export default function ArbolDeArchivos(props: {
               {(desde) => (
                 <button
                   type="button"
-                  class="w-full py-1 pr-3 text-left text-[0.6875rem] text-primary outline-none hover:underline focus-visible:outline-2 focus-visible:outline-primary"
+                  class="w-full py-1 pr-3 text-left text-caption text-primary outline-none hover:underline focus-visible:outline-2 focus-visible:outline-primary"
                   style={{ "padding-left": sangria() }}
                   onClick={() => void cargarPlegada(p.ruta, desde())}
                 >
@@ -592,7 +592,7 @@ export default function ArbolDeArchivos(props: {
     const abierta = (ruta: string) => abiertasAhora().has(ruta);
     const clasesDeFila = () =>
       cn(
-        "flex w-full items-center gap-1.5 py-1 pr-3 text-left text-[0.75rem] outline-none hover:bg-surface-muted focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+        "flex w-full items-center gap-1.5 py-1 pr-3 text-left text-label outline-none hover:bg-surface-muted focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
         seleccion()?.ruta === p.nodo.ruta && "bg-surface-muted",
       );
     const campoDeRenombre = (icono: JSX.Element) => (
@@ -686,7 +686,7 @@ export default function ArbolDeArchivos(props: {
               when={!a().nube}
               fallback={
                 <div
-                  class="flex w-full cursor-default items-center gap-1.5 py-1 pr-3 text-[0.75rem] opacity-60"
+                  class="flex w-full cursor-default items-center gap-1.5 py-1 pr-3 text-label opacity-60"
                   style={{ "padding-left": sangria() }}
                   title={t("code.tree.cloud")}
                   aria-disabled="true"
@@ -741,7 +741,7 @@ export default function ArbolDeArchivos(props: {
                     {(estado) => (
                       <span
                         class={cn(
-                          "shrink-0 font-mono text-[0.625rem] font-semibold",
+                          "shrink-0 font-mono text-2xs font-semibold",
                           colorDeMarca(estado().marca),
                         )}
                         role="img"
@@ -881,7 +881,7 @@ export default function ArbolDeArchivos(props: {
             when={visibles().length > 0}
             fallback={
               <Show when={busca().trim()}>
-                <p class="m-0 px-3 py-2 text-[0.6875rem] text-neutral-500">
+                <p class="m-0 px-3 py-2 text-caption text-neutral-500">
                   {t("code.tree.search.empty", { query: busca().trim() })}
                 </p>
               </Show>
@@ -894,7 +894,7 @@ export default function ArbolDeArchivos(props: {
         </div>
 
         <Show when={recortado()}>
-          <p class="m-0 px-3 py-2 text-[0.6875rem] text-neutral-500">
+          <p class="m-0 px-3 py-2 text-caption text-neutral-500">
             {t("code.tree.truncated")}
           </p>
         </Show>
@@ -905,7 +905,7 @@ export default function ArbolDeArchivos(props: {
           <div class="px-3 pb-3">
             {/* Un plazo vencido no es «reinicia la app»: se dice qué pasó y se ofrece otra vez. */}
             <Show when={falloTransitorio()} fallback={<FailureNote f={f()} />}>
-              <p class="m-0 py-3 text-[0.8125rem] text-error-strong">{t("code.tree.failed.slow")}</p>
+              <p class="m-0 py-3 text-ui text-error-strong">{t("code.tree.failed.slow")}</p>
             </Show>
             <Button variant="ghost" size="compact" onClick={() => lector.reintentar()}>
               {t("code.tree.retry")}
@@ -1106,7 +1106,7 @@ function CampoDeNombre(props: {
             el.setSelectionRange(0, punto > 0 ? punto : props.inicial.length);
           })
         }
-        class="min-h-6 rounded-sm px-1 py-0 font-mono text-[0.75rem]"
+        class="min-h-6 rounded-sm px-1 py-0 font-mono text-label"
         value={valor()}
         aria-label={props.etiqueta}
         spellcheck={false}

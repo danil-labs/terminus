@@ -1,4 +1,5 @@
 export * from "./links.ts";
+export * from "./steps.ts";
 export * from "./nextSteps.ts";
 export * from "./sandbox.ts";
 export * from "./inlineVisual.ts";

@@ -1,3 +1,4 @@
+import { RADIUS, TEXT } from "@terminus/design";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import type { Host } from "../lib/hosts";
 import { w } from "../lib/i18n";
@@ -28,7 +29,7 @@ export function MachineNote({ hosts, fleet }: { hosts: Host[]; fleet: Fleet }) {
   return (
     <View style={[styles.note, { backgroundColor: theme.muted }]} testID="machine-note">
       {lines.map((line) => (
-        <Text key={line} style={{ color: theme.textMuted, fontSize: 13 }}>
+        <Text key={line} style={{ color: theme.textMuted, fontSize: TEXT.ui }}>
           {line}
         </Text>
       ))}
@@ -51,10 +52,10 @@ function LicenseNote() {
   const web = Platform.OS === "web";
   return (
     <View style={[styles.note, { backgroundColor: theme.muted }]} testID="machine-note-license">
-      <Text style={{ color: theme.text, fontSize: 15, fontWeight: "600" }}>{w("danil.license.title")}</Text>
+      <Text style={{ color: theme.text, fontSize: TEXT.lead, fontWeight: "600" }}>{w("danil.license.title")}</Text>
       {web ? (
         <>
-          <Text style={{ color: theme.textMuted, fontSize: 13 }}>{w("danil.license.body")}</Text>
+          <Text style={{ color: theme.textMuted, fontSize: TEXT.ui }}>{w("danil.license.body")}</Text>
           <Pressable
             testID="license-start"
             style={[styles.cta, { backgroundColor: theme.primary }]}
@@ -73,5 +74,5 @@ function LicenseNote() {
 
 const styles = StyleSheet.create({
   note: { marginHorizontal: 12, marginTop: 10, padding: 10, borderRadius: 10, gap: 4 },
-  cta: { alignSelf: "flex-start", marginVertical: 4, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
+  cta: { alignSelf: "flex-start", marginVertical: 4, paddingHorizontal: 14, paddingVertical: 8, borderRadius: RADIUS.lg },
 });

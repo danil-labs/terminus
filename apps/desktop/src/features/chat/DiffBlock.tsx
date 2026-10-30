@@ -41,7 +41,7 @@ export default function BloqueDeDiff(props: {
     <div class="min-w-0 overflow-hidden rounded-sm border border-border">
       <div
         class={cn(
-          "overflow-auto font-mono text-[0.6875rem] leading-[1.6]",
+          "overflow-auto font-mono text-caption leading-[1.6]",
           props.alto ?? "max-h-96",
         )}
       >

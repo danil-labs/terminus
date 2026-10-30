@@ -1,3 +1,4 @@
+import { TEXT } from "@terminus/design";
 import { DEFAULT_SIDEBAR_VIEW, GROUPINGS, type SidebarView, agentOptions, folderCounts, groupingLabel, sameAgent } from "@terminus/tasks";
 import type { ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -35,7 +36,7 @@ export default function Filter() {
     <Pressable testID={testID} accessibilityRole={check ? "checkbox" : "radio"} accessibilityState={{ checked: on }} onPress={onPress} style={styles.option}>
       <View style={[check ? styles.box : styles.radio, { borderColor: on ? theme.text : theme.textMuted, backgroundColor: on && check ? theme.text : "transparent" }]}>
         {on && !check ? <View style={[styles.dot, { backgroundColor: theme.text }]} /> : null}
-        {on && check ? <Text style={{ color: theme.bg, fontSize: 11, fontWeight: "800" }}>✓</Text> : null}
+        {on && check ? <Text style={{ color: theme.bg, fontSize: TEXT.caption, fontWeight: "800" }}>✓</Text> : null}
       </View>
       <View style={styles.label}>{children}</View>
       {aside !== undefined ? <Text style={{ color: theme.textMuted, fontVariant: ["tabular-nums"] }}>{aside}</Text> : null}
@@ -103,7 +104,7 @@ export default function Filter() {
 const styles = StyleSheet.create({
   page: { padding: 12, paddingBottom: 40 },
   titleRow: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 8, paddingTop: 10, paddingBottom: 4 },
-  title: { fontSize: 13, fontWeight: "600" },
+  title: { fontSize: TEXT.ui, fontWeight: "600" },
   option: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 8, paddingVertical: 10 },
   label: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8 },
   box: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },

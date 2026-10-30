@@ -324,7 +324,7 @@ export default function AnadirCarpeta(props: {
   return (
     <Dialog open={props.abierto && !escondido()} onOpenChange={alCambiar}>
       <DialogContent class="max-w-[560px]">
-        <DialogTitle class="m-0 text-[0.9375rem] font-semibold">
+        <DialogTitle class="m-0 text-lead font-semibold">
           {t("projects.add.title")}
         </DialogTitle>
         {capabilities().machineOnCreate?.(props.workspace)}
@@ -347,8 +347,8 @@ export default function AnadirCarpeta(props: {
                 void clone();
               }}
             >
-              <Show when={repositoryName()}><p class="m-0 text-[0.8125rem] font-medium">{repositoryName()}</p></Show>
-              <label class="grid gap-1 text-[0.8125rem]">
+              <Show when={repositoryName()}><p class="m-0 text-ui font-medium">{repositoryName()}</p></Show>
+              <label class="grid gap-1 text-ui">
                 <span class="text-neutral-500">
                   {t("projects.add.clone_url")}
                 </span>
@@ -362,7 +362,7 @@ export default function AnadirCarpeta(props: {
                 />
               </label>
               <div class="grid gap-1">
-                <span class="text-[0.8125rem] text-neutral-500">{t("projects.add.clone_directory")}</span>
+                <span class="text-ui text-neutral-500">{t("projects.add.clone_directory")}</span>
                 <p class="m-0 break-all font-mono text-xs">{destino() ?? directorio()}</p>
                 <Show when={remota()}>{(m) => <p class="m-0 text-xs text-neutral-500">{t("projects.add.remote_directory", { name: machineName(m().machine) })}</p>}</Show>
                 <Show when={!remota()}><Button
@@ -430,7 +430,7 @@ export default function AnadirCarpeta(props: {
                 );
               }}
             >
-              <label class="grid gap-1 text-[0.8125rem]">
+              <label class="grid gap-1 text-ui">
                 <span class="text-neutral-500">
                   {t("projects.add.empty_name")}
                 </span>
@@ -443,7 +443,7 @@ export default function AnadirCarpeta(props: {
                 />
               </label>
               <div class="grid gap-1">
-                <span class="text-[0.8125rem] text-neutral-500">{t("projects.add.clone_directory")}</span>
+                <span class="text-ui text-neutral-500">{t("projects.add.clone_directory")}</span>
                 <p class="m-0 break-all font-mono text-xs">{destino() ?? directorio()}</p>
                 <Show when={remota()}>{(m) => <p class="m-0 text-xs text-neutral-500">{t("projects.add.remote_directory", { name: machineName(m().machine) })}</p>}</Show>
                 <Show when={!remota()}><Button

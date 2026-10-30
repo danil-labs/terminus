@@ -76,7 +76,7 @@ export default function ManageProjects(props: { contexto: ContextoDeProyectos })
               >
                 <Input
                   ref={enfocarYSeleccionar}
-                  class="h-7 min-h-7 px-1.5 text-[0.8125rem]"
+                  class="h-7 min-h-7 px-1.5 text-ui"
                   maxlength={PROJECT_NAME_MAX_LENGTH}
                   value={nombre()}
                   data-owns-escape
@@ -254,7 +254,7 @@ export default function ManageProjects(props: { contexto: ContextoDeProyectos })
         <SettingsBlock>
           <Show
             when={props.contexto.projects.length > 0}
-            fallback={<p class="m-0 text-[0.8125rem] text-neutral-500">{t("settings.projects.empty")}</p>}
+            fallback={<p class="m-0 text-ui text-neutral-500">{t("settings.projects.empty")}</p>}
           >
             <div class="overflow-x-auto rounded-lg border border-border">
               <Table class="table-fixed">

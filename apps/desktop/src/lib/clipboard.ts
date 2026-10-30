@@ -1,4 +1,5 @@
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { createSignal, onCleanup } from "solid-js";
 
 import type { Failure } from "../ui/Failure";
 import { t } from "./i18n.ts";
@@ -17,6 +18,31 @@ export async function copyText(text: string): Promise<void> {
     const detail = typeof e === "string" ? e : e instanceof Error ? e.message : "";
     throw { what: t("common.clipboard.write_failed"), detail } satisfies Failure;
   }
+}
+
+/**
+ * El «copiado» que se apaga solo. `copied()` es la clave de lo último copiado,
+ * para las listas con un botón por fila. Sin `onError` el fallo se calla.
+ */
+export function createCopied<K extends string | boolean = boolean>(ms = 1500, onError?: (e: unknown) => void) {
+  const [copied, setCopied] = createSignal<K | null>(null);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const reset = () => {
+    clearTimeout(timer);
+    setCopied(null);
+  };
+  onCleanup(() => clearTimeout(timer));
+  async function copy(text: string, key = true as K) {
+    try {
+      await copyText(text);
+      clearTimeout(timer);
+      setCopied(() => key);
+      timer = setTimeout(reset, ms);
+    } catch (e) {
+      onError?.(e);
+    }
+  }
+  return { copied, copy, reset };
 }
 
 export function imagenPegada(dt: DataTransfer | null): File | null {

@@ -50,11 +50,6 @@ export function SidebarContent(props: JSX.HTMLAttributes<HTMLDivElement>) {
   );
 }
 
-export function SidebarFooter(props: JSX.HTMLAttributes<HTMLDivElement>) {
-  const [propios, resto] = splitProps(props, ["class"]);
-  return <div class={cn("p-3 min-w-0", propios.class)} {...resto} />;
-}
-
 export function SidebarMenu(props: JSX.HTMLAttributes<HTMLUListElement>) {
   const [propios, resto] = splitProps(props, ["class"]);
   return (
@@ -110,7 +105,7 @@ export function SidebarMenuButton(props: SidebarMenuButtonProps) {
       class={cn(
         // Longhands: dejan que un riel colapsado sobreescriba el padding
         // horizontal de forma determinista a través de tailwind-merge.
-        "relative grid h-[30px] min-h-[30px] w-full min-w-0 grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-0.5 rounded-[var(--radius-sm)] border border-transparent bg-transparent py-0 pl-2 pr-2 text-left font-normal text-inherit text-[0.8125rem] leading-[1.25]",
+        "relative grid h-[30px] min-h-[30px] w-full min-w-0 grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-0.5 rounded-sm border border-transparent bg-transparent py-0 pl-2 pr-2 text-left font-normal text-inherit text-ui leading-[1.25]",
         // **El relleno va por token.** Un navy crudo al 5 % no lleva variante
         // `dark:`, así que no participa de la inversión: en
         // el negro OLED da `#010102` sobre `#000000` — **1,00:1, medido en el

@@ -185,7 +185,7 @@ export default function NewAgent(props: {
                   autofocus
                 />
                 <Show when={id() !== "" && id() !== name().trim()}>
-                  <span class="font-mono text-[0.6875rem] text-neutral-500">{id()}</span>
+                  <span class="font-mono text-caption text-neutral-500">{id()}</span>
                 </Show>
               </label>
 
@@ -308,7 +308,7 @@ export default function NewAgent(props: {
                 <p class="m-0 text-xs text-warning-strong">
                   {t("projects.agents.new_shadowed")}
                 </p>
-                <p class="m-0 font-mono text-[0.625rem] break-all text-neutral-500">
+                <p class="m-0 font-mono text-2xs break-all text-neutral-500">
                   {creado().eclipsado_por?.origin}
                 </p>
               </div>

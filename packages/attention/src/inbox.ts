@@ -1,3 +1,4 @@
+import { sessionFetch } from './request.ts';
 export type Account = { id: number; name: string };
 /**
  * Una fila de la GET de conversaciones de Appv2 (`BackendConversation`). Los campos
@@ -47,9 +48,9 @@ const array = (value: unknown): unknown[] => {
 
 /** Only same-origin, read-only BFF routes; account IDs never imply Terminus workspace IDs. */
 export function createInbox(session: InboxSession, request: typeof fetch = fetch, prefix = "/terminus/alpha-api") {
+  const send = sessionFetch(session, request);
   async function get(path: string) {
-    let response = await request(`${prefix}${path}`, { headers: { Authorization: `Bearer ${await session.getToken()}` }, cache: 'no-store' });
-    if (response.status === 401 && await session.unauthorized()) response = await request(`${prefix}${path}`, { headers: { Authorization: `Bearer ${await session.getToken()}` }, cache: 'no-store' });
+    const response = await send(`${prefix}${path}`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return object(await response.json());
   }

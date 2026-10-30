@@ -56,7 +56,7 @@ export function PaquetesDeLengua() {
 
   async function instalar(desde: "carpeta" | "zip") {
     setFallo(null);
-    // El selector nativo, y nada de red: `ARCHITECTURE.md` promete que todo es
+    // El selector nativo, y nada de red: la app promete que todo es
     // local, y un canal de descarga es una decisión de arquitectura con su gate
     // que está sin tomar.
     const elegido = await open(

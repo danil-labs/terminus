@@ -1,3 +1,4 @@
+import { TEXT } from "@terminus/design";
 import { isPinned } from "@terminus/tasks";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
@@ -77,7 +78,7 @@ export function TaskActions({ host, task, running, onRemoved, onChanged, onBusy 
       <SheetOption label={t("task.actions.cancel")} disabled={busy} onPress={() => { setDraft(null); setError(null); }} />
     </> : confirm ? <>
       <Text style={{ color: theme.text, fontSize: 17, fontWeight: "600" }}>{t(`task.actions.${confirm}`)}</Text>
-      <Text style={{ color: theme.textMuted, fontSize: 14, lineHeight: 21 }}>{t(`task.actions.${confirm}_confirm`, { name: host.label })}</Text>
+      <Text style={{ color: theme.textMuted, fontSize: TEXT.body, lineHeight: 21 }}>{t(`task.actions.${confirm}_confirm`, { name: host.label })}</Text>
       <Pressable accessibilityRole="button" testID={`task-${confirm}-confirm`} disabled={busy || running || !available || (confirm === "delete" && host.power() !== "on")} onPress={() => void act(confirm)} style={{ minHeight: 48, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: confirm === "delete" ? theme.failedMark : theme.primary, opacity: busy ? 0.5 : 1 }}>
         <Text style={{ color: theme.onPrimary, fontWeight: "600" }}>{t(busy ? "task.actions.working" : `task.actions.${confirm}`)}</Text>
       </Pressable>

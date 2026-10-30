@@ -673,7 +673,7 @@ export default function VisorDeArchivo(props: {
                     ? t("code.typst.autosave.title")
                     : t("code.file.save.title")
               }
-              class="shrink-0 text-[0.6875rem] text-warning-strong"
+              class="shrink-0 text-caption text-warning-strong"
             >
               ●
             </span>
@@ -760,7 +760,7 @@ export default function VisorDeArchivo(props: {
 
       <Show when={borrado()}>
         <div class="flex shrink-0 items-center gap-2 border-b border-border bg-surface-raised px-3 py-1.5">
-          <p class="m-0 min-w-0 flex-1 text-[0.6875rem] text-warning-strong">{t("code.file.deleted")}</p>
+          <p class="m-0 min-w-0 flex-1 text-caption text-warning-strong">{t("code.file.deleted")}</p>
           <Button variant="ghost" size="compact" class="shrink-0" disabled={guardando()} onClick={() => props.onBorrado?.()}>
             {t("code.file.deleted.close")}
           </Button>
@@ -772,7 +772,7 @@ export default function VisorDeArchivo(props: {
 
       {/* Sin este aviso, guardar pisaba el turno del agente en silencio. */}
       <Show when={desincronizado()}>
-        <p class="m-0 border-b border-border bg-surface-raised px-3 py-2 text-[0.6875rem] text-warning-strong">
+        <p class="m-0 border-b border-border bg-surface-raised px-3 py-2 text-caption text-warning-strong">
           {t("code.file.raced")}
         </p>
       </Show>
@@ -1052,7 +1052,7 @@ function BarraDeEstado(props: {
     <div
       role="group"
       aria-label={t("code.status.label")}
-      class="flex h-6 shrink-0 items-center justify-end gap-3 border-t border-border px-3 text-[0.6875rem] text-neutral-500"
+      class="flex h-6 shrink-0 items-center justify-end gap-3 border-t border-border px-3 text-caption text-neutral-500"
     >
       <Show when={props.cursor}>
         {(c) => <span class="font-mono tabular-nums">{t("code.status.position", { linea: c().linea, columna: c().columna })}</span>}
@@ -1111,7 +1111,7 @@ function Cuerpo(props: {
   return (
     <>
       <Show when={props.contenido.truncated}>
-        <p class="m-0 border-b border-border bg-surface-raised px-3 py-2 text-[0.6875rem] text-neutral-500">
+        <p class="m-0 border-b border-border bg-surface-raised px-3 py-2 text-caption text-neutral-500">
           {truncatedNotice()}
         </p>
       </Show>

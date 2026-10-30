@@ -138,7 +138,7 @@ export default function Entrega(props: {
                       <span class="min-w-0 truncate font-mono text-xs text-neutral-950">
                         {a.rel}
                       </span>
-                      <span class="ml-auto shrink-0 font-mono text-[0.6875rem] text-neutral-500 tabular-nums">
+                      <span class="ml-auto shrink-0 font-mono text-caption text-neutral-500 tabular-nums">
                         {peso(a.bytes)}
                       </span>
                     </button>
@@ -148,7 +148,7 @@ export default function Entrega(props: {
                 <Show when={ocultos() > 0}>
                   <button
                     type="button"
-                    class="justify-self-start rounded-sm py-0.5 pr-1.5 pl-3 text-[0.6875rem] text-neutral-500 transition-colors hover:text-neutral-950"
+                    class="justify-self-start rounded-sm py-0.5 pr-1.5 pl-3 text-caption text-neutral-500 transition-colors hover:text-neutral-950"
                     onClick={() => setTodos(true)}
                   >
                     {t("chat.delivery.more", { count: ocultos() })}

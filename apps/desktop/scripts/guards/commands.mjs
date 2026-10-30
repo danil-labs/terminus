@@ -39,7 +39,7 @@
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { relative } from "node:path";
-// Ver la nota de `paths.mjs`: `.pathname` en Windows da `/C:/…` y revienta.
+// `.pathname` en Windows da `/C:/…` y revienta.
 import { fileURLToPath } from "node:url";
 import { walkFiles } from "../git.mjs";
 import { COMANDOS_PENDIENTES } from "../engine-pending.mjs";
@@ -89,6 +89,7 @@ const SIN_INTERFAZ = {
   // El renombre lo hace hoy el agente con `git branch -m`; la app lo reconcilia.
   worktree_rename_branch: "el renombre al entregar aún no tiene gesto en pantalla",
   // Lo incluido se repara entero con `install_tool {"tool":"bundled-work-tools"}`.
+  set_workspace_terminal_theme: "el selector de terminal no se ofrece hoy (docs/visual-system.md); el comando es del motor",
   install_base_tool: "lo usa bootstrap::prepare_runtime; la ventana repara lo incluido con install_tool",
   remove_tool: "lo incluido con Terminus no se desinstala; queda en el contrato congelado",
   remove_google_drive: "quitar el binario de Drive es de Configuración; el onboarding solo desconecta",

@@ -268,8 +268,8 @@ export default function TabStrip(props: {
             props.onDrag?.(p.id, e);
           }}
           class={cn(
-            "group flex h-7 shrink-0 touch-none items-center rounded-[var(--radius-sm)] pr-1 select-none",
-            task() ? "w-[220px] text-sm" : "w-[180px] text-[0.75rem]",
+            "group flex h-7 shrink-0 touch-none items-center rounded-sm pr-1 select-none",
+            task() ? "w-[220px] text-sm" : "w-[180px] text-label",
             active() && !transient()
               ? "tab-active font-semibold text-neutral-950"
               : "font-medium text-neutral-500 hover:bg-neutral-950/5 hover:text-neutral-950",
@@ -316,7 +316,7 @@ export default function TabStrip(props: {
               }
             }}
             class={cn(
-              "flex h-full min-w-0 flex-1 cursor-default items-center gap-1.5 rounded-[var(--radius-sm)] outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+              "flex h-full min-w-0 flex-1 cursor-default items-center gap-1.5 rounded-sm outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
               task() ? "pl-2" : "pl-1.5 font-mono",
               transient() && "font-normal italic",
             )}
@@ -385,7 +385,7 @@ export default function TabStrip(props: {
               {(l) => (
                 <span
                   aria-hidden="true"
-                  class={cn("shrink-0 text-[0.625rem] font-semibold", colorDeMarca(l().marca))}
+                  class={cn("shrink-0 text-2xs font-semibold", colorDeMarca(l().marca))}
                 >
                   {l().marca}
                 </span>
@@ -507,7 +507,7 @@ export function NewTabButton(props: {
       <DropdownMenuTrigger
         aria-label={t("projects.tabs.new")}
         title={t("projects.tabs.new")}
-        class="ml-0.5 grid size-6 shrink-0 place-items-center rounded-[var(--radius-sm)] text-neutral-500 outline-none hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary data-[expanded]:bg-surface-muted data-[expanded]:text-neutral-950"
+        class="ml-0.5 grid size-6 shrink-0 place-items-center rounded-sm text-neutral-500 outline-none hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary data-[expanded]:bg-surface-muted data-[expanded]:text-neutral-950"
       >
         <Plus size={14} />
       </DropdownMenuTrigger>

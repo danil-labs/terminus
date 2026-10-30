@@ -32,7 +32,7 @@ const selectVariants = cva(
   //
   // Se ponen los dos —fondo y texto— y con tokens, que ya se invierten con el
   // tema. Poner solo el fondo dejaría el mismo fallo en claro.
-  "w-full min-w-0 min-h-9 px-[11px] rounded-md border border-border-strong bg-surface text-[0.8125rem] [font-family:inherit] text-neutral-950 outline-none transition-[border-color,background-color] duration-150 ease-out focus-visible:border-primary focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-60 disabled:cursor-not-allowed [&>option]:bg-surface [&>option]:text-neutral-950 [&>optgroup]:bg-surface [&>optgroup]:text-neutral-950",
+  "w-full min-w-0 min-h-9 px-[11px] rounded-md border border-border-strong bg-surface text-ui [font-family:inherit] text-neutral-950 outline-none transition-[border-color,background-color] duration-150 ease-out focus-visible:border-primary focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-60 disabled:cursor-not-allowed [&>option]:bg-surface [&>option]:text-neutral-950 [&>optgroup]:bg-surface [&>optgroup]:text-neutral-950",
   {
     variants: {
       variant: {

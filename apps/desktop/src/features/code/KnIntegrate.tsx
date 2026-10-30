@@ -103,7 +103,7 @@ export default function KnIntegrate(props: {
       </Button>
       <Dialog open={abierto()} onOpenChange={setAbierto}>
         <DialogContent>
-          <DialogTitle class="m-0 text-[0.9375rem] font-semibold">
+          <DialogTitle class="m-0 text-lead font-semibold">
             {t("kn.integrate.title")}
           </DialogTitle>
           <p class="m-0 mt-3 text-sm leading-6 text-neutral-500">
@@ -119,7 +119,7 @@ export default function KnIntegrate(props: {
                   <For each={lista().files}>
                     {(p) => (
                       <li class="border-t border-border py-2 first:border-t-0">
-                        <div class="font-mono text-[0.75rem] text-neutral-950">{p.path}</div>
+                        <div class="font-mono text-label text-neutral-950">{p.path}</div>
                         <div class="text-xs text-neutral-500">{clase(p.kind)}</div>
                         <div class="text-xs text-neutral-500">
                           {t("kn.pending.task")}: {fecha(p.session_at)}

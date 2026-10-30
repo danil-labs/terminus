@@ -1,3 +1,4 @@
+import { RADIUS, TEXT } from "@terminus/design";
 import { SendButton } from "./SendButton";
 import type { MentionList, PermissionModeOption, ProviderInfo, ProviderModels, SlashMenu } from "@terminus/protocol";
 import { modelName, previewLabel } from "@terminus/tasks";
@@ -383,7 +384,7 @@ export function Composer({
           {queue.map((q, i) => (
             <View key={q.id} style={[styles.queued, { borderColor: theme.border, backgroundColor: theme.surface }]} testID={`queued-${i}`}>
               <Text style={[styles.queueLabel, { color: theme.textMuted }]}>{w("chat.queue.label")}</Text>
-              <Text numberOfLines={2} style={{ flex: 1, color: theme.text, fontSize: 14 }}>
+              <Text numberOfLines={2} style={{ flex: 1, color: theme.text, fontSize: TEXT.body }}>
                 {q.text}
               </Text>
               {onInject ? (
@@ -394,7 +395,7 @@ export function Composer({
                   style={{ opacity: injecting.has(q.id) ? 0.5 : 1 }}
                   onPress={() => void injectQueued(q)}
                 >
-                  <Text style={{ color: theme.primary, fontWeight: "600", fontSize: 13 }}>{w("chat.queue.send_now")}</Text>
+                  <Text style={{ color: theme.primary, fontWeight: "600", fontSize: TEXT.ui }}>{w("chat.queue.send_now")}</Text>
                 </Pressable>
               ) : null}
               <Pressable hitSlop={6} accessibilityLabel={w("chat.queue.remove")} onPress={() => setQueue((old) => old.filter((x) => x.id !== q.id))}>
@@ -414,7 +415,7 @@ export function Composer({
             {attachments.map((a) => (
               <View key={a.key} style={[styles.file, { backgroundColor: theme.muted }]}>
                 <Icon name="image" size={13} color={theme.textMuted} />
-                <Text numberOfLines={1} style={{ color: theme.text, fontSize: 12, maxWidth: 140 }}>
+                <Text numberOfLines={1} style={{ color: theme.text, fontSize: TEXT.label, maxWidth: 140 }}>
                   {a.path ? a.name : t("composer.uploading", { name: a.name })}
                 </Text>
                 <Pressable hitSlop={8} accessibilityLabel={w("chat.attachments.remove", { name: a.name })} onPress={() => setAttachments((old) => old.filter((x) => x.key !== a.key))}>
@@ -450,7 +451,7 @@ export function Composer({
           {shell ? (
             <View style={[styles.pill, { backgroundColor: theme.text }]}>
               <Icon name="terminal" size={13} color={theme.bg} />
-              <Text style={{ color: theme.bg, fontSize: 12, fontWeight: "600" }}>{w("chat.composer.terminal")}</Text>
+              <Text style={{ color: theme.bg, fontSize: TEXT.label, fontWeight: "600" }}>{w("chat.composer.terminal")}</Text>
             </View>
           ) : (
             <>
@@ -467,7 +468,7 @@ export function Composer({
               {modes.length ? (
                 <Pressable testID="mode" onPress={() => setSheet("mode")} style={[styles.pill, { borderColor: theme.border, borderWidth: StyleSheet.hairlineWidth }]}>
                   <Icon name="shield" size={13} color={theme.textMuted} />
-                  <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: 12, maxWidth: 110 }}>
+                  <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: TEXT.label, maxWidth: 110 }}>
                     {modeOption ? phrase(modeOption.label) : w("chat.mode.placeholder")}
                   </Text>
                 </Pressable>
@@ -478,10 +479,10 @@ export function Composer({
           {!shell && current ? (
             <Pressable testID="model" onPress={() => setSheet("model")} style={[styles.pill, styles.modelPill, { borderColor: theme.border }]} accessibilityLabel={w("chat.model.title")}>
               <BrandMark id={current} size={13} color={theme.text} />
-              <Text numberOfLines={1} style={{ color: theme.text, fontSize: 12, maxWidth: 130 }}>
+              <Text numberOfLines={1} style={{ color: theme.text, fontSize: TEXT.label, maxWidth: 130 }}>
                 {modelText}
               </Text>
-              {efforts.length ? <Text style={{ color: theme.textMuted, fontSize: 12 }}>· {effortLabel(effort)}</Text> : null}
+              {efforts.length ? <Text style={{ color: theme.textMuted, fontSize: TEXT.label }}>· {effortLabel(effort)}</Text> : null}
               <Icon name="chevron-down" size={12} color={theme.textMuted} />
             </Pressable>
           ) : null}
@@ -492,7 +493,7 @@ export function Composer({
           ) : shell ? (
             <Pressable testID="send" disabled={!ready || !text.slice(1).trim()} onPress={send} style={[styles.run, { backgroundColor: theme.text, opacity: ready && text.slice(1).trim() ? 1 : 0.4 }]}>
               <Icon name="corner-down-left" size={14} color={theme.bg} />
-              <Text style={{ color: theme.bg, fontWeight: "700", fontSize: 13 }}>{sendLabel}</Text>
+              <Text style={{ color: theme.bg, fontWeight: "700", fontSize: TEXT.ui }}>{sendLabel}</Text>
             </Pressable>
           ) : (
             <SendButton disabled={!ready || !hasText} onPress={send} label={sendLabel} />
@@ -502,7 +503,7 @@ export function Composer({
       {running && hasText && onStop ? (
         <Pressable onPress={onStop} style={styles.stopLine} testID="stop-inline">
           <Icon name="square" size={10} color={theme.textMuted} fill={theme.textMuted} />
-          <Text style={{ color: theme.textMuted, fontSize: 13 }}>{w("chat.turn.stop")}</Text>
+          <Text style={{ color: theme.textMuted, fontSize: TEXT.ui }}>{w("chat.turn.stop")}</Text>
         </Pressable>
       ) : null}
       {note ? <Text style={[styles.hint, { color: theme.textMuted, paddingHorizontal: 16 }]}>{note}</Text> : null}
@@ -613,8 +614,8 @@ export function SelectorChip({ icon, left, label, value, onPress, testID, muted 
       style={({ pressed }) => [styles.selector, { borderColor: theme.border, backgroundColor: pressed ? theme.muted : theme.surface }]}
     >
       {left ?? (icon ? <Icon name={icon} size={13} color={theme.textMuted} /> : null)}
-      {label ? <Text style={{ color: theme.textMuted, fontSize: 12 }}>{label}</Text> : null}
-      <Text numberOfLines={1} style={{ color: muted ? theme.textMuted : theme.text, fontSize: 13, fontWeight: "500", maxWidth: 150 }}>
+      {label ? <Text style={{ color: theme.textMuted, fontSize: TEXT.label }}>{label}</Text> : null}
+      <Text numberOfLines={1} style={{ color: muted ? theme.textMuted : theme.text, fontSize: TEXT.ui, fontWeight: "500", maxWidth: 150 }}>
         {value}
       </Text>
       {onPress ? <Icon name="chevron-down" size={12} color={theme.textMuted} /> : null}
@@ -634,11 +635,11 @@ const styles = StyleSheet.create({
   run: { flexDirection: "row", alignItems: "center", gap: 6, height: 34, borderRadius: 17, paddingHorizontal: 14 },
   stopLine: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-end", paddingHorizontal: 8 },
   files: { gap: 6, paddingHorizontal: 4, paddingTop: 4 },
-  file: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 },
+  file: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: RADIUS.lg, paddingHorizontal: 8, paddingVertical: 5 },
   queue: { gap: 6 },
   queued: { flexDirection: "row", alignItems: "center", gap: 10, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
-  queueLabel: { fontSize: 11, fontWeight: "600" },
-  hint: { fontSize: 13, paddingVertical: 6, paddingHorizontal: 18 },
+  queueLabel: { fontSize: TEXT.caption, fontWeight: "600" },
+  hint: { fontSize: TEXT.ui, paddingVertical: 6, paddingHorizontal: 18 },
   suggestions: { maxHeight: 260, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, overflow: "hidden" },
   efforts: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: 18, paddingVertical: 8 },
   effort: { borderWidth: 1, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 8 },
