@@ -154,3 +154,15 @@ test("channels list is read-only and takes no query", async () => {
   assert.equal((await h.fetch(prefix + "/api/channels")).status, 401);
   assert.equal(h.calls.length, 0);
 });
+
+test("WorkOS sign-in routes stay in the Worker; the sign-in page is an asset", async () => {
+  const h = harness();
+  const session = await h.fetch("/auth/session", { method: "POST", headers: { Origin: origin } });
+  assert.equal(session.status, 503, "without its secrets nobody gets a session");
+  assert.equal((await session.json()).error, "sign_in_unavailable");
+  assert.equal((await h.fetch("/auth/workos/start")).status, 503);
+  assert.equal((await h.fetch("/auth/session", { method: "POST", headers: { Origin: "https://evil.example" } })).status, 403);
+  assert.equal(h.calls.length, 0);
+  assert.equal(await (await h.fetch("/auth?next=%2Finbox")).text(), "assets");
+  assert.equal(h.calls.length, 1);
+});

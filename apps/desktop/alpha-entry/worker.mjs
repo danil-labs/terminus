@@ -1,3 +1,5 @@
+import { handleAuth } from "./session.mjs";
+
 const HOST = "alfa-app.danil.ai";
 // La web vive en la raíz del dominio (build con `TERMINUS_WEB_BASE=/`).
 const PREFIX = "/alpha-api";
@@ -77,6 +79,8 @@ export default {
         },
       });
     }
+    const signIn = await handleAuth(request, env, url);
+    if (signIn) return signIn;
     if (request.method !== "GET" && request.method !== "HEAD") return json("method_not_allowed", 405);
     if (!env.TERMINUS_WEB) return json("assets_unavailable", 503);
     if (PHONE_ROUTES.includes(url.pathname)) {

@@ -16,7 +16,10 @@ export type Session = {
   signOut?(): Promise<void>;
 };
 
-export type BrowserSession = Session & AuthClient & { client: SupabaseClient };
+/** `watch`: calls `clear` once the session ends or passes to someone other than `userId`. */
+export type WatchedSession = Session & AuthClient & { watch(userId: string, clear: () => void): () => void };
+
+export type BrowserSession = WatchedSession & { client: SupabaseClient };
 
 type Options = {
   /** `undefined`: the Danil app's own key. */
@@ -99,5 +102,11 @@ export function supabaseSession(url: string, key: string, options: Options = {})
       return user;
     },
     signOutLocal,
+    watch(userId, clear) {
+      const { data } = client.auth.onAuthStateChange((event, value) => {
+        if (event === "SIGNED_OUT" || (value && value.user.id !== userId)) clear();
+      });
+      return () => data.subscription.unsubscribe();
+    },
   };
 }
