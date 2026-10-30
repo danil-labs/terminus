@@ -6,7 +6,8 @@ import { cn } from "../../lib/utils";
 import { Badge } from "../../ui/Badge";
 import { ProgressBar } from "../../ui/ProgressBar";
 import { type Machine, machineName } from "../machines/store";
-import { UPDATE_FEATURE, active, engineVersion, hasUsage, heaviest, history, leftovers, level, newer, split, topProcesses } from "./machineUsage";
+import { UPDATE_FEATURE, active, engineVersion, hasUsage, heaviest, history, leftovers, level, split, topProcesses, updateState } from "./machineUsage";
+import RefreshCw from "lucide-solid/icons/refresh-cw";
 
 /** El título y la carpeta de una tarea de la ventana, si se conocen. */
 export type TaskLookup = (session: string) => { title: string; project?: string } | undefined;
@@ -83,8 +84,12 @@ export function MachineCard(props: {
   lookup: TaskLookup;
   when: When;
   onSelect: () => void;
-  /** `engine_update(release)`; `now` corta los turnos en curso. Devuelve el fallo en prosa, o `""`. */
-  onUpdate?: (now: boolean) => Promise<string>;
+  /** `engine_update({ release, force })`; `force` corta los turnos en curso. Devuelve el fallo en prosa, o `""`. */
+  onUpdate?: (force: boolean) => Promise<string>;
+  /** `engine_update_status({ refresh: true })`: pregunta ya por la última release firmada. */
+  onRefresh?: () => Promise<void>;
+  /** Un código de error del motor en prosa (`no_release_known`…). */
+  failure?: (code: string) => string;
 }) {
   const r = () => props.resources;
   const on = () => props.power === "on";
@@ -109,15 +114,33 @@ export function MachineCard(props: {
 
   const version = () => engineVersion(r(), props.machine.version);
   const updatable = () => on() && !!props.machine.features?.includes(UPDATE_FEATURE) && !!props.onUpdate;
-  /** `scheduled`: pedida, espera a que no haya turnos; `confirm`: pregunta antes de «Actualizar ya». */
-  const [update, setUpdate] = createSignal<"idle" | "sending" | "scheduled" | "confirm" | "now">("idle");
+  /** Lo de esta ventana: `confirm` pregunta antes de «Actualizar ya»; el resto lo dice el motor (`updateState`). */
+  const [local, setLocal] = createSignal<"idle" | "sending" | "confirm" | "scheduled" | "now">("idle");
   const [updateError, setUpdateError] = createSignal("");
-  const ask = async (now: boolean) => {
+  const [refreshing, setRefreshing] = createSignal(false);
+  const engineState = () => updateState(r()?.engine);
+  const update = () => {
+    const mine = local();
+    if (mine === "sending" || mine === "confirm") return mine;
+    const said = engineState();
+    if (said === "scheduled" || said === "now") return said;
+    return mine;
+  };
+  const rejected = () => {
+    const e = r()?.engine?.download;
+    return engineState() === "rejected" && e?.error ? (props.failure?.(e.error) ?? e.error) : "";
+  };
+  const ask = async (force: boolean) => {
     setUpdateError("");
-    setUpdate("sending");
-    const failure = (await props.onUpdate?.(now)) ?? "";
+    setLocal("sending");
+    const failure = (await props.onUpdate?.(force)) ?? "";
     setUpdateError(failure);
-    setUpdate(failure ? "idle" : now ? "now" : "scheduled");
+    setLocal(failure ? "idle" : force ? "now" : "scheduled");
+  };
+  const refresh = async () => {
+    setRefreshing(true);
+    await props.onRefresh?.();
+    setRefreshing(false);
   };
   const small = "shrink-0 rounded-[5px] border border-border px-2 py-0.5 text-[0.6875rem] text-neutral-950 outline-none hover:bg-surface-muted focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary disabled:opacity-60";
 
@@ -239,11 +262,17 @@ export function MachineCard(props: {
               </span>
             )}
           </Show>
-          <Show when={version() && newer(version()!.latest, version()!.version)}>
+          <Show when={version()?.updateAvailable}>
             <Badge tone="info" class="px-1.5 py-0 text-[0.625rem]">{t("shell.machine_panel.update_available")}</Badge>
           </Show>
           <Show when={updatable()}>
             <span class="ml-auto flex items-center gap-1.5">
+              <Show when={props.onRefresh}>
+                <button type="button" class="grid size-6 place-items-center rounded-sm text-neutral-500 outline-none hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-60"
+                  aria-label={t("shell.machine_panel.update_check")} title={t("shell.machine_panel.update_check")} disabled={refreshing()} onClick={() => void refresh()}>
+                  <RefreshCw size={12} class={refreshing() ? "animate-spin-steps" : undefined} aria-hidden />
+                </button>
+              </Show>
               <Show when={update() === "idle" || update() === "sending"}>
                 <button type="button" class={small} disabled={update() === "sending"} onClick={() => void ask(false)}>
                   {t("shell.machine_panel.update")}
@@ -251,7 +280,7 @@ export function MachineCard(props: {
               </Show>
               <Show when={update() === "scheduled"}>
                 <span role="status" class="text-neutral-950">{t("shell.machine_panel.update_scheduled")}</span>
-                <button type="button" class={small} onClick={() => setUpdate("confirm")}>{t("shell.machine_panel.update_now")}</button>
+                <button type="button" class={small} onClick={() => setLocal("confirm")}>{t("shell.machine_panel.update_now")}</button>
               </Show>
               <Show when={update() === "now"}>
                 <span role="status" class="text-neutral-950">{t("shell.machine_panel.updating")}</span>
@@ -262,11 +291,11 @@ export function MachineCard(props: {
             <span role="alertdialog" aria-label={t("shell.machine_panel.update_now")} class="mt-1 flex w-full flex-wrap items-center gap-2 rounded-md bg-warning/10 px-2 py-1.5 text-warning-strong">
               <span class="min-w-0 flex-1">{t("shell.machine_panel.update_now_confirm")}</span>
               <button type="button" class={cn(small, "border-error-strong text-error-strong")} onClick={() => void ask(true)}>{t("shell.machine_panel.update_now")}</button>
-              <button type="button" class={small} onClick={() => setUpdate("scheduled")}>{t("shell.machine_panel.cancel")}</button>
+              <button type="button" class={small} onClick={() => setLocal("scheduled")}>{t("shell.machine_panel.cancel")}</button>
             </span>
           </Show>
-          <Show when={updateError()}>
-            <span role="alert" class="w-full text-error-strong">{updateError()}</span>
+          <Show when={updateError() || rejected()}>
+            <span role="alert" class="w-full text-error-strong">{updateError() || rejected()}</span>
           </Show>
         </div>
       </Show>
@@ -390,14 +419,14 @@ export function MemoryTab(props: {
         </ul>
       </Show>
 
-      <Show when={props.resources.engine}>
+      <Show when={props.resources.engine?.rss_bytes !== undefined && props.resources.engine}>
         {(e) => (
           <>
             <p class={section}>
               <span>{t("shell.machine_panel.engine")}</span>
-              <span class="font-mono font-normal tabular-nums">{peso(e().rss_bytes)}</span>
+              <span class="font-mono font-normal tabular-nums">{peso(e().rss_bytes ?? 0)}</span>
             </p>
-            <p class="m-0 px-1.5 text-[0.6875rem] text-neutral-500">{t("shell.machine_panel.engine.detail", { threads: e().threads })}</p>
+            <p class="m-0 px-1.5 text-[0.6875rem] text-neutral-500">{t("shell.machine_panel.engine.detail", { threads: e().threads ?? 0 })}</p>
           </>
         )}
       </Show>

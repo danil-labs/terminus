@@ -8,7 +8,6 @@
  */
 export const COMANDOS_PENDIENTES = {
   stop_task_processes: "seldon-host feat/machine-usage (machine_usage_v1, propuesta §3.4); la ventana solo la pide si el host la anuncia",
-  engine_update: "seldon-host feat/engine-update (engine_update_v1, propuesta §3.6); la ventana solo la pide si el host la anuncia",
 };
 
 export const EVENTOS_PENDIENTES = {};

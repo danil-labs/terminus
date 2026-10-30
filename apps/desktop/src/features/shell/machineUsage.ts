@@ -1,4 +1,4 @@
-import type { MachineResources, MachineTaskUsage } from "@terminus/protocol";
+import type { EngineUpdate, MachineResources, MachineTaskUsage } from "@terminus/protocol";
 
 /**
  * Lo que el panel «Máquinas» lee de `machine_resources`, sin pantalla: cuándo
@@ -117,30 +117,25 @@ export function forgetSamples() {
   samples.clear();
 }
 
-export type EngineVersion = { version: string; build: string | null; latest: string | null };
+export type EngineVersion = { version: string; build: string | null; updateAvailable: boolean };
 
 /**
- * La versión del motor: la de `status` que trae el resumen (o su copia, si la
- * máquina está apagada) y, si no, la `host_version` del plano de control
- * («0.2.73-45867e9»). El contrato no cuenta: otro contrato no es una máquina
- * inservible (nota «terminus-must-work-with-outdated-hosts»).
+ * La versión del motor: la del bloque `engine` del resumen (o de su copia, si
+ * la máquina está apagada) y, si no, la `host_version` del plano de control
+ * («0.2.73-45867e9»). Otro contrato nunca es una máquina inservible.
  */
 export function engineVersion(r: MachineResources | undefined, hostVersion?: string | null): EngineVersion | null {
   const e = r?.engine;
-  if (e?.version) return { version: e.version, build: e.build ? e.build.slice(0, 7) : null, latest: e.latest ?? null };
+  if (e?.version) return { version: e.version, build: e.build ? e.build.slice(0, 7) : null, updateAvailable: !!e.update_available };
   const m = hostVersion?.trim().replace(/^v/, "").match(/^(\d+(?:\.\d+)*)(?:[-+.]([0-9a-f]{7,}))?/i);
-  return m ? { version: m[1], build: m[2] ? m[2].slice(0, 7) : null, latest: null } : null;
+  return m ? { version: m[1], build: m[2] ? m[2].slice(0, 7) : null, updateAvailable: false } : null;
 }
 
-/** Si `latest` es una release posterior a `current`, comparando número por número. */
-export function newer(latest: string | null | undefined, current: string): boolean {
-  if (!latest) return false;
-  const a = latest.replace(/^v/, "").split(/[.-]/).map((n) => Number.parseInt(n, 10));
-  const b = current.replace(/^v/, "").split(/[.-]/).map((n) => Number.parseInt(n, 10));
-  for (let i = 0; i < Math.max(a.length, b.length); i++) {
-    const x = Number.isFinite(a[i]) ? a[i] : 0;
-    const y = Number.isFinite(b[i]) ? b[i] : 0;
-    if (x !== y) return x > y;
-  }
-  return false;
+/** En qué va una actualización pedida, según el motor. */
+export function updateState(e: EngineUpdate | undefined): "scheduled" | "now" | "rejected" | null {
+  if (!e?.available) return null;
+  if (e.download?.state === "rejected") return "rejected";
+  if (e.pending?.mode === "now") return "now";
+  if (e.handover_pending || e.pending || e.download?.state === "downloading" || e.download?.state === "staged") return "scheduled";
+  return null;
 }

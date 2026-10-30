@@ -6,7 +6,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { active, engineVersion, forgetSamples, hasUsage, heaviest, history, leftovers, level, newer, remember, split, topProcesses, worst } from "../../src/features/shell/machineUsage.ts";
+import { active, engineVersion, forgetSamples, hasUsage, heaviest, history, leftovers, level, remember, split, topProcesses, updateState, worst } from "../../src/features/shell/machineUsage.ts";
 import { resources } from "../helpers/fixtures/machine-usage.ts";
 
 const GB = 1024 ** 3;
@@ -62,13 +62,21 @@ test("pressure bars use the engine's history, or what this window sampled once a
   assert.deepEqual(history("x", bare), [31, 40], "one bar per minute, the last reading of that minute");
 });
 
-test("engine version: status version and build, else the control plane's host_version; newer compares releases", () => {
-  assert.deepEqual(engineVersion({ measured_at: 0, storage: [], engine: { rss_bytes: 1, threads: 1, version: "0.2.73", build: "09a2e33f1c 2026-10-29", latest: "0.2.74" } }),
-    { version: "0.2.73", build: "09a2e33", latest: "0.2.74" });
-  assert.deepEqual(engineVersion(undefined, "v0.2.73-45867e9"), { version: "0.2.73", build: "45867e9", latest: null });
+test("engine version: the engine block, else the control plane's host_version; «update available» is the engine's update_available", () => {
+  assert.deepEqual(engineVersion({ measured_at: 0, storage: [], engine: { version: "0.2.73", build: "09a2e33c71", update_available: true } }),
+    { version: "0.2.73", build: "09a2e33", updateAvailable: true });
+  assert.deepEqual(engineVersion({ measured_at: 0, storage: [], engine: { version: "0.2.73", build: "09a2e33c71" } })?.updateAvailable, false, "without engine_update_v1 only version and build arrive");
+  assert.deepEqual(engineVersion(undefined, "v0.2.73-45867e9"), { version: "0.2.73", build: "45867e9", updateAvailable: false });
   assert.equal(engineVersion(undefined, null), null);
-  assert.equal(newer("0.2.74", "0.2.73"), true);
-  assert.equal(newer("0.2.73", "0.2.73"), false);
-  assert.equal(newer("0.2.9", "0.2.73"), false);
-  assert.equal(newer(null, "0.2.73"), false);
+});
+
+test("update state comes from the engine: handover, pending, download", () => {
+  assert.equal(updateState(undefined), null);
+  assert.equal(updateState({ version: "1", available: false, handover_pending: true }), null, "without the capability nothing is promised");
+  assert.equal(updateState({ available: true, handover_pending: true }), "scheduled");
+  assert.equal(updateState({ available: true, pending: { mode: "when_idle" } }), "scheduled");
+  assert.equal(updateState({ available: true, pending: { mode: "now" } }), "now");
+  assert.equal(updateState({ available: true, download: { request_id: "r", release: "v1", state: "downloading" } }), "scheduled");
+  assert.equal(updateState({ available: true, download: { request_id: "r", release: "v1", state: "rejected", error: "no_release_known" } }), "rejected");
+  assert.equal(updateState({ available: true, update_available: true, latest: null }), null);
 });

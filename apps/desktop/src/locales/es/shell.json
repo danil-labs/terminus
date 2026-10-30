@@ -285,6 +285,8 @@
   "shell.machine_panel.update_now_confirm": "Actualizar ya corta los turnos que estén en curso en esta máquina.",
   "shell.machine_panel.updating": "Actualizando…",
   "shell.machine_panel.cancel": "Cancelar",
+  "shell.machine_panel.no_release_known": "No hay versión firmada disponible",
+  "shell.machine_panel.update_check": "Buscar actualización",
   "shell.machine_panel.no_attribution": "Este host no reparte la memoria por tarea.",
   "shell.theme.name.dark": "Oscuro",
   "shell.theme.name.light": "Claro",

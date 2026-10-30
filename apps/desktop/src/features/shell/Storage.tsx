@@ -1,4 +1,4 @@
-import type { MachineResources, MachineTaskUsage, Startup } from "@terminus/protocol";
+import type { EngineUpdate, MachineResources, MachineTaskUsage, Startup } from "@terminus/protocol";
 import type { JSX } from "solid-js";
 import {
   For,
@@ -34,7 +34,8 @@ import { Badge } from "../../ui/Badge";
 import { ProgressBar } from "../../ui/ProgressBar";
 import { type Machine, machineName, machines as fleetMachines } from "../machines/store";
 import { MachineCard, MemoryTab, type Power, type TaskLookup } from "./MachineCard";
-import { USAGE_FEATURE, hasUsage, remember, worst } from "./machineUsage";
+import { UPDATE_FEATURE, USAGE_FEATURE, hasUsage, remember, worst } from "./machineUsage";
+import { errorCode } from "../../lib/errorCode";
 import { prosaDe } from "../../ui/Failure";
 
 type Clase = "recuperable" | "git" | "fuente" | "trabajo" | "registro";
@@ -320,14 +321,34 @@ export default function Almacenamiento(props: {
     onCleanup(() => clearInterval(timer));
   });
 
-  /** `engine_update(release)` (§3.6): sin `force` espera a que no haya turnos. */
-  async function updateEngine(m: Machine, now: boolean): Promise<string> {
-    const release = summaryOf(m.id)?.resources?.engine?.latest ?? null;
+  /** El texto de un fallo de la actualización: `no_release_known` tiene el suyo. */
+  const updateFailure = (code: string) => code === "no_release_known" ? t("shell.machine_panel.no_release_known") : code;
+
+  /**
+   * `engine_update({ release, force })` (§3.6). `release: null` es la última
+   * firmada de su canal; `force: true` solo tras confirmar «Actualizar ya».
+   */
+  async function updateEngine(m: Machine, force: boolean): Promise<string> {
     try {
-      await invoke("engine_update", { release, ...(now ? { force: true } : {}) }, { headers: { "x-terminus-machine": m.id } });
+      await invoke("engine_update", { release: null, force }, { headers: { "x-terminus-machine": m.id } });
+      await refreshEngine(m, false);
       return "";
     } catch (error) {
-      return prosaDe(error);
+      return (error === "no_release_known" || errorCode(error) === "no_release_known") ? updateFailure("no_release_known") : prosaDe(error);
+    }
+  }
+
+  /** `engine_update_status`: el bloque `engine` de la tarjeta, sin esperar al próximo resumen. */
+  async function refreshEngine(m: Machine, refresh = true) {
+    try {
+      const engine = await invoke<EngineUpdate>("engine_update_status", { refresh }, { headers: { "x-terminus-machine": m.id } });
+      setSummaries((prev) => {
+        const s = prev[m.id];
+        if (!s?.resources) return prev;
+        return { ...prev, [m.id]: { ...s, resources: { ...s.resources, engine: { ...s.resources.engine, ...engine } } } };
+      });
+    } catch {
+      // Sin respuesta queda lo último que se leyó.
     }
   }
 
@@ -1164,7 +1185,8 @@ export default function Almacenamiento(props: {
               <>
                 <MachineCard machine={m} resources={summaryOf(m.id)?.resources} power={powerOf(m)} cachedAt={summaryOf(m.id)?.cachedAt}
                   selected={machine() === m.id && expanded()} disabled={clearing()} lookup={lookup} when={actividadDe}
-                  onSelect={() => choose(m)} onUpdate={(now) => updateEngine(m, now)} />
+                  onSelect={() => choose(m)} onUpdate={(force) => updateEngine(m, force)}
+                  onRefresh={m.features?.includes(UPDATE_FEATURE) ? () => refreshEngine(m) : undefined} failure={updateFailure} />
                 <Show when={machine() === m.id && expanded()}>
                   <section class="-mt-1 rounded-b-lg border-t border-border pt-2" data-machine-detail={m.id}>
                     <div class="flex items-center gap-1 px-1" role="tablist">

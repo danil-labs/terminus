@@ -19,6 +19,15 @@ const MODES = {
   critical: { memory: 44, io: 69, cpu: 7, used: 15.1, scale: 1.15, swap: 6.8, usage: 6 },
 } as const;
 
+/** El bloque `engine` de vm-alberto con `engine_update_v1`: hay una release firmada más nueva. */
+const ALBERTO_ENGINE = {
+  version: "0.2.73", build: "09a2e33c71", available: true, channel: "stable",
+  latest: { release: "v0.2.74", version: "0.2.74", commit: "5be01d2a90", sha256: "9f…", published_at: "2026-10-30T02:10:00Z" },
+  update_available: true, handover_pending: false, download: null, pending: null, last: null,
+};
+/** Lo que pidió «Actualizar» en esta página: el motor lo devuelve en `pending`. */
+let requested: { pending?: { request_id: string; release: string; mode: "now" | "when_idle" }; handover_pending?: boolean } = {};
+
 const RAMPA = [0.3, 0.35, 0.5, 0.6, 0.7, 0.85, 1, 0.95, 0.9, 1];
 
 type Seed = { session: string; title: string; project: string; state: MachineTaskUsage["state"]; gb: number; processes: number; top: [string, number, number?][]; ended?: number; archived?: boolean; browsers?: string[] };
@@ -69,7 +78,7 @@ export function resources(mode: Mode, now = Date.now()): Record<string, MachineR
       memory: { total_bytes: total, available_bytes: total - m.used * GB, swap_total_bytes: 7.8 * GB, swap_used_bytes: m.swap * GB },
       cpu: { cores: 4, load: [11.3, 88.9, 122.8], usage_percent: m.usage },
       pressure: { cpu: m.cpu, memory: m.memory, io: m.io, memory_history: RAMPA.map((k) => Math.round(Math.min(100, m.memory * k) * 10) / 10) },
-      engine: { rss_bytes: 2.1 * GB, threads: 57, version: "0.2.73", build: "09a2e33c71 2026-10-29T18:02Z", channel: "stable", latest: "0.2.74" },
+      engine: { rss_bytes: 2.1 * GB, threads: 57, ...ALBERTO_ENGINE, ...requested },
       attribution: "cgroup",
       tasks: [...ALBERTO.map((s) => task(s, m.scale, now)), ...LEFT.map((s) => task(s, 1, now))],
       other: { memory_bytes: 1.2 * GB, processes: 212 },
@@ -80,7 +89,7 @@ export function resources(mode: Mode, now = Date.now()): Record<string, MachineR
       memory: { total_bytes: 16 * GB, available_bytes: 6.7 * GB, swap_total_bytes: 2 * GB, swap_used_bytes: 0.4 * GB },
       cpu: { cores: 10, load: [2.1, 2.4, 2.2], usage_percent: 12 },
       pressure: { cpu: 3, memory: 2, io: 1 },
-      engine: { rss_bytes: 0.6 * GB, threads: 31, version: "0.2.74", build: "5be01d2a90", channel: "stable", latest: "0.2.74" },
+      engine: { rss_bytes: 0.6 * GB, threads: 31, version: "0.2.74", build: "5be01d2a90" },
       attribution: "best_effort",
       tasks: [
         task({ session: "s-local-a", title: "Notas de la versión 0.2.89", project: "Terminus", state: "running", gb: 2.2, processes: 8, top: [["node · vite", 1.1], ["claude", 0.3]] }, 1, now),
@@ -151,7 +160,13 @@ export function route(mode: Mode) {
       return { ...base, machine_resources: r };
     }
     if (command === "list_storage") return storage(now);
-    if (command === "stop_task_processes" || command === "engine_update") return { ok: true, args };
+    if (command === "stop_task_processes") return { ok: true, args };
+    if (command === "engine_update") {
+      const { force } = (args ?? {}) as { force?: boolean };
+      requested = { pending: { request_id: "r1", release: "v0.2.74", mode: force ? "now" : "when_idle" }, handover_pending: !force };
+      return { request_id: "r1", release: "v0.2.74", mode: force ? "now" : "when_idle", state: "downloading" };
+    }
+    if (command === "engine_update_status") return machine === "vm-alberto" ? { ...ALBERTO_ENGINE, ...requested, schema: 1 } : { version: "0.2.61", build: "1a2b3c4", available: false };
     throw { what: { clave: "shell.service.command" }, detail: "command" };
   };
 }

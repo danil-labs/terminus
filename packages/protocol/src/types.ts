@@ -32,15 +32,30 @@ export type MachineResources = {
    * uno de los últimos minutos, el más viejo primero, hasta 10.
    */
   pressure?: { cpu: number; memory: number; io: number; memory_history?: number[] };
-  /**
-   * `version` y `build` son los de `status`; `latest` (propuesto), la release
-   * publicada más nueva de su `channel`, si el motor la conoce.
-   */
-  engine?: { rss_bytes: number; threads: number; version?: string; build?: string; channel?: string; latest?: string };
+  /** `rss_bytes` y `threads` llegan con `machine_usage_v1`; lo demás, ver `EngineUpdate`. */
+  engine?: { rss_bytes?: number; threads?: number } & EngineUpdate;
   /** `cgroup` cuenta exacto; `best_effort` (macOS) reparte por proceso; `none`, sin reparto por tarea. */
   attribution?: "cgroup" | "best_effort" | "none";
   tasks?: MachineTaskUsage[];
   other?: { memory_bytes: number; processes: number };
+};
+/**
+ * `engine_update_status` y el bloque `engine` de `machine_resources` (seldon-host
+ * `engine_update.rs`): `version` y `build` siempre; el resto, con `engine_update_v1`.
+ */
+export type EngineUpdate = {
+  version?: string;
+  build?: string;
+  available?: boolean;
+  channel?: string;
+  /** La última release firmada del canal; `null` si no se conoce. */
+  latest?: { release: string; version?: string; commit?: string; sha256?: string; published_at?: string } | null;
+  update_available?: boolean;
+  /** `current` ya apunta a otra release: se cambia al quedar sin turnos. */
+  handover_pending?: boolean;
+  download?: { request_id: string; release: string; state: "downloading" | "staged" | "rejected"; error?: string } | null;
+  pending?: { request_id?: string; release?: string; mode?: "now" | "when_idle" } | null;
+  last?: { request_id?: string; state?: string; error?: string | null } | null;
 };
 export type MachineTaskUsage = {
   workspace: string;
