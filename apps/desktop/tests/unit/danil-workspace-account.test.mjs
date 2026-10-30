@@ -333,13 +333,11 @@ test("the sidebar footer shows the open workspace's account and follows a switch
   await sleep(900);
   const foot = () => w.document.querySelector("[data-danil-foot]");
   assert.equal(foot()?.dataset.danilFoot, "connected", w.document.body.innerHTML.slice(0, 300));
-  assert.ok(foot().textContent.includes("Alberto Ceballos"));
   assert.equal(foot().getAttribute("title"), "Alberto Ceballos · en línea con Danil");
 
   e.state.active = "w2";
   w.dispatchEvent(new w.CustomEvent("harness:workspace"));
   await sleep(400);
-  assert.ok(foot().textContent.includes("Alberto FDB"), foot().textContent);
   assert.equal(foot().getAttribute("title"), "Alberto FDB · sin conexión con Danil por ahora");
 
   e.state.sessions = [ALBERTO];

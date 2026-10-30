@@ -73,7 +73,10 @@ test("the account's workspaces show with their machines asleep, not the create-w
   const listed = await invoke("list_workspaces");
   assert.deepEqual(listed.workspaces.map((w) => [w.id, w.name, w.machines]), [["w1", "Producto", ["cmp_vm"]]], "the registry's workspace, on the VM");
   assert.equal(listed.active, "w1", "and it is the open one");
-  assert.ok(text().includes("Producto"), "the panel opens on it");
+  // The workspace column names it by its tile: the monogram shows, the name is the label.
+  const tile = doc.querySelector('[data-workspace-tile="w1"]');
+  assert.equal(tile?.getAttribute("aria-current"), "true", "the panel opens on it");
+  assert.equal(tile.getAttribute("aria-label"), "Producto");
   // Grouped by folder (the default), an empty project is its own group with «Sin tareas todavía».
   assert.ok(doc.querySelector('[data-sidebar-group="p1"] [data-folder-empty]'), "with an empty task list, not an error");
   const projects = await invoke("list_projects");
