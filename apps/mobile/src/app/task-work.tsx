@@ -3,7 +3,7 @@ import { useRef } from "react";
 import { Platform } from "react-native";
 import { w } from "../lib/i18n";
 import type { WorkRun } from "../lib/steps";
-import { useWorkState } from "../lib/workSheet";
+import { shownRun, useWorkState } from "../lib/workSheet";
 import { WorkSheet } from "../ui/chat/Work";
 import { SheetTitle } from "../ui/components";
 import { Sheet } from "../ui/Sheet";
@@ -20,7 +20,7 @@ export default function TaskWork() {
   const state = useWorkState(`${host}/${id}`);
   const known = useRef<WorkRun | null>(null);
   if (!state) return <Redirect href={{ pathname: "/task/[host]/[workspace]/[folder]/[id]", params: { host, workspace, folder, id } }} />;
-  known.current = state.runs.find((run) => run.key === runKey) ?? known.current;
+  known.current = shownRun(known.current, state.runs.find((run) => run.key === runKey));
   const content = (
     <WorkSheet state={state} run={known.current} last={state.runs.at(-1)?.key === runKey} focus={Number(at ?? 0)} find={find ?? ""} onClose={() => router.back()} />
   );

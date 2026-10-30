@@ -43,6 +43,16 @@ export function releaseWork(key: string, owner: object) {
   notify();
 }
 
+/**
+ * Lo que enseña la hoja. Lo vivo sin guardar se cuelga de la última ejecución: un mensaje que entra a media
+ * ejecución se lo lleva hasta que el motor guarda el tramo, y esta ejecución no debe quedarse sin sus pasos.
+ */
+export function shownRun(known: WorkRun | null, found: WorkRun | undefined): WorkRun | null {
+  if (!found) return known;
+  if (!known || found.steps.length >= known.steps.length) return found;
+  return { ...known, live: found.live, durationMs: found.durationMs };
+}
+
 export const workState = (key: string): WorkSheetState | null => entries.get(key)?.at(-1)?.state ?? null;
 
 export function useWorkState(key: string): WorkSheetState | null {

@@ -2,7 +2,7 @@ import { STATUS_LABELS, TEXT } from "@terminus/design";
 import { stepCounts } from "@terminus/chat/steps";
 import { type ComponentRef, type ReactNode, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { OPENED, type Follow, type Metrics, scrolled, shouldStick } from "../../lib/follow";
+import { OPENED, type Follow, type Metrics, measuredFollow, shouldStick } from "../../lib/follow";
 import { lang, t, w } from "../../lib/i18n";
 import { type Step, type StepRow, type WorkItem, type WorkLine, type WorkRun, bareCommand, elapsed, fileName, hitOf, runningStep } from "../../lib/steps";
 import type { WorkSheetState } from "../../lib/workSheet";
@@ -254,7 +254,7 @@ export function WorkSheet({ state, run, last, focus, find, onClose }: { state: W
   const metrics = useRef({ offset: 0, content: 0, viewport: 0 });
   const measured = useCallback((next: Partial<Metrics>) => {
     metrics.current = { ...metrics.current, ...next };
-    follow.current = scrolled(follow.current, metrics.current, 0);
+    follow.current = measuredFollow(follow.current, metrics.current, 0);
     if (!("offset" in next) && shouldStick(follow.current)) scroller.current?.scrollToEnd({ animated: false });
   }, []);
   const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
