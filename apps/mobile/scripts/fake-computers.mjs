@@ -50,6 +50,8 @@ function engine(name, ws, projects, tasks, accounts) {
 }
 
 const HOUR = 3_600_000;
+/** El logo del workspace en la cuenta (`GET /v1/workspaces/:id/logo`); `--broken-logo` lo hace fallar y `--no-logo` lo quita. */
+const LOGO_PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAABjklEQVR42tXPSVIQQBBE0TxAHhAERBFQQGYUkBlUEAeQ8Y55CdjWriIXXRHV8db5q6EJtgZNsjXoDVuDptgaNM3WoBm2Br1la9AsW4PesTXoPVuD5tga9IGtQfNsDVpga9AiW4M+sjXoEy0vg597D7REy/APmPdAy7QM/4B5D7RCy/APmPdAn2kZ/gHzHmiVluEfMO+B1mgZ/gHzHmidluEfMO+BNmgZ/gHzHmiTluEfMO+BtmhJ8iULEbRNS5IvWYigHVqSfMlCBH2hJcmXLETQV1qSfMlCBO3SkuRLFiJoj5YkX7IQQfu0JPmShQj6RkuSL1mIoANaknzJQgQd0pLkSxYi6IiWJF+yEEHHtCT5koUIOqElyZcsRNApLUm+ZCGCzmhJ8iULEXROS5IvWYigC1qSfMlCBH2nJcmXLETQD1qSfMlCBP2kJcmXLETQJS1JvmQhgq7YGvSLrUHXbA36zdagP2wN+svWoH9sDbpha9AtW4P+szXojq1B92wNemBr0CNbg57YGvTM1l4B3PqAwlYG9wwAAAAASUVORK5CYII=", "base64");
 
 const machines = {
   cmp_vm: {
@@ -728,9 +730,16 @@ const server = createServer((request, response) => {
           updated_at: new Date(0).toISOString(),
           projects: [{ id: "p-mac-api", name: "api", remote_url: null, default_branch: null, home_computer_id: "cmp_mac" }],
           computers: Object.keys(machines),
+          logo_url: process.argv.includes("--no-logo") ? null : `http://${request.headers.host}/v1/workspaces/w-prod/logo`,
+          background_url: null,
         },
       ],
     });
+  if (url.pathname === "/v1/workspaces/w-prod/logo" && request.method === "GET") {
+    if (process.argv.includes("--broken-logo")) return json(response, 500, { error: { code: "unavailable" } });
+    response.writeHead(200, { "content-type": "image/png", "access-control-allow-origin": "*", "access-control-allow-headers": "*" });
+    return response.end(LOGO_PNG);
+  }
   if (url.pathname.includes("/memory/")) {
     void memory(request, response, url).then((handled) => handled || json(response, 404, { error: { code: "not_found" } }));
     return;

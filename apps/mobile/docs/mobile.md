@@ -348,6 +348,13 @@ de 48 o más, segmentado, chips), `apps/mobile/src/ui/Popover.tsx` (menú anclad
   sus ventanas, Actualizar y Gestionar cuentas); debajo, el riel de tus
   mensajes como carrusel. La memoria de la conversación (`session_usage`) no
   está en la lista cerrada.
+- La ficha del workspace (cabecera de Inicio y filas de Workspaces) pinta su
+  logo de la cuenta (`logo_url` de `GET /v1/workspaces`), leído con la sesión y
+  con las reglas de `readAccountAsset` de `@terminus/computers`, las mismas de
+  la web de escritorio (`apps/mobile/src/lib/workspaceLogo.ts`,
+  `apps/mobile/src/ui/WorkspaceAvatar.tsx`). Sin logo, mientras carga o si
+  falla, la inicial. En el falso, `--broken-logo` lo hace fallar y `--no-logo`
+  lo quita.
 - Sin fuentes propias: Geist y Bricolage del escritorio son `woff2` variables
   y no se cargan en iOS ni Android; se usa la del sistema.
 
