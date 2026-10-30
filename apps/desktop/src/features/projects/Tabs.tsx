@@ -457,7 +457,7 @@ export default function TabStrip(props: {
       </Show>
       </div>
       <Show when={previewTabs().length > 0}>
-      <div data-preview-header="" class="ml-2 flex shrink-0 items-end self-stretch border-l border-border pl-2">
+      <div data-preview-header="" class="ml-0.5 flex shrink-0 items-end self-stretch">
         <For each={previewTabs()}>{(p, i) => renderTab(p, () => keptTabs().length + i())}</For>
       </div>
       </Show>
