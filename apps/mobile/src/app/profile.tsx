@@ -120,7 +120,7 @@ export default function Profile() {
           {ready("ports") && ports ? (
             <ListRow testID="ports" icon={{ name: "plug", color: "#0ea5e9" }} title={w("shell.ports.title")} value={String(portList.length)} chevron onPress={() => setPortsOpen(true)} />
           ) : null}
-          <ListRow testID="storage" icon={{ name: "hard-drive", color: "#8b5cf6" }} title={w("shell.storage.title")} chevron onPress={() => router.push({ pathname: "/accounts", params: { storage: "1" } })} />
+          <ListRow testID="storage" icon={{ name: "hard-drive", color: "#8b5cf6" }} title={t("storage.title")} chevron onPress={() => router.push({ pathname: "/accounts", params: { storage: "1" } })} />
         </Group>
       </ScrollView>
 

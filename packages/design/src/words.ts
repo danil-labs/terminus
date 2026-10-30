@@ -193,7 +193,6 @@ const es = {
   "usage.manage_accounts": "Gestionar cuentas",
   "settings.nav.connections": "Conexiones",
   "shell.ports.title": "Puertos",
-  "shell.storage.title": "Almacenamiento",
   "settings.title": "Configuración",
   "danil.account.title": "Cuenta de Danil",
   "settings.workspaces.manage": "Administrar workspaces",
@@ -216,6 +215,23 @@ const es = {
   "search.action.new_task": "Nueva tarea en {name}",
   "search.no_results": "Nada coincide con la búsqueda.",
   "search.loading_archived": "Cargando las archivadas…",
+  // El Inbox del teléfono, con las palabras del Inbox de la web.
+  "web.alpha.ai_assistance": "Asistencia IA",
+  "web.alpha.ai_off": "IA apagada",
+  "web.alpha.ai_read_only": "Solo lectura en este alfa",
+  "web.alpha.reply_placeholder": "Escribe una respuesta",
+  "web.alpha.all_channels": "Todos los canales",
+  "web.alpha.filter_assistance": "Humano requerido",
+  "web.alpha.filter_ai_disabled": "IA apagada",
+  "web.alpha.filter_ai_blocked": "IA bloqueada",
+  "web.alpha.label_ai_paused_loop": "IA en pausa · bucle",
+  "web.alpha.sender_ai": "Danil IA",
+  "web.alpha.sender_team": "Equipo",
+  "web.alpha.send_unavailable": "Enviar no está disponible en este alfa: el Inbox es de solo lectura.",
+  "web.alpha.older": "Ver mensajes anteriores",
+  "web.alpha.deleted": "Mensaje eliminado",
+  "web.alpha.empty": "No hay conversaciones en esta página.",
+  "web.alpha.details": "Detalles",
 } as const satisfies Record<string, Word>;
 
 export type WordKey = keyof typeof es;
@@ -403,7 +419,6 @@ const en: Record<WordKey, Word> = {
   "usage.manage_accounts": "Manage accounts",
   "settings.nav.connections": "Connections",
   "shell.ports.title": "Ports",
-  "shell.storage.title": "Storage",
   "settings.title": "Settings",
   "danil.account.title": "Danil account",
   "settings.workspaces.manage": "Manage workspaces",
@@ -426,6 +441,23 @@ const en: Record<WordKey, Word> = {
   "search.action.new_task": "New task in {name}",
   "search.no_results": "Nothing matches your search.",
   "search.loading_archived": "Loading archived tasks…",
+  // El Inbox del teléfono, con las palabras del Inbox de la web.
+  "web.alpha.ai_assistance": "AI assistance",
+  "web.alpha.ai_off": "AI off",
+  "web.alpha.ai_read_only": "Read-only in this alpha",
+  "web.alpha.reply_placeholder": "Write a reply",
+  "web.alpha.all_channels": "All channels",
+  "web.alpha.filter_assistance": "Human needed",
+  "web.alpha.filter_ai_disabled": "AI off",
+  "web.alpha.filter_ai_blocked": "AI blocked",
+  "web.alpha.label_ai_paused_loop": "AI paused · loop",
+  "web.alpha.sender_ai": "Danil AI",
+  "web.alpha.sender_team": "Team",
+  "web.alpha.send_unavailable": "Sending is not available in this alpha: the Inbox is read-only.",
+  "web.alpha.older": "See earlier messages",
+  "web.alpha.deleted": "Deleted message",
+  "web.alpha.empty": "No conversations on this page.",
+  "web.alpha.details": "Details",
 };
 
 export const WORDS: Record<"es" | "en", Record<WordKey, Word>> = { es, en };
