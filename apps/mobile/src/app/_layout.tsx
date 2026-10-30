@@ -5,6 +5,7 @@ import type { NotificationResponse } from "expo-notifications";
 import { Stack, router, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Platform } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import { AccountProvider } from "../lib/account";
@@ -73,25 +74,23 @@ export default function RootLayout() {
   }, []);
 
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <AccountProvider>
     <MachinesProvider>
       <WorkspacesProvider>
       <CustomizationProvider>
       <InboxProvider>
-        <StatusBar style="auto" />
+        <StatusBar style={theme.dark ? "light" : "dark"} />
         <Stack
           screenOptions={{
             headerStyle: { backgroundColor: theme.surface },
             headerTintColor: theme.text,
-            contentStyle: { backgroundColor: theme.bg },
+            contentStyle: { backgroundColor: theme.dark ? theme.bg : theme.muted },
             headerBackButtonDisplayMode: "minimal",
           }}
         >
           <Stack.Screen name="(home)" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="workspaces"
-            options={{ presentation: "formSheet", sheetAllowedDetents: [0.6, 0.95], sheetGrabberVisible: true, title: t("workspaces.title") }}
-          />
+          <Stack.Screen name="workspaces" options={{ headerShown: false }} />
           <Stack.Screen
             name="filter"
             options={{ presentation: "formSheet", sheetAllowedDetents: [0.6, 0.95], sheetGrabberVisible: true, title: w("shell.sidebar.view.trigger") }}
@@ -104,7 +103,14 @@ export default function RootLayout() {
             name="preview"
             options={Platform.OS === "web" ? { presentation: "transparentModal", headerShown: false, contentStyle: { backgroundColor: "transparent" }, animation: "none" } : { presentation: "formSheet", sheetAllowedDetents: "fitToContents", sheetGrabberVisible: true, headerShown: false, sheetCornerRadius: 18 }}
           />
-          <Stack.Screen name="personalize" options={{ presentation: "formSheet", title: t("attention.personalize") }} />
+          {/* Listas nativas: cada pantalla apilada pinta su cabecera (`NavBar`), igual en las tres plataformas. */}
+          <Stack.Screen name="personalize" options={{ headerShown: false }} />
+          <Stack.Screen name="search" options={{ headerShown: false, animation: Platform.OS === "ios" ? "fade" : undefined }} />
+          <Stack.Screen name="profile" options={{ headerShown: false }} />
+          <Stack.Screen name="settings" options={{ headerShown: false }} />
+          <Stack.Screen name="inbox" options={{ headerShown: false }} />
+          <Stack.Screen name="inbox-thread" options={{ headerShown: false }} />
+          <Stack.Screen name="task-tools" options={{ headerShown: false }} />
           <Stack.Screen name="activity" options={{ title: t("activity.title") }} />
           <Stack.Screen name="accounts" options={{ title: w("settings.nav.ai_providers") }} />
           <Stack.Screen name="signin" options={{ headerShown: false }} />
@@ -116,5 +122,6 @@ export default function RootLayout() {
       </WorkspacesProvider>
     </MachinesProvider>
     </AccountProvider>
+    </GestureHandlerRootView>
   );
 }

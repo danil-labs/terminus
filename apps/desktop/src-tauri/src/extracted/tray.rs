@@ -9,6 +9,9 @@ use tauri::{
 };
 
 const ID: &str = "terminus-background";
+/// El isotipo en una sola tinta (`icons/src/tray.svg`) a 22 pt @2x.
+#[cfg(target_os = "macos")]
+const MENU_BAR_ICON: &[u8] = include_bytes!("../../icons/tray@2x.png");
 pub(super) static FRONT_READY: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
@@ -127,6 +130,17 @@ fn update(app: &AppHandle, labels: &Labels, items: &[Item]) -> Result<(), String
                 "tray-quit" => super::desktop::request_quit(app),
                 _ => {}
             });
+        // macOS tiñe la imagen plantilla según el tema, como a los demás iconos de la barra.
+        #[cfg(target_os = "macos")]
+        {
+            builder = builder
+                .icon(
+                    tauri::image::Image::from_bytes(MENU_BAR_ICON)
+                        .map_err(|error| error.to_string())?,
+                )
+                .icon_as_template(true);
+        }
+        #[cfg(not(target_os = "macos"))]
         if let Some(icon) = app.default_window_icon() {
             builder = builder.icon(icon.clone());
         }

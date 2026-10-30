@@ -8,7 +8,11 @@ export type ThemeTokens = {
   bg: string;
   surface: string;
   muted: string;
+  /** Menus and popovers over the list. */
+  raised: string;
   border: string;
+  /** The edge of a menu or popover. */
+  borderStrong: string;
   text: string;
   textMuted: string;
   primary: string;
@@ -32,7 +36,9 @@ export const CSS_SOURCE: Partial<Record<keyof ThemeTokens, string>> = {
   bg: "--color-bg",
   surface: "--color-surface",
   muted: "--color-surface-muted",
+  raised: "--color-surface-raised",
   border: "--color-border",
+  borderStrong: "--color-border-strong",
   text: "--color-neutral-950",
   textMuted: "--color-neutral-500",
   primary: "--color-primary",
@@ -50,7 +56,9 @@ export const THEMES: { light: ThemeTokens; dark: ThemeTokens } = {
     bg: "#f9f9f9",
     surface: "#ffffff",
     muted: "#f3f4f8",
+    raised: "#ffffff",
     border: "rgba(10,13,35,0.1)",
+    borderStrong: "rgba(10,13,35,0.16)",
     text: "#0a0d23",
     textMuted: "#62647a",
     primary: "#6539f5",
@@ -71,7 +79,9 @@ export const THEMES: { light: ThemeTokens; dark: ThemeTokens } = {
     bg: "#111113",
     surface: "#212124",
     muted: "#19191c",
+    raised: "#2c2c30",
     border: "rgba(255,255,255,0.08)",
+    borderStrong: "rgba(255,255,255,0.14)",
     text: "#ececef",
     textMuted: "#9a9aa3",
     primary: "#ececef",

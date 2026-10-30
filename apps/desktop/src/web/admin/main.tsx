@@ -3,6 +3,7 @@ import { createSupportAccess, type Membership } from "../../../../../packages/at
 import { aplicarLengua, aplicarLenguaDeWorkspace, t } from "../../lib/i18n";
 import { activeAccountOf, type AuditEntry, webAuditLog } from "../audit-log";
 import { authLocation } from "../auth/return";
+import type { WatchedSession } from "../session";
 import { AdminPage, type AdminSource } from "./AdminPage";
 import "../phrases";
 import "../../styles/global.css";
@@ -11,14 +12,15 @@ const root = () => document.getElementById("root") as HTMLElement;
 const home = () => import.meta.env.BASE_URL;
 
 /** `/admin` con la sesión de la app de Danil en este mismo origen; sin ella, a entrar. */
-export async function startAdmin(settings: { login: string; supabaseUrl: string; supabaseKey: string }) {
+export async function startAdmin(settings: { login: string; supabaseUrl: string; supabaseKey: string; workos?: boolean }) {
   aplicarLengua();
   const [{ seguirElTema }, { supabaseSession }] = await Promise.all([import("../../lib/theme"), import("../session")]);
   seguirElTema();
   const leave = () => window.location.assign(authLocation(settings.login, window.location.origin, `${window.location.pathname}${window.location.search}`));
-  const session = supabaseSession(settings.supabaseUrl, settings.supabaseKey, { onGone: leave });
-  const { data } = await session.client.auth.getSession();
-  if (!data.session) return leave();
+  const session: WatchedSession = settings.workos
+    ? (await import("../workos-session")).workosSession({ onGone: leave })
+    : supabaseSession(settings.supabaseUrl, settings.supabaseKey, { onGone: leave });
+  if (!(await session.user().catch(() => null))) return leave();
   const api = createSupportAccess(session, fetch, `${import.meta.env.BASE_URL}alpha-api`);
   const source: AdminSource = {
     memberships: api.memberships,

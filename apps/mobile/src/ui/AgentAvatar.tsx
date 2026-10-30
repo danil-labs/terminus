@@ -1,5 +1,6 @@
+import { useTheme } from "./theme";
 import { ASTRO_SHAPES, astroBody, astroColors, type AstroNode } from "@terminus/design";
-import { Image, View, useColorScheme } from "react-native";
+import { Image, View } from "react-native";
 import Svg, { Circle, Ellipse, G, Path } from "react-native-svg";
 import { useState } from "react";
 import { useWorkspaces } from "../lib/workspaces";
@@ -21,7 +22,7 @@ export function AgentAvatar({ name, size = 32, host, folder }: { name: string; s
   const agent = snapshot?.agents.find((a) => a.name === name && (!host || a.places.some((p) => p.host === host && (folder === undefined || p.folder === folder))));
   const appearance = host ? agent?.places.find((p) => p.host === host && (folder === undefined || p.folder === folder)) : agent;
   const body = astroBody(name, appearance?.body);
-  const dark = useColorScheme() === "dark";
+  const dark = useTheme().dark;
   const colors = astroColors(body, dark);
   const [failed, setFailed] = useState<string | null>(null);
   const image = appearance?.avatar;

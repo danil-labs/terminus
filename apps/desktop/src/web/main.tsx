@@ -47,6 +47,7 @@ import { webGithubAccount } from "./github-account";
 import { type Account, type Listing, SLOT_PREFIX, loadAccounts, ownerOf, pickAccount, readListings, rememberLast, removeExtra, savedListings } from "./accounts";
 import { forgetShellCache, setShellCacheScope } from "../lib/shellCache";
 import { webAuditLog } from "./audit-log";
+import type { WatchedSession } from "./session";
 import { webWorkspaceAssets } from "./workspace-assets";
 import type { MachineRow, MachineStatus } from "./SyncNote";
 import { type BrowserHost, createWebTransport } from "./transport";
@@ -55,7 +56,7 @@ declare const __TERMINUS_VERSION__: string;
 /** Set at build time in `vite.config.ts`; all public values. */
 declare const __TERMINUS_WEB__: WebSettings;
 
-type WebSettings = { endpoint: string; supabaseUrl: string; supabaseKey: string; login: string };
+type WebSettings = { endpoint: string; supabaseUrl: string; supabaseKey: string; login: string; workos?: boolean };
 
 type Base = { supabaseUrl?: string; supabaseKey?: string; userId?: string | null; refresh?: () => Promise<boolean>; subscribe?: (clear: () => void) => () => void; endpoint: string; getToken: () => string | Promise<string>; onUnauthorized?: () => void };
 export type TerminusWebConfig = Partial<
@@ -391,7 +392,11 @@ async function start(settings: WebSettings) {
   const params = new URLSearchParams(window.location.search);
   /** A session ended (`null`: the primary, else an extra's slot); set once the page knows which account it mounted. */
   let ended: (slot: string | null) => void = () => undefined;
-  const primary = supabaseSession(settings.supabaseUrl, settings.supabaseKey, { onGone: () => ended(null) });
+  // With WorkOS (alfa) there is one session per browser: no extra accounts.
+  const primary: WatchedSession = settings.workos
+    ? (await import("./workos-session")).workosSession({ onGone: () => ended(null) })
+    : supabaseSession(settings.supabaseUrl, settings.supabaseKey, { onGone: () => ended(null) });
+  const extras = settings.workos ? null : storage;
   const clients = new Map<string, ReturnType<typeof supabaseSession>>();
   const clientFor = (slot: string) => {
     let c = clients.get(slot);
@@ -404,14 +409,14 @@ async function start(settings: WebSettings) {
 
   // «Agregar cuenta» and its return from Google or Microsoft: a page of their own.
   const callback = params.get("account-callback");
-  if (params.has("add-account") || callback) {
+  if (!settings.workos && (params.has("add-account") || callback)) {
     const { startAddAccount } = await import("./AddAccount");
-    const accounts = await loadAccounts({ storage, primary, clientFor });
+    const accounts = await loadAccounts({ storage: extras, primary, clientFor });
     startAddAccount(document.getElementById("root") as HTMLElement, { storage, accounts, clientFor, home: home(), email: params.get("email"), callback, code: params.get("code"), error: params.get("error_description") ?? params.get("error") });
     return;
   }
 
-  let accounts = await loadAccounts({ storage, primary, clientFor });
+  let accounts = await loadAccounts({ storage: extras, primary, clientFor });
   if (!accounts.some((a) => a.signedIn)) return leave();
   const list = (token: string) => listWorkspaces(endpoint, token);
   // The account is picked with the saved lists; the network only when `?w=` is not in them.
@@ -434,7 +439,7 @@ async function start(settings: WebSettings) {
   // The mounted account's session ended: another account opens, or the login. Another's: its workspaces show it.
   const [others, setOthers] = createSignal<OtherAccount[]>(othersOf(accounts, current, listings, endpoint));
   const reread = async () => {
-    accounts = await loadAccounts({ storage, primary, clientFor });
+    accounts = await loadAccounts({ storage: extras, primary, clientFor });
     listings = await readListings(storage, accounts, list);
     setOthers(othersOf(accounts, current, listings, endpoint));
   };
@@ -457,7 +462,7 @@ async function start(settings: WebSettings) {
       if (owner) rememberLast(storage, owner);
       window.location.assign(`${home()}?w=${encodeURIComponent(workspace)}`);
     },
-    add: (email) => window.location.assign(`${home()}?add-account${email ? `&email=${encodeURIComponent(email)}` : ""}`),
+    add: (email) => settings.workos ? void primary.signOut?.() : window.location.assign(`${home()}?add-account${email ? `&email=${encodeURIComponent(email)}` : ""}`),
     remove: async (userId) => {
       const gone = accounts.find((a) => a.user_id === userId);
       if (!gone || gone.slot === null) return;
@@ -466,6 +471,8 @@ async function start(settings: WebSettings) {
       if (userId === current.user_id) window.location.assign(home());
       else await reread();
     },
+    // Sin sesión la página vuelve sola a la entrada (`ended`); con WorkOS cierra también la de AuthKit.
+    signOut: () => void session.signOut?.().catch(() => leave()),
   };
   const session = current.slot === null ? primary : clientFor(current.slot);
 
@@ -491,7 +498,7 @@ async function start(settings: WebSettings) {
           const several = computers.length > 1;
           const relink = mountApp(
             computers,
-            { endpoint, supabaseUrl: settings.supabaseUrl, supabaseKey: settings.supabaseKey, userId: current.user_id, refresh: () => session.unauthorized(), getToken: () => session.getToken(), onUnauthorized: () => void session.unauthorized(), subscribe: clear => { const { data } = session.client.auth.onAuthStateChange((event, value) => { if (event === "SIGNED_OUT" || (value && value.user.id !== current.user_id)) clear(); }); return () => data.subscription.unsubscribe(); } },
+            { endpoint, supabaseUrl: settings.supabaseUrl, supabaseKey: settings.supabaseKey, userId: current.user_id, refresh: () => session.unauthorized(), getToken: () => session.getToken(), onUnauthorized: () => void session.unauthorized(), subscribe: clear => session.watch(current.user_id, clear) },
             (computerId) => async () => {
               const answer = await computersOf(endpoint, session);
               if (answer.kind === "license" || answer.kind === "no_account") block({ t: answer.kind });
@@ -555,7 +562,9 @@ const adminPath = `${import.meta.env.BASE_URL}admin`;
 const demo = new URLSearchParams(window.location.search).get("demo") === "1";
 
 if (import.meta.env.TERMINUS_ALPHA && window.location.pathname.replace(/\/+$/, "") === `${import.meta.env.BASE_URL}sign-in`) {
-  void import("./attention/SignIn").then((m) => m.startSignIn(__TERMINUS_WEB__));
+  // With WorkOS the alfa sign-in is the common one; `login` points here, so it renders in place.
+  if (__TERMINUS_WEB__.workos) void import("./auth/main").then((m) => m.startAuth(__TERMINUS_WEB__, document.getElementById("root") as HTMLElement));
+  else void import("./attention/SignIn").then((m) => m.startSignIn(__TERMINUS_WEB__));
 } else if (import.meta.env.TERMINUS_ALPHA && window.location.pathname.replace(/\/+$/, "") === adminPath) {
   if (demo) void import("./admin/main").then((m) => m.startAdminDemo({ dark: new URLSearchParams(window.location.search).get("theme") === "dark" }));
   else void import("./admin/main").then((m) => m.startAdmin({ ...__TERMINUS_WEB__, ...given } as WebSettings));
