@@ -196,3 +196,33 @@ test("email writes fail closed on origin, session, content type, size and fields
   }
   assert.equal(h.calls.length, 0);
 });
+
+test("email writes: a chunked body over 1 KB is cut while reading, and an AI actor is refused here", async () => {
+  const h = harness();
+  let pulled = 0;
+  const stream = new ReadableStream({
+    pull(controller) {
+      pulled++;
+      if (pulled > 64) return controller.close();
+      controller.enqueue(new TextEncoder().encode("x".repeat(512)));
+    },
+  });
+  const chunked = await h.fetch(prefix + "/auth/emails", {
+    method: "POST",
+    headers: { ...auth, Origin: origin, "Content-Type": "application/json" },
+    body: stream,
+    duplex: "half",
+  });
+  assert.equal(chunked.status, 400);
+  assert.ok(pulled < 64, `leyó ${pulled} partes`);
+  for (const actor of ["ai", " AI "]) {
+    const response = await h.fetch(prefix + "/auth/emails", {
+      method: "POST",
+      headers: { ...auth, Origin: origin, "Content-Type": "application/json", "X-Danil-Actor": actor },
+      body: JSON.stringify({ email: "b@x.mx" }),
+    });
+    assert.equal(response.status, 403);
+    assert.deepEqual(await response.json(), { error: "identity_requires_person" });
+  }
+  assert.equal(h.calls.length, 0);
+});

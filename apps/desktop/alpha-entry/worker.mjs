@@ -1,3 +1,9 @@
+// Entrada de alfa-app.danil.ai: sirve Terminus web (TERMINUS_WEB) y, en /terminus/alpha-api,
+// una lista cerrada del BFF de appv2 (APPV2_BFF). Lecturas GET: /auth/profile, /auth/emails,
+// /api/channels y el inbox, con query acotada. Escrituras POST, solo los correos de la persona:
+// /auth/emails, /auth/emails/verify, /auth/emails/primary y /auth/emails/remove, con Origin
+// exacto, Bearer, JSON de hasta 1 KB y exactamente sus campos; un actor `ai` se rechaza aquí.
+// Al BFF solo van Authorization, Accept, Origin, Referer y un cuerpo reconstruido; nunca cookies.
 const HOST = "alfa-app.danil.ai";
 const PREFIX = "/terminus/alpha-api";
 const json = (error, status) => Response.json({ error }, {
@@ -14,13 +20,38 @@ const EMAIL_WRITES = {
 };
 const MAX_BODY = 1024;
 
+/** Lee el cuerpo por partes y corta al pasar de `max` bytes: sin Content-Length no se carga entero. */
+async function boundedBody(request, max) {
+  if (!request.body) return new Uint8Array();
+  const reader = request.body.getReader();
+  const parts = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > max) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    parts.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let at = 0;
+  for (const part of parts) {
+    bytes.set(part, at);
+    at += part.byteLength;
+  }
+  return bytes;
+}
+
 /** El cuerpo exacto de una escritura de correos, o null: solo sus campos, todos de texto acotado. */
 async function emailBody(request, fields) {
   if (!(request.headers.get("Content-Type") ?? "").toLowerCase().startsWith("application/json")) return null;
   const declared = Number(request.headers.get("Content-Length") ?? "0");
   if (declared > MAX_BODY) return null;
-  const bytes = new Uint8Array(await request.arrayBuffer());
-  if (bytes.length > MAX_BODY) return null;
+  const bytes = await boundedBody(request, MAX_BODY);
+  if (!bytes) return null;
   let body;
   try {
     body = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
@@ -78,6 +109,8 @@ async function forward(env, upstream) {
 /** Una escritura de correos: desde esta página, con sesión y el cuerpo exacto de su ruta. */
 async function emailWrite(request, env, url, path) {
   if (request.headers.get("Origin") !== `https://${HOST}`) return json("forbidden_origin", 403);
+  // Quitar la marca convertiría en persona a un turno de IA: se rechaza aquí, como en el BFF.
+  if ((request.headers.get("X-Danil-Actor") ?? "").trim().toLowerCase() === "ai") return json("identity_requires_person", 403);
   const authorization = request.headers.get("Authorization");
   if (!authorization || !/^Bearer \S+$/i.test(authorization)) return json("unauthorized", 401);
   if (url.search) return json("invalid_query", 400);
