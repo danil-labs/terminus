@@ -376,7 +376,7 @@ test("an action on a computer that is off and cannot be woken fails short and ne
   assert.ok(vmCard?.parentElement.textContent.includes("Danil VM"), "the VM card names its machine");
   assert.ok(vmCard?.parentElement.textContent.includes("(Linux)"), "the VM card names Linux when the row says so");
   await assert.rejects(invoke("send_message", { session: "cmp_mac~t1", text: "hola" }, on("cmp_mac")), (e) => {
-    assert.equal(e.what, "Mac de Ana está sin conexión. Verifica que Terminus esté abierto y tenga acceso a internet.");
+    assert.equal(e.what, "Mac de Ana está sin conexión. Verifica que Danil esté abierto y tenga acceso a internet.");
     return true;
   });
   assert.equal(calls("cmp_mac", "send_message").length, 0, "nothing tries to start a computer the relay cannot start");
@@ -577,7 +577,7 @@ test("a computer the relay cannot start answers off at once, never starting", as
     cmp_own: { table: table("Notas", "Tarea del portátil"), state: "offline", notStartable: true },
   });
   await assert.rejects(invoke("send_message", { session: "cmp_own~t1", text: "hola" }, on("cmp_own")), (e) => {
-    assert.equal(e.what, "Portátil está sin conexión. Verifica que Terminus esté abierto y tenga acceso a internet.");
+    assert.equal(e.what, "Portátil está sin conexión. Verifica que Danil esté abierto y tenga acceso a internet.");
     return true;
   });
   assert.equal(calls("cmp_own", "send_message").length, 1, "the relay was asked and refused");

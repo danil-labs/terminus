@@ -101,7 +101,7 @@ test("restarting and quitting wait for live tasks or stop the ones they name", a
   button(guard, "Salir cuando terminen").click();
   await sleep(150);
   assert.equal(doc.querySelector("[data-close-guard]"), null);
-  assert.match(waiting().textContent, /Terminus se cierra cuando terminen/);
+  assert.match(waiting().textContent, /Danil se cierra cuando terminen/);
   assert.equal(quits, 0);
   vivos = [];
   await sleep(2600);

@@ -356,7 +356,7 @@ if (!roto) {
   // calcula geometría, y lo único que queda para filtrarlos es su ancho en
   // línea.
   const semaforos = () =>
-    [...semaforo.w.document.querySelectorAll('button[aria-label="Cerrar Terminus"]')]
+    [...semaforo.w.document.querySelectorAll('button[aria-label="Cerrar Danil"]')]
       .filter((boton) => !boton.closest('[style*="width: 0px"]')).length;
   // El tirador es lo único que distingue abierta de cerrada: la cabecera de la
   // columna sigue en el documento colapsada, y su botón de cerrar con ella.
@@ -4043,14 +4043,14 @@ if (!roto) {
   const nueva = await mount("listo", "primer-frame-sin-foto", sinContestar);
   await sleep(100);
   assert.equal(nueva.w.document.querySelector("[data-setup-skeleton]")?.dataset.setupSkeleton, "preparing");
-  assert.ok(nueva.w.document.body.textContent.includes("Preparando Terminus"), "sin foto el primer frame no es la preparación");
+  assert.ok(nueva.w.document.body.textContent.includes("Preparando Danil"), "sin foto el primer frame no es la preparación");
   const fotoDelSidebar = JSON.stringify({ workspace: "w", projects: [], sessions: {}, spaces: [], desk: null });
   const conocida = await mount("listo", "primer-frame-con-foto", sinContestar, undefined, {
     "harness:shell-cache": JSON.stringify({ version: 2, last: "w", workspaces: { w: { saved: Date.now(), snapshot: fotoDelSidebar } } }),
   });
   await sleep(100);
   assert.ok(conocida.w.document.querySelector("#root").children.length > 0, "con foto el primer frame queda en blanco");
-  assert.ok(!conocida.w.document.body.textContent.includes("Preparando Terminus"), "con foto el alta parpadea a quien ya usa Terminus");
+  assert.ok(!conocida.w.document.body.textContent.includes("Preparando Danil"), "con foto el alta parpadea a quien ya usa Terminus");
   assert.notEqual(conocida.w.document.querySelector("[data-setup-skeleton]")?.dataset.setupSkeleton, "preparing");
   assert.deepEqual([...nueva.fallos, ...conocida.fallos], []);
 
@@ -4250,7 +4250,7 @@ if (!roto) {
   assert.deepEqual(altaClaves, ["xai-123456789012"]);
   altaBoton("Continuar").click();
   await sleep(150);
-  assert.equal(altaTitulo(), "Personaliza Terminus.");
+  assert.equal(altaTitulo(), "Personaliza Danil.");
   const altaNombre = altaDoc.querySelector('input[aria-label="Workspace"]');
   altaNombre.value = "Norte";
   altaNombre.dispatchEvent(new alta.w.InputEvent("input", { bubbles: true }));
@@ -4259,7 +4259,7 @@ if (!roto) {
   assert.deepEqual(altaRenombres, ["Norte"], "el nombre se cambia en su sitio");
   altaBoton("Empezar").click();
   await sleep(200);
-  assert.ok(!altaDoc.body.textContent.includes("Personaliza Terminus."), "empezar entra a la app");
+  assert.ok(!altaDoc.body.textContent.includes("Personaliza Danil."), "empezar entra a la app");
   assert.deepEqual(altaCreados, ["Personal"], "el alta no crea otro workspace");
   assert.deepEqual(alta.fallos, []);
 

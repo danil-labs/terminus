@@ -240,7 +240,7 @@ test("an action to the person's own machine that is off says so plainly, without
   const mac = fakeLink({ send_message: "x" }, "offline");
   const { router } = setup({ cmp_mac: mac });
   await assert.rejects(router.handle("send_message", { project: "p1", session: "cmp_mac~t1", prompt: "hola" }, on("cmp_mac")), (e: { what: string; detail: string }) => {
-    assert.equal(e.what, "Mac de Ana está sin conexión. Verifica que Terminus esté abierto y tenga acceso a internet.");
+    assert.equal(e.what, "Mac de Ana está sin conexión. Verifica que Danil esté abierto y tenga acceso a internet.");
     assert.equal(e.detail, "machine_off");
     return true;
   });
@@ -269,7 +269,7 @@ test("an action on a machine stopped by the license says so by name", async () =
   const { router } = setup({ cmp_vm: vm });
   await assert.rejects(router.handle("send_message", { project: "p1", session: "cmp_vm~t1", prompt: "hola" }, on("cmp_vm")), (e: { what: string; detail: string }) => {
     assert.equal(e.detail, "license_required");
-    assert.equal(e.what, "Usar tus otras computadoras desde aquí es parte de Terminus de pago.");
+    assert.equal(e.what, "Usar tus otras computadoras desde aquí es parte de Danil de pago.");
     return true;
   });
   assert.equal(vm.calls.length, 0);

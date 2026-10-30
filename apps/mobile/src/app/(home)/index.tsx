@@ -112,7 +112,7 @@ export default function Home() {
     const host = on ? hostOf(on[0]) : undefined;
     return host && on && current?.members.has(host.id) ? { host, workspace: current.members.get(host.id)!, id: on[1] } : null;
   };
-  const title = space ? spaceName(space, t("space.general")) : current?.name ?? "Terminus";
+  const title = space ? spaceName(space, t("space.general")) : current?.name ?? w("common.brand_name");
   const manage = !!target && ready("spaces", target.host);
   const spaceItems: MenuItem[] = [
     ...(spaces.length > 1 ? spaces.map((s) => ({
@@ -181,7 +181,7 @@ export default function Home() {
           <>
             <View style={[styles.chip, { opacity: 0.5, backgroundColor: theme.surface }]}>
               <WorkspaceAvatar id={current?.id} name={current?.name ?? "T"} size={24} />
-              <Text numberOfLines={1} style={[styles.chipText, { color: theme.text }]}>{current?.name ?? "Terminus"}</Text>
+              <Text numberOfLines={1} style={[styles.chipText, { color: theme.text }]}>{current?.name ?? w("common.brand_name")}</Text>
             </View>
             <Tap testID="rename-done" accessibilityRole="button" onPress={() => void saveName()} style={[styles.done, { backgroundColor: theme.text }]}>
               <Text style={{ color: theme.onPrimary, fontWeight: "700", fontSize: TEXT.lead }}>{t("attention.close")}</Text>
@@ -191,7 +191,7 @@ export default function Home() {
           <>
             <Tap testID="workspace-switcher" accessibilityRole="button" accessibilityLabel={t("home.switch")} onPress={() => router.push("/workspaces")} style={[styles.chip, { backgroundColor: theme.surface, borderColor: theme.border }]}>
               <WorkspaceAvatar id={current?.id} name={current?.name ?? "T"} size={24} />
-              <Text numberOfLines={1} style={[styles.chipText, { color: theme.text }]}>{current?.name ?? "Terminus"}</Text>
+              <Text numberOfLines={1} style={[styles.chipText, { color: theme.text }]}>{current?.name ?? w("common.brand_name")}</Text>
               <Icon name="chevron-down" size={14} color={theme.textMuted} />
             </Tap>
             <View style={[styles.tools, { backgroundColor: theme.surface, borderColor: theme.border }]}>

@@ -96,13 +96,13 @@ async function personalize(name, table) {
 test("«Personaliza» no ofrece Danil: queda en Configuración, y «Empezar» entra directo a la app", async () => {
   const engine = danil({ state: "disconnected", name: "alberto-mbp" });
   const { w, fallos } = await personalize("danil-onboarding", engine.table);
-  assert.equal(heading(w), "Personaliza Terminus.", w.document.body.textContent.slice(0, 600));
+  assert.equal(heading(w), "Personaliza Danil.", w.document.body.textContent.slice(0, 600));
   assert.equal(w.document.querySelector("[data-danil-onboarding]"), null);
   assert.ok(!button(w, "Iniciar sesión con Danil"));
 
   button(w, "Empezar").click();
   await sleep(300);
-  assert.ok(!w.document.body.textContent.includes("Personaliza Terminus."), "starting enters the app");
+  assert.ok(!w.document.body.textContent.includes("Personaliza Danil."), "starting enters the app");
   assert.ok(!engine.calls.some((c) => c.command === "danil_connect_start"));
   assert.deepEqual(fallos, []);
 });

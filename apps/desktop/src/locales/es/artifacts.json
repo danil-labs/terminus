@@ -1,7 +1,7 @@
 {
   "artifacts.download": "Descargar",
   "artifacts.download.busy": "Descargando…",
-  "artifacts.download.remote_outdated": "Para descargar este archivo, la máquina donde corre la tarea necesita una versión más reciente de Terminus.",
+  "artifacts.download.remote_outdated": "Para descargar este archivo, la máquina donde corre la tarea necesita una versión más reciente de Danil.",
   "artifacts.history.failed": "No se pudo leer el historial de este documento.",
   "artifacts.markdown.raw": "Ver el texto",
   "artifacts.markdown.rendered": "Ver con formato",
