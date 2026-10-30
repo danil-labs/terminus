@@ -46,6 +46,8 @@ export type WebAccountsSource = {
   add: (email?: string | null) => void;
   /** Olvida una cuenta extra en este navegador. */
   remove: (userId: string) => Promise<void>;
+  /** Cierra la sesión de la cuenta abierta y vuelve a la entrada. */
+  signOut: () => void;
 };
 
 export type Capabilities = {
