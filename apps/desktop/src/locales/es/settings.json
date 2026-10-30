@@ -774,5 +774,7 @@
   "settings.support_access.cancel": "Cancelar",
   "settings.support_access.revoke_confirm": "{email} deja de tener acceso a este workspace en ese momento.",
   "settings.support_access.revoke_error": "No se pudo revocar el acceso. Inténtalo de nuevo.",
-  "settings.nav.secrets": "Secretos"
+  "settings.nav.secrets": "Secretos",
+  "settings.environment.release": "Versión de Danil",
+  "settings.environment.release_channel": "Canal de prueba: {channel}"
 }
