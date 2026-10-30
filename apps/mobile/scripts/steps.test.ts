@@ -286,3 +286,20 @@ test("Buscar conserva la fila agrupada y sus claves al apuntar a un paso interio
   assert.equal(inner?.id, first?.id);
   assert.ok(inner?.kind === "row" && inner.row.steps.length === 3);
 });
+
+
+test("Buscar elige la nota coincidente entre varias que comparten at", () => {
+  const turn: Turn = {
+    id: "a", role: "agent", text: "Listo",
+    tools: [{ name: "Read", target: "antes.ts" }, { name: "Bash", target: "echo compartido" }],
+    pieces: [{ tool: 0 }, { text: "Primera nota." }, { text: "Segunda compartido." }, { tool: 1 }, { text: "Listo" }],
+  };
+  const { runs, lines } = workRuns([user("u"), turn], [], false);
+  const notes = runs[0].items.filter(item => item.kind === "note");
+  assert.equal(notes.length, 2);
+  assert.equal(notes[0].at, notes[1].at);
+  const hit = hitOf(works(lines)[0], "compartido")!;
+  assert.equal(hit.text, "Segunda compartido.", "la nota precede al paso que también coincide");
+  assert.equal(workFocus(runs[0].items, hit.at, "compartido")?.id, notes[1].id);
+  assert.equal(workFocus(runs[0].items, hit.at, "echo")?.kind, "row", "si solo coincide el paso, conserva su fila");
+});
