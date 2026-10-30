@@ -1,6 +1,6 @@
 /**
  * Terminus in the browser shows where each key of the account is in use (Settings
- * → Skills → MCP), removes it from one machine after warning that the provider
+ * → Conexiones → MCP), removes it from one machine after warning that the provider
  * still accepts it, puts it back, and changes its value sealing it in the browser
  * for every machine with a public key. Talks to the control plane with the
  * person's session; mounts `dist-web/`.
@@ -104,9 +104,7 @@ test("the web shows where an MCP key is in use, removes it from a machine with a
     const { w } = app;
     const doc = w.document;
     await sleep(2500);
-    w.dispatchEvent(new w.CustomEvent("harness:open-settings", { detail: "skills" }));
-    assert.ok(await until(() => [...doc.querySelectorAll('[role="tab"]')].some((b) => b.textContent.trim() === "MCP")), "the MCP tab");
-    [...doc.querySelectorAll('[role="tab"]')].find((b) => b.textContent.trim() === "MCP").click();
+    w.dispatchEvent(new w.CustomEvent("harness:open-settings", { detail: "mcp" }));
     const item = () => doc.querySelector(`[data-account-credential="${SLOT}"]`);
     assert.ok(await until(() => item()), "the account's MCP key is listed");
     assert.equal(calls[0].token, "Bearer tok", "with the person's session");
