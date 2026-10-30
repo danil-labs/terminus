@@ -30,7 +30,7 @@ import { HostError } from "../../../../../lib/hosts";
 import { type ChatLine, type Line, type LivePiece, type WorkLine, applyLive, lineMatches, liveAfterRead, runClock, savesLive, workRuns } from "../../../../../lib/steps";
 import { publishWork, releaseWork } from "../../../../../lib/workSheet";
 import { lang, t, w } from "../../../../../lib/i18n";
-import { type ScrollAnchor, anchorOf, restoreAnchor } from "../../../../../lib/scrollAnchor";
+import { type ScrollAnchor, anchorOf, restoreAnchor, scrollToEnd } from "../../../../../lib/scrollAnchor";
 import { type Follow, MARGIN, OPENED, fromTop, jumped, scrolled, showJump, unseen } from "../../../../../lib/follow";
 import { useAccount } from "../../../../../lib/account";
 import { useMachines } from "../../../../../lib/machines";
@@ -133,10 +133,8 @@ export default function TaskScreen() {
   const scroller = () => Platform.OS === "web" ? list.current?.getScrollableNode() as unknown as Element | null : null;
   const toBottom = (animated: boolean) => {
     const node = scroller();
-    if (node) {
-      if (animated) node.scrollTo({ top: node.scrollHeight, behavior: "smooth" });
-      else node.scrollTop = node.scrollHeight;
-    } else list.current?.scrollToOffset({ offset: 0, animated });
+    if (node) scrollToEnd(node, animated);
+    else list.current?.scrollToOffset({ offset: 0, animated });
   };
   const restoreReading = (node: Element) => {
     const held = prepending.current;
