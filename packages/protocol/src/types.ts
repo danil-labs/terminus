@@ -231,7 +231,7 @@ export type Turn = {
   from_task?: SenderTask | null;
 };
 /** La tarea que escribió un input, como era al escribirlo (`sessions::SenderTask`). */
-export type SenderTask = { folder: string; task: string; title: string; provider: string; model?: string | null };
+export type SenderTask = { folder: string; task: string; title: string; provider: string; model?: string | null; machine?: string | null };
 /** Un paso del turno; `images` son data URLs que produjo la herramienta. `ok: false` si falló. */
 export type TurnTool = { name?: string; target?: string | null; images?: string[]; ok?: boolean | null };
 /** Un trozo de `Turn.pieces`. */
