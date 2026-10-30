@@ -153,7 +153,7 @@ export function linesOfLive(live: readonly LivePiece[]): Line[] {
 }
 
 /** Una entrada de la hoja, en su orden. `id` sobrevive a que la fila cambie de posición al guardarse. */
-export type WorkItem = { kind: "note"; id: string; text: string } | { kind: "row"; id: string; at: number; row: StepRow };
+export type WorkItem = { kind: "note"; id: string; at: number; text: string } | { kind: "row"; id: string; at: number; row: StepRow };
 
 /**
  * Una ejecución: de un mensaje que abre trabajo al siguiente. El motor la guarda
@@ -170,6 +170,18 @@ export type WorkRun = {
   /** La suma de sus tramos; `null` si ninguno la guardó. */
   durationMs: number | null;
 };
+
+/** El destino de Buscar: un avance puede compartir `at` con el paso que viene después. */
+export function workFocus(items: readonly WorkItem[], at: number, find: string): WorkItem | undefined {
+  const needle = find.toLowerCase();
+  if (needle) {
+    const hit = items.find((item) => item.kind === "note"
+      ? item.at === at && item.text.toLowerCase().includes(needle)
+      : at >= item.at && at < item.at + item.row.steps.length && (item.row.steps[at - item.at].target ?? "").toLowerCase().includes(needle));
+    if (hit) return hit;
+  }
+  return items.findLast((item) => item.kind === "row" && item.at <= at);
+}
 
 /** Algo que Buscar puede encontrar dentro de un grupo. `at` es el paso más cercano de su ejecución. */
 export type WorkHit = { at: number; text: string };
@@ -214,7 +226,7 @@ function itemsOf(flow: readonly (Step | { note: string })[]): WorkItem[] {
   for (const entry of flow) {
     if ("note" in entry) {
       flush();
-      items.push({ kind: "note", id: `note\n${notes++}`, text: entry.note });
+      items.push({ kind: "note", id: `note\n${notes++}`, at, text: entry.note });
     } else pending.push(entry);
   }
   flush();
