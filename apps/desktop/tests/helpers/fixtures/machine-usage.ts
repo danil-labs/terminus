@@ -56,11 +56,12 @@ function task(seed: Seed, scale: number, now: number): MachineTaskUsage {
   return {
     workspace: WORKSPACE, session: seed.session, state: seed.state,
     memory_bytes: bytes, memory_peak_bytes: Math.round(bytes * 1.2),
-    cpu_percent: seed.state === "running" ? 30 : 0, processes: seed.processes, pressure_memory: 0,
+    // % de un núcleo, como `top`: la del navegador pasa de 100.
+    cpu_percent: seed.state !== "running" ? 0 : seed.browsers ? 140 : 30, processes: seed.processes, pressure_memory: 0,
     browsers: (seed.browsers ?? []).map((session) => ({ session, since: now - 40 * MIN })),
     top: seed.top.map(([command, gb], i) => ({ pid: 4100 + i, command, rss_bytes: Math.round(gb * scale * GB) })),
     title: seed.title, project: seed.project,
-    ended_at: seed.ended ? now - seed.ended * MIN : undefined, archived: seed.archived,
+    ended_at: seed.ended ? now - seed.ended * MIN : undefined, archived: !!seed.archived,
   };
 }
 
@@ -82,6 +83,9 @@ export function resources(mode: Mode, now = Date.now()): Record<string, MachineR
       attribution: "cgroup",
       tasks: [...ALBERTO.map((s) => task(s, m.scale, now)), ...LEFT.map((s) => task(s, 1, now))],
       other: { memory_bytes: 1.2 * GB, processes: 212 },
+      // El aviso del motor: memoria sobre 20 % sostenida dos minutos, con lo que más usa.
+      ...(mode === "normal" ? {} : { pressure_alert: { since: now - 6 * MIN, memory: m.memory, tasks: ALBERTO.slice(0, 3).map((x) => ({ workspace: WORKSPACE, session: x.session, title: x.title, memory_bytes: Math.round(x.gb * m.scale * GB) })) } }),
+      measure_us: 2_840,
     },
     local: {
       measured_at: now - 3_000,

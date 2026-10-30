@@ -36,6 +36,7 @@ import { type Machine, machineName, machines as fleetMachines } from "../machine
 import { MachineCard, MemoryTab, type Power, type TaskLookup } from "./MachineCard";
 import { UPDATE_FEATURE, USAGE_FEATURE, hasUsage, remember, worst } from "./machineUsage";
 import { errorCode } from "../../lib/errorCode";
+import { listen } from "../../lib/serviceEvents";
 import { prosaDe } from "../../ui/Failure";
 
 type Clase = "recuperable" | "git" | "fuente" | "trabajo" | "registro";
@@ -352,12 +353,23 @@ export default function Almacenamiento(props: {
     }
   }
 
+  /**
+   * `machine-usage` (`left_running` o `pressure`): se relee el resumen de esa
+   * máquina sin esperar al sondeo. Sin `machine`, es el motor de esta ventana.
+   */
+  const usageEvents = listen<{ machine?: string }>("machine-usage", (event) => {
+    const all = [...inventory(), ...fleetMachines()];
+    const m = event.payload?.machine ? all.find((x) => x.id === event.payload.machine) : all.find((x) => x.local);
+    if (m?.on) void readSummary(m);
+  });
+  onCleanup(() => void usageEvents.then((unlisten) => unlisten()).catch(() => {}));
+
   async function stopTask(m: Machine, task: MachineTaskUsage) {
     const key = task.session;
     setStopping((prev) => ({ ...prev, [key]: true }));
     setStopFailure((prev) => ({ ...prev, [key]: "" }));
     try {
-      await invoke("stop_task_processes", { session: task.session }, { headers: {
+      await invoke("stop_task_processes", { session: task.session, workspace: task.workspace }, { headers: {
         "x-terminus-machine": m.id,
         "x-terminus-workspace": task.workspace,
       } });

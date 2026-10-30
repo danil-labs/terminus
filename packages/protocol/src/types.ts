@@ -25,12 +25,9 @@ export type MachineResources = {
   error?: "measurement_failed" | "unsupported";
   storage: { id: string; label: string; total_bytes: number; free_bytes: number; available_bytes: number; terminus_bytes: null; attribution: "unknown" }[];
   memory?: { total_bytes: number; available_bytes: number; swap_total_bytes: number; swap_used_bytes: number };
-  /** `load` es la carga promedio de 1, 5 y 15 min; `usage_percent`, el uso real de 0 a 100 (propuesto). */
+  /** `load` es la carga promedio de 1, 5 y 15 min; `usage_percent`, el uso de 0 a 100, desde la segunda lectura. */
   cpu?: { cores: number; load: [number, number, number]; usage_percent?: number };
-  /**
-   * PSI `some avg60`, en %. `memory_history` (propuesto): el de memoria de cada
-   * uno de los últimos minutos, el más viejo primero, hasta 10.
-   */
+  /** PSI `some avg60`, en %. `memory_history`: el de memoria por minuto, el más viejo primero (Linux; vacío el primer minuto). */
   pressure?: { cpu: number; memory: number; io: number; memory_history?: number[] };
   /** `rss_bytes` y `threads` llegan con `machine_usage_v1`; lo demás, ver `EngineUpdate`. */
   engine?: { rss_bytes?: number; threads?: number } & EngineUpdate;
@@ -38,6 +35,10 @@ export type MachineResources = {
   attribution?: "cgroup" | "best_effort" | "none";
   tasks?: MachineTaskUsage[];
   other?: { memory_bytes: number; processes: number };
+  /** El aviso de presión activo del motor (memoria `some avg60` sostenida), con lo que más usa. */
+  pressure_alert?: { since: number; memory: number; tasks: { workspace: string; session: string; title: string; memory_bytes: number }[] };
+  /** Cuánto tardó la lectura, en µs. */
+  measure_us?: number;
 };
 /**
  * `engine_update_status` y el bloque `engine` de `machine_resources` (seldon-host
@@ -60,22 +61,22 @@ export type EngineUpdate = {
 export type MachineTaskUsage = {
   workspace: string;
   session: string;
-  /** De la tarea, no del proceso: `finished` con procesos vivos es «Quedó corriendo». */
+  /** De la tarea, no del proceso: `finished` (también archivada con turno vivo) con procesos es «Quedó corriendo». */
   state: "running" | "idle" | "finished";
   memory_bytes: number;
   memory_peak_bytes: number;
-  /** Promedio de los últimos 10 s. */
+  /** % de un núcleo, como en `top`: puede pasar de 100. Promedio de los últimos 10 s. */
   cpu_percent: number;
   processes: number;
   pressure_memory: number;
   browsers: { session: string; since: number }[];
   /** Hasta 5. */
   top: { pid: number; command: string; rss_bytes: number }[];
-  /** Propuestos: el título y la carpeta de la tarea, y cuándo terminó o se archivó. */
   title?: string;
-  project?: string;
-  ended_at?: number;
+  project?: string | null;
   archived?: boolean;
+  /** En ms, solo si terminó o se archivó. */
+  ended_at?: number;
 };
 export type WorkspaceStorage = {
   bytes: number; recuperable: number; medido_en: number; aviso: string | null;

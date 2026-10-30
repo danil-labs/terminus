@@ -51,6 +51,14 @@ test("active tasks sort by memory; finished tasks with live processes are «left
   assert.deepEqual(procs.map((p) => [p.command, p.count]), [["chrome", 4], ["node · mount-frontend", 1]], "same program grouped: «chrome (4)»");
 });
 
+test("the engine's pressure alert raises the level and names what uses the most", () => {
+  const normal = resources("normal")["vm-alberto"];
+  const alerted = { ...normal, pressure_alert: { since: 0, memory: 22, tasks: [{ workspace: "w", session: "s-a", title: "A", memory_bytes: 3 }, { workspace: "w", session: "s-b", title: "B", memory_bytes: 2 }, { workspace: "w", session: "s-c", title: "C", memory_bytes: 1 }] } };
+  assert.equal(level(alerted), "high", "an active alert is pressure even if the last PSI reading dipped");
+  assert.deepEqual(heaviest(alerted).map((x) => x.title), ["A", "B"], "the warning text comes from the alert");
+  assert.deepEqual(heaviest(resources("high")["vm-alberto"]).map((x) => x.session), ["s-machines", "s-support"]);
+});
+
 test("pressure bars use the engine's history, or what this window sampled once a minute", () => {
   forgetSamples();
   const r = resources("high")["vm-alberto"];

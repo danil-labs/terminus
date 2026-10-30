@@ -579,3 +579,11 @@ test("an off machine's summary comes from its saved copy with its time, without 
   const list = await router.handle("machine_list") as { id: string; on: boolean; power?: string }[];
   assert.deepEqual(list.map((m) => [m.id, m.on, m.power]), [["cmp_home", true, "on"], ["cmp_vm", false, "off"], ["cmp_mac", false, "off"]]);
 });
+
+test("a machine-usage event from another machine says which machine it came from", async () => {
+  const delivered: { name: string; payload: unknown }[] = [];
+  const fleet = new Fleet({ self: "cmp_home", connect: () => fakeLink({}), deadlines: { read: 40, action: 200, intent: 400 } });
+  const router = createRouter({ self: "cmp_home", fleet, native: async () => null, deliver: (list) => void delivered.push(...list) });
+  router.events("cmp_vm", [{ name: "machine-usage", payload: { kind: "left_running", workspace: "w", tasks: [] } }, { name: "session", payload: { id: "t1" } }]);
+  assert.deepEqual(delivered.map((e) => e.payload), [{ kind: "left_running", workspace: "w", tasks: [], machine: "cmp_vm" }, { id: "t1" }]);
+});
