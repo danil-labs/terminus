@@ -442,6 +442,16 @@ const es = {
   "workspaces.count_note": "El número es lo que te necesita en cada workspace.",
   "customize.home_sections": "Secciones de Inicio",
   "customize.filter": "Filtrar",
+  "task.tools.find": "Buscar en el chat",
+  "task.tools.find_placeholder": "Buscar en esta conversación",
+  "task.tools.subtasks": "Subtareas: {count}",
+  "task.tools.title": "Herramientas",
+  "task.tools.usage": "Uso de la cuenta: resta {left} %",
+  "task.tools.of": "{n} de {total}",
+  "task.tools.subtasks_title": "Subtareas",
+  "task.tools.subtasks_note": "Las subtareas no aparecen en Inicio. Para encontrarlas, usa Buscar.",
+  "task.tools.empty": "Esta tarea no tiene subtareas.",
+  "task.tools.chat": "Chat",
 } as const;
 
 type Key = keyof typeof es;
@@ -887,6 +897,16 @@ const en: Record<Key, string> = {
   "workspaces.count_note": "The number is what needs you in each workspace.",
   "customize.home_sections": "Home sections",
   "customize.filter": "Filter",
+  "task.tools.find": "Search the chat",
+  "task.tools.find_placeholder": "Search this conversation",
+  "task.tools.subtasks": "Subtasks: {count}",
+  "task.tools.title": "Tools",
+  "task.tools.usage": "Account usage: {left}% left",
+  "task.tools.of": "{n} of {total}",
+  "task.tools.subtasks_title": "Subtasks",
+  "task.tools.subtasks_note": "Subtasks don’t show on Home. Use Search to find them.",
+  "task.tools.empty": "This task has no subtasks.",
+  "task.tools.chat": "Chat",
 };
 
 /** The language the app speaks, also for the words that come from `@terminus/design`. */
