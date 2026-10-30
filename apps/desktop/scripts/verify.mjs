@@ -492,6 +492,12 @@ const steps = [
     root,
   ],
   [
+    "Configuración abre en su entrada y pestaña los ids de antes",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/settings-entries.test.ts")],
+    root,
+  ],
+  [
     "La capa de un sitio se enseña cuando toca",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/sites.test.ts")],
