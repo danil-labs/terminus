@@ -267,3 +267,38 @@ test("WorkOS sign-in routes stay in the Worker; the sign-in page is an asset", a
   assert.equal(await (await h.fetch("/auth?next=%2Finbox")).text(), "assets");
   assert.equal(h.calls.length, 1);
 });
+
+test("access request: one read and one write, from this page, with the exact body", async () => {
+  const h = harness();
+  const read = await h.fetch(prefix + "/auth/access-request", { headers: { ...auth, Origin: origin, Cookie: "s=1" } });
+  assert.equal(read.status, 200);
+  assert.equal(h.calls[0].method, "GET");
+  assert.equal(h.calls[0].headers.get("Cookie"), null);
+  const body = { phone: "+52 999 123 4567", locale: "es", name: "Ana", company: "Acme" };
+  const sent = await h.fetch(prefix + "/auth/access-request", { method: "POST", headers: { ...auth, Origin: origin, Cookie: "s=1", "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  assert.equal(sent.status, 200);
+  assert.equal(h.calls.length, 2);
+  assert.equal(h.calls[1].url, origin + "/auth/access-request");
+  assert.equal(h.calls[1].headers.get("Cookie"), null);
+  assert.deepEqual(await h.calls[1].json(), body);
+  const short = await h.fetch(prefix + "/auth/access-request", { method: "POST", headers: { ...auth, Origin: origin, "Content-Type": "application/json" }, body: JSON.stringify({ phone: "5551234567", locale: "en" }) });
+  assert.equal(short.status, 200);
+});
+
+test("access request fails closed: origin, session, actor, size, fields and query", async () => {
+  const h = harness();
+  const post = (body, headers = {}, path = "/auth/access-request") => h.fetch(prefix + path, { method: "POST", headers: { ...auth, Origin: origin, "Content-Type": "application/json", ...headers }, body: typeof body === "string" ? body : JSON.stringify(body) });
+  const good = { phone: "5551234567", locale: "es" };
+  assert.equal((await post(good, { Origin: "https://evil.example" })).status, 403);
+  assert.equal((await post(good, { Authorization: "" })).status, 401);
+  assert.equal((await post(good, { "X-Danil-Actor": " AI " })).status, 403);
+  assert.equal((await h.fetch(prefix + "/auth/access-request", { headers: { ...auth, "X-Danil-Actor": "ai" } })).status, 403);
+  assert.equal((await post(good, {}, "/auth/access-request?source=x")).status, 400);
+  assert.equal((await h.fetch(prefix + "/auth/access-request?x=1", { headers: auth })).status, 400);
+  assert.equal((await post(good, { "Content-Type": "text/plain" })).status, 400);
+  for (const body of ["no json", "[]", {}, { phone: "5551234567" }, { locale: "es" }, { ...good, email: "otra@evil.mx" }, { ...good, source: "x" }, { ...good, locale: "fr" }, { ...good, phone: 5551234567 }, { ...good, phone: "1".repeat(41) }, { ...good, name: "a\nb" }, { ...good, name: "a".repeat(121) }, { ...good, company: "a".repeat(161) }, { ...good, name: "x".repeat(2000) }]) {
+    assert.equal((await post(body)).status, 400, JSON.stringify(body).slice(0, 60));
+  }
+  for (const method of ["PUT", "PATCH", "DELETE"]) assert.equal((await h.fetch(prefix + "/auth/access-request", { method, headers: auth })).status, 405);
+  assert.equal(h.calls.length, 0);
+});

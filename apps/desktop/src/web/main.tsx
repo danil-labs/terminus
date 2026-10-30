@@ -42,6 +42,7 @@ import { HomeLink } from "./HomeLink";
 import { installIpc } from "./ipc";
 import { webAccountProfile } from "./account";
 import { webAccountEmails } from "./account-emails";
+import { webAccessRequest } from "./access-request";
 import { authLocation } from "./auth/return";
 import { webGithubAccount } from "./github-account";
 import { type Account, type Listing, SLOT_PREFIX, loadAccounts, ownerOf, pickAccount, readListings, rememberLast, removeExtra, savedListings } from "./accounts";
@@ -507,6 +508,7 @@ async function start(settings: WebSettings) {
         session={session}
         endpoint={endpoint}
         accounts={webAccounts}
+        access={import.meta.env.TERMINUS_ALPHA ? webAccessRequest({ getToken: async () => await session.getToken(), unauthorized: () => session.unauthorized() }, `${import.meta.env.BASE_URL}alpha-api`) : undefined}
         onOpen={(computers) => {
           dispose();
           const several = computers.length > 1;

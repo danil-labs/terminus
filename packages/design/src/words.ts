@@ -1,7 +1,7 @@
 /**
  * Las palabras de la lista de tareas, su filtro, el dock de agentes, el
  * estado de una máquina, la vista previa de una tarea, el cuadro de escribir
- * y las cuentas de IA, con la misma clave que en los catálogos del
+ * las cuentas de IA y «Solicitar acceso», con la misma clave que en los catálogos del
  * escritorio (`apps/desktop/src/locales/<lengua>/*.json`).
  * `scripts/guards/shared-design.mjs` falla si una se aparta del escritorio.
  */
@@ -232,6 +232,29 @@ const es = {
   "web.alpha.deleted": "Mensaje eliminado",
   "web.alpha.empty": "No hay conversaciones en esta página.",
   "web.alpha.details": "Detalles",
+  "web.access.title": "Solicita acceso a Danil",
+  "web.access.intro": "Todavía no perteneces a un workspace. Pide acceso y te escribimos.",
+  "web.access.what": "Qué puedes hacer con Danil",
+  "web.access.lead": "Danil es un ecosistema de agentes de IA. Conecta agentes, trabaja con ellos y despliégalos.",
+  "web.access.platform_title": "La plataforma",
+  "web.access.platform": "Terminus es la mesa de trabajo de tu equipo y funciona con cualquier agente de IA. Danil Agents responde a tus clientes en cada canal.",
+  "web.access.teams_title": "Coordinación de equipos",
+  "web.access.teams": "Cada tarea tiene su lugar. Tus agentes se reparten el trabajo, se comunican y vuelven con respuestas.",
+  "web.access.permissions_title": "Permisos",
+  "web.access.permissions": "Tus agentes reciben el mismo contexto y los mismos permisos que tu equipo. Lo destructivo o lo que sale del encargo vuelve a ti.",
+  "web.access.form_title": "Solicitar acceso",
+  "web.access.email": "Correo",
+  "web.access.phone": "Teléfono",
+  "web.access.name": "Nombre (opcional)",
+  "web.access.company": "Empresa (opcional)",
+  "web.access.submit": "Solicitar acceso",
+  "web.access.sending": "Enviando…",
+  "web.access.sent_title": "Solicitud enviada",
+  "web.access.sent": "Recibimos tu solicitud. El equipo de Danil te escribirá pronto.",
+  "web.access.phone_invalid": "Escribe un teléfono válido, de 8 a 15 dígitos.",
+  "web.access.failed": "No se pudo enviar la solicitud. Vuelve a intentarlo.",
+  "web.auth.active_account": "Cuenta de Danil: {email}",
+  "web.auth.change_account": "Cambiar de cuenta",
 } as const satisfies Record<string, Word>;
 
 export type WordKey = keyof typeof es;
@@ -458,6 +481,29 @@ const en: Record<WordKey, Word> = {
   "web.alpha.deleted": "Deleted message",
   "web.alpha.empty": "No conversations on this page.",
   "web.alpha.details": "Details",
+  "web.access.title": "Request access to Danil",
+  "web.access.intro": "You do not belong to a workspace yet. Request access and we will write to you.",
+  "web.access.what": "What you can do with Danil",
+  "web.access.lead": "Danil is an ecosystem of AI agents. Connect agents, work with them and deploy them.",
+  "web.access.platform_title": "The platform",
+  "web.access.platform": "Terminus is your team's workbench and it works with any AI agent. Danil Agents answers your customers on every channel.",
+  "web.access.teams_title": "Team coordination",
+  "web.access.teams": "Every task has a home. Your agents split the work, talk to each other and come back with answers.",
+  "web.access.permissions_title": "Permissions",
+  "web.access.permissions": "Your agents get the same context and permissions as your team. Anything destructive or outside the brief comes back to you.",
+  "web.access.form_title": "Request access",
+  "web.access.email": "Email",
+  "web.access.phone": "Phone",
+  "web.access.name": "Name (optional)",
+  "web.access.company": "Company (optional)",
+  "web.access.submit": "Request access",
+  "web.access.sending": "Sending…",
+  "web.access.sent_title": "Request sent",
+  "web.access.sent": "We received your request. The Danil team will write to you soon.",
+  "web.access.phone_invalid": "Enter a valid phone number, 8 to 15 digits.",
+  "web.access.failed": "The request could not be sent. Try again.",
+  "web.auth.active_account": "Danil account: {email}",
+  "web.auth.change_account": "Switch account",
 };
 
 export const WORDS: Record<"es" | "en", Record<WordKey, Word>> = { es, en };

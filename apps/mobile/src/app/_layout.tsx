@@ -14,6 +14,7 @@ import { Notifications } from "../lib/notifications";
 import { t, w } from "../lib/i18n";
 import { pinToVisibleArea } from "../lib/viewport";
 import { WorkspacesProvider } from "../lib/workspaces";
+import { AccessRequest, useNeedsAccess } from "../ui/AccessRequest";
 import { ActivityNotice } from "../ui/ActivityNotice";
 import { useTheme } from "../ui/theme";
 
@@ -38,6 +39,11 @@ function openTarget(response: NotificationResponse | null) {
     pathname: "/task/[host]/[workspace]/[folder]/[id]",
     params: { host: target.host, workspace: target.workspace, folder: target.folder || "_", id: target.task },
   });
+}
+
+/** Por encima de todas las rutas: un enlace directo de alfa tampoco se la salta. El navegador sigue montado debajo. */
+function AccessGate() {
+  return useNeedsAccess() ? <AccessRequest /> : null;
 }
 
 export default function RootLayout() {
@@ -117,6 +123,7 @@ export default function RootLayout() {
           <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
         </Stack>
         <ActivityNotice />
+        <AccessGate />
       </InboxProvider>
       </CustomizationProvider>
       </WorkspacesProvider>
