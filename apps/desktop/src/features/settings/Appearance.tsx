@@ -12,7 +12,6 @@ import { elegirArchivoDeImagen } from "../../lib/pick-image";
 import type { AgentProfile, AgenteDeMaquina, CatalogoDeAgentes } from "../../lib/model";
 import {
   FONDOS,
-  claseDeFondo,
   type FondoDeChat,
 } from "../../lib/chat-background";
 import { elegirFondoDeChat, elegirVeloDeFondo, elegirVeloDePaneles, elegirVeloDePestanas, fondoDeChat, fondoPropio, imagenDelWorkspace, ponerFondoPropio, veloDeFondo, veloDePaneles, veloDePestanas } from "../../lib/chat-background-store";
@@ -325,7 +324,7 @@ export default function Appearance(props: { proyecto: string }) {
                             "absolute inset-0",
                             id === "propia"
                               ? "grid place-items-center bg-surface-muted text-neutral-500"
-                              : (claseDeFondo(id) ?? "bg-surface"),
+                              : "bg-surface",
                           )}
                           aria-hidden="true"
                         >

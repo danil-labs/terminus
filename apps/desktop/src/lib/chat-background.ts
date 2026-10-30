@@ -1,9 +1,9 @@
 /**
- * Fondos que la app trae para los chats: el atardecer, que se enseña como
- * «Por defecto», el neutro sin imagen y la imagen propia. Lo guardado antes
- * cae al atardecer: ningún fondo anterior deja de pintarse al actualizar.
+ * Fondos que la app trae para los chats: el neutro sin imagen, que es el de
+ * siempre, y la imagen propia. Lo guardado antes (el atardecer bicolor que ya
+ * no existe) cae al neutro.
  */
-export const FONDOS = ["dusk", "neutro", "propia"] as const;
+export const FONDOS = ["neutro", "propia"] as const;
 
 /** El marco nuevo pinta el fondo solo en el área de trabajo, no detrás de toda la ventana. */
 export const FONDO_SOLO_EN_EL_TRABAJO = true;
@@ -22,19 +22,10 @@ export const VELO_DE_PANELES = 0.4;
 export const VELO_DE_PANELES_MIN = 0;
 export const VELO_DE_PANELES_MAX = 1;
 
-const CLASE: Partial<Record<FondoDeChat, string>> = {
-  dusk: "chat-bg-dusk",
-};
-
 export function fondoDe(guardado: string | null | undefined): FondoDeChat {
   return (FONDOS as readonly string[]).includes(guardado ?? "")
     ? (guardado as FondoDeChat)
-    : "dusk";
-}
-
-/** La clase del patrón, o `null` si sale de su propio archivo. */
-export function claseDeFondo(id: string | null | undefined): string | null {
-  return CLASE[fondoDe(id)] ?? null;
+    : "neutro";
 }
 
 

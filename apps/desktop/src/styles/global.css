@@ -794,7 +794,7 @@
 .tab-active::after {
   background:
     linear-gradient(color-mix(in srgb, var(--color-surface) calc(var(--window-veil, 0.82) * 100%), transparent) 0 0),
-    var(--window-image, var(--chat-bg-dusk)) center / cover no-repeat,
+    var(--window-image, none) center / cover no-repeat,
     var(--color-surface);
   background-attachment: fixed;
 }
@@ -1049,16 +1049,3 @@
   to { transform: rotate(7deg); }
 }
 
-/* Fondo predeterminado del chat (`lib/chat-background.ts`). Sale de
-   tokens para invertirse con el tema. El velo de la ventana va encima. */
-:root {
-  --chat-bg-dusk: linear-gradient(
-    160deg,
-    color-mix(in srgb, var(--color-secondary) 80%, var(--color-surface)) 0%,
-    var(--color-surface) 46%,
-    color-mix(in srgb, var(--color-primary) 55%, var(--color-surface)) 100%
-  );
-}
-.chat-bg-dusk {
-  background-image: var(--chat-bg-dusk);
-}
