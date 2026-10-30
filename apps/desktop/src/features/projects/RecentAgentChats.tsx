@@ -31,7 +31,7 @@ export default function RecentAgentChats(props: {
     <section data-recent-agent-chats class="mt-5 w-full min-w-0">
       <div class="flex h-7 items-center gap-2">
         <h2 class="m-0 text-xs font-semibold text-neutral-700">{t("projects.agent_tasks.recent")}</h2>
-        <span class="font-mono text-[0.6875rem] text-neutral-500">{recent().length}</span>
+        <span class="font-mono text-caption text-neutral-500">{recent().length}</span>
       </div>
       <ul class="m-0 list-none p-0">
         <For each={recent()}>{row => {

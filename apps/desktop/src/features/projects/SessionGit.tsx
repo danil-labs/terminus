@@ -231,11 +231,11 @@ export default function SessionGit(props: { status?: GitStatus; compact?: boolea
     // `lead` abre la línea (la pastilla del agente): sin git, la línea queda solo con ella.
     <Show when={lineaVisible() || props.hasLead}>
       {/* Git, checks y PR al final: misma columna que el estado del modelo. */}
-      <div data-session-git={lineaVisible() ? "" : undefined} class="mt-1 flex min-w-0 items-center gap-1.5 text-[0.6875rem] font-normal leading-tight text-neutral-500">
+      <div data-session-git={lineaVisible() ? "" : undefined} class="mt-1 flex min-w-0 items-center gap-1.5 text-caption font-normal leading-tight text-neutral-500">
         <Show when={props.hasLead}>{props.lead}</Show>
         <Show when={lineaVisible()}>
           {/* Un punto por debajo del resto de la línea: la rama se lee entera y queda como dato secundario. */}
-          <span class="min-w-0 flex-1 truncate text-[0.625rem]" title={summary()}>{branch()}</span>
+          <span class="min-w-0 flex-1 truncate text-2xs" title={summary()}>{branch()}</span>
           <span class="inline-flex shrink-0 items-center gap-1">
             <span class={`inline-flex shrink-0 ${appearance().color}`} aria-label={summary()}>
               <Dynamic component={appearance().icon} size={13} aria-hidden="true" />

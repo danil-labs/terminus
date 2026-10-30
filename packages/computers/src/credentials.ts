@@ -6,11 +6,13 @@
  *
  * Sin APIs del DOM: `fetch` se inyecta (navegador, React Native, Node).
  */
-import { apiUrl } from "./api.ts";
+import { bearerCall, errorCodeOf } from "./api.ts";
 
-export type CredentialKind = "api_key" | "mcp_secret" | "zotero" | "github" | "subscription" | "mcp_oauth";
+/** Un cliente viejo recibe kinds que no conoce tal cual: cada consumidor filtra por `kinds`/`match`. */
+export type CredentialKind = "api_key" | "mcp_secret" | "zotero" | "github" | "subscription" | "mcp_oauth" | "env_secret";
 export type CredentialDelivery = "sealed" | "issued" | "login";
-export type CredentialMachineState = "active" | "pending" | "removed" | "signed_in";
+/** `unsupported`: el motor de esa máquina no anuncia `secrets_v1` y no aplicaría el secreto. */
+export type CredentialMachineState = "active" | "pending" | "removed" | "signed_in" | "unsupported";
 
 /** Una máquina de una credencial (`credential_machines`). */
 export type CredentialMachine = {
@@ -41,7 +43,16 @@ export type Credential = {
 };
 
 /** Una computadora ligada al workspace: para quién se sella. */
-export type CredentialRecipient = { computer_id: string; name: string | null; public_key: string | null; online: boolean };
+export type CredentialRecipient = {
+  computer_id: string;
+  name: string | null;
+  public_key: string | null;
+  online: boolean;
+  /** Lo que anunció su motor; null si el Worker no lo dice. */
+  service_features: string[] | null;
+};
+
+export const SECRETS_FEATURE = "secrets_v1";
 
 /** Una clave de la bóveda de esta máquina que no está en la cuenta (solo el motor la da). */
 export type LocalOnlyCredential = {
@@ -63,7 +74,7 @@ export type CredentialsListing = {
 
 /** Lo que manda `PUT …/credentials`: crea o rota una credencial sellada. */
 export type CredentialPut = {
-  kind: Extract<CredentialKind, "api_key" | "mcp_secret" | "zotero">;
+  kind: Extract<CredentialKind, "api_key" | "mcp_secret" | "zotero" | "env_secret">;
   provider: string;
   slot: string;
   label: string | null;
@@ -91,24 +102,15 @@ export type CredentialFetch = (
 /** A dónde hablar y con qué token: el JWT en la web, el token de cliente en la ventana. */
 export type CredentialSource = { endpoint: string; getToken: () => Promise<string>; fetch?: CredentialFetch };
 
-const globalFetch: CredentialFetch = (input, init) => (globalThis.fetch as unknown as CredentialFetch)(input, init);
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 const str = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 
 async function call<T>(source: CredentialSource, method: string, path: string, read: (body: unknown) => T, body?: unknown): Promise<CredentialAnswer<T>> {
-  const f = source.fetch ?? globalFetch;
-  let response: Awaited<ReturnType<CredentialFetch>>;
-  try {
-    const headers: Record<string, string> = { authorization: `Bearer ${await source.getToken()}` };
-    if (body !== undefined) headers["content-type"] = "application/json";
-    response = await f(apiUrl(source.endpoint, path), { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
-  } catch {
-    return { kind: "error", status: null };
-  }
-  const json = await response.json().catch(() => null);
-  const said = isObj(json) ? json.error : undefined;
-  const code = typeof said === "string" ? said : isObj(said) && typeof said.code === "string" ? said.code : undefined;
+  const response = await bearerCall(source, method, path, body);
+  if (!response) return { kind: "error", status: null };
+  const { json } = response;
+  const code = errorCodeOf(json);
   const withCode = <A extends object>(a: A) => (code ? { ...a, code } : a);
   if (response.status === 401) return { kind: "unauthorized" };
   if (response.status === 403) return withCode({ kind: "license" as const });
@@ -121,7 +123,7 @@ async function call<T>(source: CredentialSource, method: string, path: string, r
   }
 }
 
-const STATES = new Set(["active", "pending", "removed", "signed_in"]);
+const STATES = new Set(["active", "pending", "removed", "signed_in", "unsupported"]);
 
 function machineOf(raw: unknown): CredentialMachine | null {
   if (!isObj(raw) || !str(raw.computer_id)) return null;
@@ -160,7 +162,17 @@ export function credentialOf(raw: unknown): Credential | null {
 export function credentialsListingOf(raw: unknown): CredentialsListing {
   if (!isObj(raw) || !Array.isArray(raw.credentials)) throw new Error("bad_credentials");
   const recipients = (Array.isArray(raw.recipients) ? raw.recipients : []).flatMap((r): CredentialRecipient[] =>
-    isObj(r) && str(r.computer_id) ? [{ computer_id: r.computer_id as string, name: str(r.name), public_key: str(r.public_key), online: r.online === true }] : [],
+    isObj(r) && str(r.computer_id)
+      ? [
+          {
+            computer_id: r.computer_id as string,
+            name: str(r.name),
+            public_key: str(r.public_key),
+            online: r.online === true,
+            service_features: Array.isArray(r.service_features) ? r.service_features.filter((f): f is string => typeof f === "string") : null,
+          },
+        ]
+      : [],
   );
   const listing: CredentialsListing = {
     credentials: raw.credentials.map(credentialOf).filter((c): c is Credential => c !== null),
@@ -196,7 +208,7 @@ export function listCredentials(source: CredentialSource, workspace: string) {
   return call(source, "GET", routeOf(workspace), credentialsListingOf);
 }
 
-/** Crea o rota una credencial sellada (api_key, mcp_secret, zotero) con una copia por máquina. */
+/** Crea o rota una credencial sellada (api_key, mcp_secret, zotero, env_secret) con una copia por máquina. */
 export function putCredential(source: CredentialSource, workspace: string, put: CredentialPut) {
   return call(source, "PUT", routeOf(workspace), credentialOrThrow, put);
 }
@@ -226,12 +238,56 @@ export const credentialSlot = {
   goUsageKey: (agent: string, account: string) => `agentes/${agent}:go-usage:${account}`,
   zotero: () => "referencias/zotero-key",
   mcpSecret: (server: string, field: "env" | "headers", name: string) => `mcp/${server}/${field}/${name}`,
+  /** Sin carpeta vale para todo el workspace (`*`); la de la carpeta gana. */
+  envSecret: (folder: string | null, name: string) => `env/${folder ?? "*"}/${name}`,
 };
+
+export const ENV_SECRET_NAME = /^[A-Z_][A-Z0-9_]*$/;
+
+/** Un secreto genérico leído de su slot `env/<carpeta|*>/<NOMBRE>`; null si el slot no es de uno. */
+export type EnvSecretSlot = { folder: string | null; name: string };
+
+export function envSecretOf(slot: string): EnvSecretSlot | null {
+  const m = /^env\/([^/]+)\/([^/]+)$/.exec(slot);
+  if (!m || !ENV_SECRET_FOLDER.test(m[1]!) || !ENV_SECRET_NAME.test(m[2]!)) return null;
+  return { folder: m[1] === "*" ? null : m[1]!, name: m[2]! };
+}
+
+/** Copia de seldon-host `docs/account-credentials.md` § Secretos genéricos; `test/fixtures/env-secret-names.json` es el mismo archivo que prueba el motor. */
+const RESERVED_ENV_PREFIXES = ["TERMINUS_", "SELDON_", "HARNESS_", "ANTHROPIC_", "OPENAI_", "CLAUDE_", "CODEX_", "OPENCODE_", "GROK_", "AGY_", "XDG_", "LD_", "DYLD_", "GIT_"];
+const RESERVED_ENV = new Set([
+  "PATH", "HOME", "SHELL", "USER", "TMPDIR", "TERM", "NODE_OPTIONS", "GH_TOKEN", "GITHUB_TOKEN", "XAI_API_KEY", "ZCODE_DATA_BASE_DIR", "DANIL_COMPUTERS_URL",
+  "USERPROFILE", "APPDATA", "LOCALAPPDATA", "SYSTEMROOT", "COMSPEC", "PATHEXT", "TEMP", "TMP", "SYSTEMDRIVE", "WINDIR", "PROGRAMFILES", "PROGRAMDATA", "PSMODULEPATH",
+]);
+const ENV_SECRET_NAME_MAX = 128;
+const ENV_SECRET_FOLDER = /^(\*|[A-Za-z0-9_-]{1,64})$/;
+
+/** Por qué un nombre no sirve para un secreto genérico, o null si sirve. */
+export function envSecretNameProblem(name: string): "empty" | "grammar" | "reserved" | null {
+  if (!name) return "empty";
+  if (!ENV_SECRET_NAME.test(name) || name.length > ENV_SECRET_NAME_MAX) return "grammar";
+  if (RESERVED_ENV.has(name) || RESERVED_ENV_PREFIXES.some((p) => name.startsWith(p))) return "reserved";
+  return null;
+}
+
+/** Si sirve como alcance de un secreto: `*` (todo el workspace) o el id de una carpeta. */
+export const envSecretFolderValid = (folder: string) => ENV_SECRET_FOLDER.test(folder);
+
+/** Los últimos 4 que se enseñan; un secreto genérico corto no da pista (deja poco por adivinar). */
+export function credentialHint(kind: CredentialKind, value: string): string | null {
+  if (kind === "env_secret") return value.length >= 16 ? value.slice(-4) : null;
+  return value.length >= 4 ? value.slice(-4) : null;
+}
 
 /** Las máquinas que se enseñan en «En uso en»: primero las que la tienen, luego las pendientes y al final las quitadas. */
 export function credentialMachines(credential: Pick<Credential, "machines">): CredentialMachine[] {
-  const rank: Record<CredentialMachineState, number> = { active: 0, signed_in: 0, pending: 1, removed: 2 };
+  const rank: Record<CredentialMachineState, number> = { active: 0, signed_in: 0, pending: 1, unsupported: 2, removed: 3 };
   return [...credential.machines].sort((a, b) => rank[a.state] - rank[b.state] || (a.name ?? a.computer_id).localeCompare(b.name ?? b.computer_id));
+}
+
+/** Para quién se sella: un secreto genérico solo para las máquinas cuyo motor anunció `secrets_v1`. */
+export function sealRecipientsFor<R extends Pick<CredentialRecipient, "service_features">>(kind: CredentialKind, recipients: readonly R[]): R[] {
+  return kind === "env_secret" ? recipients.filter((r) => r.service_features?.includes(SECRETS_FEATURE) === true) : [...recipients];
 }
 
 /** Si la credencial es de esa cuenta de agente (`config.agent` / `config.account`). */

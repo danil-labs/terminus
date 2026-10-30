@@ -1,8 +1,9 @@
 # Plan: login con WorkOS en alfa-app.danil.ai (piloto)
 
 Tarea z4yp8ckz (tech-lead) para la coordinadora 0emvaj92. Brief:
-`sessions/0emvaj92/exchange/brief-workos-login-alfa.md`. Estado: **borrador para
-revisión de arquitectura**. No se ha escrito nada en producción.
+`sessions/0emvaj92/exchange/brief-workos-login-alfa.md`. Estado: **implementado
+en el cliente** (la entrada de WorkOS ya está en la rama de alfa). Se conserva por
+sus decisiones; lo pendiente de producción se confirma contra el despliegue.
 
 ## 1. Lo que hay hoy (medido el 2026-10-30)
 

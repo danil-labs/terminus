@@ -1,8 +1,9 @@
+import { RADIUS, TEXT } from "@terminus/design";
 import { usageTone, windowLabel, windowLeft } from "@terminus/computers";
 import type { AccountLimits, UsageWindow } from "@terminus/protocol";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Modal, Platform, Pressable, ScrollView, type ScrollViewInstance, StyleSheet, Text, TextInput, View } from "react-native";
+import { Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { type ProviderUsage, providerUsage } from "../lib/accountUsage";
 import { accountWorkspace } from "../lib/engine";
 import type { Host } from "../lib/hosts";
@@ -25,8 +26,7 @@ const toneColor = (theme: Theme, left: number) => {
 /**
  * Bajo el título del chat: dónde corre la tarea (máquina / carpeta / rama) y
  * sus herramientas: buscar en el chat, las subtareas (con su número), y la
- * barra de uso de la cuenta del proveedor, que abre su detalle. Debajo, el
- * riel de tus mensajes como carrusel: tocar uno salta a él. Leer el uso
+ * barra de uso de la cuenta del proveedor, que abre su detalle. Leer el uso
  * nunca enciende la máquina.
  */
 export function TaskTools({
@@ -37,10 +37,8 @@ export function TaskTools({
   branch,
   provider,
   subtasks,
-  mine,
   finding,
   onFind,
-  onJump,
   onTools,
 }: {
   host: Host | undefined;
@@ -50,10 +48,8 @@ export function TaskTools({
   branch: string | null;
   provider: string | null;
   subtasks: number;
-  mine: { key: string; text: string }[];
   finding: string | null;
   onFind: (query: string | null) => void;
-  onJump: (key: string) => void;
   onTools: () => void;
 }) {
   const theme = useTheme();
@@ -61,7 +57,6 @@ export function TaskTools({
   const [revision, setRevision] = useState(0);
   const [anchor, setAnchor] = useState<Rect | null>(null);
   const bar = useRef(null);
-  const rail = useRef<ScrollViewInstance>(null);
   const on = host?.power() === "on";
 
   useEffect(() => {
@@ -101,7 +96,7 @@ export function TaskTools({
         {subtasks ? (
           <Tap testID="chat-subtasks" accessibilityRole="button" accessibilityLabel={t("task.tools.subtasks", { count: subtasks })} onPress={onTools} style={styles.tool}>
             <Icon name="git-fork" size={16} color={theme.text} />
-            <Text style={{ color: theme.text, fontSize: 13, fontWeight: "600" }}>{subtasks}</Text>
+            <Text style={{ color: theme.text, fontSize: TEXT.ui, fontWeight: "600" }}>{subtasks}</Text>
           </Tap>
         ) : (
           <Tap testID="chat-tree" accessibilityRole="button" accessibilityLabel={t("task.tools.title")} onPress={onTools} style={styles.tool}>
@@ -127,16 +122,6 @@ export function TaskTools({
           </Tap>
         </View>
       ) : null}
-      {mine.length > 1 && finding === null ? (
-        <ScrollView ref={rail} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail} onContentSizeChange={() => rail.current?.scrollToEnd({ animated: false })}>
-          {mine.map((line, i) => (
-            <Tap key={line.key} testID={`rail-${i}`} accessibilityRole="button" onPress={() => onJump(line.key)} style={[styles.railCard, { backgroundColor: i === mine.length - 1 ? theme.userBubble : theme.muted, borderColor: i === mine.length - 1 ? `${theme.merged}44` : "transparent" }]}>
-              <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: "600" }}>{t("task.tools.of", { n: i + 1, total: mine.length })}</Text>
-              <Text numberOfLines={2} style={{ color: theme.text, fontSize: 13, lineHeight: 17 }}>{line.text}</Text>
-            </Tap>
-          ))}
-        </ScrollView>
-      ) : null}
 
       <Modal visible={!!anchor} transparent animationType="fade" onRequestClose={() => setAnchor(null)}>
         <Pressable accessibilityRole="button" onPress={() => setAnchor(null)} style={[StyleSheet.absoluteFill, { backgroundColor: theme.dark ? "rgba(0,0,0,0.4)" : "rgba(10,13,35,0.18)" }]} />
@@ -147,14 +132,14 @@ export function TaskTools({
                 <View style={styles.groupHead}>
                   <BrandMark id={provider} size={16} color={theme.text} />
                   <Text style={{ color: theme.text, fontWeight: "700", fontSize: 16, flex: 1 }}>{group.row.label}</Text>
-                  {group.row.identity ? <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: 12, maxWidth: 140 }}>{group.row.identity}</Text> : null}
+                  {group.row.identity ? <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: TEXT.label, maxWidth: 140 }}>{group.row.identity}</Text> : null}
                 </View>
                 {windowsOf(usage.limits[group.key]).map((win) => {
                   const left = windowLeft(win);
                   return (
                     <View key={win.label} style={{ gap: 6 }}>
                       <View style={styles.groupHead}>
-                        <Text style={{ color: theme.text, fontSize: 14, flex: 1 }}>{win.label}</Text>
+                        <Text style={{ color: theme.text, fontSize: TEXT.body, flex: 1 }}>{win.label}</Text>
                         <Text style={{ color: theme.textMuted, fontSize: 12.5 }}>{windowLabel(lang, win)}</Text>
                       </View>
                       <View style={[styles.longTrack, { backgroundColor: theme.border }]}>
@@ -170,7 +155,7 @@ export function TaskTools({
                 <Text style={{ color: theme.text, fontWeight: "600" }}>{t("alpha.refresh")}</Text>
               </Tap>
               <Tap accessibilityRole="button" onPress={() => { setAnchor(null); router.push("/accounts"); }} style={[styles.button, { backgroundColor: theme.text }]}>
-                <Text style={{ color: theme.dark ? theme.bg : "#ffffff", fontWeight: "600" }}>{w("usage.manage_accounts")}</Text>
+                <Text style={{ color: theme.onPrimary, fontWeight: "600" }}>{w("usage.manage_accounts")}</Text>
               </Tap>
             </View>
           </View>
@@ -184,16 +169,14 @@ const styles = StyleSheet.create({
   wrap: { borderBottomWidth: StyleSheet.hairlineWidth },
   row: { flexDirection: "row", alignItems: "center", gap: 2, paddingLeft: 16, paddingRight: 8, minHeight: 44 },
   place: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 5 },
-  placeText: { fontSize: 13 },
-  tool: { minWidth: 40, height: 40, flexDirection: "row", gap: 3, alignItems: "center", justifyContent: "center", borderRadius: 8, paddingHorizontal: 4 },
+  placeText: { fontSize: TEXT.ui },
+  tool: { minWidth: 40, height: 40, flexDirection: "row", gap: 3, alignItems: "center", justifyContent: "center", borderRadius: RADIUS.lg, paddingHorizontal: 4 },
   track: { width: 34, height: 5, borderRadius: 3, overflow: "hidden" },
   longTrack: { height: 6, borderRadius: 3, overflow: "hidden" },
   fill: { height: "100%", borderRadius: 3 },
   find: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 12, marginBottom: 8, height: 40, borderRadius: 10, paddingLeft: 12 },
-  findInput: { flex: 1, fontSize: 15, minWidth: 0, ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null) },
+  findInput: { flex: 1, fontSize: TEXT.lead, minWidth: 0, ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null) },
   close: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  rail: { gap: 8, paddingHorizontal: 12, paddingBottom: 10 },
-  railCard: { width: 170, borderRadius: 12, padding: 10, gap: 4, borderWidth: 1 },
   popover: { position: "absolute", left: 16, right: 16, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, padding: 16, gap: 16, shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 20, elevation: 10 },
   groupHead: { flexDirection: "row", alignItems: "center", gap: 8 },
   buttons: { flexDirection: "row", gap: 8 },

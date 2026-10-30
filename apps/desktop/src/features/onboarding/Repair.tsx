@@ -16,16 +16,16 @@ export function FuncionesAfectadas(props: {
   const caso = () => remedio(props.fallas);
   return (
     <div class="grid gap-2.5 rounded-lg border border-warning/40 bg-surface-raised px-4 py-3" data-setup-functions="">
-      <p class="m-0 flex items-center gap-2 text-[13px] font-semibold text-neutral-950">
+      <p class="m-0 flex items-center gap-2 text-ui font-semibold text-neutral-950">
         <TriangleAlert size={15} class="shrink-0 text-warning-strong" aria-hidden="true" />
         {t("setup.functions.title")}
       </p>
       <ul class="m-0 grid list-none gap-1 p-0">
         <For each={props.fallas}>
           {(f) => (
-            <li class="grid text-[13px]" data-function={f.id ?? "environment"} data-reason={f.reason}>
+            <li class="grid text-ui" data-function={f.id ?? "environment"} data-reason={f.reason}>
               <span class="text-neutral-950">{funcion(f.id)}</span>
-              <span class="text-[11px] text-neutral-500">{motivo(f.reason)}</span>
+              <span class="text-caption text-neutral-500">{motivo(f.reason)}</span>
             </li>
           )}
         </For>

@@ -26,7 +26,7 @@ import {
   wakes,
 } from "@terminus/computers";
 import { chosenWebLayout, MOBILE_WEB_DIR } from "@terminus/design";
-import { Fleet, type Link, type MachineInfo, unwrap } from "@terminus/fleet";
+import { Fleet, type Link, type MachineInfo, relayLink, unwrap } from "@terminus/fleet";
 import { type Accessor, createSignal, lazy, Suspense } from "solid-js";
 import { createRouter, type Router, type SliceChange } from "../features/machines/router";
 import { t } from "../lib/i18n";
@@ -125,21 +125,7 @@ const infoOf = (c: Computer): MachineInfo => {
  * in `/v1/computers`: a machine listed off with a saved slice is not asked.
  */
 function rowLink(relay: RelaySession, row: () => string | undefined): Link {
-  return {
-    state: () => (relay.state() === "unknown" ? ((row() as MachineState | undefined) ?? "unknown") : relay.state()),
-    call: (id, command, workspace, folder, args, timeout) => relay.call(id, command, workspace, folder, args, timeout),
-    onState: (listener) => relay.onState(listener),
-    onEvents: (listener) => relay.onEvents(listener),
-    onEngine: (listener) => relay.onEngine(listener),
-    blocked: () => relay.blocked(),
-    onBlocked: (listener) => relay.onBlocked(listener),
-    retry: () => relay.retry(),
-    onDeferred: (listener) => relay.onDeferred(listener),
-    deferred: () => relay.deferred(),
-    subscribe: (after) => relay.subscribe(after),
-    start: () => relay.start(),
-    close: () => relay.close(),
-  };
+  return relayLink(relay, () => (relay.state() === "unknown" ? ((row() as MachineState | undefined) ?? "unknown") : relay.state()));
 }
 
 /** Another machine's slice changed: the window rereads just that. */

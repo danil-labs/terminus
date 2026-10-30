@@ -1,3 +1,4 @@
+import { RADIUS } from "@terminus/design";
 import { destinoAbrible, imagenInerte, imagenLocal, internalTaskLink, localFilePath } from "@terminus/chat/links";
 import { MAX_CHAT_VISUALS, parseVisualDirective } from "@terminus/chat/visual";
 import * as Clipboard from "expo-clipboard";
@@ -286,7 +287,7 @@ const styles = StyleSheet.create({
   codeText: { fontFamily: MONO, fontSize: 12.5, lineHeight: 18 },
   copy: { position: "absolute", top: 8, right: 8 },
   tableWrap: { flexGrow: 0 },
-  table: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 8, overflow: "hidden" },
+  table: { borderWidth: StyleSheet.hairlineWidth, borderRadius: RADIUS.lg, overflow: "hidden" },
   row: { flexDirection: "row" },
   cell: { minWidth: 90, maxWidth: 260, padding: 6, borderWidth: StyleSheet.hairlineWidth },
 });

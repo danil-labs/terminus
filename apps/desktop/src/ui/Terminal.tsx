@@ -26,17 +26,6 @@ export function Terminal(props: JSX.HTMLAttributes<HTMLDivElement>) {
   );
 }
 
-/** La barra de título. El nombre va en `TerminalName`; lo demás se alinea al final. */
-export function TerminalBar(props: JSX.HTMLAttributes<HTMLDivElement>) {
-  const [propios, resto] = splitProps(props, ["class"]);
-  return (
-    <div
-      class={cn(BARRA_DE_TERMINAL, propios.class)}
-      {...resto}
-    />
-  );
-}
-
 export function TerminalName(props: JSX.HTMLAttributes<HTMLElement>) {
   const [propios, resto] = splitProps(props, ["class"]);
   return <strong class={cn(NOMBRE_DE_TERMINAL, propios.class)} {...resto} />;

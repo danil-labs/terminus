@@ -79,7 +79,7 @@ export default function ProfileMenu(props: {
           </button>
           <div class="my-1 h-px bg-border" />
         </Show>
-        <p class="m-0 px-2 pt-1 pb-1 text-[0.6875rem] font-medium text-neutral-500">{t("shell.profile.theme")}</p>
+        <p class="m-0 px-2 pt-1 pb-1 text-caption font-medium text-neutral-500">{t("shell.profile.theme")}</p>
         <div role="radiogroup" aria-label={t("shell.profile.theme")} class={cn(SEGMENTO, "mx-2 mb-2")}>
           <For each={TEMAS}>
             {(a) => (
@@ -98,7 +98,7 @@ export default function ProfileMenu(props: {
         <Show when={despierta.status()?.supported ? despierta.status() : null}>
           {(s) => (
             <>
-              <p class="m-0 flex items-center justify-between gap-2 px-2 pt-1 pb-1 text-[0.6875rem] font-medium text-neutral-500">
+              <p class="m-0 flex items-center justify-between gap-2 px-2 pt-1 pb-1 text-caption font-medium text-neutral-500">
                 <span>{t("shell.keep_awake.title")}</span>
                 <span class="font-normal">{s().active ? t("shell.keep_awake.active") : t("shell.keep_awake.inactive")}</span>
               </p>
@@ -117,12 +117,12 @@ export default function ProfileMenu(props: {
                   )}
                 </For>
               </div>
-              <p class="m-0 px-2 pt-1 pb-2 text-[0.6875rem] text-neutral-500">{descriptionOf(s().mode)}</p>
+              <p class="m-0 px-2 pt-1 pb-2 text-caption text-neutral-500">{descriptionOf(s().mode)}</p>
             </>
           )}
         </Show>
         <div class="my-1 h-px bg-border" />
-        <p class="m-0 flex items-center gap-1.5 px-2 pt-1 pb-1 text-[0.6875rem] font-medium text-error-strong">
+        <p class="m-0 flex items-center gap-1.5 px-2 pt-1 pb-1 text-caption font-medium text-error-strong">
           <Bug size={12} aria-hidden="true" />
           {t("usage.bug_report")}
         </p>

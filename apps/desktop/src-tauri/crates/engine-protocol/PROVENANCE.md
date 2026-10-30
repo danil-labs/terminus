@@ -6,7 +6,7 @@ Apache-2.0); the manifest was regenerated on
 `b40d34999d140d30a0e1192ba752b2fdb860dc90`. The generator reads the engine
 source and is not part of this repository.
 
-`commands.json`: 549 entries: 370 invocations, 142 CLI routes, 12 RPC routes,
+`commands.json`: 553 entries: 370 invocations, 146 CLI routes, 12 RPC routes,
 three channels and twenty-two window/bridge functions; 37 events. Names, camelCase parameters, reference Rust
 types and literal events are kept.
 
@@ -20,7 +20,7 @@ repositories, and `GitHostInfo`. Files on disk keep their keys; the types that
 are stored and also travel cross the contract wrapped in `Wire`, which renames
 their keys. There are no aliases. This copy is byte-identical to the engine's.
 SHA-256:
-`5096a84a8341725f8926cdcbfb0e8b29cb85f58abee26151cbfc1f5aecc35d02`.
+`5f59d6031b76b0248f09d7e19d184a542259d773c62080a30cb9298e7b5033ca`.
 
 seldon-host `4e21caf` (#66) added the Danil account (321 commands, 28 events):
 `danil_connect_start`, `danil_connect_status`, `danil_connect_options`,
@@ -237,6 +237,12 @@ handler approvals and quarantine routes. The public projection in
 engine-protocol `e3199a5` is for the CLI and is not the window manifest.
 A compatible published engine remains required before a desktop release.
 
+seldon-host `release/train-2026-10-30` (`b8e7fcd`) adds the four admin CLI routes
+`executor release status|stage|activate|rollback` (553 entries; invocations,
+events and the other routes unchanged). The window invokes none of them. This
+copy is `git show b8e7fcd:crates/engine-manifest/commands.json` byte for byte; no
+`seldon-runtime` with it is published yet.
+
 Handler and peer error keys come from the CLI catalogs at seldon-host
 `437a280` (`crates/terminus-cli/src/messages.{es,en}.json`); the window completes
 the Spanish translations. Pending error codes come from that engine
@@ -261,3 +267,10 @@ them answers that the command is unknown, and only that feature turns off.
 - `machine_usage_v1.json`: usage per task (`stop_task_processes`, the
   `machine-usage` event and the additive `machine_resources` fields), feature
   `machine_usage_v1`, from seldon-host PR #255 (`feat/machine-usage` 8c2ad2b).
+- `secrets_v1.json`: generic secrets (`env_secret_set`, `env_secret_remove`,
+  `env_secrets_list`, `secret run`), from seldon-host PR #240 at
+  `30b22f9c` (unchanged at `5a1b1d8e`), SHA-256
+  `2ae19484093d481df8ded327eff1a2504bee138bca4a5109a0ec7baae3239c11`.
+- `artifact_parts_v1.json`: `artifact_read_part`, the bytes of a sealed artifact
+  version in parts, so a window downloads a document from a task on another
+  machine (seldon-host `feat/artifact-read-part`).

@@ -127,7 +127,7 @@ export function CuerpoDeArchivo(props: {
     <Show
       when={!props.archivo.binario}
       fallback={
-        <p class="m-0 px-2.5 py-2 text-[0.75rem] text-neutral-500">
+        <p class="m-0 px-2.5 py-2 text-label text-neutral-500">
           {t("code.file.binary")}
         </p>
       }
@@ -390,7 +390,7 @@ function Salto(props: { cuantas: number; onDesplegar: () => void; eco?: boolean 
   return (
     <Show when={props.cuantas > 0}>
       <button
-        class="col-span-full flex w-full items-center gap-2 border-y border-border bg-surface-raised px-2 py-1 text-left text-[0.6875rem] text-neutral-500 outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        class="col-span-full flex w-full items-center gap-2 border-y border-border bg-surface-raised px-2 py-1 text-left text-caption text-neutral-500 outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         onClick={props.onDesplegar}
         title={t("code.gap.title")}
         tabindex={props.eco ? -1 : undefined}

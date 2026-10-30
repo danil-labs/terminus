@@ -94,12 +94,6 @@ export function carpetasDelEscritorio<P extends { id: string }>(
   return [...agregadas, ...conTareas];
 }
 
-/** Las del escritorio primero, en su orden, y detrás las demás como venían. */
-export function ordenDelEscritorio<P extends { id: string }>(projects: readonly P[], visibles: readonly P[]): P[] {
-  const dentro = new Set(visibles.map((p) => p.id));
-  return [...visibles, ...projects.filter((p) => !dentro.has(p.id))];
-}
-
 export const claveDeVista = (s: { folder: string; task: string }) => `${s.folder}\u0000${s.task}`;
 
 /**

@@ -73,7 +73,6 @@ import type {
   ModoDePermiso,
   Source,
 } from "../../lib/model";
-import { VELO_DE_FONDO } from "../../lib/chat-background";
 import { AstroAvatar } from "../projects/AstroAvatar";
 import {
   type CatalogosDeModelos,
@@ -387,7 +386,7 @@ type BloqueDeTrabajo = Extract<Bloque, { tipo: "trabajo" }>;
  * `font-family: inherit` le gana al textarea nativo, que si no cae a la del sistema.
  */
 const METRICA_DEL_CAMPO =
-  "border border-transparent px-2 py-1.5 text-[0.8125rem] leading-[1.4] [font-family:inherit] [scrollbar-gutter:stable]";
+  "border border-transparent px-2 py-1.5 text-ui leading-[1.4] [font-family:inherit] [scrollbar-gutter:stable]";
 // Del mismo tipo que el `inherit` de arriba, para que `cn` lo reemplace.
 const FUENTE_DE_TERMINAL = "[font-family:var(--font-mono)] [tab-size:4]";
 const archivosDelNavegador = () => import("./browserFiles");
@@ -456,8 +455,6 @@ export type ChatProps = {
   bodyOf?: (name: string) => string | null;
   avatarOf?: (name: string) => string | null;
   /** Su fondo, ya leído como `data:` URI, y cuánto lo tapa el velo. */
-  chatBackground?: string | null;
-  chatVeil?: number;
   /** Abre su perfil en esta misma pestaña. Sin él, la cabecera no es un botón. */
   onOpenProfile?: () => void;
   /**
@@ -709,7 +706,7 @@ export type ChatProps = {
   /** Abrir lo que el hilo acaba de anunciar, por su ruta dentro de la tarea. */
   onAbrirArtefacto: (rel: string) => void;
   /** Abre la tarea que firmó un mensaje (`Turn::from_task`). */
-  onOpenTask?: (folder: string, task: string) => void;
+  onOpenTask?: (folder: string, task: string, machine?: string | null) => void;
   /** Una tarea del riel por su id, para las filas guardadas sin `from_task`. */
   tareaPorId?: (id: string) => SenderTask | null;
 
@@ -2288,7 +2285,7 @@ export default function Chat(props: ChatProps) {
                 <MessageCircleQuestion size={12} aria-hidden="true" />
                 /{comando()}
               </span>
-              <span class="min-w-0 truncate text-[0.6875rem] text-neutral-500">{t("chat.side.mode")}</span>
+              <span class="min-w-0 truncate text-caption text-neutral-500">{t("chat.side.mode")}</span>
             </div>
           )}
         </Show>
@@ -2314,7 +2311,7 @@ export default function Chat(props: ChatProps) {
               fallback={
                 <button
                   type="button"
-                  class="flex h-5 items-center gap-1 rounded-[5px] px-[7px] text-[0.6875rem] font-medium text-neutral-700 outline-none hover:bg-surface-muted focus-visible:ring-2 focus-visible:ring-primary"
+                  class="flex h-5 items-center gap-1 rounded-[5px] px-[7px] text-caption font-medium text-neutral-700 outline-none hover:bg-surface-muted focus-visible:ring-2 focus-visible:ring-primary"
                   onClick={() => {
                     setSoltadoDe(null);
                     if (campo) enfocar(campo);
@@ -2331,11 +2328,11 @@ export default function Chat(props: ChatProps) {
               </Badge>
             </Show>
             <Show when={entradaActiva()}>
-              <span class="min-w-0 truncate text-[0.6875rem] text-neutral-500">{t("chat.composer.stdin.hint")}</span>
+              <span class="min-w-0 truncate text-caption text-neutral-500">{t("chat.composer.stdin.hint")}</span>
             </Show>
             <Show when={!entradaActiva() && carpetaDeTerminal()}>
               {(carpeta) => (
-                <span class="min-w-0 truncate font-mono text-[0.6875rem] text-neutral-500" title={carpeta()}>
+                <span class="min-w-0 truncate font-mono text-caption text-neutral-500" title={carpeta()}>
                   {carpeta()}
                 </span>
               )}
@@ -2841,25 +2838,6 @@ export default function Chat(props: ChatProps) {
           </header>
         )}
       </Show>
-      {/* Detrás del hilo y delante de nada: el velo del color de fondo es lo
-          que deja legible el texto sobre cualquier imagen. El fondo elegido
-          en Estilo lo pinta la sección (`App.tsx` · `Conversacion`), que
-          cubre también la tira de pestañas; aquí solo va el propio del
-          agente, si lo tiene, encima de aquel. */}
-      <Show when={props.chatBackground}>
-        {(background) => (
-          <div
-            class="pointer-events-none absolute inset-0 bg-cover bg-center"
-            style={{ "background-image": `url("${background()}")` }}
-            aria-hidden="true"
-          >
-            <div
-              class="absolute inset-0 bg-surface"
-              style={{ opacity: String(props.chatVeil ?? VELO_DE_FONDO) }}
-            />
-          </div>
-        )}
-      </Show>
       <div
         class={cn(
           "relative min-h-0 flex-1 overflow-auto [overflow-anchor:none]",
@@ -3124,7 +3102,7 @@ export default function Chat(props: ChatProps) {
                                   type="button"
                                   class={cn("truncate underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-primary", !m().encargado && "font-semibold")}
                                   aria-label={t("chat.recipients.open_task", { title: sender().title })}
-                                  onClick={() => props.onOpenTask?.(sender().folder, sender().task)}
+                                  onClick={() => props.onOpenTask?.(sender().folder, sender().task, sender().machine)}
                                 >
                                   {sender().title}
                                 </button>
@@ -3512,7 +3490,7 @@ function RegistroDeTrabajo(props: {
                         type="button"
                         title={t("chat.work.open_changes")}
                         onClick={() => props.onVerCambios?.()}
-                        class="pointer-events-auto relative rounded-sm underline decoration-neutral-400 underline-offset-2 hover:text-neutral-950 hover:decoration-current focus-visible:outline-2 focus-visible:outline-primary"
+                        class="pointer-events-auto relative rounded-sm underline decoration-neutral-300 underline-offset-2 hover:text-neutral-950 hover:decoration-current focus-visible:outline-2 focus-visible:outline-primary"
                       >
                         {parte().texto}
                       </button>
@@ -3873,7 +3851,7 @@ function SiguioTrasElCupo(props: { cambio: CambioPorCupo }) {
  */
 function FilaDeLaBandeja(props: {
   msg: Msg;
-  onOpenTask?: (folder: string, task: string) => void;
+  onOpenTask?: (folder: string, task: string, machine?: string | null) => void;
   tareaPorId?: (id: string) => SenderTask | null;
 }) {
   const informe = () => (citaInforme(props.msg.meta) ? props.msg.text.trim() : "");
@@ -3901,7 +3879,7 @@ function FilaDeLaBandeja(props: {
                   type="button"
                   class="cursor-pointer underline underline-offset-2"
                   aria-label={t("chat.recipients.open_task", { title: sender().title })}
-                  onClick={() => props.onOpenTask?.(sender().folder, sender().task)}
+                  onClick={() => props.onOpenTask?.(sender().folder, sender().task, sender().machine)}
                 >
                   {t("chat.task_completed.open")}
                 </button>
@@ -3938,7 +3916,7 @@ function HitoDelHilo(props: {
   /** Llevar a donde se conectan y se cambian las cuentas. */
   onCuentas: () => void;
   /** Abre la tarea que firmó la fila (`Turn::from_task`). */
-  onOpenTask?: (folder: string, task: string) => void;
+  onOpenTask?: (folder: string, task: string, machine?: string | null) => void;
 }) {
   const esFallo = () => props.msg.meta === "fallo";
   return (
@@ -3981,7 +3959,7 @@ function HitoDelHilo(props: {
                   type="button"
                   class="cursor-pointer underline underline-offset-2"
                   aria-label={t("chat.recipients.open_task", { title: sender().title })}
-                  onClick={() => props.onOpenTask?.(sender().folder, sender().task)}
+                  onClick={() => props.onOpenTask?.(sender().folder, sender().task, sender().machine)}
                 >
                   {t("chat.task_completed.open")}
                 </button>
@@ -3995,7 +3973,7 @@ function HitoDelHilo(props: {
         >
           {(f) => (
             <details class="text-neutral-500">
-              <summary class="cursor-pointer text-[0.6875rem]">{t("common.failure.detail")}</summary>
+              <summary class="cursor-pointer text-caption">{t("common.failure.detail")}</summary>
               <p class="m-0 font-mono text-[0.7rem] break-all whitespace-pre-wrap">{f().detail}</p>
             </details>
           )}
@@ -4021,7 +3999,7 @@ function HoraDelTurno(props: { at?: number }) {
         <time
           datetime={new Date(at()).toISOString()}
           tabindex={0}
-          class="cursor-default rounded-sm px-1 text-[0.6875rem] leading-4 whitespace-nowrap text-neutral-500 outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          class="cursor-default rounded-sm px-1 text-caption leading-4 whitespace-nowrap text-neutral-500 outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           {mostrarHoraDeTurno(at())}
         </time>
@@ -4051,7 +4029,7 @@ function LineaDeProveedor(props: {
   const titulo = () => props.provider ?? props.agentLabel;
   return (
     <span
-      class="flex items-center gap-1 whitespace-nowrap rounded-sm px-1 text-[0.6875rem] leading-4 text-neutral-500"
+      class="flex items-center gap-1 whitespace-nowrap rounded-sm px-1 text-caption leading-4 text-neutral-500"
       title={titulo()}
       aria-label={t("chat.actions.provider")}
       data-provider={props.provider}
@@ -4172,7 +4150,7 @@ function CambioDeContexto(props: {
   };
 
   return (
-    <div class="flex items-center gap-2 text-[0.6875rem] text-neutral-500">
+    <div class="flex items-center gap-2 text-caption text-neutral-500">
       <span class="h-px flex-1 bg-border" />
       <div class="flex min-w-0 flex-col gap-1">
         <Show when={props.cambio.entraron.length}>

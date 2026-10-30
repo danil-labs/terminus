@@ -71,7 +71,7 @@ export default function SpaceMenu(props: {
             variant="chrome"
             size="compact"
             data-space-menu=""
-            class="h-7 min-w-0 max-w-44 gap-1.5 px-2 text-[0.8125rem] font-semibold"
+            class="h-7 min-w-0 max-w-44 shrink gap-1.5 px-2 text-ui font-semibold"
             aria-label={t("spaces.bar.label", { workspace: props.workspace })}
             title={actual() ? spaceName(actual()!) : undefined}
             onDblClick={(e: MouseEvent) => {
@@ -100,7 +100,7 @@ export default function SpaceMenu(props: {
             />
           </Match>
           <Match when={modo().kind === "list"}>
-            <p class="m-0 truncate px-2 pt-1 pb-1 text-[0.6875rem] font-medium text-neutral-500">
+            <p class="m-0 truncate px-2 pt-1 pb-1 text-caption font-medium text-neutral-500">
               {t("spaces.bar.label", { workspace: props.workspace })}
             </p>
             <For each={props.spaces}>
@@ -165,7 +165,7 @@ export default function SpaceMenu(props: {
         <Input
           ref={(el: HTMLInputElement) => setTimeout(() => (el.focus(), el.select()), 0)}
           maxlength={NOMBRE_MAX}
-          class="h-7 w-44 px-2 text-[0.8125rem] font-semibold"
+          class="h-7 w-44 px-2 text-ui font-semibold"
           aria-label={t("spaces.rename.label", { name: spaceName(space()) })}
           value={nombre()}
           onInput={(e) => setNombre(e.currentTarget.value)}

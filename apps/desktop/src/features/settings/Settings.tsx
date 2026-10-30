@@ -9,6 +9,7 @@ import Folders from "lucide-solid/icons/folders";
 import Puzzle from "lucide-solid/icons/puzzle";
 import Radar from "lucide-solid/icons/radar";
 import GitBranch from "lucide-solid/icons/git-branch";
+import KeyRound from "lucide-solid/icons/key-round";
 import Monitor from "lucide-solid/icons/monitor";
 import ScrollText from "lucide-solid/icons/scroll-text";
 import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
@@ -32,6 +33,8 @@ import {
 import type { ModelChoices } from "../projects/NewAgent";
 import AIProviders from "./AIProviders";
 import Environment from "./Environment";
+import { machines } from "../machines/store";
+import { secretsRoute } from "./secrets-support";
 import General from "./General";
 import type { ContextoDeProyectos } from "./ManageProjects";
 import Plugins from "./Plugins";
@@ -46,6 +49,7 @@ const ActivityLogs = lazy(() => import("./ActivityLogs"));
 const AuditLog = lazy(() => import("./AuditLog"));
 const Connections = lazy(() => import("./Connections"));
 const Appearance = lazy(() => import("./Appearance"));
+const Secrets = lazy(() => import("./Secrets"));
 
 /**
  * Configuración: el contenedor y su navegación.
@@ -217,6 +221,22 @@ const destinosDe = (
     icono: () => <GitBranch size={15} />,
     panel: () => <Providers />,
   },
+  ...(capabilities().nativeWindow || capabilities().accountCredentials
+    ? [
+        {
+          id: "secretos",
+          get name() {
+            return t("settings.nav.secrets");
+          },
+          icono: () => <KeyRound size={15} />,
+          panel: () => (
+            <Suspense fallback={null}>
+              <Secrets />
+            </Suspense>
+          ),
+        },
+      ]
+    : []),
   ...(capabilities().radiant
     ? [
         {
@@ -280,7 +300,7 @@ const GRUPOS: { nombre: () => string; ids: string[] }[] = [
   { nombre: () => t("settings.nav.group_custom"), ids: ["skills", "agentes", "proyectos", "plugins"] },
   {
     nombre: () => t("settings.nav.group_connections"),
-    ids: ["cuenta-danil", "bitacora", "conexiones", "proveedores-ia", "fuentes", "integrations", "radiant"],
+    ids: ["cuenta-danil", "bitacora", "conexiones", "proveedores-ia", "secretos", "fuentes", "integrations", "radiant"],
   },
 ];
 
@@ -384,6 +404,8 @@ export default function Settings(props: {
       onAgentProfile: (project, name) => props.onAgentProfile?.(project, name),
     }, props.proyectos, () => props.workspace ?? null, () => props.activityMachine ?? null);
 
+  const navegables = () => TODOS().filter((destination) => destination.id !== "secretos" || secretsRoute(capabilities().accountCredentials ? "worker" : "engine", machines()) !== "unsupported");
+
   const [activo, setActivo] = createSignal(props.panel ?? "general");
   let hoja: HTMLDivElement | undefined;
   // El foco viaja con las flechas sin arrastrar la selección: así se puede
@@ -408,9 +430,19 @@ export default function Settings(props: {
     window.addEventListener("keydown", alTeclear, true);
     onCleanup(() => window.removeEventListener("keydown", alTeclear, true));
   });
+  // Con la hoja ya abierta, `panel` no vuelve a leerse: un enlace interno («Iniciar sesión» en Secretos) cambia de destino por aquí.
+  onMount(() => {
+    const alPedir = (e: Event) => {
+      const id = (e as CustomEvent<unknown>).detail;
+      const d = TODOS().find((x) => x.id === id);
+      if (d) abrir(d);
+    };
+    window.addEventListener("harness:open-settings", alPedir);
+    onCleanup(() => window.removeEventListener("harness:open-settings", alPedir));
+  });
 
   function mover(paso: number | "inicio" | "fin") {
-    const destinos = TODOS();
+    const destinos = navegables();
     const i = destinos.findIndex((d) => d.id === foco());
     const j =
       paso === "inicio"
@@ -512,7 +544,7 @@ export default function Settings(props: {
           <span class="truncate">{p.d.name}</span>
           <Show when={marca()}>
             {(m) => (
-              <span class="ui-sidebar-menu-badge text-[0.625rem] font-normal text-neutral-500">
+              <span class="ui-sidebar-menu-badge text-2xs font-normal text-neutral-500">
                 {m().texto}
               </span>
             )}
@@ -557,7 +589,7 @@ export default function Settings(props: {
               class="border-0 bg-rail"
             >
               <SidebarHeader class="pb-6 pl-5 pr-3 pt-4">
-                <DialogTitle class="m-0 text-[0.9375rem] font-semibold">
+                <DialogTitle class="m-0 text-lead font-semibold">
                   {t("settings.title")}
                 </DialogTitle>
               </SidebarHeader>
@@ -572,7 +604,7 @@ export default function Settings(props: {
                       <SidebarMenu role="presentation" class="gap-1.5">
                         <For each={g.ids}>
                           {(id) => (
-                            <Show when={TODOS().find((d) => d.id === id)}>
+                            <Show when={navegables().find((d) => d.id === id)}>
                               {(d) => <Fila d={d()} />}
                             </Show>
                           )}

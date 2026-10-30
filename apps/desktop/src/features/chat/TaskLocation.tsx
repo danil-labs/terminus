@@ -3,8 +3,8 @@ import GitBranch from "lucide-solid/icons/git-branch";
 import Monitor from "lucide-solid/icons/monitor";
 import { MachineIcon } from "../machines/MachineIcon";
 import { machineName, machineWakes } from "../machines/store";
-import { createSignal, type JSX, onCleanup, Show } from "solid-js";
-import { copyText } from "../../lib/clipboard";
+import { type JSX, Show } from "solid-js";
+import { createCopied } from "../../lib/clipboard";
 import { t } from "../../lib/i18n";
 import { capabilities, machineScreen } from "../../lib/platform";
 import { cn } from "../../lib/utils";
@@ -48,16 +48,7 @@ export default function TaskLocation(props: TaskLocationProps) {
   const nombre = () => (props.machine ? machineName(props.machine) : (here()?.name ?? machineName("local")));
   const id = () => props.machine ?? here()?.id ?? "local";
   const wakes = () => machineWakes(id());
-  const [copiada, setCopiada] = createSignal(false);
-  let espera: ReturnType<typeof setTimeout> | undefined;
-  onCleanup(() => clearTimeout(espera));
-  const copiar = (rama: string) => {
-    void copyText(rama).then(() => {
-      setCopiada(true);
-      clearTimeout(espera);
-      espera = setTimeout(() => setCopiada(false), 1500);
-    }).catch(() => {});
-  };
+  const { copied: copiada, copy: copiar } = createCopied();
   const pantalla = () => {
     const m = props.machine ?? here()?.id;
     const open = machineScreen(m ?? "");
@@ -91,7 +82,7 @@ export default function TaskLocation(props: TaskLocationProps) {
               class="max-w-[35%] shrink font-medium text-neutral-700"
               onClick={props.onFiles}
               label={props.onFiles ? t("shell.folder.view_on", { name: nombre() }) : undefined}
-              tip={<>{props.onFiles ? t("shell.folder.view_on", { name: nombre() }) : t("chat.location.project")}<Show when={props.path}>{(ruta) => <span class="block font-mono text-[0.6875rem] font-normal opacity-80">{ruta()}</span>}</Show></>}
+              tip={<>{props.onFiles ? t("shell.folder.view_on", { name: nombre() }) : t("chat.location.project")}<Show when={props.path}>{(ruta) => <span class="block font-mono text-caption font-normal opacity-80">{ruta()}</span>}</Show></>}
             >
               <Folder size={13} aria-hidden="true" class="shrink-0" />
               <span data-task-location-project="" class="min-w-0 truncate">{proyecto()}</span>

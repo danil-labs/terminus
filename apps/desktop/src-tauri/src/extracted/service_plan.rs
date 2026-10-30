@@ -227,7 +227,7 @@ mod tests {
     #[test]
     fn preparation_preserves_other_profiles_but_rejects_authority_conflicts() {
         let tmp = tempfile::tempdir().unwrap();
-        let data = std::fs::canonicalize(tmp.path()).unwrap();
+        let data = dunce::canonicalize(tmp.path()).unwrap();
         let engine = data.join("seldon-runtime");
         let resources = data.join("Resources");
         let current = json!({"version":1,"default":"remote","extra":42,"profiles":{"remote":{"identity":"lab"},"desktop":{"future":"preserved"}}});
@@ -274,7 +274,7 @@ mod tests {
     #[test]
     fn readiness_rejects_other_writers_and_unproven_residency() {
         let tmp = tempfile::tempdir().unwrap();
-        let data = std::fs::canonicalize(tmp.path()).unwrap();
+        let data = dunce::canonicalize(tmp.path()).unwrap();
         let engine = data.join("seldon-runtime");
         let endpoint = terminus_engine_protocol::Endpoint {
             version: 1,

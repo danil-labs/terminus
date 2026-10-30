@@ -290,7 +290,7 @@ export default function AgentProfile(props: {
         >
           <ArrowLeft size={16} />
         </button>
-        <span class="text-[0.8125rem] font-semibold">{t("projects.agents.profile_title")}</span>
+        <span class="text-ui font-semibold">{t("projects.agents.profile_title")}</span>
       </header>
 
       <div class="min-h-0 flex-1 overflow-auto">
@@ -313,13 +313,13 @@ export default function AgentProfile(props: {
                 onChange={() => void save({ display_name: name().trim() || null })}
               />
             </label>
-            <span class="font-mono text-[0.6875rem] text-neutral-500">
+            <span class="font-mono text-caption text-neutral-500">
               {props.agent.name}
             </span>
             <Show
               when={props.agent.own}
               fallback={
-                <p class="m-0 text-center text-[0.8125rem] text-neutral-700">
+                <p class="m-0 text-center text-ui text-neutral-700">
                   {props.agent.description}
                 </p>
               }
@@ -327,7 +327,7 @@ export default function AgentProfile(props: {
               <label class="grid w-full max-w-[20rem] justify-items-center gap-1">
                 <span class="sr-only">{t("projects.agents.new_description")}</span>
                 <Input
-                  class="text-center text-[0.8125rem]"
+                  class="text-center text-ui"
                   value={description()}
                   placeholder={t("projects.agents.new_description_hint")}
                   onInput={(e) => setDescription(e.currentTarget.value)}
@@ -396,7 +396,7 @@ export default function AgentProfile(props: {
                   aria-hidden="true"
                 />
               </Show>
-              <span class="relative text-[0.8125rem] text-neutral-500">
+              <span class="relative text-ui text-neutral-500">
                 {props.background
                   ? t("projects.agents.profile_background_sample")
                   : t("projects.agents.profile_background_none")}
@@ -440,10 +440,10 @@ export default function AgentProfile(props: {
               when={props.agent.own}
               fallback={
                 <>
-                  <pre class="m-0 max-h-80 overflow-auto rounded-md border border-border bg-surface-muted p-3 font-mono text-[0.6875rem] leading-relaxed whitespace-pre-wrap text-neutral-700">
+                  <pre class="m-0 max-h-80 overflow-auto rounded-md border border-border bg-surface-muted p-3 font-mono text-caption leading-relaxed whitespace-pre-wrap text-neutral-700">
                     {props.agent.instructions}
                   </pre>
-                  <span class="text-[0.6875rem] text-neutral-500">
+                  <span class="text-caption text-neutral-500">
                     {props.agent.managed
                       ? t("projects.agents.profile_prompt_radiant")
                       : t("projects.agents.profile_prompt_where")}
@@ -452,7 +452,7 @@ export default function AgentProfile(props: {
               }
             >
               <Textarea
-                class="max-h-80 font-mono text-[0.6875rem] leading-relaxed"
+                class="max-h-80 font-mono text-caption leading-relaxed"
                 rows={8}
                 value={instructions()}
                 placeholder={t("projects.agents.new_instructions_hint")}
@@ -460,7 +460,7 @@ export default function AgentProfile(props: {
                 onChange={() => void saveDeclaration({ instructions: instructions() })}
               />
             </Show>
-            <span class="font-mono text-[0.625rem] break-all text-neutral-500">
+            <span class="font-mono text-2xs break-all text-neutral-500">
               {props.agent.origin}
             </span>
             {/* Solo con carpeta suya: la declaración suelta comparte carpeta
@@ -476,7 +476,7 @@ export default function AgentProfile(props: {
                     <FolderOpen size={14} />
                     {t("projects.agents.profile_folder")}
                   </Button>
-                  <span class="self-center text-[0.6875rem] text-neutral-500">
+                  <span class="self-center text-caption text-neutral-500">
                     {t("projects.agents.profile_folder_what")}
                   </span>
                 </div>
@@ -493,7 +493,7 @@ export default function AgentProfile(props: {
               when={props.agent.own}
               fallback={
                 <>
-                  <span class="text-[0.8125rem] text-neutral-700">
+                  <span class="text-ui text-neutral-700">
                     {profile().hidden
                       ? t("projects.agents.profile_hidden_what")
                       : t("projects.agents.profile_hide_what")}

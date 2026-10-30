@@ -11,6 +11,8 @@ import Radio from 'lucide-solid/icons/radio';
 import Search from 'lucide-solid/icons/search';
 import SendHorizontal from 'lucide-solid/icons/send-horizontal';
 import { For, type JSX, Show } from 'solid-js';
+import type { InboxDraft } from './inbox-drafts';
+import { ReplyError } from '../../../../../packages/attention/src/messaging.ts';
 import { contactDisplayName, contactIdentifier, contactSubIdentifier, type Conversation, type ConversationLabel, conversationLabels, type InboxFilter, type Message, normalizeProvider } from '../../../../../packages/attention/src/inbox.ts';
 import { df } from '../../lib/format';
 import { t } from '../../lib/i18n';
@@ -80,7 +82,7 @@ function ContactAvatar(props: { name: string; channel: string; provider: string;
 export function ConversationSearch(props: { value: string; onChange: (value: string) => void }) {
   return <div class="flex h-8 w-full min-w-0 items-center gap-1.5 rounded-full border border-border bg-surface py-0 pr-1 pl-2.5 text-neutral-500 transition-all duration-150 ease-out focus-within:border-primary focus-within:ring-[3px] focus-within:ring-primary/15">
     <Search size={13} class="shrink-0 text-neutral-500" aria-hidden="true"/>
-    <input type="search" aria-label={t("web.alpha.search_label")} placeholder={t("web.alpha.search_placeholder")} value={props.value} onInput={event => props.onChange(event.currentTarget.value)} class="h-full w-full min-w-0 border-none bg-transparent p-0 text-[12px] text-neutral-950 outline-none placeholder:text-neutral-500 [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-cancel-button]:[-webkit-appearance:none]"/>
+    <input type="search" aria-label={t("web.alpha.search_label")} placeholder={t("web.alpha.search_placeholder")} value={props.value} onInput={event => props.onChange(event.currentTarget.value)} class="h-full w-full min-w-0 border-none bg-transparent p-0 text-label text-neutral-950 outline-none placeholder:text-neutral-500 [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-cancel-button]:[-webkit-appearance:none]"/>
   </div>;
 }
 
@@ -146,7 +148,7 @@ export function SelectConversation() {
     <div class="grid justify-items-center gap-2 text-neutral-500">
       <InboxIcon size={22} stroke-width={1.5} aria-hidden="true"/>
       <p class="m-0 text-[0.85rem] font-medium text-neutral-700">{t("web.alpha.select_conversation")}</p>
-      <p class="m-0 text-[0.75rem]">{t("web.alpha.select_hint")}</p>
+      <p class="m-0 text-label">{t("web.alpha.select_hint")}</p>
     </div>
   </div>;
 }
@@ -190,13 +192,39 @@ export function MessageBubble(props: { message: Message; position: 'first' | 'mi
   </div>;
 }
 
-export function InboxComposer() {
-  return <form class="absolute right-0 bottom-0 left-0 z-10 bg-transparent p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]" onSubmit={event => event.preventDefault()}>
-    <p id="alpha-inbox-send-unavailable" class="m-0 mb-1.5 text-center text-[0.72rem] text-neutral-500">{t("web.alpha.send_unavailable")}</p>
+export function InboxComposer(props: { draft: InboxDraft; conversation: number; allowed: boolean; onSend: (conversation: number, text: string, clientId: string, signal: AbortSignal) => Promise<{ requiresTemplate: boolean; duplicate: boolean }>; onRefresh: () => Promise<void> }) {
+  const state = () => props.draft.value();
+  async function refresh() {
+    const draft = props.draft;
+    draft.set(value => ({ ...value, pending: true }));
+    try { await props.onRefresh(); if (!draft.signal.aborted) draft.set(value => ({ ...value, uncertain: false, notice: t("inbox-writes.reviewed"), error: false })); }
+    catch { if (!draft.signal.aborted) draft.set(value => ({ ...value, notice: t("inbox-writes.refresh_failed"), error: true })); }
+    finally { if (!draft.signal.aborted) draft.set(value => ({ ...value, pending: false })); }
+  }
+  async function send() {
+    const draft = props.draft;
+    if (state().pending || state().uncertain || !props.allowed || !state().text.trim()) return;
+    draft.set(value => ({ ...value, pending: true, notice: '', error: false }));
+    try {
+      const result = await props.onSend(props.conversation, state().text, crypto.randomUUID(), draft.signal);
+      if (draft.signal.aborted) return;
+      draft.set(value => ({ ...value, text: result.requiresTemplate ? value.text : '', uncertain: result.requiresTemplate,
+        notice: result.requiresTemplate ? t("inbox-writes.template") : result.duplicate ? t("inbox-writes.duplicate") : t("inbox-writes.queued"), error: result.requiresTemplate }));
+      if (draft === props.draft) try { await props.onRefresh(); } catch { /* La aceptación se conserva aunque falle la lectura posterior. */ }
+    } catch (cause) {
+      if (draft.signal.aborted) return;
+      const unknown = !(cause instanceof ReplyError) || cause.code === 'uncertain';
+      draft.set(value => ({ ...value, uncertain: unknown, error: true,
+        notice: unknown ? t("inbox-writes.uncertain") : cause.status === 403 ? t("inbox-writes.denied") : cause.status === 402 ? t("inbox-writes.wallet") : t("inbox-writes.failed") }));
+    } finally { if (!draft.signal.aborted) draft.set(value => ({ ...value, pending: false })); }
+  }
+  return <form class="absolute right-0 bottom-0 left-0 z-10 bg-transparent p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]" onSubmit={event => { event.preventDefault(); void send(); }}>
+    <p id="alpha-inbox-send-status" role={state().error ? 'alert' : 'status'} class={`m-0 mb-1.5 text-center text-[0.72rem] ${state().error ? 'text-error-strong' : 'text-neutral-500'}`}>{!props.allowed ? t("inbox-writes.denied") : state().pending ? t("inbox-writes.pending") : state().notice}</p>
+    <Show when={state().uncertain}><Button size="sm" variant="secondary" disabled={state().pending} onClick={() => void refresh()}>{t("inbox-writes.review")}</Button></Show>
     <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-end gap-2 rounded-2xl border border-border/60 bg-surface/30 p-1.5 shadow-sm backdrop-blur-[4px]">
-      <Button size="icon" variant="ghost" disabled aria-label={t("web.alpha.attach")} aria-describedby="alpha-inbox-send-unavailable" class="rounded-full border border-border-strong bg-neutral-100 text-neutral-700 dark:bg-surface-raised"><Paperclip size={17}/></Button>
-      <Textarea variant="ghost" rows={1} disabled aria-label={t("web.alpha.reply_label")} aria-describedby="alpha-inbox-send-unavailable" placeholder={t("web.alpha.reply_placeholder")} class="max-h-32 overflow-y-auto px-1 py-2 text-base leading-6"/>
-      <Button size="icon" type="submit" disabled aria-label={t("web.alpha.send_reply")} aria-describedby="alpha-inbox-send-unavailable" class="rounded-full"><SendHorizontal size={17}/></Button>
+      <Button size="icon" variant="ghost" disabled aria-label={t("web.alpha.attach")} class="rounded-full border border-border-strong bg-neutral-100 text-neutral-700 dark:bg-surface-raised"><Paperclip size={17}/></Button>
+      <Textarea variant="ghost" rows={1} maxLength={4096} value={state().text} onInput={event => { const text = event.currentTarget.value; props.draft.set(value => ({ ...value, text })); }} disabled={!props.allowed || state().pending} aria-label={t("web.alpha.reply_label")} aria-describedby="alpha-inbox-send-status" placeholder={t("web.alpha.reply_placeholder")} class="max-h-32 overflow-y-auto px-1 py-2 text-base leading-6"/>
+      <Button size="icon" type="submit" disabled={!props.allowed || state().pending || state().uncertain || !state().text.trim()} aria-label={t("web.alpha.send_reply")} aria-describedby="alpha-inbox-send-status" class="rounded-full"><SendHorizontal size={17}/></Button>
     </div>
   </form>;
 }

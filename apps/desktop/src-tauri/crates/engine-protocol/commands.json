@@ -11839,6 +11839,60 @@
     },
     {
       "kind": "cli",
+      "name": "executor release status",
+      "path": "executor release status",
+      "flags": [],
+      "writes": false,
+      "audience": "secret",
+      "authority": "admin",
+      "durable": false,
+      "relay": false,
+      "enforcement": "server"
+    },
+    {
+      "kind": "cli",
+      "name": "executor release stage",
+      "path": "executor release stage",
+      "flags": [
+        "manifest*"
+      ],
+      "writes": true,
+      "audience": "secret",
+      "authority": "admin",
+      "durable": true,
+      "relay": false,
+      "enforcement": "server"
+    },
+    {
+      "kind": "cli",
+      "name": "executor release activate",
+      "path": "executor release activate",
+      "flags": [
+        "release*"
+      ],
+      "writes": true,
+      "audience": "secret",
+      "authority": "admin",
+      "durable": true,
+      "relay": false,
+      "enforcement": "server"
+    },
+    {
+      "kind": "cli",
+      "name": "executor release rollback",
+      "path": "executor release rollback",
+      "flags": [
+        "release*"
+      ],
+      "writes": true,
+      "audience": "secret",
+      "authority": "admin",
+      "durable": true,
+      "relay": false,
+      "enforcement": "server"
+    },
+    {
+      "kind": "cli",
       "name": "session attach",
       "path": "session attach",
       "flags": [

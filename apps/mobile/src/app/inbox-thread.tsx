@@ -1,3 +1,4 @@
+import { RADIUS, TEXT } from "@terminus/design";
 import { Redirect, router, usePathname } from "expo-router";
 import { ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -29,7 +30,7 @@ export default function InboxThread() {
   if (!customization.enabled("inbox")) return pathname.endsWith("/inbox-thread") ? <Redirect href={ALPHA_DEMO ? "/?demo=1" : "/"} /> : null;
   const row = inbox.selected;
   const name = row ? contactDisplayName(row, t("customize.unknown")) : t("alpha.title");
-  const outgoing = theme.dark ? "#1d3b2a" : "#dcf8c6";
+  const outgoing = theme.dark ? "#1d3b2a" : "#d9fdd3";
   const outgoingBorder = theme.dark ? "#2d5a3f" : "#b7e4a0";
 
   return (
@@ -41,14 +42,14 @@ export default function InboxThread() {
           subtitle={row?.channel_name ? (
             <View style={styles.sub}>
               <View style={[styles.dot, { backgroundColor: CHANNEL_COLORS.whatsapp }]} />
-              <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: 12 }}>{row.channel_name}</Text>
+              <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: TEXT.label }}>{row.channel_name}</Text>
             </View>
           ) : undefined}
           right={row ? <RoundButton testID="inbox-contact" icon="id-card" label={w("web.alpha.details")} onPress={() => router.push(ALPHA_DEMO ? "/inbox-detail?demo=1" : "/inbox-detail")} /> : null}
         />
         <View style={[styles.assist, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={{ color: theme.text, fontWeight: "700", fontSize: 14 }}>{w("web.alpha.ai_assistance")}</Text>
-          <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: 13, flex: 1 }}>{w("web.alpha.ai_read_only")}</Text>
+          <Text style={{ color: theme.text, fontWeight: "700", fontSize: TEXT.body }}>{w("web.alpha.ai_assistance")}</Text>
+          <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: TEXT.ui, flex: 1 }}>{w("web.alpha.ai_read_only")}</Text>
           <Switch disabled value={row?.ai_assistance ?? false} trackColor={{ true: `${theme.merged}88`, false: theme.border }} thumbColor="#ffffff"
                         {...({ activeThumbColor: "#ffffff" } as object)} accessibilityLabel={w("web.alpha.ai_assistance")} />
         </View>
@@ -94,11 +95,11 @@ export default function InboxThread() {
 
 const styles = StyleSheet.create({
   sub: { flexDirection: "row", alignItems: "center", gap: 4 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
+  dot: { width: 8, height: 8, borderRadius: RADIUS.sm },
   assist: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, minHeight: 48, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
   thread: { padding: 16, gap: 8 },
-  note: { textAlign: "center", fontSize: 13 },
-  retry: { alignItems: "center", gap: 4, padding: 8, borderRadius: 8 },
+  note: { textAlign: "center", fontSize: TEXT.ui },
+  retry: { alignItems: "center", gap: 4, padding: 8, borderRadius: RADIUS.lg },
   bubble: { maxWidth: "82%", paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, gap: 4 },
   in: { alignSelf: "flex-start", borderTopLeftRadius: 6 },
   out: { alignSelf: "flex-end", borderTopRightRadius: 6 },

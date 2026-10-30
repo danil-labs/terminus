@@ -1,5 +1,5 @@
 import { AgentAvatar } from "./AgentAvatar";
-import { folderColor } from "@terminus/design";
+import { folderColor, RADIUS, TEXT } from "@terminus/design";
 import { type CardPull, type TaskCard as Card, type PullTone, cardPull, canFinishTask, type TaskGit, taskTitle } from "@terminus/tasks";
 import * as Haptics from "expo-haptics";
 import { memo } from "react";
@@ -195,7 +195,7 @@ function TaskCardView({
 
 const styles = StyleSheet.create({
   card: { paddingHorizontal: 16, paddingVertical: 10, gap: 4, minHeight: 60, justifyContent: "center" },
-  tag: { fontSize: 11, fontWeight: "600", paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, overflow: "hidden" },
+  tag: { fontSize: TEXT.caption, fontWeight: "600", paddingHorizontal: 6, paddingVertical: 1, borderRadius: RADIUS.sm, overflow: "hidden" },
   when: { fontSize: 12.5, fontVariant: ["tabular-nums"] },
   line: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 18 },
   second: { paddingLeft: 24, gap: 8 },
@@ -203,5 +203,5 @@ const styles = StyleSheet.create({
   hollow: { width: 9, height: 9, borderRadius: 5, borderWidth: 1.5 },
   title: { flex: 1, fontSize: 16, fontWeight: "500" },
   chip: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1 },
-  meta: { fontSize: 12 },
+  meta: { fontSize: TEXT.label },
 });

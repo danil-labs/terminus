@@ -43,7 +43,7 @@ export default function AgentPageTasks(props: {
   return <section data-agent-page-tasks class="flex min-w-0 flex-col gap-1">
     <div class="flex h-7 items-center gap-2">
       <h2 class="m-0 text-xs font-semibold text-neutral-700">{t("projects.agent_tasks.launched")}</h2>
-      <span class="font-mono text-[0.6875rem] text-neutral-500">{props.tasks.length}</span>
+      <span class="font-mono text-caption text-neutral-500">{props.tasks.length}</span>
       <Button variant="ghost" size="icon" class="ml-auto size-7 text-neutral-500" aria-pressed={buscando()}
         aria-label={t("projects.agent_tasks.search")} title={t("projects.agent_tasks.search")}
         onClick={() => { setBuscando(!buscando()); if (!buscando()) setSearch(""); }}>
@@ -59,7 +59,7 @@ export default function AgentPageTasks(props: {
         <Button variant={filtro() === f.id ? "secondary" : "outline"} size="compact" class="rounded-full"
           aria-pressed={filtro() === f.id} onClick={() => setFiltro(f.id)}>
           {f.label()}
-          <span class="font-mono text-[0.6875rem] font-normal text-neutral-500">{de(f.id).length}</span>
+          <span class="font-mono text-caption font-normal text-neutral-500">{de(f.id).length}</span>
         </Button>
       }</For>
     </div>

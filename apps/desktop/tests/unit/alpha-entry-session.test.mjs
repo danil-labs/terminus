@@ -217,18 +217,51 @@ test("session and logout need the same Origin, no body and a person, not an AI",
   assert.equal(withBody.status, 400);
 });
 
-test("logout clears the cookie and ends the WorkOS session in the browser", async () => {
+test("logout clears the session, keeps the registered WorkOS return and marks the sign-in page", async () => {
   const w = world();
   const { cookie } = await signedIn(w);
   const response = await call(w, "/auth/logout", { method: "POST", headers: { Origin: origin, Cookie: cookie } });
   assert.equal(response.status, 200);
-  assert.deepEqual(cookiesOf(response), ["__Host-danil_alfa="]);
+  assert.deepEqual(cookiesOf(response), ["__Host-danil_alfa=", "__Host-danil_alfa_signed_out=1"]);
+  assert.match(response.headers.getSetCookie()[1], /^__Host-danil_alfa_signed_out=1; Path=\/; Max-Age=600; HttpOnly; Secure; SameSite=Lax$/);
   const location = new URL((await response.json()).location);
   assert.equal(location.origin + location.pathname, "https://api.workos.com/user_management/sessions/logout");
   assert.equal(location.searchParams.get("session_id"), "session_01ABC");
   assert.equal(location.searchParams.get("return_to"), `${origin}/auth`);
-  const anonymous = await call(w, "/auth/logout", { method: "POST", headers: { Origin: origin } });
-  assert.equal((await anonymous.json()).location, `${origin}/auth`);
+  const marker = cookieHeader(response);
+  for (const path of ["/auth", "/auth?next=/inbox", "/sign-in"]) {
+    const landing = await call(w, path, { headers: { Cookie: marker } });
+    assert.equal(landing.status, 200, "logging out must stop on the signed-out page without starting authentication");
+    assert.equal(await landing.text(), "assets");
+  }
+  for (const cookie of ["", "__Host-danil_alfa=invalid"]) {
+    const anonymous = await call(w, "/auth/logout", { method: "POST", headers: { Origin: origin, Cookie: cookie } });
+    assert.equal((await anonymous.json()).location, `${origin}/auth`);
+    assert.deepEqual(cookiesOf(anonymous), ["__Host-danil_alfa=", "__Host-danil_alfa_signed_out=1"]);
+  }
+});
+
+test("the signed-out marker grants no authority and explicit sign-in clears it separately from the flow cookie", async () => {
+  const w = world();
+  const marker = "__Host-danil_alfa_signed_out=1";
+  assert.equal((await session(w, marker)).status, 401);
+  const proxy = await call(w, "/alpha-api/auth/profile", { headers: { Cookie: marker } });
+  assert.equal(proxy.status, 401);
+  assert.equal(w.calls.length, 0, "a marker must never resolve a person or refresh a session");
+  for (const headers of [{ Origin: "https://evil.example" }, { Origin: origin, "x-danil-actor": "ai" }]) {
+    const refused = await call(w, "/auth/logout", { method: "POST", headers });
+    assert.equal(refused.status, 403);
+    assert.deepEqual(refused.headers.getSetCookie(), [], "a refused logout must not plant a marker");
+  }
+  const start = await call(w, "/auth/workos/start?next=/inbox", { headers: { Cookie: marker } });
+  assert.equal(start.status, 303);
+  const cookies = start.headers.getSetCookie();
+  assert.equal(cookies.length, 2, "Set-Cookie fields must not be comma-folded");
+  assert.match(cookies[0], /^__Host-danil_alfa_flow=v1\./);
+  assert.equal(cookies[1], "__Host-danil_alfa_signed_out=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax");
+  assert.equal(new URL(start.headers.get("Location")).origin, "https://api.workos.com");
+  assert.equal((await call(w, "/auth")).status, 302, "after deleting the marker automatic entry is available again");
+  assert.equal((await call(w, "/auth", { headers: { Cookie: "__Host-danil_alfa_signed_out=other" } })).status, 302);
 });
 
 test("without its configuration sign-in is unavailable, never open", async () => {
@@ -242,7 +275,14 @@ test("without its configuration sign-in is unavailable, never open", async () =>
 test("return paths stay inside Terminus", () => {
   assert.equal(safeNext("/inbox?x=1#y"), "/inbox?x=1#y");
   assert.equal(safeNext("/m/inbox"), "/m/inbox");
-  for (const value of [null, "", "inbox", "https://evil.example/", "//evil.example/", "/auth", "/auth?next=x", "/auth/workos/start", "/alpha-api/auth/profile", "/\\evil", "/inbox\n"]) {
+  for (const value of [null, "", "inbox", "https://evil.example/", "//evil.example/", "/auth", "/auth?next=x", "/auth/workos/start", "/sign-in", "/sign-in?next=/inbox", "/x/../auth", "/x/../sign-in", "/%61uth", "/%73ign-in", "/alpha-api/auth/profile", "/\\evil", "/inbox\n"]) {
     assert.equal(safeNext(value), "/", String(value));
+  }
+});
+
+test("callback refuses authentication and foreign return destinations without re-entering auth", async () => {
+  for (const next of ["/sign-in", "/sign-in?next=/inbox", "/x/../auth", "/%61uth", "//evil.example/", "https://evil.example/", "/\\evil.example/"]) {
+    const { back } = await signedIn(world(), next);
+    assert.equal(back.headers.get("Location"), `${origin}/`, next);
   }
 });

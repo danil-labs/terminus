@@ -1,17 +1,18 @@
+import { CHANNEL_COLORS as BRAND_CHANNELS, RADIUS, TEXT } from "@terminus/design";
 import { StyleSheet, Text, View } from "react-native";
 import { type Conversation, type ConversationLabel, contactDisplayName, normalizeProvider } from "../../../../packages/attention/src/inbox.ts";
 import { w } from "../lib/i18n";
 import { type Theme, useTheme } from "./theme";
 
 /** El color de cada canal en el punto del avatar. */
-export const CHANNEL_COLORS: Record<string, string> = { whatsapp: "#22c55e", instagram: "#ec4899", messenger: "#3b82f6", web: "#64748b" };
+export const CHANNEL_COLORS: Record<string, string> = { ...BRAND_CHANNELS, web: "#64748b" };
 
 export function LabelTag({ label, theme }: { label: ConversationLabel; theme: Theme }) {
   const tone = label === "human_required" ? theme.approving : label === "ai_paused_loop" ? theme.info : theme.textMuted;
   const text = label === "human_required" ? w("web.alpha.filter_assistance") : label === "ai_paused_loop" ? w("web.alpha.label_ai_paused_loop") : w("web.alpha.ai_off");
   return (
     <View style={[styles.tag, { backgroundColor: `${tone}26` }]}>
-      <Text style={{ color: label === "human_required" && !theme.dark ? "#92400e" : tone, fontSize: 11, fontWeight: "700", letterSpacing: 0.4 }}>{text.toLocaleUpperCase()}</Text>
+      <Text style={{ color: label === "human_required" && !theme.dark ? "#92400e" : tone, fontSize: TEXT.caption, fontWeight: "700", letterSpacing: 0.4 }}>{text.toLocaleUpperCase()}</Text>
     </View>
   );
 }
@@ -35,5 +36,5 @@ export function ContactAvatar({ row, size = 40 }: { row: Conversation; size?: nu
 const styles = StyleSheet.create({
   avatar: { alignItems: "center", justifyContent: "center" },
   channelDot: { position: "absolute", right: -1, bottom: -1, width: 13, height: 13, borderRadius: 7, borderWidth: 2 },
-  tag: { borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
+  tag: { borderRadius: RADIUS.sm, paddingHorizontal: 5, paddingVertical: 2 },
 });

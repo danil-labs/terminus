@@ -379,7 +379,7 @@ export default function VisorDeArchivo(props: {
   });
 
   /** La salida usa lo que hay en disco, no lo escrito sin guardar. */
-  const canOpenExternal = () => !conGuardadoManual() && (props.suelto || props.session !== "");
+  const canOpenExternal = () => !conGuardadoManual() && (props.suelto || props.session !== "") && !machineOf(props.session);
 
   async function openExternal() {
     setFalloAfuera(null);
@@ -407,7 +407,7 @@ export default function VisorDeArchivo(props: {
 
   // El PDF de un documento de Office; sin archivo en disco (una rama base) no hay.
   function pedirOffice(): Promise<Preview> | null {
-    if (props.suelto) return invoke<Preview>("office_preview", { path: props.ruta });
+    if (props.suelto) return invoke<Preview>("office_preview", { path: props.ruta }, machineOf(props.session));
     if (props.session === "") return null;
     return invoke<Preview>("tree_office_preview", {
       project: props.project,
@@ -419,7 +419,7 @@ export default function VisorDeArchivo(props: {
 
   const pedirContenido = async (): Promise<Contenido> => {
     if (props.suelto) {
-      const p = await invoke<Preview>("preview_file", { path: props.ruta, rel: props.ruta });
+      const p = await invoke<Preview>("preview_file", { path: props.ruta, rel: props.ruta }, machineOf(props.session));
       return {
         kind: p.kind === "html" ? "text" : p.kind,
         text: p.text ?? "",
@@ -673,7 +673,7 @@ export default function VisorDeArchivo(props: {
                     ? t("code.typst.autosave.title")
                     : t("code.file.save.title")
               }
-              class="shrink-0 text-[0.6875rem] text-warning-strong"
+              class="shrink-0 text-caption text-warning-strong"
             >
               ●
             </span>
@@ -760,7 +760,7 @@ export default function VisorDeArchivo(props: {
 
       <Show when={borrado()}>
         <div class="flex shrink-0 items-center gap-2 border-b border-border bg-surface-raised px-3 py-1.5">
-          <p class="m-0 min-w-0 flex-1 text-[0.6875rem] text-warning-strong">{t("code.file.deleted")}</p>
+          <p class="m-0 min-w-0 flex-1 text-caption text-warning-strong">{t("code.file.deleted")}</p>
           <Button variant="ghost" size="compact" class="shrink-0" disabled={guardando()} onClick={() => props.onBorrado?.()}>
             {t("code.file.deleted.close")}
           </Button>
@@ -772,7 +772,7 @@ export default function VisorDeArchivo(props: {
 
       {/* Sin este aviso, guardar pisaba el turno del agente en silencio. */}
       <Show when={desincronizado()}>
-        <p class="m-0 border-b border-border bg-surface-raised px-3 py-2 text-[0.6875rem] text-warning-strong">
+        <p class="m-0 border-b border-border bg-surface-raised px-3 py-2 text-caption text-warning-strong">
           {t("code.file.raced")}
         </p>
       </Show>
@@ -821,7 +821,7 @@ export default function VisorDeArchivo(props: {
                     }
                   >
                     {(d) => (
-                      <div class="min-h-0 min-w-0 flex-1 overflow-hidden bg-surface-muted">
+                      <div data-select-scope class="min-h-0 min-w-0 flex-1 overflow-hidden bg-surface-muted">
                         {/* Ya llega con el archivo entero de contexto: no hay tramo que traer. */}
                         <CuerpoDeArchivo archivo={d()} onDesplegar={() => {}} llena />
                       </div>
@@ -830,7 +830,7 @@ export default function VisorDeArchivo(props: {
                 </Show>
 
                 <Show when={!mostrarCambios() && !editable()}>
-                  <div class="min-h-0 min-w-0 flex-1 overflow-y-auto bg-surface-muted">
+                  <div data-select-scope class="min-h-0 min-w-0 flex-1 overflow-y-auto bg-surface-muted">
                     <Cuerpo contenido={c()} ruta={props.ruta} onOpenExternal={() => void openExternal()} pedirOffice={pedirOffice} />
                   </div>
                 </Show>
@@ -868,6 +868,7 @@ export default function VisorDeArchivo(props: {
         {/* Con «Código» la vista de Typst se esconde sin desmontarse: soltarla apagaría Tinymist y sus marcas. */}
         <Show when={ladoPrevia() || vistaTypst()}>
           <div
+            data-select-scope
             class={cn(
               "min-h-0 min-w-0 flex-1 flex-col",
               ladoPrevia() ? "flex" : "hidden",
@@ -1052,7 +1053,7 @@ function BarraDeEstado(props: {
     <div
       role="group"
       aria-label={t("code.status.label")}
-      class="flex h-6 shrink-0 items-center justify-end gap-3 border-t border-border px-3 text-[0.6875rem] text-neutral-500"
+      class="flex h-6 shrink-0 items-center justify-end gap-3 border-t border-border px-3 text-caption text-neutral-500"
     >
       <Show when={props.cursor}>
         {(c) => <span class="font-mono tabular-nums">{t("code.status.position", { linea: c().linea, columna: c().columna })}</span>}
@@ -1111,7 +1112,7 @@ function Cuerpo(props: {
   return (
     <>
       <Show when={props.contenido.truncated}>
-        <p class="m-0 border-b border-border bg-surface-raised px-3 py-2 text-[0.6875rem] text-neutral-500">
+        <p class="m-0 border-b border-border bg-surface-raised px-3 py-2 text-caption text-neutral-500">
           {truncatedNotice()}
         </p>
       </Show>

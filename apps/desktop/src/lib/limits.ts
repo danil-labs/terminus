@@ -117,36 +117,6 @@ export function cuandoVuelve(ms: number | null, usado: number): string {
   return t("common.limits.reset_in_days", { count: Math.round(h / 24) });
 }
 
-/**
- * Cuánto falta para que la ventana vuelva a empezar, **corto**: `26m`, `19h 36m`,
- * `5d 23h`.
- *
- * Es el mismo dato que `cuandoVuelve` y no lo reemplaza: aquél es una frase para
- * un panel donde cabe, este es para la franja de 28 px, donde una frase no
- * entra. Dos formatos del mismo número, cada uno para su sitio.
- *
- * Lleva **dos unidades y no una** porque «19 h» y «19 h 36 m» deciden cosas
- * distintas cuando lo que se está mirando es si aguanta hasta mañana. Vacío
- * cuando el proveedor no dice cuándo vuelve: inventar un plazo es peor que no
- * darlo.
- */
-export function faltaCorto(ms: number | null): string {
-  if (ms === null) return "";
-  const falta = ms - Date.now();
-  if (falta <= 0) return t("common.limits.due_now");
-  const min = Math.floor(falta / 60_000);
-  if (min < 60) return t("common.limits.short_min", { count: min });
-  const h = Math.floor(min / 60);
-  // Las abreviaturas de unidad también salen del catálogo: son lo que se lee en
-  // la franja, y no todas las lenguas cortan «hora» por la misma letra.
-  if (h < 48)
-    return h < 24
-      ? t("common.limits.short_hours_min", { hours: h, minutes: min % 60 })
-      : t("common.limits.short_hours", { count: h });
-  const d = Math.floor(h / 24);
-  return t("common.limits.short_days_hours", { days: d, hours: h % 24 });
-}
-
 export function haceCuanto(ms: number): string {
   const seg = Math.round((Date.now() - ms) / 1000);
   if (seg < 60) return t("common.ago.just_now");

@@ -79,7 +79,7 @@ export default function CarryProgress(props: {
     <Show when={carry()} keyed>
       {(c) => (
       <Show when={!c.ready} fallback={
-        <p class="m-0 shrink-0 truncate px-4 py-1 text-[0.6875rem] text-neutral-500" data-carry-from>
+        <p class="m-0 shrink-0 truncate px-4 py-1 text-caption text-neutral-500" data-carry-from>
           {t("work.bring.from", { task: c.check.task?.title ?? "", machine: machineName(c.check.source) })}
         </p>
       }>
@@ -140,14 +140,14 @@ export function CarryOriginLabel(props: { session: string; onOpen: (project: str
     <Show when={origin()}>
       {(o) => (
         <Show when={o().from} fallback={
-          <p class="m-0 shrink-0 truncate px-4 text-[0.6875rem] text-neutral-500" data-carry-origin>
+          <p class="m-0 shrink-0 truncate px-4 text-caption text-neutral-500" data-carry-origin>
             {o().branch
               ? t("work.origin", { machine: machineName(o().machine), branch: o().branch ?? "", date: date() })
               : t("work.origin_detached", { machine: machineName(o().machine), date: date() })}
           </p>
         }>
           {(from) => (
-            <p class="m-0 flex shrink-0 items-center gap-2 px-4 text-[0.6875rem] text-neutral-500" data-carry-origin>
+            <p class="m-0 flex shrink-0 items-center gap-2 px-4 text-caption text-neutral-500" data-carry-origin>
               <span class="truncate">{t("work.bring.from", { task: from().title, machine: machineName(o().machine) })}</span>
               <Button size="compact" variant="ghost" data-carry-open-original onClick={() => props.onOpen(from().project, from().session)}>
                 {t("work.bring.open_original")}

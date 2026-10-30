@@ -1,3 +1,4 @@
+import { RADIUS, TEXT } from "@terminus/design";
 import type { MachineResources, WorkspaceStorage } from "@terminus/protocol";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -88,7 +89,7 @@ function MachineDisk({ host, workspace, theme }: { host: Host; workspace: string
     return () => { request.current++; scan.current++; reading.current = false; scanning.current = false; unsubscribe(); };
   }, [host, workspace]);
 
-  const text = { color: theme.textMuted, fontSize: 13 };
+  const text = { color: theme.textMuted, fontSize: TEXT.ui };
   return <View testID={`storage-${host.id}`} style={{ padding: 14, gap: 8, borderWidth: 1, borderColor: theme.border, borderRadius: 12, backgroundColor: theme.surface }}>
     <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => {
       setOpen(!open);
@@ -101,7 +102,7 @@ function MachineDisk({ host, workspace, theme }: { host: Host; workspace: string
       const usage = diskUsage(disk);
       return usage ? <View key={disk.id} style={{ gap: 6 }}>
         <Text style={text}>{t("storage.volume")}</Text>
-        <View accessible accessibilityLabel={t("storage.disk", { used: size(usage.used), free: size(disk.free_bytes), total: size(disk.total_bytes) })} style={{ height: 8, borderRadius: 4, overflow: "hidden", backgroundColor: theme.muted }}>
+        <View accessible accessibilityLabel={t("storage.disk", { used: size(usage.used), free: size(disk.free_bytes), total: size(disk.total_bytes) })} style={{ height: 8, borderRadius: RADIUS.sm, overflow: "hidden", backgroundColor: theme.muted }}>
           <View style={{ height: 8, width: `${usage.percent}%`, backgroundColor: usage.percent >= 90 ? theme.approving : theme.primary }} />
         </View>
         <Text style={text}>{t("storage.disk", { used: size(usage.used), free: size(disk.free_bytes), total: size(disk.total_bytes) })}</Text>

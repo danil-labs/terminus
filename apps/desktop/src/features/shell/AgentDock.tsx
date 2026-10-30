@@ -88,11 +88,11 @@ export default function AgentDock(props: {
 
   return (
     <div class="flex flex-col gap-1 border-t border-border px-2 pt-1.5 pb-0.5" role="group" aria-label={t("shell.agent_dock.title")}>
-      <div class="flex items-center text-[0.6875rem] text-neutral-500">
+      <div class="flex items-center text-caption text-neutral-500">
         <span>{t("shell.agent_dock.title")}</span>
         <button
           type="button"
-          class="ml-auto flex items-center gap-0.5 rounded-sm border-0 bg-transparent p-0 text-[0.6875rem] text-neutral-500 hover:text-neutral-950 focus-visible:outline-2 focus-visible:outline-primary"
+          class="ml-auto flex items-center gap-0.5 rounded-sm border-0 bg-transparent p-0 text-caption text-neutral-500 hover:text-neutral-950 focus-visible:outline-2 focus-visible:outline-primary"
           onClick={() => props.onSeeAll()}
         >
           {t("shell.agent_dock.see_all")}
@@ -149,7 +149,7 @@ export default function AgentDock(props: {
         <Show when={plan().overflow > 0}>
           <button
             type="button"
-            class={cn(SLOT, "text-[0.6875rem] font-semibold")}
+            class={cn(SLOT, "text-caption font-semibold")}
             aria-label={t("shell.agent_dock.more", { count: plan().overflow })}
             title={t("shell.agent_dock.more", { count: plan().overflow })}
             onClick={() => props.onSeeAll()}
@@ -184,7 +184,7 @@ export default function AgentDock(props: {
         {(e) => (
           <Popover open onOpenChange={(abierto) => { if (!abierto) setEligiendo(null); }} anchorRef={() => e().anchor} placement="top-start" gutter={6}>
             <PopoverContent role="menu" aria-label={t("shell.agent_dock.pick_folder", { name: label(e().name) })} class="w-56 p-1">
-              <p class="m-0 truncate px-2 pt-1 pb-1 text-[0.6875rem] font-medium text-neutral-500">
+              <p class="m-0 truncate px-2 pt-1 pb-1 text-caption font-medium text-neutral-500">
                 {t("shell.agent_dock.pick_folder", { name: label(e().name) })}
               </p>
               <For each={e().folders}>

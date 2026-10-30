@@ -1,3 +1,5 @@
+import { sessionFetch } from './request.ts';
+export type AccountPermissions = { role: string; permissions: string[]; scoped: { permission: string; scope_type: string; scope_id: number }[] };
 export type Account = { id: number; name: string };
 /**
  * Una fila de la GET de conversaciones de Appv2 (`BackendConversation`). Los campos
@@ -47,13 +49,22 @@ const array = (value: unknown): unknown[] => {
 
 /** Only same-origin, read-only BFF routes; account IDs never imply Terminus workspace IDs. */
 export function createInbox(session: InboxSession, request: typeof fetch = fetch, prefix = "/terminus/alpha-api") {
+  const send = sessionFetch(session, request);
   async function get(path: string) {
-    let response = await request(`${prefix}${path}`, { headers: { Authorization: `Bearer ${await session.getToken()}` }, cache: 'no-store' });
-    if (response.status === 401 && await session.unauthorized()) response = await request(`${prefix}${path}`, { headers: { Authorization: `Bearer ${await session.getToken()}` }, cache: 'no-store' });
+    const response = await send(`${prefix}${path}`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return object(await response.json());
   }
   return {
+    async permissions(account: number): Promise<AccountPermissions> {
+      const data = await get(`/auth/account/my-permissions?account_id=${number(account)}`);
+      if (typeof data.role !== 'string' || !Array.isArray(data.permissions) || !data.permissions.every(value => typeof value === 'string')) throw new Error('invalid_response');
+      return { role: data.role, permissions: data.permissions, scoped: array(data.scoped).map(value => {
+        const row = object(value);
+        if (typeof row.permission !== 'string' || typeof row.scope_type !== 'string') throw new Error('invalid_response');
+        return { permission: row.permission, scope_type: row.scope_type, scope_id: number(row.scope_id) };
+      }) };
+    },
     async accounts(): Promise<Account[]> {
       const data = object((await get('/auth/profile')).user);
       return array(data.accounts ?? []).map(value => {

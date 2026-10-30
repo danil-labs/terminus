@@ -110,7 +110,7 @@ import AgentTasks, { createdTasks } from "../features/projects/AgentTasks";
 import BaseBranchPicker from "../features/projects/BaseBranchPicker";
 import { watchHandlerStatus, watchHandlerStatuses } from "../features/projects/handlerPresence";
 import { EmptyContext, ProjectPicker } from "../features/projects/Projects";
-import { bringHereLabel, canBringHere, carryOrigin, machineName, machineOf, machines, refetchMachines, remoteChildScope, runOn, setRunOn, setTaskRowMachine } from "../features/machines/store";
+import { bringHereLabel, canBringHere, carryOrigin, machineName, machineOf, machines, refetchMachines, remoteChildScope, runOn, senderTaskId, setRunOn, setTaskRowMachine } from "../features/machines/store";
 import { withRemoteLaunchers } from "@terminus/tasks";
 import type { CarriedBase, CarryCheck } from "../features/machines/carry";
 // Chunk aparte: solo lo carga quien crea una tarea, no la carga inicial.
@@ -171,7 +171,7 @@ import AvisoDeVersion from "../features/shell/VersionNotice";
 import CloseGuard from "../features/shell/CloseGuard";
 import WorkspaceColumn from "../features/shell/WorkspaceColumn";
 import Sitio from "../features/sites/Site";
-import { FONDO_SOLO_EN_EL_TRABAJO, VELO_DE_FONDO } from "../lib/chat-background";
+import { VELO_DE_FONDO } from "../lib/chat-background";
 import { fondoDeChat, fondoPropio, imagenDelWorkspace, veloDeFondo } from "../lib/chat-background-store";
 import { copyText } from "../lib/clipboard";
 import { capabilities, openMachineScreen } from "../lib/platform";
@@ -360,8 +360,7 @@ export default function App() {
    */
   const [alta, setAlta] = createSignal<null | "primera" | "nueva">(null);
   /* El fondo propio del agente de la conversación con el mando: lo publica su
-     celda y lo pinta `FondoDeVentana` detrás de toda la ventana, no solo
-     detrás de su chat. */
+     celda y se pinta detrás del área de trabajo, no solo detrás de su chat. */
   const [fondoDelAgente, setFondoDelAgente] = createSignal<{ url: string; veil?: number } | null>(null);
   // `null` es «este workspace todavía no tiene contexto»; se enseña como un
   // renglón al lado del selector de proyecto, no como una pantalla que lo pida.
@@ -504,8 +503,12 @@ export default function App() {
   const medirBordeDeLaBarra = (el: HTMLDivElement) => {
     const medir = () => setBordeDeLaBarra(el.getBoundingClientRect().left || null);
     const ojo = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(medir);
-    ojo?.observe(el);
-    queueMicrotask(medir);
+    // Con la conversación en su ancho base, la barra se encoge y este borde se mueve sin que cambie su tamaño.
+    queueMicrotask(() => {
+      const caja = el.parentElement;
+      for (const parte of caja ? [caja, ...caja.children] : [el]) ojo?.observe(parte);
+      medir();
+    });
     onCleanup(() => ojo?.disconnect());
   };
   const attentionEntries = () => capabilities().inbox?.entries(customization.selection().enabled) ?? [];
@@ -5148,7 +5151,7 @@ export default function App() {
 
   /**
    * Quitar una fuente de esta tarea: deja de ofrecerse de aquí en adelante.
-   * No deshace lo que el agente ya leyó (`ARCHITECTURE.md` § 4): el control
+   * No deshace lo que el agente ya leyó: el control
    * dice «quitar», no «olvidar».
    */
   const quitarFuente = async (id: string) => {
@@ -6826,13 +6829,14 @@ export default function App() {
           </div>
   );
   // En una tarea, el conmutador del panel derecho abre sus archivos dentro de la tarea.
-  const botonDeArchivos = (sesion: string) => (
+  // La sesión llega como accesor: leída al llamar, cada cambio de tarea volvería a montar el botón.
+  const botonDeArchivos = (sesion: () => string) => (
     <BotonConAtajo
-      variant={archivosDeTarea.panel(sesion).open ? "secondary" : "ghost"}
+      variant={archivosDeTarea.panel(sesion()).open ? "secondary" : "ghost"}
       size="icon"
       class="relative size-7 shrink-0 text-neutral-500"
-      onClick={() => archivosDeTarea.toggle(sesion)}
-      aria-pressed={archivosDeTarea.panel(sesion).open}
+      onClick={() => archivosDeTarea.toggle(sesion())}
+      aria-pressed={archivosDeTarea.panel(sesion()).open}
       aria-label={t("code.panel.toggle")}
       accion="workTree"
       etiqueta={t("code.panel.toggle")}
@@ -7220,8 +7224,6 @@ export default function App() {
         chatAvatar={cellProfile().avatar}
         bodyOf={(name) => profiles()[name]?.body ?? null}
         avatarOf={(name) => profiles()[name]?.avatar ?? null}
-        chatBackground={FONDO_SOLO_EN_EL_TRABAJO || celdaActiva() ? null : chatBackground() ?? null}
-        chatVeil={cellProfile().veil}
         onOpenProfile={() => setViewingProfile(true)}
         /* Que el hilo viene, no que no hay: sin esto el chat lee el vacío en
            vuelo como conversación nueva y salta al fondo (#315). Va por
@@ -7283,7 +7285,7 @@ export default function App() {
         onQuitarFuente={quitarFuente}
         onCambiarRama={cambiarRama}
         onAbrirArtefacto={abrirPorRel}
-        onOpenTask={(folder, task) => void abrirSesion(folder, task)}
+        onOpenTask={(folder, task, machine) => void abrirSesion(folder, machine ? senderTaskId(machine, task) : task)}
         tareaPorId={tareaDelRiel}
         /* Solo con tarea abierta y con el turno cerrado: exportar a mitad de una
            respuesta se llevaría una conversación sin ella. */
@@ -7471,23 +7473,6 @@ export default function App() {
   const imagenDeVentana = () =>
     fondoDelAgente()?.url ?? (fondoDeChat() === "propia" ? (imagenDelWorkspace() ?? fondoPropioUrl()) : null) ?? null;
   const veloDeVentana = () => (fondoDelAgente() ? (fondoDelAgente()?.veil ?? VELO_DE_FONDO) : veloDeFondo());
-  // Sin imagen no hay fondo ni velo: solo el `bg-surface` de la raíz.
-  const FondoDeVentana = () => (
-    <Show when={imagenDeVentana()}>
-      {(url) => (
-        <div
-          class="pointer-events-none absolute inset-0 bg-cover bg-center"
-          style={{ "background-image": `url("${url()}")` }}
-          aria-hidden="true"
-        >
-          <div
-            class="absolute inset-0 bg-surface"
-            style={{ opacity: String(veloDeVentana()) }}
-          />
-        </div>
-      )}
-    </Show>
-  );
 
   const Conversacion = () => (
     <section class="relative flex h-full min-h-0 flex-col overflow-hidden">
@@ -7600,7 +7585,7 @@ export default function App() {
       </Show>
       <Show when={avisoDeMaquina()}>
         {(aviso) => (
-          <p role="status" data-machine-notice="" class="mx-4 mb-2 shrink-0 rounded-[var(--radius-sm)] bg-surface px-3 py-2 text-xs text-neutral-500 shadow-sm">
+          <p role="status" data-machine-notice="" class="mx-4 mb-2 shrink-0 rounded-sm bg-surface px-3 py-2 text-xs text-neutral-500 shadow-sm">
             {aviso()}
           </p>
         )}
@@ -7646,7 +7631,7 @@ export default function App() {
                 <Show keyed when={delegatedToolbarTargets().get(`${workspaceActivo()}/${task()?.session ?? ""}`)}>{render => render()}</Show>
                 <UsageTool usage={consumo} agent={agenteDeLaVentana()} onGestionarCuentas={() => setSettings("proveedores-ia")} />
                 <Show when={task()?.session && !agenteSenalado()} fallback={<Show when={!artOpen() && !paginaDeAgente()}>{botonDelArbol()}</Show>}>
-                  {botonDeArchivos(task()?.session ?? "")}
+                  {botonDeArchivos(() => task()?.session ?? "")}
                 </Show>
               </>} />;
         // Centrada con la fila de máquina, proyecto y rama de la tarea (`TaskLocation`).
@@ -7746,7 +7731,7 @@ export default function App() {
       <Show when={arrastrando() !== null && cursor() !== null}>
         <div
           aria-hidden="true"
-          class="pointer-events-none fixed z-[60] max-w-[220px] truncate rounded-[var(--radius-sm)] border border-border-strong bg-surface-raised px-2 py-1 text-sm font-medium text-neutral-950 shadow-md"
+          class="pointer-events-none fixed z-[60] max-w-[220px] truncate rounded-sm border border-border-strong bg-surface-raised px-2 py-1 text-sm font-medium text-neutral-950 shadow-md"
           style={{
             left: `${cursor()!.x + 12}px`,
             top: `${cursor()!.y + 12}px`,
@@ -7767,7 +7752,7 @@ export default function App() {
           fallback={
             <div
               aria-hidden="true"
-              class="pointer-events-none z-50 rounded-[var(--radius-sm)] border-2 border-primary/70 bg-primary/5"
+              class="pointer-events-none z-50 rounded-sm border-2 border-primary/70 bg-primary/5"
               style={estiloDeLaCelda(donde()!.sitio)}
             />
           }
@@ -7780,7 +7765,7 @@ export default function App() {
             >
               <div
                 class={cn(
-                  "absolute rounded-[var(--radius-sm)] border-2 border-primary/70 bg-primary/5",
+                  "absolute rounded-sm border-2 border-primary/70 bg-primary/5",
                   side() === "left" && "inset-y-0 left-0 w-1/2",
                   side() === "right" && "inset-y-0 right-0 w-1/2",
                   side() === "up" && "inset-x-0 top-0 h-1/2",
@@ -8067,7 +8052,7 @@ export default function App() {
                       {(a) => (
                         <Show
                           when={a().codigo}
-                          fallback={<VisorDeArtefacto path={a().path} rel={a().rel} kind={a().kind} />}
+                          fallback={<VisorDeArtefacto path={a().path} rel={a().rel} kind={a().kind} session={a().session} />}
                         >
                           <Suspense fallback={null}><VisorDeArchivo
                             project={a().project}
@@ -8173,9 +8158,6 @@ export default function App() {
         "--window-veil": String(veloDeVentana()),
       }}
     >
-      {/* Detrás de todo y sin posicionar nada encima: `-z-10` dentro del
-          `isolate` queda sobre el `bg-surface` de la raíz y bajo cada columna. */}
-      <Show when={!FONDO_SOLO_EN_EL_TRABAJO}><div class="pointer-events-none absolute inset-0 -z-10" aria-hidden="true"><FondoDeVentana /></div></Show>
       <CloseGuard title={(id) => filaDe(id)?.title} />
       <ToastStack>
         {/* Aquí y no en Configuración: ahí no entra nadie a buscar
@@ -8256,10 +8238,10 @@ export default function App() {
         <Dialog open onOpenChange={(abierto) => { if (!abierto) setBorradoConTrabajo(null); }}>
           <DialogContent class="flex flex-col gap-3">
             <DialogTitle class="text-sm font-semibold">{t("projects.sessions.delete_work_title")}</DialogTitle>
-            <p class="m-0 text-[13px] text-neutral-700">{t("projects.sessions.delete_work")}</p>
+            <p class="m-0 text-ui text-neutral-700">{t("projects.sessions.delete_work")}</p>
             <ul class="m-0 flex max-h-[40vh] list-none flex-col overflow-y-auto p-0">
               <For each={b().files}>{(f) => (
-                <li class="shrink-0 truncate font-mono text-[11px] text-neutral-500" title={f}>{f}</li>
+                <li class="shrink-0 truncate font-mono text-caption text-neutral-500" title={f}>{f}</li>
               )}</For>
             </ul>
             <div class="flex justify-end gap-2">
@@ -8288,10 +8270,10 @@ export default function App() {
         <Dialog open onOpenChange={(abierto) => { if (!abierto) setCierreSinGuardar(null); }}>
           <DialogContent class="flex flex-col gap-3">
             <DialogTitle class="text-sm font-semibold">{t("projects.tabs.unsaved.title")}</DialogTitle>
-            <p class="m-0 text-[13px] text-neutral-700">{t("projects.tabs.unsaved.body")}</p>
+            <p class="m-0 text-ui text-neutral-700">{t("projects.tabs.unsaved.body")}</p>
             <ul class="m-0 flex max-h-[40vh] list-none flex-col overflow-y-auto p-0">
               <For each={c().archivos}>{(ruta) => (
-                <li class="shrink-0 truncate font-mono text-[11px] text-neutral-500" title={ruta}>{ruta}</li>
+                <li class="shrink-0 truncate font-mono text-caption text-neutral-500" title={ruta}>{ruta}</li>
               )}</For>
             </ul>
             <div class="flex justify-end gap-2">
@@ -8525,7 +8507,7 @@ export default function App() {
             />
             </div>
             <Show when={enCache()}>
-              <p role="status" class="pointer-events-none absolute inset-x-3 bottom-3 m-0 rounded-[var(--radius-sm)] bg-surface px-3 py-2 text-xs text-neutral-500 shadow-sm">
+              <p role="status" class="pointer-events-none absolute inset-x-3 bottom-3 m-0 rounded-sm bg-surface px-3 py-2 text-xs text-neutral-500 shadow-sm">
                 {t("shell.sidebar.cached")}
               </p>
             </Show>
@@ -8535,7 +8517,7 @@ export default function App() {
           {/* 30rem es lo que cabe en la caja sin partir el modelo ni el modo.
               Las columnas laterales encogen mil veces más rápido, hasta su
               mínimo; un factor menor que 1 aquí dejaría desbordar la fila. */}
-          <div ref={medirBordeDeLaBarra} class={cn("min-h-0 min-w-0 flex-[1_1_30rem] overflow-hidden", FONDO_SOLO_EN_EL_TRABAJO && "work-background")} data-conversacion>
+          <div ref={medirBordeDeLaBarra} class={"min-h-0 min-w-0 flex-[1_1_30rem] overflow-hidden work-background"} data-conversacion>
             <Conversacion />
           </div>
 

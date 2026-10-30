@@ -21,7 +21,7 @@ export default function DelimitedTable(props: { text: string; delim: string }) {
         }
       >
         <div class="min-h-0 flex-1 overflow-auto">
-          <table class="w-full border-collapse font-mono text-[0.6875rem]">
+          <table class="w-full border-collapse font-mono text-caption">
             <thead>
               <tr>
                 <For each={header()}>
@@ -51,7 +51,7 @@ export default function DelimitedTable(props: { text: string; delim: string }) {
           </table>
         </div>
         <Show when={table().truncated}>
-          <p class="m-0 border-t border-border bg-surface-raised px-3 py-1.5 text-[0.6875rem] text-neutral-500">
+          <p class="m-0 border-t border-border bg-surface-raised px-3 py-1.5 text-caption text-neutral-500">
             {t("code.file.table.truncated")}
           </p>
         </Show>

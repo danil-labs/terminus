@@ -1,6 +1,8 @@
 import { For, Show, Suspense, createEffect, createSignal, lazy, on, onCleanup } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
 import { save } from "@tauri-apps/plugin-dialog";
+import { join, tempDir } from "@tauri-apps/api/path";
+import { useFileMachine } from "../../ui/fileMachine";
 import Documento from "./Document";
 import Versiones from "./Versions";
 import {
@@ -29,6 +31,7 @@ import { t } from "../../lib/i18n";
 import { extensionDe } from "../../lib/steps";
 import { peso, nf } from "../../lib/format";
 import { delimiterFor } from "../viewers/csv";
+import { ArtifactDownloadError, readArtifactDownload } from "./download.ts";
 
 /** Bajan al abrirse: `pdfjs-dist` no entra en el arranque de la ventana. */
 const PdfDocument = lazy(() => import("../viewers/Pdf"));
@@ -78,6 +81,9 @@ export default function PreviewPane(props: {
   // puede quedarse en la consola: desde fuera se ve igual que un botón que no
   // hace nada.
   const [fallo, setFallo] = createSignal<Failure | null>(null);
+  /** La máquina de la tarea si no es esta: el historial vive allá, y lo que sale se escribe aquí. */
+  const enSuMaquina = useFileMachine();
+  const remota = () => enSuMaquina() !== undefined;
 
   const [historia, setHistoria] = createSignal<History | null>(null);
   /** La versión que se está mirando, o `null` si es la que está en disco. */
@@ -144,7 +150,7 @@ export default function PreviewPane(props: {
            cada apertura, para un registro que nadie lee. */
         if (formaDe(texto ?? "") === "web") return;
         let vivo = true;
-        historiaDe(absPath)
+        historiaDe(absPath, enSuMaquina())
           .then((h) => {
             if (!vivo) return;
             setHistoria(h);
@@ -192,8 +198,12 @@ export default function PreviewPane(props: {
     if (!props.absPath || !html) return;
     setFallo(null);
     try {
+      // El navegador que imprime es el de esta computadora: la copia de una tarea de otra máquina va a su carpeta temporal.
+      const path = remota()
+        ? await join(await tempDir(), "terminus-print", props.absPath.split(/[/\\]/).pop() || "artefacto.html")
+        : props.absPath;
       const destino = await invoke<string>("prepare_print", {
-        path: props.absPath,
+        path,
         html: envolver(html, { impresion: true }),
       });
       await invoke("open_external", { target: destino });
@@ -227,7 +237,7 @@ export default function PreviewPane(props: {
       };
     }
     if (!props.esArtefacto || !props.absPath) return null;
-    const h = await historiaDe(props.absPath);
+    const h = await historiaDe(props.absPath, enSuMaquina());
     if (!h.current) return null;
     const n = h.current.n;
     return {
@@ -245,7 +255,7 @@ export default function PreviewPane(props: {
       const sale = await versionQueSale();
       if (!sale) return;
       const { base, bytes } = sale;
-      await registrarSalida(base, via, destino, bytes);
+      await registrarSalida(base, via, destino, bytes, enSuMaquina());
       setPublicaciones(
         (await publicacionesDe(base.project, base.session)).filter(
           (x) => x.version?.artifact === base.artifact,
@@ -316,6 +326,7 @@ export default function PreviewPane(props: {
     if (!props.absPath || !p) return;
     setFallo(null);
     setSalida(null);
+    if (remota()) return descargarDeOtraMaquina(p);
 
     const v = viendo();
     const nombre = p.rel.split(/[/\\]/).pop() || "artefacto";
@@ -356,6 +367,47 @@ export default function PreviewPane(props: {
     }
   }
 
+  /* De una tarea de otra máquina `download_artifact` escribiría en el disco de
+     allá. La versión se sella allá (`artifact_history`), sus bytes viajan por
+     partes (`artifact_read_part`), se guardan aquí como descarga del navegador
+     y la salida se anota allá, que es donde vive la cadena. Un motor anterior
+     no tiene las partes: entonces solo sale el texto de la versión sellada. */
+  async function descargarDeOtraMaquina(p: Preview) {
+    const ruta = props.absPath!;
+    const nombre = p.rel.split(/[/\\]/).pop() || "artefacto";
+    setOcupado(true);
+    try {
+      const h = await historiaDe(ruta, enSuMaquina());
+      const v = viendo();
+      const base = v ?? h.current;
+      if (!base) return;
+      const punto = nombre.lastIndexOf(".");
+      const sugerido = !v || punto <= 0 ? nombre : `${nombre.slice(0, punto)}-v${v.n}${nombre.slice(punto)}`;
+      const version = h.versions.find(entry => entry.referencia.n === base.n && entry.referencia.artifact === base.artifact && entry.referencia.project === base.project && entry.referencia.session === base.session);
+      const machine = enSuMaquina();
+      const blob = await readArtifactDownload(base, version?.bytes ?? NaN, p.kind === "text" || p.kind === "html", {
+        part: (referencia, offset, size) => invoke("artifact_read_part", { referencia, offset, size }, machine),
+        text: referencia => leerVersion(referencia, machine),
+      });
+      const enlace = document.createElement("a");
+      enlace.href = URL.createObjectURL(blob);
+      enlace.download = sugerido;
+      enlace.click();
+      setTimeout(() => URL.revokeObjectURL(enlace.href), 1000);
+      setSalida({ destino: sugerido, bytes: blob.size });
+      await registrarSalida(base, "descarga", sugerido, blob.size, enSuMaquina()).catch(() =>
+        setFallo({ what: t("artifacts.record.failed"), detail: `descarga · ${sugerido}` }));
+      if (historia()) {
+        setHistoria(h);
+        setPublicaciones((await publicacionesDe(base.project, base.session)).filter((x) => x.version?.artifact === base.artifact));
+      }
+    } catch (e) {
+      setFallo(e instanceof ArtifactDownloadError ? { what: t(`artifacts.download.${e.reason}`), detail: nombre } : asFailure(e));
+    } finally {
+      setOcupado(false);
+    }
+  }
+
   async function ver(v: VersionRef | null) {
     setFallo(null);
     if (!v) {
@@ -365,7 +417,7 @@ export default function PreviewPane(props: {
       return;
     }
     try {
-      const txt = await leerVersion(v);
+      const txt = await leerVersion(v, enSuMaquina());
       setMostrado(txt);
       setViendo(v);
       setGen((g) => g + 1);
@@ -379,7 +431,7 @@ export default function PreviewPane(props: {
     if (!v) return;
     setOcupado(true);
     try {
-      const h = await restaurarVersion(v);
+      const h = await restaurarVersion(v, enSuMaquina());
       setHistoria(h);
       setActual(mostrado());
       setViendo(null);
@@ -545,7 +597,7 @@ export default function PreviewPane(props: {
                   es lo único que se puede hacer con el archivo, no una salida
                   más entre otras, y repetir el botón en los dos sitios sería
                   poner dos veces el mismo acto en la misma pantalla. */}
-              <Show when={props.absPath && !esOpaco()}>
+              <Show when={props.absPath && !esOpaco() && !remota()}>
                 <Button
                   variant="outline"
                   size="compact"
@@ -646,9 +698,17 @@ export default function PreviewPane(props: {
                 cuánto pesa ya lo dice la franja de arriba. */}
             <Show when={esOpaco() && props.absPath}>
               <div class="flex items-center justify-center rounded-md border border-border bg-surface-muted px-3 py-8">
-                <Button variant="primary" onClick={() => void abrirAfuera()}>
-                  {t("artifacts.open_with_system")}
-                </Button>
+                <Show when={!remota()} fallback={
+                  <Show when={props.esArtefacto}>
+                    <Button variant="primary" disabled={ocupado()} onClick={() => void descargar()}>
+                      {ocupado() ? t("artifacts.download.busy") : t("artifacts.download")}
+                    </Button>
+                  </Show>
+                }>
+                  <Button variant="primary" onClick={() => void abrirAfuera()}>
+                    {t("artifacts.open_with_system")}
+                  </Button>
+                </Show>
               </div>
             </Show>
           </div>

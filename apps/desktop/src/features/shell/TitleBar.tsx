@@ -34,9 +34,9 @@ export default function TitleBar(props: {
     window.addEventListener("resize", medir);
     onCleanup(() => window.removeEventListener("resize", medir));
   });
-  // El hueco del semáforo cambia después del `resize` (pantalla completa se lee aparte):
-  // sin volver a medir, el grupo guarda el inicio viejo y las pestañas nacen 76 px antes.
-  createEffect(on(apartarSemaforo, medir, { defer: true }));
+  // El hueco del semáforo cambia después del `resize` (pantalla completa se lee aparte) y el
+  // de `rem` con la escala, que no lo emite: sin volver a medir, las pestañas nacen fuera de la línea.
+  createEffect(on([apartarSemaforo, () => props.bordeDeLaBarra], medir, { defer: true }));
   // El grupo llega justo al borde de la barra: Personalizar queda encima de ella y la primera pestaña nace en esa línea.
   const ancho = () => {
     const borde = props.bordeDeLaBarra;
@@ -54,7 +54,7 @@ export default function TitleBar(props: {
       data-tauri-drag-region=""
       onDblClick={toggleMaximizeFromHeader}
     >
-      <div ref={grupo} class="flex min-w-0 shrink-0 items-center gap-1 pr-2" style={{ width: ancho() }}>
+      <div ref={grupo} class="flex min-w-0 shrink-0 items-center gap-1 pr-2 max-[600px]:max-w-[calc(100%-2rem)] max-[600px]:shrink" style={{ width: ancho() }}>
         {props.izquierda}
         <span class="min-w-0 flex-1" data-tauri-drag-region="" />
         {props.finDeIzquierda}

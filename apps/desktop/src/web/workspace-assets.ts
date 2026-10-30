@@ -5,11 +5,11 @@
  * the person's session. Images are shown as `data:` URIs: the page's CSP
  * loads no remote images.
  */
-import { ACCOUNT_ASSET_MAX_BYTES, ACCOUNT_ASSET_TYPES, accountAssetUrl, readAccountAsset } from "@terminus/computers";
+import { accountAssetUrl, readAccountAsset } from "@terminus/computers";
 import { blobToDataUrl } from "../features/settings/account-profile.ts";
 import { apiUrl } from "./computers.ts";
+import { type Fetch, refused, sessionCall } from "./control-plane.ts";
 
-type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
 export type WorkspaceAssetKind = "logo" | "background";
 
@@ -28,14 +28,7 @@ export type WorkspaceAssetsSource = {
   forget(): void;
 };
 
-/** Las mismas reglas que el teléfono (`@terminus/computers`). */
-export const ASSET_TYPES = ACCOUNT_ASSET_TYPES;
-export const ASSET_MAX_BYTES: Record<WorkspaceAssetKind, number> = ACCOUNT_ASSET_MAX_BYTES;
-
 type Row = Record<string, unknown> & { id: string };
-
-/** A refused call, shaped like an engine failure so the panel words it the same way. */
-const refused = (code: string) => Object.assign(new Error(code), { detail: code });
 
 export function webWorkspaceAssets(
   endpoint: string,
@@ -46,12 +39,7 @@ export function webWorkspaceAssets(
   let rows: Promise<Map<string, Row>> | null = null;
   const images = new Map<string, Promise<string | null>>();
 
-  async function call(url: string, init: RequestInit = {}): Promise<Response> {
-    const token = await getToken();
-    const response = await f(url, { ...init, headers: { ...init.headers, authorization: `Bearer ${token}` } });
-    if (response.status === 401) onUnauthorized?.();
-    return response;
-  }
+  const call = sessionCall(getToken, onUnauthorized, f);
 
   function list(): Promise<Map<string, Row>> {
     rows ??= call(apiUrl(endpoint, "/v1/workspaces"))

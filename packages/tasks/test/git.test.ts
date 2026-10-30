@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { canFinishTask, readTaskGit, UNKNOWN_TASK_GIT, type TaskGitStatus } from "../src/index.ts";
+import { canFinishTask, readTaskGit, retainGitObservation, UNKNOWN_TASK_GIT, type TaskGitStatus } from "../src/index.ts";
 
 const merged: TaskGitStatus = {
   ...UNKNOWN_TASK_GIT, kind: "branch", branch: "fix/example", head: "commit", pull_known: true,
@@ -49,4 +49,15 @@ test("el cierre depende del HEAD integrado vigente, no de tener un número de PR
   assert.equal(canFinishTask({ archived: true }, merged, false), false);
   assert.equal(canFinishTask({}, { ...merged, pull: null, pull_known: false, merged_locally: true, has_remote: true }, false), false);
   assert.equal(canFinishTask({}, { ...merged, pull: null, pull_known: false, merged_locally: true, has_remote: false }, false), true);
+});
+
+test("una observación más antigua no pisa el pull más nuevo", () => {
+  const newer: TaskGitStatus = { ...merged, checked_at: 20 };
+  const older: TaskGitStatus = { ...merged, checked_at: 10, pull: { number: 362, state: "open", head_sha: "commit" } };
+  assert.equal(retainGitObservation({ t: newer }, { t: older }).t.pull?.state, "merged");
+});
+
+test("una fila igual conserva su objeto para no repintar", () => {
+  const row: TaskGitStatus = { ...merged, checked_at: 20 };
+  assert.equal(retainGitObservation({ t: row }, { t: { ...row } }).t, row);
 });

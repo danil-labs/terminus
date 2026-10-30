@@ -402,7 +402,7 @@ export default function PuertosAbiertos(props: {
             <Plug size={12} class="text-neutral-500" aria-hidden />
             {t("shell.ports.title")}
           </h2>
-          <span class="font-mono text-[0.6875rem] tabular-nums text-neutral-500">
+          <span class="font-mono text-caption tabular-nums text-neutral-500">
             {mios()} de tus tareas · {externos()} externos
           </span>
         </div>
@@ -467,7 +467,7 @@ export default function PuertosAbiertos(props: {
                   trae aquí a alguien cuando lo suyo está vacío. */}
               <button
                 type="button"
-                class="flex w-full items-center gap-1.5 px-3 py-2 text-left text-[0.6875rem] font-semibold uppercase tracking-wide text-neutral-500 outline-none hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
+                class="flex w-full items-center gap-1.5 px-3 py-2 text-left text-caption font-semibold uppercase tracking-wide text-neutral-500 outline-none hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
                 aria-expanded={externosAbiertos()}
                 onClick={() => setExternosAbiertos((v) => !v)}
               >

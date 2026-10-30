@@ -1,5 +1,5 @@
 import { AgentAvatar } from "../ui/AgentAvatar";
-import { folderColor } from "@terminus/design";
+import { folderColor, TEXT } from "@terminus/design";
 import { canFinishTask, cardPull, previewLabel, taskPreview } from "@terminus/tasks";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState, type ReactNode } from "react";
@@ -132,9 +132,9 @@ const styles = StyleSheet.create({
   title: { flex: 1, fontSize: 17, fontWeight: "600", lineHeight: 22 },
   rows: { gap: 8 },
   field: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 22 },
-  label: { width: 84, fontSize: 13 },
+  label: { width: 84, fontSize: TEXT.ui },
   fieldValue: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 },
   square: { width: 9, height: 9, borderRadius: 2 },
-  value: { flex: 1, fontSize: 14 },
+  value: { flex: 1, fontSize: TEXT.body },
   button: { minHeight: 48, flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center", borderWidth: 1, borderRadius: 10, paddingVertical: 11 },
 });

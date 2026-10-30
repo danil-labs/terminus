@@ -14,12 +14,16 @@ import { isPinned } from "./view.ts";
 
 type Lang = "es" | "en";
 
-export type TitledTask = { title: string; inbox?: boolean; chat_de_agente?: boolean; agent_thread?: boolean };
+export type TitledTask = { title: string; inbox?: boolean; chat_de_agente?: boolean; agent_thread?: boolean; command_title?: boolean };
 
-/** El título de una fila, como la lista del escritorio: la bandeja vieja y el chat viejo del agente tienen el suyo. */
+/**
+ * El título de una fila, como la lista del escritorio: la bandeja vieja y el chat viejo del agente tienen el suyo.
+ * Una tarea que solo corrió comandos no enseña el comando crudo; un motor viejo no manda `command_title`.
+ */
 export function taskTitle(lang: Lang, task: TitledTask): string {
   if (task.inbox) return word(lang, "projects.threads.inbox");
   if (task.chat_de_agente && !task.agent_thread) return word(lang, "projects.threads.persistent_chat");
+  if (task.command_title) return word(lang, "projects.threads.command");
   return task.title;
 }
 
