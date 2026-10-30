@@ -21,7 +21,7 @@ export function Channels(props: { demo: boolean; session?: InboxSession & { subs
   const [rows, setRows] = createSignal<Channel[]>(props.demo ? DEMO : []);
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal('');
-  const api = props.session ? createChannels(props.session) : null;
+  const api = props.session ? createChannels(props.session, fetch, `${import.meta.env.BASE_URL}alpha-api`) : null;
   let epoch = 0;
   async function load() {
     if (props.demo) return;

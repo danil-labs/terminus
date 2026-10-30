@@ -1,6 +1,6 @@
 /**
  * Los correos de la cuenta en el navegador: las rutas `/auth/emails` del BFF de
- * Danil por el proxy de alfa (`/terminus/alpha-api`), con la sesión de la persona.
+ * Danil por el proxy de alfa (`<base>alpha-api`), con la sesión de la persona.
  */
 import { AccountEmailsError, type AccountEmails, type AccountEmailsSource } from "../features/settings/account-emails.ts";
 
@@ -10,7 +10,7 @@ type Session = { getToken: () => Promise<string>; unauthorized: () => Promise<bo
 const num = (v: unknown, fallback: number) => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
-export function webAccountEmails(session: Session, f: Fetch = (input, init) => fetch(input, init), prefix = "/terminus/alpha-api"): AccountEmailsSource {
+export function webAccountEmails(session: Session, prefix: string, f: Fetch = (input, init) => fetch(input, init)): AccountEmailsSource {
   async function send(path: string, body?: Record<string, string>): Promise<Record<string, unknown>> {
     const once = async () =>
       f(`${prefix}${path}`, {

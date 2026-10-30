@@ -26,8 +26,8 @@ export default function DanilAccount() {
   return web ? <WebAccount source={web} /> : <MachineAccount />;
 }
 
-/** Los correos se administran en la web de alfa, con la sesión del navegador. */
-const EMAILS_URL = "https://alfa-app.danil.ai/terminus/?settings=cuenta-danil";
+/** Los correos se administran en la web de alfa (vive en la raíz del dominio), con la sesión del navegador. */
+const EMAILS_URL = "https://alfa-app.danil.ai/?settings=cuenta-danil";
 
 /** Sin fuente de correos aquí (el escritorio, o la web fuera de alfa): la fila que abre la web. */
 function ManageEmailsRow(props: { web?: boolean }) {

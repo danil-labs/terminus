@@ -163,7 +163,7 @@ export default function SpaceMenu(props: {
     >
       {(space) => (
         <Input
-          ref={(el: HTMLInputElement) => setTimeout(() => el.select(), 0)}
+          ref={(el: HTMLInputElement) => setTimeout(() => (el.focus(), el.select()), 0)}
           maxlength={NOMBRE_MAX}
           class="h-7 w-44 px-2 text-[0.8125rem] font-semibold"
           aria-label={t("spaces.rename.label", { name: spaceName(space()) })}

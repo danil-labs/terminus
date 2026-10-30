@@ -1,3 +1,4 @@
+import { useLocalSearchParams } from "expo-router";
 import { providerUsage } from "../lib/accountUsage";
 import { type AccountGroup, usageTone, windowLabel, windowLeft } from "@terminus/computers";
 import type { AccountLimits, AiAccount, LoginEvent, ProviderInfo, UsageWindow } from "@terminus/protocol";
@@ -39,7 +40,9 @@ export default function Accounts() {
   const currentId = current?.id ?? null;
   const scopeOf = useCallback((host: Host) => accountWorkspace(host, currentId), [currentId]);
   const [data, setData] = useState<ProviderAccounts[] | null>(null);
-  const [storageOpen, setStorageOpen] = useState(false);
+  // Desde «Almacenamiento» del perfil llega abierto.
+  const { storage } = useLocalSearchParams<{ storage?: string }>();
+  const [storageOpen, setStorageOpen] = useState(storage === "1");
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   const [pick, setPick] = useState<{ provider: ProviderInfo; exclude: string[] } | null>(null);

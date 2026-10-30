@@ -1,4 +1,4 @@
-import { createSignal, type JSX, onCleanup, onMount } from "solid-js";
+import { createEffect, createSignal, type JSX, on, onCleanup, onMount } from "solid-js";
 import { cn } from "../../lib/utils";
 import {
   createFullscreen,
@@ -34,6 +34,9 @@ export default function TitleBar(props: {
     window.addEventListener("resize", medir);
     onCleanup(() => window.removeEventListener("resize", medir));
   });
+  // El hueco del semáforo cambia después del `resize` (pantalla completa se lee aparte):
+  // sin volver a medir, el grupo guarda el inicio viejo y las pestañas nacen 76 px antes.
+  createEffect(on(apartarSemaforo, medir, { defer: true }));
   // El grupo llega justo al borde de la barra: Personalizar queda encima de ella y la primera pestaña nace en esa línea.
   const ancho = () => {
     const borde = props.bordeDeLaBarra;

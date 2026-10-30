@@ -263,6 +263,7 @@
   "danil.emails.error.email_needs_support": "{email} ya tiene invitaciones o datos en Danil. Escribe a soporte para agregarlo a tu cuenta.",
   "danil.emails.error.primary_email_taken": "No se puede hacer principal {email}: otra cuenta lo usa para iniciar sesión. Escribe a soporte.",
   "danil.emails.error.sso_user": "Tu empresa administra tu correo principal.",
+  "danil.emails.error.primary_is_danil": "Tu correo @danil.ai es siempre el principal.",
   "danil.emails.error.already_verified": "Ese correo ya está en tu lista.",
   "danil.emails.error.invalid_email": "Escribe un correo válido.",
   "danil.emails.error.too_many_emails": "Llegaste al máximo de correos. Quita uno para agregar otro.",

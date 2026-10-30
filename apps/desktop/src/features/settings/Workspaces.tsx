@@ -37,6 +37,7 @@ import { blobToDataUrl } from "./account-profile";
 
 // Chunk aparte: la cuenta de Danil del workspace solo pesa al abrir esta pantalla.
 const WorkspaceAccount = lazy(() => import("./WorkspaceAccount"));
+const SupportAccess = lazy(() => import("./SupportAccess"));
 
 // ------------------------------------------------ la fila de la lista
 
@@ -709,6 +710,15 @@ export default function Workspaces() {
           </Button>
 
           <Show when={ws.fallo()}>{(f) => <FailureNote f={f()} />}</Show>
+
+          {/* Una vez y no por tarjeta: sus workspaces de Danil no son los de Terminus. */}
+          <Show when={capabilities().supportAccess}>
+            {(source) => (
+              <Suspense fallback={null}>
+                <SupportAccess source={source()} />
+              </Suspense>
+            )}
+          </Show>
 
           {/* Lo que una migración no pudo mover **no se pinta aquí**, y se quitó
               después de verlo en uso. La idea era buena —perder una tarea en

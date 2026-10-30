@@ -1,7 +1,7 @@
 import { envolver } from "@terminus/chat/sandbox";
 import type { FilePreview } from "@terminus/protocol";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useColorScheme, View } from "react-native";
+import { ActivityIndicator, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { previewFile, readVisual } from "../../lib/engine";
 import { t } from "../../lib/i18n";
 import { Icon } from "../Icon";
@@ -42,7 +42,7 @@ function Muted({ children }: { children: string }) {
 export function ChatVisual({ file, title }: { file: string; title: string }) {
   const scope = useChatScope();
   const theme = useTheme();
-  const dark = useColorScheme() === "dark";
+  const dark = useTheme().dark;
   const [opened, setOpened] = useState(true);
   const [painted, setPainted] = useState(false);
   const [expanded, setExpanded] = useState(false);

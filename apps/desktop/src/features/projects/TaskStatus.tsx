@@ -7,6 +7,7 @@ import ShieldQuestion from "lucide-solid/icons/shield-question";
 import { Match, Show, Switch } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { t } from "../../lib/i18n";
+import { Spinner } from "../../ui/Spinner";
 import { cn } from "../../lib/utils";
 import { type TaskActivity, taskPriority } from "@terminus/design";
 
@@ -58,20 +59,10 @@ function railColor(state: ReturnType<typeof taskPriority>) {
   }
 }
 
-/** El arco que gira sobre su pista: «trabajando» en la tarjeta del riel. */
-export function RailSpinner(props: { size?: number }) {
-  return (
-    <svg viewBox="0 0 16 16" width={props.size ?? 14} height={props.size ?? 14} class="animate-riel-giro" aria-hidden="true">
-      <circle cx="8" cy="8" r="5.5" fill="none" stroke-width="2" style={{ stroke: "var(--color-border-strong)" }} />
-      <path d="M8 2.5a5.5 5.5 0 0 1 5.5 5.5" fill="none" stroke-width="2" stroke-linecap="round" style={{ stroke: "var(--color-primary)" }} />
-    </svg>
-  );
-}
-
 /** El anillo punteado de la tarea que el motor todavía registra. */
 function RailDashedRing(props: { size?: number }) {
   return (
-    <svg viewBox="0 0 16 16" width={props.size ?? 14} height={props.size ?? 14} class="animate-riel-giro-lento text-neutral-500" aria-hidden="true">
+    <svg viewBox="0 0 16 16" width={props.size ?? 14} height={props.size ?? 14} class="animate-spin-lento text-neutral-500" aria-hidden="true">
       <circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2.2 2.4" />
     </svg>
   );
@@ -98,7 +89,7 @@ function RailMark(props: TaskActivity & { provisional?: boolean; archivada?: boo
       </Match>
       <Match when={state() === "working"}>
         <span class="inline-flex shrink-0 items-center justify-center" title={label()} aria-label={label()}>
-          <RailSpinner size={lado()} />
+          <Spinner size={lado()} class="text-primary" />
         </span>
       </Match>
       <Match when={state() === "unseen"}>

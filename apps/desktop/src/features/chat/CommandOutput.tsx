@@ -1,5 +1,4 @@
 import Check from "lucide-solid/icons/check";
-import Loader2 from "lucide-solid/icons/loader-circle";
 import TriangleAlert from "lucide-solid/icons/triangle-alert";
 import { type JSX, Match, Show, Switch } from "solid-js";
 import { t } from "../../lib/i18n";
@@ -8,6 +7,7 @@ import { formatTokens } from "../../lib/usage";
 import { MarcaAgente } from "../../ui/icons";
 import { Markdown } from "../../ui/Markdown";
 import { type ClaseDeSalida, comandoEscrito, esMarkdown } from "./slashOutput";
+import { Spinner } from "../../ui/Spinner";
 
 /**
  * Lo que el CLI contestó a un comando de barra. No lo dijo el agente ni la
@@ -47,7 +47,7 @@ export default function SalidaDeComando(props: {
           {...props}
           derecha={
             <span class="flex shrink-0 items-center gap-1.5 text-xs text-neutral-700">
-              <Loader2 size={13} class="animate-spin-steps text-primary" aria-hidden="true" />
+              <Spinner size={13} class="text-primary" />
               {t("chat.command.compacting")}
             </span>
           }

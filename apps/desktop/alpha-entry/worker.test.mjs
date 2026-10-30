@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import worker from "./worker.mjs";
 
 const origin = "https://alfa-app.danil.ai";
-const prefix = "/terminus/alpha-api";
+const prefix = "/alpha-api";
 const auth = { Authorization: "Bearer user.jwt" };
 function harness() {
   const calls = [];
@@ -23,12 +23,12 @@ function harness() {
 test("exact reads preserve identity headers and query, never cookies or cache headers", async () => {
   for (const path of ["/auth/profile", "/api/inbox/conversations?account_id=7&limit=30&offset=0", "/api/inbox/conversations/12/messages?account_id=7&limit=50&before_id=100", "/api/channels"]) {
     const h = harness();
-    const response = await h.fetch(prefix + path, { headers: { ...auth, Origin: origin, Referer: origin + "/terminus/inbox", Cookie: "legacy=1", "X-Account-Id": "99" } });
+    const response = await h.fetch(prefix + path, { headers: { ...auth, Origin: origin, Referer: origin + "/inbox", Cookie: "legacy=1", "X-Account-Id": "99" } });
     assert.equal(response.status, 200);
     assert.equal(h.calls.length, 1);
     assert.equal(h.calls[0].url, origin + path);
     assert.equal(h.calls[0].headers.get("Origin"), origin);
-    assert.equal(h.calls[0].headers.get("Referer"), origin + "/terminus/inbox");
+    assert.equal(h.calls[0].headers.get("Referer"), origin + "/inbox");
     assert.equal(h.calls[0].headers.get("Authorization"), auth.Authorization);
     assert.equal(h.calls[0].headers.get("Cookie"), null);
     assert.equal(h.calls[0].headers.get("X-Account-Id"), null);
@@ -77,30 +77,59 @@ test("upstream redirects, HTML and transport failures fail closed", async () => 
   assert.equal((await h.fetch(prefix + "/auth/profile", { headers: auth })).status, 502);
 });
 
-test("assets preserve CSP and legacy paths are not handled", async () => {
+test("support access is one read with account_id only; revocation does not pass", async () => {
   const h = harness();
-  for (const path of ["/terminus/inbox", "/terminus/m/inbox", "/terminus/sign-in", "/terminus/m/sw.js"]) {
+  const path = "/auth/account/support-access?account_id=7";
+  const response = await h.fetch(prefix + path, { headers: auth });
+  assert.equal(response.status, 200);
+  assert.equal(h.calls.length, 1);
+  assert.equal(h.calls[0].url, origin + path);
+  assert.equal(h.calls[0].headers.get("Authorization"), auth.Authorization);
+  for (const query of ["", "account_id=0", "account_id=7&limit=10", "account_id=7&account_id=8", "status=active"]) {
+    assert.equal((await h.fetch(prefix + "/auth/account/support-access?" + query, { headers: auth })).status, 400);
+  }
+  for (const target of ["/auth/account/support-access/9/revoke?account_id=7", "/auth/account/support-access/", "/internal/support-access"]) {
+    assert.ok([400, 404].includes((await h.fetch(prefix + target, { headers: auth })).status));
+  }
+  for (const method of ["POST", "DELETE"]) {
+    assert.equal((await h.fetch(prefix + "/auth/account/support-access/9/revoke?account_id=7", { method, headers: auth })).status, 405);
+  }
+  assert.equal((await h.fetch(prefix + path)).status, 401);
+  assert.equal(h.calls.length, 1);
+});
+
+test("assets preserve CSP and serve every other path from the root", async () => {
+  const h = harness();
+  for (const path of ["/", "/inbox", "/m/inbox-x", "/sign-in", "/auth", "/m/sw.js", "/terminusx/"]) {
     const response = await h.fetch(path);
     assert.equal(await response.text(), "assets");
     assert.equal(response.headers.get("Content-Security-Policy"), "default-src 'self'");
+    assert.equal(h.calls.at(-1).url, origin + path);
   }
   h.calls.length = 0;
-  for (const path of ["/", "/api/inbox/conversations", "/auth/profile", "/terminusx/"]) assert.equal((await h.fetch(path)).status, 404);
-  assert.equal((await h.fetch("/terminus/inbox", { method: "POST" })).status, 405);
-  assert.equal((await worker.fetch(new Request("https://app.danil.ai/terminus/inbox"), h.env)).status, 404);
+  assert.equal((await h.fetch("/inbox", { method: "POST" })).status, 405);
+  assert.equal((await worker.fetch(new Request("https://app.danil.ai/inbox"), h.env)).status, 404);
   assert.equal(h.calls.length, 0);
 });
 
 
-test("bare Terminus path redirects locally without hitting bindings", async () => {
+test("old /terminus paths redirect to the root without hitting bindings", async () => {
   const h = harness();
-  for (const method of ["GET", "HEAD"]) {
-    const response = await h.fetch("/terminus?next=https%3A%2F%2Fevil.example", { method });
-    assert.equal(response.status, 308);
-    assert.equal(response.headers.get("Location"), origin + "/terminus/?next=https%3A%2F%2Fevil.example");
+  const cases = {
+    "/terminus": "/",
+    "/terminus/": "/",
+    "/terminus?next=https%3A%2F%2Fevil.example": "/?next=https%3A%2F%2Fevil.example",
+    "/terminus/m/inbox?demo=1": "/m/inbox?demo=1",
+    "/terminus/alpha-api/auth/profile": "/alpha-api/auth/profile",
+  };
+  for (const [from, to] of Object.entries(cases)) for (const method of ["GET", "HEAD"]) {
+    const response = await h.fetch(from, { method });
+    assert.equal(response.status, 308, from);
+    assert.equal(response.headers.get("Location"), origin + to);
     assert.equal(response.headers.get("Cache-Control"), "no-store");
   }
   assert.equal((await h.fetch("/terminus", { method: "POST" })).status, 405);
+  assert.equal((await h.fetch("/terminus/inbox", { method: "POST" })).status, 405);
   assert.equal(h.calls.length, 0);
 });
 
@@ -108,9 +137,9 @@ test("bare Terminus path redirects locally without hitting bindings", async () =
 test("mobile inbox deep link serves the phone entry rather than global SPA fallback", async () => {
   const h = harness();
   for (const path of ["inbox", "inbox-thread", "inbox-detail", "personalize", "broadcasts", "channels", "attention-agents"]) for (const method of ["GET", "HEAD"]) {
-    await h.fetch(`/terminus/m/${path}?demo=1`, { method });
+    await h.fetch(`/m/${path}?demo=1`, { method });
     const forwarded = h.calls.at(-1);
-    assert.equal(forwarded.url, origin + "/terminus/m/?demo=1");
+    assert.equal(forwarded.url, origin + "/m/?demo=1");
     assert.equal(forwarded.method, method);
   }
 });
@@ -137,7 +166,7 @@ test("email writes: only the four exact routes, from this page, with the exact J
     const h = harness();
     const response = await h.fetch(prefix + path, {
       method: "POST",
-      headers: { ...auth, Origin: origin, Referer: origin + "/terminus/", "Content-Type": "application/json", Cookie: "legacy=1", "X-Danil-Actor": "member" },
+      headers: { ...auth, Origin: origin, Referer: origin + "/", "Content-Type": "application/json", Cookie: "legacy=1", "X-Danil-Actor": "member" },
       body: JSON.stringify(body),
     });
     assert.equal(response.status, 200, path);
@@ -225,4 +254,16 @@ test("email writes: a chunked body over 1 KB is cut while reading, and an AI act
     assert.deepEqual(await response.json(), { error: "identity_requires_person" });
   }
   assert.equal(h.calls.length, 0);
+});
+
+test("WorkOS sign-in routes stay in the Worker; the sign-in page is an asset", async () => {
+  const h = harness();
+  const session = await h.fetch("/auth/session", { method: "POST", headers: { Origin: origin } });
+  assert.equal(session.status, 503, "without its secrets nobody gets a session");
+  assert.equal((await session.json()).error, "sign_in_unavailable");
+  assert.equal((await h.fetch("/auth/workos/start")).status, 503);
+  assert.equal((await h.fetch("/auth/session", { method: "POST", headers: { Origin: "https://evil.example" } })).status, 403);
+  assert.equal(h.calls.length, 0);
+  assert.equal(await (await h.fetch("/auth?next=%2Finbox")).text(), "assets");
+  assert.equal(h.calls.length, 1);
 });

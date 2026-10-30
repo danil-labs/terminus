@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { createMemo, createRoot } from "solid-js";
 import "../helpers/catalog.ts";
 import { elegirLengua } from "../../src/lib/i18n.ts";
 import {
@@ -9,6 +10,8 @@ import {
   loadSidebarView,
   nonDefaultCount,
   saveSidebarView,
+  setSidebarView,
+  sidebarView,
   sidebarViewKey,
   scopeLabel,
   type SidebarTask,
@@ -110,6 +113,19 @@ test("the view survives a restart and bad data falls back to the default", () =>
   // Una vista guardada con la densidad que ya no existe la pierde sin perder lo demás.
   store.set("harness.layout.sidebar.view.w.s1", JSON.stringify({ folders: ["a", 3, "a"], agent: 7, group: "size", density: "compact" }));
   assert.deepEqual(loadSidebarView(key), view({ folders: ["a"] }));
+});
+
+test("a change from the Customize button reaches the rail on screen without a restart", () => {
+  store.clear();
+  const key = sidebarViewKey("w", "s1");
+  // El riel lee la vista viva; el botón la cambia con el filtro que tenga, aunque sea de otro riel.
+  const visto = createRoot(() => createMemo(() => sidebarView(key).group));
+  assert.equal(visto(), DEFAULT_SIDEBAR_VIEW.group);
+  setSidebarView(key, view({ group: "status" }));
+  assert.equal(visto(), "status");
+  assert.deepEqual(loadSidebarView(key), view({ group: "status" }), "y se guarda para el próximo arranque");
+  setSidebarView(sidebarViewKey("w", "s2"), view({ group: "none" }));
+  assert.equal(visto(), "status", "otro espacio no la toca");
 });
 
 test("each workspace and space keeps its own view; the old global one is ignored", () => {

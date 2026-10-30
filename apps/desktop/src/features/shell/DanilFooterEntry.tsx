@@ -1,5 +1,5 @@
 import CircleUserRound from "lucide-solid/icons/circle-user-round";
-import { createEffect, createSignal, on, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createSignal, type JSX, on, onCleanup, onMount, Show } from "solid-js";
 import { t } from "../../lib/i18n";
 import { capabilities } from "../../lib/platform";
 import { cn } from "../../lib/utils";
@@ -15,17 +15,19 @@ import { sessionForWorkspace, statusOf } from "../settings/danil-sessions";
  * nombre) con su punto de en línea, solo con sesión. Sin sesión no pinta nada:
  * se inicia en Configuración. Con una sesión por cuenta, la del workspace
  * abierto. Chunk aparte; sin el flujo en el motor no pinta nada. En la web la
- * persona viene de su sesión.
+ * persona viene de su sesión. `fallback` ocupa su sitio mientras no hay persona.
  */
-export default function DanilFooterEntry(props: { collapsed: boolean; onOpen: () => void }) {
+type EntryProps = { collapsed: boolean; onOpen: () => void; fallback?: JSX.Element };
+
+export default function DanilFooterEntry(props: EntryProps) {
   const web = capabilities().accountProfile;
   return web ? <WebEntry {...props} source={web} /> : <MachineEntry {...props} />;
 }
 
-function MachineEntry(props: { collapsed: boolean; onOpen: () => void }) {
+function MachineEntry(props: EntryProps) {
   const accounts = createDanilAccounts({ workspace: "active" });
   return (
-    <Show when={accounts.sessions() !== undefined}>
+    <Show when={accounts.sessions() !== undefined} fallback={props.fallback}>
       <Show when={accounts.connected().length > 0} fallback={<SingleEntry {...props} />}>
         <WorkspaceEntry {...props} accounts={accounts} />
       </Show>
@@ -34,7 +36,7 @@ function MachineEntry(props: { collapsed: boolean; onOpen: () => void }) {
 }
 
 /** La cuenta del workspace abierto, si tiene sesión aquí; si no es de ninguna o no la tiene, nada. */
-function WorkspaceEntry(props: { collapsed: boolean; onOpen: () => void; accounts: DanilAccounts }) {
+function WorkspaceEntry(props: EntryProps & { accounts: DanilAccounts }) {
   const session = () => sessionForWorkspace(props.accounts.sessions(), props.accounts.of());
   const [profile, setProfile] = createSignal<AccountProfile | null>(null);
   createEffect(
@@ -46,7 +48,7 @@ function WorkspaceEntry(props: { collapsed: boolean; onOpen: () => void; account
     }),
   );
   return (
-    <Show when={session()}>
+    <Show when={session()} fallback={props.fallback}>
       {(s) => (
         <Entry
           {...props}
@@ -59,11 +61,11 @@ function WorkspaceEntry(props: { collapsed: boolean; onOpen: () => void; account
 }
 
 /** Un motor sin sesiones por cuenta, o ninguna sesión todavía. */
-function SingleEntry(props: { collapsed: boolean; onOpen: () => void }) {
+function SingleEntry(props: EntryProps) {
   const session = createDanilSession({ oneClick: false });
   const identity = createAccountIdentity(engineAccountProfile, session.status, { refresh: false });
   return (
-    <Show when={session.status()?.state === "connected"}>
+    <Show when={session.status()?.state === "connected"} fallback={props.fallback}>
       <Entry
         {...props}
         online={Boolean(session.status()?.online)}
@@ -73,7 +75,7 @@ function SingleEntry(props: { collapsed: boolean; onOpen: () => void }) {
   );
 }
 
-function WebEntry(props: { collapsed: boolean; onOpen: () => void; source: AccountProfileSource }) {
+function WebEntry(props: EntryProps & { source: AccountProfileSource }) {
   const [profile, setProfile] = createSignal<AccountProfile | null>(null);
   // Configuración avisa cuando cambia la foto: el pie no espera a recargar.
   onMount(() => {
@@ -83,7 +85,7 @@ function WebEntry(props: { collapsed: boolean; onOpen: () => void; source: Accou
     onCleanup(() => window.removeEventListener(PROFILE_CHANGED, read));
   });
   return (
-    <Show when={profile()}>
+    <Show when={profile()} fallback={props.fallback}>
       <Entry {...props} online={null} profile={profile()} />
     </Show>
   );

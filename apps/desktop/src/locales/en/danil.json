@@ -263,6 +263,7 @@
   "danil.emails.error.email_needs_support": "{email} already has invitations or data in Danil. Write to support to add it to your account.",
   "danil.emails.error.primary_email_taken": "{email} can't be your primary: another account signs in with it. Write to support.",
   "danil.emails.error.sso_user": "Your company manages your primary email.",
+  "danil.emails.error.primary_is_danil": "Your @danil.ai email is always your primary.",
   "danil.emails.error.already_verified": "That email is already on your list.",
   "danil.emails.error.invalid_email": "Enter a valid email.",
   "danil.emails.error.too_many_emails": "You reached the maximum number of emails. Remove one to add another.",

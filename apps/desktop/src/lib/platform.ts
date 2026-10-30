@@ -7,6 +7,7 @@ import type { Answer, AccountWorkspace, Computer, CredentialSource, MemorySource
 import { createRoot, createSignal, type JSX } from "solid-js";
 import type { AccountEmailsSource } from "../features/settings/account-emails";
 import type { AccountProfileSource } from "../features/settings/account-profile";
+import type { SupportAccessSource } from "../features/settings/SupportAccess";
 import type { Account } from "../features/settings/accounts-store";
 import type { AuditLogSource } from "../web/audit-log";
 import type { WorkspaceAssetsSource } from "../web/workspace-assets";
@@ -46,6 +47,8 @@ export type WebAccountsSource = {
   add: (email?: string | null) => void;
   /** Olvida una cuenta extra en este navegador. */
   remove: (userId: string) => Promise<void>;
+  /** Cierra la sesión de la cuenta abierta y vuelve a la entrada. */
+  signOut: () => void;
 };
 
 export type Capabilities = {
@@ -115,6 +118,8 @@ export type Capabilities = {
    */
   /** Las computadoras de la cuenta con la sesión de la página (la web); el escritorio usa su token de cliente. */
   accountComputers?: AccountComputersSource;
+  /** El acceso de soporte de Danil a los workspaces de Danil que la persona administra (la web alfa), en Workspaces. */
+  supportAccess?: SupportAccessSource;
   /** Varias cuentas de Danil en una ventana (la web); el escritorio no la da. */
   webAccounts?: WebAccountsSource;
   connectMachine?: {

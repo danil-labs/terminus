@@ -57,6 +57,7 @@ export const EMAIL_ERRORS = [
   "email_needs_support",
   "primary_email_taken",
   "sso_user",
+  "primary_is_danil",
   "already_verified",
   "invalid_email",
   "too_many_emails",

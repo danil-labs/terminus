@@ -1,11 +1,18 @@
-// Entrada de alfa-app.danil.ai: sirve Terminus web (TERMINUS_WEB) y, en /terminus/alpha-api,
-// una lista cerrada del BFF de appv2 (APPV2_BFF). Lecturas GET: /auth/profile, /auth/emails,
-// /api/channels y el inbox, con query acotada. Escrituras POST, solo los correos de la persona:
-// /auth/emails, /auth/emails/verify, /auth/emails/primary y /auth/emails/remove, con Origin
-// exacto, Bearer, JSON de hasta 1 KB y exactamente sus campos; un actor `ai` se rechaza aquí.
-// Al BFF solo van Authorization, Accept, Origin, Referer y un cuerpo reconstruido; nunca cookies.
+// Entrada de alfa-app.danil.ai: sirve Terminus web (TERMINUS_WEB) en la raíz, la entrada con
+// WorkOS (session.mjs) y, en /alpha-api, una lista cerrada del BFF de appv2 (APPV2_BFF).
+// Lecturas GET: /auth/profile, /auth/emails, /auth/account/support-access, /api/channels y el
+// inbox, con query acotada. Escrituras POST, solo los correos de la persona: /auth/emails,
+// /auth/emails/verify, /auth/emails/primary y /auth/emails/remove, con Origin exacto, Bearer,
+// JSON de hasta 1 KB y exactamente sus campos; un actor `ai` se rechaza aquí. Al BFF solo van
+// Authorization, Accept, Origin, Referer y un cuerpo reconstruido; nunca cookies.
+import { handleAuth } from "./session.mjs";
+
 const HOST = "alfa-app.danil.ai";
-const PREFIX = "/terminus/alpha-api";
+// La web vive en la raíz del dominio (build con `TERMINUS_WEB_BASE=/`).
+const PREFIX = "/alpha-api";
+// Donde vivía antes; sus enlaces y PWA instaladas se mandan a la raíz.
+const LEGACY = "/terminus";
+const PHONE_ROUTES = ["inbox", "inbox-thread", "inbox-detail", "personalize", "broadcasts", "channels", "attention-agents"].map(route => `/m/${route}`);
 const json = (error, status) => Response.json({ error }, {
   status,
   headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" },
@@ -67,7 +74,7 @@ async function emailBody(request, fields) {
 }
 
 function queryFor(url, kind) {
-  const fields = kind === "profile" || kind === "channels" || kind === "emails" ? {} : {
+  const fields = kind === "profile" || kind === "channels" || kind === "emails" ? {} : kind === "support" ? { account_id: [1, Number.MAX_SAFE_INTEGER] } : {
     account_id: [1, Number.MAX_SAFE_INTEGER],
     limit: [1, 100],
     ...(kind === "list" ? { offset: [0, 100_000] } : { before_id: [1, Number.MAX_SAFE_INTEGER] }),
@@ -129,9 +136,9 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.hostname !== HOST || url.protocol !== "https:") return json("not_found", 404);
-    if (url.pathname === "/terminus") {
+    if (url.pathname === LEGACY || url.pathname.startsWith(`${LEGACY}/`)) {
       if (request.method !== "GET" && request.method !== "HEAD") return json("method_not_allowed", 405);
-      url.pathname = "/terminus/";
+      url.pathname = url.pathname.slice(LEGACY.length) || "/";
       return new Response(null, { status: 308, headers: { Location: url.href, "Cache-Control": "no-store" } });
     }
     if (url.pathname === PREFIX || url.pathname.startsWith(`${PREFIX}/`)) {
@@ -142,6 +149,7 @@ export default {
         path === "/auth/emails" ? "emails" :
         path === "/api/inbox/conversations" ? "list" :
         path === "/api/channels" ? "channels" :
+        path === "/auth/account/support-access" ? "support" :
         /^\/api\/inbox\/conversations\/[1-9]\d*\/messages$/.test(path) ? "messages" : null;
       if (!kind) return json("not_found", 404);
       if (kind === "messages" && !Number.isSafeInteger(Number(path.split("/")[4]))) return json("invalid_query", 400);
@@ -159,11 +167,12 @@ export default {
       url.search = query.toString();
       return forward(env, new Request(url, { headers, redirect: "manual" }));
     }
-    if (!url.pathname.startsWith("/terminus/")) return json("not_found", 404);
+    const signIn = await handleAuth(request, env, url);
+    if (signIn) return signIn;
     if (request.method !== "GET" && request.method !== "HEAD") return json("method_not_allowed", 405);
     if (!env.TERMINUS_WEB) return json("assets_unavailable", 503);
-    if (["/terminus/m/inbox", "/terminus/m/inbox-thread", "/terminus/m/inbox-detail", "/terminus/m/personalize", "/terminus/m/broadcasts", "/terminus/m/channels", "/terminus/m/attention-agents"].includes(url.pathname)) {
-      url.pathname = "/terminus/m/";
+    if (PHONE_ROUTES.includes(url.pathname)) {
+      url.pathname = "/m/";
       return env.TERMINUS_WEB.fetch(new Request(url, request));
     }
     return env.TERMINUS_WEB.fetch(request);
