@@ -469,6 +469,8 @@ async function start(settings: WebSettings) {
       if (userId === current.user_id) window.location.assign(home());
       else await reread();
     },
+    // Sin sesión la página vuelve sola a la entrada (`ended`); con WorkOS cierra también la de AuthKit.
+    signOut: () => void session.signOut?.().catch(() => leave()),
   };
   const session = current.slot === null ? primary : clientFor(current.slot);
 

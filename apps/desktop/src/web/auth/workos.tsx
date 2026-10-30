@@ -22,6 +22,7 @@ export function WorkosAuthPage(props: { base: string; next: string; error: strin
     window.location.assign(url.href);
   };
   onMount(() => {
+    document.title = "Danil";
     window.history.replaceState(null, "", `${props.base}auth?next=${encodeURIComponent(props.next)}`);
     void (async () => {
       try {
@@ -36,10 +37,10 @@ export function WorkosAuthPage(props: { base: string; next: string; error: strin
   return (
     <main class="flex h-full flex-col items-center overflow-y-auto bg-bg px-6 py-10 text-neutral-950" data-web-auth="workos" aria-busy={busy()}>
       <div class="grid w-full max-w-sm gap-6">
-        <h1 class="m-0 text-3xl font-display font-bold tracking-[-0.03em]">Terminus</h1>
+        <h1 class="m-0 text-3xl font-display font-bold tracking-[-0.03em]">Danil</h1>
         <div class="grid gap-2">
           <h2 class="m-0 text-xl font-semibold">{t("web.auth.signin_title")}</h2>
-          <p class="m-0 text-sm text-neutral-500" role="status">{t("web.auth.identity_hint")}</p>
+          <p class="m-0 text-sm text-neutral-500" role="status">{t("web.auth.workos_hint")}</p>
         </div>
         <Button class="min-h-11" disabled={busy()} onClick={go}>{t("web.auth.workos_email")}</Button>
         <p class="m-0 text-sm text-neutral-500">{t("web.auth.workos_password_hint")}</p>

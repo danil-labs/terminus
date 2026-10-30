@@ -23,6 +23,7 @@ const until = async (check, ms = 4000) => {
 test("the column lists other accounts' workspaces and opens them with their account", async () => {
   const opened = [];
   const added = [];
+  let signedOut = 0;
   const own = globalThis.fetch;
   globalThis.fetch = async () => new Response("{}", { status: 404 });
   try {
@@ -57,6 +58,7 @@ test("the column lists other accounts' workspaces and opens them with their acco
             open: (id) => opened.push(id),
             add: (email) => added.push(email ?? null),
             remove: async () => undefined,
+            signOut: () => signedOut++,
           },
         };
       },
@@ -79,6 +81,11 @@ test("the column lists other accounts' workspaces and opens them with their acco
     assert.deepEqual(opened, ["f2"], "an expired account does not open");
     assert.deepEqual(added, ["alberto@ytw.mx"], "it asks to sign in again with that email");
     assert.equal(doc.querySelector("[data-add-account]"), null, "workspace creation is the only add action");
+
+    doc.querySelector("[data-profile-menu] button").click();
+    assert.ok(await until(() => doc.querySelector("[data-sign-out]")), "the profile menu offers signing out in the browser");
+    doc.querySelector("[data-sign-out]").click();
+    assert.equal(signedOut, 1, "it signs the open account out");
   } finally {
     globalThis.fetch = own;
   }

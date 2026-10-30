@@ -193,6 +193,7 @@
   "web.auth.unconfigured": "Sign-in is not configured in this build. Contact Danil support.",
   "web.auth.active_account": "Danil account: {email}",
   "web.auth.change_account": "Switch account",
+  "web.auth.workos_hint": "Sign in with your Danil account.",
   "web.auth.workos_email": "Continue with your email",
   "web.auth.workos_password_hint": "You can sign in with a code we email you. If your Danil password does not work here, use the code or reset it.",
   "web.auth.email_not_verified": "That email is not verified. Verify it in the previous step or sign in with Google or Microsoft.",

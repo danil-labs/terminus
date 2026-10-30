@@ -1,5 +1,6 @@
 import Bug from "lucide-solid/icons/bug";
 import ChevronRight from "lucide-solid/icons/chevron-right";
+import LogOut from "lucide-solid/icons/log-out";
 import UserRound from "lucide-solid/icons/user-round";
 import { createSignal, For, lazy, Show, Suspense } from "solid-js";
 import { t } from "../../lib/i18n";
@@ -30,7 +31,7 @@ const SEGMENTO = "flex min-w-0 gap-0.5 rounded-md bg-surface-muted p-0.5";
 const OPCION = "h-6 min-w-0 flex-1 truncate rounded-sm px-2 text-xs text-neutral-500 outline-none hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary";
 const ELEGIDA = "bg-surface-raised font-semibold text-neutral-950 shadow-sm";
 
-/** El avatar al pie de la columna: la cuenta, el tema, mantener despierta y reportar un bug. */
+/** El avatar al pie de la columna: la cuenta, el tema, mantener despierta, reportar un bug y, en la web, cerrar sesión. */
 export default function ProfileMenu(props: {
   onAccount: () => void;
   onReportarBug: () => void;
@@ -138,6 +139,17 @@ export default function ProfileMenu(props: {
         >
           {t("usage.bug_report.open_web")}
         </button>
+        <Show when={capabilities().webAccounts}>
+          {(cuentas) => (
+            <>
+              <div class="my-1 h-px bg-border" />
+              <button type="button" class={cn(ITEM_DE_MENU, "flex items-center gap-2")} data-sign-out="" onClick={() => { setOpen(false); cuentas().signOut(); }}>
+                <LogOut size={14} aria-hidden="true" class="shrink-0 text-neutral-500" />
+                <span class="min-w-0 flex-1 truncate">{t("danil.account.sign_out")}</span>
+              </button>
+            </>
+          )}
+        </Show>
       </PopoverContent>
     </Popover>
   );
