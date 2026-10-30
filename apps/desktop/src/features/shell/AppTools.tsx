@@ -21,6 +21,8 @@ export default function AppTools(props: {
   trabajando: string[];
   conPestana: string[];
   onAbrirTarea: (project: string, session: string) => void;
+  /** El título y la carpeta de una tarea, para la pestaña Memoria de «Máquinas». */
+  lookup?: (session: string) => { title: string; project?: string } | undefined;
 }) {
   const [observability, setObservability] = createSignal(false);
 
@@ -62,6 +64,7 @@ export default function AppTools(props: {
         trabajando={props.trabajando}
         conPestana={props.conPestana}
         onAbrirTarea={props.onAbrirTarea}
+        lookup={props.lookup}
       />
     </div>
   );

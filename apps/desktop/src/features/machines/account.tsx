@@ -95,6 +95,7 @@ const infoOf = (c: Computer): MachineInfo => {
     wakes: wakes(c),
     linked: linkedWorkspaces(c),
     features: serviceFeatures(c),
+    ...(c.host_version ? { version: c.host_version } : {}),
     ...(os ? { os } : {}),
   };
 };
@@ -116,6 +117,7 @@ export function startAccountMachines(target: Target = window) {
   let homeWakes = false;
   let homeOs: SystemId = windowSystem();
   let homeFeatures: string[] = [];
+  let homeVersion: string | null = null;
   /** The session the fan-out talks as: the open workspace's account; `null` is the default one. */
   let account: string | null = null;
 
@@ -188,7 +190,7 @@ export function startAccountMachines(target: Target = window) {
       onSlices: slicesChanged,
       deliver,
       pickedFor,
-      home: () => ({ wakes: homeWakes, os: homeOs, features: homeFeatures }),
+      home: () => ({ wakes: homeWakes, os: homeOs, features: homeFeatures, version: homeVersion }),
     });
     fleet.setMachines(others.map(infoOf));
     fleet.subscribeEvents();
@@ -335,6 +337,7 @@ export function startAccountMachines(target: Target = window) {
     homeWakes = mine ? wakes(mine) : false;
     homeOs = systemOf(mine?.os) ?? windowSystem();
     homeFeatures = mine ? serviceFeatures(mine) : [];
+    homeVersion = mine?.host_version ?? null;
     const others = orderComputers(answer.value.filter((c) => c.computer_id !== self));
     const key = JSON.stringify([self, account, client.endpoint]);
 
