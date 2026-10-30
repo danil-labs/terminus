@@ -2,7 +2,7 @@
   "attention.inbox": "Inbox",
   "attention.inbox_description": "Read-only external conversations; choose an operational account separately.",
   "attention.broadcasts": "Broadcasts",
-  "attention.broadcasts_description": "Synthetic prototype with no sending or real campaigns.",
+  "attention.broadcasts_description": "Create, launch and follow WhatsApp broadcasts.",
   "attention.agents": "Customer service agents",
   "attention.agents_description": "Opens agents and their profiles in Settings.",
   "attention.channels": "Channels",
