@@ -486,6 +486,12 @@ const steps = [
     root,
   ],
   [
+    "Máquinas lee presión, memoria y versión, y un host anterior queda en «Solo disco»",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/machine-usage.test.ts")],
+    root,
+  ],
+  [
     "La capa de un sitio se enseña cuando toca",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/sites.test.ts")],
