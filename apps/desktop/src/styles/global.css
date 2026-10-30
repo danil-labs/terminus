@@ -285,9 +285,11 @@
   /* Un giro que se lee continuo con 20 repintados por segundo: el de compilar de Typst. */
   --animate-spin-fluido: spin 1s steps(20) infinite;
   /* El estado de la tarjeta del riel: el arco de «trabajando» y el anillo
-     punteado de la que el motor aún registra, que gira despacio. */
-  --animate-riel-giro: spin 0.9s steps(12) infinite;
-  --animate-riel-giro-lento: spin 2.4s steps(24) infinite;
+     punteado de la que el motor aún registra, que gira despacio. Pasos de
+     1/12 s, como los astros, y anclados al reloj común (`lib/sharedClock.ts`):
+     todos cambian en el mismo cuadro. */
+  --animate-riel-giro: spin 1s steps(12) infinite;
+  --animate-riel-giro-lento: spin 2.5s steps(30) infinite;
   /* El trazo que corre hacia el centro del mapa mientras se conecta una IA. */
   --animate-flujo: flujo 0.8s steps(8) infinite;
   /* La línea de una descarga que no reporta cuánto lleva. */
@@ -954,7 +956,7 @@
 [data-astro-status="asleep"] .astro-particula { display: none; }
 
 /* Todo lo que se mueve en un astro cambia en múltiplos de 1/12 s y se ancla a
-   `startTime = 0` (`AstroAvatar.tsx`): la ventana repinta a 12 cuadros por
+   `startTime = 0` (`lib/sharedClock.ts`): la ventana repinta a 12 cuadros por
    segundo, con un avatar o con cuarenta. Cada tramo dura un número entero de
    doceavos y lleva tantos pasos como doceavos dura. */
 @media (prefers-reduced-motion: no-preference) {
