@@ -66,7 +66,7 @@ export default function Tasks() {
     folderOf: (row) => row.task.folder,
     machineOf: (row) => row.task.host,
   });
-  // Git de las tarjetas en pantalla, también para las señales de la vista compacta.
+  // Git de las tarjetas en pantalla.
   const git = useTaskGit(hostOf, groups.flatMap((group) => group.tasks.map(({ task }) => task)));
   const groupFolderName = (id: string) => snapshot?.folders.find((f) => f.id === id)?.name ?? id;
   const machineName = (id: string) => hosts.find((h) => h.id === id)?.label ?? id;
@@ -179,7 +179,6 @@ export default function Tasks() {
                 card={cardOf(task, marks, effective.group === "folder")}
                 git={effectiveGit(git, task, snapshot?.tasks ?? [])}
                 folderName={folderName}
-                density={effective.density}
                 onPress={() => openTask(task.host, task.workspace, task.folder, task.id)}
                 onLongPress={() => openPreview(task.host, task.id)}
                 onFinish={() => openPreview(task.host, task.id, "finish")}

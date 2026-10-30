@@ -1,4 +1,4 @@
-import { DEFAULT_SIDEBAR_VIEW, DENSITIES, GROUPINGS, type SidebarView, agentOptions, folderCounts, groupingLabel, sameAgent } from "@terminus/tasks";
+import { DEFAULT_SIDEBAR_VIEW, GROUPINGS, type SidebarView, agentOptions, folderCounts, groupingLabel, sameAgent } from "@terminus/tasks";
 import type { ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AgentAvatar } from "../ui/AgentAvatar";
@@ -94,14 +94,6 @@ export default function Filter() {
       {GROUPINGS.filter((g) => g !== "machine" || view.group === g || tasks.some((task) => !!task.machine)).map((g) => (
         <Option key={g} testID={`filter-group-${g}`} on={view.group === g} onPress={() => set({ group: g })} aside={g === DEFAULT_SIDEBAR_VIEW.group ? w("shell.sidebar.view.default") : undefined}>
           {text(groupingLabel(lang, g))}
-        </Option>
-      ))}
-
-      <View style={[styles.rule, { backgroundColor: theme.border }]} />
-      <Title>{w("shell.sidebar.view.density")}</Title>
-      {DENSITIES.map((d) => (
-        <Option key={d} testID={`filter-density-${d}`} on={view.density === d} onPress={() => set({ density: d })}>
-          {text(d === "compact" ? w("shell.sidebar.view.density_compact") : w("shell.sidebar.view.density_comfortable"))}
         </Option>
       ))}
     </ScrollView>

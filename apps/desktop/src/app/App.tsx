@@ -76,12 +76,16 @@ import {
   tramoGuardado,
   transcripcion,
 } from "../features/chat/transcript";
-import VisorDeArchivo from "../features/code/FileViewer";
+const VisorDeArchivo = lazy(() => import("../features/code/FileViewer"));
 import { avisarDeLosArboles } from "../features/code/refresh";
 import CambiosDelTurno from "../features/code/TurnChanges";
 import { arbolesDe, contiene, ubicar } from "../features/code/treeKind";
 import type { Tipo } from "../features/code/FileTree";
-import ColumnaDeTrabajo from "../features/code/WorkTreeColumn";
+const ColumnaDeTrabajo = lazy(() => import("../features/code/WorkTreeColumn"));
+import TaskFilesRow, { taskFilesWidth } from "../features/code/TaskFilesRow";
+import { moviendoHueco } from "../lib/sites";
+const TaskFilesCard = lazy(() => import("../features/code/TaskFiles"));
+import { createTaskFiles } from "../lib/taskFiles";
 import { esDeCodigo } from "../features/code/workdirKind";
 import Observability from "../features/observability/Observability";
 import AnadirCarpeta, { type ClonEnCurso, type InicioDeCarpeta } from "../features/projects/AddWorkdir";
@@ -214,6 +218,7 @@ import {
   destinoDePestana,
   type NavegacionDePestanas,
   navegacionDePestanas,
+  textoDeAtajo,
   ventanaVecina,
 } from "../lib/shortcuts";
 import { alHilo, comandosConAlMargen, preguntaAlMargen } from "../lib/side-question";
@@ -474,6 +479,9 @@ export default function App() {
   // tarea, uno de sus archivos y uno de sus artefactos pueden estar
   // abiertos a la vez y los tres dirían "activo" si se derivara de ahí.
   const pestanas = createTabs({ transient: true });
+  const archivosDeTarea = createTaskFiles();
+  const [anchoDeArchivos, setAnchoDeArchivos] = createPref("taskFiles.width", 0.55);
+  const [anchoDelArbol, setAnchoDelArbol] = createPref("taskFiles.treeWidth", 330);
   const pestanaActiva = () => (proyectoAbierto() ? null : pestanas.active());
   // Los escritorios del workspace (`lib/spaces.ts`). Sin lista —un servicio
   // que no los conoce— la ventana se pinta como antes de los espacios.
@@ -1686,7 +1694,7 @@ export default function App() {
   // la previsualización de la carpeta de trabajo antes de empezarla. Es la
   // regla que deshabilita el conmutador, y la que impide que un estado
   // recordado abra una columna vacía.
-  const columnaConContenido = () => !paginaDeAgente() && Boolean(sessionId() || carpetaDelProyecto());
+  const columnaConContenido = () => !paginaDeAgente() && (agenteSenalado() || (!sessionId() && Boolean(carpetaDelProyecto())));
   // Abierta o cerrada es preferencia de esta máquina, igual que el historial
   // (`lib/prefs.ts`). Sin recordarla, cada tarea nueva y cada cambio de
   // proyecto reabrían la columna que se acababa de cerrar. La llave nombra la
@@ -1702,6 +1710,8 @@ export default function App() {
   const artOpen = () =>
     columnaConContenido() && (arbolQuerido() ?? arbolDePartida());
   const alternarElArbol = () => {
+    const id = sessionId();
+    if (id && !agenteSenalado()) { archivosDeTarea.toggle(id); return; }
     if (artOpen()) setArtOpen(false);
     else if (columnaConContenido()) setArtOpen(true);
   };
@@ -3264,11 +3274,13 @@ export default function App() {
       const current = p.revision === undefined
         ? (await pendientesDe(p.session, workspace))?.permissions.find((x) => (x.request_id === p.requestId || x.id === p.requestId))
         : { revision: p.revision, id: p.durableId };
-      if (!current || current.revision === undefined) throw new Error(t("shell.turn.permission_no_reply"));
+      // Un motor anterior a los pendientes durables los lista sin `id` ni
+      // `revision` y contesta por `request_id`; exigir la revisión dejaba el
+      // gate sin forma de aprobarse. El motor nuevo acepta la misma forma.
       const guardado = await invoke<Turn>("respond_permission", {
         session: p.session,
-        requestId: current.id ?? p.requestId,
-        revision: current.revision,
+        requestId: current?.id ?? p.requestId,
+        revision: current?.revision,
         allow,
       }, opcionesDeLaTarea(p.session, workspace));
       // El `permission_resolved` de esta misma decisión puede haber llegado
@@ -5248,6 +5260,8 @@ export default function App() {
    * abra.
    */
   function abrirArchivo(arbol: string, ruta: string, cambiado: boolean) {
+    const tarea = sessionId();
+    if (tarea) { archivosDeTarea.open(tarea, { tree: arbol, path: ruta, changes: cambiado }); return; }
     const proyecto = project();
     const id = sessionId() ?? "";
     if (!proyecto && !id) return;
@@ -5264,10 +5278,12 @@ export default function App() {
   }
 
   function archivoMovido(session: string, arbol: string, desde: string, hasta: string) {
+    archivosDeTarea.renamed(session, arbol, desde, hasta);
     paneles.renameTabs(pestanas.renameFiles(session, arbol, desde, hasta));
   }
 
   function archivoBorrado(session: string, arbol: string, ruta: string) {
+    archivosDeTarea.removed(session, arbol, ruta);
     const fuera = pestanas
       .open()
       .filter(
@@ -5998,8 +6014,9 @@ export default function App() {
 
   type Pendientes = {
     records?: { permissions: { id: string; request_id: string; state: string; [key: string]: unknown }[] };
-    questions: { id: string; request_id: string; revision: number; turn: string }[];
-    permissions: { id: string; request_id: string; revision: number; tool: string; target: string | null }[];
+    // `id` y `revision` faltan en un motor anterior a los pendientes durables.
+    questions: { id?: string; request_id: string; revision?: number; turn: string }[];
+    permissions: { id?: string; request_id: string; revision?: number; tool: string; target: string | null }[];
   };
   /** Lo que esa tarea tiene esperando. No lanza: sin respuesta, no hay nada. */
   const pendientesDe = (session: string, workspace = workspaceActivo()) =>
@@ -6102,7 +6119,7 @@ export default function App() {
         if (!pending) throw new Error(t("shell.answer.question_missing"));
         const guardado = await invoke<Turn>("answer_question", {
           session: sid,
-          requestId: pending.id,
+          requestId: pending.id ?? pending.request_id,
           revision: pending.revision,
           respuestas: manda,
         }, opcionesDeLaTarea(questionSession, questionWorkspace));
@@ -6957,7 +6974,17 @@ export default function App() {
     <Show
       when={viewingProfile() && declared()}
       fallback={
+    <TaskFilesRow
+      open={!!pp.sesion && archivosDeTarea.panel(pp.sesion).open}
+      covers={!!pp.sesion && (archivosDeTarea.panel(pp.sesion).expanded || paneles.isSplit() || compacta())}
+      hasTabs={!!pp.sesion && archivosDeTarea.panel(pp.sesion).tabs.length > 0}
+      width={anchoDeArchivos()}
+      treeWidth={anchoDelArbol()}
+      onWidth={setAnchoDeArchivos}
+      onTreeWidth={setAnchoDelArbol}
+      chat={
     <Chat
+        besideFiles={!!pp.sesion && archivosDeTarea.panel(pp.sesion).open}
         onSearchReady={target => {
           if (!pp.sesion) return;
           setThreadSearchTargets(previous => {
@@ -7026,7 +7053,7 @@ export default function App() {
             onScreen={abrirPantalla}
             onFiles={() => {
               const folder = proyectoDeLaCelda()?.id;
-              if (folder) void abrirSesion(folder, id()).then(() => setArtOpen(true));
+              if (folder) void abrirSesion(folder, id()).then(() => archivosDeTarea.setOpen(id(), true));
             }}
             project={proyectoDeLaCelda()?.name}
             path={estadoDelTrabajo()?.path || undefined}
@@ -7290,6 +7317,7 @@ export default function App() {
             : null,
         }}
         />
+      } />
       }
     >
       {(e) => (
@@ -7537,7 +7565,7 @@ export default function App() {
         {/* Solo con la columna cerrada: abierta, su conmutador vive en la
             cabecera del panel derecho (`features/shell/RightPanelHeader.tsx`). */}
         <div ref={controlesDerechos} class="relative z-40 ml-auto flex shrink-0 items-center gap-3">
-        <Show when={!artOpen() && !paginaDeAgente()}>
+        <Show when={!artOpen() && !paginaDeAgente() && columnaConContenido()}>
           <BotonConAtajo
             variant="ghost"
             size="icon"
@@ -7592,19 +7620,24 @@ export default function App() {
         const task = () => pestanas.open().find(p => p.id === paneles.activeTabAt(site()) && p.clase === "tarea");
         const target = () => threadSearchTargets().get(task()?.session ?? "");
         return <Show when={Boolean(task()) && !tapadoPorElProyecto(site())}>
-          <div class="z-20 min-w-0 max-w-full self-start justify-self-end px-4 py-1" style={estiloDeLaCelda(site())}
+          <div class="z-20 min-w-0 max-w-full self-start justify-self-end px-2 pt-1" style={estiloDeLaCelda(site())}
             classList={{ "mt-8": llevaTiraInterior(site()) }} onPointerDown={() => mandarVentana(site())}>
             <ThreadSearch conversation={task()?.session ?? ""} active={sameSite(site(), paneles.activeSite()) && settings() === null && alta() === null}
               messages={target()?.messages() ?? []} thread={() => target()?.thread()}
               onJump={block => target()?.jump(block)}
-              leadingTools={<Button variant="chrome" size="iconCompact" class="size-7 text-neutral-500"
+              leadingTools={<>
+                <Button variant={archivosDeTarea.panel(task()?.session ?? "").open ? "secondary" : "chrome"} size="iconCompact" class="size-6 text-neutral-500"
+                  title={t("code.panel.toggle.hint", { key: textoDeAtajo("workTree") })} aria-label={t("code.panel.toggle")}
+                  aria-pressed={archivosDeTarea.panel(task()?.session ?? "").open}
+                  onClick={() => { const id = task()?.session; if (id) archivosDeTarea.toggle(id); }}><FolderOpen size={13} /></Button>
+                <Button variant="chrome" size="iconCompact" class="size-6 text-neutral-500"
                 disabled={!paneles.isSplit() && !puedeSepararseDe(site())}
                 title={paneles.isSplit() ? t("chat.search.join") : t("chat.search.split_hint", { key: atajoDePartir(false) })}
                 aria-label={paneles.isSplit() ? t("chat.search.join") : t("chat.search.split")}
                 onClick={() => {
                   if (paneles.isSplit()) { mandarVentana(site()); juntarLaActiva(); }
                   else partirVentana(site());
-                }}><Columns2 size={14} /></Button>}
+                }}><Columns2 size={13} /></Button></>}
               tools={<Show keyed when={delegatedToolbarTargets().get(`${workspaceActivo()}/${task()?.session ?? ""}`)}>{render => render()}</Show>} />
           </div>
         </Show>;
@@ -7788,6 +7821,37 @@ export default function App() {
         }}
       </For>
 
+      {/* The files card of each open task: a sibling of its chat, kept mounted while the chat is not. */}
+      <For each={tareasEnVentanas()}>
+        {(p) => {
+          const sitio = () => paneles.siteOf(p.id);
+          const celda = () => celdaDe(p.id);
+          const placement = createMemo<ReturnType<typeof celda>>(previous => celda() ?? previous);
+          const panel = () => archivosDeTarea.panel(p.session);
+          const [usado, setUsado] = createSignal(false);
+          createEffect(() => { if (panel().open) setUsado(true); });
+          const cubre = () => panel().expanded || paneles.isSplit() || compacta();
+          const visible = () => panel().open && celda() !== undefined && !tapadoPorElProyecto(sitio());
+          const ancho = () => (cubre() ? undefined : taskFilesWidth(panel().tabs.length > 0, anchoDeArchivos(), anchoDelArbol()));
+          return (
+            <Show when={usado()}>
+              <div class="z-10 flex min-h-0 min-w-0 justify-self-end pt-9 pr-2 pb-2"
+                classList={{ hidden: !visible(), "w-full pl-2": cubre(), "mt-8": llevaTiraInterior(sitio()), "transition-[width] duration-200 ease-out": !moviendoHueco() }}
+                style={{ ...placement(), width: ancho() }}
+                onPointerDown={() => { const d = sitio(); if (d) mandarVentana(d); }}>
+                <Suspense fallback={null}>
+                  <TaskFilesCard project={p.project} session={p.session} files={archivosDeTarea}
+                    visible={visible()}
+                    expandedOnly={paneles.isSplit() || compacta()}
+                    onSaved={() => window.dispatchEvent(new CustomEvent("harness:copia"))}
+                    onMoved={archivoMovido} onRemoved={archivoBorrado} />
+                </Suspense>
+              </div>
+            </Show>
+          );
+        }}
+      </For>
+
       {/* Toda ventana enseña algo: su pestaña de delante, o la conversación
           en blanco. La vista de proyecto ocupa la activa; una ventana sin
           pestaña delante pinta el blanco en su propia celda. */}
@@ -7941,7 +8005,7 @@ export default function App() {
                       }
                     >
                       {(a) => (
-                        <VisorDeArchivo
+                        <Suspense fallback={null}><VisorDeArchivo
                           project={a().project}
                           session={a().session}
                           base={a().base}
@@ -7973,7 +8037,7 @@ export default function App() {
                               new CustomEvent("harness:copia"),
                             );
                           }}
-                        />
+                        /></Suspense>
                       )}
                     </Match>
                     <Match
@@ -8004,7 +8068,7 @@ export default function App() {
                           when={a().codigo}
                           fallback={<VisorDeArtefacto path={a().path} rel={a().rel} kind={a().kind} />}
                         >
-                          <VisorDeArchivo
+                          <Suspense fallback={null}><VisorDeArchivo
                             project={a().project}
                             session={a().session}
                             arbol=""
@@ -8015,7 +8079,7 @@ export default function App() {
                             onSucio={() => {}}
                             onGuardador={() => {}}
                             onGuardado={() => {}}
-                          />
+                          /></Suspense>
                         </Show>
                       )}
                     </Match>
@@ -8417,7 +8481,7 @@ export default function App() {
             max={560}
             etiqueta={t("shell.column.work_tree_width")}
           >
-            <Show when={agenteSenalado()} fallback={<ColumnaDeTrabajo
+            <Show when={agenteSenalado()} fallback={<Suspense fallback={null}><ColumnaDeTrabajo
               folderActions={
                 <>
                   <Button
@@ -8457,7 +8521,7 @@ export default function App() {
               onArchivoMovido={archivoMovido}
               onArchivoBorrado={archivoBorrado}
               onClose={() => setArtOpen(false)}
-            />}>
+            /></Suspense>}>
               {owner => {
                 const folderOf = (id: string) => Object.entries(sesionesConEstado()).find(([, rows]) => rows.some(row => row.id === id))?.[0] ?? owner().project;
                 return <AgentTasks

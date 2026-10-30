@@ -1,6 +1,5 @@
 /**
- * La lista plana de tareas y su único filtro: carpetas, agente, agrupar y
- * densidad. Es la vista del sidebar del escritorio (#151) y la de la lista del
+ * La lista plana de tareas y su único filtro: carpetas, agente y agrupar. Es la vista del sidebar del escritorio (#151) y la de la lista del
  * teléfono; las palabras de cada opción viven en `SIDEBAR_LABELS` de
  * `@terminus/design` (el escritorio las lee de `shell.sidebar.view.*`).
  */
@@ -11,22 +10,18 @@ export type SidebarView = {
   folders: string[];
   agent: string | null;
   group: SidebarGrouping;
-  density: SidebarDensity;
 };
 
 export type SidebarGrouping = "none" | "folder" | "status" | "agent" | "machine";
-export type SidebarDensity = "comfortable" | "compact";
 export type SidebarSection = "active";
 
 export const DEFAULT_SIDEBAR_VIEW: SidebarView = {
   folders: [],
   agent: null,
   group: "folder",
-  density: "comfortable",
 };
 
 export const GROUPINGS: readonly SidebarGrouping[] = ["none", "folder", "status", "agent", "machine"];
-export const DENSITIES: readonly SidebarDensity[] = ["comfortable", "compact"];
 
 /** Lo que la lista sabe de una fila (`SessionRow`) y basta para colocarla. */
 export type SidebarTask = {
@@ -40,7 +35,7 @@ export type SidebarTask = {
   inbox?: boolean;
   archived?: boolean | null;
   esperando: boolean;
-  outcome?: "delivered" | "failed" | null;
+  outcome?: "delivered" | "failed" | "interrupted" | null;
   sin_ver?: boolean;
   stage?: "in_progress" | "review" | "done" | null;
   delegated_activity?: TaskActivity;
@@ -114,7 +109,6 @@ export function sanitizeSidebarView(raw: unknown): SidebarView {
     folders,
     agent: typeof v.agent === "string" && v.agent !== "" ? v.agent : null,
     group: GROUPINGS.includes(v.group as SidebarGrouping) ? (v.group as SidebarGrouping) : DEFAULT_SIDEBAR_VIEW.group,
-    density: DENSITIES.includes(v.density as SidebarDensity) ? (v.density as SidebarDensity) : "comfortable",
   };
 }
 
@@ -223,6 +217,5 @@ export function groupKey(group: Pick<SidebarGroup<unknown>, "kind" | "key" | "ma
 export function nonDefaultCount(view: SidebarView): number {
   return Number(view.folders.length > 0)
     + Number(view.agent !== null)
-    + Number(view.group !== DEFAULT_SIDEBAR_VIEW.group)
-    + Number(view.density !== DEFAULT_SIDEBAR_VIEW.density);
+    + Number(view.group !== DEFAULT_SIDEBAR_VIEW.group);
 }

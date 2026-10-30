@@ -13,7 +13,6 @@ import { escribirPref, leerPref } from "./prefs.ts";
 export {
   type AgentOption,
   type SidebarContext,
-  type SidebarDensity,
   type SidebarGroup,
   type SidebarGrouping,
   type SidebarSection,
@@ -76,6 +75,7 @@ export function statusGroupLabel(key: SidebarStatusKey): string {
     case "asked": return t("shell.sidebar.view.status_asked");
     case "working": return t("shell.sidebar.view.status_working");
     case "failed": return t("shell.sidebar.view.status_failed");
+    case "interrupted": return t("shell.sidebar.view.status_interrupted");
     case "unseen": return t("shell.sidebar.view.status_unseen");
     case "finished": return t("shell.sidebar.view.status_finished");
     default: return t("shell.sidebar.view.status_idle");
