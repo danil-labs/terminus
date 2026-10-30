@@ -267,3 +267,106 @@ test("WorkOS sign-in routes stay in the Worker; the sign-in page is an asset", a
   assert.equal(await (await h.fetch("/auth?next=%2Finbox")).text(), "assets");
   assert.equal(h.calls.length, 1);
 });
+
+const replyBody = { conversation_id: 12, text: ' hola ', client_message_id: 'ea6db9df-1c8c-4b53-9b36-0d60575ef400' };
+const replyHeaders = { ...auth, Origin: origin, 'Content-Type': 'application/json' };
+test('reply is an exact JSON write preserving user identity and target, stripping ambient authority', async () => {
+  const h = harness();
+  const response = await h.fetch(prefix + '/api/messaging/reply', { method: 'POST', headers: { ...replyHeaders, Cookie: 'admin=true', 'X-Account-Id': '9' }, body: JSON.stringify(replyBody) });
+  assert.equal(response.status, 200);
+  assert.equal(h.calls.length, 1);
+  const upstream = h.calls[0];
+  assert.equal(upstream.url, origin + '/api/messaging/reply');
+  assert.equal(upstream.headers.get('Authorization'), auth.Authorization);
+  assert.equal(upstream.headers.get('Cookie'), null);
+  assert.equal(upstream.headers.get('X-Account-Id'), null);
+  assert.deepEqual(await upstream.json(), { ...replyBody, text: 'hola' });
+});
+test('reply rejects CSRF, AI identity, extra fields, malformed targets and non JSON before BFF', async () => {
+  const h = harness();
+  const options = { method: 'POST', headers: replyHeaders, body: JSON.stringify(replyBody) };
+  for (const headers of [{ ...replyHeaders, Origin: 'https://evil.example' }, { ...replyHeaders, Origin: '' }, { ...replyHeaders, 'X-Danil-Actor': ' AI ' }]) {
+    assert.equal((await h.fetch(prefix + '/api/messaging/reply', { ...options, headers })).status, 403);
+  }
+  for (const body of [{ ...replyBody, account_id: 9 }, { ...replyBody, conversation_id: 0 }, { ...replyBody, conversation_id: 9007199254740992 }, { ...replyBody, text: '  ' }, { ...replyBody, text: 'x'.repeat(4097) }, { ...replyBody, client_message_id: 'anything' }, []]) {
+    assert.equal((await h.fetch(prefix + '/api/messaging/reply', { ...options, body: JSON.stringify(body) })).status, 400);
+  }
+  assert.equal((await h.fetch(prefix + '/api/messaging/reply?account_id=7', options)).status, 400);
+  assert.equal((await h.fetch(prefix + '/api/messaging/reply', { ...options, headers: { ...replyHeaders, 'Content-Type': 'application/json-evil' } })).status, 400);
+  const stream = new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode(' '.repeat(20 * 1024 + 1))); controller.close(); } });
+  assert.equal((await h.fetch(prefix + '/api/messaging/reply', { ...options, body: stream, duplex: 'half' })).status, 400);
+  assert.equal(h.calls.length, 0);
+});
+test('effective permissions are account scoped and server write denials remain denials', async () => {
+  const h = harness();
+  assert.equal((await h.fetch(prefix + '/auth/account/my-permissions?account_id=7', { headers: auth })).status, 200);
+  for (const query of ['', 'account_id=0', 'account_id=7&limit=30', 'account_id=7&account_id=8']) assert.equal((await h.fetch(prefix + '/auth/account/my-permissions?' + query, { headers: auth })).status, 400);
+  for (const status of [401, 402, 403, 404, 503]) {
+    h.env.APPV2_BFF.fetch = async () => Response.json({ error: 'forbidden_read_only' }, { status });
+    assert.equal((await h.fetch(prefix + '/api/messaging/reply', { method: 'POST', headers: replyHeaders, body: JSON.stringify(replyBody) })).status, status);
+  }
+});
+
+const marketingToken = account => `Bearer header.${Buffer.from(JSON.stringify({ active_account_id: account })).toString('base64url')}.signature`;
+const marketingHeaders = { Authorization: marketingToken(7), Origin: origin, 'Content-Type': 'application/json' };
+function marketingHarness() {
+  const h = harness();
+  h.env.APPV2_BFF.fetch = async request => {
+    h.calls.push(request);
+    return Response.json(new URL(request.url).pathname === '/auth/account/my-permissions' ? { role: 'custom', permissions: ['campaigns.manage'], scoped: [] } : { id: 4, status: 'draft' });
+  };
+  return h;
+}
+test('marketing reads are exact and account query must match the same Bearer claim', async () => {
+  const h = marketingHarness();
+  for (const path of ['/api/marketing/campaigns?account_id=7', '/api/marketing/templates?status=APPROVED&account_id=7', '/api/marketing/templates/2/channels?account_id=7', '/api/marketing/campaigns/4/stats?account_id=7', '/api/contacts?account_id=7']) {
+    assert.equal((await h.fetch(prefix + path, { headers: marketingHeaders })).status, 200);
+  }
+  const before = h.calls.length;
+  for (const path of ['/api/marketing/campaigns?account_id=8', '/api/contacts?account_id=8']) assert.equal((await h.fetch(prefix + path, { headers: marketingHeaders })).status, 403);
+  for (const query of ['', 'account_id=7&limit=1000', 'account_id=7&account_id=7', 'account_id=9007199254740992']) assert.equal((await h.fetch(prefix + '/api/marketing/campaigns?' + query, { headers: marketingHeaders })).status, 400);
+  assert.equal((await h.fetch(prefix + '/api/marketing/campaigns?account_id=7', { headers: auth })).status, 403);
+  assert.equal(h.calls.length, before);
+});
+test('marketing create and safety stops check effective permission on every write before BFF authority', async () => {
+  const h = marketingHarness();
+  const create = { method: 'POST', headers: { ...marketingHeaders, Cookie: 'admin=true', 'X-Account-Id': '9' }, body: JSON.stringify({ name: ' Draft ', template_id: 2, channel_id: 3, variable_mapping: { first_name: 'Persona' } }) };
+  assert.equal((await h.fetch(prefix + '/api/marketing/campaigns?account_id=7', create)).status, 200);
+  assert.equal(h.calls.length, 2);
+  assert.match(h.calls[0].url, /my-permissions\?account_id=7$/);
+  const upstream = h.calls[1];
+  assert.equal(upstream.headers.get('Authorization'), marketingHeaders.Authorization);
+  assert.equal(upstream.headers.get('Cookie'), null);
+  assert.equal(upstream.headers.get('X-Account-Id'), null);
+  assert.equal((await upstream.json()).name, 'Draft');
+  for (const action of ['pause', 'cancel']) assert.equal((await h.fetch(prefix + `/api/marketing/campaigns/4/${action}?account_id=7`, { method: 'POST', headers: marketingHeaders })).status, 200);
+  assert.equal(h.calls.length, 6);
+  for (const permissions of [[], ['channels.manage']]) {
+    const denied = marketingHarness();
+    denied.env.APPV2_BFF.fetch = async request => { denied.calls.push(request); return Response.json({ role: 'owner', permissions, scoped: [] }); };
+    assert.equal((await denied.fetch(prefix + '/api/marketing/campaigns?account_id=7', create)).status, 403);
+    assert.equal(denied.calls.length, 1);
+  }
+});
+test('delivery, scheduling and audience additions remain closed without any upstream calls', async () => {
+  const h = marketingHarness();
+  for (const action of ['start', 'resume', 'schedule', 'contacts']) {
+    const response = await h.fetch(prefix + `/api/marketing/campaigns/4/${action}?account_id=7`, { method: 'POST', headers: marketingHeaders, body: '{}' });
+    assert.equal(response.status, 409);
+    assert.deepEqual(await response.json(), { error: 'campaign_delivery_unavailable' });
+  }
+  assert.equal(h.calls.length, 0);
+});
+test('marketing rejects unknown methods, routes and bodies before authorization preflight', async () => {
+  const h = marketingHarness();
+  const options = { method: 'POST', headers: marketingHeaders };
+  const base = { name: 'Draft', template_id: 2, channel_id: 3 };
+  for (const body of [{ ...base, budget: 999 }, { ...base, name: '' }, { ...base, channel_id: 0 }, { ...base, variable_mapping: { x: 'x'.repeat(1025) } }, { ...base, variable_mapping: { __header_media_url: 'https://evil.example' } }]) assert.equal((await h.fetch(prefix + '/api/marketing/campaigns?account_id=7', { ...options, body: JSON.stringify(body) })).status, 400);
+  assert.equal((await h.fetch(prefix + '/api/marketing/campaigns?account_id=7', { ...options, headers: { ...marketingHeaders, Origin: 'https://evil.example' }, body: JSON.stringify(base) })).status, 403);
+  assert.equal((await h.fetch(prefix + '/api/marketing/campaigns?account_id=7', { ...options, headers: { ...marketingHeaders, 'X-Danil-Actor': 'ai' }, body: JSON.stringify(base) })).status, 403);
+  assert.equal((await h.fetch(prefix + '/api/marketing/campaigns/4/pause?account_id=7', { ...options, body: '{}' })).status, 400);
+  assert.equal((await h.fetch(prefix + '/api/contacts?account_id=7', options)).status, 405);
+  assert.equal((await h.fetch(prefix + '/api/marketing/campaigns/4/start?account_id=7', { headers: marketingHeaders })).status, 405);
+  for (const path of ['/api/marketing/templates/2/submit', '/api/marketing/campaigns/4/unknown', '/api/marketing/channels']) assert.ok([404, 405].includes((await h.fetch(prefix + path, options)).status));
+  assert.equal(h.calls.length, 0);
+});
