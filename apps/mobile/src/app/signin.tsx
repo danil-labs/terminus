@@ -1,3 +1,4 @@
+import { TEXT } from "@terminus/design";
 import { Redirect, router } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -93,7 +94,7 @@ export default function SignIn() {
 const styles = StyleSheet.create({
   page: { flexGrow: 1, padding: 24, paddingTop: 96, gap: 10 },
   title: { fontSize: 28, fontWeight: "800" },
-  hint: { fontSize: 15, lineHeight: 21, marginBottom: 8 },
+  hint: { fontSize: TEXT.lead, lineHeight: 21, marginBottom: 8 },
   input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 12, fontSize: 16 },
   button: { borderRadius: 12, paddingVertical: 13, alignItems: "center" },
   secondary: { borderWidth: 1 },

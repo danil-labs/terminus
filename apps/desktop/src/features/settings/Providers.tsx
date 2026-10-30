@@ -642,7 +642,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                                         when={c().identity.user !== c().identity.name}
                                       >
                                         {" "}
-                                        <span class="font-mono text-[0.6875rem]">{c().identity.user}</span>
+                                        <span class="font-mono text-caption">{c().identity.user}</span>
                                       </Show>
                                       <Show
                                         when={
@@ -651,17 +651,17 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                                         }
                                       >
                                         {" · "}
-                                        <span class="font-mono text-[0.6875rem]">{c().workspace}</span>
+                                        <span class="font-mono text-caption">{c().workspace}</span>
                                       </Show>
                                     </span>
                                   }
                                 >
                                   <span class="flex flex-col gap-0.5">
-                                    <span class="font-mono text-[0.6875rem]">{c().data.correo}</span>
+                                    <span class="font-mono text-caption">{c().data.correo}</span>
                                     <strong class="text-neutral-950">
                                       {c().identity.name}
                                     </strong>
-                                    <span class="font-mono text-[0.6875rem]">{c().workspace}</span>
+                                    <span class="font-mono text-caption">{c().workspace}</span>
                                   </span>
                                 </Show>
                               }
@@ -1056,7 +1056,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                                 <li>
                                   <div class="flex items-center gap-2 rounded-sm border border-border bg-surface px-2 py-1.5 text-xs">
                                     <span class="min-w-0 flex-1 truncate">{a.name}</span>
-                                    <span class="font-mono text-[0.6875rem] text-neutral-500">{a.key}</span>
+                                    <span class="font-mono text-caption text-neutral-500">{a.key}</span>
                                     <Show when={p.id !== "github" && (!p.select_area || selected())}>
                                       <Button
                                         variant="outline"
@@ -1097,7 +1097,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                                           <li class="flex items-baseline gap-2 text-xs">
                                             <span class="min-w-0 truncate">{r.name}</span>
                                             <Show when={r.slug !== r.name}>
-                                              <span class="min-w-0 truncate font-mono text-[0.6875rem] text-neutral-500">{r.slug}</span>
+                                              <span class="min-w-0 truncate font-mono text-caption text-neutral-500">{r.slug}</span>
                                             </Show>
                                             {/* Traerlo es el acto: el botón
                                                 vive en la fila del repositorio

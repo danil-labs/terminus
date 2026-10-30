@@ -125,7 +125,7 @@ function Entry(props: {
             </span>
           }
         >
-          <AccountAvatar profile={props.profile} class="size-5 text-[10px]" />
+          <AccountAvatar profile={props.profile} class="size-5 text-2xs" />
         </Show>
         <Show when={props.online !== null}>
           <span

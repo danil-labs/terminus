@@ -173,7 +173,7 @@ export default function YourMessages(props: {
           onCloseAutoFocus={(e) => e.preventDefault()}
         >
           <div class="flex items-start gap-2">
-            <p class="m-0 min-w-0 flex-1 text-[0.8125rem] leading-[1.4] break-words line-clamp-2">{excerpt()}</p>
+            <p class="m-0 min-w-0 flex-1 text-ui leading-[1.4] break-words line-clamp-2">{excerpt()}</p>
             <Show when={current()?.sender}>
               {(sender) => (
                 <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-neutral-200">

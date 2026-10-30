@@ -310,7 +310,7 @@ export default function GithubAccount(props: {
                             return (
                               <li class="flex items-center gap-2 rounded-sm border border-border bg-surface px-2 py-1.5 text-xs">
                                 <span class="min-w-0 flex-1 truncate">{i.account.login}</span>
-                                <Show when={i.account.type}>{(type) => <span class="font-mono text-[0.6875rem] text-neutral-500">{type()}</span>}</Show>
+                                <Show when={i.account.type}>{(type) => <span class="font-mono text-caption text-neutral-500">{type()}</span>}</Show>
                                 <Toggle
                                   checked={on()}
                                   label={t("providers.github.account.area_toggle", { name: i.account.login })}

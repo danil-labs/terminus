@@ -142,12 +142,12 @@ export default function CloseGuard(props: { title: (session: string) => string |
       <Dialog open onOpenChange={(open) => { if (!open && !stopping()) setShown(false); }}>
         <DialogContent class="flex flex-col gap-3" data-close-guard>
           <DialogTitle class="text-sm font-semibold">{t("shell.close.title", { count: rows().length })}</DialogTitle>
-          <p class="m-0 text-[13px] text-neutral-700">{t("shell.close.body")}</p>
+          <p class="m-0 text-ui text-neutral-700">{t("shell.close.body")}</p>
           <Show when={failure()}>{(f) => <FailureNote f={f()} />}</Show>
           <Show when={rows().length > 0}>
             <ul class="m-0 grid list-none gap-0 rounded-md border border-neutral-200 p-0">
               <For each={rows()}>{(row) => (
-                <li class="flex items-center gap-2 border-b border-neutral-200 px-3 py-2 text-[13px] last:border-b-0">
+                <li class="flex items-center gap-2 border-b border-neutral-200 px-3 py-2 text-ui last:border-b-0">
                   <span class="min-w-0 flex-1 truncate">{row.title}</span>
                   <span class={row.waiting ? "shrink-0 font-semibold text-warning-strong" : "shrink-0 text-neutral-500"}>
                     {row.waiting ? t("shell.close.waiting") : t("shell.close.working")}

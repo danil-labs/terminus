@@ -201,7 +201,7 @@ export default function Radiant() {
                 aria-checked={mode() === id}
                 disabled={busy() || running()}
                 class={cn(
-                  "min-h-8 rounded-sm px-3 text-[13px] text-neutral-500 disabled:opacity-60",
+                  "min-h-8 rounded-sm px-3 text-ui text-neutral-500 disabled:opacity-60",
                   mode() === id ? ["bg-neutral-200", "text-neutral-950", "shadow-sm"] : "hover:bg-surface-muted",
                 )}
                 onClick={() => chooseServer(id)}

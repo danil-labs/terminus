@@ -60,7 +60,7 @@ export type MemoriaProveedor =
   | { tipo: "mcp_externo"; origen: unknown; lectura_escritura: boolean };
 
 /**
- * Una migración de los datos en disco — espejo de `src-tauri/src/workspace/migration.rs`.
+ * Una migración de los datos en disco que hace el motor.
  * `moved` es lo que se movió y `problems` lo que quedó fuera; nada de esto se
  * pinta, vive en `migrations.json`. El tipo se queda porque el contrato con
  * Rust lo trae: describirlo mal rompe el puente sin aviso.

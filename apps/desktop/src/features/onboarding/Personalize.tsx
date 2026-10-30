@@ -63,7 +63,7 @@ export default function Personalizar(props: {
             <p class="m-0 mt-3.5 max-w-[40ch] text-sm text-neutral-500">{t("onboarding.personalize.lede")}</p>
           </div>
           <div class="grid gap-1.5">
-            <span class="text-[13px] font-semibold text-neutral-950">{t("onboarding.workspace.label")}</span>
+            <span class="text-ui font-semibold text-neutral-950">{t("onboarding.workspace.label")}</span>
             <Input
               value={borrador()}
               aria-label={t("onboarding.workspace.label")}
@@ -98,12 +98,12 @@ export default function Personalizar(props: {
         </section>
         <section class="flex min-h-0 flex-col gap-3 px-7 pb-5 md:overflow-y-auto md:pt-7 md:pl-2 [&>*]:shrink-0">
           <div class="grid gap-0.5">
-            <h2 class="m-0 text-[13px] font-semibold text-neutral-950">{t("onboarding.tools.title")}</h2>
+            <h2 class="m-0 text-ui font-semibold text-neutral-950">{t("onboarding.tools.title")}</h2>
             <p class="m-0 text-xs text-neutral-500">{t("onboarding.tools.lede")}</p>
           </div>
           <Integraciones onCambio={setIntegraciones} />
           <div class="mt-2 grid gap-0.5">
-            <h2 class="m-0 text-[13px] font-semibold text-neutral-950">{t("onboarding.plugins.title")}</h2>
+            <h2 class="m-0 text-ui font-semibold text-neutral-950">{t("onboarding.plugins.title")}</h2>
             <p class="m-0 text-xs text-neutral-500">{t("onboarding.plugins.lede")}</p>
           </div>
           <Plugins onCambio={setPlugins} />

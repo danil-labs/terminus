@@ -119,7 +119,7 @@ export function ProjectPicker(props: {
           <ChevronDown size={11} aria-hidden="true" />
         </PopoverTrigger>
 
-        <PopoverContent class="w-[300px] overflow-hidden p-0 text-[0.6875rem] text-neutral-500 shadow-lg">
+        <PopoverContent class="w-[300px] overflow-hidden p-0 text-caption text-neutral-500 shadow-lg">
           <div class="relative border-b border-border">
             <Search
               size={11}
@@ -128,7 +128,7 @@ export function ProjectPicker(props: {
             />
             <input
               ref={enfocar}
-              class="w-full bg-transparent py-1 pr-2 pl-6 text-[0.6875rem] outline-none"
+              class="w-full bg-transparent py-1 pr-2 pl-6 text-caption outline-none"
               placeholder={t("projects.picker.search")}
               value={busca()}
               onInput={(e) => setBusca(e.currentTarget.value)}
@@ -155,7 +155,7 @@ export function ProjectPicker(props: {
                   >
                     {p.name}
                   </span>
-                  <span class="text-[0.6875rem] whitespace-nowrap text-neutral-500">
+                  <span class="text-caption whitespace-nowrap text-neutral-500">
                     {p.sessions > 0
                       ? t("projects.picker.tasks", { count: p.sessions })
                       : t("projects.picker.no_tasks")}
@@ -165,7 +165,7 @@ export function ProjectPicker(props: {
             </For>
 
             <Show when={sinNada()}>
-              <p class="m-0 px-2 py-3 text-center text-[0.6875rem]">
+              <p class="m-0 px-2 py-3 text-center text-caption">
                 {t("projects.picker.no_match")}
               </p>
             </Show>
@@ -193,7 +193,7 @@ export function ProjectPicker(props: {
                 >
                   <SettingsIcon size={13} aria-hidden="true" />
                   <span class="truncate">{t("projects.picker.manage")}</span>
-                  <span class="text-[0.6875rem] text-neutral-500">
+                  <span class="text-caption text-neutral-500">
                     {t("projects.picker.manage_where")}
                   </span>
                 </button>
@@ -214,7 +214,7 @@ export function ProjectPicker(props: {
             {(s) => (
               <Badge
                 forma="dato"
-                class="text-[0.625rem]"
+                class="text-2xs"
                 title={lineaDeProcedencia(
                   procedencia(s),
                   t("projects.view.origin_folder"),

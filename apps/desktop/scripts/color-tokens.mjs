@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 /**
- * Escribe `docs/color-tokens.html`: las muestras de cada token en las tres paletas,
+ * Escribe `docs/color-tokens.html`: las muestras de cada token en las cuatro paletas,
  * leídas de `src/styles/global.css`. Córrelo al cambiar un color:
  *   node scripts/color-tokens.mjs
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { RAIZ } from "./git.mjs";
+import { fileURLToPath } from "node:url";
+
+const RAIZ = fileURLToPath(new URL("..", import.meta.url));
 
 const css = readFileSync(join(RAIZ, "src/styles/global.css"), "utf8");
 

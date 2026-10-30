@@ -1,3 +1,4 @@
+import { RADIUS, TEXT } from "@terminus/design";
 import { useLocalSearchParams } from "expo-router";
 import type { Activity, ActivityLog, ActivityRow } from "@terminus/protocol";
 import { useEffect, useRef, useState } from "react";
@@ -72,11 +73,11 @@ export default function ActivityLogs() {
     const off = subscribe((id, events) => { if (id === host?.id && events.some(e => e.name === "activity" && (e.payload as { workspace?: string })?.workspace === workspace)) latest.current.refresh(); });
     return () => { clearInterval(timer); off(); };
   }, [host?.id, workspace, subscribe]);
-  const action = { color: theme.primary, fontSize: 14, fontWeight: "600" as const };
+  const action = { color: theme.primary, fontSize: TEXT.body, fontWeight: "600" as const };
   return <ScrollView contentInsetAdjustmentBehavior="automatic" refreshControl={<RefreshControl refreshing={busy} onRefresh={refresh} />} contentContainerStyle={{ padding: 16, gap: 16 }}>
-    <Text style={{ color: theme.textMuted, fontSize: 14 }}>{t("activity.description")}</Text>
+    <Text style={{ color: theme.textMuted, fontSize: TEXT.body }}>{t("activity.description")}</Text>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-      {hostsOfCurrent.map(h => <Pressable key={h.id} accessibilityRole="button" accessibilityState={{ selected: h.id === host?.id }} onPress={() => setMachine(h.id)} style={{ paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderRadius: 8, borderColor: h.id === host?.id ? theme.primary : theme.border }}><Text style={{ color: h.id === host?.id ? theme.primary : theme.text }}>{h.label}</Text></Pressable>)}
+      {hostsOfCurrent.map(h => <Pressable key={h.id} accessibilityRole="button" accessibilityState={{ selected: h.id === host?.id }} onPress={() => setMachine(h.id)} style={{ paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderRadius: RADIUS.lg, borderColor: h.id === host?.id ? theme.primary : theme.border }}><Text style={{ color: h.id === host?.id ? theme.primary : theme.text }}>{h.label}</Text></Pressable>)}
     </ScrollView>
     {!online ? <Text accessibilityRole="text" style={{ color: theme.textMuted }}>{t("activity.offline")}</Text> : null}
     {error ? <Text accessibilityRole="alert" style={{ color: theme.failedMark }}>{error}</Text> : null}
@@ -84,17 +85,17 @@ export default function ActivityLogs() {
       <Pressable accessibilityRole="button" onPress={() => { generation.current++; reading.current = false; setBusy(false); setDetail(null); setStep(""); setLog(null); logRequest.current++; }} style={{ paddingVertical: 8 }}><Text style={action}>{t("activity.back")}</Text></Pressable>
       <Text style={{ color: theme.text, fontWeight: "600", fontSize: 18 }}>{detail.title}</Text>
       <Text style={{ color: color(detail.state) }}>{t(`activity.state.${detail.state}`)} · {date(detail.updated_at)}</Text>
-      <Text style={{ color: theme.textMuted, fontSize: 13 }}>{t("activity.technical")}</Text>
+      <Text style={{ color: theme.textMuted, fontSize: TEXT.ui }}>{t("activity.technical")}</Text>
       {detail.steps.map(part => <View key={part.id} style={{ borderTopWidth: 1, borderColor: theme.border, paddingVertical: 8, gap: 10 }}>
         <Pressable accessibilityRole="button" accessibilityState={{ expanded: step === part.id }} onPress={() => { if (step === part.id) { setStep(""); logRequest.current++; } else void read(detail.id, part.id, [0]); }} style={{ minHeight: 44, justifyContent: "center", gap: 4 }}>
-          <Text style={{ color: theme.text, fontWeight: "600" }}>{date(part.started_at)}</Text><Text style={{ color: color(part.state), fontSize: 13 }}>{t(`activity.state.${part.state}`)}</Text>
+          <Text style={{ color: theme.text, fontWeight: "600" }}>{date(part.started_at)}</Text><Text style={{ color: color(part.state), fontSize: TEXT.ui }}>{t(`activity.state.${part.state}`)}</Text>
         </Pressable>
         {step === part.id ? <>
-          <Text selectable style={{ color: theme.text, backgroundColor: theme.muted, padding: 12, borderRadius: 6, fontFamily: "monospace", fontSize: 12 }}>{part.command}</Text>
-          <Text selectable style={{ color: theme.textMuted, fontSize: 12 }}>{part.cwd}</Text>
+          <Text selectable style={{ color: theme.text, backgroundColor: theme.muted, padding: 12, borderRadius: RADIUS.md, fontFamily: "monospace", fontSize: TEXT.label }}>{part.command}</Text>
+          <Text selectable style={{ color: theme.textMuted, fontSize: TEXT.label }}>{part.cwd}</Text>
           {part.exit_code !== null ? <Text style={{ color: theme.textMuted }}>{t("activity.exit", { code: part.exit_code })}</Text> : null}
           {part.error ? <Text selectable style={{ color: theme.failedMark }}>{part.error}</Text> : null}
-          <Text selectable accessibilityLabel={t("activity.output")} style={{ color: theme.text, backgroundColor: theme.muted, padding: 12, borderRadius: 6, fontFamily: "monospace", fontSize: 12 }}>{log?.text || t(log ? "activity.no_output" : "activity.loading")}</Text>
+          <Text selectable accessibilityLabel={t("activity.output")} style={{ color: theme.text, backgroundColor: theme.muted, padding: 12, borderRadius: RADIUS.md, fontFamily: "monospace", fontSize: TEXT.label }}>{log?.text || t(log ? "activity.no_output" : "activity.loading")}</Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 16 }}>
             <Pressable accessibilityRole="button" disabled={offsets.length < 2} onPress={() => void read(detail.id, part.id, offsets.slice(0,-1))} style={{ paddingVertical: 12, opacity: offsets.length < 2 ? 0.4 : 1 }}><Text style={action}>{t("activity.previous")}</Text></Pressable>
             <Pressable accessibilityRole="button" disabled={!log?.has_more} onPress={() => void read(detail.id, part.id, [...offsets, log!.next_offset])} style={{ paddingVertical: 12, opacity: log?.has_more ? 1 : 0.4 }}><Text style={action}>{t("activity.next")}</Text></Pressable>
@@ -105,7 +106,7 @@ export default function ActivityLogs() {
     </> : <>
       {online && !rows.length && !error ? <Text style={{ color: theme.textMuted, paddingVertical: 16 }}>{t(busy ? "activity.loading" : "activity.empty")}</Text> : null}
       {rows.map(row => <Pressable key={row.id} accessibilityRole="button" disabled={!online || busy} onPress={() => void load(row.id)} style={{ borderBottomWidth: 1, borderColor: theme.border, paddingVertical: 14, gap: 6 }}>
-        <Text style={{ color: theme.text, fontWeight: "600", fontSize: 15 }}>{row.title}</Text><Text style={{ color: color(row.state), fontSize: 13 }}>{t(`activity.state.${row.state}`)}</Text><Text style={{ color: theme.textMuted, fontSize: 12 }}>{date(row.updated_at)}</Text>
+        <Text style={{ color: theme.text, fontWeight: "600", fontSize: TEXT.lead }}>{row.title}</Text><Text style={{ color: color(row.state), fontSize: TEXT.ui }}>{t(`activity.state.${row.state}`)}</Text><Text style={{ color: theme.textMuted, fontSize: TEXT.label }}>{date(row.updated_at)}</Text>
       </Pressable>)}
     </>}
   </ScrollView>;

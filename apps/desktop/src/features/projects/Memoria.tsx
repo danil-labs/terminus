@@ -126,7 +126,7 @@ function FormularioDeEntrada(props: {
   return (
     <Dialog open={props.abierto} onOpenChange={(a) => !a && !guardando() && props.onCerrar()}>
       <DialogContent>
-        <DialogTitle class="m-0 text-[0.9375rem] font-semibold">
+        <DialogTitle class="m-0 text-lead font-semibold">
           {editando() ? t("projects.memory.edit_title") : t("projects.memory.new_title")}
         </DialogTitle>
         <form
@@ -136,7 +136,7 @@ function FormularioDeEntrada(props: {
             void guardar();
           }}
         >
-          <label class="grid gap-1 text-[0.8125rem]">
+          <label class="grid gap-1 text-ui">
             <span class="text-neutral-500">
               {t("projects.memory.form_file")}{" "}
               <span classList={{ "text-error-strong": archivoInvalido() }}>
@@ -160,7 +160,7 @@ function FormularioDeEntrada(props: {
               }}
             />
           </label>
-          <label class="grid gap-1 text-[0.8125rem]">
+          <label class="grid gap-1 text-ui">
             <span class="text-neutral-500">{t("projects.memory.form_type")}</span>
             <Input
               value={tipo()}
@@ -169,7 +169,7 @@ function FormularioDeEntrada(props: {
               onInput={(e) => setTipo(e.currentTarget.value)}
             />
           </label>
-          <label class="grid gap-1 text-[0.8125rem]">
+          <label class="grid gap-1 text-ui">
             <span class="text-neutral-500">{t("projects.memory.form_text")}</span>
             <Textarea
               placeholder={t("projects.memory.form_text_placeholder")}
@@ -303,7 +303,7 @@ export default function Memoria(props: { project: string; workspace?: string | n
   return (
     <section class="grid gap-2">
       <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-        <h2 class="m-0 text-[0.6875rem] font-medium tracking-wide text-neutral-500 uppercase">
+        <h2 class="m-0 text-caption font-medium tracking-wide text-neutral-500 uppercase">
           {t("projects.memory.title")}
         </h2>
         <Button variant="ghost" size="sm" onClick={() => setFormulario("nueva")}>
@@ -346,7 +346,7 @@ export default function Memoria(props: { project: string; workspace?: string | n
         <Show when={indice()}>
           {(idx) => (
             <span
-              class="text-[0.6875rem] text-neutral-500"
+              class="text-caption text-neutral-500"
               classList={{ "text-warning-strong": idx().lines >= idx().line_limit }}
             >
               {t("projects.memory.index_status", { lines: idx().lines, limit: idx().line_limit })}
@@ -358,13 +358,13 @@ export default function Memoria(props: { project: string; workspace?: string | n
       <Show when={fallo()}>{(f) => <FailureNote f={f()} />}</Show>
       <Show when={aviso()}>
         {(texto) => (
-          <p class="m-0 text-[0.8125rem] text-neutral-700" role="status" data-memory-notice="">
+          <p class="m-0 text-ui text-neutral-700" role="status" data-memory-notice="">
             {texto()}
           </p>
         )}
       </Show>
       <Show when={copias().length > 0}>
-        <p class="m-0 text-[0.8125rem] text-warning-strong" role="status" data-memory-conflicts="">
+        <p class="m-0 text-ui text-warning-strong" role="status" data-memory-conflicts="">
           {t("projects.memory.conflicts_notice")}
         </p>
       </Show>
@@ -377,8 +377,8 @@ export default function Memoria(props: { project: string; workspace?: string | n
           <For each={entradas()}>
             {(e) => (
               <li class="grid gap-1.5 rounded-md border border-border px-3 py-2" aria-busy={ocupada() === e.file}>
-                <p class="m-0 text-[0.8125rem] text-neutral-950">{e.text}</p>
-                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.6875rem] text-neutral-500">
+                <p class="m-0 text-ui text-neutral-950">{e.text}</p>
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-caption text-neutral-500">
                   <Show when={e.type}>{(tipo) => <Badge forma="dato">{tipo()}</Badge>}</Show>
                   <Show when={!e.in_index}>
                     <Badge tone="warning">{t("projects.memory.out_of_index_badge")}</Badge>

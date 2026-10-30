@@ -141,7 +141,7 @@ export default function Documento(props: {
           <IconButton label={t("code.file.image.zoom_out")} onClick={() => acercar(zoom() / ZOOM_STEP)}>
             <ZoomOut size={13} />
           </IconButton>
-          <span class="min-w-10 text-center font-mono text-[0.6875rem] tabular-nums text-neutral-500">
+          <span class="min-w-10 text-center font-mono text-caption tabular-nums text-neutral-500">
             {Math.round(zoom() * 100)}%
           </span>
           <IconButton label={t("code.file.image.zoom_in")} onClick={() => acercar(zoom() * ZOOM_STEP)}>

@@ -8,7 +8,7 @@ import RefreshCw from "lucide-solid/icons/refresh-cw";
 import Trash2 from "lucide-solid/icons/trash-2";
 import { createEffect, createMemo, createSignal, createUniqueId, For, type JSX, lazy, on, onCleanup, onMount, Show, Suspense, untrack } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
-import { copyText } from "../../lib/clipboard";
+import { createCopied } from "../../lib/clipboard";
 import { enfocar } from "../../lib/focus";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
@@ -147,8 +147,8 @@ export default function Accounts(props: {
   const [instalando, setInstalando] = createSignal<string | null>(null);
   const [url, setUrl] = createSignal<string | null>(null);
   // El fallo de copiar va dentro del diálogo: `FailureNote` queda detrás.
-  const [enlaceCopiado, setEnlaceCopiado] = createSignal(false);
   const [copiaFallida, setCopiaFallida] = createSignal<string | null>(null);
+  const { copied: enlaceCopiado, copy: copiarLaUrl, reset: olvidarEnlaceCopiado } = createCopied(1400, (e) => setCopiaFallida(prosaDe(e)));
   // El código que la página va a pedir. Se enseña ANTES de abrir el navegador:
   // llegar a «enter the code shown in your terminal» sin tenerlo delante es
   // donde la conexión se atasca.
@@ -669,7 +669,7 @@ export default function Accounts(props: {
     cancelarEspera();
     setEnCurso(id);
     setUrl(null);
-    setEnlaceCopiado(false);
+    olvidarEnlaceCopiado();
     setCopiaFallida(null);
     setPorConfirmar(null);
     setPideCodigo(false);
@@ -709,14 +709,8 @@ export default function Accounts(props: {
   }
 
   async function copiarEnlace(u: string) {
-    try {
-      await copyText(u);
-      setCopiaFallida(null);
-      setEnlaceCopiado(true);
-      setTimeout(() => setEnlaceCopiado(false), 1400);
-    } catch (e) {
-      setCopiaFallida(prosaDe(e));
-    }
+    setCopiaFallida(null);
+    await copiarLaUrl(u);
   }
 
   async function enviarCodigo() {
@@ -1043,7 +1037,7 @@ export default function Accounts(props: {
 
       <Show when={repuestas() !== null}>
         <SettingsBlock>
-          <p class="m-0 text-[0.8125rem] leading-[19px] text-neutral-500">
+          <p class="m-0 text-ui leading-[19px] text-neutral-500">
             {t("settings.accounts.awaiting_resumed", { count: repuestas() ?? 0 })}
           </p>
         </SettingsBlock>
@@ -1225,7 +1219,7 @@ export default function Accounts(props: {
       <Show when={lista()?.secret_note}>
         {(nota) => (
           <SettingsBlock>
-            <p class="m-0 max-w-[62ch] text-[0.8125rem] leading-[19px] text-neutral-500">
+            <p class="m-0 max-w-[62ch] text-ui leading-[19px] text-neutral-500">
               {prosa(nota())}
             </p>
           </SettingsBlock>
@@ -1236,7 +1230,7 @@ export default function Accounts(props: {
       <Show when={segunda()}>
         {(porque) => (
           <SettingsBlock>
-            <p class="m-0 max-w-[62ch] text-[0.8125rem] leading-[19px] text-neutral-500" data-shared-credential="">
+            <p class="m-0 max-w-[62ch] text-ui leading-[19px] text-neutral-500" data-shared-credential="">
               {porque()} {t("settings.accounts.shared_remove_first")}
             </p>
           </SettingsBlock>
@@ -1562,7 +1556,7 @@ const AVISO_DE_USO = () => t("settings.accounts.free.warning");
 function Paso(props: { numero: number; titulo: string; children: JSX.Element }) {
   return (
     <section class="flex gap-3">
-      <span class="grid size-5 shrink-0 place-items-center rounded-full bg-surface-muted text-[0.6875rem] font-semibold text-neutral-700">
+      <span class="grid size-5 shrink-0 place-items-center rounded-full bg-surface-muted text-caption font-semibold text-neutral-700">
         {props.numero}
       </span>
       <div class="flex min-w-0 flex-1 flex-col gap-2">

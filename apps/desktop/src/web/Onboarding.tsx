@@ -130,7 +130,7 @@ function Space(props: { nuevo: boolean; onCancelar?: () => void; onCreated: (nam
         }}
       >
         <label class="grid gap-1.5">
-          <span class="text-[0.8125rem] font-semibold">{t("onboarding.workspace.name")}</span>
+          <span class="text-ui font-semibold">{t("onboarding.workspace.name")}</span>
           <Input value={name()} onInput={(ev) => setName(ev.currentTarget.value)} />
         </label>
         <Show when={props.nuevo && capabilities().webAccounts}>

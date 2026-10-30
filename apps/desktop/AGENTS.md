@@ -1,6 +1,6 @@
 # Terminus: working guide
 
-This repository is the Terminus window: a Tauri 2 desktop app (Rust) with a
+`apps/desktop/` is the Terminus window: a Tauri 2 desktop app (Rust) with a
 SolidJS front. The domain (workspaces, projects, tasks, agent turns, accounts)
 lives in the engine `seldon-runtime`, a proprietary binary that is not in this
 repository. The window reaches it over RPC1 through a frozen contract; see
@@ -51,8 +51,9 @@ is not a pass. What each guard checks is in [docs/guards.md](docs/guards.md);
   ([docs/localization.md](docs/localization.md)); add the key to `es` and `en`.
   Command names in `invoke()` and event names in `listen()` stay literal so the
   guards can read them.
-- Colors are theme tokens from `@theme` in `src/styles/global.css`; shared
-  controls live in `src/ui/` ([docs/visual-system.md](docs/visual-system.md)).
+- Colors are theme tokens from `@theme` in `src/styles/global.css` and text sizes
+  come from the shared scale (`text-caption`, `text-ui`…); shared controls live
+  in `src/ui/` ([docs/visual-system.md](docs/visual-system.md)).
 - Commits are signed off (DCO, `git commit -s`) and follow Conventional
   Commits. See [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
@@ -69,6 +70,7 @@ check. A fix reproduces its defect first; if it could not be reproduced, say so.
 
 ## Pull requests
 
-Open them against `main` from a branch of your fork. CI (`verify`) runs the
-chain without secrets. Don't touch signing or publishing steps unless a
+Open them against `dev` from a branch of your fork; `dev` goes to `main` after
+QA. Run `pnpm verify` locally before asking for a merge: GitHub Actions is not
+the gate. Don't touch signing or publishing steps unless a
 maintainer asked for it.

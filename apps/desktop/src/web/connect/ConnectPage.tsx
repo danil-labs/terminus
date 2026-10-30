@@ -114,7 +114,7 @@ export function ConnectPage(props: { session: Session; endpoint: string; code: s
             >
               <p class="m-0 text-base text-neutral-950">{t("danil.connect.ask", { hostname: d().hostname, platform: d().platform })}</p>
               <p class="m-0 text-xs text-neutral-500">{t("danil.connect.code", { code: props.code })}</p>
-              <label class="grid gap-1.5 text-[0.8125rem] text-neutral-500">
+              <label class="grid gap-1.5 text-ui text-neutral-500">
                 {t("danil.connect.name_label")}
                 <Input class="min-h-11 border-neutral-500 text-base" value={name()} onInput={(e) => setName(e.currentTarget.value)} disabled={view().t === "approving"} data-machine-name="" />
                 <span class="text-xs">{t("danil.connect.name_hint")}</span>
