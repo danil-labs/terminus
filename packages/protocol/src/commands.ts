@@ -24,6 +24,8 @@ export const APP_READS = [
   "load_session",
   "pending_requests",
   "list_active_turns",
+  // Desde cuándo corre el turno: el reloj del turno en curso.
+  "list_live_turns",
   "list_workspace_attention",
   // El cuadro de escribir, como el de la ventana: modelos y razonamiento,
   // permisos, la barra de comandos, las menciones y la rama base.

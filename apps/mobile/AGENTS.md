@@ -25,7 +25,7 @@ npm run bridge          # bridge de desarrollo contra el motor del lab
 ```
 
 Los paquetes compartidos se prueban desde su carpeta: `node --test 'packages/*/test/*.test.ts'`
-en la raíz. Si tocas `packages/design` o `packages/tasks`, corre también
+en la raíz. Si tocas `packages/design`, `packages/tasks` o `packages/chat`, corre también
 `node apps/desktop/scripts/verify.mjs --no-cargo`: el escritorio los usa y el
 guard `shared-design` los compara con sus catálogos.
 

@@ -36,9 +36,10 @@ const PORT = Number(option("port", "8787"));
 const LICENSE = !process.argv.includes("--license");
 const WAKE_MS = Number(option("wake-ms", "800"));
 const WORKSPACE_MODE = option("workspace-mode", null);
+const STEP_MS = Number(option("step-ms", "400"));
 const TOKEN = "fake-jwt";
 const INTENT = new Set(["send_message", "inject_message", "create_project", "start_project_clone", "create_agent", "create_agent_thread", "add_account", "login_account", "submit_login_code", "respond_permission", "answer_question", "answer_shell_output", "run_shell_command", "queue_ready", "resume_awaiting_quota", "recreate_task_work"]);
-const MIRROR = new Set(["workspaces_startup", "list_workspaces", "list_projects", "list_spaces", "list_live_sessions", "list_agent_status", "list_providers", "load_session", "pending_requests", "list_active_turns", "list_workspace_attention", "list_agents", "list_agent_profiles", "archived_tasks"]);
+const MIRROR = new Set(["workspaces_startup", "list_workspaces", "list_projects", "list_spaces", "list_live_sessions", "list_agent_status", "list_providers", "load_session", "pending_requests", "list_active_turns", "list_live_turns", "list_workspace_attention", "list_agents", "list_agent_profiles", "archived_tasks"]);
 
 // --- Motores --------------------------------------------------------------------
 
@@ -153,7 +154,8 @@ function emit(m, name, payload) {
 /** Un turno: arranca, escribe, y termina o pide permiso si el mensaje lo dice. */
 function turn(m, s, prompt, extra = {}) {
   const e = m.engine;
-  s.turns.push({ id: randomUUID(), role: "user", text: prompt, ...extra });
+  s.turns.push({ id: randomUUID(), role: "user", text: prompt, at: Date.now(), ...extra });
+  s.started_at = Date.now();
   e.live.add(s.id);
   emit(m, "chat", { workspace: m.engine.ws, session: s.id, kind: "started", text: "", meta: null, ok: null, request_id: null });
   setTimeout(() => {
@@ -166,6 +168,7 @@ function turn(m, s, prompt, extra = {}) {
       emit(m, "question", { workspace: e.ws, session: s.id });
       return;
     }
+    if (/trabajo/i.test(prompt)) return void work(m, s, prompt);
     if (/permiso/i.test(prompt)) {
       s.pending = { request_id: randomUUID(), tool: "Bash", target: "rm -rf build" };
       emit(m, "chat", { workspace: m.engine.ws, session: s.id, kind: "permission", text: "Bash", meta: null, ok: null, request_id: s.pending.request_id, target: "rm -rf build" });
@@ -174,6 +177,50 @@ function turn(m, s, prompt, extra = {}) {
     }
     finish(m, s);
   }, 150);
+}
+
+/**
+ * «trabajo»: una ejecución con pasos, un avance y un tramo guardado (`segment_saved`). Con «permiso»
+ * pide aprobar a la mitad; con «falla», la primera aprobación contesta error. `--step-ms` marca el paso.
+ */
+function work(m, s, prompt) {
+  const say = (kind, text = "", more = {}) => emit(m, "chat", { workspace: m.engine.ws, session: s.id, kind, text, meta: null, ok: null, request_id: null, ...more });
+  const tools = [{ name: "Read", target: "src/lib/steps.ts", ok: true }, { name: "Bash", target: "pnpm verify --no-cargo 2>&1 | tail -20", ok: false }, { name: "Edit", target: "src/locales/en/chat.json", ok: true }];
+  const script = [
+    () => say("tool", "Read", { target: tools[0].target }),
+    () => say("tool_done", "Read", { ok: true }),
+    () => say("delta", "Reviso el error de la verificación.", { starts_message: true }),
+    () => say("tool", "Bash", { target: tools[1].target }),
+    () => say("tool_done", "Bash", { ok: false }),
+    () => say("tool", "Edit", { target: tools[2].target }),
+    () => say("tool_done", "Edit", { ok: true }),
+    () => {
+      s.turns.push({ id: randomUUID(), role: "agent", text: "", at: Date.now(), duration_ms: 4_000, tools, pieces: [{ tool: 0 }, { text: "Reviso el error de la verificación." }, { tool: 1 }, { tool: 2 }] });
+      say("segment_saved");
+    },
+    () => say("tool", "Bash", { target: "pnpm verify --no-cargo" }),
+  ];
+  const close = () => {
+    say("tool_done", "Bash", { ok: true });
+    setTimeout(() => {
+      s.turns.push({ id: randomUUID(), role: "agent", text: "Listo: la verificación pasó.", at: Date.now(), duration_ms: 2_000, tools: [{ name: "Bash", target: "pnpm verify --no-cargo", ok: true }], pieces: [{ tool: 0 }, { text: "Listo: la verificación pasó." }] });
+      s.updated_at = Date.now();
+      m.engine.live.delete(s.id);
+      say("done", "", { ok: true });
+      emit(m, "attention", attentionOf(m.engine));
+    }, STEP_MS);
+  };
+  const next = (i) => {
+    if (i < script.length) {
+      script[i]();
+      return void setTimeout(() => next(i + 1), STEP_MS);
+    }
+    if (!/permiso/i.test(prompt)) return close();
+    s.pending = { request_id: randomUUID(), tool: "Bash", target: "gh pr merge 479 --squash --delete-branch", failOnce: /falla/i.test(prompt), then: close };
+    say("permission", "Bash", { request_id: s.pending.request_id, target: s.pending.target });
+    emit(m, "attention", attentionOf(m.engine));
+  };
+  next(0);
 }
 
 function finish(m, s) {
@@ -289,6 +336,7 @@ function invoke(m, command, args) {
     case "list_agent_status": return args.project === "p-vm-web" ? [{ name: "Ada", status: "awake", minutes_since_last_turn: 3, live_tasks: 0 }] : [];
     case "list_providers": return [{ id: "codex", label: "Codex", available: true, driver: true }, { id: "claude", label: "Claude", available: true, driver: true }];
     case "list_active_turns": return [...e.live];
+    case "list_live_turns": return [...e.live].map((session) => ({ session, workspace: e.ws, project: e.sessions.get(session)?.project ?? "", started_at: e.sessions.get(session)?.started_at ?? Date.now() }));
     case "list_workspace_attention": return attentionOf(e);
     case "list_session_git": {
       if (!args.remote) e.gitObserved.add(args.project);
@@ -328,8 +376,14 @@ function invoke(m, command, args) {
     case "respond_permission": {
       const s = e.sessions.get(args.session);
       if (!s?.pending || s.pending.request_id !== args.requestId) throw { code: "command_failed", detail: "no pending permission" };
+      if (s.pending.failOnce) {
+        s.pending.failOnce = false;
+        throw { code: "command_failed", detail: "el motor no pudo aplicar la decisión" };
+      }
+      const { tool, target, then } = s.pending;
       s.pending = null;
-      setTimeout(() => finish(m, s), 100);
+      s.turns.push({ id: randomUUID(), role: "user", text: "", at: Date.now(), permission: { tool, target, allow: args.allow } });
+      setTimeout(() => (then ? then() : finish(m, s)), 100);
       return { role: "user", text: args.allow ? "Aprobado" : "Rechazado" };
     }
     case "answer_question": {

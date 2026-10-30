@@ -33,6 +33,7 @@ import type {
   Turn,
   Workspace,
   WorkspaceAttention,
+  LiveTurn,
 } from "@terminus/protocol";
 import { readVisualHtml, type VisualPart, type VisualWhole, VISUAL_FILE, VISUAL_TREE } from "@terminus/chat/visual";
 import { arrangeSpaces, spaceOrder, type AccountWorkspace, groupWorkspaces, linkedAttention, onlyLinked, registryProjects, withRegistry } from "@terminus/computers";
@@ -370,14 +371,17 @@ export type TaskView = {
   questions: PendingQuestion[];
   running: boolean;
   cachedAt: number | null;
+  /** Desde cuándo corre su turno, en ms de la máquina; `null` si no se pudo saber: entonces no se muestra tiempo. */
+  liveSince: number | null;
 };
 
 export async function loadTask(host: Host, workspace: string, folder: string, id: string): Promise<TaskView> {
   const at = { cachedAt: null as number | null };
-  const [session, pending, live] = await Promise.all([
+  const [session, pending, live, liveTurns] = await Promise.all([
     read<OpenedSession | null>(host, "load_session", workspace, { project: folder, id }, null, at),
     read<PendingRequests | null>(host, "pending_requests", workspace, { session: id }, null, at).catch((): PendingRequests | null => null),
     read<string[]>(host, "list_active_turns", workspace, { workspace }, [], at).catch((): string[] => []),
+    read<LiveTurn[]>(host, "list_live_turns", workspace, {}, [], at).catch((): LiveTurn[] => []),
   ]);
   if (!session) throw new HostError("machine_off", host.label);
   const turns = session.turns ?? [];
@@ -393,7 +397,7 @@ export async function loadTask(host: Host, workspace: string, folder: string, id
       questions: remaining,
     }] : [];
   });
-  return { session, permissions: pending?.permissions ?? [], questions, running: live.includes(id) && host.power() === "on", cachedAt: at.cachedAt };
+  return { session, permissions: pending?.permissions ?? [], questions, running: live.includes(id) && host.power() === "on", cachedAt: at.cachedAt, liveSince: liveTurns.find((turn) => turn.session === id)?.started_at ?? null };
 }
 
 /**

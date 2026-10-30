@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Turn } from "@terminus/protocol";
 import { coalesced } from "../src/lib/engine.ts";
-import { type LivePiece, applyLive, bareCommand, linesOfLive, linesOfTurn, liveAfterRead } from "../src/lib/steps.ts";
+import { type LivePiece, type WorkLine, applyLive, bareCommand, elapsed, hitOf, lineMatches, linesOfLive, linesOfTurn, liveAfterRead, runClock, runningStep, savesLive, stepOf, workRuns } from "../src/lib/steps.ts";
 
 test("con el orden registrado: avance, pasos y la respuesta al final", () => {
   const turn: Turn = {
@@ -103,4 +103,147 @@ test("las lecturas pedidas con una en marcha se juntan en una sola, que empieza 
   void read(false);
   assert.deepEqual(runs, [false, true, false], "terminada, la siguiente corre al momento");
   release();
+});
+
+const user = (id: string, at?: number): Turn => ({ id, role: "user", text: `pide ${id}`, at });
+const agent = (id: string, tools: string[], text = "", extra: Partial<Turn> = {}): Turn => ({ id, role: "agent", text, tools: tools.map((target) => ({ name: "Bash", target })), pieces: [...tools.map((_, tool) => ({ tool })), ...(text ? [{ text }] : [])], ...extra });
+const decision = (id: string, target: string, allow = true): Turn => ({ id, role: "user", text: "", permission: { tool: "Bash", target, allow } });
+const works = (lines: readonly { kind: string }[]) => lines.filter((l): l is WorkLine => l.kind === "work");
+const targets = (line: WorkLine) => line.steps.map((s) => s.target);
+const rowIds = (turns: Turn[], live: LivePiece[] = [], running = false) => workRuns(turns, live, running).runs.at(-1)!.items.flatMap((i) => (i.kind === "row" ? [i.id] : []));
+
+test("una ejecución cerrada es un grupo con sus avances adentro y la respuesta afuera", () => {
+  const turn: Turn = { id: "a", role: "agent", text: "Listo", duration_ms: 3000, tools: [{ name: "Read", target: "a.ts" }, { name: "Bash", target: "ls" }], pieces: [{ tool: 0 }, { text: "Miro." }, { tool: 1 }, { text: "Listo" }] };
+  const { lines, runs } = workRuns([user("u"), turn], [], false);
+  assert.deepEqual(lines.map((l) => l.kind), ["message", "work", "message"]);
+  const [group] = works(lines);
+  assert.equal(group.run, "u");
+  assert.equal(group.durationMs, 3000);
+  assert.deepEqual(runs[0].items.map((i) => i.kind), ["row", "note", "row"]);
+  assert.equal(runs[0].durationMs, 3000);
+});
+
+test("sin `duration_ms` en ningún tramo no hay duración que enseñar", () => {
+  const { lines, runs } = workRuns([user("u"), agent("a", ["ls"], "Listo")], [], false);
+  assert.equal(works(lines)[0].durationMs, null);
+  assert.equal(runs[0].durationMs, null);
+});
+
+test("decisión a mitad de turno: no parte el grupo y la ejecución sigue siendo una", () => {
+  const turns = [user("u"), agent("a", ["uno"]), decision("d", "rm -rf build"), agent("b", ["dos"], "Listo")];
+  const { lines, runs } = workRuns(turns, [], false);
+  assert.equal(runs.length, 1);
+  assert.deepEqual(works(lines).flatMap(targets), ["uno", "rm -rf build", "dos"]);
+  assert.equal(works(lines).length, 1, "un tramo sin respuesta sigue en el mismo grupo");
+  assert.ok(lines.every((l) => l.kind !== "message" || l.text), "la decisión no deja un globo vacío");
+  assert.deepEqual(runs[0].steps[1], { kind: "permission", name: "Bash", target: "rm -rf build", ok: null, running: false, allowed: true, by: null });
+});
+
+test("una decisión ya guardada entra al grupo de lo que sigue vivo", () => {
+  const { lines, live } = workRuns([user("u"), decision("d", "rm")], [{ step: stepOf("Bash", "dos", null, true) }], true);
+  assert.equal(works(lines).length, 0);
+  const [group] = works(live);
+  assert.deepEqual(targets(group), ["rm", "dos"]);
+  assert.equal(group.live, true);
+});
+
+test("la respuesta a una pregunta y un `!` no abren ejecución", () => {
+  const answer: Turn = { id: "r", role: "user", text: "Primera", answers: [{ turn: "q", question: "c" } as never] };
+  const shell: Turn = { id: "s", role: "user", text: "ls", shell: { cwd: "/", output: "", exit_code: 0, duration_ms: 1, truncated: false } };
+  const { runs } = workRuns([user("u"), agent("q", ["uno"], "¿Cuál?"), answer, shell, agent("b", ["dos"], "Listo")], [], false);
+  assert.deepEqual(runs.map((r) => r.key), ["u"]);
+  assert.deepEqual(runs[0].steps.map((s) => s.target), ["uno", "dos"]);
+});
+
+test("inyección: el mensaje abre otra ejecución y la anterior queda como pasado", () => {
+  const before = workRuns([user("u"), agent("a", ["uno"])], [{ step: stepOf("Bash", "dos", null, true) }], true);
+  assert.equal(before.runs.at(-1)?.live, true);
+  const after = workRuns([user("u"), agent("a", ["uno", "dos"]), user("i")], [], true);
+  assert.deepEqual(after.runs.map((r) => [r.key, r.live]), [["u", false], ["i", true]]);
+  assert.deepEqual(after.runs[0].steps.map((s) => s.target), ["uno", "dos"]);
+});
+
+test("lanzamiento insertado: los tramos entran antes del marcador y la clave no se mueve", () => {
+  const launch: Turn = { id: "l", role: "system", text: "Lanzó una tarea", meta: "task_launched" };
+  const first = workRuns([user("u"), launch], [{ step: stepOf("Bash", "uno", null, true) }], true);
+  const saved = workRuns([user("u"), agent("a", ["uno"]), launch, agent("b", ["dos"])], [], false);
+  assert.deepEqual([first.runs.length, saved.runs.length], [1, 1]);
+  assert.equal(first.runs[0].key, saved.runs[0].key);
+  assert.deepEqual(saved.runs[0].steps.map((s) => s.target), ["uno", "dos"]);
+  assert.deepEqual(saved.lines.map((l) => l.kind), ["message", "work", "message", "work"]);
+});
+
+test("tramo de pregunta: lo guardado no se ve dos veces porque `question` relee con `resync`", () => {
+  assert.equal(savesLive("question"), true);
+  assert.equal(savesLive("session"), false);
+  assert.equal(savesLive("chat", "segment_saved"), true);
+  assert.equal(savesLive("chat", "permission"), false);
+  const live: LivePiece[] = [{ step: stepOf("Bash", "uno") }];
+  const saved = [user("u"), agent("q", ["uno"], "¿Cuál?", { questions: [{ id: "c", question: "¿Cuál?", options: [], multiple: false, free_text: true }] })];
+  const stale = workRuns(saved, liveAfterRead(live, live, { running: true, resync: false }), true);
+  assert.equal(stale.runs[0].steps.length, 2, "el defecto: lo guardado sigue además en vivo");
+  const fixed = workRuns(saved, liveAfterRead(live, live, { running: true, resync: savesLive("question") }), true);
+  assert.deepEqual(fixed.runs[0].steps.map((s) => s.target), ["uno"]);
+  assert.deepEqual(fixed.lines.map((l) => l.kind), ["message", "work", "message"]);
+});
+
+test("de viva a guardada: la clave, los pasos y lo expandido se conservan", () => {
+  const anchor = user("u");
+  const running = workRuns([anchor], [{ step: stepOf("Bash", "uno") }, { text: "Sigo" }, { step: stepOf("Bash", "dos", null, true) }], true);
+  const segment = workRuns([anchor, agent("a", ["uno"]), decision("d", "rm")], [{ step: stepOf("Bash", "dos", null, true) }], true);
+  const saved = workRuns([anchor, agent("a", ["uno"]), decision("d", "rm"), agent("b", ["dos"], "Listo")], [], false);
+  assert.deepEqual([running, segment, saved].map((t) => t.runs[0].key), ["u", "u", "u"]);
+  const idOf = (thread: typeof saved, target: string) => thread.runs[0].items.find((i) => i.kind === "row" && i.row.steps[0].target === target)?.id;
+  assert.equal(idOf(running, "dos"), idOf(saved, "dos"), "la decisión se movió y la fila sigue siendo la misma");
+  assert.equal(idOf(segment, "uno"), idOf(saved, "uno"));
+  assert.equal(saved.runs[0].live, false);
+});
+
+test("lo expandido distingue el mismo comando por su aparición", () => {
+  const ids = rowIds([user("u"), agent("a", ["ls", "ls"], "Listo")]);
+  assert.equal(new Set(ids).size, 2);
+});
+
+test("en curso cada tramo es un grupo y el avance sigue a la vista; al cerrar se juntan", () => {
+  const live: LivePiece[] = [{ step: stepOf("Bash", "uno") }, { text: "Sigo" }, { step: stepOf("Bash", "dos", null, true) }];
+  const thread = workRuns([user("u")], live, true);
+  assert.deepEqual(thread.live.map((l) => l.kind), ["work", "progress", "work"]);
+  assert.deepEqual(works(thread.live).map((l) => l.live), [false, true]);
+  assert.equal(runningStep(thread.runs[0])?.target, "dos");
+});
+
+test("una respuesta intermedia queda en el chat y en la hoja; la última, solo en el chat", () => {
+  const { lines, runs } = workRuns([user("u"), agent("a", ["uno"], "Primera"), agent("b", ["dos"], "Segunda")], [], false);
+  assert.deepEqual(lines.map((l) => l.kind), ["message", "work", "message", "work", "message"]);
+  assert.deepEqual(runs[0].items.map((i) => (i.kind === "note" ? i.text : "fila")), ["fila", "Primera", "fila"]);
+});
+
+test("la derivación no recalcula las ejecuciones pasadas con cada pedazo vivo", () => {
+  const turns = [user("u"), agent("a", ["uno"], "Listo"), user("v")];
+  const one = workRuns(turns, [{ text: "ho" }], true);
+  const two = workRuns(turns, [{ text: "hola" }], true);
+  assert.equal(one.runs[0], two.runs[0]);
+  assert.equal(one.lines[1], two.lines[1]);
+});
+
+test("sesión vieja sin ids: la clave es el índice del turno que abrió", () => {
+  const { runs } = workRuns([{ role: "user", text: "uno" }, { role: "agent", text: "dos" }, { role: "user", text: "tres" }], [], false);
+  assert.deepEqual(runs.map((r) => r.key), ["0", "2"]);
+});
+
+test("buscar encuentra comandos y avances dentro del grupo", () => {
+  const turn: Turn = { id: "a", role: "agent", text: "Listo", tools: [{ name: "Bash", target: "pnpm verify\nsegunda" }], pieces: [{ text: "Miro el catálogo." }, { tool: 0 }, { text: "Listo" }] };
+  const [group] = works(workRuns([user("u"), turn], [], false).lines);
+  assert.equal(lineMatches(group, "verify"), true);
+  assert.equal(lineMatches(group, "catálogo"), true);
+  assert.equal(lineMatches(group, "nada"), false);
+  assert.equal(hitOf(group, "verify")?.at, 0);
+});
+
+test("el reloj es `started_at` acotado por el mensaje que abrió, y sin dato no hay tiempo", () => {
+  assert.equal(runClock(1000, 400), 1000);
+  assert.equal(runClock(1000, 2000), 2000, "un mensaje inyectado reinicia");
+  assert.equal(runClock(null, 2000), null);
+  assert.equal(runClock(1000, null), 1000);
+  assert.equal(elapsed(5000, 1000), 0, "el reloj del teléfono puede ir atrás del de la máquina");
 });
