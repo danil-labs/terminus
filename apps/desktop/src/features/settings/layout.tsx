@@ -35,7 +35,7 @@ export function SettingsSection(props: SettingsSectionProps) {
   return (
     <section class={cn("grid min-w-0 gap-0.5", own.class)} {...rest}>
       <Show when={title() || aside()}>
-        <header class="flex min-h-7 items-center gap-2">
+        <header class="flex min-h-7 min-w-0 flex-wrap items-center gap-2">
           <h3 class="m-0 min-w-0 flex-1 text-base font-semibold">{title()}</h3>
           {aside()}
         </header>
