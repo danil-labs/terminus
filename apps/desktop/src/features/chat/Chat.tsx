@@ -3512,7 +3512,7 @@ function RegistroDeTrabajo(props: {
                         type="button"
                         title={t("chat.work.open_changes")}
                         onClick={() => props.onVerCambios?.()}
-                        class="pointer-events-auto relative rounded-sm underline decoration-neutral-400 underline-offset-2 hover:text-neutral-950 hover:decoration-current focus-visible:outline-2 focus-visible:outline-primary"
+                        class="pointer-events-auto relative rounded-sm underline decoration-neutral-300 underline-offset-2 hover:text-neutral-950 hover:decoration-current focus-visible:outline-2 focus-visible:outline-primary"
                       >
                         {parte().texto}
                       </button>
