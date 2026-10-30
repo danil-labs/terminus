@@ -2,6 +2,7 @@ import { Show, createEffect, createSignal, onCleanup } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { ASTRO_BODIES, ASTRO_SHAPES, astroBody, isAstroBody, type AstroBody, type AstroNode } from "@terminus/design";
 import type { HandlerStatus } from "../../lib/model";
+import "../../lib/sharedClock";
 import { cn } from "../../lib/utils";
 import { generacionDeAvatar, urlDeAvatar } from "./avatar-src";
 
@@ -28,19 +29,6 @@ const CLASE: Record<Cuerpo, string> = {
   monkeyplanet: "astro-monkeyplanet",
 };
 
-/**
- * Ancla cada animación de un astro al origen del documento. Sin esto cada una
- * cuenta sus pasos desde que montó y N avatares repintan a 12·N cuadros por
- * segundo en vez de 12.
- */
-function alignToSharedClock(event: AnimationEvent) {
-  const face = (event.target as Element | null)?.closest?.(".astro-face");
-  if (!face) return;
-  for (const animation of face.getAnimations({ subtree: true })) {
-    if ("animationName" in animation && animation.startTime !== 0) animation.startTime = 0;
-  }
-}
-
 /** Escondida o sin foco, la ventana apaga los astros (`global.css`). */
 function markWindowIdle() {
   const idle = document.visibilityState !== "visible" || !document.hasFocus();
@@ -48,7 +36,6 @@ function markWindowIdle() {
 }
 
 if (typeof document !== "undefined") {
-  document.addEventListener("animationstart", alignToSharedClock, true);
   document.addEventListener("visibilitychange", markWindowIdle);
   window.addEventListener("focus", markWindowIdle);
   // Al pasar el foco a un iframe del visor la ventana recibe `blur` sin perderlo.
@@ -101,6 +88,7 @@ export function AstroAvatar(props: {
   return (
     <span
       class="astro-face relative inline-flex shrink-0"
+      data-shared-clock
       data-astro-working={props.status === "working" ? "true" : undefined}
     >
       <Show

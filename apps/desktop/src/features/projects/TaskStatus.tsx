@@ -7,6 +7,7 @@ import ShieldQuestion from "lucide-solid/icons/shield-question";
 import { Match, Show, Switch } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { t } from "../../lib/i18n";
+import "../../lib/sharedClock";
 import { cn } from "../../lib/utils";
 import { type TaskActivity, taskPriority } from "@terminus/design";
 
@@ -58,10 +59,13 @@ function railColor(state: ReturnType<typeof taskPriority>) {
   }
 }
 
-/** El arco que gira sobre su pista: «trabajando» en la tarjeta del riel. */
+/**
+ * El arco que gira sobre su pista: «trabajando» en la tarjeta del riel. Va al
+ * reloj común (`lib/sharedClock.ts`): diez tareas trabajando dan un paso juntas.
+ */
 export function RailSpinner(props: { size?: number }) {
   return (
-    <svg viewBox="0 0 16 16" width={props.size ?? 14} height={props.size ?? 14} class="animate-riel-giro" aria-hidden="true">
+    <svg viewBox="0 0 16 16" width={props.size ?? 14} height={props.size ?? 14} class="animate-riel-giro" aria-hidden="true" data-shared-clock>
       <circle cx="8" cy="8" r="5.5" fill="none" stroke-width="2" style={{ stroke: "var(--color-border-strong)" }} />
       <path d="M8 2.5a5.5 5.5 0 0 1 5.5 5.5" fill="none" stroke-width="2" stroke-linecap="round" style={{ stroke: "var(--color-primary)" }} />
     </svg>
@@ -71,7 +75,7 @@ export function RailSpinner(props: { size?: number }) {
 /** El anillo punteado de la tarea que el motor todavía registra. */
 function RailDashedRing(props: { size?: number }) {
   return (
-    <svg viewBox="0 0 16 16" width={props.size ?? 14} height={props.size ?? 14} class="animate-riel-giro-lento text-neutral-500" aria-hidden="true">
+    <svg viewBox="0 0 16 16" width={props.size ?? 14} height={props.size ?? 14} class="animate-riel-giro-lento text-neutral-500" aria-hidden="true" data-shared-clock>
       <circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2.2 2.4" />
     </svg>
   );
