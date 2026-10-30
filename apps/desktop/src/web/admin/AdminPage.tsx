@@ -43,7 +43,7 @@ type Section = "general" | "members" | "support" | "audit" | "workspaces" | "pla
 const SECTIONS: { id: Section; group: "workspace" | "organization"; soon: boolean; icon: () => JSX.Element; name: () => string }[] = [
   { id: "general", group: "workspace", soon: false, icon: () => <Settings size={15} />, name: () => t("web.admin.general") },
   { id: "members", group: "workspace", soon: true, icon: () => <Users size={15} />, name: () => t("web.admin.members") },
-  { id: "support", group: "workspace", soon: false, icon: () => <LifeBuoy size={15} />, name: () => t("settings.support_access.title") },
+  { id: "support", group: "workspace", soon: false, icon: () => <LifeBuoy size={15} />, name: () => t("web.admin.support") },
   { id: "audit", group: "workspace", soon: false, icon: () => <History size={15} />, name: () => t("audit.title") },
   { id: "workspaces", group: "organization", soon: true, icon: () => <Building2 size={15} />, name: () => t("web.admin.org_workspaces") },
   { id: "plan", group: "organization", soon: true, icon: () => <CreditCard size={15} />, name: () => t("web.admin.plan") },

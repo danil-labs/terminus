@@ -276,5 +276,6 @@
   "web.admin.role_owner": "Owner",
   "web.admin.role_admin": "Admin",
   "web.admin.role_member": "Member",
-  "web.admin.demo_other": "Sales"
+  "web.admin.demo_other": "Sales",
+  "web.admin.support": "Support access"
 }
