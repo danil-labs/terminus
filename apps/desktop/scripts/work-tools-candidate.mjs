@@ -5,6 +5,7 @@ import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync,
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
+import { isReleaseVersion } from "./release-version.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const options = new Map();
@@ -19,7 +20,7 @@ const required = (name) => {
 };
 const hash = (path) => createHash("sha256").update(readFileSync(path)).digest("hex");
 const version = required("version");
-if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error("Use a new numeric candidate version.");
+if (!isReleaseVersion(version)) throw new Error("Use a new stable or prerelease SemVer candidate version.");
 if (JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version !== version) throw new Error("Bump the project version before preparing its candidate.");
 const engine = resolve(required("engine"));
 const resources = resolve(required("resources"));

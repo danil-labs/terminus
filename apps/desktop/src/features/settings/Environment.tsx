@@ -1,3 +1,4 @@
+import { getVersion } from "@tauri-apps/api/app";
 import BrowserNavigation from "./BrowserNavigation";
 import Actualizacion from "./Update";
 import {
@@ -75,6 +76,7 @@ const esExtra = (id: string) => !esIncluida(id) && !AJENAS.has(id) && id !== "br
 type Fila = Requirement & { dependency?: Dependency };
 
 export default function Environment() {
+  const [appVersion, setAppVersion] = createSignal<string | null>(null);
   const [filas, setFilas] = createSignal<Dependency[]>([]);
   const [reporte, setReporte] = createSignal<EnvReport | null>(null);
   const [cargando, setCargando] = createSignal(true);
@@ -104,6 +106,7 @@ export default function Environment() {
   }
 
   onMount(() => {
+    void getVersion().then(setAppVersion).catch(() => {});
     void cargar();
 
     const cambios = listen("providers", () => void cargar(true));
@@ -180,6 +183,14 @@ export default function Environment() {
 
   return (
     <SettingsPanel>
+      <Show when={appVersion()}>
+        {(version) => <SettingsSection title={t("settings.environment.release")}>
+          <p class="m-0 font-mono text-body text-neutral-950" data-app-release="">{version()}</p>
+          <Show when={version().split("-")[1]?.split(".")[0]}>
+            {(channel) => <p class="m-0 text-body text-neutral-500">{t("settings.environment.release_channel", { channel: channel() })}</p>}
+          </Show>
+        </SettingsSection>}
+      </Show>
       <Show
         when={capabilities().updater}
         fallback={<SettingsSection title={t("settings.update.title")} description={t("settings.update.web")} />}
