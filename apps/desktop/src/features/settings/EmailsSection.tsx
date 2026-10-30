@@ -43,11 +43,16 @@ export function EmailsSection(props: { source: AccountEmailsSource; onPrimaryCha
   const [draftError, setDraftError] = createSignal<string | null>(null);
   const [sending, setSending] = createSignal(false);
   const [codeFor, setCodeFor] = createSignal<string | null>(null);
-  const [resendAt, setResendAt] = createSignal<number | null>(null);
+  /** Cuándo se puede reenviar a cada dirección: el límite del servidor es por correo. */
+  const [resendAt, setResendAt] = createSignal<Record<string, number>>({});
+  const waitUntil = (email: string, seconds: number) => setResendAt((m) => ({ ...m, [email]: Date.now() + seconds * 1000 }));
   let addWrap: HTMLDivElement | undefined;
   let draftInput: HTMLInputElement | undefined;
 
-  const rows = () => (list() ? emailRows(list()!) : []);
+  // Leer un recurso con error lanza y se lleva el panel entero: solo se lee listo.
+  const ready = () => list.state === "ready" || list.state === "refreshing";
+  const loading = () => list.state === "pending" || list.state === "unresolved";
+  const rows = () => (ready() ? emailRows(list()!) : []);
   const focusAdd = () => queueMicrotask(() => addWrap?.querySelector("button")?.focus());
 
   async function sendCode(email: string, fromDraft: boolean) {
@@ -58,11 +63,11 @@ export function EmailsSection(props: { source: AccountEmailsSource; onPrimaryCha
       setAdding(false);
       setDraft("");
       setCodeFor(sent.email);
-      setResendAt(Date.now() + sent.resendAfter * 1000);
+      waitUntil(sent.email, sent.resendAfter);
       setFeedback({ kind: "success", text: t("danil.emails.sent", { email: sent.email }) });
       void refetch();
     } catch (err) {
-      if (err instanceof AccountEmailsError && err.resendAfter != null) setResendAt(Date.now() + err.resendAfter * 1000);
+      if (err instanceof AccountEmailsError && err.resendAfter != null) waitUntil(email, err.resendAfter);
       if (fromDraft) setDraftError(emailErrorText(err, email));
       else setFeedback({ kind: "error", text: emailErrorText(err, email) });
     } finally {
@@ -83,19 +88,19 @@ export function EmailsSection(props: { source: AccountEmailsSource; onPrimaryCha
     await refetch();
     // El principal es el correo de la persona: la identidad y el pie lo vuelven a leer.
     if (kind === "primary") props.onPrimaryChanged?.();
-    if (kind === "removed") focusAdd();
     if (kind === "verified" || kind === "gone") setCodeFor(null);
+    if (kind === "removed" || kind === "verified" || kind === "gone") focusAdd();
   }
 
   return (
     <SettingsSection title={t("danil.emails.title")} description={t("danil.emails.description")} data-account-emails="">
       <Switch>
-        <Match when={list.loading && !list.latest}>
+        <Match when={loading()}>
           <div class="py-3.5">
             <Skeleton class="h-10" filas={3} />
           </div>
         </Match>
-        <Match when={list.error}>
+        <Match when={list.state === "errored"}>
           <div class="flex items-center gap-3 border-b border-border py-3.5">
             <p class="m-0 flex-1 text-[0.8125rem] text-neutral-950">{t("danil.emails.load_failed")}</p>
             <Button size="sm" variant="secondary" onClick={() => void refetch()}>
@@ -103,7 +108,7 @@ export function EmailsSection(props: { source: AccountEmailsSource; onPrimaryCha
             </Button>
           </div>
         </Match>
-        <Match when={rows().length === 0}>
+        <Match when={ready() && rows().length === 0}>
           <p class="m-0 border-b border-border py-3.5 text-[0.8125rem] text-neutral-500">{t("danil.emails.empty")}</p>
         </Match>
         <Match when={rows().length > 0}>
@@ -115,11 +120,11 @@ export function EmailsSection(props: { source: AccountEmailsSource; onPrimaryCha
                     row={row}
                     source={props.source}
                     codeOpen={codeFor() === row.email}
-                    resendAt={codeFor() === row.email ? resendAt() : row.resendAfter ? Date.now() + row.resendAfter * 1000 : null}
+                    resendAt={resendAt()[row.email] ?? null}
                     onOpenCode={() => {
                       setFeedback(null);
                       setCodeFor(row.email);
-                      if (row.resendAfter) setResendAt(Date.now() + row.resendAfter * 1000);
+                      if (row.resendAfter && resendAt()[row.email] == null) waitUntil(row.email, row.resendAfter);
                     }}
                     onCloseCode={() => setCodeFor(null)}
                     onResend={() => void sendCode(row.email, false)}
@@ -145,7 +150,7 @@ export function EmailsSection(props: { source: AccountEmailsSource; onPrimaryCha
             <Button
               size="sm"
               variant="secondary"
-              disabled={list.loading && !list.latest}
+              disabled={loading()}
               onClick={() => {
                 setFeedback(null);
                 setAdding(true);
@@ -251,6 +256,18 @@ function EmailItem(props: ItemProps) {
   const [confirming, setConfirming] = createSignal<"primary" | "remove" | null>(null);
   const [busy, setBusy] = createSignal(false);
   const email = () => props.row.email;
+  let box: HTMLDivElement | undefined;
+  // El botón que se pulsó desaparece: el foco va a lo que lo reemplaza, no al body.
+  const focusIn = (selector: string) => queueMicrotask(() => box?.querySelector<HTMLElement>(selector)?.focus());
+  const ask = (what: "primary" | "remove") => {
+    props.onResult(null);
+    setConfirming(what);
+    focusIn("[data-email-confirm] button");
+  };
+  const unask = () => {
+    setConfirming(null);
+    focusIn("[data-email-action]");
+  };
 
   async function run(action: () => Promise<void>, ok: string, kind: "primary" | "removed") {
     setBusy(true);
@@ -276,7 +293,7 @@ function EmailItem(props: ItemProps) {
           : t("danil.emails.pending_hint");
 
   return (
-    <div class="grid gap-2 border-b border-border py-3.5" data-account-email={email()}>
+    <div ref={box} class="grid gap-2 border-b border-border py-3.5" data-account-email={email()}>
       <div class="flex min-w-0 items-center gap-3">
         <span class="grid size-9 shrink-0 place-items-center rounded-md bg-surface-muted text-neutral-700">
           <Mail size={18} />
@@ -303,6 +320,7 @@ function EmailItem(props: ItemProps) {
                     size="sm"
                     variant="secondary"
                     aria-label={t("danil.emails.enter_code_label", { email: email() })}
+                    data-email-action=""
                     onClick={props.onOpenCode}
                   >
                     {t("danil.emails.enter_code")}
@@ -314,10 +332,8 @@ function EmailItem(props: ItemProps) {
                 size="sm"
                 variant="secondary"
                 aria-label={t("danil.emails.make_primary_label", { email: email() })}
-                onClick={() => {
-                  props.onResult(null);
-                  setConfirming("primary");
-                }}
+                data-email-action=""
+                onClick={() => ask("primary")}
               >
                 {t("danil.emails.make_primary")}
               </Button>
@@ -327,10 +343,8 @@ function EmailItem(props: ItemProps) {
               variant="ghost"
               aria-label={t("danil.emails.remove_label", { email: email() })}
               title={t("danil.emails.remove")}
-              onClick={() => {
-                props.onResult(null);
-                setConfirming("remove");
-              }}
+              data-email-action=""
+              onClick={() => ask("remove")}
             >
               <Trash2 size={14} />
             </Button>
@@ -339,7 +353,7 @@ function EmailItem(props: ItemProps) {
       </div>
 
       <Show when={confirming() === "primary"}>
-        <div class="grid gap-2 rounded-md border border-border bg-surface-muted p-3">
+        <div class="grid gap-2 rounded-md border border-border bg-surface-muted p-3" data-email-confirm="">
           <p class="m-0 text-[0.8125rem] font-semibold text-neutral-950">{t("danil.emails.primary_confirm", { email: email() })}</p>
           <p class="m-0 text-[0.8125rem] text-neutral-500">{t("danil.emails.primary_confirm_hint")}</p>
           <div class="flex items-center gap-2">
@@ -350,7 +364,7 @@ function EmailItem(props: ItemProps) {
             >
               {busy() ? t("danil.emails.changing") : t("danil.emails.make_primary")}
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setConfirming(null)}>
+            <Button size="sm" variant="ghost" onClick={unask}>
               {t("danil.emails.cancel")}
             </Button>
           </div>
@@ -358,7 +372,7 @@ function EmailItem(props: ItemProps) {
       </Show>
 
       <Show when={confirming() === "remove"}>
-        <div class="grid gap-2 rounded-md border border-border bg-surface-muted p-3">
+        <div class="grid gap-2 rounded-md border border-border bg-surface-muted p-3" data-email-confirm="">
           <p class="m-0 text-[0.8125rem] font-semibold text-neutral-950">{t("danil.emails.remove_confirm", { email: email() })}</p>
           <p class="m-0 text-[0.8125rem] text-neutral-500">{t("danil.emails.remove_confirm_hint")}</p>
           <div class="flex items-center gap-2">
@@ -370,7 +384,7 @@ function EmailItem(props: ItemProps) {
             >
               {t("danil.emails.remove")}
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setConfirming(null)}>
+            <Button size="sm" variant="ghost" onClick={unask}>
               {t("danil.emails.cancel")}
             </Button>
           </div>
@@ -384,7 +398,10 @@ function EmailItem(props: ItemProps) {
           resendAt={props.resendAt}
           onResend={props.onResend}
           resending={props.resending}
-          onClose={props.onCloseCode}
+          onClose={() => {
+            props.onCloseCode();
+            focusIn("[data-email-action]");
+          }}
           onResult={props.onResult}
           onChanged={props.onChanged}
         />
@@ -410,6 +427,7 @@ function CodeForm(props: {
   const wait = countdown(() => props.resendAt);
   const errorId = `account-email-code-error-${props.email}`;
   let input: HTMLInputElement | undefined;
+  let resend: HTMLSpanElement | undefined;
   onMount(() => input?.focus());
 
   async function confirm() {
@@ -429,6 +447,8 @@ function CodeForm(props: {
       if (reason === "code_expired" || reason === "no_challenge") setDead("expired");
       if (reason === "too_many_attempts") setDead("exhausted");
       setError(emailErrorText(err, props.email));
+      // El campo queda desactivado y suelta el foco: pasa a pedir otro código.
+      if (reason === "too_many_attempts") queueMicrotask(() => resend?.closest("form")?.querySelector<HTMLElement>("button:not(:disabled)")?.focus());
     } finally {
       setBusy(false);
     }
@@ -475,26 +495,28 @@ function CodeForm(props: {
         <Button type="submit" size="sm" disabled={code().length !== 6 || busy() || dead() != null}>
           {busy() ? t("danil.emails.confirming") : t("danil.emails.confirm")}
         </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          disabled={wait() > 0 || props.resending}
-          aria-label={wait() > 0 ? t("danil.emails.resend") : undefined}
-          onClick={() => {
-            setCode("");
-            setError(null);
-            setDead(null);
-            props.onResend();
-          }}
-        >
-          <Show
-            when={wait() > 0}
-            fallback={dead() === "expired" ? t("danil.emails.send_new") : t("danil.emails.resend")}
+        <span ref={resend} class="contents">
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={wait() > 0 || props.resending}
+            aria-label={wait() > 0 ? t("danil.emails.resend") : undefined}
+            onClick={() => {
+              setCode("");
+              setError(null);
+              setDead(null);
+              props.onResend();
+            }}
           >
-            <span aria-hidden="true">{t("danil.emails.resend_in", { seconds: String(wait()).padStart(2, "0") })}</span>
-          </Show>
-        </Button>
+            <Show
+              when={wait() > 0}
+              fallback={dead() === "expired" ? t("danil.emails.send_new") : t("danil.emails.resend")}
+            >
+              <span aria-hidden="true">{t("danil.emails.resend_in", { seconds: String(wait()).padStart(2, "0") })}</span>
+            </Show>
+          </Button>
+        </span>
         <Button type="button" size="sm" variant="ghost" onClick={props.onClose}>
           {t("danil.emails.later")}
         </Button>
