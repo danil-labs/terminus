@@ -33,6 +33,8 @@ import {
 import type { ModelChoices } from "../projects/NewAgent";
 import AIProviders from "./AIProviders";
 import Environment from "./Environment";
+import { machines } from "../machines/store";
+import { secretsRoute } from "./secrets-support";
 import General from "./General";
 import type { ContextoDeProyectos } from "./ManageProjects";
 import Plugins from "./Plugins";
@@ -402,6 +404,8 @@ export default function Settings(props: {
       onAgentProfile: (project, name) => props.onAgentProfile?.(project, name),
     }, props.proyectos, () => props.workspace ?? null, () => props.activityMachine ?? null);
 
+  const navegables = () => TODOS().filter((destination) => destination.id !== "secretos" || secretsRoute(capabilities().accountCredentials ? "worker" : "engine", machines()) !== "unsupported");
+
   const [activo, setActivo] = createSignal(props.panel ?? "general");
   let hoja: HTMLDivElement | undefined;
   // El foco viaja con las flechas sin arrastrar la selección: así se puede
@@ -438,7 +442,7 @@ export default function Settings(props: {
   });
 
   function mover(paso: number | "inicio" | "fin") {
-    const destinos = TODOS();
+    const destinos = navegables();
     const i = destinos.findIndex((d) => d.id === foco());
     const j =
       paso === "inicio"
@@ -600,7 +604,7 @@ export default function Settings(props: {
                       <SidebarMenu role="presentation" class="gap-1.5">
                         <For each={g.ids}>
                           {(id) => (
-                            <Show when={TODOS().find((d) => d.id === id)}>
+                            <Show when={navegables().find((d) => d.id === id)}>
                               {(d) => <Fila d={d()} />}
                             </Show>
                           )}
