@@ -17,6 +17,7 @@ import {
 import { cn } from "../../lib/utils";
 import { prosa } from "../../lib/prose";
 import { t } from "../../lib/i18n";
+import { Spinner } from "../../ui/Spinner";
 
 /**
  * La representación única de una cuenta de agente.
@@ -233,11 +234,7 @@ export default function AccountCard(props: {
                 when={props.loadingLimits}
                 fallback={<span>{t("settings.account_card.not_asked")}</span>}
               >
-                <RefreshCw
-                  size={11}
-                  class="animate-spin"
-                  aria-label={t("settings.account_card.asking")}
-                />
+                <Spinner size={11} label={t("settings.account_card.asking")} />
               </Show>
             </p>
           </Show>

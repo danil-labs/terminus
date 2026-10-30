@@ -6,7 +6,6 @@ import CircleAlert from "lucide-solid/icons/circle-alert";
 import FileDown from "lucide-solid/icons/file-down";
 import Maximize2 from "lucide-solid/icons/maximize-2";
 import Minimize2 from "lucide-solid/icons/minimize-2";
-import RefreshCw from "lucide-solid/icons/refresh-cw";
 import RotateCcw from "lucide-solid/icons/rotate-ccw";
 import TriangleAlert from "lucide-solid/icons/triangle-alert";
 import ZoomIn from "lucide-solid/icons/zoom-in";
@@ -45,6 +44,7 @@ import {
   vivaDe,
   zoomDe,
 } from "./typst";
+import { Spinner } from "../../ui/Spinner";
 
 /**
  * La vista en vivo de un documento Typst de la tarea: la página de Tinymist en
@@ -269,7 +269,7 @@ export default function VistaPreviaTypst(props: {
             fallback={
               <Show when={compilando()}>
                 <span role="status" title={t("code.typst.compiling")} aria-label={t("code.typst.compiling")} class="grid size-6 place-items-center">
-                  <RefreshCw size={13} class="animate-spin text-primary" aria-hidden="true" />
+                  <Spinner size={13} class="text-primary" />
                 </span>
               </Show>
             }
