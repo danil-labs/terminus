@@ -38,17 +38,20 @@ const WAKE_MS = Number(option("wake-ms", "800"));
 const WORKSPACE_MODE = option("workspace-mode", null);
 const TOKEN = "fake-jwt";
 const INTENT = new Set(["send_message", "inject_message", "create_project", "start_project_clone", "create_agent", "create_agent_thread", "add_account", "login_account", "submit_login_code", "respond_permission", "answer_question", "answer_shell_output", "run_shell_command", "queue_ready", "resume_awaiting_quota", "recreate_task_work"]);
-const MIRROR = new Set(["workspaces_startup", "list_workspaces", "list_projects", "list_spaces", "list_live_sessions", "list_agent_status", "list_providers", "load_session", "pending_requests", "list_active_turns", "list_workspace_attention", "list_agents", "list_agent_profiles"]);
+const MIRROR = new Set(["workspaces_startup", "list_workspaces", "list_projects", "list_spaces", "list_live_sessions", "list_agent_status", "list_providers", "load_session", "pending_requests", "list_active_turns", "list_workspace_attention", "list_agents", "list_agent_profiles", "archived_tasks"]);
 
 // --- Motores --------------------------------------------------------------------
 
 function engine(name, ws, projects, tasks, accounts) {
   const now = Date.now();
   const sessions = new Map(tasks.map((t, i) => [t.id, { ...t, created_at: now - (i + 1) * 60_000, updated_at: now - i * 60_000, turns: [{ id: `${t.id}-u`, role: "user", text: t.title }, { id: `${t.id}-a`, role: "agent", text: `Hecho en ${name}.` }, ...(t.incoming ?? [])], pending: null }]));
-  return { name, ws, projects, sessions, live: new Set(), cursor: 0, events: [], accounts, files: new Set(), logins: new Map(), gitObserved: new Set() };
+  const spaces = [{ id: "s1", name: null, folders: [], created_at: now, updated_at: now }];
+  return { name, ws, projects, sessions, spaces, awake: "agent", live: new Set(), cursor: 0, events: [], accounts, files: new Set(), logins: new Map(), gitObserved: new Set() };
 }
 
 const HOUR = 3_600_000;
+/** El logo del workspace en la cuenta (`GET /v1/workspaces/:id/logo`); `--broken-logo` lo hace fallar y `--no-logo` lo quita. */
+const LOGO_PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAABjklEQVR42tXPSVIQQBBE0TxAHhAERBFQQGYUkBlUEAeQ8Y55CdjWriIXXRHV8db5q6EJtgZNsjXoDVuDptgaNM3WoBm2Br1la9AsW4PesTXoPVuD5tga9IGtQfNsDVpga9AiW4M+sjXoEy0vg597D7REy/APmPdAy7QM/4B5D7RCy/APmPdAn2kZ/gHzHmiVluEfMO+B1mgZ/gHzHmidluEfMO+BNmgZ/gHzHmiTluEfMO+BtmhJ8iULEbRNS5IvWYigHVqSfMlCBH2hJcmXLETQV1qSfMlCBO3SkuRLFiJoj5YkX7IQQfu0JPmShQj6RkuSL1mIoANaknzJQgQd0pLkSxYi6IiWJF+yEEHHtCT5koUIOqElyZcsRNApLUm+ZCGCzmhJ8iULEXROS5IvWYigC1qSfMlCBH2nJcmXLETQD1qSfMlCBP2kJcmXLETQJS1JvmQhgq7YGvSLrUHXbA36zdagP2wN+svWoH9sDbpha9AtW4P+szXojq1B92wNemBr0CNbg57YGvTM1l4B3PqAwlYG9wwAAAAASUVORK5CYII=", "base64");
 
 const machines = {
   cmp_vm: {
@@ -80,6 +83,9 @@ const machines = {
     mirror: new Map(),
   },
 };
+
+// La Mac tiene un motor anterior a la UI nueva: no conoce Mantener despierta ni los puertos y contesta `command`, como el motor.
+machines.cmp_mac.engine.older = new Set(["keep_awake_status", "set_keep_awake", "list_ports"]);
 
 const row = (s) => ({
   id: s.id, title: s.title, provider: s.provider, model: s.model, last_message: s.turns.at(-1)?.text ?? null,
@@ -208,8 +214,14 @@ function startClone(m, args) {
   return { operation: args.operation };
 }
 
+/** Lo que eliminar un espacio toca: sus tareas sin archivar, como `TaskSeen`. */
+function seenIn(e, space) {
+  return [...e.sessions.values()].filter((s) => s.space === space && !s.archived).map((s) => ({ folder: s.project, task: s.id, root: s.id, title: s.title, working: e.live.has(s.id), files: [], kn_pending: [] }));
+}
+
 function invoke(m, command, args) {
   const e = m.engine;
+  if (e.older?.has(command)) throw { code: "command", detail: command };
   switch (command) {
     case "list_activity": return [{ id: "maintenance-qa", project: e.projects[0].id, title: `Actualizar herramientas en ${e.name}`, state: "success", created_at: Date.now() - 60000, updated_at: Date.now() - 30000, steps: 1 }];
     case "read_activity": return { ...invoke(m, "list_activity", {})[0], steps: [{ id: "step-qa", command: "terminus --version", cwd: "/lab/tools", state: "success", started_at: Date.now() - 60000, ended_at: Date.now() - 30000, exit_code: 0, error: null }] };
@@ -229,7 +241,43 @@ function invoke(m, command, args) {
     }
     case "list_workspaces": return { workspaces: [{ id: e.ws, name: "Producto", default_permission_mode: WORKSPACE_MODE }], active: e.ws };
     case "list_projects": return e.projects.map((p) => ({ ...p, working_directory: `/lab/${p.name}` }));
-    case "list_spaces": return [{ id: "s1", name: null, folders: e.projects.map((p) => p.id) }];
+    // El primero tiene todas las carpetas, también las que se crean después.
+    case "list_spaces": return e.spaces.map((x) => (x.id === "s1" ? { ...x, folders: e.projects.map((p) => p.id) } : x));
+    case "create_space": {
+      const space = { id: `s-${randomUUID().slice(0, 8)}`, name: String(args.name), folders: args.folders ?? [], created_at: Date.now(), updated_at: Date.now() };
+      e.spaces.push(space);
+      return space;
+    }
+    case "rename_space": {
+      const space = e.spaces.find((x) => x.id === args.id);
+      if (!space) throw { code: "command_failed", detail: { what: { clave: "spaces.error.not_found" }, detail: args.id } };
+      Object.assign(space, { name: String(args.name), updated_at: Date.now() });
+      return space;
+    }
+    case "space_delete_preview": {
+      const space = e.spaces.find((x) => x.id === args.id);
+      if (!space) throw { code: "command_failed", detail: { what: { clave: "spaces.error.not_found" }, detail: args.id } };
+      return { space: { id: space.id, name: space.name }, last: e.spaces.length === 1, tasks: seenIn(e, space.id) };
+    }
+    case "delete_space": {
+      const space = e.spaces.find((x) => x.id === args.id);
+      if (!space || e.spaces.length === 1) throw { code: "command_failed", detail: { what: { clave: "spaces.error.last" }, detail: args.id } };
+      // Como el motor: si ve algo que la persona no vio, no borra y devuelve la previa nueva.
+      const now = seenIn(e, space.id);
+      const seen = new Set((args.seen?.tasks ?? []).map((t) => t.task));
+      if (now.some((t) => !seen.has(t.task))) return { deleted: false, changed: { space: { id: space.id, name: space.name }, last: false, tasks: now }, failures: [] };
+      for (const t of now) e.sessions.get(t.task).archived = true;
+      e.spaces.splice(e.spaces.indexOf(space), 1);
+      return { deleted: true, changed: null, failures: [] };
+    }
+    case "keep_awake_status": return { mode: e.awake, active: e.awake === "on" || (e.awake === "agent" && e.live.size > 0), supported: true };
+    case "set_keep_awake": {
+      if (!["on", "agent", "off"].includes(args.mode)) throw { code: "command_failed", detail: "unknown mode" };
+      e.awake = args.mode;
+      return invoke(m, "keep_awake_status", {});
+    }
+    case "list_ports": return { tareas: [], externos: [{ id: "tcp-5173", pid: 4242, puerto: 5173, direccion: "*:5173", url: "http://localhost:5173", comando: "node" }], aviso: null };
+    case "archived_tasks": return { tasks: [...e.sessions.values()].filter((s) => s.archived).map((s) => ({ ...row(s), folder: s.project })), spaces: [] };
     case "list_live_sessions": return [...e.sessions.values()].filter((s) => s.project === args.project && !s.archived).map(row);
     case "list_agents": return { agents: args.project === "p-vm-web" ? [{ name: "Ada", description: "Revisa PRs" }] : [] };
     case "list_agent_profiles": return args.project === "p-vm-web" ? { Ada: { body: "catplanet", avatar: process.argv.includes("--custom-avatar") ? "/lab/avatar.svg" : null } } : {};
@@ -682,9 +730,16 @@ const server = createServer((request, response) => {
           updated_at: new Date(0).toISOString(),
           projects: [{ id: "p-mac-api", name: "api", remote_url: null, default_branch: null, home_computer_id: "cmp_mac" }],
           computers: Object.keys(machines),
+          logo_url: process.argv.includes("--no-logo") ? null : `http://${request.headers.host}/v1/workspaces/w-prod/logo`,
+          background_url: null,
         },
       ],
     });
+  if (url.pathname === "/v1/workspaces/w-prod/logo" && request.method === "GET") {
+    if (process.argv.includes("--broken-logo")) return json(response, 500, { error: { code: "unavailable" } });
+    response.writeHead(200, { "content-type": "image/png", "access-control-allow-origin": "*", "access-control-allow-headers": "*" });
+    return response.end(LOGO_PNG);
+  }
   if (url.pathname.includes("/memory/")) {
     void memory(request, response, url).then((handled) => handled || json(response, 404, { error: { code: "not_found" } }));
     return;

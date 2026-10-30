@@ -10,16 +10,22 @@ test("una delegada no sale suelta: cuelga de su lanzador, como en el escritorio"
   assert.deepEqual(flattenTasks(rows, true).map((t) => t.row.id), ["lanzador", "delegada", "subagente"], "buscando sí sale");
 });
 
-test("una delegada cuyo lanzador ya no existe sale suelta", () => {
+// Al archivar o finalizar la madre, sus subtareas subían al riel: la regla miraba
+// si el lanzador estaba en la lista, no si la tarea era una subtarea.
+test("una subtarea no sube al riel aunque su lanzador no esté en la lista", () => {
+  const archivado = { p: [row("lanzador", 3, { archived: true }), row("delegada", 2, { launched_by: "lanzador", launcher_available: true })] };
+  assert.deepEqual(flattenTasks(archivado).map((t) => t.row.id), []);
   const ida = { p: [row("delegada", 2, { launched_by: "borrado" })] };
-  assert.deepEqual(flattenTasks(ida).map((t) => t.row.id), ["delegada"]);
+  assert.deepEqual(flattenTasks(ida).map((t) => t.row.id), []);
   const noDisponible = { p: [row("lanzador", 3), row("delegada", 2, { launched_by: "lanzador", launcher_available: false })] };
-  assert.deepEqual(flattenTasks(noDisponible).map((t) => t.row.id), ["lanzador", "delegada"]);
+  assert.deepEqual(flattenTasks(noDisponible).map((t) => t.row.id), ["lanzador"]);
+  const fijada = { p: [row("delegada", 2, { launched_by: "borrado", pinned: true })] };
+  assert.deepEqual(flattenTasks(fijada).map((t) => t.row.id), ["delegada"], "fijada sí sale");
 });
 
-test("con prefijo de máquina (la web) la regla es la misma si `launched_by` lo lleva también", () => {
+test("con prefijo de máquina (la web) la regla es la misma", () => {
   const rows = { p: [row("mac~l", 3), row("mac~d", 2, { launched_by: "mac~l" }), row("vm~d", 1, { launched_by: "vm~l" })] };
-  assert.deepEqual(flattenTasks(rows).map((t) => t.row.id), ["mac~l", "vm~d"], "la de la VM no tiene lanzador en la lista: sale suelta");
+  assert.deepEqual(flattenTasks(rows).map((t) => t.row.id), ["mac~l"]);
 });
 
 test("las delegadas de un lanzador: vivas, directas y de la más nueva a la más vieja", () => {

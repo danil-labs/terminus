@@ -194,7 +194,7 @@ export default function SpaceBar(props: {
                     <ContextMenuGroupLabel>{spaceName(i())}</ContextMenuGroupLabel>
                     <ContextMenuItem class="flex items-center justify-between gap-2" onSelect={() => (renombrarAlCerrar = true)}>
                       {t("spaces.menu.rename")}
-                      <kbd class="font-sans text-[0.6875rem] text-neutral-500">F2</kbd>
+                      <kbd class="font-sans text-caption text-neutral-500">F2</kbd>
                     </ContextMenuItem>
                   </ContextMenuGroup>
                   <ContextMenuSeparator />
@@ -214,7 +214,7 @@ export default function SpaceBar(props: {
                     >
                       {t("spaces.menu.delete")}
                     </ContextMenuItem>
-                    <p id={`por-que-no-${i().id}`} class="m-0 max-w-56 px-2 pt-0.5 pb-1.5 text-[0.6875rem] leading-snug text-neutral-500">
+                    <p id={`por-que-no-${i().id}`} class="m-0 max-w-56 px-2 pt-0.5 pb-1.5 text-caption leading-snug text-neutral-500">
                       {t("spaces.menu.delete_last")}
                     </p>
                   </Show>
@@ -236,39 +236,10 @@ function NewSpace(props: {
   onCrear: (name: string, folders: string[]) => Promise<void>;
 }) {
   const [abierta, setAbierta] = createSignal(false);
-  const [nombre, setNombre] = createSignal("");
-  const [elegidas, setElegidas] = createSignal<string[]>([]);
-  const [creando, setCreando] = createSignal(false);
-  const [fallo, setFallo] = createSignal<Failure | null>(null);
-  // Las últimas que se agregaron a Terminus, delante: lo reciente es lo que se
-  // agrega. Solo diez, que son las que caben sin desplazar el resto del alta.
-  const recientes = () => [...props.proyectos].reverse().slice(0, 10);
-  const abrir = (si: boolean) => {
-    if (!si && creando()) return;
-    setAbierta(si);
-    if (si) {
-      setNombre("");
-      setElegidas([]);
-      setFallo(null);
-    }
-  };
-  const crear = async () => {
-    const name = nombre().trim();
-    if (!name || creando()) return;
-    setCreando(true);
-    setFallo(null);
-    try {
-      await props.onCrear(name, elegidas());
-      setAbierta(false);
-    } catch (e) {
-      setFallo(asFailure(e));
-    } finally {
-      setCreando(false);
-    }
-  };
-
+  // Mientras crea no se cierra: el alta a medias quedaría sin aviso de fallo.
+  let creando = false;
   return (
-    <Popover open={abierta()} onOpenChange={abrir} placement="bottom-start" gutter={4}>
+    <Popover open={abierta()} onOpenChange={(si) => (si || !creando) && setAbierta(si)} placement="bottom-start" gutter={4}>
       <PopoverTrigger
         data-new-space=""
         aria-label={t("spaces.new.title")}
@@ -278,7 +249,46 @@ function NewSpace(props: {
         <Plus size={14} aria-hidden="true" />
       </PopoverTrigger>
       <PopoverContent class="w-80 p-3" aria-label={t("spaces.new.title")}>
-        <h3 class="m-0 mb-2 text-[0.8125rem] font-semibold">{t("spaces.new.title")}</h3>
+        <NewSpaceForm {...props} onBusy={(b) => (creando = b)} onClose={() => setAbierta(false)} />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** El formulario del alta, sin su ventana: lo usan el «+» y el menú de espacios. */
+export function NewSpaceForm(props: {
+  workspace: string;
+  proyectos: Project[];
+  onCrear: (name: string, folders: string[]) => Promise<void>;
+  onClose: () => void;
+  onBusy?: (busy: boolean) => void;
+}) {
+  const [nombre, setNombre] = createSignal("");
+  const [elegidas, setElegidas] = createSignal<string[]>([]);
+  const [creando, setCreando] = createSignal(false);
+  const [fallo, setFallo] = createSignal<Failure | null>(null);
+  // Las últimas que se agregaron a Terminus, delante: lo reciente es lo que se
+  // agrega. Solo diez, que son las que caben sin desplazar el resto del alta.
+  const recientes = () => [...props.proyectos].reverse().slice(0, 10);
+  const crear = async () => {
+    const name = nombre().trim();
+    if (!name || creando()) return;
+    setCreando(true);
+    props.onBusy?.(true);
+    setFallo(null);
+    try {
+      await props.onCrear(name, elegidas());
+      props.onClose();
+    } catch (e) {
+      setFallo(asFailure(e));
+    } finally {
+      setCreando(false);
+      props.onBusy?.(false);
+    }
+  };
+  return (
+    <>
+        <h3 class="m-0 mb-2 text-ui font-semibold">{t("spaces.new.title")}</h3>
         <form
           class="grid gap-3"
           onSubmit={(e) => {
@@ -286,7 +296,7 @@ function NewSpace(props: {
             void crear();
           }}
         >
-          <label class="grid gap-1 text-[0.75rem] text-neutral-500">
+          <label class="grid gap-1 text-label text-neutral-500">
             {t("spaces.new.name")}
             <Input
               ref={(el: HTMLInputElement) => setTimeout(() => el.focus(), 0)}
@@ -298,11 +308,11 @@ function NewSpace(props: {
             />
           </label>
           <fieldset class="m-0 grid gap-1 border-0 p-0">
-            <legend class="mb-1 p-0 text-[0.75rem] text-neutral-500">{t("spaces.new.folders")}</legend>
+            <legend class="mb-1 p-0 text-label text-neutral-500">{t("spaces.new.folders")}</legend>
             <Show
               when={props.proyectos.length > 0}
               fallback={
-                <p class="m-0 text-[0.75rem] text-neutral-500">
+                <p class="m-0 text-label text-neutral-500">
                   {t("spaces.new.no_folders", { workspace: props.workspace })}
                 </p>
               }
@@ -310,7 +320,7 @@ function NewSpace(props: {
               <div class="grid max-h-36 gap-1 overflow-y-auto">
                 <For each={recientes()}>
                   {(p) => (
-                    <label class="flex min-w-0 items-center gap-2 text-[0.8125rem]">
+                    <label class="flex min-w-0 items-center gap-2 text-ui">
                       <input
                         type="checkbox"
                         class="size-4 shrink-0 accent-primary"
@@ -329,7 +339,7 @@ function NewSpace(props: {
           </fieldset>
           <Show when={fallo()}>{(f) => <FailureNote f={f()} />}</Show>
           <div class="flex justify-end gap-2">
-            <Button type="button" variant="ghost" size="sm" disabled={creando()} onClick={() => setAbierta(false)}>
+            <Button type="button" variant="ghost" size="sm" disabled={creando()} onClick={props.onClose}>
               {t("spaces.new.cancel")}
             </Button>
             <Button type="submit" size="sm" disabled={!nombre().trim() || creando()}>
@@ -337,7 +347,6 @@ function NewSpace(props: {
             </Button>
           </div>
         </form>
-      </PopoverContent>
-    </Popover>
+    </>
   );
 }

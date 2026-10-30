@@ -1,13 +1,7 @@
-import Archive from "lucide-solid/icons/archive";
 import History from "lucide-solid/icons/history";
-import Loader2 from "lucide-solid/icons/loader-2";
-import PanelLeftClose from "lucide-solid/icons/panel-left-close";
 import Plus from "lucide-solid/icons/plus";
-import Search from "lucide-solid/icons/search";
-import SettingsIcon from "lucide-solid/icons/settings";
 import SquarePen from "lucide-solid/icons/square-pen";
 import TriangleAlert from "lucide-solid/icons/triangle-alert";
-import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createResource, createSignal, type JSX, lazy, mapArray, on, onCleanup, Show, Suspense } from "solid-js";
 import { destinoEnVuelo, puntoDelArrastre, tareaEnVuelo } from "../../lib/drag";
 import { recordarCarpetas } from "../../lib/folderKinds";
@@ -18,16 +12,11 @@ import type { AgentProfile, HandlerList, HandlerStatus, Project } from "../../li
 import { createPref } from "../../lib/prefs";
 import { sharedLazy } from "../../lib/sharedLazy";
 import { ariaDeAtajo } from "../../lib/shortcuts";
-import { capabilities } from "../../lib/platform";
 import { cn } from "../../lib/utils";
-import { Button } from "../../ui/Button";
-import { Input } from "../../ui/Input";
 import { KeyedList } from "../../ui/KeyedList";
-import { BotonConAtajo, TeclaDeAtajo } from "../../ui/Shortcut";
+import { TeclaDeAtajo } from "../../ui/Shortcut";
 import {
   SidebarContent,
-  SidebarFooter,
-  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -40,29 +29,28 @@ import type { ModelChoices } from "../projects/NewAgent";
 import { watchProfiles } from "../projects/profiles";
 import Sessions, { type SessionRow } from "../projects/Sessions";
 import type { Etapa } from "../projects/TaskStage";
-import { ConexionesMenu } from "../settings/Tools";
 import {
   agentOptions,
   applySidebarView,
   groupKey,
   groupLabel,
-  loadSidebarView,
-  saveSidebarView,
+  setSidebarView,
+  sidebarView,
   type SidebarGroup,
   type SidebarView,
 } from "../../lib/sidebarView";
 import type { DockAgent } from "./dockLayout";
+import type { SidebarFilterProps } from "./SidebarFilter";
 import { flattenTasks, folderCounts } from "./sidebarTasks";
 import { machineName, machines } from "../machines/store";
 // Solo al crear un encargado: fuera de la carga inicial.
 import { LazyPart, retryableLazy } from "../../ui/LazyPart";
+import { Spinner } from "../../ui/Spinner";
 const NewAgent = retryableLazy(() => import("../projects/NewAgent"));
 
 // Fuera de la carga inicial: el botón y el dock llegan un instante después de la lista.
-const SidebarFilter = lazy(() => import("./SidebarFilter").then((m) => ({ default: m.SidebarFilter })));
 const AgentDock = lazy(() => import("./AgentDock"));
 const FolderGroupHeader = sharedLazy(() => import("./FolderGroupHeader"));
-const DanilFooterEntry = lazy(() => import("./DanilFooterEntry"));
 
 /* El ancho vive en `ColumnaLateral`, que es la columna que envuelve a esta
    barra. Aquí había cuatro constantes —expandido, mínimo, máximo y el riel— que
@@ -86,11 +74,24 @@ const RECIBE_LA_TAREA = ["ring-2", "ring-primary"];
  * tarea porque es de ella.
  */
 export function createSidebar() {
-  const [colapsado, setColapsado] = createPref("sidebar.collapsed", false);
+  const [savedCollapsed, setSavedCollapsed] = createPref("sidebar.collapsed", false);
+  const media = window.matchMedia("(max-width: 600px)");
+  const [narrow, setNarrow] = createSignal(media.matches);
+  const [narrowCollapsed, setNarrowCollapsed] = createSignal(true);
+  const update = () => {
+    setNarrow(media.matches);
+    if (media.matches) setNarrowCollapsed(true);
+  };
+  media.addEventListener("change", update);
+  onCleanup(() => media.removeEventListener("change", update));
+  // El teléfono abre sin historial y no cambia la preferencia del escritorio.
+  const colapsado = () => narrow() ? narrowCollapsed() : savedCollapsed();
 
   return {
     colapsado,
-    alternar: () => setColapsado(!colapsado()),
+    alternar: () => narrow()
+      ? setNarrowCollapsed(!narrowCollapsed())
+      : setSavedCollapsed(!savedCollapsed()),
   };
 }
 
@@ -148,15 +149,19 @@ export default function Sidebar(props: {
   onRenombrar: (project: string, id: string, title: string) => Promise<boolean | void> | boolean | void;
   onPin?: (project: string, id: string, pinned: boolean) => void | Promise<void>;
   onSettings: (panel?: string) => void;
+  attentionMenu?: (collapsed: boolean) => JSX.Element;
   /** Abre el chat con un agente de esa carpeta, como su fila de antes. */
   onHablarCon: (project: string, name: string) => void;
   onAgentProfile: (project: string, name: string) => void;
   /** Dónde se guarda la vista del riel: una por workspace y espacio (`sidebarViewKey`). */
   viewKey: string;
+  /**
+   * Entrega el filtro del riel al botón Personalizar de la franja; al desmontar,
+   * `null` con el que se suelta, para no borrar el de un riel que ya lo relevó.
+   */
+  filterRef?: (filter: SidebarFilterProps | null, released?: SidebarFilterProps) => void;
   /** El nombre del escritorio activo, para su riel vacío. */
   escritorio?: string | null;
-  viendoArchivadas?: boolean;
-  onArchivadas?: () => void;
   spaces?: { id: string; name: string }[];
   onMoveToSpace?: (project: string, id: string, space: string) => void;
   /** «Traer a esta Mac» en el menú de una tarea de otra máquina; solo en el escritorio. */
@@ -212,19 +217,9 @@ export default function Sidebar(props: {
         : [...cerrados(), p],
     );
   // Cada espacio guarda su vista: cambiar de espacio relee la suya.
-  const [vista, setVista] = createSignal<SidebarView>(loadSidebarView(props.viewKey));
-  createEffect(on(() => props.viewKey, (key) => setVista(loadSidebarView(key)), { defer: true }));
-  const cambiarVista = (siguiente: SidebarView) => {
-    setVista(siguiente);
-    saveSidebarView(props.viewKey, siguiente);
-  };
+  const vista = () => sidebarView(props.viewKey);
+  const cambiarVista = (siguiente: SidebarView) => setSidebarView(props.viewKey, siguiente);
 
-  const [searchText, setSearchText] = createSignal("");
-  const query = () => searchText().trim();
-  const [searchCounts, setSearchCounts] = createSignal<Record<string, number>>({});
-  const reportResults = (key: string, count: number) => setSearchCounts(previous => previous[key] === count ? previous : { ...previous, [key]: count });
-  const clearSearch = () => setSearchText("");
-  createEffect(() => { if (props.collapsed) clearSearch(); });
   createEffect(() => recordarCarpetas(props.projects));
 
   /** De qué carpeta es cada tarea, por id: las acciones de la fila llegan con el id. */
@@ -237,7 +232,7 @@ export default function Sidebar(props: {
   const nombreDe = (project: string) => props.projects.find((p) => p.id === project)?.name;
   const relacionadas = createMemo(() => Object.values(props.sessions).flat());
 
-  const todas = createMemo(() => flattenTasks(props.sessions, !!query()));
+  const todas = createMemo(() => flattenTasks(props.sessions));
   const cuentas = createMemo(() => folderCounts(todas()));
   // La de esta computadora, con el nombre que le da la cuenta, como su tarjeta flotante.
   const nombreDeMaquina = (id: string) => {
@@ -348,7 +343,15 @@ export default function Sidebar(props: {
   const agentesDelFiltro = createMemo(() =>
     agentOptions(agentesDelDock().map((a) => a.name), todas().map((x) => x.row))
       .map((a) => ({ ...a, body: perfilDe(a.name)?.body, avatar: perfilDe(a.name)?.avatar })));
-  const conResultados = (clave: string) => (searchCounts()[clave] ?? 0) > 0;
+  const filtro: SidebarFilterProps = {
+    get view() { return vistaEfectiva(); },
+    onChange: cambiarVista,
+    get folders() { return carpetasDelFiltro(); },
+    get agents() { return agentesDelFiltro(); },
+    get machines() { return variasMaquinas(); },
+  };
+  props.filterRef?.(filtro);
+  onCleanup(() => props.filterRef?.(null, filtro));
 
   /**
    * A qué proyectos puede irse una tarea que hoy está en `de`.
@@ -369,15 +372,13 @@ export default function Sidebar(props: {
    * sitios —expandida y en el desplegable—; una variable contendría un solo
    * nodo del DOM y colocarlo dos veces lo movería del primero al segundo.
    */
-  const Historial = (p: { filas: SessionRow[]; clave: string; sinCarpeta?: boolean }) => (
+  const Historial = (p: { filas: SessionRow[]; sinCarpeta?: boolean }) => (
     <Sessions sidebar
       draggedTask={props.draggedTask}
       hideFolder={p.sinCarpeta}
       sessions={p.filas}
       relatedSessions={relacionadas()}
       groupByAuthor={false}
-      search={query()}
-      onSearchResults={count => reportResults(p.clave, count)}
       current={props.current}
       vivas={props.vivas}
       aprobando={props.aprobando}
@@ -412,7 +413,7 @@ export default function Sidebar(props: {
     // En un memo: con `class` como único atributo vivo, Solid lo reescribe en cada
     // cambio del grupo aunque valga lo mismo (`tests/perf/open-task-cost.mjs`).
     const clase = createMemo(() => cn(
-      "group flex h-7 min-w-0 items-center gap-1.5 px-2 pt-1 text-[0.6875rem] font-medium",
+      "group flex h-7 min-w-0 items-center gap-1.5 px-2 pt-1 text-caption font-medium",
       p.accion && "pr-0",
       p.tono === "need" ? "text-warning" : "text-neutral-500",
     ));
@@ -435,7 +436,7 @@ export default function Sidebar(props: {
    */
   const FilaDeClon = (pp: { clon: ClonEnCurso }) => (
     <button
-      class="grid min-w-0 grid-cols-[22px_minmax(0,1fr)] items-center gap-0.5 rounded-[var(--radius-sm)] px-2 py-1 text-left outline-none hover:bg-surface-muted focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      class="grid min-w-0 grid-cols-[22px_minmax(0,1fr)] items-center gap-0.5 rounded-sm px-2 py-1 text-left outline-none hover:bg-surface-muted focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       onClick={() => props.onAbrirClon()}
     >
       <Show
@@ -448,17 +449,13 @@ export default function Sidebar(props: {
           />
         }
       >
-        <Loader2
-          size={14}
-          class="animate-spin justify-self-center text-neutral-500"
-          aria-hidden="true"
-        />
+        <Spinner size={14} class="justify-self-center text-neutral-500" />
       </Show>
       <span class="grid min-w-0">
-        <span class="truncate text-[0.8125rem] font-medium text-neutral-500">
+        <span class="truncate text-ui font-medium text-neutral-500">
           {pp.clon.name || t("shell.sidebar.clone_unnamed")}
         </span>
-        <span class="truncate text-[0.6875rem] text-neutral-500">
+        <span class="truncate text-caption text-neutral-500">
           {pp.clon.failed
             ? t("projects.add.clone_failed")
             : `${t("projects.add.cloning")} ${faseDeClon(pp.clon.phase)}${
@@ -473,11 +470,10 @@ export default function Sidebar(props: {
 
   const Grupo = (p: { grupo: SidebarGroup<SessionRow> }) => {
     const g = () => p.grupo;
-    const clave = () => g().kind === "section" ? g().key : groupKey(g());
     const plegado = () => g().machine ? `${g().key}@${g().machine}` : g().key;
     const titulo = () => groupLabel(g(), (id) => nombreDe(id) ?? id, nombreDeMaquina);
     const proyecto = () => g().kind === "folder" ? props.projects.find((x) => x.id === g().key) : undefined;
-    const abierto = () => !!query() || g().kind !== "folder" || !cerrados().includes(plegado());
+    const abierto = () => g().kind !== "folder" || !cerrados().includes(plegado());
     const necesita = () => g().kind === "status" && ["approving", "asked", "failed"].includes(g().key);
     return (
       <Show when={g().tasks.length > 0 || proyecto()}>
@@ -485,14 +481,13 @@ export default function Sidebar(props: {
           data-sidebar-section={g().kind === "section" ? g().key : undefined}
           data-sidebar-group={g().kind === "section" ? undefined : g().key}
           aria-label={titulo()}
-          classList={{ hidden: !!query() && !conResultados(clave()) }}
         >
           <Show
             when={proyecto()}
             fallback={
               <div
                 data-destino={g().kind === "folder" ? "" : undefined}
-                class={cn("rounded-[var(--radius-sm)]", g().kind === "folder" && (props.dragFolder ?? destinoEnVuelo()) === "" && RECIBE_LA_TAREA)}
+                class={cn("rounded-sm", g().kind === "folder" && (props.dragFolder ?? destinoEnVuelo()) === "" && RECIBE_LA_TAREA)}
               >
                 <Rotulo
                   tono={necesita() ? "need" : undefined}
@@ -543,9 +538,9 @@ export default function Sidebar(props: {
           <Show when={abierto()}>
             <Show
               when={g().tasks.length > 0}
-              fallback={<p class="m-0 py-0.5 pl-7 text-[0.6875rem] text-neutral-500" data-folder-empty="">{t("shell.sidebar.folder_empty")}</p>}
+              fallback={<p class="m-0 py-0.5 pl-7 text-caption text-neutral-500" data-folder-empty="">{t("shell.sidebar.folder_empty")}</p>}
             >
-              <Historial filas={g().tasks} clave={clave()} sinCarpeta={g().kind === "folder" && !!g().key} />
+              <Historial filas={g().tasks} sinCarpeta={g().kind === "folder" && !!g().key} />
             </Show>
           </Show>
         </section>
@@ -553,14 +548,12 @@ export default function Sidebar(props: {
     );
   };
 
-  const hayResultados = () => Object.values(searchCounts()).some((n) => n > 0);
-
   /** La misma lista, montada en dos sitios: expandida y en el desplegable. */
   const Lista = () => (
     <div data-sidebar-tasks class="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-1 rounded-[14px]">
       <Show when={props.clon}>{(c) => <FilaDeClon clon={c()} />}</Show>
 
-      <Show when={todas().length === 0 && !query() && !hayCarpetasVacias()}>
+      <Show when={todas().length === 0 && !hayCarpetasVacias()}>
         <Show
           when={props.projects.length === 0}
           fallback={<p class="m-0 px-2 pt-1 text-xs text-neutral-500" data-sidebar-empty="">{t("shell.sidebar.empty")}</p>}
@@ -573,7 +566,7 @@ export default function Sidebar(props: {
         </Show>
       </Show>
 
-      <Show when={todas().length > 0 && !query() && grupos().every((g) => g.tasks.length === 0)}>
+      <Show when={todas().length > 0 && grupos().every((g) => g.tasks.length === 0)}>
         <p class="m-0 px-2 pt-1 text-xs text-neutral-500" data-sidebar-filtered-empty="">{t("shell.sidebar.filter_empty")}</p>
       </Show>
 
@@ -604,34 +597,17 @@ export default function Sidebar(props: {
       /></LazyPart>}</Show>
       <SidebarShell
         state={props.collapsed ? "collapsed" : "expanded"}
-        class="h-full w-full min-w-0"
+        // Sin cabecera ni pie: la lista se estira y Agentes queda pegado al fondo.
+        class="h-full w-full min-w-0 grid-rows-[minmax(0,1fr)_auto]"
         aria-label={t("shell.sidebar.label")}
       >
         {/* Sin cabecera, el pie cae en la fila `1fr` de las tres que reparte
             `ui/sidebar.tsx`: se pega debajo de la lista y se va con lo que ésta
             crezca. */}
-        <SidebarHeader class="px-2 pt-2 pb-2">
-          <div class={cn("flex min-w-0 items-center gap-1", props.collapsed && "flex-col")}>
-          <BotonConAtajo
-            variant="ghost"
-            size="icon"
-            class="size-7 shrink-0 text-neutral-500"
-            onClick={props.onToggle}
-            aria-pressed
-            accion="sidebar"
-            etiqueta={t("shell.sidebar.hide")}
-            aria-label={t("shell.sidebar.hide")}
-          >
-            <PanelLeftClose size={16} />
-          </BotonConAtajo>
-          <Show when={!props.collapsed}>
-            {capabilities().sidebarExtra?.()}
-          </Show>
-          </div>
-        </SidebarHeader>
 
-        <SidebarContent class="gap-2 px-2 pb-0">
+        <SidebarContent class="gap-2 px-2 pt-2 pb-0">
           <SidebarMenu class="gap-1.5">
+
             <SidebarMenuItem>
               {/* Nueva tarea es la acción principal, negra y sólida.
                   `primary` queda reservado para las acciones del agente. */}
@@ -651,6 +627,7 @@ export default function Sidebar(props: {
                 </Show>
               </SidebarMenuButton>
             </SidebarMenuItem>
+            {props.attentionMenu?.(Boolean(props.collapsed))}
             <Show when={props.collapsed}>
               <SidebarMenuItem>
                 <SidebarMenuButton
@@ -673,29 +650,6 @@ export default function Sidebar(props: {
           </SidebarMenu>
 
           <Show when={!props.collapsed}>
-            <div data-sidebar-scope class="flex min-w-0 items-center gap-1">
-              <div data-sidebar-search class="flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-md border border-border-strong bg-surface-raised px-2 focus-within:outline-solid focus-within:outline-2 focus-within:outline-primary">
-                <Search size={14} class="shrink-0 text-neutral-500" aria-hidden="true" />
-                <Input type="text" role="searchbox" variant="ghost" class="h-full min-h-0 min-w-0 flex-1 border-0 px-0 py-0" placeholder={t("shell.sidebar.search")} aria-label={t("shell.sidebar.search")} value={searchText()} onInput={event => setSearchText(event.currentTarget.value)} onKeyDown={event => {
-                  if (event.key === "Escape" && searchText()) { event.preventDefault(); event.stopPropagation(); clearSearch(); }
-                }} />
-                <Show when={searchText()}>
-                  <Button variant="chrome" size="iconCompact" class="-mr-1 size-6 shrink-0 text-neutral-500" aria-label={t("shell.sidebar.clear_search")} title={t("shell.sidebar.clear_search")} onClick={clearSearch}><X size={14} /></Button>
-                </Show>
-              </div>
-              <Suspense>
-                <SidebarFilter
-                  view={vistaEfectiva()}
-                  onChange={cambiarVista}
-                  folders={carpetasDelFiltro()}
-                  agents={agentesDelFiltro()}
-                  machines={variasMaquinas()}
-                />
-              </Suspense>
-            </div>
-          </Show>
-
-          <Show when={!props.collapsed}>
             {/* **`overflow-y-auto` y NO `overflow-auto`.** Aquél es de los dos
                 ejes: los títulos llegaban al borde sin puntos suspensivos y lo
                 de la derecha quedaba fuera de la vista. */}
@@ -707,17 +661,11 @@ export default function Sidebar(props: {
               class="-mr-2 min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto pr-2"
               data-arrastre-scroll=""
             >
-              <Show when={query() && !hayResultados()}>
-                <p role="status" class="m-0 px-2 py-1 text-xs text-neutral-500">{t("shell.sidebar.no_results")}</p>
-              </Show>
               <Lista />
             </div>
           </Show>
         </SidebarContent>
 
-        {/* El de MCP es chico a propósito: es una consulta de un vistazo, del
-            peso del botón que oculta el historial. «Archivadas» va primero: abre
-            una página, no levanta un panel. */}
         <Show when={!props.collapsed && agentesDelDock().length > 0}>
           <Suspense>
             <AgentDock
@@ -733,40 +681,6 @@ export default function Sidebar(props: {
             />
           </Suspense>
         </Show>
-        <SidebarFooter class="border-t border-border p-2">
-          <div class={cn("flex items-center justify-end gap-1", props.collapsed && "flex-col")}>
-            <Show when={capabilities().danilAccount || capabilities().accountProfile}>
-              <Suspense>
-                <DanilFooterEntry collapsed={props.collapsed} onOpen={() => props.onSettings("cuenta-danil")} />
-              </Suspense>
-            </Show>
-            <Show when={!props.collapsed && props.onArchivadas}>
-              <Button
-                variant={props.viendoArchivadas ? "secondary" : "ghost"}
-                size="icon"
-                class="size-7 shrink-0 text-neutral-500"
-                data-archived-foot=""
-                aria-pressed={props.viendoArchivadas}
-                aria-label={t("spaces.archived.title")}
-                title={t("spaces.archived.foot_title")}
-                onClick={() => props.onArchivadas?.()}
-              >
-                <Archive size={15} aria-hidden="true" />
-              </Button>
-            </Show>
-            <ConexionesMenu onManage={() => props.onSettings("skills")} />
-            <Button
-              variant="ghost"
-              size="icon"
-              class="size-7 shrink-0 text-neutral-500"
-              aria-label={t("settings.title")}
-              title={t("settings.title")}
-              onClick={() => props.onSettings()}
-            >
-              <SettingsIcon size={15} />
-            </Button>
-          </div>
-        </SidebarFooter>
       </SidebarShell>
 
       {/* El historial colapsado no desaparece: se abre al lado del riel. Este SÍ

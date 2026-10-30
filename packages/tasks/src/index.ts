@@ -21,7 +21,7 @@ export {
   statusKeyOf,
 } from "./view.ts";
 export { REMOTE_CHILD_FEATURE, type RemoteParent, type RemoteRow, type RemoteScope, remoteLauncherOf, remoteParentOf, withRemoteLaunchers } from "./remote.ts";
-export { type FlatRow, type FlatTask, type LauncherRow, delegatedOf, flattenTasks, folderCounts, launcherOf, shownUnderLauncher } from "./flat.ts";
+export { type FlatRow, type FlatTask, type LauncherRow, delegatedOf, flattenTasks, folderCounts, isSubtask, launcherOf } from "./flat.ts";
 export {
   type AgentPresence,
   type DockAgent,
@@ -47,6 +47,6 @@ export {
   taskTitle,
 } from "./preview.ts";
 export { type CardPull, type CheckState, type PullTone, type TaskGit, type TaskGitSession, cardPull, resolveTaskGit } from "./pull.ts";
-export { type KnState, type ReviewState, type TaskGitStatus, UNKNOWN_TASK_GIT, canFinishTask, readTaskGit } from "./git.ts";
+export { type KnState, type ReviewState, type TaskGitStatus, UNKNOWN_TASK_GIT, canFinishTask, mergeRemoteGit, readTaskGit, retainGitObservation, sameGit } from "./git.ts";
 
 export { type TaskTreeRow, type TaskBranch, taskIdentity, taskParent, buildTaskTree, withTaskAncestors, taskDescendants } from "./tree.ts";

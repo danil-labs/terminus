@@ -1,9 +1,10 @@
+import Inbox from "lucide-solid/icons/inbox";
 import Globe from "lucide-solid/icons/globe";
 import Monitor from "lucide-solid/icons/monitor";
 import Plus from "lucide-solid/icons/plus";
 import SquarePen from "lucide-solid/icons/square-pen";
 import X from "lucide-solid/icons/x";
-import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from "solid-js";
 import { t } from "../../lib/i18n";
 import type { AgentProfile } from "../../lib/model";
 import { ariaDeAtajo, flechaDeLista, textoDeAtajo } from "../../lib/shortcuts";
@@ -160,46 +161,9 @@ export default function TabStrip(props: {
     if (el.scrollLeft !== before) e.preventDefault();
   }
 
-  // La barra nativa ocuparía alto bajo las pestañas; esta flota encima.
-  // Vive dentro del contenedor que se desplaza, así que su left suma el scrollLeft.
-  const [thumb, setThumb] = createSignal<{ left: number; width: number } | null>(null);
-  function measure() {
-    if (!strip || strip.scrollWidth <= strip.clientWidth) return setThumb(null);
-    const ratio = strip.clientWidth / strip.scrollWidth;
-    setThumb({ left: strip.scrollLeft * (1 + ratio), width: strip.clientWidth * ratio });
-  }
+  // Sin barra de desplazamiento: las pestañas se recorren con la rueda o el trackpad.
   function scrolled() {
     if (strip) scrollBySite.set(site(), strip.scrollLeft);
-    measure();
-  }
-  createEffect(on(() => props.tabs.length, () => queueMicrotask(measure)));
-  onMount(() => {
-    // ResizeObserver puede faltar en el entorno que monta el guarda mount-frontend.
-    if (!strip || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(measure);
-    observer.observe(strip);
-    onCleanup(() => observer.disconnect());
-  });
-  function dragThumb(e: PointerEvent) {
-    if (!strip) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const handle = e.currentTarget as HTMLElement;
-    handle.setPointerCapture(e.pointerId);
-    const startX = e.clientX;
-    const startLeft = strip.scrollLeft;
-    const scale = strip.scrollWidth / strip.clientWidth;
-    const move = (ev: PointerEvent) => {
-      if (strip) strip.scrollLeft = startLeft + (ev.clientX - startX) * scale;
-    };
-    const end = () => {
-      handle.removeEventListener("pointermove", move);
-      handle.removeEventListener("pointerup", end);
-      handle.removeEventListener("pointercancel", end);
-    };
-    handle.addEventListener("pointermove", move);
-    handle.addEventListener("pointerup", end);
-    handle.addEventListener("pointercancel", end);
   }
 
   const [selected, setSelectedTab] = createSignal<string | null>(null);
@@ -254,7 +218,7 @@ export default function TabStrip(props: {
           ? t("projects.threads.heading", { name: displayName(agent, profiles()[agent]), title: threadTitle(row()) })
           : displayName(agent, profiles()[agent]);
       }
-      return isTaskTab(p) || p.clase === "observabilidad" || p.clase === "pantalla"
+      return isTaskTab(p) || p.clase === "inbox" || p.clase === "broadcasts" || p.clase === "observabilidad" || p.clase === "pantalla"
         ? (isTaskTab(p) && props.session(p.session)?.subagent ? readableSessionTitle(p.titulo) : p.titulo)
         : (labels().get(p.id) ?? "");
     };
@@ -304,8 +268,8 @@ export default function TabStrip(props: {
             props.onDrag?.(p.id, e);
           }}
           class={cn(
-            "group flex h-7 shrink-0 touch-none items-center rounded-[var(--radius-sm)] pr-1 select-none",
-            task() ? "w-[220px] text-sm" : "w-[180px] text-[0.75rem]",
+            "group flex h-7 shrink-0 touch-none items-center rounded-sm pr-1 select-none",
+            task() ? "w-[220px] text-sm" : "w-[180px] text-label",
             active()
               ? "tab-active font-semibold text-neutral-950"
               : "font-medium text-neutral-500 hover:bg-neutral-950/5 hover:text-neutral-950",
@@ -353,7 +317,7 @@ export default function TabStrip(props: {
               }
             }}
             class={cn(
-              "flex h-full min-w-0 flex-1 cursor-default items-center gap-1.5 rounded-[var(--radius-sm)] outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+              "flex h-full min-w-0 flex-1 cursor-default items-center gap-1.5 rounded-sm outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
               task() ? "pl-2" : "pl-1.5 font-mono",
               transient() && "font-normal italic",
             )}
@@ -362,9 +326,9 @@ export default function TabStrip(props: {
               when={isTaskTab(p)}
               fallback={
               <Show
-                  when={p.clase !== "sitio" && p.clase !== "observabilidad" && p.clase !== "pantalla"}
+                  when={p.clase !== "sitio" && p.clase !== "inbox" && p.clase !== "broadcasts" && p.clase !== "observabilidad" && p.clase !== "pantalla"}
                   fallback={
-                    <Show when={p.clase === "pantalla"} fallback={<Globe size={12} class="shrink-0 text-neutral-500" aria-hidden={true} />}>
+                    <Show when={p.clase === "pantalla"} fallback={<Show when={p.clase === "inbox" || p.clase === "broadcasts"} fallback={<Globe size={12} class="shrink-0 text-neutral-500" aria-hidden={true} />}><Inbox size={12} class="shrink-0 text-neutral-500" aria-hidden={true} /></Show>}>
                       <Monitor size={12} class="shrink-0 text-neutral-500" aria-hidden={true} />
                     </Show>
                   }
@@ -422,7 +386,7 @@ export default function TabStrip(props: {
               {(l) => (
                 <span
                   aria-hidden="true"
-                  class={cn("shrink-0 text-[0.625rem] font-semibold", colorDeMarca(l().marca))}
+                  class={cn("shrink-0 text-2xs font-semibold", colorDeMarca(l().marca))}
                 >
                   {l().marca}
                 </span>
@@ -494,19 +458,9 @@ export default function TabStrip(props: {
       </Show>
       </div>
       <Show when={previewTabs().length > 0}>
-      <div data-preview-header="" class="ml-2 flex shrink-0 items-end self-stretch border-l border-border pl-2">
+      <div data-preview-header="" class="ml-0.5 flex shrink-0 items-end self-stretch">
         <For each={previewTabs()}>{(p, i) => renderTab(p, () => keptTabs().length + i())}</For>
       </div>
-      </Show>
-      <Show when={thumb()}>
-        {(bar) => (
-          <div
-            aria-hidden="true"
-            onPointerDown={dragThumb}
-            class="absolute bottom-0 h-1 rounded-full bg-[var(--scrollbar-thumb)] opacity-0 transition-opacity group-hover/strip:opacity-100 hover:bg-[var(--scrollbar-thumb-hover)]"
-            style={{ left: `${bar().left}px`, width: `${bar().width}px` }}
-          />
-        )}
       </Show>
     </ContextMenuTrigger>
     <ContextMenuContent>
@@ -554,7 +508,7 @@ export function NewTabButton(props: {
       <DropdownMenuTrigger
         aria-label={t("projects.tabs.new")}
         title={t("projects.tabs.new")}
-        class="ml-0.5 grid size-6 shrink-0 place-items-center rounded-[var(--radius-sm)] text-neutral-500 outline-none hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary data-[expanded]:bg-surface-muted data-[expanded]:text-neutral-950"
+        class="ml-0.5 grid size-6 shrink-0 place-items-center rounded-sm text-neutral-500 outline-none hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary data-[expanded]:bg-surface-muted data-[expanded]:text-neutral-950"
       >
         <Plus size={14} />
       </DropdownMenuTrigger>

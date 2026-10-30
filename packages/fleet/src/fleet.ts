@@ -26,7 +26,8 @@ type Row = Record<string, unknown>;
 /** `outdated`: su motor habla otro contrato, sabido por el plano de control. `linked`: `null` enseña todos sus workspaces. */
 /** `os` solo si se sabe: la tarjeta de la tarea lo lee y, si falta, no inventa un sistema. */
 /** `features`: lo que su motor anuncia (`status.service_features`); cada función se enciende por máquina. */
-export type MachineInfo = { id: string; name: string; wakes: boolean; outdated?: boolean; linked?: ReadonlySet<string> | null; os?: SystemId; features?: readonly string[] };
+/** `version`: la `host_version` de su último `hello`, según el plano de control; se conserva apagada. */
+export type MachineInfo = { id: string; name: string; wakes: boolean; outdated?: boolean; linked?: ReadonlySet<string> | null; os?: SystemId; features?: readonly string[]; version?: string };
 export type Power = "on" | "off" | "starting" | "outdated";
 
 export type Envelope = { machine: string; workspace: string | null; command: string; args?: Row };
@@ -50,6 +51,25 @@ export type Link = {
   onDeferred?(listener: (frame: DeferredFrame) => void): () => void;
   deferred?(): DeferredFrame;
 };
+
+/** Una sesión de relay como enlace de la flota, con su estado leído aparte: hasta que el relay lo diga vale el de la fila. */
+export function relayLink(relay: Required<Link>, state: Link["state"]): Link {
+  return {
+    state,
+    call: (id, command, workspace, folder, args, timeout) => relay.call(id, command, workspace, folder, args, timeout),
+    onState: (listener) => relay.onState(listener),
+    onEvents: (listener) => relay.onEvents(listener),
+    onEngine: (listener) => relay.onEngine(listener),
+    blocked: () => relay.blocked(),
+    onBlocked: (listener) => relay.onBlocked(listener),
+    retry: () => relay.retry(),
+    onDeferred: (listener) => relay.onDeferred(listener),
+    deferred: () => relay.deferred(),
+    subscribe: (after) => relay.subscribe(after),
+    start: () => relay.start(),
+    close: () => relay.close(),
+  };
+}
 
 export type FleetEvent = { name: string; payload: unknown };
 

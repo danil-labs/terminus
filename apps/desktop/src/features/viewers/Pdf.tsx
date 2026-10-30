@@ -236,7 +236,7 @@ export default function PdfDocument(props: { base64: string; name: string }) {
         <IconButton label={t("code.file.image.zoom_out")} onClick={() => change(1 / ZOOM_STEP)}>
           <ZoomOut size={13} />
         </IconButton>
-        <span class="min-w-11 text-center font-mono text-[0.6875rem] tabular-nums text-neutral-500">
+        <span class="min-w-11 text-center font-mono text-caption tabular-nums text-neutral-500">
           {Math.round(zoom() * 100)}%
         </span>
         <IconButton label={t("code.file.image.zoom_in")} onClick={() => change(ZOOM_STEP)}>
@@ -245,7 +245,7 @@ export default function PdfDocument(props: { base64: string; name: string }) {
         <IconButton label={t("code.file.image.fit")} onClick={() => setZoom(1)}>
           <RotateCcw size={13} />
         </IconButton>
-        <span class="ml-auto font-mono text-[0.6875rem] text-neutral-500">
+        <span class="ml-auto font-mono text-caption text-neutral-500">
           {t("code.file.pdf.pages", { count: pages(), n: pages() })}
         </span>
       </div>

@@ -12,9 +12,10 @@ import { capabilities } from "../../lib/platform";
  * `machine_list`: `hosts` es si tiene el workspace abierto (`null`, que no se sabe
  * sin encenderla); `materializes`, si puede hacerlo suyo con el mismo id al crear ahí.
  * `wakes`: VM administrada. `os` solo si se sabe; si falta, no se inventa.
- * `features`: lo que su motor anuncia (`status.service_features`).
+ * `features`: lo que su motor anuncia (`status.service_features`). `power`, lo que
+ * sabe la flota (`starting`: encendiéndose); `version`, su `host_version`, también apagada.
  */
-export type Machine = { id: string; local: boolean; active: boolean; on: boolean; hosts: boolean | null; materializes?: boolean; wakes?: boolean; os?: SystemId; features?: readonly string[] };
+export type Machine = { id: string; local: boolean; active: boolean; on: boolean; power?: "on" | "off" | "starting" | "outdated"; version?: string; hosts: boolean | null; materializes?: boolean; wakes?: boolean; os?: SystemId; features?: readonly string[] };
 
 /** Lo que el picker sabe del proyecto de la tarea nueva: las máquinas con su carpeta y su remoto. */
 export type ProjectPlace = { name: string; machines?: string[]; remote_url?: string | null } | null | undefined;
@@ -83,6 +84,14 @@ export function remoteChildScope(): RemoteScope {
     announces: (machine) => !!machines().find((m) => (machine ? m.id === machine : m.local))?.features?.includes(REMOTE_CHILD_FEATURE),
     idOf: (machine, task) => (machine === (machines().find((m) => m.local)?.id ?? null) ? task : `${machine}${SEP}${task}`),
   };
+}
+
+/**
+ * El id de panel de la tarea que firmó un mensaje en `machine`. El panel pudo
+ * ponerle el prefijo de la máquina que guardó el mensaje, que no es la suya.
+ */
+export function senderTaskId(machine: string, task: string): string {
+  return remoteChildScope().idOf(machine, task.slice(task.lastIndexOf(SEP) + 1));
 }
 
 /** La máquina de la fila de una tarea del riel; la registra `App.tsx`, que es quien tiene las filas. */

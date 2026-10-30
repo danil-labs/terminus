@@ -6,13 +6,12 @@ import {
   type SidebarView,
   sanitizeSidebarView,
 } from "@terminus/tasks";
+import { createRoot, createSignal } from "solid-js";
 import { t } from "./i18n.ts";
 import { escribirPref, leerPref } from "./prefs.ts";
 
 // La vista (filtrar, agrupar) es la misma en el teléfono: vive en `@terminus/tasks`.
 export {
-  type AgentOption,
-  type SidebarContext,
   type SidebarGroup,
   type SidebarGrouping,
   type SidebarSection,
@@ -20,11 +19,9 @@ export {
   type SidebarTask,
   type SidebarView,
   DEFAULT_SIDEBAR_VIEW,
-  activityOf,
   agentOptions,
   applySidebarView,
   groupKey,
-  isPinned,
   nonDefaultCount,
   sameAgent,
 } from "@terminus/tasks";
@@ -40,6 +37,24 @@ export function loadSidebarView(key: string): SidebarView {
 
 export function saveSidebarView(key: string, view: SidebarView) {
   escribirPref(key, sanitizeSidebarView(view));
+}
+
+/**
+ * La vista viva de cada clave, una sola para toda la ventana: el riel la pinta
+ * y el botón Personalizar de la franja la cambia, y ninguno depende de que el
+ * otro sea la misma instancia. Antes cada riel tenía su señal y un cambio
+ * podía guardarse sin que el riel que se ve se enterara hasta reiniciar.
+ */
+const [vivas, setVivas] = createRoot(() => createSignal<Record<string, SidebarView>>({}));
+
+export function sidebarView(key: string): SidebarView {
+  return vivas()[key] ?? loadSidebarView(key);
+}
+
+export function setSidebarView(key: string, view: SidebarView) {
+  const limpia = sanitizeSidebarView(view);
+  saveSidebarView(key, limpia);
+  setVivas((antes) => ({ ...antes, [key]: limpia }));
 }
 
 export function groupingLabel(group: SidebarGrouping): string {

@@ -33,8 +33,6 @@ function cifrasDe(e: unknown): Cifras | null | undefined {
   return undefined;
 }
 
-export const esSinEspacio = (e: unknown) => cifrasDe(e) !== undefined;
-
 const vistas = new Map<string, Cifras>();
 const esperando = new Map<string, Set<(c: Cifras) => void>>();
 

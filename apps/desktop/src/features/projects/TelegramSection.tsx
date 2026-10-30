@@ -1,12 +1,13 @@
 import { listen } from "../../lib/serviceEvents";
 import Copy from "lucide-solid/icons/copy";
 import { createEffect, createSignal, Match, onCleanup, Show, Switch } from "solid-js";
-import { copyText } from "../../lib/clipboard";
+import { createCopied } from "../../lib/clipboard";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
 import { Button } from "../../ui/Button";
 import { prosaDe } from "../../ui/Failure";
 import { Input } from "../../ui/Input";
+import { createNow } from "../../lib/sharedClock";
 
 type Pairing = { code: string; expires_at_ms: number };
 
@@ -35,9 +36,9 @@ export function TelegramSection(props: { project: string; name: string }) {
   const [status, setStatus] = createSignal<TelegramStatus | null>(null);
   const [token, setToken] = createSignal("");
   const [busy, setBusy] = createSignal(false);
-  const [copied, setCopied] = createSignal(false);
+  const { copied, copy } = createCopied(1500, (error) => setFailure(prosaDe(error)));
   const [failure, setFailure] = createSignal<string | null>(null);
-  const [now, setNow] = createSignal(Date.now());
+  const now = createNow();
   const [replacing, setReplacing] = createSignal(false);
   const [awake, setAwake] = createSignal<AwakeMode | null>(null);
 
@@ -68,10 +69,8 @@ export function TelegramSection(props: { project: string; name: string }) {
   const awakeEvents = listen<{ mode: AwakeMode }>("keep-awake-changed", (e) =>
     setAwake(e.payload.mode),
   );
-  const clock = window.setInterval(() => setNow(Date.now()), 1000);
   onCleanup(() => {
     request++;
-    window.clearInterval(clock);
     void events.then((unlisten) => unlisten());
     void awakeEvents.then((unlisten) => unlisten());
   });
@@ -107,16 +106,6 @@ export function TelegramSection(props: { project: string; name: string }) {
     run(() => invoke("telegram_disable", { project: props.project, name: props.name }));
   const awakeAlways = () => run(() => invoke("set_keep_awake", { mode: "on" }));
   const awakeWhileWorking = () => run(() => invoke("set_keep_awake", { mode: "agent" }));
-
-  async function copy(code: string) {
-    try {
-      await copyText(code);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch (error) {
-      setFailure(prosaDe(error));
-    }
-  }
 
   const pending = () => {
     const p = status()?.pairing;
@@ -192,14 +181,14 @@ export function TelegramSection(props: { project: string; name: string }) {
                   <span class="text-xs text-neutral-500">
                     {t("projects.agents.telegram_code_expires", { time: remaining(p()) })}
                   </span>
-                  <p class="m-0 text-[0.8125rem] text-neutral-700">
+                  <p class="m-0 text-ui text-neutral-700">
                     {t("projects.agents.telegram_code_how")}
                   </p>
                 </>
               )}
             </Match>
             <Match when={connected()}>
-              <span class="text-[0.8125rem] text-neutral-700">
+              <span class="text-ui text-neutral-700">
                 {t("projects.agents.telegram_connected", { count: s().paired_chats })}
               </span>
               <p class={NOTE}>

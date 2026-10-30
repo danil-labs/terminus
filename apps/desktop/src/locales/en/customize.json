@@ -1,0 +1,10 @@
+{
+  "customize.unavailable": "Unavailable",
+  "customize.ai_enabled": "AI assistance enabled",
+  "customize.ai_paused": "AI assistance disabled",
+  "customize.conversations": "Conversations",
+  "customize.page_empty": "No conversations on this page.",
+  "customize.no_accounts": "No operational accounts available.",
+  "customize.retry": "Retry",
+  "customize.read_only": "Read only"
+}

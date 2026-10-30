@@ -62,14 +62,14 @@ function checksAppearance(checks: HoverCardPull["checks"]) {
 function Fila(props: { label: string; children: JSX.Element }) {
   return (
     <div class="flex min-w-0 items-center gap-1.5">
-      <span class="w-16 shrink-0 text-[0.6875rem] text-neutral-500">{props.label}</span>
+      <span class="w-16 shrink-0 text-caption text-neutral-500">{props.label}</span>
       <span class="flex min-w-0 flex-1 items-center gap-1.5">{props.children}</span>
     </div>
   );
 }
 
 const BOTON =
-  "rounded-sm border border-border-strong px-2 py-0.5 text-[0.6875rem] text-neutral-700 outline-none hover:bg-surface-muted focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+  "rounded-sm border border-border-strong px-2 py-0.5 text-caption text-neutral-700 outline-none hover:bg-surface-muted focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 
 /** El cuerpo de la tarjeta: lo que se sabe de la tarea sin abrirla. */
 export function TaskHoverCard(props: TaskHoverCardProps) {
@@ -96,10 +96,10 @@ export function TaskHoverCard(props: TaskHoverCardProps) {
 
   return (
     <div class="flex flex-col gap-1.5 text-xs text-neutral-950">
-      <div class="text-[0.8125rem] leading-snug font-semibold break-words">{threadTitle(props.task)}</div>
+      <div class="text-ui leading-snug font-semibold break-words">{threadTitle(props.task)}</div>
       <Show when={props.task.last_message?.trim()}>
         {(mensaje) => (
-          <p class="m-0 line-clamp-3 border-l-2 border-border-strong pl-2 text-[0.6875rem] leading-[1.4] break-words text-neutral-700">
+          <p class="m-0 line-clamp-3 border-l-2 border-border-strong pl-2 text-caption leading-[1.4] break-words text-neutral-700">
             {mensaje()}
           </p>
         )}

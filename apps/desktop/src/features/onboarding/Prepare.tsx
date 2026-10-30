@@ -150,10 +150,10 @@ export function VistaSencilla(props: { i: Instalacion }) {
       <ol class="m-0 list-none border-t border-border p-0 pt-1">
         <For each={props.i.etapas}>
           {(f) => (
-            <li class={cn("flex min-h-[30px] items-center gap-2.5 px-0.5 text-[13px]", f.paso === "wait" && "text-neutral-500")}>
+            <li class={cn("flex min-h-[30px] items-center gap-2.5 px-0.5 text-ui", f.paso === "wait" && "text-neutral-500")}>
               <IconoDeEtapa paso={f.paso} />
               <span class={cn(f.paso !== "wait" && "text-neutral-950", f.paso === "run" && "font-semibold")}>{f.label}</span>
-              <span class="ml-auto truncate text-right text-[11px] text-neutral-500">{f.detalle}</span>
+              <span class="ml-auto truncate text-right text-caption text-neutral-500">{f.detalle}</span>
             </li>
           )}
         </For>

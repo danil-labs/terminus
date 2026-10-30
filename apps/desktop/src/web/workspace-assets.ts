@@ -5,10 +5,11 @@
  * the person's session. Images are shown as `data:` URIs: the page's CSP
  * loads no remote images.
  */
+import { accountAssetUrl, readAccountAsset } from "@terminus/computers";
 import { blobToDataUrl } from "../features/settings/account-profile.ts";
 import { apiUrl } from "./computers.ts";
+import { type Fetch, refused, sessionCall } from "./control-plane.ts";
 
-type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
 export type WorkspaceAssetKind = "logo" | "background";
 
@@ -27,13 +28,7 @@ export type WorkspaceAssetsSource = {
   forget(): void;
 };
 
-export const ASSET_TYPES = ["image/png", "image/jpeg", "image/webp"];
-export const ASSET_MAX_BYTES: Record<WorkspaceAssetKind, number> = { logo: 1024 * 1024, background: 6 * 1024 * 1024 };
-
 type Row = Record<string, unknown> & { id: string };
-
-/** A refused call, shaped like an engine failure so the panel words it the same way. */
-const refused = (code: string) => Object.assign(new Error(code), { detail: code });
 
 export function webWorkspaceAssets(
   endpoint: string,
@@ -41,16 +36,10 @@ export function webWorkspaceAssets(
   onUnauthorized?: () => void,
   f: Fetch = (input, init) => fetch(input, init),
 ): WorkspaceAssetsSource {
-  const origin = new URL(apiUrl(endpoint, "/")).origin;
   let rows: Promise<Map<string, Row>> | null = null;
   const images = new Map<string, Promise<string | null>>();
 
-  async function call(url: string, init: RequestInit = {}): Promise<Response> {
-    const token = await getToken();
-    const response = await f(url, { ...init, headers: { ...init.headers, authorization: `Bearer ${token}` } });
-    if (response.status === 401) onUnauthorized?.();
-    return response;
-  }
+  const call = sessionCall(getToken, onUnauthorized, f);
 
   function list(): Promise<Map<string, Row>> {
     rows ??= call(apiUrl(endpoint, "/v1/workspaces"))
@@ -71,28 +60,19 @@ export function webWorkspaceAssets(
     return rows ?? Promise.resolve(new Map<string, Row>());
   }
 
-  /** Only from the control plane's own origin: the session goes nowhere else. */
+  /** Only from the control plane's own origin: the session goes nowhere else (`readAccountAsset`). */
   function image(url: string, kind: WorkspaceAssetKind): Promise<string | null> {
-    let target: URL;
-    try {
-      target = new URL(url);
-    } catch {
-      return Promise.resolve(null);
-    }
-    if (target.origin !== origin) return Promise.resolve(null);
-    let pending = images.get(target.href);
+    const target = accountAssetUrl(endpoint, url);
+    if (!target) return Promise.resolve(null);
+    let pending = images.get(target);
     if (!pending) {
-      pending = call(target.href)
-        .then(async (response) => {
-          if (!response.ok) return null;
-          const blob = await response.blob();
-          if (!ASSET_TYPES.includes(blob.type) || blob.size > ASSET_MAX_BYTES[kind]) return null;
-          return blobToDataUrl(blob);
-        })
+      pending = Promise.resolve(getToken())
+        .then((token) => readAccountAsset(endpoint, target, kind, token, f, onUnauthorized))
+        .then((blob) => (blob ? blobToDataUrl(blob) : null))
         .catch(() => null);
       // A failed read is asked again next time.
-      pending.then((v) => v === null && images.delete(target.href));
-      images.set(target.href, pending);
+      pending.then((v) => v === null && images.delete(target));
+      images.set(target, pending);
     }
     return pending;
   }

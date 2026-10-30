@@ -1,7 +1,4 @@
 {
-  "chat.search.split_hint": "Dividir vista ({key}). Requiere otra pestaña abierta en esta vista.",
-  "chat.search.split": "Dividir vista",
-  "chat.search.join": "Unir vistas",
   "chat.search.label": "Buscar en esta tarea",
   "chat.search.placeholder": "Buscar en esta tarea…",
   "chat.search.open": "Buscar en esta tarea ({key})",
@@ -272,6 +269,7 @@
   "chat.turn.waiting_background": "Libre · un subagente sigue en segundo plano",
   "chat.turn.working_aria": "El agente está trabajando",
   "chat.work.duration": "Trabajó durante {duration}",
+  "chat.work.open_changes": "Ver los cambios en el panel de la tarea",
   "chat.work.running": "Trabajando",
   "chat.work.title": "Trabajo",
   "chat.steer.not_running": "Esta tarea ya no tiene un turno corriendo. Envía el mensaje como un turno nuevo.",
@@ -430,7 +428,6 @@
   "chat.history.error": "No se pudo leer este fragmento. Vuelve a abrir la tarea si cambió el historial.",
   "chat.history.latest": "Volver a los mensajes recientes",
   "chat.history.loading": "Cargando contenido…",
-  "chat.history.tools": "Resultados de herramientas",
   "chat.history.text": "Texto del mensaje",
   "chat.history.pieces": "Registro completo",
   "chat.history.content": "Contenido guardado"

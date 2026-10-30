@@ -43,7 +43,7 @@ test("un motor anterior no borra la imagen ni recibe una ruta cuando solo cambia
   await guardarFondo();
   s.elegirVeloDeFondo(0.5);
   await guardarFondo();
-  s.elegirFondoDeChat("dusk");
+  s.elegirFondoDeChat("neutro");
   await guardarFondo();
   const borrados = calls.filter((c) => c.command === "choose_chat_background" && !c.args?.path);
   assert.deepEqual(borrados, [], "ningún respaldo quita la imagen");
@@ -56,7 +56,7 @@ test("un motor anterior no borra la imagen ni recibe una ruta cuando solo cambia
 test("un workspace sin fondo propio vuelve al patrón de la app, no al del workspace anterior", async () => {
   const s = await store();
   s.ponerFondoPropio(null);
-  s.elegirFondoDeChat("dusk");
+  s.elegirFondoDeChat("neutro");
   s.elegirVeloDeFondo(0.7);
   s.elegirVeloDePaneles(0.25);
   const { cargarFondoDelWorkspace } = await engine();
@@ -70,14 +70,14 @@ test("un workspace sin fondo propio vuelve al patrón de la app, no al del works
   replies = { chat_background: () => null };
   await cargarFondoDelWorkspace("w1");
   assert.equal(s.imagenDelWorkspace(), null);
-  assert.equal(s.fondoDeChat(), "dusk", "vuelve el patrón de la app");
+  assert.equal(s.fondoDeChat(), "neutro", "vuelve el patrón de la app");
 
   replies = { chat_background: () => ({ preset: null, data_url: "data:image/png;base64,AAAA", veil: { chat: 0.3, tabs: null, panels: 0.9 } }) };
   await cargarFondoDelWorkspace("w1");
   replies = { chat_background: () => ({ preset: null, data_url: null, veil: null }) };
   await cargarFondoDelWorkspace("w2");
   assert.equal(s.imagenDelWorkspace(), null, "todo nulo es no tener fondo propio");
-  assert.equal(s.fondoDeChat(), "dusk");
+  assert.equal(s.fondoDeChat(), "neutro");
 });
 
 /* Un lienzo mínimo: `shrink-image.ts` decodifica y codifica con las APIs del navegador. */

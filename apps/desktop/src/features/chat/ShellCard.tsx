@@ -30,7 +30,7 @@ export type TarjetaDeTerminalProps = {
   pendiente?: string | null;
 };
 
-const DATO = "shrink-0 text-[0.6875rem] text-neutral-500 tabular-nums";
+const DATO = "shrink-0 text-caption text-neutral-500 tabular-nums";
 // Un `!` que termina antes no enseña el botón: aparecer y desaparecer en un instante se lee como un parpadeo.
 const ESPERA_DEL_BOTON_MS = 500;
 // Margen para contar como «al fondo»: el redondeo del scroll deja a veces un píxel.
@@ -100,7 +100,7 @@ export default function TarjetaDeTerminal(props: TarjetaDeTerminalProps) {
         <Show when={!props.vivo && props.exitCode != null}>
           <span
             class={cn(
-              "flex h-5 shrink-0 items-center rounded-[5px] px-[7px] text-[0.6875rem] font-medium",
+              "flex h-5 shrink-0 items-center rounded-[5px] px-[7px] text-caption font-medium",
               props.exitCode === 0
                 ? "bg-success/10 text-success-strong"
                 : "bg-error/10 text-error-strong",
@@ -122,7 +122,7 @@ export default function TarjetaDeTerminal(props: TarjetaDeTerminalProps) {
         </pre>
       </Show>
       <Show when={!props.vivo && props.pendiente}>
-        <div class="flex min-h-7 min-w-0 items-center gap-1.5 border-t border-border px-3 py-0.5 text-[0.6875rem] text-neutral-500">
+        <div class="flex min-h-7 min-w-0 items-center gap-1.5 border-t border-border px-3 py-0.5 text-caption text-neutral-500">
           <CornerDownRight size={12} class="shrink-0" aria-hidden="true" />
           <span class="min-w-0 truncate">{props.pendiente}</span>
         </div>

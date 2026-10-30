@@ -2,6 +2,7 @@ import { isMac } from "./window.ts";
 
 const ATAJOS = {
   findInTask: { mac: "⌘F", windows: "Ctrl+F", ariaMac: "Meta+F", ariaWindows: "Control+F" },
+  search: { mac: "⌘K", windows: "Ctrl+K", ariaMac: "Meta+K", ariaWindows: "Control+K" },
   sidebar: { mac: "⌘B", windows: "Ctrl+B", ariaMac: "Meta+B", ariaWindows: "Control+B" },
   workTree: { mac: "⌘⌥B", windows: "Ctrl+Alt+B", ariaMac: "Meta+Alt+B", ariaWindows: "Control+Alt+B" },
   newTask: { mac: "⌘T", windows: "Ctrl+T", ariaMac: "Meta+T", ariaWindows: "Control+T" },
@@ -29,6 +30,7 @@ export function accionDeAtajo(e: KeyboardEvent): AccionDeAtajo | null {
   // Option puede producir «∫» en macOS: con Alt se reconoce la tecla física.
   if (e.altKey) return tecla === "b" || e.code === "KeyB" ? "workTree" : null;
   if (tecla === "b") return "sidebar";
+  if (tecla === "k") return "search";
   if (tecla === "t") return "newTask";
   if (tecla === "w") return "closeTab";
   return null;

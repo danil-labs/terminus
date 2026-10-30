@@ -115,6 +115,8 @@ export default function PuertosAbiertos(props: {
   busy: boolean;
   /** Abrirlo como pestaña del espacio principal. Solo lo de una tarea. */
   onAbrirSitio: (url: string, project: string, session: string) => void;
+  /** En la columna de organizaciones: icono sobre la cifra y el panel a la derecha. */
+  vertical?: boolean;
 }) {
   const [datos, setDatos] = createSignal<Puertos | null>(null);
   const [abierto, setAbierto] = createSignal(false);
@@ -231,7 +233,7 @@ export default function PuertosAbiertos(props: {
     children: JSX.Element;
   }) {
     return (
-      <TooltipRoot openDelay={RETARDO_TOOLTIP} placement="top">
+      <TooltipRoot openDelay={RETARDO_TOOLTIP} placement="bottom">
         <TooltipTrigger
           as={(p: object) => (
             <button
@@ -356,7 +358,7 @@ export default function PuertosAbiertos(props: {
         setAbierto(v);
         if (v) void consultar();
       }}
-      placement="top"
+      placement={props.vertical ? "right-end" : "bottom-end"}
       gutter={6}
     >
       {/* El disparador **no lleva `onClick` propio**: Kobalte no compone
@@ -367,13 +369,26 @@ export default function PuertosAbiertos(props: {
         as={(p: object) => (
           <button
             {...p}
-            class="flex shrink-0 items-center gap-1 rounded-sm px-1.5 py-0.5 text-neutral-500 outline-none transition-colors hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary data-[expanded]:bg-surface-muted"
+            class={cn(
+              "flex shrink-0 items-center text-neutral-500 outline-none transition-colors hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary data-[expanded]:bg-surface-muted",
+              props.vertical ? "relative size-8 justify-center rounded-md" : "gap-1 rounded-sm px-1.5 py-0.5",
+            )}
             aria-label={`${t("shell.ports.aria", { mine: mios(), external: externos() })} · ${t("shell.ports.aria_processes", { processes: processes() })}`}
           >
-            <Plug size={12} class={hot() ? "text-warning-strong" : ""} aria-hidden />
-            <span class={cn("font-mono tabular-nums", hot() && "text-warning-strong")}>
-              {mios() + processes()}
-            </span>
+            <Plug size={props.vertical ? 16 : 12} class={!props.vertical && hot() ? "text-warning-strong" : ""} aria-hidden />
+            {/* En la columna la cifra no cabe al lado: un punto dice que hay algo abierto. */}
+            <Show
+              when={!props.vertical}
+              fallback={
+                <Show when={mios() + processes() > 0}>
+                  <span aria-hidden="true" class={cn("absolute top-1 right-1 size-1.5 rounded-full", hot() ? "bg-warning" : "bg-success")} />
+                </Show>
+              }
+            >
+              <span class={cn("font-mono tabular-nums", hot() && "text-warning-strong")}>
+                {mios() + processes()}
+              </span>
+            </Show>
           </button>
         )}
       />
@@ -387,7 +402,7 @@ export default function PuertosAbiertos(props: {
             <Plug size={12} class="text-neutral-500" aria-hidden />
             {t("shell.ports.title")}
           </h2>
-          <span class="font-mono text-[0.6875rem] tabular-nums text-neutral-500">
+          <span class="font-mono text-caption tabular-nums text-neutral-500">
             {mios()} de tus tareas · {externos()} externos
           </span>
         </div>
@@ -452,7 +467,7 @@ export default function PuertosAbiertos(props: {
                   trae aquí a alguien cuando lo suyo está vacío. */}
               <button
                 type="button"
-                class="flex w-full items-center gap-1.5 px-3 py-2 text-left text-[0.6875rem] font-semibold uppercase tracking-wide text-neutral-500 outline-none hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
+                class="flex w-full items-center gap-1.5 px-3 py-2 text-left text-caption font-semibold uppercase tracking-wide text-neutral-500 outline-none hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
                 aria-expanded={externosAbiertos()}
                 onClick={() => setExternosAbiertos((v) => !v)}
               >

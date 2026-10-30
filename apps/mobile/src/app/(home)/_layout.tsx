@@ -1,3 +1,4 @@
+import { ALPHA_DEMO } from "../../lib/alpha-mode";
 import { Redirect, Stack } from "expo-router";
 import { useAccount } from "../../lib/account";
 import { BRIDGE_WITHOUT_ACCOUNT } from "../../lib/bridge";
@@ -17,7 +18,7 @@ export default function HomeLayout() {
   // La cuenta de Danil va primero: un bridge guardado de antes no la salta. Solo el
   // lab sin cuenta (desarrollo, Android) entra por el bridge a propósito.
   const bridgeOnly = BRIDGE_WITHOUT_ACCOUNT && !!pairing;
-  if (!session && !bridgeOnly) return <Redirect href="/signin" />;
+  if (!ALPHA_DEMO && !session && !bridgeOnly) return <Redirect href="/signin" />;
   return (
     <Stack
       screenOptions={{

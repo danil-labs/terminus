@@ -3,7 +3,6 @@ import ArrowLeftRight from "lucide-solid/icons/arrow-left-right";
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import CornerDownRight from "lucide-solid/icons/corner-down-right";
 import FilePenLine from "lucide-solid/icons/file-pen-line";
-import ListTree from "lucide-solid/icons/list-tree";
 import MoreVertical from "lucide-solid/icons/more-vertical";
 import Pin from "lucide-solid/icons/pin";
 import PinOff from "lucide-solid/icons/pin-off";
@@ -47,7 +46,7 @@ import EtapaDeTarea, { ETAPAS, type Etapa } from "./TaskStage";
 import EstadoDeTarea from "./TaskStatus";
 import { matchesTaskQuery } from "./taskSearch";
 import { canFinishTask, effectiveTaskGit, type GitStatus, sharesTaskGit, watchSessionGit } from "./taskGit";
-import { authorKey, authorKeys, shownUnderLauncher } from "./taskAuthors";
+import { authorKey, authorKeys, isSubtask } from "./taskAuthors";
 import { descendientes, type Rama as RamaDeTareas, taskTree } from "./taskTree";
 import { rolledOutcome, type TaskActivity, taskPriority } from "@terminus/design";
 import { taskCard, buildTaskTree, launcherOf, sameAgent, taskIdentity, withTaskAncestors } from "@terminus/tasks";
@@ -103,6 +102,8 @@ export type SessionRow = {
   workspace?: string;
   delegated_activity?: TaskActivity;
   agent_thread?: boolean;
+  /** El título es solo el comando con que nació: lo decide Rust (`Session::command_title`). */
+  command_title?: boolean;
   /** Si la sesión nativa ya tiene trabajo: lo decide Rust (`Session::native_work`). */
   native_work?: boolean;
   /** Bandeja antigua del encargado (`Session::inbox`), visible si existe. */
@@ -484,7 +485,7 @@ export default function Sessions(props: {
   // En la barra no se anidan subtareas: se consultan desde la vista de subtareas
   // del chat. Solo asoman, sueltas, al buscar o si las fijaron.
   const enBarra = createMemo(() => props.sessions.filter(s => (props.includeArchived || !s.archived)
-    && (!props.sidebar || !!props.search?.trim() || s.pinned || !shownUnderLauncher(s, props.sessions))));
+    && (!props.sidebar || !!props.search?.trim() || s.pinned || !isSubtask(s))));
   // Un observador de git, de perfiles y de historiales por carpeta de la
   // lista: las cachés son por carpeta y se comparten con las demás vistas.
   const carpetasVistas = createMemo(
@@ -617,25 +618,6 @@ export default function Sessions(props: {
    */
   const gitDe = (row: SessionRow) => effectiveTaskGit(row, gitRows(), props.relatedSessions ?? props.sessions);
 
-  /**
-   * Las subtareas vivas de cada tarea, por id de quien las lanzó: el chip de
-   * subtareas de la tarjeta. No es un dato del motor; sale de las filas que la
-   * lista ya tiene (`launcherOf`, la misma relación que esconde la subtarea
-   * bajo su lanzador en el riel).
-   */
-  const hijasPorLanzador = createMemo(() => {
-    const porLanzador = new Map<string, SessionRow[]>();
-    for (const row of props.relatedSessions ?? props.sessions) {
-      const lanzador = launcherOf(row);
-      if (!lanzador || row.archived || lanzador === row.id) continue;
-      const hijas = porLanzador.get(lanzador);
-      // Una subtarea que llega por dos listas cuenta una vez.
-      if (hijas) { if (!hijas.some((h) => h.id === row.id)) hijas.push(row); }
-      else porLanzador.set(lanzador, [row]);
-    }
-    return porLanzador;
-  });
-
   /** Una cara de 13 px con el nombre solo en el tooltip; antes de ella, su flecha si la lleva. */
   const ChipDeCara = (c: {
     name: string;
@@ -696,15 +678,6 @@ export default function Sessions(props: {
       return quien && !sameAgent(quien, r.s.agent) ? quien : null;
     };
     const anterior = () => r.s.previous_agent && !sameAgent(r.s.previous_agent, r.s.agent) ? r.s.previous_agent : null;
-    const hijas = () => hijasPorLanzador().get(r.s.id) ?? [];
-    const actividadDeHijas = (): TaskActivity => ({
-      aprobando: hijas().some((h) => props.aprobando.includes(h.id)),
-      viva: hijas().some((h) => props.vivas.includes(h.id)),
-      esperando: hijas().some((h) => h.esperando),
-      outcome: hijas().some((h) => h.outcome === "failed") ? "failed"
-        : hijas().some((h) => h.outcome === "interrupted") ? "interrupted" : null,
-      sinVer: hijas().some((h) => h.sin_ver),
-    });
     // Con un motor que no manda `last_turn_at`, la última vez que se movió.
     const cuando = () => r.s.last_turn_at ?? r.s.updated_at;
     // Memo: al hacer clic el menú se reinicia y, sin él, la ranura reescribe su clase.
@@ -774,17 +747,6 @@ export default function Sessions(props: {
               </Show>
             </Show>
           </Show>
-          <Show when={hijas().length > 0}>
-            <span
-              data-session-subtasks={hijas().length}
-              class="inline-flex shrink-0 items-center gap-1 tabular-nums"
-              title={t("projects.sessions.subtasks_count", { count: hijas().length })}
-            >
-              <ListTree size={12} aria-hidden="true" />
-              <span aria-hidden="true">{hijas().length}</span>
-              <EstadoDeTarea riel ambito="plegadas" {...actividadDeHijas()} size={10} />
-            </span>
-          </Show>
           <Show when={abridor()}>
             {(quien) => <ChipDeCara kind="opener" icon={CornerDownRight} name={quien()} tip={t("projects.sessions.opened_by", { name: nombre(quien()) })} />}
           </Show>
@@ -835,6 +797,7 @@ export default function Sessions(props: {
     const conPastilla = () => !(props.groupByHandler && props.groupByAuthor !== false) && !f.s.chat_de_agente && !!f.s.agent;
     const title = () => f.s.inbox ? t("projects.threads.inbox")
       : f.s.chat_de_agente && !f.s.agent_thread ? t("projects.threads.persistent_chat")
+      : f.s.command_title ? t("projects.threads.command")
       : f.s.title;
     /**
      * Cierra el renombrado guardando lo escrito.
@@ -872,13 +835,13 @@ export default function Sessions(props: {
           // El cohete es absoluto: sin este hueco el título se mete debajo. Por
           // `:has`, no por clase reactiva: cada fila mutaría al llegar git.
           <div class={cn(
-            "flex min-w-0 items-center gap-1 text-[0.8125rem] leading-[1.35] [:has(>[data-finish-slot])_&]:pr-16",
+            "flex min-w-0 items-center gap-1 text-ui leading-[1.35] [:has(>[data-finish-slot])_&]:pr-16",
             // La tarjeta del riel: 13,5 px en su línea de 18, sin chincheta ni «Contexto».
             tarjetaDelRiel() && "text-[0.84375rem] leading-[18px]",
             apagada() && "text-neutral-500 group-hover/session:text-neutral-950",
           )}>
             <Show when={fijada(f.s) && !tarjetaDelRiel()}>{marcaDeFijada()}</Show>
-            <Show when={contextual(f.s) && !tarjetaDelRiel()}><span class="shrink-0 text-[0.6875rem] font-normal text-neutral-500">{t("projects.sessions.context")}</span></Show>
+            <Show when={contextual(f.s) && !tarjetaDelRiel()}><span class="shrink-0 text-caption font-normal text-neutral-500">{t("projects.sessions.context")}</span></Show>
             <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"><WithMentions>{f.s.subagent ? readableSessionTitle(title()) : title()}</WithMentions></span>
           </div>
         }
@@ -898,7 +861,7 @@ export default function Sessions(props: {
             // `p-0`/`min-h-0` devuelve su altura: 13 px por 1,35, los
             // mismos que el título. El peso lo hereda, para que
             // la tarea abierta siga en negrita mientras se renombra.
-            class="block h-auto min-h-0 rounded-none border-0 p-0 font-sans text-[0.8125rem] leading-[1.35] text-inherit [font-weight:inherit]"
+            class="block h-auto min-h-0 rounded-none border-0 p-0 font-sans text-ui leading-[1.35] text-inherit [font-weight:inherit]"
             maxlength={SESSION_TITLE_MAX_LENGTH}
             value={borrador()}
             aria-label={t("projects.sessions.rename_label", {
@@ -1100,7 +1063,7 @@ export default function Sessions(props: {
                       )}
                     </For>
                     <Show when={props.carpetaDe?.(f.s) ?? props.carpeta}>
-                      {(c) => <p class="m-0 px-2 pt-1 pb-1.5 text-[0.6875rem] text-neutral-500">{t("spaces.move.folder_stays", { folder: c() })}</p>}
+                      {(c) => <p class="m-0 px-2 pt-1 pb-1.5 text-caption text-neutral-500">{t("spaces.move.folder_stays", { folder: c() })}</p>}
                     </Show>
                   </PopoverContent>
                 </Popover>
@@ -1209,7 +1172,6 @@ export default function Sessions(props: {
         <div
           data-sesion={f.s.id}
           data-pinned={fijada(f.s) ? "true" : undefined}
-          data-legacy={f.s.chat_de_agente ? "true" : undefined}
           data-apagada={apagada() ? "true" : undefined}
           class={tarjetaDelRiel() ? cn(
             // La tarjeta: 52 px fijos y dos líneas, pase lo que pase con los datos.
@@ -1340,7 +1302,7 @@ export default function Sessions(props: {
             <div class="min-w-0 flex-1">
               <Titulo />
               {/* Proveedor, mensaje y estado del modelo en una línea. */}
-              <div data-session-preview class="mt-1 flex min-w-0 items-center gap-1.5 text-[0.6875rem] font-normal leading-tight text-neutral-500">
+              <div data-session-preview class="mt-1 flex min-w-0 items-center gap-1.5 text-caption font-normal leading-tight text-neutral-500">
                 <Show when={worktreeDe(f.s.id)?.owned && !worktreeDe(f.s.id)?.available}>
                   <span class="flex shrink-0 text-error-strong" title={t("projects.sessions.worktree_missing")} aria-label={t("projects.sessions.worktree_missing")}><WorktreeRoto size={13} /></span>
                 </Show>
@@ -1513,7 +1475,7 @@ export default function Sessions(props: {
         <Show when={rama().hijas.length > 0}>
           <button
             type="button"
-            class="mt-0.5 ml-2.5 flex w-[calc(100%-10px)] cursor-pointer items-center gap-1.5 rounded-sm border-0 bg-transparent px-1.5 py-0.5 text-left text-[0.6875rem] leading-[1.2] text-neutral-500 tabular-nums hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
+            class="mt-0.5 ml-2.5 flex w-[calc(100%-10px)] cursor-pointer items-center gap-1.5 rounded-sm border-0 bg-transparent px-1.5 py-0.5 text-left text-caption leading-[1.2] text-neutral-500 tabular-nums hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
             aria-expanded={expanded()}
             aria-label={
               !expanded()
@@ -1640,7 +1602,7 @@ export default function Sessions(props: {
         </ToastPortal>
       )}</Show>
       <Show when={query()}>
-        <p data-search-results class="m-0 px-2 text-[0.6875rem] text-neutral-500" aria-live="polite">
+        <p data-search-results class="m-0 px-2 text-caption text-neutral-500" aria-live="polite">
           {matchedSessions().length === 0 ? t("projects.agent_tasks.no_results") : t("projects.sessions.search_results", { count: matchedSessions().length })}
         </p>
       </Show>

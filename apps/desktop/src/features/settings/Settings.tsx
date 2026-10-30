@@ -1,6 +1,7 @@
 import { invoke } from "../../lib/invoke.ts";
 import Blocks from "lucide-solid/icons/blocks";
 import CircleUserRound from "lucide-solid/icons/circle-user-round";
+import History from "lucide-solid/icons/history";
 import Plug from "lucide-solid/icons/plug";
 import Palette from "lucide-solid/icons/palette";
 import Bot from "lucide-solid/icons/bot";
@@ -32,6 +33,8 @@ import {
 import type { ModelChoices } from "../projects/NewAgent";
 import AIProviders from "./AIProviders";
 import Environment from "./Environment";
+import { machines } from "../machines/store";
+import { secretsRoute } from "./secrets-support";
 import General from "./General";
 import type { ContextoDeProyectos } from "./ManageProjects";
 import Plugins from "./Plugins";
@@ -41,7 +44,9 @@ import Skills from "./Skills";
 import Workspaces from "./Workspaces";
 // Chunks aparte: solo los carga quien abre la sección.
 const DanilAccount = lazy(() => import("./DanilAccount"));
+const Integrations = lazy(() => import("./Integrations"));
 const ActivityLogs = lazy(() => import("./ActivityLogs"));
+const AuditLog = lazy(() => import("./AuditLog"));
 const Connections = lazy(() => import("./Connections"));
 const Appearance = lazy(() => import("./Appearance"));
 const Secrets = lazy(() => import("./Secrets"));
@@ -121,6 +126,7 @@ const destinosDe = (
   workspace: () => string | null,
   activityMachine: () => string | null,
 ): Destino[] => [
+  ...(capabilities().inbox ? [{ id: "integrations", name: t("alpha.integrations"), icono: () => <Blocks size={15}/>, panel: () => <>{capabilities().inbox!.integrations()}<Suspense fallback={null}><Integrations/></Suspense></> }] : []),
   {
     id: "general",
     get name() {
@@ -257,6 +263,22 @@ const destinosDe = (
             </Suspense>
           ),
         },
+        ...(capabilities().accountAuditLog
+          ? [
+              {
+                id: "bitacora",
+                get name() {
+                  return t("audit.title");
+                },
+                icono: () => <History size={15} />,
+                panel: () => (
+                  <Suspense fallback={null}>
+                    <AuditLog source={capabilities().accountAuditLog!} />
+                  </Suspense>
+                ),
+              },
+            ]
+          : []),
         {
           id: "cuenta-danil",
           get name() {
@@ -278,7 +300,7 @@ const GRUPOS: { nombre: () => string; ids: string[] }[] = [
   { nombre: () => t("settings.nav.group_custom"), ids: ["skills", "agentes", "proyectos", "plugins"] },
   {
     nombre: () => t("settings.nav.group_connections"),
-    ids: ["cuenta-danil", "conexiones", "proveedores-ia", "secretos", "fuentes", "radiant"],
+    ids: ["cuenta-danil", "bitacora", "conexiones", "proveedores-ia", "secretos", "fuentes", "integrations", "radiant"],
   },
 ];
 
@@ -382,6 +404,8 @@ export default function Settings(props: {
       onAgentProfile: (project, name) => props.onAgentProfile?.(project, name),
     }, props.proyectos, () => props.workspace ?? null, () => props.activityMachine ?? null);
 
+  const navegables = () => TODOS().filter((destination) => destination.id !== "secretos" || secretsRoute(capabilities().accountCredentials ? "worker" : "engine", machines()) !== "unsupported");
+
   const [activo, setActivo] = createSignal(props.panel ?? "general");
   let hoja: HTMLDivElement | undefined;
   // El foco viaja con las flechas sin arrastrar la selección: así se puede
@@ -418,7 +442,7 @@ export default function Settings(props: {
   });
 
   function mover(paso: number | "inicio" | "fin") {
-    const destinos = TODOS();
+    const destinos = navegables();
     const i = destinos.findIndex((d) => d.id === foco());
     const j =
       paso === "inicio"
@@ -520,7 +544,7 @@ export default function Settings(props: {
           <span class="truncate">{p.d.name}</span>
           <Show when={marca()}>
             {(m) => (
-              <span class="ui-sidebar-menu-badge text-[0.625rem] font-normal text-neutral-500">
+              <span class="ui-sidebar-menu-badge text-2xs font-normal text-neutral-500">
                 {m().texto}
               </span>
             )}
@@ -565,7 +589,7 @@ export default function Settings(props: {
               class="border-0 bg-rail"
             >
               <SidebarHeader class="pb-6 pl-5 pr-3 pt-4">
-                <DialogTitle class="m-0 text-[0.9375rem] font-semibold">
+                <DialogTitle class="m-0 text-lead font-semibold">
                   {t("settings.title")}
                 </DialogTitle>
               </SidebarHeader>
@@ -580,7 +604,7 @@ export default function Settings(props: {
                       <SidebarMenu role="presentation" class="gap-1.5">
                         <For each={g.ids}>
                           {(id) => (
-                            <Show when={TODOS().find((d) => d.id === id)}>
+                            <Show when={navegables().find((d) => d.id === id)}>
                               {(d) => <Fila d={d()} />}
                             </Show>
                           )}

@@ -103,7 +103,7 @@ export type RouterConfig = {
   /** «Ejecutar en» para `workspace`, si la persona eligió una máquina. */
   pickedFor?: (workspace: string | null) => string | null;
   /** La máquina de la ventana. `os` solo si se sabe; sin `wakes`, se pinta como laptop. */
-  home?: () => { wakes?: boolean; os?: SystemId | null; features?: readonly string[] };
+  home?: () => { wakes?: boolean; os?: SystemId | null; features?: readonly string[]; version?: string | null };
 };
 
 function headerOf(options: Options, name: string): string | null {
@@ -396,6 +396,13 @@ export function createRouter(config: RouterConfig) {
   /** Una llamada a otra máquina, con el workspace del sobre. Una lectura sale de su rebanada: apagada con copia, no se pregunta. */
   async function remote(machine: string, command: string, args: Args, workspace: string | null): Promise<unknown> {
     args = withoutChannel(command, args);
+    // Apagada o encendiéndose, el resumen de la máquina sale de su copia (la de
+    // la flota o la del relay) con su hora, sin encenderla: es una lectura.
+    if (command === "list_workspaces" && fleet.power(machine) !== "on") {
+      const slice = await fleet.read({ machine, workspace: null, command, args });
+      if (!slice.has || !slice.value || typeof slice.value !== "object") throw new FleetError("machine_off", machine);
+      return { ...(fleet.encode(machine, slice.value, command) as object), cached_at: slice.at };
+    }
     if (STORAGE.has(command) || command === "list_workspaces") {
       if (fleet.power(machine) !== "on") throw new FleetError("machine_off", machine);
       if (STORAGE.has(command) && !workspace) throw missing(machine);
@@ -534,7 +541,7 @@ export function createRouter(config: RouterConfig) {
     const home = config.home?.();
     const selfOs = systemOf(home?.os);
     return [
-      ...(self !== null ? [{ id: self, local: true, active: lead === self, on: true, hosts: hasHere(workspace), materializes: true, wakes: home?.wakes ?? false, ...(home?.features?.length ? { features: [...home.features] } : {}), ...(selfOs ? { os: selfOs } : {}) }] : []),
+      ...(self !== null ? [{ id: self, local: true, active: lead === self, on: true, power: "on" as const, hosts: hasHere(workspace), materializes: true, wakes: home?.wakes ?? false, ...(home?.features?.length ? { features: [...home.features] } : {}), ...(home?.version ? { version: home.version } : {}), ...(selfOs ? { os: selfOs } : {}) }] : []),
       // Una de otro contrato no corre tareas nuevas hasta actualizarse.
       ...fleet.machines().filter((m) => fleet.power(m.id) !== "outdated").map((m) => {
         const os = systemOf(m.os);
@@ -543,10 +550,12 @@ export function createRouter(config: RouterConfig) {
           local: false,
           active: lead === m.id,
           on: fleet.power(m.id) === "on",
+          power: fleet.power(m.id),
           hosts: workspace ? members.has(m.id) : null,
           materializes: !stale.has(m.id),
           wakes: m.wakes,
           ...(m.features?.length ? { features: [...m.features] } : {}),
+          ...(m.version ? { version: m.version } : {}),
           ...(os ? { os } : {}),
         };
       }),
@@ -702,7 +711,9 @@ export function createRouter(config: RouterConfig) {
         if (owner === machine && FAN.has(command)) lastRead.delete(id);
       }
     }
-    config.deliver?.(list.map((e) => (e.name === "attention" ? { ...e, payload: attention.update(machine, e.payload) } : e)));
+    // `machine-usage` no dice de qué máquina es: el panel «Máquinas» relee la suya.
+    config.deliver?.(list.map((e) => (e.name === "attention" ? { ...e, payload: attention.update(machine, e.payload) }
+      : e.name === "machine-usage" && e.payload && typeof e.payload === "object" ? { ...e, payload: { ...e.payload, machine } } : e)));
   }
 
   /** Dónde se crea algo nuevo de `workspace` ahora y si esa máquina lo encabeza; `null` si ninguna puede. */

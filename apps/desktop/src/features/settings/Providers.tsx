@@ -18,6 +18,7 @@ import {
 } from "../../ui/DropdownMenu";
 import { SettingsBlock, SettingsPanel, SettingsRow, SettingsSection } from "./layout";
 import type { GithubAccountState } from "./github-account/GithubAccount";
+import { ExternalLink } from "../../ui/ExternalLink";
 
 // La tarjeta de Drive es la del alta; su chunk solo lo carga quien abre Fuentes.
 const Integraciones = lazy(() => import("../onboarding/ToolCards").then((m) => ({ default: m.Integraciones })));
@@ -642,7 +643,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                                         when={c().identity.user !== c().identity.name}
                                       >
                                         {" "}
-                                        <span class="font-mono text-[0.6875rem]">{c().identity.user}</span>
+                                        <span class="font-mono text-caption">{c().identity.user}</span>
                                       </Show>
                                       <Show
                                         when={
@@ -651,17 +652,17 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                                         }
                                       >
                                         {" · "}
-                                        <span class="font-mono text-[0.6875rem]">{c().workspace}</span>
+                                        <span class="font-mono text-caption">{c().workspace}</span>
                                       </Show>
                                     </span>
                                   }
                                 >
                                   <span class="flex flex-col gap-0.5">
-                                    <span class="font-mono text-[0.6875rem]">{c().data.correo}</span>
+                                    <span class="font-mono text-caption">{c().data.correo}</span>
                                     <strong class="text-neutral-950">
                                       {c().identity.name}
                                     </strong>
-                                    <span class="font-mono text-[0.6875rem]">{c().workspace}</span>
+                                    <span class="font-mono text-caption">{c().workspace}</span>
                                   </span>
                                 </Show>
                               }
@@ -808,18 +809,9 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                           <SettingsRow
                             label={t("settings.providers.waiting", { name: p.name })}
                             description={
-                              <a
-                                class="text-link underline underline-offset-2 outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                                href="#"
-                                onClick={(ev) => {
-                                  ev.preventDefault();
-                                  invoke("open_external", { target: e().url }).catch(
-                                    () => {},
-                                  );
-                                }}
-                              >
+                              <ExternalLink url={e().url}>
                                 {t("settings.providers.open", { name: p.name })}
-                              </a>
+                              </ExternalLink>
                             }
                           >
                             <Button
@@ -846,18 +838,9 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                         <SettingsRow
                           label={t("settings.providers.setup_waiting", { name: p.name })}
                           description={
-                            <a
-                              class="text-link underline underline-offset-2 outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                              href="#"
-                              onClick={(ev) => {
-                                ev.preventDefault();
-                                invoke("open_external", { target: url() }).catch(
-                                  () => {},
-                                );
-                              }}
-                            >
+                            <ExternalLink url={url()}>
                               {t("settings.providers.open", { name: p.name })}
-                            </a>
+                            </ExternalLink>
                           }
                         >
                           <Button size="compact" disabled={estado() !== null} onClick={() => void actualizarAcceso(p.id)}>
@@ -944,18 +927,9 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                               : prosa(p.token_label)
                           }
                           description={
-                            <a
-                              class="text-link underline underline-offset-2 outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                              href="#"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                invoke("open_external", {
-                                  target: p.token_url,
-                                }).catch(() => {});
-                              }}
-                            >
+                            <ExternalLink url={p.token_url}>
                               {t("settings.providers.create_token", { name: p.name })}
-                            </a>
+                            </ExternalLink>
                           }
                         >
                           {/* Oculto mientras se pega, y en cuanto el llavero lo
@@ -1056,7 +1030,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                                 <li>
                                   <div class="flex items-center gap-2 rounded-sm border border-border bg-surface px-2 py-1.5 text-xs">
                                     <span class="min-w-0 flex-1 truncate">{a.name}</span>
-                                    <span class="font-mono text-[0.6875rem] text-neutral-500">{a.key}</span>
+                                    <span class="font-mono text-caption text-neutral-500">{a.key}</span>
                                     <Show when={p.id !== "github" && (!p.select_area || selected())}>
                                       <Button
                                         variant="outline"
@@ -1097,7 +1071,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                                           <li class="flex items-baseline gap-2 text-xs">
                                             <span class="min-w-0 truncate">{r.name}</span>
                                             <Show when={r.slug !== r.name}>
-                                              <span class="min-w-0 truncate font-mono text-[0.6875rem] text-neutral-500">{r.slug}</span>
+                                              <span class="min-w-0 truncate font-mono text-caption text-neutral-500">{r.slug}</span>
                                             </Show>
                                             {/* Traerlo es el acto: el botón
                                                 vive en la fila del repositorio

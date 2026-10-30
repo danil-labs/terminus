@@ -38,3 +38,21 @@ pub fn output_with_timeout(
         std::thread::sleep(std::time::Duration::from_millis(200));
     }
 }
+
+/// Quita el `%XX` de un tramo de URL; una secuencia rota o que no sea UTF-8 no da ruta.
+pub fn decodificar(s: &str) -> Option<String> {
+    let bytes = s.as_bytes();
+    let mut salida = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' {
+            let par = s.get(i + 1..i + 3)?;
+            salida.push(u8::from_str_radix(par, 16).ok()?);
+            i += 3;
+        } else {
+            salida.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8(salida).ok()
+}

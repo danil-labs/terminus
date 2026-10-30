@@ -73,7 +73,7 @@ export function CredentialMachines(props: { credential: Credential; onChanged?: 
           {(m) => (
             <li class="grid gap-1" data-credential-machine={m.computer_id} data-state={m.state}>
               <div class="flex min-w-0 items-center gap-2">
-                <span class="min-w-0 flex-1 truncate text-[0.8125rem]">{nameOf(m)}</span>
+                <span class="min-w-0 flex-1 truncate text-ui">{nameOf(m)}</span>
                 <Show when={m.state === "pending"}>
                   <Badge tone="warning">{t("danil.credentials.state.pending")}</Badge>
                 </Show>
@@ -172,7 +172,7 @@ function Rotate(props: { credential: Credential; onDone: () => void }) {
           {t("danil.credentials.rotate.save")}
         </Button>
       </div>
-      <p class="m-0 text-[0.6875rem] text-neutral-500">{t("danil.credentials.rotate.help")}</p>
+      <p class="m-0 text-caption text-neutral-500">{t("danil.credentials.rotate.help")}</p>
       <Show when={failure()}>{(f) => <FailureNote f={f()} />}</Show>
     </form>
   );
@@ -247,7 +247,7 @@ export function CredentialsInUse(props: { kinds?: CredentialKind[]; match?: (c: 
       <Show when={matching().length > 0}>
         <div class="grid min-w-0" data-account-credentials="">
           <Show when={props.title}>
-            <p class="m-0 pt-3 text-[0.8125rem] font-semibold">{props.title}</p>
+            <p class="m-0 pt-3 text-ui font-semibold">{props.title}</p>
           </Show>
           <For each={matching()}>{(c) => <CredentialItem credential={c} showLabel={props.showLabel ?? true} />}</For>
         </div>
@@ -299,7 +299,7 @@ export function LocalKeysBanner(props: { kinds: CredentialKind[] }) {
   return (
     <Show when={local().length > 0}>
       <div class="grid gap-2 rounded-md border border-border bg-surface-raised px-3 py-2.5" data-local-keys-banner="">
-        <p class="m-0 text-[0.8125rem] font-semibold">
+        <p class="m-0 text-ui font-semibold">
           {whereName()
             ? t("danil.credentials.local.title_on", { count: local().length, machine: whereName()! })
             : t("danil.credentials.local.title", { count: local().length })}
@@ -309,14 +309,14 @@ export function LocalKeysBanner(props: { kinds: CredentialKind[] }) {
           <For each={local()}>
             {(l) => (
               <li>
-                <label class="flex items-center gap-2 text-[0.8125rem]">
+                <label class="flex items-center gap-2 text-ui">
                   <input type="checkbox" checked={picked().has(l.slot)} onChange={(e) => toggle(l.slot, e.currentTarget.checked)} data-local-key={l.slot} />
                   <span class="min-w-0 truncate">{l.label ?? l.slot}</span>
                   <Show when={l.hint}>{(hint) => <Badge forma="dato">{`••••${hint()}`}</Badge>}</Show>
                 </label>
                 <Show when={l.upload_error}>
                   {(code) => (
-                    <p class="m-0 pl-6 text-[0.6875rem] text-warning-strong" data-upload-error={l.slot}>
+                    <p class="m-0 pl-6 text-caption text-warning-strong" data-upload-error={l.slot}>
                       {prosa(failureOf({ what: { clave: code() }, detail: "" }).what)}
                     </p>
                   )}

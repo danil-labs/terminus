@@ -1,3 +1,5 @@
+import { ALPHA_DEMO } from "./alpha-mode";
+import { t } from "./i18n";
 import type { ProviderInfo, Workspace } from "@terminus/protocol";
 import { DEFAULT_SIDEBAR_VIEW, type SidebarView, sanitizeSidebarView } from "@terminus/tasks";
 import { store } from "./store";
@@ -31,6 +33,7 @@ type Workspaces = {
   current: WorkspaceEntry | null;
   snapshot: Snapshot | null;
   loading: boolean;
+  selectionReady: boolean;
   select: (id: string) => void;
   /** El space activo, como la SpaceBar del escritorio; el primero si no se eligió ninguno. */
   space: MergedSpace | null;
@@ -59,10 +62,28 @@ export function useWorkspaces() {
 const viewKey = (workspace: string, space: string | null) => `terminus.view.${workspace}${space ? `.${space}` : ""}`.replace(/[^\w.-]/g, "_");
 
 export function WorkspacesProvider({ children }: { children: ReactNode }) {
+  return ALPHA_DEMO ? <DemoWorkspacesProvider>{children}</DemoWorkspacesProvider> : <LiveWorkspacesProvider>{children}</LiveWorkspacesProvider>;
+}
+
+function DemoWorkspacesProvider({ children }: { children: ReactNode }) {
+  const { hosts } = useMachines();
+  const [view, setView] = useState<SidebarView>({ ...DEFAULT_SIDEBAR_VIEW, group: "none" });
+  const entry: WorkspaceEntry = { id: "demo-workspace", name: t("alpha.workspace_demo"), members: new Map([["demo-host", "demo-workspace"]]), hosts: ["demo-host"], defaultPermissionMode: null };
+  const [spaceId, setSpaceId] = useState("demo-space");
+  const firstSpace: MergedSpace = { id: "demo-space", name: t("alpha.space_demo"), folders: ["demo-host/demo-folder"], on: { "demo-host": "demo-space" } };
+  const alternate: MergedSpace = { id: "demo-space-alt", name: t("alpha.folder_demo"), folders: [], on: {"demo-host":"demo-space-alt"} };
+  const space = spaceId === firstSpace.id ? firstSpace : alternate;
+  const snapshot: Snapshot = { folders: [{id:"demo-folder",name:t("alpha.folder_demo"),key:"demo-host/demo-folder",host:"demo-host",kind:"folder"}], spaces:[firstSpace,alternate], tasks:[{id:"demo-task",title:t("alpha.task_demo"),last_message:t("alpha.answer_demo"),provider:"codex",model:"gpt-5.6",created_at:0,updated_at:0,esperando:false,agent:null,space:firstSpace.id,host:"demo-host",workspace:entry.id,folder:"demo-folder",folderKey:"demo-host/demo-folder"}], delegated:[], agents:[{name:"atencion-demo",description:t("alpha.agent"),status:"asleep",liveTasks:0,minutesSinceLastTurn:null,places:[{host:"demo-host",folder:"demo-folder"}]}], live:new Set(), providers:{}, cachedAt:null };
+  return <Context.Provider value={{list:[entry],current:entry,snapshot,loading:false,selectionReady:true,select:()=>{},space,selectSpace:setSpaceId,view,setView,hostsOfCurrent:hosts,reload:async()=>{}}}>{children}</Context.Provider>;
+}
+
+function LiveWorkspacesProvider({ children }: { children: ReactNode }) {
   const { hosts, registry, subscribe, rememberTitles, tick } = useMachines();
   const [perHost, setPerHost] = useState<Record<string, Workspace[] | null>>({});
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [snapshotScope, setSnapshotScope] = useState("");
+  const [enumeratedScope, setEnumeratedScope] = useState("");
   const [loading, setLoading] = useState(false);
   const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
   const asked = useRef(0);
@@ -112,6 +133,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         rememberTitles(merged.tasks.map((task) => [taskKey(task), task.title]));
         // Solo cambia lo que cambió: las filas iguales conservan su objeto y sus tarjetas no se repintan.
         setSnapshot((old) => (old ? keepSame<Snapshot>(old, merged) : merged));
+        setSnapshotScope(JSON.stringify([entry.id,having.map(host=>host.id).sort()]));
       };
       await Promise.all(
         having.map(async (host, i) => {
@@ -144,7 +166,10 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
       }
       await (sameEntry(early, entry) && first ? first : loadEntry(entry));
     } finally {
-      if (mine === asked.current) setLoading(false);
+      if (mine === asked.current) {
+        setLoading(false);
+        setEnumeratedScope(JSON.stringify(hosts.map(host=>host.id).sort()));
+      }
     }
   }, [hosts, registry, rememberTitles, machineCount]);
   const reload = useCallback(() => load(false), [load]);
@@ -183,8 +208,9 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   }, [reload]);
 
   const [spaceIds, setSpaceIds] = useState<Record<string, string>>({});
+  const [spacePreferenceReady, setSpacePreferenceReady] = useState(false);
   useEffect(() => {
-    void store.get(SPACES_KEY).then((saved) => saved && setSpaceIds(JSON.parse(saved)));
+    void store.get(SPACES_KEY).then((saved) => saved && setSpaceIds(JSON.parse(saved))).catch(() => {}).finally(() => setSpacePreferenceReady(true));
   }, []);
   const selectSpace = useCallback(
     (id: string) => {
@@ -220,9 +246,10 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   const current = list.find((w) => w.id === currentId) ?? null;
   const hostsOfCurrent = useMemo(() => hosts.filter((h) => current?.members.has(h.id)), [hosts, current]);
 
+  const selectionReady=spacePreferenceReady && enumeratedScope===JSON.stringify(hosts.map(host=>host.id).sort()) && (!current || snapshotScope===JSON.stringify([current.id,[...current.hosts].sort()]));
   const value = useMemo<Workspaces>(
-    () => ({ list, current, snapshot, loading, select, space, selectSpace, view, setView, hostsOfCurrent, reload }),
-    [list, current, snapshot, loading, select, space, selectSpace, view, setView, hostsOfCurrent, reload],
+    () => ({ list, current, snapshot, loading, selectionReady, select, space, selectSpace, view, setView, hostsOfCurrent, reload }),
+    [list, current, snapshot, loading, selectionReady, select, space, selectSpace, view, setView, hostsOfCurrent, reload],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

@@ -36,5 +36,8 @@
   "artifacts.versions.of": "v{n} de {total}",
   "artifacts.versions.published_as": "salió como {vias}",
   "artifacts.versions.title": "El historial de este documento",
-  "artifacts.versions.title_old": "Estás viendo una versión anterior, no la que está en el documento"
+  "artifacts.versions.title_old": "Estás viendo una versión anterior, no la que está en el documento",
+  "artifacts.download.too_large": "Este archivo supera el límite de descarga de 256 MiB.",
+  "artifacts.download.incomplete": "La descarga quedó incompleta. Intenta de nuevo.",
+  "artifacts.download.timeout": "La descarga tardó demasiado. Intenta de nuevo."
 }

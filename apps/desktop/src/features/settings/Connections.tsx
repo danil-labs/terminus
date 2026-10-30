@@ -10,6 +10,7 @@ import {
   webhookUrlOk,
 } from "@terminus/computers";
 import { createResource, createSignal, For, Show } from "solid-js";
+import { createCopied } from "../../lib/clipboard";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
 import { Badge } from "../../ui/Badge";
@@ -74,7 +75,7 @@ function LocalSection(props: { workspace: string | null }) {
   const [busy, setBusy] = createSignal(false);
   const [failed, setFailed] = createSignal(false);
   const [open, setOpen] = createSignal<string | null>(null);
-  const [copied, setCopied] = createSignal<string | null>(null);
+  const { copied, copy } = createCopied<string>(2_000);
   const [removing, setRemoving] = createSignal<LocalOrchestrator | null>(null);
 
   async function connect() {
@@ -114,7 +115,7 @@ function LocalSection(props: { workspace: string | null }) {
     <Show when={rows() !== null && rows() !== undefined}>
       <SettingsSection title={t("settings.connections.local.title")} description={t("settings.connections.local.description")}>
         <Show when={failed()}>
-          <p class="m-0 py-2 text-[0.8125rem] text-error-strong" role="alert">
+          <p class="m-0 py-2 text-ui text-error-strong" role="alert">
             {t("settings.connections.failed")}
           </p>
         </Show>
@@ -153,11 +154,7 @@ function LocalSection(props: { workspace: string | null }) {
                           <Button
                             variant="ghost"
                             size="compact"
-                            onClick={async () => {
-                              await navigator.clipboard.writeText(snippet.text);
-                              setCopied(`${o.id}:${snippet.id}`);
-                              setTimeout(() => setCopied(null), 2_000);
-                            }}
+                            onClick={() => void copy(snippet.text, `${o.id}:${snippet.id}`)}
                           >
                             {copied() === `${o.id}:${snippet.id}` ? t("settings.connections.copied") : t("settings.connections.local.copy")}
                           </Button>
@@ -215,7 +212,7 @@ export default function Connections(props: { workspace?: string | null }) {
   const [busy, setBusy] = createSignal<string | null>(null);
   const [failure, setFailure] = createSignal<string | null>(null);
   const [revoking, setRevoking] = createSignal<Connection | null>(null);
-  const [copied, setCopied] = createSignal(false);
+  const { copied, copy } = createCopied(2_000);
 
   const ready = () => {
     const d = data();
@@ -254,11 +251,7 @@ export default function Connections(props: { workspace?: string | null }) {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={async () => {
-                  await navigator.clipboard.writeText(mcpUrl(d().endpoint));
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2_000);
-                }}
+                onClick={() => void copy(mcpUrl(d().endpoint))}
               >
                 {copied() ? t("settings.connections.copied") : t("settings.connections.copy_url")}
               </Button>
@@ -267,7 +260,7 @@ export default function Connections(props: { workspace?: string | null }) {
         }
       >
         <Show when={failure()}>
-          <p class="m-0 py-2 text-[0.8125rem] text-error-strong" role="alert">
+          <p class="m-0 py-2 text-ui text-error-strong" role="alert">
             {t("settings.connections.failed")}
           </p>
         </Show>
@@ -348,7 +341,7 @@ function WebhookBlock(props: {
   const [editing, setEditing] = createSignal(false);
   const [url, setUrl] = createSignal("");
   const [secret, setSecret] = createSignal<string | null>(null);
-  const [copied, setCopied] = createSignal(false);
+  const { copied, copy } = createCopied(2_000);
   const valid = () => webhookUrlOk(url().trim());
 
   async function save(webhook: { url: string; rotate?: boolean } | null) {
@@ -414,11 +407,7 @@ function WebhookBlock(props: {
               <Button
                 variant="ghost"
                 size="compact"
-                onClick={async () => {
-                  await navigator.clipboard.writeText(value());
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2_000);
-                }}
+                onClick={() => void copy(value())}
               >
                 {copied() ? t("settings.connections.copied") : t("settings.connections.local.copy")}
               </Button>

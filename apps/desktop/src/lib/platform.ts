@@ -5,8 +5,11 @@
  */
 import type { Answer, AccountWorkspace, Computer, CredentialSource, MemorySource, SpaceOrderSource } from "@terminus/computers";
 import { createRoot, createSignal, type JSX } from "solid-js";
+import type { AccountEmailsSource } from "../features/settings/account-emails";
 import type { AccountProfileSource } from "../features/settings/account-profile";
+import type { SupportAccessSource } from "../features/settings/SupportAccess";
 import type { Account } from "../features/settings/accounts-store";
+import type { AuditLogSource } from "../web/audit-log";
 import type { WorkspaceAssetsSource } from "../web/workspace-assets";
 
 /** Una cuenta agrupada (web y escritorio): las máquinas donde tiene sesión (`@terminus/fleet`, `merge.ts`). */
@@ -44,9 +47,12 @@ export type WebAccountsSource = {
   add: (email?: string | null) => void;
   /** Olvida una cuenta extra en este navegador. */
   remove: (userId: string) => Promise<void>;
+  /** Cierra la sesión de la cuenta abierta y vuelve a la entrada. */
+  signOut: () => void;
 };
 
 export type Capabilities = {
+  inbox?: { customization: typeof import("./customization").createCustomization; entries: typeof import("./attention-labels").featureEntries; demo: boolean; userId?: string | null; subscribe?: (clear: () => void) => () => void; sidebarMenu: typeof import("../web/attention/SidebarEntries").AttentionMenu; personalizeMenu: typeof import("../web/attention/SidebarEntries").PersonalizeMenu; catalog: (props: import("../web/attention/CustomizationSection").CustomizationSectionProps) => JSX.Element; broadcasts: () => JSX.Element; initial: boolean; render: () => JSX.Element; agentSettings: (name: string) => JSX.Element; integrations: () => JSX.Element; search: { conversations: () => import("../features/shell/GlobalSearch").SearchConversation[]; open: (id: number) => void } };
   spaceOrder?: SpaceOrderSource;
   /** Controles de ventana propios, semáforo de macOS y bandeja. */
   nativeWindow: boolean;
@@ -62,6 +68,12 @@ export type Capabilities = {
   danilAccount?: boolean;
   /** La persona de la cuenta de Danil leída sin el motor (la web, con su sesión): pie y Configuración. */
   accountProfile?: AccountProfileSource;
+  /** Los correos de la cuenta con la sesión (la web de alfa, por su proxy al BFF). */
+  accountEmails?: AccountEmailsSource;
+  /** El panel de Configuración que la página pidió abrir al cargar (`?settings=`). */
+  initialSettings?: string;
+  /** La bitácora de cambios de la cuenta de Danil activa, con la sesión (la web en alfa); sin esto, Configuración no la ofrece. */
+  accountAuditLog?: AuditLogSource;
   /** El logo y el fondo de los workspaces leídos y cambiados en la cuenta con la sesión (la web). */
   accountAssets?: WorkspaceAssetsSource;
   /** Botón extra al lado de la búsqueda de la barra lateral (en la web, volver a Danil Agents). */
@@ -106,6 +118,8 @@ export type Capabilities = {
    */
   /** Las computadoras de la cuenta con la sesión de la página (la web); el escritorio usa su token de cliente. */
   accountComputers?: AccountComputersSource;
+  /** El acceso de soporte de Danil a los workspaces de Danil que la persona administra (la web alfa), en Workspaces. */
+  supportAccess?: SupportAccessSource;
   /** Varias cuentas de Danil en una ventana (la web); el escritorio no la da. */
   webAccounts?: WebAccountsSource;
   connectMachine?: {

@@ -1,5 +1,4 @@
 import { For, Show, Suspense, createEffect, createSignal, lazy, on, onCleanup } from "solid-js";
-import type { InvokeOptions } from "@tauri-apps/api/core";
 import { invoke } from "../../lib/invoke.ts";
 import { save } from "@tauri-apps/plugin-dialog";
 import { join, tempDir } from "@tauri-apps/api/path";
@@ -32,6 +31,7 @@ import { t } from "../../lib/i18n";
 import { extensionDe } from "../../lib/steps";
 import { peso, nf } from "../../lib/format";
 import { delimiterFor } from "../viewers/csv";
+import { ArtifactDownloadError, readArtifactDownload } from "./download.ts";
 
 /** Bajan al abrirse: `pdfjs-dist` no entra en el arranque de la ventana. */
 const PdfDocument = lazy(() => import("../viewers/Pdf"));
@@ -68,30 +68,6 @@ const extDescarga = (rel: string) => {
   const e = extensionDe(rel);
   return e ? `.${e.toLowerCase()}` : "";
 };
-
-/** Lo que pide cada `artifact_read_part`: con base64 cabe en el tope de RPC1 y del relay. */
-const PARTE = 2 * 1024 * 1024;
-
-/** Los bytes de una versión sellada en la máquina de su tarea, por partes. */
-async function bytesPorPartes(referencia: VersionRef, en: InvokeOptions | undefined): Promise<Blob> {
-  const partes: Uint8Array<ArrayBuffer>[] = [];
-  for (let offset = 0; ; ) {
-    const parte = await invoke<{ data: string; eof: boolean }>("artifact_read_part", { referencia, offset, size: PARTE }, en);
-    const bytes = Uint8Array.from(atob(parte.data), (c) => c.charCodeAt(0));
-    partes.push(bytes);
-    offset += bytes.length;
-    if (parte.eof || bytes.length === 0) return new Blob(partes);
-  }
-}
-
-/** Los bytes que `preview_file` trae enteros; `null` si es binario o no cabía (tope de la vista previa). */
-async function bytesDe(p: Preview): Promise<Blob | null> {
-  if (p.truncated) return null;
-  if (p.pdf) return new Blob([Uint8Array.from(atob(p.pdf), (c) => c.charCodeAt(0))], { type: "application/pdf" });
-  if (p.data_url) return (await fetch(p.data_url)).blob();
-  if (p.text !== null && (p.kind === "text" || p.kind === "html")) return new Blob([p.text]);
-  return null;
-}
 
 export default function PreviewPane(props: {
   preview: Preview | null;
@@ -395,7 +371,7 @@ export default function PreviewPane(props: {
      allá. La versión se sella allá (`artifact_history`), sus bytes viajan por
      partes (`artifact_read_part`), se guardan aquí como descarga del navegador
      y la salida se anota allá, que es donde vive la cadena. Un motor anterior
-     no tiene las partes: entonces solo sale lo que su vista previa trae entero. */
+     no tiene las partes: entonces solo sale el texto de la versión sellada. */
   async function descargarDeOtraMaquina(p: Preview) {
     const ruta = props.absPath!;
     const nombre = p.rel.split(/[/\\]/).pop() || "artefacto";
@@ -407,13 +383,12 @@ export default function PreviewPane(props: {
       if (!base) return;
       const punto = nombre.lastIndexOf(".");
       const sugerido = !v || punto <= 0 ? nombre : `${nombre.slice(0, punto)}-v${v.n}${nombre.slice(punto)}`;
-      const blob = await bytesPorPartes(base, enSuMaquina()).catch(async () =>
-        v ? new Blob([await leerVersion(v, enSuMaquina())])
-          : bytesDe(await invoke<Preview>("preview_file", { path: ruta, rel: p.rel }, enSuMaquina())));
-      if (!blob) {
-        setFallo({ what: t("artifacts.download.remote_outdated"), detail: nombre });
-        return;
-      }
+      const version = h.versions.find(entry => entry.referencia.n === base.n && entry.referencia.artifact === base.artifact && entry.referencia.project === base.project && entry.referencia.session === base.session);
+      const machine = enSuMaquina();
+      const blob = await readArtifactDownload(base, version?.bytes ?? NaN, p.kind === "text" || p.kind === "html", {
+        part: (referencia, offset, size) => invoke("artifact_read_part", { referencia, offset, size }, machine),
+        text: referencia => leerVersion(referencia, machine),
+      });
       const enlace = document.createElement("a");
       enlace.href = URL.createObjectURL(blob);
       enlace.download = sugerido;
@@ -427,7 +402,7 @@ export default function PreviewPane(props: {
         setPublicaciones((await publicacionesDe(base.project, base.session)).filter((x) => x.version?.artifact === base.artifact));
       }
     } catch (e) {
-      setFallo(asFailure(e));
+      setFallo(e instanceof ArtifactDownloadError ? { what: t(`artifacts.download.${e.reason}`), detail: nombre } : asFailure(e));
     } finally {
       setOcupado(false);
     }

@@ -83,22 +83,3 @@ export function Pantalla(props: {
     </>
   );
 }
-
-/** Una de varias maneras excluyentes de traer algo: una carpeta, un clon, una nueva. */
-export function Opcion(props: { activa: boolean; onClick: () => void; children: JSX.Element }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={props.activa}
-      onClick={() => props.onClick()}
-      class={cn(
-        "min-h-9 cursor-pointer rounded-md border px-3 text-[13px] font-medium transition-colors",
-        props.activa
-          ? "border-primary bg-primary/5 text-neutral-950"
-          : "border-border bg-surface-raised text-neutral-500 hover:border-border-strong",
-      )}
-    >
-      {props.children}
-    </button>
-  );
-}

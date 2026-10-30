@@ -12,7 +12,6 @@ import { elegirArchivoDeImagen } from "../../lib/pick-image";
 import type { AgentProfile, AgenteDeMaquina, CatalogoDeAgentes } from "../../lib/model";
 import {
   FONDOS,
-  claseDeFondo,
   type FondoDeChat,
 } from "../../lib/chat-background";
 import { elegirFondoDeChat, elegirVeloDeFondo, elegirVeloDePaneles, elegirVeloDePestanas, fondoDeChat, fondoPropio, imagenDelWorkspace, ponerFondoPropio, veloDeFondo, veloDePaneles, veloDePestanas } from "../../lib/chat-background-store";
@@ -325,7 +324,7 @@ export default function Appearance(props: { proyecto: string }) {
                             "absolute inset-0",
                             id === "propia"
                               ? "grid place-items-center bg-surface-muted text-neutral-500"
-                              : claseDeFondo(id),
+                              : "bg-surface",
                           )}
                           aria-hidden="true"
                         >
@@ -429,7 +428,7 @@ export default function Appearance(props: { proyecto: string }) {
 
       <SettingsSection title={t("settings.appearance.avatar.title")}>
         <Show when={cargado() && filas().length === 0}>
-          <p class="m-0 py-3.5 text-[0.8125rem] text-neutral-500">
+          <p class="m-0 py-3.5 text-ui text-neutral-500">
             {t("settings.appearance.avatar.empty")}
           </p>
         </Show>
@@ -522,7 +521,7 @@ function StylePicker(props: {
                   </span>
                 </span>
               </span>
-              <span class="truncate px-0.5 text-[0.6875rem] text-neutral-950">{label}</span>
+              <span class="truncate px-0.5 text-caption text-neutral-950">{label}</span>
             </button>
           )}
         </For>

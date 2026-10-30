@@ -320,7 +320,7 @@ export default function Sitio(props: {
         <Show
           when={props.navegador}
           fallback={
-            <span class="ml-1 min-w-0 flex-1 truncate font-mono text-[0.6875rem] text-neutral-500">
+            <span class="ml-1 min-w-0 flex-1 truncate font-mono text-caption text-neutral-500">
               {donde()}
             </span>
           }
@@ -358,7 +358,7 @@ export default function Sitio(props: {
                 e.currentTarget.blur();
               }
             }}
-            class="ml-1 h-6 min-w-0 flex-1 rounded-[var(--radius-sm)] border border-border bg-surface-muted px-2 font-mono text-[0.6875rem] text-neutral-950 outline-none placeholder:text-neutral-500 focus:border-primary"
+            class="ml-1 h-6 min-w-0 flex-1 rounded-sm border border-border bg-surface-muted px-2 font-mono text-caption text-neutral-950 outline-none placeholder:text-neutral-500 focus:border-primary"
           />
         </Show>
         {/* **La salida, y va aquí porque aquí es donde uno se queda atascado.**
@@ -392,7 +392,7 @@ export default function Sitio(props: {
 
       <Show when={estado() === "abriendo"}>
         <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <span class="text-[0.8125rem] text-neutral-500">
+          <span class="text-ui text-neutral-500">
             {t("sites.opening", { site: corta(destino()) })}
           </span>
         </div>
@@ -400,13 +400,13 @@ export default function Sitio(props: {
 
       <Show when={estado() === "inicio"}>
         <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <span class="text-[0.8125rem] text-neutral-500">{t("sites.start")}</span>
+          <span class="text-ui text-neutral-500">{t("sites.start")}</span>
         </div>
       </Show>
 
       <Show when={estado() === "fallo"}>
         <div class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-8 text-center">
-          <span class="max-w-[46ch] text-[0.8125rem] text-neutral-700">{fallo()}</span>
+          <span class="max-w-[46ch] text-ui text-neutral-700">{fallo()}</span>
           <Button variant="secondary" size="sm" onClick={reintentar}>
             {t("sites.retry")}
           </Button>

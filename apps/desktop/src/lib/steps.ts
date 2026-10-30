@@ -15,6 +15,7 @@
  * máquina, y por eso van en mono al lado del verbo—: traducirlos rompería el
  * emparejamiento con lo que manda `runtime/chat/`.
  */
+import { bareCommand, classify, fileName, type StepKind } from "@terminus/chat/steps";
 import { manifiesto, t } from "./i18n.ts";
 
 /** Qué clase de acto fue. Decide el verbo y el ícono de la fila. */
@@ -85,43 +86,10 @@ export type Paso = {
   decidio?: string;
 };
 
-/**
- * De qué clase es una herramienta.
- *
- * Los nombres de Claude y los tipos de item de Codex conviven en la misma tabla
- * porque nombran lo mismo: `Bash` y `command_execution` son «ejecutó algo». Lo
- * que no está en la tabla cae en `otro` y se muestra con su nombre crudo, que es
- * más honesto que forzarlo a una categoría.
- */
-export function clasificar(nombre: string): Clase {
-  switch (nombre) {
-    case "Read":
-    case "NotebookRead":
-      return "leer";
-    case "Write":
-    case "Edit":
-    case "NotebookEdit":
-    case "file_change":
-      return "editar";
-    case "Bash":
-    case "BashOutput":
-    case "KillShell":
-    case "command_execution":
-      return "ejecutar";
-    case "Glob":
-    case "Grep":
-      return "buscar";
-    case "WebFetch":
-    case "WebSearch":
-    case "web_search":
-      return "web";
-    case "TodoWrite":
-    case "todo_list":
-      return "plan";
-    default:
-      return "otro";
-  }
-}
+const CLASE: Record<StepKind, Clase> = { read: "leer", search: "buscar", edit: "editar", run: "ejecutar", web: "web", plan: "plan", other: "otro" };
+
+/** De qué clase es una herramienta; la tabla es la misma en todos los clientes. */
+export const clasificar = (nombre: string): Clase => CLASE[classify(nombre)];
 
 /** Un paso recién abierto. Es la puerta por la que entra todo. */
 export function pasoDe(
@@ -197,36 +165,45 @@ export function agrupar(pasos: Paso[]): Fila[] {
  * `null` si el tramo no tiene ninguno que contar — solo avisos, gasto o cierre.
  */
 export function cuentaDelTramo(pasos: Paso[], vivo = false): string | null {
+  const partes = partesDelTramo(pasos, vivo);
+  return partes.length === 0 ? null : partes.map((p) => p.texto).join(t("common.steps.summary.separator"));
+}
+
+/**
+ * La misma cabecera en trozos, con la clase de cada uno: el chat hace de
+ * «Editó N archivos» un botón que abre los cambios en el panel de la tarea.
+ * Ya va con mayúscula inicial; se une con `common.steps.summary.separator`.
+ */
+export function partesDelTramo(pasos: Paso[], vivo = false): { clase: Clase; texto: string }[] {
   const de = (clase: Clase) => pasos.filter((p) => p.clase === clase);
   const editados = archivosDistintos(de("editar"));
   const permisos = de("permiso");
-  const cuentas: [number, (count: number) => string][] = vivo
+  const cuentas: [number, (count: number) => string, Clase][] = vivo
     ? [
-        [de("leer").length, (count) => t("common.steps.summary_live.read", { count })],
-        [de("buscar").length, (count) => t("common.steps.summary_live.search", { count })],
-        [editados, (count) => t("common.steps.summary_live.edit", { count })],
-        [de("ejecutar").length, (count) => t("common.steps.summary_live.run", { count })],
-        [de("web").length, (count) => t("common.steps.summary_live.web", { count })],
-        [de("plan").length, (count) => t("common.steps.summary_live.plan", { count })],
-        [de("otro").length, (count) => t("common.steps.summary_live.other", { count })],
+        [de("leer").length, (count) => t("common.steps.summary_live.read", { count }), "leer"],
+        [de("buscar").length, (count) => t("common.steps.summary_live.search", { count }), "buscar"],
+        [editados, (count) => t("common.steps.summary_live.edit", { count }), "editar"],
+        [de("ejecutar").length, (count) => t("common.steps.summary_live.run", { count }), "ejecutar"],
+        [de("web").length, (count) => t("common.steps.summary_live.web", { count }), "web"],
+        [de("plan").length, (count) => t("common.steps.summary_live.plan", { count }), "plan"],
+        [de("otro").length, (count) => t("common.steps.summary_live.other", { count }), "otro"],
       ]
     : [
-        [de("leer").length, (count) => t("common.steps.summary.read", { count })],
-        [de("buscar").length, (count) => t("common.steps.summary.search", { count })],
-        [editados, (count) => t("common.steps.summary.edit", { count })],
-        [de("ejecutar").length, (count) => t("common.steps.summary.run", { count })],
-        [de("web").length, (count) => t("common.steps.summary.web", { count })],
-        [de("plan").length, (count) => t("common.steps.summary.plan", { count })],
-        [de("otro").length, (count) => t("common.steps.summary.other", { count })],
+        [de("leer").length, (count) => t("common.steps.summary.read", { count }), "leer"],
+        [de("buscar").length, (count) => t("common.steps.summary.search", { count }), "buscar"],
+        [editados, (count) => t("common.steps.summary.edit", { count }), "editar"],
+        [de("ejecutar").length, (count) => t("common.steps.summary.run", { count }), "ejecutar"],
+        [de("web").length, (count) => t("common.steps.summary.web", { count }), "web"],
+        [de("plan").length, (count) => t("common.steps.summary.plan", { count }), "plan"],
+        [de("otro").length, (count) => t("common.steps.summary.other", { count }), "otro"],
       ];
   cuentas.push(
-    [permisos.filter((p) => p.permitido).length, (count) => t("common.steps.summary.allowed", { count })],
-    [permisos.filter((p) => !p.permitido).length, (count) => t("common.steps.summary.denied", { count })],
+    [permisos.filter((p) => p.permitido).length, (count) => t("common.steps.summary.allowed", { count }), "permiso"],
+    [permisos.filter((p) => !p.permitido).length, (count) => t("common.steps.summary.denied", { count }), "permiso"],
   );
-  const partes = cuentas.filter(([n]) => n > 0).map(([n, frase]) => frase(n));
-  if (partes.length === 0) return null;
-  const frase = partes.join(t("common.steps.summary.separator"));
-  return frase.charAt(0).toLocaleUpperCase(manifiesto().formato) + frase.slice(1);
+  const partes = cuentas.filter(([n]) => n > 0).map(([n, frase, clase]) => ({ clase, texto: frase(n) }));
+  if (partes[0]) partes[0].texto = partes[0].texto.charAt(0).toLocaleUpperCase(manifiesto().formato) + partes[0].texto.slice(1);
+  return partes;
 }
 
 /** Tres ediciones al mismo archivo son un archivo que revisar, no tres. */
@@ -234,10 +211,7 @@ function archivosDistintos(pasos: Paso[]) {
   return new Set(pasos.map((p, i) => p.objetivo ?? `#${i}`)).size;
 }
 
-/** El nombre de archivo de una ruta, en las dos convenciones de barra. */
-export function nombreDe(ruta: string) {
-  return ruta.split(/[\\/]/).filter(Boolean).pop() || ruta;
-}
+export const nombreDe = fileName;
 
 /**
  * La extensión, sin punto y tal como viene, o vacía si el nombre no la trae.
@@ -251,32 +225,10 @@ export function extensionDe(ruta: string) {
 }
 
 /**
- * Lo que se ejecutó, sin el envoltorio del shell **ni el `cd` que lo precede**.
- *
- * Son dos envoltorios y el motivo es el mismo: enseñar la fontanería en el sitio
- * donde va lo que el agente decidió hacer.
- *
- * - Codex no manda el comando: manda `/bin/zsh -lc "…"` con el comando dentro.
- *   Verificado sobre un turno real.
- * - Y **el 52 % de los comandos empieza por `cd "<ruta absoluta>" && `**, medido
- *   sobre 14 sesiones. Ese prefijo ocupa 137 caracteres de mediana —la ruta de
- *   una carpeta de trabajo de Terminus es larga— y es idéntico en todas las
- *   filas de la misma tarea: no distingue una de otra y desplaza a la derecha lo
- *   único que sí.
- *
- * **Se quita al pintar, no al guardar.** El rastro es lo que el gate aprueba, y
- * ahí el comando tiene que ser el que se ejecutó de verdad. Lo que se recorta es
- * la lectura.
- *
- * El `cd` se quita **solo cuando hay algo detrás**: un `cd` suelto es lo que el
- * agente hizo y se enseña tal cual.
+ * Se quita al pintar, no al guardar: el rastro es lo que el gate aprueba, y ahí
+ * el comando tiene que ser el que se ejecutó de verdad.
  */
-export function comando(cmd: string) {
-  const envuelto = /^\S*(?:sh|bash|zsh)\s+-[a-z]*c\s+(["'])([\s\S]*)\1\s*$/.exec(cmd.trim());
-  const desnudo = (envuelto ? envuelto[2] : cmd).trim();
-  const conCd = /^cd\s+(?:"[^"]*"|'[^']*'|\S+)\s*&&\s*([\s\S]+)$/.exec(desnudo);
-  return (conCd ? conCd[1] : desnudo).trim();
-}
+export const comando = bareCommand;
 
 /**
  * La cabecera de una fila: el verbo en prosa y el sujeto como dato de máquina.

@@ -1,225 +1,70 @@
-import Check from "lucide-solid/icons/check";
-import ChevronDown from "lucide-solid/icons/chevron-down";
-import Plus from "lucide-solid/icons/plus";
-import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
-import X from "lucide-solid/icons/x";
-import { For, type JSX, Show } from "solid-js";
-import { t } from "../../lib/i18n";
-import { invoke } from "../../lib/invoke.ts";
-import { createPref } from "../../lib/prefs";
+import { createEffect, createSignal, type JSX, on, onCleanup, onMount } from "solid-js";
 import { cn } from "../../lib/utils";
 import {
   createFullscreen,
-  createWindowTitle,
   HEADER_HEIGHT,
   needsTrafficLightPadding,
   TRAFFIC_LIGHT_PADDING,
   toggleMaximizeFromHeader,
 } from "../../lib/window";
-import { Button } from "../../ui/Button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuGroupLabel,
-  DropdownMenuItem,
-  DropdownMenuItemIndicator,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "../../ui/DropdownMenu";
-import { GitHubMark } from "../../ui/icons";
-import { RETARDO_TOOLTIP, TooltipContent, TooltipRoot, TooltipTrigger } from "../../ui/Tooltip";
-import { createWorkspaces } from "../settings/workspaces-store";
-import { topState, type WorkspaceAttention } from "./attention";
 import WindowControls from "./WindowControls";
-import { AttentionBadge, MarcaDeWorkspace } from "./WorkspaceColumn";
-
-const TERMINUS_REPOSITORY_URL = "https://github.com/danil-labs/terminus";
 
 /**
- * La fila del título, a todo lo ancho: el nombre del workspace al principio y
- * de qué build salió la ventana al final. Su alto es `ALTO_DE_CABECERA`, que es
- * lo que la pone en el eje del semáforo (`lib/window.ts`).
+ * La franja de la ventana, a todo lo ancho: navegación a la izquierda, las
+ * pestañas en medio y los controles de la app a la derecha. Lo que queda libre
+ * es donde se arrastra la ventana.
  */
 export default function TitleBar(props: {
-  attention: WorkspaceAttention[];
-  onManage: () => void;
-  /** Los espacios del workspace, detrás de su nombre. */
-  escritorios?: (workspace: () => string) => JSX.Element;
+  /** Ocultar la barra, el espacio y Personalizar. */
+  izquierda: JSX.Element;
+  /** El botón que va pegado al borde derecho de la barra lateral. */
+  finDeIzquierda?: JSX.Element;
+  /** Dónde termina la barra lateral, en px de ventana; `null` si está oculta. */
+  bordeDeLaBarra: number | null;
+  /** Las pestañas de la ventana. */
+  centro?: JSX.Element;
+  derecha: JSX.Element;
 }) {
-  const ws = createWorkspaces();
-  const [starDismissed, setStarDismissed] = createPref("github.star.dismissed", false);
-  let titleBar: HTMLDivElement | undefined;
-  let starInvitation: HTMLDivElement | undefined;
-  let openingRepository = false;
-  const dismissStar = () => {
-    const restoreFocus = document.hasFocus() && starInvitation?.contains(document.activeElement);
-    setStarDismissed(true);
-    if (restoreFocus) titleBar?.querySelector<HTMLButtonElement>("[data-workspace-name]")?.focus();
-  };
-  const openRepository = () => {
-    if (openingRepository) return;
-    openingRepository = true;
-    void invoke("site_open_external", { url: TERMINUS_REPOSITORY_URL })
-      .then(dismissStar)
-      .catch(() => {})
-      .finally(() => { openingRepository = false; });
-  };
   const apartarSemaforo = needsTrafficLightPadding(() => true, createFullscreen());
-  const titulo = createWindowTitle();
-  const segmentoFinal = () => {
-    const actual = titulo();
-    if (!actual || actual === "Terminus") return null;
-    const partes = actual.split(" · ");
-    const texto = partes.at(-1) ?? actual;
-    return texto;
+  let grupo: HTMLDivElement | undefined;
+  const [inicio, setInicio] = createSignal(0);
+  const medir = () => setInicio(grupo?.getBoundingClientRect().left ?? 0);
+  onMount(() => {
+    medir();
+    window.addEventListener("resize", medir);
+    onCleanup(() => window.removeEventListener("resize", medir));
+  });
+  // El hueco del semáforo cambia después del `resize` (pantalla completa se lee aparte) y el
+  // de `rem` con la escala, que no lo emite: sin volver a medir, las pestañas nacen fuera de la línea.
+  createEffect(on([apartarSemaforo, () => props.bordeDeLaBarra], medir, { defer: true }));
+  // El grupo llega justo al borde de la barra: Personalizar queda encima de ella y la primera pestaña nace en esa línea.
+  const ancho = () => {
+    const borde = props.bordeDeLaBarra;
+    return borde === null ? undefined : `${Math.max(0, borde - inicio())}px`;
   };
 
   return (
     <div
-      ref={titleBar}
       data-title-bar=""
       class={cn(
-        "glass-panel flex shrink-0 items-center border-b border-border",
+        "tab-veil window-frame flex shrink-0 items-center",
         HEADER_HEIGHT,
         apartarSemaforo() ? TRAFFIC_LIGHT_PADDING : "pl-2",
       )}
       data-tauri-drag-region=""
       onDblClick={toggleMaximizeFromHeader}
     >
-      <WorkspaceMenu ws={ws} attention={props.attention} onManage={props.onManage} />
-      <Show when={props.escritorios && ws.actual()}>{(actual) => props.escritorios?.(() => actual().name)}</Show>
-      {/* Un solo margen automático para el final de la fila: ver `WindowControls`. */}
-      <div class="ml-auto flex min-w-0 items-center">
-        <Show when={segmentoFinal()}>
-          {(texto) => (
-            <span data-window-branch="" class="min-w-0 truncate px-3 text-xs font-medium text-neutral-500">
-              {texto()}
-            </span>
-          )}
-        </Show>
-        <Show when={!starDismissed()}>
-          <div ref={starInvitation} class="mx-2 flex shrink-0 items-center gap-0.5">
-            <TooltipRoot openDelay={RETARDO_TOOLTIP} placement="bottom-end" gutter={8}>
-              <TooltipTrigger
-                as={Button}
-                type="button"
-                variant="chrome"
-                size="compact"
-                class="h-6.5 gap-1.5"
-                aria-label={t("shell.github.star.title")}
-                onClick={openRepository}
-              >
-                <span aria-hidden="true"><GitHubMark size={14} /></span>
-                {t("shell.github.star")}
-              </TooltipTrigger>
-              <TooltipContent>{t("shell.github.star.help")}</TooltipContent>
-            </TooltipRoot>
-            <Button
-              type="button"
-              variant="chrome"
-              size="compact"
-              class="size-6 p-0 text-neutral-500"
-              aria-label={t("shell.github.star.dismiss")}
-              title={t("shell.github.star.dismiss")}
-              onClick={dismissStar}
-            >
-              <X size={12} aria-hidden="true" />
-            </Button>
-          </div>
-        </Show>
+      <div ref={grupo} class="flex min-w-0 shrink-0 items-center gap-1 pr-2 max-[600px]:max-w-[calc(100%-2rem)] max-[600px]:shrink" style={{ width: ancho() }}>
+        {props.izquierda}
+        <span class="min-w-0 flex-1" data-tauri-drag-region="" />
+        {props.finDeIzquierda}
+      </div>
+      {/* La tira de pestañas trae su propio margen; se compensa para que la primera nazca en la línea. */}
+      <div class="-ml-1.5 flex min-w-0 flex-1 items-center self-stretch">{props.centro}</div>
+      <div class="flex shrink-0 items-center gap-1 pr-2">
+        {props.derecha}
         <WindowControls />
       </div>
     </div>
-  );
-}
-
-/**
- * El nombre del cliente, que no es una pestaña ni lleva señal: lo que espera
- * en OTRO workspace se ve en su renglón del menú y en la columna.
- */
-function WorkspaceMenu(props: {
-  ws: ReturnType<typeof createWorkspaces>;
-  attention: WorkspaceAttention[];
-  onManage: () => void;
-}) {
-  const ws = props.ws;
-  const stateOf = (id: string) =>
-    topState(props.attention.find((w) => w.workspace === id)?.tasks ?? []);
-
-  return (
-    <Show when={ws.actual()}>
-      {(actual) => (
-        <DropdownMenu placement="bottom-start" gutter={4}>
-          <DropdownMenuTrigger
-            as={Button}
-            variant="chrome"
-            size="compact"
-            data-workspace-name=""
-            class="h-6.5 max-w-55 min-w-0 gap-1 px-1.5 text-[0.8125rem] font-bold"
-            title={actual().name}
-          >
-            <span class="min-w-0 truncate">{actual().name}</span>
-            <ChevronDown size={13} aria-hidden="true" class="shrink-0 text-neutral-500" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent class="w-64" data-workspace-menu="">
-            <DropdownMenuGroup>
-              <DropdownMenuGroupLabel>{t("shell.workspaces.label")}</DropdownMenuGroupLabel>
-              <DropdownMenuRadioGroup value={ws.activo() ?? undefined} onChange={(id) => void ws.cambiarA(id)}>
-                <For each={ws.lista() ?? []}>
-                  {(w) => {
-                    const actualEs = () => w.id === ws.activo();
-                    const estado = () => (actualEs() ? null : stateOf(w.id));
-                    return (
-                      <DropdownMenuRadioItem value={w.id} closeOnSelect class="flex items-center gap-2" data-workspace-option={w.id}>
-                        <span
-                          aria-hidden="true"
-                          class={cn(
-                            "relative grid size-5 shrink-0 place-items-center overflow-hidden rounded-sm border bg-surface text-[0.6875rem] leading-none font-bold",
-                            actualEs() ? "border-neutral-500 text-neutral-950" : "border-border-strong text-neutral-700",
-                          )}
-                        >
-                          <MarcaDeWorkspace id={w.id} name={w.name} logo={w.logo} />
-                        </span>
-                        <span class="min-w-0 flex-1 truncate">{w.name}</span>
-                        <Show when={estado()}>{(s) => <AttentionBadge state={s()} />}</Show>
-                        <DropdownMenuItemIndicator class="grid w-3.5 shrink-0 text-neutral-950">
-                          <Check size={14} aria-hidden="true" />
-                        </DropdownMenuItemIndicator>
-                      </DropdownMenuRadioItem>
-                    );
-                  }}
-                </For>
-              </DropdownMenuRadioGroup>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              class="flex items-center gap-2"
-              onSelect={() => window.dispatchEvent(new CustomEvent("harness:new-workspace"))}
-            >
-              <Plus size={14} aria-hidden="true" class="shrink-0 text-neutral-500" />
-              {t("shell.workspaces.new")}
-            </DropdownMenuItem>
-            <DropdownMenuItem class="flex items-center gap-2" onSelect={props.onManage}>
-              <SlidersHorizontal size={14} aria-hidden="true" class="shrink-0 text-neutral-500" />
-              {t("settings.workspaces.manage")}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuGroupLabel>{t("shell.help")}</DropdownMenuGroupLabel>
-              <DropdownMenuItem
-                class="flex items-center gap-2"
-                onSelect={() => void invoke("site_open_external", { url: TERMINUS_REPOSITORY_URL }).catch(() => {})}
-              >
-                <span aria-hidden="true"><GitHubMark size={14} /></span>
-                {t("shell.github.repository")}
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
-    </Show>
   );
 }

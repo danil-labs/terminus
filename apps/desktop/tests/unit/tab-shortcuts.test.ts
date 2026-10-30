@@ -101,6 +101,13 @@ test("con Shift, la T reabre lo cerrado y lo demás no es atajo", () => {
   assert.equal(accionDeAtajo(cmd({ key: "T", code: "KeyT", shiftKey: true, altKey: true })), null);
 });
 
+test("⌘K y Ctrl+K abren el buscador; con Shift o Alt no", () => {
+  assert.equal(accionDeAtajo(cmd({ key: "k", code: "KeyK" })), "search");
+  assert.equal(accionDeAtajo(tecla({ ctrlKey: true, key: "k", code: "KeyK" })), "search");
+  assert.equal(accionDeAtajo(cmd({ key: "K", code: "KeyK", shiftKey: true })), null);
+  assert.equal(accionDeAtajo(cmd({ key: "k", code: "KeyK", altKey: true })), null);
+});
+
 test("un número fuera de la tira no hace nada", () => {
   assert.equal(destinoDePestana({ tipo: "indice", n: 4 }, ["a", "b"], "a"), null);
   assert.equal(destinoDePestana({ tipo: "indice", n: 0 }, [], null), null);

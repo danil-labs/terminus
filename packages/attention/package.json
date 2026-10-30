@@ -1,0 +1,6 @@
+{
+  "name": "@terminus/attention",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/inbox.ts" }
+}

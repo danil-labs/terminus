@@ -1,194 +1,88 @@
-import { router } from "expo-router";
-import { useState } from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { MOBILE_WEB_DIR, WEB_LAYOUT_KEY } from "@terminus/design";
+import { TEXT } from "@terminus/design";
 import type { AttentionState } from "@terminus/protocol";
-import { useAccount } from "../lib/account";
-import { BRIDGE_ENABLED } from "../lib/bridge";
-import type { Host } from "../lib/hosts";
+import { router } from "expo-router";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useHomeLabel } from "../lib/homeLabel";
 import { t, w } from "../lib/i18n";
 import { useMachines } from "../lib/machines";
+import { can } from "../lib/pending";
 import { useWorkspaces } from "../lib/workspaces";
-import { Avatar, Badge, Dot, Row, SectionTitle, SheetTitle } from "../ui/components";
-import { TaskMark, type TaskState, topState } from "../ui/TaskStatus";
 import { Icon } from "../ui/Icon";
-import { matches, NoMatch, SearchField } from "../ui/Search";
+import { Group, GroupFooter, LargeTitle, ListRow, NavBar, pageColor, RoundButton } from "../ui/list";
 import { useTheme } from "../ui/theme";
+import { WorkspaceAvatar } from "../ui/WorkspaceAvatar";
 
 const NEEDS_YOU = new Set<AttentionState>(["approving", "asked", "failed"]);
 
-/**
- * La raíz de la web de escritorio: la que fijó la compilación
- * (`EXPO_PUBLIC_TERMINUS_WEB_BASE`, `web-mobile.mjs`); sin ella, lo que hay
- * antes de `/m` en la ruta, con o sin barra final.
- */
-function desktopBase(): string {
-  const built = process.env.EXPO_PUBLIC_TERMINUS_WEB_BASE?.trim();
-  if (built) return built.endsWith("/") ? built : `${built}/`;
-  const path = window.location.pathname;
-  const at = path.search(new RegExp(`/${MOBILE_WEB_DIR}(/|$)`));
-  return at >= 0 ? `${path.slice(0, at)}/` : "/";
-}
+/** Crear y administrar workspaces desde el teléfono: no se ve mientras sus comandos no estén en la lista cerrada. */
+const MANAGE = can("add_workspace") && can("rename_workspace");
 
 /**
- * La columna de workspaces del escritorio, como hoja: cada workspace con lo que
- * espera en él, las máquinas de la persona con su estado (encendida, apagada,
- * encendiéndose: nunca un error), la cuenta y la conexión de desarrollo.
- * Abrir esta hoja no enciende nada.
+ * Cambiar de workspace, desde la ficha de Inicio: aparte del espacio, como la
+ * columna de organizaciones del escritorio. Cada fila trae su ficha, en qué
+ * máquinas corre (y si están apagadas) y lo que te necesita ahí. Abrirla no
+ * enciende nada.
  */
-export default function WorkspaceSwitcher() {
+export default function Workspaces() {
   const theme = useTheme();
-  const { email, signOut, session } = useAccount();
-  const { attention, hosts, pairing, pair, registry } = useMachines();
+  const insets = useSafeAreaInsets();
+  const back = useHomeLabel();
+  const { attention, hosts } = useMachines();
   const { list, current, select } = useWorkspaces();
-  const several = hosts.length > 1;
-  const labelOf = (id: string) => hosts.find((h) => h.id === id)?.label ?? id;
-  const power = (host: Host) =>
-    host.power() === "on" ? w("web.computers.state.online") : host.power() === "starting" ? w("web.computers.state.starting") : host.power() === "outdated" ? w("web.computers.state.outdated") : w("web.computers.state.offline");
-  const dot = (host: Host) => (host.power() === "on" ? theme.success : host.power() === "starting" ? theme.info : theme.border);
-  // Un workspace coincide por su nombre o por el de una de sus máquinas.
-  const [query, setQuery] = useState("");
-  const workspaces = list.filter((workspace) => matches(query, workspace.name, ...workspace.hosts.map(labelOf)));
-  const machines = hosts.filter((host) => matches(query, host.label));
+  const hostOf = (id: string) => hosts.find((h) => h.id === id);
 
   return (
-    <ScrollView contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingVertical: 8 }}>
-      <SheetTitle>{t("workspaces.title")}</SheetTitle>
-      <SearchField testID="workspaces-search" value={query} onChange={setQuery} placeholder={t("search.workspaces")} />
-      {query.trim() && !workspaces.length && !machines.length ? <NoMatch /> : null}
-      {workspaces.map((workspace) => {
-        const tasks = Object.entries(attention).flatMap(([host, ws]) => ws.filter((x) => x.workspace === workspace.members.get(host)).flatMap((x) => x.tasks));
-        const pending = tasks.filter((task) => NEEDS_YOU.has(task.state)).length;
-        const folded = topState(tasks.map((task) => task.state as TaskState));
-        return (
-          <Row
-            key={workspace.id}
-            testID={`workspace-${workspace.id}`}
-            left={<Avatar name={workspace.name} size={40} />}
-            title={workspace.name}
-            bold={workspace.id === current?.id}
-            right={pending ? <Badge count={pending} /> : <TaskMark state={folded} />}
-            subtitle={several ? workspace.hosts.map(labelOf).join(" · ") : undefined}
-            onPress={() => {
-              select(workspace.id);
-              router.back();
-            }}
-          />
-        );
-      })}
-
-      {session && registry?.length ? (
-        <>
-          <SectionTitle>{t("memory.title")}</SectionTitle>
-          {registry.map((workspace) => (
-            <Row
-              key={workspace.id}
-              testID={`memory-${workspace.id}`}
-              left={<Icon name="brain" size={20} color={theme.textMuted} />}
-              title={t("memory.open", { name: workspace.name })}
-              subtitle={t("memory.subtitle")}
-              right={<Icon name="chevron-right" size={16} color={theme.textMuted} />}
-              onPress={() => {
-                router.back();
-                router.push({ pathname: "/memory/[workspace]", params: { workspace: workspace.id } });
-              }}
-            />
-          ))}
-        </>
-      ) : null}
-
-      {machines.length ? <SectionTitle>{t("machines.title")}</SectionTitle> : null}
-      {machines.map((host) => (
-        <Row
-          key={host.id}
-          testID={`machine-${host.id}`}
-          left={<Dot color={dot(host)} />}
-          title={host.label}
-          subtitle={`${power(host)} · ${host.kind === "bridge" ? t("signin.dev_bridge") : host.managed ? t("machines.managed") : t("machines.own")}`}
-        />
-      ))}
-      {hosts.length ? <Row testID="open-activity" left={<Icon name="terminal" size={20} color={theme.textMuted} />} title={t("activity.title")} subtitle={t("activity.description")} right={<Icon name="chevron-right" size={16} color={theme.textMuted} />} onPress={() => { router.back(); router.push("/activity"); }} /> : null}
-      {hosts.length ? (
-        <Row
-          testID="open-accounts"
-          left={<Icon name="key-round" size={20} color={theme.textMuted} />}
-          title={w("settings.nav.ai_providers")}
-          subtitle={t("accounts.subtitle")}
-          right={<Icon name="chevron-right" size={16} color={theme.textMuted} />}
-          onPress={() => {
-            router.back();
-            router.push("/accounts");
-          }}
-        />
-      ) : null}
-
-      {session ? (
-        <>
-          <SectionTitle>{t("account.title")}</SectionTitle>
-          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <Text style={{ color: theme.text, fontWeight: "600" }}>{email}</Text>
-          </View>
-          <Pressable
-            testID="sign-out"
-            style={[styles.button, { borderColor: theme.failedMark }]}
-            onPress={() => {
-              router.back();
-              void signOut();
-            }}
-          >
-            <Text style={{ color: theme.failedMark, fontWeight: "600" }}>{t("account.sign_out")}</Text>
-          </Pressable>
-        </>
-      ) : (
-        <Pressable testID="sign-in" style={[styles.button, { borderColor: theme.primary }]} onPress={() => router.push("/signin")}>
-          <Text style={{ color: theme.primary, fontWeight: "600" }}>{t("signin.title")}</Text>
-        </Pressable>
-      )}
-
-      {Platform.OS === "web" ? (
-        <Pressable
-          testID="desktop-layout"
-          style={[styles.button, { borderColor: theme.border }]}
-          onPress={() => {
-            localStorage.setItem(WEB_LAYOUT_KEY, "desktop");
-            window.location.assign(desktopBase());
-          }}
-        >
-          <Text style={{ color: theme.text }}>{t("web.desktop_layout")}</Text>
-        </Pressable>
-      ) : null}
-
-      {BRIDGE_ENABLED ? (
-        <>
-          <SectionTitle>{t("you.connection")}</SectionTitle>
-          {pairing ? (
-            <>
-              <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-                <Text style={{ color: theme.text, fontWeight: "600" }}>{pairing.url}</Text>
-              </View>
-              <Pressable
-                testID="disconnect"
-                style={[styles.button, { borderColor: theme.border }]}
+    <View style={{ flex: 1, backgroundColor: pageColor(theme) }}>
+      <NavBar back={back} right={MANAGE ? <RoundButton icon="plus" label={w("settings.workspaces.manage")} onPress={() => router.push("/settings")} /> : null} />
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
+        <LargeTitle>{t("workspaces.title")}</LargeTitle>
+        <Group inset={68}>
+          {list.map((workspace) => {
+            const pending = Object.entries(attention)
+              .flatMap(([host, ws]) => ws.filter((x) => x.workspace === workspace.members.get(host)).flatMap((x) => x.tasks))
+              .filter((task) => NEEDS_YOU.has(task.state)).length;
+            const machines = workspace.hosts.map(hostOf).filter((h) => !!h);
+            const asleep = machines.length > 0 && machines.every((h) => h.power() !== "on" && h.power() !== "starting");
+            const subtitle = [...machines.map((h) => h.label), asleep ? w("web.computers.state.offline") : null].filter(Boolean).join(" · ");
+            const chosen = workspace.id === current?.id;
+            return (
+              <ListRow
+                key={workspace.id}
+                testID={`workspace-${workspace.id}`}
+                left={<WorkspaceAvatar id={workspace.id} name={workspace.name} size={36} />}
+                title={workspace.name}
+                subtitle={subtitle || undefined}
+                right={
+                  <View style={styles.right}>
+                    {pending ? <View style={[styles.count, { backgroundColor: theme.muted }]}><Text style={{ color: theme.text, fontSize: TEXT.label, fontWeight: "600" }}>{pending}</Text></View> : null}
+                    {chosen ? <Icon name="check" size={18} color={theme.merged} /> : <View style={{ width: 18 }} />}
+                  </View>
+                }
+                accessibilityLabel={`${workspace.name}${pending ? `, ${pending}` : ""}`}
                 onPress={() => {
+                  select(workspace.id);
                   router.back();
-                  void pair(null);
                 }}
-              >
-                <Text style={{ color: theme.text, fontWeight: "600" }}>{t("home.disconnect")}</Text>
-              </Pressable>
-            </>
-          ) : (
-            <Pressable testID="connect-bridge" style={[styles.button, { borderColor: theme.border }]} onPress={() => router.push("/pair")}>
-              <Text style={{ color: theme.text }}>{t("signin.dev_bridge")}</Text>
-            </Pressable>
-          )}
-        </>
-      ) : null}
-    </ScrollView>
+              />
+            );
+          })}
+        </Group>
+        {list.length ? <GroupFooter>{t("workspaces.count_note")}</GroupFooter> : null}
+        {MANAGE ? (
+          <>
+            <View style={{ height: 20 }} />
+            <Group>
+              <ListRow testID="manage-workspaces" title={w("settings.workspaces.manage")} chevron onPress={() => router.push("/settings")} />
+            </Group>
+          </>
+        ) : null}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { marginHorizontal: 12, padding: 14, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, gap: 4 },
-  button: { margin: 12, padding: 12, borderRadius: 10, borderWidth: 1, alignItems: "center" },
+  right: { flexDirection: "row", alignItems: "center", gap: 10 },
+  count: { minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, alignItems: "center", justifyContent: "center" },
 });

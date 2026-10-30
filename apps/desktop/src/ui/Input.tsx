@@ -12,7 +12,7 @@ import { cn } from "../lib/utils";
  * átomo o no hay campo.
  */
 const inputVariants = cva(
-  "w-full min-w-0 min-h-9 px-[11px] py-[7px] rounded-md border border-border-strong bg-surface text-neutral-950 text-[0.8125rem] [font-family:inherit] outline-none transition-[border-color,background-color] duration-150 ease-out placeholder:text-neutral-500 focus-visible:border-primary focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-60 disabled:cursor-not-allowed",
+  "w-full min-w-0 min-h-9 px-[11px] py-[7px] rounded-md border border-border-strong bg-surface text-neutral-950 text-ui [font-family:inherit] outline-none transition-[border-color,background-color] duration-150 ease-out placeholder:text-neutral-500 focus-visible:border-primary focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-60 disabled:cursor-not-allowed",
   {
     variants: {
       variant: {

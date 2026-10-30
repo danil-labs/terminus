@@ -11,7 +11,6 @@ import ChevronRight from "lucide-solid/icons/chevron-right";
 import Copy from "lucide-solid/icons/copy";
 import CornerDownLeft from "lucide-solid/icons/corner-down-left";
 import FileText from "lucide-solid/icons/file-text";
-import Loader2 from "lucide-solid/icons/loader-circle";
 import Maximize2 from "lucide-solid/icons/maximize-2";
 import MessageCircleQuestion from "lucide-solid/icons/message-circle-question-mark";
 import Paperclip from "lucide-solid/icons/paperclip";
@@ -74,7 +73,6 @@ import type {
   ModoDePermiso,
   Source,
 } from "../../lib/model";
-import { VELO_DE_FONDO } from "../../lib/chat-background";
 import { AstroAvatar } from "../projects/AstroAvatar";
 import {
   type CatalogosDeModelos,
@@ -93,6 +91,7 @@ import {
 import {
   type Clase,
   cuentaDelTramo,
+  partesDelTramo,
   formatearDuracion,
   nombreDe,
   type Paso,
@@ -167,6 +166,7 @@ import Suggestions, { type Suggestion } from "./Suggestions";
 import LineaDeTiempo, { SUPERFICIE_DE_EJECUCION } from "./Timeline";
 import EstadoDelTurno from "./TurnStatus";
 import { WithMentions } from "./WithMentions";
+import { Spinner } from "../../ui/Spinner";
 
 /**
  * Quién dijo un turno: lo arma Rust a partir de la cuenta del agente o del
@@ -386,7 +386,7 @@ type BloqueDeTrabajo = Extract<Bloque, { tipo: "trabajo" }>;
  * `font-family: inherit` le gana al textarea nativo, que si no cae a la del sistema.
  */
 const METRICA_DEL_CAMPO =
-  "border border-transparent px-2 py-1.5 text-[0.8125rem] leading-[1.4] [font-family:inherit] [scrollbar-gutter:stable]";
+  "border border-transparent px-2 py-1.5 text-ui leading-[1.4] [font-family:inherit] [scrollbar-gutter:stable]";
 // Del mismo tipo que el `inherit` de arriba, para que `cn` lo reemplace.
 const FUENTE_DE_TERMINAL = "[font-family:var(--font-mono)] [tab-size:4]";
 const archivosDelNavegador = () => import("./browserFiles");
@@ -413,7 +413,7 @@ export type ChatProps = {
    * Cuál de las conversaciones es esta: la clave de la tarea abierta, `""`
    * mientras todavía no tiene id. No es el id de la tarea para usarlo como
    * tal: la transcripción no conoce proyectos ni tareas —trabaja con
-   * mensajes—, esa frontera es la que deja `cambiosDelTurno` fuera.
+   * mensajes—, esa frontera es la que deja `onVerCambios` fuera.
    */
 
   /**
@@ -455,8 +455,6 @@ export type ChatProps = {
   bodyOf?: (name: string) => string | null;
   avatarOf?: (name: string) => string | null;
   /** Su fondo, ya leído como `data:` URI, y cuánto lo tapa el velo. */
-  chatBackground?: string | null;
-  chatVeil?: number;
   /** Abre su perfil en esta misma pestaña. Sin él, la cabecera no es un botón. */
   onOpenProfile?: () => void;
   /**
@@ -488,12 +486,11 @@ export type ChatProps = {
    */
   proyecto: JSX.Element;
   /**
-   * El bloque de código de un turno, compuesto por `App.tsx`: función y no
-   * nodo, hay uno por turno (SYSTEM.md § Las reglas de Solid, regla 9). El
-   * chat no conoce ids de proyecto y sesión —trabaja con mensajes—;
-   * dárselos solo para esto ampliaría su contrato (precedente: `proyecto`).
+   * Abre el panel de archivos de esta tarea en «Cambios». Lo compone
+   * `App.tsx`: el chat no conoce ids de proyecto y sesión —trabaja con
+   * mensajes—. Sin él, «Editó N archivos» es solo texto.
    */
-  cambiosDelTurno: (code: CodeRange[]) => JSX.Element;
+  onVerCambios?: () => void;
   agent: string;
   modelOptions?: { headers: Record<string, string> };
   /**
@@ -709,7 +706,7 @@ export type ChatProps = {
   /** Abrir lo que el hilo acaba de anunciar, por su ruta dentro de la tarea. */
   onAbrirArtefacto: (rel: string) => void;
   /** Abre la tarea que firmó un mensaje (`Turn::from_task`). */
-  onOpenTask?: (folder: string, task: string) => void;
+  onOpenTask?: (folder: string, task: string, machine?: string | null) => void;
   /** Una tarea del riel por su id, para las filas guardadas sin `from_task`. */
   tareaPorId?: (id: string) => SenderTask | null;
 
@@ -2288,7 +2285,7 @@ export default function Chat(props: ChatProps) {
                 <MessageCircleQuestion size={12} aria-hidden="true" />
                 /{comando()}
               </span>
-              <span class="min-w-0 truncate text-[0.6875rem] text-neutral-500">{t("chat.side.mode")}</span>
+              <span class="min-w-0 truncate text-caption text-neutral-500">{t("chat.side.mode")}</span>
             </div>
           )}
         </Show>
@@ -2314,7 +2311,7 @@ export default function Chat(props: ChatProps) {
               fallback={
                 <button
                   type="button"
-                  class="flex h-5 items-center gap-1 rounded-[5px] px-[7px] text-[0.6875rem] font-medium text-neutral-700 outline-none hover:bg-surface-muted focus-visible:ring-2 focus-visible:ring-primary"
+                  class="flex h-5 items-center gap-1 rounded-[5px] px-[7px] text-caption font-medium text-neutral-700 outline-none hover:bg-surface-muted focus-visible:ring-2 focus-visible:ring-primary"
                   onClick={() => {
                     setSoltadoDe(null);
                     if (campo) enfocar(campo);
@@ -2331,11 +2328,11 @@ export default function Chat(props: ChatProps) {
               </Badge>
             </Show>
             <Show when={entradaActiva()}>
-              <span class="min-w-0 truncate text-[0.6875rem] text-neutral-500">{t("chat.composer.stdin.hint")}</span>
+              <span class="min-w-0 truncate text-caption text-neutral-500">{t("chat.composer.stdin.hint")}</span>
             </Show>
             <Show when={!entradaActiva() && carpetaDeTerminal()}>
               {(carpeta) => (
-                <span class="min-w-0 truncate font-mono text-[0.6875rem] text-neutral-500" title={carpeta()}>
+                <span class="min-w-0 truncate font-mono text-caption text-neutral-500" title={carpeta()}>
                   {carpeta()}
                 </span>
               )}
@@ -2841,25 +2838,6 @@ export default function Chat(props: ChatProps) {
           </header>
         )}
       </Show>
-      {/* Detrás del hilo y delante de nada: el velo del color de fondo es lo
-          que deja legible el texto sobre cualquier imagen. El fondo elegido
-          en Estilo lo pinta la sección (`App.tsx` · `Conversacion`), que
-          cubre también la tira de pestañas; aquí solo va el propio del
-          agente, si lo tiene, encima de aquel. */}
-      <Show when={props.chatBackground}>
-        {(background) => (
-          <div
-            class="pointer-events-none absolute inset-0 bg-cover bg-center"
-            style={{ "background-image": `url("${background()}")` }}
-            aria-hidden="true"
-          >
-            <div
-              class="absolute inset-0 bg-surface"
-              style={{ opacity: String(props.chatVeil ?? VELO_DE_FONDO) }}
-            />
-          </div>
-        )}
-      </Show>
       <div
         class={cn(
           "relative min-h-0 flex-1 overflow-auto [overflow-anchor:none]",
@@ -2937,7 +2915,7 @@ export default function Chat(props: ChatProps) {
                           [k]: !preguntasPlegadas()[k],
                         });
                       }}
-                      cambios={props.cambiosDelTurno}
+                      onVerCambios={props.onVerCambios}
                       agenteDelTurno={fromWork(b(), (t) => t.msg.agent ?? props.agent, props.agent)}
                       catalogo={props.catalogos[fromWork(b(), (t) => t.msg.agent ?? props.agent, props.agent)] ?? null}
                       agentLabel={
@@ -3124,7 +3102,7 @@ export default function Chat(props: ChatProps) {
                                   type="button"
                                   class={cn("truncate underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-primary", !m().encargado && "font-semibold")}
                                   aria-label={t("chat.recipients.open_task", { title: sender().title })}
-                                  onClick={() => props.onOpenTask?.(sender().folder, sender().task)}
+                                  onClick={() => props.onOpenTask?.(sender().folder, sender().task, sender().machine)}
                                 >
                                   {sender().title}
                                 </button>
@@ -3411,10 +3389,15 @@ export default function Chat(props: ChatProps) {
   );
 }
 
+/** La cabecera de un tramo, entera o partida (ver `RegistroDeTrabajo`). */
+const FILA_DEL_TRAMO =
+  "flex w-full min-w-0 items-center gap-2 rounded-sm py-1.5 text-left text-sm hover:bg-surface-muted";
+
 /**
  * Un tramo de trabajo: las herramientas seguidas entre dos textos del agente,
  * con su cuenta por clase como cabecera. Se pliega; lo que el turno preguntó
- * (`RegistroPreguntas`) y lo que cambió quedan fuera: son el resultado.
+ * (`RegistroPreguntas`) queda fuera. Lo que cambió no se pinta en el hilo:
+ * «Editó N archivos» abre el panel de la tarea en «Cambios».
  */
 function RegistroDeTrabajo(props: {
   pasos: Paso[];
@@ -3424,6 +3407,8 @@ function RegistroDeTrabajo(props: {
   duracion?: string | null;
   abierto?: boolean;
   onAlternar: (abierto: boolean) => void;
+  /** Con él, «Editó N archivos» abre los cambios en el panel de la tarea. */
+  onVerCambios?: () => void;
 }) {
   // Sin contar los pasos con error: fallar y reintentar es normal en un turno
   // correcto, y «1 con error» alarmaba. El fallo del turno va aparte.
@@ -3432,10 +3417,28 @@ function RegistroDeTrabajo(props: {
   const rotulo = () =>
     cuentaDelTramo(todos(), props.corriendo) ??
     (props.corriendo ? t("chat.work.running") : t("chat.work.title"));
+  const partes = createMemo(() => (props.onVerCambios ? partesDelTramo(todos(), props.corriendo) : []));
   const duracion = () =>
     !props.corriendo && props.duracion ? t("chat.work.duration", { duration: props.duracion }) : null;
   // El chevron y el cuerpo leen esto; si divergen, el primer clic abre lo que ya se veía abierto.
   const desplegado = () => Boolean(props.abierto);
+  const chevron = () => (
+    <ChevronRight
+      size={14}
+      class={cn("shrink-0 text-neutral-500 transition-transform", desplegado() && "rotate-90")}
+      aria-hidden="true"
+    />
+  );
+  const girando = () => (
+    <Show when={props.corriendo}>
+      <Spinner size={14} class="pointer-events-none text-primary" />
+    </Show>
+  );
+  const tiempo = () => (
+    <Show when={duracion()}>
+      <span class="pointer-events-none ml-auto shrink-0 text-xs whitespace-nowrap text-neutral-500">{duracion()}</span>
+    </Show>
+  );
 
   // Sin envoltorio y con los datos de la derecha en un solo texto: cada
   // elemento de más se multiplica por los tramos del hilo (`open-task-cost`).
@@ -3445,33 +3448,60 @@ function RegistroDeTrabajo(props: {
         when={todos().length > 0 || avance().length > 0}
         fallback={<p class="m-0 mb-2 px-1 py-1.5 text-xs text-neutral-500">{duracion()}</p>}
       >
-        <button
-          type="button"
-          aria-expanded={desplegado()}
-          onClick={() => props.onAlternar(!desplegado())}
-          class={cn(
-            "flex w-full min-w-0 items-center gap-2 rounded-sm px-1 py-1.5 text-left text-sm hover:bg-surface-muted",
-            !desplegado() && "mb-2",
-          )}
+        {/* Con cambios que abrir, la fila se parte: el plegado la cubre por
+            debajo del texto y encima solo «Editó N archivos» recibe el clic
+            (dos botones hermanos: uno dentro de otro no es HTML válido). Sin
+            ellos queda el botón de siempre: cada nodo de más se multiplica por
+            los tramos del hilo (`open-task-cost`). */}
+        <Show
+          when={props.onVerCambios && partes().some((p) => p.clase === "editar")}
+          fallback={
+            <button
+              type="button"
+              aria-expanded={desplegado()}
+              onClick={() => props.onAlternar(!desplegado())}
+              class={cn(FILA_DEL_TRAMO, "px-1", !desplegado() && "mb-2")}
+            >
+              {chevron()}
+              {girando()}
+              <span class="min-w-0 truncate font-medium text-neutral-700">{rotulo()}</span>
+              {tiempo()}
+            </button>
+          }
         >
-          <ChevronRight
-            size={14}
-            class={cn(
-              "shrink-0 text-neutral-500 transition-transform",
-              desplegado() && "rotate-90",
-            )}
-            aria-hidden="true"
-          />
-          <Show when={props.corriendo}>
-            <Loader2 size={14} class="shrink-0 animate-spin-steps text-primary" aria-hidden="true" />
-          </Show>
-          <span class="min-w-0 truncate font-medium text-neutral-700">{rotulo()}</span>
-          <Show when={duracion()}>
-            <span class="ml-auto shrink-0 text-xs whitespace-nowrap text-neutral-500">
-              {duracion()}
+          <div class={cn(FILA_DEL_TRAMO, "relative pr-1 pl-[1.625rem]", !desplegado() && "mb-2")}>
+            <button
+              type="button"
+              aria-expanded={desplegado()}
+              aria-label={[rotulo(), duracion()].filter(Boolean).join(" · ")}
+              onClick={() => props.onAlternar(!desplegado())}
+              class="absolute inset-0 flex items-center rounded-sm px-1 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
+            >
+              {chevron()}
+            </button>
+            {girando()}
+            <span class="pointer-events-none min-w-0 truncate font-medium text-neutral-700">
+              <Index each={partes()}>
+                {(parte, i) => (
+                  <>
+                    {i > 0 ? t("common.steps.summary.separator") : ""}
+                    <Show when={parte().clase === "editar"} fallback={parte().texto}>
+                      <button
+                        type="button"
+                        title={t("chat.work.open_changes")}
+                        onClick={() => props.onVerCambios?.()}
+                        class="pointer-events-auto relative rounded-sm underline decoration-neutral-300 underline-offset-2 hover:text-neutral-950 hover:decoration-current focus-visible:outline-2 focus-visible:outline-primary"
+                      >
+                        {parte().texto}
+                      </button>
+                    </Show>
+                  </>
+                )}
+              </Index>
             </span>
-          </Show>
-        </button>
+            {tiempo()}
+          </div>
+        </Show>
 
         <Show when={desplegado()}>
           <div class={cn(SUPERFICIE_DE_EJECUCION, "mb-2")}>
@@ -3525,7 +3555,8 @@ function TrabajoDeAgente(props: {
   /** Si las preguntas de ESTE turno están desplegadas. Nacen abiertas. */
   preguntasAbiertas: boolean;
   onAlternarPreguntas: () => void;
-  cambios: (code: CodeRange[]) => JSX.Element;
+  /** Solo se ofrece si el turno trae rango de código (`msg.code`). */
+  onVerCambios?: () => void;
   /** El agente dueño del turno, cuando el mensaje no lo trae. */
   agenteDelTurno: string;
   /** El nombre legible del agente, para el tooltip cuando no hay proveedor. */
@@ -3566,6 +3597,7 @@ function TrabajoDeAgente(props: {
           duracion={duracion()}
           abierto={props.abiertoElTrabajo}
           onAlternar={props.onAlternarTrabajo}
+          onVerCambios={props.msg.code?.length ? props.onVerCambios : undefined}
         />
       </Show>
 
@@ -3653,15 +3685,6 @@ function TrabajoDeAgente(props: {
         />
       </div>
 
-      {/* Fuera del plegado, y fuera también del registro de trabajo: lo
-          que el agente hizo para contestar se dobla dentro de «Trabajó
-          durante…», que es el rastro; qué código cambió es el resultado,
-          visible sin desplegar nada. Depende de que el turno tenga par de
-          árboles: uno que solo conversa no pinta nada, el rango existe
-          pero los dos árboles son el mismo y `Cambios` no enseña archivos. */}
-      <Show when={props.msg.code?.length ? props.msg.code : null}>
-        {(c) => props.cambios(c())}
-      </Show>
     </article>
   );
 }
@@ -3828,7 +3851,7 @@ function SiguioTrasElCupo(props: { cambio: CambioPorCupo }) {
  */
 function FilaDeLaBandeja(props: {
   msg: Msg;
-  onOpenTask?: (folder: string, task: string) => void;
+  onOpenTask?: (folder: string, task: string, machine?: string | null) => void;
   tareaPorId?: (id: string) => SenderTask | null;
 }) {
   const informe = () => (citaInforme(props.msg.meta) ? props.msg.text.trim() : "");
@@ -3856,7 +3879,7 @@ function FilaDeLaBandeja(props: {
                   type="button"
                   class="cursor-pointer underline underline-offset-2"
                   aria-label={t("chat.recipients.open_task", { title: sender().title })}
-                  onClick={() => props.onOpenTask?.(sender().folder, sender().task)}
+                  onClick={() => props.onOpenTask?.(sender().folder, sender().task, sender().machine)}
                 >
                   {t("chat.task_completed.open")}
                 </button>
@@ -3893,7 +3916,7 @@ function HitoDelHilo(props: {
   /** Llevar a donde se conectan y se cambian las cuentas. */
   onCuentas: () => void;
   /** Abre la tarea que firmó la fila (`Turn::from_task`). */
-  onOpenTask?: (folder: string, task: string) => void;
+  onOpenTask?: (folder: string, task: string, machine?: string | null) => void;
 }) {
   const esFallo = () => props.msg.meta === "fallo";
   return (
@@ -3936,7 +3959,7 @@ function HitoDelHilo(props: {
                   type="button"
                   class="cursor-pointer underline underline-offset-2"
                   aria-label={t("chat.recipients.open_task", { title: sender().title })}
-                  onClick={() => props.onOpenTask?.(sender().folder, sender().task)}
+                  onClick={() => props.onOpenTask?.(sender().folder, sender().task, sender().machine)}
                 >
                   {t("chat.task_completed.open")}
                 </button>
@@ -3950,7 +3973,7 @@ function HitoDelHilo(props: {
         >
           {(f) => (
             <details class="text-neutral-500">
-              <summary class="cursor-pointer text-[0.6875rem]">{t("common.failure.detail")}</summary>
+              <summary class="cursor-pointer text-caption">{t("common.failure.detail")}</summary>
               <p class="m-0 font-mono text-[0.7rem] break-all whitespace-pre-wrap">{f().detail}</p>
             </details>
           )}
@@ -3976,7 +3999,7 @@ function HoraDelTurno(props: { at?: number }) {
         <time
           datetime={new Date(at()).toISOString()}
           tabindex={0}
-          class="cursor-default rounded-sm px-1 text-[0.6875rem] leading-4 whitespace-nowrap text-neutral-500 outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          class="cursor-default rounded-sm px-1 text-caption leading-4 whitespace-nowrap text-neutral-500 outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           {mostrarHoraDeTurno(at())}
         </time>
@@ -4006,7 +4029,7 @@ function LineaDeProveedor(props: {
   const titulo = () => props.provider ?? props.agentLabel;
   return (
     <span
-      class="flex items-center gap-1 whitespace-nowrap rounded-sm px-1 text-[0.6875rem] leading-4 text-neutral-500"
+      class="flex items-center gap-1 whitespace-nowrap rounded-sm px-1 text-caption leading-4 text-neutral-500"
       title={titulo()}
       aria-label={t("chat.actions.provider")}
       data-provider={props.provider}
@@ -4127,7 +4150,7 @@ function CambioDeContexto(props: {
   };
 
   return (
-    <div class="flex items-center gap-2 text-[0.6875rem] text-neutral-500">
+    <div class="flex items-center gap-2 text-caption text-neutral-500">
       <span class="h-px flex-1 bg-border" />
       <div class="flex min-w-0 flex-col gap-1">
         <Show when={props.cambio.entraron.length}>

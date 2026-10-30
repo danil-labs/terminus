@@ -11,7 +11,7 @@
  *
  * Sin APIs del DOM: `fetch` se inyecta (navegador, React Native, Node).
  */
-import { apiUrl } from "./api.ts";
+import { bearerCall, errorCodeOf } from "./api.ts";
 
 export type MemoryAuthor = { name: string; email: string };
 export type MemoryCommit = { commit: string; message: string; author: MemoryAuthor; at: string };
@@ -54,8 +54,6 @@ export type MemoryFetch = (
 /** Cómo llegar al Worker con la cuenta del workspace: el JWT en la web y el teléfono, el token de cliente en la ventana. */
 export type MemorySource = { endpoint: string; getToken: () => Promise<string>; fetch?: MemoryFetch };
 
-const globalFetch: MemoryFetch = (input, init) => (globalThis.fetch as unknown as MemoryFetch)(input, init);
-
 async function call<T>(
   source: MemorySource,
   method: string,
@@ -63,17 +61,10 @@ async function call<T>(
   read: (body: unknown) => T,
   body?: unknown,
 ): Promise<MemoryAnswer<T>> {
-  const f = source.fetch ?? globalFetch;
-  let response: Awaited<ReturnType<MemoryFetch>>;
-  try {
-    const headers: Record<string, string> = { authorization: `Bearer ${await source.getToken()}` };
-    if (body !== undefined) headers["content-type"] = "application/json";
-    response = await f(apiUrl(source.endpoint, path), { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
-  } catch {
-    return { kind: "error", status: null };
-  }
-  const json = await response.json().catch(() => null);
-  const code = (json as { error?: { code?: unknown } } | null)?.error?.code;
+  const response = await bearerCall(source, method, path, body);
+  if (!response) return { kind: "error", status: null };
+  const { json } = response;
+  const code = errorCodeOf(json);
   if (response.status === 409 && code === "memory_conflict") {
     const current = (json as { current?: unknown }).current;
     return { kind: "conflict", current: typeof current === "string" ? current : null };

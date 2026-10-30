@@ -31,9 +31,9 @@
  * legítima —el backend puede publicar algo que todavía nadie pinta— mientras que
  * escuchar lo que nadie emite es siempre esperar a Godot.
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { relative } from "node:path";
-// Ver la nota de `paths.mjs`: `.pathname` en Windows da `/C:/…` y revienta.
+// `.pathname` en Windows da `/C:/…` y revienta.
 import { fileURLToPath } from "node:url";
 import { walkFiles } from "../git.mjs";
 import { EVENTOS_PENDIENTES } from "../engine-pending.mjs";
@@ -100,6 +100,13 @@ const emitidos = nombres(RUST, [".rs"], EMITE);
 const CONTRATO = fileURLToPath(new URL("../../src-tauri/crates/engine-protocol/commands.json", import.meta.url));
 for (const evento of JSON.parse(readFileSync(CONTRATO, "utf8")).events) {
   if (!emitidos.has(evento)) emitidos.set(evento, ["commands.json"]);
+}
+// Y los de sus extensiones (`engine-protocol/extensions/*.json`), fuera de la huella.
+const EXTENSIONES = fileURLToPath(new URL("../../src-tauri/crates/engine-protocol/extensions", import.meta.url));
+for (const f of existsSync(EXTENSIONES) ? readdirSync(EXTENSIONES).filter((n) => n.endsWith(".json")) : []) {
+  for (const evento of JSON.parse(readFileSync(`${EXTENSIONES}/${f}`, "utf8")).events ?? []) {
+    if (!emitidos.has(evento)) emitidos.set(evento, [`extensions/${f}`]);
+  }
 }
 const escuchados = nombres(WEB, [".ts", ".tsx"], ESCUCHA);
 

@@ -1,3 +1,5 @@
+import { RADIUS, TEXT } from "@terminus/design";
+import { useLocalSearchParams } from "expo-router";
 import { providerUsage } from "../lib/accountUsage";
 import { type AccountGroup, usageTone, windowLabel, windowLeft } from "@terminus/computers";
 import type { AccountLimits, AiAccount, LoginEvent, ProviderInfo, UsageWindow } from "@terminus/protocol";
@@ -39,7 +41,9 @@ export default function Accounts() {
   const currentId = current?.id ?? null;
   const scopeOf = useCallback((host: Host) => accountWorkspace(host, currentId), [currentId]);
   const [data, setData] = useState<ProviderAccounts[] | null>(null);
-  const [storageOpen, setStorageOpen] = useState(false);
+  // Desde «Almacenamiento» del perfil llega abierto.
+  const { storage } = useLocalSearchParams<{ storage?: string }>();
+  const [storageOpen, setStorageOpen] = useState(storage === "1");
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   const [pick, setPick] = useState<{ provider: ProviderInfo; exclude: string[] } | null>(null);
@@ -188,7 +192,7 @@ export default function Accounts() {
                     <Plan limits={limits[g.key]} theme={theme} />
                   </View>
                   <Usage limits={limits[g.key]} signedIn={Boolean(g.row.authenticated_at)} theme={theme} />
-                  {cachedAt[g.key] ? <Text style={{ color: theme.textMuted, fontSize: 12 }}>{t("accounts.cached", { time: new Date(cachedAt[g.key]!).toLocaleString() })}</Text> : null}
+                  {cachedAt[g.key] ? <Text style={{ color: theme.textMuted, fontSize: TEXT.label }}>{t("accounts.cached", { time: new Date(cachedAt[g.key]!).toLocaleString() })}</Text> : null}
                   <View style={styles.chips}>
                     {g.members.map((m) => {
                       const host = hosts.find((h) => h.id === m.machine);
@@ -196,7 +200,7 @@ export default function Accounts() {
                       return (
                         <View key={`${m.machine}~${m.id}`} style={[styles.chip, { borderColor: theme.border }]} testID={`chip-${m.machine}`}>
                           <Dot color={on ? theme.success : theme.border} />
-                          <Text numberOfLines={1} style={{ color: theme.text, fontSize: 13, maxWidth: 150 }} accessibilityLabel={`${nameOf(m.machine)} · ${on ? w("web.computers.state.online") : w("web.computers.state.offline")}`}>
+                          <Text numberOfLines={1} style={{ color: theme.text, fontSize: TEXT.ui, maxWidth: 150 }} accessibilityLabel={`${nameOf(m.machine)} · ${on ? w("web.computers.state.online") : w("web.computers.state.offline")}`}>
                             {nameOf(m.machine)}
                           </Text>
                           <Pressable hitSlop={10} accessibilityLabel={w("web.accounts.sign_out", { name: nameOf(m.machine) })} onPress={() => signOut(g, provider, m)} testID={`sign-out-${m.machine}`}>
@@ -212,7 +216,7 @@ export default function Accounts() {
                       <Text style={{ color: theme.primary, fontWeight: "600" }}>{w("web.accounts.sign_in_elsewhere")}</Text>
                     </Pressable>
                   ) : hosts.length > 1 ? (
-                    <Text style={{ color: theme.textMuted, fontSize: 13 }}>{t("accounts.all_signed_in")}</Text>
+                    <Text style={{ color: theme.textMuted, fontSize: TEXT.ui }}>{t("accounts.all_signed_in")}</Text>
                   ) : null}
                 </View>
               );
@@ -306,7 +310,7 @@ export default function Accounts() {
               </>
             ) : null}
             {!login.done && (login.url || login.confirm) && !login.askCode ? (
-              <Text style={{ color: theme.textMuted, fontSize: 13 }}>{t("accounts.waiting", { provider: login.provider.label })}</Text>
+              <Text style={{ color: theme.textMuted, fontSize: TEXT.ui }}>{t("accounts.waiting", { provider: login.provider.label })}</Text>
             ) : null}
             <Pressable onPress={() => void closeLogin()} style={{ alignSelf: "flex-start", paddingVertical: 6 }}>
               <Text style={{ color: theme.textMuted, fontWeight: "600" }}>{login.done ? t("accounts.close") : w("settings.accounts.cancel")}</Text>
@@ -340,17 +344,17 @@ function windowsOf(limits: AccountLimits | null | undefined): UsageWindow[] {
 function Plan({ limits, theme }: { limits: AccountLimits | null | undefined; theme: Theme }) {
   const plan = limits?.mode === "read" ? limits.plan : limits?.mode === "waiting" ? limits.last?.plan : null;
   if (!plan) return null;
-  return <Text style={{ color: theme.textMuted, fontSize: 12 }}>{plan}</Text>;
+  return <Text style={{ color: theme.textMuted, fontSize: TEXT.label }}>{plan}</Text>;
 }
 
 /** Las ventanas de consumo: lo que queda y cuándo vuelve, con la barra del escritorio. */
 function Usage({ limits, signedIn, theme }: { limits: AccountLimits | null | undefined; signedIn: boolean; theme: Theme }) {
-  if (!signedIn) return <Text style={{ color: theme.textMuted, fontSize: 13 }}>{w("settings.account_card.disconnected")}</Text>;
-  if (limits?.mode === "in_use") return <Text style={{ color: theme.textMuted, fontSize: 13 }}>{w("settings.account_card.in_use")}</Text>;
+  if (!signedIn) return <Text style={{ color: theme.textMuted, fontSize: TEXT.ui }}>{w("settings.account_card.disconnected")}</Text>;
+  if (limits?.mode === "in_use") return <Text style={{ color: theme.textMuted, fontSize: TEXT.ui }}>{w("settings.account_card.in_use")}</Text>;
   const windows = windowsOf(limits);
-  if (!windows.length && limits?.mode === "waiting") return <Text style={{ color: theme.textMuted, fontSize: 13 }}>{t("accounts.usage_waiting")}</Text>;
-  if (!windows.length && (limits?.mode === "failed" || limits?.mode === "revoked")) return <Text style={{ color: theme.error, fontSize: 13 }}>{t("accounts.usage_failed")}</Text>;
-  if (!windows.length) return <Text style={{ color: theme.textMuted, fontSize: 13 }}>{limits ? w("settings.account_card.not_asked") : t("accounts.no_usage")}</Text>;
+  if (!windows.length && limits?.mode === "waiting") return <Text style={{ color: theme.textMuted, fontSize: TEXT.ui }}>{t("accounts.usage_waiting")}</Text>;
+  if (!windows.length && (limits?.mode === "failed" || limits?.mode === "revoked")) return <Text style={{ color: theme.error, fontSize: TEXT.ui }}>{t("accounts.usage_failed")}</Text>;
+  if (!windows.length) return <Text style={{ color: theme.textMuted, fontSize: TEXT.ui }}>{limits ? w("settings.account_card.not_asked") : t("accounts.no_usage")}</Text>;
   return (
     <View style={{ gap: 8 }}>
       {windows.map((win) => {
@@ -360,8 +364,8 @@ function Usage({ limits, signedIn, theme }: { limits: AccountLimits | null | und
         return (
           <View key={win.label} style={{ gap: 4 }}>
             <View style={styles.windowHead}>
-              <Text style={{ color: theme.text, fontSize: 13 }}>{win.label}</Text>
-              <Text style={{ color: theme.textMuted, fontSize: 13, fontVariant: ["tabular-nums"] }}>{windowLabel(lang, win)}</Text>
+              <Text style={{ color: theme.text, fontSize: TEXT.ui }}>{win.label}</Text>
+              <Text style={{ color: theme.textMuted, fontSize: TEXT.ui, fontVariant: ["tabular-nums"] }}>{windowLabel(lang, win)}</Text>
             </View>
             <View style={[styles.track, { backgroundColor: theme.muted }]}>
               <View style={[styles.fill, { width: `${left}%`, backgroundColor: color }]} />
@@ -375,21 +379,21 @@ function Usage({ limits, signedIn, theme }: { limits: AccountLimits | null | und
 
 const styles = StyleSheet.create({
   page: { padding: 12, gap: 14, paddingBottom: 40 },
-  note: { padding: 10, borderRadius: 10, fontSize: 13 },
+  note: { padding: 10, borderRadius: 10, fontSize: TEXT.ui },
   provider: { gap: 8 },
   providerHead: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 4, paddingTop: 6 },
   providerName: { fontSize: 17, fontWeight: "700" },
   card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, padding: 14, gap: 12 },
   cardHead: { flexDirection: "row", alignItems: "center", gap: 8 },
-  accountName: { flex: 1, fontSize: 15, fontWeight: "600" },
+  accountName: { flex: 1, fontSize: TEXT.lead, fontWeight: "600" },
   windowHead: { flexDirection: "row", justifyContent: "space-between", gap: 8 },
   track: { height: 5, borderRadius: 3, overflow: "hidden" },
   fill: { height: 5, borderRadius: 3 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  chip: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: StyleSheet.hairlineWidth, borderRadius: 8, paddingLeft: 8, paddingRight: 6, paddingVertical: 5 },
+  chip: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: StyleSheet.hairlineWidth, borderRadius: RADIUS.lg, paddingLeft: 8, paddingRight: 6, paddingVertical: 5 },
   link: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 4, paddingHorizontal: 4 },
   login: { paddingHorizontal: 18, gap: 12, paddingBottom: 8 },
-  step: { fontSize: 15, fontWeight: "600" },
+  step: { fontSize: TEXT.lead, fontWeight: "600" },
   row: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   button: { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10 },
   code: { fontSize: 26, fontWeight: "700", letterSpacing: 3, textAlign: "center", paddingVertical: 12, borderRadius: 10, fontVariant: ["tabular-nums"] },

@@ -126,12 +126,12 @@ export default function CarrySheet(props: {
     return parts;
   };
 
-  const row = "flex items-center gap-2 text-[13px] text-neutral-700";
+  const row = "flex items-center gap-2 text-ui text-neutral-700";
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) props.onCancel(); }}>
       <DialogContent class="max-w-[560px]" data-carry-sheet={bring() ? "bring" : "carry"}>
-        <DialogTitle class="m-0 text-[0.9375rem] font-semibold">
+        <DialogTitle class="m-0 text-lead font-semibold">
           {bring()
             ? t("work.bring.title", { task: props.check.task?.title ?? "", machine: source(), here: target() })
             : t("work.carry.title", { project: props.check.project.name, machine: target() })}
@@ -161,7 +161,7 @@ export default function CarrySheet(props: {
 
         <section class="mt-4">
           <div class="flex items-center justify-between gap-2">
-            <h3 class="m-0 text-[13px] font-semibold">{bring() ? t("work.bring.work_title") : t("work.carry.work_title")}</h3>
+            <h3 class="m-0 text-ui font-semibold">{bring() ? t("work.bring.work_title") : t("work.carry.work_title")}</h3>
             <Show when={workLine().length}>
               <label class={row}>
                 <Toggle
@@ -196,7 +196,7 @@ export default function CarrySheet(props: {
 
         <Show when={s().ignored.length || s().ignoredSkipped.length}>
           <section class="mt-4">
-            <h3 class="m-0 text-[13px] font-semibold">{t("work.carry.ignored_title")}</h3>
+            <h3 class="m-0 text-ui font-semibold">{t("work.carry.ignored_title")}</h3>
             <For each={s().ignored}>
               {(f) => (
                 <label class={row}>
@@ -229,7 +229,7 @@ export default function CarrySheet(props: {
             <p class="m-0 mt-1 text-xs text-warning-strong" data-carry-busy>{t("work.bring.busy")}</p>
           </Show>
           <fieldset class="m-0 mt-3 flex flex-col gap-1 border-0 p-0">
-            <legend class="mb-1 p-0 text-[13px] font-semibold">{t("work.bring.then")}</legend>
+            <legend class="mb-1 p-0 text-ui font-semibold">{t("work.bring.then")}</legend>
             <label class={row}>
               <input type="radio" name="carry-next" data-carry-next="continue" checked={next() === "continue"} onChange={() => setNext("continue")} />
               {t("work.bring.continue")}

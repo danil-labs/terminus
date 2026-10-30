@@ -63,7 +63,7 @@ async function fondoDeLaCuenta(workspace: string | null, respuesta: unknown, sin
 
 /** El patrón y los velos elegidos; nunca una ruta: la imagen guardada en el workspace queda. */
 function eleccion(): ChatBackgroundChange {
-  return { preset: store.fondoDeChat() === "propia" ? null : "dusk", veil: velos() };
+  return { preset: store.fondoDeChat() === "propia" ? null : store.fondoDeChat(), veil: velos() };
 }
 
 let veloPendiente: ReturnType<typeof setTimeout> | null = null;
@@ -102,14 +102,14 @@ export async function cargarFondoDelWorkspace(workspace: string | null): Promise
   if (!r.data_url) store.olvidarFondoPropio();
   const nada = !r.data_url && !vista.preset && r.veil == null;
   if (nada) {
-    store.elegirFondoDeChat("dusk");
+    store.elegirFondoDeChat("neutro");
     store.elegirVeloDeFondo(VELO_DE_FONDO);
     store.elegirVeloDePestanas(VELO_DE_PESTANAS);
     store.elegirVeloDePaneles(VELO_DE_PANELES);
     return;
   }
   store.setImagenDelWorkspace(vista.image);
-  store.elegirFondoDeChat(vista.image ? "propia" : fondoDe(vista.preset ?? "dusk"));
+  store.elegirFondoDeChat(vista.image ? "propia" : fondoDe(vista.preset));
   store.elegirVeloDeFondo(vista.veil.chat ?? VELO_DE_FONDO);
   if (vista.veil.tabs !== null) store.elegirVeloDePestanas(vista.veil.tabs);
   if (vista.veil.panels !== null) store.elegirVeloDePaneles(vista.veil.panels);

@@ -2,10 +2,7 @@
 /**
  * Clases escritas en el TSX que la hoja compilada no define.
  *
- * **El tercer lado del mismo agujero, y el que faltaba.** `colisiones.mjs` mira
- * legacy que choca con una utility; `huerfanas.mjs`, legacy que ya no escribe
- * nadie. Los dos vigilan el CSS viejo. Nadie miraba lo contrario: una clase
- * escrita **que Tailwind nunca generó**. No da error de tipos, no rompe el
+ * Una clase escrita **que Tailwind nunca generó** no da error de tipos, no rompe el
  * build, no deja rastro en consola — pinta nada.
  *
  * Costó cinco sitios y un reporte del dueño. `bg-surface-sunken` se escribió en

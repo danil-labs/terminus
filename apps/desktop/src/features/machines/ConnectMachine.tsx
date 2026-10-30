@@ -10,7 +10,7 @@ import Check from "lucide-solid/icons/check";
 import Copy from "lucide-solid/icons/copy";
 import { createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { t } from "../../lib/i18n";
-import { copyText } from "../../lib/clipboard";
+import { createCopied } from "../../lib/clipboard";
 import { invoke } from "../../lib/invoke";
 import { capabilities } from "../../lib/platform";
 import { Button } from "../../ui/Button";
@@ -32,7 +32,7 @@ export type ConnectMachineProps = {
  */
 export function ConnectMachine(props: ConnectMachineProps) {
   const [name, setName] = createSignal("");
-  const [copied, setCopied] = createSignal(false);
+  const { copied, copy: copyCommand } = createCopied(2000);
   const [progress, setProgress] = createSignal<ConnectProgress>({ stage: "waiting" });
   let stop: AbortController | null = null;
   const command = () => installCommand({ name: name() });
@@ -52,15 +52,7 @@ export function ConnectMachine(props: ConnectMachineProps) {
   onMount(() => void start());
   onCleanup(() => stop?.abort());
 
-  async function copy() {
-    try {
-      await copyText(command());
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setCopied(false);
-    }
-  }
+  const copy = () => copyCommand(command());
 
   const failed = () => {
     const p = progress();

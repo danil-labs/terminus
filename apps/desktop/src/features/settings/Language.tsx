@@ -183,7 +183,7 @@ export function Lengua(props: { row?: boolean }) {
       when={props.row}
       fallback={
         <section class="grid gap-2">
-          <h3 class="m-0 text-[0.8125rem] font-semibold">{t("settings.language.title")}</h3>
+          <h3 class="m-0 text-ui font-semibold">{t("settings.language.title")}</h3>
           {selector()}
           {estado()}
         </section>

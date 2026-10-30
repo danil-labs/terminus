@@ -23,6 +23,7 @@ const until = async (check, ms = 4000) => {
 test("the column lists other accounts' workspaces and opens them with their account", async () => {
   const opened = [];
   const added = [];
+  let signedOut = 0;
   const own = globalThis.fetch;
   globalThis.fetch = async () => new Response("{}", { status: 404 });
   try {
@@ -57,6 +58,7 @@ test("the column lists other accounts' workspaces and opens them with their acco
             open: (id) => opened.push(id),
             add: (email) => added.push(email ?? null),
             remove: async () => undefined,
+            signOut: () => signedOut++,
           },
         };
       },
@@ -79,12 +81,17 @@ test("the column lists other accounts' workspaces and opens them with their acco
     assert.deepEqual(opened, ["f2"], "an expired account does not open");
     assert.deepEqual(added, ["alberto@ytw.mx"], "it asks to sign in again with that email");
     assert.equal(doc.querySelector("[data-add-account]"), null, "workspace creation is the only add action");
+
+    doc.querySelector("[data-profile-menu] button").click();
+    assert.ok(await until(() => doc.querySelector("[data-sign-out]")), "the profile menu offers signing out in the browser");
+    doc.querySelector("[data-sign-out]").click();
+    assert.equal(signedOut, 1, "it signs the open account out");
   } finally {
     globalThis.fetch = own;
   }
 });
 
-for (const emptyAccount of [false, true]) test(`a single workspace hides the column with empty extra account: ${emptyAccount}`, async () => {
+for (const emptyAccount of [false, true]) test(`a single workspace keeps the column, whose «+» only adds workspaces, with empty extra account: ${emptyAccount}`, async () => {
   const added = [];
   const own = globalThis.fetch;
   globalThis.fetch = async () => new Response("{}", { status: 404 });
@@ -110,24 +117,11 @@ for (const emptyAccount of [false, true]) test(`a single workspace hides the col
       },
     });
     const doc = app.w.document;
-    assert.ok(await until(() => doc.querySelector("[data-workspace-name]")));
-    assert.equal(doc.querySelector("[data-workspace-column]"), null);
-    const key = (el, value) => el.dispatchEvent(new app.w.KeyboardEvent("keydown", { key: value, bubbles: true }));
-    const item = (text) => [...doc.querySelectorAll('[role="menuitem"]')].find(el => el.textContent.trim() === text);
-    const openMenu = async () => {
-      const trigger = doc.querySelector("[data-workspace-name]");
-      trigger.focus();
-      key(trigger, "ArrowDown");
-      assert.ok(await until(() => item("Nuevo workspace")));
-      assert.ok(doc.querySelector('[data-workspace-option="w"]'));
-    };
-    await openMenu();
-    assert.equal(item("Agregar cuenta"), undefined, "the menu only adds workspaces");
-    key(doc.activeElement, "Escape");
-    assert.ok(await until(() => !doc.querySelector("[data-workspace-menu]")));
-    assert.equal(doc.activeElement, doc.querySelector("[data-workspace-name]"));
-    await openMenu();
-    key(item("Nuevo workspace"), "Enter");
+    // The column is the only place to switch workspaces, so it stays with one.
+    assert.ok(await until(() => doc.querySelector('[data-workspace-column] [data-workspace-tile="w"]')), "the column shows the single workspace");
+    const column = doc.querySelector("[data-workspace-column]");
+    assert.equal([...column.querySelectorAll("button")].some((el) => el.textContent.trim() === "Agregar cuenta"), false, "the column only adds workspaces");
+    column.querySelector('button[aria-label="Nuevo workspace"]').click();
     assert.ok(await until(() => doc.querySelector('[data-web-onboarding="space"]')), "creation opens the existing workspace flow");
     const other = [...doc.querySelectorAll("button")].find(el => el.textContent.trim() === "Usar otra cuenta");
     assert.ok(other, "the workspace flow keeps access to other Danil accounts");

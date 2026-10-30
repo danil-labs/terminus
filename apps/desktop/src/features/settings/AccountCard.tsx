@@ -1,4 +1,4 @@
-import { For, Show, createSignal, onCleanup, type JSX } from "solid-js";
+import { For, Show, createSignal, type JSX } from "solid-js";
 import AlertTriangle from "lucide-solid/icons/triangle-alert";
 import RefreshCw from "lucide-solid/icons/refresh-cw";
 import { SESION_INICIADA, type Account, type AccountStatus } from "./accounts-store";
@@ -17,6 +17,8 @@ import {
 import { cn } from "../../lib/utils";
 import { prosa } from "../../lib/prose";
 import { t } from "../../lib/i18n";
+import { Spinner } from "../../ui/Spinner";
+import { createNow } from "../../lib/sharedClock";
 
 /**
  * La representación única de una cuenta de agente.
@@ -49,9 +51,7 @@ export default function AccountCard(props: {
   destructiveAction?: JSX.Element;
 }) {
   const [refreshing, setRefreshing] = createSignal(false);
-  const [now, setNow] = createSignal(Date.now());
-  const timer = window.setInterval(() => setNow(Date.now()), 1000);
-  onCleanup(() => clearInterval(timer));
+  const now = createNow();
   const waitMinutes = () => {
     const limits = props.limits;
     return limits?.mode === "waiting"
@@ -177,7 +177,7 @@ export default function AccountCard(props: {
                 class={cn(
                   "m-0 truncate text-neutral-500",
                   fila()
-                    ? "text-[0.8125rem] leading-[19px]"
+                    ? "text-ui leading-[19px]"
                     : "mt-0.5 font-mono text-[0.68rem]",
                 )}
               >
@@ -233,11 +233,7 @@ export default function AccountCard(props: {
                 when={props.loadingLimits}
                 fallback={<span>{t("settings.account_card.not_asked")}</span>}
               >
-                <RefreshCw
-                  size={11}
-                  class="animate-spin"
-                  aria-label={t("settings.account_card.asking")}
-                />
+                <Spinner size={11} label={t("settings.account_card.asking")} />
               </Show>
             </p>
           </Show>

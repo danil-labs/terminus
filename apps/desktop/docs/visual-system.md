@@ -37,7 +37,11 @@ utilities y tema no detectan todos los valores CSS válidos.
 Geist es la fuente de interfaz; Geist Mono, la de código; Bricolage Grotesque, la de
 títulos. Las fuentes están empaquetadas y sus licencias están en `CREDITS.md`.
 
-Los tamaños, radios, sombras y separación salen de tokens y variantes de átomos.
+Los colores, radios, sombras y la escala de texto salen de tokens; los tamaños
+se escriben `text-2xs`, `text-caption`, `text-label`, `text-ui`, `text-body` y
+`text-lead`, definidos en `packages/design/src/scale.ts` y repetidos en
+`global.css`. La separación usa la escala de Tailwind. Anchos de panel, `z-index`
+y duraciones todavía no tienen tokens propios.
 Los controles asumen el preflight de Tailwind. `cva` define variantes; `cn` combina
 clases. Kobalte aporta foco, portal y accesibilidad de popovers, tooltips y menús.
 

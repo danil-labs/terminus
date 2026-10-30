@@ -37,13 +37,15 @@ const expoEnv = {
   TERMINUS_MOBILE_WEB_BASE: `${base}${PHONE_DIR}`,
   // La raíz de la web de escritorio, para «Ver la versión de escritorio» sin adivinarla de la ruta.
   EXPO_PUBLIC_TERMINUS_WEB_BASE: base,
+  EXPO_PUBLIC_TERMINUS_ALPHA: env.TERMINUS_WEB_ALPHA === "1" ? "1" : "0",
   EXPO_PUBLIC_COMPUTERS_ENDPOINT: origin(env.TERMINUS_WEB_ENDPOINT || "https://computers.danil.ai"),
   EXPO_PUBLIC_TERMINUS_WEB_LOGIN: env.TERMINUS_WEB_LOGIN || `${base}auth`,
+  EXPO_PUBLIC_TERMINUS_WEB_WORKOS: env.TERMINUS_WEB_WORKOS === "1" ? "1" : "0",
   ...(env.TERMINUS_WEB_SUPABASE_URL ? { EXPO_PUBLIC_SUPABASE_URL: origin(env.TERMINUS_WEB_SUPABASE_URL) } : {}),
   ...(env.TERMINUS_WEB_SUPABASE_KEY ? { EXPO_PUBLIC_SUPABASE_KEY: env.TERMINUS_WEB_SUPABASE_KEY.trim() } : {}),
 };
 const npx = process.platform === "win32" ? "npx.cmd" : "npx";
-const run = spawnSync(npx, ["expo", "export", "--platform", "web", "--output-dir", out], {
+const run = spawnSync(npx, ["expo", "export", "--platform", "web", ...(env.TERMINUS_WEB_ALPHA === "1" ? ["--clear"] : []), "--output-dir", out], {
   cwd: mobile,
   env: expoEnv,
   stdio: "inherit",

@@ -12,7 +12,7 @@
  */
 import "../../locales/danilPhrases";
 import { type Credential, type CredentialMachine, credentialMachines, credentialSlot, envSecretNameProblem, envSecretOf, sealRecipientsFor } from "@terminus/computers";
-import { createMemo, createResource, createSignal, For, Match, onMount, Show, Switch } from "solid-js";
+import { createEffect, createMemo, createResource, createSignal, For, Match, on, onMount, Show, Switch } from "solid-js";
 import { unknownCommand } from "../../lib/errorCode.ts";
 import { df } from "../../lib/format";
 import { t } from "../../lib/i18n";
@@ -32,6 +32,8 @@ import { Spinner } from "../../ui/Spinner";
 import { CredentialMachines, LocalKeysBanner } from "./credentials/AccountCredentials";
 import { act, credentialsBackend, credentialsView, failureOf, reloadCredentials } from "./credentials/store";
 import { SettingsBlock, SettingsPanel, SettingsSection } from "./layout";
+import { machines } from "../machines/store";
+import { secretsRoute } from "./secrets-support";
 
 const NAME_PROBLEM = {
   empty: () => t("danil.secrets.name_empty"),
@@ -57,6 +59,7 @@ type SecretRow = { slot: string; folder: string | null; name: string; hint: stri
 
 const machineLabel = (m: Pick<CredentialMachine, "computer_id" | "name">) => m.name?.trim() || capabilities().machineName?.(m.computer_id) || m.computer_id;
 const viaEngine = () => credentialsBackend().where === "engine";
+const route = () => secretsRoute(credentialsBackend().where, machines());
 
 /** Lo que se escribe en el nombre: mayúsculas, y espacio o guion como `_`. */
 export const normalizeSecretName = (raw: string) => raw.toUpperCase().replace(/[\s-]/g, "_");
@@ -107,7 +110,7 @@ function SecretItem(props: { row: SecretRow; overrides: boolean; onChange: () =>
   return (
     <SettingsBlock data-secret={props.row.slot}>
       <div class="flex min-w-0 items-center gap-2">
-        <span class="min-w-0 truncate font-mono text-[0.8125rem] text-neutral-950">{props.row.name}</span>
+        <span class="min-w-0 truncate font-mono text-ui text-neutral-950">{props.row.name}</span>
         <Show when={props.row.hint}>{(hint) => <Badge forma="dato">{`••••${hint()}`}</Badge>}</Show>
         <span class="flex-1" />
         <Button variant="ghost" size="compact" onClick={() => props.onChange()}>
@@ -171,7 +174,7 @@ function SecretDialog(props: { rows: SecretRow[]; folders: Project[]; initial: {
   const problem = () => (name() ? envSecretNameProblem(name()) : null);
   const slot = () => credentialSlot.envSecret(folder(), name());
   const existing = () => props.rows.find((r) => r.slot === slot());
-  const valid = () => !!value() && !envSecretNameProblem(name()) && !noSecretRecipients();
+  const valid = () => route() !== "unsupported" && !!value() && !envSecretNameProblem(name()) && !noSecretRecipients();
 
   async function save(e: Event) {
     e.preventDefault();
@@ -335,8 +338,10 @@ export default function Secrets() {
   // Las carpetas del workspace, para elegir alcance y nombrar los grupos; sin lista se ve el id.
   const [folders] = createResource(() => invoke<Project[]>("list_projects").catch(() => [] as Project[]), { initialValue: [] });
   const folderName = (id: string) => folders().find((p) => p.id === id)?.name ?? id;
-  // Sondea el motor al abrir: uno sin `secrets_v1` contesta orden desconocida y solo esta sección se apaga.
-  const [engine, { refetch: rereadEngine }] = createResource(() => (viaEngine() ? readEngineSecrets() : Promise.resolve(null)));
+  const [engine, { refetch: rereadEngine }] = createResource(route, (target) => target === "worker"
+    ? Promise.resolve(null)
+    : target === "unsupported" ? Promise.resolve<EngineSecrets>({ kind: "unsupported" }) : readEngineSecrets());
+  createEffect(on(route, () => setEditing(undefined), { defer: true }));
 
   const rows = createMemo((): SecretRow[] => {
     const v = credentialsView();
@@ -369,7 +374,7 @@ export default function Secrets() {
   };
   const engineState = () => engine()?.kind ?? null;
   const loading = () => (viaEngine() ? engine.loading : credentialsView().kind === "loading");
-  const canWrite = () => (viaEngine() ? engineState() === "ready" : credentialsView().kind === "ready" && !!credentialsBackend().create);
+  const canWrite = () => (viaEngine() ? route() !== "unsupported" && !engine.loading && engineState() === "ready" : credentialsView().kind === "ready" && !!credentialsBackend().create);
   const reread = () => {
     void reloadCredentials();
     if (viaEngine()) void rereadEngine();
@@ -394,7 +399,7 @@ export default function Secrets() {
           </Match>
           <Match when={engineState() === "unsupported"}>
             <div class="mt-2 grid gap-1 rounded-md border border-border bg-surface-raised px-3 py-2.5" data-secrets-unsupported="">
-              <p class="m-0 text-[0.8125rem] font-semibold">{t("danil.secrets.engine_unsupported")}</p>
+              <p class="m-0 text-ui font-semibold">{t("danil.secrets.engine_unsupported")}</p>
               <p class="m-0 text-xs text-neutral-500">{t("danil.secrets.engine_unsupported_help")}</p>
             </div>
           </Match>
@@ -429,7 +434,7 @@ export default function Secrets() {
                 <KeyedList each={groups()} by={(g) => g.folder ?? "*"}>
                   {(g) => (
                     <div class="grid min-w-0" data-secrets-group={g().folder ?? "*"}>
-                      <p class="m-0 pt-3 text-[0.8125rem] font-semibold">
+                      <p class="m-0 pt-3 text-ui font-semibold">
                         {g().folder === null ? t("danil.secrets.scope_workspace") : t("danil.secrets.scope_folder", { folder: folderName(g().folder!) })}
                       </p>
                       <KeyedList each={g().items} by={(r) => r.slot}>
@@ -450,7 +455,7 @@ export default function Secrets() {
           </Match>
         </Switch>
       </SettingsSection>
-      <Show when={editing() !== undefined}>
+      <Show when={canWrite() && editing() !== undefined}>
         <SecretDialog
           rows={rows()}
           folders={folders()}

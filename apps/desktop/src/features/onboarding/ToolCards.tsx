@@ -740,8 +740,8 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
           <MarcaIntegracion id={p.i.id} size={15} />
         </span>
         <span class="grid min-w-0 flex-1 gap-px">
-          <strong class="truncate text-[13px] font-semibold text-neutral-950">{nombre}</strong>
-          <span class={cn("truncate text-[11px]", fallo() ? "text-error-strong" : "text-neutral-500")} title={fallo() ? (errores[p.i.id] ?? "") : detalle(p.i)}>
+          <strong class="truncate text-ui font-semibold text-neutral-950">{nombre}</strong>
+          <span class={cn("truncate text-caption", fallo() ? "text-error-strong" : "text-neutral-500")} title={fallo() ? (errores[p.i.id] ?? "") : detalle(p.i)}>
             {fallo() ? errores[p.i.id] : detalle(p.i)}
           </span>
         </span>
@@ -840,8 +840,8 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
         </div>
         <Show when={permiso()}>
           <div class="grid gap-2 border-t border-primary/30 px-3 py-3 motion-safe:animate-entrar" role="status">
-            <strong class="text-[13px] font-semibold">{t("onboarding.tools.references.zotero_permission_title")}</strong>
-            <p class="m-0 text-[13px]">{t("settings.references.zotero.error_local_api")}</p>
+            <strong class="text-ui font-semibold">{t("onboarding.tools.references.zotero_permission_title")}</strong>
+            <p class="m-0 text-ui">{t("settings.references.zotero.error_local_api")}</p>
             <div class="mt-0.5 flex flex-wrap items-center gap-2">
               <span class="text-xs text-neutral-500">{t("onboarding.tools.references.zotero_permission_why")}</span>
               <span class="flex-1" />
@@ -929,7 +929,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
       <Show when={p()}>
         {(prov) => (
           <div class="grid gap-2 rounded-lg border border-primary bg-surface-raised px-4 py-3.5 motion-safe:animate-entrar">
-            <p class="m-0 flex items-center gap-2 text-[13px]">
+            <p class="m-0 flex items-center gap-2 text-ui">
               <MarcaIntegracion id={q.i.id} size={16} />
               <strong class="font-semibold">{t("onboarding.tools.credential.title", { name: q.i.nombre })}</strong>
             </p>
@@ -944,7 +944,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
               <For each={prov().fields}>
                 {(c, n) => (
                   <label class="grid gap-1.5">
-                    <span class="text-[13px] font-semibold">
+                    <span class="text-ui font-semibold">
                       {bitbucket ? t("onboarding.tools.bitbucket.space") : prosa(c.label)}
                     </span>
                     <Input
@@ -963,7 +963,7 @@ export function Integraciones(props: { onCambio: (conectadas: number) => void; s
                 )}
               </For>
               <label class="grid gap-1.5">
-                <span class="text-[13px] font-semibold">
+                <span class="text-ui font-semibold">
                   {bitbucket ? t("onboarding.tools.bitbucket.token") : prosa(prov().token_label)}
                 </span>
                 <Input
@@ -1170,15 +1170,15 @@ export function Plugins(props: { onCambio: (estado: { instalados: number; instal
           <MarcaPlugin id={q.p.id} size={15} />
         </span>
         <span class="grid min-w-0 flex-1 gap-1">
-          <strong class="flex min-w-0 items-center text-[13px] leading-[1.2] font-semibold text-neutral-950">
+          <strong class="flex min-w-0 items-center text-ui leading-[1.2] font-semibold text-neutral-950">
             <span class="truncate">{nombre()}</span>
             <Show when={RECOMENDADOS.includes(q.p.id)}>
-              <span class="ml-1 shrink-0 rounded-full bg-primary/10 px-1.5 py-px text-[10px] font-medium text-primary">
+              <span class="ml-1 shrink-0 rounded-full bg-primary/10 px-1.5 py-px text-2xs font-medium text-primary">
                 {t("onboarding.tools.recommended")}
               </span>
             </Show>
           </strong>
-          <span class={cn("truncate text-[11px]", errores[q.p.id] ? "text-error-strong" : "text-neutral-500")} title={sub()}>
+          <span class={cn("truncate text-caption", errores[q.p.id] ? "text-error-strong" : "text-neutral-500")} title={sub()}>
             {sub()}
           </span>
         </span>
@@ -1186,7 +1186,7 @@ export function Plugins(props: { onCambio: (estado: { instalados: number; instal
           <Switch
             fallback={
               <>
-                <span class="text-[11px] whitespace-nowrap text-neutral-500">{peso(q.p)}</span>
+                <span class="text-caption whitespace-nowrap text-neutral-500">{peso(q.p)}</span>
                 <Button
                   size="compact"
                   variant="secondary"
@@ -1207,11 +1207,11 @@ export function Plugins(props: { onCambio: (estado: { instalados: number; instal
               />
             </Match>
             <Match when={ocupados[q.p.id] === "desinstalando"}>
-              <span class="text-[11px] whitespace-nowrap text-neutral-500">{t("onboarding.tools.uninstalling")}</span>
+              <span class="text-caption whitespace-nowrap text-neutral-500">{t("onboarding.tools.uninstalling")}</span>
               <Spinner class="text-neutral-500" />
             </Match>
             <Match when={q.p.installed}>
-              <span class="text-[11px] whitespace-nowrap text-neutral-500">{peso(q.p)}</span>
+              <span class="text-caption whitespace-nowrap text-neutral-500">{peso(q.p)}</span>
               <Badge tone="success" class="gap-1">
                 <Check size={11} stroke-width={3} aria-hidden="true" />
                 {t("onboarding.tools.installed")}
