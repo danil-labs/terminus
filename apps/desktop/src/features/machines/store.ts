@@ -85,6 +85,14 @@ export function remoteChildScope(): RemoteScope {
   };
 }
 
+/**
+ * El id de panel de la tarea que firmó un mensaje en `machine`. El panel pudo
+ * ponerle el prefijo de la máquina que guardó el mensaje, que no es la suya.
+ */
+export function senderTaskId(machine: string, task: string): string {
+  return remoteChildScope().idOf(machine, task.slice(task.lastIndexOf(SEP) + 1));
+}
+
 /** La máquina de la fila de una tarea del riel; la registra `App.tsx`, que es quien tiene las filas. */
 let taskRowMachine: (id: string) => string | null | undefined = () => null;
 

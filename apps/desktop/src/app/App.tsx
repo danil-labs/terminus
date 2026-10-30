@@ -110,7 +110,7 @@ import ArchivedTasks from "../features/projects/ArchivedTasks";
 import BaseBranchPicker from "../features/projects/BaseBranchPicker";
 import { watchHandlerStatus, watchHandlerStatuses } from "../features/projects/handlerPresence";
 import { EmptyContext, ProjectPicker } from "../features/projects/Projects";
-import { bringHereLabel, canBringHere, carryOrigin, machineName, machineOf, machines, refetchMachines, remoteChildScope, runOn, setRunOn, setTaskRowMachine } from "../features/machines/store";
+import { bringHereLabel, canBringHere, carryOrigin, machineName, machineOf, machines, refetchMachines, remoteChildScope, runOn, senderTaskId, setRunOn, setTaskRowMachine } from "../features/machines/store";
 import { withRemoteLaunchers } from "@terminus/tasks";
 import type { CarriedBase, CarryCheck } from "../features/machines/carry";
 // Chunk aparte: solo lo carga quien crea una tarea, no la carga inicial.
@@ -7185,7 +7185,7 @@ export default function App() {
         onQuitarFuente={quitarFuente}
         onCambiarRama={cambiarRama}
         onAbrirArtefacto={abrirPorRel}
-        onOpenTask={(folder, task) => void abrirSesion(folder, task)}
+        onOpenTask={(folder, task, machine) => void abrirSesion(folder, machine ? senderTaskId(machine, task) : task)}
         tareaPorId={tareaDelRiel}
         /* Solo con tarea abierta y con el turno cerrado: exportar a mitad de una
            respuesta se llevaría una conversación sin ella. */
