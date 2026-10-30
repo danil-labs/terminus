@@ -1,0 +1,199 @@
+{
+  "scope": "Windows existing evidence only; no remote access, DB, cookies, tokens, private messages, model turns or lifecycle operations in this triage",
+  "sourceOID": "93eeb9ef51b71f3cece7fa04942fa76e3b15adc2",
+  "engineOID": "4e10efc24a9be6f8dbf15559f767a50fb109a0a7",
+  "version": "0.3.0-rc.1",
+  "engineVersion": "0.2.73",
+  "artifactSHA256": "97c75273e511087106244cf5336562f5997c1666b3cd6c2f700b2dbaae0ceb94",
+  "installedMainSHA256": "de7a117f894bc4e67b782dfc23e681c694b3811e46d7b6d3b1e47a8722fa93ed",
+  "engineSHA256": "9b8e940fdc2cbd2c39cd6344bab648bfd4ed1d72b20c3d50e7b3be7764939920",
+  "reconstruction": [
+    {
+      "step": "Initial UI rendered, Personalize nonblank; required activity finished before quit",
+      "evidence": "03-personalize.png; prior terminal status"
+    },
+    {
+      "step": "quit_completely acknowledged; UI PID5596 remained; no active turns at that time",
+      "evidence": "reopen-stop-window.json; retained turn tool observations; no exact quit timestamp retained"
+    },
+    {
+      "step": "Previous QA stopped only own verified idle window5596, then ran retained launch script again",
+      "evidence": "reopen-stop-window.json; clean-launch-task.json"
+    },
+    {
+      "step": "Reopen task result0, recorded LastRunTime2026-10-30T18:10:10Z; UI showed engine unavailable",
+      "evidence": "clean-launch-task.json; 08-reopen-engine-unavailable.png"
+    },
+    {
+      "step": "Native UI8016 and engine3664 both existed in session0; later closed during prior authorized cleanup",
+      "evidence": "own-process-stop.json; prior recorded process observation"
+    },
+    {
+      "step": "Prior reinstall and uninstall returned0; installation removed and cleanup completed",
+      "evidence": "real-install/reinstall-result.json; real-install/uninstall-result.json; terminal status"
+    }
+  ],
+  "processes": [
+    {
+      "role": "first UI",
+      "pid": 5596,
+      "ppid": null,
+      "owner": "qarc030; verified during previous QA",
+      "session": 0,
+      "exe": "C:\\TerminusQA\\rc030-final-93-31ze36h8\\installed-93eeb9ef\\terminus.exe",
+      "observedCwd": null
+    },
+    {
+      "role": "reopened UI",
+      "pid": 8016,
+      "ppid": null,
+      "owner": "qarc030; SID verified during previous cleanup",
+      "session": 0,
+      "exe": "C:\\TerminusQA\\rc030-final-93-31ze36h8\\installed-93eeb9ef\\terminus.exe",
+      "observedCwd": null
+    },
+    {
+      "role": "engine seen after reopen",
+      "pid": 3664,
+      "ppid": null,
+      "owner": "qarc030; SID verified during previous cleanup",
+      "session": 0,
+      "exe": "C:\\TerminusQA\\rc030-final-93-31ze36h8\\installed-93eeb9ef\\seldon-runtime.exe",
+      "observedCwd": null
+    }
+  ],
+  "configuredLaunch": {
+    "exe": "C:\\TerminusQA\\rc030-final-93-31ze36h8\\installed-93eeb9ef\\terminus.exe",
+    "cwd": "C:\\TerminusQA\\rc030-final-93-31ze36h8\\installed-93eeb9ef",
+    "TERMINUS_LAB_ROOT": "C:\\TerminusQA\\rc030-final-93-31ze36h8\\clean-user\\app-root",
+    "TERMINUS_LAB_IDENTITY": "ai.danil.seldon.dev",
+    "WEBVIEW2_USER_DATA_FOLDER": "C:\\TerminusQA\\rc030-final-93-31ze36h8\\clean-user\\webview",
+    "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS": "--remote-debugging-port=19248 --remote-debugging-address=127.0.0.1",
+    "PATH": "C:\\Windows\\System32;C:\\Windows"
+  },
+  "endpoints": {
+    "webviewOrigin": "http://tauri.localhost/",
+    "webviewDebug": "127.0.0.1:19248 (CDP only, NOT engine endpoint)",
+    "engineRPC": null,
+    "namedPipe": null
+  },
+  "resourceDir": {
+    "runtimeObserved": null,
+    "expectedFromWindowsInstallLayout": "C:\\TerminusQA\\rc030-final-93-31ze36h8\\installed-93eeb9ef",
+    "evidenceLimit": "installed canonical tools verified there; actual resource_dir() value not captured"
+  },
+  "errors": {
+    "UIBanner": "El motor de Danil no responde. Puede haberse cerrado: vuelve a abrirlo y reinicia esta ventana.",
+    "javascriptErrorMessage": null,
+    "javascriptErrorStack": null,
+    "buildWrapperMessage": "Info Looking up installed tauri packages to check mismatched versions...",
+    "buildWrapperStack": null,
+    "buildWrapperExit": 1,
+    "tauriExit": null,
+    "processExitCodes": null
+  },
+  "missing": [
+    "UI/engine PPID and measured runtime cwd",
+    "runtimeID/buildID beyond observed versions and pinned source OIDs",
+    "engine endpoint and named pipe state before/after quit; no stale-endpoint conclusion possible",
+    "selector/profile owner ACL, NTFS file ID/inode and before/after contents or timestamps",
+    "Windows mutex ownership/state",
+    "UI failed IPC command, request identifier and structured Error.message/stack for engine-unavailable failure",
+    "engine stderr/launcher diagnostics captured under owning user; prior Administrator read was denied, not bypassed",
+    "WSL involvement not inspected; existing process evidence is native Windows, not proof about WSL",
+    "exact quit timestamp, process birth/death times and real process exit codes",
+    "Mac Personalize/WebKit/IPC evidence is outside this Windows export; Windows Personalize did render"
+  ],
+  "conclusion": "UI engine-unavailable banner coexisted with an engine process after quit/reopen. Existing evidence cannot distinguish stopped/unresponsive engine, stale endpoint/profile, transport/mutex/resource mismatch. Session0 does not certify interactive UX. No root cause established.",
+  "files": [
+    {
+      "path": "/Users/aceballosvilla/qa/rc030-final-93/windows-evidence/08-reopen-engine-unavailable.png",
+      "bytes": 40193,
+      "sha256": "927a4cf69055574ec0cbcce3e6b6793030da7a67809fc301678010513d9cc70e",
+      "localFileMtimeUTC": "2026-10-30T18:11:20.681331+00:00",
+      "timestampMeaning": "local saved/copied/normalized file mtime; not asserted as original Windows event time"
+    },
+    {
+      "path": "/Users/aceballosvilla/qa/rc030-final-93/windows-evidence/03-personalize.png",
+      "bytes": 99346,
+      "sha256": "2fb36831f7a12a178edf1430c9f3b0e352b2f99841af4200f32fe043da01c389",
+      "localFileMtimeUTC": "2026-10-30T18:03:50.665950+00:00",
+      "timestampMeaning": "local saved/copied/normalized file mtime; not asserted as original Windows event time"
+    },
+    {
+      "path": "/Users/aceballosvilla/qa/rc030-final-93/windows-evidence/reopen-stop-window.json",
+      "bytes": 173,
+      "sha256": "bd294e21c814cae1200bf86cb9740b8e2a3e4f3fbcfc96da457169d18a23e6c6",
+      "localFileMtimeUTC": "2026-10-30T18:17:40.584455+00:00",
+      "timestampMeaning": "local saved/copied/normalized file mtime; not asserted as original Windows event time"
+    },
+    {
+      "path": "/Users/aceballosvilla/qa/rc030-final-93/windows-evidence/own-process-stop.json",
+      "bytes": 524,
+      "sha256": "f9266b7e8ce98feae00234e3705fcb1faf650cecb072498d8aa66cec9d9421a3",
+      "localFileMtimeUTC": "2026-10-30T18:17:40.582057+00:00",
+      "timestampMeaning": "local saved/copied/normalized file mtime; not asserted as original Windows event time"
+    },
+    {
+      "path": "/Users/aceballosvilla/qa/rc030-final-93/windows-evidence/clean-launch-task.json",
+      "bytes": 121,
+      "sha256": "d4df44f198e98af7749b6274aa762b5dea4e614da87960bb58ce49a809d62455",
+      "localFileMtimeUTC": "2026-10-30T18:17:40.581277+00:00",
+      "timestampMeaning": "local saved/copied/normalized file mtime; not asserted as original Windows event time"
+    },
+    {
+      "path": "/Users/aceballosvilla/qa/rc030-final-93/windows-evidence/real-install/install-result.json",
+      "bytes": 126,
+      "sha256": "0638ff8117fc81065b6ccfa66c1c0c3aae3ca3b20a5cc3e466ba1754cc768168",
+      "localFileMtimeUTC": "2026-10-30T18:17:40.585720+00:00",
+      "timestampMeaning": "local saved/copied/normalized file mtime; not asserted as original Windows event time"
+    },
+    {
+      "path": "/Users/aceballosvilla/qa/rc030-final-93/windows-evidence/real-install/reinstall-result.json",
+      "bytes": 338,
+      "sha256": "ce0978d17521e208108dcbd8f05253b524c1cf3c103c28c938ecc0edad03af93",
+      "localFileMtimeUTC": "2026-10-30T18:17:40.585640+00:00",
+      "timestampMeaning": "local saved/copied/normalized file mtime; not asserted as original Windows event time"
+    },
+    {
+      "path": "/Users/aceballosvilla/qa/rc030-final-93/windows-evidence/real-install/uninstall-result.json",
+      "bytes": 236,
+      "sha256": "fb5a74774e13d1f157028eabdc0d03f54abc0804ddd6e6d7e69fec68585e3a20",
+      "localFileMtimeUTC": "2026-10-30T18:17:40.585552+00:00",
+      "timestampMeaning": "local saved/copied/normalized file mtime; not asserted as original Windows event time"
+    },
+    {
+      "path": "/Users/aceballosvilla/qa/rc030-final-93/windows-evidence/main-package-equivalence.json",
+      "bytes": 347,
+      "sha256": "614ac68a6454aa9731d0a79d47730efd2bfcafb6dbfd67b4587f847d053d0439",
+      "localFileMtimeUTC": "2026-10-30T18:17:40.581112+00:00",
+      "timestampMeaning": "local saved/copied/normalized file mtime; not asserted as original Windows event time"
+    },
+    {
+      "path": "/Users/aceballosvilla/qa/rc030-final-93/windows-evidence/environment-ui.json",
+      "bytes": 1767,
+      "sha256": "4e25b783820de2e0f1c50c1c34b91a71ad70c30bfc9240d7e979a42b388b7407",
+      "localFileMtimeUTC": "2026-10-30T18:17:40.582196+00:00",
+      "timestampMeaning": "local saved/copied/normalized file mtime; not asserted as original Windows event time"
+    },
+    {
+      "path": "/Users/aceballosvilla/qa/rc030-final-93/windows-evidence/error.txt",
+      "bytes": 82,
+      "sha256": "a6964832a1982594d221f77a5eadf6d06d4c5fec86c6fc521e1743dcf43b929d",
+      "localFileMtimeUTC": "2026-10-30T18:17:02.962436+00:00",
+      "timestampMeaning": "local saved/copied/normalized file mtime; not asserted as original Windows event time"
+    },
+    {
+      "path": "/Users/aceballosvilla/qa/rc030-final-93/windows-evidence/build.log",
+      "bytes": 197,
+      "sha256": "6a40b44fcbb667110523f526b2da07ea1ea14d676ecbc05201a39766409e4668",
+      "localFileMtimeUTC": "2026-10-30T18:18:11.483825+00:00",
+      "timestampMeaning": "local saved/copied/normalized file mtime; not asserted as original Windows event time"
+    },
+    {
+      "path": "/Users/aceballosvilla/qa/rc030-final-93/windows-scripts/clean-launch.ps1",
+      "sha256": "a03dc6443161de6c1aa87eb9ed1f1939384b4bd59a3d1c23ca03a9ebe18bd6de",
+      "role": "retained launch script; configured environment/cwd, not measured runtime cwd"
+    }
+  ]
+}

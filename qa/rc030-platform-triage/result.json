@@ -1,0 +1,219 @@
+{
+  "schema": "rc030-platform-triage/1",
+  "capturedAt": "2026-10-30T19:10:49.354077+00:00",
+  "status": "BLOCKED_MISSING_RUNTIME_EVIDENCE",
+  "candidate": {
+    "source": "93eeb9ef51b71f3cece7fa04942fa76e3b15adc2",
+    "version": "0.3.0-rc.1",
+    "engine": "4e10efc24a9be6f8dbf15559f767a50fb109a0a7"
+  },
+  "devInspected": "9596cfa614a70942a45b5956b89bd05e4acaea9a",
+  "coordination": {
+    "initialOperatorsRunning": false,
+    "coordinatorConfirmedNoOtherTriage": true,
+    "requests": {
+      "mac": "0e37b0ee-1f7f-4bc8-a421-dd2663b727f9",
+      "windows": "e2b030ed-3eb5-4ff6-b5c6-0f983bc7fa49",
+      "coordinator": "3c842131-3ec9-47d5-9fff-e43474d6d73a"
+    },
+    "acceptedIsNotCompleted": true,
+    "producerRepliesReceived": [
+      "mac",
+      "windows"
+    ],
+    "macReportedActiveTriage": "This task itself (7tfstzq6), not a conflicting operator"
+  },
+  "mac": {
+    "status": "SYMPTOM_CONFIRMED_CAUSE_UNPROVEN",
+    "observation": "Personalize central content blank; phase header and Back/later/Start visible; screenshot inspected. Terminal report says Start reached main.",
+    "windowPID": 99869,
+    "enginePID": 99921,
+    "rootIdentity": "ai.danil.seldon.dev",
+    "isolation": "NOT ACCREDITED; unexpected task/history observations; no user messages or databases read in triage",
+    "ownTwoTurns": "NOT ACCREDITED",
+    "launchLogBytes": 0,
+    "missing": [
+      "WebKit JS Error.message and stack",
+      "DOM layout/computed opacity and animation state",
+      "IPC result immediately before blank",
+      "failed request names and errors",
+      "launch environment/selector and endpoint provenance with owner/inode"
+    ],
+    "launch": {
+      "method": "Direct QA app executable; own HOME/XDG/TMP; system PATH; cwd own lab (operator historical report)",
+      "windowPPID": 1,
+      "enginePPID": 99869,
+      "profile": "desktop-lab",
+      "profileOwner": "aceballosvilla",
+      "profileUID": 501,
+      "profileMode": "0600",
+      "profileInode": 246814875,
+      "profileMtimeUTC": "2026-10-30T17:44:21.699111Z",
+      "runtimeID": null,
+      "endpoint": null
+    },
+    "windowLog": {
+      "startupUTC": "2026-10-30T17:44:21Z",
+      "adopt": false,
+      "contractMismatch": "Explicitly tolerated; not established as failure cause",
+      "profileWrite": true
+    }
+  },
+  "windows": {
+    "status": "SESSION0_REOPEN_FAILURE_CAUSE_UNPROVEN",
+    "session": 0,
+    "interactiveDesktopUX": "NOT TESTED; no inference permitted",
+    "observation": "quit_completely acknowledged, window PID5596 remained; operator terminated verified own idle window; reopened window reported engine unavailable despite engine process. Later cleanup records UI8016 and engine3664; these are not a simultaneous IPC connectivity proof.",
+    "launchEvidence": {
+      "source": "windows-scripts/clean-launch.ps1",
+      "environmentNames": [
+        "TERMINUS_LAB_ROOT",
+        "TERMINUS_LAB_IDENTITY",
+        "WEBVIEW2_USER_DATA_FOLDER",
+        "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+        "PATH"
+      ],
+      "identity": "ai.danil.seldon.dev",
+      "workingDirectory": "C:\\TerminusQA\\rc030-final-93-31ze36h8\\installed-93eeb9ef",
+      "scope": "Configured script rerun according to producer; runtime PPID/cwd unmeasured",
+      "relaunchReportedByOperator": true,
+      "relaunchTimeUTC": "2026-10-30T18:10:10Z"
+    },
+    "missing": [
+      "pre/post endpoint transport and runtimeID (no token)",
+      "UI/engine PID PPID exe cwd and session at failed request",
+      "resourceDir/profile selection and ownership",
+      "native quit invocation and exit timestamps/errors",
+      "pipe/mutex/WSL evidence or proof not involved"
+    ],
+    "producerExport": "windows-operator.json"
+  },
+  "staticFindings": [
+    {
+      "path": "apps/desktop/src/features/onboarding/Personalize.tsx:51",
+      "finding": "Main content unconditional; footer sibling. Empty main does not prove missing workspace/IPC failure. Animation starts opacity0; computed state unavailable, so CSS hypothesis unproven."
+    },
+    {
+      "path": "apps/desktop/src-tauri/src/extracted/tray.rs:170",
+      "finding": "quit_completely marks instance exiting and calls app.exit(0). IPC acknowledgment is not OS process exit proof."
+    },
+    {
+      "path": "apps/desktop/src-tauri/src/extracted/mod.rs:289",
+      "finding": "ExitRequested prevention is guarded by code:None; cannot claim this intercepts app.exit(0) without event trace."
+    },
+    {
+      "path": "apps/desktop/src-tauri/src/extracted/proxy.rs:294",
+      "finding": "app_unavailable maps to engine_down display. Present engine PID does not prove selected endpoint/transport/auth/contract connectivity."
+    },
+    {
+      "revision": "9596cfa6",
+      "finding": "#531 bundled prepare/settings simplification and #529 shell CSS present; #530 absent from inspected dev log. Personalize, tray quit and mod exit paths unchanged from candidate."
+    }
+  ],
+  "classification": {
+    "packaging": "NO PROVEN CAUSE; prior canonical/provenance passes do not prove all runtime paths",
+    "launcherSelectionEndpoint": "OPEN; insufficient failed-request provenance",
+    "frontendIPCJS": "OPEN; missing stack/DOM/IPC snapshot",
+    "Session0": "PROVEN LIMITATION, not proven root cause",
+    "isolationHarness": "MAC ISOLATION NOT ACCREDITED; cause unknown"
+  },
+  "proposedFixPR": null,
+  "freshLab": {
+    "executed": false,
+    "requiresPlanFirst": true,
+    "planOnly": [
+      "Recover existing sanitized operator trace first.",
+      "If insufficient, request separately approved lab plan to capture frontend stack/DOM/IPC and Windows pre/post selected endpoint, native quit and Session0 versus interactive context.",
+      "No model turns needed to diagnose onboarding or transport."
+    ]
+  },
+  "constraintsObserved": [
+    "No builds/install/sign/publish/workflows/security changes",
+    "No relaunch/retry/new lab/model turns",
+    "No hostengine/global app changes or process stops",
+    "No producer worktree edits",
+    "No databases/cookies/tokens/private user conversation collected",
+    "Original logs preserved; hashes and safe summaries only"
+  ],
+  "evidence": [
+    {
+      "original": "/Users/aceballosvilla/qa/rc030-final-93/status.json",
+      "sha256": "598221bfec11475d69ac32883bfdfa17d433fedefdabe47c4a838f7388dca741",
+      "bytes": 34005,
+      "mtimeUTC": "2026-10-30T18:19:13.565760+00:00"
+    },
+    {
+      "original": "/Users/aceballosvilla/qa/rc030-final-93/mac-status.json",
+      "sha256": "e5bea4f131791cf47197352de8447a82d5011ae0302a0773fa55c1ad1cecc659",
+      "bytes": 7488,
+      "mtimeUTC": "2026-10-30T17:51:30.394973+00:00"
+    },
+    {
+      "original": "/Users/aceballosvilla/qa/rc030-final-93/windows-status.json",
+      "sha256": "10640b6abdff4451f7f3981227cdb71b0aec0cf648cd587f1ab2e9613e5726ca",
+      "bytes": 10785,
+      "mtimeUTC": "2026-10-30T18:17:40.615563+00:00"
+    },
+    {
+      "original": "/Users/aceballosvilla/qa/rc030-final-93/mac-evidence/terminal-report.md",
+      "sha256": "98b911085b6c448baebbd907ca1bb5ae85ca58b77918ba7c5584e46107eba379",
+      "bytes": 2269,
+      "mtimeUTC": "2026-10-30T17:51:30.396308+00:00"
+    },
+    {
+      "original": "/Users/aceballosvilla/qa/rc030-final-93/mac-evidence/window-launch.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "mtimeUTC": "2026-10-30T17:39:54.915081+00:00"
+    },
+    {
+      "original": "/Users/aceballosvilla/qa/rc030-final-93/mac-evidence/isolated-personalize.png",
+      "sha256": "1f812d38b607b9d74a285de17b6075aae9dec09ed01b0fa755a72c3f3234016b",
+      "bytes": 61568,
+      "mtimeUTC": "2026-10-30T17:46:02.650379+00:00"
+    },
+    {
+      "original": "/Users/aceballosvilla/qa/rc030-final-93/windows-evidence/reopen-stop-window.json",
+      "sha256": "bd294e21c814cae1200bf86cb9740b8e2a3e4f3fbcfc96da457169d18a23e6c6",
+      "bytes": 173,
+      "mtimeUTC": "2026-10-30T18:17:40.584455+00:00"
+    },
+    {
+      "original": "/Users/aceballosvilla/qa/rc030-final-93/windows-evidence/own-process-stop.json",
+      "sha256": "f9266b7e8ce98feae00234e3705fcb1faf650cecb072498d8aa66cec9d9421a3",
+      "bytes": 524,
+      "mtimeUTC": "2026-10-30T18:17:40.582057+00:00"
+    },
+    {
+      "original": "/Users/aceballosvilla/qa/rc030-final-93/windows-evidence/08-reopen-engine-unavailable.png",
+      "sha256": "927a4cf69055574ec0cbcce3e6b6793030da7a67809fc301678010513d9cc70e",
+      "bytes": 40193,
+      "mtimeUTC": "2026-10-30T18:11:20.681331+00:00"
+    },
+    {
+      "original": "/Users/aceballosvilla/qa/rc030-final-93/windows-scripts/clean-launch.ps1",
+      "sha256": "a03dc6443161de6c1aa87eb9ed1f1939384b4bd59a3d1c23ca03a9ebe18bd6de",
+      "bytes": 916,
+      "mtimeUTC": "2026-10-30T17:42:23.164457+00:00"
+    },
+    {
+      "original": "/Users/aceballosvilla/qa/rc030-final-93/mac-lab-isolated/root/window/window.log",
+      "sha256": "fcdeaec3f7bcf8c82c93cd26a3f629119333c9eaf359f0eb361d03325535a0ec",
+      "bytes": 1166,
+      "mtimeUTC": "2026-10-30T17:48:18.845317+00:00"
+    },
+    {
+      "original": "/Users/aceballosvilla/qa/rc030-final-93/mac-qa-control.py",
+      "sha256": "e748d2e0f3c4c4bfdba992d7062377ebe684bd340985f733f8f2b44599a59783",
+      "bytes": 1250,
+      "mtimeUTC": "2026-10-30T17:44:18.310522+00:00"
+    },
+    {
+      "original": "/Users/aceballosvilla/qa/rc030-final93-windows-readonly-triage.json",
+      "sha256": "d828647da343f54fe75e9c4e8b77fafcb709975ad5b909cc2144d0c189d07771",
+      "bytes": 10370,
+      "mtimeUTC": "2026-10-30T19:10:54.834284+00:00"
+    }
+  ],
+  "timestampLimit": "Evidence mtime is local save/copy time, not automatically an original event timestamp."
+}
