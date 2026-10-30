@@ -821,7 +821,7 @@ export default function VisorDeArchivo(props: {
                     }
                   >
                     {(d) => (
-                      <div class="min-h-0 min-w-0 flex-1 overflow-hidden bg-surface-muted">
+                      <div data-select-scope class="min-h-0 min-w-0 flex-1 overflow-hidden bg-surface-muted">
                         {/* Ya llega con el archivo entero de contexto: no hay tramo que traer. */}
                         <CuerpoDeArchivo archivo={d()} onDesplegar={() => {}} llena />
                       </div>
@@ -830,7 +830,7 @@ export default function VisorDeArchivo(props: {
                 </Show>
 
                 <Show when={!mostrarCambios() && !editable()}>
-                  <div class="min-h-0 min-w-0 flex-1 overflow-y-auto bg-surface-muted">
+                  <div data-select-scope class="min-h-0 min-w-0 flex-1 overflow-y-auto bg-surface-muted">
                     <Cuerpo contenido={c()} ruta={props.ruta} onOpenExternal={() => void openExternal()} pedirOffice={pedirOffice} />
                   </div>
                 </Show>
@@ -868,6 +868,7 @@ export default function VisorDeArchivo(props: {
         {/* Con «Código» la vista de Typst se esconde sin desmontarse: soltarla apagaría Tinymist y sus marcas. */}
         <Show when={ladoPrevia() || vistaTypst()}>
           <div
+            data-select-scope
             class={cn(
               "min-h-0 min-w-0 flex-1 flex-col",
               ladoPrevia() ? "flex" : "hidden",
