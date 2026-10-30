@@ -503,8 +503,12 @@ export default function App() {
   const medirBordeDeLaBarra = (el: HTMLDivElement) => {
     const medir = () => setBordeDeLaBarra(el.getBoundingClientRect().left || null);
     const ojo = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(medir);
-    ojo?.observe(el);
-    queueMicrotask(medir);
+    // Con la conversación en su ancho base, la barra se encoge y este borde se mueve sin que cambie su tamaño.
+    queueMicrotask(() => {
+      const caja = el.parentElement;
+      for (const parte of caja ? [caja, ...caja.children] : [el]) ojo?.observe(parte);
+      medir();
+    });
     onCleanup(() => ojo?.disconnect());
   };
   const attentionEntries = () => capabilities().inbox?.entries(customization.selection().enabled) ?? [];
