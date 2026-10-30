@@ -2,7 +2,7 @@
  * WorkOS sign-in for alfa. The browser never holds a WorkOS or refresh token:
  * at the callback the Worker resolves the person (`resolve_login`) and opens a
  * real Supabase session for `users.uuid`; the cookie keeps the WorkOS session
- * id and that refresh token, sealed. Each POST to `/terminus/auth/session`
+ * id and that refresh token, sealed. Each POST to `/auth/session`
  * checks the WorkOS session and refreshes in GoTrue, so bans, the hook and RLS
  * stay those of app.danil.ai. Any failure denies; there is no fallback.
  */
@@ -88,10 +88,10 @@ function readCookie(request, name) {
 // `__Host-` needs Path=/. The flow cookie must survive the return from WorkOS (Lax); the session one never leaves the site (Strict).
 const setCookie = (name, value, maxAge) => `${name}=${value}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=${name === SESSION_COOKIE ? "Strict" : "Lax"}`;
 
-/** A return path inside this Terminus installation; anything else goes to its root. */
+/** A path on this site (the web lives at the root), never the sign-in pages; anything else goes to the root. */
 export function safeNext(value) {
-  const base = "/terminus/";
-  if (!value || !value.startsWith(base) || value.startsWith(`${base}auth`) || /[\\\x00-\x1f]/.test(value)) return base;
+  const base = "/";
+  if (!value || !value.startsWith(base) || value.startsWith("//") || /^\/auth(?:[/?#]|$)/.test(value) || /[\\\x00-\x1f]/.test(value)) return base;
   try {
     const url = new URL(value, HOST_ORIGIN);
     return url.origin === HOST_ORIGIN && url.pathname.startsWith(base) ? url.pathname + url.search + url.hash : base;
@@ -179,13 +179,17 @@ async function checkSession(config, userId, sessionId) {
  * WorkOS user → Danil person with a Supabase login. Only the callback calls
  * it: `resolve_login` writes (links logins, may create a person).
  */
-async function resolvePerson(config, workosUserId) {
+async function resolvePerson(config, workosUserId, method) {
+  // Microsoft waits for xms_edov, which WorkOS does not expose: out of the pilot even if AuthKit offers it.
+  if (method === "MicrosoftOAuth") throw new Denied("provider_not_in_pilot", 403);
   const user = await workos(config, `/user_management/users/${encodeURIComponent(workosUserId)}`);
   const email = typeof user.email === "string" ? user.email.trim().toLowerCase() : "";
   if (user.id !== workosUserId || !email) throw unavailable();
-  if (user.email_verified !== true) throw new Denied("email_not_verified", 403);
+  // What WorkOS says, never assumed: an unverified email links no person, so it does not enter.
+  const verified = user.email_verified === true;
+  if (!verified) throw new Denied("email_not_verified", 403);
   const name = [user.first_name, user.last_name].filter(v => typeof v === "string" && v.trim()).join(" ").trim() || null;
-  const personId = await rpc(config, "resolve_login", { p_provider: "workos", p_subject: workosUserId, p_email: email, p_email_verified: true, p_name: name });
+  const personId = await rpc(config, "resolve_login", { p_provider: "workos", p_subject: workosUserId, p_email: email, p_email_verified: verified, p_name: name });
   if (!Number.isSafeInteger(personId) || personId < 1) throw new Denied("unknown_person", 403);
   const rows = await supabase(config, `/rest/v1/users?id=eq.${personId}&select=id,uuid,merged_into_user_id&limit=1`);
   const row = Array.isArray(rows) ? rows[0] : null;
@@ -235,7 +239,7 @@ async function start(config, url) {
   const flow = await seal(config.env, FLOW_COOKIE, { state, verifier, next: safeNext(url.searchParams.get("next")), exp: now() + FLOW_SECONDS });
   const authorize = new URL(`${WORKOS_API}/user_management/authorize`);
   for (const [key, value] of Object.entries({
-    client_id: config.clientId, redirect_uri: `${url.origin}/terminus/auth/workos/callback`, response_type: "code",
+    client_id: config.clientId, redirect_uri: `${url.origin}/auth/workos/callback`, response_type: "code",
     provider, state, code_challenge: challenge, code_challenge_method: "S256",
   })) authorize.searchParams.set(key, value);
   return new Response(null, { status: 303, headers: { ...NO_STORE, Location: authorize.href, "Set-Cookie": setCookie(FLOW_COOKIE, flow, FLOW_SECONDS) } });
@@ -250,7 +254,7 @@ function equal(a, b) {
 
 async function callback(config, request, url) {
   const back = (error) => {
-    const page = new URL("/terminus/auth", url.origin);
+    const page = new URL("/auth", url.origin);
     page.searchParams.set("error", error);
     return new Response(null, { status: 303, headers: { ...NO_STORE, Location: page.href, "Set-Cookie": setCookie(FLOW_COOKIE, "", 0) } });
   };
@@ -270,7 +274,7 @@ async function callback(config, request, url) {
     const userId = answer.user?.id;
     const sessionId = typeof answer.access_token === "string" ? sessionIdOf(answer.access_token) : null;
     if (typeof userId !== "string" || !ID_RE.test(userId) || !sessionId) throw unavailable();
-    const person = await resolvePerson(config, userId);
+    const person = await resolvePerson(config, userId, answer.authentication_method);
     const opened = await openSupabaseSession(config, person);
     const session = await seal(config.env, SESSION_COOKIE, { user: userId, sid: sessionId, uuid: person.uuid, refresh: opened.refresh, exp: now() + SESSION_SECONDS });
     const headers = new Headers({ ...NO_STORE, Location: new URL(flow.next, url.origin).href });
@@ -310,7 +314,7 @@ async function issue(config, request) {
 }
 
 async function logout(config, request) {
-  let location = new URL("/terminus/auth", HOST_ORIGIN).href;
+  let location = new URL("/auth", HOST_ORIGIN).href;
   try {
     const session = await open(config.env, SESSION_COOKIE, readCookie(request, SESSION_COOKIE));
     if (ID_RE.test(session.sid ?? "")) {
@@ -325,12 +329,12 @@ async function logout(config, request) {
   return json({ location }, 200, { "Set-Cookie": setCookie(SESSION_COOKIE, "", 0) });
 }
 
-/** `/terminus/auth/workos/*`, `/terminus/auth/session` and `/terminus/auth/logout`; null for any other path. */
+/** `/auth/workos/*`, `/auth/session` and `/auth/logout` (the web lives at the root); null for any other path. */
 export async function handleAuth(request, env, url) {
-  const route = url.pathname === "/terminus/auth/workos/start" ? "start" :
-    url.pathname === "/terminus/auth/workos/callback" ? "callback" :
-    url.pathname === "/terminus/auth/session" ? "session" :
-    url.pathname === "/terminus/auth/logout" ? "logout" : null;
+  const route = url.pathname === "/auth/workos/start" ? "start" :
+    url.pathname === "/auth/workos/callback" ? "callback" :
+    url.pathname === "/auth/session" ? "session" :
+    url.pathname === "/auth/logout" ? "logout" : null;
   if (!route) return null;
   const method = route === "start" || route === "callback" ? "GET" : "POST";
   if (request.method !== method) return json({ error: "method_not_allowed" }, 405);

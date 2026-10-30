@@ -1,5 +1,4 @@
 import CornerDownLeft from "lucide-solid/icons/corner-down-left";
-import Loader2 from "lucide-solid/icons/loader-circle";
 import MessageCircle from "lucide-solid/icons/message-circle";
 import MessageCircleQuestion from "lucide-solid/icons/message-circle-question-mark";
 import X from "lucide-solid/icons/x";
@@ -9,6 +8,7 @@ import { Button } from "../../ui/Button";
 import { type Failure, FailureNote } from "../../ui/Failure";
 import { Markdown } from "../../ui/Markdown";
 import { TeclaDeAtajo } from "../../ui/Shortcut";
+import { Spinner } from "../../ui/Spinner";
 
 /** Una pregunta al margen en pantalla. Vive en memoria: nada de esto se guarda. */
 export type AlMargen = {
@@ -62,7 +62,7 @@ export function PanelAlMargen(props: {
             when={props.estado.failure}
             fallback={
               <span class="flex items-center gap-1.5 text-[0.8125rem] text-neutral-500">
-                <Loader2 size={13} class="animate-spin-steps text-side" aria-hidden="true" />
+                <Spinner size={13} class="text-side" />
                 {t("chat.side.waiting")}
               </span>
             }

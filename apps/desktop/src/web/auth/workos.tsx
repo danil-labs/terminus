@@ -4,7 +4,7 @@ import { Button } from "../../ui/Button";
 import { workosSession } from "../workos-session";
 
 /** Codes the entry Worker sends back in `?error=`; any other shows the generic one. */
-const ERRORS = new Set(["callback_failed", "email_not_verified", "unknown_person", "no_login_yet", "login_banned", "identity_unavailable"]);
+const ERRORS = new Set(["callback_failed", "email_not_verified", "unknown_person", "no_login_yet", "login_banned", "identity_unavailable", "provider_not_in_pilot"]);
 
 /** Sign-in with WorkOS (AuthKit): every method goes through the entry Worker, which keeps the session. */
 export function WorkosAuthPage(props: { base: string; next: string; error: string | null }) {

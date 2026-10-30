@@ -1,8 +1,44 @@
 # Plan: login con WorkOS en alfa-app.danil.ai (piloto)
 
 Tarea z4yp8ckz (tech-lead) para la coordinadora 0emvaj92. Brief:
-`sessions/0emvaj92/exchange/brief-workos-login-alfa.md`. Estado: **borrador para
-revisión de arquitectura**. No se ha escrito nada en producción.
+`sessions/0emvaj92/exchange/brief-workos-login-alfa.md`. No se ha escrito nada
+en producción.
+
+## 0. Estado (2026-10-30, retomado)
+
+Las secciones 2 a 4 son la propuesta original. La revisión de arquitectura la
+cambió, y el código (`alpha-entry/session.mjs`) sigue lo que dice esta
+sección:
+
+- **Sin llave de firma propia (D2 ya no aplica).** Al volver de AuthKit, el
+  Worker abre una **sesión real de Supabase**: `generate_link` tipo magiclink
+  con service role, y después `POST /auth/v1/verify` con `token_hash`. GoTrue
+  sigue aplicando bans y bajas, y el hook estampa `active_account_id`.
+- **La alfa vive en la raíz** de `alfa-app.danil.ai` (#483). Las rutas son
+  `/auth/workos/start`, `/auth/workos/callback`, `POST /auth/session` y
+  `POST /auth/logout`. `/terminus/*` redirige con 308 a la raíz, y un POST ahí
+  responde 405. El front arma las rutas con la base del build.
+- **`resolve_login` solo en el callback.** `POST /auth/session` solo revisa la
+  sesión de WorkOS y refresca en GoTrue; nunca escribe.
+- **Una persona sin cuenta viva entra**, sin `active_account_id` y sin 403.
+  El Worker no revisa cuentas: eso lo hace el hook de Supabase, como en
+  app.danil.ai.
+- **El correo verificado es lo que diga WorkOS.** Sin `email_verified` no se
+  llama a `resolve_login` (`email_not_verified`).
+- **Microsoft queda fuera del piloto**, porque WorkOS no expone `xms_edov`.
+  `start` no lo acepta, y si AuthKit lo ofrece igual, el callback lo niega
+  con `provider_not_in_pilot`.
+- **Con WorkOS el login es siempre `<base>auth`.** El build de alfa define
+  `TERMINUS_WEB_LOGIN=/sign-in?…`; con `TERMINUS_WEB_WORKOS=1` ese valor se
+  ignora, para que `/sign-in` no se redirija a sí mismo.
+
+**Configuración que debe tener WorkOS para el piloto:**
+
+- registro libre de AuthKit **apagado**: solo entra quien ya existe;
+- métodos: código por correo, contraseña y Google;
+- Microsoft apagado.
+
+Nada de esto se configura desde el código.
 
 ## 1. Lo que hay hoy (medido el 2026-10-30)
 
@@ -12,7 +48,7 @@ verificadores**:
 
 | Verificador | Cómo valida | Cómo resuelve a la persona |
 |---|---|---|
-| BFF de appv2 (`worker/src/jwt.ts`, vía `/terminus/alpha-api`) | ES256 contra el JWKS de Supabase; acepta cualquier `kid` publicado | `claims.sub` = `auth.users.id`, en decenas de sitios; reenvía el JWT a PostgREST (inbox) |
+| BFF de appv2 (`worker/src/jwt.ts`, vía `/alpha-api`) | ES256 contra el JWKS de Supabase; acepta cualquier `kid` publicado | `claims.sub` = `auth.users.id`, en decenas de sitios; reenvía el JWT a PostgREST (inbox) |
 | computers (`src/auth.ts`, `computers.danil.ai` y relay) | El mismo `jwt.ts` copiado de appv2 | `users?uuid=eq.<sub>` |
 | PostgREST directo (`audit-log.ts`) | Supabase: solo la llave **current** (y la anterior en rotación) | RLS: `current_user_id()` y `user_account_ids()` hacen `sub::uuid`; `auth.uid()` en 7 sitios del baseline |
 | Hook `custom_access_token_hook` | — | Estampa `active_account_id` con `user_can_enter_account` |
@@ -76,12 +112,12 @@ en standby, pero conviene saberlo.
 
 ## 3. Flujo
 
-1. `/terminus/auth` (alfa): un botón «Entrar», además de Google y Microsoft.
-   Lleva a `GET /terminus/auth/workos/start?provider=authkit|GoogleOAuth|MicrosoftOAuth&next=…`.
+1. `/auth` (alfa): un botón «Entrar», además de Google y Microsoft.
+   Lleva a `GET /auth/workos/start?provider=authkit|GoogleOAuth|MicrosoftOAuth&next=…`.
    El worker crea `state` y el verificador PKCE en una cookie `__Host-`
    firmada (HMAC, 10 min) y redirige a
    `https://api.workos.com/user_management/authorize`.
-2. `GET /terminus/auth/workos/callback?code&state`: el worker valida el
+2. `GET /auth/workos/callback?code&state`: el worker valida el
    `state` y llama `POST /user_management/authenticate` (con `client_id`,
    `client_secret` = API key y `code_verifier`). Recibe `user`,
    `access_token` y `refresh_token`. Después:
@@ -91,19 +127,19 @@ en standby, pero conviene saberlo.
    - lee `users.uuid`, `banned` y `active_account_id` y `user_can_enter_account`;
    - guarda el refresh token de WorkOS **cifrado** (AES-GCM con un secreto del
      Worker) en una cookie `__Host-danil_alfa`, HttpOnly, Secure,
-     SameSite=Lax, con `Path=/terminus/`;
+     SameSite=Lax, con `Path=/`;
    - redirige a `next`.
-3. `POST /terminus/auth/session` (mismo origen; se comprueba `Origin`): el
+3. `POST /auth/session` (mismo origen; se comprueba `Origin`): el
    worker descifra la cookie y renueva con WorkOS
    (`grant_type=refresh_token`). WorkOS rota el refresh token y la cookie se
    reescribe. Vuelve a resolver a la persona y devuelve `{ access_token,
    expires_at, user: { user_id, email, name } }`. El front lo pide al cargar y
    antes de que venza: el `getToken` y el `unauthorized` de `Session`.
-4. `POST /terminus/auth/logout`: revoca la sesión de WorkOS
+4. `POST /auth/logout`: revoca la sesión de WorkOS
    (`/user_management/sessions/revoke`), borra la cookie y redirige al logout
    de AuthKit si hace falta.
 5. **Cuenta activa:** con WorkOS no se llama `set_active_account` + refresh de
-   Supabase. Basta con `POST /terminus/auth/session` y `{ account_id }`: el
+   Supabase. Basta con `POST /auth/session` y `{ account_id }`: el
    worker comprueba `user_can_enter_account`, guarda
    `users.active_account_id` y emite el token nuevo. Hay que revisar cuántos
    sitios del front llaman hoy `set_active_account`.
@@ -126,7 +162,7 @@ decisión D2).
 **terminus, rama `feat/workos-login-alfa` sobre `feat/new-danil`:**
 
 - `apps/desktop/alpha-entry/worker.mjs` crece:
-  - las rutas `/terminus/auth/workos/*` y `/terminus/auth/session|logout`;
+  - las rutas `/auth/workos/*` y `/auth/session|logout`;
   - la firma ES256 con WebCrypto (`importKey` del JWK privado);
   - el cifrado de la cookie;
   - las llamadas a WorkOS y a PostgREST con service role, solo `rpc/resolve_login`
@@ -211,9 +247,9 @@ que se adjunta a la entrega.
 1. **WorkOS Production** (`environment_01M2HETZ3VSG6QAR42NYWK4CAK`):
    - el **Client ID**;
    - permiso para que yo configure por API, o que configure en el dashboard:
-     - Redirect URIs: `https://alfa-app.danil.ai/terminus/auth/workos/callback`
-       y `http://localhost:5173/terminus/auth/workos/callback`;
-     - Sign-out redirect `https://alfa-app.danil.ai/terminus/auth`;
+     - Redirect URIs: `https://alfa-app.danil.ai/auth/workos/callback`
+       y `http://localhost:5173/auth/workos/callback`;
+     - Sign-out redirect `https://alfa-app.danil.ai/auth`;
      - Allowed origins (CORS) `https://alfa-app.danil.ai` y
        `http://localhost:5173`;
    - métodos de AuthKit: Magic Auth, contraseña, Google y Microsoft.

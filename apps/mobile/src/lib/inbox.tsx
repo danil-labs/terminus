@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createInbox, type Account, type Conversation, type Message } from '../../../../packages/attention/src/inbox.ts';
-import { ALPHA_DEMO } from './alpha-mode';
+import { ALPHA_API, ALPHA_DEMO } from './alpha-mode';
 import { useCustomization } from './customization';
 import { useAccount } from './account';
 import { supabase } from './supabase';
@@ -15,7 +15,7 @@ function useInboxModel() {
   const generation=useRef(0);
   if(active.current!==scope){active.current=scope;generation.current++;}
   const [dataScope,setDataScope]=useState(scope);
-  const api=useMemo(()=>ALPHA_DEMO||!enabled?null:createInbox(session),[session.getToken,session.unauthorized,enabled]);
+  const api=useMemo(()=>ALPHA_DEMO||!enabled?null:createInbox(session,fetch,ALPHA_API),[session.getToken,session.unauthorized,enabled]);
   const [accounts,setAccounts]=useState<Account[]>([]);
   const [account,setAccount]=useState<Account|null>(null);
   const [rows,setRows]=useState<Conversation[]>([]);

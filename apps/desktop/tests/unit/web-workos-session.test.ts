@@ -22,13 +22,13 @@ const minted = (token: string, seconds = 600, who = user) => ({ status: 200, bod
 test("the token is asked once, reused until near expiry and renewed after a refusal", async () => {
   const w = worker([minted("t1"), minted("t2", 30), minted("t3"), minted("t4")]);
   let ended = 0;
-  const session = workosSession({ base: "/terminus/", fetch: w.fetch, onGone: () => ended++ });
+  const session = workosSession({ base: "/", fetch: w.fetch, onGone: () => ended++ });
   const [a, b] = await Promise.all([session.getToken(), session.getToken()]);
   assert.equal(a, "t1");
   assert.equal(b, "t1");
   assert.deepEqual(await session.user(), user);
   assert.equal(w.calls.length, 1);
-  assert.equal(w.calls[0], "POST /terminus/auth/session");
+  assert.equal(w.calls[0], "POST /auth/session");
   assert.equal(await session.unauthorized(), true);
   assert.equal(await session.getToken(), "t3", "a token about to expire is not handed out");
   assert.equal(await session.getToken(), "t3");
@@ -39,7 +39,7 @@ test("a refused session ends once and stays ended", async () => {
   const w = worker([minted("t1"), { status: 401, body: { error: "session_ended" } }]);
   let ended = 0;
   let cleared = 0;
-  const session = workosSession({ base: "/terminus/", fetch: w.fetch, onGone: () => ended++ });
+  const session = workosSession({ base: "/", fetch: w.fetch, onGone: () => ended++ });
   await session.getToken();
   session.watch(user.user_id, () => cleared++);
   assert.equal(await session.unauthorized(), false);
@@ -51,10 +51,10 @@ test("a refused session ends once and stays ended", async () => {
 });
 
 test("no session reads as signed out; an unavailable Worker is an error, never a session", async () => {
-  assert.equal(await workosSession({ base: "/terminus/", fetch: worker([{ status: 401 }]).fetch }).user(), null);
-  await assert.rejects(workosSession({ base: "/terminus/", fetch: worker([{ status: 503, body: { error: "identity_unavailable" } }]).fetch }).user(), SignInUnavailable);
+  assert.equal(await workosSession({ base: "/", fetch: worker([{ status: 401 }]).fetch }).user(), null);
+  await assert.rejects(workosSession({ base: "/", fetch: worker([{ status: 503, body: { error: "identity_unavailable" } }]).fetch }).user(), SignInUnavailable);
   let ended = 0;
-  const down = workosSession({ base: "/terminus/", fetch: worker([minted("t1"), { status: 503 }]).fetch, onGone: () => ended++ });
+  const down = workosSession({ base: "/", fetch: worker([minted("t1"), { status: 503 }]).fetch, onGone: () => ended++ });
   await down.getToken();
   assert.equal(await down.unauthorized(), false);
   assert.equal(ended, 0, "an outage does not sign the person out");
@@ -62,7 +62,7 @@ test("no session reads as signed out; an unavailable Worker is an error, never a
 
 test("another person behind the same cookie ends the session", async () => {
   let ended = 0;
-  const session = workosSession({ base: "/terminus/", fetch: worker([minted("t1"), minted("t2", 600, { ...user, user_id: "someone-else" })]).fetch, onGone: () => ended++ });
+  const session = workosSession({ base: "/", fetch: worker([minted("t1"), minted("t2", 600, { ...user, user_id: "someone-else" })]).fetch, onGone: () => ended++ });
   await session.getToken();
   assert.equal(await session.unauthorized(), false);
   assert.equal(ended, 1);
@@ -71,9 +71,21 @@ test("another person behind the same cookie ends the session", async () => {
 test("signing out here clears the Worker session and ends it", async () => {
   const w = worker([minted("t1"), { status: 200, body: { location: "https://api.workos.com/user_management/sessions/logout?session_id=s" } }]);
   let ended = 0;
-  const session = workosSession({ base: "/terminus/", fetch: w.fetch, onGone: () => ended++ });
+  const session = workosSession({ base: "/", fetch: w.fetch, onGone: () => ended++ });
   await session.getToken();
   await session.signOutLocal();
-  assert.equal(w.calls[1], "POST /terminus/auth/logout");
+  assert.equal(w.calls[1], "POST /auth/logout");
   assert.equal(ended, 1);
+});
+
+test("signing out in one tab ends the session in the others", async () => {
+  let ended = 0;
+  const here = workosSession({ base: "/", fetch: worker([minted("t1"), { status: 200, body: { location: null } }]).fetch });
+  const there = workosSession({ base: "/", fetch: worker([minted("t1")]).fetch, onGone: () => ended++ });
+  await here.getToken();
+  await there.getToken();
+  await here.signOutLocal();
+  for (let i = 0; i < 50 && ended === 0; i += 1) await new Promise((r) => setTimeout(r, 10));
+  assert.equal(ended, 1);
+  await assert.rejects(there.getToken(), /session ended/);
 });

@@ -1,5 +1,4 @@
 import History from "lucide-solid/icons/history";
-import Loader2 from "lucide-solid/icons/loader-2";
 import Plus from "lucide-solid/icons/plus";
 import SquarePen from "lucide-solid/icons/square-pen";
 import TriangleAlert from "lucide-solid/icons/triangle-alert";
@@ -35,8 +34,8 @@ import {
   applySidebarView,
   groupKey,
   groupLabel,
-  loadSidebarView,
-  saveSidebarView,
+  setSidebarView,
+  sidebarView,
   type SidebarGroup,
   type SidebarView,
 } from "../../lib/sidebarView";
@@ -46,6 +45,7 @@ import { flattenTasks, folderCounts } from "./sidebarTasks";
 import { machineName, machines } from "../machines/store";
 // Solo al crear un encargado: fuera de la carga inicial.
 import { LazyPart, retryableLazy } from "../../ui/LazyPart";
+import { Spinner } from "../../ui/Spinner";
 const NewAgent = retryableLazy(() => import("../projects/NewAgent"));
 
 // Fuera de la carga inicial: el botón y el dock llegan un instante después de la lista.
@@ -142,8 +142,11 @@ export default function Sidebar(props: {
   onAgentProfile: (project: string, name: string) => void;
   /** Dónde se guarda la vista del riel: una por workspace y espacio (`sidebarViewKey`). */
   viewKey: string;
-  /** Entrega el filtro del riel al botón Personalizar de la franja; `null` al desmontar. */
-  filterRef?: (filter: SidebarFilterProps | null) => void;
+  /**
+   * Entrega el filtro del riel al botón Personalizar de la franja; al desmontar,
+   * `null` con el que se suelta, para no borrar el de un riel que ya lo relevó.
+   */
+  filterRef?: (filter: SidebarFilterProps | null, released?: SidebarFilterProps) => void;
   /** El nombre del escritorio activo, para su riel vacío. */
   escritorio?: string | null;
   spaces?: { id: string; name: string }[];
@@ -201,12 +204,8 @@ export default function Sidebar(props: {
         : [...cerrados(), p],
     );
   // Cada espacio guarda su vista: cambiar de espacio relee la suya.
-  const [vista, setVista] = createSignal<SidebarView>(loadSidebarView(props.viewKey));
-  createEffect(on(() => props.viewKey, (key) => setVista(loadSidebarView(key)), { defer: true }));
-  const cambiarVista = (siguiente: SidebarView) => {
-    setVista(siguiente);
-    saveSidebarView(props.viewKey, siguiente);
-  };
+  const vista = () => sidebarView(props.viewKey);
+  const cambiarVista = (siguiente: SidebarView) => setSidebarView(props.viewKey, siguiente);
 
   createEffect(() => recordarCarpetas(props.projects));
 
@@ -331,14 +330,15 @@ export default function Sidebar(props: {
   const agentesDelFiltro = createMemo(() =>
     agentOptions(agentesDelDock().map((a) => a.name), todas().map((x) => x.row))
       .map((a) => ({ ...a, body: perfilDe(a.name)?.body, avatar: perfilDe(a.name)?.avatar })));
-  props.filterRef?.({
+  const filtro: SidebarFilterProps = {
     get view() { return vistaEfectiva(); },
     onChange: cambiarVista,
     get folders() { return carpetasDelFiltro(); },
     get agents() { return agentesDelFiltro(); },
     get machines() { return variasMaquinas(); },
-  });
-  onCleanup(() => props.filterRef?.(null));
+  };
+  props.filterRef?.(filtro);
+  onCleanup(() => props.filterRef?.(null, filtro));
 
   /**
    * A qué proyectos puede irse una tarea que hoy está en `de`.
@@ -436,11 +436,7 @@ export default function Sidebar(props: {
           />
         }
       >
-        <Loader2
-          size={14}
-          class="animate-spin justify-self-center text-neutral-500"
-          aria-hidden="true"
-        />
+        <Spinner size={14} class="justify-self-center text-neutral-500" />
       </Show>
       <span class="grid min-w-0">
         <span class="truncate text-[0.8125rem] font-medium text-neutral-500">

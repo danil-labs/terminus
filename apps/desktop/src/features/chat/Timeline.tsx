@@ -5,7 +5,6 @@ import FilePenLine from "lucide-solid/icons/file-pen-line";
 import FileText from "lucide-solid/icons/file-text";
 import Globe from "lucide-solid/icons/globe";
 import ListChecks from "lucide-solid/icons/list-checks";
-import Loader2 from "lucide-solid/icons/loader-circle";
 import Search from "lucide-solid/icons/search";
 import ShieldCheck from "lucide-solid/icons/shield-check";
 import SquareTerminal from "lucide-solid/icons/square-terminal";
@@ -28,6 +27,7 @@ import { cn } from "../../lib/utils";
 import { AnsiText } from "../../ui/AnsiText";
 import BloqueDeDiff from "./DiffBlock";
 import { balance, comparado } from "./diff";
+import { Spinner } from "../../ui/Spinner";
 
 /**
  * El carril de un tramo: una raya bajo el chevron de su cabecera y ningún
@@ -210,11 +210,7 @@ function FilaDePaso(props: {
           />
         }
       >
-        <Loader2
-          size={12}
-          class="shrink-0 animate-spin-steps text-primary"
-          aria-hidden="true"
-        />
+        <Spinner size={12} class="text-primary" />
       </Show>
       {/* En avisos, gasto y fin, resumen() coloca el mensaje entero en verbo y deja sujeto vacío. Impedir que verbo encoja o envuelva sacaría la prosa del ancho del hilo. */}
       <span

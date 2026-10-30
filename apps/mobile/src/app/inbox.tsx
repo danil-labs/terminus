@@ -15,7 +15,7 @@ export default function Inbox(){
  if(!customization.enabled('inbox'))return pathname.endsWith('/inbox')?<Redirect href={ALPHA_DEMO?'/?demo=1':'/'}/>:null;
  return <><Stack.Screen options={{title:t('alpha.title')}}/><ScrollView contentContainerStyle={{padding:16,gap:16,paddingBottom:40}}>
   <Text style={{color:theme.textMuted}}>{t(ALPHA_DEMO?'alpha.demo_notice':'alpha.real_notice')}</Text>
-  {!ALPHA_DEMO&&!inbox.consent&&<><Text style={text}>{t('alpha.intro')}</Text>{button(t('alpha.signin'),()=>void Linking.openURL(`${process.env.EXPO_PUBLIC_TERMINUS_WEB_BASE||'/terminus/'}sign-in?next=%2Fterminus%2Fm%2Finbox`))}</>}
+  {!ALPHA_DEMO&&!inbox.consent&&<><Text style={text}>{t('alpha.intro')}</Text>{button(t('alpha.signin'),()=>void Linking.openURL(`${process.env.EXPO_PUBLIC_TERMINUS_WEB_BASE||'/terminus/'}sign-in?next=${encodeURIComponent(`${process.env.EXPO_PUBLIC_TERMINUS_WEB_BASE||'/terminus/'}m/inbox`)}`))}</>}
   {!ALPHA_DEMO&&inbox.consent&&<View style={{gap:8}}>{button(t('alpha.refresh'),()=>void inbox.connect())}{inbox.accounts.map(row=><Row key={row.id} title={row.name} subtitle={t('alpha.select_account')} onPress={()=>void inbox.selectAccount(row)}/>)}</View>}
   {inbox.busy&&<Text accessibilityLiveRegion="polite" style={text}>{t('alpha.loading')}</Text>}
   {!!inbox.error&&<Text accessibilityRole="alert" style={text}>{t(inbox.error==='HTTP 403'?'alpha.forbidden':'alpha.load_error')}</Text>}

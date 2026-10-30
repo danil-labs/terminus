@@ -37,6 +37,7 @@ import { type OtherAccount, setCapabilities, type WebAccountsSource } from "../l
 import { deliver } from "../lib/serviceEvents";
 // In the page, not in the lazy app chunk: the stylesheet loads with the HTML.
 import "../styles/global.css";
+import "../lib/sharedClock";
 import { HomeLink } from "./HomeLink";
 import { installIpc } from "./ipc";
 import { webAccountProfile } from "./account";
@@ -113,6 +114,7 @@ const infoOf = (c: Computer): MachineInfo => {
     wakes: wakes(c),
     linked: linkedWorkspaces(c),
     features: serviceFeatures(c),
+    ...(c.host_version ? { version: c.host_version } : {}),
     ...(os ? { os } : {}),
   };
 };
@@ -553,7 +555,7 @@ function toPhone(): boolean {
 }
 
 if (import.meta.env.TERMINUS_ALPHA && window.location.pathname.replace(/\/+$/, "") === `${import.meta.env.BASE_URL}sign-in`) {
-  if (__TERMINUS_WEB__.workos) window.location.replace(authLocation(__TERMINUS_WEB__.login, window.location.origin, new URLSearchParams(window.location.search).get("next") ?? import.meta.env.BASE_URL));
+  if (__TERMINUS_WEB__.workos) window.location.replace(authLocation(`${import.meta.env.BASE_URL}auth`, window.location.origin, new URLSearchParams(window.location.search).get("next") ?? import.meta.env.BASE_URL));
   else void import("./attention/SignIn").then((m) => m.startSignIn(__TERMINUS_WEB__));
 } else if (import.meta.env.TERMINUS_ALPHA && !window.location.pathname.startsWith(`${import.meta.env.BASE_URL}m/`) && new URLSearchParams(window.location.search).get("demo") === "1") {
   void import("./attention/main").then((m) => m.startAttention(__TERMINUS_WEB__));

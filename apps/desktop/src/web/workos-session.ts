@@ -25,6 +25,8 @@ export function workosSession(options: { base?: string; onGone?: () => void; fet
   let invalidated = false;
   const watchers = new Set<(ended: boolean, userId?: string) => void>();
   const channel = typeof BroadcastChannel === "function" ? new BroadcastChannel(CHANNEL) : null;
+  // Node (the tests) keeps the process alive for an open channel; browsers have no `unref`.
+  (channel as { unref?: () => void } | null)?.unref?.();
   const gone = () => {
     if (invalidated) return;
     invalidated = true;
