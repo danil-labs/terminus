@@ -74,7 +74,7 @@ export default function AvisoDeCarpeta(props: {
   return (
     <Show when={atrasada() && descartada() !== clave()}>
       <Toast onDismiss={() => setDescartada(clave())}>
-        <p class="m-0 text-[0.8125rem] font-semibold">{t("kn.stale.title")}</p>
+        <p class="m-0 text-ui font-semibold">{t("kn.stale.title")}</p>
         <p class="m-0 text-xs text-neutral-500">{t("kn.stale.body")}</p>
         <div class="flex gap-1.5">
           <Button size="sm" disabled={actualizando()} onClick={() => void actualizar()}>

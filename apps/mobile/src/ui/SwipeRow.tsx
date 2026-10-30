@@ -1,3 +1,4 @@
+import { TEXT } from "@terminus/design";
 import type { ReactNode } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
 import ReanimatedSwipeable, { type SwipeableMethods } from "react-native-gesture-handler/ReanimatedSwipeable";
@@ -64,5 +65,5 @@ export function SwipeRow({ actions, children, testID }: { actions: SwipeAction[]
 const styles = StyleSheet.create({
   actions: { flexDirection: "row" },
   action: { width: 84, alignItems: "center", justifyContent: "center", gap: 4 },
-  label: { color: "#ffffff", fontSize: 13, fontWeight: "600" },
+  label: { color: "#ffffff", fontSize: TEXT.ui, fontWeight: "600" },
 });

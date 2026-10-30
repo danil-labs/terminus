@@ -81,27 +81,10 @@ fn tipo_de(path: &Path) -> &'static str {
     }
 }
 
-fn decodificar(s: &str) -> Option<String> {
-    let bytes = s.as_bytes();
-    let mut salida = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'%' {
-            let par = s.get(i + 1..i + 3)?;
-            salida.push(u8::from_str_radix(par, 16).ok()?);
-            i += 3;
-        } else {
-            salida.push(bytes[i]);
-            i += 1;
-        }
-    }
-    String::from_utf8(salida).ok()
-}
-
 /// Un tramo de ruta que no puede salir de su carpeta: ni `..`, ni separadores
 /// escondidos tras `%2F`, ni `C:` o `a:b` (unidad o flujo alterno en Windows).
 fn tramo(crudo: &str) -> Option<String> {
-    let t = decodificar(crudo)?;
+    let t = crate::util::decodificar(crudo)?;
     let valido = !t.is_empty()
         && t != "."
         && t != ".."

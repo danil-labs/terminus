@@ -41,7 +41,7 @@ export function SettingsSection(props: SettingsSectionProps) {
         </header>
       </Show>
       <Show when={description()}>
-        <p class="m-0 text-[0.8125rem] leading-[19px] text-neutral-500">{description()}</p>
+        <p class="m-0 text-ui leading-[19px] text-neutral-500">{description()}</p>
       </Show>
       <div class="grid min-w-0">{own.children}</div>
     </section>
@@ -85,7 +85,7 @@ export function SettingsRow(props: SettingsRowProps) {
             <div class="min-w-0 text-sm">{own.label}</div>
           </Show>
           <Show when={description()}>
-            <div class="min-w-0 text-[0.8125rem] leading-[19px] text-neutral-500">
+            <div class="min-w-0 text-ui leading-[19px] text-neutral-500">
               {description()}
             </div>
           </Show>

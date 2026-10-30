@@ -102,14 +102,14 @@ export function EmailsSection(props: { source: AccountEmailsSource; onPrimaryCha
         </Match>
         <Match when={list.state === "errored"}>
           <div class="flex items-center gap-3 border-b border-border py-3.5">
-            <p class="m-0 flex-1 text-[0.8125rem] text-neutral-950">{t("danil.emails.load_failed")}</p>
+            <p class="m-0 flex-1 text-ui text-neutral-950">{t("danil.emails.load_failed")}</p>
             <Button size="sm" variant="secondary" onClick={() => void refetch()}>
               {t("danil.emails.retry")}
             </Button>
           </div>
         </Match>
         <Match when={ready() && rows().length === 0}>
-          <p class="m-0 border-b border-border py-3.5 text-[0.8125rem] text-neutral-500">{t("danil.emails.empty")}</p>
+          <p class="m-0 border-b border-border py-3.5 text-ui text-neutral-500">{t("danil.emails.empty")}</p>
         </Match>
         <Match when={rows().length > 0}>
           <ul class="m-0 grid list-none p-0">
@@ -171,7 +171,7 @@ export function EmailsSection(props: { source: AccountEmailsSource; onPrimaryCha
             submitDraft();
           }}
         >
-          <label class="grid gap-1.5 text-[0.8125rem] text-neutral-500">
+          <label class="grid gap-1.5 text-ui text-neutral-500">
             {t("danil.emails.new_label")}
             <Input
               ref={draftInput}
@@ -198,7 +198,7 @@ export function EmailsSection(props: { source: AccountEmailsSource; onPrimaryCha
             }
           >
             {(text) => (
-              <p id="account-email-draft-error" role="alert" class="m-0 text-[0.8125rem] text-neutral-950">
+              <p id="account-email-draft-error" role="alert" class="m-0 text-ui text-neutral-950">
                 {text()}
               </p>
             )}
@@ -228,7 +228,7 @@ export function EmailsSection(props: { source: AccountEmailsSource; onPrimaryCha
         {(f) => (
           <p
             role={f().kind === "success" ? "status" : "alert"}
-            class="m-0 pt-3 text-[0.8125rem] text-neutral-950"
+            class="m-0 pt-3 text-ui text-neutral-950"
             data-account-emails-feedback={f().kind}
           >
             {f().text}
@@ -308,7 +308,7 @@ function EmailItem(props: ItemProps) {
               <Badge tone="warning">{t("danil.emails.unconfirmed")}</Badge>
             </Show>
           </div>
-          <div class="min-w-0 truncate text-[0.8125rem] text-neutral-500">{subtitle()}</div>
+          <div class="min-w-0 truncate text-ui text-neutral-500">{subtitle()}</div>
         </div>
         <Show when={!props.row.primary && !confirming()}>
           <div class="flex shrink-0 items-center gap-1">
@@ -354,8 +354,8 @@ function EmailItem(props: ItemProps) {
 
       <Show when={confirming() === "primary"}>
         <div class="grid gap-2 rounded-md border border-border bg-surface-muted p-3" data-email-confirm="">
-          <p class="m-0 text-[0.8125rem] font-semibold text-neutral-950">{t("danil.emails.primary_confirm", { email: email() })}</p>
-          <p class="m-0 text-[0.8125rem] text-neutral-500">{t("danil.emails.primary_confirm_hint")}</p>
+          <p class="m-0 text-ui font-semibold text-neutral-950">{t("danil.emails.primary_confirm", { email: email() })}</p>
+          <p class="m-0 text-ui text-neutral-500">{t("danil.emails.primary_confirm_hint")}</p>
           <div class="flex items-center gap-2">
             <Button
               size="sm"
@@ -373,8 +373,8 @@ function EmailItem(props: ItemProps) {
 
       <Show when={confirming() === "remove"}>
         <div class="grid gap-2 rounded-md border border-border bg-surface-muted p-3" data-email-confirm="">
-          <p class="m-0 text-[0.8125rem] font-semibold text-neutral-950">{t("danil.emails.remove_confirm", { email: email() })}</p>
-          <p class="m-0 text-[0.8125rem] text-neutral-500">{t("danil.emails.remove_confirm_hint")}</p>
+          <p class="m-0 text-ui font-semibold text-neutral-950">{t("danil.emails.remove_confirm", { email: email() })}</p>
+          <p class="m-0 text-ui text-neutral-500">{t("danil.emails.remove_confirm_hint")}</p>
           <div class="flex items-center gap-2">
             <Button
               size="sm"
@@ -462,7 +462,7 @@ function CodeForm(props: {
         void confirm();
       }}
     >
-      <label class="grid gap-1.5 text-[0.8125rem] text-neutral-700">
+      <label class="grid gap-1.5 text-ui text-neutral-700">
         <span>{t("danil.emails.code_prompt", { email: props.email })}</span>
         <Input
           ref={input}
@@ -486,7 +486,7 @@ function CodeForm(props: {
       </label>
       <Show when={error()}>
         {(text) => (
-          <p id={errorId} role="alert" class="m-0 text-[0.8125rem] text-neutral-950">
+          <p id={errorId} role="alert" class="m-0 text-ui text-neutral-950">
             {text()}
           </p>
         )}

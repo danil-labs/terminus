@@ -27,7 +27,7 @@ export default function NextSteps(props: {
             <button
               type="button"
               class={cn(
-                "flex w-full min-w-0 items-start gap-2 rounded-md border border-border bg-transparent px-2.5 py-1.5 text-left text-[13px] leading-[1.45] text-neutral-700 transition-colors duration-150 outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+                "flex w-full min-w-0 items-start gap-2 rounded-md border border-border bg-transparent px-2.5 py-1.5 text-left text-ui leading-[1.45] text-neutral-700 transition-colors duration-150 outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
                 "enabled:hover:border-border-strong enabled:hover:bg-surface-muted enabled:hover:text-neutral-950",
                 "disabled:cursor-default disabled:text-neutral-500",
                 usada() && "opacity-60",

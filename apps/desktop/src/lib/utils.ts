@@ -1,5 +1,9 @@
 import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { TEXT_STEPS } from "@terminus/design";
+import { extendTailwindMerge } from "tailwind-merge";
+
+// Sin esto `text-caption` se lee como color y borra el `text-*` de color de al lado.
+const twMerge = extendTailwindMerge({ extend: { theme: { text: TEXT_STEPS } } });
 
 /**
  * Compone clases resolviendo conflictos: la última gana. Sin esto,

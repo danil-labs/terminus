@@ -1,6 +1,6 @@
 /**
  * Qué hay instalado, según Rust. Espeja `src-tauri/src/environment/env.rs`; el tipo lo
- * consumen `Setup.tsx`, `Environment.tsx` y `RequirementRow.tsx`.
+ * consumen `Setup.tsx` y `Environment.tsx`.
  */
 
 export type Requirement = {

@@ -98,7 +98,7 @@ function Insignia(props: { puesta: boolean; children: JSX.Element }) {
     <span
       aria-hidden="true"
       class={cn(
-        "inline-flex size-5 shrink-0 items-center justify-center rounded-full border text-[0.6875rem] font-semibold tabular-nums transition-colors duration-150 ease-out",
+        "inline-flex size-5 shrink-0 items-center justify-center rounded-full border text-caption font-semibold tabular-nums transition-colors duration-150 ease-out",
         props.puesta
           ? "border-neutral-950 bg-neutral-950 text-surface-raised"
           : "border-border-strong text-neutral-500",

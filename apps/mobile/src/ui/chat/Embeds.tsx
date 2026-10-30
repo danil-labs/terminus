@@ -1,3 +1,4 @@
+import { RADIUS, TEXT } from "@terminus/design";
 import { envolver } from "@terminus/chat/sandbox";
 import type { FilePreview } from "@terminus/protocol";
 import { useEffect, useMemo, useState } from "react";
@@ -30,7 +31,7 @@ function useLoad<T>(key: string | null, load: () => Promise<T>): { value: T | nu
 
 function Muted({ children }: { children: string }) {
   const theme = useTheme();
-  return <Text style={{ color: theme.textMuted, fontSize: 13 }}>{children}</Text>;
+  return <Text style={{ color: theme.textMuted, fontSize: TEXT.ui }}>{children}</Text>;
 }
 
 /**
@@ -79,7 +80,7 @@ export function ChatVisual({ file, title }: { file: string; title: string }) {
             <Text numberOfLines={1} style={{ color: theme.text, fontWeight: "600" }}>
               {name}
             </Text>
-            {opened ? null : <Text style={{ color: theme.textMuted, fontSize: 12 }}>{t("chat.visual.load")}</Text>}
+            {opened ? null : <Text style={{ color: theme.textMuted, fontSize: TEXT.label }}>{t("chat.visual.load")}</Text>}
           </View>
           {opened ? <ActivityIndicator size="small" color={theme.textMuted} /> : <Icon name="maximize-2" size={16} color={theme.textMuted} />}
         </Pressable>
@@ -171,7 +172,7 @@ export function LocalFile({ path, alt }: { path: string; alt?: string }) {
           <Text numberOfLines={1} style={{ color: theme.text, fontWeight: "600" }}>
             {alt && alt !== name ? alt : name}
           </Text>
-          <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: 12 }}>
+          <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: TEXT.label }}>
             {path}
           </Text>
         </View>
@@ -212,7 +213,7 @@ function FileBody({ preview, failed }: { preview: FilePreview | null; failed: bo
 
 const styles = StyleSheet.create({
   block: { alignSelf: "stretch", marginVertical: 4, gap: 4 },
-  caption: { fontSize: 12, fontWeight: "600" },
+  caption: { fontSize: TEXT.label, fontWeight: "600" },
   loading: { alignSelf: "flex-start", marginVertical: 8 },
   image: { width: "100%", borderRadius: 10 },
   viewer: { flex: 1, backgroundColor: "rgba(0,0,0,0.92)", justifyContent: "center" },
@@ -223,5 +224,5 @@ const styles = StyleSheet.create({
   hidden: { position: "absolute", left: 0, right: 0, top: 0, opacity: 0 },
   sheet: { flex: 1, padding: 16, gap: 12 },
   sheetTop: { flexDirection: "row", alignItems: "center", gap: 12 },
-  mono: { fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }), fontSize: 12.5, lineHeight: 18, padding: 10, borderRadius: 8 },
+  mono: { fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }), fontSize: 12.5, lineHeight: 18, padding: 10, borderRadius: RADIUS.lg },
 });

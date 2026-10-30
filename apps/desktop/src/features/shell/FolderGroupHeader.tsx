@@ -66,7 +66,7 @@ export default function FolderGroupHeader(pp: {
       data-folder-group={p().id}
       data-folder-machine={pp.maquina}
       class={cn(
-        "group grid min-w-0 grid-cols-[20px_minmax(0,1fr)_auto_auto] items-center rounded-[var(--radius-sm)]",
+        "group grid min-w-0 grid-cols-[20px_minmax(0,1fr)_auto_auto] items-center rounded-sm",
         recibiendo() && RECIBE_LA_TAREA,
       )}
       data-destino={p().id}
@@ -92,7 +92,7 @@ export default function FolderGroupHeader(pp: {
         fallback={
           <SidebarMenuButton
             data-folder-open=""
-            class="h-7 min-h-7 grid-cols-[minmax(0,1fr)_auto] text-[0.75rem] font-semibold"
+            class="h-7 min-h-7 grid-cols-[minmax(0,1fr)_auto] text-label font-semibold"
             isActive={pp.proyectoAbierto === p().id}
             selectionMark={false}
             onDblClick={() => { setNombre(p().name); setRenombrando(true); }}
@@ -114,7 +114,7 @@ export default function FolderGroupHeader(pp: {
         }
       >
         <form
-          class="grid h-7 min-w-0 grid-cols-[minmax(0,1fr)] items-center gap-0.5 rounded-[var(--radius-sm)] bg-neutral-200 px-2 text-[0.75rem] font-semibold"
+          class="grid h-7 min-w-0 grid-cols-[minmax(0,1fr)] items-center gap-0.5 rounded-sm bg-neutral-200 px-2 text-label font-semibold"
           onSubmit={(e) => {
             e.preventDefault();
             const n = nombre().trim();
@@ -126,7 +126,7 @@ export default function FolderGroupHeader(pp: {
           <Input
             ref={enfocarYSeleccionar}
             variant="ghost"
-            class="block h-auto min-h-0 rounded-none border-0 p-0 font-sans text-[0.75rem] leading-[1.25] text-inherit [font-weight:inherit]"
+            class="block h-auto min-h-0 rounded-none border-0 p-0 font-sans text-label leading-[1.25] text-inherit [font-weight:inherit]"
             maxlength={PROJECT_NAME_MAX_LENGTH}
             value={nombre()}
             aria-label={t("shell.sidebar.rename_label", { name: p().name })}

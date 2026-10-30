@@ -624,11 +624,11 @@ export default function Almacenamiento(props: {
         when={props.trabajando.includes(props2.session)}
         fallback={
           <Show when={props.conPestana.includes(props2.session)}>
-            <Badge class="px-1.5 py-0 text-[0.625rem]">{t("shell.storage.state.open_tab")}</Badge>
+            <Badge class="px-1.5 py-0 text-2xs">{t("shell.storage.state.open_tab")}</Badge>
           </Show>
         }
       >
-        <Badge tone="success" class="px-1.5 py-0 text-[0.625rem]">{t("shell.storage.state.working")}</Badge>
+        <Badge tone="success" class="px-1.5 py-0 text-2xs">{t("shell.storage.state.working")}</Badge>
       </Show>
       </Show>
     );
@@ -661,7 +661,7 @@ export default function Almacenamiento(props: {
               <span class="block truncate text-xs font-medium text-neutral-950">
                 {props2.t.tarea}
               </span>
-              <span class="flex min-w-0 items-center gap-1.5 text-[0.6875rem] text-neutral-500">
+              <span class="flex min-w-0 items-center gap-1.5 text-caption text-neutral-500">
                 <Show when={props2.conProyecto && props2.t.proyecto}>
                   {(p) => <span class="truncate">{p()}</span>}
                 </Show>
@@ -712,11 +712,11 @@ export default function Almacenamiento(props: {
                     >
                       {nombreBloque(b)}
                     </span>
-                    <span class="block truncate font-mono text-[0.625rem] text-neutral-500">
+                    <span class="block truncate font-mono text-2xs text-neutral-500">
                       {b.rel}
                     </span>
                   </span>
-                  <span class="shrink-0 font-mono text-[0.6875rem] tabular-nums text-neutral-500">
+                  <span class="shrink-0 font-mono text-caption tabular-nums text-neutral-500">
                     {peso(b.bytes)}
                   </span>
                   {/* Solo lo recuperable lleva botón. Un bloque de fuente o de
@@ -742,7 +742,7 @@ export default function Almacenamiento(props: {
             <li class="flex flex-wrap items-center gap-2 pt-1.5">
               <button
                 type="button"
-                class="flex items-center gap-1.5 rounded-md border border-border-strong bg-surface px-2 py-1 text-[0.6875rem] font-medium text-neutral-950 outline-none hover:bg-surface-muted focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
+                class="flex items-center gap-1.5 rounded-md border border-border-strong bg-surface px-2 py-1 text-caption font-medium text-neutral-950 outline-none hover:bg-surface-muted focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
                 disabled={!selected()?.active}
                 onClick={() => abrirTarea(props2.t)}
               >
@@ -752,7 +752,7 @@ export default function Almacenamiento(props: {
               <Show when={tirables().length}>
                 <button
                   type="button"
-                  class="flex items-center gap-1.5 rounded-md border border-warning-strong/40 bg-warning/10 px-2 py-1 text-[0.6875rem] font-medium text-warning-strong outline-none hover:bg-warning/20 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary disabled:opacity-60"
+                  class="flex items-center gap-1.5 rounded-md border border-warning-strong/40 bg-warning/10 px-2 py-1 text-caption font-medium text-warning-strong outline-none hover:bg-warning/20 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary disabled:opacity-60"
                   disabled={!canClean()}
                   onClick={vaciarTodo}
                 >
@@ -768,12 +768,12 @@ export default function Almacenamiento(props: {
                 que no hace nada y no dice por qué manda a pulsarlo otra vez. */}
             <Show when={fallo()[clave()]}>
               {(f) => (
-                <li class="py-0.5 text-[0.6875rem] text-warning-strong">{f()}</li>
+                <li class="py-0.5 text-caption text-warning-strong">{f()}</li>
               )}
             </Show>
             <Show when={liberado()[clave()]}>
               {(l) => (
-                <li class="py-0.5 text-[0.6875rem] text-neutral-500">{l()}</li>
+                <li class="py-0.5 text-caption text-neutral-500">{l()}</li>
               )}
             </Show>
           </ul>
@@ -799,12 +799,12 @@ export default function Almacenamiento(props: {
           </Show>
           <Folder size={12} class="shrink-0 text-neutral-500" aria-hidden />
           <span class="truncate text-xs font-semibold text-neutral-950">{props2.g.nombre}</span>
-          <span class="shrink-0 text-[0.6875rem] text-neutral-500">
+          <span class="shrink-0 text-caption text-neutral-500">
             {t("shell.storage.group.tasks", { count: props2.g.tareas.length })}
           </span>
           <span class="ml-auto flex shrink-0 items-center gap-2">
             <Show when={props2.g.recuperable > 0}>
-              <span class="text-[0.6875rem] text-warning-strong">
+              <span class="text-caption text-warning-strong">
                 {t("shell.storage.group.reclaimable", { size: peso(props2.g.recuperable) })}
               </span>
             </Show>
@@ -834,18 +834,18 @@ export default function Almacenamiento(props: {
     const used = () => props2.disk.total_bytes - props2.disk.free_bytes;
     return (
       <div class="mt-2">
-        <p class="m-0 truncate text-[0.6875rem] text-neutral-500">{t("shell.storage.engine_data")}</p>
+        <p class="m-0 truncate text-caption text-neutral-500">{t("shell.storage.engine_data")}</p>
         <Show when={comparable(props2.disk)} fallback={<p class="m-0 text-xs text-neutral-500">{t("shell.storage.capacity_unavailable")}</p>}>
           <ProgressBar class="my-1.5 h-2 border border-neutral-500" value={used()} max={props2.disk.total_bytes}
             label={t("shell.storage.disk_aria", { used: peso(used()), free: peso(props2.disk.free_bytes), total: peso(props2.disk.total_bytes) })}
             barClass="bg-neutral-500" />
-          <p class="m-0 flex flex-wrap gap-x-3 text-[0.6875rem] text-neutral-500">
+          <p class="m-0 flex flex-wrap gap-x-3 text-caption text-neutral-500">
             <span>{t("shell.storage.disk_used", { size: peso(used()) })}</span>
             <span>{t("shell.storage.disk_free", { size: peso(props2.disk.free_bytes) })}</span>
             <span>{t("shell.storage.disk_total", { size: peso(props2.disk.total_bytes) })}</span>
           </p>
           <Show when={props2.disk.available_bytes !== props2.disk.free_bytes}>
-            <p class="m-0 mt-1 text-[0.6875rem] text-neutral-500">{t("shell.storage.disk_available", { size: peso(props2.disk.available_bytes) })}</p>
+            <p class="m-0 mt-1 text-caption text-neutral-500">{t("shell.storage.disk_available", { size: peso(props2.disk.available_bytes) })}</p>
           </Show>
         </Show>
       </div>
@@ -864,12 +864,12 @@ export default function Almacenamiento(props: {
             <Show when={resources().error}>
               <p role="alert" class="m-0 mt-1 text-xs text-warning-strong">{resources().error === "measurement_failed" ? t("shell.storage.measurement_failed") : t("shell.storage.unsupported")}</p>
             </Show>
-            <p class="m-0 mt-1 text-[0.6875rem] text-neutral-500">{resources().error ? t("shell.storage.attempted", { when: haceCuanto(resources().measured_at) }) : t("shell.storage.measured", { when: haceCuanto(resources().measured_at) })}</p>
+            <p class="m-0 mt-1 text-caption text-neutral-500">{resources().error ? t("shell.storage.attempted", { when: haceCuanto(resources().measured_at) }) : t("shell.storage.measured", { when: haceCuanto(resources().measured_at) })}</p>
             <For each={resources().storage}>{(disk) => <Disk disk={disk} />}</For>
             <Show when={resources().storage.length === 0 && !resources().error}><p class="m-0 mt-1 text-xs text-neutral-500">{t("shell.storage.capacity_unavailable")}</p></Show>
           </>}
         </Show>
-        <p class="m-0 mt-2 text-[0.6875rem] text-neutral-500">{t("shell.storage.attribution_unknown")}</p>
+        <p class="m-0 mt-2 text-caption text-neutral-500">{t("shell.storage.attribution_unknown")}</p>
       </>
     );
   }
@@ -910,7 +910,7 @@ export default function Almacenamiento(props: {
                 <p role="status" class="m-0 mt-1 text-xs text-warning-strong">{t("shell.storage.incomplete")} {datos()?.aviso}</p>
               </Show>
               <Show when={datos()}>
-                <p class="m-0 mt-1 text-[0.6875rem] text-neutral-500">{t("shell.storage.measured", { when: haceCuanto(datos()!.medido_en) })}</p>
+                <p class="m-0 mt-1 text-caption text-neutral-500">{t("shell.storage.measured", { when: haceCuanto(datos()!.medido_en) })}</p>
                 <Show when={!m().on || !!readError() || Date.now() - datos()!.medido_en > 300_000}>
                   <p role="status" class="m-0 mt-1 text-xs text-warning-strong">{t("shell.storage.stale")}</p>
                 </Show>
@@ -923,7 +923,7 @@ export default function Almacenamiento(props: {
               <span class="font-mono text-lg font-semibold tabular-nums text-neutral-950">
                 {peso(datos()?.bytes ?? 0)}
               </span>
-              <span class="text-[0.6875rem] text-neutral-500">
+              <span class="text-caption text-neutral-500">
                 {t("shell.storage.in_tasks", { count: cuantasTareas() })}
               </span>
             </p>
@@ -931,7 +931,7 @@ export default function Almacenamiento(props: {
               <span class="h-full bg-warning-strong/80" style={{ width: `${fraccionRecuperable() * 100}%` }} />
               <span class="h-full flex-1 bg-neutral-500/45" />
             </span>
-            <p class="m-0 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[0.6875rem]">
+            <p class="m-0 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-caption">
               <span class="flex items-center gap-1 font-medium text-warning-strong">
                 <span class="size-1.5 rounded-full bg-warning-strong" aria-hidden />
                 {t("shell.storage.reclaimable", { size: peso(datos()?.recuperable ?? 0) })}
@@ -954,7 +954,7 @@ export default function Almacenamiento(props: {
                   <button
                     type="button"
                     class={cn(
-                      "rounded-sm px-2 py-0.5 text-[0.6875rem] outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary",
+                      "rounded-sm px-2 py-0.5 text-caption outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary",
                       vista() === v
                         ? "bg-surface font-medium text-neutral-950 shadow-sm"
                         : "text-neutral-500 hover:text-neutral-950",
@@ -997,16 +997,16 @@ export default function Almacenamiento(props: {
               <Show when={(datos()?.archivadas?.cuantas ?? 0) > 0}>
                 <section class="mt-1 border-t border-border px-1.5 py-2">
                   <div class="flex items-center gap-2">
-                    <span class="min-w-0 flex-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-neutral-500">
+                    <span class="min-w-0 flex-1 text-caption font-semibold uppercase tracking-wide text-neutral-500">
                       {t("shell.storage.archived", {
                         n: datos()?.archivadas?.cuantas ?? 0,
                       })}
                     </span>
-                    <span class="shrink-0 font-mono text-[0.6875rem] tabular-nums text-neutral-500">
+                    <span class="shrink-0 font-mono text-caption tabular-nums text-neutral-500">
                       {peso(datos()?.archivadas?.bytes ?? 0)}
                     </span>
                   </div>
-                  <p class="m-0 mt-0.5 text-[0.6875rem] text-neutral-500">
+                  <p class="m-0 mt-0.5 text-caption text-neutral-500">
                     {t("shell.storage.archived.why")}
                   </p>
                 </section>
@@ -1019,7 +1019,7 @@ export default function Almacenamiento(props: {
             <section class="border-t border-border">
               <button
                 type="button"
-                class="flex w-full items-center gap-1.5 px-1.5 py-2 text-left text-[0.6875rem] font-semibold uppercase tracking-wide text-neutral-500 outline-none hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
+                class="flex w-full items-center gap-1.5 px-1.5 py-2 text-left text-caption font-semibold uppercase tracking-wide text-neutral-500 outline-none hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
                 aria-expanded={compartidoAbierto()}
                 onClick={() => setCompartidoAbierto((v) => !v)}
               >
@@ -1045,10 +1045,10 @@ export default function Almacenamiento(props: {
                   <For each={datos()?.compartido ?? []}>
                     {(s) => (
                       <li class="flex min-w-0 items-center gap-2 py-0.5">
-                        <span class="min-w-0 flex-1 truncate text-[0.6875rem] text-neutral-500">
+                        <span class="min-w-0 flex-1 truncate text-caption text-neutral-500">
                           {s.etiqueta}
                         </span>
-                        <span class="shrink-0 font-mono text-[0.6875rem] tabular-nums text-neutral-500">
+                        <span class="shrink-0 font-mono text-caption tabular-nums text-neutral-500">
                           {peso(s.bytes)}
                         </span>
                         <Show when={s.rel}>
@@ -1081,12 +1081,12 @@ export default function Almacenamiento(props: {
             <Show when={datos()?.sueltos.length}>
               <section class="border-t border-border px-1.5 py-2">
                 <div class="flex items-center gap-2">
-                  <span class="min-w-0 flex-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-neutral-500">
+                  <span class="min-w-0 flex-1 text-caption font-semibold uppercase tracking-wide text-neutral-500">
                     {t("shell.storage.orphans", {
                       n: datos()?.sueltos.length ?? 0,
                     })}
                   </span>
-                  <span class="shrink-0 font-mono text-[0.6875rem] tabular-nums text-neutral-500">
+                  <span class="shrink-0 font-mono text-caption tabular-nums text-neutral-500">
                     {peso((datos()?.sueltos ?? []).reduce((n, s) => n + s.bytes, 0))}
                   </span>
                   <Accion
@@ -1098,7 +1098,7 @@ export default function Almacenamiento(props: {
                     <Trash2 size={12} />
                   </Accion>
                 </div>
-                <p class="m-0 mt-0.5 text-[0.6875rem] text-neutral-500">
+                <p class="m-0 mt-0.5 text-caption text-neutral-500">
                   {t("shell.storage.orphans.why")}
                 </p>
               </section>
@@ -1164,7 +1164,7 @@ export default function Almacenamiento(props: {
             {t("shell.machine_panel.title")}
           </h2>
           <span class="flex items-center gap-1">
-            <span class="font-mono text-[0.6875rem] tabular-nums text-neutral-500">
+            <span class="font-mono text-caption tabular-nums text-neutral-500">
               {clearing()
                 ? t("shell.storage.emptying")
                 : midiendo()

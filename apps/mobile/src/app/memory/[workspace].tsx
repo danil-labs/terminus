@@ -1,3 +1,4 @@
+import { RADIUS, TEXT } from "@terminus/design";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -253,11 +254,11 @@ export default function MemoryScreen() {
         ) : (
           items.map((item) => (
             <View key={item.path} testID={`memory-entry-${item.file}`} style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-              <Text style={{ color: theme.text, fontSize: 15 }}>{item.body}</Text>
-              <Text style={{ color: theme.textMuted, fontSize: 12 }}>
+              <Text style={{ color: theme.text, fontSize: TEXT.lead }}>{item.body}</Text>
+              <Text style={{ color: theme.textMuted, fontSize: TEXT.label }}>
                 {[item.type, item.agent ?? t("memory.person"), when(item.modified), item.file].filter(Boolean).join(" · ")}
               </Text>
-              {item.conflictOf ? <Text style={{ color: theme.approving, fontSize: 12, fontWeight: "600" }}>{t("memory.conflict_badge", { file: item.conflictOf })}</Text> : null}
+              {item.conflictOf ? <Text style={{ color: theme.approving, fontSize: TEXT.label, fontWeight: "600" }}>{t("memory.conflict_badge", { file: item.conflictOf })}</Text> : null}
               <View style={styles.actions}>
                 <Pressable testID={`memory-history-${item.file}`} style={styles.link} onPress={() => void openHistory(item)}>
                   <Icon name="clock" size={14} color={theme.textMuted} />
@@ -284,11 +285,11 @@ export default function MemoryScreen() {
                   ) : (
                     history.versions.map((v, i) => (
                       <Pressable key={v.commit} testID={`memory-version-${v.commit}`} onPress={() => void openVersion(item.path, v)} style={[styles.version, { borderColor: theme.border }]}>
-                        <Text style={{ color: theme.text, fontSize: 13, fontWeight: "600" }}>
+                        <Text style={{ color: theme.text, fontSize: TEXT.ui, fontWeight: "600" }}>
                           {[v.author.name || v.author.email, when(v.at), i === 0 ? t("memory.history_current") : null].filter(Boolean).join(" · ")}
                         </Text>
-                        <Text style={{ color: theme.textMuted, fontSize: 12 }}>{v.oid ? v.message : t("memory.history_deleted")}</Text>
-                        {history.open === v.commit && history.text !== null ? <Text style={{ color: theme.text, fontSize: 13 }}>{history.text}</Text> : null}
+                        <Text style={{ color: theme.textMuted, fontSize: TEXT.label }}>{v.oid ? v.message : t("memory.history_deleted")}</Text>
+                        {history.open === v.commit && history.text !== null ? <Text style={{ color: theme.text, fontSize: TEXT.ui }}>{history.text}</Text> : null}
                       </Pressable>
                     ))
                   )}
@@ -307,7 +308,7 @@ const styles = StyleSheet.create({
   chips: { gap: 8, paddingVertical: 4 },
   chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth },
   card: { padding: 12, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, gap: 6 },
-  input: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 15 },
+  input: { borderWidth: StyleSheet.hairlineWidth, borderRadius: RADIUS.lg, paddingHorizontal: 10, paddingVertical: 8, fontSize: TEXT.lead },
   body: { minHeight: 110, textAlignVertical: "top" },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: 14, alignItems: "center" },
   button: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, borderWidth: 1, alignItems: "center" },

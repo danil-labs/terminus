@@ -10,7 +10,7 @@ import {
   type InboxFilter,
   matchesFilter,
 } from "../../../../packages/attention/src/inbox.ts";
-import { MOBILE_WEB_DIR } from "@terminus/design";
+import { MOBILE_WEB_DIR, RADIUS, TEXT } from "@terminus/design";
 import { ALPHA_DEMO, WEB_BASE } from "../lib/alpha-mode";
 import { useCustomization } from "../lib/customization";
 import { useHomeLabel } from "../lib/homeLabel";
@@ -70,7 +70,7 @@ export default function Inbox() {
           <View ref={menu.ref} collapsable={false}>
             <Tap testID="inbox-channels" accessibilityRole="button" onPress={() => void menu.open()} style={[styles.channels, { backgroundColor: theme.surface, borderColor: theme.border }]}>
               <View style={[styles.dot, { backgroundColor: channel ? theme.merged : CHANNEL_COLORS.whatsapp }]} />
-              <Text numberOfLines={1} style={{ color: theme.text, fontSize: 15, fontWeight: "500", flexShrink: 1 }}>{channel ?? w("web.alpha.all_channels")}</Text>
+              <Text numberOfLines={1} style={{ color: theme.text, fontSize: TEXT.lead, fontWeight: "500", flexShrink: 1 }}>{channel ?? w("web.alpha.all_channels")}</Text>
               <Icon name="chevron-down" size={14} color={theme.textMuted} />
             </Tap>
           </View>
@@ -81,7 +81,7 @@ export default function Inbox() {
         <LargeTitle note={
           <View style={styles.note}>
             <Icon name="file-text" size={13} color={theme.textMuted} />
-            <Text style={{ color: theme.textMuted, fontSize: 13 }}>{w("web.alpha.ai_read_only")}</Text>
+            <Text style={{ color: theme.textMuted, fontSize: TEXT.ui }}>{w("web.alpha.ai_read_only")}</Text>
           </View>
         }>{w("search.chip.inbox")}</LargeTitle>
 
@@ -124,10 +124,10 @@ export default function Inbox() {
                     <View style={{ gap: 3 }}>
                       <View style={styles.line}>
                         {row.channel_name ? <Text style={[styles.channelTag, { color: theme.text, backgroundColor: theme.muted }]}>{row.channel_name}</Text> : null}
-                        <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: 13, flexShrink: 1 }}>{contactSubIdentifier(row) ?? ""}</Text>
+                        <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: TEXT.ui, flexShrink: 1 }}>{contactSubIdentifier(row) ?? ""}</Text>
                       </View>
                       <View style={styles.line}>
-                        <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: 14, flex: 1 }}>{row.last_message || t("alpha.no_text")}</Text>
+                        <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: TEXT.body, flex: 1 }}>{row.last_message || t("alpha.no_text")}</Text>
                         {row.unread_count > 0 ? <View style={[styles.unread, { backgroundColor: theme.merged }]}><Text style={styles.unreadText}>{row.unread_count}</Text></View> : null}
                       </View>
                       {conversationLabels(row).length ? <View style={styles.line}>{conversationLabels(row).map((label) => <LabelTag key={label} label={label} theme={theme} />)}</View> : null}
@@ -161,9 +161,9 @@ const styles = StyleSheet.create({
   avatar: { alignItems: "center", justifyContent: "center" },
   channelDot: { position: "absolute", right: -1, bottom: -1, width: 13, height: 13, borderRadius: 7, borderWidth: 2 },
   line: { flexDirection: "row", alignItems: "center", gap: 6 },
-  channelTag: { fontSize: 11.5, fontWeight: "600", paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, overflow: "hidden" },
+  channelTag: { fontSize: 11.5, fontWeight: "600", paddingHorizontal: 5, paddingVertical: 1, borderRadius: RADIUS.sm, overflow: "hidden" },
   unread: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, alignItems: "center", justifyContent: "center" },
-  unreadText: { color: "#ffffff", fontSize: 11, fontWeight: "700" },
-  tag: { borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
+  unreadText: { color: "#ffffff", fontSize: TEXT.caption, fontWeight: "700" },
+  tag: { borderRadius: RADIUS.sm, paddingHorizontal: 5, paddingVertical: 2 },
   when: { fontSize: 12.5, alignSelf: "flex-start", marginTop: 2 },
 });

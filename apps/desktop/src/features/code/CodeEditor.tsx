@@ -423,7 +423,7 @@ export default function EditorDeCodigo(props: {
   return (
     <div class="flex min-h-0 min-w-0 flex-1 flex-col">
       <Show when={grande}>
-        <p class="m-0 border-b border-border bg-surface-raised px-3 py-1.5 text-[0.6875rem] text-neutral-500">
+        <p class="m-0 border-b border-border bg-surface-raised px-3 py-1.5 text-caption text-neutral-500">
           {t("code.editor.large")}
         </p>
       </Show>

@@ -20,6 +20,27 @@ export const UNKNOWN_TASK_GIT: TaskGitStatus = {
   pull: null, pull_known: false, checked_at: null, stale: false, has_remote: false, merged_locally: false,
 };
 
+export const sameGit = (a: TaskGitStatus, b: TaskGitStatus) => a === b || JSON.stringify(a) === JSON.stringify(b);
+
+/** Lo remoto solo cuenta si habla de la misma rama y cabeza, y no es más viejo que lo que hay. */
+export function mergeRemoteGit(previous: Record<string, TaskGitStatus>, incoming: Record<string, TaskGitStatus>) {
+  return Object.fromEntries(Object.entries(previous).map(([id, row]) => {
+    const remote = incoming[id];
+    if (!remote || remote.repository !== row.repository || remote.kind !== row.kind || remote.branch !== row.branch || remote.head !== row.head
+      || (remote.checked_at ?? 0) < (row.checked_at ?? 0)) return [id, row];
+    return [id, { ...row, pull: remote.pull, pull_known: remote.pull_known, checked_at: remote.checked_at, stale: remote.stale }];
+  }));
+}
+
+/** Una fila `unknown` deja vieja la anterior, una más antigua no pisa su `pull`, y lo que no cambió conserva su objeto para no repintar. */
+export function retainGitObservation(previous: Record<string, TaskGitStatus>, incoming: Record<string, TaskGitStatus>) {
+  return Object.fromEntries(Object.entries(incoming).map(([id, row]) => {
+    const next = row.kind === "unknown" && previous[id] ? { ...previous[id], stale: true }
+      : (previous[id]?.checked_at ?? 0) > (row.checked_at ?? 0) ? mergeRemoteGit({ [id]: row }, previous)[id] : row;
+    return [id, previous[id] && sameGit(previous[id], next) ? previous[id] : next];
+  }));
+}
+
 /** `remote` actualiza las ramas observadas: por sí solo no descubre los árboles de las tareas. */
 export async function readTaskGit<T>(
   read: (remote: boolean) => Promise<T>,

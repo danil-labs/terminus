@@ -106,7 +106,7 @@ export default function RepositoryPicker(props: {
       class="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left hover:bg-surface-muted focus-visible:bg-surface-muted"
       onClick={() => props.onRepository({ ...repo, git_host: providers().some(p => p.id === repo.git_host && p.connected) && repo.url.startsWith("https://") ? repo.git_host : null })}>
       <Show when={repo.git_host} fallback={<GitBranch size={18} class="text-neutral-500" />}><MarcaGitHost id={repo.git_host ?? ""} size={18} /></Show>
-      <span class="min-w-0 flex-1"><span class="block truncate text-[0.8125rem]">{repo.name}</span>
+      <span class="min-w-0 flex-1"><span class="block truncate text-ui">{repo.name}</span>
         <span class="block truncate text-xs text-neutral-500">{repo.local_path ? t("projects.add.on_this_machine", { path: repo.local_path }) : repo.url}</span></span>
       <ChevronRight size={14} class="shrink-0 text-neutral-500" />
     </button>}</For>;
@@ -140,7 +140,7 @@ export default function RepositoryPicker(props: {
           <Show when={"host" in choice}><MarcaGitHost id={choice.id} size={18} /></Show>
           <Show when={choice.id === "folder"}><FolderOpen size={18} class="text-neutral-500" /></Show>
           <Show when={choice.id === "empty"}><Plus size={18} class="text-neutral-500" /></Show>
-          <span class="text-[0.8125rem]">{choice.name}</span><span class="ml-auto max-w-[50%] truncate text-xs text-neutral-500">{choice.detail}</span>
+          <span class="text-ui">{choice.name}</span><span class="ml-auto max-w-[50%] truncate text-xs text-neutral-500">{choice.detail}</span>
         </button>}</For>
       </div></Show>
       <Show when={recent().length}><p class="mb-1 mt-3 shrink-0 px-3 text-xs text-neutral-500">{t("projects.add.workspace_history")}</p>

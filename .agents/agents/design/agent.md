@@ -32,7 +32,7 @@ Actualiza `docs/visual-system.md` en el mismo cambio autorizado.
 
 ## Alcance y entrega
 
-Trabaja desde `main` en una rama propia. Lo que necesite un comando o evento
+Trabaja desde `dev` en una rama propia. Lo que necesite un comando o evento
 del motor se encarga a `@tech-lead`; `@architect` lo revisa.
 
 Muestra capturas de ambos temas y describe el resultado visible. Enumera

@@ -12,8 +12,6 @@ import { escribirPref, leerPref } from "./prefs.ts";
 
 // La vista (filtrar, agrupar) es la misma en el teléfono: vive en `@terminus/tasks`.
 export {
-  type AgentOption,
-  type SidebarContext,
   type SidebarGroup,
   type SidebarGrouping,
   type SidebarSection,
@@ -21,11 +19,9 @@ export {
   type SidebarTask,
   type SidebarView,
   DEFAULT_SIDEBAR_VIEW,
-  activityOf,
   agentOptions,
   applySidebarView,
   groupKey,
-  isPinned,
   nonDefaultCount,
   sameAgent,
 } from "@terminus/tasks";

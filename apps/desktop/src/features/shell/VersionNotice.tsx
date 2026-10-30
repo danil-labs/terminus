@@ -129,7 +129,7 @@ export default function AvisoDeVersion() {
       <Show when={waitingThen() ? null : hay()}>
         {(u) => (
           <Toast>
-            <p class="m-0 text-[0.8125rem] font-semibold">
+            <p class="m-0 text-ui font-semibold">
               {t("shell.update.available", { version: u().version })}
             </p>
 

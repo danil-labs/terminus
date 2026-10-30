@@ -1,3 +1,4 @@
+import { TEXT } from "@terminus/design";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { t } from "../lib/i18n";
 import { Icon } from "./Icon";
@@ -48,5 +49,5 @@ export function NoMatch() {
 const styles = StyleSheet.create({
   field: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 12, marginVertical: 6, paddingHorizontal: 12, borderRadius: 10, minHeight: 40 },
   input: { flex: 1, fontSize: 16, paddingVertical: 8 },
-  empty: { paddingHorizontal: 18, paddingVertical: 14, fontSize: 15 },
+  empty: { paddingHorizontal: 18, paddingVertical: 14, fontSize: TEXT.lead },
 });

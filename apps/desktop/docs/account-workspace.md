@@ -2,8 +2,8 @@
 
 **Estado:** PROPUESTA · 2026-10-20 · clientes de la fase 1 en `feat/account-workspace`
 
-**Reemplaza:** el enlace de workspaces de [`per-task-machine.md`](per-task-machine.md)
-(«El workspace de la cuenta», en «Lo que queda») y «Usar este workspace aquí».
+**Reemplaza:** el enlace de workspaces del diseño anterior de máquina por tarea
+(«El workspace de la cuenta») y «Usar este workspace aquí».
 
 **Toca tres repositorios:** `danil-labs/computers` (plano de control),
 `danil-labs/seldon-host` (motor) y `danil-labs/terminus` (escritorio, web y

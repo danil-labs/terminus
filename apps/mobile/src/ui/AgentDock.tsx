@@ -1,3 +1,4 @@
+import { RADIUS, TEXT } from "@terminus/design";
 import { type DockAgent, dockCapacity, dockStatusText, orderDockAgents, planDock } from "@terminus/tasks";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -80,11 +81,11 @@ export function AgentDock({
 const styles = StyleSheet.create({
   dock: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth, gap: 6 },
   head: { flexDirection: "row", justifyContent: "space-between" },
-  title: { fontSize: 12, fontWeight: "600" },
+  title: { fontSize: TEXT.label, fontWeight: "600" },
   row: { flexDirection: "row", gap: GAP },
   slot: { width: SLOT, height: SLOT, borderRadius: 12, alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: "transparent" },
   more: { borderRadius: 12 },
-  presence: { position: "absolute", left: 2, bottom: 2, borderWidth: 2, borderRadius: 6 },
-  count: { position: "absolute", right: -2, bottom: -2, borderRadius: 8, paddingHorizontal: 4, minWidth: 16, alignItems: "center" },
-  countText: { fontSize: 10, fontWeight: "700" },
+  presence: { position: "absolute", left: 2, bottom: 2, borderWidth: 2, borderRadius: RADIUS.md },
+  count: { position: "absolute", right: -2, bottom: -2, borderRadius: RADIUS.lg, paddingHorizontal: 4, minWidth: 16, alignItems: "center" },
+  countText: { fontSize: TEXT["2xs"], fontWeight: "700" },
 });

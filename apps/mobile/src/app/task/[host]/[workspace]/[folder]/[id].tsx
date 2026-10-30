@@ -1,3 +1,4 @@
+import { RADIUS, TEXT } from "@terminus/design";
 import { AgentAvatar } from "../../../../../ui/AgentAvatar";
 import { SendButton } from "../../../../../ui/SendButton";
 import { Stack, router, useFocusEffect, useLocalSearchParams } from "expo-router";
@@ -420,7 +421,7 @@ export default function TaskScreen() {
           testID="to-bottom"
           style={[styles.toBottom, { backgroundColor: theme.surface, borderColor: theme.border }]}
         >
-          <Text style={{ color: theme.text, fontSize: 13, fontWeight: "500" }}>
+          <Text style={{ color: theme.text, fontSize: TEXT.ui, fontWeight: "500" }}>
             {newReplies > 0 ? w("chat.thread.new_messages", { count: newReplies }) : w("chat.thread.to_bottom")}
           </Text>
           <Icon name="arrow-down" size={14} color={theme.text} />
@@ -488,7 +489,7 @@ const Row = memo(function Row({ line, theme, streaming, onQuickReply }: { line: 
   if (line.kind === "progress")
     return (
       <View style={styles.progress}>
-        <Text selectable style={{ color: theme.textMuted, fontSize: 14, lineHeight: 20 }}>
+        <Text selectable style={{ color: theme.textMuted, fontSize: TEXT.body, lineHeight: 20 }}>
           {line.text}
         </Text>
       </View>
@@ -595,7 +596,7 @@ function Steps({ rows, theme }: { rows: StepRow[]; theme: Theme }) {
       {hidden ? (
         <Pressable onPress={() => setOpen(true)} hitSlop={6} style={styles.stepRow}>
           <Icon name="chevron-right" size={14} color={theme.textMuted} />
-          <Text style={{ color: theme.textMuted, fontSize: 13 }}>{t("task.more_steps", { count: hidden })}</Text>
+          <Text style={{ color: theme.textMuted, fontSize: TEXT.ui }}>{t("task.more_steps", { count: hidden })}</Text>
         </Pressable>
       ) : null}
       {rows.slice(hidden).map((row, i) => {
@@ -606,9 +607,9 @@ function Steps({ rows, theme }: { rows: StepRow[]; theme: Theme }) {
         return (
           <View key={i} style={styles.stepRow}>
             <Icon name={STEP_ICON[row.kind]} size={14} color={color} />
-            <Text numberOfLines={1} style={{ flexShrink: 1, color, fontSize: 13 }}>
+            <Text numberOfLines={1} style={{ flexShrink: 1, color, fontSize: TEXT.ui }}>
               {verb}
-              {subject ? <Text style={{ fontFamily: MONO, fontSize: 12 }}>{` ${subject}`}</Text> : null}
+              {subject ? <Text style={{ fontFamily: MONO, fontSize: TEXT.label }}>{` ${subject}`}</Text> : null}
               {running ? "…" : ""}
             </Text>
           </View>
@@ -623,12 +624,12 @@ function ShellRun({ command, output, exitCode, theme }: { command: string; outpu
   const failed = exitCode !== null && exitCode !== 0;
   return (
     <View style={[styles.bubble, { alignSelf: "stretch", backgroundColor: theme.surface, borderColor: theme.border }]}>
-      <Text selectable style={{ color: theme.text, fontFamily: MONO, fontSize: 13 }}>
+      <Text selectable style={{ color: theme.text, fontFamily: MONO, fontSize: TEXT.ui }}>
         {`$ ${command}`}
       </Text>
       {output ? (
         <ScrollView horizontal style={{ marginTop: 6 }}>
-          <Text selectable style={{ color: failed ? theme.error : theme.textMuted, fontFamily: MONO, fontSize: 12, lineHeight: 17 }}>
+          <Text selectable style={{ color: failed ? theme.error : theme.textMuted, fontFamily: MONO, fontSize: TEXT.label, lineHeight: 17 }}>
             {output.trimEnd()}
           </Text>
         </ScrollView>
@@ -679,7 +680,7 @@ function QuestionCard({
     });
   return (
     <View style={[styles.card, { borderColor: theme.info, backgroundColor: theme.surface }]} testID="question">
-      <Text style={{ color: theme.textMuted, fontSize: 12 }}>{t("task.question")}</Text>
+      <Text style={{ color: theme.textMuted, fontSize: TEXT.label }}>{t("task.question")}</Text>
       {pending.questions.map((q) => (
         <View key={q.id} style={{ gap: 6 }}>
           <Text style={{ color: theme.text, fontWeight: "600" }}>{q.question}</Text>
@@ -692,7 +693,7 @@ function QuestionCard({
                 style={[styles.option, { borderColor: on ? theme.primary : theme.border, backgroundColor: on ? theme.userBubble : theme.surface }]}
               >
                 <Text style={{ color: theme.text }}>{o.label}</Text>
-                {o.detail ? <Text style={{ color: theme.textMuted, fontSize: 12 }}>{o.detail}</Text> : null}
+                {o.detail ? <Text style={{ color: theme.textMuted, fontSize: TEXT.label }}>{o.detail}</Text> : null}
               </Pressable>
             );
           })}
@@ -715,7 +716,7 @@ function QuestionCard({
 }
 
 const styles = StyleSheet.create({
-  banner: { padding: 8, borderRadius: 8, fontSize: 13 },
+  banner: { padding: 8, borderRadius: RADIUS.lg, fontSize: TEXT.ui },
   thread: { flex: 1 },
   delegated: { marginHorizontal: 12, marginTop: 8, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth },
   delegatedRow: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 6 },
@@ -747,15 +748,15 @@ const styles = StyleSheet.create({
   incomingFace: { paddingBottom: 2 },
   incomingColumn: { flexShrink: 1, gap: 3 },
   taskFace: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth },
-  signature: { fontSize: 12, fontWeight: "600", paddingLeft: 2 },
+  signature: { fontSize: TEXT.label, fontWeight: "600", paddingLeft: 2 },
   reply: { alignSelf: "stretch", paddingHorizontal: 4, paddingVertical: 2 },
   progress: { alignSelf: "stretch", paddingHorizontal: 4 },
   steps: { alignSelf: "stretch", gap: 4, paddingHorizontal: 4, paddingVertical: 2 },
   stepRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   card: { borderWidth: 1, borderRadius: 14, padding: 12, gap: 10 },
-  code: { fontFamily: MONO, fontSize: 13, padding: 8, borderRadius: 8 },
+  code: { fontFamily: MONO, fontSize: TEXT.ui, padding: 8, borderRadius: RADIUS.lg },
   actions: { flexDirection: "row", justifyContent: "flex-end", gap: 8 },
   action: { borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
   option: { borderWidth: 1, borderRadius: 10, padding: 10 },
-  input: { flex: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 15, maxHeight: 140 },
+  input: { flex: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: TEXT.lead, maxHeight: 140 },
 });
