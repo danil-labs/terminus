@@ -309,13 +309,14 @@ async function issue(config, request) {
 }
 
 async function logout(config, request) {
-  let location = new URL("/auth", HOST_ORIGIN).href;
+  // Sin sesión de WorkOS que cerrar, entrar de nuevo la reabriría sola: `/auth` se queda en su pantalla.
+  let location = new URL("/auth?signed_out=1", HOST_ORIGIN).href;
   try {
     const session = await open(config.env, SESSION_COOKIE, readCookie(request, SESSION_COOKIE));
     if (ID_RE.test(session.sid ?? "")) {
       const end = new URL(`${WORKOS_API}/user_management/sessions/logout`);
       end.searchParams.set("session_id", session.sid);
-      end.searchParams.set("return_to", location);
+      end.searchParams.set("return_to", new URL("/auth", HOST_ORIGIN).href);
       location = end.href;
     }
   } catch {

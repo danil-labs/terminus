@@ -5,11 +5,12 @@
 // /auth/emails/verify, /auth/emails/primary y /auth/emails/remove, con Origin exacto, Bearer,
 // JSON de hasta 1 KB y exactamente sus campos; un actor `ai` se rechaza aquí. Al BFF solo van
 // Authorization, Accept, Origin, Referer y un cuerpo reconstruido; nunca cookies.
-import { handleAuth } from "./session.mjs";
+import { handleAuth, sessionConfig } from "./session.mjs";
 
 const HOST = "alfa-app.danil.ai";
 // La web vive en la raíz del dominio (build con `TERMINUS_WEB_BASE=/`).
 const PREFIX = "/alpha-api";
+const ENTRY_PATHS = ["/auth", "/sign-in"];
 // Donde vivía antes; sus enlaces y PWA instaladas se mandan a la raíz.
 const LEGACY = "/terminus";
 const PHONE_ROUTES = ["inbox", "inbox-thread", "inbox-detail", "personalize", "broadcasts", "channels", "attention-agents"].map(route => `/m/${route}`);
@@ -170,6 +171,11 @@ export default {
     const signIn = await handleAuth(request, env, url);
     if (signIn) return signIn;
     if (request.method !== "GET" && request.method !== "HEAD") return json("method_not_allowed", 405);
+    // Sin pantalla previa: la entrada es la de WorkOS. Con cualquier otro parámetro
+    // (`error`, `signed_out`) se pinta `/auth`; si no, un fallo volvería a entrar en bucle.
+    if (request.method === "GET" && sessionConfig(env) && ENTRY_PATHS.includes(url.pathname) && [...url.searchParams.keys()].every((key) => key === "next")) {
+      return new Response(null, { status: 302, headers: { Location: `/auth/workos/start${url.search}`, "Cache-Control": "no-store" } });
+    }
     if (!env.TERMINUS_WEB) return json("assets_unavailable", 503);
     if (PHONE_ROUTES.includes(url.pathname)) {
       url.pathname = "/m/";
