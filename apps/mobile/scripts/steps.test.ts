@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Turn } from "@terminus/protocol";
 import { coalesced } from "../src/lib/engine.ts";
-import { type LivePiece, type WorkLine, applyLive, bareCommand, elapsed, hitOf, lineMatches, linesOfLive, linesOfTurn, liveAfterRead, runClock, runningStep, savesLive, stepOf, workRuns } from "../src/lib/steps.ts";
+import { type LivePiece, type WorkLine, applyLive, bareCommand, elapsed, hitOf, lineMatches, linesOfLive, linesOfTurn, liveAfterRead, runClock, runningStep, savesLive, stepOf, workFocus, workRuns } from "../src/lib/steps.ts";
 
 test("con el orden registrado: avance, pasos y la respuesta al final", () => {
   const turn: Turn = {
@@ -246,4 +246,60 @@ test("el reloj es `started_at` acotado por el mensaje que abrió, y sin dato no 
   assert.equal(runClock(null, 2000), null);
   assert.equal(runClock(1000, null), 1000);
   assert.equal(elapsed(5000, 1000), 0, "el reloj del teléfono puede ir atrás del de la máquina");
+});
+
+
+test("Buscar distingue un avance del paso siguiente aunque comparten at", () => {
+  const turn: Turn = {
+    id: "a", role: "agent", text: "Listo",
+    tools: [{ name: "Read", target: "antes.ts" }, { name: "Bash", target: "echo paso-profundo" }],
+    pieces: [{ tool: 0 }, { text: "Nota avanceprofundo para hallar." }, { tool: 1 }, { text: "Listo" }],
+  };
+  const { lines, runs } = workRuns([user("u"), turn], [], false);
+  const items = runs[0].items;
+  const group = works(lines)[0];
+  const noteHit = hitOf(group, "avanceprofundo")!;
+  const stepHit = hitOf(group, "paso-profundo")!;
+  assert.equal(noteHit.at, 1);
+  assert.equal(stepHit.at, noteHit.at);
+  const note = workFocus(items, noteHit.at, "avanceprofundo");
+  assert.equal(note?.kind, "note");
+  assert.equal(note?.id, "note\n0");
+  const step = workFocus(items, stepHit.at, "paso-profundo");
+  assert.equal(step?.kind, "row");
+  assert.notEqual(step?.id, note?.id);
+  assert.equal(workFocus(items, 1, "")?.id, step?.id, "abrir sin Buscar conserva el ancla del paso");
+  assert.equal(workFocus(items, 1, "ya no existe")?.id, step?.id, "una coincidencia retirada conserva el respaldo por paso");
+});
+
+
+test("Buscar conserva la fila agrupada y sus claves al apuntar a un paso interior", () => {
+  const turn: Turn = { id: "a", role: "agent", text: "Listo", tools: [
+    { name: "Read", target: "uno.ts" }, { name: "Read", target: "dos.ts" }, { name: "Read", target: "tres.ts" },
+  ] };
+  const { runs } = workRuns([user("u"), turn], [], false);
+  const items = runs[0].items;
+  assert.equal(items.length, 1);
+  const first = workFocus(items, 0, "uno.ts");
+  const inner = workFocus(items, 2, "TRES.TS");
+  assert.equal(inner?.kind, "row");
+  assert.equal(inner?.id, first?.id);
+  assert.ok(inner?.kind === "row" && inner.row.steps.length === 3);
+});
+
+
+test("Buscar elige la nota coincidente entre varias que comparten at", () => {
+  const turn: Turn = {
+    id: "a", role: "agent", text: "Listo",
+    tools: [{ name: "Read", target: "antes.ts" }, { name: "Bash", target: "echo compartido" }],
+    pieces: [{ tool: 0 }, { text: "Primera nota." }, { text: "Segunda compartido." }, { tool: 1 }, { text: "Listo" }],
+  };
+  const { runs, lines } = workRuns([user("u"), turn], [], false);
+  const notes = runs[0].items.filter(item => item.kind === "note");
+  assert.equal(notes.length, 2);
+  assert.equal(notes[0].at, notes[1].at);
+  const hit = hitOf(works(lines)[0], "compartido")!;
+  assert.equal(hit.text, "Segunda compartido.", "la nota precede al paso que también coincide");
+  assert.equal(workFocus(runs[0].items, hit.at, "compartido")?.id, notes[1].id);
+  assert.equal(workFocus(runs[0].items, hit.at, "echo")?.kind, "row", "si solo coincide el paso, conserva su fila");
 });

@@ -4,7 +4,7 @@ import { type ComponentRef, type ReactNode, memo, useCallback, useEffect, useMem
 import { ActivityIndicator, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { OPENED, type Follow, type Metrics, measuredFollow, shouldStick } from "../../lib/follow";
 import { lang, t, w } from "../../lib/i18n";
-import { type Step, type StepRow, type WorkItem, type WorkLine, type WorkRun, bareCommand, elapsed, fileName, hitOf, runningStep } from "../../lib/steps";
+import { type Step, type StepRow, type WorkLine, type WorkRun, bareCommand, elapsed, fileName, hitOf, runningStep, workFocus } from "../../lib/steps";
 import type { WorkSheetState } from "../../lib/workSheet";
 import { Icon, type IconName } from "../Icon";
 import { PermissionCard } from "../PermissionCard";
@@ -224,14 +224,12 @@ const WorkRow = memo(function WorkRow({ row, id, open, full, needle, onToggle, o
   );
 }, (a, b) => a.open === b.open && a.full === b.full && a.needle === b.needle && a.theme === b.theme && JSON.stringify(a.row) === JSON.stringify(b.row));
 
-const rowAt = (items: readonly WorkItem[], at: number) => items.findLast((item) => item.kind === "row" && item.at <= at) as Extract<WorkItem, { kind: "row" }> | undefined;
-
 /** Toda la ejecución, en vivo: los pasos y avances en su orden. Sirve igual en la hoja nativa y en la de web. */
 export function WorkSheet({ state, run, last, focus, find, onClose }: { state: WorkSheetState; run: WorkRun | null; last: boolean; focus: number; find: string; onClose: () => void }) {
   const theme = useTheme();
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => {
-    const row = find && run ? rowAt(run.items, focus) : undefined;
-    return new Set(row ? [row.id, `${row.id}\nfull`] : []);
+    const item = find && run ? workFocus(run.items, focus, find) : undefined;
+    return new Set(item?.kind === "row" ? [item.id, `${item.id}\nfull`] : []);
   });
   const toggle = useCallback((id: string) => setExpanded((now) => {
     const next = new Set(now);
@@ -242,7 +240,7 @@ export function WorkSheet({ state, run, last, focus, find, onClose }: { state: W
   const scroller = useRef<ComponentRef<typeof ScrollView>>(null);
   const follow = useRef<Follow>({ ...OPENED, following: false, near: false });
   const positions = useRef(new Map<string, number>());
-  const target = useMemo(() => (run ? rowAt(run.items, focus)?.id ?? null : null), [run === null, focus]);
+  const target = useMemo(() => (run ? workFocus(run.items, focus, find)?.id ?? null : null), [run === null, focus, find]);
   const placed = useRef(false);
   const onRowLayout = useCallback((id: string, y: number) => {
     positions.current.set(id, y);
@@ -311,7 +309,7 @@ export function WorkSheet({ state, run, last, focus, find, onClose }: { state: W
       >
         {(run?.items ?? []).map((item) =>
           item.kind === "note" ? (
-            <Text key={item.id} selectable style={[styles.note, { color: theme.textMuted }]}><Marked text={item.text} needle={find} theme={theme} /></Text>
+            <Text key={item.id} onLayout={(e) => onRowLayout(item.id, e.nativeEvent.layout.y)} selectable style={[styles.note, { color: theme.textMuted }]}><Marked text={item.text} needle={find} theme={theme} /></Text>
           ) : (
             <WorkRow key={item.id} id={item.id} row={item.row} open={expanded.has(item.id)} full={expanded.has(`${item.id}\nfull`)} needle={find} onToggle={toggle} onLayout={onRowLayout} theme={theme} />
           ),
