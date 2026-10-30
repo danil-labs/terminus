@@ -320,25 +320,25 @@ node apps/mobile/bridge/bridge.mjs                                      # imprim
 
 Mismas pantallas, textos y medidas en iOS, Android y la web; cambian solo el
 atrás, la búsqueda por gesto, el aspecto del menú y la respuesta al tocar.
-Las piezas viven en `src/ui/list.tsx` (cabecera, título grande, grupos, filas
-de 48 o más, segmentado, chips), `src/ui/Popover.tsx` (menú anclado) y
-`src/ui/SwipeRow.tsx`.
+Las piezas viven en `apps/mobile/src/ui/list.tsx` (cabecera, título grande, grupos, filas
+de 48 o más, segmentado, chips), `apps/mobile/src/ui/Popover.tsx` (menú anclado) y
+`apps/mobile/src/ui/SwipeRow.tsx`.
 
 | | iOS | Android | Web |
 |---|---|---|---|
 | Atrás | «‹ Pantalla» en píldora y el gesto del borde | flecha sin texto y el atrás del sistema | «‹ Pantalla» y la historia del navegador |
 | Buscar | lupa y, además, tirar hacia abajo (campo escondido sobre la lista) | lupa | lupa (tirar recarga la página) |
-| Menú del espacio | `Menu` de `@expo/ui/swift-ui` (`SpaceMenu.ios.tsx`) | `DropdownMenu` de `@expo/ui/jetpack-compose` (`SpaceMenu.android.tsx`) | popover propio con borde y flecha; cierra tocando fuera o con Esc |
+| Menú del espacio | `Menu` de `@expo/ui/swift-ui` (`apps/mobile/src/ui/SpaceMenu.ios.tsx`) | `DropdownMenu` de `@expo/ui/jetpack-compose` (`apps/mobile/src/ui/SpaceMenu.android.tsx`) | popover propio con borde y flecha; cierra tocando fuera o con Esc |
 | Filas | deslizar: Fijar · Archivar (`ReanimatedSwipeable`); pulsación larga: el menú anclado | igual, con vibración | igual |
 | Toque | gris | ripple | gris y anillo de foco solo con teclado |
 
 - El tema se elige en el perfil (Claro, Oscuro, El del sistema) y se recuerda
-  (`lib/appearance.ts`); `useTheme()` lo respeta. En claro la lista va sobre
+  (`apps/mobile/src/lib/appearance.ts`); `useTheme()` lo respeta. En claro la lista va sobre
   `surface-muted`; menús y popovers usan `surface-raised` y `border-strong`
   (`raised`, `borderStrong` en `@terminus/design`).
 - Las subtareas no salen en Inicio: viven en el chat (Herramientas) y en Buscar.
 - Lo que necesita comandos nuevos se enseña solo si están en `APP_COMMANDS` y
-  la máquina no dijo que no los conoce (`ready()` en `lib/pending.ts`, sobre
+  la máquina no dijo que no los conoce (`ready()` en `apps/mobile/src/lib/pending.ts`, sobre
   `host.available`): crear, renombrar y eliminar espacios (en la primera
   máquina del workspace), Mantener despierta y Puertos (en la primera máquina),
   Archivadas en Buscar. Mover una tarea a otro espacio (`move_task_to_space`)
@@ -348,6 +348,13 @@ de 48 o más, segmentado, chips), `src/ui/Popover.tsx` (menú anclado) y
   sus ventanas, Actualizar y Gestionar cuentas); debajo, el riel de tus
   mensajes como carrusel. La memoria de la conversación (`session_usage`) no
   está en la lista cerrada.
+- La ficha del workspace (cabecera de Inicio y filas de Workspaces) pinta su
+  logo de la cuenta (`logo_url` de `GET /v1/workspaces`), leído con la sesión y
+  con las reglas de `readAccountAsset` de `@terminus/computers`, las mismas de
+  la web de escritorio (`apps/mobile/src/lib/workspaceLogo.ts`,
+  `apps/mobile/src/ui/WorkspaceAvatar.tsx`). Sin logo, mientras carga o si
+  falla, la inicial. En el falso, `--broken-logo` lo hace fallar y `--no-logo`
+  lo quita.
 - Sin fuentes propias: Geist y Bricolage del escritorio son `woff2` variables
   y no se cargan en iOS ni Android; se usa la del sistema.
 
