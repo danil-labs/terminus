@@ -269,6 +269,7 @@
   "chat.turn.waiting_background": "Libre · un subagente sigue en segundo plano",
   "chat.turn.working_aria": "El agente está trabajando",
   "chat.work.duration": "Trabajó durante {duration}",
+  "chat.work.open_changes": "Ver los cambios en el panel de la tarea",
   "chat.work.running": "Trabajando",
   "chat.work.title": "Trabajo",
   "chat.steer.not_running": "Esta tarea ya no tiene un turno corriendo. Envía el mensaje como un turno nuevo.",
