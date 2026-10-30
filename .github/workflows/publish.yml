@@ -1,1345 +1,267 @@
-# Builds Terminus for macOS (universal), Windows and Linux from this repository,
-# signs it and publishes it as a GitHub release.
-#
-# **Who can run it.** Only a tag push (`v*`) or a manual `workflow_dispatch`,
-# and both require write access to this repository. It never runs for pull
-# requests, so a fork's code never sees the signing secrets. Forks that copy
-# this file skip every job (`github.repository` check) instead of failing on
-# missing secrets.
-#
-# ## El contrato con las dos cosas que consumen esto
-#
-#   • **La app instalada** pregunta por
-#     `releases/latest/download/latest.json` (`tauri.conf.json` → `plugins.updater`)
-#     y enseña el aviso de versión nueva abajo a la derecha. `releases/latest`
-#     resuelve a la última release **publicada** —ni borrador ni prerelease—.
-#     Una corrida normal publica con `--latest`: llega a todas las copias.
-#
-#   • **Prerelease** (`-f prerelease=true`, solo a mano). La release sale con
-#     `--prerelease` y sin marca de latest: `releases/latest` sigue en la
-#     anterior, así que ni el updater ni la página la ven. Lleva los mismos
-#     archivos que una normal, `latest.json` y nombres estables incluidos. El
-#     tag lo crea la release sobre `sha` con el token del workflow, y eso no
-#     dispara otra corrida; empujar el tag `v*` a mano sí, y publicaría como
-#     latest. Se lanza desde la rama, sin tag:
-#
-#         gh workflow run publish.yml -R danil-labs/terminus --ref main -f prerelease=true
-#
-#     Pasarla a latest después de probar la actualización es una sola orden; no
-#     se reconstruye ni se resube nada, porque `latest.json` y los nombres
-#     estables ya están en la release y apuntan a `download/v<versión>`:
-#
-#         gh release edit v<versión> -R danil-labs/terminus --prerelease=false --latest
-#
-#     Y se comprueba como lo hace «Comprobar que la app lo ve»:
-#
-#         curl -fsSL https://github.com/danil-labs/terminus/releases/latest/download/latest.json | jq .version
-#
-#   • **terminus.danil.ai** enlaza a `releases/latest/download/Terminus-Windows-Setup.exe`,
-#     `.../Terminus-macOS.dmg`, `.../Terminus-macOS-Intel.dmg` y
-#     `.../Terminus-Linux-x86_64.AppImage`. Son **nombres estables sin versión
-#     dentro**: la página no se toca al publicar, y por eso este workflow sube
-#     una copia con ese nombre además del archivo versionado. Cambiarlos rompe
-#     el botón de descarga sin que nada avise.
-#
-#   • **Las notas por idioma.** `latest.json` lleva `notes` (la nota en inglés,
-#     o en español si la versión no trae inglés: es el campo estándar del
-#     updater de Tauri) y, en la raíz, `notes_by_locale`: `{ "es": …, "en": … }`,
-#     para que la app muestre la del idioma de la persona. Y el cuerpo de la
-#     release de GitHub va bilingüe: primero inglés y después español, separados
-#     por una regla `---`.
-#
-# ## Firmar no es opcional, y no es una sola firma
-#
-# La app comprueba lo que se baja contra la llave pública **que viaja dentro del
-# binario ya instalado**. Una release sin firmar no se instala mal: no se instala,
-# y la copia de quien la esperaba se queda donde está. Es minisign, y no tiene
-# nada que ver con Authenticode ni con la notarización de Apple —esas quitan el
-# aviso del sistema la primera vez, y cada una tiene su propio paso en
-# `build`: eSigner (SSL.com) en Windows, Developer ID + notarytool en macOS. En
-# Linux no hay firma del sistema: el AppImage lleva solo la de minisign.
-#
-name: publish
+name: Sign existing candidate (manual review only)
 
+# No compila ni publica. Requiere excepción explícita a la política sin Actions.
 on:
-  # A version tag publishes that version. The tag must match `tauri.conf.json`.
-  push:
-    tags: ["v*"]
-
-  # By hand, from a maintainer:
-  #
-  #     gh workflow run publish.yml -R danil-labs/terminus --ref v<version>
-  #
   workflow_dispatch:
     inputs:
-      rebuild:
-        description: "Volver a construir aunque la versión ya tenga release (la reemplaza)"
-        type: boolean
-        default: false
-      # Para probar un cambio a este archivo sin tocar lo publicado. Corre todo
-      # —build, firmas, pruebas, `latest.json`— y se detiene antes de crear la
-      # release: `publish` arma el manifiesto y lo deja como artefacto
-      # `dist-manifest`, pero no publica nada. Se lanza desde la rama del PR:
-      #
-      #     gh workflow run publish.yml -R danil-labs/terminus --ref <rama> -f dry_run=true
-      #
-      # **Un ensayo no firma Windows.** El plan de eSigner cobra cada firma, y un
-      # ensayo gastaba las de una release para un instalador que nadie baja. Sin
-      # sus secrets el paso de Windows no puede firmar aunque algo falle: Tauri
-      # construye sin `signCommand` y se comprueba que lo instalado esté, no su
-      # Authenticode. La firma de minisign, macOS y Linux siguen igual. Lo que
-      # solo prueba eSigner se ve en la primera release real.
-      dry_run:
-        description: "Construir y comprobar sin publicar nada"
-        type: boolean
-        default: false
-      # Ver «Prerelease» arriba: el updater y la página no la ven hasta pasarla a latest.
-      prerelease:
-        description: "Publicar como prerelease, sin tocar releases/latest"
-        type: boolean
-        default: false
-
-# Dos corridas a la vez se pisarían creando el mismo tag. No se cancela la que
-# esté en curso: a mitad de un build cancelar deja el tag sin sus binarios.
-concurrency:
-  group: publish
-  cancel-in-progress: false
+      workflow_oid:
+        description: OID completo aprobado del dispatcher y scripts (distinto de source_oid)
+        required: true
+      source_oid:
+        description: OID completo del código de los binarios revisados
+        required: true
+      input_release:
+        description: Tag de pre-release que contiene los ZIP de firma revisados
+        required: true
+      windows_sha256:
+        description: SHA256 de windows-signing-input.zip (vacío omite Windows)
+        required: false
+      windows_mode:
+        description: Dos despachos separados; NSIS ocurre localmente entre ambos
+        type: choice
+        default: internals
+        options: [internals, installer]
+      windows_receipt_sha256:
+        description: SHA256 externo de windows-build-receipt.json revisado
+        required: false
+      macos_sha256:
+        description: SHA256 de macos-signing-input.zip (vacío omite macOS)
+        required: false
+      macos_receipt_sha256:
+        description: SHA256 externo de macos-build-receipt.json revisado
+        required: false
+      linux_sha256:
+        description: SHA256 de linux-signing-input.zip (vacío omite Linux)
+        required: false
+      linux_receipt_sha256:
+        description: SHA256 externo de linux-build-receipt.json revisado
+        required: false
 
 permissions:
   contents: read
-
 env:
-  # El runner de macOS (7 GB) se queda sin heap de Node al construir el front con
-  # Mermaid 12 y Excalidraw; el límite por omisión es menor que la memoria.
-  NODE_OPTIONS: --max-old-space-size=6144
-
-  # ─── La identidad de la app, copiada aquí a propósito ───────────────────────
-  #
-  # Estas tres cosas **no se pueden cambiar publicando**. Un cambio en cualquiera
-  # de ellas sale de un build que funciona, de un instalador que se ejecuta y de
-  # una corrida en verde — y rompe algo que nadie va a ver hasta semanas después:
-  #
-  #   • `PUBLIC_KEY` — la app instalada verifica lo que baja contra la llave
-  #     que lleva **compilada dentro de su propio binario**. Una release firmada
-  #     con otra llave no es «una actualización que falla»: esa copia queda
-  #     varada en su versión para siempre, y desde dentro no hay vuelta. Rotar la
-  #     llave son dos pasos y en este orden: primero una versión firmada con la
-  #     llave VIEJA que ya lleve la NUEVA dentro, y solo después firmar con la
-  #     nueva. Quien se salte esa versión puente reinstala a mano.
-  #
-  #   • `IDENTIFIER` — es dónde viven los datos (sesiones, cuentas, consumo) y
-  #     la llave del llavero. Cambiarlo no borra nada: deja los datos huérfanos y
-  #     la app abre **vacía**, sin error y sin aviso.
-  #
-  #   • `PRODUCT_NAME` — es la clave del registro de desinstalación en Windows
-  #     (`HKCU\…\Uninstall\Terminus`) y la carpeta de instalación. Cambiarlo
-  #     instala **al lado** de la copia vieja: dos entradas en Programas y
-  #     características y dos apps en disco.
-  #
-  # Duplicarlas aquí es el punto: son la memoria de lo que las copias instaladas
-  # ya creen. Cambiarlas exige tocar este archivo, que es un PR que alguien lee —
-  # en vez de un `tauri.conf.json` que se edita por otra razón.
-  PUBLIC_KEY: dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM5ODEzRDE1M0QwQ0RFQjgKUldTNDNndzlGVDJCT1hPSnp4ZzBIbkowOW9kVGFYb0YyRkZKZjNTT2N3eERXOXhuRi9UblY5d3EK
-  IDENTIFIER: ai.danil.terminus
-  PRODUCT_NAME: Terminus
+  EXPECTED_WORKFLOW_OID: ${{ inputs.workflow_oid }}
+  DEFINITION_OID: ${{ github.workflow_sha }}
+concurrency:
+  group: sign-existing-candidate
+  cancel-in-progress: false
 
 jobs:
-  # ─────────────────────────────────────────────────────────────────────────────
-  # ¿Hay algo que publicar? Sale barato preguntarlo, y evita arrancar los runners de build.
-  # ─────────────────────────────────────────────────────────────────────────────
-  check:
-    if: github.repository == 'danil-labs/terminus'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/desktop
-    outputs:
-      should_build: ${{ steps.compare.outputs.should_build }}
-      version: ${{ steps.compare.outputs.version }}
-      sha: ${{ steps.compare.outputs.sha }}
-      note_es: ${{ steps.compare.outputs.note_es }}
-      note_en: ${{ steps.compare.outputs.note_en }}
+  linux:
+    if: github.repository == 'danil-labs/terminus' && inputs.linux_sha256 != ''
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    env:
+      RECEIPT_SHA256: ${{ inputs.linux_receipt_sha256 }}
+      INPUT_RELEASE: ${{ inputs.input_release }}
+      INPUT_SHA256: ${{ inputs.linux_sha256 }}
     steps:
-      - name: Traer la fuente
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Check approved dispatcher revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_WORKFLOW_OID" =~ ^[a-f0-9]{40}$ ]]
+          test "$GITHUB_SHA" = "$EXPECTED_WORKFLOW_OID"
+          test "$DEFINITION_OID" = "$EXPECTED_WORKFLOW_OID"
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
-          fetch-depth: 1
-
-      # Lo que este paso protege no lo protege ninguna otra cosa: el build, el
-      # instalador y la corrida salen todos en verde con la identidad cambiada.
-      # Falla aquí, antes de publicar, porque después de publicar ya no se puede
-      # arreglar en las copias instaladas.
-      - name: La identidad no cambió a espaldas de nadie
-        run: |
-          set -euo pipefail
-
-          failed=0
-          compare_value() {
-            local what="$1" expected="$2" found="$3" consequence="$4"
-            if [ "$expected" != "$found" ]; then
-              echo "::error title=$what cambió::esperado '$expected', encontrado '$found'. $consequence"
-              failed=1
-            fi
-          }
-
-          compare_value "La llave pública del updater" \
-            "$PUBLIC_KEY" \
-            "$(jq -r .plugins.updater.pubkey src-tauri/tauri.conf.json)" \
-            "Publicar así deja varada en su versión, para siempre, a toda copia ya instalada. Se rota en dos pasos: primero una versión firmada con la llave vieja que lleve la nueva dentro."
-
-          compare_value "El identificador del bundle" \
-            "$IDENTIFIER" \
-            "$(jq -r .identifier src-tauri/tauri.conf.json)" \
-            "Los datos de quien ya la tiene quedan huérfanos y la app abre vacía, sin error. Hace falta una migración en migration.rs."
-
-          compare_value "El nombre del producto" \
-            "$PRODUCT_NAME" \
-            "$(jq -r .productName src-tauri/tauri.conf.json)" \
-            "La actualización instala al lado de la copia vieja: dos entradas en Programas y características."
-
-          compare_value "La llave pública que usa npx" \
-            "$PUBLIC_KEY" \
-            "$(sed -n "s/^ *'\(dW50cnVzdGVk[^']*\)';$/\1/p" npx/bin.mjs | head -1)" \
-            "npx dejaría de poder instalar aunque la app se actualice bien."
-
-          [ "$failed" = 0 ] || {
-            echo ""
-            echo "Si el cambio es deliberado, va en el mismo PR que actualiza estos valores"
-            echo "en .github/workflows/publish.yml — y lee ahí lo que cuesta cada uno."
-            exit 1
-          }
-
-          echo "Identidad intacta: misma llave, mismo identificador, mismo nombre."
-
-      # La ventana no trae motor: lo arranca desde el `seldon-runtime` empaquetado.
-      # Publicar sin él deja a toda copia instalada con una ventana que no abre,
-      # y el updater la reparte sola. El ensayo también lo exige: es lo que prueba.
-      # Que el archivo esté lo comprueba cada build, después de «Colocar el motor como sidecar».
-      - name: El motor viaja dentro del instalador
-        id: engine-pinned
-        run: |
-          set -euo pipefail
-          missing=$(jq -r '.platforms | to_entries[] | select(.value.url == "" or .value.sha256 == "") | .key' seldon-runtime.lock)
-          if [ -n "$missing" ]; then
-            echo "::error title=Motor sin fijar::seldon-runtime.lock no fija: $(echo $missing). Una release sin motor deja la app instalada sin abrir."
-            exit 1
-          fi
-          # La ventana deriva su contrato de commands.json y rechaza un motor que hable otro.
-          vendored=$(sha256sum src-tauri/crates/engine-protocol/commands.json | cut -d' ' -f1)
-          pinned=$(jq -r .contract seldon-runtime.lock)
-          if [ "$vendored" != "$pinned" ]; then
-            echo "::error title=Motor con otro contrato::seldon-runtime.lock fija el contrato $pinned y la ventana habla $vendored: la app instalada no abriría su motor."
-            exit 1
-          fi
-          # Tauri suma a la base el archivo de cada plataforma; macOS no tiene archivo propio.
-          for os in windows linux macos; do
-            files=(src-tauri/tauri.conf.json)
-            [ -f "src-tauri/tauri.$os.conf.json" ] && files+=("src-tauri/tauri.$os.conf.json")
-            jq -es 'map(.bundle.externalBin // []) | add | map(select(test("seldon-runtime"))) | length > 0' "${files[@]}" >/dev/null \
-              || { echo "::error title=Motor sin empaquetar::$os no declara seldon-runtime en bundle.externalBin (${files[*]})."; exit 1; }
-          done
-
-      - name: Comparar con lo publicado
-        id: compare
+      - name: Fetch and validate reviewed AppImage
         env:
           GH_TOKEN: ${{ github.token }}
-          REBUILD: ${{ inputs.rebuild }}
-          DRY_RUN: ${{ inputs.dry_run }}
-          PRERELEASE: ${{ inputs.prerelease }}
+          SOURCE_OID: ${{ inputs.source_oid }}
         run: |
           set -euo pipefail
+          gh release download "$INPUT_RELEASE" --repo danil-labs/terminus --pattern linux-signing-input.zip --dir input
+          gh release download "$INPUT_RELEASE" --repo danil-labs/terminus --pattern linux-build-receipt.json --dir input
+      - name: Inspect Linux input without credentials
+        env:
+          SOURCE_OID: ${{ inputs.source_oid }}
+        run: |
+          set -euo pipefail
+          [[ "$INPUT_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          printf '%s  %s\n' "$INPUT_SHA256" input/linux-signing-input.zip | sha256sum -c -
+          python3 apps/desktop/scripts/candidate-archive.py input/linux-signing-input.zip candidate "$INPUT_SHA256" linux
+          node apps/desktop/scripts/candidate-signing.mjs validate candidate linux "$SOURCE_OID"
+          node apps/desktop/scripts/candidate-signing.mjs attest input/linux-build-receipt.json linux "$SOURCE_OID"
+          mkdir output
+          node --input-type=module -e 'import fs from "node:fs";const m=JSON.parse(fs.readFileSync("candidate/manifest.json","utf8"));fs.copyFileSync(`candidate/${m.appimage}`,"output/Terminus-Linux-x86_64.AppImage")'
+          sudo apt-get update -qq
+          sudo apt-get install -y squashfs-tools
+          python3 apps/desktop/scripts/candidate-native-linux.py
+          npm install --prefix signing-cli --ignore-scripts --no-audit --no-fund @tauri-apps/cli@2.11.4
+      - name: Sign and verify existing AppImage
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          signing-cli/node_modules/.bin/tauri signer sign output/Terminus-Linux-x86_64.AppImage
+          node apps/desktop/scripts/candidate-signing.mjs verify output/Terminus-Linux-x86_64.AppImage
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: signed-existing-linux
+          path: output/*
+          if-no-files-found: error
+          retention-days: 7
 
-          # La versión de la app la manda `tauri.conf.json`: es la que se compila
-          # dentro del binario y la que el updater compara. `package.json` y
-          # `Cargo.toml` la repiten y podrían desincronizarse, así que se
-          # comprueba que las tres digan lo mismo antes de publicar nada — una
-          # release cuyo binario dice otra versión que su `latest.json` deja a
-          # todo el mundo en bucle de actualizar.
-          V=$(jq -r .version src-tauri/tauri.conf.json)
-          VP=$(jq -r .version package.json)
-          VC=$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -1)
-          if [ "$V" != "$VP" ] || [ "$V" != "$VC" ]; then
-            echo "::error::Las versiones no coinciden — tauri.conf.json=$V package.json=$VP Cargo.toml=$VC"
-            exit 1
-          fi
-          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$GITHUB_REF_NAME" != "v$V" ]; then
-            echo "::error::El tag $GITHUB_REF_NAME no coincide con la versión v$V de tauri.conf.json"
-            exit 1
-          fi
-
-          # La nota es lo que lee una persona en la página de la release y en el
-          # aviso de la app. Se revisa en el mismo PR que sube la versión. Hay una por
-          # idioma: `release-notes/es.md` y `release-notes/en.md`.
-          #
-          NOTE_ES=""
-          NOTE_EN=""
-          [ ! -f release-notes/es.md ] || NOTE_ES=$(cat release-notes/es.md)
-          [ ! -f release-notes/en.md ] || NOTE_EN=$(cat release-notes/en.md)
-          [ -n "$NOTE_ES" ] || NOTE_ES="Mejoras y correcciones."
-
-          # Las notas son texto libre de varias líneas: el delimitador es
-          # aleatorio para que ninguna nota pueda cerrarlo por accidente.
-          DELIMITER="NOTE_END_$(openssl rand -hex 8)"
-          {
-            echo "version=$V"
-            echo "sha=$(git rev-parse HEAD)"
-            echo "note_es<<$DELIMITER"
-            printf '%s\n' "$NOTE_ES"
-            echo "$DELIMITER"
-            echo "note_en<<$DELIMITER"
-            printf '%s\n' "$NOTE_EN"
-            echo "$DELIMITER"
-          } >> "$GITHUB_OUTPUT"
-
-          # Rehacer como prerelease una versión que ya es latest la borraría, y
-          # `releases/latest` volvería a la anterior para todas las copias.
-          if [ "${PRERELEASE:-false}" = "true" ] \
-            && [ "$(gh release view "v$V" --repo "$GITHUB_REPOSITORY" --json isPrerelease -q .isPrerelease 2>/dev/null)" = "false" ]; then
-            echo "::error::v$V ya está publicada y no es prerelease. Una prerelease necesita una versión nueva."
-            exit 1
-          fi
-
-          if [ "${DRY_RUN:-false}" = "true" ]; then
-            echo "Ensayo de v$V: se construye y se comprueba, no se publica."
-            echo "should_build=true" >> "$GITHUB_OUTPUT"
-          elif [ "${REBUILD:-false}" = "true" ]; then
-            echo "Se pidió rehacer v$V."
-            echo "should_build=true" >> "$GITHUB_OUTPUT"
-          elif gh release view "v$V" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "v$V ya está publicada. No hay nada que hacer."
-            echo "should_build=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "v$V no está publicada. Se construye."
-            echo "should_build=true" >> "$GITHUB_OUTPUT"
-          fi
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Un runner por plataforma. Cross-compilar Windows desde macOS no funciona —el
-  # target MSVC necesita el `link.exe` de Microsoft— así que no hay atajo. Linux
-  # se construye en Ubuntu 22.04 y no en la última: un AppImage lleva pegada la
-  # versión de glibc del runner donde se hizo, y solo corre en sistemas con esa
-  # versión o una posterior.
-  # ─────────────────────────────────────────────────────────────────────────────
-  build:
-    needs: check
-    if: needs.check.outputs.should_build == 'true'
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - so: windows-latest
-            name: windows
-          - so: macos-latest
-            name: macos
-          - so: ubuntu-22.04
-            name: linux
-    runs-on: ${{ matrix.so }}
+  windows:
+    if: github.repository == 'danil-labs/terminus' && inputs.windows_sha256 != ''
+    runs-on: windows-2022
+    timeout-minutes: 45
+    env:
+      RECEIPT_SHA256: ${{ inputs.windows_receipt_sha256 }}
+      WINDOWS_MODE: ${{ inputs.windows_mode }}
+      INPUT_RELEASE: ${{ inputs.input_release }}
+      INPUT_SHA256: ${{ inputs.windows_sha256 }}
     defaults:
       run:
-        working-directory: apps/desktop
+        shell: pwsh
     steps:
-      - name: Traer la fuente
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Check approved dispatcher revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_WORKFLOW_OID" =~ ^[a-f0-9]{40}$ ]]
+          test "$GITHUB_SHA" = "$EXPECTED_WORKFLOW_OID"
+          test "$DEFINITION_OID" = "$EXPECTED_WORKFLOW_OID"
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
-          ref: ${{ needs.check.outputs.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
-          fetch-depth: 1
-
-      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+      - name: Fetch reviewed input
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_RELEASE: ${{ inputs.input_release }}
+          INPUT_SHA256: ${{ inputs.windows_sha256 }}
+          SOURCE_OID: ${{ inputs.source_oid }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          gh release download $env:INPUT_RELEASE --repo danil-labs/terminus --pattern windows-signing-input.zip --dir input
+          if ($LASTEXITCODE) { throw 'Download failed' }
+          gh release download $env:INPUT_RELEASE --repo danil-labs/terminus --pattern windows-build-receipt.json --dir input
+          if ($LASTEXITCODE) { throw 'Receipt download failed' }
+      - name: Inspect Windows input without credentials
+        env:
+          SOURCE_OID: ${{ inputs.source_oid }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:INPUT_SHA256 -notmatch '^[a-fA-F0-9]{64}$') { throw 'Invalid SHA256' }
+          $actual = (Get-FileHash input/windows-signing-input.zip -Algorithm SHA256).Hash
+          if ($actual -ne $env:INPUT_SHA256) { throw 'Input hash mismatch' }
+          python apps/desktop/scripts/candidate-archive.py input/windows-signing-input.zip candidate $env:INPUT_SHA256 windows
+          if ($LASTEXITCODE) { throw 'Archive validation failed' }
+          node apps/desktop/scripts/candidate-signing.mjs validate candidate windows $env:SOURCE_OID $env:WINDOWS_MODE
+          if ($LASTEXITCODE) { throw 'Manifest validation failed' }
+          node apps/desktop/scripts/candidate-signing.mjs attest input/windows-build-receipt.json windows $env:SOURCE_OID
+          if ($LASTEXITCODE) { throw 'External build attestation failed' }
+          & apps/desktop/scripts/sign-existing-windows.ps1 -Phase inspect
+      - name: Prepare pinned signing tools
+        run: |
+          npm install --prefix signing-cli --ignore-scripts --no-audit --no-fund @tauri-apps/cli@2.11.4
+          if ($LASTEXITCODE) { throw 'CLI installation failed' }
+          & apps/desktop/scripts/sign-existing-windows.ps1 -Phase prepare
+      - name: Sign compiled binaries
+        if: inputs.windows_mode == 'internals'
+        env:
+          ES_USERNAME: ${{ secrets.ES_USERNAME }}
+          ES_PASSWORD: ${{ secrets.ES_PASSWORD }}
+          ES_CREDENTIAL_ID: ${{ secrets.ES_CREDENTIAL_ID }}
+          ES_TOTP_SECRET: ${{ secrets.ES_TOTP_SECRET }}
+        run: |
+          & apps/desktop/scripts/sign-existing-windows.ps1 -Phase internals
+          node apps/desktop/scripts/candidate-signing.mjs record output
+          if ($LASTEXITCODE) { throw 'Receipt failed' }
+      - name: Sign final installer
+        if: inputs.windows_mode == 'installer'
+        env:
+          ES_USERNAME: ${{ secrets.ES_USERNAME }}
+          ES_PASSWORD: ${{ secrets.ES_PASSWORD }}
+          ES_CREDENTIAL_ID: ${{ secrets.ES_CREDENTIAL_ID }}
+          ES_TOTP_SECRET: ${{ secrets.ES_TOTP_SECRET }}
+        run: '& apps/desktop/scripts/sign-existing-windows.ps1 -Phase installer'
+      - name: Sign and verify updater artifact
+        if: inputs.windows_mode == 'installer'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          & signing-cli/node_modules/.bin/tauri.cmd signer sign output/Terminus-Windows-Setup.exe
+          if ($LASTEXITCODE) { throw 'Updater signing failed' }
+          node apps/desktop/scripts/candidate-signing.mjs verify output/Terminus-Windows-Setup.exe
+          if ($LASTEXITCODE) { throw 'Updater verification failed' }
+      - name: Save review artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          version: 10.15.0
+          name: signed-existing-windows
+          path: output/*
+          if-no-files-found: error
+          retention-days: 7
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
-        with:
-          targets: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
-
-      - uses: swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
-        with:
-          workspaces: apps/desktop/src-tauri
-          key: ${{ matrix.name }}
-
-      # Lo que Tauri necesita para compilar en Linux (WebKitGTK, la bandeja del
-      # sistema, `patchelf` para el AppImage) y lo que el AppImage necesita para
-      # arrancar aquí mismo (`libfuse2`, y `xvfb` para tener pantalla).
-      - name: Instalar las dependencias de build en Linux
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf pkg-config build-essential libssl-dev libfuse2 xvfb
-
-      - run: pnpm install --frozen-lockfile
-
-      # El motor fijado en `seldon-runtime.lock`, verificado por su SHA-256 y
-      # copiado a `src-tauri/binaries/` para `bundle.externalBin`, que lo declara
-      # para las cuatro plataformas. En macOS también deja el universal (`lipo`
-      # de los dos) que pide `--target universal-apple-darwin`.
-      - name: Colocar el motor como sidecar
+  macos:
+    if: github.repository == 'danil-labs/terminus' && inputs.macos_sha256 != ''
+    runs-on: macos-14
+    timeout-minutes: 60
+    env:
+      RECEIPT_SHA256: ${{ inputs.macos_receipt_sha256 }}
+      INPUT_RELEASE: ${{ inputs.input_release }}
+      INPUT_SHA256: ${{ inputs.macos_sha256 }}
+    steps:
+      - name: Check approved dispatcher revision
         shell: bash
         run: |
           set -euo pipefail
-          pnpm engine:sidecar
-          case "${{ matrix.name }}" in
-            windows) expected=(seldon-runtime-x86_64-pc-windows-msvc.exe) ;;
-            macos) expected=(seldon-runtime-aarch64-apple-darwin seldon-runtime-x86_64-apple-darwin seldon-runtime-universal-apple-darwin) ;;
-            linux) expected=(seldon-runtime-x86_64-unknown-linux-gnu) ;;
-          esac
-          for f in "${expected[@]}"; do
-            [ -f "src-tauri/binaries/$f" ] || { echo "::error title=Motor sin empaquetar::falta src-tauri/binaries/$f."; exit 1; }
-          done
-
-      - name: Preparar herramientas incluidas verificadas
-        shell: bash
+          [[ "$EXPECTED_WORKFLOW_OID" =~ ^[a-f0-9]{40}$ ]]
+          test "$GITHUB_SHA" = "$EXPECTED_WORKFLOW_OID"
+          test "$DEFINITION_OID" = "$EXPECTED_WORKFLOW_OID"
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Fetch reviewed input
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_RELEASE: ${{ inputs.input_release }}
+          INPUT_SHA256: ${{ inputs.macos_sha256 }}
+          SOURCE_OID: ${{ inputs.source_oid }}
         run: |
           set -euo pipefail
-          python3 scripts/work-tools-release.py prepare --directory "$RUNNER_TEMP/work-tools-release"
-
-      # La notarización pide un `.p8` en disco, no el contenido en una variable.
-      # Tauri busca `AuthKey_<APPLE_API_KEY>.p8` o `APPLE_API_KEY_PATH`. El
-      # secret es el PEM entero; aquí se escribe y se borra con el runner.
-      #
-      # `signingIdentity: "-"` en `tauri.conf.json` se queda: es la firma ad-hoc
-      # de los builds locales. `APPLE_SIGNING_IDENTITY` la pisa solo aquí.
-      - name: Preparar la notarización de Apple
-        if: runner.os == 'macOS'
+          gh release download "$INPUT_RELEASE" --repo danil-labs/terminus --pattern macos-signing-input.zip --dir input
+          gh release download "$INPUT_RELEASE" --repo danil-labs/terminus --pattern macos-build-receipt.json --dir input
+      - name: Inspect macOS input without credentials
+        env:
+          SOURCE_OID: ${{ inputs.source_oid }}
+        run: |
+          set -euo pipefail
+          [[ "$INPUT_SHA256" =~ ^[a-fA-F0-9]{64}$ ]]
+          actual=$(shasum -a 256 input/macos-signing-input.zip | cut -d' ' -f1)
+          test "$actual" = "$INPUT_SHA256"
+          python3 apps/desktop/scripts/candidate-archive.py input/macos-signing-input.zip candidate "$INPUT_SHA256" macos
+          node apps/desktop/scripts/candidate-signing.mjs validate candidate macos "$SOURCE_OID"
+          node apps/desktop/scripts/candidate-signing.mjs attest input/macos-build-receipt.json macos "$SOURCE_OID"
+          bash apps/desktop/scripts/sign-existing-macos.sh inspect
+          npm install --prefix signing-cli --ignore-scripts --no-audit --no-fund @tauri-apps/cli@2.11.4
+      - name: Notarize existing app and repackage containers
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
-        run: |
-          set -euo pipefail
-
-          for v in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_TEAM_ID APPLE_API_ISSUER APPLE_API_KEY APPLE_API_KEY_P8; do
-            [ -n "${!v}" ] || { echo "::error title=Falta el secret $v::Sin él el .dmg sale ad-hoc y macOS avisa. Va en Settings → Secrets and variables → Actions de este repo."; exit 1; }
-          done
-
-          umask 077
-          mkdir -p "$RUNNER_TEMP/private_keys"
-          P8="$RUNNER_TEMP/private_keys/AuthKey_${APPLE_API_KEY}.p8"
-          printf '%s' "$APPLE_API_KEY_P8" | tr -d '\r' > "$P8"
-          [ -s "$P8" ] || { echo "::error::APPLE_API_KEY_P8 quedó vacío al escribirlo."; exit 1; }
-          grep -q "BEGIN PRIVATE KEY" "$P8" \
-            || { echo "::error::APPLE_API_KEY_P8 no parece un PEM: falta BEGIN PRIVATE KEY. Pega el .p8 entero, encabezado incluido."; exit 1; }
-          # PEM con newline final: notarytool es más quisquilloso si el archivo
-          # se corta a media línea.
-          [ "$(tail -c1 "$P8" | wc -l)" -eq 1 ] || echo >> "$P8"
-          echo "APPLE_API_KEY_PATH=$P8" >> "$GITHUB_ENV"
-
-      # **Tauri reescribe `terminus.exe` al empaquetar.** `tauri bundle` busca en
-      # el binario la marca `__TAURI_BUNDLE_TYPE_VAR_UNK` y la cambia por
-      # `__TAURI_BUNDLE_TYPE_VAR_NSS` (`patch_binary` en
-      # `tauri-bundler/src/bundle.rs`, CLI 2.11.4): así el updater de la app sabe
-      # qué paquete le toca bajar. Firmar el `.exe` antes de ese paso, como se hizo
-      # hasta v0.2.6, deja la firma sobre bytes que ya no existen: en la copia
-      # instalada `Get-AuthenticodeSignature` da `HashMismatch`. Y el desinstalador
-      # lo genera `makensis` dentro del paquete, así que nadie lo firmaba.
-      #
-      # Por eso firma Tauri, con `bundle.windows.signCommand`. Llama al comando
-      # **después** de parchear el `.exe`, desde `!uninstfinalize` para el
-      # desinstalador y sobre el instalador antes de escribir su `.sig` de minisign.
-      # Se pasa con `--config` desde aquí para no tocar `tauri.conf.json`.
-      #
-      # Tauri también le pasa las DLL de plugins de NSIS. Esas no se firman: solo
-      # existen en un temporal mientras corre el instalador y nunca quedan
-      # instaladas. Cada firma cuenta en el plan de eSigner, de 20 al mes: **dos por
-      # release**, el ejecutable y el instalador. El desinstalador no se firma:
-      # makensis lo regenera en cada build y no se descarga, así que SmartScreen
-      # no lo evalúa; firmarlo costaba una firma por release.
-      #
-      # **El motor viaja dentro.** `bundle.externalBin` declara `seldon-runtime` y
-      # Tauri le pasa ese `.exe` a `signCommand` salvo que ya llegue firmado
-      # (`signtool verify /pa`, `sign_binaries_if_needed`, tauri-bundler 2.9.4).
-      # El lock fija el `.exe` de Windows ya firmado por Danil, así que el motor
-      # cuesta una firma por versión del motor, no por release: la primera release
-      # que lo empaqueta sin firma lo firma y deja la copia firmada en el artefacto
-      # `seldon-runtime-windows-signed`, que se sube a la release del motor y se fija.
-      #
-      # **En un ensayo, cero.** Los secrets de eSigner llegan vacíos y no se
-      # pasa `signCommand`; el `.sig` de minisign sí se escribe, porque `publish`
-      # arma `latest.json` con él. En un push de tag `inputs.dry_run` es nulo y
-      # `!inputs.dry_run` da verdadero: una release real recibe los secrets.
-      - name: Construir y firmar en Windows
-        if: runner.os == 'Windows'
-        shell: bash
+        run: bash apps/desktop/scripts/sign-existing-macos.sh
+      - name: Sign and verify updater artifact
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          DRY_RUN: ${{ inputs.dry_run }}
-          ES_USERNAME: ${{ !inputs.dry_run && secrets.ES_USERNAME || '' }}
-          ES_PASSWORD: ${{ !inputs.dry_run && secrets.ES_PASSWORD || '' }}
-          ES_CREDENTIAL_ID: ${{ !inputs.dry_run && secrets.ES_CREDENTIAL_ID || '' }}
-          ES_TOTP_SECRET: ${{ !inputs.dry_run && secrets.ES_TOTP_SECRET || '' }}
-          CST_URL: https://github.com/SSLcom/CodeSignTool/releases/download/v1.3.2/CodeSignTool-v1.3.2-windows.zip
-          CST_SHA256: 4afc32e8b7f79bbe1de7e4e7049aaad4e0f754357613b9bbec0e3052f06fd36b
-          SSLCOM_ROOT_URL: http://cert.ssl.com/SSLcom-TLS-Root-2022-RSA.cer
-          SSLCOM_ROOT_SHA256: 8faf7d2e2cb4709bb8e0b33666bf75a5dd45b5de480f8ea8d4bfe6bebc17f2ed
         run: |
           set -euo pipefail
-
-          T=$(cygpath -u "$RUNNER_TEMP")
-          export T
-
-          if [ "${DRY_RUN:-false}" = "true" ]; then
-            echo "Ensayo: no se prepara eSigner ni se pasa signCommand. Windows sale sin Authenticode."
-          else
-            for v in ES_USERNAME ES_PASSWORD ES_CREDENTIAL_ID ES_TOTP_SECRET; do
-              [ -n "${!v}" ] || { echo "::error title=Falta el secret $v::Sin él no se firma la release de Windows. Va en Settings → Secrets and variables → Actions de este repo."; exit 1; }
-            done
-
-            curl -fsSL -o "$T/cst.zip" "$CST_URL"
-            echo "$CST_SHA256  $T/cst.zip" | sha256sum -c -
-            pwsh -NoProfile -Command "Expand-Archive -LiteralPath '$(cygpath -w "$T/cst.zip")' -DestinationPath '$(cygpath -w "$T/cst")'"
-
-            # JDK 11.0.2 (2019) bundled en CodeSignTool no incluye la raíz
-            # "SSL.com TLS RSA Root CA 2022" que cs.ssl.com empezó a usar en
-            # septiembre de 2026. Sin ella, el handshake TLS cae por PKIX.
-            curl -fsSL -o "$T/sslcom-root.cer" "$SSLCOM_ROOT_URL"
-            echo "$SSLCOM_ROOT_SHA256  $T/sslcom-root.cer" | sha256sum -c -
-            "$T/cst/jdk-11.0.2/bin/keytool.exe" -import -noprompt -trustcacerts \
-              -alias sslcomtlsroot2022 \
-              -file "$(cygpath -w "$T/sslcom-root.cer")" \
-              -keystore "$(cygpath -w "$T/cst/jdk-11.0.2/lib/security/cacerts")" \
-              -storepass changeit
-          fi
-
-          # Lo llama Tauri, un archivo por vez, con la ruta de Windows como único
-          # argumento. Hereda del paso los secrets de eSigner y `T`.
-          cat > "$T/sign-authenticode.sh" <<'SIGN'
-          set -euo pipefail
-          original=$(cygpath -u "$1")
-          name=$(basename "$original")
-
-          # Tauri también pasa cada .exe y .dll de los recursos. Las herramientas
-          # incluidas conservan su firma de origen: firmarlas aquí cambiaría bytes
-          # ya inventariados y gastaría cientos de firmas.
-          case "$original" in
-            */work-tools-release/work-tools/*)
-              exit 0 ;;
-          esac
-          case "$name" in
-            NSISdl.dll|StartMenu.dll|System.dll|nsDialogs.dll|nsis_tauri_utils.dll)
-              echo "Authenticode: $name no se firma (plugin de NSIS, no se instala)."
-              exit 0 ;;
-            *.exe) copy="$name" ;;
-            *)
-              # El desinstalador llega con el nombre temporal que le da makensis (`nst….tmp`).
-              echo "Authenticode: el desinstalador ($name) no se firma."
-              exit 0 ;;
-          esac
-          input_dir="$T/sign-input"
-          output_dir="$T/sign-output"
-          rm -rf "$input_dir" "$output_dir"
-          mkdir -p "$input_dir" "$output_dir"
-          cp "$original" "$input_dir/$copy"
-
-          # Cada firma manda un código TOTP. Entre la del desinstalador y la del
-          # instalador pasan pocos segundos, y si eSigner rechaza un código ya
-          # usado, la segunda fallaría. Esperar a la siguiente ventana de 30 s
-          # cuesta, como mucho, medio minuto.
-          if [ -f "$T/last-signature" ]; then
-            wait_seconds=$(( $(cat "$T/last-signature") + 31 - $(date +%s) ))
-            [ "$wait_seconds" -le 0 ] || sleep "$wait_seconds"
-          fi
-
-          (
-            cd "$T/cst"
-            MSYS_NO_PATHCONV=1 ./jdk-11.0.2/bin/java.exe -jar jar/code_sign_tool-1.3.2.jar sign \
-              -username="$ES_USERNAME" \
-              -password="$ES_PASSWORD" \
-              -credential_id="$ES_CREDENTIAL_ID" \
-              -totp_secret="$ES_TOTP_SECRET" \
-              -input_file_path="$(cygpath -w "$input_dir/$copy")" \
-              -output_dir_path="$(cygpath -w "$output_dir")"
-          )
-          date +%s > "$T/last-signature"
-
-          signed="$output_dir/$copy"
-          [ -f "$signed" ] || { echo "CodeSignTool no dejó $name firmado; su salida está arriba." >&2; exit 1; }
-
-          seen=$(FILE_W="$(cygpath -w "$signed")" pwsh -NoProfile -Command '$s = Get-AuthenticodeSignature -LiteralPath $env:FILE_W; "{0}|{1}|{2}" -f $s.Status, $s.SignerCertificate.Subject, [bool]$s.TimeStamperCertificate' | tr -d '\r')
-          IFS='|' read -r status subject timestamp <<< "$seen"
-          [ "$status" = "Valid" ] || { echo "Windows no da la firma de $name por válida: $status." >&2; exit 1; }
-          case "$subject" in
-            *"Software y Servicios Danil"*) ;;
-            *) echo "Firmó un certificado que no es el de Danil: $subject" >&2; exit 1 ;;
-          esac
-          [ "$timestamp" = "True" ] || { echo "La firma de $name no lleva sello de tiempo." >&2; exit 1; }
-
-          cp -f "$signed" "$original"
-          echo "$copy|$seen" >> "$T/signed.txt"
-          SIGN
-
-          # Rutas absolutas y con `/`: el mismo comando lo ejecuta Tauri y, para
-          # el desinstalador, makensis desde otra carpeta. `bash` con ruta
-          # completa porque, sin ella, Windows puede encontrar antes el de WSL
-          # en System32. En un ensayo el script existe pero nadie lo llama.
-          SIGN_CONFIG=()
-          if [ "${DRY_RUN:-false}" != "true" ]; then
-            CONFIG=$(jq -nc \
-              --arg bash "$(cygpath -m "$(command -v bash)")" \
-              --arg sign_script "$(cygpath -m "$T/sign-authenticode.sh")" \
-              '{bundle: {windows: {signCommand: {cmd: $bash, args: [$sign_script, "%1"]}}}}')
-            echo "signCommand: $CONFIG"
-            SIGN_CONFIG=(--config "$CONFIG")
-          fi
-          : > "$T/signed.txt"
-
-          # El motor como sidecar: Tauri lo busca en `src-tauri/<entrada>-<triple>.exe`
-          # y lo instala como `seldon-runtime.exe`. Si ya llega firmado por Danil,
-          # Tauri no lo pasa por eSigner y no cuenta como firma de esta corrida.
-          ENGINE_SIDECAR=""
-          ENGINE_ENTRY=$(jq -rs 'map(.bundle.externalBin // []) | add | map(select(test("seldon-runtime"))) | .[0] // ""' \
-            src-tauri/tauri.conf.json src-tauri/tauri.windows.conf.json)
-          if [ -n "$ENGINE_ENTRY" ]; then
-            ENGINE_FILE="src-tauri/${ENGINE_ENTRY}-x86_64-pc-windows-msvc.exe"
-            [ -f "$ENGINE_FILE" ] || { echo "::error title=Motor sin empaquetar::externalBin declara $ENGINE_ENTRY pero no está $ENGINE_FILE."; exit 1; }
-            echo "ENGINE_PACKAGED=true" >> "$GITHUB_ENV"
-            engine_signer=$(FILE_W="$(cygpath -w "$(realpath "$ENGINE_FILE")")" pwsh -NoProfile -Command '$s = Get-AuthenticodeSignature -LiteralPath $env:FILE_W; "{0}|{1}" -f $s.Status, $s.SignerCertificate.Subject' | tr -d '\r')
-            case "$engine_signer" in
-              "Valid|"*"Software y Servicios Danil"*) echo "seldon-runtime ya llega firmado por Danil: Tauri no lo vuelve a firmar." ;;
-              *)
-                ENGINE_SIDECAR=$(basename "$ENGINE_FILE")
-                # En un ensayo no se firma: no hay copia firmada que guardar.
-                [ "${DRY_RUN:-false}" = "true" ] || echo "ENGINE_SIGNED_HERE=true" >> "$GITHUB_ENV"
-                echo "::warning title=Motor sin firma en el lock::seldon-runtime llega sin la firma de Danil ($engine_signer): lo firma eSigner (en un ensayo, no). Sube el artefacto seldon-runtime-windows-signed a la release del motor y fíjalo en seldon-runtime.lock para no volver a gastar esta firma." ;;
-            esac
-          fi
-
-          pnpm desktop:build --bundles nsis --config "$WORK_TOOLS_CONFIG" "${SIGN_CONFIG[@]}"
-
-          INSTALLER=$(find src-tauri/target/release/bundle -type f -name '*_x64-setup.exe' | head -1)
-          [ -n "$INSTALLER" ] || { echo "::error::No se construyó ningún *_x64-setup.exe."; exit 1; }
-
-          # Tauri ya escribe el `.sig` después de la firma Authenticode. Se
-          # rehace de todos modos: sale gratis y no depende de ese orden interno.
-          pnpm tauri signer sign "$INSTALLER"
-
-          if [ "${DRY_RUN:-false}" = "true" ]; then
-            {
-              echo "### Authenticode — Windows"
-              echo ""
-              echo "Ensayo: firmas de eSigner en esta corrida: **0**. Se construyó sin signCommand; lo instalado no se exige firmado."
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
-          # Lo que se firmó, y cuántas firmas de eSigner costó.
-          echo "Firmado con eSigner:"
-          sed 's/^/  /' "$T/signed.txt"
-          failed=0
-          expected_files=(terminus.exe "$(basename "$INSTALLER")")
-          [ -z "$ENGINE_SIDECAR" ] || expected_files+=("$ENGINE_SIDECAR")
-          for expected in "${expected_files[@]}"; do
-            grep -q "^$expected|" "$T/signed.txt" \
-              || { echo "::error::Tauri no pidió firmar $expected."; failed=1; }
-          done
-          [ "$failed" = 0 ]
-          n=$(wc -l < "$T/signed.txt")
-          [ "$n" -le "${#expected_files[@]}" ] || echo "::warning title=Más firmas de eSigner::Esta release gastó $n firmas, no ${#expected_files[@]}. Mira qué más pasó por signCommand."
-          {
-            echo "### Authenticode — Windows"
-            echo ""
-            echo "Firmas de eSigner en esta corrida: **$n**"
-            echo ""
-            cut -d'|' -f1,2 "$T/signed.txt" | sed 's/|/: /; s/^/- /'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      # La firma que importa es la del archivo que queda en disco, no la del que
-      # salió del build: v0.2.6 pasó todas las comprobaciones del build con un
-      # `terminus.exe` que, instalado, daba `HashMismatch`. Aquí se instala en
-      # silencio, como usuario, igual que lo hace una persona, y se mira lo que
-      # quedó en `%LOCALAPPDATA%\Terminus`. En un ensayo no hubo Authenticode:
-      # se exige que esté todo y la marca de NSIS, y la firma solo se muestra.
-      - name: Comprobar las firmas de lo que se instala
-        if: runner.os == 'Windows'
-        shell: pwsh
-        env:
-          DRY_RUN: ${{ inputs.dry_run }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $dryRun = $env:DRY_RUN -eq 'true'
-          $installer = Get-ChildItem -Recurse -File src-tauri/target/release/bundle -Filter '*_x64-setup.exe' | Select-Object -First 1
-          if (-not $installer) { throw 'No se construyó ningún *_x64-setup.exe.' }
-
-          $p = Start-Process -FilePath $installer.FullName -ArgumentList '/S' -Wait -PassThru
-          if ($p.ExitCode -ne 0) { throw "El instalador salió con $($p.ExitCode)." }
-
-          $dir = Join-Path $env:LOCALAPPDATA $env:PRODUCT_NAME
-          $failed = $false
-          $required = @('terminus.exe', 'uninstall.exe')
-          if ($env:ENGINE_PACKAGED -eq 'true') { $required += 'seldon-runtime.exe' }
-          foreach ($expected in $required) {
-            if (-not (Test-Path (Join-Path $dir $expected))) {
-              Write-Output "::error::El instalador no dejó $expected en $dir."
-              $failed = $true
-            }
-          }
-
-          Get-ChildItem -Recurse -File $dir -Include *.exe, *.dll | ForEach-Object {
-            $s = Get-AuthenticodeSignature -LiteralPath $_.FullName
-            $rel = $_.FullName.Substring($dir.Length + 1)
-            Write-Output ("{0}: {1} | {2} | sello: {3}" -f $rel, $s.Status, $s.SignerCertificate.Subject, [bool]$s.TimeStamperCertificate)
-            # Dentro de ForEach-Object, `return` pasa al siguiente archivo.
-            if ($dryRun) { return }
-            if ($rel -eq 'uninstall.exe' -and $s.Status -eq 'NotSigned') {
-              # Sin firmar a propósito: ver «Construir y firmar en Windows».
-            } elseif ($s.Status -ne 'Valid') {
-              Write-Output "::error title=Firma inválida en lo instalado::$rel quedó $($s.Status)."
-              $failed = $true
-            } elseif ($s.SignerCertificate.Subject -notlike '*Software y Servicios Danil*' -or -not $s.TimeStamperCertificate) {
-              Write-Output "::error::$rel no lleva el certificado de Danil con sello de tiempo."
-              $failed = $true
-            }
-          }
-
-          # Y que lo firmado sea el `.exe` ya parcheado: sin la marca de NSIS, el
-          # updater de la app no sabría qué paquete bajar.
-          $bytes = [IO.File]::ReadAllBytes((Join-Path $dir 'terminus.exe'))
-          $text = [Text.Encoding]::ASCII.GetString($bytes)
-          if (-not $text.Contains('__TAURI_BUNDLE_TYPE_VAR_NSS')) {
-            Write-Output '::error::El terminus.exe instalado no lleva la marca __TAURI_BUNDLE_TYPE_VAR_NSS.'
-            $failed = $true
-          }
-
-          if ($failed) { exit 1 }
-          if ($dryRun) {
-            Write-Output ("Ensayo: lo instalado está completo ({0}); su Authenticode no se exige." -f ($required -join ', '))
-          } else {
-            Write-Output ("Lo instalado: {0} presentes; los firmados, por Danil, válidos y con sello de tiempo." -f ($required -join ', '))
-          }
-
-          if ($env:ENGINE_SIGNED_HERE -eq 'true') {
-            $out = Join-Path $env:RUNNER_TEMP 'engine-signed'
-            New-Item -ItemType Directory -Force $out | Out-Null
-            $signedEngine = Join-Path $out 'seldon-runtime-x86_64-pc-windows-msvc.exe'
-            Copy-Item -LiteralPath (Join-Path $dir 'seldon-runtime.exe') -Destination $signedEngine
-            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $signedEngine).Hash.ToLowerInvariant()
-            "ENGINE_SIGNED_DIR=$out" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
-            "### Motor firmado en esta corrida`n`nSHA-256 ``$hash``. Súbelo a la release del motor y fíjalo en ``seldon-runtime.lock``." | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
-          }
-
-      - name: Guardar el motor firmado
-        if: runner.os == 'Windows' && env.ENGINE_SIGNED_HERE == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+          signing-cli/node_modules/.bin/tauri signer sign output/Terminus.app.tar.gz
+          node apps/desktop/scripts/candidate-signing.mjs verify output/Terminus.app.tar.gz
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: seldon-runtime-windows-signed
-          path: ${{ env.ENGINE_SIGNED_DIR }}
+          name: signed-existing-macos
+          path: output/*
           if-no-files-found: error
-          retention-days: 90
-
-      - name: Construir y firmar en macOS
-        if: runner.os == 'macOS'
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-          APPLE_API_KEY_PATH: ${{ env.APPLE_API_KEY_PATH }}
-        run: |
-          python3 scripts/work-tools-macos.py --directory "$RUNNER_TEMP/work-tools-release/work-tools"
-          pnpm desktop:build --target universal-apple-darwin --config "$WORK_TOOLS_CONFIG"
-
-      # `tauri.linux.conf.json` vive en el repo del código y ajusta el bundle a
-      # AppImage. Firma con la llave de minisign, como en las otras dos.
-      - name: Construir y firmar en Linux
-        if: runner.os == 'Linux'
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: pnpm exec tauri build --config src-tauri/tauri.linux.conf.json --config "$WORK_TOOLS_CONFIG"
-
-      - name: Verificar los recursos después del empaquetado
-        shell: bash
-        env:
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          set -euo pipefail
-          case "$RUNNER_OS" in
-            macOS)
-              app=src-tauri/target/universal-apple-darwin/release/bundle/macos/Terminus.app
-              resources="$app/Contents/Resources/work-tools"
-              engine="$app/Contents/MacOS/seldon-runtime"
-              ;;
-            Windows)
-              resources="$(cygpath -u "$LOCALAPPDATA")/Terminus/work-tools"
-              engine="$(cygpath -u "$LOCALAPPDATA")/Terminus/seldon-runtime.exe"
-              ;;
-            Linux)
-              image=$(find src-tauri/target/release/bundle -name '*.AppImage' -type f | head -1)
-              image=$(realpath "$image")
-              mkdir -p "$RUNNER_TEMP/work-tools-final"
-              (cd "$RUNNER_TEMP/work-tools-final" && "$image" --appimage-extract >/dev/null)
-              resources="$RUNNER_TEMP/work-tools-final/squashfs-root/usr/share/Terminus/work-tools"
-              engine="$RUNNER_TEMP/work-tools-final/squashfs-root/usr/bin/seldon-runtime"
-              ;;
-          esac
-          python3 scripts/work-tools-release.py verify --directory "$resources"
-          app_args=()
-          [ "$RUNNER_OS" != macOS ] || app_args=(--app "$app")
-          python3 scripts/work-tools-runtime-smoke.py --engine "$engine" --resources "$(dirname "$resources")" --browser --clone "${app_args[@]}"
-
-      - name: Comprobar el bundle universal
-        if: runner.os == 'macOS'
-        run: |
-          set -euo pipefail
-          APP=src-tauri/target/universal-apple-darwin/release/bundle/macos/Terminus.app
-          lipo "$APP/Contents/MacOS/terminus" -verify_arch arm64 x86_64
-          # Las herramientas van en un árbol por arquitectura: cada uno con la suya.
-          TOOLS="$APP/Contents/Resources/work-tools"
-          while IFS= read -r f; do
-            file -b "$f" | grep -q 'Mach-O' || continue
-            lipo "$f" -verify_arch arm64 x86_64
-          done < <(find "$APP" -type f -not -path "$TOOLS/*")
-          for pair in aarch64-apple-darwin:arm64 x86_64-apple-darwin:x86_64; do
-            while IFS= read -r f; do
-              file -b "$f" | grep -q 'Mach-O' || continue
-              lipo "$f" -verify_arch "${pair#*:}"
-            done < <(find "$TOOLS/${pair%%:*}" -type f)
-          done
-
-      # Con `CI=true` Tauri arma el `.dmg` sin acomodar la ventana (`--skip-jenkins`)
-      # y le pone al disco el ícono de la app: la gente abría Terminus desde el
-      # disco en vez de copiarlo. dmgbuild escribe la ventana sin Finder, con el
-      # ícono de instalador. Se firma aquí porque el llavero de Tauri ya no existe.
-      - name: Armar el .dmg con su ventana
-        if: runner.os == 'macOS'
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-        run: |
-          set -euo pipefail
-          B=src-tauri/target/universal-apple-darwin/release/bundle
-          APP="$B/macos/Terminus.app"
-          DMG=$(find "$B" -type f -name '*.dmg' | head -1)
-          [ -n "$DMG" ] || { echo "::error::No se construyó el .dmg."; exit 1; }
-
-          python3 -m venv "$RUNNER_TEMP/dmgbuild"
-          "$RUNNER_TEMP/dmgbuild/bin/pip" install --quiet 'dmgbuild==1.6.7'
-          rm "$DMG"
-          "$RUNNER_TEMP/dmgbuild/bin/dmgbuild" -s src-tauri/macos/dmg-settings.py \
-            -D "app=$APP" -D "assets=$PWD/src-tauri/macos" "Instalar Terminus" "$DMG"
-
-          KC="$RUNNER_TEMP/dmg-signing.keychain-db"
-          KC_PASSWORD=$(openssl rand -hex 24)
-          security create-keychain -p "$KC_PASSWORD" "$KC"
-          security set-keychain-settings -lut 900 "$KC"
-          security unlock-keychain -p "$KC_PASSWORD" "$KC"
-          umask 077
-          printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/dmg-signing.p12"
-          security import "$RUNNER_TEMP/dmg-signing.p12" -k "$KC" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          rm "$RUNNER_TEMP/dmg-signing.p12"
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KC_PASSWORD" "$KC" >/dev/null
-          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
-          codesign --force --timestamp --keychain "$KC" --sign "$APPLE_SIGNING_IDENTITY" "$DMG"
-          security delete-keychain "$KC"
-          codesign --verify --verbose=2 "$DMG"
-
-          MNT=$(mktemp -d)
-          hdiutil attach -nobrowse -readonly -mountpoint "$MNT" "$DMG" >/dev/null
-          for f in .DS_Store .VolumeIcon.icns .background.tiff Terminus.app Applications; do
-            [ -e "$MNT/$f" ] || { hdiutil detach "$MNT" >/dev/null; echo "::error::Al .dmg le falta $f."; exit 1; }
-          done
-          hdiutil detach "$MNT" >/dev/null
-
-      # El código de salida de `tauri build` tampoco basta: un .app ad-hoc o sin
-      # ticket grapado llega a `release-assets/` igual. `stapler validate` es lo que
-      # Gatekeeper mira en un Mac sin red; si falla, no se publica.
-      # Tauri notariza y grapa el `.app`; el `.dmg` lo arma después, y sale sin
-      # ticket propio. Lo que la gente descarga es el `.dmg`, así que se
-      # notariza también: con su ticket grapado, Gatekeeper lo acepta en un Mac
-      # sin red. Hay que someterlo aparte porque el ticket va por hash, y el del
-      # `.dmg` no es el del `.app` que lleva dentro.
-      - name: Notarizar y grapar el .dmg
-        if: runner.os == 'macOS'
-        env:
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-        run: |
-          set -euo pipefail
-          DMG=$(find src-tauri/target/universal-apple-darwin/release/bundle -type f -name '*.dmg' | head -1)
-          [ -n "$DMG" ] || { echo "::error::No se construyó el .dmg."; exit 1; }
-          xcrun notarytool submit "$DMG"             --key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER"             --wait
-          xcrun stapler staple "$DMG"
-
-      - name: Comprobar la firma de Apple
-        if: runner.os == 'macOS'
-        run: |
-          set -euo pipefail
-          B=src-tauri/target/universal-apple-darwin/release/bundle
-          APP=$(find "$B" -name 'Terminus.app' -type d | head -1)
-          DMG=$(find "$B" -type f -name '*.dmg' | head -1)
-          [ -n "$APP" ] || { echo "::error::No se construyó Terminus.app."; exit 1; }
-          [ -n "$DMG" ] || { echo "::error::No se construyó el .dmg."; exit 1; }
-
-          codesign --verify --deep --strict --verbose=2 "$APP"
-          INFO=$(codesign -dv --verbose=4 "$APP" 2>&1)
-          echo "$INFO"
-          echo "$INFO" | grep -q "Developer ID Application: Software y Servicios Danil" \
-            || { echo "::error::No está firmado con el Developer ID de Danil."; exit 1; }
-          echo "$INFO" | grep -q "flags=.*runtime" \
-            || { echo "::error::Falta hardened runtime: Apple rechaza la notarización."; exit 1; }
-
-          xcrun stapler validate "$APP"
-          xcrun stapler validate "$DMG"
-          echo "Apple: Developer ID de Danil, hardened runtime, ticket grapado en .app y .dmg."
-
-      # Los nombres que produce Tauri llevan la versión y la arquitectura dentro,
-      # y cambian solos al subir cualquiera de las dos. Aquí se normalizan a una
-      # carpeta con nombres fijos: lo que el paso de publicar espera encontrar
-      # deja de depender de cómo se llamó el archivo hoy.
-      #
-      # Y **se falla si algo no está**. Un `cp` que no encuentra su origen en un
-      # `if` amable publica una release a la que le falta el `.sig`, que es
-      # exactamente la release que nadie puede instalar.
-      - name: Recoger los artefactos
-        id: collect-artifacts
-        shell: bash
-        env:
-          V: ${{ needs.check.outputs.version }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: |
-          set -euo pipefail
-          mkdir -p release-assets
-          B=src-tauri/target/release/bundle
-          if [ "${{ matrix.name }}" = "macos" ]; then
-            B=src-tauri/target/universal-apple-darwin/release/bundle
-          fi
-
-          require_file() {
-            local pattern="$1" target="$2"
-            local f
-            f=$(find "$B" -type f -name "$pattern" | head -1)
-            if [ -z "$f" ]; then
-              echo "::error::No se construyó ningún $pattern. Contenido de $B:"
-              find "$B" -type f | sed 's/^/    /'
-              exit 1
-            fi
-            cp "$f" "release-assets/$target"
-            echo "  $pattern → $target  ($(du -h "$f" | cut -f1))"
-          }
-
-          if [ "${{ matrix.name }}" = "windows" ]; then
-            # NSIS y no MSI: es el formato que el updater sabe aplicar sin
-            # intervención, y `installMode: passive` lo instala enseñando barra
-            # de progreso pero sin preguntar nada.
-            require_file '*_x64-setup.exe'     "Terminus_${V}_x64-setup.exe"
-            require_file '*_x64-setup.exe.sig' "Terminus_${V}_x64-setup.exe.sig"
-            cp "release-assets/Terminus_${V}_x64-setup.exe" release-assets/Terminus-Windows-Setup.exe
-          elif [ "${{ matrix.name }}" = "macos" ]; then
-            require_file '*.app.tar.gz'     "Terminus.app.tar.gz"
-            require_file '*.app.tar.gz.sig' "Terminus.app.tar.gz.sig"
-            require_file '*_universal.dmg'  "Terminus_${V}_universal.dmg"
-            cp "release-assets/Terminus_${V}_universal.dmg" release-assets/Terminus-macOS.dmg
-            cp "release-assets/Terminus_${V}_universal.dmg" release-assets/Terminus-macOS-Intel.dmg
-          else
-            # El AppImage es lo que el updater baja y lo que la página enlaza:
-            # una sola copia versionada, más el nombre estable.
-            require_file '*.AppImage'     "Terminus_${V}_amd64.AppImage"
-            require_file '*.AppImage.sig' "Terminus_${V}_amd64.AppImage.sig"
-            cp "release-assets/Terminus_${V}_amd64.AppImage" release-assets/Terminus-Linux-x86_64.AppImage
-          fi
-
-          {
-            echo "### Instaladores — ${{ matrix.name }}"
-            echo ""
-            echo "| archivo | tamaño |"
-            echo "|---|---|"
-            for f in release-assets/*; do
-              echo "| $(basename "$f") | $(du -h "$f" | cut -f1) |"
-            done
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: dist-${{ matrix.name }}
-          if-no-files-found: error
-          path: apps/desktop/release-assets/*
-
-      - name: Dividir el instalador para revisión del ensayo
-        if: inputs.dry_run
-        shell: bash
-        run: |
-          node scripts/work-tools-qa-artifacts.mjs release-assets "$RUNNER_TEMP/qa-installer" "${{ matrix.name }}"
-
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: inputs.dry_run
-        with:
-          name: qa-${{ matrix.name }}-installer-1
-          path: ${{ runner.temp }}/qa-installer/*.part-01
-          if-no-files-found: ignore
-          compression-level: 0
-
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: inputs.dry_run
-        with:
-          name: qa-${{ matrix.name }}-installer-2
-          path: ${{ runner.temp }}/qa-installer/*.part-02
-          if-no-files-found: ignore
-          compression-level: 0
-
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: inputs.dry_run
-        with:
-          name: qa-${{ matrix.name }}-installer-3
-          path: ${{ runner.temp }}/qa-installer/*.part-03
-          if-no-files-found: ignore
-          compression-level: 0
-
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: inputs.dry_run
-        with:
-          name: qa-${{ matrix.name }}-installer-4
-          path: ${{ runner.temp }}/qa-installer/*.part-04
-          if-no-files-found: ignore
-          compression-level: 0
-
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: inputs.dry_run
-        with:
-          name: qa-${{ matrix.name }}-installer-5
-          path: ${{ runner.temp }}/qa-installer/*.part-05
-          if-no-files-found: ignore
-          compression-level: 0
-
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: inputs.dry_run
-        with:
-          name: qa-${{ matrix.name }}-installer-6
-          path: ${{ runner.temp }}/qa-installer/*.part-06
-          if-no-files-found: ignore
-          compression-level: 0
-
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: inputs.dry_run
-        with:
-          name: qa-${{ matrix.name }}-installer-7
-          path: ${{ runner.temp }}/qa-installer/*.part-07
-          if-no-files-found: ignore
-          compression-level: 0
-
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: inputs.dry_run
-        with:
-          name: qa-${{ matrix.name }}-installer-8
-          path: ${{ runner.temp }}/qa-installer/*.part-08
-          if-no-files-found: ignore
-          compression-level: 0
-
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: inputs.dry_run
-        with:
-          name: qa-${{ matrix.name }}-installer-metadata
-          path: ${{ runner.temp }}/qa-installer/*.json
-          if-no-files-found: error
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Una sola release con Windows, macOS universal y Linux dentro, y el
-  # `latest.json` que la app consulta. Va en un job aparte porque **publicar
-  # media release es peor que no publicarla**: si macOS falla, aquí no se llega
-  # y Windows tampoco sale.
-  # ─────────────────────────────────────────────────────────────────────────────
-  test-macos:
-    needs: [check, build]
-    strategy:
-      matrix:
-        so: [macos-latest, macos-15-intel]
-    runs-on: ${{ matrix.so }}
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          ref: ${{ needs.check.outputs.sha }}
-          persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: 22
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: dist-macos
-          path: release-assets
-      - name: Ejecutar el mismo universal en ambas arquitecturas
-        env:
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          set -euo pipefail
-          tar xzf release-assets/Terminus.app.tar.gz
-          lipo Terminus.app/Contents/MacOS/terminus -verify_arch arm64 x86_64
-          codesign --verify --deep --strict Terminus.app
-          lipo Terminus.app/Contents/MacOS/seldon-runtime -verify_arch arm64 x86_64
-          # Sin argumentos arrancaría el motor empaquetado. Con uno que no entiende
-          # sale con `cli.error.invalid_request`: el ejecutable carga; la interfaz no se prueba.
-          out=$(Terminus.app/Contents/MacOS/terminus --external-host 2>&1) && { echo "::error::Arrancó con un argumento inválido"; exit 1; }
-          echo "$out" | grep -q invalid_request
-          python3 apps/desktop/scripts/work-tools-release.py verify --directory Terminus.app/Contents/Resources/work-tools
-          python3 apps/desktop/scripts/work-tools-runtime-smoke.py --engine Terminus.app/Contents/MacOS/seldon-runtime --resources Terminus.app/Contents/Resources --browser --clone --app Terminus.app
-
-  # El AppImage que se va a publicar, en un Ubuntu limpio: la firma minisign
-  # con el mismo verificador que usa `npx`, que lleve el motor, y que el binario
-  # cargue y responda (con un argumento que no entiende sale con `invalid_request`:
-  # el ejecutable carga; la interfaz no se prueba).
-  # `xvfb-run` da una pantalla virtual y `--appimage-extract-and-run` evita
-  # depender de que FUSE funcione dentro del runner.
-  test-linux:
-    needs: [check, build]
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          ref: ${{ needs.check.outputs.sha }}
-          persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: 22
-      - name: Instalar las dependencias de ejecución del AppImage
-        run: sudo apt-get update && sudo apt-get install -y libfuse2 xvfb libwebkit2gtk-4.1-0 libayatana-appindicator3-1
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: dist-linux
-          path: release-assets
-      - name: Verificar la firma del AppImage y arrancarlo
-        env:
-          V: ${{ needs.check.outputs.version }}
-        run: |
-          set -euo pipefail
-          APP="Terminus_${V}_amd64.AppImage"
-          export APP PUBLIC_KEY
-          node --input-type=module <<'JS'
-          import { verifyFile } from './apps/desktop/npx/lib/minisign.mjs';
-          import { readFileSync } from 'node:fs';
-          await verifyFile({
-            filePath: `release-assets/${process.env.APP}`,
-            sigFileB64: readFileSync(`release-assets/${process.env.APP}.sig`, 'utf8'),
-            publicKeyB64: process.env.PUBLIC_KEY,
-            expectedFileName: process.env.APP,
-          });
-          console.log('Firma minisign del AppImage verificada.');
-          JS
-          chmod +x "release-assets/$APP"
-          (cd "$RUNNER_TEMP" && "$GITHUB_WORKSPACE/release-assets/$APP" --appimage-extract usr/bin/seldon-runtime >/dev/null)
-          [ -x "$RUNNER_TEMP/squashfs-root/usr/bin/seldon-runtime" ] || { echo "::error title=Motor sin empaquetar::el AppImage no lleva usr/bin/seldon-runtime."; exit 1; }
-          out=$(timeout 60s xvfb-run -a "release-assets/$APP" --appimage-extract-and-run --external-host 2>&1) && { echo "::error::Arrancó con un argumento inválido"; exit 1; }
-          echo "$out" | grep -q invalid_request
-
-  publish:
-    needs: [check, build, test-macos, test-linux]
-    # En un ensayo también corre: arma el `latest.json` y lo deja como artefacto,
-    # pero los pasos que crean la release y la comprueban se saltan.
-    if: ${{ success() }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          path: release-assets
-          pattern: dist-*
-          merge-multiple: true
-
-      # La firma no cubre solo los bytes: su comentario de confianza lleva el
-      # **nombre** del archivo que se firmó. Publicarlo con otro nombre deja una
-      # release que se instala en unos sitios y no en otros —el updater de Tauri
-      # mira los bytes, `npx` mira además el nombre y se niega— y eso no se ve
-      # aquí: se ve en la terminal de otro, tres canales más allá.
-      #
-      # Pasó con `Terminus.app.tar.gz`, renombrado a `Terminus_0.1.8_aarch64…`.
-      - name: Cada firma habla del archivo que se publica
-        id: verify-signature-names
-        run: |
-          set -euo pipefail
-          failed=0
-          for sig in release-assets/*.sig; do
-            file=$(basename "${sig%.sig}")
-            signed_name=$(base64 -d < "$sig" | grep -o 'file:[^[:space:]]*' | head -1 | cut -d: -f2-)
-            if [ "$signed_name" != "$file" ]; then
-              echo "::error title=Firma renombrada::$file lleva una firma que dice «$signed_name». Renombrar un artefacto firmado rompe la comprobación de nombre."
-              failed=1
-            else
-              echo "  $file ✓"
-            fi
-          done
-          [ "$failed" = 0 ]
-
-      - name: Armar latest.json
-        id: build-manifest
-        env:
-          V: ${{ needs.check.outputs.version }}
-          NOTE_ES: ${{ needs.check.outputs.note_es }}
-          NOTE_EN: ${{ needs.check.outputs.note_en }}
-        run: |
-          set -euo pipefail
-          ls -la release-assets
-
-          BASE="https://github.com/$GITHUB_REPOSITORY/releases/download/v$V"
-
-          # Las claves de plataforma las decide el plugin, no nosotros: la app
-          # busca **la suya** y, si no está, concluye que está al día. Sin ruido,
-          # sin error y sin actualizarse nunca — que es como estuvo `darwin` desde
-          # la primera release hasta hoy.
-          #
-          # `notes` es el campo estándar y lo lee el updater de Tauri: la nota
-          # en inglés, o en español si la versión no trae inglés. `notes_by_locale`
-          # es de la app, que elige la de su idioma y, si no está, cae a `notes`.
-          jq -n \
-            --arg v "$V" \
-            --arg notes_es "$NOTE_ES" \
-            --arg notes_en "$NOTE_EN" \
-            --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" \
-            --arg win_sig "$(cat "release-assets/Terminus_${V}_x64-setup.exe.sig")" \
-            --arg win_url "$BASE/Terminus_${V}_x64-setup.exe" \
-            --arg mac_sig "$(cat "release-assets/Terminus.app.tar.gz.sig")" \
-            --arg mac_url "$BASE/Terminus.app.tar.gz" \
-            --arg linux_sig "$(cat "release-assets/Terminus_${V}_amd64.AppImage.sig")" \
-            --arg linux_url "$BASE/Terminus_${V}_amd64.AppImage" \
-            '{
-              version: $v,
-              notes: (if $notes_en != "" then $notes_en else $notes_es end),
-              notes_by_locale: { es: $notes_es, en: $notes_en },
-              pub_date: $pub_date,
-              platforms: {
-                "windows-x86_64": { signature: $win_sig, url: $win_url },
-                "darwin-aarch64": { signature: $mac_sig, url: $mac_url },
-                "darwin-x86_64": { signature: $mac_sig, url: $mac_url },
-                "linux-x86_64": { signature: $linux_sig, url: $linux_url }
-              }
-            }' > release-assets/latest.json
-
-          cat release-assets/latest.json
-
-      # En un ensayo no hay release donde mirarlo: el manifiesto se queda como
-      # artefacto, que es lo que se revisa para saber que salió bien armado.
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: inputs.dry_run
-        with:
-          name: dist-manifest
-          path: release-assets/latest.json
-          if-no-files-found: error
-
-      # En un ensayo arma el cuerpo, escribe la orden que habría usado y para ahí.
-      - name: Publicar la release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          V: ${{ needs.check.outputs.version }}
-          NOTE_ES: ${{ needs.check.outputs.note_es }}
-          NOTE_EN: ${{ needs.check.outputs.note_en }}
-          SHA: ${{ needs.check.outputs.sha }}
-          DRY_RUN: ${{ inputs.dry_run }}
-          PRERELEASE: ${{ inputs.prerelease }}
-        run: |
-          set -euo pipefail
-
-          # El cuerpo va bilingüe: primero inglés y después español, separados
-          # por una regla. Si la versión no trae nota en inglés (transición),
-          # la parte en inglés lleva una línea genérica en vez de la nota en
-          # español.
-          [ -n "$NOTE_EN" ] || NOTE_EN="Improvements and fixes."
-
-          # shellcheck disable=SC2016  # Los backticks son Markdown literal.
-          BODY=$(
-            printf '%s\n\n' "$NOTE_EN"
-            printf 'Windows: `Terminus-Windows-Setup.exe` · macOS Apple Silicon: `Terminus-macOS.dmg` · macOS Intel: `Terminus-macOS-Intel.dmg` · Linux x86_64: `Terminus-Linux-x86_64.AppImage`\n\n'
-            printf 'The two macOS files contain the same universal DMG. If you already have it installed there is nothing to download: the app notifies you on its own.\n\n'
-            printf 'Built from `%s` in run `%s`.\n\n---\n\n' "$SHA" "$GITHUB_RUN_ID"
-            printf '%s\n\n' "$NOTE_ES"
-            printf 'Windows: `Terminus-Windows-Setup.exe` · macOS Apple Silicon: `Terminus-macOS.dmg` · macOS Intel: `Terminus-macOS-Intel.dmg` · Linux x86_64: `Terminus-Linux-x86_64.AppImage`\n\n'
-            printf 'Los dos archivos de macOS traen el mismo DMG universal. Quien ya la tenga instalada no necesita bajar nada: la app avisa sola.\n\n'
-            printf 'Construida desde `%s` en `%s`.\n' "$SHA" "$GITHUB_RUN_ID"
-          )
-
-          # Rehacer una versión reemplaza la release entera. Borrarla y crearla de
-          # nuevo, y no `upload --clobber`, porque un asset que dejó de producirse
-          # se quedaría colgando de la anterior y el `latest.json` nuevo no lo
-          # menciona: un archivo que nadie referencia pero que la página sí
-          # enlaza por nombre estable.
-          # `--target`: sin tag previo, gh lo crearía sobre la rama por omisión.
-          # `--latest=false` explícito: sin él la marca la decide la API.
-          if [ "${PRERELEASE:-false}" = "true" ]; then
-            MODE=(--prerelease --latest=false)
-          else
-            MODE=(--latest)
-          fi
-          ASSETS=(release-assets/*)
-          echo "gh release create v$V --repo $GITHUB_REPOSITORY --target $SHA --title v$V --notes <cuerpo> ${MODE[*]} ${ASSETS[*]}"
-          printf '### Release\n\n`gh release create v%s --target %s %s`\n' "$V" "$SHA" "${MODE[*]}" >> "$GITHUB_STEP_SUMMARY"
-
-          if [ "${DRY_RUN:-false}" = "true" ]; then
-            echo "Ensayo: no se crea la release."
-            exit 0
-          fi
-
-          if gh release view "v$V" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Reemplazando v$V."
-            gh release delete "v$V" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
-          fi
-
-          gh release create "v$V" \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$SHA" \
-            --title "v$V" \
-            --notes "$BODY" \
-            "${MODE[@]}" \
-            "${ASSETS[@]}"
-
-      # Comprobar lo publicado desde fuera, por la misma URL que usan la app y la
-      # página. Que el paso anterior salga con 0 dice que GitHub aceptó los
-      # archivos; no dice que `releases/latest` resuelva a esta release ni que el
-      # `latest.json` que se sirve sea este. Es lo único que lo convierte en un
-      # hecho, y cuesta tres segundos.
-      - name: Comprobar que la app lo ve
-        if: ${{ !inputs.dry_run && !inputs.prerelease }}
-        env:
-          V: ${{ needs.check.outputs.version }}
-        run: |
-          set -euo pipefail
-          BASE="https://github.com/$GITHUB_REPOSITORY/releases/latest/download"
-
-          J=$(curl -fsSL "$BASE/latest.json")
-          echo "$J" | jq .
-
-          [ "$(echo "$J" | jq -r .version)" = "$V" ] \
-            || { echo "::error::releases/latest sirve otra versión"; exit 1; }
-          echo "$J" | jq -e '.notes_by_locale | has("es") and has("en")' >/dev/null \
-            || { echo "::error::latest.json se publicó sin notes_by_locale"; exit 1; }
-          for p in windows-x86_64 darwin-aarch64 darwin-x86_64 linux-x86_64; do
-            echo "$J" | jq -e --arg p "$p" '.platforms[$p].signature | length > 0' >/dev/null \
-              || { echo "::error::$p se publicó sin firma"; exit 1; }
-          done
-
-          # Todos los enlaces de descarga estables deben existir antes de dar
-          # esto por bueno.
-          for a in Terminus-Windows-Setup.exe Terminus-macOS.dmg Terminus-macOS-Intel.dmg Terminus-Linux-x86_64.AppImage; do
-            curl -fsSIL -o /dev/null "$BASE/$a" \
-              || { echo "::error::$a no se puede descargar — el botón de la página está roto"; exit 1; }
-          done
-
-          echo "v$V publicada, firmada para Windows, ambas arquitecturas de macOS y Linux x86_64, y descargable."
-
-      # Lo contrario: la prerelease tiene su `latest.json` y `releases/latest`
-      # sigue sirviendo otra versión a la app y a la página.
-      - name: Comprobar que la app no ve la prerelease
-        if: ${{ !inputs.dry_run && inputs.prerelease }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          V: ${{ needs.check.outputs.version }}
-        run: |
-          set -euo pipefail
-          [ "$(gh release view "v$V" --repo "$GITHUB_REPOSITORY" --json isPrerelease -q .isPrerelease)" = "true" ] \
-            || { echo "::error::v$V no quedó como prerelease"; exit 1; }
-          J=$(curl -fsSL "https://github.com/$GITHUB_REPOSITORY/releases/download/v$V/latest.json")
-          [ "$(echo "$J" | jq -r .version)" = "$V" ] \
-            || { echo "::error::el latest.json de v$V no dice $V"; exit 1; }
-          LATEST=$(curl -fsSL "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/latest.json" | jq -r .version)
-          [ "$LATEST" != "$V" ] \
-            || { echo "::error::releases/latest ya sirve v$V: las copias instaladas la van a bajar"; exit 1; }
-          echo "v$V publicada como prerelease; releases/latest sigue en $LATEST."
+          retention-days: 7
