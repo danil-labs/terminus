@@ -1,6 +1,7 @@
-import { createSignal, For, onCleanup, onMount, Show } from 'solid-js';
+import { createEffect, createSignal, For, onCleanup, onMount, Show } from 'solid-js';
 import { createInbox, type Account, type Conversation, type InboxSession, type Message } from '../../../../../packages/attention/src/inbox.ts';
 import { t } from '../../lib/i18n';
+import { publishConversations, requestedConversation, requestConversation } from './loaded';
 import { Button } from '../../ui/Button';
 import { Skeleton } from '../../ui/Skeleton';
 import { ChannelFilter, ContactDetails, ConversationHeader, ConversationRow, ConversationSearch, InboxComposer, MessageBubble, senderLabel, SelectConversation } from './inbox-view';
@@ -52,6 +53,10 @@ export function Attention(props: { demo: boolean; session?: InboxSession & { sub
     catch(cause){if(request===epoch&&selectedThread===thread)setError(cause instanceof Error?cause.message:t("web.alpha.error"));}
     finally{if(request===epoch&&selectedThread===thread){setBusy(false);setLoadingThread(false);}}
   }
+  // El buscador global solo ve lo ya cargado y pide abrir una de esas filas.
+  createEffect(() => publishConversations(rows()));
+  onCleanup(() => publishConversations([]));
+  createEffect(() => { const id = requestedConversation(); const row = id === null ? undefined : rows().find(r => r.id === id); if (row) { requestConversation(null); void open(row); } });
   function close() { thread++; setSelected(undefined); setMessages([]); setOlder(false); setError(''); setBusy(false); setLoadingThread(false); setDetail(false); }
   // Un tramo se corta al cambiar de lado o de remitente, como en Danil Agents.
   const position = (index: number) => {

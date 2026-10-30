@@ -1,10 +1,8 @@
 import History from "lucide-solid/icons/history";
 import Loader2 from "lucide-solid/icons/loader-2";
 import Plus from "lucide-solid/icons/plus";
-import Search from "lucide-solid/icons/search";
 import SquarePen from "lucide-solid/icons/square-pen";
 import TriangleAlert from "lucide-solid/icons/triangle-alert";
-import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createResource, createSignal, type JSX, lazy, mapArray, on, onCleanup, Show, Suspense } from "solid-js";
 import { destinoEnVuelo, puntoDelArrastre, tareaEnVuelo } from "../../lib/drag";
 import { recordarCarpetas } from "../../lib/folderKinds";
@@ -16,8 +14,6 @@ import { createPref } from "../../lib/prefs";
 import { sharedLazy } from "../../lib/sharedLazy";
 import { ariaDeAtajo } from "../../lib/shortcuts";
 import { cn } from "../../lib/utils";
-import { Button } from "../../ui/Button";
-import { Input } from "../../ui/Input";
 import { KeyedList } from "../../ui/KeyedList";
 import { TeclaDeAtajo } from "../../ui/Shortcut";
 import {
@@ -150,8 +146,6 @@ export default function Sidebar(props: {
   filterRef?: (filter: SidebarFilterProps | null) => void;
   /** El nombre del escritorio activo, para su riel vacío. */
   escritorio?: string | null;
-  viendoArchivadas?: boolean;
-  onArchivadas?: () => void;
   spaces?: { id: string; name: string }[];
   onMoveToSpace?: (project: string, id: string, space: string) => void;
   /** «Traer a esta Mac» en el menú de una tarea de otra máquina; solo en el escritorio. */
@@ -214,12 +208,6 @@ export default function Sidebar(props: {
     saveSidebarView(props.viewKey, siguiente);
   };
 
-  const [searchText, setSearchText] = createSignal("");
-  const query = () => searchText().trim();
-  const [searchCounts, setSearchCounts] = createSignal<Record<string, number>>({});
-  const reportResults = (key: string, count: number) => setSearchCounts(previous => previous[key] === count ? previous : { ...previous, [key]: count });
-  const clearSearch = () => setSearchText("");
-  createEffect(() => { if (props.collapsed) clearSearch(); });
   createEffect(() => recordarCarpetas(props.projects));
 
   /** De qué carpeta es cada tarea, por id: las acciones de la fila llegan con el id. */
@@ -232,7 +220,7 @@ export default function Sidebar(props: {
   const nombreDe = (project: string) => props.projects.find((p) => p.id === project)?.name;
   const relacionadas = createMemo(() => Object.values(props.sessions).flat());
 
-  const todas = createMemo(() => flattenTasks(props.sessions, !!query()));
+  const todas = createMemo(() => flattenTasks(props.sessions));
   const cuentas = createMemo(() => folderCounts(todas()));
   // La de esta computadora, con el nombre que le da la cuenta, como su tarjeta flotante.
   const nombreDeMaquina = (id: string) => {
@@ -343,7 +331,6 @@ export default function Sidebar(props: {
   const agentesDelFiltro = createMemo(() =>
     agentOptions(agentesDelDock().map((a) => a.name), todas().map((x) => x.row))
       .map((a) => ({ ...a, body: perfilDe(a.name)?.body, avatar: perfilDe(a.name)?.avatar })));
-  const conResultados = (clave: string) => (searchCounts()[clave] ?? 0) > 0;
   props.filterRef?.({
     get view() { return vistaEfectiva(); },
     onChange: cambiarVista,
@@ -372,15 +359,13 @@ export default function Sidebar(props: {
    * sitios —expandida y en el desplegable—; una variable contendría un solo
    * nodo del DOM y colocarlo dos veces lo movería del primero al segundo.
    */
-  const Historial = (p: { filas: SessionRow[]; clave: string; sinCarpeta?: boolean }) => (
+  const Historial = (p: { filas: SessionRow[]; sinCarpeta?: boolean }) => (
     <Sessions sidebar
       draggedTask={props.draggedTask}
       hideFolder={p.sinCarpeta}
       sessions={p.filas}
       relatedSessions={relacionadas()}
       groupByAuthor={false}
-      search={query()}
-      onSearchResults={count => reportResults(p.clave, count)}
       current={props.current}
       vivas={props.vivas}
       aprobando={props.aprobando}
@@ -476,11 +461,10 @@ export default function Sidebar(props: {
 
   const Grupo = (p: { grupo: SidebarGroup<SessionRow> }) => {
     const g = () => p.grupo;
-    const clave = () => g().kind === "section" ? g().key : groupKey(g());
     const plegado = () => g().machine ? `${g().key}@${g().machine}` : g().key;
     const titulo = () => groupLabel(g(), (id) => nombreDe(id) ?? id, nombreDeMaquina);
     const proyecto = () => g().kind === "folder" ? props.projects.find((x) => x.id === g().key) : undefined;
-    const abierto = () => !!query() || g().kind !== "folder" || !cerrados().includes(plegado());
+    const abierto = () => g().kind !== "folder" || !cerrados().includes(plegado());
     const necesita = () => g().kind === "status" && ["approving", "asked", "failed"].includes(g().key);
     return (
       <Show when={g().tasks.length > 0 || proyecto()}>
@@ -488,7 +472,6 @@ export default function Sidebar(props: {
           data-sidebar-section={g().kind === "section" ? g().key : undefined}
           data-sidebar-group={g().kind === "section" ? undefined : g().key}
           aria-label={titulo()}
-          classList={{ hidden: !!query() && !conResultados(clave()) }}
         >
           <Show
             when={proyecto()}
@@ -548,7 +531,7 @@ export default function Sidebar(props: {
               when={g().tasks.length > 0}
               fallback={<p class="m-0 py-0.5 pl-7 text-[0.6875rem] text-neutral-500" data-folder-empty="">{t("shell.sidebar.folder_empty")}</p>}
             >
-              <Historial filas={g().tasks} clave={clave()} sinCarpeta={g().kind === "folder" && !!g().key} />
+              <Historial filas={g().tasks} sinCarpeta={g().kind === "folder" && !!g().key} />
             </Show>
           </Show>
         </section>
@@ -556,14 +539,12 @@ export default function Sidebar(props: {
     );
   };
 
-  const hayResultados = () => Object.values(searchCounts()).some((n) => n > 0);
-
   /** La misma lista, montada en dos sitios: expandida y en el desplegable. */
   const Lista = () => (
     <div data-sidebar-tasks class="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-1 rounded-[14px]">
       <Show when={props.clon}>{(c) => <FilaDeClon clon={c()} />}</Show>
 
-      <Show when={todas().length === 0 && !query() && !hayCarpetasVacias()}>
+      <Show when={todas().length === 0 && !hayCarpetasVacias()}>
         <Show
           when={props.projects.length === 0}
           fallback={<p class="m-0 px-2 pt-1 text-xs text-neutral-500" data-sidebar-empty="">{t("shell.sidebar.empty")}</p>}
@@ -576,7 +557,7 @@ export default function Sidebar(props: {
         </Show>
       </Show>
 
-      <Show when={todas().length > 0 && !query() && grupos().every((g) => g.tasks.length === 0)}>
+      <Show when={todas().length > 0 && grupos().every((g) => g.tasks.length === 0)}>
         <p class="m-0 px-2 pt-1 text-xs text-neutral-500" data-sidebar-filtered-empty="">{t("shell.sidebar.filter_empty")}</p>
       </Show>
 
@@ -660,20 +641,6 @@ export default function Sidebar(props: {
           </SidebarMenu>
 
           <Show when={!props.collapsed}>
-            <div data-sidebar-scope class="flex min-w-0 items-center gap-1">
-              <div data-sidebar-search class="flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-md border border-border-strong bg-surface-raised px-2 focus-within:outline-solid focus-within:outline-2 focus-within:outline-primary">
-                <Search size={14} class="shrink-0 text-neutral-500" aria-hidden="true" />
-                <Input type="text" role="searchbox" variant="ghost" class="h-full min-h-0 min-w-0 flex-1 border-0 px-0 py-0" placeholder={t("shell.sidebar.search")} aria-label={t("shell.sidebar.search")} value={searchText()} onInput={event => setSearchText(event.currentTarget.value)} onKeyDown={event => {
-                  if (event.key === "Escape" && searchText()) { event.preventDefault(); event.stopPropagation(); clearSearch(); }
-                }} />
-                <Show when={searchText()}>
-                  <Button variant="chrome" size="iconCompact" class="-mr-1 size-6 shrink-0 text-neutral-500" aria-label={t("shell.sidebar.clear_search")} title={t("shell.sidebar.clear_search")} onClick={clearSearch}><X size={14} /></Button>
-                </Show>
-              </div>
-            </div>
-          </Show>
-
-          <Show when={!props.collapsed}>
             {/* **`overflow-y-auto` y NO `overflow-auto`.** Aquél es de los dos
                 ejes: los títulos llegaban al borde sin puntos suspensivos y lo
                 de la derecha quedaba fuera de la vista. */}
@@ -685,9 +652,6 @@ export default function Sidebar(props: {
               class="-mr-2 min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto pr-2"
               data-arrastre-scroll=""
             >
-              <Show when={query() && !hayResultados()}>
-                <p role="status" class="m-0 px-2 py-1 text-xs text-neutral-500">{t("shell.sidebar.no_results")}</p>
-              </Show>
               <Lista />
             </div>
           </Show>
