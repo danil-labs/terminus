@@ -429,6 +429,15 @@ const es = {
   "search.clear": "Borrar búsqueda",
   "search.no_match": "Nada coincide con la búsqueda.",
   "lists.soon": "pronto",
+  "home.space_menu": "Cambiar de espacio",
+  "home.agents_working": "Trabajando · {count}",
+  "profile.title": "Tu perfil",
+  "space.name_placeholder": "Nombre del espacio",
+  "space.create": "Crear",
+  "space.delete_title": "¿Eliminar «{name}»?",
+  "space.delete_body": "Se archivan sus {count} tareas.",
+  "space.delete_dirty": "{count} con cambios sin commitear: esos cambios se descartan.",
+  "space.delete_last": "Es el único espacio del workspace: no se puede eliminar.",
 } as const;
 
 type Key = keyof typeof es;
@@ -861,6 +870,15 @@ const en: Record<Key, string> = {
   "search.clear": "Clear search",
   "search.no_match": "Nothing matches the search.",
   "lists.soon": "soon",
+  "home.space_menu": "Switch space",
+  "home.agents_working": "Working · {count}",
+  "profile.title": "Your profile",
+  "space.name_placeholder": "Space name",
+  "space.create": "Create",
+  "space.delete_title": "Delete “{name}”?",
+  "space.delete_body": "Its {count} tasks are archived.",
+  "space.delete_dirty": "{count} with uncommitted changes: those changes are discarded.",
+  "space.delete_last": "It's the workspace's only space: it can't be deleted.",
 };
 
 /** The language the app speaks, also for the words that come from `@terminus/design`. */

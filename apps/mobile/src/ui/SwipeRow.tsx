@@ -41,7 +41,7 @@ export function SwipeRow({ actions, children, testID }: { actions: SwipeAction[]
         </View>
       )}
     >
-      {children}
+      <View style={{ backgroundColor: theme.surface }}>{children}</View>
     </ReanimatedSwipeable>
   );
 }
