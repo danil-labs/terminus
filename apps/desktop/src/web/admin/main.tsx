@@ -5,6 +5,7 @@ import { activeAccountOf, type AuditEntry, webAuditLog } from "../audit-log";
 import { authLocation } from "../auth/return";
 import type { WatchedSession } from "../session";
 import { AdminPage, type AdminSource } from "./AdminPage";
+import { sharedDemo } from "./Shared";
 import "../phrases";
 import "../../styles/global.css";
 
@@ -27,6 +28,7 @@ export async function startAdmin(settings: { login: string; supabaseUrl: string;
     active: async () => activeAccountOf(await session.getToken()),
     support: { demo: false, workspaces: api.workspaces, list: api.list },
     auditLog: webAuditLog(settings.supabaseUrl, settings.supabaseKey, () => session.getToken(), () => void session.unauthorized()),
+    workspace: new URLSearchParams(window.location.search).get("workspace"),
     home: home(),
   };
   render(() => <AdminPage source={source} />, root());
@@ -58,6 +60,8 @@ export async function startAdminDemo(options: { dark: boolean }) {
     memberships: async () => rows,
     active: async () => 1,
     support: supportAccessDemo(workspace),
+    shared: sharedDemo(),
+    workspace: null,
     auditLog: { list: async () => ({ kind: "ok", entries, more: false }) },
     home: `${home()}?demo=1${options.dark ? "&theme=dark" : ""}`,
   };

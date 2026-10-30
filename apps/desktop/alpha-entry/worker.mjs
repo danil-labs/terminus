@@ -1,7 +1,7 @@
 // Entrada de alfa-app.danil.ai: sirve Terminus web (TERMINUS_WEB) en la raíz, la entrada con
 // WorkOS (session.mjs) y, en /alpha-api, una lista cerrada del BFF de appv2 (APPV2_BFF).
-// Lecturas GET: /auth/profile, /auth/emails, /auth/account/support-access, /api/channels y el
-// inbox, con query acotada. Escrituras POST, solo los correos de la persona: /auth/emails,
+// Lecturas GET: /auth/profile, /auth/emails, /auth/account/support-access, /api/channels, el
+// inbox y los agentes y conexiones de atención de Configuración, con query acotada. Escrituras POST, solo los correos de la persona: /auth/emails,
 // /auth/emails/verify, /auth/emails/primary y /auth/emails/remove, con Origin exacto, Bearer,
 // JSON de hasta 1 KB y exactamente sus campos; un actor `ai` se rechaza aquí. Al BFF solo van
 // Authorization, Accept, Origin, Referer y un cuerpo reconstruido; nunca cookies.
@@ -26,6 +26,9 @@ const EMAIL_WRITES = {
   "/auth/emails/remove": ["email"],
 };
 const MAX_BODY = 1024;
+// Atención en Configuración: sin query; el BFF ancla cada una a la cuenta activa de la sesión.
+const SERVICE_READS = ["/api/agents", "/api/calendar/connections", "/api/http_tools", "/api/account_variables"];
+const SERVICE_AGENT = /^\/api\/agents\/[1-9]\d*(\/connections)?$/;
 
 /** Lee el cuerpo por partes y corta al pasar de `max` bytes: sin Content-Length no se carga entero. */
 async function boundedBody(request, max) {
@@ -74,7 +77,7 @@ async function emailBody(request, fields) {
 }
 
 function queryFor(url, kind) {
-  const fields = kind === "profile" || kind === "channels" || kind === "emails" ? {} : kind === "support" ? { account_id: [1, Number.MAX_SAFE_INTEGER] } : {
+  const fields = kind === "profile" || kind === "channels" || kind === "emails" || kind === "service" ? {} : kind === "support" ? { account_id: [1, Number.MAX_SAFE_INTEGER] } : {
     account_id: [1, Number.MAX_SAFE_INTEGER],
     limit: [1, 100],
     ...(kind === "list" ? { offset: [0, 100_000] } : { before_id: [1, Number.MAX_SAFE_INTEGER] }),
@@ -87,7 +90,7 @@ function queryFor(url, kind) {
         !Number.isSafeInteger(number) || number < bounds[0] || number > bounds[1]) return null;
     query.set(key, String(number));
   }
-  if (kind !== "profile" && kind !== "channels" && kind !== "emails" && !query.has("account_id")) return null;
+  if (kind !== "profile" && kind !== "channels" && kind !== "emails" && kind !== "service" && !query.has("account_id")) return null;
   return query;
 }
 
@@ -150,9 +153,11 @@ export default {
         path === "/api/inbox/conversations" ? "list" :
         path === "/api/channels" ? "channels" :
         path === "/auth/account/support-access" ? "support" :
+        SERVICE_READS.includes(path) || SERVICE_AGENT.test(path) ? "service" :
         /^\/api\/inbox\/conversations\/[1-9]\d*\/messages$/.test(path) ? "messages" : null;
       if (!kind) return json("not_found", 404);
       if (kind === "messages" && !Number.isSafeInteger(Number(path.split("/")[4]))) return json("invalid_query", 400);
+      if (kind === "service" && path.startsWith("/api/agents/") && !Number.isSafeInteger(Number(path.split("/")[3]))) return json("invalid_query", 400);
       const query = queryFor(url, kind);
       if (!query) return json("invalid_query", 400);
       const authorization = request.headers.get("Authorization");

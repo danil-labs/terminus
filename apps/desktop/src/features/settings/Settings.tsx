@@ -30,22 +30,20 @@ import {
 } from "../../ui/sidebar";
 import type { ModelChoices } from "../projects/NewAgent";
 import AIProviders from "./AIProviders";
+import ConnectionsOperation from "./ConnectionsOperation";
+import { CustomerAgents, CustomerConnections } from "./CustomerService";
 import Environment from "./Environment";
 import General from "./General";
 import type { ContextoDeProyectos } from "./ManageProjects";
 import { NotifyBehavior } from "./NotifyBehavior";
-import Plugins from "./Plugins";
 import Providers from "./Providers";
-import Radiant from "./Radiant";
 import { SETTINGS_ENTRIES, type SettingsEntryId, type SettingsGroup, settingsTarget } from "./settings-entries";
 import Skills from "./Skills";
 import Workspaces from "./Workspaces";
 import { SettingsPanel, SettingsSection } from "./layout";
 // Chunks aparte: solo los carga quien abre la sección.
 const DanilAccount = lazy(() => import("./DanilAccount"));
-const Integrations = lazy(() => import("./Integrations"));
 const ActivityLogs = lazy(() => import("./ActivityLogs"));
-const Connections = lazy(() => import("./Connections"));
 const Appearance = lazy(() => import("./Appearance"));
 const ManageProjects = lazy(() => import("./ManageProjects"));
 const Agents = lazy(() => import("./Agents"));
@@ -94,6 +92,7 @@ const pestanasDe = (
   proyectos: ContextoDeProyectos | undefined,
   workspace: () => string | null,
   activityMachine: () => string | null,
+  workspaceName: () => string | null,
 ): Record<string, Pestana | undefined> => {
   const cuenta = capabilities().danilAccount || capabilities().accountProfile;
   const tab = (id: string, name: () => string, panel: Pestana["panel"]): Pestana => ({ id, get name() { return name(); }, panel });
@@ -114,14 +113,17 @@ const pestanasDe = (
     secrets: tab("secrets", () => t("settings.tab.secrets"), null),
     agentes: tab("agentes", () => t("settings.nav.agents"), () => (
       <Suspense fallback={null}>
-        <Agents modelos={agentes.modelos} proyecto={agentes.proyecto} onAgentProfile={agentes.onAgentProfile} />
+        <Agents
+          modelos={agentes.modelos}
+          proyecto={agentes.proyecto}
+          onAgentProfile={agentes.onAgentProfile}
+          after={<CustomerAgents workspace={workspaceName} />}
+        />
       </Suspense>
     )),
     skills: tab("skills", () => t("settings.nav.skills"), () => <Skills />),
-    plugins: tab("plugins", () => t("settings.nav.plugins"), () => <Plugins />),
-    conexiones: cuenta ? tab("conexiones", () => t("settings.tab.orchestrators"), () => <Suspense fallback={null}><Connections workspace={workspace()} /></Suspense>) : undefined,
-    integrations: capabilities().inbox ? tab("integrations", () => t("alpha.integrations"), () => <Suspense fallback={null}><Integrations /></Suspense>) : undefined,
-    radiant: capabilities().radiant ? tab("radiant", () => t("settings.nav.radiant"), () => <Radiant />) : undefined,
+    operation: tab("operation", () => t("settings.tab.operation"), () => <ConnectionsOperation workspace={workspace()} />),
+    customers: tab("customers", () => t("settings.tab.customers"), () => <CustomerConnections workspace={workspaceName} />),
   };
 };
 
@@ -153,12 +155,13 @@ const idTab = (id: string) => `cfg-tab-${id}`;
 const idSub = (id: string) => `cfg-sub-${id}`;
 
 /** «Administración ↗»: en la web de alfa, solo para owner y admin; el escritorio no sabe el rol y la ofrece siempre. */
-function AdminLink() {
+function AdminLink(props: { workspace: string | null }) {
   const page = capabilities().adminPage;
   const [allowed] = createResource(async () => (page ? await page.allowed().catch(() => false) : capabilities().nativeWindow));
   const open = () => {
-    if (page) window.location.assign(page.href);
-    else void invoke("open_external", { target: ADMIN_URL }).catch(() => {});
+    const query = props.workspace ? `?workspace=${encodeURIComponent(props.workspace)}` : "";
+    if (page) window.location.assign(page.href(props.workspace));
+    else void invoke("open_external", { target: `${ADMIN_URL}${query}` }).catch(() => {});
   };
   return (
     <Show when={allowed()}>
@@ -184,6 +187,8 @@ function AdminLink() {
 
 export default function Settings(props: {
   workspace?: string | null;
+  /** Su nombre: con él se avisa si la atención que se ve es de otra cuenta. */
+  workspaceName?: string | null;
   activityMachine?: string | null;
   onClose: () => void;
   /** Con qué entrada o pestaña abrir: un id de `settings-entries.ts`, viejo o nuevo. */
@@ -277,7 +282,7 @@ export default function Settings(props: {
       return props.agentesEnUso ?? [];
     },
     onAgentProfile: (project, name) => props.onAgentProfile?.(project, name),
-  }, props.proyectos, () => props.workspace ?? null, () => props.activityMachine ?? null);
+  }, props.proyectos, () => props.workspace ?? null, () => props.activityMachine ?? null, () => props.workspaceName ?? null);
   const ENTRADAS = entradasDe(pestanas);
 
   const pedido = settingsTarget(props.panel);
@@ -432,7 +437,7 @@ export default function Settings(props: {
                   )}
                 </For>
               </SidebarContent>
-              <AdminLink />
+              <AdminLink workspace={props.workspaceName ?? null} />
             </Sidebar>
 
             <div class="relative min-h-0 min-w-0 bg-surface">

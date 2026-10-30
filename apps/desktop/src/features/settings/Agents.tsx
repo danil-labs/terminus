@@ -3,7 +3,7 @@ import Check from "lucide-solid/icons/check";
 import FolderOpen from "lucide-solid/icons/folder-open";
 import Plus from "lucide-solid/icons/plus";
 import X from "lucide-solid/icons/x";
-import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createSignal, For, type JSX, onCleanup, onMount, Show } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
@@ -61,6 +61,8 @@ export default function Agents(props: {
   /** La carpeta abierta: donde nace por omisión un agente nuevo. */
   proyecto: string;
   onAgentProfile?: (project: string, name: string) => void;
+  /** Lo que sigue a los agentes de este workspace: los de atención a clientes. */
+  after?: JSX.Element;
 }) {
   const [propios, setPropios] = createStore<Fila[]>([]);
   const [delRepositorio, setDelRepositorio] = createStore<FilaDelRepositorio[]>([]);
@@ -589,6 +591,8 @@ export default function Agents(props: {
           enfocar("new-agent");
         }}
       />
+
+      {props.after}
 
       <Dialog
         open={mudanza() !== null}

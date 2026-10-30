@@ -10,10 +10,13 @@ import { AttentionMenu, PersonalizeMenu } from './SidebarEntries';
 import { loadedConversations, requestConversation } from './loaded';
 
 const CustomizationSection = lazy(() => import('./CustomizationSection').then(module => ({default:module.CustomizationSection})));
-const Channels = lazy(() => import('./Channels').then(module => ({default:module.Channels})));
+const Customer = () => import('./CustomerService');
+const CustomerAgents = lazy(() => Customer().then(module => ({default:module.CustomerAgents})));
+const CustomerConnections = lazy(() => Customer().then(module => ({default:module.CustomerConnections})));
 const Broadcasts = lazy(() => import('./Broadcasts').then(module => ({default:module.Broadcasts})));
 
 export function attentionCapability(demo: boolean, initial: boolean, session?: InboxSession & { subscribe?: (clear: () => void) => () => void; userId?: string | null }) {
+  const load = async () => demo ? (await import('./service-demo')).serviceDemo() : session ? (await Customer()).liveService(session) : null;
   return {
     customization: createCustomization, entries: featureEntries,
     demo, userId: demo ? 'demo' : session?.userId, subscribe: session?.subscribe,
@@ -21,9 +24,10 @@ export function attentionCapability(demo: boolean, initial: boolean, session?: I
     catalog: (props: import("./CustomizationSection").CustomizationSectionProps) => <Suspense fallback={null}><CustomizationSection {...props}/></Suspense>,
     broadcasts: () => <Suspense fallback={null}><Broadcasts/></Suspense>,
     initial,
-    render: () => <Attention demo={demo} session={session}/>,
+    render: (workspace: () => string | null) => <Attention demo={demo} session={session} workspace={workspace}/>,
     agentSettings: (name: string) => <SettingsSection title={`${t("web.alpha.service_agent")} · ${name}`} description={t("web.alpha.configuration_unavailable")}><For each={['scope','knowledge','tools','schedule','host']}>{field=><SettingsRow label={t(`web.alpha.${field}`)} description={t(`web.alpha.${field}_hint`)}><input class="w-48 max-w-full rounded-md border border-border bg-surface p-2 text-sm" disabled={!demo} aria-label={t(`web.alpha.${field}`)}/></SettingsRow>}</For><Button class="mt-3 justify-self-start" disabled>{t("web.alpha.publish")}</Button></SettingsSection>,
-    integrations: () => <Suspense fallback={null}><Channels demo={demo} session={session}/></Suspense>,
+    customerAgents: (workspace: () => string | null) => <Suspense fallback={null}><CustomerAgents demo={demo} session={session} load={load} workspace={workspace}/></Suspense>,
+    customerConnections: (workspace: () => string | null) => <Suspense fallback={null}><CustomerConnections demo={demo} session={session} load={load} workspace={workspace}/></Suspense>,
     search: { conversations: loadedConversations, open: requestConversation },
   };
 }
