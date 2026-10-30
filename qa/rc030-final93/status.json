@@ -1,0 +1,251 @@
+{
+  "sourceOID": "93eeb9ef51b71f3cece7fa04942fa76e3b15adc2",
+  "version": "0.3.0-rc.1",
+  "enginePin": "4e10efc24a9be6f8dbf15559f767a50fb109a0a7",
+  "sourceEvidence": {
+    "apps/desktop/package.json": {
+      "sha256": "b602d15642a370fe4101801dd3bb599bc3b339222d7461cf67991d5418d87506",
+      "bytes": 3064
+    },
+    "apps/desktop/src-tauri/Cargo.toml": {
+      "sha256": "bf76b6daeb45b33a73de8726bdde89093e2523336f86bff526705dd10b69d417",
+      "bytes": 3428
+    },
+    "apps/desktop/src-tauri/tauri.conf.json": {
+      "sha256": "56f6e748989f9b7f99f00d26213b44556478b12255ac6cdedeb93025235f6ace",
+      "bytes": 2325
+    },
+    "apps/desktop/seldon-runtime.lock": {
+      "sha256": "342922a79250bb621ec441b6e83fad3c94c50b50aed9e35d2bd1a0086fd951bb",
+      "bytes": 1573
+    },
+    "pnpm-lock.yaml": {
+      "sha256": "c868f92ca98b688090af7c896803a3d7f32f77eab688391ab97bca31e485db35",
+      "bytes": 213547
+    },
+    "apps/desktop/src-tauri/Cargo.lock": {
+      "sha256": "351e46fc62698ffd01d8aad3f8d1bb2515bdaf88f3446c81485c9db8b37972b7",
+      "bytes": 147196
+    },
+    "clean": true
+  },
+  "versions": {
+    "package": "0.3.0-rc.1",
+    "cargo": "0.3.0-rc.1",
+    "tauri": "0.3.0-rc.1"
+  },
+  "productionBaseline": {
+    "capturedAt": "2026-10-30T17:33:05.889108+00:00",
+    "files": {
+      "/Applications/Terminus.app/Contents/Info.plist": {
+        "sha256": "b77cd9914cf7987a14a4d639f9f665b9f1eeeb18c3f52136c970ea0a892bf8d1",
+        "bytes": 965
+      },
+      "/Applications/Terminus.app/Contents/MacOS/terminus": {
+        "sha256": "76fe09270a4e8a77ffbef004c1e4cb0a77256c9c4a87fc140dd1754ff6ad0beb",
+        "bytes": 30015008
+      }
+    }
+  },
+  "schemaVersion": 1,
+  "capturedAt": "2026-10-30T17:47:35.571446+00:00",
+  "snapshotOnly": true,
+  "publication": false,
+  "operators": {
+    "coordinator": {
+      "task": "sre19sr7",
+      "stage": "producers_running"
+    },
+    "mac": {
+      "taskID": "0qs6mqpm",
+      "stage": "QA_RUNNING",
+      "buildCount": 1,
+      "buildExitCode": 0
+    },
+    "windows": {
+      "taskID": "31ze36h8",
+      "stage": "building_normal_tauri",
+      "buildsStarted": 1,
+      "updatedAt": "2026-10-30T17:47:33.072381+00:00"
+    }
+  },
+  "mac": {
+    "artifacts": {
+      "appMain": {
+        "path": "/Users/aceballosvilla/qa/rc030-final-93/mac-cargo-target/aarch64-apple-darwin/release/bundle/macos/Terminus.app/Contents/MacOS/terminus",
+        "sha256": "9bf76316fa62de2d7394b865e8a02de4d351c459f362bf9bcbd152faf366d50c",
+        "bytes": 30344160
+      },
+      "engine": {
+        "path": "/Users/aceballosvilla/qa/rc030-final-93/mac-cargo-target/aarch64-apple-darwin/release/bundle/macos/Terminus.app/Contents/MacOS/seldon-runtime",
+        "sha256": "c39f25022cc7fb09b537be8b9b8c6f1f88ca721021cbc38bde7173a69442ae8f",
+        "bytes": 30013200
+      },
+      "dmg": {
+        "path": "/Users/aceballosvilla/qa/rc030-final-93/mac-cargo-target/aarch64-apple-darwin/release/bundle/dmg/Terminus_0.3.0-rc.1_aarch64.dmg",
+        "sha256": "4a7b80a2a2dda2f949c5322b37f5a10c6e4251fa7ba3be4b4f0b626b21ef6b1f",
+        "bytes": 219169665
+      }
+    },
+    "tools": {
+      "canonicalPrepare": "PASS",
+      "DeveloperIDResources": "PASS",
+      "signedNativeFiles": 62
+    },
+    "signatureChecks": {
+      "app": {
+        "exitCode": 0
+      },
+      "dmg": {
+        "exitCode": 0
+      },
+      "gatekeeper": {
+        "exitCode": 3
+      },
+      "stapler": {
+        "exitCode": 65
+      }
+    },
+    "notary": false,
+    "updater": false,
+    "canonicalPackaged": "PASS",
+    "rustFormat": "FAIL pre-existing formatting at engine-protocol/src/lib.rs:97; sources not changed",
+    "rustResults": [
+      {
+        "command": "cargo fmt --all -- --check",
+        "exit": 1
+      },
+      {
+        "command": "cargo check --locked",
+        "exit": 0
+      },
+      {
+        "command": "cargo clippy --locked -- -D warnings",
+        "exit": 101
+      },
+      {
+        "command": "cargo test --locked",
+        "exit": 0
+      }
+    ],
+    "engineProvenance": {
+      "method": "codesign --remove-signature on copies, normalize __LINKEDIT vmsize only",
+      "equal": true,
+      "rows": [
+        {
+          "role": "pinned",
+          "rawSHA256": "d63daf4e33440bb02b3bd4b8a5492921284c5db5e296135cee40b1f03ca318d9",
+          "normalizedSHA256": "f1976055a93b224e8ed8b398c437244efe37d88b13eff53165c57374b8e6e1ba"
+        },
+        {
+          "role": "signed_packaged",
+          "rawSHA256": "c39f25022cc7fb09b537be8b9b8c6f1f88ca721021cbc38bde7173a69442ae8f",
+          "normalizedSHA256": "f1976055a93b224e8ed8b398c437244efe37d88b13eff53165c57374b8e6e1ba"
+        }
+      ]
+    },
+    "appInventory": {
+      "path": "/Users/aceballosvilla/qa/rc030-final-93/mac-evidence/app-inventory.json",
+      "sha256": "6750809911b891a94dbd41143e9d636c44099a865fbb0b5a05cdbc982c69d700",
+      "bytes": 515342644,
+      "files": 5625,
+      "symlinks": 154,
+      "bytesMeaning": "aggregate packaged inventory bytes, not JSON report size"
+    },
+    "globalUntouched": true,
+    "checks": {
+      "coldStart": "PASS, Danil window and fresh onboarding",
+      "toolsWithoutGlobalPATH": "PASS canonical runtime smoke, documents and inventory identical",
+      "globalUnchanged": "Installed binaries/processes unchanged; initial same-ID lab discarded, final QA uses exclusive bundle ID",
+      "initialLabUncounted": "Unexpected hola turn not issued by operator; initial lab stopped, no result credited",
+      "labBundleID": "ai.danil.terminus.rc93-qa",
+      "labCopyAdhocOnly": true,
+      "freshBundleColdStart": "PASS English/light defaults, Prepare Danil and Danil environment",
+      "labRoot": "/Users/aceballosvilla/qa/rc030-final-93/mac-lab-isolated/root",
+      "personalize": "Blank main content observed with Start button available; no personalization capability credited"
+    }
+  },
+  "windows": {
+    "signature": "not yet built; no signing credentials used",
+    "notary": "not applicable Windows",
+    "updater": "disabled via private overlay only",
+    "canonicalPrepare": "PASS",
+    "frozenInstall": {
+      "exitCode": 0,
+      "pnpm": "10.15.0",
+      "durationSeconds": 48.7
+    },
+    "lastObservation": {
+      "stage": "cargo release compilation active",
+      "cargoPID": 4600,
+      "freeDiskBytes": 5869076480
+    },
+    "sourceOID": "93eeb9ef51b71f3cece7fa04942fa76e3b15adc2",
+    "sourceTree": "ffcf873dfff20d8b33b7aa489551567cdac5ca5f",
+    "sourceClean": true,
+    "sourceFileSHA256": {
+      "pnpm-lock.yaml": "c868f92ca98b688090af7c896803a3d7f32f77eab688391ab97bca31e485db35",
+      "apps/desktop/package.json": "b602d15642a370fe4101801dd3bb599bc3b339222d7461cf67991d5418d87506",
+      "apps/desktop/seldon-runtime.lock": "342922a79250bb621ec441b6e83fad3c94c50b50aed9e35d2bd1a0086fd951bb",
+      "apps/desktop/src-tauri/Cargo.toml": "bf76b6daeb45b33a73de8726bdde89093e2523336f86bff526705dd10b69d417",
+      "apps/desktop/src-tauri/Cargo.lock": "351e46fc62698ffd01d8aad3f8d1bb2515bdaf88f3446c81485c9db8b37972b7",
+      "apps/desktop/src-tauri/tauri.conf.json": "56f6e748989f9b7f99f00d26213b44556478b12255ac6cdedeb93025235f6ace"
+    },
+    "sourceZipSHA256": "0973797f40497c01c51d0961b5c3720872e22a9060e46161ffb476160978b88d",
+    "remoteLab": "C:\\TerminusQA\\rc030-final-93-31ze36h8",
+    "cleanup": {
+      "pending": true
+    },
+    "preparationAttempt1": "blocked: uv interpreter discovery; corrected with private UV_PYTHON, no source edits",
+    "artifacts": {}
+  },
+  "limitations": [
+    "Snapshot of existing evidence only; no new build or QA executed by exporter.",
+    "Mac QA still running; two successful turns and durable-file restart not credited in this snapshot.",
+    "Mac Gatekeeper exit 3 and stapler exit 65; notarization and updater absent.",
+    "Rust format exit 1 and clippy exit 101; check and tests exit 0.",
+    "Windows compilation in progress; final NSIS hash, size and completed QA unavailable.",
+    "Removing Terminal from preparation/selector and simplifying bundled-tool detection assigned separately on Linux; do not rebuild QA93 for that change yet.",
+    "No global installation, Mac shutdown, workflow, release or binary upload authorized by this receipt."
+  ],
+  "coordination": {
+    "delivery": "steered",
+    "operations": {
+      "sre19sr7": "2bac4b1c-1de9-4150-b440-215850b3abb2",
+      "0qs6mqpm": "90915fe3-7156-4e83-9eae-35986e2892ef",
+      "31ze36h8": "c674e7cc-1b05-443a-b979-2125ecd40804"
+    }
+  },
+  "evidenceFiles": [
+    {
+      "path": "/Users/aceballosvilla/qa/rc030-final-93/status.json",
+      "sha256": "5c30c2c4e9ef87047f39d4506a07bdd3a4999011b10d41361ace7c4cae79c309",
+      "bytes": 11192
+    },
+    {
+      "path": "/Users/aceballosvilla/qa/rc030-final-93/mac-status.json",
+      "sha256": "7413f9f00d9224e5c5240a09f24fbcf6df894a44401289d1850fb423cb859784",
+      "bytes": 4388
+    },
+    {
+      "path": "/Users/aceballosvilla/qa/rc030-final-93/windows-status.json",
+      "sha256": "114b64feb3ba295428c4017fd17125900e14808519789de61f2d8147f3eaf37a",
+      "bytes": 3623
+    },
+    {
+      "path": "/Users/aceballosvilla/qa/rc030-final-93/coordinator-artifact-observation.json",
+      "sha256": "52d2cc6fd3a367c20610130ad3a0f6010100e9a3248e4dc8a6339d111a263733",
+      "bytes": 500
+    },
+    {
+      "path": "/Users/aceballosvilla/qa/rc030-final-93/mac-evidence/engine-provenance.json",
+      "sha256": "3b90fbf6e69873dbe4010e572758389bad1631132c66d6fc1628a23be9714f26",
+      "bytes": 565
+    },
+    {
+      "path": "/Users/aceballosvilla/qa/rc030-final-93/mac-evidence/rust-results.json",
+      "sha256": "eeaa76521b31b6ad4689cd41f5fc1d6fa2d067ac76c6a6489498be0437ab20f0",
+      "bytes": 273
+    }
+  ]
+}
