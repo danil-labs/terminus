@@ -24,6 +24,76 @@ const EMAIL_WRITES = {
 };
 const MAX_BODY = 1024;
 
+const positive = value => Number.isSafeInteger(value) && value > 0;
+const exact = (body, required, optional = []) => body && typeof body === "object" && !Array.isArray(body) && required.every(key => Object.hasOwn(body, key)) && Object.keys(body).every(key => required.includes(key) || optional.includes(key));
+
+function marketingRoute(path) {
+  if (path === "/api/marketing/campaigns") return "campaigns";
+  if (path === "/api/marketing/templates") return "templates";
+  if (path === "/api/contacts") return "contact-list";
+  const match = /^\/api\/marketing\/(?:templates\/([1-9]\d*)\/(channels)|campaigns\/([1-9]\d*)\/(stats|pause|cancel|contacts|start|resume|schedule))$/.exec(path);
+  return match && positive(Number(match[1] ?? match[3])) ? match[2] ?? match[4] : null;
+}
+
+/** Solo restringe; la firma y la autoridad del mismo Bearer se verifican después en el BFF. */
+function bearerAccount(authorization) {
+  try {
+    const token = authorization.split(" ")[1];
+    if (token.split(".").length !== 3) return null;
+    const payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const account = JSON.parse(atob(payload)).active_account_id;
+    return positive(account) ? account : null;
+  } catch { return null; }
+}
+
+async function marketingProxy(request, env, url, path, route) {
+  const write = request.method === "POST";
+  if (!write && request.method !== "GET") return json("method_not_allowed", 405);
+  if ((!write && !["campaigns", "templates", "contact-list", "channels", "stats"].includes(route)) || (write && !["campaigns", "pause", "cancel", "contacts", "start", "resume", "schedule"].includes(route))) return json("method_not_allowed", 405);
+  if (write && request.headers.get("Origin") !== `https://${HOST}`) return json("forbidden_origin", 403);
+  if (write && (request.headers.get("X-Danil-Actor") ?? "").trim().toLowerCase() === "ai") return json("identity_requires_person", 403);
+  const authorization = request.headers.get("Authorization");
+  if (!authorization || !/^Bearer \S+$/i.test(authorization)) return json("unauthorized", 401);
+  const keys = [...url.searchParams.keys()];
+  const templateList = !write && route === "templates";
+  if (keys.length !== (templateList ? 2 : 1) || new Set(keys).size !== keys.length || !keys.includes("account_id") || (templateList && url.searchParams.get("status") !== "APPROVED")) return json("invalid_query", 400);
+  const rawAccount = url.searchParams.get("account_id");
+  const account = Number(rawAccount);
+  if (!/^\d+$/.test(rawAccount ?? "") || !positive(account)) return json("invalid_query", 400);
+  const active = bearerAccount(authorization);
+  if (active === null) return json("missing_active_account", 403);
+  if (active !== account) return json("account_mismatch", 403);
+  if (write && ["contacts", "start", "resume", "schedule"].includes(route)) return json("campaign_delivery_unavailable", 409);
+  if (!env.APPV2_BFF) return json("bff_unavailable", 503);
+  const headers = new Headers({ Authorization: authorization, Accept: "application/json", Origin: `https://${HOST}` });
+  let body;
+  if (write) {
+    if (route === "campaigns") {
+      if (!/^application\/json(?:\s*;\s*charset=utf-8)?$/i.test(request.headers.get("Content-Type") ?? "")) return json("invalid_body", 400);
+      const bytes = await boundedBody(request, 20 * 1024);
+      let value;
+      try { value = bytes && JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)); } catch { return json("invalid_body", 400); }
+      if (!exact(value, ["name", "template_id", "channel_id"], ["variable_mapping"]) || typeof value.name !== "string" || !value.name.trim() || value.name.trim().length > 200 || !positive(value.template_id) || !positive(value.channel_id)) return json("invalid_body", 400);
+      const mapping = value.variable_mapping;
+      if (mapping !== undefined && (!mapping || typeof mapping !== "object" || Array.isArray(mapping) || Object.keys(mapping).length > 50 || Object.entries(mapping).some(([key, val]) => !/^[a-zA-Z0-9_.]{1,64}$/.test(key) || key === "__header_media_url" || typeof val !== "string" || !val.trim() || val.length > 1024))) return json("invalid_body", 400);
+      body = JSON.stringify({ name: value.name.trim(), template_id: value.template_id, channel_id: value.channel_id, ...(mapping === undefined ? {} : { variable_mapping: Object.fromEntries(Object.entries(mapping)) }) });
+      headers.set("Content-Type", "application/json");
+    } else {
+      const bytes = await boundedBody(request, 0);
+      if (!bytes) return json("invalid_body", 400);
+    }
+    const permissionsUrl = new URL(`https://${HOST}/auth/account/my-permissions?account_id=${account}`);
+    const response = await forward(env, new Request(permissionsUrl, { headers, redirect: "manual" }));
+    if (!response.ok) return json("permissions_unavailable", response.status === 401 ? 401 : 403);
+    let permissions;
+    try { permissions = await response.json(); } catch { return json("permissions_unavailable", 403); }
+    if (typeof permissions?.role !== "string" || !Array.isArray(permissions.permissions) || !permissions.permissions.every(value => typeof value === "string") || !Array.isArray(permissions.scoped) || !permissions.scoped.every(grant => grant && typeof grant.permission === "string" && typeof grant.scope_type === "string" && positive(grant.scope_id)) || !permissions.permissions.includes("campaigns.manage")) return json("forbidden_read_only", 403);
+  }
+  url.pathname = path;
+  url.search = new URLSearchParams({ account_id: String(account), ...(templateList ? { status: "APPROVED" } : {}) }).toString();
+  return forward(env, new Request(url, { method: request.method, headers, ...(body === undefined ? {} : { body }), redirect: "manual" }));
+}
+
 async function replyWrite(request, env, url) {
   if (request.headers.get("Origin") !== `https://${HOST}`) return json("forbidden_origin", 403);
   if ((request.headers.get("X-Danil-Actor") ?? "").trim().toLowerCase() === "ai") return json("identity_requires_person", 403);
@@ -162,6 +232,8 @@ export default {
     }
     if (url.pathname === PREFIX || url.pathname.startsWith(`${PREFIX}/`)) {
       const path = url.pathname.slice(PREFIX.length);
+      const marketing = marketingRoute(path);
+      if (marketing) return marketingProxy(request, env, url, path, marketing);
       if (request.method === "POST" && path === "/api/messaging/reply") return replyWrite(request, env, url);
       if (request.method === "POST" && Object.hasOwn(EMAIL_WRITES, path)) return emailWrite(request, env, url, path);
       if (request.method !== "GET") return json("method_not_allowed", 405);
