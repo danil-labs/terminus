@@ -170,6 +170,7 @@ import { createUsage } from "../features/shell/usage";
 import AvisoDeVersion from "../features/shell/VersionNotice";
 import CloseGuard from "../features/shell/CloseGuard";
 import WorkspaceColumn from "../features/shell/WorkspaceColumn";
+import { agentsWorkspace, setAgentsWorkspace } from "../features/shell/workspace-directory";
 import Sitio from "../features/sites/Site";
 import { VELO_DE_FONDO } from "../lib/chat-background";
 import { fondoDeChat, fondoPropio, imagenDelWorkspace, veloDeFondo } from "../lib/chat-background-store";
@@ -498,6 +499,9 @@ export default function App() {
   // El nombre del workspace abierto rotula el menú de espacios de la franja.
   const workspacesDeLaFranja = createWorkspaces();
   const workspaceActual = () => workspacesDeLaFranja.actual();
+  // Agentes: el workspace abierto o el elegido en el menú que solo tiene agentes. Volver a uno de Terminus lo suelta.
+  const workspaceDeAgentes = () => agentsWorkspace() ?? workspaceActivo();
+  createEffect(on(() => workspaceActivo(), () => setAgentsWorkspace(null), { defer: true }));
   // Dónde empieza el chat, ya pasada la línea de la barra lateral: la primera pestaña nace ahí.
   const [bordeDeLaBarra, setBordeDeLaBarra] = createSignal<number | null>(null);
   const medirBordeDeLaBarra = (el: HTMLDivElement) => {
@@ -8079,13 +8083,13 @@ export default function App() {
 
       <Show when={pestanas.open().some(p => p.id === INBOX_TAB_ID) && customization.enabled("inbox") ? customization.scope() : undefined} keyed>
         <div class="min-h-0 min-w-0" classList={{ hidden: celdaDe(INBOX_TAB_ID) === undefined || tapadoPorElProyecto(paneles.siteOf(INBOX_TAB_ID)), "pt-8": llevaTiraInterior(paneles.siteOf(INBOX_TAB_ID)) }} style={celdaDe(INBOX_TAB_ID)}>
-          {capabilities().inbox?.render(() => workspaceActual()?.name ?? null)}
+          {capabilities().inbox?.render(workspaceDeAgentes)}
         </div>
       </Show>
 
       <Show when={pestanas.open().some(p => p.id === BROADCASTS_TAB_ID) && customization.enabled("broadcasts") ? customization.scope() : undefined} keyed>
         <div class="min-h-0 min-w-0" classList={{ hidden: celdaDe(BROADCASTS_TAB_ID) === undefined || tapadoPorElProyecto(paneles.siteOf(BROADCASTS_TAB_ID)), "pt-8": llevaTiraInterior(paneles.siteOf(BROADCASTS_TAB_ID)) }} style={celdaDe(BROADCASTS_TAB_ID)}>
-          {capabilities().inbox?.broadcasts(() => workspaceActual()?.name ?? null)}
+          {capabilities().inbox?.broadcasts(workspaceDeAgentes)}
         </div>
       </Show>
 
@@ -8400,6 +8404,7 @@ export default function App() {
           <WorkspaceColumn
             attention={attention.list()}
             onManage={() => setSettings("workspaces")}
+            onOpenAgents={abrirInbox}
             onSettings={(panel) => setSettings(panel ?? "")}
             onReportarBug={() => setInput(t("chat.composer.bug_report_starter"))}
             tools={<>
@@ -8670,6 +8675,7 @@ export default function App() {
           <Settings
             workspace={workspaceActivo()}
             workspaceName={workspaceActual()?.name ?? null}
+            agentsWorkspace={workspaceDeAgentes()}
             activityMachine={activityMachine()}
             panel={settings() || undefined}
             modelos={modelosParaAgentes()}

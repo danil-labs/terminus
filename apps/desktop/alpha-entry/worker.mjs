@@ -30,6 +30,7 @@ const EMAIL_WRITES = {
   "/auth/emails/remove": ["email"],
 };
 const MAX_BODY = 1024;
+const WORKSPACE_KEY = /^(a:[1-9][0-9]{0,18}|w:[!-~]{1,128})$/;
 // Atención en Configuración: sin query; el BFF ancla cada una a la cuenta activa de la sesión.
 const SERVICE_READS = ["/api/agents", "/api/calendar/connections", "/api/http_tools", "/api/account_variables"];
 const SERVICE_AGENT = /^\/api\/agents\/[1-9]\d*(\/connections)?$/;
@@ -199,6 +200,10 @@ function queryFor(url, kind) {
 
 /** Al BFF; solo vuelve JSON, sin redirecciones, cookies ni caché. */
 async function forward(env, upstream) {
+  if (env.workspaceKey) {
+    upstream = new Request(upstream);
+    upstream.headers.set("X-Danil-Workspace", env.workspaceKey);
+  }
   let response;
   try {
     response = await env.APPV2_BFF.fetch(upstream);
@@ -221,6 +226,24 @@ async function forward(env, upstream) {
 }
 
 /** Una escritura de correos: desde esta página, con sesión y el cuerpo exacto de su ruta. */
+/** Entrar a un workspace en esta sesión. Solo la clave llega al BFF, que decide con el Bearer de la persona. */
+async function enterWrite(request, env, url) {
+  if (request.headers.get("Origin") !== `https://${HOST}`) return json("forbidden_origin", 403);
+  if ((request.headers.get("X-Danil-Actor") ?? "").trim().toLowerCase() === "ai") return json("identity_requires_person", 403);
+  const authorization = request.headers.get("Authorization");
+  if (!authorization || !/^Bearer \S+$/i.test(authorization)) return json("unauthorized", 401);
+  if (url.search) return json("invalid_query", 400);
+  if (!/^application\/json(?:\s*;\s*charset=utf-8)?$/i.test(request.headers.get("Content-Type") ?? "")) return json("invalid_body", 400);
+  const bytes = await boundedBody(request, MAX_BODY);
+  let body;
+  try { body = bytes && JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)); } catch { return json("invalid_body", 400); }
+  if (!exact(body, ["key"]) || typeof body.key !== "string" || !WORKSPACE_KEY.test(body.key)) return json("invalid_body", 400);
+  if (!env.APPV2_BFF) return json("bff_unavailable", 503);
+  url.pathname = "/api/workspace/enter";
+  const headers = { Authorization: authorization, Accept: "application/json", "Content-Type": "application/json", Origin: `https://${HOST}` };
+  return forward(env, new Request(url, { method: "POST", headers, body: JSON.stringify({ key: body.key }), redirect: "manual" }));
+}
+
 async function emailWrite(request, env, url, path) {
   if (request.headers.get("Origin") !== `https://${HOST}`) return json("forbidden_origin", 403);
   // Quitar la marca convertiría en persona a un turno de IA: se rechaza aquí, como en el BFF.
@@ -285,6 +308,11 @@ export default {
     }
     if (url.pathname === PREFIX || url.pathname.startsWith(`${PREFIX}/`)) {
       const path = url.pathname.slice(PREFIX.length);
+      // Cerrada también: el BFF compara la clave con el claim verificado. Nunca elige workspace.
+      const workspaceKey = request.headers.get("X-Danil-Workspace");
+      if (workspaceKey !== null && !WORKSPACE_KEY.test(workspaceKey)) return json("invalid_workspace_key", 400);
+      if (workspaceKey !== null) env = { ...env, workspaceKey };
+      if (request.method === "POST" && path === "/api/workspace/enter") return enterWrite(request, env, url);
       const write = broadcastWrite(request.method, path);
       if (write && (!write.delivery || env.BROADCAST_DELIVERY === "on")) return writeBroadcast(request, env, url, path, write);
       const marketing = marketingRoute(path);
