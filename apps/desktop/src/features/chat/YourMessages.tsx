@@ -128,7 +128,7 @@ export default function YourMessages(props: {
         <button
           ref={rail}
           type="button"
-          class="riel-de-mensajes pointer-events-auto absolute left-0 w-8 rounded-sm outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          class="pointer-events-auto absolute left-0 w-8 rounded-sm outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           style={{ top: `${top()}px`, height: `${height()}px` }}
           aria-label={`${t("chat.rail.label")}: ${excerpt()}`}
           aria-haspopup="dialog"
