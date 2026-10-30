@@ -32,6 +32,8 @@ import AIProviders from "./AIProviders";
 import ConnectionsOperation from "./ConnectionsOperation";
 import { CustomerAgents, CustomerConnections } from "./CustomerService";
 import Environment from "./Environment";
+import { machines } from "../machines/store";
+import { secretsRoute } from "./secrets-support";
 import General from "./General";
 import type { ContextoDeProyectos } from "./ManageProjects";
 import { NotifyBehavior } from "./NotifyBehavior";
@@ -285,6 +287,8 @@ export default function Settings(props: {
   }, props.proyectos, () => props.workspace ?? null, () => props.activityMachine ?? null, () => props.workspaceName ?? null);
   const ENTRADAS = entradasDe(pestanas);
 
+  // Sin soporte del motor activo, Secretos no se ofrece.
+  const pestanaVisible = (p: Pestana) => p.id !== "secrets" || secretsRoute(capabilities().accountCredentials ? "worker" : "engine", machines()) !== "unsupported";
   const pedido = settingsTarget(props.panel);
   const inicial = ENTRADAS.find((e) => e.id === pedido?.entry) ?? ENTRADAS[0];
   const [activo, setActivo] = createSignal<SettingsEntryId>(inicial.id);
@@ -364,7 +368,8 @@ export default function Settings(props: {
   const entrada = () => ENTRADAS.find((d) => d.id === activo()) ?? ENTRADAS[0];
   const pestana = () => {
     const e = entrada();
-    return e.tabs.find((p) => p.id === subs()[e.id] && p.panel) ?? e.tabs.find((p) => p.panel)!;
+    const tabs = e.tabs.filter(pestanaVisible);
+    return tabs.find((p) => p.id === subs()[e.id] && p.panel) ?? tabs.find((p) => p.panel)!;
   };
   const elegir = (p: Pestana) => {
     if (p.panel) setSubs((antes) => ({ ...antes, [entrada().id]: p.id }));
@@ -376,7 +381,7 @@ export default function Settings(props: {
     const paso = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
     if (paso === 0) return;
     e.preventDefault();
-    const usables = entrada().tabs.filter((p) => p.panel);
+    const usables = entrada().tabs.filter((p) => p.panel && pestanaVisible(p));
     const i = usables.findIndex((p) => p.id === pestana().id);
     const siguiente = usables[(i + paso + usables.length) % usables.length];
     elegir(siguiente);
@@ -482,7 +487,7 @@ export default function Settings(props: {
                     onKeyDown={moverPestana}
                     class="mb-6 flex items-end gap-5 border-0 border-b border-solid border-border"
                   >
-                    <For each={entrada().tabs}>
+                    <For each={entrada().tabs.filter(pestanaVisible)}>
                       {(p) => (
                         <button
                           type="button"
