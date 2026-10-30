@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { listaBasta, reconciliar } from "../../src/features/settings/early-startup.ts";
+import { mountAfterLanguagePacks } from "../../src/locales/startup.ts";
+import { untilConnected } from "../../src/lib/invoke.ts";
 
 /**
  * La ventana no espera a `workspaces_startup`. El arranque migra dentro y
@@ -10,6 +12,28 @@ import { listaBasta, reconciliar } from "../../src/features/settings/early-start
  */
 
 const ws = (...ids: string[]) => ids.map((id) => ({ id }));
+
+test("un catálogo que espera al motor no bloquea el lanzador que lo conecta", { timeout: 1000 }, async () => {
+  let connect!: () => void;
+  const ready = new Promise<void>((done) => { connect = done; });
+  let calls = 0;
+  let mounts = 0;
+  const packs = untilConnected(async () => {
+    if (++calls === 1) throw { code: "engine_down" };
+    return [];
+  }, () => false, () => ready);
+  await mountAfterLanguagePacks(packs, () => { mounts++; connect(); }, 20);
+  await packs;
+  assert.equal(calls, 2);
+  assert.equal(mounts, 1);
+});
+
+test("catálogo disponible o rechazado monta sin esperar el plazo", async () => {
+  let mounts = 0;
+  await mountAfterLanguagePacks(Promise.resolve([]), () => { mounts++; });
+  await mountAfterLanguagePacks(Promise.reject(new Error("unreadable")), () => { mounts++; });
+  assert.equal(mounts, 2);
+});
 
 test("una lista con activo abre la ventana", () => {
   assert.equal(listaBasta({ workspaces: ws("a", "b"), active: "a" }), true);
