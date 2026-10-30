@@ -16,8 +16,6 @@
   "attention.inventory": "Inventory",
   "attention.inventory_description": "Inventory is not available yet.",
   "attention.personalize": "Customize",
-  "attention.memory": "Temporary selection in memory. Reloading discards it.",
-  "attention.local": "Local browser preference; grants no permissions and connects no services.",
   "attention.future": "This preference uses a newer format. No destinations will be enabled or overwritten.",
   "attention.leave_demo": "Leave demo"
 }
