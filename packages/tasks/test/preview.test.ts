@@ -33,6 +33,8 @@ test("títulos y modelos como en el escritorio", () => {
   assert.equal(taskTitle("es", { title: "x", inbox: true }), "Bandeja anterior");
   assert.equal(taskTitle("es", { title: "x", chat_de_agente: true }), "Chat anterior del agente");
   assert.equal(taskTitle("es", { title: "x", chat_de_agente: true, agent_thread: true }), "x");
+  assert.equal(taskTitle("es", { title: "env -i HOME=x", command_title: true }), "Comando en terminal");
+  assert.equal(taskTitle("en", { title: "env -i HOME=x", command_title: true }), "Terminal command");
   assert.equal(modelName("claude-sonnet-4-5-20250929"), "Claude Sonnet 4.5");
   assert.equal(modelName("claude-opus-4-1[1m]"), "Claude Opus 4.1");
   assert.equal(modelName("gpt-5.6", { models: [{ id: "gpt-5.6", label: "GPT-5.6" }] }), "GPT-5.6");

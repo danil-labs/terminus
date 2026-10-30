@@ -30,6 +30,7 @@
   "projects.sessions.unpin_named": "Desfijar «{title}»",
   "projects.sessions.without_agent": "Mis tareas",
   "projects.threads.persistent_chat": "Chat anterior del agente",
+  "projects.threads.command": "Comando en terminal",
   "projects.sessions.error_not_ephemeral": "La tarea no es efímera y no se puede purgar.",
   "projects.sessions.error_ephemeral_busy": "La tarea efímera sigue respondiendo y no se puede purgar.",
   "projects.add.back": "Atrás",

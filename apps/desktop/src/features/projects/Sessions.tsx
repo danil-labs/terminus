@@ -102,6 +102,8 @@ export type SessionRow = {
   workspace?: string;
   delegated_activity?: TaskActivity;
   agent_thread?: boolean;
+  /** El título es solo el comando con que nació: lo decide Rust (`Session::command_title`). */
+  command_title?: boolean;
   /** Si la sesión nativa ya tiene trabajo: lo decide Rust (`Session::native_work`). */
   native_work?: boolean;
   /** Bandeja antigua del encargado (`Session::inbox`), visible si existe. */
@@ -795,6 +797,7 @@ export default function Sessions(props: {
     const conPastilla = () => !(props.groupByHandler && props.groupByAuthor !== false) && !f.s.chat_de_agente && !!f.s.agent;
     const title = () => f.s.inbox ? t("projects.threads.inbox")
       : f.s.chat_de_agente && !f.s.agent_thread ? t("projects.threads.persistent_chat")
+      : f.s.command_title ? t("projects.threads.command")
       : f.s.title;
     /**
      * Cierra el renombrado guardando lo escrito.
