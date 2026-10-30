@@ -11,6 +11,7 @@ import * as WebBrowser from "expo-web-browser";
 import { AccountProvider } from "../lib/account";
 import { MachinesProvider } from "../lib/machines";
 import { Notifications } from "../lib/notifications";
+import { selectWordOnDoubleTap } from "../lib/selection";
 import { t, w } from "../lib/i18n";
 import { pinToVisibleArea } from "../lib/viewport";
 import { WorkspacesProvider } from "../lib/workspaces";
@@ -28,6 +29,7 @@ Notifications?.setNotificationHandler({
 
 // Cierra la ventana del navegador del inicio de sesión si vuelve aquí (solo hace algo en web).
 if (!ALPHA_DEMO) WebBrowser.maybeCompleteAuthSession();
+selectWordOnDoubleTap();
 
 type Target = { host?: string; workspace?: string; folder?: string | null; task?: string };
 
