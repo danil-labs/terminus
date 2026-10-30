@@ -353,5 +353,6 @@
   "web.service.demo_prices": "Lista de precios",
   "web.service.unresolved": "Este workspace no tiene atención a clientes.",
   "web.service.unresolved_hint": "Para operar otro workspace, entra a ese workspace.",
-  "web.service.edit_hint": "Para conectar o editar, abre Danil Agents."
+  "web.service.edit_hint": "Para conectar o editar, abre Danil Agents.",
+  "web.service.not_entered": "No se pudo entrar a este workspace. Vuelve a intentarlo."
 }

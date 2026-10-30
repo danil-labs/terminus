@@ -45,7 +45,7 @@ export function Attention(props: { demo: boolean; session?: AgentsSession & { su
   async function connect() {
     clear(); setResolved(false); setAccount(undefined); const request = epoch; setBusy(true);
     try { if (!api) throw new Error(t("web.alpha.session_required")); const value = await resolveWorkspaceAccount(props.workspace(), accountSources(props.session!)); if (request === epoch) { setResolved(true); if (value) void load(value.id); } }
-    catch (cause) { if (request === epoch) setError(cause instanceof Error ? cause.message : t("web.alpha.error")); }
+    catch (cause) { if (request === epoch) setError(cause instanceof Error && cause.message === 'workspace_not_entered' ? t("web.service.not_entered") : cause instanceof Error ? cause.message : t("web.alpha.error")); }
     finally { if (request === epoch) setBusy(false); }
   }
   async function load(id: number, append = false) {
