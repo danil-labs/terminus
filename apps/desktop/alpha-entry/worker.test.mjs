@@ -305,40 +305,61 @@ test("the panel adds exact reads over marketingProxy", async () => {
 });
 
 const accountToken = { Authorization: `Bearer a.${btoa(JSON.stringify({ active_account_id: 7 }))}.c` };
+const MEDIA_BASE = "https://cdn.example/";
 const metaWrites = [
-  ["POST", "/api/marketing/templates", { channel_id: 2, name: "promo", category: "MARKETING", language: "es_MX", header: null, body: { text: "Hola" }, footer: null, submit: false }],
+  ["POST", "/api/marketing/templates", { channel_id: 2, name: "promo", category: "MARKETING", language: "es_MX", header: { format: "IMAGE", text: null, media_url: `${MEDIA_BASE}a.png` }, body: { text: "Hola" }, footer: null, submit: false }],
   ["POST", "/api/marketing/templates/sync", {}],
   ["PATCH", "/api/marketing/templates/9", { name: "promo_2", body: { text: "Hola" } }],
   ["POST", "/api/marketing/templates/9/submit"], ["DELETE", "/api/marketing/templates/9"],
-  ["POST", "/auth/account/request-access", { account_id: 7, feature: "campaigns", phone: "+525512345678" }],
 ];
+const access = ["POST", "/auth/account/request-access", { account_id: 7, feature: "campaigns", phone: "+525512345678" }];
 const deliveryWrites = [
   ["POST", "/api/marketing/campaigns/4/contacts?account_id=7", { contact_account_ids: [1, 2] }],
   ["POST", "/api/marketing/campaigns/4/start?account_id=7"], ["POST", "/api/marketing/campaigns/4/resume?account_id=7"],
   ["POST", "/api/marketing/campaigns/4/schedule?account_id=7", { scheduled_at: "2026-11-01T12:00:00.000Z" }],
 ];
 const send = (h, method, path, body, extra = {}) => h.fetch(prefix + path, { method, headers: { ...accountToken, Origin: origin, ...(body === undefined ? {} : { "Content-Type": "application/json" }), ...extra }, body: body === undefined ? undefined : JSON.stringify(body) });
-
-test("switch off: Meta writes answer 403, delivery keeps its 409, nothing reaches the BFF", async () => {
+const upload = (h, form) => h.fetch(prefix + "/api/media", { method: "POST", headers: { ...accountToken, Origin: origin }, body: form });
+const mediaForm = (fields = {}) => {
+  const form = new FormData();
+  form.append("file", new File(["x"], "a.png", { type: "image/png" }));
+  form.append("kind", "template");
+  for (const [key, value] of Object.entries(fields)) form.set(key, value);
+  return form;
+};
+function broadcastHarness(permissions = ["campaigns.manage"]) {
   const h = harness();
-  for (const [method, path, body] of metaWrites) {
+  h.env.BROADCAST_WRITES = "on";
+  h.env.BROADCAST_DELIVERY = "on";
+  h.env.MEDIA_PUBLIC_BASE = MEDIA_BASE;
+  h.env.APPV2_BFF.fetch = async request => {
+    const preflight = new URL(request.url).pathname === "/auth/account/my-permissions";
+    if (!preflight) h.calls.push(request);
+    return Response.json(preflight ? { role: "custom", permissions, scoped: [] } : { ok: true });
+  };
+  return h;
+}
+
+test("switches off: Meta writes answer 403, delivery keeps its 409, nothing reaches the BFF", async () => {
+  const h = harness();
+  for (const [method, path, body] of [...metaWrites, access]) {
     const response = await send(h, method, path, body);
     assert.equal(response.status, 403, path);
     assert.deepEqual(await response.json(), { error: "broadcast_writes_disabled" });
   }
+  assert.equal((await upload(h, mediaForm())).status, 403);
+  h.env.BROADCAST_WRITES = "on";
   for (const [method, path, body] of deliveryWrites) {
     const response = await send(h, method, path, body);
-    assert.equal(response.status, 409, path);
+    assert.equal(response.status, 409, `${path}: opening Meta must not open delivery`);
     assert.deepEqual(await response.json(), { error: "campaign_delivery_unavailable" });
   }
-  assert.equal((await h.fetch(prefix + "/api/media", { method: "POST", headers: { ...accountToken, Origin: origin, "Content-Type": "multipart/form-data; boundary=x" }, body: "--x--" })).status, 403);
   assert.equal(h.calls.length, 0);
 });
 
-test("switch on: each write keeps its barriers and sends a rebuilt body", async () => {
-  const h = harness();
-  h.env.BROADCAST_WRITES = "on";
-  for (const [method, path, body] of [...metaWrites, ...deliveryWrites]) {
+test("switches on: each write keeps its barriers and sends a rebuilt body", async () => {
+  const h = broadcastHarness();
+  for (const [method, path, body] of [...metaWrites, ...deliveryWrites, access]) {
     assert.equal((await send(h, method, path, body)).status, 200, path);
     const call = h.calls.at(-1);
     assert.equal(call.method, method);
@@ -357,25 +378,60 @@ test("switch on: each write keeps its barriers and sends a rebuilt body", async 
   assert.equal((await send(h, "POST", "/api/marketing/campaigns/4/start")).status, 403, "no account");
   for (const [badPath, bad] of [
     ["/api/marketing/campaigns/4/contacts?account_id=7", { contact_account_ids: [] }], ["/api/marketing/campaigns/4/contacts?account_id=7", { contact_account_ids: [1.5] }],
+    ["/api/marketing/campaigns/4/contacts?account_id=7", { contact_account_ids: Array.from({ length: 101 }, (_, index) => index + 1) }],
     ["/api/marketing/campaigns/4/schedule?account_id=7", { scheduled_at: "mañana" }],
     ["/api/marketing/templates", { ...body, name: "Con Espacios" }], ["/api/marketing/templates", { ...body, submit: "yes" }], ["/api/marketing/templates", { ...body, body: { text: "x".repeat(1025) } }],
-    ["/auth/account/request-access", { account_id: 7, feature: "funnels", phone: "+525512345678" }],
+    ["/api/marketing/templates", { ...body, header: { format: "IMAGE", text: null, media_url: "https://evil.example/a.png" } }],
+    ["/auth/account/request-access", { ...access[2], feature: "funnels" }], ["/auth/account/request-access", { ...access[2], account_id: 8 }],
   ]) assert.equal((await send(h, "POST", badPath, bad)).status, 400, JSON.stringify(bad));
   assert.equal((await h.fetch(prefix + path, { method, headers: { ...accountToken, Origin: origin, "Content-Type": "text/plain" }, body: JSON.stringify(body) })).status, 400);
   for (const [m, p] of [["PUT", "/api/marketing/templates/9"], ["POST", "/api/contacts"], ["POST", "/api/contacts/import"]]) {
     assert.equal((await h.fetch(prefix + p, { method: m, headers: { ...accountToken, Origin: origin } })).status, 405, p);
   }
   assert.equal(h.calls.length, before);
-  const upload = await h.fetch(prefix + "/api/media", { method: "POST", headers: { ...accountToken, Origin: origin, "Content-Type": "multipart/form-data; boundary=x" }, body: "--x--" });
-  assert.equal(upload.status, 200);
-  assert.match(h.calls.at(-1).headers.get("Content-Type"), /^multipart\/form-data; boundary=x/);
-  assert.equal((await h.fetch(prefix + "/api/media", { method: "POST", headers: { ...accountToken, Origin: origin, "Content-Type": "application/json" }, body: "{}" })).status, 400);
+});
+
+test("the media envelope is rebuilt: only file and kind=template with an allowed type", async () => {
+  const h = broadcastHarness();
+  assert.equal((await upload(h, mediaForm())).status, 200);
+  const form = await h.calls.at(-1).formData();
+  assert.deepEqual([...form.keys()].sort(), ["file", "kind"]);
+  assert.equal(form.get("kind"), "template");
+  const before = h.calls.length;
+  assert.equal((await upload(h, mediaForm({ kind: "inventory" }))).status, 400);
+  assert.equal((await upload(h, mediaForm({ session_id: "5" }))).status, 400);
+  const html = mediaForm();
+  html.set("file", new File(["<script>"], "a.html", { type: "text/html" }));
+  assert.equal((await upload(h, html)).status, 400);
+  assert.equal(h.calls.length, before);
+});
+
+test("without campaigns.manage no write leaves the Worker; request-access needs only membership", async () => {
+  const h = broadcastHarness([]);
+  for (const [method, path, body] of [...metaWrites, ...deliveryWrites]) {
+    const response = await send(h, method, path, body);
+    assert.equal(response.status, 403, path);
+    assert.deepEqual(await response.json(), { error: "forbidden_read_only" });
+  }
+  assert.equal((await upload(h, mediaForm())).status, 403);
+  assert.equal(h.calls.length, 0);
+  assert.equal((await send(h, ...access)).status, 200);
+});
+
+test("pause and cancel also stop at the preflight", async () => {
+  const h = marketingHarness();
+  h.env.APPV2_BFF.fetch = async request => { h.calls.push(request); return Response.json({ role: "custom", permissions: [], scoped: [] }); };
+  for (const action of ["pause", "cancel"]) {
+    const response = await h.fetch(`${prefix}/api/marketing/campaigns/4/${action}?account_id=7`, { method: "POST", headers: marketingHeaders });
+    assert.equal(response.status, 403, action);
+  }
+  assert.ok(h.calls.every(call => new URL(call.url).pathname === "/auth/account/my-permissions"));
 });
 
 test("a 204 from the BFF passes without a body", async () => {
-  const h = harness();
-  h.env.BROADCAST_WRITES = "on";
-  h.env.APPV2_BFF = { fetch: async () => new Response(null, { status: 204 }) };
+  const h = broadcastHarness();
+  const fetchBff = h.env.APPV2_BFF.fetch;
+  h.env.APPV2_BFF.fetch = async request => new URL(request.url).pathname === "/auth/account/my-permissions" ? fetchBff(request) : new Response(null, { status: 204 });
   assert.equal((await send(h, "DELETE", "/api/marketing/templates/9")).status, 204);
 });
 
@@ -478,7 +534,9 @@ test('marketing rejects unknown methods, routes and bodies before authorization 
   assert.equal((await h.fetch(prefix + '/api/marketing/campaigns/4/pause?account_id=7', { ...options, body: '{}' })).status, 400);
   assert.equal((await h.fetch(prefix + '/api/contacts?account_id=7', options)).status, 405);
   assert.equal((await h.fetch(prefix + '/api/marketing/campaigns/4/start?account_id=7', { headers: marketingHeaders })).status, 405);
-  assert.equal((await h.fetch(prefix + '/api/marketing/templates/2/submit', options)).status, 403);
+  const submit = await h.fetch(prefix + '/api/marketing/templates/2/submit', options);
+  assert.equal(submit.status, 403);
+  assert.deepEqual(await submit.json(), { error: 'broadcast_writes_disabled' });
   for (const path of ['/api/marketing/campaigns/4/unknown', '/api/marketing/channels']) assert.ok([404, 405].includes((await h.fetch(prefix + path, options)).status));
   assert.equal(h.calls.length, 0);
 });

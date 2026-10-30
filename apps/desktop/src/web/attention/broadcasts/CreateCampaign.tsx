@@ -5,14 +5,14 @@ import { Button } from '../../../ui/Button';
 import { EmptyState } from '../../../ui/EmptyState';
 import { Input } from '../../../ui/Input';
 import { Select } from '../../../ui/Select';
-import { Field, errorText, type Context } from './parts';
+import { Field, UncertainWrite, errorText, type Context } from './parts';
 import { createQuery } from './query';
 
 const LITERAL = '__literal__';
 const SOURCES = ['contact.name', 'contact.email', 'contact.phone', 'time.now', 'time.now_full'] as const;
 
 /** Crea el borrador; la audiencia y el envío se deciden después, en el detalle. */
-export function CreateCampaign(props: { context: Context; onDone: (created: StatusOut | null) => void }) {
+export function CreateCampaign(props: { context: Context; onDone: (created: StatusOut | null) => void; onReconciled: () => void }) {
   const api = props.context.api;
   const templates = createQuery(() => api.templates(true));
   // Si faltan los metadatos, el selector sigue con las fuentes estándar.
@@ -33,7 +33,9 @@ export function CreateCampaign(props: { context: Context; onDone: (created: Stat
   const noChannels = () => templateId() !== null && !!channels.data() && eligible().length === 0;
   const channelOk = () => eligible().some(row => row.id === channelId());
   const complete = () => variables().every(name => values()[name]?.trim());
-  const ready = () => !!name().trim() && templateId() !== null && channelOk() && complete() && !unmappable() && !busy() && props.context.canOperate(channelId());
+  const [operations, setOperations] = createSignal(0);
+  const uncertain = () => { operations(); return api.blocked(props.context.account(), 'create'); };
+  const ready = () => !!name().trim() && templateId() !== null && channelOk() && complete() && !unmappable() && !busy() && !uncertain() && props.context.canOperate(channelId());
 
   createEffect(() => { const first = templates.data()?.[0]; if (templateId() === null && first) setTemplateId(first.id); });
   createEffect(on(templateId, () => { setValues({}); setLiteral({}); }));
@@ -46,7 +48,13 @@ export function CreateCampaign(props: { context: Context; onDone: (created: Stat
     const mapping = variables().length ? Object.fromEntries(variables().map(key => [key, values()[key]!.trim()])) : undefined;
     try { props.onDone(await api.createCampaign({ template_id: templateId()!, channel_id: channelId()!, name: name().trim(), ...(mapping ? { variable_mapping: mapping } : {}) })); }
     catch (cause) { setError(errorText(cause)); }
-    finally { setBusy(false); }
+    finally { setBusy(false); setOperations(value => value + 1); }
+  }
+  async function reread() {
+    setBusy(true); setError('');
+    try { await api.reconcile(); props.onReconciled(); }
+    catch (cause) { setError(errorText(cause)); }
+    finally { setBusy(false); setOperations(value => value + 1); }
   }
   function pick(variable: string, value: string) {
     setLiteral({ ...literal(), [variable]: value === LITERAL });
@@ -55,7 +63,7 @@ export function CreateCampaign(props: { context: Context; onDone: (created: Stat
 
   return <section class="grid content-start gap-3 rounded-lg border border-border bg-surface p-4" aria-label={t("broadcasts.new_broadcast")}>
     <header class="flex items-center justify-between"><h2 class="m-0 text-base font-semibold">{t("broadcasts.new_broadcast")}</h2><Button type="button" variant="ghost" size="sm" onClick={() => props.onDone(null)}>{t("broadcasts.cancel")}</Button></header>
-    <Show when={templates.error()}><p role="alert" class="m-0 text-[0.82rem] font-medium text-error-strong">{t("broadcasts.templates_error")} {templates.error()}</p></Show>
+    <Show when={templates.error()}><p role="alert" class="m-0 text-ui font-medium text-error-strong">{t("broadcasts.templates_error")} {templates.error()}</p></Show>
     <Show when={templates.data()?.length === 0} fallback={
       <form class="grid gap-3" onSubmit={event => void submit(event)}>
         <Field label={t("broadcasts.name")} for="camp-name"><Input id="camp-name" value={name()} maxLength={200} autocomplete="off" placeholder={t("broadcasts.name_placeholder")} onInput={event => setName(event.currentTarget.value)}/></Field>
@@ -69,12 +77,12 @@ export function CreateCampaign(props: { context: Context; onDone: (created: Stat
             <For each={eligible()}>{row => <option value={row.id}>{row.name || t("broadcasts.channel_fallback", { id: row.id })}</option>}</For>
           </Select>
         </Field>
-        <Show when={noChannels()}><p role="alert" class="m-0 text-[0.82rem] font-medium text-error-strong">{t("broadcasts.no_eligible")}</p></Show>
+        <Show when={noChannels()}><p role="alert" class="m-0 text-ui font-medium text-error-strong">{t("broadcasts.no_eligible")}</p></Show>
         <Show when={unmappable()} fallback={
           <Show when={variables().length > 0}>
             <div class="grid gap-2 rounded-md border border-border bg-surface-muted p-3">
-              <span class="text-[0.8rem] font-semibold text-neutral-700">{t("broadcasts.variables")}</span>
-              <p class="m-0 text-[0.78rem] text-neutral-500">{t("broadcasts.variables_hint")}</p>
+              <span class="text-ui font-semibold text-neutral-700">{t("broadcasts.variables")}</span>
+              <p class="m-0 text-label text-neutral-500">{t("broadcasts.variables_hint")}</p>
               <For each={variables()}>{variable => <Field label={`{{${variable}}}`} for={`camp-var-${variable}`}>
                 <div class="grid gap-1.5">
                   <Select id={`camp-var-${variable}`} value={literal()[variable] ? LITERAL : values()[variable] ?? ''} onChange={event => pick(variable, event.currentTarget.value)}>
@@ -88,8 +96,9 @@ export function CreateCampaign(props: { context: Context; onDone: (created: Stat
               </Field>}</For>
             </div>
           </Show>
-        }><p role="alert" class="m-0 text-[0.82rem] font-medium text-error-strong">{t("broadcasts.unmappable")}</p></Show>
-        <Show when={error()}><p role="alert" class="m-0 text-[0.82rem] font-medium text-error-strong">{error()}</p></Show>
+        }><p role="alert" class="m-0 text-ui font-medium text-error-strong">{t("broadcasts.unmappable")}</p></Show>
+        <Show when={uncertain()}><UncertainWrite busy={busy()} onReread={() => void reread()}/></Show>
+        <Show when={error()}><p role="alert" class="m-0 text-ui font-medium text-error-strong">{error()}</p></Show>
         <div class="flex justify-end"><Button type="submit" disabled={!ready()}>{busy() ? t("broadcasts.creating") : t("broadcasts.create_draft")}</Button></div>
       </form>
     }><EmptyState title={t("broadcasts.no_approved")} description={t("broadcasts.no_approved_hint")}/></Show>

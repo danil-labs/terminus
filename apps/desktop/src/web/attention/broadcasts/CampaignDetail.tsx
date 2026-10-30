@@ -10,7 +10,7 @@ import { Button } from '../../../ui/Button';
 import { Input } from '../../../ui/Input';
 import { Skeleton } from '../../../ui/Skeleton';
 import { AddContacts } from './AddContacts';
-import { Confirm, Eyebrow, Note, StatusBadge, errorText, type Context } from './parts';
+import { Confirm, Eyebrow, Note, StatusBadge, UncertainWrite, errorText, type Context } from './parts';
 import { ProgressPanel } from './Progress';
 import { createQuery } from './query';
 
@@ -30,15 +30,23 @@ export function CampaignDetail(props: { context: Context; campaign: Campaign; on
   const [when, setWhen] = createSignal('');
   const [adding, setAdding] = createSignal(false);
   const actions = () => actionsFor(props.campaign.status);
-  const canDeliver = () => props.context.canWrite() && props.context.canOperate(props.campaign.channel_id);
-  const canOperate = () => props.context.canOperate(props.campaign.channel_id);
+  const [operations, setOperations] = createSignal(0);
+  const uncertain = () => { operations(); const account = props.context.account(); return api.blocked(account, `campaign:${id}`) || api.blocked(account, `contacts:${id}`); };
+  const canDeliver = () => props.context.canDeliver(props.campaign.channel_id) && !uncertain();
+  const canOperate = () => props.context.canOperate(props.campaign.channel_id) && !uncertain();
   const emptyAudience = () => stats.data()?.total === 0;
 
   async function act(action: () => Promise<unknown>) {
     setBusy(true); setError(''); setConfirm(null);
     try { await action(); setScheduling(false); props.onChanged(); void stats.refresh(); }
     catch (cause) { setError(errorText(cause)); }
-    finally { setBusy(false); }
+    finally { setBusy(false); setOperations(value => value + 1); }
+  }
+  async function reread() {
+    setBusy(true); setError('');
+    try { await api.reconcile(id); props.onChanged(); void stats.refresh(); void recipients.refresh(); }
+    catch (cause) { setError(errorText(cause)); }
+    finally { setBusy(false); setOperations(value => value + 1); }
   }
 
   return <section class="flex h-full min-h-0 min-w-0 flex-col overflow-hidden" aria-label={t("broadcasts.detail_of", { name: props.campaign.name })}>
@@ -56,12 +64,13 @@ export function CampaignDetail(props: { context: Context; campaign: Campaign; on
       </div>
     </header>
     <div class="grid min-h-0 flex-1 content-start gap-4 overflow-y-auto p-4">
+      <Show when={uncertain()}><UncertainWrite busy={busy()} onReread={() => void reread()}/></Show>
       <Show when={error()}><Note tone="danger">{t("broadcasts.action_error", { reason: error() })}</Note></Show>
       <Show when={confirm() === 'start'}><Confirm text={t("broadcasts.confirm_start", { count: stats.data()?.total ?? 0, account: props.context.accountName() })} action={t("broadcasts.confirm_start_action")} busy={busy()} onBack={() => setConfirm(null)} onConfirm={() => void act(() => api.start(id))}/></Show>
       <Show when={confirm() === 'cancel'}><Confirm text={t("broadcasts.confirm_cancel")} action={t("broadcasts.confirm_cancel_action")} danger busy={busy()} onBack={() => setConfirm(null)} onConfirm={() => void act(() => api.cancel(id))}/></Show>
       <Show when={scheduling() && actions().includes('schedule')}>
         <form class="flex flex-wrap items-end gap-2 rounded-md border border-border bg-surface-muted p-3" onSubmit={event => { event.preventDefault(); if (when()) void act(() => api.schedule(id, new Date(when()).toISOString())); }}>
-          <label class="grid gap-1 text-[0.8rem] text-neutral-500">{t("broadcasts.schedule_at")}<Input type="datetime-local" class="w-auto" value={when()} onInput={event => setWhen(event.currentTarget.value)}/></label>
+          <label class="grid gap-1 text-ui text-neutral-500">{t("broadcasts.schedule_at")}<Input type="datetime-local" class="w-auto" value={when()} onInput={event => setWhen(event.currentTarget.value)}/></label>
           <Button type="submit" size="sm" disabled={!when() || busy() || !canDeliver()}>{t("broadcasts.schedule")}</Button>
           <Button type="button" size="sm" variant="ghost" onClick={() => setScheduling(false)}>{t("broadcasts.cancel")}</Button>
         </form>
@@ -74,7 +83,7 @@ export function CampaignDetail(props: { context: Context; campaign: Campaign; on
       </div>}</Show>
       <Show when={buildingAudience(props.campaign.status)}>
         <Show when={adding()} fallback={<Button size="sm" variant="secondary" type="button" class="w-fit" onClick={() => setAdding(true)}><UserPlus size={15}/>{t("broadcasts.add_contacts")}</Button>}>
-          <AddContacts context={props.context} campaignId={id} onClose={() => setAdding(false)} onAdded={() => { void stats.refresh(); void recipients.refresh(); }}/>
+          <AddContacts context={props.context} campaignId={id} canAdd={canDeliver()} onClose={() => setAdding(false)} onFinished={() => setOperations(value => value + 1)} onAdded={() => { void stats.refresh(); void recipients.refresh(); }}/>
         </Show>
         <Audience total={stats.data()?.total ?? 0} rows={recipients.data()} error={recipients.error()}/>
       </Show>
@@ -95,7 +104,7 @@ function FailureSummary(props: { failed: number; total: number; rows?: Recipient
           <ul class="m-0 grid list-none gap-1 p-0">
             <For each={reasons()}>{row => <li class="grid gap-0.5">
               <div class="flex gap-2"><span class="shrink-0 font-mono tabular-nums">{row.count}×</span><span>{row.code ? t(`broadcasts.meta_${row.code}`) : row.text || t("broadcasts.meta_generic")}</span></div>
-              <Show when={row.raw}><details class="ml-6 text-neutral-500"><summary class="cursor-pointer">{t("broadcasts.technical_details")}</summary><pre class="m-0 mt-1 max-h-32 overflow-auto rounded-sm bg-surface-muted p-2 text-[0.7rem] break-all whitespace-pre-wrap text-neutral-700">{row.raw}</pre></details></Show>
+              <Show when={row.raw}><details class="ml-6 text-neutral-500"><summary class="cursor-pointer">{t("broadcasts.technical_details")}</summary><pre class="m-0 mt-1 max-h-32 overflow-auto rounded-sm bg-surface-muted p-2 text-caption break-all whitespace-pre-wrap text-neutral-700">{row.raw}</pre></details></Show>
             </li>}</For>
           </ul>
           <Show when={shown() < props.failed}><span class="text-neutral-500">{t("broadcasts.reasons_partial", { shown: shown(), failed: props.failed })}</span></Show>
@@ -108,18 +117,18 @@ function FailureSummary(props: { failed: number; total: number; rows?: Recipient
 function Audience(props: { total: number; rows?: Recipient[]; error: string }) {
   const rows = () => props.rows ?? [];
   return <div class="rounded-md border border-border bg-surface p-3">
-    <div class="flex items-baseline justify-between"><Eyebrow>{t("broadcasts.audience")}</Eyebrow><Show when={rows().length > 0}><span class="font-mono text-[0.82rem] text-neutral-950 tabular-nums">{props.total}</span></Show></div>
-    <Show when={props.error}><p role="alert" class="m-0 mt-1 text-[0.82rem] text-error-strong">{props.error}</p></Show>
+    <div class="flex items-baseline justify-between"><Eyebrow>{t("broadcasts.audience")}</Eyebrow><Show when={rows().length > 0}><span class="font-mono text-ui text-neutral-950 tabular-nums">{props.total}</span></Show></div>
+    <Show when={props.error}><p role="alert" class="m-0 mt-1 text-ui text-error-strong">{props.error}</p></Show>
     <Show when={!props.rows && !props.error}><div class="mt-2"><Skeleton class="h-16"/></div></Show>
-    <Show when={props.rows && rows().length === 0}><p class="m-0 mt-1 text-[0.82rem] text-neutral-500">{t("broadcasts.audience_empty")}</p></Show>
+    <Show when={props.rows && rows().length === 0}><p class="m-0 mt-1 text-ui text-neutral-500">{t("broadcasts.audience_empty")}</p></Show>
     <Show when={rows().length > 0}>
       <ul class="m-0 mt-2 grid max-h-56 list-none content-start gap-0.5 overflow-auto p-0">
-        <For each={rows()}>{row => <li class="flex items-center justify-between gap-2 px-1 py-1 text-[0.85rem]">
+        <For each={rows()}>{row => <li class="flex items-center justify-between gap-2 px-1 py-1 text-body">
           <span class="truncate">{row.name || row.phone || t("broadcasts.contact_fallback", { id: row.contact_account_id })}<Show when={row.name && row.phone}><span class="text-neutral-500"> · {row.phone}</span></Show></span>
-          <span class="shrink-0 rounded-sm bg-surface-muted px-1.5 py-0.5 text-[0.72rem] text-neutral-700">{row.status}</span>
+          <span class="shrink-0 rounded-sm bg-surface-muted px-1.5 py-0.5 text-caption text-neutral-700">{row.status}</span>
         </li>}</For>
       </ul>
-      <Show when={props.total > rows().length}><p class="m-0 mt-2 text-[0.76rem] text-neutral-500">{t("broadcasts.showing_of", { shown: rows().length, total: props.total })}</p></Show>
+      <Show when={props.total > rows().length}><p class="m-0 mt-2 text-label text-neutral-500">{t("broadcasts.showing_of", { shown: rows().length, total: props.total })}</p></Show>
     </Show>
   </div>;
 }

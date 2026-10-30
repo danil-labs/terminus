@@ -45,25 +45,39 @@ const object = (bytes) => {
 const isJson = (type) => type.toLowerCase().startsWith("application/json");
 const text = (value, max, min = 0) => typeof value === "string" && value.length >= min && value.length <= max && !/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(value);
 const only = (value, allowed) => Object.keys(value).every((key) => allowed.includes(key));
-const exact = (fields) => (parse) => (bytes, type) => {
+const exact = (fields) => (parse) => (bytes, type, context) => {
   const value = isJson(type) ? object(bytes) : null;
-  if (!value || !only(value, fields) || !parse(value)) return null;
+  if (!value || !only(value, fields) || !parse(value, context)) return null;
   return JSON.stringify(Object.fromEntries(fields.filter((field) => value[field] !== undefined).map((field) => [field, value[field]])));
 };
 
-const header = (value) => value === null || value === undefined || (typeof value === "object" && only(value, ["format", "text", "media_url"]) && ["TEXT", "IMAGE", "VIDEO", "DOCUMENT"].includes(value.format) && (value.text == null || text(value.text, 60)) && (value.media_url == null || text(value.media_url, 2048)));
+// El Gateway descarga esta URL: solo se acepta la base pública de medios configurada.
+const mediaUrl = (value, env) => !!env.MEDIA_PUBLIC_BASE && text(value, 2048) && value.startsWith(env.MEDIA_PUBLIC_BASE);
+const header = (value, env) => value === null || value === undefined || (typeof value === "object" && only(value, ["format", "text", "media_url"]) && ["TEXT", "IMAGE", "VIDEO", "DOCUMENT"].includes(value.format) && (value.text == null || text(value.text, 60)) && (value.media_url == null || mediaUrl(value.media_url, env)));
 const body = (value) => value === undefined || (value && typeof value === "object" && only(value, ["text"]) && text(value.text, 1024, 1));
 const footer = (value) => value === null || value === undefined || (typeof value === "object" && only(value, ["text"]) && text(value.text, 60, 1));
-const templateCore = (value) => (value.name === undefined || (text(value.name, 512, 1) && /^[a-z0-9_]+$/.test(value.name))) && (value.category === undefined || ["MARKETING", "UTILITY"].includes(value.category)) && (value.language === undefined || text(value.language, 12, 2)) && (value.channel_id === undefined || safeId(value.channel_id)) && header(value.header) && body(value.body) && footer(value.footer);
+const templateCore = (value, { env }) => (value.name === undefined || (text(value.name, 512, 1) && /^[a-z0-9_]+$/.test(value.name))) && (value.category === undefined || ["MARKETING", "UTILITY"].includes(value.category)) && (value.language === undefined || text(value.language, 12, 2)) && (value.channel_id === undefined || safeId(value.channel_id)) && header(value.header, env) && body(value.body) && footer(value.footer);
 
 const TEMPLATE_FIELDS = ["channel_id", "name", "category", "language", "header", "body", "footer"];
-const addContacts = exact(["contact_account_ids"])((value) => Array.isArray(value.contact_account_ids) && value.contact_account_ids.length > 0 && value.contact_account_ids.every(safeId));
+const addContacts = exact(["contact_account_ids"])((value) => Array.isArray(value.contact_account_ids) && value.contact_account_ids.length > 0 && value.contact_account_ids.length <= 100 && value.contact_account_ids.every(safeId));
 const schedule = exact(["scheduled_at"])((value) => text(value.scheduled_at, 40, 1) && !Number.isNaN(Date.parse(value.scheduled_at)));
-const createTemplate = exact([...TEMPLATE_FIELDS, "submit"])((value) => safeId(value.channel_id) && value.name !== undefined && value.category !== undefined && value.body !== undefined && typeof value.submit === "boolean" && templateCore(value));
+const createTemplate = exact([...TEMPLATE_FIELDS, "submit"])((value, context) => safeId(value.channel_id) && value.name !== undefined && value.category !== undefined && value.body !== undefined && typeof value.submit === "boolean" && templateCore(value, context));
 const updateTemplate = exact(TEMPLATE_FIELDS)(templateCore);
 const syncTemplates = exact([])(() => true);
-const requestAccess = exact(["account_id", "feature", "phone"])((value) => safeId(value.account_id) && value.feature === "campaigns" && text(value.phone, 40, 7));
-const media = (bytes, type) => (/^multipart\/form-data;\s*boundary=/i.test(type) ? bytes : null);
+const requestAccess = exact(["account_id", "feature", "phone"])((value, { account }) => value.account_id === account && value.feature === "campaigns" && text(value.phone, 40, 7));
+const MEDIA_TYPES = ["image/png", "image/jpeg", "video/mp4", "application/pdf"];
+/** El sobre multipart se rehace: solo `file` de un tipo permitido y `kind=template`. */
+const media = async (bytes, type) => {
+  if (!/^multipart\/form-data;\s*boundary=/i.test(type)) return null;
+  let form;
+  try { form = await new Response(bytes, { headers: { "Content-Type": type } }).formData(); } catch { return null; }
+  const file = form.get("file");
+  if ([...form.keys()].sort().join() !== "file,kind" || form.get("kind") !== "template" || !(file instanceof File) || !MEDIA_TYPES.includes(file.type)) return null;
+  const rebuilt = new FormData();
+  rebuilt.append("file", file);
+  rebuilt.append("kind", "template");
+  return rebuilt;
+};
 
 const WRITES = [
   ["POST", `${CAMPAIGN}/contacts`, { parse: addContacts, max: IDS_MAX, delivery: true }],
@@ -75,7 +89,7 @@ const WRITES = [
   ["POST", `${TEMPLATE}/submit`, { parse: null, max: 0 }],
   ["DELETE", TEMPLATE, { parse: null, max: 0 }],
   ["POST", "/api/media", { parse: media, max: MEDIA_MAX, multipart: true }],
-  ["POST", "/auth/account/request-access", { parse: requestAccess, max: KB }],
+  ["POST", "/auth/account/request-access", { parse: requestAccess, max: KB, anyMember: true }],
 ].map(([method, path, route]) => [method, new RegExp(`^${path}$`), route]);
 
 /** La ruta de una escritura permitida, o null. */

@@ -47,16 +47,16 @@ export function TemplateList(props: { context: Context; templates: Query<Templat
   };
   return <div class="grid content-start gap-2">
     <div class="flex items-center justify-between gap-2 px-1">
-      <span class="text-[0.8rem] text-neutral-500">{(props.templates.data()?.length ?? 0) === 1 ? t("broadcasts.templates_one", { count: 1 }) : t("broadcasts.templates_other", { count: props.templates.data()?.length ?? 0 })}</span>
+      <span class="text-ui text-neutral-500">{(props.templates.data()?.length ?? 0) === 1 ? t("broadcasts.templates_one", { count: 1 }) : t("broadcasts.templates_other", { count: props.templates.data()?.length ?? 0 })}</span>
       <Button size="sm" variant="ghost" type="button" disabled={syncing() || !props.context.canWrite()} aria-label={t("broadcasts.sync_label")} onClick={() => void sync()}><RefreshCw size={14} class={syncing() ? 'animate-spin' : undefined}/>{syncing() ? t("broadcasts.syncing") : t("broadcasts.sync")}</Button>
     </div>
-    <Show when={notice()}><p role="status" class="m-0 rounded-md bg-surface-muted px-3 py-2 text-[0.78rem] text-neutral-700">{notice()}</p></Show>
+    <Show when={notice()}><p role="status" class="m-0 rounded-md bg-surface-muted px-3 py-2 text-label text-neutral-700">{notice()}</p></Show>
     <Show when={!props.templates.data() && !props.templates.error()}><Skeleton class="h-12" filas={3}/></Show>
     <Show when={props.templates.error()}><Note tone="danger">{t("broadcasts.templates_error")} {props.templates.error()}</Note></Show>
-    <Show when={props.templates.data()?.length === 0}><p role="status" class="m-0 p-4 text-center text-[0.85rem] text-neutral-500">{t("broadcasts.no_templates")}</p></Show>
+    <Show when={props.templates.data()?.length === 0}><p role="status" class="m-0 p-4 text-center text-body text-neutral-500">{t("broadcasts.no_templates")}</p></Show>
     <ul class="m-0 grid list-none content-start gap-1 p-0">
       <For each={rows()}>{row => <li class="min-w-0"><RowButton active={props.selected === row.id} muted={row.status === 'DELETED'} onClick={() => props.onOpen(row.id)}>
-        <span class="grid min-w-0 gap-0.5"><strong class="truncate font-mono text-[0.82rem]">{row.name}</strong><span class="truncate text-[0.74rem] text-neutral-500">{[row.category, row.language].filter(Boolean).join(' · ') || '—'}</span></span>
+        <span class="grid min-w-0 gap-0.5"><strong class="truncate font-mono text-ui">{row.name}</strong><span class="truncate text-label text-neutral-500">{[row.category, row.language].filter(Boolean).join(' · ') || '—'}</span></span>
         <TemplateBadge template={row}/>
       </RowButton></li>}</For>
     </ul>
@@ -78,12 +78,12 @@ export function TemplatePreview(props: { content: TemplateContent }) {
   const header = () => props.content.header;
   const media = () => header() && header()!.format !== 'TEXT' ? header()! : null;
   return <div class="grid content-start rounded-lg border border-border bg-surface-muted p-4" aria-label={t("broadcasts.preview_label")}>
-    <span class="mb-3 text-[0.7rem] font-semibold tracking-wider text-neutral-500 uppercase">{t("broadcasts.preview")}</span>
+    <span class="mb-3 text-caption font-semibold tracking-wider text-neutral-500 uppercase">{t("broadcasts.preview")}</span>
     <div class="max-w-[320px] rounded-[18px] rounded-bl-[6px] border border-border bg-surface px-3 pt-2.5 pb-2 shadow-sm">
-      <Show when={header()?.format === 'TEXT' && header()?.text?.trim()}><p class="m-0 mb-1 text-[0.92rem] leading-[1.35] font-bold text-neutral-950">{header()!.text}</p></Show>
-      <Show when={media()}>{value => <Show when={value().format === 'IMAGE' && value().media_url} fallback={<div class="mb-2 grid h-28 w-full place-items-center rounded-md bg-neutral-200 text-[0.74rem] font-semibold text-neutral-500">{value().media_url ? t("broadcasts.attached") : t(`broadcasts.header_${value().format}`)}</div>}><img src={value().media_url!} alt={t("broadcasts.header_image_alt")} class="mb-2 max-h-44 w-full rounded-md border border-border object-cover"/></Show>}</Show>
-      <p class="m-0 text-[0.92rem] leading-[1.42] whitespace-pre-wrap text-neutral-950"><Show when={props.content.body.text.trim()} fallback={<span class="text-neutral-500">{t("broadcasts.body_placeholder")}</span>}><Nodes nodes={parseTemplateText(props.content.body.text)}/></Show></p>
-      <Show when={props.content.footer?.text.trim()}><p class="m-0 mt-1 text-[0.76rem] leading-[1.3] text-neutral-500">{props.content.footer!.text}</p></Show>
+      <Show when={header()?.format === 'TEXT' && header()?.text?.trim()}><p class="m-0 mb-1 text-lead leading-[1.35] font-bold text-neutral-950">{header()!.text}</p></Show>
+      <Show when={media()}>{value => <Show when={value().format === 'IMAGE' && value().media_url} fallback={<div class="mb-2 grid h-28 w-full place-items-center rounded-md bg-neutral-200 text-label font-semibold text-neutral-500">{value().media_url ? t("broadcasts.attached") : t(`broadcasts.header_${value().format}`)}</div>}><img src={value().media_url!} alt={t("broadcasts.header_image_alt")} class="mb-2 max-h-44 w-full rounded-md border border-border object-cover"/></Show>}</Show>
+      <p class="m-0 text-lead leading-[1.42] whitespace-pre-wrap text-neutral-950"><Show when={props.content.body.text.trim()} fallback={<span class="text-neutral-500">{t("broadcasts.body_placeholder")}</span>}><Nodes nodes={parseTemplateText(props.content.body.text)}/></Show></p>
+      <Show when={props.content.footer?.text.trim()}><p class="m-0 mt-1 text-label leading-[1.3] text-neutral-500">{props.content.footer!.text}</p></Show>
     </div>
   </div>;
 }
@@ -116,7 +116,7 @@ function ReadOnly(props: { template: Template; onDone: () => void }) {
     </header>
     <Note tone={tone()}>{message()}</Note>
     <TemplatePreview content={templateContent(props.template.components)}/>
-    <Show when={props.template.waba_id}><p class="m-0 text-[0.74rem] text-neutral-500">{t("broadcasts.waba")} <span class="font-mono">{props.template.waba_id}</span></p></Show>
+    <Show when={props.template.waba_id}><p class="m-0 text-label text-neutral-500">{t("broadcasts.waba")} <span class="font-mono">{props.template.waba_id}</span></p></Show>
   </section>;
 }
 
@@ -211,21 +211,21 @@ function DraftForm(props: { context: Context; template: Template | null; onDone:
               <Show when={headerKind() === 'TEXT'}><Input value={headerText()} maxLength={60} placeholder={t("broadcasts.header_text_placeholder")} aria-label={t("broadcasts.header_text")} onInput={event => setHeaderText(event.currentTarget.value)}/></Show>
               <Show when={isMedia()}>
                 <div class="grid gap-2 rounded-md border border-border bg-surface-muted p-3">
-                  <input ref={file} type="file" accept={ACCEPT[headerKind()]} aria-label={t("broadcasts.header_file")} class="text-[0.82rem] text-neutral-700" onChange={event => void upload(event.currentTarget.files?.[0])}/>
-                  <Show when={uploading()}><p class="m-0 text-[0.8rem] text-neutral-500">{t("broadcasts.uploading", { name: fileName() ?? '' })}</p></Show>
-                  <Show when={!uploading() && mediaUrl()}><Show when={headerKind() === 'IMAGE'} fallback={<p class="m-0 truncate text-[0.8rem] text-neutral-700">{fileName() ?? t("broadcasts.attached")}</p>}><img src={mediaUrl()!} alt={t("broadcasts.header_image_alt")} class="max-h-28 w-fit rounded-md border border-border object-contain"/></Show></Show>
+                  <input ref={file} type="file" accept={ACCEPT[headerKind()]} aria-label={t("broadcasts.header_file")} class="text-ui text-neutral-700" onChange={event => void upload(event.currentTarget.files?.[0])}/>
+                  <Show when={uploading()}><p class="m-0 text-ui text-neutral-500">{t("broadcasts.uploading", { name: fileName() ?? '' })}</p></Show>
+                  <Show when={!uploading() && mediaUrl()}><Show when={headerKind() === 'IMAGE'} fallback={<p class="m-0 truncate text-ui text-neutral-700">{fileName() ?? t("broadcasts.attached")}</p>}><img src={mediaUrl()!} alt={t("broadcasts.header_image_alt")} class="max-h-28 w-fit rounded-md border border-border object-contain"/></Show></Show>
                 </div>
               </Show>
             </div>
           </Field>
           <Field label={t("broadcasts.body")} for="tpl-body" hint={t("broadcasts.body_hint")}><Textarea id="tpl-body" class="min-h-[110px]" value={body()} maxLength={1024} placeholder={t("broadcasts.body_example")} onInput={event => setBody(event.currentTarget.value)}/></Field>
-          <Show when={extractTemplateVariables(body()).length > 0}><p class="m-0 flex flex-wrap items-center gap-1.5 text-[0.8rem] text-neutral-500">{t("broadcasts.variables_label")}<For each={extractTemplateVariables(body())}>{value => <span class="rounded-sm bg-neutral-500/10 px-1.5 py-0.5 font-mono text-[0.74rem] font-semibold text-neutral-700">{value}</span>}</For></p></Show>
+          <Show when={extractTemplateVariables(body()).length > 0}><p class="m-0 flex flex-wrap items-center gap-1.5 text-ui text-neutral-500">{t("broadcasts.variables_label")}<For each={extractTemplateVariables(body())}>{value => <span class="rounded-sm bg-neutral-500/10 px-1.5 py-0.5 font-mono text-label font-semibold text-neutral-700">{value}</span>}</For></p></Show>
           <Field label={t("broadcasts.footer")} for="tpl-footer"><Input id="tpl-footer" value={footer()} maxLength={60} placeholder={t("broadcasts.footer_placeholder")} onInput={event => setFooter(event.currentTarget.value)}/></Field>
-          <Show when={error()}><p role="alert" class="m-0 text-[0.82rem] font-medium text-error-strong">{error()}</p></Show>
+          <Show when={error()}><p role="alert" class="m-0 text-ui font-medium text-error-strong">{error()}</p></Show>
           <Switch fallback={
             <div class="flex flex-wrap items-center justify-end gap-2">
               <Show when={draftId() !== null}><Button type="button" variant="ghost" size="sm" class="mr-auto text-error-strong" disabled={busy() || !props.context.canWrite()} onClick={() => setConfirming('discard')}><Trash2 size={14}/>{t("broadcasts.discard")}</Button></Show>
-              <Show when={saved() && !busy()}><span class="text-[0.8rem] text-neutral-500">{t("broadcasts.draft_saved")}</span></Show>
+              <Show when={saved() && !busy()}><span class="text-ui text-neutral-500">{t("broadcasts.draft_saved")}</span></Show>
               <Button type="button" variant="secondary" disabled={blocked()} onClick={() => void save()}>{t("broadcasts.save_draft")}</Button>
               <Button type="button" disabled={blocked()} onClick={() => setConfirming('submit')}>{t("broadcasts.submit")}</Button>
             </div>

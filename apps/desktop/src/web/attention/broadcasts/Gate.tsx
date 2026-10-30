@@ -32,7 +32,7 @@ export function FeatureGate(props: { context: Context; account: number }) {
       <Show when={!sent()} fallback={<p role="status" class="m-0 mt-6 flex items-center gap-2 text-sm text-success-strong"><Check size={16} class="shrink-0"/>{t("broadcasts.gate_sent")}</p>}>
         <form class="mt-6 grid gap-3" onSubmit={event => void request(event)}>
           <Field label={t("broadcasts.gate_phone")} for="gate-phone"><Input id="gate-phone" type="tel" inputMode="tel" value={phone()} placeholder={t("broadcasts.gate_phone_placeholder")} onInput={event => setPhone(event.currentTarget.value)}/></Field>
-          <Show when={error()}><p role="alert" class="m-0 text-[0.82rem] font-medium text-error-strong">{error()}</p></Show>
+          <Show when={error()}><p role="alert" class="m-0 text-ui font-medium text-error-strong">{error()}</p></Show>
           <Button type="submit" disabled={!ready()}>{busy() ? t("broadcasts.gate_sending") : t("broadcasts.gate_request")}</Button>
           <p class="m-0 text-center text-xs text-neutral-500">{t("broadcasts.gate_hint")}</p>
         </form>

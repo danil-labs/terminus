@@ -9,7 +9,7 @@ export const STATUS_TONE: Record<CampaignStatus, Tone> = { draft: 'neutral', sch
 const TEMPLATE_TONE: Record<string, Tone> = { DRAFT: 'neutral', APPROVED: 'success', PENDING: 'warning', REJECTED: 'danger', DELETED: 'neutral' };
 
 /** Lo que toda vista de Difusiones recibe: el cliente y si esta persona puede escribir aquí. */
-export type Context = { api: BroadcastPanel; canWrite: () => boolean; canManage: () => boolean; canOperate: (channel: number | null) => boolean; accountName: () => string };
+export type Context = { api: BroadcastPanel; canWrite: () => boolean; canManage: () => boolean; canOperate: (channel: number | null) => boolean; canDeliver: (channel: number | null) => boolean; account: () => number; accountName: () => string };
 
 export function errorText(cause: unknown) {
   if (!(cause instanceof Error)) return t("web.alpha.error");
@@ -31,25 +31,33 @@ export function TemplateBadge(props: { template: Template }) {
 const NOTE: Record<Tone, string> = { neutral: 'border-border text-neutral-700', info: 'border-border text-neutral-700', success: 'border-current text-success-strong', warning: 'border-current text-warning-strong', danger: 'border-current text-error-strong' };
 export function Note(props: { tone?: Tone; children: JSX.Element }) {
   const tone = () => props.tone ?? 'neutral';
-  return <div role={tone() === 'danger' || tone() === 'warning' ? 'alert' : 'status'} class={`m-0 rounded-md border px-3 py-2 text-[0.82rem] leading-relaxed ${NOTE[tone()]}`}>{props.children}</div>;
+  return <div role={tone() === 'danger' || tone() === 'warning' ? 'alert' : 'status'} class={`m-0 rounded-md border px-3 py-2 text-ui leading-relaxed ${NOTE[tone()]}`}>{props.children}</div>;
 }
 
 export function Eyebrow(props: { children: JSX.Element }) {
-  return <span class="text-[0.7rem] font-semibold tracking-wider text-neutral-500 uppercase">{props.children}</span>;
+  return <span class="text-caption font-semibold tracking-wider text-neutral-500 uppercase">{props.children}</span>;
 }
 
 export function Field(props: { label: string; for?: string; hint?: string; children: JSX.Element }) {
   return <div class="grid min-w-0 gap-1">
-    <label for={props.for} class="text-[0.8rem] font-medium text-neutral-700">{props.label}</label>
+    <label for={props.for} class="text-ui font-medium text-neutral-700">{props.label}</label>
     {props.children}
-    <Show when={props.hint}><p class="m-0 text-[0.76rem] text-neutral-500">{props.hint}</p></Show>
+    <Show when={props.hint}><p class="m-0 text-label text-neutral-500">{props.hint}</p></Show>
+  </div>;
+}
+
+/** Una escritura quedó sin confirmar: repetirla podría duplicarla. Solo se libera aquí. */
+export function UncertainWrite(props: { busy?: boolean; onReread: () => void }) {
+  return <div class="grid gap-2">
+    <Note tone="warning">{t("broadcast-writes.reconcile_required")}</Note>
+    <Button type="button" size="sm" variant="secondary" class="justify-self-start" disabled={props.busy} onClick={props.onReread}>{t("broadcast-writes.reread")}</Button>
   </div>;
 }
 
 /** Confirmación en línea: un error de la acción se queda junto a ella. */
 export function Confirm(props: { text: string; action: string; danger?: boolean; busy?: boolean; onConfirm: () => void; onBack: () => void }) {
   return <div class="grid gap-2 rounded-md border border-border bg-surface-muted p-3">
-    <p class="m-0 text-[0.85rem] text-neutral-700">{props.text}</p>
+    <p class="m-0 text-body text-neutral-700">{props.text}</p>
     <div class="flex items-center justify-end gap-2">
       <Button type="button" variant="ghost" size="sm" onClick={props.onBack}>{t("broadcasts.back")}</Button>
       <Button type="button" variant={props.danger ? 'danger' : 'primary'} size="sm" disabled={props.busy} onClick={props.onConfirm}>{props.action}</Button>

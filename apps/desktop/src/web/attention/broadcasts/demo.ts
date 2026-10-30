@@ -153,8 +153,11 @@ function route(path: string, method: string, body: Row, query: URLSearchParams, 
 }
 
 function demoTransport(): typeof fetch {
-  const gated = new URLSearchParams(location.search).get('gate') === 'broadcasts';
+  const query = new URLSearchParams(location.search);
+  const gated = query.get('gate') === 'broadcasts';
+  let failNextWrite = query.get('uncertain') === 'broadcasts';
   return (async (input, init) => {
+    if (failNextWrite && init?.method && init.method !== 'GET') { failNextWrite = false; return json({ detail: 'demo_unavailable' }, 503); }
     const url = new URL(String(input), location.href);
     const path = url.pathname.replace(/^.*\/alpha-api/, '');
     const body: Row = typeof init?.body === 'string' ? JSON.parse(init.body) as Row : {};
@@ -166,5 +169,5 @@ function demoTransport(): typeof fetch {
 
 export const demoBroadcastSource = (): BroadcastSource => ({
   session: { getToken: async () => 'demo', unauthorized: async () => false },
-  request: demoTransport(), prefix: '/alpha-api', writes: true, demo: true, account: async () => 1,
+  request: demoTransport(), prefix: '/alpha-api', writes: true, delivery: true, demo: true, account: async () => 1,
 });

@@ -28,14 +28,18 @@ export type Funnel = { id: number; name: string; stages: { id: number; name: str
 export type FunnelBoard = { stages: { id: number; name: string }[]; cards: { stage_id: number; contact_account_id: number }[] };
 export { canManageBroadcast, type BroadcastPermissions };
 
-/** Lo que cada cliente inyecta: con quién habla, con qué sesión y sobre qué cuenta. */
+/** Lo que cada cliente inyecta. Es un punto de inyección, no una frontera: el preflight y los cuerpos cerrados viven en la entrada que hay detrás de `prefix`. */
 export type BroadcastSource = {
+  /** Estable mientras dure: los candados de escrituras inciertas se guardan por sesión. */
   session: InboxSession & { subscribe?: (clear: () => void) => () => void };
   request: typeof fetch;
   prefix: string;
+  /** Pista de interfaz para plantillas y medios; no autoriza nada. */
   writes: boolean;
+  /** Pista de interfaz para lo que llega a clientes; no autoriza nada. */
+  delivery: boolean;
   demo: boolean;
-  /** La cuenta a la que el servidor anclará las lecturas; null si la sesión no tiene ninguna. */
+  /** La cuenta del mismo token que usa `session`; null si no tiene ninguna. */
   account: () => Promise<number | null>;
 };
 
@@ -103,9 +107,9 @@ async function failure(response: Response): Promise<BroadcastPanelError> {
   return new BroadcastPanelError(text(data.detail) || text(detail?.detail) || code || `HTTP ${response.status}`, response.status, code);
 }
 
-/** `writes` apagado corta aquí, antes de la red, lo que llega a clientes o a Meta. Borradores, pausa y cancelación no dependen de él. */
-export function createBroadcastPanel(source: Pick<BroadcastSource, 'session' | 'request' | 'prefix' | 'writes' | 'account'>) {
-  const { session, request, prefix, writes } = source;
+/** `writes` y `delivery` apagados cortan aquí, antes de la red. Borradores, pausa y cancelación no dependen de ellos. */
+export function createBroadcastPanel(source: Pick<BroadcastSource, 'session' | 'request' | 'prefix' | 'writes' | 'delivery' | 'account'>) {
+  const { session, request, prefix, writes, delivery } = source;
   const core = createBroadcasts(session, request, prefix);
   const active = async () => {
     const account = await source.account();
@@ -113,6 +117,7 @@ export function createBroadcastPanel(source: Pick<BroadcastSource, 'session' | '
     return account;
   };
   const guard = () => { if (!writes) throw new BroadcastPanelError('writes_disabled', 403, 'writes_disabled'); };
+  const guardDelivery = () => { if (!delivery) throw new BroadcastPanelError('writes_disabled', 403, 'writes_disabled'); };
   async function call(path: string, init: RequestInit = {}) {
     const attempt = async () => request(`${prefix}${path}`, { ...init, headers: { ...init.headers, Authorization: `Bearer ${await session.getToken()}` }, cache: 'no-store' });
     let response = await attempt();
@@ -132,18 +137,24 @@ export function createBroadcastPanel(source: Pick<BroadcastSource, 'session' | '
   const operate = async (campaignId: number, action: 'start' | 'pause' | 'resume' | 'cancel' | 'schedule', scheduledAt?: string) => core.transition(await active(), id(campaignId), action, scheduledAt);
   return {
     writes,
+    delivery,
     async account(account: number): Promise<string | null> {
       const accounts = list(object((await get('/auth/profile')).user).accounts ?? []);
       return accounts.map(object).find(row => row.id === account)?.name as string | undefined ?? null;
     },
     async features(account: number): Promise<string[]> { return list((await get(`/auth/account/features?account_id=${id(account)}`)).features).filter((row): row is string => typeof row === 'string'); },
     permissions: (account: number): Promise<BroadcastPermissions> => core.permissions(account),
-    /** Leer la lista también reconcilia las escrituras inciertas que siguen abiertas. */
-    async campaigns(): Promise<Campaign[]> { return core.list(await active(), undefined, true); },
+    async campaigns(): Promise<Campaign[]> { return core.list(await active()); },
+    /** Si una escritura quedó sin confirmar en esa cuenta y recurso. Sobrevive al remontaje. */
+    blocked: (account: number, resource: string) => core.blocked(account, resource),
+    /** Solo la persona la pide, después de ver el aviso: un sondeo no puede liberar un candado. */
+    async reconcile(campaignId?: number) {
+      const account = await active();
+      await core.list(account, undefined, true);
+      if (campaignId !== undefined) await core.stats(account, campaignId, undefined, true);
+    },
     async stats(campaignId: number): Promise<CampaignStats> {
       const data = await scoped(`/api/marketing/campaigns/${id(campaignId)}/stats`);
-      const account = await active();
-      if (core.blocked(account, `contacts:${campaignId}`)) await core.stats(account, campaignId, undefined, true);
       return { by_process_status: counts(data.by_process_status), by_delivery_status: counts(data.by_delivery_status), responded: whole(data.responded), total: whole(data.total) };
     },
     async recipients(campaignId: number): Promise<Recipient[]> { return list((await get(`/api/marketing/campaigns/${id(campaignId)}/messages?limit=200&offset=0`)).items).map(recipient); },
@@ -171,7 +182,7 @@ export function createBroadcastPanel(source: Pick<BroadcastSource, 'session' | '
     async createCampaign(input: CampaignInput): Promise<StatusOut> { return core.create(await active(), input); },
     /** La entrada acepta hasta 100 ids por envío; un fallo detiene los lotes siguientes. */
     async addContacts(campaignId: number, ids: number[]): Promise<AddContactsResult> {
-      guard();
+      guardDelivery();
       const account = await active();
       const total: AddContactsResult = { added: 0, requested: 0, rejected: [] };
       for (let at = 0; at < ids.length; at += 100) {
@@ -180,9 +191,9 @@ export function createBroadcastPanel(source: Pick<BroadcastSource, 'session' | '
       }
       return total;
     },
-    async start(campaignId: number) { guard(); return operate(campaignId, 'start'); },
-    async resume(campaignId: number) { guard(); return operate(campaignId, 'resume'); },
-    async schedule(campaignId: number, scheduledAt: string) { guard(); return operate(campaignId, 'schedule', scheduledAt); },
+    async start(campaignId: number) { guardDelivery(); return operate(campaignId, 'start'); },
+    async resume(campaignId: number) { guardDelivery(); return operate(campaignId, 'resume'); },
+    async schedule(campaignId: number, scheduledAt: string) { guardDelivery(); return operate(campaignId, 'schedule', scheduledAt); },
     pause: (campaignId: number) => operate(campaignId, 'pause'),
     cancel: (campaignId: number) => operate(campaignId, 'cancel'),
     async syncTemplates(): Promise<TemplateSyncResult> {

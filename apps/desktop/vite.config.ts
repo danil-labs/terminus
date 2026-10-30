@@ -105,6 +105,7 @@ function webBuild(serve: boolean): UserConfig {
       __TERMINUS_WEB__: JSON.stringify({ endpoint, supabaseUrl, supabaseKey, login, alphaOauth: env.TERMINUS_WEB_ALPHA_OAUTH === "1", workos: env.TERMINUS_WEB_WORKOS === "1" }),
       "import.meta.env.TERMINUS_ALPHA": JSON.stringify(env.TERMINUS_WEB_ALPHA === "1"),
       "import.meta.env.TERMINUS_BROADCAST_WRITES": JSON.stringify(env.TERMINUS_WEB_BROADCAST_WRITES === "1"),
+      "import.meta.env.TERMINUS_BROADCAST_DELIVERY": JSON.stringify(env.TERMINUS_WEB_BROADCAST_DELIVERY === "1"),
     },
     plugins: [page],
     // Los iconos de la pestaña solo los usa la web; la ventana de escritorio no los copia.

@@ -43,10 +43,10 @@ function Workspace(props: { api: BroadcastPanel; source: BroadcastSource }) {
   const canOperate = (channel: number | null) => canManageBroadcast(access.data()?.permissions ?? null, channel);
   const manage = () => access.data()?.permissions?.permissions.includes('campaigns.manage') ?? false;
   const accountName = () => { const value = access.data(); return value?.name || t("broadcasts.account_fallback", { id: value?.account ?? 0 }); };
-  const context: Context = { api, canWrite: () => api.writes && manage(), canManage: manage, canOperate, accountName };
+  const context: Context = { api, canWrite: () => api.writes && manage(), canManage: manage, canOperate, canDeliver: channel => api.delivery && canOperate(channel), account: () => access.data()?.account ?? 0, accountName };
   return <section class="@container flex h-full min-h-0 min-w-0 flex-col overflow-hidden" data-broadcasts="" aria-label={t("broadcasts.title")}>
     <Show when={props.source.demo}><p class="m-0 border-b border-border px-4 py-2 text-xs text-neutral-500">{t("web.alpha.demo_badge")} · {t("broadcasts.demo_note")}</p></Show>
-    <Show when={!api.writes}><p role="note" class="m-0 border-b border-border bg-surface-muted px-4 py-2 text-xs text-neutral-500">{t("broadcasts.writes_off")}</p></Show>
+    <Show when={!api.writes || !api.delivery}><p role="note" class="m-0 border-b border-border bg-surface-muted px-4 py-2 text-xs text-neutral-500">{t("broadcasts.writes_off")}</p></Show>
     <Show when={access.data()} fallback={<Show when={access.error()} fallback={<div class="p-4"><Skeleton class="h-14 rounded-md" filas={4}/></div>}><div class="p-4"><Note tone="danger">{access.error()}</Note></div></Show>}>{value =>
       <Show when={value().account} keyed fallback={<div class="p-4"><Note tone="warning">{t("broadcasts.no_active_account")}</Note></div>}>{account => <>
         <p class="m-0 shrink-0 truncate border-b border-border px-4 py-1.5 text-xs text-neutral-500" data-broadcast-account="" title={t("broadcasts.account_hint")}>{t("broadcasts.viewing_account", { name: accountName() })}</p>
@@ -81,7 +81,7 @@ function Panes(props: { context: Context }) {
   return <div class="flex min-h-0 flex-1 overflow-hidden @[46rem]:grid @[46rem]:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
     <section aria-label={t("broadcasts.title")} class={`min-h-0 w-full min-w-0 flex-col overflow-hidden @[46rem]:flex @[46rem]:border-r @[46rem]:border-border ${open() ? 'hidden' : 'flex'}`}>
       <header class="flex min-h-11 w-full min-w-0 shrink-0 items-center gap-2 border-b border-border px-3 py-1">
-        <span class="min-w-0 flex-1 truncate text-[0.85rem] font-semibold text-neutral-950">{mode() === 'templates' ? t("broadcasts.templates") : t("broadcasts.title")}</span>
+        <span class="min-w-0 flex-1 truncate text-body font-semibold text-neutral-950">{mode() === 'templates' ? t("broadcasts.templates") : t("broadcasts.title")}</span>
         <Button size="sm" variant="secondary" type="button" disabled={!canCreate()} onClick={startNew}><Plus size={15}/>{mode() === 'templates' ? t("broadcasts.new_template_short") : t("broadcasts.new_broadcast_short")}</Button>
       </header>
       <div class="grid w-full min-w-0 shrink-0 gap-2 border-b border-border px-3 py-2">
@@ -95,9 +95,9 @@ function Panes(props: { context: Context }) {
           <Show when={!campaigns.data() && !campaigns.error()}><Skeleton class="h-12 rounded-md" filas={4}/></Show>
           <Show when={campaigns.error()}><div class="grid gap-2 p-1"><Note tone="danger">{t("broadcasts.list_error")} {campaigns.error()}</Note><Button size="sm" variant="secondary" class="justify-self-start" onClick={() => void campaigns.refresh()}>{t("customize.retry")}</Button></div></Show>
           <Show when={campaigns.data()?.length === 0}><EmptyState title={t("broadcasts.empty_title")} description={t("broadcasts.empty_hint")}/></Show>
-          <Show when={(campaigns.data()?.length ?? 0) > 0 && rows().length === 0}><p role="status" class="m-0 p-4 text-center text-[0.85rem] text-neutral-500">{t("broadcasts.search_empty", { query: query().trim() })}</p></Show>
+          <Show when={(campaigns.data()?.length ?? 0) > 0 && rows().length === 0}><p role="status" class="m-0 p-4 text-center text-body text-neutral-500">{t("broadcasts.search_empty", { query: query().trim() })}</p></Show>
           <ul class="m-0 grid list-none content-start gap-1 p-0">
-            <For each={rows()}>{row => <li class="min-w-0"><RowButton active={selected() === row.id && !creating()} onClick={() => { setCreating(false); setSelected(row.id); }}><strong class="min-w-0 truncate text-[0.88rem] font-semibold text-neutral-950">{row.name}</strong><StatusBadge status={row.status}/></RowButton></li>}</For>
+            <For each={rows()}>{row => <li class="min-w-0"><RowButton active={selected() === row.id && !creating()} onClick={() => { setCreating(false); setSelected(row.id); }}><strong class="min-w-0 truncate text-body font-semibold text-neutral-950">{row.name}</strong><StatusBadge status={row.status}/></RowButton></li>}</For>
           </ul>
         </Show>
       </div>
@@ -115,7 +115,7 @@ function Panes(props: { context: Context }) {
               <div class="min-h-0 flex-1"><CampaignDetail context={props.context} campaign={campaign()!} onChanged={() => void campaigns.refresh()}/></div>
             </Show>
           </Show>
-        }><div class="min-h-0 flex-1 overflow-y-auto p-4"><CreateCampaign context={props.context} onDone={created}/></div></Show>
+        }><div class="min-h-0 flex-1 overflow-y-auto p-4"><CreateCampaign context={props.context} onDone={created} onReconciled={() => void campaigns.refresh()}/></div></Show>
       </Show>
     </div>
   </div>;

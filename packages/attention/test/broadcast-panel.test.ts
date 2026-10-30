@@ -3,7 +3,7 @@ import test from 'node:test';
 import { actionsFor, campaignProgress, cleanReason, contactTagLabels, contactsInWindow, createBroadcastPanel, failureReason, maskPhone, nothingReachedMeta, parseTemplateText, sendsDone, summarizeFailures, summarizeRejections, templateContent, templateHasUnmappableParams, templateVariables, type Recipient } from '../src/broadcast-panel.ts';
 
 const session = (refresh = true) => ({ getToken: async () => 'jwt', unauthorized: async () => refresh });
-const panel = (request: typeof fetch, writes = false, prefix = '', refresh = true) => createBroadcastPanel({ session: session(refresh), request, prefix, writes, account: async () => 7 });
+const panel = (request: typeof fetch, writes = false, prefix = '', refresh = true) => createBroadcastPanel({ session: session(refresh), request, prefix, writes, delivery: writes, account: async () => 7 });
 const reply = (body: unknown, status = 200) => (async () => Response.json(body, { status })) as unknown as typeof fetch;
 const stats = (over = {}) => ({ by_process_status: {}, by_delivery_status: {}, responded: 0, total: 0, ...over });
 
@@ -35,6 +35,10 @@ test('an uncertain start blocks a repeat until the list reconciles it', async ()
   await assert.rejects(api.start(4), (error: { uncertain: boolean }) => error.uncertain);
   await assert.rejects(api.start(4), /reconcile_required/);
   await api.campaigns();
+  await assert.rejects(api.start(4), /reconcile_required/, 'a poll does not release the lock');
+  assert.equal(api.blocked(7, 'campaign:4'), true);
+  await api.reconcile();
+  assert.equal(api.blocked(7, 'campaign:4'), false);
   assert.deepEqual(await api.start(4), { id: 4, status: 'running' });
 });
 

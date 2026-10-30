@@ -11,7 +11,7 @@ import { createQuery } from './query';
 const WINDOWS = Object.keys(ACTIVITY_WINDOWS) as ActivityWindow[];
 
 /** Los filtros son la selección: al cambiarlos, queda elegido todo lo visible. */
-export function AddContacts(props: { context: Context; campaignId: number; onAdded: () => void; onClose: () => void }) {
+export function AddContacts(props: { context: Context; campaignId: number; canAdd: boolean; onAdded: () => void; onFinished: () => void; onClose: () => void }) {
   const api = props.context.api;
   const contacts = createQuery(() => api.contacts());
   // Embudos y etiquetas son opcionales: sin ellos, el control no aparece.
@@ -70,14 +70,14 @@ export function AddContacts(props: { context: Context; campaignId: number; onAdd
 
   return <div class="grid gap-2 rounded-md border border-border bg-surface-muted p-3">
     <div class="flex items-center justify-between gap-2">
-      <strong class="text-[0.9rem]">{t("broadcasts.add_contacts")}</strong>
+      <strong class="text-body">{t("broadcasts.add_contacts")}</strong>
       <Button size="iconCompact" variant="ghost" type="button" aria-label={t("broadcasts.close")} onClick={props.onClose}><X size={15}/></Button>
     </div>
-    <p class="m-0 text-[0.76rem] text-neutral-500">{t("broadcasts.import_elsewhere")}</p>
+    <p class="m-0 text-label text-neutral-500">{t("broadcasts.import_elsewhere")}</p>
     <Show when={contacts.error()}><Note tone="danger">{t("broadcasts.contacts_error")} {contacts.error()}</Note></Show>
     <Show when={!contacts.data() && !contacts.error()}><Skeleton class="h-24"/></Show>
     <Show when={contacts.data()}>
-      <Show when={sendable().length > 0} fallback={<p class="m-0 text-[0.82rem] text-neutral-500">{(all().length === 0 ? t("broadcasts.no_contacts") : t("broadcasts.no_sendable"))}</p>}>
+      <Show when={sendable().length > 0} fallback={<p class="m-0 text-ui text-neutral-500">{(all().length === 0 ? t("broadcasts.no_contacts") : t("broadcasts.no_sendable"))}</p>}>
         <div class="flex flex-wrap items-center gap-1" role="group" aria-label={t("broadcasts.filter_activity")}>
           <For each={WINDOWS}>{value => <Button type="button" size="sm" variant={activity() === value ? 'primary' : 'secondary'} aria-pressed={activity() === value} onClick={() => setActivity(value)}>{t(`broadcasts.activity_${value}`)}</Button>}</For>
         </div>
@@ -103,17 +103,17 @@ export function AddContacts(props: { context: Context; campaignId: number; onAdd
             </Show>
           </div>
         </Show>
-        <Show when={hidden() > 0}><p class="m-0 px-1 text-[0.76rem] text-neutral-500">{(hidden() === 1 ? t("broadcasts.hidden_no_phone_one", { count: hidden() }) : t("broadcasts.hidden_no_phone_other", { count: hidden() }))}</p></Show>
-        <label class={`flex items-center gap-2 px-1 text-[0.82rem] text-neutral-500 ${visible().length === 0 ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
+        <Show when={hidden() > 0}><p class="m-0 px-1 text-label text-neutral-500">{(hidden() === 1 ? t("broadcasts.hidden_no_phone_one", { count: hidden() }) : t("broadcasts.hidden_no_phone_other", { count: hidden() }))}</p></Show>
+        <label class={`flex items-center gap-2 px-1 text-ui text-neutral-500 ${visible().length === 0 ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
           <input type="checkbox" checked={allSelected()} ref={element => createEffect(() => { element.indeterminate = !allSelected() && someSelected(); })} disabled={visible().length === 0} onChange={toggleAll}/>
           <span>{t("broadcasts.select_all")} <Show when={visible().length > 0}><span class="tabular-nums">({visible().length})</span></Show></span>
         </label>
         <Show when={boardLoading()}><Skeleton class="h-24"/></Show>
-        <Show when={board.error() && funnelId() !== null}><p role="alert" class="m-0 text-[0.82rem] font-medium text-error-strong">{t("broadcasts.funnel_error")}</p></Show>
+        <Show when={board.error() && funnelId() !== null}><p role="alert" class="m-0 text-ui font-medium text-error-strong">{t("broadcasts.funnel_error")}</p></Show>
         <Show when={!boardLoading() && !board.error()}>
-          <Show when={visible().length > 0} fallback={<p class="m-0 text-[0.82rem] text-neutral-500">{t("broadcasts.no_filter_match")}</p>}>
+          <Show when={visible().length > 0} fallback={<p class="m-0 text-ui text-neutral-500">{t("broadcasts.no_filter_match")}</p>}>
             <ul class="m-0 grid max-h-56 list-none content-start gap-0.5 overflow-auto rounded-md border border-border bg-surface p-0">
-              <For each={visible()}>{row => <li><label class="flex cursor-pointer items-center gap-2 px-3 py-2 text-[0.85rem] hover:bg-surface-muted">
+              <For each={visible()}>{row => <li><label class="flex cursor-pointer items-center gap-2 px-3 py-2 text-body hover:bg-surface-muted">
                 <input type="checkbox" checked={selected().has(row.id)} onChange={() => toggle(row.id)}/>
                 <span class="truncate">{label(row)}<Show when={(row.name || row.email) && row.phone}><span class="text-neutral-500"> · {row.phone}</span></Show></span>
               </label></li>}</For>
@@ -122,7 +122,7 @@ export function AddContacts(props: { context: Context; campaignId: number; onAdd
         </Show>
       </Show>
     </Show>
-    <Show when={result()}><p role="status" class="m-0 text-[0.82rem] text-success-strong">{result()}</p></Show>
+    <Show when={result()}><p role="status" class="m-0 text-ui text-success-strong">{result()}</p></Show>
     <Show when={rejected().length > 0}>
       <Note tone="warning">
         <strong>{(rejected().length === 1 ? t("broadcasts.rejected_one", { count: rejected().length }) : t("broadcasts.rejected_other", { count: rejected().length }))}</strong>
@@ -130,7 +130,7 @@ export function AddContacts(props: { context: Context; campaignId: number; onAdd
         <span>{t("broadcasts.rejected_hint")}</span>
       </Note>
     </Show>
-    <Show when={error()}><p role="alert" class="m-0 text-[0.82rem] font-medium text-error-strong">{error()}</p></Show>
-    <div class="flex justify-end"><Button size="sm" type="button" disabled={selected().size === 0 || busy() || !props.context.canWrite()} onClick={() => void submit()}>{busy() ? t("broadcasts.adding") : t("broadcasts.add_count", { count: selected().size })}</Button></div>
+    <Show when={error()}><p role="alert" class="m-0 text-ui font-medium text-error-strong">{error()}</p></Show>
+    <div class="flex justify-end"><Button size="sm" type="button" disabled={selected().size === 0 || busy() || !props.canAdd} onClick={() => void submit()}>{busy() ? t("broadcasts.adding") : t("broadcasts.add_count", { count: selected().size })}</Button></div>
   </div>;
 }
