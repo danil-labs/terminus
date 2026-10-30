@@ -428,6 +428,7 @@ const es = {
   "search.workspaces": "Buscar workspace o máquina",
   "search.clear": "Borrar búsqueda",
   "search.no_match": "Nada coincide con la búsqueda.",
+  "lists.soon": "pronto",
 } as const;
 
 type Key = keyof typeof es;
@@ -859,6 +860,7 @@ const en: Record<Key, string> = {
   "search.workspaces": "Search workspaces or machines",
   "search.clear": "Clear search",
   "search.no_match": "Nothing matches the search.",
+  "lists.soon": "soon",
 };
 
 /** The language the app speaks, also for the words that come from `@terminus/design`. */

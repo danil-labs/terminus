@@ -3,7 +3,7 @@ import { folderColor } from "@terminus/design";
 import { type CardPull, type TaskCard as Card, type PullTone, cardPull, canFinishTask, type TaskGit, taskTitle } from "@terminus/tasks";
 import * as Haptics from "expo-haptics";
 import { memo } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { secondLine } from "../lib/cardLine";
 import { sameCard } from "../lib/reconcile";
 import type { Task } from "../lib/engine";
@@ -69,6 +69,8 @@ type TaskCardProps = {
   onLongPress?: () => void;
   onFinish?: () => void;
   online: boolean;
+  /** La hora corta a la derecha («2 min»); el menú queda en la pulsación larga. */
+  when?: string;
 };
 
 /**
@@ -81,6 +83,7 @@ const sameProps = (a: TaskCardProps, b: TaskCardProps) =>
   a.task === b.task &&
   a.git === b.git &&
   a.online === b.online &&
+  a.when === b.when &&
   !a.onFinish === !b.onFinish &&
   !a.onLongPress === !b.onLongPress &&
   sameCard(a.card, b.card) &&
@@ -102,6 +105,7 @@ function TaskCardView({
   onLongPress,
   onFinish,
   online,
+  when,
 }: TaskCardProps) {
   const theme = useTheme();
   const git = observed && !online ? { ...observed, stale: true } : observed;
@@ -123,7 +127,10 @@ function TaskCardView({
           : undefined
       }
       delayLongPress={350}
-      style={({ pressed }) => [styles.card, { backgroundColor: pressed ? theme.muted : "transparent" }]}
+      accessibilityActions={onLongPress ? [{ name: "longpress", label: t("task.actions.menu") }] : undefined}
+      onAccessibilityAction={(event) => { if (event.nativeEvent.actionName === "longpress") onLongPress?.(); }}
+      android_ripple={{ color: theme.border }}
+      style={({ pressed }) => [styles.card, { backgroundColor: pressed && Platform.OS !== "android" ? theme.border : "transparent" }]}
     >
       <View style={styles.line}>
         <View style={styles.mark}>
@@ -144,9 +151,7 @@ function TaskCardView({
         {onFinish && pull?.state === "merged" && !git?.stale ? <Pressable testID={`finish-${task.host}-${task.id}`} accessibilityRole="button" accessibilityLabel={`${t("task.header.finish")}: ${taskTitle(lang, task)}`} accessibilityState={{ disabled: !ready }} disabled={!ready} hitSlop={8} onPress={(event) => { event.stopPropagation(); onFinish(); }} style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", marginVertical: -8, opacity: ready ? 1 : 0.3 }}>
           <Icon name="rocket" size={18} color={theme.merged} />
         </Pressable> : null}
-        {onLongPress ? <Pressable accessibilityRole="button" accessibilityLabel={`${t("task.actions.menu")}: ${taskTitle(lang, task)}`} hitSlop={8} onPress={(event) => { event.stopPropagation(); onLongPress(); }} style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", marginVertical: -8 }}>
-          <Icon name="ellipsis" size={17} color={theme.textMuted} />
-        </Pressable> : null}
+        {when ? <Text style={[styles.when, { color: theme.textMuted }]}>{when}</Text> : null}
       </View>
       <View style={[styles.line, styles.second]}>
         {chips.map((chip) => {
@@ -184,12 +189,13 @@ function TaskCardView({
 }
 
 const styles = StyleSheet.create({
-  card: { paddingHorizontal: 16, paddingVertical: 8, gap: 3 },
+  card: { paddingHorizontal: 16, paddingVertical: 10, gap: 4, minHeight: 60, justifyContent: "center" },
+  when: { fontSize: 12.5, fontVariant: ["tabular-nums"] },
   line: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 18 },
   second: { paddingLeft: 24, gap: 8 },
   mark: { width: 18, alignItems: "center" },
   hollow: { width: 9, height: 9, borderRadius: 5, borderWidth: 1.5 },
-  title: { flex: 1, fontSize: 15, fontWeight: "500" },
+  title: { flex: 1, fontSize: 16, fontWeight: "500" },
   chip: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1 },
   meta: { fontSize: 12 },
 });
